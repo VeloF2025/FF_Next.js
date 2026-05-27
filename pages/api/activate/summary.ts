@@ -137,7 +137,7 @@ async function handler(
     log.info(`Fetching summary for ${dropNumber}`, undefined, 'DRSummary');
 
     // UNIFIED ARCHITECTURE: All data from database tables only - NO live API calls
-    const [unifiedResult, oesResult, dropsResult, qaResult, swapResult] = await Promise.all([
+    const [unifiedResult, oesResult, dropsResult, qaResult, swapResult, oltResult] = await Promise.all([
       // Main unified review data (including contact info stored during processing)
       pool.query(
         `SELECT
@@ -235,6 +235,16 @@ async function handler(
          LIMIT 1`,
         [dropNumber]
       ),
+
+      // OLT port data from oes_pp_data (linked via ONT serial scanned)
+      pool.query(
+        `SELECT pp.olt_address, pp.olt_port, pp.olt_pon, pp.olt_lt
+         FROM dr_photo_unified_reviews u
+         JOIN oes_pp_data pp ON pp.serial_number = u.ont_serial_scanned
+         WHERE u.drop_number = $1
+         LIMIT 1`,
+        [dropNumber]
+      ),
     ]);
 
     const unified = unifiedResult.rows[0];
@@ -242,6 +252,7 @@ async function handler(
     const drop = dropsResult.rows[0];
     const qa = qaResult.rows[0];
     const swap = swapResult.rows[0];
+    const olt = oltResult.rows[0];
 
     // If no data found anywhere
     if (!unified && !oes && !drop && !qa) {
@@ -325,6 +336,10 @@ async function handler(
       equipment: {
         ontSerial: unified?.ont_serial_scanned || oes?.serial_number || null,
         upsSerial: unified?.ups_serial_scanned || null,
+        oltAddress: olt?.olt_address || null,
+        oltPort: olt?.olt_port || null,
+        oltPon: olt?.olt_pon ?? null,
+        oltLt: olt?.olt_lt ?? null,
       },
 
       photoPreview,

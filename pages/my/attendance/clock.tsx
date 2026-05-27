@@ -9,8 +9,14 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
-import { captureGPS } from '@/modules/fleet/offline/gpsCapture';
-import { ApiError, grantSelfieConsent, getSession } from '@/modules/attendance/portal/client/api';
+import { captureGPSWithFallback, queryGeolocationPermission } from '@/modules/fleet/offline/gpsCapture';
+import {
+  ApiError,
+  grantSelfieConsent,
+  getSession,
+  getReverseGeocode,
+  type GeocodeResult,
+} from '@/modules/attendance/portal/client/api';
 import { submitClockEventWithOfflineFallback } from '@/modules/attendance/portal/client/offline/submitClockEvent';
 import { useAttendanceSync } from '@/modules/attendance/portal/client/offline/useAttendanceSync';
 import { fileToResizedBase64 } from '@/modules/attendance/portal/client/imageUtils';
@@ -20,6 +26,8 @@ import { ConsentModal, GpsSnapshot, GpsStep, SelfieStep } from '@/modules/attend
 import { NotSavedView, QueuedView, SuccessView } from '@/modules/attendance/portal/client/clockResults';
 import { OfflineBanner, PendingQueueBanner, QueueUnavailableBanner } from '@/modules/attendance/portal/client/clockBanners';
 import { mapConsentError, mapImageError } from '@/modules/attendance/portal/client/clockErrors';
+import { GpsPermissionHelp } from '@/modules/attendance/portal/client/GpsPermissionHelp';
+import { classifyDenialFollowup } from '@/modules/attendance/portal/client/gpsPlatform';
 
 type Action = 'in' | 'out';
 type FlowState =
@@ -39,12 +47,23 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
   const action: Action = router.query.action === 'out' ? 'out' : 'in';
 
   const [staffName, setStaffName] = React.useState<string | null>(null);
+  const [staffPhotoUrl, setStaffPhotoUrl] = React.useState<string | null>(null);
   const [selfieFile, setSelfieFile] = React.useState<File | null>(null);
   const [selfiePreview, setSelfiePreview] = React.useState<string | null>(null);
   const [gps, setGps] = React.useState<GpsSnapshot | null>(null);
+  // Resolved human-readable address for the current gps fix, e.g.
+  // "Somerset West, Western Cape". Purely informational — null while the
+  // lookup is pending OR failed. Clock-in submit never waits on this.
+  const [gpsAddress, setGpsAddress] = React.useState<string | null>(null);
   const [state, setState] = React.useState<FlowState>('idle');
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+  // True when the browser has a persistent "deny" for geolocation on this
+  // origin. Set either by the Permissions API check on mount (iOS 16+,
+  // Chrome, Firefox) or by a live PERMISSION_DENIED from getCurrentPosition.
+  // When true, we don't hit getCurrentPosition (iOS Safari silently hangs
+  // in that state); we render GpsPermissionHelp instead.
+  const [gpsDenied, setGpsDenied] = React.useState(false);
 
   const { online, pendingCount, syncing, queueUnavailable, syncNow, refreshPendingCount } =
     useAttendanceSync();
@@ -63,6 +82,7 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
           return;
         }
         setStaffName(sess.profile?.name ?? null);
+        setStaffPhotoUrl(sess.profile?.profilePhotoUrl ?? null);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -80,13 +100,49 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
     if (selfiePreview) URL.revokeObjectURL(selfiePreview);
   }, [selfiePreview]);
 
+  // Preflight the geolocation permission so that if the browser has a
+  // stored deny for this origin, we render the help banner instead of
+  // calling getCurrentPosition (which on iOS Safari just hangs forever
+  // without firing the error callback).
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const state = await queryGeolocationPermission();
+      if (cancelled) return;
+      if (state === 'denied') setGpsDenied(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Reverse-geocode the captured gps fix so the user sees a readable
+  // "Somerset West, Western Cape" under the raw coordinates. Fire-and-
+  // forget — never blocks submit. Clears on new capture so an old
+  // address from an earlier fix doesn't linger next to new coords.
+  React.useEffect(() => {
+    if (!gps) { setGpsAddress(null); return; }
+    let cancelled = false;
+    (async () => {
+      const result: GeocodeResult | null = await getReverseGeocode(gps.lat, gps.lon);
+      if (cancelled || !result) return;
+      setGpsAddress(formatGeocode(result));
+    })();
+    return () => { cancelled = true; };
+  }, [gps]);
+
   const captureGpsOnce = React.useCallback(async () => {
     if (gpsInFlight.current) return;
     gpsInFlight.current = true;
     setState('gps');
     try {
-      const result = await captureGPS(10_000, true);
+      // High-accuracy first with a 10s budget, then auto-fall-back to
+      // network/wifi-based low-accuracy with 15s. Indoor clock-ins where
+      // the GPS chip can't get a fix previously stuck on the spinner —
+      // the fallback lets the browser use cell-tower / wifi triangulation
+      // instead. Accuracy may widen to ~50-500m; the summary-view banner
+      // in GpsStep already flags "Low accuracy" when the radius > 100m.
+      const result = await captureGPSWithFallback(10_000, 15_000);
       if (result.success && result.coordinates) {
+        setGpsDenied(false);
         setGps({
           lat: result.coordinates.latitude,
           lon: result.coordinates.longitude,
@@ -94,6 +150,48 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
           capturedAt: new Date(result.coordinates.timestamp).toISOString(),
         });
         setState('idle');
+      } else if (result.errorKind === 'denied') {
+        // A single PERMISSION_DENIED from getCurrentPosition is not the
+        // same as the browser having a *persistent* deny on this origin.
+        // On Samsung Internet (and occasionally Android Chrome) a tap-
+        // outside on the native prompt, or a navigation race during page
+        // load, fires PERMISSION_DENIED once but leaves Permissions API
+        // state as 'prompt' (or 'granted'). Re-query the Permissions
+        // API and react accordingly:
+        //   show-help  → persistent deny / no Permissions API
+        //   retry      → 'granted' (race): retry once, no user-facing error
+        //   soft-error → 'prompt' (dismissed): ask user to tap again
+        const permState = await queryGeolocationPermission();
+        const followup = classifyDenialFollowup(permState);
+        if (followup === 'show-help') {
+          setGpsDenied(true);
+          setState('idle');
+        } else if (followup === 'retry') {
+          // Permissions API says 'granted' but getCurrentPosition fired
+          // PERMISSION_DENIED — a transient race. Try the capture
+          // exactly once more inline (NOT via captureGpsOnce — we hold
+          // the in-flight ref and want to avoid an infinite loop if the
+          // second call hits the same race). If the retry still fails,
+          // fall back to the soft error so the user has an actionable
+          // path rather than a hung spinner.
+          const retry = await captureGPSWithFallback(10_000, 15_000);
+          if (retry.success && retry.coordinates) {
+            setGpsDenied(false);
+            setGps({
+              lat: retry.coordinates.latitude,
+              lon: retry.coordinates.longitude,
+              accuracyM: retry.coordinates.accuracy,
+              capturedAt: new Date(retry.coordinates.timestamp).toISOString(),
+            });
+            setState('idle');
+          } else {
+            setState('error');
+            setError(retry.error ?? 'Could not capture location. Tap "Get location" to try again.');
+          }
+        } else {
+          setState('error');
+          setError('Location permission was dismissed. Tap "Get location" to try again.');
+        }
       } else {
         setState('error');
         setError(result.error ?? 'Could not capture location. Check GPS permission.');
@@ -211,7 +309,7 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
   const submitDisabled = !selfieFile || !gps || state === 'submitting' || state === 'gps';
 
   return (
-    <MyPortalShell title={headingLabel} staffName={staffName} showFooterNav={false}>
+    <MyPortalShell title={headingLabel} staffName={staffName} staffPhotoUrl={staffPhotoUrl} showFooterNav={false}>
       <div className="pt-2 pb-3">
         <Link href="/my/attendance" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
           <ArrowLeft className="w-4 h-4" />
@@ -262,9 +360,18 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
             className="hidden"
             onChange={handleSelfieChange}
           />
-          <GpsStep gps={gps} capturing={state === 'gps'} onRetry={captureGpsOnce} />
+          {gpsDenied ? (
+            <GpsPermissionHelp onRetry={() => { setGpsDenied(false); void captureGpsOnce(); }} />
+          ) : (
+            <GpsStep
+              gps={gps}
+              capturing={state === 'gps'}
+              onRetry={captureGpsOnce}
+              address={gpsAddress}
+            />
+          )}
           {error && (
-            <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 mb-3">
+            <div role="alert" className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-3">
               {error}
             </div>
           )}
@@ -288,6 +395,23 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
     </MyPortalShell>
   );
 };
+
+/**
+ * Format the Nominatim proxy result into a compact one-liner for
+ * display under the raw coordinates. Preferred form is
+ * "<city>, <province>" (e.g. "Somerset West, Western Cape"); falls
+ * back to province-only if the geocoder returned its "Unknown City"
+ * sentinel; returns empty string if neither field is usable, which
+ * makes the caller hide the line.
+ */
+function formatGeocode(r: GeocodeResult): string {
+  const cityRaw = r.city?.trim() ?? '';
+  const provinceRaw = r.province?.trim() ?? '';
+  const city = cityRaw && cityRaw !== 'Unknown City' ? cityRaw : '';
+  const province = provinceRaw;
+  if (city && province) return `${city}, ${province}`;
+  return city || province || '';
+}
 
 MyClockPage.getLayout = (page: React.ReactElement) => page;
 

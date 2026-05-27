@@ -31,7 +31,6 @@ const statusConfig: Partial<Record<DatabaseStatus, { label: string; color: strin
   'in_progress': { label: 'In Progress', color: 'text-indigo-400', bgColor: 'bg-indigo-500/20', borderColor: 'border-indigo-500/40', glowColor: 'ring-indigo-500/30' },
   'pending_qa': { label: 'Pending QA', color: 'text-amber-400', bgColor: 'bg-amber-500/20', borderColor: 'border-amber-500/40', glowColor: 'ring-amber-500/30' },
   'resolved': { label: 'Resolved', color: 'text-green-400', bgColor: 'bg-green-500/20', borderColor: 'border-green-500/40', glowColor: 'ring-green-500/30' },
-  'closed': { label: 'Closed', color: 'text-slate-400', bgColor: 'bg-slate-500/20', borderColor: 'border-slate-500/40', glowColor: 'ring-slate-500/30' },
   'cancelled': { label: 'Cancelled', color: 'text-red-400', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/30', glowColor: 'ring-red-500/20' },
 };
 
@@ -43,7 +42,7 @@ export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUp
   return (
     <div
       className={`
-        flex flex-col min-w-[280px] max-w-[320px] h-full
+        flex flex-col w-full min-w-0 h-full
         bg-[var(--ff-bg-secondary)] rounded-xl border-2
         transition-all duration-200 ease-out
         ${isDraggingOver
@@ -53,15 +52,16 @@ export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUp
       `}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between p-3 border-b border-[var(--ff-border-light)]">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 p-2 border-b border-[var(--ff-border-light)]">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`
-              px-3 py-1.5 text-xs font-semibold rounded-lg
+              px-2 py-1 text-[11px] font-semibold rounded-lg truncate
               ${config.bgColor} ${config.color}
               transition-transform duration-150
               ${isDraggingOver ? 'scale-105' : ''}
             `}
+            title={config.label}
           >
             {config.label}
           </span>
@@ -84,7 +84,7 @@ export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUp
       </div>
 
       {/* Cards Container */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
         {/* Empty state */}
         {tickets.length === 0 && (
           <div

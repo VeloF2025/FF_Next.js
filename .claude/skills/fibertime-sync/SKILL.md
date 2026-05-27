@@ -14,7 +14,9 @@ Two nightly SharePoint pulls from Fibertime into FibreFlow:
 
 | What | Detail |
 |------|--------|
-| **Sites** | LAW, MAM, MOA, TEM (ETW excluded) |
+| **Sites** | LAW, MAM, MOA, TEM, TEM-3 (OES only), ETW-1, ETW-2 (Etwatwa POPs) |
+| **Etwatwa** | Published per-POP: `ETW-1` (readable, empty), `ETW-2` (live data). Bare `ETW` + `ETW-3` return **403 Access denied** (no grant) — excluded from the sync. All ETW-* aggregate to one "Etwatwa" report row. |
+| **403 handling** | A 403 on one folder = per-folder permission issue, not auth expiry. Sync records it per-site and continues; it only raises "session expired" when **every** folder 403s (true cookie expiry). |
 | **Auth** | Playwright cookie file (auto-refreshed nightly at 22:00 SAST) |
 | **Cookie file** | `/home/velo/.fibertime-sp-cookies.json` |
 | **Login email** | `reporting@velocityfibre.co.za` |
@@ -101,6 +103,7 @@ View at: `/activate/data-sync?group=non_invoiceables` → Billing Crossref tab
 | MAM | `ed032579-91ad-45e2-9e25-c41c5f9217dd` |
 | MOA | `e3dd6115-c874-4bdb-a5f5-091f472bef1e` |
 | TEM | `827cf861-c798-4e4d-812d-79ff2f2b750f` |
+| ETW-1 / ETW-2 | `3012ec9e-8b00-44cb-97c8-0f5b9270c502` (Etwatwa Maintenance) |
 
 ### Historical Backfill
 

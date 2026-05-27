@@ -1,14 +1,10 @@
-/**
- * EOD History Tab
- * Paginated list of uploaded EOD install sheets
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Image } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
+import { EodSheetEditor } from './EodSheetEditor';
 import type { EodInstallSheet } from '../../../types';
 
 export function EodHistoryTab() {
@@ -18,13 +14,14 @@ export function EodHistoryTab() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedSheet, setExpandedSheet] = useState<EodInstallSheet | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const fetchSheets = async (p: number) => {
     setLoading(true);
     try {
       const res = await fetch(`/api/eod/sheets?page=${p}`);
-      const json = await res.json();
-      if (json.success) {
+      const json = (await res.json()) as { success: boolean; data?: { sheets: EodInstallSheet[]; total: number } };
+      if (json.success && json.data) {
         setSheets(json.data.sheets);
         setTotal(json.data.total);
       }
@@ -44,18 +41,23 @@ export function EodHistoryTab() {
       return;
     }
     setExpandedId(id);
-    // Fetch full sheet with entries
-    await fetch(`/api/eod/sheets?page=1&date=`);
-    // For now just expand the row — entries will come from a detail endpoint later
-    setExpandedSheet(sheets.find((s) => s.id === id) || null);
+    setExpandedSheet(null);
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/eod/sheets/${id}`);
+      const json = (await res.json()) as { success: boolean; data?: EodInstallSheet };
+      if (json.success && json.data) {
+        setExpandedSheet(json.data);
+      }
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   const totalPages = Math.ceil(total / 20);
 
   if (loading && sheets.length === 0) {
-    return (
-      <LoadingSpinner className="py-12" size="lg" label="" />
-    );
+    return <LoadingSpinner className="py-12" size="lg" label="" />;
   }
 
   if (sheets.length === 0) {
@@ -124,15 +126,17 @@ export function EodHistoryTab() {
                     )}
                   </td>
                 </tr>
-                {expandedId === sheet.id && expandedSheet && (
+                {expandedId === sheet.id && (
                   <tr>
                     <td colSpan={7} className="bg-[var(--ff-bg-tertiary)] px-6 py-4">
-                      <p className="text-xs text-[var(--ff-text-secondary)] mb-2">
-                        Tech ID: {sheet.technician_id || 'N/A'} | Sheet ID: {sheet.id}
-                      </p>
-                      <p className="text-sm text-[var(--ff-text-tertiary)]">
-                        Expand detail view coming soon — check Reconciliation tab for match results.
-                      </p>
+                      {loadingDetail ? (
+                        <LoadingSpinner size="sm" label="Loading entries…" />
+                      ) : expandedSheet ? (
+                        <EodSheetEditor
+                          sheet={expandedSheet}
+                          onClose={() => { setExpandedId(null); setExpandedSheet(null); }}
+                        />
+                      ) : null}
                     </td>
                   </tr>
                 )}
@@ -142,7 +146,6 @@ export function EodHistoryTab() {
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-[var(--ff-text-tertiary)]">

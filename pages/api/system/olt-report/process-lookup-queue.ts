@@ -222,6 +222,9 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
       const wrongStatusRecord = correctSerialRecords[0];
       if (wrongStatusRecord) {
         mismatchType = 'status_mismatch';
+        // Route blocked rows straight to Investigate — they cannot be auto-fixed
+        // until 1Map advances the prop status to Home Installation: Installed.
+        fixStatus = 'needs_investigation';
         statusMismatchContext = JSON.stringify({
           reason: 'status_mismatch',
           propId: wrongStatusRecord.prop_id,

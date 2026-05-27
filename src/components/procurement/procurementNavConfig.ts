@@ -87,6 +87,8 @@ export const TABS: Tab[] = [
         section: 'Field',
         items: [
           { label: 'Field Stock', href: '/procurement/field-stock' },
+          { label: 'Serials by Warehouse', href: '/procurement/field-stock/warehouses' },
+          { label: 'Serials by Project', href: '/procurement/field-stock/projects' },
           { label: 'Bundles', href: '/procurement/bundles' },
         ],
       },

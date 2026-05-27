@@ -12,11 +12,14 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { normalizePPTicketBatches } from '@/modules/activate/services/ticketBatchService';
 import { createTicket } from '@/modules/noc/services/ticketService';
+import { findDuplicateTickets, linkSourceToTicket } from '@/modules/noc/services/duplicateTicketService';
+import { classifyResolutionPath } from '@/modules/noc/services/resolutionPathClassifier';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
@@ -28,6 +31,7 @@ const VALID_TICKET_TYPES: string[] = [
   TicketType.ACTIVATIONS,
   TicketType.OPTICAL,
   TicketType.CIVILS,
+  TicketType.UNSPECIFIED,
 ];
 
 const VALID_CATEGORIES: string[] = [...PP_OLT_SUBTYPES];
@@ -202,7 +206,9 @@ async function handleCreate(
 
   try {
     const allTickets: { id: string; ticket_uid: string; pp_data_id: number }[] = [];
+    const allDuplicates: { ticket_id: string; ticket_uid: string; pp_data_id: number; match_reasons: string[] }[] = [];
     let totalSkipped = 0;
+    let totalLinkedToExisting = 0;
     const projectCounts: Record<string, number> = {};
 
     for (const batch of batches) {
@@ -252,9 +258,9 @@ async function handleCreate(
         if (enrichment.zone) locationParts.push(`Zone ${enrichment.zone}`);
         if (enrichment.pon) locationParts.push(`PON ${enrichment.pon}`);
 
-        const title = dr
-          ? `PP ONT ${serial} at ${dr}`
-          : `PP ONT ${serial} — No DR (Project: ${project})`;
+        const title = ticket_category === 'home_signup_not_done'
+          ? (dr ? `Home Sign Up Not Done — DR ${dr}` : `Home Sign Up Not Done — No DR (Project: ${project})`)
+          : (dr ? `PP ONT ${serial} at ${dr}` : `PP ONT ${serial} — No DR (Project: ${project})`);
 
         // Build enriched description
         const descParts: string[] = [];
@@ -271,27 +277,115 @@ async function handleCreate(
 
         const description = notes || descParts.join('\n');
 
-        const ticket = await createTicket({
-          source: TicketSource.PP_DATA,
-          title,
-          ticket_type: ticket_type as TicketType,
+        // PARTIAL: only the category-heuristic signals are passed here. The
+        // PP-data ingest can also resolve inOes/inOneMap/serialMismatch per
+        // record — wiring those into the detection object would let the
+        // classifier produce FIX_SERIAL / FIX_PROJECT_TAG / INVESTIGATE_DATA_GAP
+        // at creation instead of after technician triage. Tracked as a
+        // follow-up; for now ambiguous cases land on TRIAGE_REQUIRED, which
+        // is safe.
+        const resolution_path = classifyResolutionPath({
           ticket_category,
-          priority: ticketPriority,
-          description,
-          dr_number: dr || undefined,
-          ont_serial: serial,
-          created_by: req.user.id,
-          assigned_team_id: assigned_team_id || undefined,
-          status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
-          project_id: enrichment.project_id || undefined,
-          address: enrichment.address || undefined,
-          zone_id: enrichment.zone || undefined,
-          pon_number: enrichment.pon || undefined,
-          // Note: pole_number maps to pole_id (UUID) column — store pole label in description instead
-          client_name: enrichment.client_name || undefined,
-          client_contact: enrichment.client_contact || undefined,
-          client_email: enrichment.client_email || undefined,
+          ticket_type: ticket_type as TicketType,
+          hasDrNumber: Boolean(dr),
         });
+
+        // Dedup guard: if an open ticket already covers this DR or ONT serial,
+        // relink the PP row to that ticket instead of creating a duplicate.
+        // The OES re-entry path can clear maintenance_ticket_id while the
+        // prior ticket is still open, so source-level uniqueness alone is
+        // not enough. The partial unique index on (ont_serial) WHERE
+        // source='pp_data' AND open is the belt-and-braces backstop for
+        // the race below.
+        const relinkToExisting = async (
+          match: { id: string; ticket_uid: string; match_reasons: string[] },
+        ): Promise<void> => {
+          const link = await linkSourceToTicket(
+            'oes_pp_data.maintenance_ticket_id',
+            String(record.id),
+            match.id,
+          );
+          if (!link.updated) {
+            logger.warn('PP Data relink no-op (likely concurrent writer)', {
+              pp_data_id: record.id,
+              dr,
+              serial,
+              existing_ticket_uid: match.ticket_uid,
+            });
+          }
+          allDuplicates.push({
+            ticket_id: match.id,
+            ticket_uid: match.ticket_uid,
+            pp_data_id: record.id,
+            match_reasons: match.match_reasons,
+          });
+          totalLinkedToExisting++;
+          logger.info('PP Data row linked to existing open ticket (dedup)', {
+            pp_data_id: record.id,
+            dr,
+            serial,
+            existing_ticket_uid: match.ticket_uid,
+            match_reasons: match.match_reasons,
+            relinked: link.updated,
+          });
+        };
+
+        const existingOpen = await findDuplicateTickets({ drNumber: dr, ontSerial: serial });
+        const match = existingOpen[0];
+        if (match) {
+          await relinkToExisting(match);
+          continue;
+        }
+
+        let ticket;
+        try {
+          ticket = await createTicket({
+            source: TicketSource.PP_DATA,
+            title,
+            ticket_type: ticket_type as TicketType,
+            ticket_category,
+            resolution_path,
+            priority: ticketPriority,
+            description,
+            dr_number: dr || undefined,
+            ont_serial: serial,
+            created_by: req.user.id,
+            assigned_team_id: assigned_team_id || undefined,
+            status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
+            project_id: enrichment.project_id || undefined,
+            address: enrichment.address || undefined,
+            zone_id: enrichment.zone || undefined,
+            pon_number: enrichment.pon || undefined,
+            // Note: pole_number maps to pole_id (UUID) column — store pole label in description instead
+            client_name: enrichment.client_name || undefined,
+            client_contact: enrichment.client_contact || undefined,
+            client_email: enrichment.client_email || undefined,
+          });
+        } catch (err) {
+          // Race: a concurrent request created an open ticket for the same
+          // ONT serial between our findDuplicateTickets check above and this
+          // INSERT. The partial unique index uniq_open_pp_data_ticket_per_serial
+          // catches it (Postgres SQLSTATE 23505). Re-query and relink.
+          const isUniqueViolation =
+            typeof err === 'object' && err !== null && 'code' in err && (err as { code: unknown }).code === '23505';
+          if (!isUniqueViolation) {
+            throw err;
+          }
+          log.warn('pp-data-tickets.create.unique_violation_retry', {
+            dr_number: dr,
+            ont_serial: serial,
+            pg_code: (err as { code?: string }).code,
+            pg_detail: (err as { detail?: string }).detail,
+          });
+          const retry = await findDuplicateTickets({ drNumber: dr, ontSerial: serial });
+          const retryMatch = retry[0];
+          if (!retryMatch) {
+            // Should not happen — unique violation without a matching open ticket.
+            throw err;
+          }
+          await relinkToExisting(retryMatch);
+          continue;
+        }
 
         // Set GPS coordinates directly (createTicket doesn't handle text GPS format)
         if (enrichment.lat && enrichment.lng) {
@@ -320,13 +414,19 @@ async function handleCreate(
       }
     }
 
-    logger.info('PP Data tickets created', { created: allTickets.length, skipped: totalSkipped });
+    logger.info('PP Data tickets created', {
+      created: allTickets.length,
+      skipped: totalSkipped,
+      linked_to_existing: totalLinkedToExisting,
+    });
 
-    if (allTickets.length === 0) {
-      return apiResponse.success(res, { created: 0, skipped: totalSkipped, tickets: [] });
-    }
-
-    return apiResponse.success(res, { created: allTickets.length, skipped: totalSkipped, tickets: allTickets });
+    return apiResponse.success(res, {
+      created: allTickets.length,
+      skipped: totalSkipped,
+      linked_to_existing: totalLinkedToExisting,
+      tickets: allTickets,
+      duplicates: allDuplicates,
+    });
   } catch (err) {
     logger.error('Failed to create PP Data tickets', { error: err });
     return apiResponse.internalError(res, err);
@@ -565,4 +665,4 @@ async function sendTeamNotification(
   });
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withRole('technician')(handler));

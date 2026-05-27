@@ -14,11 +14,30 @@
  * NLNH Confidence: HIGH
  */
 
-import { neon } from '@neondatabase/serverless';
-
 // Load environment variables
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.production' });
+
+// DB driver: post-Neon-cutover (2026-04-18) the database is self-hosted
+// Supabase, which the @neondatabase/serverless neon() driver cannot talk to,
+// and the webpack neon-shim that rescues the Next.js app does not apply to a
+// standalone tsx script. Use the shared pg.Pool via `@/lib/db-pool` (its `sql`
+// is a tagged-template drop-in), assigned to this module-level binding inside
+// main() (after dotenv) so the pool — built from process.env.DATABASE_URL at
+// db.ts module load, which also fires a warm-up pool.connect() — sees the
+// resolved URL.
+// IMPORTANT: do NOT add a static top-level import of `@/lib/db-pool` or
+// `@/lib/db` to this file. That would evaluate the pool (and its warm-up
+// connect) before dotenv.config() runs, capturing an undefined DATABASE_URL.
+// Keep the import dynamic and inside main().
+// Output goes to stdout/stderr because @/lib/logger never writes to them
+// (in-memory only) and would blank this cron's logfile.
+const logOut = (msg: string) => process.stdout.write(msg + '\n');
+const logErr = (msg: string) => process.stderr.write(msg + '\n');
+const fmtErr = (e: unknown) =>
+  e instanceof Error ? e.stack ?? e.message : JSON.stringify(e);
+
+let sql: (typeof import('../../src/lib/db-pool'))['sql'];
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
@@ -31,16 +50,14 @@ const BATCH_SIZE = 50;
 const BATCH_DELAY = 5000;
 
 if (!DATABASE_URL) {
-  console.error('❌ DATABASE_URL not set');
+  logErr('❌ DATABASE_URL not set');
   process.exit(1);
 }
 
 if (!SHAREPOINT_ENABLED) {
-  console.log('ℹ️ SharePoint DR sync is disabled (SHAREPOINT_DR_SYNC_ENABLED != true)');
+  logOut('ℹ️ SharePoint DR sync is disabled (SHAREPOINT_DR_SYNC_ENABLED != true)');
   process.exit(0);
 }
-
-const sql = neon(DATABASE_URL);
 
 interface SyncStats {
   totalProcessed: number;
@@ -123,9 +140,9 @@ async function callBatchSync(
  * Main sync function
  */
 async function main() {
-  console.log('🚀 Starting SharePoint DR photo sync cron job...');
-  console.log(`📅 Date: ${new Date().toISOString()}`);
-  console.log(`🔗 API Base URL: ${BASE_URL}`);
+  logOut('🚀 Starting SharePoint DR photo sync cron job...');
+  logOut(`📅 Date: ${new Date().toISOString()}`);
+  logOut(`🔗 API Base URL: ${BASE_URL}`);
 
   const stats: SyncStats = {
     totalProcessed: 0,
@@ -136,17 +153,22 @@ async function main() {
   };
 
   try {
+    // Dynamic import so the pg.Pool in src/lib/db.ts initialises with the
+    // DATABASE_URL dotenv resolved above (a static import would hoist above
+    // dotenv.config and capture an undefined connection string).
+    sql = (await import('../../src/lib/db-pool')).sql;
+
     // === PHASE 1: Create folders for DRs missing them ===
-    console.log('\n📁 Phase 1: Checking for DRs needing folder creation...');
+    logOut('\n📁 Phase 1: Checking for DRs needing folder creation...');
 
     const drsPendingFolders = await getDrsPendingFolders(BATCH_SIZE * 2);
-    console.log(`   Found ${drsPendingFolders.length} DRs needing folders`);
+    logOut(`   Found ${drsPendingFolders.length} DRs needing folders`);
 
     if (drsPendingFolders.length > 0) {
       // Process in batches
       for (let i = 0; i < drsPendingFolders.length; i += BATCH_SIZE) {
         const batch = drsPendingFolders.slice(i, i + BATCH_SIZE);
-        console.log(`   Processing folder batch ${Math.floor(i / BATCH_SIZE) + 1}...`);
+        logOut(`   Processing folder batch ${Math.floor(i / BATCH_SIZE) + 1}...`);
 
         const result = await callBatchSync('verify_folders', batch);
         stats.batches++;
@@ -158,7 +180,7 @@ async function main() {
           stats.errors.push(...result.errors.map(e => `${e.dropNumber}: ${e.error}`));
         }
 
-        console.log(`   Batch result: ${result.succeeded} succeeded, ${result.failed} failed`);
+        logOut(`   Batch result: ${result.succeeded} succeeded, ${result.failed} failed`);
 
         // Delay between batches
         if (i + BATCH_SIZE < drsPendingFolders.length) {
@@ -168,16 +190,16 @@ async function main() {
     }
 
     // === PHASE 2: Sync photos for DRs with folders ===
-    console.log('\n📸 Phase 2: Syncing photos for DRs with folders...');
+    logOut('\n📸 Phase 2: Syncing photos for DRs with folders...');
 
     const drsPendingSync = await getDrsPendingSync(BATCH_SIZE * 4);
-    console.log(`   Found ${drsPendingSync.length} DRs pending photo sync`);
+    logOut(`   Found ${drsPendingSync.length} DRs pending photo sync`);
 
     if (drsPendingSync.length > 0) {
       // Process in batches
       for (let i = 0; i < drsPendingSync.length; i += BATCH_SIZE) {
         const batch = drsPendingSync.slice(i, i + BATCH_SIZE);
-        console.log(`   Processing photo batch ${Math.floor(i / BATCH_SIZE) + 1}...`);
+        logOut(`   Processing photo batch ${Math.floor(i / BATCH_SIZE) + 1}...`);
 
         const result = await callBatchSync('sync_photos', batch);
         stats.batches++;
@@ -189,7 +211,7 @@ async function main() {
           stats.errors.push(...result.errors.map(e => `${e.dropNumber}: ${e.error}`));
         }
 
-        console.log(`   Batch result: ${result.succeeded} succeeded, ${result.failed} failed`);
+        logOut(`   Batch result: ${result.succeeded} succeeded, ${result.failed} failed`);
 
         // Delay between batches
         if (i + BATCH_SIZE < drsPendingSync.length) {
@@ -199,27 +221,33 @@ async function main() {
     }
 
     // === SUMMARY ===
-    console.log('\n📊 Sync Summary:');
-    console.log(`   Total Processed: ${stats.totalProcessed}`);
-    console.log(`   Succeeded: ${stats.succeeded}`);
-    console.log(`   Failed: ${stats.failed}`);
-    console.log(`   Batches: ${stats.batches}`);
+    logOut('\n📊 Sync Summary:');
+    logOut(`   Total Processed: ${stats.totalProcessed}`);
+    logOut(`   Succeeded: ${stats.succeeded}`);
+    logOut(`   Failed: ${stats.failed}`);
+    logOut(`   Batches: ${stats.batches}`);
 
     if (stats.errors.length > 0) {
-      console.log('\n❌ Errors:');
-      stats.errors.slice(0, 20).forEach(e => console.log(`   - ${e}`));
+      logOut('\n❌ Errors:');
+      stats.errors.slice(0, 20).forEach(e => logOut(`   - ${e}`));
       if (stats.errors.length > 20) {
-        console.log(`   ... and ${stats.errors.length - 20} more`);
+        logOut(`   ... and ${stats.errors.length - 20} more`);
       }
     }
 
-    console.log('\n✅ SharePoint DR sync completed');
+    logOut('\n✅ SharePoint DR sync completed');
     process.exit(stats.failed > 0 ? 1 : 0);
   } catch (error) {
-    console.error('\n❌ Sync failed with error:', error);
+    logErr(`\n❌ Sync failed with error: ${fmtErr(error)}`);
     process.exit(1);
   }
 }
 
-// Run main function
-main();
+// main() exits explicitly in all paths above (pg.Pool would otherwise keep the
+// event loop alive). The dynamic db-pool import and both queries run inside
+// main()'s own try/catch, so this outer .catch is a belt-and-suspenders guard
+// for an unexpected synchronous throw escaping main().
+main().catch((error) => {
+  logErr(`💥 Unhandled error: ${fmtErr(error)}`);
+  process.exit(1);
+});

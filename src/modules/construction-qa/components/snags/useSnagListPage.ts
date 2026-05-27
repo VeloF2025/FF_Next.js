@@ -21,14 +21,15 @@ import type { Snag, SnagPhoto } from '../../types/snag.types';
 
 export interface SnagListFilters {
   projectId: string;
-  status: string;
-  category: string;
-  severity: string;
+  /** Multi-select: empty array means "all" */
+  status: string[];
+  category: string[];
+  severity: string[];
   search?: string;
-  /** Zone number deep-link filter (from ?zone_no= URL param) */
-  zone_no?: string;
-  /** PON number deep-link filter (from ?pon_no= URL param) */
-  pon_no?: string;
+  /** Multi-select zone numbers (strings for URL parity), empty = all */
+  zone_no: string[];
+  /** Multi-select PON numbers, empty = all */
+  pon_no: string[];
   page: number;
   pageSize: number;
 }
@@ -40,14 +41,21 @@ export interface ProjectOption {
 
 const DEFAULT_FILTERS: SnagListFilters = {
   projectId: '',
-  status: '',
-  category: '',
-  severity: '',
-  zone_no: '',
-  pon_no: '',
+  status: [],
+  category: [],
+  severity: [],
+  zone_no: [],
+  pon_no: [],
   page: 1,
   pageSize: 25,
 };
+
+/** Parse a possibly-CSV query param into a string[]. Empty/missing → []. */
+function parseListParam(v: string | string[] | undefined): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.flatMap((s) => s.split(',')).filter(Boolean);
+  return v.split(',').filter(Boolean);
+}
 
 export function useSnagListPage() {
   const router = useRouter();
@@ -89,20 +97,20 @@ export function useSnagListPage() {
 
   useEffect(() => {
     if (!router.isReady) return;
-    const { projectId, zone_no, pon_no } = router.query;
+    const { projectId, zone_no, pon_no, status } = router.query;
 
     const hasDeepLink =
       (projectId && typeof projectId === 'string') ||
-      (zone_no && typeof zone_no === 'string') ||
-      (pon_no && typeof pon_no === 'string');
+      zone_no || pon_no || status;
 
     if (!hasDeepLink) return;
 
     setFilters((prev) => ({
       ...prev,
       projectId: typeof projectId === 'string' ? projectId : prev.projectId,
-      zone_no:   typeof zone_no   === 'string' ? zone_no   : prev.zone_no,
-      pon_no:    typeof pon_no    === 'string' ? pon_no    : prev.pon_no,
+      zone_no:   zone_no ? parseListParam(zone_no) : prev.zone_no,
+      pon_no:    pon_no  ? parseListParam(pon_no)  : prev.pon_no,
+      status:    status  ? parseListParam(status)  : prev.status,
       page: 1,
     }));
   }, [router.isReady, router.query]);
@@ -131,11 +139,11 @@ export function useSnagListPage() {
     try {
       const data = await fetchSnagSummary({
         projectId: activeFilters.projectId || undefined,
-        category:  activeFilters.category  || undefined,
-        severity:  activeFilters.severity  || undefined,
+        category:  activeFilters.category.length ? activeFilters.category.join(',') : undefined,
+        severity:  activeFilters.severity.length ? activeFilters.severity.join(',') : undefined,
         search:    activeFilters.search    || undefined,
-        zone_no:   activeFilters.zone_no   || undefined,
-        pon_no:    activeFilters.pon_no    || undefined,
+        zone_no:   activeFilters.zone_no.length ? activeFilters.zone_no.join(',') : undefined,
+        pon_no:    activeFilters.pon_no.length  ? activeFilters.pon_no.join(',')  : undefined,
       });
       setSummary(data);
     } catch (err) {
@@ -154,12 +162,12 @@ export function useSnagListPage() {
         pageSize: String(activeFilters.pageSize),
       };
       if (activeFilters.projectId) params['projectId'] = activeFilters.projectId;
-      if (activeFilters.status) params['status'] = activeFilters.status;
-      if (activeFilters.category) params['category'] = activeFilters.category;
-      if (activeFilters.severity) params['severity'] = activeFilters.severity;
-      if (activeFilters.search) params['search'] = activeFilters.search;
-      if (activeFilters.zone_no) params['zone_no'] = activeFilters.zone_no;
-      if (activeFilters.pon_no) params['pon_no'] = activeFilters.pon_no;
+      if (activeFilters.status.length)   params['status']   = activeFilters.status.join(',');
+      if (activeFilters.category.length) params['category'] = activeFilters.category.join(',');
+      if (activeFilters.severity.length) params['severity'] = activeFilters.severity.join(',');
+      if (activeFilters.search)          params['search']   = activeFilters.search;
+      if (activeFilters.zone_no.length)  params['zone_no']  = activeFilters.zone_no.join(',');
+      if (activeFilters.pon_no.length)   params['pon_no']   = activeFilters.pon_no.join(',');
 
       const { snags: data, total: count } = await fetchSnags(params);
       setSnags(data);
@@ -181,21 +189,24 @@ export function useSnagListPage() {
   // Filter changes
   // -------------------------------------------------------
 
-  const handleFilterChange = useCallback((key: string, value: string) => {
-    setFilters((prev) => {
-      const next = { ...prev, [key]: value, page: 1 };
-      // Cascade: project change resets zone + PON
-      if (key === 'projectId') {
-        next.zone_no = '';
-        next.pon_no = '';
-      }
-      // Cascade: zone change resets PON
-      if (key === 'zone_no') {
-        next.pon_no = '';
-      }
-      return next;
-    });
-  }, []);
+  const handleFilterChange = useCallback(
+    <K extends keyof SnagListFilters>(key: K, value: SnagListFilters[K]) => {
+      setFilters((prev) => {
+        const next: SnagListFilters = { ...prev, [key]: value, page: 1 };
+        // Cascade: project change resets zone + PON
+        if (key === 'projectId') {
+          next.zone_no = [];
+          next.pon_no = [];
+        }
+        // Cascade: zone change resets PON (scoping pons back to new zone set)
+        if (key === 'zone_no') {
+          next.pon_no = [];
+        }
+        return next;
+      });
+    },
+    []
+  );
 
   const handlePageChange = useCallback((page: number) => {
     setFilters((prev) => ({ ...prev, page }));

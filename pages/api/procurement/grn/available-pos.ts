@@ -30,7 +30,7 @@ export default withAuth(withErrorHandler(async (
       COALESCE((
         SELECT SUM(gri.quantity_received)
         FROM goods_receipt_items gri
-        JOIN goods_receipt_notes grn ON grn.id = gri.goods_receipt_id
+        JOIN goods_receipt_notes grn ON grn.id = gri.grn_id
         WHERE grn.purchase_order_id = po.id
           AND grn.status NOT IN ('cancelled', 'rejected')
       ), 0)::numeric as total_received

@@ -27,6 +27,8 @@ export interface ItemsTableProps {
   category?: NonInvoiceableCategory;
   /** Pre-filter to one project (hides project dropdown). */
   project?: string;
+  /** Full list of projects from the parent API call — avoids deriving from page data. */
+  projectOptions?: string[];
   /** Opens the ticket creation modal with the chosen items. */
   onCreateTickets: (items: NonInvoiceableItem[]) => void;
 }
@@ -103,7 +105,7 @@ function ItemRow({ item, isSelected, showCategory, showProject, onToggle }: RowP
   );
 }
 
-export function ItemsTable({ category, project, onCreateTickets }: ItemsTableProps) {
+export function ItemsTable({ category, project, projectOptions: propProjectOptions, onCreateTickets }: ItemsTableProps) {
   const [projectFilter, setProjectFilter] = useState<string>(project ?? '');
   const [statusFilter, setStatusFilter] = useState<ActionStatus | 'all'>('all');
   const [searchRaw, setSearchRaw] = useState('');
@@ -111,8 +113,11 @@ export function ItemsTable({ category, project, onCreateTickets }: ItemsTablePro
   const [page, setPage] = useState(1);
   const [data, setData] = useState<NonInvoiceableItemsResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [projectOptions, setProjectOptions] = useState<string[]>([]);
+  const [derivedProjectOptions, setDerivedProjectOptions] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Use parent-supplied list if available; fall back to what we accumulate from page data
+  const projectOptions = propProjectOptions?.length ? propProjectOptions : derivedProjectOptions;
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -142,14 +147,17 @@ export function ItemsTable({ category, project, onCreateTickets }: ItemsTablePro
           signal: controller.signal,
         });
         if (!res.ok) {
-          const err = await res.json().catch(() => ({})) as { message?: string };
+          const err = await res.json().catch((parseErr: unknown) => {
+            log.debug('ItemsTable: non-JSON error body', { error: String(parseErr) });
+            return { message: undefined } as { message?: string };
+          });
           throw new Error(err.message ?? `HTTP ${res.status}`);
         }
         const envelope = await res.json() as { success: boolean; data: NonInvoiceableItemsResponse };
         setData(envelope.data);
         if (!projectFilter && !searchDebounced && page === 1) {
           const projects = Array.from(new Set(envelope.data.items.map((i) => i.project))).sort();
-          setProjectOptions((prev) => Array.from(new Set([...prev, ...projects])).sort());
+          setDerivedProjectOptions((prev) => Array.from(new Set([...prev, ...projects])).sort());
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;

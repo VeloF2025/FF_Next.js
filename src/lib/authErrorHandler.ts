@@ -126,8 +126,12 @@ export function installAuthInterceptor() {
       // - Fleet check-in/vehicle APIs (support portal session auth)
       // - Staff attendance portal APIs (own PIN/OTP session, 401 is normal
       //   on the login page before sign-in)
-      // - Web-vitals telemetry (posts on every page, 401 shouldn't bounce
-      //   unauthenticated visitors off their current flow)
+      // - Analytics telemetry endpoints ONLY (web-vitals + errors posts
+      //   fire from every page including unauthenticated ones; they must
+      //   not bounce users). Interactive analytics dashboard reads
+      //   (/api/analytics/dashboard/*, /api/analytics/projects/*) are
+      //   deliberately NOT excluded — a stale session on /analytics
+      //   should still redirect.
       const isExcludedPath =
         url.includes('/api/auth/me') ||
         url.includes('/api/auth/check-email') ||
@@ -136,7 +140,8 @@ export function installAuthInterceptor() {
         url.includes('/api/fleet/vehicles/') ||
         url.includes('/api/snags/shared/') ||
         url.includes('/api/my/') ||
-        url.includes('/api/analytics/');
+        url.includes('/api/analytics/web-vitals') ||
+        url.includes('/api/analytics/errors');
 
       if (!isExcludedPath) {
         handleAuthError();

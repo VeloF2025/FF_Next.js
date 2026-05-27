@@ -55,30 +55,48 @@ interface MeetingStatusRow { processing_status: string }
  * Returns empty array if folder doesn't exist or access is denied.
  */
 export async function listUserRecordings(userId: string): Promise<DriveItem[]> {
-  const url =
-    `${GRAPH_BASE}/users/${userId}/drive/root:/Recordings:/children` +
-    `?$select=id,name,size,createdDateTime,lastModifiedDateTime,createdBy` +
-    `&$top=200&$orderby=createdDateTime desc`;
+  // Step 1: Find the Recordings folder ID from root children.
+  // The path-based API (root:/Recordings:/children) returns 400 on this tenant —
+  // using the folder item ID directly is more reliable.
+  const rootUrl = `${GRAPH_BASE}/users/${userId}/drive/root/children?$select=id,name,folder&$top=200`;
+  const rootResp = await graphFetch(rootUrl);
 
-  const response = await graphFetch(url);
-
-  if (response.status === 404) return []; // No Recordings folder
-  if (response.status === 403) {
+  if (rootResp.status === 403) {
     log.warn('OneDrive access denied', { userId }, LOGGER);
     return [];
   }
+  if (!rootResp.ok) {
+    log.warn('OneDrive root listing failed', { userId, status: rootResp.status }, LOGGER);
+    return [];
+  }
+
+  const rootData = await rootResp.json();
+  const recordingsFolder = (rootData.value || []).find(
+    (item: { name: string; folder?: object }) => item.name === 'Recordings' && item.folder
+  ) as { id: string } | undefined;
+
+  if (!recordingsFolder) return []; // No Recordings folder
+
+  // Step 2: List the folder contents by item ID (avoids path-based 400 error).
+  const url =
+    `${GRAPH_BASE}/users/${userId}/drive/items/${recordingsFolder.id}/children` +
+    `?$select=id,name,size,createdDateTime,lastModifiedDateTime,createdBy` +
+    `&$top=200`;
+
+  const response = await graphFetch(url);
+
   if (!response.ok) {
-    log.warn('OneDrive listing failed', { userId, status: response.status }, LOGGER);
+    log.warn('OneDrive Recordings folder listing failed', { userId, status: response.status }, LOGGER);
     return [];
   }
 
   const data = await response.json();
   const items = (data.value || []) as DriveItem[];
 
-  // Only MP4 files (Teams recordings)
-  return items.filter(
-    (item) => item.name.toLowerCase().endsWith('.mp4') && item.size > 0
-  );
+  // Only MP4 files with content — size=0 means Teams hasn't finished processing yet
+  return items
+    .filter((item) => item.name.toLowerCase().endsWith('.mp4') && item.size > 0)
+    .sort((a, b) => b.createdDateTime.localeCompare(a.createdDateTime));
 }
 
 /**
@@ -206,8 +224,8 @@ export async function scrapeOneDriveRecordings(
           const parsed = parseRecordingFilename(item.name);
           const recordingDate = parsed.date || itemDate;
 
-          // Try to match to existing meeting by date (± 2 hours) that lacks a recording
-          const windowMs = 2 * 60 * 60 * 1000;
+          // Match window: 4h covers SAST→UTC offset (2h) plus scheduling buffer
+          const windowMs = 4 * 60 * 60 * 1000;
           const dateStart = new Date(recordingDate.getTime() - windowMs).toISOString();
           const dateEnd = new Date(recordingDate.getTime() + windowMs).toISOString();
 

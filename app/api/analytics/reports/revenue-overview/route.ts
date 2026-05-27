@@ -15,6 +15,11 @@ import { verifyToken } from '@/lib/auth/jwt';
 import { userHasPermission } from '@/lib/permissions';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
 
+
+// Opt out of build-time static collection. Route depends on runtime
+// SharePoint/Graph data + auth cookies that are not available during
+// `next build`. Matches sibling analytics report routes.
+export const dynamic = 'force-dynamic';
 const logger = createLogger('analytics:api:revenue-overview');
 
 /** Allowlist — fallback guard independent of RBAC table */

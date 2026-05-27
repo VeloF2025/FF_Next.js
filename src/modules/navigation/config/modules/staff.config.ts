@@ -10,6 +10,9 @@ import {
   Cake,
   ShieldCheck,
   Building2,
+  Activity,
+  Receipt,
+  FileText,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -33,6 +36,27 @@ export const staffConfig: ModuleNavigationConfig = {
       icon: Building2,
       path: '/staff/departments',
       rbacKey: 'people.staff.departments',
+    },
+    {
+      id: 'pulse',
+      label: 'Pulse',
+      icon: Activity,
+      path: '/staff/attendance',
+      rbacKey: 'people.staff.attendance.manage',
+    },
+    {
+      id: 'payslips',
+      label: 'Payslips',
+      icon: FileText,
+      path: '/staff/payslips/import',
+      rbacKey: 'payslips.import',
+    },
+    {
+      id: 'receipts',
+      label: 'Receipts',
+      icon: Receipt,
+      path: '/staff/receipts',
+      rbacKey: 'receipts.review',
     },
     {
       id: 'alerts',

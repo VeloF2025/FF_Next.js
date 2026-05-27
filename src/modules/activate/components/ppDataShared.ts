@@ -11,6 +11,7 @@ export interface PPRecord {
   resolved_drop_number: string | null;
   resolved_source: string | null;
   resolved_at: string | null;
+  first_resolved_at: string | null;
   maintenance_ticket_id: string | null;
   ticket_uid: string | null;
   ticket_priority: string | null;
@@ -20,8 +21,15 @@ export interface PPRecord {
   wa_phone: string | null;
   wa_name: string | null;
   wa_team: string | null;
+  technician_source: 'wa' | 'eod' | null;
   zone_no: number | null;
   pon_no: number | null;
+  olt_port: string | null;
+  olt_address: string | null;
+  olt_name: string | null;
+  olt_lt: number | null;
+  olt_pon: number | null;
+  olt_ont_pos: number | null;
 }
 
 export type PPCardCategory = 'total' | 'activated' | 'located' | 'not_found' | 'ticketed';

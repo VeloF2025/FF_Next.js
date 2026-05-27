@@ -286,6 +286,7 @@ function PhotoThumbnail({ photo, onClick }: PhotoThumbnailProps) {
           src={photo.url}
           alt={photo.filename}
           fill
+          unoptimized
           className="object-cover group-hover:scale-105 transition-transform duration-200"
           onError={() => setImageError(true)}
         />

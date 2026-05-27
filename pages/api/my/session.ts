@@ -36,6 +36,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       email: string | null;
       home_site_id: string | null;
       has_vehicle: boolean;
+      profile_photo_url: string | null;
+      role: string | null;
+      account_status: string;
+      auth_role: string | null;
     }>`
       SELECT
         s.id,
@@ -43,11 +47,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         s.phone,
         s.email,
         s.home_site_id,
+        s.profile_photo_url,
+        s.role,
+        COALESCE(s.account_status, 'active') AS account_status,
         EXISTS (
           SELECT 1 FROM vehicle_assignments va
           WHERE va.staff_id = s.id AND va.is_active = true
-        ) AS has_vehicle
+        ) AS has_vehicle,
+        u.role AS auth_role
       FROM staff s
+      LEFT JOIN users u ON u.id = s.user_id
       WHERE s.id = ${session.staffId}
       LIMIT 1
     `;
@@ -56,6 +65,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.success(res, { session: null, profile: null, reason: 'staff_not_found' });
     }
 
+    // Note: account_status === 'suspended' is already gated in verifySession()
+    // above — this secondary profile fetch is solely for the client's UI state.
+
     const profile: AttendanceSessionProfile = {
       staffId: row.id,
       name: row.full_name,
@@ -63,6 +75,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       email: row.email,
       homeSiteId: row.home_site_id,
       hasAssignedVehicle: row.has_vehicle,
+      profilePhotoUrl: row.profile_photo_url,
+      role: (row.role as AttendanceSessionProfile['role']) ?? null,
+      accountStatus: row.account_status as AttendanceSessionProfile['accountStatus'],
+      // auth_role comes from users.role (AuthRole enum) via staff.user_id → users.id.
+      // Null for PIN-only staff with no linked user account.
+      authRole: row.auth_role ?? null,
     };
 
     return apiResponse.success(res, {

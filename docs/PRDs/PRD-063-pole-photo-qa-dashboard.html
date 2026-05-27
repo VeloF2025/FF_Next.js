@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRD-063 — Pole Photo QA Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d23;
+      --surface2: #22262f;
+      --border: #2d3142;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #3b82f6;
+      --accent-dim: #1d3a6e;
+      --green: #22c55e;
+      --green-dim: #14532d;
+      --amber: #f59e0b;
+      --amber-dim: #78350f;
+      --red: #ef4444;
+      --red-dim: #7f1d1d;
+      --purple: #a855f7;
+      --purple-dim: #4c1d95;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 32px;
+    }
+
+    /* Header */
+    .prd-header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 32px;
+      margin-bottom: 40px;
+    }
+
+    .prd-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-blue   { background: var(--accent-dim); color: #93c5fd; border: 1px solid #2563eb44; }
+    .badge-amber  { background: var(--amber-dim);  color: #fcd34d; border: 1px solid #d97706aa; }
+    .badge-green  { background: var(--green-dim);  color: #86efac; border: 1px solid #16a34a44; }
+    .badge-muted  { background: var(--surface2);   color: var(--text-muted); border: 1px solid var(--border); }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 8px;
+      color: #f8fafc;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .meta-item label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .meta-item span {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    /* TOC */
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 40px;
+    }
+
+    .toc h2 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .toc ol {
+      list-style: decimal;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    .toc li { margin-bottom: 6px; }
+    .toc a { color: var(--accent); text-decoration: none; font-size: 13px; }
+    .toc a:hover { text-decoration: underline; }
+
+    /* Sections */
+    section {
+      margin-bottom: 48px;
+      scroll-margin-top: 24px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin: 24px 0 12px;
+    }
+
+    h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 20px 0 10px;
+    }
+
+    p { margin-bottom: 12px; color: var(--text-muted); }
+    p strong { color: var(--text); }
+
+    ul, ol { padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 6px; color: var(--text-muted); }
+    li strong { color: var(--text); }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 8px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    th {
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+
+    td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      vertical-align: top;
+    }
+
+    td strong { color: var(--text); }
+    tr:hover td { background: var(--surface); }
+
+    /* Callouts */
+    .callout {
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      border-left: 3px solid;
+    }
+
+    .callout-blue   { background: #1d3a6e22; border-color: var(--accent); }
+    .callout-amber  { background: #78350f22; border-color: var(--amber); }
+    .callout-green  { background: #14532d22; border-color: var(--green); }
+    .callout-red    { background: #7f1d1d22; border-color: var(--red); }
+
+    .callout-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .callout-blue .callout-label   { color: #93c5fd; }
+    .callout-amber .callout-label  { color: #fcd34d; }
+    .callout-green .callout-label  { color: #86efac; }
+    .callout-red .callout-label    { color: #fca5a5; }
+
+    .callout p { margin: 0; }
+
+    /* Code */
+    code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 12px;
+      color: #93c5fd;
+    }
+
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: #a5f3fc;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    /* Wireframe */
+    .wireframe {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* Photo checklist */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .photo-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .photo-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .civil-title   { color: #fb923c; }
+    .optical-title { color: #60a5fa; }
+
+    .photo-slot {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .photo-slot:last-child { border-bottom: none; }
+
+    .slot-number {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .slot-present  { background: var(--green-dim); color: #86efac; }
+    .slot-missing  { background: #1e293b; color: #475569; }
+    .slot-warning  { background: var(--amber-dim); color: #fcd34d; }
+
+    .slot-name { font-size: 12px; color: var(--text-muted); flex: 1; }
+    .slot-name em { font-style: italic; color: #475569; font-size: 11px; }
+
+    /* Status pill */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .pill-green  { background: var(--green-dim);  color: #86efac; }
+    .pill-amber  { background: var(--amber-dim);  color: #fcd34d; }
+    .pill-red    { background: var(--red-dim);    color: #fca5a5; }
+    .pill-blue   { background: var(--accent-dim); color: #93c5fd; }
+    .pill-purple { background: var(--purple-dim); color: #d8b4fe; }
+
+    /* Phase timeline */
+    .phases { display: flex; flex-direction: column; gap: 0; }
+
+    .phase { display: flex; gap: 16px; }
+
+    .phase-line {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .phase-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .phase-dot-1 { background: var(--accent-dim); color: #93c5fd; border: 2px solid var(--accent); }
+    .phase-dot-2 { background: var(--surface2); color: var(--text-muted); border: 2px solid var(--border); }
+    .phase-dot-3 { background: var(--surface2); color: var(--text-muted); border: 2px solid var(--border); }
+
+    .phase-connector {
+      width: 2px;
+      flex: 1;
+      min-height: 24px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .phase-body { flex: 1; padding-bottom: 28px; padding-top: 4px; }
+    .phase-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    /* Footer */
+    .prd-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+      margin-top: 48px;
+      color: var(--text-muted);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="prd-header">
+    <div class="prd-meta">
+      <span class="badge badge-muted">PRD-063</span>
+      <span class="badge badge-amber">Draft</span>
+      <span class="badge badge-blue">Field Operations · Works QA</span>
+    </div>
+    <h1>Pole Photo QA Dashboard</h1>
+    <p class="subtitle">Per-PON pole inspection workflow — civil &amp; optical photo review, upload, approval, and ZIP export</p>
+
+    <div class="meta-grid">
+      <div class="meta-item"><label>Date</label><span>2026-05-12</span></div>
+      <div class="meta-item"><label>Status</label><span>Draft — awaiting Johan's confirmation (6 questions in §12)</span></div>
+      <div class="meta-item"><label>Primary user</label><span>Johan Scott (Field QA Lead)</span></div>
+      <div class="meta-item"><label>Requested by</label><span>Hein van Vuuren</span></div>
+      <div class="meta-item"><label>Source meeting</label><span>Call with Johan Scott — 2026-05-11 (#51722)</span></div>
+      <div class="meta-item"><label>Related PRD</label><span>PRD-civil-qa.md (upstream module)</span></div>
+    </div>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#problem">Problem Statement</a></li>
+      <li><a href="#goals">Goals &amp; Success Criteria</a></li>
+      <li><a href="#users">Users &amp; Context</a></li>
+      <li><a href="#photo-spec">Photo Specification (14 per pole)</a></li>
+      <li><a href="#navigation">Navigation Model</a></li>
+      <li><a href="#features">Feature Specifications</a></li>
+      <li><a href="#wireframes">Wireframes</a></li>
+      <li><a href="#data-model">Data Model</a></li>
+      <li><a href="#api">API Endpoints</a></li>
+      <li><a href="#scope">Scope &amp; Constraints</a></li>
+      <li><a href="#phases">Phased Delivery</a></li>
+      <li><a href="#assumptions">Open Questions &amp; Assumptions</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. PROBLEM -->
+  <section id="problem">
+    <h2>1. Problem Statement</h2>
+
+    <p>
+      Johan Scott (Field QA Lead) conducts quality assurance on pole installations by manually
+      cross-referencing photos from <strong>four to five separate sources per pole</strong>:
+      QField civil audit, QField optical, SharePoint (multiple people's folders), and OneDrive.
+      Each pole requires <strong>7 civil photos + 7 optical photos</strong>. A single PON contains
+      dozens of poles. A full PON audit currently takes hours.
+    </p>
+
+    <div class="card">
+      <div class="card-title">Pain points identified in meeting 2026-05-11</div>
+      <ul>
+        <li><strong>Photo hunting.</strong> No single view of all photos for one pole. Johan opens QField civil, QField optical, and SharePoint in parallel windows and cross-references manually.</li>
+        <li><strong>Folder naming fragility.</strong> A single SharePoint folder name mismatch excludes all photos for that pole entirely.</li>
+        <li><strong>Verification gap.</strong> Field worker says "done with pole 28" — Johan must go hunt to confirm photos actually appeared. "A lot of times he says he did it, but then he didn't."</li>
+        <li><strong>Optical photos mis-filed under civil.</strong> Technicians file optical photos in QField's civil layer, creating double-check work for Johan.</li>
+        <li><strong>VLM misclassification.</strong> Auto-assigned photo categories are sometimes wrong — the end plate photo also shows depth, so it should satisfy both slots.</li>
+        <li><strong>No structured export.</strong> When a PON is complete, Johan has no way to produce a clean, correctly structured photo package for FiberTime submission.</li>
+        <li><strong>Burnout risk.</strong> Johan: "I'm going to burn out if I can't communicate on one side and have to switch sides and do [QA] well."</li>
+      </ul>
+    </div>
+
+    <div class="callout callout-blue">
+      <div class="callout-label">Design principle from meeting</div>
+      <p>Johan works <strong>pole-by-pole within a specific PON</strong>, not across projects. The system must mirror that mental model: navigate to a PON, see all poles at a glance, click in for detail. Do not make a cross-project aggregate view the primary interface.</p>
+    </div>
+  </section>
+
+  <!-- 2. GOALS -->
+  <section id="goals">
+    <h2>2. Goals &amp; Success Criteria</h2>
+
+    <table>
+      <thead>
+        <tr><th>Goal</th><th>Measurement</th><th>Target</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Eliminate photo hunting</strong></td>
+          <td>Time to complete a full PON audit</td>
+          <td>&lt; 50% of current time</td>
+        </tr>
+        <tr>
+          <td><strong>Single ingestion point</strong></td>
+          <td>All photos visible in FibreFlow — no need to open QField or SharePoint</td>
+          <td>100% of photos in one place</td>
+        </tr>
+        <tr>
+          <td><strong>Completeness at a glance</strong></td>
+          <td>Johan can identify incomplete poles without opening each one</td>
+          <td>Civil + optical fraction visible on pole list</td>
+        </tr>
+        <tr>
+          <td><strong>Clean export for FiberTime</strong></td>
+          <td>Download a correctly structured ZIP per approved pole</td>
+          <td>ZIP generated in &lt; 5 seconds</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Non-Goals (explicitly out of scope for Phase 1)</h3>
+    <ul>
+      <li>Automated retake notifications to field workers</li>
+      <li>GPS camera app for guided photo capture in the field</li>
+      <li>QField sync-back / write-to-QField (disabled — overwrites existing project data)</li>
+      <li>Live SharePoint sync (manual folder upload only)</li>
+      <li>VLM auto-classification on upload</li>
+      <li>Cross-PON or cross-project aggregate dashboards as primary interface</li>
+    </ul>
+  </section>
+
+  <!-- 3. USERS -->
+  <section id="users">
+    <h2>3. Users &amp; Context</h2>
+
+    <div class="card">
+      <div class="card-title">Johan Scott — Field QA Lead (Primary user)</div>
+      <ul>
+        <li>Reviews pole installation photos for a specific PON / zone</li>
+        <li>Works from desktop or laptop (not primarily mobile)</li>
+        <li>Currently uses QField + SharePoint simultaneously in separate browser windows</li>
+        <li>Approves poles once all 14 photos are present and acceptable</li>
+        <li>Communicates retake requests via WhatsApp groups manually today</li>
+        <li>Produces photo packages for FiberTime submission after PON completion</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Hein van Vuuren — Operations Director (Secondary)</div>
+      <ul>
+        <li>Needs visibility into PON completeness per zone without being in the QA workflow</li>
+        <li>Needs confidence that FiberTime deliverables are being produced on schedule</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 4. PHOTO SPEC -->
+  <section id="photo-spec">
+    <h2>4. Photo Specification — QField Attributes &amp; DB Columns</h2>
+
+    <div class="callout callout-amber">
+      <div class="callout-label">Confirm with Johan before build starts</div>
+      <p>
+        The meeting confirmed <strong>7 civil + 7 optical per pole</strong>. The codebase defines
+        civil as <strong>7 active steps</strong> (step 8 is a reserved signature slot, unused).
+        Optical has <strong>two phases in QField</strong>: Distribution Dome (8 steps) and Main Joint
+        (6 steps). Johan needs to confirm which of these apply per pole — does every pole have both
+        a dome <em>and</em> a main joint, or only one?
+        <strong>The exact optical slot count must be confirmed against the FiberTime spec before build.</strong>
+      </p>
+    </div>
+
+    <h3>4.1 Civil Photo Slots</h3>
+    <p>
+      QField detects civil photos by matching GPKG column names against numbered prefixes
+      (e.g. <code>1. Before Markout Photo</code> matches Step 1). FibreFlow normalises these
+      to the DB columns below.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Step</th>
+          <th>Label</th>
+          <th>DB Column (<code>construction_qa_reviews</code>)</th>
+          <th>QField GPKG column pattern (regex)</th>
+          <th>VLM check</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Before Photo</strong></td>
+          <td><code>civil_step_01_before_photo</code></td>
+          <td><code>^1[\.\s].*(before|mark)</code></td>
+          <td>Undisturbed ground, chalk/spray markings visible, NO hole, NO digging started</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>During Photo</strong></td>
+          <td><code>civil_step_02_during_photo</code></td>
+          <td><code>^2[\.\s].*(during|digging)</code></td>
+          <td>Active excavation in progress, open hole with workers visible, NO pole yet</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Depth Photo</strong></td>
+          <td><code>civil_step_03_depth_photo</code></td>
+          <td><code>^3[\.\s].*(depth|measuring)</code></td>
+          <td>Measuring tape or ruler in hole showing depth measurement clearly</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>End Plates</strong></td>
+          <td><code>civil_step_04_end_plates</code></td>
+          <td><code>^4[\.\s].*(end.?plate|visible)</code></td>
+          <td>Close-up of metal end-plates, HDPE strapping, or cap plates on pole. <em>Note: one photo often satisfies both Depth and End Plates — see §4.3.</em></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>Compaction / Backfill</strong></td>
+          <td><code>civil_step_05_compaction</code></td>
+          <td><code>^5[\.\s].*(compact|backfill)</code></td>
+          <td>Pole STANDING, hole FILLED with sand+cement, compacted surface visible</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><strong>Level Check</strong></td>
+          <td><code>civil_step_06_level_check</code></td>
+          <td><code>^6[\.\s].*(level|spirit)</code></td>
+          <td>Spirit level held against the side of an upright pole</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><strong>After Photo</strong></td>
+          <td><code>civil_step_07_after_photo</code></td>
+          <td><code>^7[\.\s].*(after|picture)</code></td>
+          <td>Full pole standing upright, wide shot from distance</td>
+        </tr>
+        <tr style="opacity:0.5">
+          <td>8</td>
+          <td><em>Signature (reserved)</em></td>
+          <td><code>civil_step_08_signature</code></td>
+          <td><code>^8[\.\s].*(label|foto|photo)</code></td>
+          <td><em>Not in active checklist — DB column exists but step 8 is unused in current workflow</em></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>4.2 Optical Photo Slots</h3>
+    <p>Optical has two phases in QField. <strong>Confirm with Johan which phases apply to each pole type.</strong></p>
+
+    <h4>Phase A — Distribution Dome (steps 1–8)</h4>
+    <table>
+      <thead>
+        <tr>
+          <th>Step</th>
+          <th>Label</th>
+          <th>DB Column (<code>construction_qa_reviews</code>)</th>
+          <th>QField GPKG column pattern (regex)</th>
+          <th>VLM check</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Dome on Pole</strong></td>
+          <td><code>optical_step_01_dome_on_pole</code></td>
+          <td><code>^1[\.\s].*dome.*pole</code></td>
+          <td>Wide shot of splice dome installed on pole</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Dome Label</strong></td>
+          <td><code>optical_step_02_dome_label</code></td>
+          <td><code>^2[\.\s].*dome.*label</code></td>
+          <td>Dome label with Pole ID / Fibre ID clearly readable</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Open Dome</strong></td>
+          <td><code>optical_step_03_open_dome</code></td>
+          <td><code>^3[\.\s].*open.*dome</code></td>
+          <td>Fibre routing and tray layout visible inside open dome</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Splice Protectors</strong></td>
+          <td><code>optical_step_04_splice_protectors</code></td>
+          <td><code>^4[\.\s].*splice.*protect</code></td>
+          <td>Splice protectors fitted correctly over fibre splices</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>Slack Management</strong></td>
+          <td><code>optical_step_05_slack_management</code></td>
+          <td><code>^5[\.\s].*slack.*manage</code></td>
+          <td>Neat fibre loops and cable organization within dome</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><strong>Strength Members</strong></td>
+          <td><code>optical_step_06_strength_members</code></td>
+          <td><code>^6[\.\s].*strength.*member</code></td>
+          <td>Strength members (aramid/steel) secured inside dome</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><strong>Seals &amp; Dust Caps</strong></td>
+          <td><code>optical_step_07_seals_dustcaps</code></td>
+          <td><code>^7[\.\s].*seal.*dust</code></td>
+          <td>Dome seals tightened, dust caps on unused ports, cable ties white (not black)</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><strong>Pole ID</strong></td>
+          <td><code>optical_step_08_pole_id</code></td>
+          <td><code>^8[\.\s].*pole.*id</code></td>
+          <td>Pole ID label/SJC tag attached to pole near dome, clearly readable</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>Phase B — Main Joint (steps 11–16)</h4>
+    <table>
+      <thead>
+        <tr>
+          <th>Step</th>
+          <th>Label</th>
+          <th>DB Column (<code>construction_qa_reviews</code>)</th>
+          <th>VLM check</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>11</td><td><strong>Cable Entries</strong></td><td><code>optical_step_11_cable_entries</code></td><td>Labelled cable entries into main joint closure</td></tr>
+        <tr><td>12</td><td><strong>Strength Members</strong></td><td><code>optical_step_12_strength_members</code></td><td>Strength members properly secured within closure</td></tr>
+        <tr><td>13</td><td><strong>Tube Routing</strong></td><td><code>optical_step_13_tube_routing</code></td><td>Fibre tubes routed neatly from entry to splice tray</td></tr>
+        <tr><td>14</td><td><strong>Tray Entries</strong></td><td><code>optical_step_14_tray_entries</code></td><td>Fibre entering splice trays in organized manner</td></tr>
+        <tr><td>15</td><td><strong>Coiling &amp; Protectors</strong></td><td><code>optical_step_15_coiling_protectors</code></td><td>Fibre coiling loops and visible splice protectors</td></tr>
+        <tr><td>16</td><td><strong>Readable Labels</strong></td><td><code>optical_step_16_readable_labels</code></td><td>Clear readable labels on cables, tubes, or closure</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Unassigned / unmatched optical photos</h4>
+    <p>
+      QField columns that don't match the numbered patterns above are ingested with
+      <code>checklist_step = NULL</code>. Common unmatched column names seen in production:
+      <code>Photo Joint</code>, <code>Photo Label</code>, <code>Photo Slack</code>,
+      <code>Pole Photo</code>, <code>Joint Photo</code>, <code>Lable Photo</code>,
+      <code>Slack Photo</code>. These appear in the assignment tray on folder import and
+      Johan assigns them manually.
+    </p>
+
+    <h3>4.3 How photos arrive from QField</h3>
+    <p>The pipeline from field device to dashboard has three layers:</p>
+
+    <div class="wireframe">QField app (GPKG column "3. Depth Measuring")
+    │
+    ▼
+scripts/extract-gpkg-photos.py
+    │  regex match: ^3[\.\s].*(depth|measuring)
+    │  → checklist_step = 3, step_label = "Depth Photo"
+    ▼
+qfield_photo_validations table
+    │  photo_key = "projects/{uuid}/files/DCIM/IMG.jpg/..."
+    │  feature_id = "A673"   (pole label from GPKG)
+    │  work_type  = "pole_installation"
+    │  checklist_step = 3
+    ▼
+construction_qa_reviews table
+    │  civil_step_03_depth_photo = true  (boolean pass/fail only)
+    ▼
+pole_qa_photos table   ← NEW for this dashboard
+       civil_3_key = "works-qa/{project}/{pole}/civil/03_depth.jpg"</div>
+
+    <h3>4.4 Special rule: double-duty photos</h3>
+    <p>
+      A single photo can satisfy <strong>two civil slots simultaneously</strong> — most commonly
+      the End Plates photo (step 4) which also clearly shows the depth measurement, satisfying
+      step 3 (Depth). The system must allow one stored photo key to be assigned to multiple slots
+      without duplicating the file. Both slots show the same thumbnail with a badge:
+      <code>also satisfies: Depth</code>.
+    </p>
+
+    <h3>4.5 QField write-back columns (read-only reference — do NOT use)</h3>
+    <p>
+      FibreFlow currently writes QA decisions back to QField via these GPKG columns:
+      <code>Q/A Civil Comments</code>, <code>QA Civil Comments</code> (Mohadin variant),
+      <code>Status</code> (<code>"QA Approved"</code> / <code>"Rework"</code> / <code>"Rejected"</code>),
+      <code>Q/A Date</code>. <strong>This dashboard must NOT trigger write-back</strong> — it corrupts
+      existing project data. The write-back feature flag is disabled and must remain so.
+    </p>
+  </section>
+
+  <!-- 5. NAVIGATION -->
+  <section id="navigation">
+    <h2>5. Navigation Model</h2>
+
+    <p>The dashboard mirrors Johan's existing mental model. Navigation is strictly hierarchical and filter-driven:</p>
+
+    <div class="wireframe">Site  ──▶  Zone  ──▶  PON  ──▶  Pole List  ──▶  Pole Detail
+(dropdown)   (dropdown)  (dropdown)  (primary view)    (right panel)</div>
+
+    <table>
+      <thead>
+        <tr><th>Level</th><th>Examples</th><th>Source data</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Site</strong></td><td>Plannet, Herotel, Mowa</td><td>existing <code>projects</code> table</td></tr>
+        <tr><td><strong>Zone</strong></td><td>Zone 2, Zone 17, Zone 19</td><td>existing <code>zones</code> table</td></tr>
+        <tr><td><strong>PON</strong></td><td>PON 19, PON 50</td><td>existing <code>drops</code> / PONs table</td></tr>
+        <tr><td><strong>Pole</strong></td><td>A673, A737, P028</td><td>QField sync or manual entry</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-blue">
+      <div class="callout-label">Module placement</div>
+      <p>
+        This dashboard lives under <strong>Field Operations → Works QA</strong> as a new tab,
+        separate from the Activate module. This is pre-activation construction QA, not customer drop QA.
+      </p>
+    </div>
+  </section>
+
+  <!-- 6. FEATURES -->
+  <section id="features">
+    <h2>6. Feature Specifications</h2>
+
+    <h3>6.1 PON Pole List</h3>
+    <p>The primary working surface. Johan selects a Site / Zone / PON and sees all poles in that PON.</p>
+
+    <table>
+      <thead>
+        <tr><th>Column</th><th>Content</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Pole ID</strong></td><td>e.g. A673 — alphanumeric sort ascending by default</td></tr>
+        <tr>
+          <td><strong>Civil</strong></td>
+          <td>
+            Fraction + progress bar:<br>
+            <span class="status-pill pill-green">7 / 7</span> &nbsp;
+            <span class="status-pill pill-amber">4 / 7</span> &nbsp;
+            <span class="status-pill pill-red">0 / 7</span>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Optical</strong></td>
+          <td>
+            Same pattern:<br>
+            <span class="status-pill pill-green">7 / 7</span> &nbsp;
+            <span class="status-pill pill-amber">3 / 7</span> &nbsp;
+            <span class="status-pill pill-red">0 / 7</span>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Status</strong></td>
+          <td>
+            <span class="status-pill pill-purple">Approved</span> &nbsp;
+            <span class="status-pill pill-blue">Ready for Review</span> &nbsp;
+            <span class="status-pill pill-amber">Incomplete</span> &nbsp;
+            <span class="status-pill pill-red">No Photos</span>
+          </td>
+        </tr>
+        <tr><td><strong>Source</strong></td><td>Icon only: QField sync / Manual upload / Mixed</td></tr>
+        <tr><td><strong>Actions</strong></td><td>Open detail button</td></tr>
+      </tbody>
+    </table>
+
+    <ul>
+      <li>Filter chips above list: <strong>All · Incomplete · Ready for Review · Approved</strong></li>
+      <li>PON summary header: <em>"PON 19 — 28 poles · 12 approved · 11 ready · 5 incomplete"</em></li>
+      <li>Bulk action in header: <strong>Download All Approved as ZIP</strong></li>
+    </ul>
+
+    <h3>6.2 Pole Detail Panel</h3>
+    <p>Opens as a right-side slide-in panel (not a new page) — Johan stays in context and can navigate back to the pole list without a full reload.</p>
+
+    <h4>Panel header</h4>
+    <ul>
+      <li>Pole ID + status pill</li>
+      <li><strong>Approve</strong> button (primary action — enabled when all 14 slots filled, or with force-approve override)</li>
+      <li><strong>Download ZIP</strong> button (enabled only when approved)</li>
+      <li>Pole-level notes field (free text, auto-saved)</li>
+    </ul>
+
+    <h4>Unassigned photo tray (folder import result)</h4>
+    <p>After a folder is imported, unassigned photos appear in a horizontal tray at the top of the panel. Johan drags each photo from the tray to the target slot. The tray disappears once all photos are assigned.</p>
+
+    <h4>Photo sections</h4>
+    <p>Two equal columns: <strong>Civil (left)</strong> and <strong>Optical (right)</strong>. On narrow screens: civil first, optical below.</p>
+
+    <ul>
+      <li><strong>Filled slot:</strong> thumbnail, source badge (QField / Upload), slot name. Click → full-size lightbox.</li>
+      <li><strong>Empty slot:</strong> dashed border, slot name, Upload button.</li>
+      <li><strong>Double-duty indicator:</strong> small badge on the slot — <em>"Also: Depth"</em></li>
+      <li><strong>Slot note:</strong> optional text per slot (e.g. "blurry — retake needed")</li>
+    </ul>
+
+    <h3>6.3 Photo Upload</h3>
+
+    <h4>Per-slot upload</h4>
+    <ul>
+      <li>Click any slot → file picker (single image, jpg/png/heic accepted)</li>
+      <li>Drag a file directly onto a slot → assigns immediately</li>
+      <li>Click an occupied slot → offers replace or cancel</li>
+    </ul>
+
+    <h4>Folder upload (bulk import for old sites)</h4>
+    <ul>
+      <li>"Import Folder" button on the pole detail panel — or drag a folder onto the panel</li>
+      <li>System reads all image files in the folder, uploads to VF Storage under a staging path</li>
+      <li>Photos appear in the <strong>unassigned tray</strong> — thumbnails in a horizontal strip</li>
+      <li>Johan drags each from tray → target slot (civil or optical)</li>
+      <li>Duplicate detection by file hash — silently skips already-present images</li>
+      <li>VLM slot suggestion shown as a dim label on each tray item (e.g. <em>"Likely: Depth"</em>) — Johan confirms with one click or overrides by dragging elsewhere</li>
+    </ul>
+
+    <div class="callout callout-amber">
+      <div class="callout-label">Old sites / SharePoint exception</div>
+      <p>
+        For existing sites where photos are already in structured SharePoint folders (Zone / PON / Pole),
+        the folder upload is the correct ingestion path. Johan downloads the pole folder from SharePoint,
+        drags it into FibreFlow, assigns photos to slots. No live SharePoint sync is required in Phase 1.
+      </p>
+    </div>
+
+    <h3>6.4 QA Approval</h3>
+    <ul>
+      <li><strong>Approve Pole</strong> button on the panel header</li>
+      <li>Standard approval: requires all 14 slots filled</li>
+      <li>Force approval: if slots are missing, a confirmation modal asks for a mandatory reason comment (e.g. "pole P028 physically inaccessible — 12/14 accepted by ops manager")</li>
+      <li>Approval records: <code>approved_by</code> (user ID), <code>approved_at</code> (timestamp), <code>approval_note</code> (if forced)</li>
+      <li>Approved poles: slots go read-only, status updates in the PON list immediately</li>
+      <li>Undo approval: available to <code>super_admin</code> and <code>manager</code> roles</li>
+    </ul>
+
+    <h3>6.5 ZIP Download</h3>
+
+    <h4>Per-pole download</h4>
+    <ul>
+      <li>"Download ZIP" button in the pole detail panel header</li>
+      <li>Only active when the pole is approved</li>
+      <li>Generated server-side; streams to browser within 3 seconds for a typical 14-photo set</li>
+    </ul>
+
+    <h4>ZIP structure — per pole</h4>
+    <pre><code>{POLE_ID}/
+  civil/
+    01_before.jpg
+    02_during.jpg
+    03_depth.jpg
+    04_end_plates.jpg
+    05_compaction.jpg
+    06_level_check.jpg
+    07_after.jpg
+  optical/
+    01_dome_on_pole.jpg
+    02_dome_label.jpg
+    03_open_dome.jpg
+    04_splice_protectors.jpg
+    05_slack_management.jpg
+    06_seals_dust_caps.jpg
+    07_pole_id.jpg</code></pre>
+
+    <ul>
+      <li>Filenames: slot number prefix + slot slug (FiberTime-compatible)</li>
+      <li>Double-duty photos are <em>copied</em> (not symlinked) into both slot positions</li>
+    </ul>
+
+    <h4>Per-PON bulk download</h4>
+    <ul>
+      <li>"Download All Approved" button on the PON pole list header</li>
+      <li>ZIP contains one subfolder per approved pole, same internal structure</li>
+      <li>Unapproved poles excluded silently</li>
+    </ul>
+
+    <pre><code>PON_19_approved_2026-05-12.zip
+  A673/
+    civil/ ...
+    optical/ ...
+  A737/
+    civil/ ...
+    optical/ ...
+  ...</code></pre>
+  </section>
+
+  <!-- 7. WIREFRAMES -->
+  <section id="wireframes">
+    <h2>7. Wireframes</h2>
+
+    <h3>PON Pole List</h3>
+    <div class="wireframe">┌────────────────────────────────────────────────────────────────────────────────────┐
+│  Field Operations › Works QA                                                       │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│  [Site: Plannet ▾]  [Zone: Zone 2 ▾]  [PON: PON 19 ▾]           [↓ Download All]  │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│  PON 19 — 28 poles    ✓ 12 approved    ◑ 11 ready    ○ 5 incomplete                │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│  [All]  [Incomplete]  [Ready for Review]  [Approved]           Search poles...     │
+├──────────┬─────────────────────┬─────────────────────┬────────────────┬────────────┤
+│  POLE    │  CIVIL              │  OPTICAL            │  STATUS        │            │
+├──────────┼─────────────────────┼─────────────────────┼────────────────┼────────────┤
+│  A673    │  ███████████░  6/7  │  ███████░░░░░  4/7  │  ◑ Ready       │  [Open →]  │
+│  A737    │  █████████████ 7/7  │  █████████████ 7/7  │  ✓ Approved    │  [Open →]  │
+│  A744    │  ████░░░░░░░░░ 2/7  │  ░░░░░░░░░░░░░ 0/7  │  ○ Incomplete  │  [Open →]  │
+│  P028    │  █████████████ 7/7  │  ████████████░ 6/7  │  ◑ Ready       │  [Open →]  │
+│  ...     │                     │                     │                │            │
+└──────────┴─────────────────────┴─────────────────────┴────────────────┴────────────┘</div>
+
+    <h3>Pole Detail Panel</h3>
+    <div class="wireframe">┌──────────────────────────────────────────────────────────────────────────────────┐
+│  ← PON 19                                Pole A673    ◑ Ready    [✓ Approve] [↓ ZIP] │
+│  Notes: _____________________________________________________________                │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  Unassigned (drag to assign):  [📷 img_001]  [📷 img_002]  [📷 img_003]             │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│        CIVIL  (6 / 7)                    │       OPTICAL  (4 / 7)                   │
+├──────────────────────────────────────────┼──────────────────────────────────────────┤
+│  ① Before           [📷]  ✓  [note]     │  ① Dome on Pole    [  Upload  ]           │
+│  ② During           [📷]  ✓  [note]     │  ② Dome Label      [📷]  ✓  [note]       │
+│  ③ Depth            [📷]  ✓  [note]     │  ③ Open Dome       [  Upload  ]           │
+│     ↳ also: End Plates                  │  ④ Splice Protectors [📷]  ✓  [note]     │
+│  ④ End Plates    (← shared w/ ③)       │  ⑤ Slack Management [  Upload  ]          │
+│  ⑤ Compaction       [📷]  ✓  [note]     │  ⑥ Seals & Dust Caps [📷]  ✓  [note]    │
+│  ⑥ Level Check      [📷]  ✓  [note]     │     note: cable ties white ✓             │
+│  ⑦ After            [  Upload  ]        │  ⑦ Pole ID          [  Upload  ]          │
+├──────────────────────────────────────────┴──────────────────────────────────────────┤
+│  [+ Import Folder]                                                                   │
+└──────────────────────────────────────────────────────────────────────────────────────┘</div>
+
+    <h3>ZIP folder structure</h3>
+    <div class="wireframe">PON_19_approved_2026-05-12.zip
+├── A673/
+│   ├── civil/
+│   │   ├── 01_before.jpg
+│   │   ├── 02_during.jpg
+│   │   ├── 03_depth.jpg
+│   │   ├── 04_end_plates.jpg        ← same file as 03_depth.jpg (double-duty)
+│   │   ├── 05_compaction.jpg
+│   │   ├── 06_level_check.jpg
+│   │   └── 07_after.jpg
+│   └── optical/
+│       ├── 01_dome_on_pole.jpg
+│       ├── 02_dome_label.jpg
+│       ├── 03_open_dome.jpg
+│       ├── 04_splice_protectors.jpg
+│       ├── 05_slack_management.jpg
+│       ├── 06_seals_dust_caps.jpg
+│       └── 07_pole_id.jpg
+├── A737/
+│   ├── civil/ ...
+│   └── optical/ ...
+└── ...</div>
+  </section>
+
+  <!-- 8. DATA MODEL -->
+  <section id="data-model">
+    <h2>8. Data Model</h2>
+
+    <h3>8.1 Existing tables (read from, do not modify)</h3>
+
+    <table>
+      <thead>
+        <tr><th>Table</th><th>Role in this dashboard</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>qfield_photo_validations</code></td>
+          <td>Bridge table written by the GPKG extractor. Contains <code>photo_key</code> (VF Storage path), <code>feature_id</code> (pole label e.g. "A673"), <code>work_type</code>, <code>checklist_step</code> (1–8 / 11–16 / NULL), <code>step_label</code>. This is the source of truth for QField-originated photos.</td>
+        </tr>
+        <tr>
+          <td><code>construction_qa_reviews</code></td>
+          <td>Stores boolean pass/fail per step (e.g. <code>civil_step_03_depth_photo = true</code>). No photo storage keys — this is why the new table below is needed.</td>
+        </tr>
+        <tr>
+          <td><code>projects</code>, <code>zones</code>, <code>drops</code></td>
+          <td>Drive the Site / Zone / PON navigation dropdowns.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>8.2 New table: <code>pole_qa_photos</code></h3>
+    <p>
+      Stores the actual photo storage keys per slot, approval state, and notes.
+      Column names mirror the <code>construction_qa_reviews</code> boolean columns exactly,
+      with <code>_key</code> suffix instead of boolean type.
+    </p>
+
+    <pre><code>CREATE TABLE pole_qa_photos (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id          UUID NOT NULL REFERENCES projects(id),
+  zone_id             UUID,
+  pon_id              UUID,
+  pole_id             TEXT NOT NULL,   -- QField feature_id, e.g. 'A673'
+
+  -- Civil slots — named to match construction_qa_reviews columns
+  civil_step_01_key   TEXT,            -- VF Storage key for Before Photo
+  civil_step_02_key   TEXT,            -- During Photo
+  civil_step_03_key   TEXT,            -- Depth Photo
+  civil_step_04_key   TEXT,            -- End Plates (may = civil_step_03_key, double-duty)
+  civil_step_05_key   TEXT,            -- Compaction / Backfill
+  civil_step_06_key   TEXT,            -- Level Check
+  civil_step_07_key   TEXT,            -- After Photo
+  -- civil_step_08 (Signature) intentionally omitted — unused in active workflow
+
+  -- Optical slots — Distribution Dome (Phase A, steps 1–8)
+  optical_step_01_key TEXT,            -- Dome on Pole
+  optical_step_02_key TEXT,            -- Dome Label
+  optical_step_03_key TEXT,            -- Open Dome
+  optical_step_04_key TEXT,            -- Splice Protectors
+  optical_step_05_key TEXT,            -- Slack Management
+  optical_step_06_key TEXT,            -- Strength Members
+  optical_step_07_key TEXT,            -- Seals & Dust Caps
+  optical_step_08_key TEXT,            -- Pole ID
+
+  -- Optical slots — Main Joint (Phase B, steps 11–16)
+  -- Include only if Johan confirms pole type has a main joint
+  optical_step_11_key TEXT,            -- Cable Entries
+  optical_step_12_key TEXT,            -- Strength Members (joint)
+  optical_step_13_key TEXT,            -- Tube Routing
+  optical_step_14_key TEXT,            -- Tray Entries
+  optical_step_15_key TEXT,            -- Coiling & Protectors
+  optical_step_16_key TEXT,            -- Readable Labels
+
+  -- Double-duty assignments: { "civil_step_04": "civil_step_03" }
+  -- means slot 4 displays the same photo as slot 3
+  double_duty         JSONB,
+
+  -- Per-slot notes: { "civil_step_03": "blurry – retake", "optical_step_08": "unreadable" }
+  slot_notes          JSONB,
+
+  -- Source tracking per slot: { "civil_step_01": "qfield", "civil_step_03": "upload" }
+  slot_sources        JSONB,
+
+  -- Staging area for folder-imported photos not yet assigned to a slot
+  staging_keys        TEXT[],          -- array of VF Storage keys awaiting assignment
+
+  -- Approval
+  approved_by         UUID REFERENCES users(id),
+  approved_at         TIMESTAMPTZ,
+  approval_note       TEXT,            -- populated when force-approved with missing slots
+
+  -- Audit
+  created_by          UUID REFERENCES users(id),
+  created_at          TIMESTAMPTZ DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE (project_id, pole_id)
+);
+
+CREATE INDEX ON pole_qa_photos (project_id, pon_id);
+CREATE INDEX ON pole_qa_photos (approved_at) WHERE approved_at IS NOT NULL;</code></pre>
+
+    <h3>8.3 Storage paths</h3>
+    <pre><code>works-qa/{project_id}/{pole_id}/civil/{step}-{slug}.jpg
+works-qa/{project_id}/{pole_id}/optical/{step}-{slug}.jpg
+works-qa/{project_id}/{pole_id}/staging/{uuid}.jpg    ← unassigned tray items</code></pre>
+
+    <h3>8.4 Initial data population from QField sync</h3>
+    <p>
+      A migration script reads <code>qfield_photo_validations</code> and creates / updates
+      <code>pole_qa_photos</code> records for any pole already tracked:
+    </p>
+    <pre><code>-- Populate civil slots from existing QField sync
+UPDATE pole_qa_photos pq
+SET civil_step_01_key = qpv.photo_key
+FROM qfield_photo_validations qpv
+WHERE qpv.feature_id  = pq.pole_id
+  AND qpv.work_type   = 'pole_installation'
+  AND qpv.checklist_step = 1
+  AND pq.civil_step_01_key IS NULL;
+-- Repeat for steps 2–7 and optical steps 1–8, 11–16</code></pre>
+    <p>
+      Johan opens an existing PON and sees all QField photos already in place — no re-upload required.
+      Photos uploaded manually in this dashboard are stored in the same VF Storage bucket but under
+      the <code>works-qa/</code> prefix, distinct from the original QField paths.
+    </p>
+  </section>
+
+  <!-- 9. API -->
+  <section id="api">
+    <h2>9. API Endpoints</h2>
+
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/api/works-qa/poles</code></td><td>List poles for a PON with completeness counts. Query: <code>projectId, zoneId, ponId</code></td></tr>
+        <tr><td>GET</td><td><code>/api/works-qa/poles/[poleId]</code></td><td>Full pole detail — all slot keys, notes, approval status. Query: <code>projectId</code></td></tr>
+        <tr><td>POST</td><td><code>/api/works-qa/poles/[poleId]/photos</code></td><td>Upload photo to a specific slot. Body: <code>multipart/form-data</code> with <code>slot</code> + image file</td></tr>
+        <tr><td>PATCH</td><td><code>/api/works-qa/poles/[poleId]/slots</code></td><td>Assign existing staging key(s) to slot(s) after folder import. Body: <code>{ assignments: { civil_3: "staging/uuid.jpg" } }</code></td></tr>
+        <tr><td>POST</td><td><code>/api/works-qa/poles/[poleId]/import-folder</code></td><td>Bulk upload folder contents. Returns array of staging keys for the assignment tray.</td></tr>
+        <tr><td>POST</td><td><code>/api/works-qa/poles/[poleId]/approve</code></td><td>Approve pole. Body: optional <code>{ note: string }</code> for force-approve</td></tr>
+        <tr><td>DELETE</td><td><code>/api/works-qa/poles/[poleId]/approve</code></td><td>Undo approval (super_admin / manager only)</td></tr>
+        <tr><td>PATCH</td><td><code>/api/works-qa/poles/[poleId]/notes</code></td><td>Save pole-level or slot-level notes. Body: <code>{ note?: string, slotNotes?: JSONB }</code></td></tr>
+        <tr><td>GET</td><td><code>/api/works-qa/poles/[poleId]/download</code></td><td>Stream ZIP for a single approved pole</td></tr>
+        <tr><td>GET</td><td><code>/api/works-qa/download</code></td><td>Stream ZIP for all approved poles in a PON. Query: <code>projectId, ponId</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 10. SCOPE -->
+  <section id="scope">
+    <h2>10. Scope &amp; Constraints</h2>
+
+    <div class="callout callout-red">
+      <div class="callout-label">Hard constraint — no QField sync-back</div>
+      <p>
+        This dashboard reads from QField (via existing sync) but must <strong>never write to QField</strong>.
+        The QField sync-back feature overwrote pole status on existing projects and caused
+        data corruption. The feature flag disabling it must remain active for the entire lifetime
+        of this module.
+      </p>
+    </div>
+
+    <div class="callout callout-amber">
+      <div class="callout-label">Data safety — existing QField photos are read-only source</div>
+      <p>
+        QField photo records in <code>qfield_photo_validations</code> are never modified.
+        <code>pole_qa_photos</code> is a QA layer that references the same storage keys.
+        Uploading a replacement photo creates a new storage key; the original QField photo remains untouched.
+      </p>
+    </div>
+
+    <h3>RBAC</h3>
+    <table>
+      <thead>
+        <tr><th>Role</th><th>Upload</th><th>Approve</th><th>Undo Approval</th><th>Download ZIP</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>super_admin, manager</strong></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td><strong>qa_reviewer</strong></td><td>✓</td><td>✓</td><td>✗</td><td>✓</td><td>✓</td></tr>
+        <tr><td><strong>viewer</strong></td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>Read-only</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 11. PHASES -->
+  <section id="phases">
+    <h2>11. Phased Delivery</h2>
+
+    <div class="phases">
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot phase-dot-1">1</div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-label">Phase 1 — PON QA Dashboard MVP <span class="status-pill pill-blue" style="margin-left:8px">Build now</span></div>
+          <ul>
+            <li>Site → Zone → PON → Pole List navigation</li>
+            <li>Pole list: civil + optical completeness indicators per pole</li>
+            <li>Pole detail panel: 7 civil + 7 optical slots</li>
+            <li>Per-slot file upload + drag-folder import → assignment tray → manual slot assignment</li>
+            <li>Double-duty photo support (one photo assigned to two slots)</li>
+            <li>Pole-level and slot-level notes</li>
+            <li>Pole approval with force-override option</li>
+            <li>Download ZIP per approved pole</li>
+            <li>Download ZIP for entire PON (all approved poles)</li>
+            <li>Auto-populate slots from existing QField sync data on first open</li>
+            <li>VLM slot suggestion on folder import (dim label only, Johan confirms)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot phase-dot-2">2</div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-label">Phase 2 — VLM Quality Check + Retake Requests</div>
+          <ul>
+            <li>VLM validates photo quality on upload: blurry, wrong angle, black cable ties flagged</li>
+            <li>"Needs retake" flag per slot — visible to Johan and (eventually) field workers</li>
+            <li>WhatsApp retake notification to field worker when slot is flagged</li>
+            <li>Field worker acknowledgement tracking</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot phase-dot-3">3</div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-label">Phase 3 — GPS Camera App + Automated FiberTime Submission</div>
+          <ul>
+            <li>GPS-aware field capture PWA: detects nearby poles, guides photo-by-photo with per-step instructions</li>
+            <li>Photos route directly to correct pole slots on capture — no manual assignment</li>
+            <li>PON completion reports at zone and project level</li>
+            <li>Automated FiberTime submission bundle (no manual ZIP)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12. ASSUMPTIONS -->
+  <section id="assumptions">
+    <h2>12. Open Questions &amp; Assumptions</h2>
+
+    <table>
+      <thead>
+        <tr><th>#</th><th>Question for Johan</th><th>Current assumption</th><th>Impact if wrong</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#78350f22">
+          <td>1</td>
+          <td>
+            <strong>Which optical steps apply per pole?</strong><br>
+            The codebase has <strong>8 dome steps</strong> (optical_step_01–08) AND
+            <strong>6 main joint steps</strong> (optical_step_11–16) = 14 optical columns total.
+            You said "7 for optical". Are we checking only the dome phase? Or do some poles
+            also need a main joint check? And which of the 8 dome steps are the required 7
+            (if one is skipped, which one)?
+          </td>
+          <td>All 8 dome steps required. Main joint (steps 11–16) only if pole has a joint.
+          Schema already has all columns — no changes needed once confirmed.</td>
+          <td><strong>High.</strong> Determines the total slot count and the approval gate condition.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>
+            <strong>Does the checklist vary by project?</strong><br>
+            Does Herotel use the same 14 steps as Plannet? Or does each client have a
+            different FiberTime spec?
+          </td>
+          <td>Fixed steps for all projects in Phase 1.</td>
+          <td>Need per-project spec config if different clients require different slots.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>
+            <strong>Are all poles already in FibreFlow via QField sync?</strong><br>
+            Or are there PONs/poles for old sites that have never been synced from QField
+            and would need to be entered manually?
+          </td>
+          <td>Poles exist via QField sync. No manual pole creation UI in Phase 1.</td>
+          <td>Need an "Add pole manually" flow for sites not in QField yet.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>
+            <strong>FiberTime ZIP filename convention?</strong><br>
+            Does FiberTime require a specific folder structure or filename format when
+            you submit the photo package? (e.g. must the civil folder be named
+            <code>Civil</code> not <code>civil</code>? Must filenames match their pole ID?)
+          </td>
+          <td>Using <code>{step}_{slug}.jpg</code> inside <code>civil/</code> and <code>optical/</code> subfolders.</td>
+          <td>Filename / folder name template change only — no schema or logic impact.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>
+            <strong>Who else needs QA reviewer access?</strong><br>
+            Besides you, does anyone else on the team need to upload or approve poles?
+          </td>
+          <td>Johan + managers only. No field worker access in Phase 1.</td>
+          <td>RBAC expansion if other reviewers or field workers need upload access.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>
+            <strong>Unmatched QField column names?</strong><br>
+            The extractor has seen these unmatched column names in production:
+            <code>Photo Joint</code>, <code>Photo Label</code>, <code>Photo Slack</code>,
+            <code>Pole Photo</code>, <code>Lable Photo</code>.
+            Are any of these supposed to map to a specific optical step, or are they
+            always miscategorised uploads that belong in the manual tray?
+          </td>
+          <td>All unmatched columns go to the unassigned tray for manual assignment.</td>
+          <td>Can add new patterns to the GPKG extractor regex to auto-assign them.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- FOOTER -->
+  <div class="prd-footer">
+    <span>PRD-063 · Pole Photo QA Dashboard · FibreFlow Engineering</span>
+    <span>2026-05-12 · Draft — sent to Johan Scott for confirmation</span>
+  </div>
+
+</div>
+</body>
+</html>

@@ -30,6 +30,7 @@ export type VlmAnalysisType =
   | 'green_lights_check'
   | 'wa_photo_serial'
   | 'wa_serial_recheck'
+  | 'ups_serial'          // Gizzu UPS serial (GU18W...) from WhatsApp photo
   // Fleet module
   | 'odometer'
   | 'license_plate'
@@ -54,9 +55,11 @@ export type VlmAnalysisType =
   | 'construction_photo_qa'
   // Data Sync module (EOD sheets)
   | 'eod_sheet_dr'
+  | 'eod_sheet_gizzu_dr'
   | 'eod_sheet_address'
   | 'eod_sheet_gizzu'
-  | 'eod_sheet_pon';
+  | 'eod_sheet_pon'
+  | 'eod_sheet_ont';
 
 /**
  * Analysis types grouped by module (for UI filtering)
@@ -72,6 +75,7 @@ export const ANALYSIS_TYPES_BY_MODULE: Record<VlmModule, VlmAnalysisType[]> = {
     'green_lights_check',
     'wa_photo_serial',
     'wa_serial_recheck',
+    'ups_serial',
   ],
   fleet: ['odometer', 'license_plate', 'fuel_gauge', 'fuel_receipt', 'license_disk'],
   procurement: ['quote_supplier', 'quote_line_item', 'quote_totals', 'po_header', 'po_quantity', 'po_pricing'],
@@ -79,7 +83,7 @@ export const ANALYSIS_TYPES_BY_MODULE: Record<VlmModule, VlmAnalysisType[]> = {
   staff: ['id_extraction', 'photo_match'],
   qfield: ['qfield_photo_qa'],
   construction_qa: ['construction_photo_qa'],
-  'data-sync': ['eod_sheet_dr', 'eod_sheet_address', 'eod_sheet_gizzu', 'eod_sheet_pon'],
+  'data-sync': ['eod_sheet_dr', 'eod_sheet_gizzu_dr', 'eod_sheet_address', 'eod_sheet_gizzu', 'eod_sheet_pon', 'eod_sheet_ont'],
 };
 
 // ============================================================================

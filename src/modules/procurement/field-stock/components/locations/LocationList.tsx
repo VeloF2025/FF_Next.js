@@ -6,7 +6,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, Plus, Search, Filter, Building2, Truck, User, Package } from 'lucide-react';
+import { MapPin, Plus, Search, Filter, Building2, Truck, User, Package, Pencil } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useLocations } from '../../hooks';
 import type { StockLocation, LocationType } from '../../types';
@@ -16,6 +16,7 @@ interface LocationListProps {
   selectedLocationId?: string;
   showCreateButton?: boolean;
   onCreateClick?: () => void;
+  onEditLocation?: (location: StockLocation) => void;
 }
 
 const locationTypeIcons: Record<LocationType, React.ReactNode> = {
@@ -48,11 +49,14 @@ const locationTypeColors: Record<LocationType, string> = {
   adjustment: 'bg-secondary text-gray-800 dark:bg-gray-700 dark:text-gray-300',
 };
 
+const HIDDEN_ADMIN_TYPES: LocationType[] = ['technician', 'scrap', 'adjustment'];
+
 export function LocationList({
   onSelectLocation,
   selectedLocationId,
   showCreateButton = true,
   onCreateClick,
+  onEditLocation,
 }: LocationListProps) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<LocationType | ''>('');
@@ -66,6 +70,10 @@ export function LocationList({
     },
     autoFetch: true,
   });
+
+  const visibleLocations = locations.filter(
+    (l) => !HIDDEN_ADMIN_TYPES.includes(l.locationType) && !l.isVirtual,
+  );
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -148,19 +156,21 @@ export function LocationList({
             >
               All Types
             </button>
-            {Object.entries(locationTypeLabels).map(([type, label]) => (
-              <button
-                key={type}
-                onClick={() => handleTypeFilter(type as LocationType)}
-                className={`rounded-full px-3 py-1 text-sm font-medium ${
-                  typeFilter === type
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-card text-muted-foreground hover:bg-secondary dark:text-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+            {Object.entries(locationTypeLabels)
+              .filter(([type]) => !HIDDEN_ADMIN_TYPES.includes(type as LocationType))
+              .map(([type, label]) => (
+                <button
+                  key={type}
+                  onClick={() => handleTypeFilter(type as LocationType)}
+                  className={`rounded-full px-3 py-1 text-sm font-medium ${
+                    typeFilter === type
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-card text-muted-foreground hover:bg-secondary dark:text-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
           </div>
         </div>
       )}
@@ -169,7 +179,7 @@ export function LocationList({
       {loading && <LoadingSpinner className="h-32" label="" />}
 
       {/* Location List */}
-      {!loading && locations.length === 0 && (
+      {!loading && visibleLocations.length === 0 && (
         <div className="rounded-lg border border-border bg-background p-8 text-center dark:border-gray-700 dark:bg-gray-800">
           <MapPin className="mx-auto h-12 w-12 text-gray-400" />
           <p className="mt-2 text-muted-foreground">No locations found</p>
@@ -179,17 +189,19 @@ export function LocationList({
         </div>
       )}
 
-      {!loading && locations.length > 0 && (
+      {!loading && visibleLocations.length > 0 && (
         <div className="divide-y divide-gray-200 rounded-lg border border-border bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
-          {locations.map((location) => (
-            <button
+          {visibleLocations.map((location) => (
+            <div
               key={location.id}
-              onClick={() => onSelectLocation?.(location)}
-              className={`flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-accent ${
+              className={`flex w-full items-center justify-between p-4 transition-colors hover:bg-accent ${
                 selectedLocationId === location.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
               }`}
             >
-              <div className="flex items-center gap-4">
+              <button
+                onClick={() => onSelectLocation?.(location)}
+                className="flex flex-1 items-center gap-4 text-left"
+              >
                 <div className={`rounded-lg p-2 ${locationTypeColors[location.locationType]}`}>
                   {locationTypeIcons[location.locationType]}
                 </div>
@@ -200,15 +212,23 @@ export function LocationList({
                     {location.assignedToName && ` • ${location.assignedToName}`}
                   </p>
                 </div>
+              </button>
+              <div className="flex items-center gap-3">
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${locationTypeColors[location.locationType]}`}>
+                  {locationTypeLabels[location.locationType]}
+                </span>
+                {onEditLocation && (
+                  <button
+                    type="button"
+                    onClick={() => onEditLocation(location)}
+                    className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    aria-label={`Edit ${location.name}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
               </div>
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  locationTypeColors[location.locationType]
-                }`}
-              >
-                {locationTypeLabels[location.locationType]}
-              </span>
-            </button>
+            </div>
           ))}
         </div>
       )}

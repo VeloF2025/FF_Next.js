@@ -1,8 +1,11 @@
 /**
  * Project Staff API
- * GET /api/projects/[projectId]/staff - Get all staff assigned to a project
  * POST /api/projects/[projectId]/staff - Assign staff to project
  * DELETE /api/projects/[projectId]/staff/[staffId] - Remove staff from project
+ *
+ * GET removed: was selecting `s.name` from a table whose actual columns are
+ * first_name + last_name. List-staff-by-project is served by
+ * pages/api/projects/[projectId]/team.ts instead.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -33,73 +36,10 @@ async function syncProjectCount(staffId: string): Promise<void> {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authReq = req as AuthenticatedNextApiRequest;
-  const { projectId, activeOnly, staffId: staffIdToRemove } = req.query;
+  const { projectId, staffId: staffIdToRemove } = req.query;
 
   if (!projectId || typeof projectId !== 'string') {
     return apiResponse.badRequest(res, 'Project ID is required');
-  }
-
-  // GET - Fetch staff for project
-  if (req.method === 'GET') {
-    try {
-      let staff;
-
-      if (activeOnly === 'true') {
-        staff = await sql`
-          SELECT
-            sp.*,
-            p.name as project_name,
-            p.status as project_status,
-            s.name as staff_name,
-            s.email as staff_email,
-            s.position as staff_position,
-            a.name as assigned_by_name
-          FROM staff_projects sp
-          LEFT JOIN projects p ON p.id = sp.project_id
-          LEFT JOIN staff s ON s.id = sp.staff_id
-          LEFT JOIN staff a ON a.id = sp.assigned_by
-          WHERE sp.project_id = ${projectId}
-            AND sp.is_active = true
-          ORDER BY s.name ASC
-        `;
-      } else {
-        staff = await sql`
-          SELECT
-            sp.*,
-            p.name as project_name,
-            p.status as project_status,
-            s.name as staff_name,
-            s.email as staff_email,
-            s.position as staff_position,
-            a.name as assigned_by_name
-          FROM staff_projects sp
-          LEFT JOIN projects p ON p.id = sp.project_id
-          LEFT JOIN staff s ON s.id = sp.staff_id
-          LEFT JOIN staff a ON a.id = sp.assigned_by
-          WHERE sp.project_id = ${projectId}
-          ORDER BY s.name ASC
-        `;
-      }
-
-      // Group by role
-      const byRole: Record<string, unknown[]> = {};
-      staff.forEach((s: Record<string, unknown>) => {
-        const role = (s.role as string) || 'Unassigned';
-        if (!byRole[role]) byRole[role] = [];
-        byRole[role].push(mapDbToStaffProject(s));
-      });
-
-      return res.status(200).json({
-        success: true,
-        staff: staff.map(mapDbToStaffProject),
-        byRole,
-        count: staff.length,
-      });
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Failed to fetch project staff', { projectId, error: errorMessage });
-      return res.status(500).json({ error: 'Failed to fetch staff', message: errorMessage });
-    }
   }
 
   // POST - Assign staff to project
@@ -238,7 +178,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'DELETE']);
+  return apiResponse.methodNotAllowed(res, req.method!, ['POST', 'DELETE']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

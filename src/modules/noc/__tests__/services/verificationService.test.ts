@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as verificationService from '../../services/verificationService';
 import * as db from '../../utils/db';
 import { VerificationStep, VerificationStepNumber } from '../../types/verification';
-import { TOTAL_VERIFICATION_STEPS, VERIFICATION_STEP_TEMPLATES } from '../../constants/verificationSteps';
+import { VERIFICATION_STEP_TEMPLATES } from '../../constants/verificationSteps';
 
 // Mock dependencies
 vi.mock('../../utils/db');
@@ -59,18 +59,25 @@ describe('VerificationService - TDD', () => {
   }
 
   describe('initializeVerificationSteps', () => {
-    it('should initialize exactly 12 verification steps for a ticket', async () => {
+    // PR4: the default install template was consolidated from 12 steps to 6
+    // with named photo_slots. These tests assert the new contract for
+    // activations/new_installation. Other ticket types (fault_repair, etc.)
+    // still have their own non-slot step counts.
+    const INSTALL_STEP_COUNT = 6;
+
+    it(`should initialize exactly ${INSTALL_STEP_COUNT} verification steps for the default install template`, async () => {
       // Arrange
       vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId }); // ticket exists
       vi.mocked(db.query).mockResolvedValueOnce([]); // no existing steps
 
-      const mockSteps = Array.from({ length: 12 }, (_, i) =>
+      const mockSteps = Array.from({ length: INSTALL_STEP_COUNT }, (_, i) =>
         createMockStep((i + 1) as VerificationStepNumber)
       );
 
       vi.mocked(db.transaction).mockImplementation(async (callback) => {
         const mockTxn = {
-          query: vi.fn(),
+          // Pre-seed INSERT returns a row per slot via RETURNING id.
+          query: vi.fn().mockResolvedValue([{ id: 'mock-slot' }]),
           queryOne: vi.fn().mockImplementation(async () => {
             return mockSteps.shift();
           }),
@@ -82,16 +89,15 @@ describe('VerificationService - TDD', () => {
       const steps = await verificationService.initializeVerificationSteps(mockTicketId);
 
       // Assert
-      expect(steps).toHaveLength(TOTAL_VERIFICATION_STEPS);
-      expect(steps).toHaveLength(12);
+      expect(steps).toHaveLength(INSTALL_STEP_COUNT);
     });
 
-    it('should create steps with correct step numbers 1-12', async () => {
+    it(`should create steps with correct step numbers 1-${INSTALL_STEP_COUNT}`, async () => {
       // Arrange
       vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId });
       vi.mocked(db.query).mockResolvedValueOnce([]);
 
-      const mockSteps = Array.from({ length: 12 }, (_, i) =>
+      const mockSteps = Array.from({ length: INSTALL_STEP_COUNT }, (_, i) =>
         createMockStep((i + 1) as VerificationStepNumber)
       );
 
@@ -102,7 +108,7 @@ describe('VerificationService - TDD', () => {
 
       // Assert
       const stepNumbers = steps.map(s => s.step_number).sort((a, b) => a - b);
-      expect(stepNumbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+      expect(stepNumbers).toEqual(Array.from({ length: INSTALL_STEP_COUNT }, (_, i) => i + 1));
     });
 
     it('should initialize all steps as incomplete', async () => {
@@ -110,7 +116,7 @@ describe('VerificationService - TDD', () => {
       vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId });
       vi.mocked(db.query).mockResolvedValueOnce([]);
 
-      const mockSteps = Array.from({ length: 12 }, (_, i) =>
+      const mockSteps = Array.from({ length: INSTALL_STEP_COUNT }, (_, i) =>
         createMockStep((i + 1) as VerificationStepNumber)
       );
 
@@ -127,12 +133,12 @@ describe('VerificationService - TDD', () => {
       });
     });
 
-    it('should set correct photo requirements for each step', async () => {
+    it('should set photo_required = true on every install step (slot-aware)', async () => {
       // Arrange
       vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId });
       vi.mocked(db.query).mockResolvedValueOnce([]);
 
-      const mockSteps = Array.from({ length: 12 }, (_, i) =>
+      const mockSteps = Array.from({ length: INSTALL_STEP_COUNT }, (_, i) =>
         createMockStep((i + 1) as VerificationStepNumber)
       );
 
@@ -141,12 +147,93 @@ describe('VerificationService - TDD', () => {
       // Act
       const steps = await verificationService.initializeVerificationSteps(mockTicketId);
 
-      // Assert
-      const step9 = steps.find(s => s.step_number === 9);
-      expect(step9?.photo_required).toBe(false);
+      // Assert — the 6-step install template marks every step photo_required.
+      // Slot-level required flags are tested separately at the template level.
+      steps.forEach(step => {
+        expect(step.photo_required).toBe(true);
+      });
+    });
 
-      const step1 = steps.find(s => s.step_number === 1);
-      expect(step1?.photo_required).toBe(true);
+    it('should pre-seed maintenance_step_photos rows for every photo_slot in the install template', async () => {
+      // Mirrors the production INSTALL_STEPS_WITH_SLOTS — 6 steps with 11
+      // total slots. The test asserts the pre-seed loop calls txn.query for
+      // every slot with the slot metadata coming straight from the template
+      // (label, source_mode, is_required — never client-supplied).
+      vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId });
+      vi.mocked(db.query).mockResolvedValueOnce([]);
+
+      const slotQueries: Array<{ sql: string; params: unknown[] }> = [];
+      const stepIds = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5', 'step-6'];
+
+      vi.mocked(db.transaction).mockImplementation(async (callback) => {
+        let stepIndex = 0;
+        const mockTxn = {
+          query: vi.fn().mockImplementation(async (sql: string, params: unknown[]) => {
+            // Only capture the INSERT INTO maintenance_step_photos calls;
+            // RETURNING id => one inserted row.
+            if (sql.includes('maintenance_step_photos')) {
+              slotQueries.push({ sql, params });
+              return [{ id: `slot-${slotQueries.length}` }];
+            }
+            return [];
+          }),
+          queryOne: vi.fn().mockImplementation(async () => {
+            const id = stepIds[stepIndex++];
+            return id ? createMockStep(((stepIndex) % 12 + 1) as VerificationStepNumber, { id }) : null;
+          }),
+        };
+        return await callback(mockTxn as Parameters<typeof callback>[0]);
+      });
+
+      await verificationService.initializeVerificationSteps(mockTicketId, 'activations');
+
+      // 11 photo slots across 6 steps (1 + 1 + 3 + 2 + 2 + 2) in the install template.
+      expect(slotQueries).toHaveLength(11);
+
+      // Spot-check the 1Map sign-up slot — source_mode must be 'gallery' so
+      // the resolve page hides the camera-capture attribute.
+      const onemapSlot = slotQueries.find((q) => q.params[1] === 'onemap_signup_screenshot');
+      expect(onemapSlot).toBeDefined();
+      expect(onemapSlot?.params[3]).toBe('gallery');
+      expect(onemapSlot?.params[4]).toBe(true); // is_required
+
+      // Spot-check a camera slot.
+      const ontCloseup = slotQueries.find((q) => q.params[1] === 'ont_closeup');
+      expect(ontCloseup).toBeDefined();
+      expect(ontCloseup?.params[3]).toBe('camera');
+
+      // Every INSERT must use ON CONFLICT DO NOTHING for idempotency.
+      slotQueries.forEach((q) => {
+        expect(q.sql).toContain('ON CONFLICT (step_id, slot_key) DO NOTHING');
+      });
+    });
+
+    it('should not pre-seed maintenance_step_photos for templates without slots (legacy fault_repair)', async () => {
+      vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId });
+      vi.mocked(db.query).mockResolvedValueOnce([]);
+
+      const txnQuery = vi.fn().mockResolvedValue([]);
+      let returned = 0;
+      vi.mocked(db.transaction).mockImplementation(async (callback) => {
+        const mockTxn = {
+          query: txnQuery,
+          queryOne: vi.fn().mockImplementation(async () => {
+            returned += 1;
+            return createMockStep(((returned - 1) % 12 + 1) as VerificationStepNumber);
+          }),
+        };
+        return await callback(mockTxn as Parameters<typeof callback>[0]);
+      });
+
+      await verificationService.initializeVerificationSteps(mockTicketId, 'fault_repair');
+
+      // fault_repair template has no photo_slots → zero INSERTs into
+      // maintenance_step_photos.
+      const slotInserts = txnQuery.mock.calls.filter((call: unknown[]) => {
+        const sqlArg = call[0];
+        return typeof sqlArg === 'string' && sqlArg.includes('maintenance_step_photos');
+      });
+      expect(slotInserts).toHaveLength(0);
     });
 
     it('should throw error if ticket does not exist', async () => {

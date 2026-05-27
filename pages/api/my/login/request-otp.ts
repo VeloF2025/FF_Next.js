@@ -114,12 +114,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       log.info('[my-request-otp] OTP sent', { staffId: row.staff_id });
     } catch (sendErr) {
       // A WA send failure is not visible to the client — if we returned 500
-      // here, the attacker could A/B test which phones bounce. Ops still get
-      // the error in the log.
+      // here, the attacker could A/B test which phones bounce.
+      //
+      // The app-level log.error writes to in-memory only (lib/logger.ts is
+      // effectively dead in prod), so a silent WA outage could go unnoticed
+      // for hours — that's how #1426 hid for weeks. Mirror the message to
+      // stderr as a structured JSON line so it lands in the systemd journal
+      // (/var/log/fibreflow-production.error.log) and can be alerted on.
+      // The OTP itself is never included.
+      const errMsg =
+        sendErr instanceof Error ? sendErr.message : String(sendErr);
       log.error('[my-request-otp] WA send failed', {
         staffId: row.staff_id,
-        error: sendErr instanceof Error ? sendErr.message : String(sendErr),
+        error: errMsg,
       });
+      // Mirror to stderr synchronously — stderr.write on Node is effectively
+      // infallible (blocks until flushed), so no try/catch is needed.
+      process.stderr.write(
+        JSON.stringify({
+          level: 'ERROR',
+          component: 'attendance-otp',
+          event: 'wa_send_failed',
+          staffId: row.staff_id,
+          error: errMsg,
+          timestamp: new Date().toISOString(),
+        }) + '\n'
+      );
     }
 
     return apiResponse.success(res, { ok: true });

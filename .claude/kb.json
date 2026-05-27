@@ -1,0 +1,15 @@
+{
+  "collection": "fibreflow_kb",
+  "targets": [
+    {
+      "pattern": "src/modules/*",
+      "strategy": "group",
+      "group_by": "src/modules/",
+      "template": ".claude/templates/module-claude-md.template"
+    }
+  ],
+  "ingest": {
+    "script": "scripts/ingest-qdrant.py",
+    "venv": "scripts/.venv"
+  }
+}

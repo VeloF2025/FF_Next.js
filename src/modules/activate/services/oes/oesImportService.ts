@@ -10,7 +10,103 @@
 
 import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
+import { isOntLifecycleV2Enabled } from '@/lib/featureFlags';
 import type { OESRow, PPRow } from './oesExcelParser';
+
+// ============================================================================
+// PP DATA UPSERT TEMPLATES (module-level constants)
+//
+// Each template is a function that accepts the machine-generated $N placeholder
+// string (e.g. "($1,$2,$3,$4),($5,$6,$7,$8),...") and returns complete SQL.
+// Placeholders are generated in the batch loop as:
+//   `($${offset+1}, $${offset+2}, $${offset+3}::date, $${offset+4})`
+// and joined with ', '. Values array is positional and matches this pattern.
+//
+// Two separate templates ensure each code path is readable and independently
+// auditable without conditional branching inside the SQL body.
+// ============================================================================
+
+/**
+ * UPSERT_LEGACY — Flag OFF: activated rows are demoted to not_found on
+ * FT re-list. This was the behavior that caused the 211 vs 22 MOA discrepancy.
+ * Preserved verbatim so flag-off is byte-identical to pre-PR master.
+ */
+const UPSERT_LEGACY = (valuePlaceholders: string) => `
+  INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
+  VALUES ${valuePlaceholders}
+  ON CONFLICT (serial_number, project) DO UPDATE SET
+    date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
+    import_batch_id = EXCLUDED.import_batch_id,
+    -- Re-entry: an activated serial reappears in PP DATA → reset for fresh
+    -- ticket lifecycle, but only clear maintenance_ticket_id when the
+    -- linked ticket is actually closed. Clearing it while the prior
+    -- ticket is still open caused daily duplicate creates (the
+    -- pp-data-tickets endpoint's eligibility query re-fires on
+    -- maintenance_ticket_id IS NULL).
+    --
+    -- PERF: the EXISTS sub-query runs once per conflicting row inside
+    -- the bulk INSERT. For our expected import sizes (≤ low thousands
+    -- of rows per chunk, with re-entries being a small fraction) this
+    -- is acceptable. If imports balloon, replace with a CTE that
+    -- pre-joins the open-ticket set once before the upsert.
+    resolution_status = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN 'not_found'
+      ELSE oes_pp_data.resolution_status
+    END,
+    maintenance_ticket_id = CASE
+      WHEN oes_pp_data.resolution_status = 'activated'
+           AND (
+             oes_pp_data.maintenance_ticket_id IS NULL
+             OR EXISTS (
+               SELECT 1 FROM maintenance_tickets mt
+                WHERE mt.id = oes_pp_data.maintenance_ticket_id
+                  AND mt.status IN ('resolved','closed','cancelled')
+             )
+           )
+        THEN NULL
+      ELSE oes_pp_data.maintenance_ticket_id
+    END,
+    resolved_drop_number = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+      ELSE oes_pp_data.resolved_drop_number
+    END,
+    resolved_source = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+      ELSE oes_pp_data.resolved_source
+    END,
+    resolved_details = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+      ELSE oes_pp_data.resolved_details
+    END,
+    resolved_at = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+      ELSE oes_pp_data.resolved_at
+    END,
+    updated_at = NOW()`;
+
+/**
+ * UPSERT_V2 — Flag ON (ONT_LIFECYCLE_V2): activated rows stay activated.
+ * The lifecycle is one-way: not_activated_yet → activated → decommissioned.
+ * A serial re-appearing on FT PP DATA does NOT revert its activation status —
+ * only an explicit decommission event (decommissioned_at) can do that.
+ * Activation context (resolved_drop_number / source / details / resolved_at /
+ * maintenance_ticket_id) is preserved as the record of fact.
+ */
+const UPSERT_V2 = (valuePlaceholders: string) => `
+  INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
+  VALUES ${valuePlaceholders}
+  ON CONFLICT (serial_number, project) DO UPDATE SET
+    date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
+    import_batch_id = EXCLUDED.import_batch_id,
+    -- ONT_LIFECYCLE_V2: never demote activated rows. Status is immutable
+    -- once activated; only decommissioned_at can move it to terminal state.
+    resolution_status = oes_pp_data.resolution_status,
+    maintenance_ticket_id = oes_pp_data.maintenance_ticket_id,
+    resolved_drop_number = oes_pp_data.resolved_drop_number,
+    resolved_source = oes_pp_data.resolved_source,
+    resolved_details = oes_pp_data.resolved_details,
+    resolved_at = oes_pp_data.resolved_at,
+    updated_at = NOW()`;
 
 const logger = createLogger('oes/oesImportService');
 
@@ -155,12 +251,55 @@ export async function upsertActivations(
     .map(r => r.drop_number);
 
   if (matchedDropNumbers.length > 0) {
-    await pool.query(
-      `UPDATE drops
-       SET oes_confirmed = true, oes_confirmed_at = NOW()
-       WHERE drop_number = ANY($1)`,
-      [matchedDropNumbers]
-    );
+    // oes_confirmed + ont_serial propagation share a transaction so a
+    // mid-flow failure can't leave drops marked confirmed without their
+    // serial filled. Wrapped in try/catch — propagation is best-effort,
+    // since the next batch (or migration 361) will catch any unprocessed
+    // drops via the idempotent `ont_serial IS NULL` guard.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE drops
+         SET oes_confirmed = true, oes_confirmed_at = NOW()
+         WHERE drop_number = ANY($1)`,
+        [matchedDropNumbers]
+      );
+
+      // Propagate OES serial_number to drops.ont_serial when the drops row
+      // has no serial yet. Never overwrites — drops.ont_serial may already
+      // hold a field-captured (1Map / stock / QField / Loeks) serial that
+      // should win. Format guard skips Gizzu and other non-ALCLB strings
+      // that appear in oes_activations.serial_number occasionally.
+      // oes_activations has UNIQUE (drop_number) so this UPDATE touches each
+      // drops row at most once — no DISTINCT ON needed.
+      const propResult = await client.query(
+        `UPDATE drops d
+         SET ont_serial = oa.serial_number,
+             notes = TRIM(BOTH E'\n' FROM
+                     COALESCE(d.notes, '') || E'\nOES propagation'),
+             updated_at = NOW()
+         FROM oes_activations oa
+         WHERE oa.drop_number = d.drop_number
+           AND oa.drop_number = ANY($1)
+           AND oa.serial_number IS NOT NULL
+           AND oa.serial_number <> ''
+           AND oa.serial_number ~* '^ALCLB[A-F0-9]{7,13}$'
+           AND (d.ont_serial IS NULL OR d.ont_serial = '')`,
+        [matchedDropNumbers]
+      );
+      await client.query('COMMIT');
+      if (propResult.rowCount && propResult.rowCount > 0) {
+        logger.info(`Propagated OES serial to ${propResult.rowCount} drops`);
+      }
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => { /* best-effort */ });
+      const msg = err instanceof Error ? err.message : 'unknown';
+      logger.error(`OES confirmed+propagation failed: ${msg}`);
+      errors.push(`Confirmation+propagation: ${msg}`);
+    } finally {
+      client.release();
+    }
   }
 
   const matched = dropsMap.size;
@@ -194,6 +333,21 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
     );
     const batchId = batchResult.rows[0].id as string;
 
+    // Capture re-entries: previously-activated PP rows whose serial+project re-appear
+    // in this import. These represent "DR went live, dropped from PP, then OES put it
+    // back in PP DATA again" — typically a service swap or re-provision.
+    //
+    // Flag OFF (legacy): we reset them to not_found so a fresh ticket lifecycle kicks in,
+    //   and emit a DR timeline event (pre_prov_reentered) capturing the prior DR resolution.
+    // Flag ON (ONT_LIFECYCLE_V2): we keep the row as activated (lifecycle is one-way).
+    //   We still emit the pre_prov_reentered event as a diagnostic — the re-entry
+    //   is valuable information even if we don't demote the status.
+    type ReentryRow = { drop_number: string | null; serial_number: string; project: string };
+    const reentryRows: ReentryRow[] = [];
+
+    // Select template once; module-level UPSERT_LEGACY / UPSERT_V2 hold the SQL bodies.
+    const lifecycleV2On = isOntLifecycleV2Enabled();
+
     const BATCH_SIZE = 500;
     for (let i = 0; i < ppRows.length; i += BATCH_SIZE) {
       const chunk = ppRows.slice(i, i + BATCH_SIZE);
@@ -206,16 +360,57 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
         values.push(row.serial_number, row.project, row.date_registered, batchId);
       });
 
-      await pool.query(
-        `INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
-         VALUES ${placeholders.join(', ')}
-         ON CONFLICT (serial_number, project) DO UPDATE SET
-           date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
-           import_batch_id = EXCLUDED.import_batch_id,
-           updated_at = NOW()
-         WHERE oes_pp_data.resolution_status = 'not_found'`,
-        values
+      // Look up which (serial, project) pairs in this chunk already exist as
+      // activated rows — those are re-entries. We capture them BEFORE the upsert
+      // so we still know the prior resolved_drop_number for the timeline event.
+      const reentryLookup = await pool.query<ReentryRow>(
+        `SELECT resolved_drop_number AS drop_number, serial_number, project
+         FROM oes_pp_data
+         WHERE (serial_number, project) IN (
+           SELECT UNNEST($1::text[]), UNNEST($2::text[])
+         )
+         AND resolution_status = 'activated'`,
+        [chunk.map(r => r.serial_number), chunk.map(r => r.project)],
       );
+      reentryRows.push(...reentryLookup.rows);
+
+      const upsertSql = lifecycleV2On
+        ? UPSERT_V2(placeholders.join(', '))
+        : UPSERT_LEGACY(placeholders.join(', '));
+
+      await pool.query(upsertSql, values);
+    }
+
+    // Emit pre_prov_reentered timeline event per re-entry (best-effort).
+    if (reentryRows.length > 0) {
+      logger.info(`PP re-entry detected: ${reentryRows.length} previously-activated serials back in PP DATA`);
+      try {
+        const { logPreProvReentered } = await import(
+          '@/modules/activate/services/activity-log/eventLoggers'
+        );
+        await Promise.all(
+          reentryRows
+            .filter((r): r is ReentryRow & { drop_number: string } => !!r.drop_number)
+            .map((r) =>
+              logPreProvReentered(
+                r.drop_number,
+                { serialNumber: r.serial_number, project: r.project },
+                'oes-import',
+              ).catch((err: unknown) => {
+                logger.warn('logPreProvReentered failed for re-entry row', {
+                  drop_number: r.drop_number,
+                  serial_number: r.serial_number,
+                  project: r.project,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }),
+            ),
+        );
+      } catch (e) {
+        logger.warn('Timeline log for pre_prov_reentered skipped', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
     }
 
     // Run local resolution — 3 sequential UPDATE queries. RETURNING captures

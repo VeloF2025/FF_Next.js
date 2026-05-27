@@ -6,7 +6,8 @@
  * Query params:
  * - status: pending | needs_investigation | fixed | escalated | all
  * - page: page number (default 1)
- * - pageSize: records per page (default 50, max 100)
+ * - pageSize: records per page (default 50, max 100; max 10000 with bulk=1)
+ * - bulk: set to 1 to allow large bulk-selection page sizes
  * - dateFrom: ISO date string (filter by date range)
  * - dateTo: ISO date string (filter by date range)
  *
@@ -32,12 +33,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : null;
     const dateTo = req.query.dateTo ? String(req.query.dateTo) : null;
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-    const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '50'), 10)));
+    const pageSizeCap = req.query.bulk === '1' ? 10000 : 100;
+    const pageSize = Math.min(pageSizeCap, Math.max(1, parseInt(String(req.query.pageSize || '50'), 10)));
     const offset = (page - 1) * pageSize;
 
     // Build WHERE clause based on status
     let whereClause = '';
-    const params: (string | number)[] = [];
+    const params: Array<string | number | string[]> = [];
 
     if (status === 'pending') {
       whereClause = "WHERE r.fix_status = 'pending' AND r.olt_serial IS NOT NULL";
@@ -63,10 +65,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Optional sub-status filter (within needs_investigation group)
-    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
+    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'other'];
     if (subStatus && validSubStatuses.includes(subStatus)) {
       if (subStatus === 'needs_investigation') {
         const cond = `r.fix_status IN ('needs_investigation', 'needs_reinvestigation')`;
+        whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+      } else if (subStatus === 'other') {
+        const cond = `(r.fix_status IS NULL OR r.fix_status NOT IN ('needs_investigation', 'needs_reinvestigation', 'not_found'))`;
         whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
       } else {
         params.push(subStatus);
@@ -98,7 +103,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Optional project filter — matches on import project or drops→projects.project_name
     const project = req.query.project ? String(req.query.project).trim() : null;
-    if (project) {
+    const projectsParam = req.query.projects ? String(req.query.projects).trim() : null;
+    const projects = projectsParam
+      ? projectsParam.split('|').map((name) => name.trim()).filter(Boolean)
+      : [];
+    if (projects.length > 0) {
+      params.push(projects);
+      const cond = `COALESCE(i.project, p.project_name) = ANY($${params.length}::text[])`;
+      whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+    } else if (project) {
       params.push(project);
       const cond = `COALESCE(i.project, p.project_name) = $${params.length}`;
       whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
@@ -106,7 +119,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get total count — JOIN needed when project filter applied so count matches list
     const countResult = await pool.query(`
-      SELECT COUNT(*)::int as total
+      SELECT COUNT(DISTINCT r.id)::int as total
       FROM olt_mismatch_records r
       LEFT JOIN olt_report_imports i ON r.import_id = i.id
       LEFT JOIN drops d ON r.drop_number = d.drop_number
@@ -141,12 +154,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         mt.ticket_uid,
         i.filename as import_filename,
         i.imported_at as import_date,
-        COALESCE(i.project, p.project_name) as project
+        COALESCE(i.project, p.project_name) as project,
+        NULLIF(COALESCE(d.installed_by_name, op.installer_name, dur.installer_name), '') as installer_name,
+        NULLIF(COALESCE(d.raw_data->>'last_modified_install_by', d.raw_data->>'last_modified_install_by ', d.site_submitted_by), '') as onemap_install_team,
+        NULLIF(COALESCE(dur.oes_team, wc.team), '') as wa_activation_team
       FROM olt_mismatch_records r
       LEFT JOIN olt_report_imports i ON r.import_id = i.id
       LEFT JOIN drops d ON r.drop_number = d.drop_number
       LEFT JOIN projects p ON d.project_id = p.id
       LEFT JOIN maintenance_tickets mt ON r.maintenance_ticket_id = mt.id
+      LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = r.drop_number
+      LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
+      LEFT JOIN LATERAL (
+        SELECT op.installer_name
+        FROM onemap_properties op
+        WHERE op.drop_number = r.drop_number
+        ORDER BY op.updated_at DESC NULLS LAST, op.id DESC
+        LIMIT 1
+      ) op ON true
       ${whereClause}
       ORDER BY r.created_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}

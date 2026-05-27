@@ -12,6 +12,10 @@ export default defineConfig({
       '.next',
       'dist',
       '.claude/worktrees/**',
+      // tests/db/** are docker-Postgres integration tests; they run under
+      // vitest.db.config.ts. Including them here would crash collection
+      // because they throw at module load when DATABASE_URL_TEST is unset.
+      'tests/db/**',
       'src/modules/wa-monitor/tests/integration.test.ts',
       'src/lib/qfield/__tests__/gpkg-import-types.test.ts',
       // No single flat route exists for these multi-method nested handlers
@@ -48,6 +52,7 @@ export default defineConfig({
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
       { find: '@/lib/neon', replacement: path.resolve(__dirname, './src/lib/neon') },
       { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
+      { find: '@/lib/serial-events', replacement: path.resolve(__dirname, './src/lib/serial-events') },
       { find: '@/lib/vlm', replacement: path.resolve(__dirname, './src/lib/vlm') },
       { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
       { find: '@/lib/email', replacement: path.resolve(__dirname, './src/lib/email') },
@@ -61,6 +66,9 @@ export default defineConfig({
       { find: '@/lib/auth', replacement: path.resolve(__dirname, './src/lib/auth') },
       { find: '@/lib/permissions', replacement: path.resolve(__dirname, './src/lib/permissions') },
       { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
+      // @/lib/hooks/* lives at src/lib/hooks/ — needed after useStockSync was updated
+      // to import from '@/lib/hooks/useOnlineStatus' (bucket B refactor).
+      { find: /^@\/lib\/hooks/, replacement: path.resolve(__dirname, './src/lib/hooks') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },

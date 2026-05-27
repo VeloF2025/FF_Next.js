@@ -30,6 +30,11 @@ import { userHasPermission } from '@/lib/permissions';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
 import type { IncomeStatementRow, IncomeStatementData } from '@/modules/analytics/reports/income-statement/useIncomeStatementData';
 
+
+// Opt out of build-time static collection. Route depends on runtime
+// SharePoint/Graph data + auth cookies that are not available during
+// `next build`. Matches sibling analytics report routes.
+export const dynamic = 'force-dynamic';
 const logger = createLogger('analytics:api:income-statement');
 
 const ALLOWED_USERS = new Set([

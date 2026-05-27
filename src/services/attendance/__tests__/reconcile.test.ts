@@ -98,6 +98,20 @@ describe('isoWeekMonday', () => {
   it('throws on malformed YYYY-MM-DD input', () => {
     expect(() => isoWeekMonday('not-a-date')).toThrow(/YYYY-MM-DD/);
   });
+
+  it('accepts a Date object (pg driver returns DATE columns as Date)', () => {
+    // Regression guard for the 500 on 2026-04-24 where findOpenEntry
+    // returned work_date as a Date, clock-out.ts passed it to
+    // isoWeekMonday, and String coercion produced
+    // "Fri Apr 24 2026 00:00:00 GMT+0200 ..." which failed the regex.
+    // UTC midnight Date == same calendar day as the string form.
+    const friday = new Date('2026-04-24T00:00:00Z');
+    expect(isoWeekMonday(friday)).toBe('2026-04-20');
+  });
+
+  it('throws on a Date that is NaN', () => {
+    expect(() => isoWeekMonday(new Date('invalid'))).toThrow(/unparseable/i);
+  });
 });
 
 // ---------------------------------------------------------------------------

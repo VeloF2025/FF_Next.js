@@ -126,6 +126,10 @@ export default async function handler(
         driverId: session.driverId,
         driverName: session.driverName,
         expiresAt: session.expiresAt,
+        // Optional — present on PRD-040 Phase 2+ sessions, undefined on
+        // legacy plate-photo sessions. Lets /fleet/portal route SSO
+        // users back to /my on logout instead of the plate screen.
+        source: session.source,
       },
       vehicle: {
         id: vehicle.id,

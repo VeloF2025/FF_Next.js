@@ -65,19 +65,18 @@ const TICKET_WORKFLOW_ACTIONS: Record<string, {
   qa_approved:     { forward: { status: 'resolved',    label: 'Mark Resolved' } },
   pending_handover:{ forward: { status: 'resolved',    label: 'Mark Resolved' } },
   handed_to_ops:   { forward: { status: 'resolved',    label: 'Mark Resolved' } },
-  resolved:        { forward: { status: 'closed',      label: 'Close Ticket' },      backward: { status: 'in_progress', label: 'Reopen' } },
-  verified:        { forward: { status: 'closed',      label: 'Close Ticket' },      backward: { status: 'in_progress', label: 'Reopen' } },
-  closed:          {                                                                   backward: { status: 'open',        label: 'Reopen' } },
+  // 'resolved' is the terminal state (migration 364 collapsed the old 'closed' bucket into it).
+  resolved:        {                                                                   backward: { status: 'in_progress', label: 'Reopen' } },
+  verified:        {                                                                   backward: { status: 'in_progress', label: 'Reopen' } },
   cancelled:       {                                                                   backward: { status: 'open',        label: 'Reopen' } },
 };
 
-/** DevOps tickets are internal — skip verified, close directly */
+/** DevOps tickets are internal — no forward action from resolved (terminal). */
 const DEVOPS_RESOLVED_ACTIONS: {
   forward?: { status: string; label: string };
   backward?: { status: string; label: string };
   reject?: { status: string; label: string };
 } = {
-  forward: { status: 'closed', label: 'Close Ticket' },
   backward: { status: 'in_progress', label: 'Fix Not Working' },
 };
 

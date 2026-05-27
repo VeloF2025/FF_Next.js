@@ -12,7 +12,7 @@
  * - Partial updates support (PUT)
  * - Soft delete (marks status as CANCELLED, never hard delete)
  * - Proper error handling with standard API responses
- * - Follows Zero Tolerance protocol (no console.log, proper error handling)
+ * - Follows Zero Tolerance protocol (logger only, proper error handling)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -27,7 +27,6 @@ import {
   logTicketChanges,
   logTicketActivity,
 } from '@/modules/noc/services/ticketService';
-import { isTeamLead } from '@/modules/noc/services/teamService';
 import { enrichTicketData } from '@/modules/noc/services/ticketEnrichmentService';
 import { syncOutboundUpdate } from '@/modules/noc/services/qcontactSyncOutbound';
 import {
@@ -211,21 +210,9 @@ export async function PUT(
     // Capture old state for change detection
     const oldTicket = await getTicketById(ticketId);
 
-    // Team lead approval check: only team leads (or super_admin) can move resolved → closed
-    if (
-      body.status === 'closed' &&
-      oldTicket?.status === 'resolved' &&
-      oldTicket.assigned_team_id &&
-      actingUser.id &&
-      actingUser.role !== 'super_admin'
-    ) {
-      const userIsLead = await isTeamLead(actingUser.id, oldTicket.assigned_team_id);
-      if (!userIsLead) {
-        return validationError(
-          'Only the team lead can approve and close a resolved ticket'
-        );
-      }
-    }
+    // Migration 364 removed the resolved → closed transition (closed was
+    // consolidated into resolved). The team-lead approval gate that
+    // previously guarded that transition is gone with it.
 
     const updatedTicket = await updateTicket(ticketId, body);
 
@@ -322,18 +309,19 @@ export async function PUT(
       });
     }
 
-    // When ticket is resolved/closed, mark linked Data Sync records as resolved
-    if (body.status && ['resolved', 'closed'].includes(body.status)) {
+    // When ticket is resolved, mark linked Data Sync records as resolved.
+    // (Migration 364 removed the 'closed' status; 'resolved' is terminal.)
+    if (body.status === 'resolved') {
       markLinkedDataSyncResolved(ticketId)
         .catch(err => {
           logger.error('Data Sync resolution error', { ticketId, error: err.message });
         });
     }
 
-    // Bi-directional sync: propagate NOC status back to linked snag
-    // resolved → snag.status = 'fixed'; closed → snag.status = 'closed'
-    if (body.status && ['resolved', 'closed'].includes(body.status) && updatedTicket.source === 'snags') {
-      const snagStatus = body.status === 'resolved' ? 'fixed' : 'closed';
+    // Bi-directional sync: propagate NOC resolution back to linked snag
+    // (resolved → snag.status = 'fixed').
+    if (body.status === 'resolved' && updatedTicket.source === 'snags') {
+      const snagStatus = 'fixed';
       sql`
         UPDATE snags
         SET status = ${snagStatus}, updated_at = NOW()

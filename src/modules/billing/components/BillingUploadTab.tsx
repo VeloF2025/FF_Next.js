@@ -54,6 +54,7 @@ interface BundleSummary {
   note4Count: number;
   note5Count: number;
   preProvisionsCount: number;
+  preProvOutstanding: number;
   totalClaimableForPayment: number;
   lowerThanLinkBudgetCount: number;
 }
@@ -494,12 +495,25 @@ function ProjectResultCard({
 
       {/* Metrics */}
       {row.summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          <Metric label="Total ONTs" value={row.summary.totalOnts.toLocaleString()} />
-          <Metric label="Claimable" value={row.summary.totalClaimableForPayment.toLocaleString()} />
-          <Metric label="Deductions" value={String(row.deductionCount)} />
-          <Metric label="Zones / PONs" value={`${row.zoneRowCount} / ${row.ponRowCount}`} />
-        </div>
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <Metric label="Total ONTs" value={row.summary.totalOnts.toLocaleString()} />
+            <Metric label="Claimable" value={row.summary.totalClaimableForPayment.toLocaleString()} />
+            <DeductionsMetric deductionCount={row.deductionCount} summary={row.summary} />
+            <Metric label="Zones / PONs" value={`${row.zoneRowCount} / ${row.ponRowCount}`} />
+          </div>
+          {row.summary.preProvOutstanding > 0 && (
+            <p className="text-xs text-[var(--ff-text-tertiary)]">
+              PP outstanding (OES cumulative):{' '}
+              <span className="text-teal-300 font-medium">
+                {row.summary.preProvOutstanding.toLocaleString()}
+              </span>
+              <span className="ml-1 text-[var(--ff-text-tertiary)]">
+                — running inventory, not deducted from this week
+              </span>
+            </p>
+          )}
+        </>
       )}
 
       {/* Invoice total (only after import) */}
@@ -566,6 +580,39 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="text-[var(--ff-text-tertiary)]">{label}</p>
     </div>
   );
+}
+
+// Sum of deduction notes that reduce the payment, per FT semantics:
+// claimable - (note1 + note2 + note4 + note5) - preProvisions = totalClaimableForPayment.
+// Note 3 (degraded) is reported separately and does not reduce the payment.
+function pdfDeductionTotal(summary: BundleSummary): number {
+  return (
+    summary.note1Count +
+    summary.note2Count +
+    summary.note4Count +
+    summary.note5Count +
+    summary.preProvisionsCount
+  );
+}
+
+// "Deductions" prefers the XLSX per-drop count when present. When the bundle
+// has no notes XLSX, fall back to the PDF aggregate so the card doesn't lie
+// about zero deductions on a project that clearly has them.
+function DeductionsMetric({
+  deductionCount,
+  summary,
+}: {
+  deductionCount: number;
+  summary: BundleSummary;
+}) {
+  if (deductionCount > 0) {
+    return <Metric label="Deductions" value={String(deductionCount)} />;
+  }
+  const pdfTotal = pdfDeductionTotal(summary);
+  if (pdfTotal > 0) {
+    return <Metric label="Deductions (PDF)" value={String(pdfTotal)} />;
+  }
+  return <Metric label="Deductions" value="0" />;
 }
 
 function StatusBadge({ status }: { status: ProjectBundleImport['status'] }) {

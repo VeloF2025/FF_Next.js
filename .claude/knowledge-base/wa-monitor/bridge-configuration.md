@@ -1,6 +1,6 @@
 # Go WhatsApp Bridge Configuration
 
-> **Last updated:** 2026-02-20  
+> **Last updated:** 2026-05-26  
 > **Architecture:** VPS unified bridge v2.0.0
 
 ## Overview
@@ -43,23 +43,51 @@ ssh root@72.61.197.178 "strings /opt/whatsapp-bridge/whatsapp-bridge | grep FIBR
 
 ```
 handleMessage()
-  ├── groupType == "dr_submission"
-  │     ├── processDropNumbers()  → DR regex extraction → API calls
-  │     ├── sendDRAcknowledgment() → /api/activate/dr-acknowledgment
+  ├── groupType == "dr_submission"          (the 10 activation feeds)
+  │     ├── processDropNumbers()  → DR regex extraction → QA review + photo
+  │     ├── sendDRAcknowledgment() → /api/activate/dr-acknowledgment   ← ACK SENT
   │     └── syncToFibreFlow()     → /api/activate/process-new-dr
   │
   ├── groupType == "maintenance"
-  │     ├── processDropNumbers()  → SKIPS (returns early)
+  │     ├── processDropNumbers()  → SKIPS (returns early — no DR processing)
   │     └── forwardToMaintenanceAPI() → /api/maintenance/wa-message
   │
-  ├── groupType == "pre_provision"
-  │     └── TBD (pre-provisioning workflow)
+  ├── groupType == "pre_provision" / "civil" / "optical"
+  │     ├── processDropNumbers()  → DR still extracted, QA review + photo stored
+  │     ├── (NO ACK — see allowlist below)
+  │     ├── civil/optical only → forwardToFieldOpsAPI() (photo_base64)
+  │     └── pre_provision → DR capture only (no field-ops forward)
   │
   └── groupType == "admin"
+        ├── processDropNumbers()  → DR still extracted + stored if a DR appears
+        ├── (NO ACK)
         └── Command bot only (wa-command-bot:8086)
 ```
 
-**Critical:** `processDropNumbers()` must check `groupType` and return early for maintenance groups. Without this check, activation ack messages ("DR1234567 Received!") get sent to maintenance groups.
+**Critical — ACK is an allowlist, not a denylist (2026-05-26).** `sendDRAcknowledgment()`
+fires **only** when `groupType == "dr_submission"`. The gate is:
+
+```go
+if groupType == "dr_submission" {
+    sendDRAcknowledgment(...)
+} else {
+    fmt.Printf("Skipping ACK for %s (group_type=%s, %s)\n", dropNumber, groupType, chatJID)
+}
+```
+
+This deliberately captures DRs/ONT serials that surface in *any* monitored group
+(pre_provision, civil, optical, admin) — they still create/update a `qa_photo_reviews`
+row so the data feeds DR history and ONT lifecycle — but **no "Received!" ACK reply is
+sent** outside the 10 `dr_submission` activation feeds. (Before this date the gate was
+`!= "pre_provision"`, which leaked ACKs into civil/optical/admin groups whenever a DR was
+posted there.) For `maintenance`, only `processDropNumbers()` returns early — so no DR is
+captured and no ACK is sent — but the message is still forwarded to the maintenance API
+via `forwardToMaintenanceAPI()`.
+
+**Source-group traceability:** `createQAPhotoReview()` writes `qa_photo_reviews.wa_group_jid =
+chatJID` on every new capture, and the resubmission UPDATE path backfills it
+(`COALESCE(NULLIF(wa_group_jid,''), $3)`, where `$3` is `chatJID`) plus records the source
+group in the comment trail — so you can tell which group each DR sighting came from.
 
 ## Maintenance API Authentication
 

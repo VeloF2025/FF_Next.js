@@ -25,13 +25,15 @@ async function handler(
   }
 
   try {
-    // team_members links via email, not user_id — resolve the user's email first
+    // team_members can link via user_id OR email — check both
     const result = await pool.query(
-      `SELECT t.id, t.name, t.team_type
+      `SELECT DISTINCT t.id, t.name, t.team_type
        FROM teams t
        JOIN team_members tmem ON tmem.team_id = t.id
-       JOIN users u ON LOWER(u.email) = LOWER(tmem.email)
-       WHERE u.id = $1 AND tmem.is_active = true`,
+       JOIN users u ON u.id = $1
+       WHERE (tmem.user_id = u.id OR LOWER(tmem.email) = LOWER(u.email))
+         AND tmem.is_active = true
+         AND t.is_active = true`,
       [authReq.user.id]
     );
 

@@ -15,12 +15,16 @@ const logger = createLogger('services:fibertime-offline-db');
 // CONSTANTS
 // ============================================================================
 
-/** Maps each Offline ONT site to its NOC maintenance team UUID. */
+// Maps each Offline ONT site (SharePoint folder name) to its NOC maintenance
+// team UUID. Etwatwa POP folders (ETW-1, ETW-2) route to the single
+// "Etwatwa Maintenance" team.
 export const SITE_MAINTENANCE_TEAMS = {
   LAW: '0c15b3b9-a878-4fef-8291-772dcd1460c3',
   MAM: 'ed032579-91ad-45e2-9e25-c41c5f9217dd',
   MOA: 'e3dd6115-c874-4bdb-a5f5-091f472bef1e',
   TEM: '827cf861-c798-4e4d-812d-79ff2f2b750f',
+  'ETW-1': '3012ec9e-8b00-44cb-97c8-0f5b9270c502',
+  'ETW-2': '3012ec9e-8b00-44cb-97c8-0f5b9270c502',
 } as const;
 
 export type OfflineSite = keyof typeof SITE_MAINTENANCE_TEAMS;

@@ -124,6 +124,15 @@ export default function RequisitionDetailPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
+  // Inline-edit (project / department / required-date) modal state.
+  // Allowed on draft / submitted / pending_approval — see PUT handler.
+  const [showEditMetaModal, setShowEditMetaModal] = useState(false);
+  const [editMeta, setEditMeta] = useState({ projectId: '', department: '', requiredDate: '' });
+  const [editMetaSaving, setEditMetaSaving] = useState(false);
+  const [editMetaError, setEditMetaError] = useState<string | null>(null);
+  const [projects, setProjects] = useState<{ id: string; name: string; project_code?: string }[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+
   // Convert to PO modal state
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string; companyName?: string }[]>([]);
@@ -143,12 +152,53 @@ export default function RequisitionDetailPage() {
   const currentUserId = currentUser?.id || '';
   const isCreator = requisition?.requestedBy === currentUserId;
   const isApprover = can('procurement.sourcing', 'edit');
+  // Allow editing project / department / required-date while the requisition
+  // is still en route to approval. Creator OR approver may patch missing fields.
+  const canEditMeta =
+    !!requisition &&
+    (isCreator || isApprover) &&
+    (requisition.status === 'draft' ||
+      requisition.status === 'submitted' ||
+      requisition.status === 'pending_approval');
 
   useEffect(() => {
     if (id) {
       fetchRequisition();
     }
   }, [id]);
+
+  // Lazily load projects + departments — only when the edit modal is opened.
+  // Avoids pulling 500-row dropdowns for read-only viewers.
+  const loadEditMetaOptions = async () => {
+    try {
+      if (projects.length === 0) {
+        const r = await fetch('/api/projects');
+        const d = await r.json();
+        if (d?.success && Array.isArray(d.data)) {
+          const sorted = [...d.data].sort((a, b) =>
+            String(a.name || '').localeCompare(String(b.name || ''))
+          );
+          setProjects(sorted);
+        }
+      }
+    } catch (err) {
+      log.error('Failed to load projects', { error: err });
+    }
+    try {
+      if (departments.length === 0) {
+        const r = await fetch('/api/departments?isActive=true');
+        const d = await r.json();
+        if (d?.success && Array.isArray(d.data)) {
+          const sorted = [...d.data].sort((a, b) =>
+            String(a.name || '').localeCompare(String(b.name || ''))
+          );
+          setDepartments(sorted);
+        }
+      }
+    } catch (err) {
+      log.error('Failed to load departments', { error: err });
+    }
+  };
 
   // Fetch suppliers for conversion
   useEffect(() => {
@@ -268,6 +318,51 @@ export default function RequisitionDetailPage() {
       setError(`Failed to ${action} requisition`);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const openEditMeta = () => {
+    if (!requisition) return;
+    setEditMeta({
+      projectId: requisition.projectId || '',
+      department: requisition.department || '',
+      requiredDate: requisition.requiredDate ? requisition.requiredDate.slice(0, 10) : '',
+    });
+    setEditMetaError(null);
+    setShowEditMetaModal(true);
+    loadEditMetaOptions();
+  };
+
+  const handleSaveMeta = async () => {
+    if (!requisition) return;
+    if (!editMeta.projectId && !editMeta.department) {
+      setEditMetaError('Either project or department is required');
+      return;
+    }
+    try {
+      setEditMetaSaving(true);
+      setEditMetaError(null);
+      const response = await fetch(`/api/procurement/requisitions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: editMeta.projectId || '',
+          department: editMeta.department || null,
+          requiredDate: editMeta.requiredDate || null,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setShowEditMetaModal(false);
+        fetchRequisition();
+      } else {
+        setEditMetaError(data.error?.message || 'Failed to save changes');
+      }
+    } catch (err) {
+      log.error('Failed to update requisition meta', { error: err });
+      setEditMetaError('Failed to save changes');
+    } finally {
+      setEditMetaSaving(false);
     }
   };
 
@@ -525,9 +620,20 @@ export default function RequisitionDetailPage() {
                 <div className="grid grid-cols-2 gap-6">
                   {/* Project Info */}
                   <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <FolderOpen className="h-5 w-5 text-purple-400" />
-                      <h3 className="font-medium text-[var(--ff-text-primary)]">Project</h3>
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="h-5 w-5 text-purple-400" />
+                        <h3 className="font-medium text-[var(--ff-text-primary)]">Project</h3>
+                      </div>
+                      {canEditMeta && (
+                        <button
+                          onClick={openEditMeta}
+                          title="Edit project, department, required date"
+                          className="p-1 text-[var(--ff-text-tertiary)] hover:text-purple-400 transition-colors"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                     {requisition.projectName ? (
                       <div>
@@ -543,9 +649,20 @@ export default function RequisitionDetailPage() {
 
                   {/* Request Info */}
                   <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Building className="h-5 w-5 text-purple-400" />
-                      <h3 className="font-medium text-[var(--ff-text-primary)]">Request Details</h3>
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Building className="h-5 w-5 text-purple-400" />
+                        <h3 className="font-medium text-[var(--ff-text-primary)]">Request Details</h3>
+                      </div>
+                      {canEditMeta && (
+                        <button
+                          onClick={openEditMeta}
+                          title="Edit project, department, required date"
+                          className="p-1 text-[var(--ff-text-tertiary)] hover:text-purple-400 transition-colors"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                     <div className="space-y-3">
                       <div className="flex justify-between">
@@ -903,6 +1020,79 @@ export default function RequisitionDetailPage() {
         )}
 
         {/* Reject Modal */}
+        {/* Edit project / department / required-date modal */}
+        {showEditMetaModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">Edit Request Details</h3>
+              <p className="text-sm text-[var(--ff-text-tertiary)] mb-4">
+                Fill in or change these fields without recreating the request.
+              </p>
+              {editMetaError && (
+                <div className="mb-3 p-3 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
+                  {editMetaError}
+                </div>
+              )}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-[var(--ff-text-secondary)] mb-2">Project</label>
+                  <select
+                    value={editMeta.projectId}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, projectId: e.target.value }))}
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  >
+                    <option value="">-- No project --</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.project_code ? ` (${p.project_code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-[var(--ff-text-secondary)] mb-2">Department</label>
+                  <select
+                    value={editMeta.department}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, department: e.target.value }))}
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  >
+                    <option value="">-- None --</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-[var(--ff-text-secondary)] mb-2">Required by</label>
+                  <input
+                    type="date"
+                    value={editMeta.requiredDate}
+                    onChange={(e) => setEditMeta((m) => ({ ...m, requiredDate: e.target.value }))}
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowEditMetaModal(false)}
+                  disabled={editMetaSaving}
+                  className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveMeta}
+                  disabled={editMetaSaving}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                >
+                  {editMetaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
+                  Save changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showRejectModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 max-w-md w-full mx-4">

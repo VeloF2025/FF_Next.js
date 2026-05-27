@@ -35,6 +35,7 @@ import {
   type SessionResponse,
 } from '@/modules/attendance/portal/client/api';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
+import { useStatusFilterUrlSync } from '@/modules/attendance/corrections/useStatusFilterUrl';
 
 const STATUS_TABS: readonly { key: CorrectionStatusFilter; label: string }[] = [
   { key: 'pending', label: 'Pending' },
@@ -49,13 +50,6 @@ const VALID_STATUS_FILTERS: readonly CorrectionStatusFilter[] =
 
 const DEFAULT_STATUS_FILTER: CorrectionStatusFilter = 'pending';
 
-function parseStatusParam(raw: unknown): CorrectionStatusFilter {
-  return typeof raw === 'string' &&
-    VALID_STATUS_FILTERS.includes(raw as CorrectionStatusFilter)
-    ? (raw as CorrectionStatusFilter)
-    : DEFAULT_STATUS_FILTER;
-}
-
 const ZERO_COUNTS: CorrectionCounts = {
   pending: 0,
   approved: 0,
@@ -69,42 +63,16 @@ const MyCorrectionsPage: NextPage & {
   const router = useRouter();
   const [session, setSession] = React.useState<SessionResponse | null>(null);
   const [hints, setHints] = React.useState<CorrectionHints | null>(null);
-  const [statusFilter, setStatusFilter] = React.useState<CorrectionStatusFilter>(
-    DEFAULT_STATUS_FILTER
-  );
+  const { statusFilter, setStatusFilter: handleTabChange } =
+    useStatusFilterUrlSync<CorrectionStatusFilter>(
+      VALID_STATUS_FILTERS,
+      DEFAULT_STATUS_FILTER
+    );
   const [rows, setRows] = React.useState<CorrectionRow[] | null>(null);
   const [counts, setCounts] = React.useState<CorrectionCounts>(ZERO_COUNTS);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [cancellingId, setCancellingId] = React.useState<string | null>(null);
   const [cancelError, setCancelError] = React.useState<string | null>(null);
-
-  // URL ↔ tab sync: the ?status= query param is the source of truth.
-  // Handles deep-links, bookmarks, and browser back from nested routes
-  // (e.g. corrections/new). Same-page tab clicks use router.replace so
-  // we don't pollute history with every click.
-  React.useEffect(() => {
-    if (!router.isReady) return;
-    const next = parseStatusParam(router.query.status);
-    setStatusFilter((prev) => (prev === next ? prev : next));
-  }, [router.isReady, router.query.status]);
-
-  const handleTabChange = React.useCallback(
-    (next: CorrectionStatusFilter) => {
-      setStatusFilter(next);
-      if (!router.isReady) return;
-      const { status: _prev, ...restQuery } = router.query;
-      const nextQuery =
-        next === DEFAULT_STATUS_FILTER
-          ? restQuery
-          : { ...restQuery, status: next };
-      router.replace(
-        { pathname: router.pathname, query: nextQuery },
-        undefined,
-        { shallow: true }
-      );
-    },
-    [router]
-  );
 
   // Session + hints — fetched once on mount.
   React.useEffect(() => {
@@ -208,9 +176,10 @@ const MyCorrectionsPage: NextPage & {
     <MyPortalShell
       title="My corrections"
       staffName={session?.profile?.name ?? null}
+      staffPhotoUrl={session?.profile?.profilePhotoUrl ?? null}
     >
       {!session && !loadError && (
-        <div className="flex items-center justify-center py-16 text-sm text-gray-500">
+        <div className="flex items-center justify-center py-16 text-sm text-neutral-400">
           Loading…
         </div>
       )}
@@ -218,7 +187,7 @@ const MyCorrectionsPage: NextPage & {
       {loadError && (
         <div
           role="alert"
-          className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 mb-4"
+          className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-4"
         >
           {loadError}
         </div>
@@ -235,7 +204,7 @@ const MyCorrectionsPage: NextPage & {
           {cancelError && (
             <div
               role="alert"
-              className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900"
+              className="mt-3 rounded-lg bg-amber-950/40 border border-amber-800 px-3 py-2 text-sm text-amber-200"
             >
               {cancelError}
             </div>
@@ -243,13 +212,13 @@ const MyCorrectionsPage: NextPage & {
 
           <div className="mt-3">
             {rows === null ? (
-              <div className="py-8 text-center text-sm text-gray-500">
+              <div className="py-8 text-center text-sm text-neutral-400">
                 Loading…
               </div>
             ) : rows.length === 0 ? (
               <EmptyState statusFilter={statusFilter} />
             ) : (
-              <ul className="rounded-2xl bg-white border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+              <ul className="rounded-2xl bg-neutral-900 border border-neutral-800 divide-y divide-neutral-800 overflow-hidden">
                 {rows.map((row) => (
                   <CorrectionListItem
                     key={row.id}
@@ -299,10 +268,10 @@ function StatusTabs({
             aria-selected={isActive}
             type="button"
             onClick={() => onChange(tab.key)}
-            className={`shrink-0 px-3 py-1.5 rounded-full border text-sm font-medium transition ${
+            className={`shrink-0 inline-flex items-center min-h-[48px] px-4 py-2 rounded-full border text-sm font-medium transition ${
               isActive
                 ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-neutral-700 hover:text-neutral-100'
             }`}
           >
             {tab.label}
@@ -310,7 +279,7 @@ function StatusTabs({
               className={`ml-2 inline-block min-w-[1.25rem] px-1 py-0.5 rounded-full text-xs tabular-nums ${
                 isActive
                   ? 'bg-white/20 text-white'
-                  : 'bg-gray-100 text-gray-600'
+                  : 'bg-neutral-800 text-neutral-300'
               }`}
             >
               {count}
@@ -330,7 +299,7 @@ function EmptyState({ statusFilter }: { statusFilter: CorrectionStatusFilter }) 
         ? 'You haven\'t submitted any corrections yet.'
         : `No ${statusFilter} corrections.`;
   return (
-    <div className="rounded-2xl bg-white border border-gray-200 py-10 text-center text-sm text-gray-500">
+    <div className="rounded-2xl bg-neutral-900 border border-neutral-800 py-10 text-center text-sm text-neutral-400">
       {message}
     </div>
   );
@@ -354,16 +323,16 @@ function CorrectionListItem({
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={row.status} />
-            <span className="text-sm font-medium text-gray-900">{kindLabel}</span>
+            <span className="text-sm font-medium text-neutral-100">{kindLabel}</span>
           </div>
           {row.entry_work_date && (
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-1 text-xs text-neutral-400">
               For shift on {formatWorkDate(row.entry_work_date)}
             </div>
           )}
-          <p className="mt-2 text-sm text-gray-700 break-words">{row.reason}</p>
+          <p className="mt-2 text-sm text-neutral-300 break-words">{row.reason}</p>
           {row.review_note && row.status !== 'pending' && (
-            <p className="mt-2 text-xs text-gray-500 italic">
+            <p className="mt-2 text-xs text-neutral-400 italic">
               Reviewer: {row.review_note}
             </p>
           )}
@@ -373,7 +342,7 @@ function CorrectionListItem({
             type="button"
             onClick={() => onCancel(row.id)}
             disabled={cancelling}
-            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:border-red-300 hover:text-red-700 disabled:opacity-50"
+            className="shrink-0 inline-flex items-center gap-1 min-h-[48px] px-3 py-2 rounded-lg border border-neutral-700 text-sm font-medium text-neutral-300 hover:border-red-800 hover:text-red-300 disabled:opacity-50"
             aria-label={`Cancel ${kindLabel} correction`}
           >
             <X className="w-3.5 h-3.5" />
@@ -391,26 +360,26 @@ function StatusBadge({ status }: { status: CorrectionStatus }) {
     { bg: string; text: string; label: string; icon: React.ReactNode }
   > = {
     pending: {
-      bg: 'bg-amber-50',
-      text: 'text-amber-800',
+      bg: 'bg-amber-950/50',
+      text: 'text-amber-300',
       label: 'Pending',
       icon: <Clock className="w-3 h-3" />,
     },
     approved: {
-      bg: 'bg-emerald-50',
-      text: 'text-emerald-800',
+      bg: 'bg-emerald-950/50',
+      text: 'text-emerald-300',
       label: 'Approved',
       icon: <CheckCircle2 className="w-3 h-3" />,
     },
     rejected: {
-      bg: 'bg-red-50',
-      text: 'text-red-800',
+      bg: 'bg-red-950/50',
+      text: 'text-red-300',
       label: 'Rejected',
       icon: <XCircle className="w-3 h-3" />,
     },
     cancelled: {
-      bg: 'bg-gray-100',
-      text: 'text-gray-700',
+      bg: 'bg-neutral-800',
+      text: 'text-neutral-300',
       label: 'Cancelled',
       icon: <AlertTriangle className="w-3 h-3" />,
     },

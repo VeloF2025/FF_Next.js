@@ -18,6 +18,7 @@ import { neon } from '@/lib/db-neon';
 import { log, createLogger } from '@/lib/logger';
 import { extractSerialsFromWaPhoto } from '@/modules/activate/services/vlmExtractionService';
 import { logActivity, logWaPhotoVlmProcessed } from '@/modules/activate/services/activityLogService';
+import { classifyOntMismatch, applyOntFallbackToBadge, type OntFallbackResult } from '@/modules/activate/services/ontMismatchFallback';
 
 // Component logger
 const logger = createLogger('SerialVerification');
@@ -57,6 +58,8 @@ export interface SerialVerificationResult {
   upsVerification: VerificationDetail;
   overallStatus: 'gold' | 'silver' | 'bronze' | 'warning' | 'none';
   badgeLabel: string;
+  /** ph_bl fallback reclassification of an ONT mismatch (undefined when ONT is not a mismatch). */
+  ontFallback?: OntFallbackResult;
 }
 
 interface VerificationDetail {
@@ -69,7 +72,7 @@ interface VerificationDetail {
 export interface WaPhotoExtractionResult {
   dropNumber: string;
   photosProcessed: number;
-  bestOnt: { serial: string; confidence: number } | null;
+  bestOnt: { serial: string; confidence: number; fromBarcode: boolean } | null;
   bestUps: { serial: string; confidence: number } | null;
   results: Array<{
     photoId: string;
@@ -148,7 +151,9 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
       LIMIT 1
     ),
     onemap_data AS (
-      SELECT ont_serial_scanned as ont, ups_serial_scanned as ups
+      SELECT ont_serial_scanned as ont, ups_serial_scanned as ups,
+             vlm_dr_number_step9 as ph_bl_dr, vlm_ont_serial_step9 as ph_bl_ont,
+             oes_serial as row_oes_serial
       FROM dr_photo_unified_reviews
       WHERE drop_number = ${dropNumber}
       LIMIT 1
@@ -167,6 +172,9 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
       (SELECT ont FROM offline_data) as offline_ont,
       (SELECT ont FROM onemap_data) as onemap_ont,
       (SELECT ups FROM onemap_data) as onemap_ups,
+      (SELECT ph_bl_dr FROM onemap_data) as ph_bl_dr,
+      (SELECT ph_bl_ont FROM onemap_data) as ph_bl_ont,
+      (SELECT row_oes_serial FROM onemap_data) as row_oes_serial,
       (SELECT ont FROM wa_photo_data) as wa_ont,
       (SELECT ups FROM wa_photo_data) as wa_ups,
       (SELECT vlm_confidence FROM wa_photo_data) as wa_confidence
@@ -209,8 +217,33 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
     badgeLabel = 'Serial Mismatch';
   }
 
+  // Fallback: an ONT mismatch is ~99% a VLM misread or a misattached photo, not a
+  // real 1Map error. Reclassify it using the ph_bl (Green Lights & DR Label) photo
+  // extraction + OES, so the badge stops crying wolf and the genuine-error/needs-
+  // human tail is flagged distinctly. Never auto-writes a serial.
+  let ontFallback: OntFallbackResult | undefined;
+  if (ontVerification.status === 'mismatch') {
+    ontFallback = classifyOntMismatch({
+      dropNumber,
+      dr9: (row.ph_bl_dr as string | null) ?? null,
+      ont9: (row.ph_bl_ont as string | null) ?? null,
+      onemap: (row.onemap_ont as string | null) ?? null,
+      // Use the denormalised oes_serial (same field the recheck cron + backtest
+      // treat as the ONT source of truth), not the oes_activations CTE value.
+      oes: (row.row_oes_serial as string | null) ?? null,
+    });
+    const refined = applyOntFallbackToBadge(
+      { overallStatus, badgeLabel },
+      ontFallback,
+      upsVerification.status === 'mismatch',
+    );
+    overallStatus = refined.overallStatus;
+    badgeLabel = refined.badgeLabel;
+  }
+
   return {
     dropNumber,
+    ontFallback,
     ont: {
       oes: row.oes_ont || null,
       offline: row.offline_ont || null,
@@ -249,6 +282,7 @@ export async function computeAndPersistVerification(dropNumber: string): Promise
             ups: verification.ups,
             ontVerification: verification.ontVerification,
             upsVerification: verification.upsVerification,
+            ontFallback: verification.ontFallback ?? null,
           })},
           serial_verification_computed_at = NOW()
       WHERE drop_number = ${dropNumber}
@@ -326,7 +360,7 @@ export async function extractWaPhotoSerials(
   const onemapUps = currentData[0]?.ups_serial_scanned || null;
 
   const results: WaPhotoExtractionResult['results'] = [];
-  let bestOnt: { serial: string; confidence: number } | null = null;
+  let bestOnt: { serial: string; confidence: number; fromBarcode: boolean } | null = null;
   let bestUps: { serial: string; confidence: number } | null = null;
 
   for (const photo of photos) {
@@ -373,7 +407,7 @@ export async function extractWaPhotoSerials(
       const ontConf = extraction.ontConfidence ?? extraction.confidence;
       const upsConf = extraction.upsConfidence ?? extraction.confidence;
       if (extraction.ontSerial && ontConf > (bestOnt?.confidence || 0)) {
-        bestOnt = { serial: extraction.ontSerial, confidence: ontConf };
+        bestOnt = { serial: extraction.ontSerial, confidence: ontConf, fromBarcode: extraction.ontFromBarcode };
       }
       if (extraction.upsSerial && upsConf > (bestUps?.confidence || 0)) {
         bestUps = { serial: extraction.upsSerial, confidence: upsConf };

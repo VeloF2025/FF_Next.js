@@ -1,0 +1,19 @@
+# API route conventions
+
+```typescript
+import { apiResponse } from '@/lib/apiResponse';
+return apiResponse.success(res, data);
+return apiResponse.notFound(res, 'Resource', id);
+return apiResponse.error(res, 'Message');
+```
+
+- Nested dynamic API routes FAIL on Vercel — flatten them.
+- Use specific param names (`[projectId]`, not `[id]`).
+- No `console.log` — use `log` from `@/lib/logger`.
+- Prefer `pg.Pool` via `@/lib/db` for new DB code.
+- No conditional SQL fragments via the Neon serverless shim — breaks `lib/db/pool.js` callers.
+
+## Two drop tables — DO NOT CONFUSE
+
+- `drops` — SOW imports
+- `qa_photo_reviews` — WhatsApp QA data

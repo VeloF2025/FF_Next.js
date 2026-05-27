@@ -151,20 +151,20 @@ describe('SLA Calculator (TDD)', () => {
       expect(result.hours_overdue).toBe(0);
     });
 
-    it('should return false when ticket is already closed', () => {
-      // Arrange: SLA due yesterday but ticket is closed
+    it('should return false when ticket is already resolved', () => {
+      // Arrange: SLA due yesterday but ticket is resolved (terminal state since migration 364)
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
       const input: OverdueCheckInput = {
         sla_due_at: yesterday,
-        current_status: 'closed'
+        current_status: 'resolved'
       };
 
       // Act
       const result = isTicketOverdue(input);
 
-      // Assert: Not overdue (closed tickets exempt)
+      // Assert: Not overdue (resolved tickets exempt)
       expect(result.is_overdue).toBe(false);
       expect(result.hours_overdue).toBe(0);
     });

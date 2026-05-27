@@ -8,23 +8,23 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
 
 import {
-  FieldStockDashboard,
   LocationList,
-  CreateLocationModal,
   SerialScanner,
   PickingList,
   CreatePickingForm,
   ReturnList,
   CreateReturnModal,
-  ContractorAccountabilityList,
 } from '@/modules/procurement/field-stock/components';
+import { HolderAccountabilityList } from '@/modules/procurement/field-stock/components/accountability/HolderAccountabilityList';
+import { LocationFormModal } from '@/modules/procurement/field-stock/components/locations/LocationFormModal';
+import type { StockLocation } from '@/modules/procurement/field-stock/types';
 import {
   useReturns,
-  useContractorAccountability,
   useLocations,
   useStockItems,
   useConsumptions,
 } from '@/modules/procurement/field-stock/hooks';
+import { useHolderAccountability } from '@/modules/procurement/field-stock/hooks/useHolderAccountability';
 import {
   LayoutDashboard,
   MapPin,
@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { FaultReportList } from '@/modules/procurement/field-stock/components/faults';
 import { AdjustmentPanel } from '@/modules/procurement/field-stock/components/adjustments';
+import { DashboardV2Body } from '@/components/field-stock/dashboard-v2/DashboardV2Body';
 
 type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability' | 'faults' | 'adjustments';
 
@@ -108,17 +109,32 @@ const tabs: TabConfig[] = [
   },
 ];
 
-/** Locations tab with create modal */
+/** Locations tab with create/edit modals */
 function LocationsTab() {
+  const { createLocation, updateLocation } = useLocations({ autoFetch: false });
   const [showCreate, setShowCreate] = useState(false);
-  const { createLocation } = useLocations({ autoFetch: false });
+  const [editLocation, setEditLocation] = useState<StockLocation | null>(null);
+
   return (
     <>
-      <LocationList onCreateClick={() => setShowCreate(true)} />
-      <CreateLocationModal
+      <LocationList
+        onCreateClick={() => setShowCreate(true)}
+        onEditLocation={(loc) => setEditLocation(loc)}
+      />
+      <LocationFormModal
         isOpen={showCreate}
+        mode="create"
         onClose={() => setShowCreate(false)}
-        onCreated={async (input) => { await createLocation(input); }}
+        onCreate={async (input) => { await createLocation(input); }}
+        onUpdate={async () => { /* unused in create mode */ }}
+      />
+      <LocationFormModal
+        isOpen={!!editLocation}
+        mode="edit"
+        location={editLocation}
+        onClose={() => setEditLocation(null)}
+        onCreate={async () => { /* unused in edit mode */ }}
+        onUpdate={async (id, input) => { await updateLocation(id, input); }}
       />
     </>
   );
@@ -173,10 +189,48 @@ function ReturnsTabContent() {
   );
 }
 
-/** Accountability tab */
+/** Accountability tab — holder-centric (Sprint D custody model) */
 function AccountabilityTabContent() {
-  const { contractors, loading } = useContractorAccountability({ autoFetch: true });
-  return <ContractorAccountabilityList contractors={contractors} loading={loading} />;
+  const { holders, loading, refetch } = useHolderAccountability({ autoFetch: true });
+
+  async function handleBlock(holderId: string, reason: string) {
+    const res = await fetch(
+      `/api/procurement/field-stock/accountability/holders/${holderId}/block`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || undefined }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: 'Failed to block holder' } })) as { error?: { message?: string } };
+      window.alert(err?.error?.message ?? 'Failed to block holder');
+      return;
+    }
+    await refetch();
+  }
+
+  async function handleUnblock(holderId: string) {
+    const res = await fetch(
+      `/api/procurement/field-stock/accountability/holders/${holderId}/unblock`,
+      { method: 'POST' }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: 'Failed to unblock holder' } })) as { error?: { message?: string } };
+      window.alert(err?.error?.message ?? 'Failed to unblock holder');
+      return;
+    }
+    await refetch();
+  }
+
+  return (
+    <HolderAccountabilityList
+      holders={holders}
+      loading={loading}
+      onBlock={handleBlock}
+      onUnblock={handleUnblock}
+    />
+  );
 }
 
 /** Consumptions tab with recent list */
@@ -245,7 +299,7 @@ export default function FieldStockPage() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <FieldStockDashboard onNavigate={(tab) => setActiveTab(tab as TabType)} />;
+        return <DashboardV2Body onNavigate={(tab) => setActiveTab(tab as TabType)} />;
       case 'locations':
         return <LocationsTab />;
       case 'serials':
@@ -285,7 +339,7 @@ export default function FieldStockPage() {
       case 'adjustments':
         return <AdjustmentPanel />;
       default:
-        return <FieldStockDashboard onNavigate={(tab) => setActiveTab(tab as TabType)} />;
+        return <DashboardV2Body onNavigate={(tab) => setActiveTab(tab as TabType)} />;
     }
   };
 

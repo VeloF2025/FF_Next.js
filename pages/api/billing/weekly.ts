@@ -33,6 +33,7 @@ interface WeeklyBillingRow {
   ft_note4_count: number;
   ft_note5_count: number;
   ft_pre_provisions_count: number;
+  ft_pre_provisions_outstanding: number;
   ft_total_claimable: number;
   price_per_drop: string | null;
   tax_rate: string | null;
@@ -101,6 +102,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
          ft_note4_count,
          ft_note5_count,
          ft_pre_provisions_count,
+         ft_pre_provisions_outstanding,
          ft_total_claimable,
          price_per_drop,
          tax_rate,

@@ -5,13 +5,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import type { SnagReport, CreateSnagReportRequest } from '@/modules/construction-qa/types/snag.types';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -31,29 +29,60 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
+/** Valid values for the ?source= query param. */
+const VALID_SOURCES = ['tqr', 'works_qa', 'scope'] as const;
+type SnagReportSource = (typeof VALID_SOURCES)[number];
+
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
-  const { projectId, page = '1', pageSize = '20' } = req.query;
+  const { projectId, page = '1', pageSize = '20', source } = req.query;
   const pageNum = Math.max(1, parseInt(page as string, 10));
   const pageSizeNum = Math.min(100, parseInt(pageSize as string, 10));
   const offset = (pageNum - 1) * pageSizeNum;
 
-  if (projectId && typeof projectId === 'string') {
-    const rows = await sql`
-      SELECT
-        sr.*,
-        p.project_name AS project_name
-      FROM snag_reports sr
-      INNER JOIN projects p ON p.id = sr.project_id
-      WHERE sr.project_id = ${projectId}
-      ORDER BY sr.audit_date DESC
-      LIMIT ${pageSizeNum} OFFSET ${offset}
-    ` as Array<SnagReport & { project_name: string }>;
+  // Validate source — unknown values fall through to "no filter".
+  const sourceFilter: SnagReportSource | null =
+    typeof source === 'string' && (VALID_SOURCES as readonly string[]).includes(source)
+      ? (source as SnagReportSource)
+      : null;
 
-    const countRows = await sql`
-      SELECT COUNT(*) AS total
-      FROM snag_reports
-      WHERE project_id = ${projectId}
-    ` as Array<{ total: string }>;
+  if (projectId && typeof projectId === 'string') {
+    // Two explicit branches — the tagged-template sql helper interpolates values
+    // as $-params, not concatenable SQL fragments.
+    const rows = sourceFilter
+      ? await sql`
+          SELECT
+            sr.*,
+            p.project_name AS project_name
+          FROM snag_reports sr
+          INNER JOIN projects p ON p.id = sr.project_id
+          WHERE sr.project_id = ${projectId}
+            AND sr.source = ${sourceFilter}
+          ORDER BY sr.audit_date DESC, sr.generated_at DESC NULLS LAST
+          LIMIT ${pageSizeNum} OFFSET ${offset}
+        ` as unknown as Array<SnagReport & { project_name: string }>
+      : await sql`
+          SELECT
+            sr.*,
+            p.project_name AS project_name
+          FROM snag_reports sr
+          INNER JOIN projects p ON p.id = sr.project_id
+          WHERE sr.project_id = ${projectId}
+          ORDER BY sr.audit_date DESC, sr.generated_at DESC NULLS LAST
+          LIMIT ${pageSizeNum} OFFSET ${offset}
+        ` as unknown as Array<SnagReport & { project_name: string }>;
+
+    const countRows = sourceFilter
+      ? await sql`
+          SELECT COUNT(*) AS total
+          FROM snag_reports
+          WHERE project_id = ${projectId}
+            AND source = ${sourceFilter}
+        ` as unknown as Array<{ total: string }>
+      : await sql`
+          SELECT COUNT(*) AS total
+          FROM snag_reports
+          WHERE project_id = ${projectId}
+        ` as unknown as Array<{ total: string }>;
 
     const total = parseInt(countRows[0]?.total ?? '0', 10);
 
@@ -64,20 +93,38 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 
-  // No projectId filter — return all reports
-  const rows = await sql`
-    SELECT
-      sr.*,
-      p.project_name AS project_name
-    FROM snag_reports sr
-    INNER JOIN projects p ON p.id = sr.project_id
-    ORDER BY sr.audit_date DESC
-    LIMIT ${pageSizeNum} OFFSET ${offset}
-  ` as Array<SnagReport & { project_name: string }>;
+  // No projectId filter — return all reports (optionally filtered by source).
+  // Two explicit branches — same tagged-template constraint applies.
+  const rows = sourceFilter
+    ? await sql`
+        SELECT
+          sr.*,
+          p.project_name AS project_name
+        FROM snag_reports sr
+        INNER JOIN projects p ON p.id = sr.project_id
+        WHERE sr.source = ${sourceFilter}
+        ORDER BY sr.audit_date DESC, sr.generated_at DESC NULLS LAST
+        LIMIT ${pageSizeNum} OFFSET ${offset}
+      ` as unknown as Array<SnagReport & { project_name: string }>
+    : await sql`
+        SELECT
+          sr.*,
+          p.project_name AS project_name
+        FROM snag_reports sr
+        INNER JOIN projects p ON p.id = sr.project_id
+        ORDER BY sr.audit_date DESC, sr.generated_at DESC NULLS LAST
+        LIMIT ${pageSizeNum} OFFSET ${offset}
+      ` as unknown as Array<SnagReport & { project_name: string }>;
 
-  const countRows = await sql`
-    SELECT COUNT(*) AS total FROM snag_reports
-  ` as Array<{ total: string }>;
+  const countRows = sourceFilter
+    ? await sql`
+        SELECT COUNT(*) AS total
+        FROM snag_reports
+        WHERE source = ${sourceFilter}
+      ` as unknown as Array<{ total: string }>
+    : await sql`
+        SELECT COUNT(*) AS total FROM snag_reports
+      ` as unknown as Array<{ total: string }>;
 
   const total = parseInt(countRows[0]?.total ?? '0', 10);
 
@@ -134,7 +181,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       'pending'
     )
     RETURNING *
-  ` as SnagReport[];
+  ` as unknown as SnagReport[];
 
   if (!rows[0]) {
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag report');
@@ -154,7 +201,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
   // Verify the report exists before deleting
   const existing = await sql`
     SELECT id FROM snag_reports WHERE id = ${id}
-  ` as Array<{ id: string }>;
+  ` as unknown as Array<{ id: string }>;
 
   if (existing.length === 0) {
     return apiResponse.notFound(res, 'Snag report', id);

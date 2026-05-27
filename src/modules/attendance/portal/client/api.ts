@@ -131,6 +131,11 @@ export interface AttendanceSessionMeta {
   expiresAt: string;
 }
 
+// Single source of truth: definitions live in types.ts, re-exported here for
+// backward-compatible import paths (consumers using this module's path still work).
+import type { StaffRole, AccountStatus } from '../types';
+export type { StaffRole, AccountStatus };
+
 export interface AttendanceProfile {
   staffId: string;
   name: string;
@@ -138,6 +143,17 @@ export interface AttendanceProfile {
   email: string | null;
   homeSiteId: string | null;
   hasAssignedVehicle: boolean;
+  profilePhotoUrl: string | null;
+  /** Staff role — null when the column is not yet populated for legacy rows. */
+  role: StaffRole | null;
+  /** Account lifecycle status — always populated; defaults to 'active' for legacy rows. */
+  accountStatus: AccountStatus;
+  /**
+   * Auth-tier role from users.role (AuthRole). Null when no user_id link exists.
+   * Used by isStoresAuthorised() to admit super_admin/system callers who have no
+   * 'stores' or 'admin' staff.role but do have a privileged users.role.
+   */
+  authRole: string | null;
 }
 
 export interface SessionResponse {
@@ -148,6 +164,87 @@ export interface SessionResponse {
 
 export function getSession(): Promise<SessionResponse> {
   return request<SessionResponse>('/api/my/session', { method: 'GET' });
+}
+
+// =============================================================================
+// Hub
+// =============================================================================
+
+export interface HubSummaryResponse {
+  openEntry: {
+    id: string;
+    clockInAt: string;
+    durationMs: number;
+  } | null;
+  assignedVehicle: {
+    id: string;
+    registration: string | null;
+  } | null;
+  latestPayslip: {
+    id: string;
+    payPeriodStart: string;
+    payPeriodEnd: string;
+    hasPdf: boolean;
+  } | null;
+  latestReceipt: {
+    id: string;
+    vendor: string | null;
+    totalCents: number;
+    capturedAt: string;
+  } | null;
+  pendingCorrectionsCount: number;
+  recentEntryCount: number;
+}
+
+export function getHubSummary(): Promise<HubSummaryResponse> {
+  return request<HubSummaryResponse>('/api/my/hub-summary', { method: 'GET' });
+}
+
+// =============================================================================
+// Payslips (PRD-040 Phase 3)
+// =============================================================================
+
+export interface PayslipListItem {
+  id: string;
+  payPeriodStart: string;
+  payPeriodEnd: string;
+  grossCents: number;
+  deductionsCents: number;
+  netCents: number;
+  hasPdf: boolean;
+  importedAt: string;
+}
+
+export function listMyPayslips(): Promise<{ items: PayslipListItem[] }> {
+  return request<{ items: PayslipListItem[] }>('/api/my/payslips', { method: 'GET' });
+}
+
+/**
+ * Build the URL the browser should hit to download a payslip PDF. The
+ * server proxies VF Storage so the underlying storage URL never reaches
+ * the client (POPIA — payslips are personal financial data).
+ */
+export function payslipDownloadUrl(payslipId: string): string {
+  return `/api/my/payslips/${encodeURIComponent(payslipId)}/download`;
+}
+
+// =============================================================================
+// Fleet handoff (PRD-040 Phase 2)
+// =============================================================================
+
+export interface FleetHandoffResponse {
+  sessionId: string;
+  vehicleRegistration: string | null;
+  expiresAt: string;
+}
+
+/**
+ * Mint a fleet portal session from the current /my session and return
+ * the assigned vehicle's registration. Caller should navigate to
+ * /fleet/portal after this resolves so the page sees the new cookie.
+ */
+export function requestFleetHandoff(): Promise<FleetHandoffResponse> {
+  return request<FleetHandoffResponse>('/api/my/fleet-handoff', { method: 'POST' });
 }
 
 // =============================================================================
@@ -270,6 +367,40 @@ export function getHistory(limit = 14): Promise<{ entries: ClockEntry[]; limit: 
     `/api/my/attendance/history?limit=${encodeURIComponent(String(limit))}`,
     { method: 'GET' }
   );
+}
+
+// =============================================================================
+// Reverse geocoding (coords → "Somerset West, Western Cape")
+// =============================================================================
+
+export interface GeocodeResult {
+  city: string;
+  municipalDistrict: string;
+  province: string;
+}
+
+/**
+ * Resolve lat/lon to a structured SA address via our server-side
+ * Nominatim proxy. Returns `null` on any failure — the caller should
+ * silently hide the address line, never block submit on it.
+ *
+ * Swallows ApiError so a geocode outage can't propagate into the clock
+ * flow. The server-side endpoint itself also masks upstream failures
+ * as `{ geocode: null }`, but belt-and-braces here for network errors.
+ */
+export async function getReverseGeocode(
+  lat: number,
+  lon: number
+): Promise<GeocodeResult | null> {
+  try {
+    const resp = await request<{ geocode: GeocodeResult | null; cached: boolean }>(
+      `/api/my/geocode?lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lon))}`,
+      { method: 'GET' }
+    );
+    return resp.geocode;
+  } catch {
+    return null;
+  }
 }
 
 // =============================================================================

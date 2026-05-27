@@ -23,7 +23,10 @@ export async function transcribeAudio(
   try {
     log.info('Starting bot recording transcription', { audioPath, meetingId }, LOGGER);
 
-    const result = await transcribeWithWhisper(audioPath, meetingId);
+    // Bot recordings only persist the English transcript, so skip the
+    // Afrikaans pass to halve OpenAI cost+latency. The Teams ingestion path
+    // (meeting-processor) still runs both passes to populate whisper-af.
+    const result = await transcribeWithWhisper(audioPath, meetingId, { withAfrikaans: false });
 
     if (!result.englishTranscript) {
       log.warn('Transcription returned empty', { audioPath, meetingId }, LOGGER);

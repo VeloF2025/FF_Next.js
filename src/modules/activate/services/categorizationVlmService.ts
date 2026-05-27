@@ -1,361 +1,36 @@
 /**
  * VLM Photo Categorization Service
  *
- * Purpose: Use Qwen3 VLM to categorize photos into installation steps
- * without trusting the pre-assigned OneMap types.
+ * Use Qwen3 VLM to categorize photos into installation steps without trusting
+ * the pre-assigned OneMap types (field workers routinely upload photos to the
+ * wrong attribute).
  *
- * Problem: Field workers upload photos to wrong attributes in OneMap.
- * Solution: VLM analyzes visual content and predicts correct category.
- *
- * Status: WORKING - Phase 1 implementation
+ * This file orchestrates the batched VLM call and HITL example loading. The
+ * prompt, HTTP client, and image fetching helpers each live in sibling
+ * modules so this file stays under the CLAUDE.md 300-line limit:
+ *  - ./categorizationPrompt         — buildCategorizationPrompt
+ *  - ./categorizationImageFetcher   — fetchImageAsBase64, resolveImageUrl
+ *  - ./categorizationVlmClient      — callVlmForCategorization
+ *  - ./categorizationExampleLoader  — loadFewShotExamples, loadPositiveExamples,
+ *                                     loadGalleryExamples
  */
 
 import { log } from '@/lib/logger';
-import { pool } from '@/lib/db';
 import {
   VlmCategorizationResult,
-  VlmBatchCategorizationResponse,
   STEP_LABELS,
 } from '../types/unified.types';
+import { VLM_BATCH_SIZE } from '@/lib/vlm';
+import { fetchImageAsBase64 } from './categorizationImageFetcher';
+import { callVlmForCategorization } from './categorizationVlmClient';
 import {
-  FewShotExample,
-  getRelevantExamples,
-  buildFewShotPromptSection,
-  hasCorrections,
-  PositiveExample,
-  getPositiveExamples,
-  buildPositiveExamplesPromptSection,
-  hasConfirmedCorrect,
-} from '@/modules/qa-learning';
-import { VLM_CHAT_ENDPOINT, VLM_CATEGORIZATION_MODEL, VLM_TIMEOUT_BATCH, VLM_BATCH_SIZE, VLM_MAX_TOKENS_CATEGORIZATION, VLM_TEMPERATURE } from '@/lib/vlm';
-import { QA_PHOTO_CRITERIA } from './qaPhotoCriteria';
+  loadFewShotExamples,
+  loadPositiveExamples,
+  loadGalleryExamples,
+} from './categorizationExampleLoader';
 
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
+export { CategorizationError } from './categorizationError';
 
-// VLM_TEMPERATURE imported from @/lib/vlm (0.1 for consistent categorization)
-
-// ============================================================================
-// ERROR HANDLING
-// ============================================================================
-
-export class CategorizationError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly details?: unknown
-  ) {
-    super(message);
-    this.name = 'CategorizationError';
-  }
-}
-
-// ============================================================================
-// PROMPTS
-// ============================================================================
-
-/**
- * Build the categorization prompt for a batch of photos
- *
- * @param photoCount - Number of photos in batch
- * @param drNumber - DR number for context
- * @param fewShotExamples - Optional few-shot examples from human corrections
- * @param positiveExamples - Optional confirmed-correct examples for positive reinforcement
- */
-function buildCategorizationPrompt(
-  photoCount: number,
-  drNumber: string,
-  fewShotExamples?: FewShotExample[],
-  positiveExamples?: PositiveExample[]
-): string {
-  let prompt = `You are an expert fiber optic installation photo categorizer for ${drNumber}.
-
-Your task is to analyze ${photoCount} photos and categorize each one into one of these 13 installation steps:
-
-STEP CATEGORIES:
-0. Discard/Not Relevant - Photos that do NOT depict any specific installation step. This is a PRIMARY category, not a last resort. Use Step 0 for:
-   • Duplicate photos (same subject already covered by another photo)
-   • Blurry, dark, or unrecognizable photos where the subject cannot be identified
-   • Wide-angle/context shots that show a general scene without focusing on any installation step
-   • Photos of vehicles, people, paperwork (not signatures), food, or other non-installation subjects
-   • Generic exterior shots that show ONLY sky, roads, or landscapes with NO building/structure visible
-   • Screenshots or phone screen photos that aren't power meter readings or speed tests
-   • Accidental photos (selfies, ground, sky without cables)
-   If your confidence for any step 1-12 is below 0.50, prefer Step 0 over forcing a weak classification.
-1. House Photo - Property exterior showing the BUILDING for location verification. Must show the structure itself, not just sky/poles.
-2. Cable from Pole - Fiber cable visibly spanning open air between a utility pole and the building fascia. Must show cable crossing sky. Pole J-hook, service drop wire, messenger wire are indicators. A pole alone without visible cable span = low confidence.
-3. Cable Entry Outside - EXTERIOR close-up of where cable ENTERS the building through wall/roof. Cable penetrating exterior wall, conduit, grommet. Drip loop before entry point is a strong indicator. Cable transitioning from OUTSIDE to INSIDE.
-4. Cable Entry Inside - INTERIOR view showing cable ROUTING from entry point along walls/ceiling. Cable running along interior wall, cable clips, indoor path. Cable is TRAVELING, not yet at destination.
-5. Wall for Installation - The DESTINATION wall surface where ONT will be mounted. Mounting bracket, power outlet nearby, clean wall section. NO cable routing as main subject. Also includes a bare pole (with nothing on it) inside a house or shack — in informal housing the pole IS the wall/mounting point.
-6. ONT Back After Install - BACK panel of ONT with a GREEN FIBER CABLE physically plugged into the fiber port (yellow/orange socket). Camera angle BEHIND the ONT. Power cable may also be connected. The green fiber cable inserted into the fiber port is REQUIRED — without it, the ONT is not actually installed. If you see a back-of-ONT photo with an empty fiber port, no green cable visible at the port, or the port obscured, classify as Step 0 (not Step 6). Step 6 is specifically "After Install" and proves the fiber is connected. CRITICAL: The actual ONT DEVICE must be clearly visible — a rectangular plastic networking box with labeled ports (fiber port, LAN ports, power port). A wooden board, wall bracket, cable management board, or cable loop WITHOUT an identifiable ONT device body = Step 0, NOT Step 6. Do not confuse a cable clip, cable holder, or wall-mounted cable management accessory for an ONT.
-7. Power Meter Reading - Optical power meter display showing dBm reading (valid range: -18 to -24 dBm). Handheld meter screen with numbers.
-8. Final Installation - WIDE shot of COMPLETE setup from a distance: ONT + UPS/GIZZU + wall + surroundings. Key = WIDE FRAMING showing full context, even if green lights visible.
-9. Green Lights on ONT - CLOSE-UP of ONT FRONT panel focused on indicator lights (POWER, LINK, LAN, 2.4GHz, 5GHz, INTERNET). Nokia/Fibertime branding, LED labels, green dots. Also includes photos showing the ONT label/sticker with Nokia/Fibertime branding, DR number, or serial number — these confirm the installed device.
-10. Signature - Customer signature on paper/tablet completion form. Handwriting, form fields, sign here marks.
-11. Dome Joint Open - The dome joint (handhole/splice closure) with its LID REMOVED, showing the INSIDE: fibre splice tray, cables routed into the enclosure, inner compartments visible. Key = you can see INSIDE the box with cables/fibres.
-12. Dome Joint Closed - The dome joint (handhole/splice closure) with its LID SEALED shut. Just the outer black/grey enclosure casing visible, no internal components showing. Key = the box is CLOSED, lid on, you CANNOT see inside.
-
-KEY DIFFERENTIATORS for commonly confused categories:
-- Step 1 vs Step 2: Step 1 = BUILDING/HOUSE visible. Step 2 = CABLE in AIR between pole and house. Pole+sky with no house = Step 2, not Step 1.
-- Step 2 vs Step 3: Step 2 = cable spanning open AIR between pole and building (sky visible). Step 3 = cable at WALL entering building (conduit, grommet, drip loop visible). Cable along roofline/wall approaching entry = Step 3. Cable crossing open sky = Step 2.
-- Step 3 vs Step 4: Step 3 = OUTSIDE (exterior wall, daylight). Step 4 = INSIDE (interior wall, indoor lighting). Sky or exterior materials = Step 3. Enclosed indoor = Step 4.
-- Step 4 vs Step 5: Step 4 = cable ROUTING/traveling along walls. Step 5 = TARGET wall (bracket, outlet). Cable as main subject = Step 4. Wall surface as main subject = Step 5.
-- Step 2 vs Step 5: Step 2 = pole OUTSIDE with cable in the air/sky. Step 5 = bare pole INSIDE a house/shack (no cable span, indoor setting, walls/roof visible around it). Indoor pole = Step 5 (wall/mounting point).
-- Step 6 vs Step 8: ONT BACK only (with green fiber cable plugged into fiber port) vs FULL SETUP wide shot (ONT + UPS + cables). Step 6 REQUIRES a green fiber cable visibly plugged into the fiber port — if no green cable is at the port, the photo is Step 0, not Step 6.
-- Step 5 vs Step 6: Step 5 = bare wall or mounting surface where the ONT WILL be mounted (no device yet, just the wall/bracket). Step 6 = the ACTUAL ONT device must be clearly visible with its back panel and green fiber cable. A wooden board with a cable coiled on it (no ONT device body visible) = Step 5 or Step 0, NEVER Step 6.
-- Step 8 vs Step 9: FRAMING is key. Step 8 = WIDE shot (ONT + UPS + wall + surroundings). Step 9 = CLOSE-UP of front panel lights only. UPS and wall visible = Step 8 even if lights visible.
-- Step 11 vs Step 12: Step 11 (OPEN) = you can see INSIDE the dome joint — splice tray, cables, inner compartments visible. Step 12 (CLOSED) = lid is ON, sealed shut, only the outer casing visible. Cables visible inside = Step 11. Sealed box = Step 12.
-
-⚠️ STEP 0 BALANCE — Based on 3776 human corrections:
-The #1 error (50%+ of corrections) is OVER-CLASSIFYING: forcing photos into installation steps when they should be Step 0.
-Common over-classification mistakes to AVOID:
-- A photo of ONLY sky, road, or landscape with NO building/structure visible = Step 0, NOT Step 1. But ANY photo showing a building/house/shack/structure IS Step 1 — fiber route or cable is NOT required for Step 1
-- A pole photo without visible cable span or installation context = Step 0, NOT Step 2
-- A dark/blurry photo where you cannot identify the subject = Step 0, NOT a guessed step
-- A random screenshot that isn't a power meter or speed test = Step 0, NOT Step 9
-- A photo of empty cardboard boxes or packaging material WITHOUT any device visible = Step 0, NOT Step 6 or 7. But a Nokia/Fibertime ONT showing its label, branding, serial number, or DR sticker = Step 9 (it confirms the installed device)
-- A wide contextual photo showing a room without ONT/UPS focus = Step 0, NOT Step 8
-
-DO still classify when the installation subject is clearly visible:
-- ANY building, house, shack, or structure = Step 1 (house photo for location verification)
-- Clear ONT, router, or networking equipment = Step 6, 8, or 9
-- Nokia/Fibertime ONT with label, branding, DR sticker, or serial number = Step 9
-- Clear power meter display with dBm reading = Step 7
-- Clear signature on a form = Step 10
-- Clear cable spanning sky between pole and building = Step 2`;
-
-  // Inject per-step QA photo quality criteria (maintained by QA team)
-  prompt += QA_PHOTO_CRITERIA;
-
-  // Inject few-shot examples from human corrections (HITL learning)
-  if (fewShotExamples && fewShotExamples.length > 0) {
-    prompt += buildFewShotPromptSection(fewShotExamples);
-  }
-
-  // Inject confirmed-correct examples (positive reinforcement)
-  if (positiveExamples && positiveExamples.length > 0) {
-    prompt += buildPositiveExamplesPromptSection(positiveExamples);
-  }
-
-  prompt += `
-
-For EACH photo (numbered 1-${photoCount}), respond in this JSON format:
-{
-  "categorizations": [
-    {
-      "photo_index": 1,
-      "identified_as": "Brief description of what this photo actually shows",
-      "predicted_category": "Category name from list above",
-      "predicted_step": <number 0-12>,
-      "confidence": <0.0-1.0>,
-      "reasoning": "Visual elements that led to this classification",
-      "date_stamps": ["YYYY-MM-DD", ...] or null
-    }
-  ]
-}
-
-DATE STAMP EXTRACTION:
-Many photos have visible date/time watermarks burned into the image pixels (e.g. "2026/2/5 13:12" or "2026-03-15 09:30"). These are NOT EXIF metadata — they are TEXT overlaid on the photo, typically in a corner. Scan the ENTIRE photo carefully for ALL visible date stamps — there may be more than one:
-- A FRESH stamp added by the camera app at capture time (usually top-left or bottom-right)
-- An OLD stamp burned into the original photo that was then re-photographed (anywhere in the frame)
-
-Return ALL distinct dates you can read in "date_stamps" as an array of YYYY-MM-DD strings. Order from most prominent/legible first. If no visible date stamps exist, return null. Finding 2+ dates is a strong signal of a recycled/duplicated photo, so be thorough — check corners, edges, and any text overlays on both the outer frame and the inner (re-photographed) content.
-
-Step 0 = not relevant/discard (duplicates, blurry, generic context shots, non-installation subjects, or confidence < 0.50 for any step).
-CRITICAL: Do NOT trust any pre-existing labels or filenames. Categorize based ONLY on visual content.
-If a photo doesn't clearly match any category, set confidence below 0.5 and explain why.`;
-
-  return prompt;
-}
-
-// ============================================================================
-// IMAGE HANDLING
-// ============================================================================
-
-// Internal OneMap server for direct photo fetching (bypasses proxy for server-side)
-const ONEMAP_INTERNAL_URL = process.env.ONEMAP_INTERNAL_URL || 'http://100.96.203.105:8003';
-
-/**
- * Convert proxy URL to internal OneMap URL for server-side fetching
- *
- * Proxy URL format: /api/activate/photo/{drNumber}/{filename}
- * Internal URL format: http://100.96.203.105:8003/api/photo/{drNumber}/{filename}
- */
-function resolveImageUrl(imageUrl: string): string {
-  // If already an absolute URL, use it directly
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    return imageUrl;
-  }
-
-  // Convert relative proxy URL to internal OneMap URL
-  // /api/activate/photo/DR123/file.jpg → http://100.96.203.105:8003/api/photo/DR123/file.jpg
-  const proxyPattern = /^\/api\/activate\/photo\/(.+)$/;
-  const match = imageUrl.match(proxyPattern);
-
-  if (match) {
-    const internalUrl = `${ONEMAP_INTERNAL_URL}/api/photo/${match[1]}`;
-    log.debug(`Resolved proxy URL to internal: ${imageUrl} → ${internalUrl}`, undefined, 'CategorizationVlm');
-    return internalUrl;
-  }
-
-  // Fallback: prepend internal URL base (shouldn't happen with current architecture)
-  log.warn(`Unrecognized URL format, using as-is: ${imageUrl}`, undefined, 'CategorizationVlm');
-  return imageUrl;
-}
-
-/**
- * Fetch an image and convert to base64
- *
- * Handles both:
- * - Relative proxy URLs: /api/activate/photo/{dr}/{file} → converts to internal OneMap
- * - Absolute URLs: Used directly
- */
-async function fetchImageAsBase64(imageUrl: string): Promise<string> {
-  const resolvedUrl = resolveImageUrl(imageUrl);
-
-  try {
-    const response = await fetch(resolvedUrl);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status} from ${resolvedUrl}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64 = buffer.toString('base64');
-
-    return base64;
-  } catch (error) {
-    log.error(`Failed to fetch/encode image ${resolvedUrl}: ${error}`, undefined, 'CategorizationVlm');
-    throw error;
-  }
-}
-
-// ============================================================================
-// VLM API CALLS
-// ============================================================================
-
-/**
- * Call VLM API to categorize a batch of photos
- *
- * @param drNumber - DR number for context
- * @param photos - Array of photos to categorize
- * @param base64Images - Base64 encoded images
- * @param fewShotExamples - Optional few-shot examples for prompt enhancement
- * @param positiveExamples - Optional confirmed-correct examples for positive reinforcement
- */
-async function callVlmForCategorization(
-  drNumber: string,
-  photos: Array<{ filename: string; url: string; original_type: string | null }>,
-  base64Images: string[],
-  fewShotExamples?: FewShotExample[],
-  positiveExamples?: PositiveExample[],
-  gallerySectionText?: string
-): Promise<VlmBatchCategorizationResponse> {
-  const prompt = buildCategorizationPrompt(photos.length, drNumber, fewShotExamples, positiveExamples) + (gallerySectionText ?? '');
-
-  const requestBody = {
-    model: VLM_CATEGORIZATION_MODEL,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: prompt,
-          },
-          ...base64Images.map((base64) => ({
-            type: 'image_url',
-            image_url: {
-              url: `data:image/jpeg;base64,${base64}`,
-            },
-          })),
-        ],
-      },
-    ],
-    max_tokens: VLM_MAX_TOKENS_CATEGORIZATION,
-    temperature: VLM_TEMPERATURE,
-  };
-
-  log.info(`Calling ${VLM_CATEGORIZATION_MODEL} for ${drNumber} (${photos.length} photos)...`, undefined, 'CategorizationVlm');
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_BATCH);
-
-  try {
-    const response = await fetch(VLM_CHAT_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new CategorizationError(
-        `VLM API returned ${response.status}: ${errorText}`,
-        `VLM_HTTP_${response.status}`,
-        errorText
-      );
-    }
-
-    const data = await response.json();
-    log.info(`VLM response received for ${drNumber}`, undefined, 'CategorizationVlm');
-
-    // Parse response
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new CategorizationError('No content in VLM response', 'VLM_EMPTY_RESPONSE');
-    }
-
-    // Extract JSON from response (may be wrapped in markdown code blocks)
-    const jsonMatch =
-      content.match(/```json\n([\s\S]*?)\n```/) ||
-      content.match(/```\n([\s\S]*?)\n```/) ||
-      [null, content];
-
-    const parsed = JSON.parse(jsonMatch[1] || content);
-
-    if (!parsed.categorizations || !Array.isArray(parsed.categorizations)) {
-      throw new CategorizationError(
-        'Invalid VLM response format: missing categorizations array',
-        'VLM_INVALID_FORMAT',
-        parsed
-      );
-    }
-
-    return parsed as VlmBatchCategorizationResponse;
-  } catch (error: unknown) {
-    clearTimeout(timeoutId);
-
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new CategorizationError('VLM API request timed out', 'VLM_TIMEOUT');
-    }
-
-    if (error instanceof CategorizationError) {
-      throw error;
-    }
-
-    throw new CategorizationError(
-      `VLM API error: ${error instanceof Error ? error.message : String(error)}`,
-      'VLM_API_ERROR',
-      error
-    );
-  }
-}
-
-// ============================================================================
-// MAIN CATEGORIZATION FUNCTION
-// ============================================================================
-
-/**
- * Photo input for categorization
- */
 export interface PhotoInput {
   filename: string;
   url: string;
@@ -364,160 +39,39 @@ export interface PhotoInput {
 }
 
 /**
- * Categorize photos using VLM
- *
- * @param drNumber - DR number being processed
- * @param photos - Array of photos with URLs and original metadata
- * @param batchSize - Optional batch size override (default: 6)
- * @returns Array of categorization results
+ * Categorize photos using VLM.
  */
 export async function categorizePhotos(
   drNumber: string,
   photos: PhotoInput[],
-  batchSize: number = VLM_BATCH_SIZE
+  batchSize: number = VLM_BATCH_SIZE,
 ): Promise<VlmCategorizationResult[]> {
   const startTime = Date.now();
   const results: VlmCategorizationResult[] = [];
 
-  log.info(`Starting categorization for ${drNumber}: ${photos.length} photos`, undefined, 'CategorizationVlm');
+  log.info(
+    `Starting categorization for ${drNumber}: ${photos.length} photos`,
+    undefined,
+    'CategorizationVlm',
+  );
 
-  // HITL Learning: Fetch few-shot examples from human corrections
-  let fewShotExamples: FewShotExample[] = [];
-  try {
-    // Quick check to avoid unnecessary queries
-    const hasCorrectionData = await hasCorrections('dr_photo');
-    if (!hasCorrectionData) {
-      log.warn('Few-shot learning inactive: no corrections available', {
-        action: 'fewShotSkipped',
-        reason: 'no_corrections_available',
-        workflowType: 'dr_photo',
-        drNumber,
-      }, 'CategorizationVlm');
-    } else {
-      const selectionResult = await getRelevantExamples({
-        workflowType: 'dr_photo',
-        maxExamples: 5,
-        includeConfusionPairs: true,
-      });
-      fewShotExamples = selectionResult.examples;
+  // HITL example sources are loaded once per DR (not per batch) and reused
+  // across every batch's prompt. Each loader fails open (returns []/'').
+  const fewShotExamples = await loadFewShotExamples(drNumber);
+  const positiveExamples = await loadPositiveExamples(drNumber);
+  const gallerySection = await loadGalleryExamples();
 
-      if (fewShotExamples.length === 0) {
-        log.warn('Few-shot learning inactive: getRelevantExamples returned empty', {
-          action: 'fewShotEmpty',
-          workflowType: 'dr_photo',
-          drNumber,
-          selectionCriteria: selectionResult.selectionCriteria,
-        }, 'CategorizationVlm');
-      } else {
-        log.info('Few-shot examples loaded for categorization', {
-          action: 'fewShotLoaded',
-          drNumber,
-          exampleCount: fewShotExamples.length,
-          criteria: selectionResult.selectionCriteria,
-        }, 'CategorizationVlm');
-      }
-    }
-  } catch (error) {
-    // Don't fail categorization if few-shot loading fails
-    log.warn('Few-shot example loading failed', {
-      action: 'fewShotLoadFailed',
-      drNumber,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'CategorizationVlm');
-  }
-
-  // HITL Learning: Fetch positive examples from confirmed-correct DRs
-  let positiveExamples: PositiveExample[] = [];
-  try {
-    const hasPositiveData = await hasConfirmedCorrect('dr_photo');
-    if (!hasPositiveData) {
-      log.warn('Positive examples inactive: no confirmed-correct data available', {
-        action: 'positiveExamplesSkipped',
-        reason: 'no_confirmed_correct_available',
-        workflowType: 'dr_photo',
-        drNumber,
-      }, 'CategorizationVlm');
-    } else {
-      const positiveResult = await getPositiveExamples({
-        workflowType: 'dr_photo',
-        maxExamples: 3,
-        minConfidence: 0.9,
-      });
-      positiveExamples = positiveResult.examples;
-
-      if (positiveExamples.length === 0) {
-        log.warn('Positive examples inactive: getPositiveExamples returned empty', {
-          action: 'positiveExamplesEmpty',
-          workflowType: 'dr_photo',
-          drNumber,
-        }, 'CategorizationVlm');
-      } else {
-        log.info('Positive examples loaded for categorization', {
-          action: 'positiveExamplesLoaded',
-          drNumber,
-          exampleCount: positiveExamples.length,
-        }, 'CategorizationVlm');
-      }
-    }
-  } catch (error) {
-    log.warn('Positive example loading failed', {
-      action: 'positiveExamplesLoadFailed',
-      drNumber,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'CategorizationVlm');
-  }
-
-  // Supplement with gallery-curated corrections from vlm_corrections
-  let gallerySectionText = '';
-  try {
-    const { rows: galleryRows } = await pool.query<{
-      vlm_extracted_value: string;
-      corrected_value: string;
-      correction_notes: string | null;
-      is_canonical: boolean;
-    }>(
-      `SELECT vlm_extracted_value, corrected_value, correction_notes, is_canonical
-       FROM vlm_corrections
-       WHERE module = 'activate'
-         AND analysis_type = 'photo_categorization'
-       ORDER BY is_canonical DESC, priority DESC, created_at DESC
-       LIMIT 8`
-    );
-
-    if (galleryRows.length > 0) {
-      const goodRows = galleryRows.filter((r) => r.corrected_value !== 'reject');
-      const badRows  = galleryRows.filter((r) => r.corrected_value === 'reject');
-      const lines: string[] = ['\n### GALLERY-CURATED EXAMPLES:'];
-
-      if (goodRows.length > 0) {
-        lines.push('\nConfirmed ACCEPTABLE photos (prioritise accepting these):');
-        goodRows.slice(0, 4).forEach((r) => {
-          lines.push(`✅ ACCEPT photos for ${r.vlm_extracted_value}`);
-          if (r.correction_notes) lines.push(`   (${r.correction_notes})`);
-        });
-      }
-      if (badRows.length > 0) {
-        lines.push('\nConfirmed REJECT photos (do not accept photos like these):');
-        badRows.slice(0, 4).forEach((r) => {
-          lines.push(`❌ REJECT photos for ${r.vlm_extracted_value}`);
-          if (r.correction_notes) lines.push(`   (${r.correction_notes})`);
-        });
-      }
-      gallerySectionText = lines.join('\n');
-    }
-  } catch (err) {
-    log.warn('[CategorizationVlm] Failed to load gallery corrections — continuing without them', { err });
-  }
-
-  // Process in batches
   for (let i = 0; i < photos.length; i += batchSize) {
     const batch = photos.slice(i, i + batchSize);
     const batchNum = Math.floor(i / batchSize) + 1;
     const totalBatches = Math.ceil(photos.length / batchSize);
 
-    log.info(`Processing batch ${batchNum}/${totalBatches} (${batch.length} photos)`, undefined, 'CategorizationVlm');
+    log.info(
+      `Processing batch ${batchNum}/${totalBatches} (${batch.length} photos)`,
+      undefined,
+      'CategorizationVlm',
+    );
 
-    // Fetch and encode images
     const base64Images: string[] = [];
     const validPhotos: PhotoInput[] = [];
 
@@ -528,20 +82,7 @@ export async function categorizePhotos(
         validPhotos.push(photo);
       } catch (error) {
         log.warn(`Skipping ${photo.filename}: ${error}`, undefined, 'CategorizationVlm');
-        // Add failed photo with error result
-        results.push({
-          photo_filename: photo.filename,
-          original_type: photo.original_type,
-          original_step: photo.original_step,
-          vlm_predicted_category: 'Error',
-          vlm_predicted_step: 0,
-          vlm_confidence: 0,
-          vlm_identified_as: 'Failed to fetch image',
-          vlm_reasoning: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          human_approved: null,
-          human_override_step: null,
-          human_override_reason: null,
-        });
+        results.push(buildErrorResult(photo, 'Failed to fetch image', error));
       }
     }
 
@@ -550,7 +91,6 @@ export async function categorizePhotos(
       continue;
     }
 
-    // Call VLM with few-shot examples
     try {
       const vlmResponse = await callVlmForCategorization(
         drNumber,
@@ -558,39 +98,44 @@ export async function categorizePhotos(
         base64Images,
         fewShotExamples,
         positiveExamples,
-        gallerySectionText
+        gallerySection,
       );
 
-      // Map VLM response to results
       for (const cat of vlmResponse.categorizations) {
         const photoIndex = cat.photo_index - 1; // VLM uses 1-based index
         const photo = validPhotos[photoIndex];
 
         if (!photo) {
-          log.warn(`Invalid photo_index ${cat.photo_index} in VLM response`, undefined, 'CategorizationVlm');
+          log.warn(
+            `Invalid photo_index ${cat.photo_index} in VLM response`,
+            undefined,
+            'CategorizationVlm',
+          );
           continue;
         }
 
         // Normalise date stamps: accept either new `date_stamps` array or legacy singular `date_stamp`
         const dateStamps: string[] = Array.isArray(cat.date_stamps)
-          ? cat.date_stamps.filter((d): d is string => typeof d === 'string' && d.length > 0)
+          ? cat.date_stamps.filter(
+              (d): d is string => typeof d === 'string' && d.length > 0,
+            )
           : cat.date_stamp
             ? [cat.date_stamp]
             : [];
         const uniqueDates = Array.from(new Set(dateStamps));
 
-        // Blocker 5: Distinct telemetry for each VLM date-extraction outcome so
-        // we can distinguish silent failures from real "no stamps" results.
+        // Distinct telemetry so silent failures don't get masked as "no stamps".
         const photoMeta = { drNumber, photoFilename: photo.filename };
         if (!('date_stamps' in cat) && !('date_stamp' in cat)) {
-          // Field entirely absent from VLM response — indicates a prompt/parsing issue
           log.info('VLM_DATE_EXTRACTION_MISSING_FIELD', photoMeta, 'CategorizationVlm');
         } else if (uniqueDates.length === 0) {
-          // Field present but empty — VLM found no visible date stamps in the photo
           log.info('VLM_DATE_EXTRACTION_EMPTY', photoMeta, 'CategorizationVlm');
         } else {
-          // Field present with one or more entries — extraction succeeded
-          log.info('VLM_DATE_EXTRACTION_OK', { ...photoMeta, count: uniqueDates.length, dates: uniqueDates }, 'CategorizationVlm');
+          log.info(
+            'VLM_DATE_EXTRACTION_OK',
+            { ...photoMeta, count: uniqueDates.length, dates: uniqueDates },
+            'CategorizationVlm',
+          );
         }
 
         results.push({
@@ -611,22 +156,8 @@ export async function categorizePhotos(
       }
     } catch (error) {
       log.error(`Batch ${batchNum} VLM error: ${error}`, undefined, 'CategorizationVlm');
-
-      // Mark all photos in batch as failed
       for (const photo of validPhotos) {
-        results.push({
-          photo_filename: photo.filename,
-          original_type: photo.original_type,
-          original_step: photo.original_step,
-          vlm_predicted_category: 'Error',
-          vlm_predicted_step: 0,
-          vlm_confidence: 0,
-          vlm_identified_as: 'VLM categorization failed',
-          vlm_reasoning: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          human_approved: null,
-          human_override_step: null,
-          human_override_reason: null,
-        });
+        results.push(buildErrorResult(photo, 'VLM categorization failed', error));
       }
     }
   }
@@ -635,30 +166,41 @@ export async function categorizePhotos(
   log.info(
     `Categorization complete for ${drNumber}: ${results.length} photos in ${duration}ms`,
     undefined,
-    'CategorizationVlm'
+    'CategorizationVlm',
   );
 
   return results;
 }
 
-/**
- * Get step label from step number
- */
+function buildErrorResult(
+  photo: PhotoInput,
+  identifiedAs: string,
+  error: unknown,
+): VlmCategorizationResult {
+  return {
+    photo_filename: photo.filename,
+    original_type: photo.original_type,
+    original_step: photo.original_step,
+    vlm_predicted_category: 'Error',
+    vlm_predicted_step: 0,
+    vlm_confidence: 0,
+    vlm_identified_as: identifiedAs,
+    vlm_reasoning: `Error: ${error instanceof Error ? error.message : String(error)}`,
+    human_approved: null,
+    human_override_step: null,
+    human_override_reason: null,
+  };
+}
+
 export function getStepLabel(step: number): string {
   return STEP_LABELS[step] || `Unknown Step ${step}`;
 }
 
-/**
- * Check if categorization matches original type
- */
 export function doesCategorizationMatch(result: VlmCategorizationResult): boolean {
   if (result.original_step === null) return false;
   return result.vlm_predicted_step === result.original_step;
 }
 
-/**
- * Get categorization confidence level
- */
 export function getConfidenceLevel(confidence: number): 'high' | 'medium' | 'low' {
   if (confidence >= 0.9) return 'high';
   if (confidence >= 0.7) return 'medium';

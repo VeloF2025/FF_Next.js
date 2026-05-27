@@ -1,0 +1,109 @@
+#!/usr/bin/env tsx
+/**
+ * reconcile-serials.ts — Serial Master Register validation-gate CLI.
+ *
+ * Reads reconcile-queries.sql, parses each named check with its tolerance,
+ * runs them against DATABASE_URL, prints [OK ] / [FAIL] lines, exits 0 if
+ * all pass, 1 if any fail.
+ *
+ * Usage:
+ *   DATABASE_URL=... npx tsx scripts/reconcile-serials.ts
+ *   npm run reconcile:serials
+ */
+import { Pool } from 'pg';
+import { log } from '../src/lib/logger';
+import { parseChecks, type CheckSpec } from '../src/modules/procurement/field-stock/services/reconcileChecks';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+
+interface CheckResult {
+  name: string;
+  tolerance: number;
+  drift: number;
+  passed: boolean;
+}
+
+async function runChecks(
+  pool: Pool,
+  checks: CheckSpec[],
+): Promise<CheckResult[]> {
+  const results: CheckResult[] = [];
+
+  for (const check of checks) {
+    // Per-check try/catch — prepends the check name to any error so a single
+    // failing SQL doesn't crash the CLI without telling the operator which
+    // invariant blew up (CLI/reconcile reviewer Important #2).
+    try {
+      const r = await pool.query<{ drift_count: string }>(check.sql);
+      const drift = parseInt(r.rows[0]?.drift_count ?? '0', 10);
+      const passed = drift <= check.tolerance;
+      results.push({ name: check.name, tolerance: check.tolerance, drift, passed });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`reconcile check "${check.name}" failed to execute: ${message}`);
+    }
+  }
+
+  return results;
+}
+
+async function main(): Promise<void> {
+  const url = process.env.DATABASE_URL ?? process.env.DATABASE_URL_TEST;
+  if (!url) {
+    process.stderr.write('ERROR: DATABASE_URL not set\n');
+    process.exit(1);
+  }
+
+  const sqlPath = path.join(
+    __dirname,
+    'migrations',
+    'sql',
+    'reconcile-queries.sql',
+  );
+  const source = fs.readFileSync(sqlPath, 'utf8');
+  const checks = parseChecks(source);
+
+  if (checks.length === 0) {
+    process.stderr.write('ERROR: no checks parsed from reconcile-queries.sql\n');
+    process.exit(1);
+  }
+
+  const pool = new Pool({ connectionString: url });
+  let allPassed = true;
+
+  try {
+    const results = await runChecks(pool, checks);
+
+    for (const r of results) {
+      const tag = r.passed ? '[OK ]' : '[FAIL]';
+      const line = `${tag} ${r.name}: drift=${r.drift} (tolerance=${r.tolerance})`;
+      process.stdout.write(line + '\n');
+      if (!r.passed) {
+        allPassed = false;
+        log.warn('reconcile-serials: check failed', {
+          name: r.name,
+          drift: r.drift,
+          tolerance: r.tolerance,
+        });
+      }
+    }
+
+    if (allPassed) {
+      process.stdout.write(`\nAll ${results.length} checks passed.\n`);
+    } else {
+      const failed = results.filter(x => !x.passed).length;
+      process.stdout.write(`\n${failed} of ${results.length} checks FAILED.\n`);
+    }
+  } finally {
+    await pool.end();
+  }
+
+  process.exit(allPassed ? 0 : 1);
+}
+
+main().catch((err: unknown) => {
+  log.error('reconcile-serials: unexpected error', {
+    error: err instanceof Error ? err.message : String(err),
+  });
+  process.exit(1);
+});

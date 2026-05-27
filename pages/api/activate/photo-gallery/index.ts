@@ -12,20 +12,8 @@ import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { pool } from '@/lib/db';
 import { log } from '@/lib/logger';
-
-export interface GalleryPhoto {
-  drNumber: string;
-  filename: string;
-  url: string;
-  confidence: number;
-  originalType: string | null;
-}
-
-export interface GalleryStepData {
-  step: number;
-  count: number;
-  photos: GalleryPhoto[];
-}
+// Shared shape — single source of truth used by the gallery UI components too.
+import type { GalleryPhoto, GalleryStepData } from '@/modules/activate/components/photo-gallery/types';
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') {
@@ -37,7 +25,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     const limitParam = req.query['limit'];
     const allSteps = req.query['all'] === 'true';
 
-    const limit = Math.min(parseInt(String(limitParam ?? '60'), 10), 100);
+    const parsedLimit = parseInt(String(limitParam ?? '60'), 10);
+    const limit = Number.isNaN(parsedLimit) ? 60 : Math.min(Math.max(parsedLimit, 1), 100);
 
     if (allSteps) {
       // Return counts per step for the overview
@@ -65,18 +54,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     }
 
     if (!stepParam) {
-      return apiResponse.error(res, 'VALIDATION_ERROR' as never, 'Missing step parameter');
+      return apiResponse.badRequest(res, 'Missing step parameter');
     }
 
     const step = parseInt(String(stepParam), 10);
     if (isNaN(step) || step < 1 || step > 12) {
-      return apiResponse.error(res, 'VALIDATION_ERROR' as never, 'Step must be between 1 and 12');
+      return apiResponse.badRequest(res, 'Step must be between 1 and 12');
     }
 
     const result = await pool.query<{
       drop_number: string;
       filename: string;
-      confidence: string;
+      confidence: number;
       original_type: string | null;
     }>(
       `
@@ -105,13 +94,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       [step, limit]
     );
 
-    const appBase = process.env.NEXT_PUBLIC_APP_URL ?? 'https://dev.fibreflow.app';
-
     const photos: GalleryPhoto[] = result.rows.map((row) => ({
       drNumber: row.drop_number,
       filename: row.filename,
-      url: `${appBase}/api/activate/photo/${row.drop_number}/${row.filename}`,
-      confidence: parseFloat(row.confidence ?? '0'),
+      // Relative URL: the browser resolves it against the current origin, so the
+      // prod gallery serves prod photos and dev serves dev — no cross-env dependency.
+      url: `/api/activate/photo/${row.drop_number}/${row.filename}`,
+      confidence: row.confidence ?? 0,
       originalType: row.original_type,
     }));
 

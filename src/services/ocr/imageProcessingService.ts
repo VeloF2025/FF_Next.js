@@ -15,7 +15,7 @@ import { execSync } from 'child_process';
 import sharp from 'sharp';
 import type formidable from 'formidable';
 import { log } from '@/lib/logger';
-import { VLM_API_URL, VLM_MODEL } from '@/lib/vlm';
+import { VLM_API_URL, VLM_MODEL, VLM_MAX_TOKENS_ORIENTATION } from '@/lib/vlm';
 
 /** Max image dimensions for VLM (keeps the model under its token/image-size limit) */
 const MAX_IMAGE_WIDTH = 1280;
@@ -53,7 +53,7 @@ Return ONLY the number, nothing else.`;
             ],
           },
         ],
-        max_tokens: 10,
+        max_tokens: VLM_MAX_TOKENS_ORIENTATION,
         temperature: 0,
       }),
       signal: AbortSignal.timeout(15000),

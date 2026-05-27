@@ -1,0 +1,18 @@
+[
+  {
+    "id": "serial-0001",
+    "imageRef": "serial-0001.jpg",
+    "sha256": "96581434cbe2b22bea5f7c0f3695b8ff15fe44ea3342adbebc4dc5eef79fbad2",
+    "expected": {
+      "serial": "ALCLB463FE25"
+    }
+  },
+  {
+    "id": "serial-0002",
+    "imageRef": "serial-0002.jpg",
+    "sha256": "fe3cab2b1a66f720f6e4c35e249e533e43b2408ff0fd55dc512f917611cf9c01",
+    "expected": {
+      "serial": "ALCLB477C5B8"
+    }
+  }
+]

@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { formatDateISO } from '@/utils/dateFormat';
 
 const db = neon(process.env.DATABASE_URL!);
 
@@ -148,13 +149,16 @@ export async function GET(_req: Request, { params }: RouteParams) {
     // Column widths
     ws.columns = COLS.map((c) => ({ width: c.width }));
 
-    // Data rows
+    // Data rows. Date columns (key ends with _date) are formatted as YYYY-MM-DD
+    // to avoid locale-dependent ExcelJS default rendering.
     for (const row of rows as Record<string, unknown>[]) {
       const dataRow = ws.addRow(COLS.map((c) => {
         const v = row[c.key];
         if (v === true) return 'Yes';
         if (v === false) return 'No';
-        return v ?? '';
+        if (v == null) return '';
+        if (c.key.endsWith('_date')) return formatDateISO(v as Date | string);
+        return v;
       }));
       dataRow.alignment = { vertical: 'middle' };
     }

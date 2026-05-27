@@ -218,6 +218,9 @@ export interface OltRecord {
   import_filename?: string;
   import_date?: string;
   project?: string;
+  installer_name?: string | null;
+  onemap_install_team?: string | null;
+  wa_activation_team?: string | null;
   maintenance_ticket_id?: string | null;
   ticket_uid?: string | null;
 }
@@ -269,6 +272,7 @@ export interface OltStats {
   empty: number;
   total: number;
   investigateBreakdown?: { cross_dr: number; not_found: number; other: number };
+  projectBreakdown?: { project: string; count: number }[];
 }
 
 export interface AutoDetectStatus {
@@ -372,6 +376,7 @@ export interface FtWeeklyBilling {
   ft_note4_count: number;
   ft_note5_count: number;
   ft_pre_provisions_count: number;
+  ft_pre_provisions_outstanding: number;
   ft_total_claimable: number;
   price_per_drop: number | null;
   tax_rate: number;
@@ -409,8 +414,12 @@ export interface EodInstallSheet {
   sheet_date: string;
   technician_name: string | null;
   technician_id: string | null;
+  velocity_rep_name: string | null;
+  velocity_rep_id: string | null;
   photo_url: string | null;
+  photo_hash: string | null;
   entry_count: number;
+  vlm_raw_json?: unknown;
   uploaded_by: string | null;
   created_at: string;
   updated_at: string;
@@ -423,7 +432,10 @@ export interface EodInstallSheetEntry {
   row_number: number;
   ont_serial: string | null;
   gizzu_serial: string | null;
+  /** DR where the ONT was installed (form column 2). */
   dr_number: string | null;
+  /** DR where the Gizzu was installed (form column 4). May differ from dr_number. */
+  gizzu_dr_number: string | null;
   pon_number: string | null;
   address: string | null;
   match_status: EodMatchStatus;
@@ -444,15 +456,31 @@ export interface EodVlmExtraction {
   date: string | null;
   technician_name: string | null;
   technician_id: string | null;
+  velocity_rep_name: string | null;
+  velocity_rep_id: string | null;
   entries: EodVlmEntry[];
   overall_confidence: number;
+  /** Set when the source photo is too low-res for reliable barcode decoding.
+   *  When true the reviewer surfaces a banner asking the user to re-upload at
+   *  higher resolution (WhatsApp Document mode or the app's file picker). */
+  low_resolution_warning?: boolean;
+  /** Source image width × height in pixels (post EXIF rotate). Diagnostic. */
+  source_width?: number;
+  source_height?: number;
 }
 
 export interface EodVlmEntry {
   row_number: number;
   ont_serial: string | null;
   gizzu_serial: string | null;
+  /** DR where the ONT was installed (form column 2). Primary match key. */
   dr_number: string | null;
+  /**
+   * DR where the Gizzu was installed (form column 4). May differ from
+   * `dr_number` — technicians do not pair ONT and Gizzu installs by drop.
+   * Find-it-later field; no downstream join consumes it today.
+   */
+  gizzu_dr_number: string | null;
   pon_number: string | null;
   address: string | null;
   confidence: number;
@@ -479,4 +507,43 @@ export interface EodReconciliationSummary {
   matched_oes: number;
   matched_all: number;
   discrepancies: number;
+}
+
+export interface EodSavePayload {
+  sheetDate: string;
+  technicianName: string | null;
+  technicianId: string | null;
+  velocityRepName: string | null;
+  velocityRepId: string | null;
+  entries: EodVlmEntry[];
+  photoHash?: string | null;
+  vlmExtraction?: EodVlmExtraction | null;
+}
+
+export type EodSlotStatus = 'pending' | 'extracting' | 'ready' | 'saving' | 'saved' | 'failed' | 'skipped' | 'duplicate';
+
+export interface EodSheetSlot {
+  file: File;
+  status: EodSlotStatus;
+  extraction: EodVlmExtraction | null;
+  photoHash: string | null;
+  error: string | null;
+  /** Set true when the user clicks "Re-extract anyway" on a duplicate — instructs
+   * the next extract call to bypass the API's image-hash dedup so the VLM runs
+   * fresh and the result lands as a new sheet. */
+  forceReExtract?: boolean;
+}
+
+/**
+ * Returned by /api/eod/sheets when the new sheet shares DR numbers or
+ * ONT serials with existing sheets. Identical shape on server (created by
+ * eodOverlapService) and client (consumed by EodOverlapModal).
+ */
+export interface EodOverlapMatch {
+  sheet_id: string;
+  sheet_date: string;
+  uploaded_by: string | null;
+  technician_name: string | null;
+  overlapping_drs: string[];
+  overlapping_onts: string[];
 }

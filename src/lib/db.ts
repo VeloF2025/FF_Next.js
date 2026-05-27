@@ -30,13 +30,23 @@ import { dbCircuitBreaker } from '@/lib/dbCircuitBreaker';
 
 const useSSL = process.env.DATABASE_URL?.includes('sslmode=require') ?? false;
 
+// Pool sizing tuned 2026-05-22 after a connection-pool exhaustion incident:
+// 64 idle fibreflow_user connections hit Supabase max_connections=100 and
+// blocked even psql admin connects. Cold-start hedging is no longer needed
+// since the Neon→Supabase cutover (2026-04-18 per project_db_supabase.md).
+//   - max 20 → 10            single service can no longer dominate the pool
+//   - min 2 → 1              smaller idle baseline; warm-up still primes 1
+//   - idleTimeout 300s → 30s evict idle quickly (matches lib/db/pool.js shim)
+//   - connectionTimeout 30s → 5s  fail fast on saturation rather than hanging
+// Footprint at full load: 4 pools (pg + Neon shim × dev + prod) × max 10 = 40
+// slots, well below the 100-slot ceiling.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: useSSL ? { rejectUnauthorized: false } : false,
-  max: 20,
-  min: 2,                           // keep 2 idle connections ready
-  idleTimeoutMillis: 300_000,       // 5 min — keeps min-pool alive between the 60s db-health pings
-  connectionTimeoutMillis: 30_000,  // 30s — Neon cold starts can take 10-15s
+  max: 10,
+  min: 1,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
 });

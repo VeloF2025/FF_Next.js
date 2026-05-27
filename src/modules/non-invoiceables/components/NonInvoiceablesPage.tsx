@@ -162,6 +162,7 @@ export function NonInvoiceablesPage() {
           key={`items-${activeCategory}-${refreshKey}`}
           category={activeCategory}
           project={project}
+          projectOptions={projects}
           onCreateTickets={handleCreateTickets}
         />
       )}

@@ -4,6 +4,7 @@ import { log } from '@/lib/logger';
 import { fetchCallRecordById } from './call-records';
 import { resolveParticipants } from './speaker-resolver';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
+import { transcribeWithWhisper } from '@/lib/llm/whisper-transcriber';
 import {
   resolveOnlineMeeting,
   fetchAndStoreTranscript,
@@ -17,6 +18,56 @@ const sql = neon(process.env.DATABASE_URL!);
 const MIN_DURATION_SECONDS = 60;
 
 const LOGGER = 'MeetingProcessor';
+const WHISPER_TEAMS_RECORDINGS = process.env.WHISPER_TEAMS_RECORDINGS === 'true';
+
+async function transcribeStoredRecordingWithWhisper(meetingId: number): Promise<void> {
+  const rows = await sql`
+    SELECT recording_path
+    FROM meetings
+    WHERE id = ${meetingId}
+      AND recording_path IS NOT NULL
+  `;
+  const recordingPath = rows[0]?.recording_path as string | undefined;
+  if (!recordingPath) return;
+
+  const result = await transcribeWithWhisper(recordingPath, meetingId);
+  if (!result.englishTranscript) return;
+
+  await sql`
+    UPDATE meetings
+    SET raw_transcript = ${result.englishTranscript},
+        transcript_source = 'whisper',
+        updated_at = NOW()
+    WHERE id = ${meetingId}
+  `;
+
+  const afrikaansStored = !!result.afrikaansTranscript;
+  if (afrikaansStored) {
+    await sql`DELETE FROM meeting_transcripts WHERE meeting_id = ${meetingId} AND format = 'whisper-af'`;
+    await sql`
+      INSERT INTO meeting_transcripts (meeting_id, format, content, created_at)
+      VALUES (${meetingId}, 'whisper-af', ${result.afrikaansTranscript}, NOW())
+    `;
+  } else {
+    // Empty Afrikaans transcript usually means silence, all-English audio,
+    // or a Whisper miss on the af-language pass. English raw_transcript is
+    // still saved above, so meeting summarisation is unaffected — but we
+    // surface this so empty whisper-af rows are diagnosable.
+    log.warn(
+      'Whisper produced empty Afrikaans transcript; whisper-af row not stored',
+      { meetingId, englishChars: result.englishTranscript.length },
+      LOGGER,
+    );
+  }
+
+  log.info(
+    afrikaansStored
+      ? 'Whisper Afrikaans transcription stored'
+      : 'Whisper English transcription stored (no Afrikaans content)',
+    { meetingId, englishChars: result.englishTranscript.length, afrikaansChars: result.afrikaansTranscript.length },
+    LOGGER,
+  );
+}
 
 /**
  * Processes a single Teams call record into a fully enriched meeting row.
@@ -142,8 +193,7 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
 
       if (meetingInfo?.id && resolvedUserId) {
         await fetchAndStoreTranscript(meetingId, resolvedUserId, meetingInfo.id);
-        await fetchAndStoreRecording(meetingId, resolvedUserId, meetingInfo.id);
-        hasRecording = true;
+        hasRecording = await fetchAndStoreRecording(meetingId, resolvedUserId, meetingInfo.id);
       }
     }
 
@@ -156,8 +206,13 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
         participants
       );
       if (found) {
+        hasRecording = true;
         log.info('Recording recovered via OneDrive fallback', { meetingId }, LOGGER);
       }
+    }
+
+    if (hasRecording && WHISPER_TEAMS_RECORDINGS) {
+      await transcribeStoredRecordingWithWhisper(meetingId);
     }
 
     // 6. LLM enrichment

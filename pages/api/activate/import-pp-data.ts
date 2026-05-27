@@ -80,6 +80,7 @@ async function handler(
     const search = (req.query.search as string || '').trim();
     const priority = req.query.priority as string;
     const aging = req.query.aging as string;
+    const pon = req.query.pon as string;
 
     let whereClause = '';
     const params: (string | number)[] = [];
@@ -158,6 +159,13 @@ async function handler(
       params.push(`%${search}%`);
       paramIndex++;
     }
+    if (pon) {
+      const ponNum = parseInt(pon, 10);
+      if (!isNaN(ponNum)) {
+        whereClause += ` AND pp.olt_pon = $${paramIndex++}`;
+        params.push(ponNum);
+      }
+    }
 
     const countResult = await pool.query(
       `SELECT COUNT(*) as total FROM oes_pp_data pp
@@ -167,11 +175,30 @@ async function handler(
     );
 
     const dataResult = await pool.query(
-      `SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority, mt.created_at AS ticket_created_at,
-              COALESCE(oa.team, d.installed_by_name) AS oes_team,
-              oa.activation_date,
+      `WITH eod_match AS (
+         SELECT DISTINCT ON (e.dr_number)
+                e.dr_number,
+                s.technician_name AS eod_technician_name,
+                s.velocity_rep_name AS eod_velocity_rep_name,
+                s.sheet_date AS eod_sheet_date
+         FROM eod_install_sheet_entries e
+         JOIN eod_install_sheets s ON s.id = e.sheet_id
+         WHERE e.dr_number IS NOT NULL
+         ORDER BY e.dr_number, s.sheet_date DESC NULLS LAST, e.id DESC
+       )
+       SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority, mt.created_at AS ticket_created_at,
+              COALESCE(oa.team, d.installed_by_name, wc.team, em.eod_velocity_rep_name) AS oes_team,
+              -- Activation: strict OES activation date. Blank until OES has logged the
+              -- activation. WA/EOD submission dates are NOT used as fallback — those are
+              -- "located" signals, not real activations.
+              oa.activation_date AS activation_date,
               dur.sender_phone AS wa_phone,
-              COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
+              COALESCE(wc.formal_name, wc.wa_display_name, em.eod_technician_name) AS wa_name,
+              CASE
+                WHEN wc.formal_name IS NOT NULL OR wc.wa_display_name IS NOT NULL THEN 'wa'
+                WHEN em.eod_technician_name IS NOT NULL THEN 'eod'
+                ELSE NULL
+              END AS technician_source,
               wc.team AS wa_team,
               d.zone_no,
               d.pon_no
@@ -181,6 +208,7 @@ async function handler(
        LEFT JOIN drops d ON d.drop_number = pp.resolved_drop_number
        LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = pp.resolved_drop_number
        LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
+       LEFT JOIN eod_match em ON em.dr_number = pp.resolved_drop_number
        WHERE 1=1${whereClause}
        ORDER BY pp.created_at DESC
        LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
@@ -242,13 +270,31 @@ async function handler(
     }
 
     const dataResult = await pool.query(
-      `SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
-              pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
+      `WITH eod_match AS (
+         SELECT DISTINCT ON (e.dr_number)
+                e.dr_number,
+                s.technician_name AS eod_technician_name,
+                s.velocity_rep_name AS eod_velocity_rep_name,
+                s.sheet_date AS eod_sheet_date
+         FROM eod_install_sheet_entries e
+         JOIN eod_install_sheets s ON s.id = e.sheet_id
+         WHERE e.dr_number IS NOT NULL
+         ORDER BY e.dr_number, s.sheet_date DESC NULLS LAST, e.id DESC
+       )
+       SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
+              pp.resolved_drop_number, pp.resolved_source, pp.resolved_at, pp.first_resolved_at,
+              pp.olt_address, pp.olt_port, pp.olt_pon, pp.olt_lt, pp.olt_ont_pos,
               mt.priority AS ticket_priority,
-              COALESCE(oa.team, d.installed_by_name) AS oes_team,
-              oa.activation_date,
+              COALESCE(oa.team, d.installed_by_name, wc.team, em.eod_velocity_rep_name) AS oes_team,
+              -- Strict OES activation only — see comment in list query above.
+              oa.activation_date AS activation_date,
               dur.sender_phone AS wa_phone,
-              COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
+              COALESCE(wc.formal_name, wc.wa_display_name, em.eod_technician_name) AS wa_name,
+              CASE
+                WHEN wc.formal_name IS NOT NULL OR wc.wa_display_name IS NOT NULL THEN 'wa'
+                WHEN em.eod_technician_name IS NOT NULL THEN 'eod'
+                ELSE NULL
+              END AS technician_source,
               wc.team AS wa_team,
               d.zone_no,
               d.pon_no
@@ -258,6 +304,7 @@ async function handler(
        LEFT JOIN drops d ON d.drop_number = pp.resolved_drop_number
        LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = pp.resolved_drop_number
        LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
+       LEFT JOIN eod_match em ON em.dr_number = pp.resolved_drop_number
        WHERE 1=1${whereClause}
        ORDER BY pp.project, pp.resolution_status, pp.serial_number`,
       params
@@ -276,19 +323,28 @@ async function handler(
     const rows = dataResult.rows.map(r => ({
       'Serial Number': r.serial_number,
       'Project': r.project,
-      'Date Registered': r.date_registered ? new Date(r.date_registered).toLocaleDateString() : '',
+      'PP Date': r.date_registered ? new Date(r.date_registered).toLocaleDateString() : '',
       'Status': STATUS_LABELS[r.resolution_status] || r.resolution_status,
       'Resolved DR': r.resolved_drop_number || '',
       'Zone': r.zone_no ?? '',
       'PON': r.pon_no ?? '',
       'Source': r.resolved_source || '',
+      'Located Date': r.first_resolved_at ? new Date(r.first_resolved_at).toLocaleDateString() : '',
       'Resolved At': r.resolved_at ? new Date(r.resolved_at).toLocaleString() : '',
       'Install Team': r.oes_team || '',
       'Activation Date': r.activation_date ? new Date(r.activation_date).toLocaleDateString() : '',
-      'WA Technician': r.wa_name || '',
+      'WA Technician': r.wa_name
+        ? `${r.wa_name}${r.technician_source === 'eod' ? ' (EOD)' : ''}`
+        : '',
+      'Technician Source': r.technician_source || '',
       'WA Phone': r.wa_phone || '',
       'WA Team': r.wa_team || '',
       'Priority': r.ticket_priority ? (r.ticket_priority === 'high' ? 'High' : 'Normal') : '',
+      'OLT Address': r.olt_address || '',
+      'OLT Port': r.olt_port || '',
+      'OLT PON': r.olt_pon ?? '',
+      'OLT LT': r.olt_lt ?? '',
+      'OLT ONT Pos': r.olt_ont_pos ?? '',
     }));
 
     const wb = XLSX.utils.book_new();

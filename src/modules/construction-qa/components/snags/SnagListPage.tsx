@@ -49,9 +49,9 @@ export function SnagListPage() {
     try {
       // 1. Fetch report data
       const params = new URLSearchParams({ projectId: filters.projectId });
-      if (filters.status) params.set('status', filters.status);
-      if (filters.zone_no) params.set('zone_no', filters.zone_no);
-      if (filters.pon_no) params.set('pon_no', filters.pon_no);
+      if (filters.status.length)  params.set('status',  filters.status.join(','));
+      if (filters.zone_no.length) params.set('zone_no', filters.zone_no.join(','));
+      if (filters.pon_no.length)  params.set('pon_no',  filters.pon_no.join(','));
 
       const res = await fetch(`/api/snags/closeout-report?${params.toString()}`);
       if (!res.ok) throw new Error(`Failed to fetch report data: ${res.status}`);

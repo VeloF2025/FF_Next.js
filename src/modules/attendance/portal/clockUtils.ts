@@ -49,7 +49,7 @@ export interface ActiveVehicleAssignment {
  */
 export async function findOpenEntry(staffId: string): Promise<AttendanceEntryRow | null> {
   const rows = await sql<AttendanceEntryRow>`
-    SELECT id, staff_id, work_date, clock_in_at, clock_out_at,
+    SELECT id, staff_id, to_char(work_date, 'YYYY-MM-DD') AS work_date, clock_in_at, clock_out_at,
            clock_in_lat, clock_in_lon, clock_in_accuracy_m,
            clock_out_lat, clock_out_lon, clock_out_accuracy_m,
            selfie_in_url, selfie_out_url,
@@ -113,7 +113,7 @@ export async function insertClockIn(args: {
       ${args.deviceFingerprint}, ${args.deviceUserAgent},
       'open'
     )
-    RETURNING id, staff_id, work_date, clock_in_at, clock_out_at,
+    RETURNING id, staff_id, to_char(work_date, 'YYYY-MM-DD') AS work_date, clock_in_at, clock_out_at,
               clock_in_lat, clock_in_lon, clock_in_accuracy_m,
               clock_out_lat, clock_out_lon, clock_out_accuracy_m,
               selfie_in_url, selfie_out_url,
@@ -195,7 +195,7 @@ export async function closeOpenEntry(args: {
     WHERE id = ${args.entryId}
       AND staff_id = ${args.staffId}
       AND status = 'open'
-    RETURNING id, staff_id, work_date, clock_in_at, clock_out_at,
+    RETURNING id, staff_id, to_char(work_date, 'YYYY-MM-DD') AS work_date, clock_in_at, clock_out_at,
               clock_in_lat, clock_in_lon, clock_in_accuracy_m,
               clock_out_lat, clock_out_lon, clock_out_accuracy_m,
               selfie_in_url, selfie_out_url,
@@ -260,7 +260,7 @@ export async function listRecentEntries(args: {
   // can't accidentally issue an unbounded scan.
   const safeLimit = Math.min(Math.max(Math.trunc(args.limit), 1), HISTORY_HARD_CAP);
   return sql<AttendanceEntryRow>`
-    SELECT id, staff_id, work_date, clock_in_at, clock_out_at,
+    SELECT id, staff_id, to_char(work_date, 'YYYY-MM-DD') AS work_date, clock_in_at, clock_out_at,
            clock_in_lat, clock_in_lon, clock_in_accuracy_m,
            clock_out_lat, clock_out_lon, clock_out_accuracy_m,
            selfie_in_url, selfie_out_url,

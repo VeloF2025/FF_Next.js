@@ -20,8 +20,6 @@ export function MasterTrackerPage({ projectId }: Props) {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectLists, setSelectLists] = useState<Record<string, string[]>>({});
-  const [filters, setFilters] = useState<Record<string, Set<string>>>({});
   const importRef = useRef<HTMLInputElement>(null);
 
   const fetchData = useCallback(async () => {
@@ -29,17 +27,10 @@ export function MasterTrackerPage({ projectId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const [rowsRes, listsRes] = await Promise.all([
-        fetch(`/api/tracker/master/${projectId}`),
-        fetch('/api/tracker/selectlists'),
-      ]);
-      if (!rowsRes.ok) throw new Error('Failed to load');
-      const rowsJson = (await rowsRes.json()) as { data?: MasterRow[] };
-      const listsJson = listsRes.ok ? (await listsRes.json()) as { data?: Record<string, string[]> } : { data: {} };
-      // Add inline PoleScope values (not in DB selectlist)
-      const lists = { ...(listsJson.data ?? {}), PoleScope: ['PLANNED', 'WIP', 'Done'] };
-      setSelectLists(lists);
-      const data = rowsJson.data ?? [];
+      const res = await fetch(`/api/tracker/master/${projectId}`);
+      if (!res.ok) throw new Error('Failed to load');
+      const json = (await res.json()) as { data?: MasterRow[] };
+      const data = json.data ?? [];
       setRows(data);
       setSaved(data);
     } catch (err) {
@@ -78,13 +69,18 @@ export function MasterTrackerPage({ projectId }: Props) {
     setError(null);
   }
 
+  const handleRowChange = useCallback((rowIndex: number, field: string, value: unknown) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next[rowIndex] = { ...next[rowIndex], [field]: value } as MasterRow;
+      return next;
+    });
+    if (!editMode) setEditMode(true);
+  }, [editMode]);
+
   function handleAddRow() {
     if (!editMode) setEditMode(true);
     setRows((prev) => [...prev, emptyMasterRow(projectId)]);
-  }
-
-  function handleDeleteRow(idx: number) {
-    setRows((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function exportCsv() {
@@ -105,20 +101,23 @@ export function MasterTrackerPage({ projectId }: Props) {
         const ws = wb.Sheets[wb.SheetNames[0] ?? ''];
         if (!ws) return;
         const rowData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
-        const labelToKey: Record<string, keyof MasterRow> = {};
-        MASTER_COLS.forEach((c) => { labelToKey[c.label] = c.key; });
+        const labelToField: Record<string, string> = {};
+        MASTER_COLS.forEach((c) => {
+          if (c.headerName && c.field) labelToField[c.headerName] = c.field;
+        });
         const imported: MasterRow[] = rowData.map((r) => {
           const row = emptyMasterRow(projectId);
           for (const [header, val] of Object.entries(r)) {
-            const key = labelToKey[header];
-            if (key) (row as unknown as Record<string, unknown>)[key] = val === '' ? null : val;
+            const field = labelToField[header];
+            if (field) (row as unknown as Record<string, unknown>)[field] = val === '' ? null : val;
           }
           return row;
         });
         setRows((prev) => [...prev, ...imported]);
         if (!editMode) setEditMode(true);
       } catch (err) {
-        void err;
+        setError('Import failed — check file format');
+        log.error('MasterTrackerPage: import failed', { err }, 'tracker');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -153,11 +152,6 @@ export function MasterTrackerPage({ projectId }: Props) {
           Import Excel
         </Button>
         <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
-        {Object.values(filters).some((s) => s.size > 0) && (
-          <Button variant="secondary" size="sm" onClick={() => setFilters({})}>
-            Clear Filters
-          </Button>
-        )}
         {lastSaved && <span className="text-xs text-slate-500 ml-2">Saved {new Date(lastSaved).toLocaleTimeString()}</span>}
         {error && <span className="text-xs text-red-400 ml-2">{error}</span>}
       </div>
@@ -169,11 +163,7 @@ export function MasterTrackerPage({ projectId }: Props) {
         <MasterTrackerTable
           rows={rows}
           editMode={editMode}
-          selectLists={selectLists}
-          onChange={setRows}
-          onDeleteRow={handleDeleteRow}
-          filters={filters}
-          onFiltersChange={setFilters}
+          onRowChange={handleRowChange}
         />
       )}
     </div>

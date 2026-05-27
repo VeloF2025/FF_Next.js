@@ -1,10 +1,23 @@
 /**
  * Credential handling for the /my portal — PIN and password.
  *
- * The attendance_credentials table stores either a pin_hash (field staff)
- * or a password_hash (office staff), or both for office staff who also
- * clock in via the mobile portal. Lockout is shared: 5 consecutive bad
- * attempts across either credential locks the row for 15 minutes.
+ * Two credential flavours, two stores:
+ *   - PIN flow:      hash lives in `attendance_credentials.pin_hash` (set via
+ *                    the WhatsApp OTP onboarding flow, /api/my/login/*).
+ *   - Password flow: hash lives in `users.password` — the SAME password the
+ *                    staff member uses for the main FibreFlow web app. This
+ *                    avoids forcing every staff member to set up a second
+ *                    password just for /my (the previous design left the
+ *                    Email+password tab unusable because no one ever set one).
+ *
+ * Lockout (failed_attempts, locked_until) is keyed by `staff_id` in
+ * `attendance_credentials`. Both flows share the counter — 5 consecutive bad
+ * attempts across either credential locks the row for 15 minutes. The row is
+ * lazy-upserted on the first failed attempt, so staff with no pre-existing
+ * credentials row still accumulate lockout state.
+ *
+ * `attendance_credentials.password_hash` is retained as a column for
+ * historical compatibility but is no longer read by the login path.
  */
 
 import * as bcrypt from 'bcryptjs';
@@ -135,11 +148,16 @@ export async function findAuthRowByPhone(phone: string): Promise<StaffAuthRow | 
   // row with only pending_otp_hash, so this is safe.
   // COALESCE on the auth-state columns so consumers always see concrete
   // values for a brand-new (no-credentials) staff member.
+  // Note: `password_hash` from attendance_credentials is intentionally not
+  // selected here. The PIN flow only authenticates against `pin_hash`; the
+  // password flow uses `findAuthRowByEmail` (which sources from users.password).
+  // We still return a `password_hash` field on StaffAuthRow as `null` so the
+  // type stays consistent across both finders.
   const rows = await sql<StaffAuthRow>`
     SELECT
       s.id              AS staff_id,
       c.pin_hash,
-      c.password_hash,
+      NULL::text        AS password_hash,
       COALESCE(c.failed_attempts, 0) AS failed_attempts,
       c.locked_until,
       s.status          AS staff_status,
@@ -159,22 +177,43 @@ export async function findAuthRowByPhone(phone: string): Promise<StaffAuthRow | 
   return rows[0] ?? null;
 }
 
+/**
+ * Look up the password-flow auth row by email.
+ *
+ * Source of truth for the password hash is `users.password` (same as the main
+ * web app's login). The JOIN goes strictly through `staff.user_id` — staff
+ * rows without a `user_id` link cannot use the email+password flow (they
+ * still log in via Phone+PIN). Avoiding an OR-branch in the JOIN closes a
+ * small timing-oracle asymmetry between FK-index lookups and email-fallback
+ * scans. `attendance_credentials` is LEFT-JOINed for lockout state only; a
+ * missing row is fine and gets lazy-created on the first failed attempt.
+ *
+ * `users.email` carries a UNIQUE constraint, but `staff.user_id` does not,
+ * so an `ORDER BY s.id` is required for deterministic `LIMIT 1` selection
+ * if a single user is ever linked to multiple staff rows.
+ *
+ * Returned `password_hash` field is aliased from `users.password` so callers
+ * (login.ts) don't need to know the source.
+ */
 export async function findAuthRowByEmail(email: string): Promise<StaffAuthRow | null> {
   const rows = await sql<StaffAuthRow>`
     SELECT
-      c.staff_id,
+      s.id              AS staff_id,
       c.pin_hash,
-      c.password_hash,
-      c.failed_attempts,
+      u.password        AS password_hash,
+      COALESCE(c.failed_attempts, 0) AS failed_attempts,
       c.locked_until,
-      s.status         AS staff_status,
+      s.status          AS staff_status,
       TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS staff_name,
-      s.phone          AS staff_phone,
-      s.email          AS staff_email
-    FROM staff s
-    JOIN attendance_credentials c ON c.staff_id = s.id
-    WHERE LOWER(s.status) = 'active'
-      AND LOWER(s.email) = LOWER(${email})
+      s.phone           AS staff_phone,
+      s.email           AS staff_email
+    FROM users u
+    JOIN staff s ON s.user_id = u.id
+    LEFT JOIN attendance_credentials c ON c.staff_id = s.id
+    WHERE LOWER(u.email) = LOWER(${email})
+      AND LOWER(s.status) = 'active'
+      AND u.is_active = true
+    ORDER BY s.id
     LIMIT 1
   `;
   return rows[0] ?? null;
@@ -210,17 +249,24 @@ export function lockoutMsRemaining(row: Pick<StaffAuthRow, 'locked_until'>): num
  */
 export async function recordFailedAttempt(staffId: string): Promise<void> {
   try {
+    // UPSERT: a staff member whose only credential is `users.password` has no
+    // attendance_credentials row until their first failed /my attempt, and we
+    // still need lockout state to accumulate. Migration 333 dropped the
+    // CHECK requiring a hash, so a lockout-only row is valid. `created_at` is
+    // set explicitly rather than relying on the column DEFAULT — defends
+    // against a future DDL change that drops the DEFAULT.
     await sql`
-      UPDATE attendance_credentials
+      INSERT INTO attendance_credentials (staff_id, failed_attempts, locked_until, created_at, updated_at)
+      VALUES (${staffId}, 1, NULL, NOW(), NOW())
+      ON CONFLICT (staff_id) DO UPDATE
       SET
-        failed_attempts = failed_attempts + 1,
+        failed_attempts = attendance_credentials.failed_attempts + 1,
         locked_until = CASE
-          WHEN failed_attempts + 1 >= ${LOCKOUT_THRESHOLD}
+          WHEN attendance_credentials.failed_attempts + 1 >= ${LOCKOUT_THRESHOLD}
             THEN NOW() + (${LOCKOUT_DURATION_MS} || ' milliseconds')::interval
-          ELSE locked_until
+          ELSE attendance_credentials.locked_until
         END,
         updated_at = NOW()
-      WHERE staff_id = ${staffId}
     `;
   } catch (err) {
     // Lockout is a security control — we must scream when it fails to write.
@@ -242,10 +288,16 @@ export async function recordFailedAttempt(staffId: string): Promise<void> {
  */
 export async function recordSuccessfulLogin(staffId: string): Promise<void> {
   try {
+    // UPSERT: same rationale as recordFailedAttempt — a staff member can
+    // legitimately have no attendance_credentials row when they authenticate
+    // via users.password. Inserting a zeroed row gives subsequent failed
+    // attempts something to increment. `created_at` set explicitly for the
+    // same reason as recordFailedAttempt.
     await sql`
-      UPDATE attendance_credentials
+      INSERT INTO attendance_credentials (staff_id, failed_attempts, locked_until, created_at, updated_at)
+      VALUES (${staffId}, 0, NULL, NOW(), NOW())
+      ON CONFLICT (staff_id) DO UPDATE
       SET failed_attempts = 0, locked_until = NULL, updated_at = NOW()
-      WHERE staff_id = ${staffId}
     `;
   } catch (err) {
     log.error('[attendance-portal] recordSuccessfulLogin UPDATE failed', {

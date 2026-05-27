@@ -4,9 +4,17 @@
  * Separate from the fleet portal's session layer:
  *   - different cookie name (ff_my_session vs ff_portal_session)
  *   - different signing secret (MY_PORTAL_SESSION_SECRET)
- *   - different path scope (/my vs /fleet)
- *   - 12-hour shifts vs 8-hour (field crews run longer)
+ *   - different session duration (12h vs 8h — field crews run longer)
  *   - DB row lives in attendance_auth_sessions, not fleet_portal_sessions
+ *
+ * Cookie path is '/' (sent on every request). It used to be '/my' on the
+ * theory that the session is only relevant to /my pages, but that broke
+ * authentication entirely: the session-validation endpoints live at
+ * /api/my/*, whose URL path doesn't start with /my, so the browser never
+ * sent the cookie. Login would 200 + set the cookie, the next GET
+ * /api/my/session would see no cookie, return {session: null}, and the
+ * client would bounce back to /my. ff_portal_session (fleet) also uses
+ * Path=/ for the same reason — see src/lib/auth/middleware.ts:413.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -17,7 +25,7 @@ import { log } from '@/lib/logger';
 import type { AttendanceSession, LoginMethod } from './types';
 
 export const MY_SESSION_COOKIE = 'ff_my_session';
-export const MY_SESSION_PATH = '/my';
+export const MY_SESSION_PATH = '/';
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000; // 12h
 const SECRET = process.env.MY_PORTAL_SESSION_SECRET;
 
@@ -148,22 +156,34 @@ export function readSessionCookie(req: NextApiRequest): AttendanceSession | null
   return session;
 }
 
-/** Verify session against the DB (checks revoked/expired). */
+/** Verify session against the DB (checks revoked/expired/suspended). */
 export async function verifySession(
   req: NextApiRequest
 ): Promise<{ valid: boolean; session: AttendanceSession | null; reason?: string }> {
   const session = readSessionCookie(req);
   if (!session) return { valid: false, session: null, reason: 'no_cookie_or_bad_signature' };
 
-  const rows = await sql<{ revoked_at: string | null; expires_at: string }>`
-    SELECT revoked_at, expires_at
-    FROM attendance_auth_sessions
-    WHERE id = ${session.sessionId}
+  const rows = await sql<{
+    revoked_at: string | null;
+    expires_at: string;
+    account_status: string | null;
+  }>`
+    SELECT s.revoked_at, s.expires_at, st.account_status
+    FROM attendance_auth_sessions s
+    LEFT JOIN staff st ON st.id = s.staff_id
+    WHERE s.id = ${session.sessionId}
     LIMIT 1
   `;
   const row = rows[0];
   if (!row) return { valid: false, session: null, reason: 'session_not_found' };
   if (row.revoked_at) return { valid: false, session: null, reason: 'session_revoked' };
+  if (row.account_status === 'suspended') {
+    log.warn('[my-portal] suspended staff attempted session access via verifySession', {
+      staffId: session.staffId,
+      sessionId: session.sessionId,
+    });
+    return { valid: false, session: null, reason: 'suspended' };
+  }
   if (new Date(row.expires_at).getTime() < Date.now()) {
     return { valid: false, session: null, reason: 'session_expired' };
   }

@@ -38,6 +38,10 @@ export interface WaPhotoExtractionResult {
   confidence: number;
   ontConfidence: number;
   upsConfidence: number;
+  // True when the ONT serial came from a decoded barcode (reliable); false when
+  // it fell back to VLM OCR (unreliable on tiny ONT hex labels). Drives whether
+  // an ONT/1Map conflict fires a hard MISMATCH or a soft double-check prompt.
+  ontFromBarcode: boolean;
   processingTimeMs: number;
   error?: string;
 }
@@ -244,6 +248,7 @@ export async function extractSerialsFromWaPhoto(
         confidence: ontFromBarcode ? 0.95 : 0,
         ontConfidence: ontFromBarcode ? 0.95 : 0,
         upsConfidence: 0,
+        ontFromBarcode: !!ontFromBarcode,
         processingTimeMs,
         error: result.error || 'VLM extraction failed',
       };
@@ -342,6 +347,7 @@ export async function extractSerialsFromWaPhoto(
       confidence: overallConfidence,
       ontConfidence,
       upsConfidence,
+      ontFromBarcode: !!ontFromBarcode,
       processingTimeMs,
     };
   } catch (error) {
@@ -359,6 +365,7 @@ export async function extractSerialsFromWaPhoto(
       confidence: 0,
       ontConfidence: 0,
       upsConfidence: 0,
+      ontFromBarcode: false,
       processingTimeMs: Date.now() - startTime,
       error: message,
     };
@@ -419,9 +426,27 @@ export async function extractUpsSerialRecheck(
     const preprocessed = await preprocessForVlm(base64, 'UPS recheck');
     base64 = preprocessed.base64;
 
+    // Inject HITL few-shot examples from past UPS corrections (non-blocking on failure)
+    let upsPrompt = UPS_RECHECK_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'activate',
+        analysisType: 'ups_serial',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      const fewShotSection = buildVlmFewShotPrompt(examples);
+      if (fewShotSection) {
+        upsPrompt = `${fewShotSection}\n\n${UPS_RECHECK_PROMPT}`;
+        vlmLogger.info(`Injecting ${examples.length} few-shot examples for ups_serial`);
+      }
+    } catch (fewShotError) {
+      vlmLogger.warn(`Few-shot retrieval failed for ups_serial (continuing without): ${fewShotError}`);
+    }
+
     const result = await callVlmExtraction<{
       upsSerial: { found: boolean; serial: string | null; confidence: number };
-    }>(base64, UPS_RECHECK_PROMPT, 'UPS serial recheck');
+    }>(base64, upsPrompt, 'UPS serial recheck');
 
     if (!result.success || !result.data) {
       return { success: false, serial: null, confidence: 0, error: result.error };

@@ -94,6 +94,26 @@ export enum TicketCategory {
 
 
 /**
+ * Resolution Path — how a ticket should be worked on the public resolve link.
+ *
+ * Drives per-path verification step templates, Context Panel variant, and
+ * dispatch routing. Set at ticket creation by classifyResolutionPath().
+ * 'triage_required' surfaces a single classification step on first link open.
+ */
+export enum ResolutionPath {
+  INSTALL = 'install',
+  MAINTENANCE = 'maintenance',
+  SNAG = 'snag',
+  INVESTIGATE_DATA_GAP = 'investigate_data_gap',
+  DISPATCH_SIGNUP = 'dispatch_signup',
+  DISPATCH_INSTALL = 'dispatch_install',
+  FIX_SERIAL = 'fix_serial',
+  FIX_PROJECT_TAG = 'fix_project_tag',
+  TRIAGE_REQUIRED = 'triage_required',
+  NOT_APPLICABLE = 'not_applicable',
+}
+
+/**
  * Ticket Priority Levels
  */
 export enum TicketPriority {
@@ -117,9 +137,8 @@ export enum TicketStatus {
   QA_APPROVED = 'qa_approved',
   PENDING_HANDOVER = 'pending_handover',
   HANDED_TO_OPS = 'handed_to_ops', // Renamed from HANDED_TO_MAINTENANCE
-  RESOLVED = 'resolved', // Work completed, pending formal closure
+  RESOLVED = 'resolved', // Terminal state: work completed. Replaces former 'closed' (migration 364).
   VERIFIED = 'verified',
-  CLOSED = 'closed',
   CANCELLED = 'cancelled',
 }
 
@@ -177,6 +196,11 @@ export interface Ticket {
    * has a `category` column for QContact's category hierarchy.
    */
   ticket_category: TicketCategory | null;
+  /**
+   * Resolution path — drives the resolve-page step template + Context Panel
+   * variant. Added by migration 2026-05-14; classifier sets this at creation.
+   */
+  resolution_path: ResolutionPath | null;
   priority: TicketPriority;
   status: TicketStatus;
 
@@ -202,7 +226,7 @@ export interface Ticket {
   // Assignment
   assigned_to: string | null; // UUID reference to users
   assigned_contractor_id: string | null; // UUID reference to contractors
-  assigned_team: string | null; // Legacy text field
+  assigned_team: string | null; // Legacy UUID FK to teams; mirrors assigned_team_id (both kept in sync)
   assigned_team_id: string | null; // UUID reference to teams table
 
   // Guarantee
@@ -293,6 +317,13 @@ export interface CreateTicketPayload {
   ticket_category?: TicketCategory | string;
   /** Fault cause attribution (optional at creation, typically set during investigation) */
   fault_cause?: FaultCause;
+  /**
+   * Resolution path — drives the resolve-page step template + Context Panel.
+   * Callers must call classifyResolutionPath() and pass the result here; if
+   * not provided, the column is stored as NULL and downstream UI falls back
+   * to the legacy template.
+   */
+  resolution_path?: ResolutionPath;
 }
 
 /**
@@ -327,6 +358,12 @@ export interface UpdateTicketPayload {
   sla_due_at?: Date;
   sla_first_response_at?: Date;
   sla_breached?: boolean;
+  /**
+   * Set when a caller transitions status to 'resolved' so downstream reports
+   * (e.g. snag closeout) can filter on resolution timestamp. updateTicket()
+   * does NOT auto-stamp this on its own — callers must pass it explicitly.
+   */
+  resolved_at?: Date | string;
 }
 
 /** Meta-status groups used by Active/Completed sub-tabs */
@@ -337,7 +374,7 @@ export type TicketStatusGroup = 'active' | 'completed';
  */
 export interface TicketFilters {
   status?: TicketStatus | TicketStatus[] | TicketStatusGroup;
-  /** Explicit status blacklist (e.g. `['closed','cancelled']` to hide completed work) */
+  /** Explicit status blacklist (e.g. `['resolved','cancelled']` to hide completed work) */
   exclude_status?: TicketStatus[] | string[];
   ticket_type?: TicketType | TicketType[];
   /**
@@ -352,7 +389,7 @@ export interface TicketFilters {
   source?: TicketSource | TicketSource[];
   assigned_to?: string; // User ID
   assigned_contractor_id?: string; // Contractor ID
-  assigned_team_id?: string; // Team ID
+  assigned_team_id?: string | string[]; // Team ID or multiple team IDs
   project_id?: string;
   dr_number?: string;
   qa_ready?: boolean;

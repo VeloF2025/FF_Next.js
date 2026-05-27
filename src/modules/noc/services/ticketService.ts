@@ -287,6 +287,24 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
     }
   }
 
+  // Resolve pole_number → pole_id (UUID). The INSERT below maps
+  // payload.pole_number into the pole_id column, which is a uuid; passing
+  // a human-readable pole reference like "MAM.P.B605" raises 22P02.
+  let resolvedPoleId: string | null = null;
+  if (payload.pole_number) {
+    const poleRow = await queryOne<{ id: string }>(
+      `SELECT id FROM poles WHERE pole_number = $1 LIMIT 1`,
+      [payload.pole_number]
+    );
+    if (poleRow) {
+      resolvedPoleId = poleRow.id;
+    } else {
+      logger.warn('Pole not found for ticket — pole_id left null', {
+        pole_number: payload.pole_number,
+      });
+    }
+  }
+
   // 🟢 WORKING: Set defaults
   const priority = payload.priority || TicketPriority.NORMAL;
   let status = payload.status || TicketStatus.OPEN;
@@ -326,9 +344,10 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
         client_name,
         client_contact,
         client_email,
-        ticket_category
+        ticket_category,
+        resolution_path
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
       )
       RETURNING *
     `;
@@ -387,6 +406,14 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       }
     }
 
+    // Mirror assigned_team_id → assigned_team when the caller only sets the _id
+    // column. Both columns are UUID FKs to teams; assigned_team is the legacy
+    // field (now redundant) but AssignmentSection always writes both, so we keep
+    // them in sync here for callers (OLT/PP ticket APIs) that only set _id.
+    if (payload.assigned_team_id && !payload.assigned_team) {
+      payload.assigned_team = payload.assigned_team_id;
+    }
+
     const values = [
       ticketUID,
       payload.source,
@@ -400,7 +427,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       payload.dr_number || null,
       payload.project_id || null,
       payload.zone_id || null,
-      payload.pole_number || null,
+      resolvedPoleId,
       payload.pon_number || null,
       payload.address || null,
       payload.assigned_to || null,
@@ -413,6 +440,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       payload.client_contact || null,
       payload.client_email || null,
       payload.ticket_category || null,
+      payload.resolution_path || null,
     ];
 
     const ticket = await queryOne<Ticket>(sql, values);
@@ -476,6 +504,23 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
           error: e instanceof Error ? e.message : String(e),
         });
       }
+    }
+
+    // PRD-062 — fire-and-forget AI history summary attached as an
+    // 'ai_summary' activity row. Feature flag (FF_AI_TICKET_SUMMARY=1) is
+    // checked inside summarizeAndAttachDrHistory; the dr_number guard here
+    // just avoids a needless dynamic import for tickets with no DR. The
+    // .catch is for the unlikely module-load / destructure failure — the
+    // service itself swallows all runtime errors.
+    if (ticket.dr_number) {
+      void import('./drHistoryService').then(({ summarizeAndAttachDrHistory }) =>
+        summarizeAndAttachDrHistory(ticket.id, ticket.dr_number!, ticket.ont_serial ?? null),
+      ).catch((err) => {
+        logger.warn('drHistorySummary dispatch failed', {
+          ticket_uid: ticket.ticket_uid,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     }
 
     return ticket;
@@ -618,7 +663,8 @@ export async function updateTicket(
       qa_ready: 'qa_ready',
       sla_due_at: 'sla_due_at',
       sla_first_response_at: 'sla_first_response_at',
-      sla_breached: 'sla_breached'
+      sla_breached: 'sla_breached',
+      resolved_at: 'resolved_at',
     };
 
     // Build SET clause dynamically
@@ -759,7 +805,7 @@ export async function listTickets(
     if (filters.status) {
       // Support meta-groups (active/completed) used by sub-tabs, not just individual DB statuses
       const ACTIVE_STATUSES = ['open', 'assigned', 'in_progress', 'pending_qa'];
-      const COMPLETED_STATUSES = ['resolved', 'verified', 'closed'];
+      const COMPLETED_STATUSES = ['resolved', 'verified'];
 
       if (filters.status === 'active') {
         const placeholders = ACTIVE_STATUSES.map((_, i) => `$${paramCounter + i}`).join(', ');
@@ -845,8 +891,16 @@ export async function listTickets(
     }
 
     if (filters.assigned_team_id) {
-      whereClauses.push(`assigned_team_id = $${paramCounter}`);
-      values.push(filters.assigned_team_id);
+      const teamIds = Array.isArray(filters.assigned_team_id)
+        ? filters.assigned_team_id
+        : [filters.assigned_team_id];
+      if (teamIds.length === 1) {
+        whereClauses.push(`assigned_team_id = $${paramCounter}`);
+        values.push(teamIds[0]);
+      } else {
+        whereClauses.push(`assigned_team_id = ANY($${paramCounter}::uuid[])`);
+        values.push(teamIds);
+      }
       paramCounter++;
     }
 

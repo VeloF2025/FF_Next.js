@@ -17,6 +17,7 @@ import {
   conduitSection,
   trackerSection,
   systemSection,
+  cortexSection,
 } from './config';
 
 export const navItems: NavSection[] = [
@@ -34,5 +35,6 @@ export const navItems: NavSection[] = [
   trackerSection,         // 12. PON TRACKER - Editable project tracker
   analyticsSection,       // 13. ANALYTICS - Performance metrics
   communicationsSection,  // 14. COMMUNICATIONS - WhatsApp, meetings
-  systemSection,          // 15. SYSTEM - Admin tools (always last)
+  cortexSection,          // 15. CORTEX - AI enrichment review
+  systemSection,          // 16. SYSTEM - Admin tools (always last)
 ];

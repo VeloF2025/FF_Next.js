@@ -30,7 +30,8 @@ function mapSnagStatusToTicketStatus(snagStatus: SnagStatus): TicketStatus | und
     case 'fixed':       return TicketStatus.PENDING_QA;  // legacy: treat as pending_qa
     case 'resolved':    return TicketStatus.RESOLVED;
     case 'verified':    return TicketStatus.VERIFIED;
-    case 'closed':      return TicketStatus.CLOSED;
+    // Migration 364: snag 'closed' maps to ticket 'resolved' (consolidated bucket).
+    case 'closed':      return TicketStatus.RESOLVED;
     default:            return undefined;
   }
 }
@@ -55,6 +56,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
+/** Parse a query param into a string[] — accepts CSV or repeated params, empty → []. */
+function parseCsvParam(v: unknown): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.flatMap((s) => String(s).split(',')).map((s) => s.trim()).filter(Boolean);
+  return String(v).split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/** Parse CSV integer list. Invalid entries dropped. */
+function parseCsvIntParam(v: unknown): number[] {
+  return parseCsvParam(v)
+    .map((s) => parseInt(s, 10))
+    .filter((n) => Number.isFinite(n));
+}
+
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const {
     reportId,
@@ -73,36 +88,60 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const pageSizeNum = Math.min(200, parseInt(pageSize as string, 10));
   const offset = (pageNum - 1) * pageSizeNum;
   const searchTerm = search && typeof search === 'string' ? `%${search}%` : null;
-  const zoneNoNum = zone_no && typeof zone_no === 'string' ? parseInt(zone_no, 10) : undefined;
-  const ponNoNum  = pon_no  && typeof pon_no  === 'string' ? parseInt(pon_no,  10) : undefined;
+
+  const statusArr   = parseCsvParam(status);
+  const categoryArr = parseCsvParam(category);
+  const severityArr = parseCsvParam(severity);
+  const zoneArr     = parseCsvIntParam(zone_no);
+  const ponArr      = parseCsvIntParam(pon_no);
 
   if (reportId && typeof reportId === 'string') {
     return querySnagsByReport(
       res, reportId,
-      status as string | undefined,
-      category as string | undefined,
-      severity as string | undefined,
+      statusArr, categoryArr, severityArr,
       searchTerm,
       pageNum, pageSizeNum, offset
     );
   }
 
+  // Direct pole_qa_photo_id lookup (used by Works QA ConfirmPlantedModal to find
+  // the verification snag for a specific pole). Filters by exact UUID match plus
+  // optional projectId/category narrowing. Joins maintenance_tickets to surface
+  // noc_ticket_uid so the modal can show the existing ticket reference instead
+  // of double-creating.
+  const poleQaPhotoId = req.query.pole_qa_photo_id;
+  if (typeof poleQaPhotoId === 'string' && poleQaPhotoId) {
+    const projectIdFilter = (typeof projectId === 'string' && projectId) ? projectId : null;
+    const categoryFilter = categoryArr[0] ?? null;
+    const rows = await sql`
+      SELECT s.*,
+             (u.first_name || ' ' || u.last_name) AS assigned_to_name,
+             mt.ticket_uid AS noc_ticket_uid
+      FROM snags s
+      LEFT JOIN users u ON u.id = s.assigned_to
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      WHERE s.pole_qa_photo_id = ${poleQaPhotoId}::uuid
+        AND (${projectIdFilter}::uuid IS NULL OR s.project_id = ${projectIdFilter}::uuid)
+        AND (${categoryFilter}::text IS NULL OR s.category = ${categoryFilter}::text)
+      ORDER BY s.created_at DESC
+      LIMIT 100
+    ` as Snag[];
+    return apiResponse.success(res, rows);
+  }
+
   if (projectId && typeof projectId === 'string') {
     // When zone_no/pon_no are present, use the hierarchy-aware query
-    if (zoneNoNum !== undefined || ponNoNum !== undefined) {
+    if (zoneArr.length > 0 || ponArr.length > 0) {
       return querySnagsByProjectAndZone(
         res, projectId,
-        zoneNoNum,
-        ponNoNum,
-        status as string | undefined,
+        zoneArr, ponArr,
+        statusArr,
         pageNum, pageSizeNum, offset
       );
     }
     return querySnagsByProject(
       res, projectId,
-      status as string | undefined,
-      category as string | undefined,
-      severity as string | undefined,
+      statusArr, categoryArr, severityArr,
       pageNum, pageSizeNum, offset
     );
   }
@@ -132,14 +171,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const body = req.body as CreateSnagRequest;
 
-  if (!body.report_id) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
-  }
   if (!body.project_id) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'project_id is required');
-  }
-  if (!body.snag_number) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'snag_number is required');
   }
   if (!body.category) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'category is required');
@@ -148,39 +181,90 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'description is required');
   }
 
-  const rows = await sql`
-    INSERT INTO snags (
-      report_id, project_id, snag_number,
-      category, severity, description,
-      pole_references, status
-    ) VALUES (
-      ${body.report_id},
-      ${body.project_id},
-      ${body.snag_number},
-      ${body.category},
-      ${body.severity ?? 'major'},
-      ${body.description.trim()},
-      ${body.pole_references ?? null},
-      'open'
-    )
-    RETURNING *
-  ` as Snag[];
+  // Ad-hoc works_qa snag: category=verification OR (category=quality + pole_qa_photo_id without report_id).
+  // The presence of pole_qa_photo_id without report_id is the canonical signal that this row
+  // originates from the Field App / Works QA dashboard rather than a TQR PDF import.
+  const isAdHocWorksQa =
+    body.category === 'verification' ||
+    (!!body.pole_qa_photo_id && !body.report_id);
+
+  if (!isAdHocWorksQa) {
+    if (!body.report_id) {
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
+    }
+    if (!body.snag_number) {
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'snag_number is required');
+    }
+  }
+
+  let rows: Snag[];
+  if (isAdHocWorksQa) {
+    rows = await sql`
+      INSERT INTO snags (
+        report_id, project_id, snag_number,
+        category, severity, description,
+        pole_references, pole_qa_photo_id, source,
+        status, verification_notes
+      )
+      SELECT
+        NULL,
+        ${body.project_id},
+        COALESCE(MAX(snag_number), 0) + 1,
+        ${body.category},
+        ${body.severity ?? 'minor'},
+        ${body.description.trim()},
+        ${body.pole_references ?? null},
+        ${body.pole_qa_photo_id ?? null},
+        'works_qa',
+        'open',
+        ${body.verification_notes ?? null}
+      FROM snags
+      WHERE project_id = ${body.project_id} AND report_id IS NULL
+      RETURNING *
+    ` as Snag[];
+  } else {
+    // Non-verification (PDF-import) path: omit `source` from the column list so
+    // Postgres uses the column default ('tqr'::text). Passing NULL would violate
+    // the NOT NULL constraint on snags.source.
+    rows = await sql`
+      INSERT INTO snags (
+        report_id, project_id, snag_number,
+        category, severity, description,
+        pole_references, pole_qa_photo_id,
+        status, verification_notes
+      ) VALUES (
+        ${body.report_id},
+        ${body.project_id},
+        ${body.snag_number},
+        ${body.category},
+        ${body.severity ?? 'major'},
+        ${body.description.trim()},
+        ${body.pole_references ?? null},
+        ${body.pole_qa_photo_id ?? null},
+        'open',
+        ${body.verification_notes ?? null}
+      )
+      RETURNING *
+    ` as Snag[];
+  }
 
   if (!rows[0]) {
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag');
   }
 
-  // Update total_findings count on report
-  await sql`
-    UPDATE snag_reports
-    SET total_findings = (
-      SELECT COUNT(*) FROM snags WHERE report_id = ${body.report_id}
-    ),
-    updated_at = NOW()
-    WHERE id = ${body.report_id}
-  `;
+  // Only update total_findings when snag belongs to a report
+  if (body.report_id) {
+    await sql`
+      UPDATE snag_reports
+      SET total_findings = (
+        SELECT COUNT(*) FROM snags WHERE report_id = ${body.report_id}
+      ),
+      updated_at = NOW()
+      WHERE id = ${body.report_id}
+    `;
+  }
 
-  log.info('Snag created', { snagId: rows[0].id, reportId: body.report_id });
+  log.info('Snag created', { snagId: rows[0].id, reportId: body.report_id ?? null, category: body.category });
   return apiResponse.created(res, rows[0]);
 }
 
@@ -229,12 +313,19 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
 
   const updatedSnag = rows[0];
 
-  // Sync status to linked NOC ticket if applicable
+  // Sync status to linked NOC ticket if applicable.
+  // updateTicket does NOT auto-stamp resolved_at on status transitions —
+  // callers must pass it explicitly (same contract the works-qa snag
+  // resolve path follows). Without this, transitioning to RESOLVED leaves
+  // resolved_at NULL and breaks downstream SLA + activity-log queries.
   if (body.status && updatedSnag.noc_ticket_id) {
     const ticketStatus = mapSnagStatusToTicketStatus(body.status);
     if (ticketStatus) {
       try {
-        await updateTicket(updatedSnag.noc_ticket_id, { status: ticketStatus });
+        await updateTicket(updatedSnag.noc_ticket_id, {
+          status: ticketStatus,
+          ...(ticketStatus === TicketStatus.RESOLVED && { resolved_at: new Date() }),
+        });
         log.info('NOC ticket status synced', {
           snagId: body.id,
           ticketId: updatedSnag.noc_ticket_id,

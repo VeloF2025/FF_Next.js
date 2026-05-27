@@ -26,8 +26,9 @@ interface KanbanBoardProps {
   filters?: TicketFilters;
 }
 
-// Database status values — aligned with TicketStatus enum
-export type DatabaseStatus = 'new' | 'open' | 'assigned' | 'in_progress' | 'pending_qa' | 'qa_in_progress' | 'qa_rejected' | 'qa_approved' | 'pending_handover' | 'handed_to_ops' | 'resolved' | 'verified' | 'closed' | 'cancelled';
+// Database status values — aligned with TicketStatus enum.
+// Note: 'closed' was consolidated into 'resolved' in migration 364.
+export type DatabaseStatus = 'new' | 'open' | 'assigned' | 'in_progress' | 'pending_qa' | 'qa_in_progress' | 'qa_rejected' | 'qa_approved' | 'pending_handover' | 'handed_to_ops' | 'resolved' | 'verified' | 'cancelled';
 
 // Define visible columns and their order
 interface ColumnConfig {
@@ -41,7 +42,6 @@ const COLUMN_CONFIG: ColumnConfig[] = [
   { status: 'pending_qa' },
   { status: 'resolved' },
   { status: 'verified' },
-  { status: 'closed' },
 ];
 
 // Ordered status flow for quick-move navigation
@@ -55,6 +55,8 @@ const STATUS_COLUMN_MAP: Record<string, DatabaseStatus> = {
   qa_approved: 'resolved',
   pending_handover: 'resolved',
   handed_to_ops: 'resolved',
+  // Legacy: any 'closed' row that slipped through the migration still shows in Resolved.
+  closed: 'resolved',
 };
 
 // Statuses that roll up into each visible column (for summary counts)
@@ -63,9 +65,8 @@ const COLUMN_STATUSES: Record<DatabaseStatus, string[]> = {
   assigned: ['assigned'],
   in_progress: ['in_progress', 'qa_rejected'],
   pending_qa: ['pending_qa', 'qa_in_progress'],
-  resolved: ['resolved', 'qa_approved', 'pending_handover', 'handed_to_ops'],
+  resolved: ['resolved', 'qa_approved', 'pending_handover', 'handed_to_ops', 'closed'],
   verified: ['verified'],
-  closed: ['closed', 'cancelled'],
   // Not visible but needed for type completeness
   new: [], qa_in_progress: [], qa_rejected: [], qa_approved: [],
   pending_handover: [], handed_to_ops: [], cancelled: [],
@@ -73,7 +74,7 @@ const COLUMN_STATUSES: Record<DatabaseStatus, string[]> = {
 
 // Active vs Completed column groups for sub-tab filtering
 const ACTIVE_STATUSES: DatabaseStatus[] = ['open', 'assigned', 'in_progress', 'pending_qa'];
-const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'verified', 'closed'];
+const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'verified'];
 
 // Max tickets fetched for Kanban (server caps at 2500).
 // Needs to cover the active working set so every column can populate —
@@ -83,10 +84,11 @@ const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'verified', 'closed'];
 // grew past a couple of days of activity.
 const KANBAN_PAGE_SIZE = 2500;
 
-// Default Kanban view drops closed+cancelled at the API level and hides
-// the 'closed' column. Those two statuses account for ~1/3 of all tickets
-// and users view them through the Table view when needed.
-const DEFAULT_EXCLUDED_STATUSES = ['closed', 'cancelled'];
+// Default Kanban view drops 'cancelled' at the API level so the active
+// board surfaces real work. Completed/resolved tickets stay visible in the
+// Resolved column. (Pre-migration this also excluded 'closed' — that status
+// no longer exists as of migration 364.)
+const DEFAULT_EXCLUDED_STATUSES = ['cancelled'];
 
 export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -105,9 +107,9 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   // Strip meta status filter (active/completed) — handled below on the fetch side
   const { status: metaStatus, ...apiFilters } = filters || {};
 
-  // Default view drops closed+cancelled server-side and sorts by updated_at
+  // Default view drops 'cancelled' server-side and sorts by updated_at
   // so the 200/2500-row window floats recently-touched work to the top.
-  // The 'completed' sub-tab keeps closed/cancelled (that's the whole point).
+  // The 'completed' sub-tab keeps cancelled too (that's the whole point).
   const isCompletedView = (metaStatus as string) === 'completed';
   const ticketFetchFilters: TicketFilters = {
     ...apiFilters,
@@ -119,15 +121,14 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   const { tickets, isLoading, isError, error, refetch } = useTickets(ticketFetchFilters);
 
   // Summary endpoint drives column header counts. Intentionally skips the
-  // exclude_status filter so closed/cancelled totals still render accurately.
+  // exclude_status filter so cancelled totals still render accurately.
   const { counts: summaryCounts } = useTicketSummary(apiFilters as TicketFilters);
 
   // Determine which columns to show based on sub-tab filter.
-  // Default view hides 'closed' to match the exclude_status fetch above.
   const visibleColumns = useMemo(() => {
     if ((metaStatus as string) === 'completed') return COLUMN_CONFIG.filter(c => COMPLETED_STATUSES.includes(c.status));
     if ((metaStatus as string) === 'active') return COLUMN_CONFIG.filter(c => ACTIVE_STATUSES.includes(c.status));
-    return COLUMN_CONFIG.filter(c => c.status !== 'closed');
+    return COLUMN_CONFIG;
   }, [metaStatus]);
 
   const updateTicket = useUpdateTicket();
@@ -326,14 +327,14 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
       {/* Kanban Columns */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex-1 overflow-x-auto pb-4">
-          <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
+          <div className="grid gap-3 h-[calc(100vh-280px)] min-h-[500px]" style={{ gridTemplateColumns: `repeat(${visibleColumns.length}, minmax(180px, 300px))` }}>
             {visibleColumns.map(({ status }, colIndex) => (
               <Droppable key={status} droppableId={status}>
                 {(provided, snapshot) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="h-full"
+                    className="h-full min-w-0"
                   >
                     <KanbanColumn
                       status={status}

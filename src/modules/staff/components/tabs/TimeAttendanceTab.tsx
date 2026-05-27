@@ -7,7 +7,11 @@
  * Selfie URLs are deliberately NOT returned by the listing endpoint
  * (POPIA + IDOR protection); admins see a camera button per entry that
  * hits `/api/staff/attendance-selfie` which audits the access and enforces
- * `people.staff.attendance.manage`. Corrections / edits land in PR1c.
+ * `people.staff.attendance.manage`.
+ *
+ * Theme: matches the rest of the staff-detail tabs by using the
+ * `--ff-bg-*` / `--ff-text-*` / `--ff-border-*` design-token CSS vars
+ * so light + dark themes both render legibly.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -65,8 +69,6 @@ async function openSelfie(
     const body = (await res.json().catch(() => null)) as ApiBody | ApiFailure | null;
     if (!res.ok || !body || body.success !== true) {
       const reason = (body as ApiFailure | null)?.error?.details?.reason;
-      // Differentiate the three realistic failure modes explicitly so the
-      // admin isn't left guessing at "Could not load the selfie".
       if (reason === 'audit_write_failed') {
         setRowError('Compliance audit failed — selfie access denied. Please try again.');
         return;
@@ -130,7 +132,7 @@ export function TimeAttendanceTab({ staffId }: { staffId: string }) {
 
   if (error) {
     return (
-      <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+      <div role="alert" className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300">
         {error}
       </div>
     );
@@ -138,7 +140,7 @@ export function TimeAttendanceTab({ staffId }: { staffId: string }) {
   if (!entries) return <LoadingSpinner />;
   if (entries.length === 0) {
     return (
-      <div className="text-center py-10 text-sm text-gray-500">
+      <div className="text-center py-10 text-sm text-[var(--ff-text-secondary)]">
         No attendance entries in the last 30 days.
       </div>
     );
@@ -149,44 +151,52 @@ export function TimeAttendanceTab({ staffId }: { staffId: string }) {
   return (
     <div className="space-y-4">
       {openExceptionCount > 0 && (
-        <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-3 py-2 text-sm text-yellow-900 flex items-center gap-2">
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-sm text-amber-300 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" />
           {openExceptionCount} open exception{openExceptionCount === 1 ? '' : 's'} need review.
         </div>
       )}
 
       {selfieError && (
-        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 flex items-center justify-between">
+        <div role="alert" className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-300 flex items-center justify-between">
           <span>{selfieError}</span>
-          <button type="button" onClick={() => setSelfieError(null)} className="text-xs font-medium underline">Dismiss</button>
+          <button
+            type="button"
+            onClick={() => setSelfieError(null)}
+            className="text-xs font-medium underline hover:text-red-200"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <Th>Date</Th>
-              <Th>Clock in</Th>
-              <Th>Clock out</Th>
-              <Th>Duration</Th>
-              <Th>Status</Th>
-              <Th>Exceptions</Th>
-              <Th>Selfies</Th>
-              <Th>Notes</Th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
-            {entries.map((e) => (
-              <EntryRow
-                key={e.entryId}
-                entry={e}
-                exceptions={exceptionsByEntry.get(e.entryId) ?? []}
-                onSelfieError={setSelfieError}
-              />
-            ))}
-          </tbody>
-        </table>
+      <div className="rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-[var(--ff-bg-tertiary)]">
+              <tr>
+                <Th>Date</Th>
+                <Th>Clock in</Th>
+                <Th>Clock out</Th>
+                <Th>Duration</Th>
+                <Th>Status</Th>
+                <Th>Exceptions</Th>
+                <Th>Selfies</Th>
+                <Th>Notes</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--ff-border-light)]">
+              {entries.map((e) => (
+                <EntryRow
+                  key={e.entryId}
+                  entry={e}
+                  exceptions={exceptionsByEntry.get(e.entryId) ?? []}
+                  onSelfieError={setSelfieError}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -203,19 +213,19 @@ function EntryRow({
 }) {
   const duration = computeDuration(entry.clockInAt, entry.clockOutAt);
   return (
-    <tr className="hover:bg-gray-50">
+    <tr className="hover:bg-[var(--ff-bg-hover)]">
       <Td>{formatDate(entry.workDate)}</Td>
-      <Td>{formatTime(entry.clockInAt)}</Td>
-      <Td>{entry.clockOutAt ? formatTime(entry.clockOutAt) : '—'}</Td>
-      <Td>{duration}</Td>
+      <Td className="tabular-nums">{formatTime(entry.clockInAt)}</Td>
+      <Td className="tabular-nums">{entry.clockOutAt ? formatTime(entry.clockOutAt) : <span className="text-[var(--ff-text-muted)]">—</span>}</Td>
+      <Td className="tabular-nums">{duration}</Td>
       <Td><StatusBadge status={entry.status} /></Td>
       <Td>
         {exceptions.length > 0 ? (
-          <span className="inline-flex items-center gap-1 text-yellow-800">
+          <span className="inline-flex items-center gap-1 text-amber-300">
             <AlertTriangle className="w-3 h-3" />
             {exceptions.length}
           </span>
-        ) : '—'}
+        ) : <span className="text-[var(--ff-text-muted)]">—</span>}
       </Td>
       <Td>
         <div className="flex gap-1">
@@ -225,11 +235,13 @@ function EntryRow({
           {entry.hasSelfieOut && (
             <SelfieButton entryId={entry.entryId} kind="out" label="Out" onError={onSelfieError} />
           )}
-          {!entry.hasSelfieIn && !entry.hasSelfieOut && '—'}
+          {!entry.hasSelfieIn && !entry.hasSelfieOut && (
+            <span className="text-[var(--ff-text-muted)]">—</span>
+          )}
         </div>
       </Td>
-      <Td className="max-w-xs truncate text-xs text-gray-500">
-        {entry.notes ?? ''}
+      <Td className="max-w-xs truncate text-xs text-[var(--ff-text-secondary)]">
+        {entry.notes ?? <span className="text-[var(--ff-text-muted)]">—</span>}
       </Td>
     </tr>
   );
@@ -247,7 +259,7 @@ function SelfieButton({
     <button
       type="button"
       onClick={() => void openSelfie(entryId, kind, onError)}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs hover:bg-blue-100"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/15 text-blue-300 text-xs hover:bg-blue-500/25 border border-blue-500/30"
     >
       <Camera className="w-3 h-3" />
       {label}
@@ -258,11 +270,11 @@ function SelfieButton({
 
 function StatusBadge({ status }: { status: ApiEntry['status'] }) {
   const style: Record<ApiEntry['status'], string> = {
-    open: 'bg-green-50 text-green-700 border-green-200',
-    closed: 'bg-gray-50 text-gray-600 border-gray-200',
-    auto_closed: 'bg-yellow-50 text-yellow-800 border-yellow-200',
-    disputed: 'bg-red-50 text-red-700 border-red-200',
-    manual: 'bg-purple-50 text-purple-700 border-purple-200',
+    open: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+    closed: 'bg-neutral-500/15 text-neutral-300 border-neutral-500/30',
+    auto_closed: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    disputed: 'bg-red-500/15 text-red-300 border-red-500/30',
+    manual: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
   };
   return (
     <span className={`inline-block px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide border rounded-full ${style[status]}`}>
@@ -273,14 +285,18 @@ function StatusBadge({ status }: { status: ApiEntry['status'] }) {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+    <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--ff-text-secondary)]">
       {children}
     </th>
   );
 }
 
 function Td({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2 align-top ${className ?? ''}`}>{children}</td>;
+  return (
+    <td className={`px-3 py-2 align-top text-[var(--ff-text-primary)] ${className ?? ''}`}>
+      {children}
+    </td>
+  );
 }
 
 function formatDate(yyyyMmDd: string): string {

@@ -18,5 +18,6 @@ export { activateSection } from './activateSection';
 export { fieldOperationsSection } from './fieldOperationsSection';
 export { conduitSection } from './conduitSection';
 export { trackerSection } from './trackerSection';
+export { cortexSection } from './cortexSection';
 export { systemSection } from './systemSection';
 export * from './types';

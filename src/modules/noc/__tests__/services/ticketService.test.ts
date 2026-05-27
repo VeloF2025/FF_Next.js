@@ -575,7 +575,7 @@ describe('Ticket Service - CRUD Operations', () => {
       // 🟢 WORKING: Test error handling for non-existent ticket
       const ticketId = '999e4567-e89b-12d3-a456-426614174999';
       const updatePayload: UpdateTicketPayload = {
-        status: TicketStatus.CLOSED
+        status: TicketStatus.RESOLVED
       };
 
       vi.mocked(queryOne).mockResolvedValue(null);
@@ -668,7 +668,7 @@ describe('Ticket Service - CRUD Operations', () => {
       // 🟢 WORKING: Test that updated_at is set automatically
       const ticketId = '123e4567-e89b-12d3-a456-426614174000';
       const updatePayload: UpdateTicketPayload = {
-        status: TicketStatus.CLOSED
+        status: TicketStatus.RESOLVED
       };
 
       const now = new Date();
@@ -679,7 +679,7 @@ describe('Ticket Service - CRUD Operations', () => {
         title: 'Test ticket',
         ticket_type: TicketType.MAINTENANCE,
         priority: TicketPriority.NORMAL,
-        status: TicketStatus.CLOSED,
+        status: TicketStatus.RESOLVED,
         created_at: new Date('2024-01-15T10:00:00Z'),
         updated_at: now, // Should be updated
         description: null,
@@ -1312,15 +1312,17 @@ describe('Ticket Service - CRUD Operations', () => {
     });
 
     it('should exclude statuses when exclude_status is provided', async () => {
-      // Kanban default view hides closed/cancelled to keep the window small
+      // Kanban default view hides cancelled to keep the window small.
+      // (Migration 364 consolidated 'closed' into 'resolved'; default
+      // excludes 'cancelled' only.)
       vi.mocked(query).mockResolvedValue([]);
       vi.mocked(queryOne).mockResolvedValueOnce({ count: '0' });
 
-      await listTickets({ exclude_status: ['closed', 'cancelled'] });
+      await listTickets({ exclude_status: ['cancelled'] });
 
       const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('status NOT IN');
-      expect(callArgs[1]).toEqual(expect.arrayContaining(['closed', 'cancelled']));
+      expect(callArgs[1]).toEqual(expect.arrayContaining(['cancelled']));
     });
 
     it('should order by updated_at DESC when sort=updated_desc', async () => {

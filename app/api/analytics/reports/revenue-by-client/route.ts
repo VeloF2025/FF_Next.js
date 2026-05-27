@@ -17,6 +17,11 @@ import { userHasPermission } from '@/lib/permissions';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
 import type { RevenueByClientItem } from '@/modules/analytics/reports/revenue-by-client/useRevenueByClientData';
 
+
+// Opt out of build-time static collection. Route depends on runtime
+// SharePoint/Graph data + auth cookies that are not available during
+// `next build`. Matches sibling analytics report routes.
+export const dynamic = 'force-dynamic';
 const logger = createLogger('analytics:api:revenue-by-client');
 
 const ALLOWED_USERS = new Set([

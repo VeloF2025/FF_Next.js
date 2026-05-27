@@ -57,7 +57,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         userId || 'system'
       );
 
-      // Mark the mismatch record as fixed
+      // Mark the mismatch record as fixed. status_mismatch rows now route directly
+      // to 'needs_investigation' (so they show up in Investigate, not Fixable), so
+      // accept either status when the fix actually succeeds.
       await client.query(
         `UPDATE olt_mismatch_records
          SET fix_status = 'fixed',
@@ -66,7 +68,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              fix_old_value = $2,
              fix_by = $3
          WHERE drop_number = $4
-           AND fix_status = 'pending'
+           AND fix_status IN ('pending', 'needs_investigation')
            AND investigation_context::text LIKE '%status_mismatch%'`,
         [
           'success',

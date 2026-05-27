@@ -12,7 +12,7 @@
  *   0 18 * * * cd /var/www/fibreflow && /usr/bin/npx tsx scripts/cron/sync-meetings-fireflies.ts >> /var/log/meetings-sync.log 2>&1
  */
 
-import { neon } from '@neondatabase/serverless';
+import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { Resend } from 'resend';
 import { syncFirefliesToNeon } from '../../src/services/fireflies/firefliesService';
 import {
@@ -27,27 +27,39 @@ if (!process.env.DATABASE_URL) {
   dotenv.config({ path: '.env.production' });
 }
 
+// DB driver: post-Neon-cutover (2026-04-18) the database is self-hosted
+// Supabase, which the @neondatabase/serverless neon() driver cannot talk to,
+// and the webpack neon-shim that rescues the Next.js app does not apply to a
+// standalone tsx script. Use the shared pg.Pool via `@/lib/db-pool` (its `sql`
+// is a tagged-template drop-in), imported dynamically inside main() so the
+// pool — built from process.env.DATABASE_URL at db.ts module load — sees the
+// resolved URL. Output goes to stdout/stderr because @/lib/logger never writes
+// to them (in-memory only) and would blank this cron's logfile.
+const logOut = (msg: string) => process.stdout.write(msg + '\n');
+const logErr = (msg: string) => process.stderr.write(msg + '\n');
+const fmtErr = (e: unknown) =>
+  e instanceof Error ? e.stack ?? e.message : JSON.stringify(e);
+
 const DATABASE_URL = process.env.DATABASE_URL;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FIREFLIES_API_KEY = process.env.FIREFLIES_API_KEY;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'ai@velocityfibre.co.za';
 
 if (!DATABASE_URL) {
-  console.error('❌ DATABASE_URL not set');
+  logErr('❌ DATABASE_URL not set');
   process.exit(1);
 }
 
 if (!RESEND_API_KEY) {
-  console.error('❌ RESEND_API_KEY not set');
+  logErr('❌ RESEND_API_KEY not set');
   process.exit(1);
 }
 
 if (!FIREFLIES_API_KEY) {
-  console.error('❌ FIREFLIES_API_KEY not set');
+  logErr('❌ FIREFLIES_API_KEY not set');
   process.exit(1);
 }
 
-const sql = neon(DATABASE_URL);
 const resend = new Resend(RESEND_API_KEY);
 
 interface SyncStats {
@@ -55,6 +67,17 @@ interface SyncStats {
   actionItemsExtracted: number;
   actionItemsSkipped: number;
   actionItemsErrors: number;
+}
+
+// Shape of the rows returned by the meetings query below. `extends
+// Record<string, unknown>` satisfies db-pool's SqlRow constraint so the typed
+// `sql<MeetingRow>` call compiles. summary/participants are jsonb, returned
+// already-parsed by node-postgres.
+interface MeetingRow extends Record<string, unknown> {
+  id: number;
+  title: string | null;
+  summary: { action_items?: string } | null;
+  participants: Array<{ name: string; email: string; displayName?: string }> | null;
 }
 
 function generateEmailHtml(success: boolean, stats?: SyncStats, error?: string): string {
@@ -192,8 +215,13 @@ function generateEmailHtml(success: boolean, stats?: SyncStats, error?: string):
 }
 
 async function main() {
-  console.log('🚀 Starting Fireflies meetings sync cron job...');
-  console.log(`📅 Date: ${new Date().toISOString()}`);
+  // Dynamic import so the pg.Pool in src/lib/db.ts initialises with the
+  // DATABASE_URL dotenv resolved above (a static import would hoist above
+  // dotenv.config and capture an undefined connection string).
+  const { sql } = await import('../../src/lib/db-pool');
+
+  logOut('🚀 Starting Fireflies meetings sync cron job...');
+  logOut(`📅 Date: ${new Date().toISOString()}`);
 
   let syncedCount = 0;
   let actionItemsExtracted = 0;
@@ -204,15 +232,23 @@ async function main() {
 
   try {
     // STEP 1: Sync meetings from Fireflies
-    console.log('🔄 Step 1: Syncing meetings from Fireflies...');
-    syncedCount = await syncFirefliesToNeon(FIREFLIES_API_KEY, sql);
-    console.log(`✅ Successfully synced ${syncedCount} meetings`);
+    logOut('🔄 Step 1: Syncing meetings from Fireflies...');
+    // syncFirefliesToNeon is typed for the Neon driver but only uses the
+    // tagged-template call surface, which db-pool's `sql` implements
+    // identically (and parameterises). The shared service + its app callers
+    // still pass the webpack-shimmed neon sql, so we adapt at this call site
+    // rather than widening the service signature.
+    syncedCount = await syncFirefliesToNeon(
+      FIREFLIES_API_KEY,
+      sql as unknown as NeonQueryFunction<false, false>
+    );
+    logOut(`✅ Successfully synced ${syncedCount} meetings`);
 
     // STEP 2: Extract action items from meetings
-    console.log('🔄 Step 2: Extracting action items from meetings...');
+    logOut('🔄 Step 2: Extracting action items from meetings...');
 
     // Find all meetings with action items
-    const meetings = await sql`
+    const meetings = await sql<MeetingRow>`
       SELECT id, title, summary, participants
       FROM meetings
       WHERE summary IS NOT NULL
@@ -220,18 +256,18 @@ async function main() {
       AND summary->>'action_items' != ''
     `;
 
-    console.log(`📋 Found ${meetings.length} meetings with action items`);
+    logOut(`📋 Found ${meetings.length} meetings with action items`);
 
     for (const meeting of meetings) {
       try {
         // Check if already extracted
-        const existing = await sql`
+        const existing = await sql<{ count: number }>`
           SELECT COUNT(*)::int as count
-          FROM meeting_action_items
+          FROM action_items
           WHERE meeting_id = ${meeting.id}
         `;
 
-        if (existing[0]?.count > 0) {
+        if ((existing[0]?.count ?? 0) > 0) {
           actionItemsSkipped++;
           continue;
         }
@@ -246,10 +282,10 @@ async function main() {
 
         // Insert action items
         for (const item of parsedItems) {
-          const assignee_email = findAssigneeEmail(item.assignee, meeting.participants);
+          const assignee_email = findAssigneeEmail(item.assignee, meeting.participants ?? []);
 
           await sql`
-            INSERT INTO meeting_action_items (
+            INSERT INTO action_items (
               meeting_id,
               description,
               assignee_name,
@@ -271,25 +307,25 @@ async function main() {
           actionItemsExtracted++;
         }
 
-        console.log(`  ✅ ${meeting.title}: ${parsedItems.length} items`);
-      } catch (error: any) {
-        console.error(`  ❌ ${meeting.title}:`, error.message);
+        logOut(`  ✅ ${meeting.title}: ${parsedItems.length} items`);
+      } catch (error) {
+        logErr(`  ❌ ${meeting.title}: ${fmtErr(error)}`);
         actionItemsErrors++;
       }
     }
 
-    console.log(`✅ Extracted ${actionItemsExtracted} action items (${actionItemsSkipped} already processed, ${actionItemsErrors} errors)`);
+    logOut(`✅ Extracted ${actionItemsExtracted} action items (${actionItemsSkipped} already processed, ${actionItemsErrors} errors)`);
     success = true;
 
-  } catch (error: any) {
+  } catch (error) {
     success = false;
-    errorMessage = error.message || String(error);
-    console.error('❌ Sync failed:', errorMessage);
+    errorMessage = error instanceof Error ? error.message : String(error);
+    logErr(`❌ Sync failed: ${errorMessage}`);
   }
 
   // Send email notification
   try {
-    console.log('📧 Sending email notification...');
+    logOut('📧 Sending email notification...');
 
     const stats: SyncStats = {
       meetingCount: syncedCount,
@@ -311,26 +347,26 @@ async function main() {
     });
 
     if (result.error) {
-      console.error('❌ Failed to send email notification:', result.error);
+      logErr(`❌ Failed to send email notification: ${fmtErr(result.error)}`);
     } else {
-      console.log(`✅ Email notification sent (ID: ${result.data?.id})`);
+      logOut(`✅ Email notification sent (ID: ${result.data?.id})`);
     }
 
-  } catch (emailError: any) {
-    console.error('❌ Error sending email:', emailError.message);
+  } catch (emailError) {
+    logErr(`❌ Error sending email: ${fmtErr(emailError)}`);
   }
 
   // Summary
-  console.log('\n📊 Summary:');
-  console.log(`  🔄 Sync Status: ${success ? '✅ Success' : '❌ Failed'}`);
-  console.log(`  📊 Meetings Synced: ${syncedCount}`);
-  console.log(`  📋 Action Items Extracted: ${actionItemsExtracted}`);
-  console.log(`  ⏭️  Already Processed: ${actionItemsSkipped}`);
-  console.log(`  ❌ Errors: ${actionItemsErrors}`);
+  logOut('\n📊 Summary:');
+  logOut(`  🔄 Sync Status: ${success ? '✅ Success' : '❌ Failed'}`);
+  logOut(`  📊 Meetings Synced: ${syncedCount}`);
+  logOut(`  📋 Action Items Extracted: ${actionItemsExtracted}`);
+  logOut(`  ⏭️  Already Processed: ${actionItemsSkipped}`);
+  logOut(`  ❌ Errors: ${actionItemsErrors}`);
   if (!success) {
-    console.log(`  ❌ Error: ${errorMessage}`);
+    logOut(`  ❌ Error: ${errorMessage}`);
   }
-  console.log('✅ Cron job completed\n');
+  logOut('✅ Cron job completed\n');
 
   // Exit with error code if sync failed
   if (!success) {
@@ -338,8 +374,13 @@ async function main() {
   }
 }
 
-// Run the script
-main().catch(error => {
-  console.error('💥 Unhandled error:', error);
-  process.exit(1);
-});
+// pg.Pool keeps the event loop alive after work completes, so exit explicitly
+// (matching the sibling attendance crons). All queries, the INSERT loop, and
+// the email send are awaited before this resolves, so a hard exit loses
+// nothing.
+main()
+  .then(() => process.exit(0))
+  .catch(error => {
+    logErr(`💥 Unhandled error: ${fmtErr(error)}`);
+    process.exit(1);
+  });

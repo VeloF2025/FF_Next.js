@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { log } from '@/lib/logger';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { staffConfig } from '@/modules/navigation';
@@ -55,12 +56,41 @@ interface StaffMember {
   exitType?: string;
   exitReason?: string;
   isRehireable?: boolean;
+  profilePhotoUrl?: string | null;
 }
 
 // Helper to check if a status represents a former employee
 const isFormerEmployee = (status: StaffStatusType): boolean => {
   return ['terminated', 'resigned', 'retired'].includes(status);
 };
+
+function staffInitials(name: string): string {
+  if (!name) return '';
+  const parts = name.split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
+}
+
+function StaffListAvatar({ member }: { member: StaffMember }) {
+  const [showFallback, setShowFallback] = useState(!member.profilePhotoUrl);
+  return (
+    <div className="h-10 w-10 rounded-full bg-blue-500/20 overflow-hidden flex items-center justify-center">
+      {member.profilePhotoUrl && !showFallback && (
+        <img
+          src={member.profilePhotoUrl}
+          alt={member.name}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setShowFallback(true)}
+        />
+      )}
+      {(!member.profilePhotoUrl || showFallback) && (
+        <span className="text-sm font-medium text-blue-400">
+          {staffInitials(member.name) || '?'}
+        </span>
+      )}
+    </div>
+  );
+}
 
 function StaffDirectorySkeleton() {
   return (
@@ -113,7 +143,16 @@ export default function StaffDirectoryPage() {
         const data = await response.json();
         setStaff(data.data || []);
       } else {
-        const errorData = await response.json().catch(() => ({}));
+        let errorData: { error?: { message?: string } } = {};
+        try {
+          errorData = await response.json();
+        } catch (parseErr) {
+          // Non-JSON error body — fall through to the status-code message.
+          log.warn('staff list error response was not JSON', {
+            status: response.status,
+            err: parseErr instanceof Error ? parseErr.message : String(parseErr),
+          });
+        }
         const message = errorData?.error?.message || `Failed to load staff (${response.status})`;
         setError(message);
         setStaff([]);
@@ -488,12 +527,7 @@ export default function StaffDirectoryPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                                <span className="text-sm font-medium text-blue-400">
-                                  {member.name ? member.name.charAt(0) : ''}
-                                  {member.name ? member.name.split(' ')[1]?.charAt(0) || '' : ''}
-                                </span>
-                              </div>
+                              <StaffListAvatar member={member} />
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-[var(--ff-text-primary)]">

@@ -26,6 +26,13 @@ export interface ParsedPaymentSummary {
   note4Count: number;
   note5Count: number;
   preProvisionsCount: number;
+  /**
+   * Outstanding pre-provisioned drops per the OES Report — running balance
+   * tracked across all weeks. NOT a deduction from current-week payment;
+   * surfaced separately as an inventory metric ("drops withheld, not yet
+   * resolved"). 0 when the PDF row has no OES cumulative.
+   */
+  preProvOutstanding: number;
   totalClaimableForPayment: number;
   /** Site label from PDF header (e.g. "Lawley", "Tembisa"). Null if not found. */
   site: string | null;
@@ -88,6 +95,56 @@ function parseNaturalDate(raw: string): string | null {
   }
 
   return `${year}-${monthNum}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * Parse the Pre-Provisioned line of an FT payment summary.
+ *
+ * Layout: `Pre-Provisioned <X>% of Pre-provisioned withheld  <count>  <OES>  OES Report, as at <date>`
+ *
+ * Two distinct values:
+ * - `count`:       first integer after "withheld" — current-week withhold count.
+ *                  Subtracted from this week's payment. Typically 0.
+ * - `outstanding`: second integer (the OES Report cumulative, usually negative)
+ *                  — running balance of pre-provisioned drops awaiting
+ *                  resolution. NOT a deduction; tracked as an inventory metric
+ *                  that grows / shrinks week-to-week.
+ *
+ * Sign flags (callers should warn when set — both are unexpected):
+ * - `isNegativeRaw`:        current-week raw value < 0 (count semantics are
+ *                           non-negative; possible PDF format change).
+ * - `isOutstandingPositive`: OES cumulative raw value > 0 (FT prints this
+ *                           negative in every observed PDF; positive could
+ *                           mean a net credit or a format change).
+ */
+export function parsePreProvisionLine(line: string): {
+  count: number;
+  outstanding: number;
+  isNegativeRaw: boolean;
+  isOutstandingPositive: boolean;
+} {
+  // Strip the "as at <date>" tail so date digits can't leak into the match.
+  const stripped = line.replace(/as\s+at\b.*$/i, '');
+  // Anchor on "withheld" — the last word of the label — and capture both
+  // numbers that follow. Second number is optional (older PDFs have it as 0
+  // or absent).
+  const m = stripped.match(/withheld\s+(-?\d+)(?:\s+(-?\d+))?/i);
+  if (!m) {
+    return {
+      count: 0,
+      outstanding: 0,
+      isNegativeRaw: false,
+      isOutstandingPositive: false,
+    };
+  }
+  const raw = parseInt(m[1]!, 10);
+  const oes = m[2] != null ? parseInt(m[2], 10) : 0;
+  return {
+    count: Math.abs(raw),
+    outstanding: Math.abs(oes),
+    isNegativeRaw: raw < 0,
+    isOutstandingPositive: oes > 0,
+  };
 }
 
 /**
@@ -339,25 +396,24 @@ export async function parseFTPaymentPdf(
   }
 
   // ── Pre-provisions ───────────────────────────────────────────────────────
-  // Line format: "Pre-Provisioned 20% of Pre-provisioned withheld   0   -180 OES Report, as at 05 Apr 2026"
-  // The count we want is the negative number just before the trailing report
-  // label. Historical bug: when no negative existed, the fallback took
-  // max(|allNums|) which then picked up stray year numbers (e.g. 2026) from
-  // the "as at <date>" suffix. Fix: only accept explicitly negative values,
-  // default 0 otherwise. That matches FT's semantics — "no withhold".
   let preProvisionsCount = 0;
+  let preProvOutstanding = 0;
   let preProvLineFound = false;
   for (const line of lines) {
     if (/pre-prov/i.test(line)) {
       preProvLineFound = true;
-      // Strip any "as at <date>" tail so date digits can't leak in.
-      const stripped = line.replace(/as\s+at\b.*$/i, '');
-      const nums = [...stripped.matchAll(/-?\d+/g)]
-        .map((m) => parseInt(m[0], 10))
-        .filter((n) => !isNaN(n));
-      const negatives = nums.filter((n) => n < 0);
-      if (negatives.length > 0) {
-        preProvisionsCount = Math.abs(Math.min(...negatives));
+      const result = parsePreProvisionLine(line);
+      preProvisionsCount = result.count;
+      preProvOutstanding = result.outstanding;
+      if (result.isNegativeRaw) {
+        warnings.push(
+          `Pre-Provisioned current-week value is negative (verify FT PDF format hasn't changed)`,
+        );
+      }
+      if (result.isOutstandingPositive) {
+        warnings.push(
+          `Pre-Provisioned OES cumulative is positive (FT prints this negative in every observed PDF — verify format hasn't changed)`,
+        );
       }
       break;
     }
@@ -417,6 +473,7 @@ export async function parseFTPaymentPdf(
     note4Count,
     note5Count,
     preProvisionsCount,
+    preProvOutstanding,
     totalClaimableForPayment,
     site,
     contractor,

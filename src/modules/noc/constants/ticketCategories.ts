@@ -90,6 +90,8 @@ export const TICKET_CATEGORY_LABELS: Record<string, string> = {
   new_installation: 'New Installation',
   serial_mismatch: 'Serial Mismatch',
   olt_investigation: 'OLT Investigation',
+  home_installation_status: 'Home Installation Status',
+  home_signup_not_done: 'Home Sign Up Not Done',
 };
 
 /** The sub-type tags valid as ticket_category on PP/OLT ingest paths. */
@@ -101,6 +103,8 @@ export const PP_OLT_SUBTYPES = [
   'new_installation',
   'serial_mismatch',
   'olt_investigation',
+  'home_installation_status',
+  'home_signup_not_done',
 ] as const;
 
 export type PPOLTSubtype = (typeof PP_OLT_SUBTYPES)[number];

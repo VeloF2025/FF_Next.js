@@ -10,13 +10,18 @@
 import React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Clock, History, LogOut } from 'lucide-react';
+import { Clock, Home, History, LogOut, RefreshCw, Receipt } from 'lucide-react';
 
 import { logout } from './api';
+import { useMyServiceWorker } from './useServiceWorker';
 
 export interface MyPortalShellProps {
   title: string;
   staffName?: string | null;
+  /** Optional avatar URL — typically `profile.profilePhotoUrl`. Renders
+   *  the photo at the right of the header strip; falls back to initials
+   *  when missing or when the URL fails to load. */
+  staffPhotoUrl?: string | null;
   /** Hide the footer nav on the login / onboard screens. */
   showFooterNav?: boolean;
   /** Hide the header on the login / onboard screens. */
@@ -24,15 +29,41 @@ export interface MyPortalShellProps {
   children: React.ReactNode;
 }
 
+function staffInitials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).map((p) => p[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function StaffAvatar({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
+  const [showFallback, setShowFallback] = React.useState(!photoUrl);
+  const initials = staffInitials(name);
+  return (
+    <div className="relative h-10 w-10 shrink-0 rounded-full bg-blue-500/20 overflow-hidden flex items-center justify-center">
+      {photoUrl && !showFallback && (
+        <img
+          src={photoUrl}
+          alt={name}
+          className="h-full w-full object-cover"
+          onError={() => setShowFallback(true)}
+        />
+      )}
+      {(!photoUrl || showFallback) && (
+        <span className="text-sm font-semibold text-blue-200">{initials || '?'}</span>
+      )}
+    </div>
+  );
+}
+
 export function MyPortalShell({
   title,
   staffName,
+  staffPhotoUrl,
   showFooterNav = true,
   showHeader = true,
   children,
 }: MyPortalShellProps) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = React.useState(false);
+  const { updateAvailable, updateServiceWorker } = useMyServiceWorker();
 
   const handleLogout = React.useCallback(async () => {
     if (loggingOut) return;
@@ -47,10 +78,23 @@ export function MyPortalShell({
     } catch {
       // swallow — see comment above.
     }
-    // Non-httpOnly client state (device fingerprint survives a logout, which
-    // is correct — it's a device identity, not a session secret).
-    await router.push('/my');
-  }, [loggingOut, router]);
+    // Defence in depth: tell the SW to drop the cached /api/my/session
+    // response. The httpOnly cookie is gone, but if the user is offline
+    // the SW could otherwise serve a stale "logged in" payload from
+    // OFFLINE_CACHE. Best-effort — the navigator might not be available.
+    try {
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_SESSION_CACHE' });
+      }
+    } catch {
+      // No SW yet, or postMessage rejected — fall through to the reload.
+    }
+    // Hard reload so the page remounts and the fresh (now-null) session
+    // state takes effect. router.push('/my') is a no-op when the user
+    // signs out from /my (the hub) — Next.js doesn't remount the page,
+    // so the user appears stuck on the hub until they refresh manually.
+    window.location.assign('/my');
+  }, [loggingOut]);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
@@ -63,7 +107,12 @@ export function MyPortalShell({
 
       {showHeader && (
         <header className="bg-neutral-900 text-neutral-100 border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => router.push('/my')}
+            aria-label="Go to hub"
+            className="flex items-center gap-3 min-w-0 text-left rounded-lg hover:bg-neutral-800/60 active:bg-neutral-800 -m-1 p-1"
+          >
             <img
               src="/assets/vf/vf-logo.svg"
               alt=""
@@ -74,22 +123,42 @@ export function MyPortalShell({
               <div className="text-xs uppercase tracking-wide text-neutral-400">Velocity Fibre</div>
               <div className="text-base font-semibold truncate">{title}</div>
             </div>
-          </div>
+          </button>
           {staffName && (
-            <div className="text-right">
-              <div className="text-sm font-medium leading-tight">{staffName}</div>
+            <div className="flex items-center gap-2">
+              <StaffAvatar name={staffName} photoUrl={staffPhotoUrl} />
+              <div className="text-right hidden sm:block">
+                <div className="text-sm font-medium leading-tight">{staffName}</div>
+              </div>
               <button
                 type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="mt-0.5 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200 underline disabled:opacity-50"
+                aria-label={loggingOut ? 'Signing out' : 'Sign out'}
+                className="inline-flex items-center justify-center gap-1 min-w-[48px] min-h-[48px] px-3 rounded-lg text-xs font-medium text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
               >
-                <LogOut className="w-3 h-3" />
-                {loggingOut ? 'Signing out…' : 'Sign out'}
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  {loggingOut ? 'Signing out…' : 'Sign out'}
+                </span>
               </button>
             </div>
           )}
         </header>
+      )}
+
+      {updateAvailable && (
+        <div className="bg-blue-600 text-white px-4 py-2 text-sm flex items-center justify-between gap-3">
+          <span>A new version is ready.</span>
+          <button
+            type="button"
+            onClick={updateServiceWorker}
+            className="inline-flex items-center gap-1 font-medium underline"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Reload
+          </button>
+        </div>
       )}
 
       <main className="w-full max-w-lg mx-auto px-4 py-4 pb-24">
@@ -98,8 +167,10 @@ export function MyPortalShell({
 
       {showFooterNav && (
         <nav className="fixed bottom-0 inset-x-0 bg-neutral-900 border-t border-neutral-800 px-2 py-2 safe-area-pb">
-          <div className="max-w-lg mx-auto grid grid-cols-2 gap-2">
+          <div className="max-w-lg mx-auto grid grid-cols-4 gap-2">
+            <FooterLink href="/my" label="Home" icon={<Home className="w-5 h-5" />} />
             <FooterLink href="/my/attendance" label="Clock" icon={<Clock className="w-5 h-5" />} />
+            <FooterLink href="/my/receipts" label="Receipts" icon={<Receipt className="w-5 h-5" />} />
             <FooterLink
               href="/my/attendance/history"
               label="History"

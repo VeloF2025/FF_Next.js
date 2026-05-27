@@ -1,7 +1,9 @@
 /**
  * Zone/PON Options API
  * GET /api/snags/zone-pon-options?projectId=<id>
- * Returns distinct zone_no + pon_no pairs for cascading filter dropdowns.
+ * Returns distinct zone_no + pon_no pairs for cascading filter dropdowns,
+ * plus the distinct snag categories actually present for the project so the
+ * report dialog's category chips reflect real data instead of a hardcoded list.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -21,21 +23,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { projectId } = req.query;
 
     if (!projectId || typeof projectId !== 'string') {
-      return apiResponse.success(res, { zones: [], pons: [] });
+      return apiResponse.success(res, { zones: [], pons: [], categories: [] });
     }
 
     type RawRow = { zone_no: string | null; pon_no: string | null };
 
+    // Resolves zone/PON across all three location sources so the picker
+    // sees the same universe as runSnagScopeQuery (Works QA snags via
+    // pole_qa_photos + TQR snags via pole_ids[1] / drop_id).
     const rows = await sql`
       SELECT DISTINCT
-        COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
-        COALESCE(pole.pon_no, dr.pon_no) AS pon_no
+        COALESCE(pqa.zone_no, pole.zone_no, dr.zone_no) AS zone_no,
+        COALESCE(pqa.pon_no,  pole.pon_no,  dr.pon_no)  AS pon_no
       FROM snags s
-      LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
-      LEFT JOIN drops dr ON dr.id = s.drop_id
+      LEFT JOIN pole_qa_photos pqa  ON pqa.id  = s.pole_qa_photo_id
+      LEFT JOIN poles          pole ON pole.id = s.pole_ids[1]
+      LEFT JOIN drops          dr   ON dr.id   = s.drop_id
       WHERE s.project_id = ${projectId}
-        AND (COALESCE(pole.zone_no, dr.zone_no) IS NOT NULL
-             OR COALESCE(pole.pon_no, dr.pon_no) IS NOT NULL)
+        AND (COALESCE(pqa.zone_no, pole.zone_no, dr.zone_no) IS NOT NULL
+             OR COALESCE(pqa.pon_no,  pole.pon_no,  dr.pon_no)  IS NOT NULL)
       ORDER BY zone_no ASC NULLS LAST, pon_no ASC NULLS LAST
     ` as RawRow[];
 
@@ -51,7 +57,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const zones = Array.from(zoneSet).sort((a, b) => a - b);
 
-    return apiResponse.success(res, { zones, pons });
+    // Distinct categories actually stored for this project's snags. Drives the
+    // report dialog's Category chips so the filter can never drift from the data
+    // (the previous hardcoded list — photo_quality/pole_quality/… — matched no rows).
+    const catRows = await sql`
+      SELECT DISTINCT category
+      FROM snags
+      WHERE project_id = ${projectId} AND category IS NOT NULL
+      ORDER BY category ASC
+    ` as { category: string }[];
+    const categories = catRows.map(r => r.category);
+
+    return apiResponse.success(res, { zones, pons, categories });
   } catch (error) {
     log.error('Zone-PON options API error', { error });
     return apiResponse.internalError(res, error);

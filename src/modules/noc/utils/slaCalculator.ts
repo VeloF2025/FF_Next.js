@@ -136,8 +136,8 @@ export function isTicketOverdue(input: OverdueCheckInput): OverdueCheckResult {
     };
   }
 
-  // Closed and cancelled tickets are exempt
-  const exempt_statuses = ['closed', 'cancelled'];
+  // Resolved and cancelled tickets are exempt (terminal states)
+  const exempt_statuses = ['resolved', 'cancelled'];
   if (exempt_statuses.includes(current_status.toLowerCase())) {
     return {
       is_overdue: false,

@@ -235,11 +235,28 @@ export default withMySession(async (req, res, session) => {
       selfieUrl: selfie.url,
     });
   } catch (err) {
+    // @/lib/logger writes to in-memory only in prod — invisible. Mirror
+    // to stderr (systemd captures to /var/log/fibreflow-*.error.log) so
+    // the next 500 from this handler surfaces the stack trace for ops.
+    // Same rationale as #1434 for the OTP send failure path.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errStack = err instanceof Error ? err.stack : undefined;
     log.error('[my-clock-out] unexpected error', {
       staffId: session.staffId,
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
+      error: errMsg,
+      stack: errStack,
     });
+    process.stderr.write(
+      JSON.stringify({
+        level: 'ERROR',
+        component: 'attendance-clock-out',
+        event: 'unexpected_error',
+        staffId: session.staffId,
+        error: errMsg,
+        stack: errStack,
+        timestamp: new Date().toISOString(),
+      }) + '\n'
+    );
     return apiResponse.internalError(res, err);
   }
 });

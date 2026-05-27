@@ -8,28 +8,29 @@
 | **Complexity** | High |
 | **Category** | infrastructure |
 | **Server** | Velocity 100.96.203.105:8100 |
-| **Model** | Qwen/Qwen3-VL-8B-Instruct |
+| **Model** | QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ |
 
 ## Quick Reference
 - **URL:** `http://100.96.203.105:8100`
-- **Model:** Qwen/Qwen3-VL-8B-Instruct
+- **Model:** QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ
 - **Service:** `vllm-qwen.service`
 - **Config:** `/etc/systemd/system/vllm-qwen.service`
 - **GPU:** NVIDIA RTX 5090 (compute-only mode)
 
 ## VLM Configuration
 ```bash
-# Current stable settings (Jan 2026)
---model Qwen/Qwen3-VL-8B-Instruct
---max-model-len 16384      # Max tokens
---gpu-memory-utilization 0.90
---dtype bfloat16
+# Current stable settings (Apr 2026 — 30B-A3B AWQ migration)
+--model QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ
+--max-model-len 32768      # Total context: prompt + image tokens + output
+--gpu-memory-utilization 0.92
+--dtype auto
 --max-num-seqs 4           # 4 parallel sequences
+--quantization awq
 --enforce-eager            # REQUIRED: prevents FLASHINFER crashes
 ```
 
 ## Image Size Limits
-**CRITICAL:** Large images exceed VLM token limits (16384 max)
+**CRITICAL:** Large images eat into the 32768 total-context budget (prompt + image + output)
 
 | Use Case | Max Size | Notes |
 |----------|----------|-------|
@@ -45,6 +46,36 @@ const resized = await sharp(buffer)
   .jpeg({ quality: 85 })
   .toBuffer();
 ```
+
+## Per-function Token Budgets
+
+All `max_tokens` values live in `src/lib/vlm/config.ts` — **do not hardcode**. Import from `@/lib/vlm`:
+
+| Constant | Value | Use For |
+|----------|-------|---------|
+| `VLM_MAX_TOKENS_ORIENTATION` | 10 | Orientation probe (single-number reply) |
+| `VLM_MAX_TOKENS_QUICK` | 500 | Plate, odometer, fuel, pole-install classifier, fleet |
+| `VLM_MAX_TOKENS_DEFAULT` | 1000 | Generic fallback |
+| `VLM_MAX_TOKENS_OCR` | 1000 | ID/serial OCR, asset labels, construction QA |
+| `VLM_MAX_TOKENS_QA` | 2000 | QA validation, photo evaluation, doc cross-validation |
+| `VLM_MAX_TOKENS_ANALYSIS` | 2048 | Screenshot/devops analysis |
+| `VLM_MAX_TOKENS_CATEGORIZATION` | 4000 | Batch photo categorization (6 photos/call) |
+| `VLM_MAX_TOKENS_DOCUMENT` | 4000 | Quote/PO structured extraction |
+
+```typescript
+import { VLM_MAX_TOKENS_OCR, VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL } from '@/lib/vlm';
+
+await fetch(VLM_CHAT_ENDPOINT, {
+  method: 'POST',
+  body: JSON.stringify({
+    model: VLM_EXTRACTION_MODEL,
+    messages: [...],
+    max_tokens: VLM_MAX_TOKENS_OCR,
+  }),
+});
+```
+
+Note: `src/modules/data-sync/services/eodVlmService.ts` has a local `EOD_MAX_TOKENS = 4096` for the full EOD-table pass — this is larger than `DOCUMENT` (4000) because a single call returns dozens of rows. Keep it file-local unless a second caller needs the same budget.
 
 ## Benchmark System
 **Location:** `/home/velo/scripts/vllm/`

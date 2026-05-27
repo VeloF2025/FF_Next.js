@@ -116,6 +116,15 @@ export interface StockLocation {
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
+  /**
+   * Logical bin classification (migration 182 CHECK constraint):
+   *   main | department | project | technician | in_transit | faulty | quarantine
+   *
+   * Optional: rows created before migration 182 may have null here.
+   * The PWA picker uses this to exclude the "Faulty Equipment Bin" row which has
+   * locationType='warehouse' and binType='faulty'.
+   */
+  binType?: string | null;
   // Computed/joined
   children?: StockLocation[];
   stockCount?: number;
@@ -418,6 +427,7 @@ export interface CreateLocationInput {
 }
 
 export interface UpdateLocationInput {
+  parentId?: string;
   name?: string;
   address?: string;
   coordinates?: { lat: number; lng: number };
@@ -495,6 +505,8 @@ export interface RecordConsumptionInput {
   consumedById?: string;
   consumedByName?: string;
   consumedFromLocationId: string;
+  /** Explicit stock_holders.id. If omitted, resolved from consumedById (staff lookup). */
+  holderId?: string;
   gpsLat?: number;
   gpsLng?: number;
   notes?: string;

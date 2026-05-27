@@ -224,7 +224,7 @@ function buildStatusUpdateMessage(
     `*${ticket.ticket_uid}* → *${statusLabel}*`,
     ticket.title,
   ];
-  if (resolutionNote && (newStatus === 'resolved' || newStatus === 'closed')) {
+  if (resolutionNote && newStatus === 'resolved') {
     lines.push('', `🔧 *Technician notes:*`, resolutionNote);
   }
   if (ticket.dr_number) lines.push(`DR: ${ticket.dr_number}`);
@@ -317,7 +317,7 @@ export async function notifySnagGroupOnStatusChange(
     const groupJid = await resolveGroupJid(ticket.project_id);
     if (!groupJid) return;
 
-    const isResolution = newStatus === 'resolved' || newStatus === 'closed';
+    const isResolution = newStatus === 'resolved';
 
     // Fetch context in parallel:
     // - Resolution: technician notes + after photos

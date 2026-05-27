@@ -67,12 +67,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { projectId, category, severity, search, zone_no, pon_no } = req.query;
 
+    const parseCsv = (v: unknown): string[] => {
+      if (!v) return [];
+      if (Array.isArray(v)) return v.flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+      return String(v).split(',').map((x) => x.trim()).filter(Boolean);
+    };
+    const parseCsvInt = (v: unknown): number[] =>
+      parseCsv(v).map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n));
+
     const p  = typeof projectId === 'string' && projectId ? projectId : null;
-    const c  = typeof category  === 'string' && category  ? category  : null;
-    const sv = typeof severity  === 'string' && severity  ? severity  : null;
     const se = typeof search    === 'string' && search    ? `%${search}%` : null;
-    const zn = typeof zone_no   === 'string' && zone_no   ? parseInt(zone_no, 10) : null;
-    const pn = typeof pon_no    === 'string' && pon_no    ? parseInt(pon_no, 10) : null;
+
+    const cArr  = parseCsv(category);
+    const svArr = parseCsv(severity);
+    const znArr = parseCsvInt(zone_no);
+    const pnArr = parseCsvInt(pon_no);
+
+    // Null when empty so the `IS NULL OR …` guard skips the ANY() filter entirely.
+    // Cast arrays so Postgres infers the element type for empty arrays too.
+    const cParam  = cArr.length  > 0 ? cArr  : null;
+    const svParam = svArr.length > 0 ? svArr : null;
+    const znParam = znArr.length > 0 ? znArr : null;
+    const pnParam = pnArr.length > 0 ? pnArr : null;
 
     // Use the NOC ticket status when a ticket is linked, otherwise fall back to snag status.
     // Aligned to NOC Kanban columns:
@@ -134,11 +150,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE (${p}::text  IS NULL OR s.project_id::text = ${p})
-        AND (${c}::text  IS NULL OR s.category = ${c})
-        AND (${sv}::text IS NULL OR s.severity = ${sv})
+        AND (${cParam}::text[]  IS NULL OR s.category = ANY(${cParam}::text[]))
+        AND (${svParam}::text[] IS NULL OR s.severity = ANY(${svParam}::text[]))
         AND (${se}::text IS NULL OR s.description ILIKE ${se})
-        AND (${zn}::int  IS NULL OR COALESCE(pole.zone_no, dr.zone_no) = ${zn})
-        AND (${pn}::int  IS NULL OR COALESCE(pole.pon_no, dr.pon_no) = ${pn})
+        AND (${znParam}::int[] IS NULL OR COALESCE(pole.zone_no, dr.zone_no) = ANY(${znParam}::int[]))
+        AND (${pnParam}::int[] IS NULL OR COALESCE(pole.pon_no, dr.pon_no) = ANY(${pnParam}::int[]))
     ` as CountRow[];
 
     const empty: CountRow = { total: '0', open: '0', assigned: '0', in_progress: '0', pending_qa: '0', resolved: '0', verified: '0', closed: '0', critical: '0' };

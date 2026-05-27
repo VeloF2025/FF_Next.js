@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { FieldTechnician } from '../../../../src/modules/field-app/types/field-app.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
-import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
+import { createLoggedSql } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 
@@ -51,7 +50,6 @@ export default withAuth(withErrorHandler(async (
       `;
       
       // Transform data to match FieldTechnician format
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const transformedTechnicians = technicianData.map((s) => ({
         id: s.id,
         name: `${s.first_name} ${s.last_name}`,
@@ -81,61 +79,113 @@ export default withAuth(withErrorHandler(async (
         avgRating: transformedTechnicians.reduce((sum, t) => sum + t.rating, 0) / (transformedTechnicians.length || 1),
       };
 
-      res.status(200).json({ 
-        technicians: transformedTechnicians,
-        ...stats
-      });
+      return apiResponse.success(res, { technicians: transformedTechnicians, ...stats });
     } catch (error) {
       log.error('Error fetching technicians', { error });
       apiResponse.internalError(res, new Error('Failed to fetch technicians'));
     }
   } else if (req.method === 'POST') {
-    try {
-      const newTechnician = req.body;
-      
-      // Generate employee ID if not provided
-      const employeeId = newTechnician.employeeId || `TECH-${Date.now().toString().slice(-8)}`;
-      
-      // Insert new staff member as technician
-      const insertedStaff = await sql`
-        INSERT INTO staff (
-          employee_id, first_name, last_name, email, phone,
-          department, position, status, contract_type
-        )
-        VALUES (
-          ${employeeId},
-          ${newTechnician.firstName || newTechnician.name?.split(' ')[0] || ''},
-          ${newTechnician.lastName || newTechnician.name?.split(' ')[1] || ''},
-          ${newTechnician.email},
-          ${newTechnician.phone},
-          'Field Operations',
-          'Field Technician',
-          'active',
-          'full-time'
-        )
-        RETURNING *
-      `;
-      
-      // Log technician creation
-      if (insertedStaff[0]) {
-        logCreate('field_technician', insertedStaff[0].id, {
-          employee_id: insertedStaff[0].employee_id,
-          name: `${insertedStaff[0].first_name} ${insertedStaff[0].last_name}`,
-          email: insertedStaff[0].email,
-          department: 'Field Operations'
-        });
+    // POST is a deprecation shim that forwards to /api/field/users.
+    // Normalises legacy body shape: { name: 'First Last' } → split into firstName/lastName.
+    // role is forced to 'technician'.
+    //
+    // Response shape is translated back to legacy:
+    //   201 success → { message: 'Technician added successfully', technician: <full staff row> }
+    //   Any error   → forwarded verbatim (status + body unchanged)
+    const incoming = req.body as {
+      name?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      email?: string;
+      contractorId?: string;
+      [k: string]: unknown;
+    };
+    const [splitFirst, ...splitRest] = (incoming.name ?? '').trim().split(/\s+/);
+    const forwardBody = {
+      firstName: incoming.firstName ?? splitFirst ?? '',
+      lastName: incoming.lastName ?? splitRest.join(' ') ?? '',
+      email: incoming.email,
+      phone: incoming.phone,
+      role: 'technician' as const,
+      contractorId: incoming.contractorId,
+    };
+
+    // Build a response interceptor to capture what usersHandler would emit
+    // without touching the real `res` object.
+    let capturedStatus = 500;
+    let capturedBody: unknown = null;
+    const interceptor = {
+      status(code: number) {
+        capturedStatus = code;
+        return this;
+      },
+      json(body: unknown) {
+        capturedBody = body;
+        return this;
+      },
+      setHeader: res.setHeader.bind(res),
+    } as unknown as typeof res;
+
+    const usersHandler = (await import('@/pages/api/field/users/index')).default;
+    (req as unknown as { body: unknown }).body = forwardBody;
+    await usersHandler(req, interceptor);
+
+    // Translate 201 success to the legacy response shape.
+    // Any other status (4xx, 5xx) is forwarded as-is so callers see real errors.
+    const body201 = capturedBody as { data?: { user?: { id?: string } } } | null;
+    if (capturedStatus === 201 && body201?.data?.user?.id) {
+      const newId = body201.data.user.id;
+      try {
+        // ── H6 (blind review 2026-05-19): Explicit column projection ───────────
+        // Previously used SELECT * which exposes columns added by later migrations
+        // (e.g. role, account_status, created_by_staff_id from migration 346).
+        // We project only the columns that existed in the original pre-shim
+        // INSERT … RETURNING * surface: the nine INSERT columns plus id,
+        // created_at, updated_at. This preserves the legacy response contract
+        // without leaking newer additions to this public-facing shim endpoint.
+        // ────────────────────────────────────────────────────────────────────────
+        const rows = await sql`
+          SELECT
+            id,
+            employee_id,
+            first_name,
+            last_name,
+            email,
+            phone,
+            department,
+            position,
+            status,
+            contract_type,
+            created_at,
+            updated_at
+          FROM staff
+          WHERE id = ${newId}
+          LIMIT 1
+        `;
+        const technician = rows[0] ?? null;
+        // ── H1 (blind review 2026-05-19): LEGACY_RESPONSE_SHAPE ─────────────
+        // This POST path is a backward-compatibility shim. Its callers expect:
+        //   201  { message: 'Technician added successfully', technician: <row> }
+        // Using apiResponse.created() would emit { success:true, data:..., message }
+        // which breaks the contract. There is no apiResponse.raw() escape hatch.
+        // Decision: preserve raw JSON here and document the deviation. This shim
+        // exists specifically to bridge legacy callers — contract > strict convention.
+        // ────────────────────────────────────────────────────────────────────────
+        res.status(201).json({ message: 'Technician added successfully', technician });
+      } catch (dbErr) {
+        log.error('Failed to fetch full staff row after technician create', { error: dbErr }, 'TechniciansShim');
+        // Fall through: still surface the 201 with whatever we have
+        res.status(201).json({ message: 'Technician added successfully', technician: body201.data.user });
       }
-      
-      res.status(201).json({ 
-        message: 'Technician added successfully',
-        technician: insertedStaff[0]
-      });
-    } catch (error) {
-      log.error('Error adding technician', { error });
-      apiResponse.internalError(res, new Error('Failed to add technician'));
+      return;
     }
+
+    // Non-201 or unexpected shape: forward verbatim
+    res.status(capturedStatus).json(capturedBody);
+    return;
   } else {
-    apiResponse.methodNotAllowed(res, req.method!, ['GET']);
+    apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 }))
 

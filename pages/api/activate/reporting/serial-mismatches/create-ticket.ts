@@ -17,8 +17,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { createTicket } from '@/modules/noc/services/ticketService';
+import { findDuplicateTickets, linkSourceToTicket } from '@/modules/noc/services/duplicateTicketService';
 import {
   TicketSource,
   TicketType,
@@ -47,6 +49,9 @@ async function handler(
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
+  // withAuth populates req.user; cast once so we can forward it to createTicket.
+  const authedReq = req as AuthenticatedNextApiRequest;
+
   try {
     const { id, priority = 'normal', notes } = req.body as CreateTicketBody;
 
@@ -74,7 +79,7 @@ async function handler(
     const device = deviceResult.rows[0];
     const isMismatch = device.serial_mismatch === true;
 
-    // Check if ticket already exists
+    // Check if ticket already exists on this row
     if (device.mismatch_ticket_id) {
       return apiResponse.success(res, {
         success: false,
@@ -82,6 +87,31 @@ async function handler(
           ? 'Ticket already exists for this mismatch'
           : 'Ticket already exists for this offline device',
         ticket_id: String(device.mismatch_ticket_id),
+      });
+    }
+
+    // Dedup guard: offline_devices can have many rows per drop_number, and a
+    // ticket may already cover the same DR/serial via another row, snag, or
+    // pp_data flow. Relink instead of creating a duplicate.
+    const existingOpen = await findDuplicateTickets({
+      drNumber: device.drop_number,
+      ontSerial: device.serial_number,
+    });
+    const match = existingOpen[0];
+    if (match) {
+      await linkSourceToTicket('offline_devices.mismatch_ticket_id', String(device.id), match.id);
+      log.info('Offline device linked to existing open ticket (dedup)', {
+        deviceId: id,
+        dropNumber: device.drop_number,
+        existing_ticket_uid: match.ticket_uid,
+        match_reasons: match.match_reasons,
+      }, 'SerialMismatchTicket');
+      return apiResponse.success(res, {
+        success: false,
+        message: `Linked to existing open ticket ${match.ticket_uid} (matched on ${match.match_reasons.join(', ')})`,
+        ticket_id: match.id,
+        ticket_uid: match.ticket_uid,
+        match_reasons: match.match_reasons,
       });
     }
 
@@ -148,6 +178,7 @@ ${notes ?? 'Please investigate why this device is offline. Possible causes: fibe
       pon_number: device.planned_pon?.toString() || undefined,
       address: device.address || undefined,
       ont_serial: device.serial_number || undefined,
+      created_by: authedReq.user.id,
     });
 
     // Update offline_devices with ticket reference
@@ -187,4 +218,4 @@ ${notes ?? 'Please investigate why this device is offline. Possible causes: fibe
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withRole('technician')(handler));
