@@ -1,20 +1,20 @@
 /**
- * Photo Gallery — Criteria Review
- * Accessible at /activate/photo-gallery
- *
- * Shows accepted photos from PASS DRs grouped by step.
- * Used to review and select good/bad photo examples for PhotoGuide PWA criteria.
+ * /activate/photo-gallery → redirect to VLM Learning section
  */
 
 'use client';
 
-import { AppLayout } from '@/components/layout';
-import PhotoGalleryPage from '@/modules/activate/components/PhotoGalleryPage';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function PhotoGalleryRoute() {
+export default function PhotoGalleryRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/system/vlm-learning/photo-gallery');
+  }, [router]);
   return (
-    <AppLayout>
-      <PhotoGalleryPage />
-    </AppLayout>
+    <div className="flex min-h-screen items-center justify-center bg-gray-950 text-sm text-gray-400">
+      Redirecting to VLM Learning…
+    </div>
   );
 }
