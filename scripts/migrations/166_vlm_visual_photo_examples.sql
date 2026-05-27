@@ -1,4 +1,4 @@
--- Migration 165: VLM Visual Photo Examples
+-- Migration 166: VLM Visual Photo Examples
 -- Stores gallery-curated good/bad photo URLs as visual few-shot examples
 -- for stepQualityValidationService (auto-QA and PWA).
 
