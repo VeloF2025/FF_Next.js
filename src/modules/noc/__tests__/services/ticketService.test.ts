@@ -194,6 +194,50 @@ describe('Ticket Service - CRUD Operations', () => {
       expect(result.status).toBe(TicketStatus.OPEN);
     });
 
+    it('should ignore manually typed project names instead of writing them to uuid project_id', async () => {
+      const payload: CreateTicketPayload = {
+        source: TicketSource.MANUAL,
+        title: 'Manual ticket after DR lookup miss',
+        ticket_type: TicketType.MAINTENANCE,
+        project_id: 'Tembisa POP1',
+      };
+
+      const mockCreatedTicket = {
+        id: '123e4567-e89b-12d3-a456-426614174999',
+        ticket_uid: 'VF-20260527-001',
+        source: payload.source,
+        title: payload.title,
+        ticket_type: payload.ticket_type,
+        priority: TicketPriority.NORMAL,
+        status: TicketStatus.OPEN,
+        project_id: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      vi.mocked(queryOne).mockImplementation(async (sql: string) => {
+        if (sql.includes('maintenance_ticket_sequences')) return { last_sequence: 1 };
+        if (sql.includes('SELECT id, name FROM teams')) return null;
+        if (sql.includes('INSERT INTO maintenance_tickets')) return mockCreatedTicket;
+        return null;
+      });
+
+      const result = await createTicket(payload);
+
+      const teamLookupCall = vi.mocked(queryOne).mock.calls.find(
+        (c) => typeof c[0] === 'string' && (c[0] as string).includes('SELECT id, name FROM teams')
+      );
+      expect(teamLookupCall?.[1]?.[1]).toBeNull();
+
+      const insertCall = vi.mocked(queryOne).mock.calls.find(
+        (c) => typeof c[0] === 'string' && (c[0] as string).includes('INSERT INTO maintenance_tickets')
+      );
+      expect(insertCall).toBeDefined();
+      // values[10] maps to maintenance_tickets.project_id
+      expect(insertCall?.[1]?.[10]).toBeNull();
+      expect(result).toEqual(mockCreatedTicket);
+    });
+
     it('should reject ticket creation without required fields', async () => {
       // 🟢 WORKING: Test validation for missing required fields
       const invalidPayload = {

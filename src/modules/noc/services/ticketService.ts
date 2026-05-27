@@ -287,6 +287,18 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
     }
   }
 
+  // Project field is a UUID FK. The manual form allows users to type a
+  // project name when DR lookup fails; do not pass that display text into SQL
+  // because Postgres raises 22P02 (invalid input syntax for uuid).
+  const normalizedProjectId = payload.project_id && isValidUUID(payload.project_id)
+    ? payload.project_id
+    : null;
+  if (payload.project_id && !normalizedProjectId) {
+    logger.warn('Invalid project_id for ticket — project link left null', {
+      project_id: payload.project_id,
+    });
+  }
+
   // Resolve pole_number → pole_id (UUID). The INSERT below maps
   // payload.pole_number into the pole_id column, which is a uuid; passing
   // a human-readable pole reference like "MAM.P.B605" raises 22P02.
@@ -385,7 +397,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
            (contractor_id IS NULL) DESC,
            name
          LIMIT 1`,
-        [payload.ticket_type, payload.project_id || null]
+        [payload.ticket_type, normalizedProjectId]
       );
       if (team) {
         payload.assigned_team_id = team.id;
@@ -393,7 +405,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
         status = TicketStatus.ASSIGNED;
         logger.info('Auto-assigned ticket to discipline team', {
           discipline: payload.ticket_type,
-          project_id: payload.project_id || null,
+          project_id: normalizedProjectId,
           team_id: team.id,
           team_name: team.name,
         });
@@ -424,7 +436,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       priority,
       status,
       payload.dr_number || null,
-      payload.project_id || null,
+      normalizedProjectId,
       payload.zone_id || null,
       resolvedPoleId,
       payload.pon_number || null,

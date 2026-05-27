@@ -1,8 +1,8 @@
 /**
  * DR Lookup Service Tests
  *
- * Testing DR number lookup from SOW (onemap.drops) module with single
- * JOINed query that returns project details inline.
+ * Testing DR number lookup from the current FibreFlow drops source with a
+ * fallback to legacy onemap.drops and a JOINed project lookup.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -43,6 +43,10 @@ type DRRow = {
   current_status: string | null;
   project_name: string | null;
   project_code: string | null;
+  municipality: string | null;
+  cable_type: string | null;
+  cable_length: string | null;
+  ont_serial: string | null;
 };
 
 function makeRow(overrides: Partial<DRRow> = {}): DRRow {
@@ -58,6 +62,10 @@ function makeRow(overrides: Partial<DRRow> = {}): DRRow {
     current_status: 'installed',
     project_name: 'Cape Town Fiber Rollout 2024',
     project_code: 'CT-2024',
+    municipality: 'City of Cape Town',
+    cable_type: 'drop',
+    cable_length: '25m',
+    ont_serial: 'ALCL123456',
     ...overrides,
   };
 }
@@ -73,9 +81,18 @@ describe('DR Lookup Service', () => {
   });
 
   describe('lookupDR - Valid DR Number', () => {
-    it('should lookup a valid DR number and return complete details', async () => {
-      const drNumber = 'DR-2024-001';
-      vi.mocked(queryOne).mockResolvedValueOnce(makeRow({ dr_number: drNumber }));
+    it('should lookup a valid DR number from public.drops and return complete details', async () => {
+      const drNumber = 'DR2598903';
+      vi.mocked(queryOne).mockResolvedValueOnce(makeRow({
+        dr_number: drNumber,
+        project_id: '7d8b94d6-8e5a-4dbb-9ede-69ce3884e004',
+        pon_code: '192',
+        zone_code: '17',
+        current_status: 'planned',
+        project_name: 'Thembisa POP 1',
+        project_code: 'PRJ-1770227968561',
+        ont_serial: 'ALCLB48E9DE0',
+      }));
 
       const result = await lookupDR(drNumber);
 
@@ -83,17 +100,18 @@ describe('DR Lookup Service', () => {
       expect(result.data).toBeDefined();
       expect(result.data?.dr_number).toBe(drNumber);
       expect(result.data?.pole_number).toBe('POLE-123');
-      expect(result.data?.pon_number).toBe(5);
-      expect(result.data?.zone_number).toBe(2);
-      expect(result.data?.project_id).toBe('proj-uuid-123');
-      expect(result.data?.project_name).toBe('Cape Town Fiber Rollout 2024');
+      expect(result.data?.pon_number).toBe(192);
+      expect(result.data?.zone_number).toBe(17);
+      expect(result.data?.project_id).toBe('7d8b94d6-8e5a-4dbb-9ede-69ce3884e004');
+      expect(result.data?.project_name).toBe('Thembisa POP 1');
       expect(result.data?.address).toBe('123 Main Street, Cape Town');
+      expect(result.data?.ont_serial).toBe('ALCLB48E9DE0');
 
-      // Single JOINed query — no separate project lookup
+      // Single normalized query checks public.drops first, then legacy onemap.drops.
       expect(queryOne).toHaveBeenCalledTimes(1);
       expect(queryOne).toHaveBeenNthCalledWith(
         1,
-        expect.stringContaining('SELECT'),
+        expect.stringContaining('FROM public.drops'),
         expect.arrayContaining([drNumber])
       );
     });
