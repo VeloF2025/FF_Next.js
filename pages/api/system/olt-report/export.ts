@@ -19,6 +19,9 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
 
 type QueryParam = string | string[] | undefined;
 type SqlParam = string | string[];
@@ -28,8 +31,15 @@ interface OltExportRow {
   project: string | null;
   olt_serial: string | null;
   wrong_onemap_serial: string | null;
+  zone_no: number | null;
+  pon_no: number | null;
+  pole_number: string | null;
+  latitude: number | string | null;
+  longitude: number | string | null;
   fix_status: string | null;
+  ticket_id: string | null;
   ticket_uid: string | null;
+  ticket_link: string | null;
   installer_name: string | null;
   onemap_install_team: string | null;
   wa_activation_team: string | null;
@@ -151,14 +161,27 @@ function investigationSummary(context: string | null) {
   return '';
 }
 
+// Column indexes that carry a clickable hyperlink (0-based; data starts at sheet row 1).
+const TICKET_COL = 9; // "Ticket" → internal ticket page
+const TICKET_LINK_COL = 10; // "Ticket Link" → public shareable page
+
+function gpsCoordinates(lat: number | string | null, lng: number | string | null): string {
+  return lat != null && lng != null ? `${lat}, ${lng}` : '';
+}
+
 function toExcel(rows: OltExportRow[], filters: Record<string, string>) {
   const headers = [
     'DR Number',
     'Project',
     'OLT Serial',
     '1Map Serial',
+    'Zone',
+    'PON',
+    'POLE',
+    'GPS coordinates',
     'Status',
     'Ticket',
+    'Ticket Link',
     'Installer',
     '1Map Install Team',
     'WhatsApp Activation Team',
@@ -182,8 +205,13 @@ function toExcel(rows: OltExportRow[], filters: Record<string, string>) {
     row.project || '',
     row.olt_serial || '',
     row.wrong_onemap_serial || '',
+    row.zone_no ?? '',
+    row.pon_no ?? '',
+    row.pole_number || '',
+    gpsCoordinates(row.latitude, row.longitude),
     row.fix_status || '',
     row.ticket_uid || '',
+    row.ticket_link || '',
     row.installer_name || '',
     row.onemap_install_team || '',
     row.wa_activation_team || '',
@@ -205,6 +233,22 @@ function toExcel(rows: OltExportRow[], filters: Record<string, string>) {
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
   worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(14, Math.min(34, header.length + 6)) }));
+
+  // Make the Ticket (internal) and Ticket Link (shareable) cells clickable in Excel.
+  rows.forEach((row, i) => {
+    const sheetRow = i + 1; // +1 for the header row
+    if (row.ticket_id && row.ticket_uid) {
+      const ref = XLSX.utils.encode_cell({ r: sheetRow, c: TICKET_COL });
+      const cell = worksheet[ref];
+      if (cell) cell.l = { Target: `${APP_URL}/noc/tickets/${row.ticket_id}`, Tooltip: 'Open ticket in FibreFlow (sign-in required)' };
+    }
+    if (row.ticket_link) {
+      const ref = XLSX.utils.encode_cell({ r: sheetRow, c: TICKET_LINK_COL });
+      const cell = worksheet[ref];
+      if (cell) cell.l = { Target: row.ticket_link, Tooltip: 'Open shareable ticket link' };
+    }
+  });
+
   XLSX.utils.book_append_sheet(workbook, worksheet, 'OLT Export');
 
   const filterRows = [
@@ -247,7 +291,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.escalated_at,
         r.resolved_at,
         r.created_at,
+        mt.id as ticket_id,
         mt.ticket_uid,
+        d.zone_no,
+        d.pon_no,
+        d.pole_number,
+        d.latitude,
+        d.longitude,
         i.filename as import_filename,
         i.imported_at as import_date,
         COALESCE(i.project, p.project_name) as project,
@@ -273,6 +323,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `, filters.params);
 
     const rows = result.rows as OltExportRow[];
+
+    // Mint (or reuse) a public shareable link for every linked ticket — this is an
+    // authenticated, on-demand server-side export, so minting here is intentional.
+    const shareUrls = await getOrCreateShareUrls(rows.map((r) => r.ticket_id));
+    for (const row of rows) {
+      row.ticket_link = row.ticket_id ? shareUrls.get(row.ticket_id) ?? null : null;
+    }
+
     const status = 'needs_investigation';
     const filterSummary: Record<string, string> = {
       Status: status,
