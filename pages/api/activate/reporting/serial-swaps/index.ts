@@ -19,6 +19,7 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
 import type {
   SerialSwapReportResponse,
   SerialSwapRecord,
@@ -172,8 +173,12 @@ async function handler(
         u.project,
         d.zone_no,
         d.pon_no,
+        d.pole_number,
+        d.latitude,
+        d.longitude,
         u.ont_serial_scanned as ont_serial,
         u.ups_serial_scanned as ups_serial,
+        u.onemap_ont_serial as onemap_serial,
         u.serial_swap_details as swap_details,
         u.serial_swap_status as swap_status,
         u.serial_swap_detected_at as detected_at,
@@ -181,10 +186,23 @@ async function handler(
         u.serial_swap_corrected_by as corrected_by,
         q.submitted_by as technician_name,
         q.sender_phone as technician_phone,
+        mt.id as ticket_id,
+        mt.ticket_uid,
         EXTRACT(EPOCH FROM (NOW() - u.serial_swap_detected_at)) / 86400 as days_pending
       FROM dr_photo_unified_reviews u
-      LEFT JOIN drops d ON u.drop_number = d.drop_number
+      LEFT JOIN (
+        SELECT DISTINCT ON (drop_number) drop_number, zone_no, pon_no, pole_number, latitude, longitude
+        FROM drops
+        ORDER BY drop_number, updated_at DESC NULLS LAST
+      ) d ON u.drop_number = d.drop_number
       LEFT JOIN qa_photo_reviews q ON u.drop_number = q.drop_number
+      LEFT JOIN LATERAL (
+        SELECT id, ticket_uid
+        FROM maintenance_tickets
+        WHERE dr_number = u.drop_number
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) mt ON true
       WHERE ${whereClause}
       ORDER BY
         CASE WHEN u.serial_swap_status = 'pending_correction' THEN 0 ELSE 1 END,
@@ -213,20 +231,36 @@ async function handler(
 
     // Handle CSV export
     if (format === 'csv') {
+      // Raw rows carry 1Map serial / pole / GPS / ticket not on the typed record
+      const rawByDrop = new Map(recordsResult.rows.map((row) => [String(row.drop_number), row]));
+      // Shareable NOC links for every linked ticket (batched, mints if missing)
+      const shareUrls = await getOrCreateShareUrls(recordsResult.rows.map((r) => r.ticket_id));
+      const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
       const csvRows = [
-        ['DR Number', 'Project', 'ONT Serial', 'UPS Serial', 'Swap Details', 'Status', 'Detected At', 'Days Pending'].join(','),
-        ...records.map((r) =>
-          [
+        ['DR Number', 'Project', '1Map Serial', 'Zone', 'PON', 'Pole', 'GPS Coordinates', 'ONT Serial', 'UPS Serial', 'Swap Details', 'Status', 'Ticket Number', 'Ticket Link', 'Detected At', 'Days Pending'].join(','),
+        ...records.map((r) => {
+          const raw = rawByDrop.get(r.drop_number);
+          const lat = raw?.latitude;
+          const lng = raw?.longitude;
+          return [
             r.drop_number,
             r.project || '',
+            raw?.onemap_serial || '',
+            r.zone_no ?? '',
+            r.pon_no ?? '',
+            raw?.pole_number ?? '',
+            q(lat != null && lng != null ? `${lat}, ${lng}` : ''),
             r.ont_serial || '',
             r.ups_serial || '',
-            `"${(r.swap_details || '').replace(/"/g, '""')}"`,
+            q(r.swap_details || ''),
             r.swap_status,
+            raw?.ticket_uid ?? '',
+            raw?.ticket_id ? shareUrls.get(raw.ticket_id) ?? '' : '',
             r.detected_at?.split('T')[0] || '',
             r.days_pending,
-          ].join(',')
-        ),
+          ].join(',');
+        }),
       ];
 
       res.setHeader('Content-Type', 'text/csv');

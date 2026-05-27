@@ -1159,6 +1159,16 @@ export interface OfflineDeviceRecord {
   installation_date: string | null;
   /** Revenue 30-day average */
   revenue_30day_avg: number | null;
+  /** Latitude (from offline_devices) */
+  latitude: number | null;
+  /** Longitude (from offline_devices) */
+  longitude: number | null;
+  /** ONT serial recorded in 1Map (from dr_photo_unified_reviews) */
+  onemap_serial: string | null;
+  /** NOC ticket UID, when a ticket exists for this DR */
+  ticket_uid: string | null;
+  /** Public shareable NOC ticket link — only present when already shared */
+  ticket_link: string | null;
 }
 
 /**

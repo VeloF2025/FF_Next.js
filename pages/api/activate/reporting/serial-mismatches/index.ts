@@ -25,6 +25,7 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
 import type {
   SerialMismatchReportResponse,
   SerialMismatchRecord,
@@ -172,6 +173,9 @@ async function handler(
         o.drop_number,
         o.zone,
         o.planned_pon as pon,
+        o.pole_number,
+        o.latitude,
+        o.longitude,
         o.address,
         o.serial_number as current_serial,
         o.expected_serial as original_serial,
@@ -182,6 +186,7 @@ async function handler(
         o.mismatch_notes as notes,
         o.mismatch_ticket_id as ticket_id,
         t.status as ticket_status,
+        t.ticket_uid as ticket_uid,
         e.activation_date,
         e.team as installation_team,
         o.last_inform_date,
@@ -299,21 +304,36 @@ async function handler(
 
     // Handle CSV export
     if (format === 'csv') {
+      // Raw rows carry pole/GPS/ticket_uid not present on the typed record
+      const rawById = new Map(recordsResult.rows.map((row) => [String(row.id), row]));
+      // Shareable NOC links for every linked ticket (batched, mints if missing)
+      const shareUrls = await getOrCreateShareUrls(records.map((r) => r.ticket_id));
+      const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
       const csvRows = [
-        ['DR Number', 'Zone', 'Team', 'Original Serial', 'Current Serial', 'Status', 'Days Offline', 'Down Reason', 'Activation Date'].join(','),
-        ...records.map((r) =>
-          [
+        ['DR Number', 'Zone', 'PON', 'Pole', 'GPS Coordinates', 'Team', 'Original Serial', 'Current Serial', '1Map Serial', 'Status', 'Ticket Number', 'Ticket Link', 'Days Offline', 'Down Reason', 'Activation Date'].join(','),
+        ...records.map((r) => {
+          const raw = rawById.get(r.id);
+          const lat = raw?.latitude;
+          const lng = raw?.longitude;
+          return [
             r.drop_number,
             r.zone ?? '',
+            r.pon ?? '',
+            raw?.pole_number ?? '',
+            q(lat != null && lng != null ? `${lat}, ${lng}` : ''),
             r.installation_team ?? 'Unknown',
             r.expected_serial,
             r.current_serial,
+            r.serial_comparison?.onemap ?? '',
             r.status,
+            raw?.ticket_uid ?? '',
+            r.ticket_id ? shareUrls.get(r.ticket_id) ?? '' : '',
             r.days_offline,
-            `"${(r.down_reason ?? '').replace(/"/g, '""')}"`,
+            q(r.down_reason ?? ''),
             r.activation_date ?? '',
-          ].join(',')
-        ),
+          ].join(',');
+        }),
       ];
 
       res.setHeader('Content-Type', 'text/csv');

@@ -109,29 +109,41 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
     const headers = [
       'DR Number',
       'Serial',
+      '1Map Serial',
       'Zone',
+      'PON',
       'Address',
       'Pole',
+      'GPS Coordinates',
       'Down Reason',
       'Days Offline',
       'Bucket',
       'Match Status',
       'Serial Mismatch',
       'Report Date',
+      'Ticket Number',
+      'Ticket Link',
     ];
+
+    const csvCell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
     const rows = data.records.map((r) => [
       r.drop_number,
       r.serial_number,
+      r.onemap_serial || '',
       r.zone || '',
-      r.address || '',
+      r.planned_pon || '',
+      csvCell(r.address || ''),
       r.pole_number || '',
+      csvCell(r.latitude != null && r.longitude != null ? `${r.latitude}, ${r.longitude}` : ''),
       r.last_down_reason,
       r.days_since_last_inform,
       r.offline_bucket,
       r.match_status,
       r.serial_mismatch ? 'Yes' : 'No',
       r.report_date,
+      r.ticket_uid || '',
+      r.ticket_link || '',
     ]);
 
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');

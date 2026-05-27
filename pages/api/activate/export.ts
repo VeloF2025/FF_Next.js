@@ -20,6 +20,7 @@ import * as XLSX from 'xlsx';
 import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
+import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
 
 interface ExportRow {
   drop_number: string;
@@ -28,6 +29,15 @@ interface ExportRow {
   photo_count: number;
   steps_completed: number;
   is_complete: boolean;
+  // Network location (from drops) — sit to the right of the 1Map serial
+  onemap_serial: string | null;
+  zone: string | number | null;
+  pon: string | number | null;
+  pole: string | null;
+  gps: string;
+  // NOC ticket + shareable link
+  ticket_uid: string | null;
+  ticket_link: string | null;
   // Step details
   step_01_house_photo: boolean;
   step_02_cable_from_pole: boolean;
@@ -116,11 +126,18 @@ function toExcel(rows: ExportRow[]): Buffer {
     'Feedback Sent',
     'ONT Serial',
     'UPS Serial',
+    '1Map Serial',
+    'Zone',
+    'PON',
+    'Pole',
+    'GPS Coordinates',
     'Sender Phone',
     'Sender Name',
     'Assigned Agent',
     'Activation Date',
     'Activated',
+    'Ticket Number',
+    'Ticket Link',
   ];
 
   // Convert rows to array of arrays
@@ -145,11 +162,18 @@ function toExcel(rows: ExportRow[]): Buffer {
     row.feedback_sent ? 'Yes' : 'No',
     row.ont_serial_scanned || '',
     row.ups_serial_scanned || '',
+    row.onemap_serial || '',
+    row.zone ?? '',
+    row.pon ?? '',
+    row.pole || '',
+    row.gps || '',
     row.sender_phone || '',
     row.sender_name || '',
     row.assigned_agent || '',
     row.activation_date || '',
     row.activated ? 'Yes' : 'No',
+    row.ticket_uid || '',
+    row.ticket_link || '',
   ]);
 
   // Create worksheet
@@ -177,11 +201,18 @@ function toExcel(rows: ExportRow[]): Buffer {
     { wch: 10 }, // Feedback Sent
     { wch: 18 }, // ONT Serial
     { wch: 18 }, // UPS Serial
+    { wch: 18 }, // 1Map Serial
+    { wch: 8 }, // Zone
+    { wch: 8 }, // PON
+    { wch: 14 }, // Pole
+    { wch: 22 }, // GPS Coordinates
     { wch: 15 }, // Sender Phone
     { wch: 15 }, // Sender Name
     { wch: 15 }, // Assigned Agent
     { wch: 12 }, // Activation Date
     { wch: 10 }, // Activated
+    { wch: 16 }, // Ticket Number
+    { wch: 48 }, // Ticket Link
   ];
 
   // Create workbook
@@ -304,13 +335,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         -- Serials (scanned from photos)
         upr.ont_serial_scanned,
         upr.ups_serial_scanned,
+        -- 1Map ONT serial + network location (from drops)
+        upr.onemap_ont_serial as onemap_serial,
+        d.zone_no as zone,
+        d.pon_no as pon,
+        d.pole_number as pole,
+        COALESCE(d.latitude, upr.latitude, oes.latitude) as latitude,
+        COALESCE(d.longitude, upr.longitude, oes.longitude) as longitude,
         -- Sender info from unified reviews or qa_photo_reviews
         COALESCE(upr.sender_phone, qpr.sender_phone) as sender_phone,
         qpr.user_name as sender_name,
         qpr.assigned_agent,
         -- OES activation data
         oes.activation_date::TEXT as activation_date,
-        CASE WHEN oes.drop_number IS NOT NULL THEN true ELSE false END as activated
+        CASE WHEN oes.drop_number IS NOT NULL THEN true ELSE false END as activated,
+        -- Latest NOC ticket for this DR (if any)
+        mt.id as ticket_id,
+        mt.ticket_uid
       FROM dr_photo_unified_reviews upr
       LEFT JOIN (
         SELECT DISTINCT ON (drop_number) *
@@ -318,17 +359,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ORDER BY drop_number, created_at DESC
       ) qpr ON qpr.drop_number = upr.drop_number
       LEFT JOIN oes_activations oes ON oes.drop_number = upr.drop_number
+      LEFT JOIN (
+        SELECT DISTINCT ON (drop_number) drop_number, zone_no, pon_no, pole_number, latitude, longitude
+        FROM drops
+        ORDER BY drop_number, updated_at DESC NULLS LAST
+      ) d ON d.drop_number = upr.drop_number
+      LEFT JOIN LATERAL (
+        SELECT id, ticket_uid
+        FROM maintenance_tickets
+        WHERE dr_number = upr.drop_number
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) mt ON true
       ${whereClause}
       ORDER BY upr.submitted_date DESC NULLS LAST, upr.created_at DESC
     `;
 
     const result = await pool.query(query, params);
 
+    // Resolve shareable NOC links for every linked ticket (batched, mints if missing)
+    const shareUrls = await getOrCreateShareUrls(result.rows.map((r) => r.ticket_id));
+
     // Transform rows with calculated fields
     const rows: ExportRow[] = result.rows.map((row) => ({
       ...row,
       steps_completed: countCompletedSteps(row),
       is_complete: isComplete(row),
+      gps:
+        row.latitude != null && row.longitude != null
+          ? `${row.latitude}, ${row.longitude}`
+          : '',
+      ticket_link: row.ticket_id ? shareUrls.get(row.ticket_id) ?? '' : '',
     }));
 
     log.info(`Exporting ${rows.length} rows`, {
