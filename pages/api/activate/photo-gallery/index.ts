@@ -56,7 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           (photo_result->>'vlm_predicted_step')::int AS step,
           COUNT(*) AS photo_count
         FROM photo_data
-        WHERE (photo_result->>'vlm_predicted_step')::int BETWEEN 1 AND 10
+        WHERE (photo_result->>'vlm_predicted_step')::int BETWEEN 1 AND 12
         GROUP BY step
         ORDER BY step
       `);
@@ -69,8 +69,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     }
 
     const step = parseInt(String(stepParam), 10);
-    if (isNaN(step) || step < 1 || step > 10) {
-      return apiResponse.error(res, 'VALIDATION_ERROR' as never, 'Step must be between 1 and 10');
+    if (isNaN(step) || step < 1 || step > 12) {
+      return apiResponse.error(res, 'VALIDATION_ERROR' as never, 'Step must be between 1 and 12');
     }
 
     const result = await pool.query<{
