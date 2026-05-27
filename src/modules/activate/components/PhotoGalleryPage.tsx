@@ -11,7 +11,10 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, XCircle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import {
+  CheckCircle2, XCircle, ChevronLeft, ChevronRight,
+  Loader2, RefreshCw, Save,
+} from 'lucide-react';
 
 const STEP_LABELS: Record<number, string> = {
   1: 'House Photo',
@@ -24,6 +27,8 @@ const STEP_LABELS: Record<number, string> = {
   8: 'Final Installation',
   9: 'Green Lights',
   10: 'Signature',
+  11: 'Dome Joint Open',
+  12: 'Dome Joint Closed',
 };
 
 interface GalleryPhoto {
@@ -50,6 +55,10 @@ export default function PhotoGalleryPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'single'>('grid');
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
+  const [savedPhotoIds, setSavedPhotoIds] = useState<Set<string>>(new Set());
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ saved: number; good: number; bad: number } | null>(null);
 
   // Load step counts on mount
   useEffect(() => {
@@ -102,9 +111,60 @@ export default function PhotoGalleryPage() {
   const goodCount = photos.filter((p) => decisions[photoKey(p)] === 'good').length;
   const badCount = photos.filter((p) => decisions[photoKey(p)] === 'bad').length;
   const undecidedCount = photos.length - goodCount - badCount;
+  const unsavedGoodCount = photos.filter(
+    (p) => decisions[photoKey(p)] === 'good' && !savedPhotoIds.has(photoKey(p))
+  ).length;
+  const unsavedBadCount = photos.filter(
+    (p) => decisions[photoKey(p)] === 'bad' && !savedPhotoIds.has(photoKey(p))
+  ).length;
+  const unsavedDecisionCount = unsavedGoodCount + unsavedBadCount;
 
   const goodPhotos = photos.filter((p) => decisions[photoKey(p)] === 'good');
   const badPhotos = photos.filter((p) => decisions[photoKey(p)] === 'bad');
+
+  const handleSave = async () => {
+    const decisionsToSave = photos
+      .filter((p) => decisions[photoKey(p)] !== null && !savedPhotoIds.has(photoKey(p)))
+      .map((p) => ({
+        drNumber: p.drNumber,
+        filename: p.filename,
+        url: p.url,
+        stepNumber: activeStep,
+        stepName: STEP_LABELS[activeStep] ?? `Step ${activeStep}`,
+        decision: decisions[photoKey(p)] as 'good' | 'bad',
+        confidence: p.confidence,
+      }));
+
+    if (decisionsToSave.length === 0) return;
+
+    setSaving(true);
+    setShowConfirmModal(false);
+    try {
+      const res = await fetch('/api/activate/photo-gallery/save-decisions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decisions: decisionsToSave }),
+      });
+      const data = await res.json() as {
+        success: boolean;
+        data?: { saved: number; skipped: number; good: number; bad: number };
+      };
+      if (data.success && data.data) {
+        const { saved, good, bad } = data.data;
+        setSavedPhotoIds((prev) => {
+          const next = new Set(prev);
+          decisionsToSave.forEach((d) => next.add(`${d.drNumber}__${d.filename}`));
+          return next;
+        });
+        setSaveResult({ saved, good, bad });
+        setTimeout(() => setSaveResult(null), 5000);
+      }
+    } catch {
+      // silent — user can retry
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const copyResults = () => {
     const lines = [
@@ -148,14 +208,25 @@ export default function PhotoGalleryPage() {
                 Single
               </button>
             </div>
-            {/* Copy results */}
-            {(goodCount > 0 || badCount > 0) && (
+            {/* Save to VLM Learning */}
+            {unsavedDecisionCount > 0 && (
               <button
-                onClick={copyResults}
-                className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-600"
+                onClick={() => setShowConfirmModal(true)}
+                disabled={saving}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
               >
-                Copy Results ({goodCount}✅ {badCount}❌)
+                {saving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Save {unsavedDecisionCount} decision{unsavedDecisionCount !== 1 ? 's' : ''}
               </button>
+            )}
+            {saveResult && (
+              <span className="text-sm text-green-400 animate-pulse">
+                ✓ Saved {saveResult.saved} ({saveResult.good}✅ {saveResult.bad}❌)
+              </span>
             )}
           </div>
         </div>
@@ -284,6 +355,13 @@ export default function PhotoGalleryPage() {
                         ) : (
                           <XCircle className="h-4 w-4 text-white" />
                         )}
+                      </div>
+                    )}
+
+                    {/* Saved indicator */}
+                    {savedPhotoIds.has(key) && (
+                      <div className="absolute top-1 left-1 rounded-full bg-blue-700/90 p-0.5">
+                        <Save className="h-3 w-3 text-white" />
                       </div>
                     )}
 
@@ -439,6 +517,40 @@ export default function PhotoGalleryPage() {
           )}
         </div>
       </div>
+
+      {/* Save confirmation modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-sm rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-xl">
+            <h3 className="mb-2 text-base font-semibold text-white">
+              Save to VLM Learning
+            </h3>
+            <p className="mb-4 text-sm text-gray-400">
+              Save {unsavedDecisionCount} decision{unsavedDecisionCount !== 1 ? 's' : ''} for{' '}
+              <span className="text-white">Step {activeStep} — {STEP_LABELS[activeStep]}</span>?
+              <br />
+              <span className="text-green-400">{unsavedGoodCount} good</span>
+              {' · '}
+              <span className="text-red-400">{unsavedBadCount} bad</span>
+              {' examples will train the VLM for auto-QA and PWA.'}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 rounded-lg border border-gray-700 py-2 text-sm text-gray-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleSave()}
+                className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500"
+              >
+                Save Examples
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
