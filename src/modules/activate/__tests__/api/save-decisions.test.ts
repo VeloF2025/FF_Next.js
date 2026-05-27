@@ -107,6 +107,17 @@ describe('POST /api/activate/photo-gallery/save-decisions', () => {
     expect(sqls.some((s) => /INSERT INTO vlm_corrections[\s\S]*source_id/i.test(s))).toBe(false);
   });
 
+  it('skips items with out-of-range confidence (NUMERIC(4,3) guard)', async () => {
+    noDuplicateDb();
+    const { res, captured } = makeRes();
+    await handler(makeReq({ decisions: [
+      { drNumber: 'DR1', filename: 'p.jpg', url: VALID_URL, stepNumber: 6, decision: 'good', confidence: 42 },
+    ] }), res);
+    expect(captured.statusCode).toBe(200);
+    expect(captured.body?.data).toMatchObject({ saved: 0 });
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
   it('marks a bad decision as reject', async () => {
     noDuplicateDb();
     const { res, captured } = makeRes();

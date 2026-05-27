@@ -71,6 +71,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     if (!d.drNumber || !d.filename || !d.url || !d.stepNumber || !d.decision) continue;
     if (d.stepNumber < 1 || d.stepNumber > 12) continue;
     if (d.decision !== 'good' && d.decision !== 'bad') continue;
+    // confidence lands in NUMERIC(4,3); reject out-of-range so a bad value can't
+    // throw mid-loop after the first INSERT and leave a split write.
+    if (typeof d.confidence !== 'number' || !Number.isFinite(d.confidence) || d.confidence < 0 || d.confidence > 1) continue;
     if (!isAllowedPhotoUrl(d.url)) {
       log.warn('[SaveDecisions] Rejected non-allowlisted photo url', { url: d.url }, 'PhotoGallery');
       continue;
