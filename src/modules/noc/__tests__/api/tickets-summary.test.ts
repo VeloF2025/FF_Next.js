@@ -52,8 +52,8 @@ describe('GET /api/noc/tickets/summary — assigned_team_id filter', () => {
     expect(response.status).toBe(200);
     const call = teamFilterCall();
     expect(call).toBeDefined();
-    expect(call![0]).toContain('assigned_team_id = $1');
-    expect(call![1]).toEqual(['team-a']);
+    expect(call?.[0]).toContain('assigned_team_id = $1');
+    expect(call?.[1]).toEqual(['team-a']);
   });
 
   it('builds an IN clause for multiple team ids (multi-team filter)', async () => {
@@ -64,8 +64,8 @@ describe('GET /api/noc/tickets/summary — assigned_team_id filter', () => {
     expect(response.status).toBe(200);
     const call = teamFilterCall();
     expect(call).toBeDefined();
-    expect(call![0]).toContain('assigned_team_id IN ($1, $2)');
-    expect(call![1]).toEqual(['team-a', 'team-b']);
+    expect(call?.[0]).toContain('assigned_team_id IN ($1, $2)');
+    expect(call?.[1]).toEqual(['team-a', 'team-b']);
   });
 
   it('omits the team clause entirely when no team id is provided', async () => {
