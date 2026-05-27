@@ -113,6 +113,7 @@ interface BuildWorkbookV2Opts extends BuildWorkbookBaseOpts {
   lifecycleV2: true;
   ppNotFoundRows: NotFoundRow[];
   ppLinkedAwaitingRows: LinkedAwaitingRow[];
+  ppActivatedRows: LinkedAwaitingRow[];
   ftDisputeDefiniteRows: FtDisputeDefiniteRow[];
   ftDisputeLifecycleRows: FtDisputeLifecycleRow[];
 }
@@ -246,12 +247,13 @@ export async function buildOesWorkbook(opts: BuildWorkbookOpts): Promise<Buffer>
     const {
       ppNotFoundRows,
       ppLinkedAwaitingRows,
+      ppActivatedRows,
       ftDisputeDefiniteRows,
       ftDisputeLifecycleRows,
     } = opts;
 
     const sheetNotFound   = addPpNotFoundSheet(wb, ppNotFoundRows);
-    const sheetLinked     = addPpLinkedAwaitingSheet(wb, ppLinkedAwaitingRows);
+    const sheetLinked     = addPpLinkedAwaitingSheet(wb, ppLinkedAwaitingRows, ppActivatedRows);
     const sheetDefinite   = addFtDisputeDefiniteSheet(wb, ftDisputeDefiniteRows, ticketMap);
     const sheetLifecycle  = addFtDisputeLifecycleSheet(wb, ftDisputeLifecycleRows, ticketMap);
     ppAndDisputeSheets = [sheetNotFound, sheetLinked, sheetDefinite, sheetLifecycle];

@@ -124,11 +124,43 @@ export async function loadPpLinkedAwaitingRows(): Promise<LinkedAwaitingRow[]> {
     JOIN latest_batch_per_project lb
       ON p.project = lb.project AND p.import_batch_id = lb.bid
     WHERE (
-      p.resolution_status IN ('located_oes', 'located_unified', 'located_onemap')
+      -- Actual oes_pp_data status values are located_1map / located_local /
+      -- located_unified. (located_oes / located_onemap kept for forward-compat.)
+      p.resolution_status IN ('located_1map', 'located_local', 'located_unified', 'located_oes', 'located_onemap')
       OR cardinality(p.linked_via) > 0
     )
-      AND p.resolution_status != 'not_found'
+      -- Exclude not_found (own tab) and activated (own highlighted set) so the
+      -- three PP sets stay mutually exclusive — an 'activated' row with a
+      -- populated linked_via must not also land here and double-count the total.
+      AND p.resolution_status NOT IN ('not_found', 'activated')
       AND p.activated_at IS NULL
+    ORDER BY p.project NULLS LAST, p.date_registered NULLS LAST, p.serial_number
+  `);
+  return result.rows;
+}
+
+/**
+ * PP serials from the latest batch that are ALREADY activated but still appear
+ * on Fibertime's pre-provision list (resolution_status = 'activated'). These
+ * should have been removed from the PP list once activated, so they are shown
+ * on the PP — Linked sheet highlighted. They also appear in the FT Dispute tabs;
+ * this is intentional so the PP list reconciles to the full tab count.
+ */
+export async function loadPpActivatedOnListRows(): Promise<LinkedAwaitingRow[]> {
+  const result = await pool.query<LinkedAwaitingRow>(`
+    WITH latest_batch_per_project AS (
+      SELECT project, MAX(import_batch_id) AS bid
+      FROM oes_pp_data
+      WHERE project IS NOT NULL
+      GROUP BY project
+    )
+    SELECT p.project, p.serial_number, p.date_registered::text,
+           p.resolution_status, p.resolved_drop_number, p.resolved_source,
+           COALESCE(p.linked_via, '{}') AS linked_via
+    FROM oes_pp_data p
+    JOIN latest_batch_per_project lb
+      ON p.project = lb.project AND p.import_batch_id = lb.bid
+    WHERE p.resolution_status = 'activated'
     ORDER BY p.project NULLS LAST, p.date_registered NULLS LAST, p.serial_number
   `);
   return result.rows;
