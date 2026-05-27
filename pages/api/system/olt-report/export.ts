@@ -14,7 +14,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
@@ -161,15 +161,23 @@ function investigationSummary(context: string | null) {
   return '';
 }
 
-// Column indexes that carry a clickable hyperlink (0-based; data starts at sheet row 1).
-const TICKET_COL = 9; // "Ticket" → internal ticket page
-const TICKET_LINK_COL = 10; // "Ticket Link" → public shareable page
+// 1-based worksheet column positions for the cells rendered as clickable links.
+const GPS_COL = 8; // "GPS coordinates" → Google Maps
+const TICKET_COL = 10; // "Ticket" → internal ticket page
+const TICKET_LINK_COL = 11; // "Ticket Link" → public shareable page
+
+// Excel's default hyperlink look: blue + underlined.
+const LINK_FONT: Partial<ExcelJS.Font> = { color: { argb: 'FF2563EB' }, underline: true };
 
 function gpsCoordinates(lat: number | string | null, lng: number | string | null): string {
   return lat != null && lng != null ? `${lat}, ${lng}` : '';
 }
 
-function toExcel(rows: OltExportRow[], filters: Record<string, string>) {
+function gpsMapsUrl(lat: number | string | null, lng: number | string | null): string | null {
+  return lat != null && lng != null ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+}
+
+async function toExcel(rows: OltExportRow[], filters: Record<string, string>): Promise<Buffer> {
   const headers = [
     'DR Number',
     'Project',
@@ -200,67 +208,76 @@ function toExcel(rows: OltExportRow[], filters: Record<string, string>) {
     'UPS Swap',
   ];
 
-  const data = rows.map((row) => [
-    row.drop_number || '',
-    row.project || '',
-    row.olt_serial || '',
-    row.wrong_onemap_serial || '',
-    row.zone_no ?? '',
-    row.pon_no ?? '',
-    row.pole_number || '',
-    gpsCoordinates(row.latitude, row.longitude),
-    row.fix_status || '',
-    row.ticket_uid || '',
-    row.ticket_link || '',
-    row.installer_name || '',
-    row.onemap_install_team || '',
-    row.wa_activation_team || '',
-    row.detection_source || '',
-    investigationSummary(row.investigation_context),
-    row.import_filename || '',
-    formatDate(row.import_date),
-    formatDate(row.created_at),
-    formatDate(row.fix_attempted_at),
-    formatDate(row.resolved_at),
-    formatDate(row.escalated_at),
-    row.resolution_type || '',
-    row.resolution_notes || '',
-    row.fix_result || '',
-    row.fix_old_value || '',
-    row.has_ups_swap ? 'Yes' : 'No',
-  ]);
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('OLT Export');
+  sheet.columns = headers.map((header) => ({
+    header,
+    width: Math.max(14, Math.min(40, header.length + 6)),
+  }));
+  sheet.getRow(1).font = { bold: true };
 
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
-  worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(14, Math.min(34, header.length + 6)) }));
+  for (const row of rows) {
+    const added = sheet.addRow([
+      row.drop_number || '',
+      row.project || '',
+      row.olt_serial || '',
+      row.wrong_onemap_serial || '',
+      row.zone_no ?? '',
+      row.pon_no ?? '',
+      row.pole_number || '',
+      gpsCoordinates(row.latitude, row.longitude),
+      row.fix_status || '',
+      row.ticket_uid || '',
+      row.ticket_link || '',
+      row.installer_name || '',
+      row.onemap_install_team || '',
+      row.wa_activation_team || '',
+      row.detection_source || '',
+      investigationSummary(row.investigation_context),
+      row.import_filename || '',
+      formatDate(row.import_date),
+      formatDate(row.created_at),
+      formatDate(row.fix_attempted_at),
+      formatDate(row.resolved_at),
+      formatDate(row.escalated_at),
+      row.resolution_type || '',
+      row.resolution_notes || '',
+      row.fix_result || '',
+      row.fix_old_value || '',
+      row.has_ups_swap ? 'Yes' : 'No',
+    ]);
 
-  // Make the Ticket (internal) and Ticket Link (shareable) cells clickable in Excel.
-  rows.forEach((row, i) => {
-    const sheetRow = i + 1; // +1 for the header row
+    // Ticket → internal FibreFlow ticket page (sign-in required)
     if (row.ticket_id && row.ticket_uid) {
-      const ref = XLSX.utils.encode_cell({ r: sheetRow, c: TICKET_COL });
-      const cell = worksheet[ref];
-      if (cell) cell.l = { Target: `${APP_URL}/noc/tickets/${row.ticket_id}`, Tooltip: 'Open ticket in FibreFlow (sign-in required)' };
+      const cell = added.getCell(TICKET_COL);
+      cell.value = { text: row.ticket_uid, hyperlink: `${APP_URL}/noc/tickets/${row.ticket_id}`, tooltip: 'Open ticket in FibreFlow (sign-in required)' };
+      cell.font = LINK_FONT;
     }
+    // Ticket Link → public shareable page
     if (row.ticket_link) {
-      const ref = XLSX.utils.encode_cell({ r: sheetRow, c: TICKET_LINK_COL });
-      const cell = worksheet[ref];
-      if (cell) cell.l = { Target: row.ticket_link, Tooltip: 'Open shareable ticket link' };
+      const cell = added.getCell(TICKET_LINK_COL);
+      cell.value = { text: row.ticket_link, hyperlink: row.ticket_link, tooltip: 'Open shareable ticket link' };
+      cell.font = LINK_FONT;
     }
-  });
+    // GPS coordinates → Google Maps
+    const mapsUrl = gpsMapsUrl(row.latitude, row.longitude);
+    if (mapsUrl) {
+      const cell = added.getCell(GPS_COL);
+      cell.value = { text: gpsCoordinates(row.latitude, row.longitude), hyperlink: mapsUrl, tooltip: 'Open in Google Maps' };
+      cell.font = LINK_FONT;
+    }
+  }
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'OLT Export');
+  const filterSheet = workbook.addWorksheet('Filters');
+  filterSheet.columns = [{ width: 18 }, { width: 60 }];
+  filterSheet.addRow(['Exported At', new Date().toISOString()]);
+  filterSheet.addRow(['Record Count', String(rows.length)]);
+  for (const [key, value] of Object.entries(filters)) {
+    filterSheet.addRow([key, value || 'All']);
+  }
 
-  const filterRows = [
-    ['Exported At', new Date().toISOString()],
-    ['Record Count', String(rows.length)],
-    ...Object.entries(filters).map(([key, value]) => [key, value || 'All']),
-  ];
-  const filterSheet = XLSX.utils.aoa_to_sheet(filterRows);
-  filterSheet['!cols'] = [{ wch: 18 }, { wch: 60 }];
-  XLSX.utils.book_append_sheet(workbook, filterSheet, 'Filters');
-
-  return Buffer.from(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer as unknown as Buffer;
 }
 
 function safeFilenamePart(value: string) {
@@ -341,7 +358,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       'Date to': firstParam(req.query.dateTo) || '',
     };
 
-    const excel = toExcel(rows, filterSummary);
+    const excel = await toExcel(rows, filterSummary);
     const date = new Date().toISOString().slice(0, 10);
     const projectLabel = firstParam(req.query.projects) || firstParam(req.query.project) || 'all-projects';
     const filename = `olt-${safeFilenamePart(status)}-${safeFilenamePart(projectLabel)}-${rows.length}-records-${date}.xlsx`;
