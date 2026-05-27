@@ -119,9 +119,6 @@ export default function PhotoGalleryPage() {
   ).length;
   const unsavedDecisionCount = unsavedGoodCount + unsavedBadCount;
 
-  const goodPhotos = photos.filter((p) => decisions[photoKey(p)] === 'good');
-  const badPhotos = photos.filter((p) => decisions[photoKey(p)] === 'bad');
-
   const handleSave = async () => {
     const decisionsToSave = photos
       .filter((p) => decisions[photoKey(p)] !== null && !savedPhotoIds.has(photoKey(p)))
