@@ -319,7 +319,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         LIMIT 1
       ) op ON true
       ${filters.whereClause}
-      ORDER BY r.id, r.created_at DESC
+      ORDER BY r.id, r.created_at DESC, d.id DESC
     `, filters.params);
 
     const rows = result.rows as OltExportRow[];

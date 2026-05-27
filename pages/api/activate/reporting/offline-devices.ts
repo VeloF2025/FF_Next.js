@@ -22,7 +22,7 @@ import { getOfflineDevicesReport } from '@/modules/activate/services/reportingSe
 import type { OfflineMatchStatus } from '@/modules/activate/types/reporting.types';
 import { log } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 
 async function handler(
   req: NextApiRequest,
@@ -106,22 +106,22 @@ async function handler(
       const lines = [
         header.join(','),
         ...report.records.map((r) => [
-          r.drop_number,
-          r.serial_number ?? '',
-          r.onemap_serial ?? '',
-          r.zone ?? '',
-          r.planned_pon ?? '',
-          q(r.address ?? ''),
-          r.pole_number ?? '',
+          q(r.drop_number),
+          q(r.serial_number),
+          q(r.onemap_serial),
+          q(r.zone),
+          q(r.planned_pon),
+          q(r.address),
+          q(r.pole_number),
           q(r.latitude != null && r.longitude != null ? `${r.latitude}, ${r.longitude}` : ''),
-          q(r.last_down_reason ?? ''),
+          q(r.last_down_reason),
           r.days_since_last_inform,
-          r.offline_bucket,
-          r.match_status,
+          q(r.offline_bucket),
+          q(r.match_status),
           r.serial_mismatch ? 'Yes' : 'No',
-          r.report_date,
-          r.ticket_uid ?? '',
-          r.ticket_link ?? '',
+          q(r.report_date),
+          q(r.ticket_uid),
+          q(r.ticket_link),
         ].join(',')),
       ];
 
