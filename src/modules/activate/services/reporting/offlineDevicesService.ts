@@ -4,6 +4,7 @@
 
 import { log } from '@/lib/logger';
 import { pool } from './_shared';
+import { getShareUrls } from '@/modules/noc/services/ticketShareLinks';
 import type {
   OfflineDevicesReportResponse,
   OfflineDeviceRecord,
@@ -187,6 +188,11 @@ export async function getOfflineDevicesReport(
         od.planned_pon,
         od.address,
         od.pole_number,
+        od.latitude,
+        od.longitude,
+        r.onemap_ont_serial AS onemap_serial,
+        mt.id AS ticket_id,
+        mt.ticket_uid,
         od.last_down_reason,
         od.last_inform_date,
         od.days_since_last_inform,
@@ -198,12 +204,23 @@ export async function getOfflineDevicesReport(
         od.installation_date,
         od.revenue_30day_avg
       FROM offline_devices od
+      LEFT JOIN dr_photo_unified_reviews r ON r.drop_number = od.drop_number
+      LEFT JOIN LATERAL (
+        SELECT id, ticket_uid
+        FROM maintenance_tickets
+        WHERE dr_number = od.drop_number
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) mt ON true
       WHERE ${whereClause}
       ORDER BY od.days_since_last_inform DESC, od.drop_number
       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
       `,
       [...params, pageSize, offset]
     );
+
+    // Read-only existing share links (list endpoint must not mint tokens on every page load)
+    const shareUrls = await getShareUrls(recordsResult.rows.map((r) => r.ticket_id));
 
     const records: OfflineDeviceRecord[] = recordsResult.rows.map((row) => ({
       id: row.id,
@@ -228,6 +245,11 @@ export async function getOfflineDevicesReport(
       revenue_30day_avg: row.revenue_30day_avg
         ? parseFloat(row.revenue_30day_avg)
         : null,
+      latitude: row.latitude != null ? Number(row.latitude) : null,
+      longitude: row.longitude != null ? Number(row.longitude) : null,
+      onemap_serial: row.onemap_serial ?? null,
+      ticket_uid: row.ticket_uid ?? null,
+      ticket_link: row.ticket_id ? shareUrls.get(row.ticket_id) ?? null : null,
     }));
 
     const summary: OfflineDevicesSummary = {

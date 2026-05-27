@@ -17,6 +17,7 @@ import * as XLSX from 'xlsx';
 import { withAuth, withRole } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import pool from '@/lib/db';
+import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
 
 async function handler(
   req: NextApiRequest,
@@ -297,7 +298,12 @@ async function handler(
               END AS technician_source,
               wc.team AS wa_team,
               d.zone_no,
-              d.pon_no
+              d.pon_no,
+              d.pole_number,
+              d.latitude,
+              d.longitude,
+              mt.id AS ticket_id,
+              mt.ticket_uid
        FROM oes_pp_data pp
        LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
        LEFT JOIN oes_activations oa ON oa.drop_number = pp.resolved_drop_number
@@ -309,6 +315,9 @@ async function handler(
        ORDER BY pp.project, pp.resolution_status, pp.serial_number`,
       params
     );
+
+    // Resolve shareable NOC links for every linked ticket (batched, mints if missing)
+    const ppShareUrls = await getOrCreateShareUrls(dataResult.rows.map((r) => r.ticket_id));
 
     const STATUS_LABELS: Record<string, string> = {
       not_found: 'Not Found',
@@ -328,6 +337,9 @@ async function handler(
       'Resolved DR': r.resolved_drop_number || '',
       'Zone': r.zone_no ?? '',
       'PON': r.pon_no ?? '',
+      'Pole': r.pole_number || '',
+      'GPS Coordinates':
+        r.latitude != null && r.longitude != null ? `${r.latitude}, ${r.longitude}` : '',
       'Source': r.resolved_source || '',
       'Located Date': r.first_resolved_at ? new Date(r.first_resolved_at).toLocaleDateString() : '',
       'Resolved At': r.resolved_at ? new Date(r.resolved_at).toLocaleString() : '',
@@ -340,6 +352,8 @@ async function handler(
       'WA Phone': r.wa_phone || '',
       'WA Team': r.wa_team || '',
       'Priority': r.ticket_priority ? (r.ticket_priority === 'high' ? 'High' : 'Normal') : '',
+      'Ticket Number': r.ticket_uid || '',
+      'Ticket Link': r.ticket_id ? ppShareUrls.get(r.ticket_id) ?? '' : '',
       'OLT Address': r.olt_address || '',
       'OLT Port': r.olt_port || '',
       'OLT PON': r.olt_pon ?? '',
