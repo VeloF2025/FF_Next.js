@@ -31,7 +31,7 @@ import * as path from 'path';
 const appRoot = path.resolve(__dirname, '..');
 dotenv.config({ path: path.join(appRoot, '.env') });
 dotenv.config({ path: path.join(appRoot, '.env.local'), override: true });
-import { chromium } from 'playwright';
+import { chromium, type Page } from 'playwright';
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 
@@ -167,6 +167,33 @@ async function waitForOtp(triggerTime: Date): Promise<string> {
 // Main
 // ---------------------------------------------------------------------------
 
+/**
+ * Navigate with retry. Chromium under xvfb on the Velocity host intermittently
+ * aborts the first navigation with net::ERR_NETWORK_CHANGED (a transient network
+ * interface event, likely Tailscale), leaving the page on chrome-error://chromewebdata/.
+ * A single un-retried goto then fails the entire nightly refresh — this happened
+ * 5 nights running (22–26 May 2026). Retry transient navigation failures before
+ * giving up so one blip no longer expires the SharePoint cookies.
+ */
+async function gotoWithRetry(page: Page, url: string, attempts = 4): Promise<void> {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const isLastAttempt = attempt === attempts;
+    let failure: string | null = null;
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      if (!page.url().startsWith('chrome-error://')) return;
+      failure = `landed on chrome-error page (${page.url()})`;
+    } catch (err) {
+      failure = String(err).split('\n')[0];
+    }
+    if (isLastAttempt) {
+      throw new Error(`Navigation to ${url} failed after ${attempts} attempts: ${failure}`);
+    }
+    log('WARN', 'Navigation failed, retrying', { attempt, failure });
+    await new Promise<void>(resolve => setTimeout(resolve, 3_000));
+  }
+}
+
 async function main(): Promise<void> {
   const cookieFile = requireEnv('FIBERTIME_SP_COOKIE_FILE');
 
@@ -200,7 +227,7 @@ async function main(): Promise<void> {
   try {
     // Step 1: Navigate to login
     log('INFO','Navigating to Fibertime login...');
-    await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await gotoWithRetry(page, LOGIN_URL);
 
     // Step 2: Enter email
     await page.waitForSelector('input[type="email"]', { timeout: 10_000 });
