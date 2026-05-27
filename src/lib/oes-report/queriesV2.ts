@@ -129,7 +129,10 @@ export async function loadPpLinkedAwaitingRows(): Promise<LinkedAwaitingRow[]> {
       p.resolution_status IN ('located_1map', 'located_local', 'located_unified', 'located_oes', 'located_onemap')
       OR cardinality(p.linked_via) > 0
     )
-      AND p.resolution_status != 'not_found'
+      -- Exclude not_found (own tab) and activated (own highlighted set) so the
+      -- three PP sets stay mutually exclusive — an 'activated' row with a
+      -- populated linked_via must not also land here and double-count the total.
+      AND p.resolution_status NOT IN ('not_found', 'activated')
       AND p.activated_at IS NULL
     ORDER BY p.project NULLS LAST, p.date_registered NULLS LAST, p.serial_number
   `);
