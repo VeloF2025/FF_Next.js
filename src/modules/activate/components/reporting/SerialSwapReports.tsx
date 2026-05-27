@@ -128,7 +128,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       a.href = url;
       // Build descriptive filename with status filter
       const statusLabel = selectedStatus ? selectedStatus.replace(/_/g, '-') : 'all';
-      a.download = `serial-swaps-${statusLabel}-${filters.dateFrom}-to-${filters.dateTo}.csv`;
+      a.download = `serial-swaps-${statusLabel}-${filters.dateFrom}-to-${filters.dateTo}.xlsx`;
       a.click();
     } catch (err) {
       toast.error('Export failed. Please try again.');
@@ -236,11 +236,11 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
           variant="primary"
           size="sm"
           onClick={handleExport}
-          title={`Export ${selectedStatus ? selectedStatus.replace(/_/g, ' ') : 'all'} records to CSV`}
+          title={`Export ${selectedStatus ? selectedStatus.replace(/_/g, ' ') : 'all'} records to Excel`}
           className="ml-auto"
         >
           <Download className="h-4 w-4" />
-          Export {selectedStatus ? selectedStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} CSV
+          Export {selectedStatus ? selectedStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} Excel
         </Button>
       </div>
 

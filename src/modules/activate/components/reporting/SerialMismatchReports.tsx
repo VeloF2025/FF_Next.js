@@ -204,7 +204,7 @@ export function SerialMismatchReports({ filters: _filters, refreshKey }: SerialM
       const statusLabel = selectedStatus ? selectedStatus.replace(/_/g, '-') : 'all';
       const teamLabel = selectedTeam ? `-${selectedTeam.replace(/\s+/g, '-')}` : '';
       const zoneLabel = selectedZone ? `-zone${selectedZone}` : '';
-      a.download = `ont-serial-mismatches-${statusLabel}${teamLabel}${zoneLabel}-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `ont-serial-mismatches-${statusLabel}${teamLabel}${zoneLabel}-${new Date().toISOString().split('T')[0]}.xlsx`;
       a.click();
     } catch (err) {
       alert('Export failed');
@@ -404,7 +404,7 @@ export function SerialMismatchReports({ filters: _filters, refreshKey }: SerialM
           title={`Export ${selectedStatus ? selectedStatus.replace(/_/g, ' ') : 'all'} records${selectedTeam ? ` for ${selectedTeam}` : ''}${selectedZone ? ` in zone ${selectedZone}` : ''}`}
         >
           <Download className="h-4 w-4" />
-          Export {selectedStatus ? selectedStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} CSV
+          Export {selectedStatus ? selectedStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} Excel
         </Button>
       </div>
 
