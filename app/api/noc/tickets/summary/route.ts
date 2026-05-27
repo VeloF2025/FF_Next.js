@@ -95,7 +95,19 @@ export async function GET(req: NextRequest) {
       values.push(resolvedId);
     }
 
-    addFilter('assigned_team_id', 'assigned_team_id');
+    // assigned_team_id supports multiple values (multi-team filter) — kept
+    // symmetric with the ticket list endpoint so summary counts cannot diverge
+    // from the list when more than one team is selected.
+    const teamIds = searchParams.getAll('assigned_team_id');
+    if (teamIds.length === 1) {
+      whereClauses.push(`assigned_team_id = $${p++}`);
+      values.push(teamIds[0]!);
+    } else if (teamIds.length > 1) {
+      const placeholders = teamIds.map((_, i) => `$${p + i}`).join(', ');
+      whereClauses.push(`assigned_team_id IN (${placeholders})`);
+      values.push(...teamIds);
+      p += teamIds.length;
+    }
     addFilter('project_id', 'project_id');
     addFilter('dr_number', 'dr_number');
 
