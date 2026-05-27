@@ -21,6 +21,12 @@ const HEADER_FILL: ExcelJS.Fill = {
   type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' },
 };
 
+// Highlight for rows that are activated but still on Fibertime's PP list —
+// light amber so they stand out against the plain awaiting rows.
+const ACTIVATED_FILL: ExcelJS.Fill = {
+  type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE68A' },
+};
+
 function styleHeader(row: ExcelJS.Row): void {
   row.eachCell((cell: ExcelJS.Cell) => {
     cell.fill = HEADER_FILL;
@@ -70,8 +76,9 @@ export function addPpNotFoundSheet(
 export function addPpLinkedAwaitingSheet(
   wb: ExcelJS.Workbook,
   rows: LinkedAwaitingRow[],
+  activatedRows: LinkedAwaitingRow[] = [],
 ): ExcelJS.Worksheet {
-  const sheet = wb.addWorksheet('PP — Linked, Awaiting');
+  const sheet = wb.addWorksheet('PP — Linked');
 
   sheet.columns = [
     { key: 'project',              width: 16 },
@@ -88,7 +95,7 @@ export function addPpLinkedAwaitingSheet(
     'Resolution Status', 'Matched Drop', 'Source', 'Linked Via',
   ]));
 
-  for (const r of rows) {
+  const addDataRow = (r: LinkedAwaitingRow): ExcelJS.Row =>
     sheet.addRow([
       r.project,
       r.serial_number,
@@ -99,9 +106,21 @@ export function addPpLinkedAwaitingSheet(
       // linked_via is a TEXT[] from PostgreSQL; join as comma-separated string
       Array.isArray(r.linked_via) ? r.linked_via.join(', ') : '',
     ]);
+
+  for (const r of rows) {
+    addDataRow(r);
   }
 
-  const totalRow = sheet.addRow([`${rows.length} awaiting activation`, '', '', '', '', '', '']);
+  // Activated-but-still-on-PP rows, highlighted amber so they're easy to spot.
+  for (const r of activatedRows) {
+    const row = addDataRow(r);
+    row.eachCell((cell: ExcelJS.Cell) => { cell.fill = ACTIVATED_FILL; });
+  }
+
+  const summary = activatedRows.length > 0
+    ? `${rows.length} awaiting activation + ${activatedRows.length} activated (still on PP list)`
+    : `${rows.length} awaiting activation`;
+  const totalRow = sheet.addRow([summary, '', '', '', '', '', '']);
   totalRow.font = { bold: true };
 
   return sheet;

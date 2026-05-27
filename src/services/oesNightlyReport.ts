@@ -9,6 +9,7 @@ import {
 import {
   loadPpNotFoundRows,
   loadPpLinkedAwaitingRows,
+  loadPpActivatedOnListRows,
   loadFtDisputeDefiniteRows,
   loadFtDisputeLifecycleRows,
 } from '@/lib/oes-report/queriesV2';
@@ -57,12 +58,13 @@ export async function runNightlyOesReport(opts: {
 
   if (lifecycleV2) {
     // ── V2 path: load the four split datasets in parallel ───────────────────
-    const [allRows, dailySummary, ppNotFoundRows, ppLinkedAwaitingRows, ftDisputeDefiniteRows, ftDisputeLifecycleRows] =
+    const [allRows, dailySummary, ppNotFoundRows, ppLinkedAwaitingRows, ppActivatedRows, ftDisputeDefiniteRows, ftDisputeLifecycleRows] =
       await Promise.all([
         loadAllActivations(),
         loadDailySummary(reportDate),
         loadPpNotFoundRows(),
         loadPpLinkedAwaitingRows(),
+        loadPpActivatedOnListRows(),
         loadFtDisputeDefiniteRows(),
         loadFtDisputeLifecycleRows(),
       ]);
@@ -71,6 +73,7 @@ export async function runNightlyOesReport(opts: {
       activations: allRows.length,
       ppNotFound: ppNotFoundRows.length,
       ppLinkedAwaiting: ppLinkedAwaitingRows.length,
+      ppActivatedOnList: ppActivatedRows.length,
       ftDisputeDefinite: ftDisputeDefiniteRows.length,
       ftDisputeLifecycle: ftDisputeLifecycleRows.length,
     }, 'OesNightlyReport');
@@ -86,6 +89,7 @@ export async function runNightlyOesReport(opts: {
       ...allRows.map(r => r.serial_number),
       ...ppNotFoundRows.map(r => r.serial_number),
       ...ppLinkedAwaitingRows.map(r => r.serial_number),
+      ...ppActivatedRows.map(r => r.serial_number),
       ...ftDisputeDefiniteRows.map(r => r.serial_number),
       ...ftDisputeLifecycleRows.map(r => r.serial_number),
     ].filter(Boolean) as string[];
@@ -106,6 +110,7 @@ export async function runNightlyOesReport(opts: {
       reportDate,
       ppNotFoundRows,
       ppLinkedAwaitingRows,
+      ppActivatedRows,
       ftDisputeDefiniteRows,
       ftDisputeLifecycleRows,
     });
@@ -115,11 +120,11 @@ export async function runNightlyOesReport(opts: {
 
     if (!opts.dryRun) {
       const filename = `OES-Report-${reportDate}.xlsx`;
-      const ppTotal = ppNotFoundRows.length + ppLinkedAwaitingRows.length;
+      const ppTotal = ppNotFoundRows.length + ppLinkedAwaitingRows.length + ppActivatedRows.length;
       const caption =
         `*OES Daily Report — ${reportDate}*\n` +
         `Activations: ${allRows.length} | PP: ${ppTotal} ` +
-        `(${ppNotFoundRows.length} not found, ${ppLinkedAwaitingRows.length} linked awaiting)\n` +
+        `(${ppNotFoundRows.length} not found, ${ppLinkedAwaitingRows.length} linked awaiting, ${ppActivatedRows.length} activated)\n` +
         `FT Dispute — Definite: ${ftDisputeDefiniteRows.length} | ` +
         `Lifecycle: ${ftDisputeLifecycleRows.length}`;
       try {
@@ -141,7 +146,7 @@ export async function runNightlyOesReport(opts: {
       sizeBytes: buffer.length,
       rowCounts: {
         activations: allRows.length,
-        pp: ppNotFoundRows.length + ppLinkedAwaitingRows.length,
+        pp: ppNotFoundRows.length + ppLinkedAwaitingRows.length + ppActivatedRows.length,
         ftDispute: ftDisputeDefiniteRows.length + ftDisputeLifecycleRows.length,
         ftDisputeDefinite: ftDisputeDefiniteRows.length,
         ftDisputeLifecycle: ftDisputeLifecycleRows.length,
