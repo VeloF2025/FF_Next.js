@@ -215,6 +215,58 @@ def set_renderer(maplayer, color: str = "0,100,255,255"):
     return renderer
 
 
+# Canonical EPSG:4326 spatial-reference block. The OES GPKG is always written in
+# WGS84 (see gpkg_spatial_ref_sys / gpkg_geometry_columns in create_gpkg), so every
+# OES maplayer must carry this CRS. Without an <srs>, QGIS/QField treats the vector
+# layer as invalid and the field tablet shows a red "!" (broken datasource). This
+# bit the individual boards (Lawley/Mohadin/Mamelodi/Etwatwa) whose .qgs had no
+# layer to clone a CRS from, so they fell through to the from-scratch maplayer
+# branch below which emitted no <srs>. Master/THM1 only worked by luck of having a
+# correctly-named template layer to deep-copy.
+SRS_4326_XML = (
+    '<srs><spatialrefsys nativeFormat="Wkt">'
+    '<wkt>GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",'
+    'MEMBER["World Geodetic System 1984 (Transit)"],'
+    'MEMBER["World Geodetic System 1984 (G730)"],'
+    'MEMBER["World Geodetic System 1984 (G873)"],'
+    'MEMBER["World Geodetic System 1984 (G1150)"],'
+    'MEMBER["World Geodetic System 1984 (G1674)"],'
+    'MEMBER["World Geodetic System 1984 (G1762)"],'
+    'MEMBER["World Geodetic System 1984 (G2139)"],'
+    'MEMBER["World Geodetic System 1984 (G2296)"],'
+    'ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],'
+    'ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,'
+    'ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],'
+    'AXIS["geodetic latitude (Lat)",north,ORDER[1],'
+    'ANGLEUNIT["degree",0.0174532925199433]],'
+    'AXIS["geodetic longitude (Lon)",east,ORDER[2],'
+    'ANGLEUNIT["degree",0.0174532925199433]],'
+    'USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],'
+    'BBOX[-90,-180,90,180]],ID["EPSG",4326]]</wkt>'
+    '<proj4>+proj=longlat +datum=WGS84 +no_defs</proj4>'
+    '<srsid>3452</srsid><srid>4326</srid><authid>EPSG:4326</authid>'
+    '<description>WGS 84</description>'
+    '<projectionacronym>longlat</projectionacronym>'
+    '<ellipsoidacronym>EPSG:7030</ellipsoidacronym>'
+    '<geographicflag>true</geographicflag>'
+    '</spatialrefsys></srs>'
+)
+
+
+def ensure_srs_4326(maplayer):
+    """Guarantee the maplayer carries an EPSG:4326 <srs> block.
+
+    QField marks CRS-less vector layers invalid (red "!"). The OES GPKG is always
+    WGS84, so replace any existing/missing <srs> with the canonical 4326 block,
+    preserving its position in the element so QGIS reads it normally.
+    """
+    existing = maplayer.find("srs")
+    idx = list(maplayer).index(existing) if existing is not None else 0
+    if existing is not None:
+        maplayer.remove(existing)
+    maplayer.insert(idx, ET.fromstring(SRS_4326_XML))
+
+
 def fetch_oes_data_by_project() -> Dict[str, Dict[str, List[Tuple]]]:
     """
     Fetch OES data grouped by FF project_id.
@@ -550,6 +602,10 @@ def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
             prov = ET.SubElement(maplayer, "provider")
             prov.text = "ogr"
 
+        # Always stamp the WGS84 CRS — both the clone path (in case a future template
+        # lacks an <srs>) and the from-scratch path (which never emits one). This is
+        # the fix for the red "!" / invalid-layer on individual QField boards.
+        ensure_srs_4326(maplayer)
         add_pole_nr_labeling(maplayer)
         set_renderer(maplayer, color)
 
