@@ -31,6 +31,34 @@ where they apply. Captured here for searchability:
 
 ---
 
+## Deviations from spec applied during implementation
+
+Mig 387 deviates from the spec's L3 model: `holder_id` is for **person-custody only**
+(matches Sprint D shipped reality — mig 383 `stock_holders_type_chk` restricts
+`holder_type` to `{staff, contractor, external_person}`), not for warehouse/project/vendor.
+
+The spec table in "State vocabulary" lists `warehouse`, `project`, and `vendor` as custody
+holders. **These are wrong.** Sprint D made a deliberate architectural choice: holder = person,
+location = `stock_locations` + `stock_quants`. The two are kept separate so Odoo warehouse
+reconciliation is not corrupted by personal van-stock data.
+
+**The corrected three-axes mental model** (authoritative; use this, not the L3 table above):
+
+| Axis | Column | Tracks | Allowed values |
+|---|---|---|---|
+| Lifecycle | `stock_serials.status` | what phase of life | the 8-state vocab |
+| Person-custody | `stock_serials.holder_id` → `stock_holders` | who's CARRYING the unit (only for `issued`/`faulty`-during-pickup) | NULL or staff/contractor person |
+| Location | `stock_serials.current_location_id` → `stock_locations` | where the unit is physically | warehouses, sites, etc. |
+
+For `in_stock`/`allocated_to_project`/`returned`, the unit is at a warehouse location —
+tracked via `stock_locations` + `stock_quants`, not via `holder_id`. `holder_id` is NULL for
+those statuses.
+
+The `stock_serial_status_holder_pairs` seed data reflects this correction: 11 rows with
+NULL or `{staff, contractor}` holder_types only.
+
+---
+
 ## Purpose
 
 Make `stock_serials.status` the single, validated, trigger-emitted source of truth for the

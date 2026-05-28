@@ -11,7 +11,7 @@ DROP FUNCTION IF EXISTS trg_stock_serial_status_validate();
 DROP FUNCTION IF EXISTS trg_stock_serial_status_emit();
 DROP FUNCTION IF EXISTS trg_stock_serial_holder_validate();
 
--- Rename in_stock back to available before restoring the 11-value CHECK
+-- Reverses Track 5 backfill rename (no-op if Track 5 hasn't run yet).
 UPDATE stock_serials SET status = 'available' WHERE status = 'in_stock';
 
 ALTER TABLE stock_serials DROP CONSTRAINT IF EXISTS stock_serials_status_check;

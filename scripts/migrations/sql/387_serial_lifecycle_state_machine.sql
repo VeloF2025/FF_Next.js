@@ -49,7 +49,7 @@ ALTER TABLE stock_serials
 --    Sentinel '__new__' represents the INSERT case (no prior row). Using a
 --    sentinel rather than NULL because Postgres forces PK columns to NOT NULL;
 --    a nullable PK would fail at CREATE TABLE time.
-CREATE TABLE stock_serial_status_transitions (
+CREATE TABLE IF NOT EXISTS stock_serial_status_transitions (
   from_state    varchar(50)   NOT NULL,     -- '__new__' for INSERT (no prior row)
   to_state      varchar(50)   NOT NULL,
   event_type    varchar(50)   NOT NULL,
@@ -57,6 +57,8 @@ CREATE TABLE stock_serial_status_transitions (
   PRIMARY KEY (from_state, to_state)
 );
 
+-- Same-state UPDATEs (no_op) are not in the table — both triggers short-circuit
+-- before consulting transitions, so no row is required.
 INSERT INTO stock_serial_status_transitions (from_state, to_state, event_type, description) VALUES
   ('__new__',             'in_stock',             'received',              'GRN posting / Odoo opening seed'),
   ('__new__',             'available',            'received',              'Legacy/transitional INSERT prior to backfill rename'),
@@ -74,46 +76,42 @@ INSERT INTO stock_serial_status_transitions (from_state, to_state, event_type, d
   ('faulty',              'returned',             'returned_to_warehouse', 'RMA returned'),
   ('returned',            'in_stock',             'restocked',             'Return disposition=restock'),
   ('returned',            'scrapped',             'scrapped',              'Return disposition=scrap'),
-  ('faulty',              'scrapped',             'scrapped',              'Scrapped without restock'),
-  -- Self-loops (no-op writes) — explicitly allowed, emit nothing
-  ('in_stock',            'in_stock',             'no_op',                 'Same-state UPDATE'),
-  ('issued',              'issued',               'no_op',                 'Same-state UPDATE'),
-  ('installed',           'installed',            'no_op',                 'Same-state UPDATE'),
-  ('activated',           'activated',            'no_op',                 'Same-state UPDATE');
+  ('faulty',              'scrapped',             'scrapped',              'Scrapped without restock')
+ON CONFLICT (from_state, to_state) DO NOTHING;
 
 -- 3. Holder cross-validation pairs (status × holder_type).
---    NULL holder_type means holder_id IS NULL is acceptable.
---    Cannot use PRIMARY KEY (status, holder_type) because PK columns must be
---    NOT NULL in Postgres; use a surrogate id PK + UNIQUE NULLS NOT DISTINCT
---    (Postgres 15+) to enforce the uniqueness while permitting NULL holder_type.
-CREATE TABLE stock_serial_status_holder_pairs (
+--    holder_id is PERSONAL CUSTODY only (Sprint D mig 383: staff/contractor/
+--    external_person). Warehouse presence is tracked via stock_quants — NOT here.
+--    Surrogate PK + named UNIQUE NULLS NOT DISTINCT (PG15) allows NULL holder_type.
+CREATE TABLE IF NOT EXISTS stock_serial_status_holder_pairs (
   id            serial        PRIMARY KEY,
   status        varchar(50)   NOT NULL,
   holder_type   varchar(50),                -- NULL = holder_id IS NULL required
-  UNIQUE NULLS NOT DISTINCT (status, holder_type)
+  CONSTRAINT sshp_status_holder_uniq UNIQUE NULLS NOT DISTINCT (status, holder_type)
 );
 COMMENT ON TABLE stock_serial_status_holder_pairs IS
-  'Allowed (status, holder_type) pairs. Multiple rows per status mean each is acceptable.';
+  'Allowed (status, holder_type) pairs. holder_type matches stock_holders.holder_type '
+  '(staff/contractor/external_person) or NULL when holder_id must be NULL '
+  '(warehouse-resident via stock_quants, or at customer post-install).';
 
 INSERT INTO stock_serial_status_holder_pairs (status, holder_type) VALUES
-  ('available',            'warehouse'),       -- legacy, until backfill
-  ('in_stock',             'warehouse'),
-  ('allocated_to_project', 'warehouse'),       -- earmarked but still at warehouse
-  ('allocated_to_project', 'project'),         -- moved to project staging
-  ('issued',               'staff'),
+  ('available',            NULL),              -- legacy, location-based
+  ('in_stock',             NULL),              -- location-based via stock_quants
+  ('allocated_to_project', NULL),              -- still at warehouse, paper allocation
+  ('issued',               'staff'),           -- tech carrying the unit
+  ('issued',               'contractor'),      -- org-level handoff (if used)
   ('installed',            NULL),              -- at customer, no tracked holder
   ('activated',            NULL),
+  ('faulty',               NULL),              -- post-pickup at warehouse
   ('faulty',               'staff'),           -- during pickup
-  ('faulty',               'warehouse'),       -- after pickup
-  ('faulty',               'vendor'),          -- RMA in flight
-  ('returned',             'warehouse'),
-  ('scrapped',             NULL),
-  ('scrapped',             'vendor');
+  ('returned',             NULL),              -- back at warehouse
+  ('scrapped',             NULL)
+ON CONFLICT ON CONSTRAINT sshp_status_holder_uniq DO NOTHING;
 
--- 4. Side table for any RAISE NOTICE warnings during bypass operations.
-CREATE TABLE stock_serial_lifecycle_violations (
+-- 4. Audit side-table for bypass operations (written by trg_stock_serial_status_validate when ff.bypass_validation=true).
+CREATE TABLE IF NOT EXISTS stock_serial_lifecycle_violations (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  serial_id     uuid REFERENCES stock_serials(id),
+  serial_id     uuid,                         -- no FK: fires in BEFORE trigger, row may not exist yet
   serial_number varchar(100),
   attempted_from varchar(50),
   attempted_to   varchar(50),
@@ -122,7 +120,7 @@ CREATE TABLE stock_serial_lifecycle_violations (
   bypass_used   boolean DEFAULT false,
   raised_at     timestamptz DEFAULT now()
 );
-CREATE INDEX idx_ssv_raised_at ON stock_serial_lifecycle_violations (raised_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ssv_raised_at ON stock_serial_lifecycle_violations (raised_at DESC);
 
 -- 5. Status-validate trigger function.
 --    SQLSTATE 'FF001' (custom; not a built-in Postgres class) so the Bugsink
@@ -133,12 +131,9 @@ RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   v_from      varchar(50);
   v_to        varchar(50);
-  v_bypass    boolean;
   v_allowed   boolean;
 BEGIN
-  -- Guard OLD reference behind TG_OP. In BEFORE INSERT triggers OLD is null
-  -- and accessing OLD.status against a null record is brittle; the explicit
-  -- IF keeps the assignment safe and reads naturally.
+  -- Guard OLD behind TG_OP: OLD is undefined for BEFORE INSERT.
   IF TG_OP = 'INSERT' THEN
     v_from := '__new__';
   ELSE
@@ -151,9 +146,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  v_bypass := COALESCE(current_setting('ff.bypass_validation', true), 'false') = 'true';
-
-  IF v_bypass THEN
+  -- NULL GUC setting compares as NULL → IF body skipped (correct).
+  IF current_setting('ff.bypass_validation', true) = 'true' THEN
     -- Log the bypass to the violations side-table for audit; allow write
     INSERT INTO stock_serial_lifecycle_violations
       (serial_id, serial_number, attempted_from, attempted_to,
@@ -183,6 +177,10 @@ END;
 $$;
 
 -- 6. Status-emit trigger function. Reads per-txn GUCs for context.
+--    DEDUP GAP: when ff.event_source_id is unset (empty string / NULL), the
+--    ON CONFLICT … WHERE source_id IS NOT NULL partial index never fires, so
+--    duplicate events can accumulate for the same (serial_id, event_type).
+--    Track 2 reviewers MUST verify every promoteSerial() call sets this GUC.
 CREATE OR REPLACE FUNCTION trg_stock_serial_status_emit()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
@@ -209,7 +207,10 @@ BEGIN
      AND to_state   = NEW.status
    LIMIT 1;
 
-  -- Unknown transition (only possible with bypass): emit a generic event
+  -- Vocabulary: `no_op` rows in stock_serial_status_transitions are
+  -- documentation-only; both triggers short-circuit on same-state writes so
+  -- they are never queried here. `force_corrected` is emitted only when
+  -- bypass=true is used to make an off-matrix (unlisted) transition.
   IF v_event_type IS NULL THEN
     v_event_type := 'force_corrected';
   END IF;
@@ -224,8 +225,7 @@ BEGIN
      actor_user_id, actor_staff_id,
      payload, occurred_at)
   VALUES
-    -- Translate the internal '__new__' sentinel back to NULL on the way out
-    -- so the events table preserves the original "no prior state" semantics.
+    -- '__new__' sentinel translated back to NULL in the events table.
     (NEW.id, v_event_type, NULLIF(v_from, '__new__'), NEW.status,
      v_source_table, v_source_id,
      NULLIF(current_setting('ff.event_actor_user_id',  true), '')::uuid,
@@ -266,8 +266,7 @@ BEGIN
    LIMIT 1;
 
   IF v_allowed IS NULL THEN
-    -- Custom SQLSTATE 'FF002' so Bugsink can isolate holder-mismatch alerts
-    -- from generic check_violation noise.
+    -- SQLSTATE 'FF002': Bugsink isolates holder-mismatch from CHECK noise.
     RAISE EXCEPTION 'holder_mismatch: status=% with holder_type=% not allowed for serial %',
       NEW.status, COALESCE(v_holder_type, 'NULL'), NEW.serial_number
       USING ERRCODE = 'FF002';
@@ -277,8 +276,7 @@ BEGIN
 END;
 $$;
 
--- 8. Install triggers. NOTE: legacy mig 365/366/367 triggers REMAIN INSTALLED
---    until Track 2 retires them after the verbs are refactored.
+-- 8. Install triggers. Legacy mig 365/366/367 triggers REMAIN until Track 2.
 DROP TRIGGER IF EXISTS trg_stock_serial_status_validate_t ON stock_serials;
 CREATE TRIGGER trg_stock_serial_status_validate_t
   BEFORE INSERT OR UPDATE OF status ON stock_serials
