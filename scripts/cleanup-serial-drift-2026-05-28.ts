@@ -114,6 +114,10 @@ async function applyPatternA(pool: Pool, rows: PatternARow[]): Promise<number> {
         [row.event_id],
       );
       if (d.rowCount && d.rowCount > 0) {
+        // All bare params inside jsonb_build_object need explicit ::text casts —
+        // jsonb_build_object is VARIADIC any, so Postgres can't infer the
+        // column type from context and fails with "could not determine data
+        // type of parameter $N".
         await client.query(
           `INSERT INTO serial_change_history
              (drop_number, change_type, old_value, new_value,
@@ -124,10 +128,10 @@ async function applyPatternA(pool: Pool, rows: PatternARow[]): Promise<number> {
               'spurious installed_at_drop event deletion',
               jsonb_build_object(
                 'serial_id',      $2::text,
-                'serial_number',  $3,
+                'serial_number',  $3::text,
                 'event_id',       $4::text,
-                'current_status', $5,
-                'occurred_at',    $6,
+                'current_status', $5::text,
+                'occurred_at',    $6::text,
                 'cleanup_run',    '2026-05-28'))`,
           [ACTOR, row.serial_id, row.serial_number, row.event_id, row.current_status, row.occurred_at],
         );
@@ -163,6 +167,8 @@ async function applyPatternB(pool: Pool, rows: PatternBRow[]): Promise<number> {
         [row.serial_id],
       );
       if (u.rowCount && u.rowCount > 0) {
+        // ::text cast on bare params inside jsonb_build_object — same
+        // type-inference fix as applyPatternA above.
         await client.query(
           `INSERT INTO serial_change_history
              (drop_number, change_type, old_value, new_value,
@@ -173,7 +179,7 @@ async function applyPatternB(pool: Pool, rows: PatternBRow[]): Promise<number> {
               'cascade silent regression revert',
               jsonb_build_object(
                 'serial_id',      $3::text,
-                'serial_number',  $4,
+                'serial_number',  $4::text,
                 'latest_event',   'activated',
                 'oracle',         'oes_pp_data',
                 'cleanup_run',    '2026-05-28'))`,
