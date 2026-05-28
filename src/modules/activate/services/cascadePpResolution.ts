@@ -207,6 +207,10 @@ export async function cascadePpResolution(
     // that's the physical unit on the wall. Fall back to pp_serial. Only
     // update one record per resolution; if both rows happen to exist, the
     // physical (photo) wins.
+    // status: only promote pre-install states. Already-activated serials get
+    // their install metadata backfilled (so the install fact is captured), but
+    // their status is NOT regressed from 'activated' — OES is the activation
+    // oracle, and the lifecycle is one-way past activated.
     const stockUpdate = await client.query(
       `
       WITH ranked AS (
@@ -231,7 +235,11 @@ export async function cascadePpResolution(
       UPDATE stock_serials ss
       SET installed_at_drop_number = r.resolved_drop_number,
           installed_date = COALESCE(r.photo_date, CURRENT_DATE),
-          status = 'installed',
+          status = CASE
+            WHEN ss.status IN ('available','reserved','allocated_to_project','in_transit','issued')
+              THEN 'installed'
+            ELSE ss.status
+          END,
           updated_at = NOW()
       FROM ranked r
       WHERE ss.serial_number = r.serial_number
