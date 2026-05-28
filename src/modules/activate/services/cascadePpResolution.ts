@@ -17,6 +17,10 @@
 
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
+import {
+  selectAndUpdateMetadataForCascade,
+  promoteCascadeCandidates,
+} from './cascadeSerialPromotion';
 
 const logger = createLogger('cascadePpResolution');
 
@@ -201,55 +205,70 @@ export async function cascadePpResolution(
     );
     result.drops_backfilled = dropsUpdate.rowCount ?? 0;
 
-    // stock_serials may key the inventory record by either the PP serial
-    // (procurement source) or the photo serial (what was actually installed,
-    // when VLM/OCR differs by 1 char). Prefer photo_serial when present —
-    // that's the physical unit on the wall. Fall back to pp_serial. Only
-    // update one record per resolution; if both rows happen to exist, the
-    // physical (photo) wins.
-    // status: only promote pre-install states. Already-activated serials get
-    // their install metadata backfilled (so the install fact is captured), but
-    // their status is NOT regressed from 'activated' — OES is the activation
-    // oracle, and the lifecycle is one-way past activated.
-    const stockUpdate = await client.query(
-      `
-      WITH ranked AS (
-        SELECT ss.serial_number,
-               pp.resolved_drop_number,
-               (pp.resolved_details->>'photo_date')::date AS photo_date,
-               ROW_NUMBER() OVER (
-                 PARTITION BY pp.id
-                 ORDER BY CASE
-                   WHEN ss.serial_number = pp.resolved_details->>'photo_serial' THEN 1
-                   WHEN ss.serial_number = pp.serial_number THEN 2
-                   ELSE 3
-                 END
-               ) AS rn
-        FROM oes_pp_data pp
-        JOIN stock_serials ss
-          ON ss.serial_number IN (pp.serial_number, COALESCE(pp.resolved_details->>'photo_serial', pp.serial_number))
-        WHERE pp.resolved_at >= $1
-          AND pp.resolved_drop_number IS NOT NULL
-          AND ss.installed_at_drop_number IS NULL
-      )
-      UPDATE stock_serials ss
-      SET installed_at_drop_number = r.resolved_drop_number,
-          installed_date = COALESCE(r.photo_date, CURRENT_DATE),
-          status = CASE
-            WHEN ss.status IN ('available','reserved','allocated_to_project','in_transit','issued')
-              THEN 'installed'
-            ELSE ss.status
-          END,
-          updated_at = NOW()
-      FROM ranked r
-      WHERE ss.serial_number = r.serial_number
-        AND r.rn = 1
-        AND ss.installed_at_drop_number IS NULL
-      RETURNING ss.serial_number
-      `,
-      [cutoffTime.toISOString()],
+    // ── Pre-cutover production-vs-test divergence (Track 7 cutover concern) ──
+    //
+    // mig 364 TRIGGER 3 (`trg_oes_pp_data_after_insert_activate`) fires on
+    // oes_pp_data INSERT and directly UPDATEs stock_serials.status → 'activated'
+    // when the prior status is one of {available, installed, issued}. In production
+    // today, this trigger races ahead of cascadePpResolution() — by the time
+    // cascade runs, the candidate serials have ALREADY been flipped to 'activated'.
+    //
+    // Effect: the Step B per-row promoteSerial calls below MOSTLY hit the
+    // metadata-only branch in production (current_status='activated' is not in
+    // MATRIX_VALID_SOURCES). The new (in_stock|available|allocated_to_project,
+    // installed) matrix rows added in this PR are dormant pre-cutover and only
+    // become hot after TRIGGER 3 is retired (presumably Track 7).
+    //
+    // The test suite asserts cascade behaviour in ISOLATION (TRIGGER 3 side-effects
+    // are explicitly cleaned up before each case). This is a deliberate test
+    // posture: we're testing the CASCADE's contract, not the joint behaviour with
+    // TRIGGER 3.
+    //
+    // See PR #1816 body for full background + Track 7 retirement plan.
+
+    // ── Step 2.4.2: Serial lifecycle — two-step write per PR #1805 Pattern B ──
+    //
+    // STEP A — Metadata bulk UPDATE (no status change).
+    //   stock_serials may key the inventory record by either the PP serial
+    //   (procurement source) or the photo serial (what was actually installed,
+    //   when VLM/OCR differs by 1 char). Prefer photo_serial when present —
+    //   that's the physical unit on the wall. Fall back to pp_serial. Only
+    //   update one record per resolution; if both rows happen to exist, the
+    //   physical (photo) wins.
+    //   status: only promote pre-install states. Already-activated serials get
+    //   their install metadata backfilled (so the install fact is captured), but
+    //   their status is NOT regressed from 'activated' — OES is the activation
+    //   oracle, and the lifecycle is one-way past activated.
+    //   Runs for ALL eligible serials regardless of current status.
+    //   No mig 387 status-validate trigger fires here (status column untouched),
+    //   so a single bulk statement is safe even with mixed prior states.
+    //   photo_serial wins over pp_serial when both rows exist (ROW_NUMBER).
+    //
+    // STEP B — Per-row promoteSerial loop.
+    //   Only fires for matrix-valid source states:
+    //     issued, in_stock, available, allocated_to_project  (mig 387, Track 2.4)
+    //   Already-activated / already-installed serials: metadata was set by
+    //   Step A; no status event is emitted (PR #1805 regression guard preserved).
+    //
+    // Order matters: metadata UPDATE first so installed_at_drop_number is set
+    // before the trigger fires on the subsequent status change.
+
+    // STEP A: bulk metadata UPDATE + candidate collection (see cascadeSerialPromotion.ts).
+    const candidates = await selectAndUpdateMetadataForCascade(client, cutoffTime);
+    // NOTE: stock_serials_updated now counts ALL rows that received a metadata
+    // write (installed_at_drop_number/installed_date), including rows that did
+    // NOT have their status promoted (activated, installed). Pre-Track-2.4 this
+    // counted only status-promoted rows. The shift is intentional: it reflects
+    // the broader "did the cascade touch this serial?" semantic.
+    result.stock_serials_updated = candidates.length;
+
+    // STEP B: per-row promoteSerial for matrix-valid source states.
+    const { promoted, metadataOnly } = await promoteCascadeCandidates(
+      client,
+      candidates,
+      cutoffTime,
     );
-    result.stock_serials_updated = stockUpdate.rowCount ?? 0;
+    logger.info('cascade serial promotion summary', { promoted, metadataOnly });
 
     await client.query('COMMIT');
     logger.info('PP cascade complete', { ...result });

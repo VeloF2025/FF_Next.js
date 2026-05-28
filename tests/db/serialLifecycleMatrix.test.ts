@@ -2,7 +2,12 @@
  * tests/db/serialLifecycleMatrix.test.ts
  *
  * Full transition-matrix coverage for mig 387 lifecycle triggers.
- * 14 forward ALLOWED + 4 ILLEGAL (FF001) + 2 HOLDER_MISMATCH (FF002) = 20 tests.
+ * 17 forward ALLOWED + 3 ILLEGAL (FF001) + 2 HOLDER_MISMATCH (FF002) = 22 tests.
+ *
+ * Track 2.4 additions: mig 387 matrix extended with OES cascade paths:
+ *   in_stock → installed       (was ILLEGAL: "skips issued")
+ *   available → installed      (new: legacy pre-backfill direct install)
+ *   allocated_to_project → installed  (new: direct install from project allocation)
  *
  * Run: npx vitest run --config vitest.db.sprinte.config.ts \
  *        tests/db/serialLifecycleMatrix.test.ts
@@ -59,13 +64,18 @@ interface HolderMismatchCase {
   transitionAllowed: boolean;
 }
 
-// 14 forward transitions mirroring stock_serial_status_transitions (excludes
+// 17 forward transitions mirroring stock_serial_status_transitions (excludes
 // null → in_stock INSERT case covered by Task 1.3).
+// Track 2.4 added 3 OES cascade paths: in_stock/available/allocated_to_project → installed.
 const ALLOWED: AllowedCase[] = [
   { from: 'in_stock',            to: 'allocated_to_project', expectedEventType: 'allocated',             seedHolderId: null },
   { from: 'allocated_to_project',to: 'issued',               expectedEventType: 'issued_to_tech',        seedHolderId: null,           toHolderId: STAFF_HOLDER_ID },
   { from: 'in_stock',            to: 'issued',               expectedEventType: 'issued_to_tech',        seedHolderId: null,           toHolderId: STAFF_HOLDER_ID },
   { from: 'issued',              to: 'installed',            expectedEventType: 'installed_at_drop',     seedHolderId: STAFF_HOLDER_ID,toHolderId: null },
+  // OES cascade paths (Track 2.4 — mig 387 matrix extension)
+  { from: 'in_stock',            to: 'installed',            expectedEventType: 'installed_at_drop',     seedHolderId: null,           toHolderId: null },
+  { from: 'available',           to: 'installed',            expectedEventType: 'installed_at_drop',     seedHolderId: null,           toHolderId: null },
+  { from: 'allocated_to_project',to: 'installed',            expectedEventType: 'installed_at_drop',     seedHolderId: null,           toHolderId: null },
   { from: 'installed',           to: 'activated',            expectedEventType: 'activated',             seedHolderId: null },
   { from: 'installed',           to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: null },
   { from: 'activated',           to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: null },
@@ -78,9 +88,9 @@ const ALLOWED: AllowedCase[] = [
   { from: 'faulty',              to: 'scrapped',             expectedEventType: 'scrapped',              seedHolderId: null },
 ];
 
-// 4 illegal transitions — holder valid for from-status so status-validate fires
+// 3 illegal transitions — holder valid for from-status so status-validate fires.
+// Track 2.4 removed in_stock → installed (now in the matrix via OES cascade row).
 const ILLEGAL: IllegalCase[] = [
-  { from: 'in_stock',  to: 'installed', seedHolderId: null }, // skips issued
   { from: 'activated', to: 'in_stock',  seedHolderId: null }, // backwards
   { from: 'scrapped',  to: 'in_stock',  seedHolderId: null }, // terminal state
   { from: 'installed', to: 'in_stock',  seedHolderId: null }, // backwards skip
