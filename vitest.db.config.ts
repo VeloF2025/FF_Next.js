@@ -10,6 +10,14 @@ import path from 'node:path';
 export default defineConfig({
   test: {
     include: ['tests/db/**/*.test.ts'],
+    // Sprint E tests require mig 387 (not loaded by global-setup.ts) and run
+    // in their own container via vitest.db.sprinte.config.ts. Exclude them
+    // here so `npm run test:db` doesn't pick them up against the wrong DB.
+    exclude: [
+      'tests/db/serialLifecycleMatrix.test.ts',
+      'tests/db/serialEventContext.test.ts',
+      'tests/db/services/field-stock/serialLifecycle.test.ts',
+    ],
     globalSetup: ['./tests/db/setup/global-setup.ts'],
     // Docker startup on a cold image pull can take ~30s; hooks need 2x headroom.
     testTimeout: 30_000,
@@ -38,6 +46,8 @@ export default defineConfig({
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
       { find: '@/lib/neon', replacement: path.resolve(__dirname, './src/lib/neon') },
       { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
+      // @/lib/db/* lives at src/lib/db/ (serialEventContext etc.)
+      { find: /^@\/lib\/db/, replacement: path.resolve(__dirname, './src/lib/db') },
       { find: '@/lib/vlm', replacement: path.resolve(__dirname, './src/lib/vlm') },
       { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
       { find: '@/lib/email', replacement: path.resolve(__dirname, './src/lib/email') },
