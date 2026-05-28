@@ -1,6 +1,11 @@
 /**
  * History Group Component
- * Unified timeline of all data sync operations across all sources
+ * Unified timeline of all data sync operations across all sources.
+ *
+ * Filters: operation type pills + DateChipFilter (date range) + clickable
+ * stat cards (status filter, OLT Investigate aesthetic). Date filtering is
+ * client-side because /api/system/data-sync/history doesn't accept date
+ * params yet — fine while the fetch caps at limit=100.
  */
 
 'use client';
@@ -10,25 +15,20 @@ import {
   Clock,
   RefreshCw,
   Filter,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
   FileSpreadsheet,
   WifiOff,
   Users,
   MapPin,
   Radio,
-  ChevronDown,
-  ChevronRight,
   Lock,
-  Loader2,
 } from 'lucide-react';
-import type { SyncHistoryEntry, SyncOperationType } from '../../types';
-import { formatDisplayDate } from '@/utils/dateFormat';
+import type { SyncHistoryEntry } from '../../types';
+import { getDateRange, type DateFilter } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
-import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { DateChipFilter } from '../DateChipFilter';
+import { HistoryEntry } from './HistoryEntry';
 
-// Filter options
 const FILTER_OPTIONS: { value: string; label: string; icon: React.ElementType; color: string }[] = [
   { value: 'all', label: 'All Operations', icon: Clock, color: 'text-[var(--ff-text-secondary)]' },
   { value: 'oes_import', label: 'OES Import', icon: FileSpreadsheet, color: 'text-amber-400' },
@@ -38,22 +38,14 @@ const FILTER_OPTIONS: { value: string; label: string; icon: React.ElementType; c
   { value: 'olt_import', label: 'OLT Import', icon: Radio, color: 'text-red-400' },
 ];
 
-// Status badge config
-const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-  success: { label: 'Success', icon: CheckCircle, className: 'bg-green-500/10 text-green-400 border-green-500/20' },
-  failed: { label: 'Failed', icon: XCircle, className: 'bg-red-500/10 text-red-400 border-red-500/20' },
-  partial: { label: 'Partial', icon: AlertTriangle, className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-  running: { label: 'Running', icon: Loader2, className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-};
+type StatusFilter = 'all' | 'success' | 'failed' | 'running';
 
-// Type badge config
-const TYPE_CONFIG: Record<SyncOperationType, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
-  oes_import: { label: 'OES Import', icon: FileSpreadsheet, color: 'text-amber-400', bgColor: 'bg-amber-500/10' },
-  arch_import: { label: 'ARCH Import', icon: WifiOff, color: 'text-purple-400', bgColor: 'bg-purple-500/10' },
-  qcontact_sync: { label: 'QContact', icon: Users, color: 'text-blue-400', bgColor: 'bg-blue-500/10' },
-  qfield_sync: { label: 'QField', icon: MapPin, color: 'text-green-400', bgColor: 'bg-green-500/10' },
-  olt_import: { label: 'OLT Import', icon: Radio, color: 'text-red-400', bgColor: 'bg-red-500/10' },
-};
+const STAT_CARDS: { key: StatusFilter; label: string; color: string; ring: string }[] = [
+  { key: 'all', label: 'Total Operations', color: 'text-[var(--ff-text-primary)]', ring: 'ring-[var(--ff-accent)]' },
+  { key: 'success', label: 'Successful', color: 'text-green-400', ring: 'ring-green-400' },
+  { key: 'failed', label: 'Failed', color: 'text-red-400', ring: 'ring-red-400' },
+  { key: 'running', label: 'Running', color: 'text-blue-400', ring: 'ring-blue-400' },
+];
 
 interface HistoryGroupProps {
   activeTab: string | null;
@@ -66,11 +58,14 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [customDateFrom, setCustomDateFrom] = useState<string>('');
+  const [customDateTo, setCustomDateTo] = useState<string>('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Check permission for timeline tab
   const hasAccess = useMemo(() => {
-    if (permissionsLoading) return true; // Assume access while loading
+    if (permissionsLoading) return true;
     return can('system.data-sync.history.timeline', 'view');
   }, [permissionsLoading, can]);
 
@@ -81,11 +76,8 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
       const res = await fetch(`/api/system/data-sync/history?limit=100&type=${filter}`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      if (data.success) {
-        setEntries(data.data);
-      } else {
-        setError(data.error || 'Failed to load history');
-      }
+      if (data.success) setEntries(data.data);
+      else setError(data.error || 'Failed to load history');
     } catch {
       setError('Failed to fetch sync history');
     } finally {
@@ -93,62 +85,40 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
     }
   }, [filter]);
 
-  // Fetch on mount and filter change
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
-  // Auto-refresh every 30s
   useEffect(() => {
     const interval = setInterval(fetchHistory, 30000);
     return () => clearInterval(interval);
   }, [fetchHistory]);
 
-  // Default tab
   useEffect(() => {
     if (!activeTab) onTabChange('timeline');
   }, [activeTab, onTabChange]);
 
-  // Format relative time
-  const formatTime = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
+  // Client-side date + status filtering. Date predicate uses the shared
+  // getDateRange (ISO timestamps); started_at is also ISO so direct compare.
+  const visibleEntries = useMemo(() => {
+    const range = getDateRange(dateFilter, customDateFrom, customDateTo);
+    return entries.filter((e) => {
+      if (statusFilter !== 'all' && e.status !== statusFilter) return false;
+      if (range.dateFrom && e.started_at < range.dateFrom) return false;
+      if (range.dateTo && e.started_at >= range.dateTo) return false;
+      return true;
+    });
+  }, [entries, statusFilter, dateFilter, customDateFrom, customDateTo]);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return formatDisplayDate(date);
-  };
+  const stats = useMemo(() => ({
+    all: visibleEntries.length,
+    success: visibleEntries.filter((e) => e.status === 'success').length,
+    failed: visibleEntries.filter((e) => e.status === 'failed').length,
+    running: visibleEntries.filter((e) => e.status === 'running').length,
+  }), [visibleEntries]);
 
-  // Format duration
-  const formatDuration = (seconds: number | null): string => {
-    if (seconds === null || seconds === undefined) return '-';
-    if (seconds < 60) return `${Math.round(seconds)}s`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
-  };
-
-  // Stats summary
-  const stats = {
-    total: entries.length,
-    success: entries.filter(e => e.status === 'success').length,
-    failed: entries.filter(e => e.status === 'failed').length,
-    running: entries.filter(e => e.status === 'running').length,
-  };
-
-  // Show loading state
   if (permissionsLoading) {
-    return (
-      <LoadingSpinner className="py-16" size="lg" label="Loading..." />
-    );
+    return <LoadingSpinner className="py-16" size="lg" label="Loading..." />;
   }
 
-  // Show access denied if no permission
   if (!hasAccess) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -165,27 +135,35 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
 
   return (
     <div className="space-y-6">
-      {/* Summary Stats */}
+      {/* Stat Cards — clickable, ring-on-active (OLT Investigate aesthetic) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <p className="text-sm text-[var(--ff-text-secondary)]">Total Operations</p>
-          <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.total}</p>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <p className="text-sm text-green-400">Successful</p>
-          <p className="text-2xl font-bold text-green-400">{stats.success}</p>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <p className="text-sm text-red-400">Failed</p>
-          <p className="text-2xl font-bold text-red-400">{stats.failed}</p>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <p className="text-sm text-blue-400">Running</p>
-          <p className="text-2xl font-bold text-blue-400">{stats.running}</p>
-        </div>
+        {STAT_CARDS.map(({ key, label, color, ring }) => (
+          <button
+            key={key}
+            onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
+            className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border text-left transition-all cursor-pointer ${
+              statusFilter === key
+                ? `border-transparent ring-2 ${ring}`
+                : 'border-[var(--ff-border-light)] hover:border-[var(--ff-text-tertiary)]'
+            }`}
+          >
+            <div className={`text-2xl font-bold ${color}`}>{stats[key]}</div>
+            <div className="text-sm text-[var(--ff-text-secondary)]">{label}</div>
+          </button>
+        ))}
       </div>
 
-      {/* Filter Bar */}
+      {/* Date Chip Filter */}
+      <DateChipFilter
+        dateFilter={dateFilter}
+        onDateFilterChange={setDateFilter}
+        customDateFrom={customDateFrom}
+        customDateTo={customDateTo}
+        onCustomDateFromChange={setCustomDateFrom}
+        onCustomDateToChange={setCustomDateTo}
+      />
+
+      {/* Operation type filter pills */}
       <div className="flex flex-wrap items-center gap-2">
         <Filter className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
         {FILTER_OPTIONS.map((opt) => {
@@ -216,156 +194,34 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
         </button>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
           {error}
         </div>
       )}
 
-      {/* Timeline */}
       {loading && entries.length === 0 ? (
         <LoadingSpinner className="py-12" size="md" label="Loading history..." />
-      ) : entries.length === 0 ? (
+      ) : visibleEntries.length === 0 ? (
         <div className="text-center py-12">
           <Clock className="w-12 h-12 mx-auto text-[var(--ff-text-tertiary)] mb-3" />
           <p className="text-[var(--ff-text-secondary)]">No sync operations found</p>
           <p className="text-sm text-[var(--ff-text-tertiary)] mt-1">
-            Operations will appear here as imports and syncs are run
+            {entries.length === 0
+              ? 'Operations will appear here as imports and syncs are run'
+              : 'Try widening the date range or clearing the status filter'}
           </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {entries.map((entry) => {
-            const typeConf = TYPE_CONFIG[entry.operation_type] ?? TYPE_CONFIG.oes_import;
-            const statusConfEntry = (STATUS_CONFIG[entry.status] || STATUS_CONFIG.success)!;
-            const StatusIcon = statusConfEntry.icon;
-            const statusClassName = statusConfEntry.className;
-            const statusLabel = statusConfEntry.label;
-            const TypeIcon = typeConf.icon;
-            const isExpanded = expandedId === entry.id;
-
-            return (
-              <div
-                key={entry.id}
-                className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden"
-              >
-                {/* Main Row */}
-                <button
-                  onClick={() => setExpandedId(isExpanded ? null : entry.id)}
-                  className="w-full flex items-center gap-4 p-4 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-                >
-                  {/* Expand icon */}
-                  <div className="flex-shrink-0">
-                    {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                    )}
-                  </div>
-
-                  {/* Type Icon */}
-                  <div className={`flex-shrink-0 p-2 rounded-lg ${typeConf.bgColor}`}>
-                    <TypeIcon className={`w-4 h-4 ${typeConf.color}`} />
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium ${typeConf.color}`}>
-                        {typeConf.label}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${statusClassName}`}>
-                        {entry.status === 'running'
-                          ? <InlineSpinner size="sm" />
-                          : <StatusIcon className="w-3 h-3" />
-                        }
-                        {statusLabel}
-                      </span>
-                    </div>
-                    <p className="text-sm text-[var(--ff-text-primary)] mt-0.5 truncate">
-                      {entry.summary}
-                    </p>
-                  </div>
-
-                  {/* Duration */}
-                  <div className="flex-shrink-0 text-right">
-                    <p className="text-xs text-[var(--ff-text-tertiary)]">
-                      {formatTime(entry.started_at)}
-                    </p>
-                    {entry.duration_seconds !== null && (
-                      <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">
-                        {formatDuration(entry.duration_seconds)}
-                      </p>
-                    )}
-                  </div>
-                </button>
-
-                {/* Expanded Details */}
-                {isExpanded && (
-                  <div className="border-t border-[var(--ff-border-light)] px-4 py-3 bg-[var(--ff-bg-primary)]">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-[var(--ff-text-tertiary)] text-xs">Started</span>
-                        <p className="text-[var(--ff-text-primary)]">
-                          {new Date(entry.started_at).toLocaleString('en-ZA')}
-                        </p>
-                      </div>
-                      {entry.completed_at && (
-                        <div>
-                          <span className="text-[var(--ff-text-tertiary)] text-xs">Completed</span>
-                          <p className="text-[var(--ff-text-primary)]">
-                            {new Date(entry.completed_at).toLocaleString('en-ZA')}
-                          </p>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-[var(--ff-text-tertiary)] text-xs">Duration</span>
-                        <p className="text-[var(--ff-text-primary)]">
-                          {formatDuration(entry.duration_seconds)}
-                        </p>
-                      </div>
-                      {entry.triggered_by && (
-                        <div>
-                          <span className="text-[var(--ff-text-tertiary)] text-xs">Triggered By</span>
-                          <p className="text-[var(--ff-text-primary)]">{entry.triggered_by}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Error message */}
-                    {entry.error_message && (
-                      <div className="mt-3 p-2 bg-red-500/5 border border-red-500/20 rounded text-sm text-red-400">
-                        {entry.error_message}
-                      </div>
-                    )}
-
-                    {/* Details JSON */}
-                    {entry.details && Object.keys(entry.details).length > 0 && (
-                      <div className="mt-3">
-                        <span className="text-[var(--ff-text-tertiary)] text-xs">Details</span>
-                        <div className="mt-1 grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {Object.entries(entry.details).map(([key, value]) => (
-                            <div
-                              key={key}
-                              className="px-2 py-1 bg-[var(--ff-bg-tertiary)] rounded text-xs"
-                            >
-                              <span className="text-[var(--ff-text-tertiary)]">
-                                {key.replace(/_/g, ' ')}:
-                              </span>{' '}
-                              <span className="text-[var(--ff-text-primary)] font-medium">
-                                {String(value ?? '-')}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {visibleEntries.map((entry) => (
+            <HistoryEntry
+              key={entry.id}
+              entry={entry}
+              isExpanded={expandedId === entry.id}
+              onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+            />
+          ))}
         </div>
       )}
     </div>
