@@ -7,7 +7,7 @@
 
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { OltRecord, OltStats, ImportRecord, DateFilter } from '../../../types';
-import { OltDateFilterBar } from './OltDateFilterBar';
+import { DateChipFilter } from '../../DateChipFilter';
 import { OltStatsBar } from './OltStatsBar';
 
 interface OltFixLogTabProps {
@@ -17,10 +17,12 @@ interface OltFixLogTabProps {
   isLoading: boolean;
   total: number;
   dateFilter: DateFilter;
-  customDate: string;
+  customDateFrom: string;
+  customDateTo: string;
   statusFilter: string;
   setDateFilter: (f: DateFilter) => void;
-  setCustomDate: (d: string) => void;
+  setCustomDateFrom: (d: string) => void;
+  setCustomDateTo: (d: string) => void;
   setStatusFilter: (s: string) => void;
 }
 
@@ -31,20 +33,24 @@ export function OltFixLogTab({
   isLoading,
   total,
   dateFilter,
-  customDate,
+  customDateFrom,
+  customDateTo,
   statusFilter,
   setDateFilter,
-  setCustomDate,
+  setCustomDateFrom,
+  setCustomDateTo,
   setStatusFilter,
 }: OltFixLogTabProps) {
   return (
     <div className="space-y-6">
       {/* Date + Stats filters */}
-      <OltDateFilterBar
+      <DateChipFilter
         dateFilter={dateFilter}
-        customDate={customDate}
+        customDateFrom={customDateFrom}
+        customDateTo={customDateTo}
         onDateFilterChange={setDateFilter}
-        onCustomDateChange={setCustomDate}
+        onCustomDateFromChange={setCustomDateFrom}
+        onCustomDateToChange={setCustomDateTo}
       />
       <OltStatsBar
         stats={stats}

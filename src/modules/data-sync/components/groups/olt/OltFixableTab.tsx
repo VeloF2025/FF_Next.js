@@ -11,9 +11,11 @@ import {
   CheckSquare,
   Square,
 } from 'lucide-react';
-import type { OltRecord, OltStats, InvestigationContext, DisplacedInfo, BulkFixResult } from '../../../types';
+import type { OltRecord, OltStats, InvestigationContext, DisplacedInfo, BulkFixResult, DateFilter } from '../../../types';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { OltRecordTable } from './OltRecordTable';
+import { OltStatsBar } from './OltStatsBar';
+import { DateChipFilter } from '../../DateChipFilter';
 
 interface OltFixableTabProps {
   records: OltRecord[];
@@ -31,10 +33,21 @@ interface OltFixableTabProps {
   getInvestigationContext: (record: OltRecord) => InvestigationContext | null;
   fetchRecords: (status: string, subStatus?: string, search?: string) => Promise<void>;
   fetchStats: () => Promise<void>;
+  // Shared date filter state from useOltState (drives both the table query and
+  // the stat-card breakdown via fetchStats).
+  dateFilter: DateFilter;
+  customDateFrom: string;
+  customDateTo: string;
+  setDateFilter: (f: DateFilter) => void;
+  setCustomDateFrom: (d: string) => void;
+  setCustomDateTo: (d: string) => void;
+  statusFilter: string;
+  setStatusFilter: (s: string) => void;
 }
 
 export function OltFixableTab({
   records,
+  stats,
   isLoading,
   page,
   total,
@@ -48,6 +61,14 @@ export function OltFixableTab({
   getInvestigationContext,
   fetchRecords,
   fetchStats,
+  dateFilter,
+  customDateFrom,
+  customDateTo,
+  setDateFilter,
+  setCustomDateFrom,
+  setCustomDateTo,
+  statusFilter,
+  setStatusFilter,
 }: OltFixableTabProps) {
   // Local state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -180,7 +201,19 @@ export function OltFixableTab({
   };
 
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+    <div className="space-y-4">
+      {/* Date filter + filter-aware stat cards */}
+      <DateChipFilter
+        dateFilter={dateFilter}
+        customDateFrom={customDateFrom}
+        customDateTo={customDateTo}
+        onDateFilterChange={setDateFilter}
+        onCustomDateFromChange={setCustomDateFrom}
+        onCustomDateToChange={setCustomDateTo}
+      />
+      <OltStatsBar stats={stats} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} />
+
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
       {/* Bulk Action Bar */}
       {records.length > 0 && (
         <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
@@ -250,6 +283,7 @@ export function OltFixableTab({
         getInvestigationContext={getInvestigationContext}
         displacedInfo={displacedInfo}
       />
+      </div>
     </div>
   );
 }

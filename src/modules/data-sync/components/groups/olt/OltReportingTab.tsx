@@ -9,16 +9,37 @@ import { Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
-import type { ReportPeriod, ReportData, DisplacedReport, OltRecord } from '../../../types';
+import type { ReportPeriod, ReportData, DisplacedReport, OltRecord, DateFilter } from '../../../types';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { DateChipFilter } from '../../DateChipFilter';
 
 interface OltReportingTabProps {
   setError: (e: string | null) => void;
 }
 
+// The reporting API takes a fixed `period` enum (today/yesterday/week/30days/all);
+// it does not accept a from/to range. Map the shared DateChipFilter values onto
+// that enum so the UI is consistent with other groups but the API contract is
+// unchanged. Custom is hidden via `omitCustom` so it cannot reach this function.
+function dateFilterToReportPeriod(f: DateFilter): ReportPeriod {
+  switch (f) {
+    case 'today': return 'today';
+    case 'yesterday': return 'yesterday';
+    case '7d': return 'week';
+    case '30d': return '30days';
+    case 'all': return 'all';
+    case 'custom':
+      // Unreachable: DateChipFilter is mounted with omitCustom — Custom chip
+      // is hidden, no UI path can produce this value. If a future caller drops
+      // omitCustom, throw loudly rather than silently coerce to 'all'.
+      throw new Error("OltReportingTab: dateFilter='custom' unreachable while omitCustom is set");
+  }
+}
+
 export function OltReportingTab({ setError }: OltReportingTabProps) {
   // All reporting state is local
-  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('all');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const reportPeriod: ReportPeriod = dateFilterToReportPeriod(dateFilter);
   const [reportStatusFilter, setReportStatusFilter] = useState<string>('all');
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -133,24 +154,12 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
     <div className="space-y-6">
       {/* Period Selector and Export */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-[var(--ff-text-secondary)]">Period:</span>
-          <div className="flex gap-2">
-            {(['today', 'yesterday', 'week', '30days', 'all'] as ReportPeriod[]).map((period) => (
-              <button
-                key={period}
-                onClick={() => setReportPeriod(period)}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  reportPeriod === period
-                    ? 'bg-[var(--ff-accent)] text-white'
-                    : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
-                }`}
-              >
-                {period === 'all' ? 'All Time' : period === '30days' ? '30 Days' : period.charAt(0).toUpperCase() + period.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
+        <DateChipFilter
+          dateFilter={dateFilter}
+          onDateFilterChange={setDateFilter}
+          omitCustom
+          label="Period:"
+        />
         <div className="flex items-center gap-2">
           <button
             onClick={handleExportCSV}

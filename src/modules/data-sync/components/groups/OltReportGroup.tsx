@@ -125,6 +125,14 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           getInvestigationContext={state.getInvestigationContext}
           fetchRecords={state.fetchRecords}
           fetchStats={state.fetchStats}
+          dateFilter={state.dateFilter}
+          customDateFrom={state.customDateFrom}
+          customDateTo={state.customDateTo}
+          setDateFilter={state.setDateFilter}
+          setCustomDateFrom={state.setCustomDateFrom}
+          setCustomDateTo={state.setCustomDateTo}
+          statusFilter={state.statusFilter}
+          setStatusFilter={state.setStatusFilter}
         />
       )}
 
@@ -148,6 +156,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       {state.currentTab === 'escalations' && (
         <OltEscalationsTab
           records={state.records}
+          stats={state.stats}
           isLoading={state.isLoading}
           page={state.page}
           total={state.total}
@@ -155,6 +164,12 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           setPage={state.setPage}
           isStatusMismatch={state.isStatusMismatch}
           getInvestigationContext={state.getInvestigationContext}
+          dateFilter={state.dateFilter}
+          customDateFrom={state.customDateFrom}
+          customDateTo={state.customDateTo}
+          setDateFilter={state.setDateFilter}
+          setCustomDateFrom={state.setCustomDateFrom}
+          setCustomDateTo={state.setCustomDateTo}
         />
       )}
 
@@ -166,10 +181,12 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           isLoading={state.isLoading}
           total={state.total}
           dateFilter={state.dateFilter}
-          customDate={state.customDate}
+          customDateFrom={state.customDateFrom}
+          customDateTo={state.customDateTo}
           statusFilter={state.statusFilter}
           setDateFilter={state.setDateFilter}
-          setCustomDate={state.setCustomDate}
+          setCustomDateFrom={state.setCustomDateFrom}
+          setCustomDateTo={state.setCustomDateTo}
           setStatusFilter={state.setStatusFilter}
         />
       )}

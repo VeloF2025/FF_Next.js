@@ -65,11 +65,13 @@ export interface UseOltStateReturn {
   fixErrors: Record<string, string>;
   setFixErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
 
-  // Date/status filters (used by Fix Log + Reporting)
+  // Date/status filters shared across Fixable + Investigate + Escalations + Fix Log.
   dateFilter: DateFilter;
   setDateFilter: (f: DateFilter) => void;
-  customDate: string;
-  setCustomDate: (d: string) => void;
+  customDateFrom: string;
+  setCustomDateFrom: (d: string) => void;
+  customDateTo: string;
+  setCustomDateTo: (d: string) => void;
   statusFilter: string;
   setStatusFilter: (s: string) => void;
 
@@ -132,9 +134,10 @@ export function useOltState(
   const [fixing, setFixing] = useState<string | null>(null);
   const [fixErrors, setFixErrors] = useState<Record<string, string>>({});
 
-  // Date/status filters (shared between Fix Log + Reporting)
+  // Date/status filters shared across tabs that surface a DateChipFilter.
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
-  const [customDate, setCustomDate] = useState('');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Auto-detect status (shared across all tabs)
@@ -151,7 +154,7 @@ export function useOltState(
 
   const fetchStats = useCallback(async () => {
     try {
-      const range = getDateRange(dateFilter, customDate);
+      const range = getDateRange(dateFilter, customDateFrom, customDateTo);
       const params = new URLSearchParams();
       if (range.dateFrom) params.set('dateFrom', range.dateFrom);
       if (range.dateTo) params.set('dateTo', range.dateTo);
@@ -164,7 +167,7 @@ export function useOltState(
     } catch {
       // Silently fail
     }
-  }, [dateFilter, customDate]);
+  }, [dateFilter, customDateFrom, customDateTo]);
 
   const fetchRecords = useCallback(
     async (status: string, subStatus?: string, search?: string, project?: string, projects?: string[], dateFrom?: string, dateTo?: string) => {
@@ -198,7 +201,7 @@ export function useOltState(
   const fetchImports = useCallback(async () => {
     setIsLoading(true);
     try {
-      const range = getDateRange(dateFilter, customDate);
+      const range = getDateRange(dateFilter, customDateFrom, customDateTo);
       const dateParams = new URLSearchParams();
       if (range.dateFrom) dateParams.set('dateFrom', range.dateFrom);
       if (range.dateTo) dateParams.set('dateTo', range.dateTo);
@@ -225,7 +228,7 @@ export function useOltState(
     } finally {
       setIsLoading(false);
     }
-  }, [dateFilter, customDate, statusFilter]);
+  }, [dateFilter, customDateFrom, customDateTo, statusFilter]);
 
   const fetchAutoDetectStatus = useCallback(async () => {
     try {
@@ -276,21 +279,24 @@ export function useOltState(
   // ─── Tab-change data loading ───────────────────────────────────────
 
   useEffect(() => {
-    // Clear stale fix state on tab change
+    // Clear stale fix state on tab change.
     setFixErrors({});
 
     fetchStats();
+    // Investigate tab manages its own date filter locally, so it intentionally
+    // re-fetches via its own effect — don't drive it from the shared filter.
+    const range = getDateRange(dateFilter, customDateFrom, customDateTo);
     if (currentTab === 'pending') {
-      fetchRecords('pending');
+      fetchRecords('pending', undefined, undefined, undefined, undefined, range.dateFrom, range.dateTo);
     } else if (currentTab === 'investigate') {
       fetchRecords('needs_investigation');
     } else if (currentTab === 'escalations') {
-      fetchRecords('escalated');
+      fetchRecords('escalated', undefined, undefined, undefined, undefined, range.dateFrom, range.dateTo);
     } else if (currentTab === 'history') {
       fetchImports();
     }
     // reporting tab fetches its own data locally
-  }, [currentTab, page, fetchStats, fetchRecords, fetchImports]);
+  }, [currentTab, page, dateFilter, customDateFrom, customDateTo, fetchStats, fetchRecords, fetchImports]);
 
   // ─── Helpers ───────────────────────────────────────────────────────
 
@@ -376,8 +382,10 @@ export function useOltState(
 
     dateFilter,
     setDateFilter,
-    customDate,
-    setCustomDate,
+    customDateFrom,
+    setCustomDateFrom,
+    customDateTo,
+    setCustomDateTo,
     statusFilter,
     setStatusFilter,
 
