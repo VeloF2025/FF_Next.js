@@ -1,18 +1,18 @@
 /**
  * cascadeSerialPromotion.ts — Sprint E Track 2.4 helper
  *
- * Encapsulates the per-row promoteSerial loop used by cascadePpResolution.
- * Separated because the refactored cascade + imports would exceed the 300-line
- * service file limit.
+ * Encapsulates the bulk metadata UPDATE (Step A) and per-row promoteSerial
+ * loop (Step B) used by cascadePpResolution. Separated because the refactored
+ * cascade + imports would exceed the 300-line service file limit.
  *
  * Contract:
  *   - Accepts a PoolClient already inside an open transaction (caller owns
  *     BEGIN/COMMIT/ROLLBACK — same pattern as cascadePpResolution.ts).
- *   - For each candidate whose `currentStatus` is a matrix-valid source for
- *     the `(*, installed)` transition, calls promoteSerial(client, ...).
- *   - For all other candidates (activated, installed, faulty, returned,
- *     scrapped) the metadata UPDATE that precedes this call already ran in the
- *     parent; no additional write is performed here.
+ *   - selectAndUpdateMetadataForCascade: CTE+UPDATE...RETURNING → candidate
+ *     array (STEP A).  promoteCascadeCandidates: per-row status promotion
+ *     loop (STEP B).
+ *   - For candidates not in MATRIX_VALID_SOURCES (activated, installed, etc.)
+ *     the Step A metadata UPDATE already ran; no further write is performed.
  *
  * Valid sources after mig 387 matrix extension:
  *   issued, in_stock, available, allocated_to_project
@@ -20,15 +20,13 @@
  *
  * Design notes:
  *   - Metadata UPDATE (installed_at_drop_number, installed_date) runs as a
- *     bulk statement in cascadePpResolution BEFORE this helper is called so
- *     that cross-validation triggers see the installed_at_drop_number already
- *     set when promoteSerial fires.
+ *     bulk statement BEFORE the per-row loop so that cross-validation triggers
+ *     see installed_at_drop_number already set when promoteSerial fires.
  *   - sourceTable is always 'oes_pp_data'; sourceId is the pp.id (integer) cast
  *     to string. The emit trigger stores it as uuid; oes_pp_data.id is SERIAL
  *     (integer), so we pass a nil-UUID placeholder to keep the uuid column happy
- *     while still namespacing events by sourceTable. The FAKE_PP_UUID approach
- *     is intentional — see Gotcha 5 in the plan: sourceId ← pp.id, but the
- *     column is uuid so we encode as a deterministic nil UUID.
+ *     while still namespacing events by sourceTable. The ppIdToUuid approach is
+ *     intentional — see Gotcha 5 in the plan.
  *
  * Refs: docs/superpowers/plans/2026-05-28-serial-lifecycle-state-machine-sprintE.md
  */
@@ -78,16 +76,100 @@ const MATRIX_VALID_SOURCES = new Set<string>([
   'allocated_to_project',
 ]);
 
-// ─── Implementation ────────────────────────────────────────────────────────────
+// ─── Step A: bulk metadata UPDATE ─────────────────────────────────────────────
+
+/**
+ * CTE + bulk UPDATE that writes installed_at_drop_number / installed_date for
+ * all eligible serials matched against newly-resolved oes_pp_data rows.
+ *
+ * WHY: stock_serials may key the inventory record by either the PP serial
+ * (procurement source) or the photo serial (what was actually installed, when
+ * VLM/OCR differs by 1 char). Prefer photo_serial when present — that's the
+ * physical unit on the wall. Fall back to pp_serial. Only update one record per
+ * resolution; if both rows happen to exist, the physical (photo) wins.
+ *
+ * status: only promote pre-install states. Already-activated serials get their
+ * install metadata backfilled (so the install fact is captured), but their
+ * status is NOT regressed from 'activated' — OES is the activation oracle, and
+ * the lifecycle is one-way past activated.
+ *
+ * The ROW_NUMBER() OVER (PARTITION BY pp.id ORDER BY CASE WHEN serial_number =
+ * photo_serial THEN 1 ... END) is the mechanism that enforces the photo_serial
+ * preference: the photo-matched row gets rn=1 and is the only row updated.
+ *
+ * @param client      An open pg PoolClient — caller owns the transaction.
+ * @param cutoffTime  Lower bound for pp.resolved_at — only newly-resolved PPs
+ *                    are touched (passed from cascadePpResolution caller).
+ * @returns           Candidate array ready for the Step B promotion loop.
+ */
+export async function selectAndUpdateMetadataForCascade(
+  client:      PoolClient,
+  cutoffTime:  Date,
+): Promise<CascadeCandidate[]> {
+  const metadataUpdate = await client.query(
+    `
+    WITH ranked AS (
+      SELECT ss.id          AS serial_id,
+             ss.serial_number,
+             ss.status      AS current_status,
+             pp.id          AS pp_id,
+             pp.resolved_drop_number,
+             (pp.resolved_details->>'photo_date')::date AS photo_date,
+             ROW_NUMBER() OVER (
+               PARTITION BY pp.id
+               ORDER BY CASE
+                 WHEN ss.serial_number = pp.resolved_details->>'photo_serial' THEN 1
+                 WHEN ss.serial_number = pp.serial_number THEN 2
+                 ELSE 3
+               END
+             ) AS rn
+      FROM oes_pp_data pp
+      JOIN stock_serials ss
+        ON ss.serial_number IN (pp.serial_number, COALESCE(pp.resolved_details->>'photo_serial', pp.serial_number))
+      WHERE pp.resolved_at >= $1
+        AND pp.resolved_drop_number IS NOT NULL
+        AND ss.installed_at_drop_number IS NULL
+    )
+    UPDATE stock_serials ss
+    SET installed_at_drop_number = r.resolved_drop_number,
+        installed_date = COALESCE(r.photo_date, CURRENT_DATE),
+        updated_at = NOW()
+    FROM ranked r
+    WHERE ss.id = r.serial_id
+      AND r.rn = 1
+      AND ss.installed_at_drop_number IS NULL
+    RETURNING
+      ss.id          AS serial_id,
+      ss.serial_number,
+      ss.status      AS current_status,
+      r.pp_id        AS pp_id,
+      r.resolved_drop_number AS drop_number,
+      r.photo_date::text     AS photo_date
+    `,
+    [cutoffTime.toISOString()],
+  );
+
+  return metadataUpdate.rows.map((r) => ({
+    serialId:      r.serial_id     as string,
+    serialNumber:  r.serial_number as string,
+    currentStatus: r.current_status as string,
+    ppId:          Number(r.pp_id),
+    dropNumber:    r.drop_number   as string,
+    photoDate:     r.photo_date    as string | null,
+  }));
+}
+// ─── Step B: per-row status promotion ─────────────────────────────────────────
 
 /**
  * For each candidate, call promoteSerial (status + event) when the source
  * state is matrix-valid. Skip already-installed/activated states (metadata
  * was already updated by the bulk UPDATE; no event is appropriate).
  *
- * @param client    An open pg PoolClient — caller owns the transaction.
+ * @param client      An open pg PoolClient — caller owns the transaction.
  * @param candidates  Resolved PP serials with their pre-UPDATE status.
- * @param cutoffTime  Passed through for log context only.
+ * @param cutoffTime  Stored on each emitted stock_serial_events.payload as
+ *                    `cutoff_time` for forensic audit, plus included in the
+ *                    cascade summary log.
  */
 export async function promoteCascadeCandidates(
   client:      PoolClient,
@@ -143,11 +225,25 @@ export async function promoteCascadeCandidates(
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Encode an integer oes_pp_data.id as a deterministic UUID by zero-padding
- * into the last segment. This gives a stable, non-random UUID that is
- * searchable via `WHERE source_table = 'oes_pp_data' AND source_id = ...`.
+ * Encode integer oes_pp_data.id into a UUID-shaped string for storage in
+ * stock_serial_events.source_id (which is uuid-typed).
  *
- * Example: 42 → '00000000-0000-0000-0000-000000000042'
+ * Encoding: zero-pad the decimal integer to 12 chars and place it in the
+ * trailing segment of an otherwise all-zero UUID:
+ *   ppId 42 → '00000000-0000-0000-0000-000000000042'
+ *
+ * Safety:
+ *   - oes_pp_data.id is INT4 (PG SERIAL); max value 2,147,483,647 (10 digits)
+ *     fits comfortably in the 12-char trailing segment.
+ *   - Decimal digits 0-9 ARE valid hex chars — pg's uuid type accepts them.
+ *
+ * Reversal: parse the trailing 12 chars as a base-10 integer.
+ *
+ * Limitations:
+ *   - NOT namespaced. If another source_table ever adopts the same trick,
+ *     collisions are possible across source_table values. This is acceptable
+ *     today because only the cascade uses this encoding. Future-work: add a
+ *     real `source_integer_id` column to stock_serial_events to retire this.
  */
 function ppIdToUuid(ppId: number): string {
   return `00000000-0000-0000-0000-${String(ppId).padStart(12, '0')}`;
