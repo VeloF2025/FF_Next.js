@@ -80,4 +80,17 @@ CREATE TABLE IF NOT EXISTS stock_consumptions (
     CHECK (job_type IN ('drop','home_install','maintenance'))
 );
 
+-- qa_photo_reviews — Track 2.6 scan serial columns.
+-- The base seed.sql creates qa_photo_reviews with only (id, drop_number,
+-- ont_serial_scanned, created_at). scanSerialService.ts writes additional
+-- columns that the prod schema carries. Adding them here keeps schema
+-- mutations in seed DDL rather than in test beforeAll hooks.
+ALTER TABLE qa_photo_reviews
+  ADD COLUMN IF NOT EXISTS ont_consumption_id  UUID,
+  ADD COLUMN IF NOT EXISTS ups_serial_scanned  TEXT,
+  ADD COLUMN IF NOT EXISTS ups_consumption_id  UUID,
+  ADD COLUMN IF NOT EXISTS scan_gps_lat        NUMERIC,
+  ADD COLUMN IF NOT EXISTS scan_gps_lng        NUMERIC,
+  ADD COLUMN IF NOT EXISTS updated_at          TIMESTAMPTZ DEFAULT NOW();
+
 COMMIT;

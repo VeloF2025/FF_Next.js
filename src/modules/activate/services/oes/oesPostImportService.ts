@@ -18,6 +18,7 @@ import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
 import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
 import { recordVlmCorrectionsFromOes } from './oesVlmLearningService';
+import { promoteOesActivatedSerials } from './oesSerialLifecycle';
 
 const logger = createLogger('oes/oesPostImportService');
 
@@ -239,6 +240,24 @@ export function triggerPpActivationCheck(): void {
       `);
       if ((activatedResult.rowCount ?? 0) > 0) {
         logger.info(`PP activation check: ${activatedResult.rowCount} serials now activated`);
+
+        // ── Sprint E Track 2.6: OES installed → activated lifecycle promotion ──
+        //
+        // DORMANT PRE-CUTOVER: mig 364 TRIGGER 3 (`trg_oes_pp_data_after_insert_activate`)
+        // fires on oes_pp_data INSERT/UPDATE and directly sets stock_serials.status →
+        // 'activated' before this application-layer code runs. By the time we reach
+        // this point, TRIGGER 3 has already raced ahead — so promoteSerial calls for
+        // serials already in 'activated' state will be no-ops (mig 387 matrix row 73
+        // source='installed' won't match 'activated' current state).
+        //
+        // POST-CUTOVER (Track 7): TRIGGER 3 will be retired. This loop becomes the
+        // sole `installed → activated` writer for the OES activation path.
+        // Matrix row 73: `installed → activated` → event_type='activated_on_oes'.
+        //
+        // Implementation: for each activated serial, look up its stock_serials row.
+        // If status='installed', promote to 'activated' via the lifecycle state machine.
+        // Serials already in 'activated' (TRIGGER 3 pre-cutover) are silently skipped.
+        await promoteOesActivatedSerials(activatedResult.rows);
 
         // Action Centre timeline: emit pre_prov_resolved for each newly-activated
         // PP row so the DR timeline shows "pre-provisioned → active" transition.
