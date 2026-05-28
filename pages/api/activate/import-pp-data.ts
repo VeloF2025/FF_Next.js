@@ -31,17 +31,89 @@ async function handler(
   const action = req.query.action as string;
 
   if (action === 'stats') {
-    const statsResult = await pool.query(`
-      SELECT
+    // Apply the same filter set as list (except status, so each card reflects
+    // its own status count against the same project/date/priority/etc. scope).
+    const project = req.query.project as string;
+    const status = req.query.status as string;
+    const priority = req.query.priority as string;
+    const aging = req.query.aging as string;
+    const dateFrom = req.query.dateFrom as string;
+    const dateTo = req.query.dateTo as string;
+    const search = ((req.query.search as string) || '').trim();
+    const pon = req.query.pon as string;
+
+    let whereClause = '';
+    const params: (string | number)[] = [];
+    let paramIndex = 1;
+
+    if (project) {
+      whereClause += ` AND pp.project = $${paramIndex++}`;
+      params.push(project);
+    }
+    if (status === 'unticketed') {
+      whereClause += ` AND pp.maintenance_ticket_id IS NULL AND pp.resolution_status != 'activated'`;
+    } else if (status === 'located') {
+      whereClause += ` AND pp.resolution_status LIKE 'located_%'`;
+    } else if (status === 'ticketed') {
+      whereClause += ` AND pp.maintenance_ticket_id IS NOT NULL`;
+    } else if (status) {
+      whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
+      params.push(status);
+    }
+    // Aging implies high priority; if both supplied, aging wins to avoid a
+    // double `mt.priority = X` AND-clause that would never match.
+    const effectivePriority = aging ? 'high' : priority;
+    if (effectivePriority) {
+      whereClause += ` AND mt.priority = $${paramIndex++}`;
+      params.push(effectivePriority);
+    }
+    if (aging === 'recent') {
+      whereClause += ` AND mt.created_at >= NOW() - $${paramIndex++}::interval`;
+      params.push('6 days');
+    } else if (aging === '7days') {
+      whereClause += ` AND mt.created_at >= NOW() - $${paramIndex++}::interval AND mt.created_at < NOW() - $${paramIndex++}::interval`;
+      params.push('13 days', '6 days');
+    } else if (aging === '14days') {
+      whereClause += ` AND mt.created_at < NOW() - $${paramIndex++}::interval`;
+      params.push('13 days');
+    }
+    if (dateFrom) {
+      whereClause += ` AND pp.date_registered >= $${paramIndex++}::date`;
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      whereClause += ` AND pp.date_registered <= $${paramIndex++}::date`;
+      params.push(dateTo);
+    }
+    if (search) {
+      // One bound param reused across three ILIKE checks → push once, then
+      // single increment (intentional deferred ++ — matches the list branch).
+      whereClause += ` AND (pp.serial_number ILIKE $${paramIndex} OR pp.resolved_drop_number ILIKE $${paramIndex} OR mt.ticket_uid ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+    if (pon) {
+      const ponNum = parseInt(pon, 10);
+      if (!isNaN(ponNum)) {
+        whereClause += ` AND pp.olt_pon = $${paramIndex++}`;
+        params.push(ponNum);
+      }
+    }
+
+    const statsResult = await pool.query(
+      `SELECT
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE resolution_status = 'activated') as activated,
-        COUNT(*) FILTER (WHERE resolution_status LIKE 'located_%') as located,
-        COUNT(*) FILTER (WHERE resolution_status = 'not_found') as not_found,
-        COUNT(DISTINCT project) as projects,
-        COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL) as ticketed,
-        COUNT(*) FILTER (WHERE maintenance_ticket_id IS NULL AND resolution_status != 'activated') as unticketed
-      FROM oes_pp_data
-    `);
+        COUNT(*) FILTER (WHERE pp.resolution_status = 'activated') as activated,
+        COUNT(*) FILTER (WHERE pp.resolution_status LIKE 'located_%') as located,
+        COUNT(*) FILTER (WHERE pp.resolution_status = 'not_found') as not_found,
+        COUNT(DISTINCT pp.project) as projects,
+        COUNT(*) FILTER (WHERE pp.maintenance_ticket_id IS NOT NULL) as ticketed,
+        COUNT(*) FILTER (WHERE pp.maintenance_ticket_id IS NULL AND pp.resolution_status != 'activated') as unticketed
+      FROM oes_pp_data pp
+      LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
+      WHERE 1=1${whereClause}`,
+      params,
+    );
 
     const lastImportResult = await pool.query(`
       SELECT created_at, filename, total_rows
