@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { DOCUMENT_TYPE_CONFIG, type DocumentTypeValue } from '@/modules/assets/types/document';
 import { ASSET_STATUS_CONFIG } from '@/modules/assets/constants/assetStatus';
+import { log } from '@/lib/logger';
 import { CheckInButton } from './CheckInButton';
 import { DeleteDocumentButton } from './DeleteDocumentButton';
 import { DeleteAssetButton } from './DeleteAssetButton';
@@ -47,7 +48,7 @@ async function getAsset(id: string) {
     const data = await response.json();
     return data.data;
   } catch (error) {
-    console.error('Error fetching asset:', error);
+    log.error('Failed to fetch asset', { error, id }, 'AssetDetailPage');
     return null;
   }
 }
@@ -62,7 +63,7 @@ async function getAssignmentHistory(id: string) {
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching history:', error);
+    log.error('Failed to fetch asset history', { error, id }, 'AssetDetailPage');
     return [];
   }
 }
@@ -77,7 +78,7 @@ async function getDocuments(id: string) {
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching documents:', error);
+    log.error('Failed to fetch asset documents', { error, id }, 'AssetDetailPage');
     return [];
   }
 }
@@ -595,7 +596,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
             <AssetVerificationSection
               assetId={id}
               verificationStatus={asset.verificationStatus || null}
-              verifiedAt={asset.verifiedAt?.toISOString() || null}
+              verifiedAt={asset.verifiedAt || null}
               verifiedBy={asset.verifiedBy || null}
             />
           </div>
