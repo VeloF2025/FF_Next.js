@@ -17,16 +17,15 @@
  *   Happy path (issue): serial in_stock → issued, sourceTable='stock_pickings'
  *     → exactly one event row with event_type='issued_to_tech'
  *
- *   Cancel/revert path: serial in_stock → in_stock (same-state write)
+ *   Non-issue/restock path: serial available → available (same-state write)
+ *     Production writes 'available' (not 'in_stock') because the legacy
+ *     stock_serials_status_check constraint pre-cutover rejects 'in_stock'.
  *     The mig 387 validate trigger short-circuits on same-state UPDATEs
- *     (no matrix row needed; both triggers skip on v_from = v_to).
- *     The emit trigger also short-circuits — zero events expected.
- *     This covers the non-issue branch where the handler restocks a serial
- *     to its current state.
+ *     (both triggers skip on v_from = v_to), so zero events fire.
  *
  * Matrix reference (scripts/migrations/sql/387_serial_lifecycle_state_machine.sql):
  *   ('in_stock', 'issued')     → event_type='issued_to_tech'   [line 68]
- *   ('in_stock', 'in_stock')   → same-state no-op, no event    [trigger L144-L146]
+ *   same-state UPDATE          → no event                       [trigger L144-L146]
  *
  * Isolation: uses TRACK2-PICK- prefixed serial numbers; afterAll cleans up
  * events + serials so re-runs start clean.
@@ -83,9 +82,11 @@ beforeAll(async () => {
        RETURNING id`,
       [`${SN_PREFIX}ISSUE-001`, itemId, LOC_WAREHOUSE_ID],
     );
+    // noopSerial seeded as 'available' — matches the production state of
+    // warehouse serials pre-cutover (legacy CHECK constraint vocabulary).
     const noopRes = await seedClient.query<{ id: string }>(
       `INSERT INTO stock_serials (serial_number, stock_item_id, status, current_location_id)
-       VALUES ($1, $2, 'in_stock', $3)
+       VALUES ($1, $2, 'available', $3)
        RETURNING id`,
       [`${SN_PREFIX}NOOP-001`, itemId, LOC_WAREHOUSE_ID],
     );
@@ -200,32 +201,26 @@ describe('picking process handler — serial lifecycle via promoteSerial (Task 2
   });
 
   /**
-   * Cancel/revert (non-issue) path: in_stock → in_stock (same-state no-op)
+   * Non-issue restock path: available → available (same-state no-op)
    *
-   * The refactored handler replaces the raw `status='available'` UPDATE with
-   * promoteSerial(... toStatus: 'in_stock' ...). When the serial is already
-   * in_stock, this is a same-state write.
+   * Pre-cutover, the legacy stock_serials_status_check constraint (mig 362)
+   * does NOT include 'in_stock' — writing 'in_stock' would 23514 reject.
+   * The refactored handler therefore writes 'available' on the non-issue
+   * branch; warehouse serials are already 'available', so this is a
+   * same-state UPDATE and both mig 387 triggers short-circuit
+   * (validate L144-L146; emit L200-L202) before consulting the matrix.
+   * Zero events expected.
    *
-   * mig 387 validate trigger (line 144-146):
-   *   IF v_from = v_to AND TG_OP = 'UPDATE' THEN RETURN NEW; END IF;
-   *
-   * mig 387 emit trigger (line 200-202):
-   *   IF v_from = NEW.status AND TG_OP = 'UPDATE' THEN RETURN NEW; END IF;
-   *
-   * Both triggers short-circuit without consulting the transition matrix and
-   * without emitting an event. Zero events expected.
-   *
-   * Note: the production code routes status='available' writes to 'in_stock'
-   * because mig 387 widens the vocabulary and 'available' is the legacy alias.
-   * The net effect for already-in_stock serials is a same-state no-op.
+   * Track 5 backfill (post-cutover) will rename available → in_stock; until
+   * then, callers stay on the legacy vocabulary so this path works against
+   * both the legacy CHECK and the widened mig 387 CHECK.
    */
-  it('emits zero events for same-state in_stock → in_stock (non-issue restock no-op)', async () => {
+  it('emits zero events for same-state available → available (non-issue restock no-op)', async () => {
     await transaction(async (txn) => {
-      // toHolderId is left undefined (not passed) — the non-issue path does
-      // not own holder semantics; holder should remain whatever it was.
+      // toHolderId omitted — the non-issue path does not own holder semantics.
       await promoteSerial(txn.client, {
         serialId:    noopSerialId,
-        toStatus:    'in_stock',
+        toStatus:    'available',
         sourceTable: 'stock_pickings',
         sourceId:    FAKE_PICKING_ID,
         actorStaffId: null,
@@ -233,12 +228,12 @@ describe('picking process handler — serial lifecycle via promoteSerial (Task 2
       });
     });
 
-    // Assertion: serial status remains 'in_stock'
+    // Assertion: serial status remains 'available'
     const serialRow = await pool.query<{ status: string }>(
       `SELECT status FROM stock_serials WHERE id = $1`,
       [noopSerialId],
     );
-    expect(serialRow.rows[0]?.status).toBe('in_stock');
+    expect(serialRow.rows[0]?.status).toBe('available');
 
     // Assertion: zero events (same-state write → both triggers short-circuit)
     const events = await pool.query<{ id: string }>(

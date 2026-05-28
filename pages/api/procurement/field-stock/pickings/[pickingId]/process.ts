@@ -1,7 +1,11 @@
 /**
+ * Process Picking API
  * POST /api/procurement/field-stock/pickings/[pickingId]/process
+ *
  * Fix VF-20260331-048: stock availability validation + explicit transaction.
- * Sprint D: custody via postIssueToHolderWith. Sprint E: serial status via promoteSerial.
+ * Sprint D: issue pickings post into holder custody via postIssueToHolderWith.
+ * Sprint E Track 2.2: serial status writes route through promoteSerial so
+ * mig 387 triggers can emit stock_serial_events with source_table='stock_pickings'.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -17,7 +21,7 @@ import {
   getOrCreateStaffHolder,
   getOrCreateContractorHolder,
 } from '@/modules/procurement/field-stock/services/stockHolderService';
-import { promoteSerial } from '@/modules/procurement/field-stock/services/serialLifecycle';
+import { promotePickingSerials } from '@/modules/procurement/field-stock/services/pickingSerialPromotion';
 
 interface PickingLine {
   id: string;
@@ -162,10 +166,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           performedBy: picking.signed_by ?? undefined,
         });
 
-        // Serials: metadata (current_location_id) in a batched UPDATE; then
-        // per-serial promoteSerial routes status+holder through mig 387 triggers.
-        // Must pass txn.client (raw PoolClient) — TxnClient has no `release`,
-        // which would misidentify it as a Pool and break at runtime.
+        // Metadata first (current_location_id batched); then per-serial promoteSerial
+        // routes status+holder through mig 387 triggers via the Track 2.2 helper.
         const allSerialIds = lines.flatMap((l) => l.serial_ids ?? []);
         if (allSerialIds.length > 0) {
           await txn.query(
@@ -173,17 +175,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              WHERE id = ANY($1::uuid[])`,
             [allSerialIds],
           );
-          for (const serialId of allSerialIds) {
-            await promoteSerial(txn.client, {
-              serialId,
-              toStatus:    'issued',
-              toHolderId:  toHolderId,
-              sourceTable: 'stock_pickings',
-              sourceId:    pickingId,
-              actorStaffId: picking.signed_by ?? null,
-              payload: { picking_number: picking.picking_number },
-            });
-          }
+          await promotePickingSerials(txn, allSerialIds, {
+            toStatus:     'issued',
+            toHolderId:   toHolderId,
+            sourceId:     pickingId,
+            actorStaffId: picking.signed_by ?? null,
+            payload:      { picking_number: picking.picking_number },
+          });
         }
 
         // Persist holder_id on picking if not already set
@@ -220,22 +218,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           );
           if (Array.isArray(line.serial_ids) && line.serial_ids.length > 0) {
             // Metadata first; promoteSerial routes status through mig 387 triggers.
-            // toHolderId omitted — non-issue path does not own holder semantics.
+            // toStatus='available' (not 'in_stock'): the legacy stock_serials_status_check
+            // constraint (mig 362) predates mig 387's vocabulary widening, so writing
+            // 'in_stock' would 23514 reject pre-cutover. 'available' is in both the legacy
+            // CHECK and mig 387's matrix; Track 5 backfill renames it after cutover.
             await txn.query(
               `UPDATE stock_serials SET current_location_id = $1, updated_at = NOW()
                WHERE id = ANY($2::uuid[])`,
               [destinationLocationId, line.serial_ids],
             );
-            for (const serialId of line.serial_ids) {
-              await promoteSerial(txn.client, {
-                serialId,
-                toStatus:    'in_stock',
-                sourceTable: 'stock_pickings',
-                sourceId:    pickingId,
-                actorStaffId: picking.signed_by ?? null,
-                payload: { picking_number: picking.picking_number, picking_type: pickingType },
-              });
-            }
+            await promotePickingSerials(txn, line.serial_ids, {
+              toStatus:     'available',
+              sourceId:     pickingId,
+              actorStaffId: picking.signed_by ?? null,
+              payload:      { picking_number: picking.picking_number, picking_type: pickingType },
+            });
           }
           await txn.query(
             `INSERT INTO stock_movements (picking_id, stock_item_id, movement_type,
