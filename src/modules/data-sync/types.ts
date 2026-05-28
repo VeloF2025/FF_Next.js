@@ -159,15 +159,35 @@ export interface QFieldCloudProject {
 export type DateFilter = 'today' | 'yesterday' | '7d' | '30d' | 'all' | 'custom';
 export type ReportPeriod = 'today' | 'yesterday' | 'week' | '30days' | 'all';
 
-/** Compute date range from a DateFilter preset */
-export function getDateRange(filter: DateFilter, customDate?: string): { dateFrom?: string; dateTo?: string } {
+/** Compute date range (ISO timestamps) from a DateFilter preset. For `custom`
+ *  the caller supplies from/to as YYYY-MM-DD strings; the returned `dateTo` is
+ *  exclusive (next-day midnight) so callers using `< dateTo` capture the full
+ *  end day. Either bound may be empty for an open-ended range. Legacy two-arg
+ *  callers (`getDateRange(filter, customDate)`) get the old single-day window
+ *  because the third arg defaults to undefined and falls through that branch. */
+export function getDateRange(
+  filter: DateFilter,
+  customDateFrom?: string,
+  customDateTo?: string,
+): { dateFrom?: string; dateTo?: string } {
   if (filter === 'all') return {};
   const now = new Date();
-  if (filter === 'custom' && customDate) {
-    const d = new Date(customDate);
-    const next = new Date(d);
-    next.setDate(next.getDate() + 1);
-    return { dateFrom: d.toISOString(), dateTo: next.toISOString() };
+  if (filter === 'custom') {
+    const result: { dateFrom?: string; dateTo?: string } = {};
+    if (customDateFrom) {
+      result.dateFrom = new Date(customDateFrom).toISOString();
+    }
+    if (customDateTo) {
+      const t = new Date(customDateTo);
+      t.setDate(t.getDate() + 1);
+      result.dateTo = t.toISOString();
+    } else if (customDateFrom && customDateTo === undefined) {
+      // Legacy single-date callers: cap with next-day midnight.
+      const t = new Date(customDateFrom);
+      t.setDate(t.getDate() + 1);
+      result.dateTo = t.toISOString();
+    }
+    return result;
   }
   if (filter === 'today') {
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());

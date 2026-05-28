@@ -22,9 +22,12 @@ interface DateChipFilterProps {
   onCustomDateFromChange: (d: string) => void;
   onCustomDateToChange: (d: string) => void;
   label?: string;
+  /** Hide the Custom chip + from/to inputs. Use when the consuming API does
+   *  not accept a from/to range (e.g. OLT reporting takes a `period` enum). */
+  omitCustom?: boolean;
 }
 
-const DATE_OPTIONS: { key: DateFilter; label: string }[] = [
+const ALL_DATE_OPTIONS: { key: DateFilter; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'yesterday', label: 'Yesterday' },
   { key: '7d', label: '7 Days' },
@@ -41,14 +44,16 @@ export function DateChipFilter({
   onCustomDateFromChange,
   onCustomDateToChange,
   label = 'Date:',
+  omitCustom = false,
 }: DateChipFilterProps) {
+  const options = omitCustom ? ALL_DATE_OPTIONS.filter(o => o.key !== 'custom') : ALL_DATE_OPTIONS;
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       <span className="text-xs text-[var(--ff-text-secondary)] mr-1">
         <Calendar className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
         {label}
       </span>
-      {DATE_OPTIONS.map(({ key, label: chipLabel }) => (
+      {options.map(({ key, label: chipLabel }) => (
         <button
           key={key}
           type="button"
