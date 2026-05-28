@@ -10,7 +10,7 @@
 import { loadStepReferences } from './qaReferencePhotos';
 
 /** Steps with explicit visual quality criteria that receive a VLM check. */
-export const QUALITY_CHECK_STEPS = [1, 2, 5, 7, 8, 9, 10] as const;
+export const QUALITY_CHECK_STEPS = [1, 2, 5, 7, 8, 9, 10, 11, 12] as const;
 export type QualityCheckStep = (typeof QUALITY_CHECK_STEPS)[number];
 
 export interface StepCriteria {
@@ -76,6 +76,22 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
     failInstruction:
       'FAIL if no signature is visible, if the form is blank or the signature area is empty, or if the photo does not show a completed signature.',
     failReason: 'No signature visible',
+  },
+  11: {
+    label: 'Dome Joint Open',
+    requirements:
+      'The dome joint lid must be REMOVED or OPEN. The WHITE interior of the dome joint box must be clearly visible. GREEN fiber splice connectors ("green flickers") must be visible inside the box. Internal components (splice tray, black cable management clips, splitter blocks, cable routing) should be visible.',
+    failInstruction:
+      'FAIL if the lid is closed and no interior is visible — that is a closed dome joint (Step 12), not open. The white interior AND green splice connectors must be visible for this photo to pass.',
+    failReason: 'Dome joint interior not visible — lid appears closed',
+  },
+  12: {
+    label: 'Dome Joint Closed',
+    requirements:
+      'The dome joint must be fully SEALED with its black rectangular lid closed on the circular housing. Only the black exterior/back of the dome joint box should be visible. The interior must NOT be visible — it must be completely sealed. Yellow cables entering the bottom of the unit are acceptable.',
+    failInstruction:
+      'FAIL if the interior of the dome joint is visible (white interior, green splice connectors) — that is an open dome joint (Step 11), not closed.',
+    failReason: 'Dome joint is not sealed — interior visible',
   },
 };
 

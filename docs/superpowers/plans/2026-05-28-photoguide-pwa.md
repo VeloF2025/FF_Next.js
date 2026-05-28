@@ -182,6 +182,18 @@ git add -A && git commit -m "chore: install deps (zustand, dexie, shadcn, serwis
     "label": "Signature",
     "instruction": "Take a photo of the signed customer acceptance form with the signature clearly visible.",
     "exampleDescription": "Paper or tablet with visible handwritten signature."
+  },
+  {
+    "stepNumber": 11,
+    "label": "Dome Joint Open",
+    "instruction": "Take a photo showing the dome joint with the lid REMOVED. The white interior with green fiber splice connectors must be clearly visible inside.",
+    "exampleDescription": "White interior visible, green splice connectors ('flickers') and internal components clearly showing."
+  },
+  {
+    "stepNumber": 12,
+    "label": "Dome Joint Closed",
+    "instruction": "Take a photo showing the dome joint fully SEALED — the black rectangular lid closed on the housing. No interior should be visible.",
+    "exampleDescription": "Black exterior/back of sealed dome joint only. Yellow entry cables at bottom are normal."
   }
 ]
 ```
@@ -795,7 +807,7 @@ export default function HomePage() {
       <div className="space-y-4">
         <JobTypeTile
           label="Activations"
-          description="Home fiber installation — 10 steps"
+          description="Home fiber installation — 12 steps"
           icon="🏠"
           onClick={() => router.push('/activations/lookup')}
         />
