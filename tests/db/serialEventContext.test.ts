@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { Pool, PoolClient } from 'pg';
-import { withSerialEventContext, SERIAL_EVENT_GUCS } from '@/lib/db/serialEventContext';
+import { Pool } from 'pg';
+import { withSerialEventContext } from '@/lib/db/serialEventContext';
 
 describe('serialEventContext', () => {
   let pool: Pool;
