@@ -28,6 +28,7 @@ export default defineConfig({
     include: [
       'tests/db/services/field-stock/serialLifecycle.test.ts',
       'tests/db/services/field-stock/consumptionService.lifecycle.test.ts',
+      'tests/db/services/field-stock/pickingProcess.lifecycle.test.ts',
       'tests/db/serialLifecycleMatrix.test.ts',
     ],
     globalSetup: ['./tests/db/setup/sprint-e-global-setup.ts'],
