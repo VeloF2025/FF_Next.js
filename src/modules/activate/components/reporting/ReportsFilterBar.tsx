@@ -41,6 +41,9 @@ function resolveRange(
   customDateTo: string,
 ): { dateFrom: string; dateTo: string } {
   const todayStr = getTodaySAST();
+  // `new Date(year, month, day - N)` is safe even when `day - N` goes negative:
+  // the Date constructor rolls the month/year back automatically (e.g. `day=2`
+  // and `N=7` yields the 26th of the previous month).
   const today = new Date(todayStr);
   switch (filter) {
     case 'today':
