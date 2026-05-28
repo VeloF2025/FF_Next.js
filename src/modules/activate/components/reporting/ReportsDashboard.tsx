@@ -19,9 +19,6 @@ import {
   TrendingUp,
   Users,
   Filter as FilterIcon,
-  Calendar,
-  RefreshCw,
-  Download,
   WifiOff,
   Repeat,
   FileWarning,
@@ -32,7 +29,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
-import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
+import { useActivateData, getTodaySAST } from '../../context';
 
 // Import report sections
 import { AnomalyReports } from './AnomalyReports';
@@ -47,7 +44,7 @@ import { ActivationProgressReport } from './ActivationProgressReport';
 import { MaturityTrackingReport } from './MaturityTrackingReport';
 import { PenetrationCurveReport } from './PenetrationCurveReport';
 import { UptakeReport } from './UptakeReport';
-import { Button } from '@/components/ui/button';
+import { ReportsFilterBar } from './ReportsFilterBar';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -131,14 +128,6 @@ const categories: CategoryTab[] = [
   },
 ];
 
-// Helper to format date as YYYY-MM-DD without timezone issues
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 export function ReportsDashboard() {
   // Get shared filters from context
   const { filters: sharedFilters, projects } = useActivateData();
@@ -146,9 +135,12 @@ export function ReportsDashboard() {
   // Active category
   const [activeCategory, setActiveCategory] = useState<ReportCategory>('anomalies');
 
-  // Local filters
+  // Local filters — default chip is 'all' (matches the shared DateChipFilter
+  // convention used across PP Data and the OLT tabs). ReportsFilterBar resolves
+  // 'all' to 2020-01-01..today, so initialize with the same explicit range to
+  // avoid a double-fetch on mount.
   const [filters, setFilters] = useState<ReportFilters>({
-    dateFrom: getYesterdaySAST(), // Default to yesterday for reports
+    dateFrom: '2020-01-01',
     dateTo: getTodaySAST(),
     project: sharedFilters.projectFilter !== 'all' ? sharedFilters.projectFilter : undefined,
   });
@@ -168,141 +160,6 @@ export function ReportsDashboard() {
   // NOTE: Removed auto-refresh on lastRefreshAt change to prevent visual re-renders.
   // Reports now only refresh when user clicks "Refresh" button or changes filters.
   // The Dashboard tab still auto-refreshes via ActivateDataContext.
-
-  // Quick filter handlers
-  type QuickFilterType = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'last7days' | 'last30days' | 'all';
-
-  const handleQuickFilter = (filter: QuickFilterType) => {
-    const todayStr = getTodaySAST();
-    const today = new Date(todayStr);
-
-    switch (filter) {
-      case 'today':
-        setFilters({ ...filters, dateFrom: todayStr, dateTo: todayStr });
-        break;
-      case 'yesterday': {
-        const yesterdayStr = getYesterdaySAST();
-        setFilters({ ...filters, dateFrom: yesterdayStr, dateTo: yesterdayStr });
-        break;
-      }
-      case 'thisWeek': {
-        // Start of current week (Monday)
-        const startOfWeek = new Date(today);
-        const day = startOfWeek.getDay();
-        const diff = day === 0 ? -6 : 1 - day; // Monday as start
-        startOfWeek.setDate(startOfWeek.getDate() + diff);
-        setFilters({
-          ...filters,
-          dateFrom: formatLocalDate(startOfWeek),
-          dateTo: todayStr,
-        });
-        break;
-      }
-      case 'lastWeek': {
-        // Last week Monday to Sunday
-        const startOfLastWeek = new Date(today);
-        const day = startOfLastWeek.getDay();
-        const diff = day === 0 ? -13 : -6 - day; // Previous Monday
-        startOfLastWeek.setDate(startOfLastWeek.getDate() + diff);
-        const endOfLastWeek = new Date(startOfLastWeek);
-        endOfLastWeek.setDate(endOfLastWeek.getDate() + 6);
-        setFilters({
-          ...filters,
-          dateFrom: formatLocalDate(startOfLastWeek),
-          dateTo: formatLocalDate(endOfLastWeek),
-        });
-        break;
-      }
-      case 'thisMonth': {
-        // First of current month to today
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        setFilters({
-          ...filters,
-          dateFrom: formatLocalDate(startOfMonth),
-          dateTo: todayStr,
-        });
-        break;
-      }
-      case 'last7days': {
-        const last7 = new Date(today);
-        last7.setDate(last7.getDate() - 7);
-        setFilters({
-          ...filters,
-          dateFrom: formatLocalDate(last7),
-          dateTo: todayStr,
-        });
-        break;
-      }
-      case 'last30days': {
-        const last30 = new Date(today);
-        last30.setDate(last30.getDate() - 30);
-        setFilters({
-          ...filters,
-          dateFrom: formatLocalDate(last30),
-          dateTo: todayStr,
-        });
-        break;
-      }
-      case 'all': {
-        // Set to earliest possible date (2020-01-01) to today
-        setFilters({
-          ...filters,
-          dateFrom: '2020-01-01',
-          dateTo: todayStr,
-        });
-        break;
-      }
-    }
-  };
-
-  // Get active quick filter
-  const getActiveQuickFilter = (): QuickFilterType | null => {
-    const todayStr = getTodaySAST();
-    const yesterdayStr = getYesterdaySAST();
-    const today = new Date(todayStr);
-
-    // Last 7 days
-    const last7 = new Date(today);
-    last7.setDate(last7.getDate() - 7);
-    const last7Str = formatLocalDate(last7);
-
-    // Last 30 days
-    const last30 = new Date(today);
-    last30.setDate(last30.getDate() - 30);
-    const last30Str = formatLocalDate(last30);
-
-    // This week (Monday to today)
-    const startOfWeek = new Date(today);
-    const day = startOfWeek.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    startOfWeek.setDate(startOfWeek.getDate() + diff);
-    const thisWeekStr = formatLocalDate(startOfWeek);
-
-    // Last week (Monday to Sunday)
-    const startOfLastWeek = new Date(today);
-    const dayLw = startOfLastWeek.getDay();
-    const diffLw = dayLw === 0 ? -13 : -6 - dayLw;
-    startOfLastWeek.setDate(startOfLastWeek.getDate() + diffLw);
-    const endOfLastWeek = new Date(startOfLastWeek);
-    endOfLastWeek.setDate(endOfLastWeek.getDate() + 6);
-    const lastWeekStartStr = formatLocalDate(startOfLastWeek);
-    const lastWeekEndStr = formatLocalDate(endOfLastWeek);
-
-    // This month
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const thisMonthStr = formatLocalDate(startOfMonth);
-
-    if (filters.dateFrom === todayStr && filters.dateTo === todayStr) return 'today';
-    if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) return 'yesterday';
-    if (filters.dateFrom === thisWeekStr && filters.dateTo === todayStr) return 'thisWeek';
-    if (filters.dateFrom === lastWeekStartStr && filters.dateTo === lastWeekEndStr) return 'lastWeek';
-    if (filters.dateFrom === thisMonthStr && filters.dateTo === todayStr) return 'thisMonth';
-    if (filters.dateFrom === last7Str && filters.dateTo === todayStr) return 'last7days';
-    if (filters.dateFrom === last30Str && filters.dateTo === todayStr) return 'last30days';
-    if (filters.dateFrom === '2020-01-01' && filters.dateTo === todayStr) return 'all';
-
-    return null;
-  };
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
@@ -383,99 +240,15 @@ export function ReportsDashboard() {
         </p>
       </div>
 
-      {/* Filters Bar - Sticky */}
-      <div className="bg-card rounded-lg shadow-md dark:shadow-gray-900/50 p-4 sticky top-0 z-10">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Quick Filters */}
-          <div className="flex flex-wrap gap-1.5">
-            {(
-              [
-                { key: 'today', label: 'Today' },
-                { key: 'yesterday', label: 'Yesterday' },
-                { key: 'thisWeek', label: 'This Week' },
-                { key: 'lastWeek', label: 'Last Week' },
-                { key: 'thisMonth', label: 'This Month' },
-                { key: 'last7days', label: '7 Days' },
-                { key: 'last30days', label: '30 Days' },
-                { key: 'all', label: 'All' },
-              ] as const
-            ).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => handleQuickFilter(key)}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                  getActiveQuickFilter() === key
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Date Range Inputs */}
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-              className="px-2 py-1.5 border border-border rounded text-sm bg-card text-foreground"
-            />
-            <span className="text-muted-foreground">to</span>
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-              className="px-2 py-1.5 border border-border rounded text-sm bg-card text-foreground"
-            />
-          </div>
-
-          {/* Project Filter */}
-          <select
-            value={filters.project || ''}
-            onChange={(e) =>
-              setFilters({
-                ...filters,
-                project: e.target.value || undefined,
-              })
-            }
-            className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
-          >
-            <option value="">All Projects</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 ml-auto">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isLoading}
-              loading={isLoading}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleExport}
-              disabled={isExporting}
-              loading={isExporting}
-            >
-              <Download className="h-4 w-4" />
-              {isExporting ? 'Exporting...' : 'Export'}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <ReportsFilterBar
+        filters={filters}
+        onFiltersChange={setFilters}
+        projects={projects}
+        isLoading={isLoading}
+        onRefresh={handleRefresh}
+        isExporting={isExporting}
+        onExport={handleExport}
+      />
 
       {/* Report Content */}
       <div className="bg-card rounded-lg shadow-md dark:shadow-gray-900/50">
