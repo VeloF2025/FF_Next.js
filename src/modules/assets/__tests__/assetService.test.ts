@@ -7,8 +7,40 @@
  * asset" error.
  */
 
-import { describe, it, expect } from 'vitest';
-import { mapAssetUniqueViolation } from '../services/assetService';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { mockSql, queries } = vi.hoisted(() => {
+  const queries: string[] = [];
+  const mockSql = vi.fn(async (strings: TemplateStringsArray, ..._values: unknown[]) => {
+    queries.push(strings.join('?'));
+    return [{
+      id: 'asset-1',
+      asset_number: 'OTDR-2026-00015',
+      category_id: 'category-1',
+      name: 'TOOL-EXFO-OTDR-MAX730D-SM3',
+      status: 'available',
+      condition: 'good',
+      currency: 'ZAR',
+      salvage_value: 0,
+      requires_calibration: false,
+      specifications: {},
+      tags: [],
+      image_urls: [],
+      verification_status: 'pending',
+      created_at: '2026-05-28T00:00:00.000Z',
+      updated_at: '2026-05-28T00:00:00.000Z',
+      created_by: 'user-1',
+    }];
+  });
+  return { mockSql, queries };
+});
+
+vi.mock('../utils/db', () => ({
+  getDbConnection: () => mockSql,
+}));
+
+import { assetService, mapAssetUniqueViolation } from '../services/assetService';
+import { UpdateAssetSchema } from '../utils/schemas';
 
 describe('mapAssetUniqueViolation', () => {
   it('returns null for non-unique-violation errors', () => {
@@ -62,5 +94,45 @@ describe('mapAssetUniqueViolation', () => {
     expect(mapAssetUniqueViolation({ code: '23505' })).toBe(
       'This asset conflicts with an existing record. Please check for duplicates.'
     );
+  });
+});
+
+describe('assetService.update', () => {
+  beforeEach(() => {
+    mockSql.mockClear();
+    queries.length = 0;
+  });
+
+  it('accepts relative VF Storage image paths in update payloads', () => {
+    const validation = UpdateAssetSchema.safeParse({
+      primaryImageUrl: '/storage/assets/photos/front.jpeg',
+      imageUrls: ['/storage/assets/photos/back.jpeg'],
+      labelImageUrl: '/storage/assets/photos/label.jpeg',
+      verificationImageUrl: '/api/uploads/assets/photos/label.jpeg',
+    });
+
+    expect(validation.success).toBe(true);
+  });
+
+  it('persists barcode and asset image fields during updates', async () => {
+    const result = await assetService.update('asset-1', {
+      barcode: '1981860',
+      primaryImageUrl: '/api/uploads/assets/photos/front.jpeg',
+      imageUrls: ['/api/uploads/assets/photos/back.jpeg'],
+      labelImageUrl: '/api/uploads/assets/photos/label.jpeg',
+      verificationImageUrl: '/api/uploads/assets/photos/label.jpeg',
+      vlmExtractionData: { serialNumber: '1981860', confidence: 0.98 },
+      verificationStatus: 'verified',
+    }, 'user-1');
+
+    expect(result.success).toBe(true);
+    const updateSql = queries.join('\n');
+    expect(updateSql).toContain('barcode = COALESCE');
+    expect(updateSql).toContain('primary_image_url = COALESCE');
+    expect(updateSql).toContain('image_urls = COALESCE');
+    expect(updateSql).toContain('label_image_url = COALESCE');
+    expect(updateSql).toContain('verification_image_url = COALESCE');
+    expect(updateSql).toContain('vlm_extraction_data = COALESCE');
+    expect(updateSql).toContain('verification_status = COALESCE');
   });
 });

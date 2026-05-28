@@ -487,6 +487,7 @@ export const assetService = {
           name = COALESCE(${input.name || null}, name),
           description = COALESCE(${input.description || null}, description),
           serial_number = COALESCE(${input.serialNumber || null}, serial_number),
+          barcode = COALESCE(${input.barcode || null}, barcode),
           manufacturer = COALESCE(${input.manufacturer || null}, manufacturer),
           model = COALESCE(${input.model || null}, model),
           model_number = COALESCE(${input.modelNumber || null}, model_number),
@@ -498,6 +499,14 @@ export const assetService = {
           warehouse_location = COALESCE(${input.warehouseLocation || null}, warehouse_location),
           bin_location = COALESCE(${input.binLocation || null}, bin_location),
           notes = COALESCE(${input.notes || null}, notes),
+          tags = COALESCE(${input.tags ? JSON.stringify(input.tags) : null}::jsonb, tags),
+          primary_image_url = COALESCE(${input.primaryImageUrl || null}, primary_image_url),
+          image_urls = COALESCE(${input.imageUrls ? JSON.stringify(input.imageUrls) : null}::jsonb, image_urls),
+          label_image_url = COALESCE(${input.labelImageUrl || null}, label_image_url),
+          vlm_extraction_data = COALESCE(${input.vlmExtractionData ? JSON.stringify(input.vlmExtractionData) : null}::jsonb, vlm_extraction_data),
+          verification_status = COALESCE(${input.verificationStatus || null}, verification_status),
+          verification_image_url = COALESCE(${input.verificationImageUrl || null}, verification_image_url),
+          verification_mismatches = COALESCE(${input.verificationMismatches ? JSON.stringify(input.verificationMismatches) : null}::jsonb, verification_mismatches),
           next_calibration_date = COALESCE(${input.nextCalibrationDate || null}, next_calibration_date),
           calibration_provider = COALESCE(${input.calibrationProvider || null}, calibration_provider),
           updated_by = ${updatedBy},
@@ -519,11 +528,12 @@ export const assetService = {
         data: transformRow(row),
       };
     } catch (error) {
+      const uniqueMessage = mapAssetUniqueViolation(error);
       log.error('Failed to update asset', { error, id, input }, 'assetService');
       return {
         success: false,
         data: null,
-        error: 'Failed to update asset',
+        error: uniqueMessage || 'Failed to update asset',
       };
     }
   },

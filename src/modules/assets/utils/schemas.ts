@@ -24,6 +24,10 @@ const DateStringSchema = z.string().refine(
 );
 const _PositiveNumberSchema = z.number().positive('Must be a positive number');
 const NonNegativeNumberSchema = z.number().min(0, 'Cannot be negative');
+const AssetImageUrlSchema = z.union([
+  z.string().url(),
+  z.string().regex(/^\/(storage|api\/uploads)\//, 'Invalid asset image path'),
+]);
 
 // Status enum schema
 const AssetStatusSchema = z.enum([
@@ -117,7 +121,8 @@ export const CreateAssetSchema = z.object({
   specifications: z.record(z.unknown()).optional(),
   notes: z.string().max(5000).optional(),
   tags: z.array(z.string().max(50)).optional(),
-  primaryImageUrl: z.string().url().optional(),
+  primaryImageUrl: AssetImageUrlSchema.optional(),
+  imageUrls: z.array(AssetImageUrlSchema).optional(),
 
   // Procurement linkage (from GRN/PO workflow)
   poId: UUIDSchema.optional(),
@@ -126,7 +131,7 @@ export const CreateAssetSchema = z.object({
   stockItemId: UUIDSchema.optional(),
 
   // VLM extraction data (from label scanning)
-  labelImageUrl: z.string().url().optional(),
+  labelImageUrl: AssetImageUrlSchema.optional(),
   vlmExtractionData: z.record(z.unknown()).optional(),
 });
 
@@ -147,7 +152,7 @@ export const UpdateAssetSchema = CreateAssetSchema.partial().extend({
 
   // Verification fields (from label scanning)
   verificationStatus: VerificationStatusSchema.optional(),
-  verificationImageUrl: z.string().url().optional(),
+  verificationImageUrl: AssetImageUrlSchema.optional(),
   verificationMismatches: z.array(z.object({
     field: z.string(),
     expected: z.string().nullable(),
