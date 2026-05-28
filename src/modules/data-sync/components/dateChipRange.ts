@@ -32,6 +32,10 @@ export function getDateChipRangeYmd(
       dateTo: customDateTo || undefined,
     };
   }
+  // Open-ended upper bound for today / 7d / 30d: callers want "the most recent
+  // N days including anything stamped today", and any future-dated rows would
+  // also show up — acceptable since `date_registered` is set at PP-import time
+  // and is never forward-dated. `yesterday` is closed-ended so it excludes today.
   const now = new Date();
   if (filter === 'today') {
     return { dateFrom: ymd(now) };

@@ -223,10 +223,10 @@ export function usePPData(): { state: PPDataState; actions: PPDataActions } {
     finally { setSelectingAllUnticketed(false); }
   };
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     const params = buildFilterParams(true); params.set('action', 'export');
     window.open(`/api/activate/import-pp-data?${params}`, '_blank');
-  };
+  }, [buildFilterParams]);
 
   const handleImportOlt = async (file: File) => {
     setIsImportingOlt(true);

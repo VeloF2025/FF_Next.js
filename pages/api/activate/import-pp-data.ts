@@ -86,6 +86,8 @@ async function handler(
       params.push(dateTo);
     }
     if (search) {
+      // One bound param reused across three ILIKE checks → push once, then
+      // single increment (intentional deferred ++ — matches the list branch).
       whereClause += ` AND (pp.serial_number ILIKE $${paramIndex} OR pp.resolved_drop_number ILIKE $${paramIndex} OR mt.ticket_uid ILIKE $${paramIndex})`;
       params.push(`%${search}%`);
       paramIndex++;
