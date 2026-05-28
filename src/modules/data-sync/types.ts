@@ -162,9 +162,7 @@ export type ReportPeriod = 'today' | 'yesterday' | 'week' | '30days' | 'all';
 /** Compute date range (ISO timestamps) from a DateFilter preset. For `custom`
  *  the caller supplies from/to as YYYY-MM-DD strings; the returned `dateTo` is
  *  exclusive (next-day midnight) so callers using `< dateTo` capture the full
- *  end day. Either bound may be empty for an open-ended range. Legacy two-arg
- *  callers (`getDateRange(filter, customDate)`) get the old single-day window
- *  because the third arg defaults to undefined and falls through that branch. */
+ *  end day. Either bound may be empty (or omitted) for an open-ended range. */
 export function getDateRange(
   filter: DateFilter,
   customDateFrom?: string,
@@ -179,11 +177,6 @@ export function getDateRange(
     }
     if (customDateTo) {
       const t = new Date(customDateTo);
-      t.setDate(t.getDate() + 1);
-      result.dateTo = t.toISOString();
-    } else if (customDateFrom && customDateTo === undefined) {
-      // Legacy single-date callers: cap with next-day midnight.
-      const t = new Date(customDateFrom);
       t.setDate(t.getDate() + 1);
       result.dateTo = t.toISOString();
     }

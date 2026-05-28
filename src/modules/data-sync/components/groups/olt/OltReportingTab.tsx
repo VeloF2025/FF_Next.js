@@ -20,15 +20,19 @@ interface OltReportingTabProps {
 // The reporting API takes a fixed `period` enum (today/yesterday/week/30days/all);
 // it does not accept a from/to range. Map the shared DateChipFilter values onto
 // that enum so the UI is consistent with other groups but the API contract is
-// unchanged. Custom is hidden via `omitCustom`.
+// unchanged. Custom is hidden via `omitCustom` so it cannot reach this function.
 function dateFilterToReportPeriod(f: DateFilter): ReportPeriod {
   switch (f) {
     case 'today': return 'today';
     case 'yesterday': return 'yesterday';
     case '7d': return 'week';
     case '30d': return '30days';
-    case 'custom': return 'all'; // unreachable (Custom hidden) but keep total exhaustiveness
     case 'all': return 'all';
+    case 'custom':
+      // Unreachable: DateChipFilter is mounted with omitCustom — Custom chip
+      // is hidden, no UI path can produce this value. If a future caller drops
+      // omitCustom, throw loudly rather than silently coerce to 'all'.
+      throw new Error("OltReportingTab: dateFilter='custom' unreachable while omitCustom is set");
   }
 }
 
@@ -152,11 +156,7 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <DateChipFilter
           dateFilter={dateFilter}
-          customDateFrom=""
-          customDateTo=""
           onDateFilterChange={setDateFilter}
-          onCustomDateFromChange={() => { /* unused: Custom hidden */ }}
-          onCustomDateToChange={() => { /* unused: Custom hidden */ }}
           omitCustom
           label="Period:"
         />

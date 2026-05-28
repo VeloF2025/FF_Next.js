@@ -16,14 +16,16 @@ import type { DateFilter } from '../types';
 
 interface DateChipFilterProps {
   dateFilter: DateFilter;
-  customDateFrom: string;
-  customDateTo: string;
   onDateFilterChange: (f: DateFilter) => void;
-  onCustomDateFromChange: (d: string) => void;
-  onCustomDateToChange: (d: string) => void;
+  /** Custom-range state. Required unless `omitCustom` is true. */
+  customDateFrom?: string;
+  customDateTo?: string;
+  onCustomDateFromChange?: (d: string) => void;
+  onCustomDateToChange?: (d: string) => void;
   label?: string;
   /** Hide the Custom chip + from/to inputs. Use when the consuming API does
-   *  not accept a from/to range (e.g. OLT reporting takes a `period` enum). */
+   *  not accept a from/to range (e.g. OLT reporting takes a `period` enum).
+   *  When set, the four `custom*` props become unnecessary and can be omitted. */
   omitCustom?: boolean;
 }
 
@@ -38,8 +40,8 @@ const ALL_DATE_OPTIONS: { key: DateFilter; label: string }[] = [
 
 export function DateChipFilter({
   dateFilter,
-  customDateFrom,
-  customDateTo,
+  customDateFrom = '',
+  customDateTo = '',
   onDateFilterChange,
   onCustomDateFromChange,
   onCustomDateToChange,
@@ -47,6 +49,11 @@ export function DateChipFilter({
   omitCustom = false,
 }: DateChipFilterProps) {
   const options = omitCustom ? ALL_DATE_OPTIONS.filter(o => o.key !== 'custom') : ALL_DATE_OPTIONS;
+  // If a caller asks to show Custom but forgets to wire the callbacks, fail
+  // loudly in dev rather than render dead inputs (silent-footgun guard).
+  if (process.env.NODE_ENV !== 'production' && !omitCustom && (!onCustomDateFromChange || !onCustomDateToChange)) {
+    throw new Error('DateChipFilter: onCustomDateFromChange/onCustomDateToChange required when omitCustom is false');
+  }
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       <span className="text-xs text-[var(--ff-text-secondary)] mr-1">
@@ -67,12 +74,12 @@ export function DateChipFilter({
           {chipLabel}
         </button>
       ))}
-      {dateFilter === 'custom' && (
+      {dateFilter === 'custom' && !omitCustom && (
         <div className="flex items-center gap-1">
           <input
             type="date"
             value={customDateFrom}
-            onChange={(e) => onCustomDateFromChange(e.target.value)}
+            onChange={(e) => onCustomDateFromChange?.(e.target.value)}
             className="px-2 py-1 text-xs rounded border bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)] focus:border-[var(--ff-accent)] outline-none"
             aria-label="Custom date from"
           />
@@ -80,7 +87,7 @@ export function DateChipFilter({
           <input
             type="date"
             value={customDateTo}
-            onChange={(e) => onCustomDateToChange(e.target.value)}
+            onChange={(e) => onCustomDateToChange?.(e.target.value)}
             className="px-2 py-1 text-xs rounded border bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)] focus:border-[var(--ff-accent)] outline-none"
             aria-label="Custom date to"
           />
