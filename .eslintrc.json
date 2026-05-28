@@ -44,6 +44,7 @@
     "no-var": "error",
     "max-lines": ["warn", { "max": 500, "skipBlankLines": true, "skipComments": true }],
     "local/no-silent-catch": "warn",
+    "local/no-direct-serial-status-write": "off",
     "jsx-a11y/alt-text": "error",
     "jsx-a11y/form-has-associated-label": "error",
     "jsx-a11y/label-has-associated-control": "error",

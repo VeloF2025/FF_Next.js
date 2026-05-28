@@ -158,6 +158,25 @@ else
   pass "Zero Tolerance: no changed files"
 fi
 
+# ─── Gate 4b: Serial Lifecycle Discipline (Sprint E Track 3) ─────────────────
+#
+# UNCOMMENT THIS BLOCK IN THE SPRINT-E CUTOVER PR — together with flipping
+# "local/no-direct-serial-status-write": "off" → "error" in .eslintrc.json.
+# Until cutover, Track 2's still-legitimate pre-cutover direct writers
+# (import-serials, fault-reports, movementReversalService, the dead
+# markSerialInstalled, grn-confirm) would trip this gate by design.
+#
+# echo -e "\n${CYAN}── Gate 4b: Serial Lifecycle Discipline ──${NC}\n"
+# SERIAL_VIOLATIONS=$(git grep -nE "UPDATE[[:space:]]+stock_serials[[:space:]]+SET[^;]*(status|holder_id)[[:space:]]*=" -- \
+#   'src/**/*.ts' 'pages/**/*.ts' 'scripts/**/*.ts' \
+#   | grep -vE "serialLifecycle\.ts|serialForceCorrectService\.ts|backfill-serial-lifecycle-status\.ts" || true)
+# if [ -n "$SERIAL_VIOLATIONS" ]; then
+#   fail "Direct stock_serials.status/holder_id writes outside allowed files (use promoteSerial)"
+#   echo "$SERIAL_VIOLATIONS" | head -20 | sed 's/^/    /'
+# else
+#   pass "Serial Lifecycle: no direct status/holder_id writes outside allowed files"
+# fi
+
 # ─── Gate 5+6: Tests & Build (full mode only) ────────────────────────────────
 if [ "$MODE" = "--quick" ] || [ "$MODE" = "--pre-deploy" ]; then
   echo -e "\n${YELLOW}Skipped: tests + build (${MODE} mode)${NC}"
