@@ -101,11 +101,47 @@ async function findPatternB(pool: Pool): Promise<PatternBRow[]> {
 
 async function applyPatternA(pool: Pool, rows: PatternARow[]): Promise<number> {
   if (rows.length === 0) return 0;
-  const r = await pool.query(
-    `DELETE FROM stock_serial_events WHERE id = ANY($1::uuid[])`,
-    [rows.map((x) => x.event_id)],
-  );
-  return r.rowCount ?? 0;
+  let deleted = 0;
+  // One txn per row so the audit write is co-committed with the event delete.
+  // Without an audit row the deletion is unrecoverable from the table itself,
+  // so we record every targeted event in serial_change_history before removing it.
+  for (const row of rows) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const d = await client.query(
+        `DELETE FROM stock_serial_events WHERE id = $1`,
+        [row.event_id],
+      );
+      if (d.rowCount && d.rowCount > 0) {
+        await client.query(
+          `INSERT INTO serial_change_history
+             (drop_number, change_type, old_value, new_value,
+              change_source, actor, change_reason, metadata)
+           VALUES
+             ('UNKNOWN', 'status', 'installed_event', 'deleted',
+              'serial-drift-cleanup', $1,
+              'spurious installed_at_drop event deletion',
+              jsonb_build_object(
+                'serial_id',      $2::text,
+                'serial_number',  $3,
+                'event_id',       $4::text,
+                'current_status', $5,
+                'occurred_at',    $6,
+                'cleanup_run',    '2026-05-28'))`,
+          [ACTOR, row.serial_id, row.serial_number, row.event_id, row.current_status, row.occurred_at],
+        );
+        deleted += 1;
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+  return deleted;
 }
 
 async function applyPatternB(pool: Pool, rows: PatternBRow[]): Promise<number> {
@@ -192,7 +228,7 @@ async function main(): Promise<void> {
     process.stdout.write(`\nApplying...\n`);
     const aDeleted = await applyPatternA(pool, a);
     const bUpdated = await applyPatternB(pool, b);
-    process.stdout.write(`  Pattern A: deleted ${aDeleted} events\n`);
+    process.stdout.write(`  Pattern A: deleted ${aDeleted} events (+ ${aDeleted} audit rows)\n`);
     process.stdout.write(`  Pattern B: reverted ${bUpdated} serials → 'activated' (+ ${bUpdated} audit rows)\n`);
   } finally {
     await pool.end();
