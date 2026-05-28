@@ -13,16 +13,20 @@ import type {
 // snags, most-missing slot) are evaluated inside the same CTE pipeline so the
 // 60s cache header keeps p95 down even on the 2000+ pole projects.
 
-const CIVIL_SLOTS = ['civil_step_01_key','civil_step_02_key','civil_step_03_key','civil_step_04_key','civil_step_05_key','civil_step_06_key','civil_step_07_key'] as const;
+const CIVIL_SLOTS = ['civil_step_01_key','civil_step_02_key','civil_step_03_key','civil_step_04_key','civil_step_05_key','civil_step_06_key','civil_step_07_key','civil_step_08_key'] as const;
 const DOME_SLOTS  = ['optical_dome_01_key','optical_dome_02_key','optical_dome_03_key','optical_dome_04_key','optical_dome_05_key','optical_dome_06_key','optical_dome_07_key','optical_dome_08_key'] as const;
 const JOINT_SLOTS = ['main_joint_11_key','main_joint_12_key','main_joint_13_key','main_joint_14_key','main_joint_15_key','main_joint_16_key'] as const;
 
 // Build a `(COL_NOT_NULL_TO_INT) + ...` expression. Used both for civil/dome/joint
-// fill counts and for the overall 21-slot completeness count.
+// fill counts and for the overall all-slot completeness count.
 function sumNotNull(cols: readonly string[]): string {
   return cols.map(c => `(qa.${c} IS NOT NULL)::int`).join(' + ');
 }
 
+// Total fixed photo slots (excludes tray + unassigned). Derived from the slot
+// arrays so the "complete" / "partial_high" boundaries below track SLOT_META —
+// adding a slot (e.g. civil step 8) shifts these automatically.
+const TOTAL_SLOT_COUNT = CIVIL_SLOTS.length + DOME_SLOTS.length + JOINT_SLOTS.length;
 const TOTAL_SLOTS_EXPR = sumNotNull([...CIVIL_SLOTS, ...DOME_SLOTS, ...JOINT_SLOTS]);
 const CIVIL_SLOTS_EXPR = sumNotNull(CIVIL_SLOTS);
 const DOME_SLOTS_EXPR  = sumNotNull(DOME_SLOTS);
@@ -52,7 +56,7 @@ interface DashboardRawRow {
   joint_in_progress: number;
   joint_empty: number;
   joint_vlm_failed: number;
-  complete_21: number;
+  complete_full: number;
   partial_high: number;
   partial_mid: number;
   partial_low: number;
@@ -187,8 +191,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(*) FILTER (WHERE COALESCE(m.joint_filled,0) = 0)::int                                AS joint_empty,
         COALESCE(SUM(m.joint_vlm_failed), 0)::int                                                  AS joint_vlm_failed,
 
-        COUNT(*) FILTER (WHERE m.total_filled = 21)::int                                           AS complete_21,
-        COUNT(*) FILTER (WHERE m.total_filled BETWEEN 14 AND 20)::int                              AS partial_high,
+        COUNT(*) FILTER (WHERE m.total_filled = ${TOTAL_SLOT_COUNT})::int                          AS complete_full,
+        COUNT(*) FILTER (WHERE m.total_filled BETWEEN 14 AND ${TOTAL_SLOT_COUNT - 1})::int         AS partial_high,
         COUNT(*) FILTER (WHERE m.total_filled BETWEEN 7  AND 13)::int                              AS partial_mid,
         COUNT(*) FILTER (WHERE m.total_filled BETWEEN 1  AND 6 )::int                              AS partial_low,
         -- "no_photos" band only counts poles with zero photos in any bucket
@@ -259,7 +263,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         vlm_failed: r.joint_vlm_failed,
       },
       photo_completeness: {
-        complete_21:  r.complete_21,
+        complete_full: r.complete_full,
         partial_high: r.partial_high,
         partial_mid:  r.partial_mid,
         partial_low:  r.partial_low,

@@ -21,6 +21,7 @@ export interface PoleQaPhoto {
   civil_step_05_key: string | null;
   civil_step_06_key: string | null;
   civil_step_07_key: string | null;
+  civil_step_08_key: string | null;
 
   // Optical Dome
   optical_dome_01_key: string | null;
@@ -85,7 +86,7 @@ export interface PoleSummary {
   pole_label: string;
   zone_no: number | null;
   pon_no: number | null;
-  civil_filled: number;     // 0-7
+  civil_filled: number;     // 0-8
   dome_filled: number;      // 0-8
   joint_filled: number;     // 0-6
   tray_count: number;
@@ -119,7 +120,7 @@ export interface WorksQAZoneSummary {
 }
 
 export type SlotKey =
-  | 'civil_01' | 'civil_02' | 'civil_03' | 'civil_04' | 'civil_05' | 'civil_06' | 'civil_07'
+  | 'civil_01' | 'civil_02' | 'civil_03' | 'civil_04' | 'civil_05' | 'civil_06' | 'civil_07' | 'civil_08'
   | 'dome_01' | 'dome_02' | 'dome_03' | 'dome_04' | 'dome_05' | 'dome_06' | 'dome_07' | 'dome_08'
   | 'main_joint_11' | 'main_joint_12' | 'main_joint_13' | 'main_joint_14' | 'main_joint_15' | 'main_joint_16'
   | 'tray_photos';

@@ -3,7 +3,7 @@
  *
  * Accepts a multipart upload with:
  *   - pole_id  — UUID of the pole_qa_photos record
- *   - slot     — slot key (civil_01 … civil_07, dome_01 … dome_08, main_joint_11 … main_joint_16, 'tray', or 'unassigned')
+ *   - slot     — slot key (civil_01 … civil_08, dome_01 … dome_08, main_joint_11 … main_joint_16, 'tray', or 'unassigned')
  *   - source   — optional, defaults to 'upload'
  *   - photo    — image file
  *

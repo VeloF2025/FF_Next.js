@@ -44,7 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               qa.civil_step_01_key IS NOT NULL AND qa.civil_step_02_key IS NOT NULL AND
               qa.civil_step_03_key IS NOT NULL AND qa.civil_step_04_key IS NOT NULL AND
               qa.civil_step_05_key IS NOT NULL AND qa.civil_step_06_key IS NOT NULL AND
-              qa.civil_step_07_key IS NOT NULL AND
+              qa.civil_step_07_key IS NOT NULL AND qa.civil_step_08_key IS NOT NULL AND
               qa.optical_dome_01_key IS NOT NULL AND qa.optical_dome_02_key IS NOT NULL AND
               qa.optical_dome_03_key IS NOT NULL AND qa.optical_dome_04_key IS NOT NULL AND
               qa.optical_dome_05_key IS NOT NULL AND qa.optical_dome_06_key IS NOT NULL AND
@@ -61,7 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               qa.civil_step_01_key IS NOT NULL OR qa.civil_step_02_key IS NOT NULL OR
               qa.civil_step_03_key IS NOT NULL OR qa.civil_step_04_key IS NOT NULL OR
               qa.civil_step_05_key IS NOT NULL OR qa.civil_step_06_key IS NOT NULL OR
-              qa.civil_step_07_key IS NOT NULL OR
+              qa.civil_step_07_key IS NOT NULL OR qa.civil_step_08_key IS NOT NULL OR
               qa.optical_dome_01_key IS NOT NULL OR qa.optical_dome_02_key IS NOT NULL OR
               qa.optical_dome_03_key IS NOT NULL OR qa.optical_dome_04_key IS NOT NULL OR
               qa.optical_dome_05_key IS NOT NULL OR qa.optical_dome_06_key IS NOT NULL OR

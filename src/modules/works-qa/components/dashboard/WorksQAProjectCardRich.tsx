@@ -11,7 +11,7 @@ const SLOT_LABEL: Record<string, string> = {
   civil_step_01_key: 'Before Photo', civil_step_02_key: 'During Photo',
   civil_step_03_key: 'Depth Photo',  civil_step_04_key: 'End Plates',
   civil_step_05_key: 'Compaction',   civil_step_06_key: 'Level Check',
-  civil_step_07_key: 'After Photo',
+  civil_step_07_key: 'After Photo',  civil_step_08_key: 'Pole Label',
   optical_dome_01_key: 'Dome on Pole', optical_dome_02_key: 'Dome Label',
   optical_dome_03_key: 'Open Dome',    optical_dome_04_key: 'Splice Protectors',
   optical_dome_05_key: 'Slack Mgmt',   optical_dome_06_key: 'Strength Members',
@@ -46,25 +46,25 @@ function DisciplineTile({ label, stats }: { label: string; stats: DisciplineStat
 
 function PhotoCompletenessBar({ project }: { project: WorksQADashboardRow }) {
   const c = project.photo_completeness;
-  const total = c.complete_21 + c.partial_high + c.partial_mid + c.partial_low + c.no_photos;
+  const total = c.complete_full + c.partial_high + c.partial_mid + c.partial_low + c.no_photos;
   if (total === 0) return null;
   const seg = (n: number) => `${(n / total) * 100}%`;
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-zinc-400">Photo Slots (21 max)</span>
-        <span className="text-zinc-500">{c.complete_21.toLocaleString()} / {total.toLocaleString()} complete</span>
+        <span className="text-zinc-400">Photo Slots (22 max)</span>
+        <span className="text-zinc-500">{c.complete_full.toLocaleString()} / {total.toLocaleString()} complete</span>
       </div>
       <div className="h-2 bg-zinc-800 rounded overflow-hidden flex">
-        <div className="bg-green-500"  style={{ width: seg(c.complete_21)  }} title={`Complete (21/21): ${c.complete_21}`} />
-        <div className="bg-lime-500"   style={{ width: seg(c.partial_high) }} title={`High (14–20): ${c.partial_high}`} />
+        <div className="bg-green-500"  style={{ width: seg(c.complete_full)  }} title={`Complete (22/22): ${c.complete_full}`} />
+        <div className="bg-lime-500"   style={{ width: seg(c.partial_high) }} title={`High (14–21): ${c.partial_high}`} />
         <div className="bg-yellow-500" style={{ width: seg(c.partial_mid)  }} title={`Mid (7–13): ${c.partial_mid}`} />
         <div className="bg-orange-500" style={{ width: seg(c.partial_low)  }} title={`Low (1–6): ${c.partial_low}`} />
         <div className="bg-red-500"    style={{ width: seg(c.no_photos)    }} title={`None: ${c.no_photos}`} />
       </div>
       <div className="flex items-center justify-between text-[10px] text-zinc-500">
         <span>
-          <span className="text-green-400">{c.complete_21}</span> full ·{' '}
+          <span className="text-green-400">{c.complete_full}</span> full ·{' '}
           <span className="text-lime-400">{c.partial_high}</span> high ·{' '}
           <span className="text-yellow-400">{c.partial_mid}</span> mid ·{' '}
           <span className="text-orange-400">{c.partial_low}</span> low ·{' '}

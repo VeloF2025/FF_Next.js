@@ -542,10 +542,10 @@ describe('photoSnagService.getPoleSnagReport', () => {
     ]);
 
     const report = await getPoleSnagReport('pole-uuid-1', 'user-1');
-    expect(report.totals.total).toBe(21);            // 7 civil + 8 dome + 6 main_joint
+    expect(report.totals.total).toBe(22);            // 8 civil + 8 dome + 6 main_joint
     expect(report.totals.approved).toBe(2);
     expect(report.totals.snagged).toBe(1);
-    expect(report.totals.pending).toBe(18);
+    expect(report.totals.pending).toBe(19);
     expect(report.report_id).toBe('report-uuid-1');
   });
 });

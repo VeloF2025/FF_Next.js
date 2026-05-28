@@ -26,7 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         (civil_step_01_key IS NOT NULL)::int + (civil_step_02_key IS NOT NULL)::int +
         (civil_step_03_key IS NOT NULL)::int + (civil_step_04_key IS NOT NULL)::int +
         (civil_step_05_key IS NOT NULL)::int + (civil_step_06_key IS NOT NULL)::int +
-        (civil_step_07_key IS NOT NULL)::int AS civil_filled,
+        (civil_step_07_key IS NOT NULL)::int + (civil_step_08_key IS NOT NULL)::int AS civil_filled,
         (optical_dome_01_key IS NOT NULL)::int + (optical_dome_02_key IS NOT NULL)::int +
         (optical_dome_03_key IS NOT NULL)::int + (optical_dome_04_key IS NOT NULL)::int +
         (optical_dome_05_key IS NOT NULL)::int + (optical_dome_06_key IS NOT NULL)::int +
@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             civil_step_01_key IS NOT NULL OR civil_step_02_key IS NOT NULL OR
             civil_step_03_key IS NOT NULL OR civil_step_04_key IS NOT NULL OR
             civil_step_05_key IS NOT NULL OR civil_step_06_key IS NOT NULL OR
-            civil_step_07_key IS NOT NULL OR
+            civil_step_07_key IS NOT NULL OR civil_step_08_key IS NOT NULL OR
             optical_dome_01_key IS NOT NULL OR optical_dome_02_key IS NOT NULL OR
             optical_dome_03_key IS NOT NULL OR optical_dome_04_key IS NOT NULL OR
             optical_dome_05_key IS NOT NULL OR optical_dome_06_key IS NOT NULL OR
@@ -56,7 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               civil_step_01_key IS NOT NULL AND civil_step_02_key IS NOT NULL AND
               civil_step_03_key IS NOT NULL AND civil_step_04_key IS NOT NULL AND
               civil_step_05_key IS NOT NULL AND civil_step_06_key IS NOT NULL AND
-              civil_step_07_key IS NOT NULL AND
+              civil_step_07_key IS NOT NULL AND civil_step_08_key IS NOT NULL AND
               optical_dome_01_key IS NOT NULL AND optical_dome_02_key IS NOT NULL AND
               optical_dome_03_key IS NOT NULL AND optical_dome_04_key IS NOT NULL AND
               optical_dome_05_key IS NOT NULL AND optical_dome_06_key IS NOT NULL AND
