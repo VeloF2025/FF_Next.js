@@ -6,9 +6,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, Calendar } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { EodReconciliationRow, EodReconciliationSummary } from '../../../types';
+import {
+  SingleDateChipFilter,
+  type SingleDateChip,
+} from '../../SingleDateChipFilter';
+
+function initialYesterdayYmd(): string {
+  const now = new Date();
+  const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const yyyy = y.getFullYear();
+  const mm = String(y.getMonth() + 1).padStart(2, '0');
+  const dd = String(y.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   matched_all:   { label: 'Full Match',     color: 'text-green-400',  bg: 'bg-green-500/10' },
@@ -20,9 +33,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 };
 
 export function EodReconciliationTab() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const [date, setDate] = useState(yesterday.toISOString().split('T')[0]);
+  const [chip, setChip] = useState<SingleDateChip>('yesterday');
+  const [date, setDate] = useState<string>(initialYesterdayYmd());
   const [rows, setRows] = useState<EodReconciliationRow[]>([]);
   const [summary, setSummary] = useState<EodReconciliationSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,14 +65,12 @@ export function EodReconciliationTab() {
 
   return (
     <div className="space-y-6">
-      {/* Date Picker */}
-      <div className="flex items-center gap-4">
-        <Calendar className="w-5 h-5 text-[var(--ff-text-secondary)]" />
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]"
+      {/* Date Chip Filter */}
+      <div className="flex flex-wrap items-center gap-4">
+        <SingleDateChipFilter
+          chip={chip}
+          date={date}
+          onChange={(c, d) => { setChip(c); setDate(d); }}
         />
         <span className="text-xs text-[var(--ff-text-tertiary)]">
           OES activations compared from {date ? new Date(new Date(date).getTime() + 86400000).toISOString().split('T')[0] : '—'}
