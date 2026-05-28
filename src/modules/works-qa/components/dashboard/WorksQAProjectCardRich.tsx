@@ -11,7 +11,7 @@ const SLOT_LABEL: Record<string, string> = {
   civil_step_01_key: 'Before Photo', civil_step_02_key: 'During Photo',
   civil_step_03_key: 'Depth Photo',  civil_step_04_key: 'End Plates',
   civil_step_05_key: 'Compaction',   civil_step_06_key: 'Level Check',
-  civil_step_07_key: 'After Photo',
+  civil_step_07_key: 'After Photo',  civil_step_08_key: 'Pole Label',
   optical_dome_01_key: 'Dome on Pole', optical_dome_02_key: 'Dome Label',
   optical_dome_03_key: 'Open Dome',    optical_dome_04_key: 'Splice Protectors',
   optical_dome_05_key: 'Slack Mgmt',   optical_dome_06_key: 'Strength Members',

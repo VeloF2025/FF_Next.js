@@ -12,11 +12,13 @@ interface SyncBody {
   pole_label?: string;
 }
 
-// Civil checklist_step -> slot key (steps 1-7).
-// Step 8 (Pole Label / pole tag) is also produced for civil/pole_installation jobs.
-// Share dome_08 since both disciplines record the same Pole ID photo and there is
-// no civil step 8 — without this, pole-tag photos uploaded from the field were
-// silently dropped (root cause of MOA.P.A830 missing photos, May 2026).
+// Civil checklist_step -> slot key (steps 1-8).
+// Step 8 (Pole Label / pole tag) is the pole ID label on the installed pole. It maps
+// to its own civil slot (civil_08, migration 388) so it renders under Civil and counts
+// toward the civil approval gate. Previously it was shared into the optical dome_08
+// slot (commit d1517023f) to avoid silently dropping it — but on civil-only poles that
+// surfaced the tag under "Optical Dome" and left Civil at 7/7. Optical dome jobs still
+// map their own step 8 to dome_08 via OPTICAL_STEP_MAP below.
 const CIVIL_STEP_MAP: Record<number, string> = {
   1: 'civil_01',
   2: 'civil_02',
@@ -25,7 +27,7 @@ const CIVIL_STEP_MAP: Record<number, string> = {
   5: 'civil_05',
   6: 'civil_06',
   7: 'civil_07',
-  8: 'dome_08',
+  8: 'civil_08',
 };
 
 // Optical checklist_step -> slot key (steps 1-8 = dome, 11-16 = joint)
@@ -136,7 +138,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               || ARRAY[
                 qa.civil_step_01_key, qa.civil_step_02_key, qa.civil_step_03_key,
                 qa.civil_step_04_key, qa.civil_step_05_key, qa.civil_step_06_key,
-                qa.civil_step_07_key,
+                qa.civil_step_07_key, qa.civil_step_08_key,
                 qa.optical_dome_01_key, qa.optical_dome_02_key, qa.optical_dome_03_key,
                 qa.optical_dome_04_key, qa.optical_dome_05_key, qa.optical_dome_06_key,
                 qa.optical_dome_07_key, qa.optical_dome_08_key,

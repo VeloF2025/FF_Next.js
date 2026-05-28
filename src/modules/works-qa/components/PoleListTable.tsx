@@ -93,7 +93,7 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: P
             >
               <td className="py-2 px-3 font-semibold text-zinc-100">{pole.pole_label}</td>
               <td className="py-2 px-3">
-                <PixelStrip filled={pole.civil_filled} total={7} hasFailures={pole.status !== 'approved' && pole.vlm_failures > 0} />
+                <PixelStrip filled={pole.civil_filled} total={8} hasFailures={pole.status !== 'approved' && pole.vlm_failures > 0} />
               </td>
               <td className="py-2 px-3">
                 <PixelStrip filled={pole.dome_filled} total={8} hasFailures={pole.status !== 'approved' && pole.vlm_failures > 0} />

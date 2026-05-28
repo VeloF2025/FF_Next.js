@@ -21,6 +21,7 @@ export interface PoleQaPhoto {
   civil_step_05_key: string | null;
   civil_step_06_key: string | null;
   civil_step_07_key: string | null;
+  civil_step_08_key: string | null;
 
   // Optical Dome
   optical_dome_01_key: string | null;
@@ -85,7 +86,7 @@ export interface PoleSummary {
   pole_label: string;
   zone_no: number | null;
   pon_no: number | null;
-  civil_filled: number;     // 0-7
+  civil_filled: number;     // 0-8
   dome_filled: number;      // 0-8
   joint_filled: number;     // 0-6
   tray_count: number;

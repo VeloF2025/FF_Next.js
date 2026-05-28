@@ -212,7 +212,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                       SELECT v FROM (VALUES
                         (qa.civil_step_01_key), (qa.civil_step_02_key), (qa.civil_step_03_key),
                         (qa.civil_step_04_key), (qa.civil_step_05_key), (qa.civil_step_06_key),
-                        (qa.civil_step_07_key),
+                        (qa.civil_step_07_key), (qa.civil_step_08_key),
                         (qa.optical_dome_01_key), (qa.optical_dome_02_key), (qa.optical_dome_03_key),
                         (qa.optical_dome_04_key), (qa.optical_dome_05_key), (qa.optical_dome_06_key),
                         (qa.optical_dome_07_key), (qa.optical_dome_08_key),

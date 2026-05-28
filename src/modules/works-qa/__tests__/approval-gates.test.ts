@@ -15,6 +15,7 @@ const FULL_POLE: PoleQaPhoto = {
   civil_step_05_key: 'works-qa/proj/A673/civil/05.jpg',
   civil_step_06_key: 'works-qa/proj/A673/civil/06.jpg',
   civil_step_07_key: 'works-qa/proj/A673/civil/07.jpg',
+  civil_step_08_key: 'works-qa/proj/A673/civil/08.jpg',
   optical_dome_01_key: 'works-qa/proj/A673/optical/dome_01.jpg',
   optical_dome_02_key: 'works-qa/proj/A673/optical/dome_02.jpg',
   optical_dome_03_key: 'works-qa/proj/A673/optical/dome_03.jpg',
@@ -38,6 +39,7 @@ const FULL_POLE: PoleQaPhoto = {
     civil_05: { valid: true, confidence: 0.90, feedback: 'OK' },
     civil_06: { valid: true, confidence: 0.87, feedback: 'OK' },
     civil_07: { valid: true, confidence: 0.93, feedback: 'OK' },
+    civil_08: { valid: true, confidence: 0.90, feedback: 'OK' },
     dome_01: { valid: true, confidence: 0.89, feedback: 'OK' },
     dome_02: { valid: true, confidence: 0.91, feedback: 'OK' },
     dome_03: { valid: true, confidence: 0.88, feedback: 'OK' },
@@ -63,7 +65,7 @@ const FULL_POLE: PoleQaPhoto = {
 };
 
 describe('allGatesPass', () => {
-  it('passes when all 21 slots filled, all VLM valid, ≥1 tray photo', () => {
+  it('passes when all 22 slots filled, all VLM valid, ≥1 tray photo', () => {
     const result = allGatesPass(FULL_POLE);
     expect(result.pass).toBe(true);
     expect(result.blocking).toHaveLength(0);
@@ -125,6 +127,13 @@ describe('disciplineGatesPass', () => {
     const result = disciplineGatesPass(pole, 'civil');
     expect(result.pass).toBe(false);
     expect(result.blocking).toContain('civil_01');
+  });
+
+  it('blocks civil gate when the Pole Label (civil_08) photo is missing', () => {
+    const pole = { ...FULL_POLE, civil_step_08_key: null };
+    const result = disciplineGatesPass(pole, 'civil');
+    expect(result.pass).toBe(false);
+    expect(result.blocking).toContain('civil_08');
   });
 
   it('passes civil gate when reviewed slot has decision "approved" and other slots pass VLM', () => {

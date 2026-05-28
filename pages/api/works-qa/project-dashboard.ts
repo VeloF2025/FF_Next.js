@@ -13,7 +13,7 @@ import type {
 // snags, most-missing slot) are evaluated inside the same CTE pipeline so the
 // 60s cache header keeps p95 down even on the 2000+ pole projects.
 
-const CIVIL_SLOTS = ['civil_step_01_key','civil_step_02_key','civil_step_03_key','civil_step_04_key','civil_step_05_key','civil_step_06_key','civil_step_07_key'] as const;
+const CIVIL_SLOTS = ['civil_step_01_key','civil_step_02_key','civil_step_03_key','civil_step_04_key','civil_step_05_key','civil_step_06_key','civil_step_07_key','civil_step_08_key'] as const;
 const DOME_SLOTS  = ['optical_dome_01_key','optical_dome_02_key','optical_dome_03_key','optical_dome_04_key','optical_dome_05_key','optical_dome_06_key','optical_dome_07_key','optical_dome_08_key'] as const;
 const JOINT_SLOTS = ['main_joint_11_key','main_joint_12_key','main_joint_13_key','main_joint_14_key','main_joint_15_key','main_joint_16_key'] as const;
 

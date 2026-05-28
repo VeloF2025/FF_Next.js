@@ -16,6 +16,7 @@ export const SLOT_META: SlotMeta[] = [
   { key: 'civil_05', dbColumn: 'civil_step_05_key', label: 'Compaction/Backfill', discipline: 'civil', stepNumber: 5, vlmCheck: 'Pole STANDING, hole FILLED and packed with sand+cement. Compacted surface.' },
   { key: 'civil_06', dbColumn: 'civil_step_06_key', label: 'Level Check',         discipline: 'civil', stepNumber: 6, vlmCheck: 'Spirit level (yellow/green bubble level tool) held against an upright pole.' },
   { key: 'civil_07', dbColumn: 'civil_step_07_key', label: 'After Photo',         discipline: 'civil', stepNumber: 7, vlmCheck: 'Full pole standing upright, wide shot from distance.' },
+  { key: 'civil_08', dbColumn: 'civil_step_08_key', label: 'Pole Label',          discipline: 'civil', stepNumber: 8, vlmCheck: 'Pole ID label/tag readable on the installed pole.' },
   // Dome
   { key: 'dome_01', dbColumn: 'optical_dome_01_key', label: 'Dome on Pole',       discipline: 'dome', stepNumber: 1, vlmCheck: 'Wide shot of splice dome installed on pole.' },
   { key: 'dome_02', dbColumn: 'optical_dome_02_key', label: 'Dome Label',         discipline: 'dome', stepNumber: 2, vlmCheck: 'Dome label with Pole ID / Fibre ID clearly readable.' },
