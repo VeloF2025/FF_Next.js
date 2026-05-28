@@ -295,6 +295,38 @@ CREATE TRIGGER trg_stock_serial_holder_validate_t
   BEFORE INSERT OR UPDATE OF status, holder_id ON stock_serials
   FOR EACH ROW EXECUTE FUNCTION trg_stock_serial_holder_validate();
 
+-- 9. Track 2.7: retire legacy per-source emit triggers now that mig 387 generic
+--    emit (trg_stock_serial_status_emit_t) + Track 2.x promoteSerial paths cover
+--    all three emission routes.
+--
+--    Dropped (fully superseded):
+--      emit_serial_event_on_picking_done  (mig 364 T1, fn last redefined mig 366)
+--        → now Track 2.2 (pickingProcess.lifecycle / promoteSerial)
+--      emit_serial_event_on_oes_activate  (mig 364 T3, fn last redefined mig 365)
+--        → now Track 2.6 (oesActivation.lifecycle / promoteOesActivatedSerials)
+--        → also resolves the TRIGGER 3 race documented in
+--          project_sprint_e_mig_364_trigger_3_race.md
+--      emit_serial_event_on_drop_install  (mig 367)
+--        → now Track 2.4 / 2.6 (cascade PP resolution / OES install path)
+--
+--    Intentionally RETAINED (not superseded):
+--      emit_serial_event_on_qa_install  ON qa_photo_reviews
+--        (mig 364 T2 / mig 365 FIX) — dormant in prod (ont_serial_scanned=NULL);
+--        kept as a no-cost safety net; Track 2.x does not route QA installs.
+--      emit_serial_event_on_return      ON stock_returns
+--        (mig 364 T4) — fires on return creation; Track 2.3 refactored return
+--        *acceptance* only; creation-time 'returned' emission still relies on this
+--        trigger (different lifecycle point — no double-emit risk).
+--
+--    Triggers are dropped first (must precede their function drops).
+DROP TRIGGER IF EXISTS emit_serial_event_on_picking_done  ON stock_pickings;
+DROP TRIGGER IF EXISTS emit_serial_event_on_oes_activate  ON oes_pp_data;
+DROP TRIGGER IF EXISTS emit_serial_event_on_drop_install  ON drops;
+
+DROP FUNCTION IF EXISTS trg_emit_serial_event_on_picking_done();
+DROP FUNCTION IF EXISTS trg_emit_serial_event_on_oes_activate();
+DROP FUNCTION IF EXISTS trg_emit_serial_event_on_drop_install();
+
 INSERT INTO migrations (version, name)
   VALUES (387, 'serial_lifecycle_state_machine')
   ON CONFLICT (version) DO NOTHING;
