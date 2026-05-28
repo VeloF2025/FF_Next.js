@@ -3,7 +3,7 @@
 // pole_universe (qfield_photo_validations ∪ pole_qa_photos).
 
 export interface DisciplineStats {
-  /** Pole slot capacity for the discipline (7 civil, 8 dome, 6 main_joint). */
+  /** Pole slot capacity for the discipline (8 civil, 8 dome, 6 main_joint). */
   capacity: number;
   /** Poles where this discipline is flipped approved (civil_approved / dome_approved / joint_approved). */
   approved: number;
