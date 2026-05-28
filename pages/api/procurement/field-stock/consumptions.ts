@@ -8,13 +8,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { recordConsumption } from '@/modules/procurement/field-stock/services/consumptionService';
 import {
   getConsumptions,
-  recordConsumption,
   getConsumptionsByDrop,
   getConsumptionsByTechnician,
   getUnverifiedCount,
-} from '@/modules/procurement/field-stock/services/consumptionService';
+} from '@/modules/procurement/field-stock/services/consumptionQueries';
 import type { RecordConsumptionInput, ConsumptionFilters, JobType } from '@/modules/procurement/field-stock/types';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {

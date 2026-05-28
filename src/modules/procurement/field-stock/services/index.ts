@@ -6,3 +6,4 @@
 export * from './locationService';
 export * from './serialService';
 export * from './consumptionService';
+export * from './consumptionQueries';
