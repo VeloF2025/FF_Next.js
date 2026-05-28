@@ -55,25 +55,16 @@ beforeAll(async () => {
     [DROP_NUMBER],
   );
 
-  // 3. Extend qa_photo_reviews with columns scanSerialService uses (idempotent).
-  await pool.query(`
-    ALTER TABLE qa_photo_reviews
-      ADD COLUMN IF NOT EXISTS ont_consumption_id  UUID,
-      ADD COLUMN IF NOT EXISTS ups_serial_scanned  TEXT,
-      ADD COLUMN IF NOT EXISTS ups_consumption_id  UUID,
-      ADD COLUMN IF NOT EXISTS scan_gps_lat        NUMERIC,
-      ADD COLUMN IF NOT EXISTS scan_gps_lng        NUMERIC,
-      ADD COLUMN IF NOT EXISTS updated_at          TIMESTAMPTZ DEFAULT NOW()
-  `);
-
-  // 4. Insert qa_photo_review row for the test drop.
+  // 3. Insert qa_photo_review row for the test drop.
+  // Extra columns (ont_consumption_id, ups_serial_scanned, etc.) are added to
+  // qa_photo_reviews in sprint-e-seed.sql — no ALTER TABLE needed here.
   await pool.query(
     `INSERT INTO qa_photo_reviews (id, drop_number)
      VALUES ($1, $2) ON CONFLICT DO NOTHING`,
     [QA_REVIEW_ID, DROP_NUMBER],
   );
 
-  // 5. Seed serial in `issued` state using bypass (issued is not reachable from
+  // 4. Seed serial in `issued` state using bypass (issued is not reachable from
   //    __new__ via the matrix without a picking step — use SET LOCAL bypass).
   const seedClient = await pool.connect();
   try {

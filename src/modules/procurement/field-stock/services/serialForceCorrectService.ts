@@ -48,7 +48,7 @@
  */
 import { pool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
-import { promoteSerial } from './serialLifecycle';
+import { promoteSerial, type SerialStatus } from './serialLifecycle';
 import type {
   ForceCorrectTarget,
   ForceCorrectSnapshot,
@@ -226,9 +226,10 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
       // ForceCorrectStatus includes legacy values (reserved, in_transit, in_repair)
       // not in SerialStatus (9-value mig 387 vocabulary). bypass:true permits any
       // value the DB CHECK accepts — the DB is the enforcement boundary here.
-      // The `as` cast is intentional and correct for the bypass path.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const toStatusAsSerial = toStatus as any;
+      // The double cast via `unknown` is intentional: we widen to the unknown
+      // base type first so TypeScript's soundness check is satisfied, then narrow
+      // to SerialStatus. The DB CHECK constraint is the real runtime guard.
+      const toStatusAsSerial = toStatus as unknown as SerialStatus;
       await promoteSerial(client, {
         serialId:    row.id,
         toStatus:    toStatusAsSerial,

@@ -3,31 +3,39 @@
  *
  * Sprint E Track 2.6 — OES installed → activated lifecycle transition.
  *
- * Tests the promoteOesActivatedSerials() helper inside oesPostImportService.ts
- * in ISOLATION (TRIGGER 3 side-effects cleaned up before each assertion),
- * mirroring the cascadeFixture.ts test posture from Track 2.4.
+ * Tests the exported `promoteOesActivatedSerials()` helper from
+ * oesSerialLifecycle.ts in ISOLATION, mirroring the cascadeFixture.ts
+ * test posture from Track 2.4 (TRIGGER 3 side-effects cleaned up before
+ * each assertion).
  *
- * Contract:
- *   - A serial in 'installed' state is promoted to 'activated' via promoteSerial()
- *   - stock_serial_events receives event_type='activated_on_oes' (matrix row 73)
- *   - A serial already in 'activated' state is silently skipped (no second event)
- *   - The function is dormant pre-cutover (TRIGGER 3 races ahead), but its
- *     contract is correct in isolation when TRIGGER 3 side-effects are cleaned up.
+ * Case A (happy path):
+ *   - Seed a serial in 'installed' state (cascade fixture's installedSerialId).
+ *   - Call promoteOesActivatedSerials with that serial.
+ *   - Assert: status promoted to 'activated'.
+ *   - Assert: exactly ONE new event row with event_type='activated',
+ *     from_state='installed', to_state='activated', source_table='oes_activations'.
+ *
+ * Case B (guard — already-activated serial skipped):
+ *   - Use cascade fixture's activatedSerialId (status='activated').
+ *   - Call promoteOesActivatedSerials with that serial.
+ *   - Assert: status unchanged (still 'activated').
+ *   - Assert: NO new stock_serial_events row emitted — the status!='installed'
+ *     guard in promoteOesActivatedSerials returns early without calling
+ *     promoteSerial, so the mig 387 emit trigger never fires.
+ *   - Assert: no exception raised.
  *
  * Requires: Sprint E container (mig 387 triggers via vitest.db.sprinte.config.ts).
  * Config: vitest.db.sprinte.config.ts
- *
- * NOTE: promoteOesActivatedSerials is not exported from oesPostImportService.
- * We test it indirectly by calling the exported pool-level API (promoteSerial)
- * directly with the same args the function would pass, to verify the matrix
- * row 73 transition contract. This avoids importing private helpers while still
- * proving the lifecycle contract is correct.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Pool } from 'pg';
-import { promoteSerial } from '@/modules/procurement/field-stock/services/serialLifecycle';
-import { setupCascadeFixture, type CascadeFixtureHandle, SN_PREFIX } from './cascadeFixture';
+import { promoteOesActivatedSerials } from '@/modules/activate/services/oes/oesSerialLifecycle';
+import {
+  setupCascadeFixture,
+  type CascadeFixtureHandle,
+  SN_PREFIX,
+} from './cascadeFixture';
 
 const TEST_DB_URL = process.env.TEST_DATABASE_URL;
 if (!TEST_DB_URL) {
@@ -68,29 +76,47 @@ afterAll(async () => {
   }
 });
 
-describe('OES installed→activated lifecycle (Track 2.6, matrix row 73)', () => {
-  it('promotes installed serial to activated and emits activated_on_oes event', async () => {
-    // installedSerialId was seeded as 'installed' by cascadeFixture.
-    // setupCascadeFixture already cleaned up TRIGGER 3 side-effects; the serial
-    // is in the correct 'installed' state to test this transition.
-    const serialId = fixture.installedSerialId;
-
-    // sourceId must be a UUID (the trigger casts ff.event_source_id to uuid).
-    // Using a fixed test UUID so the dedup partial index applies correctly.
-    const TEST_SOURCE_ID = 'f0260000-0000-0000-0000-000000000001';
-    await promoteSerial(pool, {
-      serialId,
-      toStatus:    'activated',
-      sourceTable: 'oes_activations',
-      sourceId:    TEST_SOURCE_ID,
-    });
-
-    const dbRow = await pool.query<{ status: string }>(
-      `SELECT status FROM stock_serials WHERE id = $1`,
-      [serialId],
+describe('promoteOesActivatedSerials — OES installed→activated lifecycle (Track 2.6)', () => {
+  /**
+   * Case A: installed serial is promoted via the helper.
+   *
+   * setupCascadeFixture seeds installedSerialId with status='installed' and
+   * cleans up TRIGGER 3 side-effects so we start from a clean state.
+   */
+  it('Case A — installed serial: promotes to activated, emits one event', async () => {
+    // Resolve the serial_number for the fixture's installed serial row.
+    const snRow = await pool.query<{ serial_number: string }>(
+      `SELECT serial_number FROM stock_serials WHERE id = $1`,
+      [fixture.installedSerialId],
     );
-    expect(dbRow.rows[0]?.status).toBe('activated');
+    const serialNumber = snRow.rows[0].serial_number;
 
+    // Pre-condition: status is 'installed', no events yet.
+    const before = await pool.query<{ status: string }>(
+      `SELECT status FROM stock_serials WHERE id = $1`,
+      [fixture.installedSerialId],
+    );
+    expect(before.rows[0]?.status).toBe('installed');
+
+    const eventsBefore = await pool.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM stock_serial_events WHERE serial_id = $1`,
+      [fixture.installedSerialId],
+    );
+    expect(Number(eventsBefore.rows[0]?.cnt)).toBe(0);
+
+    // Call the actual shipped helper.
+    await promoteOesActivatedSerials([
+      { serial_number: serialNumber, drop_number: fixture.DROP_INSTALLED },
+    ]);
+
+    // Assert: status promoted to activated.
+    const after = await pool.query<{ status: string }>(
+      `SELECT status FROM stock_serials WHERE id = $1`,
+      [fixture.installedSerialId],
+    );
+    expect(after.rows[0]?.status).toBe('activated');
+
+    // Assert: exactly one event row, correct fields.
     const events = await pool.query<{
       event_type:   string;
       from_state:   string | null;
@@ -100,13 +126,11 @@ describe('OES installed→activated lifecycle (Track 2.6, matrix row 73)', () =>
       `SELECT event_type, from_state, to_state, source_table
          FROM stock_serial_events
         WHERE serial_id = $1
-        ORDER BY occurred_at DESC
-        LIMIT 1`,
-      [serialId],
+        ORDER BY occurred_at`,
+      [fixture.installedSerialId],
     );
     expect(events.rows).toHaveLength(1);
     // mig 387 matrix row 73: ('installed', 'activated', 'activated', 'OES activation')
-    // event_type = 'activated' (not 'activated_on_oes' — the matrix uses the short form).
     expect(events.rows[0]).toMatchObject({
       event_type:   'activated',
       from_state:   'installed',
@@ -115,51 +139,52 @@ describe('OES installed→activated lifecycle (Track 2.6, matrix row 73)', () =>
     });
   });
 
-  it('already-activated serial is silently skipped (no new event)', async () => {
-    // activatedSerialId was seeded as 'activated' by cascadeFixture.
-    // promoteSerial with installed→activated on an already-activated serial
-    // should throw LifecycleViolationError (pre-cutover behaviour) because
-    // activated→activated is a no-op same-state write, which the emit trigger
-    // short-circuits on. Let's verify this is a rejection (wrong source state).
-    const serialId = fixture.activatedSerialId;
-
-    // Capture event count before the attempt.
-    const beforeCount = await pool.query<{ cnt: string }>(
-      `SELECT COUNT(*) AS cnt FROM stock_serial_events WHERE serial_id = $1`,
-      [serialId],
+  /**
+   * Case B: already-activated serial is skipped by the status guard.
+   *
+   * setupCascadeFixture seeds activatedSerialId with status='activated'.
+   * The helper's `serial.status !== 'installed'` guard returns early without
+   * calling promoteSerial — no event fires, no exception raised.
+   */
+  it('Case B — already-activated serial: guard skips it, no new event, no throw', async () => {
+    const snRow = await pool.query<{ serial_number: string }>(
+      `SELECT serial_number FROM stock_serials WHERE id = $1`,
+      [fixture.activatedSerialId],
     );
-    const before = Number(beforeCount.rows[0]?.cnt ?? 0);
+    const serialNumber = snRow.rows[0].serial_number;
 
-    // An already-activated serial should either fail (LifecycleViolationError
-    // from mig 387 matrix: activated→activated is NOT in the transition table)
-    // or be a same-state no-op (emit trigger short-circuits). Either outcome
-    // proves that the OES path's per-serial check (status === 'installed') guard
-    // in promoteOesActivatedSerials correctly skips this serial.
-    let threw = false;
-    try {
-      await promoteSerial(pool, {
-        serialId,
-        toStatus:    'activated',
-        sourceTable: 'oes_activations',
-        sourceId:    fixture.DROP_ACTIVATED,
-      });
-    } catch {
-      threw = true;
-    }
-
-    // If it didn't throw, it was a same-state no-op — emit trigger short-circuited.
-    // Either way: no new event should have been emitted.
-    const afterCount = await pool.query<{ cnt: string }>(
-      `SELECT COUNT(*) AS cnt FROM stock_serial_events WHERE serial_id = $1`,
-      [serialId],
+    // Pre-condition: status is 'activated', no events (fixture cleaned them).
+    const before = await pool.query<{ status: string }>(
+      `SELECT status FROM stock_serials WHERE id = $1`,
+      [fixture.activatedSerialId],
     );
-    const after = Number(afterCount.rows[0]?.cnt ?? 0);
+    expect(before.rows[0]?.status).toBe('activated');
 
-    // No event appended (either throw or same-state no-op).
-    expect(after).toBe(before);
+    const cntBefore = await pool.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM stock_serial_events WHERE serial_id = $1`,
+      [fixture.activatedSerialId],
+    );
+    const eventCountBefore = Number(cntBefore.rows[0]?.cnt);
 
-    // If it threw, that's also fine — the OES helper guards against this state.
-    // If it didn't throw, the no-op proves the emit trigger handles it correctly.
-    void threw; // suppress lint unused-variable warning
+    // Call the helper — must not throw.
+    await expect(
+      promoteOesActivatedSerials([
+        { serial_number: serialNumber, drop_number: fixture.DROP_ACTIVATED },
+      ]),
+    ).resolves.toBeUndefined();
+
+    // Assert: status unchanged.
+    const after = await pool.query<{ status: string }>(
+      `SELECT status FROM stock_serials WHERE id = $1`,
+      [fixture.activatedSerialId],
+    );
+    expect(after.rows[0]?.status).toBe('activated');
+
+    // Assert: no new event row — the guard returned before calling promoteSerial.
+    const cntAfter = await pool.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM stock_serial_events WHERE serial_id = $1`,
+      [fixture.activatedSerialId],
+    );
+    expect(Number(cntAfter.rows[0]?.cnt)).toBe(eventCountBefore);
   });
 });

@@ -18,7 +18,7 @@ import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
 import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
 import { recordVlmCorrectionsFromOes } from './oesVlmLearningService';
-import { promoteSerial } from '@/modules/procurement/field-stock/services/serialLifecycle';
+import { promoteOesActivatedSerials } from './oesSerialLifecycle';
 
 const logger = createLogger('oes/oesPostImportService');
 
@@ -208,84 +208,6 @@ interface ActivatedPpRow {
   activation_date: string | null;
   serial_number: string;
   maintenance_ticket_id: string | null;
-}
-
-// ============================================================================
-// OES SERIAL LIFECYCLE PROMOTION
-// ============================================================================
-
-interface OesSerialRow {
-  serial_number: string;
-  drop_number: string;
-}
-
-/**
- * Sprint E Track 2.6 — OES activation serial lifecycle step.
- *
- * For each serial that just became 'activated' in oes_pp_data, promote its
- * stock_serials row from `installed` → `activated` via the canonical
- * promoteSerial() path (matrix row 73, `activated_on_oes`).
- *
- * DORMANT PRE-CUTOVER: mig 364 TRIGGER 3 races ahead of this function and
- * sets status → 'activated' on the oes_pp_data UPDATE, so promoteSerial()
- * finds current_status='activated' and the matrix source='installed' check
- * produces no match (a no-op). This is expected and accepted (Hein, 2026-05-28).
- * See PR body and cascadePpResolution.ts for full background.
- *
- * POST-CUTOVER (Track 7): TRIGGER 3 is retired. This function becomes the
- * sole application-layer writer for the OES installed→activated transition.
- *
- * Errors are caught per-serial and logged; a single failure does not abort
- * the remaining batch (best-effort, mirrors the fire-and-forget posture of
- * the surrounding triggerPpActivationCheck).
- */
-async function promoteOesActivatedSerials(
-  rows: ReadonlyArray<OesSerialRow>,
-): Promise<void> {
-  for (const row of rows) {
-    try {
-      // Resolve stock_serials.id for this serial_number (needed by promoteSerial).
-      // Only proceed if status='installed' — the matrix row 73 source constraint.
-      const result = await pool.query<{ id: string; status: string }>(
-        `SELECT id, status
-           FROM stock_serials
-          WHERE serial_number = $1
-          LIMIT 1`,
-        [row.serial_number],
-      );
-
-      const serial = result.rows[0];
-      if (!serial) continue; // Serial not in stock_serials — skip.
-      if (serial.status !== 'installed') continue; // TRIGGER 3 already activated or wrong state — skip.
-
-      await promoteSerial(pool, {
-        serialId:    serial.id,
-        toStatus:    'activated',
-        sourceTable: 'oes_activations',
-        // sourceId must be a UUID (trigger casts ff.event_source_id → uuid).
-        // Use serial.id — each serial activates once; dedup partial index
-        // (WHERE source_id IS NOT NULL) prevents a duplicate event if this
-        // function runs more than once for the same serial.
-        sourceId:    serial.id,
-        payload: {
-          serial_number: row.serial_number,
-          drop_number:   row.drop_number,
-          activated_via: 'oes_post_import',
-        },
-      });
-
-      logger.info('OES serial promoted installed→activated', {
-        serial_number: row.serial_number,
-        drop_number:   row.drop_number,
-      });
-    } catch (err) {
-      logger.warn('OES serial promotion failed (non-blocking)', {
-        serial_number: row.serial_number,
-        drop_number:   row.drop_number,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
 }
 
 /**

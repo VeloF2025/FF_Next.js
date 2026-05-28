@@ -147,9 +147,9 @@ export async function recordScan(
     await client.query('BEGIN');
 
     // 1. Insert consumption record.
-    // Note: `updated_at` is not included in the INSERT because the test schema's
-    // stock_consumptions table (sprint-e-seed.sql) does not have that column.
-    // Production schema may include it — omitting is safe (created_at covers audit).
+    // `updated_at` is not included: the stock_consumptions schema (sprint-e-seed.sql
+    // and the production migration 384 CREATE TABLE) does not define that column.
+    // created_at is sufficient for insert-only audit on consumption records.
     await client.query(
       `INSERT INTO stock_consumptions (
          id, job_type, drop_number, stock_item_id, serial_id, serial_number,
