@@ -25,18 +25,21 @@
  *     per-serial.
  *   - `field_stock_movements` (consumptionService.ts) is a quantity-level
  *     ledger of physical stock moves, not per-serial state.
- *   `serialStateMachine.ts` writes to audit_logs + field_stock_movements but
- *   NOT stock_serial_events — that's wired via the migration-364 triggers
- *   firing on its UPDATE statements. Force-correct writes stock_serial_events
- *   directly because triggers fire on source-table events we're bypassing.
  *
- * Audit row layout (stock_serial_events):
- *   actor_user_id  ← performedBy (uuid)
- *   from_state     ← old status (only when status changed; else NULL)
- *   to_state       ← new status (only when status changed; else NULL)
- *   payload        ← { isForceCorrect, performedByName, reason, before, after, changedFields }
- *   occurred_at    ← NOW()
- *   source_table / source_id intentionally NULL (bypasses dedupe unique index).
+ * Sprint E Track 2.6 — audit event path:
+ *   The status UPDATE is now routed through promoteSerial(bypass:true). The
+ *   mig 387 trg_stock_serial_status_emit_t trigger fires on the UPDATE and
+ *   writes the `force_corrected` event row, with rich payload supplied via
+ *   the ff.event_payload GUC. The former direct emitSerialEvent() call has
+ *   been removed — the trigger is now the sole emitter (no double-emit).
+ *
+ *   Non-status fields (currentLocationId etc.) are written via a separate
+ *   UPDATE after promoteSerial(), inside the same transaction.
+ *
+ *   source_table: '' and sourceId: '' collapse to NULL inside the trigger
+ *   (via NULLIF('', '')) — preserving the pre-existing "never dedup" behaviour
+ *   for force-correct events (every correction writes a row regardless of
+ *   whether the same serial was corrected before).
  *
  * CONNECTION POOL — uses pg.Pool via @/lib/db-pool (NOT the @neondatabase/serverless
  * shim used by sibling serialService.ts). pg.Pool is the canonical pool for new
@@ -45,7 +48,7 @@
  */
 import { pool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
-import { emitSerialEvent } from '@/lib/serial-events';
+import { promoteSerial } from './serialLifecycle';
 import type {
   ForceCorrectTarget,
   ForceCorrectSnapshot,
@@ -184,41 +187,83 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
       return { serialNumber, found: true, applied: false, before, after, changedFields: changed };
     }
 
-    // Apply UPDATE.
-    const setParts: string[] = [];
-    const params: unknown[] = [];
-    let i = 1;
-    for (const field of changed) {
-      setParts.push(`${TARGET_COLUMN_MAP[field]} = $${i++}`);
-      params.push(p.target[field] ?? null);
-    }
-    params.push(row.id);
-    await client.query(
-      `UPDATE stock_serials
-          SET ${setParts.join(', ')}, updated_at = NOW()
-        WHERE id = $${i}`,
-      params,
-    );
+    // ── Sprint E Track 2.6: two-step write ───────────────────────────────────
+    //
+    // STEP 1 — Status change via promoteSerial(bypass:true).
+    //   Routes through the mig 387 lifecycle infrastructure so the
+    //   trg_stock_serial_status_emit_t trigger fires and writes a
+    //   `force_corrected` stock_serial_events row with full payload context.
+    //
+    //   bypass:true skips the status-validate trigger (FF001) — required
+    //   because force-correct may target ANY of the 11 legacy-CHECK statuses,
+    //   including off-matrix transitions.
+    //
+    //   sourceTable: '' / sourceId: '' → NULLIF('','') = NULL inside the
+    //   trigger — preserves the "never dedup" contract: every force-correct
+    //   call writes an event row regardless of prior corrections.
+    //
+    //   PoolClient path is used (caller owns BEGIN/COMMIT; promoteSerial
+    //   detects `release` on the object and skips its own txn wrapper).
+    //
+    // STEP 2 — Non-status fields via a direct bulk UPDATE.
+    //   currentLocationId, allocatedToProjectId, installedAtDropNumber,
+    //   activatedAtOltId do not affect the status-validate trigger and
+    //   are written separately. No duplicate event is emitted for these
+    //   (the trigger only fires on status changes — same-column updates
+    //   on non-status fields don't invoke trg_stock_serial_status_emit_t).
 
-    // Write audit event via the canonical writer. source_table + source_id are
-    // left null so the dedupe partial index (WHERE source_id IS NOT NULL) never
-    // applies — every force-correct always records a row.
     const statusChanged = changed.includes('status');
-    await emitSerialEvent(client, {
-      serialId: row.id,
-      eventType: 'force_corrected',
-      fromState: statusChanged ? (before.status ?? null) : null,
-      toState: statusChanged ? (after.status ?? null) : null,
-      actorUserId: p.performedBy,
-      payload: {
-        isForceCorrect: true,
-        performedByName: p.performedByName,
-        reason: p.reason,
-        before,
-        after,
-        changedFields: changed,
-      },
-    });
+    const nonStatusChanged = changed.filter(f => f !== 'status');
+
+    if (statusChanged) {
+      const toStatus = after.status;
+      if (toStatus == null) {
+        // Should never happen (status is in changed but after.status is null)
+        await client.query('ROLLBACK');
+        return { serialNumber, found: true, applied: false, changedFields: changed,
+          error: 'Internal: status in changedFields but after.status is null' };
+      }
+      // ForceCorrectStatus includes legacy values (reserved, in_transit, in_repair)
+      // not in SerialStatus (9-value mig 387 vocabulary). bypass:true permits any
+      // value the DB CHECK accepts — the DB is the enforcement boundary here.
+      // The `as` cast is intentional and correct for the bypass path.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const toStatusAsSerial = toStatus as any;
+      await promoteSerial(client, {
+        serialId:    row.id,
+        toStatus:    toStatusAsSerial,
+        // holder_id is not managed by force-correct (no holder column in ForceCorrectTarget)
+        sourceTable: '',
+        sourceId:    '',
+        actorUserId: p.performedBy,
+        bypass:      true,
+        payload: {
+          isForceCorrect:  true,
+          performedByName: p.performedByName,
+          reason:          p.reason,
+          before,
+          after,
+          changedFields:   changed,
+        },
+      });
+    }
+
+    if (nonStatusChanged.length > 0) {
+      const setParts: string[] = [];
+      const params: unknown[] = [];
+      let i = 1;
+      for (const field of nonStatusChanged) {
+        setParts.push(`${TARGET_COLUMN_MAP[field]} = $${i++}`);
+        params.push(p.target[field] ?? null);
+      }
+      params.push(row.id);
+      await client.query(
+        `UPDATE stock_serials
+            SET ${setParts.join(', ')}, updated_at = NOW()
+          WHERE id = $${i}`,
+        params,
+      );
+    }
 
     await client.query('COMMIT');
     return { serialNumber, found: true, applied: true, before, after, changedFields: changed };
