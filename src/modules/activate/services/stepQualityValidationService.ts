@@ -195,7 +195,7 @@ async function checkOnePhoto(
 /**
  * Validate categorized photos against per-step visual quality criteria.
  *
- * Only processes steps in QUALITY_CHECK_STEPS (1, 2, 5, 7, 8, 9, 10).
+ * Only processes steps in QUALITY_CHECK_STEPS (1, 2, 5, 7, 8, 9, 10, 11, 12).
  * Step 6 is excluded — handled by validateOntBackCables.
  *
  * Returns a map of filename → result.

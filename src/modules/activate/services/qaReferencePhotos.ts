@@ -56,6 +56,11 @@ const REGISTRY: Record<number, StepReferenceEntry> = {
     correct: ['step-9-correct.png'],
     incorrect: [{ file: 'step-9-incorrect.png', reason: 'Not all lights in view — only 3 of 4 lights are on' }],
   },
+  // Steps 11 & 12 (dome joint open/closed) — reference photos pending; entries
+  // intentionally empty so loadStepReferences returns null and the VLM runs
+  // zero-shot until field photos are uploaded via the gallery UI.
+  11: { correct: [], incorrect: [] },
+  12: { correct: [], incorrect: [] },
 };
 
 export interface LoadedReference {
