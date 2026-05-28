@@ -1,13 +1,33 @@
 # Sprint E — Serial Lifecycle State Machine — Design
 
 **Date:** 2026-05-28
-**Status:** Draft design (brainstorm complete, pending grill-me + Hein sign-off). Next: `writing-plans`.
+**Status:** Approved design (brainstorm + grill-me complete). Next: `writing-plans`.
 **Owner:** Hein
 **Module:** Procurement / Field Stock
 **Branch / worktree:** `docs/stock-mgmt-rebuild-spec` @ `/home/hein/Workspace/FF_Next.js-stock-mgmt-spec` (off `origin/master` `92ae0cdc3`)
 **Roadmap parent:** `docs/superpowers/specs/2026-05-25-stock-locations-custody-roadmap-design.md` — this is the **fifth sub-project** after B (Locations v2, #1772), A (Ledger consolidation, #1777), C (Holder registry, #1780), D (Pure custody, #1786).
-**Depends on:** B + A + C + D — all shipped to dev 2026-05-25/26.
+**Depends on:** B + A + C + D — all shipped to dev 2026-05-25/26. Hard prerequisite: A/B/C/D production app promotion before E's cutover.
 **Triggered by:** `latest_event_matches_status` reconcile drift, 2026-05-28 (27 ONT serials drifted between `stock_serials.status` and `stock_serial_events`; PR #1805 fixes the immediate trigger and cascade bugs but does not address the structural gap).
+
+---
+
+## Grill-me decisions (2026-05-28)
+
+Five high-leverage decisions resolved during the grill-me gate; documented inline below
+where they apply. Captured here for searchability:
+
+1. **`pre_provision` is an overlay flag, not a status enum value.** The 8-state vocabulary
+   in L1 below excludes `pre_provision`; existing `pp_flagged` + `pp_resolution_status`
+   columns (mig 312) stay.
+2. **A/B/C/D production app promotion is a hard prerequisite.** Shared Supabase DB means
+   the validate-trigger applies to both apps the moment mig 387 lands; prod app must be on
+   post-D code first.
+3. **Sprint E ships fast, accepting elevated risk.** No warn-only stage, no separate test
+   DB, no shadow run. Current model is already broken; revert is the safety net.
+4. **Rollback rehearsal commit + runbook in DoD.** Rehearsed against a `pg_dump`-restored
+   Docker DB the week before cutover; runbook at `docs/runbooks/sprint-e-rollback.md`.
+5. **Three-layer detection.** Bugsink alerts on `lifecycle_violation` SQLSTATE + cron'd
+   reconcile every 10 min for 48h + active monitoring for first 4 hours post-cutover.
 
 ---
 
@@ -15,11 +35,12 @@
 
 Make `stock_serials.status` the single, validated, trigger-emitted source of truth for the
 ONT/Gizzu lifecycle — closing the only foundation gap that Sprints B/A/C/D left open. Today the
-status field is written from ~10 places, has no transition validation, and drifts from its own
+status field is written from ~12 places, has no transition validation, and drifts from its own
 event log within days (the bug PR #1805 patches one of several drift sources). This spec
-generalises the trigger pattern from migrations 365/367 into a single generic mechanism, adds
-the missing `pre_provision` state, and forces all status writes through a typed helper that
-composes the shipped Sprint D custody postings.
+generalises the trigger pattern from migrations 365/367 into a single generic mechanism and
+forces all status writes through a typed helper that composes the shipped Sprint D custody
+postings. Pre-provision tracking stays as the existing overlay (`pp_flagged` +
+`pp_resolution_status`).
 
 Plus: clear the deferred fast-follows from Sprint D so the custody work is fully consolidated
 under one operating model.
@@ -78,7 +99,8 @@ via `stock_custody`). It does **not** handle **what phase of life a serial is in
 
 1. `stock_serials.status` reflects ground truth at all times; drift is structurally impossible.
 2. The complete lifecycle Hein described is representable in the schema: supplier → warehouse
-   → project → technician → installed → activated, with first-class `pre_provision`.
+   → project → technician → installed → activated. Pre-provision tracking remains the
+   existing `pp_flagged`/`pp_resolution_status` overlay (no new status enum value).
 3. All status writes flow through one helper (`promoteSerial`) so context, validation, and
    event emission are uniform.
 4. Mig 365/367 per-source triggers are retired in favour of one generic trigger.
@@ -138,7 +160,7 @@ grep gate enforces the rule.
 
 ### State vocabulary
 
-Replace today's 11-value enum with these 9 values:
+Replace today's 11-value enum with these 8 values:
 
 | Status | Meaning | Custody (typical) |
 |---|---|---|
@@ -147,7 +169,6 @@ Replace today's 11-value enum with these 9 values:
 | `issued` | Held by a technician en route to installation | `staff` holder |
 | `installed` | Physically installed at a customer drop, not yet OES-activated | NULL (at customer) |
 | `activated` | OES has registered the unit on the OLT | NULL |
-| `pre_provision` | OES flagged an activation issue; team work required to resolve. Can be entered from `installed` (pre-activate anomaly) or `activated` (post-activate anomaly); resolution always lands at `activated`. | NULL |
 | `faulty` | Marked for replacement / RMA | `staff` (during pickup), `warehouse` (post-pickup), or `vendor` (RMA in flight) |
 | `returned` | Back at warehouse, awaiting disposition (restock or scrap) | `warehouse` |
 | `scrapped` | Terminal. Out of inventory. | NULL or `vendor` |
@@ -155,6 +176,15 @@ Replace today's 11-value enum with these 9 values:
 Retired: `reserved` (collapses into `allocated_to_project`), `in_transit` (logistics fact, not
 lifecycle), `in_repair` (collapses into `faulty`). `available` is renamed to `in_stock` and
 mechanically backfilled.
+
+**Pre-provision is an overlay, not a status.** The existing `stock_serials.pp_flagged`,
+`pp_flagged_at`, and `pp_resolution_status` columns (mig 312, live: 1,995 flagged rows) stay.
+A serial in PP work has its lifecycle status untouched (`installed` or `activated`) and the
+overlay set. The overlay's rich resolution taxonomy (`located_1map`, `located_unified`,
+`located_local`, `located_oes`, `not_found`, `pp_flagged`, `activated`) is preserved as-is.
+PP transitions emit dedicated `pp_flagged` / `pp_resolved` events on `stock_serial_events`
+(triggered by `pp_flagged` column changes), but do not change `stock_serials.status`. Grill-me
+decision 2026-05-28.
 
 ### Transition matrix (hard-enforced)
 
@@ -165,14 +195,11 @@ raises.
 | From → To | event_type | Allowed source_table(s) |
 |---|---|---|
 | `(no row)` → `in_stock` | `received` | `procurement_grns`, `odoo_quant_seed` |
-| `in_stock` → `allocated_to_project` | `allocated` | TBD per open-question §2 — `projects.allocations` if a dedicated table exists, else the picking creation step in reserved state |
+| `in_stock` → `allocated_to_project` | `allocated` | TBD per open-question §1 — `projects.allocations` if a dedicated table exists, else the picking creation step in reserved state |
 | `allocated_to_project` → `issued` | `issued_to_tech` | `stock_pickings` (status='done') |
 | `in_stock` → `issued` | `issued_to_tech` | `stock_pickings` (when allocation is skipped — small projects) |
 | `issued` → `installed` | `installed_at_drop` | `drops`, `stock_consumptions` |
 | `installed` → `activated` | `activated` | `oes_pp_data` |
-| `installed` → `pre_provision` | `pp_flagged` | `oes_pp_data` (`resolved_to='pp'`) |
-| `activated` → `pre_provision` | `pp_flagged_post_activate` | `oes_pp_data` (post-activate flag) |
-| `pre_provision` → `activated` | `pp_resolved` | `oes_pp_data`, NOC ticket resolution |
 | any non-terminal → `faulty` | `marked_faulty` | `stock_returns`, NOC RMA |
 | `installed` / `activated` / `faulty` → `returned` | `returned_to_warehouse` | `stock_returns` |
 | `returned` → `in_stock` | `restocked` | `stock_returns` (disposition='restock') |
@@ -286,7 +313,8 @@ messages.
 | `allocate` | `procurement/allocateToProject.ts` | `in_stock → allocated_to_project` | optional `warehouse → project` | optional location transfer |
 | `issue` | `field-stock/issueToTech.ts` (PWA) | `allocated_to_project → issued` or `in_stock → issued` | `warehouse → staff` (Sprint D shipped via `postIssueToHolderWith`) | move qty |
 | `install` | `consumption/recordInstall.ts` | `issued → installed` | `staff → null` (Sprint D shipped via `postConsumeFromHolderWith`) | consume qty |
-| `activate` | `oes/applyActivation.ts` (nightly cron) | `installed → activated` (or `→ pre_provision`), `pre_provision → activated` | unchanged (null) | none |
+| `activate` | `oes/applyActivation.ts` (nightly cron) | `installed → activated` | unchanged (null) | none |
+| `flagPp` / `resolvePp` | `oes/applyPpFlag.ts` (cron + manual) | unchanged (pp_flagged column toggles) | unchanged | none |
 | `return` | `field-stock/returnToWarehouse.ts` | varies → `returned` then `→ in_stock` or `→ scrapped` | `staff → warehouse` (Sprint D shipped via `postReturnFromHolderWith`) | +qty back |
 
 ### Discipline gates
@@ -314,11 +342,8 @@ Per the D design's deferred list, this spec also delivers:
 3. **Consumption-no-holder off-book guard** — `consumptionService.recordConsumption` refuses
    to record a consumption when `holderId IS NULL` for a serialised item (today it logs a
    warning and proceeds — that lets "off-book" stock leave inventory). Bulk items unaffected.
-4. **Scrap / faulty custody-debit decision (open question §)** — needs Hein decision: when a
-   serial is marked `faulty` while held by a tech, does the custody balance move staff →
-   warehouse immediately (pessimistic, debits the tech) or stay at staff until physical
-   pickup (optimistic, matches reality)? Spec proposes **optimistic** (custody moves on
-   physical return, not on status change) — to be confirmed during sign-off.
+4. **Scrap / faulty custody-debit decision** — spec proposes **optimistic** (custody moves on
+   physical return, not on status change). Final confirmation in implementation plan.
 5. **`contractor_stock_accountability` consumers migrated** off the shim:
    `dashboard.ts`, `dashboardV2Service.ts`, `reconciliationService.ts`,
    `DailyReconciliationDashboard.tsx`, and the `/contractor` + `/kpi` skill docs all read
@@ -332,6 +357,29 @@ These are explicitly part of the cutover, not after — coordination cost folded
 
 ## Big-bang rollout
 
+### Hard prerequisite — A/B/C/D prod app promotion
+
+The shared Supabase DB means migration 387's validate-trigger fires for **both** apps the
+moment it lands. The prod app must be running post-Sprint-D code before Sprint E ships, or
+its legacy direct-status writes break. **Before Sprint E's cutover window:**
+
+1. `bash scripts/deploy-local.sh production` lands the post-D commit on
+   `fibreflow-production.service` after-hours (separately approved by Hein per CLAUDE.md
+   production deploy rule).
+2. ~24h of post-promotion soak time on prod to confirm nothing regresses.
+3. Only then schedule the Sprint E cutover window.
+
+Grill-me decision 2026-05-28: this prerequisite is non-negotiable.
+
+### Accepted-risk note
+
+Sprint E ships **without** a warn-only trigger stage, **without** a separate test DB, and
+**without** a 1-week shadow run. Grill-me decision 2026-05-28: the current model is already
+broken (drift bugs, no pre_provision semantics, undisciplined writers), so the risk floor is
+"today's pain" and the risk ceiling is "revert to today's pain". Speed over maximum safety,
+**explicitly accepted** by Hein. Detection + revert is the safety net (see "Detection &
+rollback" below).
+
 ### Cutover window
 
 Off-hours, one weekend (target Friday 22:00 SAST start, complete by Sunday 22:00 — full
@@ -344,7 +392,7 @@ Sequence inside the window:
    `/my/stores` PWA + procurement screens):
    - Apply migration **387** (next available; verify with `SELECT MAX(version) FROM
      migrations` and `gh pr list --search 'migration in:title'` immediately before opening):
-     - Widen CHECK on `stock_serials.status` to the 9-value vocabulary
+     - Widen CHECK on `stock_serials.status` to the 8-value vocabulary
      - Add `stock_serial_status_transitions` lookup table + seed rows
      - Add `stock_serial_status_holder_pairs` cross-validation table + seed rows
      - Install three new triggers (validate, emit, holder-validate)
@@ -352,8 +400,7 @@ Sequence inside the window:
      - Drop the orphaned per-source trigger functions
 2. **Backfill** (~5 min for 36k rows):
    - `available → in_stock` (mechanical rename)
-   - For each serial with `oes_pp_data.resolved_to='pp'` and no subsequent activation:
-     status → `pre_provision`
+   - `pp_flagged` column untouched (overlay semantics preserved — see L1 vocabulary section)
    - Emit one synthetic `stock_serial_events` row per serial with
      `source_table='backfill_2026-05-XX'` capturing the migrated `to_state` (so the audit
      trail is non-empty from day one).
@@ -377,67 +424,95 @@ Sequence inside the window:
 | Source signal | New status |
 |---|---|
 | `status='available'` | → `in_stock` |
-| `status='installed'`, `oes_pp_data.resolved_to='pp'`, no later activation | → `pre_provision` |
-| `status='installed'`, no `oes_pp_data` row | → `installed` (unchanged) |
-| `status='activated'`, `oes_pp_data.resolved_to='pp'` post-activate | → `pre_provision` |
-| `status='activated'`, no flag | → `activated` (unchanged) |
+| `status='installed'` | → `installed` (unchanged; `pp_flagged` overlay preserved verbatim) |
+| `status='activated'` | → `activated` (unchanged; `pp_flagged` overlay preserved verbatim) |
 | `status` in `{reserved, in_transit, in_repair}` | re-mapped per audit at backfill-prep time (these are unused today; expected zero rows; abort backfill if any found) |
 
-### Rollback
+`pp_flagged`, `pp_flagged_at`, and `pp_resolution_status` columns are untouched by the
+backfill — the existing 1,995 flagged rows + rich resolution taxonomy carry through unchanged.
 
-Down-migration drops the three new triggers, re-installs mig-365/366/367, restores the CHECK
-constraint to the 9 → 11 value set (additive, no data loss), reverts status renames
-(`in_stock → available`, `pre_provision → installed/activated` based on event history).
-Deployable in ≤10 min. Decision made by engineer-on-call within 30 min of any post-deploy
-alert.
+### Detection & rollback (the safety net)
 
-The rollback **preserves all events** emitted during the window — the event log is the
-recovery source.
+With no warn-only stage and no separate test DB, **detection + revert is the only safety
+net**. Three layers, sequenced by latency:
+
+1. **Bugsink alerts** — validate-trigger raises typed exceptions (`lifecycle_violation`,
+   `holder_mismatch`); the existing API error handler reports them with
+   `tags.event_type=lifecycle_violation` and `tags.sqlstate`. Sprint E adds a Bugsink alert
+   rule keyed on those tags → paging channel within ~1 min of first occurrence.
+2. **Cron'd reconcile** — `scripts/cron-serial-reconcile.sh` runs the L5 invariants every
+   **10 min for first 48h post-cutover**, then hourly for 1 week, then daily. Any non-zero
+   result is a P1 page. Cron writes to `/var/log/serial-reconcile.log` on velo (SAST per
+   [[feedback_velo_cron_local_time]]).
+3. **Active monitoring** — for the first 4 hours post-cutover, the engineer driving the
+   deploy keeps `tail -f` on prod app logs + periodic `psql` query against
+   `stock_serial_lifecycle_violations` (added by mig 387 as a side table for any
+   `RAISE NOTICE` calls during bypass operations).
+
+**Revert trigger** — any of:
+(a) reconcile non-zero, (b) >5 `lifecycle_violation` exceptions in first hour, (c)
+field-stock PWA end-to-end smoke fails, (d) observable data drift.
+
+**Revert path** (rehearsed before cutover):
+- Run `scripts/migrations/sql/rollback_387_serial_lifecycle_state_machine.sql` in a single
+  transaction: drops the three new triggers, re-installs mig-365/366/367 verbatim, restores
+  CHECK constraint to the 11-value set (additive, lossless), `UPDATE stock_serials SET
+  status='available' WHERE status='in_stock'`.
+- Revert app commit via `bash scripts/deploy-local.sh production --rollback`.
+- The rollback **preserves all events** emitted during the window — event log is the
+  recovery source if forensics are needed.
+
+**Rollback budget**: 15 min decide + 15 min execute = 30 min total from first alert to
+green-light. **Rehearsed** against a `pg_dump`-restored Docker DB the week before cutover
+(this is the *only* container plumbing Sprint E ships — purely for rollback rehearsal, not
+for testing E itself; grill-me decision 2026-05-28).
+
+**Runbook**: `docs/runbooks/sprint-e-rollback.md` written before cutover, walked through with
+Hein on the eve of the deploy. Part of definition of done.
 
 ---
 
-## Test plan (the safety net replacing strangler's warn-only stage)
+## Test plan
 
-Six layers:
+With the test-DB infrastructure dropped (grill-me decision: ship fast, accept higher risk),
+test plan reduces to four layers:
 
 1. **Static analysis (PR-blocking)**:
    - ESLint `no-direct-serial-status-write` rule
    - `scripts/ci-local.sh` grep gate (`Gate 5`, added next to existing Zero Tolerance)
+   - **Gates are the LAST thing enabled in the cutover PR** so the same PR can't be blocked
+     by its own gate.
 2. **Unit tests** (≥90% branch coverage on `promoteSerial`, each verb, the validate trigger
-   tested via SQL fixtures): every cell of the transition matrix gets a passing or rejecting
-   assertion.
-3. **Integration tests**: replay the last 7 days of `stock_serial_events` against a pristine
-   DB seeded with the backfill; assert final `stock_serials` rows match production state row
-   for row.
-4. **Shadow run** (1 week before cutover, on dev): new triggers installed on dev in
-   enforcing mode; dev app pointed at new verbs. All routine syncs (OES nightly cron, drops
-   sync, field-stock PWA, GRN flow) run for ≥7 days. Any `lifecycle_violation` or
-   `holder_mismatch` raised in dev is a P1.
-5. **Cutover-window assertions**:
+   tested via in-line SQL fixtures using vitest with `pg.Pool` against a fresh schema in the
+   shared DB's test schema namespace, or mocked txn). Every cell of the transition matrix
+   gets a passing or rejecting assertion.
+3. **Cutover-window assertions**:
    - Pre-backfill row counts match pre-cutover snapshot
    - Post-backfill: 36,264 rows, status distribution sane (`in_stock` ≈ 34.6k, `installed` ≈
-     242, `activated` ≈ 1.4k, `pre_provision` derived count matches `oes_pp_data` query)
+     242, `activated` ≈ 1.4k; `pp_flagged` count unchanged at 1,995)
    - Post-deploy: L5 reconcile invariant = 0
-   - Six verbs synthetic-data smoke pass
-6. **Rollback rehearsed** on dev. Decision criteria documented: any of (a) reconcile non-zero,
-   (b) >5 lifecycle_violation in first hour, (c) field-stock PWA smoke fails, (d) any data
-   loss observed → rollback.
+   - Six verbs synthetic-data smoke pass (each invoked once with a test serial, assert
+     events emitted with expected context, idempotent on second invocation)
+4. **Caller enumeration evidence**: the PR description must include the output of an explicit
+   `git grep` for every existing `UPDATE stock_serials` and `INSERT INTO stock_serials`
+   site, with the file:line:redirect-target documented. Grill-me-decided guardrail against
+   missed callers.
 
 ---
 
-## Open questions
+## Open questions (settled during implementation, not blockers)
 
-1. **Scrap/faulty custody-debit semantics** (Section "D fast-follows" #4) — pessimistic or
-   optimistic? Spec proposes optimistic; needs Hein confirm.
-2. **`allocate` verb existence today** — is there an "allocate to project" UI flow, or do
+1. **`allocate` verb existence today** — is there an "allocate to project" UI flow, or do
    projects just consume from `in_stock` directly via picking? If the latter, the
    `allocated_to_project` state may be unreachable in practice and the transition table
-   should be slimmed.
-3. **NOC ticket → `pp_resolved` integration** — does resolving a PP NOC ticket trigger
-   `applyActivation(serialId, {resolution:'pp_resolved'})`? If yes, the ticket service needs
-   to import and call the verb; if no, OES re-scan picks it up on the next cron run.
-4. **Bulk-import path** — `import-pp-olt-data.ts` and other bulk scripts: do they go through
-   `promoteSerial` with bypass enabled, or are they re-architected to emit per-row verb calls?
+   should be slimmed. Resolve during caller enumeration.
+2. **NOC ticket → `resolvePp` integration** — does resolving a PP NOC ticket trigger
+   `applyPpFlag(serialId, {clear:true})`? If yes, the ticket service needs to import and
+   call the verb; if no, OES re-scan picks it up on the next cron run. Resolve during
+   implementation by grepping NOC ticket service for pp-resolution handlers.
+3. **Bulk-import path** — `import-pp-olt-data.ts` and other bulk scripts: do they go through
+   `promoteSerial` with bypass enabled, or are they re-architected to emit per-row verb
+   calls? Resolve case-by-case during caller-enumeration pass.
 
 ---
 
