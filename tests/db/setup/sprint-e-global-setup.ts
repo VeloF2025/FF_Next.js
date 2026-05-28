@@ -85,9 +85,13 @@ export async function setup() {
 
   await pool.end();
 
-  // Environment wiring — same convention as base global-setup.ts
-  process.env.DATABASE_URL_TEST = URL;
-  process.env.DATABASE_URL      = URL;
+  // Environment wiring — same convention as base global-setup.ts.
+  // TEST_DATABASE_URL is the canonical name used by test files that create
+  // their own Pool instances; DATABASE_URL_TEST and DATABASE_URL are kept
+  // for legacy compatibility with test helpers that read either form.
+  process.env.TEST_DATABASE_URL  = URL;
+  process.env.DATABASE_URL_TEST  = URL;
+  process.env.DATABASE_URL       = URL;
 }
 
 export async function teardown() {

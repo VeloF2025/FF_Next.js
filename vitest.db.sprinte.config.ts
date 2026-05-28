@@ -27,7 +27,7 @@ export default defineConfig({
     // Sprint E lifecycle tests only
     include: [
       'tests/db/services/field-stock/serialLifecycle.test.ts',
-      // Future: 'tests/db/sprint-e/**/*.test.ts',
+      'tests/db/serialLifecycleMatrix.test.ts',
     ],
     globalSetup: ['./tests/db/setup/sprint-e-global-setup.ts'],
     // Docker startup on cold pull can take ~30s; hooks need 2x headroom.
