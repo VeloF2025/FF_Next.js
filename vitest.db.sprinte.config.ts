@@ -24,9 +24,10 @@ import path from 'node:path';
 
 export default defineConfig({
   test: {
-    // Sprint E lifecycle tests only
+    // Sprint E lifecycle tests only (require mig 387 triggers via sprint-e-global-setup)
     include: [
       'tests/db/services/field-stock/serialLifecycle.test.ts',
+      'tests/db/services/field-stock/consumptionService.lifecycle.test.ts',
       'tests/db/serialLifecycleMatrix.test.ts',
     ],
     globalSetup: ['./tests/db/setup/sprint-e-global-setup.ts'],
@@ -44,6 +45,10 @@ export default defineConfig({
     // header comment for the rationale.
     alias: [
       { find: '@sentry/nextjs', replacement: path.resolve(__dirname, 'src/lib/sentry/__stubs__/sentry-nextjs.ts') },
+      // Replace the Neon HTTP driver with the pg-pool shim so service functions
+      // that still import from '@neondatabase/serverless' work against the local
+      // Docker test container (which speaks the Postgres wire protocol, not HTTP).
+      { find: '@neondatabase/serverless', replacement: path.resolve(__dirname, 'src/lib/neon-shim.ts') },
       { find: /^@\/lib\/sentry/, replacement: path.resolve(__dirname, 'src/lib/sentry') },
       { find: /^@\/lib\/observability/, replacement: path.resolve(__dirname, 'src/lib/observability') },
       { find: '@/lib/utils', replacement: path.resolve(__dirname, './src/lib/utils') },

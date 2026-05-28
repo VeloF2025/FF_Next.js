@@ -15,6 +15,11 @@ BEGIN;
 -- Migrations table may lack executed_at (mig 383/384 INSERT uses that column).
 ALTER TABLE migrations ADD COLUMN IF NOT EXISTS executed_at TIMESTAMPTZ DEFAULT NOW();
 
+-- stock_items.uom — present in prod but absent from the base seed.sql.
+-- The consumptionService pre-flight query reads this column; without it the
+-- service fails with 'column "uom" does not exist' in service tests.
+ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS uom varchar(20) NOT NULL DEFAULT 'each';
+
 -- contractors — referenced by stock_holders.contractor_id FK.
 -- Minimal version; only id + name required for FK validity.
 CREATE TABLE IF NOT EXISTS contractors (
@@ -43,14 +48,36 @@ CREATE TABLE IF NOT EXISTS field_stock_movements (
 );
 
 -- stock_consumptions — referenced by mig 384 ADD COLUMN.
--- Minimal columns; full prod schema is not required for lifecycle tests.
+-- Extended to mirror the prod schema so service-layer lifecycle tests
+-- (Task 2.1: consumptionService.lifecycle.test.ts) can call recordConsumption
+-- end-to-end against the Sprint E container. The subset was too narrow for
+-- the full SQL_INSERT_CONSUMPTION parameter list.
 CREATE TABLE IF NOT EXISTS stock_consumptions (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stock_item_id uuid REFERENCES stock_items(id),
-  serial_id     uuid REFERENCES stock_serials(id),
-  quantity      numeric(12,3) NOT NULL DEFAULT 1,
-  consumed_by   uuid REFERENCES staff(id),
-  created_at    timestamptz NOT NULL DEFAULT now()
+  id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_type                  varchar(50)   NOT NULL,
+  drop_id                   uuid,
+  drop_number               varchar(50),
+  home_install_id           uuid,
+  stock_item_id             uuid REFERENCES stock_items(id),
+  item_code                 varchar(100)  NOT NULL DEFAULT '',
+  item_name                 varchar(255)  NOT NULL DEFAULT '',
+  quantity                  numeric(12,3) NOT NULL DEFAULT 1,
+  uom                       varchar(20)   NOT NULL DEFAULT 'each',
+  serial_id                 uuid REFERENCES stock_serials(id),
+  serial_number             varchar(100),
+  consumed_by_id            uuid,
+  consumed_by_name          varchar(255),
+  consumed_from_location_id uuid,
+  consumption_date          timestamptz   DEFAULT now(),
+  gps_lat                   numeric(10,7),
+  gps_lng                   numeric(10,7),
+  verified                  boolean       DEFAULT false,
+  verified_by               varchar(255),
+  verified_at               timestamptz,
+  notes                     text,
+  created_at                timestamptz   NOT NULL DEFAULT now(),
+  CONSTRAINT stock_consumptions_job_type_check
+    CHECK (job_type IN ('drop','home_install','maintenance'))
 );
 
 COMMIT;

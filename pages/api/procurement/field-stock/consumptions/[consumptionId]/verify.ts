@@ -6,7 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { verifyConsumption } from '@/modules/procurement/field-stock/services/consumptionService';
+import { verifyConsumption } from '@/modules/procurement/field-stock/services/consumptionQueries';
 import { withAuth } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
