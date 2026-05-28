@@ -14,11 +14,16 @@ import type {
   ConsumptionFilters,
 } from '../types';
 import { validateSerialForConsumption } from './serialService';
+import { promoteSerial } from './serialLifecycle';
 
-// SQL for serial install with holder clearance (inlined in txn)
-const SQL_INSTALL_SERIAL =
-  `UPDATE stock_serials ` +
-  `SET status = 'installed', holder_id = NULL, ` +
+/**
+ * Metadata-only update for a serial install — does NOT touch status or holder_id.
+ * Status and holder_id are written exclusively via promoteSerial (Sprint E Track 1).
+ * Separated from promoteSerial so the validate trigger fires first, then this
+ * update sets the install-location columns atomically in the same transaction.
+ */
+const SQL_INSTALL_SERIAL_METADATA =
+  `UPDATE stock_serials SET ` +
   `installed_at_drop_id = $2, installed_at_drop_number = $3, ` +
   `installed_date = NOW(), installed_by = $4, updated_at = NOW() ` +
   `WHERE id = $1`;
@@ -144,16 +149,30 @@ export async function recordConsumption(
         await txn.query(dropSql, dropParams);
       }
 
-      // 3. Mark serial installed + clear holder (inlined to stay in txn)
+      // 3. Mark serial installed + clear holder via promoteSerial (Sprint E Track 1).
+      //    promoteSerial fires the mig 387 validate + emit triggers in the same txn.
+      //    SQL_INSTALL_SERIAL_METADATA follows immediately to record install location
+      //    columns; it does not touch status or holder_id.
+      //    Note: txn.client is the raw PoolClient; promoteSerial discriminates
+      //    Pool vs PoolClient via the presence of `release` on the object.
       if (input.serialId && input.dropId && input.dropNumber) {
-        await txn.query(SQL_INSTALL_SERIAL, [
+        await promoteSerial(txn.client, {
+          serialId:     input.serialId,
+          toStatus:     'installed',
+          toHolderId:   null,
+          sourceTable:  'stock_consumptions',
+          sourceId:     record.id,
+          actorStaffId: input.consumedById ?? null,
+          payload: { drop_number: input.dropNumber, drop_id: input.dropId },
+        });
+        await txn.query(SQL_INSTALL_SERIAL_METADATA, [
           input.serialId,
           input.dropId,
           input.dropNumber,
           input.consumedByName ?? 'Unknown',
         ]);
         log.info(
-          `Serial ${input.serialId} installed at drop ${input.dropNumber} (holder cleared)`,
+          `Serial ${input.serialId} installed at drop ${input.dropNumber} via promoteSerial (holder cleared)`,
           undefined,
           'consumptionService'
         );
