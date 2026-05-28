@@ -44,7 +44,7 @@ export function WorksQAProjectTable({ projects, onSelect }: WorksQAProjectTableP
             <th className="px-2 py-1.5 text-right font-medium border-l border-zinc-800">Civil</th>
             <th className="px-2 py-1.5 text-right font-medium">Dome</th>
             <th className="px-2 py-1.5 text-right font-medium">Joint</th>
-            <th className="px-2 py-1.5 text-right font-medium border-l border-zinc-800">21/21</th>
+            <th className="px-2 py-1.5 text-right font-medium border-l border-zinc-800">22/22</th>
             <th className="px-2 py-1.5 text-right font-medium">Partial</th>
             <th className="px-2 py-1.5 text-right font-medium">Most missing</th>
             <th className="px-2 py-1.5 text-right font-medium border-l border-zinc-800">Unassigned</th>
@@ -84,7 +84,7 @@ export function WorksQAProjectTable({ projects, onSelect }: WorksQAProjectTableP
                 <td className="px-2 py-2 text-right text-zinc-300 border-l border-zinc-800" title={`${p.civil.approved} / ${p.civil.approved + p.civil.in_progress + p.civil.empty}`}>{civilPct}</td>
                 <td className="px-2 py-2 text-right text-zinc-300" title={`${p.dome.approved} / ${p.dome.approved + p.dome.in_progress + p.dome.empty}`}>{domePct}</td>
                 <td className="px-2 py-2 text-right text-zinc-300" title={`${p.main_joint.approved} / ${p.main_joint.approved + p.main_joint.in_progress + p.main_joint.empty}`}>{jointPct}</td>
-                <td className="px-2 py-2 text-right text-green-400 border-l border-zinc-800">{p.photo_completeness.complete_21.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right text-green-400 border-l border-zinc-800">{p.photo_completeness.complete_full.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right text-yellow-400">{partial.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right text-zinc-300" title={mm ?? ''}>{mmLabel}{p.photo_completeness.most_missing_count > 0 && ` (${p.photo_completeness.most_missing_count})`}</td>
                 <td className="px-2 py-2 text-right border-l border-zinc-800">

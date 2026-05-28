@@ -16,9 +16,9 @@ export interface DisciplineStats {
 }
 
 export interface PhotoCompletenessBand {
-  /** 21/21 slots filled (excludes tray + unassigned). */
-  complete_21: number;
-  /** 14-20 slots filled. */
+  /** All fixed slots filled (excludes tray + unassigned). */
+  complete_full: number;
+  /** 14 slots filled up to one below full. */
   partial_high: number;
   /** 7-13 slots filled. */
   partial_mid: number;
@@ -68,7 +68,7 @@ export interface WorksQADashboardRow {
 
   zone_count: number;
   pon_count: number;
-  /** Total photos across all 21 slot columns + tray + unassigned. */
+  /** Total photos across all 22 slot columns + tray + unassigned. */
   photo_count: number;
   /** MAX(updated_at) across pole_qa_photos for this project, or null. */
   last_synced_at: string | null;

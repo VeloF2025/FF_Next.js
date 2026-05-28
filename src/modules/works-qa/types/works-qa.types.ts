@@ -120,7 +120,7 @@ export interface WorksQAZoneSummary {
 }
 
 export type SlotKey =
-  | 'civil_01' | 'civil_02' | 'civil_03' | 'civil_04' | 'civil_05' | 'civil_06' | 'civil_07'
+  | 'civil_01' | 'civil_02' | 'civil_03' | 'civil_04' | 'civil_05' | 'civil_06' | 'civil_07' | 'civil_08'
   | 'dome_01' | 'dome_02' | 'dome_03' | 'dome_04' | 'dome_05' | 'dome_06' | 'dome_07' | 'dome_08'
   | 'main_joint_11' | 'main_joint_12' | 'main_joint_13' | 'main_joint_14' | 'main_joint_15' | 'main_joint_16'
   | 'tray_photos';

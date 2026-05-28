@@ -13,7 +13,7 @@
  *      / joint_approved) and copies qa_decision_at / manual_reviewed_by.
  *
  * Discipline + step → slot mapping follows the slot-keys utility:
- *   civil + 1-7    → civil_step_0{step}_key       / civil_approved
+ *   civil + 1-8    → civil_step_0{step}_key       / civil_approved
  *   optical + 1-8  → optical_dome_0{step}_key     / dome_approved
  *   optical + 11-16 → main_joint_{step}_key    / joint_approved
  */
@@ -45,15 +45,12 @@ interface HistoricalRow {
 }
 
 function resolveSlot(discipline: string, step: number): { dbColumn: string; slotKey: string; approveColumn: 'civil_approved' | 'dome_approved' | 'joint_approved' } | null {
-  if (discipline === 'civil' && step >= 1 && step <= 7) {
+  // Civil step 8 (Pole Label / pole tag) maps to its own civil slot (civil_08,
+  // migration 388), consistent with CIVIL_STEP_MAP in sync-qfield.ts. Optical
+  // dome step 8 is handled by the optical branch below.
+  if (discipline === 'civil' && step >= 1 && step <= 8) {
     const s = String(step).padStart(2, '0');
     return { dbColumn: `civil_step_${s}_key`, slotKey: `civil_${s}`, approveColumn: 'civil_approved' };
-  }
-  // Civil step 8 (Pole Label / pole tag) shares dome_08 with optical — see
-  // sync-qfield.ts. Without this, historical pole-tag photos coming through
-  // construction-qa get dropped at the BETWEEN 1 AND 7 filter below.
-  if (discipline === 'civil' && step === 8) {
-    return { dbColumn: 'optical_dome_08_key', slotKey: 'dome_08', approveColumn: 'dome_approved' };
   }
   if (discipline === 'optical' && step >= 1 && step <= 8) {
     const s = String(step).padStart(2, '0');
