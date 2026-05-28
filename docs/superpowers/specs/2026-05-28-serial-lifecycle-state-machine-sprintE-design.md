@@ -190,12 +190,17 @@ decision 2026-05-28.
 
 Encoded as a static table `stock_serial_status_transitions(from_state, to_state,
 event_type)`, populated by migration and read by the validate trigger. Anything not listed
-raises.
+raises. The `(no prior row)` INSERT case is encoded as the sentinel string `'__new__'` in
+`from_state` because Postgres forces PK columns to NOT NULL; the trigger functions translate
+between `OLD.status IS NULL` (INSERT) and the sentinel value on the way in, and back to NULL
+when writing the event row.
 
 | From → To | event_type | Allowed source_table(s) |
 |---|---|---|
 | `(no row)` → `in_stock` | `received` | `procurement_grns`, `odoo_quant_seed` |
-| `in_stock` → `allocated_to_project` | `allocated` | TBD per open-question §1 — `projects.allocations` if a dedicated table exists, else the picking creation step in reserved state |
+| `(no row)` → `available` | `received` | Transitional row — legacy INSERTs prior to mig 387's backfill rename. Kept so any straggler INSERT before the rename completes does not throw `lifecycle_violation`. Removed by a follow-up migration once the live count of `status='available'` reaches zero. |
+| `available` → `in_stock` | `backfill_rename` | Mig 387's backfill (`UPDATE stock_serials SET status='in_stock' WHERE status='available'`). Backfill runs with `ff.bypass_validation=true` set, so the emit-trigger emits `force_corrected` events; the bypass log row in `stock_serial_lifecycle_violations` is the persistent audit trail. Row exists in the matrix so a non-bypass `UPDATE` from any straggler caller is also accepted. |
+| `in_stock` → `allocated_to_project` | `allocated` | `projects.allocations` if a dedicated table exists at Track 2.6.1, else the picking-creation step. Allowed source resolved at caller enumeration; row stays in the matrix per open-question §1 decision (keep). |
 | `allocated_to_project` → `issued` | `issued_to_tech` | `stock_pickings` (status='done') |
 | `in_stock` → `issued` | `issued_to_tech` | `stock_pickings` (when allocation is skipped — small projects) |
 | `issued` → `installed` | `installed_at_drop` | `drops`, `stock_consumptions` |
@@ -223,7 +228,7 @@ suppressed).
 2. `trg_stock_serial_emit_event` — `AFTER INSERT OR UPDATE OF status`. When `OLD.status` is
    distinct from `NEW.status` (or row is new), inserts one `stock_serial_events` row with:
    - `event_type` = looked up from the transition table
-   - `from_state` = `OLD.status` (NULL on INSERT)
+   - `from_state` = `OLD.status` (NULL on INSERT; the trigger internally uses the `'__new__'` sentinel for the transition lookup but writes NULL to `stock_serial_events.from_state`)
    - `to_state` = `NEW.status`
    - `source_table` = `current_setting('ff.event_source_table', true)` (NULL if unset)
    - `source_id` = `current_setting('ff.event_source_id', true)::uuid` (NULL if unset)
@@ -268,8 +273,8 @@ automatically.
 ### Pre-install events
 
 For the `(no row) → in_stock` transition (newly-received serial), the emit trigger fires on
-INSERT. The validate trigger has a special-case row in the transition table where `from_state
-IS NULL`. No second trigger needed.
+INSERT. The validate trigger looks up `from_state = '__new__'` (the sentinel for the
+"no prior state" case — see Transition matrix above). No second trigger needed.
 
 ---
 
@@ -458,7 +463,12 @@ field-stock PWA end-to-end smoke fails, (d) observable data drift.
   transaction: drops the three new triggers, re-installs mig-365/366/367 verbatim, restores
   CHECK constraint to the 11-value set (additive, lossless), `UPDATE stock_serials SET
   status='available' WHERE status='in_stock'`.
-- Revert app commit via `bash scripts/deploy-local.sh production --rollback`.
+- Drop the cutover marker (`DROP TABLE IF EXISTS __sprint_e_cutover_gate__;`) so any future
+  re-attempt re-trips the mig-387 atomicity gate.
+- Revert the app to the pre-cutover commit. `scripts/deploy-local.sh` has no `--rollback`
+  flag in this repo — the rollback path is to deploy the previous commit through a temporary
+  worktree pointed at the captured SHA. The cutover runbook MUST record the pre-cutover SHA
+  before T-0; the rollback runbook reads it back. Plan Task 6.4.1 has the exact commands.
 - The rollback **preserves all events** emitted during the window — event log is the
   recovery source if forensics are needed.
 
@@ -503,9 +513,15 @@ test plan reduces to four layers:
 ## Open questions (settled during implementation, not blockers)
 
 1. **`allocate` verb existence today** — is there an "allocate to project" UI flow, or do
-   projects just consume from `in_stock` directly via picking? If the latter, the
-   `allocated_to_project` state may be unreachable in practice and the transition table
-   should be slimmed. Resolve during caller enumeration.
+   projects just consume from `in_stock` directly via picking? **Decision (2026-05-28):**
+   keep `allocated_to_project` in the 8-state vocabulary and the transition matrix. The
+   verb's caller enumeration in Track 2.6.1 will confirm whether anything writes it today.
+   If no caller exists, the row stays as a documented future-state placeholder (the
+   validate-trigger only rejects DISALLOWED transitions, so an unused matrix row is inert
+   — the cost of keeping it is one row in the lookup table, the cost of removing it is a
+   second migration if the verb later gets added). The spec is `allocated_to_project` is
+   reachable; if Track 2.6.1's grep finds zero writers, log it as a follow-up issue rather
+   than rewriting the matrix mid-implementation.
 2. **NOC ticket → `resolvePp` integration** — does resolving a PP NOC ticket trigger
    `applyPpFlag(serialId, {clear:true})`? If yes, the ticket service needs to import and
    call the verb; if no, OES re-scan picks it up on the next cron run. Resolve during

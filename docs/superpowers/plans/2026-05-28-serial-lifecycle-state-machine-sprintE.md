@@ -24,6 +24,46 @@
 
 ---
 
+## Cutover atomicity contract (read this before touching Track 1)
+
+**The DB is shared between dev and production** (single Supabase Postgres at `100.96.203.105:5437`, cutover 2026-04-18 per [[project_db_supabase]]). Any migration applied to the shared DB affects both apps the moment it lands. mig 387 installs a trigger that REJECTS any `stock_serials.status` write that doesn't match the transition matrix.
+
+**Therefore mig 387 MUST NOT be applied until every L4 caller has been refactored to route through `promoteSerial`.** If a single un-refactored writer still exists in production code, it will start throwing `lifecycle_violation` (SQLSTATE FF001) on every status update the moment mig 387 runs — and there is no warn-only stage.
+
+To enforce this we use a **two-phase deploy** wrapped in a single cutover PR:
+
+1. **Tracks 1–6 do NOT apply mig 387 at merge time.** The migration SQL file is committed to `scripts/migrations/sql/387_serial_lifecycle_state_machine.sql` but its `INSERT INTO migrations` row is gated behind a `gate_file` check:
+
+    ```sql
+    -- At the top of 387_serial_lifecycle_state_machine.sql:
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='__sprint_e_cutover_gate__') THEN
+        RAISE EXCEPTION 'mig 387 cannot run until __sprint_e_cutover_gate__ marker table exists. Create it manually as the first step of the cutover runbook.';
+      END IF;
+    END$$;
+    ```
+
+    Track 7 (cutover) creates the marker table by hand as step 1, then triggers the migration runner. Without the marker, the migration aborts with a loud message rather than partially applying.
+
+2. **The cutover PR is the bundle.** It rolls up:
+   - Track 1's foundation (migration file + helper + matrix tests),
+   - Track 2's six L4 verbs + the per-source trigger retirements,
+   - Track 3's ESLint rule + Gate 5 grep,
+   - Track 4's Sprint D fast-follows,
+   - Track 5's backfill + cleanup script,
+   - Track 6's detection wiring + rollback rehearsal artefacts.
+
+   Earlier tracks may merge individual PRs to master for review/CI hygiene, but the **cutover PR** is what swaps prod onto the new commit. Until that cutover PR merges and the marker is set, mig 387 sits dormant in the file system.
+
+3. **Pre-flight check before creating the cutover marker.** `scripts/verify-no-direct-status-writes.ts` (defined in Track 3) MUST exit 0 against `origin/master` HEAD. The grep gate proves every status write goes through `promoteSerial`. If it exits non-zero, the cutover aborts.
+
+4. **What happens if rule 1 is forgotten:** the migration file's first DO block raises an exception, the migration runner aborts mid-script, no schema changes apply, and the cutover script logs the failure. The shared DB is unaffected. The cutover runbook (Task 6.3) MUST verify the marker exists before calling the migration runner.
+
+This contract closes the structural ordering gap the blind review flagged — Tracks 1–6 can land in master in any order, but mig 387 itself does not apply until the cutover marker is created intentionally.
+
+---
+
 ## Track 1 — Foundation: migration + helper + tests
 
 Single PR. Lands the trigger infrastructure and the `promoteSerial` helper. Does NOT yet retire mig 365/366/367 (Track 2 will, once verbs are refactored).
@@ -58,6 +98,25 @@ Create `scripts/migrations/sql/387_serial_lifecycle_state_machine.sql`:
 
 BEGIN;
 
+-- 0. Cutover atomicity gate. See "Cutover atomicity contract" in the plan.
+--    The shared dev+prod DB means this migration affects production the
+--    moment it runs. Without a marker table proving every L4 caller has been
+--    refactored through promoteSerial, this RAISE EXCEPTION aborts the txn
+--    and the schema stays untouched.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_tables
+     WHERE schemaname = 'public'
+       AND tablename  = '__sprint_e_cutover_gate__'
+  ) THEN
+    RAISE EXCEPTION
+      'mig 387 cannot run until __sprint_e_cutover_gate__ marker table exists. '
+      'Create it manually as the first step of docs/runbooks/sprint-e-cutover.md, '
+      'AFTER scripts/verify-no-direct-status-writes.ts exits 0 against origin/master HEAD.';
+  END IF;
+END$$;
+
 -- 1. Widen the status CHECK to the 8-value vocabulary.
 --    Drops `reserved`, `in_transit`, `in_repair` from acceptable values; the
 --    backfill task (Track 5) maps `available` → `in_stock` first, so the
@@ -79,8 +138,11 @@ ALTER TABLE stock_serials
   ));
 
 -- 2. Transition matrix table.
+--    Sentinel '__new__' represents the INSERT case (no prior row). Using a
+--    sentinel rather than NULL because Postgres forces PK columns to NOT NULL;
+--    a nullable PK would fail at CREATE TABLE time.
 CREATE TABLE stock_serial_status_transitions (
-  from_state    varchar(50),                -- NULL means INSERT (no prior row)
+  from_state    varchar(50)   NOT NULL,     -- '__new__' for INSERT (no prior row)
   to_state      varchar(50)   NOT NULL,
   event_type    varchar(50)   NOT NULL,
   description   text,
@@ -88,7 +150,9 @@ CREATE TABLE stock_serial_status_transitions (
 );
 
 INSERT INTO stock_serial_status_transitions (from_state, to_state, event_type, description) VALUES
-  (NULL,                  'in_stock',             'received',              'GRN posting / Odoo opening seed'),
+  ('__new__',             'in_stock',             'received',              'GRN posting / Odoo opening seed'),
+  ('__new__',             'available',            'received',              'Legacy/transitional INSERT prior to backfill rename'),
+  ('available',           'in_stock',             'backfill_rename',       'Migration 387 status rename (backfill bypass path)'),
   ('in_stock',            'allocated_to_project', 'allocated',             'Project allocation'),
   ('allocated_to_project','issued',               'issued_to_tech',        'Picking done'),
   ('in_stock',            'issued',               'issued_to_tech',        'Picking done (allocation skipped)'),
@@ -149,6 +213,9 @@ CREATE TABLE stock_serial_lifecycle_violations (
 CREATE INDEX idx_ssv_raised_at ON stock_serial_lifecycle_violations (raised_at DESC);
 
 -- 5. Status-validate trigger function.
+--    SQLSTATE 'FF001' (custom; not a built-in Postgres class) so the Bugsink
+--    alert can filter on it without colliding with general check_violation
+--    noise from unrelated CHECK constraints.
 CREATE OR REPLACE FUNCTION trg_stock_serial_status_validate()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
@@ -157,11 +224,18 @@ DECLARE
   v_bypass    boolean;
   v_allowed   boolean;
 BEGIN
-  v_from := CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE OLD.status END;
-  v_to   := NEW.status;
+  -- Guard OLD reference behind TG_OP. In BEFORE INSERT triggers OLD is null
+  -- and accessing OLD.status against a null record is brittle; the explicit
+  -- IF keeps the assignment safe and reads naturally.
+  IF TG_OP = 'INSERT' THEN
+    v_from := '__new__';
+  ELSE
+    v_from := OLD.status;
+  END IF;
+  v_to := NEW.status;
 
   -- No-op same-state writes pass without check
-  IF v_from IS NOT DISTINCT FROM v_to AND TG_OP = 'UPDATE' THEN
+  IF v_from = v_to AND TG_OP = 'UPDATE' THEN
     RETURN NEW;
   END IF;
 
@@ -173,7 +247,7 @@ BEGIN
       (serial_id, serial_number, attempted_from, attempted_to,
        source_table, source_id, bypass_used)
     VALUES
-      (NEW.id, NEW.serial_number, v_from, v_to,
+      (NEW.id, NEW.serial_number, NULLIF(v_from, '__new__'), v_to,
        NULLIF(current_setting('ff.event_source_table', true), ''),
        NULLIF(current_setting('ff.event_source_id', true), '')::uuid,
        true);
@@ -182,14 +256,14 @@ BEGIN
 
   SELECT TRUE INTO v_allowed
     FROM stock_serial_status_transitions
-   WHERE from_state IS NOT DISTINCT FROM v_from
+   WHERE from_state = v_from
      AND to_state   = v_to
    LIMIT 1;
 
   IF v_allowed IS NULL THEN
     RAISE EXCEPTION 'lifecycle_violation: % → % not allowed for serial % (set ff.bypass_validation=true to override)',
-      COALESCE(v_from, 'NULL'), v_to, NEW.serial_number
-      USING ERRCODE = 'check_violation';
+      v_from, v_to, NEW.serial_number
+      USING ERRCODE = 'FF001';
   END IF;
 
   RETURN NEW;
@@ -206,16 +280,20 @@ DECLARE
   v_source_id    uuid;
   v_payload     jsonb;
 BEGIN
-  v_from := CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE OLD.status END;
+  IF TG_OP = 'INSERT' THEN
+    v_from := '__new__';
+  ELSE
+    v_from := OLD.status;
+  END IF;
 
   -- Skip no-op same-state
-  IF v_from IS NOT DISTINCT FROM NEW.status AND TG_OP = 'UPDATE' THEN
+  IF v_from = NEW.status AND TG_OP = 'UPDATE' THEN
     RETURN NEW;
   END IF;
 
   SELECT event_type INTO v_event_type
     FROM stock_serial_status_transitions
-   WHERE from_state IS NOT DISTINCT FROM v_from
+   WHERE from_state = v_from
      AND to_state   = NEW.status
    LIMIT 1;
 
@@ -234,7 +312,9 @@ BEGIN
      actor_user_id, actor_staff_id,
      payload, occurred_at)
   VALUES
-    (NEW.id, v_event_type, v_from, NEW.status,
+    -- Translate the internal '__new__' sentinel back to NULL on the way out
+    -- so the events table preserves the original "no prior state" semantics.
+    (NEW.id, v_event_type, NULLIF(v_from, '__new__'), NEW.status,
      v_source_table, v_source_id,
      NULLIF(current_setting('ff.event_actor_user_id',  true), '')::uuid,
      NULLIF(current_setting('ff.event_actor_staff_id', true), '')::uuid,
@@ -274,9 +354,11 @@ BEGIN
    LIMIT 1;
 
   IF v_allowed IS NULL THEN
+    -- Custom SQLSTATE 'FF002' so Bugsink can isolate holder-mismatch alerts
+    -- from generic check_violation noise.
     RAISE EXCEPTION 'holder_mismatch: status=% with holder_type=% not allowed for serial %',
       NEW.status, COALESCE(v_holder_type, 'NULL'), NEW.serial_number
-      USING ERRCODE = 'check_violation';
+      USING ERRCODE = 'FF002';
   END IF;
 
   RETURN NEW;
@@ -615,7 +697,7 @@ export interface PromoteSerialArgs extends SerialEventContext {
 /**
  * THE single sanctioned write path for stock_serials.status (and holder_id).
  * Wraps the UPDATE in a transaction, sets per-txn GUCs the triggers read, and
- * translates PG check_violation errors into typed `LifecycleViolationError`
+ * translates PG SQLSTATE FF001/FF002 errors into typed `LifecycleViolationError`
  * or `HolderMismatchError`.
  *
  * Callers MUST pass {sourceTable, sourceId} so the audit trail is non-anon.
@@ -683,7 +765,18 @@ git commit -m "feat(stock-serial): promoteSerial helper + typed lifecycle errors
 
 - [ ] **Step 1.4.1: Write a matrix coverage test (one `it` per transition)**
 
-For every row in `stock_serial_status_transitions`, write an assertion that the transition succeeds when applied via `promoteSerial`. Use a fresh test serial per case, clean up after. Show one example, mechanically expand to cover all 15 forward transitions and at least 3 known-illegal cases (e.g. `in_stock → installed`, `activated → in_stock`, `scrapped → anything`). Example sketch:
+For every row in `stock_serial_status_transitions`, write an assertion that the transition succeeds when applied via `promoteSerial`. Use a fresh test serial per case, clean up after. Show one example, mechanically expand to cover all 15 forward transitions and at least 3 known-illegal cases (e.g. `in_stock → installed`, `activated → in_stock`, `scrapped → anything`).
+
+**Shared-DB cleanup discipline** (the test runs against the live Supabase, not a Docker DB — per [[project_db_supabase]] dev and prod share one DB). Each test MUST:
+
+1. Generate a unique serial number with prefix `__sprint_e_test__<test-id>__<uuid>` so any leak is greppable.
+2. Insert + assert + delete inside a single `beforeEach`/`afterEach` pair tied to the individual `it`, not the suite-level `afterAll`.
+3. The `afterAll` runs `DELETE FROM stock_serial_events WHERE serial_id IN (SELECT id FROM stock_serials WHERE serial_number LIKE '__sprint_e_test__%') ; DELETE FROM stock_serials WHERE serial_number LIKE '__sprint_e_test__%'` as a belt-and-braces sweep.
+4. A grep gate (`scripts/ci-local.sh` Gate 6) refuses to merge if any `__sprint_e_test__` row exists in the live DB after the test suite ran — proves the cleanup is complete.
+
+This closes the "tests against a shared DB with partial cleanup" risk flagged in [[feedback_data_safety]].
+
+Example sketch:
 
 ```typescript
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -735,7 +828,75 @@ describe('serial lifecycle matrix', () => {
 
 - [ ] **Step 1.4.2: Implement the seed + assertion helpers fully**
 
-Expand the placeholders in step 1.4.1 with the actual SQL inserts (status seeded directly via `SET LOCAL ff.bypass_validation=true`) and `promoteSerial` calls + cleanups. ~20 assertions total. Skipping the full per-case body here for brevity, but the file must contain real code for each.
+Expand the placeholders in step 1.4.1 with the actual SQL inserts (status seeded directly via `SET LOCAL ff.bypass_validation=true`) and `promoteSerial` calls + cleanups. ~20 assertions total.
+
+```typescript
+async function seedAt(pool: Pool, status: string): Promise<{id: string, serialNumber: string}> {
+  const serialNumber = `__sprint_e_test__${Date.now()}__${crypto.randomUUID()}`;
+  const txn = await pool.connect();
+  try {
+    await txn.query('BEGIN');
+    await txn.query(`SET LOCAL ff.bypass_validation = 'true'`);
+    const r = await txn.query(
+      `INSERT INTO stock_serials (serial_number, status) VALUES ($1, $2) RETURNING id`,
+      [serialNumber, status],
+    );
+    await txn.query('COMMIT');
+    return { id: r.rows[0].id, serialNumber };
+  } finally {
+    txn.release();
+  }
+}
+
+async function purge(pool: Pool, id: string): Promise<void> {
+  await pool.query('DELETE FROM stock_serial_events WHERE serial_id = $1', [id]);
+  await pool.query('DELETE FROM stock_serials WHERE id = $1', [id]);
+}
+
+// One `it` per ALLOWED + ILLEGAL row, fully bodied:
+for (const [from, to] of ALLOWED) {
+  if (from === null) continue;  // INSERT covered by Task 1.3
+  it(`allows ${from} → ${to}`, async () => {
+    const seed = await seedAt(pool, from);
+    try {
+      await promoteSerial(pool, seed.id, to, {
+        sourceTable: 'matrix-test',
+        sourceId: crypto.randomUUID(),
+      });
+      const r = await pool.query(`SELECT status FROM stock_serials WHERE id=$1`, [seed.id]);
+      expect(r.rows[0].status).toBe(to);
+    } finally {
+      await purge(pool, seed.id);
+    }
+  });
+}
+
+for (const [from, to] of ILLEGAL) {
+  it(`rejects ${from} → ${to}`, async () => {
+    const seed = await seedAt(pool, from);
+    try {
+      await expect(
+        promoteSerial(pool, seed.id, to, {
+          sourceTable: 'matrix-test',
+          sourceId: crypto.randomUUID(),
+        }),
+      ).rejects.toBeInstanceOf(LifecycleViolationError);
+    } finally {
+      await purge(pool, seed.id);
+    }
+  });
+}
+```
+
+Belt-and-braces afterAll sweep:
+
+```typescript
+afterAll(async () => {
+  await pool.query(`DELETE FROM stock_serial_events WHERE serial_id IN (SELECT id FROM stock_serials WHERE serial_number LIKE '__sprint_e_test__%')`);
+  await pool.query(`DELETE FROM stock_serials WHERE serial_number LIKE '__sprint_e_test__%'`);
+  await pool.end();
+});
+```
 
 - [ ] **Step 1.4.3: Run all matrix tests, verify green**
 
@@ -1070,19 +1231,31 @@ fi
 
 Because Track 2 work isn't done yet. That's intentional — the gate must be installable but kept noisy until Track 2 finishes.
 
-- [ ] **Step 3.2.3: Wrap Gate 5 behind an opt-in flag for now**
+- [ ] **Step 3.2.3: Comment-gate Gate 5 in the source rather than env-var-gate**
 
-Add at the top of Gate 5:
+The earlier draft of this plan used an `ENFORCE_SERIAL_LIFECYCLE_GATE=1` env-var
+flipped on by the deploy script. That coupled the CI gate to the deploy runtime —
+running `ci:quick` outside the deploy script (e.g. locally or in a worker's worktree)
+would silently skip the gate. Cleaner: ship Gate 5 commented out in `scripts/ci-local.sh`
+with a clear marker, and the cutover PR uncomments the block in the same diff that
+flips the ESLint rule from `"off"` to `"error"`:
 
 ```bash
-if [ "$ENFORCE_SERIAL_LIFECYCLE_GATE" = "1" ]; then
-  # ... Gate 5 body ...
-else
-  echo -e "${YELLOW}  ⊘ Gate 5 (serial lifecycle) disabled until Sprint E cutover${NC}"
-fi
+# ── Gate 5: Serial Lifecycle Discipline ──
+#
+# UNCOMMENT THIS BLOCK IN THE SPRINT-E CUTOVER PR.
+# Until then Track 2 PRs still contain direct UPDATEs by design and would trip the gate.
+#
+# echo -e "\n${CYAN}── Gate 5: Serial Lifecycle Discipline ──${NC}\n"
+# SERIAL_VIOLATIONS=$(...)
+# ...
 ```
 
-Cutover PR flips `ENFORCE_SERIAL_LIFECYCLE_GATE=1` in the deploy script.
+The cutover PR contains exactly two source changes for the gate flip: (a) uncomment
+the Gate 5 block in `scripts/ci-local.sh`, (b) flip
+`"local/no-direct-serial-status-write": "off"` → `"error"` in `.eslintrc.json`. Both
+changes live in the diff that ships the swap to the new commit, so the gate becomes
+load-bearing the moment the cutover PR merges.
 
 - [ ] **Step 3.2.4: Commit**
 
@@ -1124,7 +1297,7 @@ Each is a separate PR, can land in any order after Track 1 is merged.
 - Modify: `src/modules/procurement/field-stock/services/dashboard.ts`
 - Modify: `src/modules/procurement/field-stock/services/dashboardV2Service.ts`
 - Modify: `src/modules/field-stock/services/reconciliationService.ts`
-- Modify: `src/components/.../DailyReconciliationDashboard.tsx`
+- Modify: `src/modules/field-stock/components/DailyReconciliationDashboard.tsx`
 - Modify: `.claude/skills/contractor/*.md`, `.claude/skills/kpi/*.md` (skill docs)
 
 - [ ] One PR per consumer is fine (or one bundled). Each consumer reads `v_holder_accountability` instead of `contractor_stock_accountability` (the view exists as the Sprint D rollup shim).
@@ -1262,7 +1435,7 @@ exec npx tsx scripts/serial-reconcile-check.ts
 
 - [ ] Document the alert rule:
   - Project: FibreFlow (project 2)
-  - Filter: `tags.sqlstate=23514 AND message ~ 'lifecycle_violation|holder_mismatch'`
+  - Filter: `tags.sqlstate IN ('FF001','FF002')` (custom SQLSTATEs the triggers RAISE with — avoids the generic 23514 check_violation noise from unrelated CHECK constraints elsewhere in the codebase)
   - Channel: paging Slack/email (existing FibreFlow channel)
   - Threshold: 1 event in 5 min
 - [ ] Commit the doc; Hein configures the rule in Bugsink UI before cutover (operational step).
@@ -1289,22 +1462,111 @@ exec npx tsx scripts/serial-reconcile-check.ts
 
 - [ ] **Step 6.4.1: Runbook**
 
-Lists the exact commands:
-1. `psql -f scripts/migrations/sql/rollback_387_serial_lifecycle_state_machine.sql` (single txn)
-2. `bash scripts/deploy-local.sh production --rollback`
-3. Verify by running `scripts/serial-reconcile-check.ts` — must return 0 against the legacy reconcile.
+Lists the exact commands. Note: `bash scripts/deploy-local.sh` does NOT have a `--rollback` flag in this repo — the rollback path is to redeploy the previous commit, not invoke a flag. The runbook MUST capture the pre-cutover commit SHA before T-0.
+
+1. Record the pre-cutover commit:
+   ```bash
+   echo "ROLLBACK_TARGET=$(git rev-parse origin/master~1)" > /tmp/sprint-e-rollback-target
+   ```
+
+2. Apply the migration rollback (single txn):
+   ```bash
+   PGPASSWORD="$PGPASSWORD" psql -h 100.96.203.105 -p 5437 -U postgres -d fibreflow \
+     -1 -f scripts/migrations/sql/rollback_387_serial_lifecycle_state_machine.sql
+   ```
+
+3. Drop the cutover marker so a future re-attempt re-trips the gate:
+   ```bash
+   PGPASSWORD="$PGPASSWORD" psql -h 100.96.203.105 -p 5437 -U postgres -d fibreflow \
+     -c "DROP TABLE IF EXISTS __sprint_e_cutover_gate__;"
+   ```
+
+4. Redeploy the pre-cutover commit. The deploy script doesn't have a `--rollback` flag; instead point it at the captured SHA via a temporary worktree:
+   ```bash
+   source /tmp/sprint-e-rollback-target
+   git worktree add /tmp/ff-rollback "$ROLLBACK_TARGET"
+   ( cd /tmp/ff-rollback && bash scripts/deploy-local.sh production )
+   git worktree remove /tmp/ff-rollback
+   ```
+
+5. Verify by running `tsx scripts/serial-reconcile-check.ts` — must return 0 against the legacy reconcile.
 
 - [ ] **Step 6.4.2: Rehearsal script**
 
 ```bash
 #!/bin/bash
-# Spins up a Docker DB, applies mig 387, runs the backfill, then runs the
-# rollback, and asserts the schema is back to legacy state.
+# scripts/rehearse-sprint-e-rollback.sh
+# Spins up a throwaway Postgres in Docker, replays a recent pg_dump of the
+# live DB, applies mig 387 + backfill, then applies the rollback, then
+# asserts the schema and event-count are back to pre-mig-387 state.
 set -euo pipefail
-# ... (mirror Task 1.1.4 + run forward + run rollback + assert)
+
+CONTAINER="ff-sprint-e-rollback-rehearsal"
+PG_PORT=5438
+DUMP_FILE="${DUMP_FILE:-/tmp/fibreflow-prod-dump.sql.gz}"
+
+if [ ! -f "$DUMP_FILE" ]; then
+  echo "ERROR: $DUMP_FILE not found. Take a fresh pg_dump first:"
+  echo "  pg_dump -h 100.96.203.105 -p 5437 -U postgres -d fibreflow | gzip > $DUMP_FILE"
+  exit 1
+fi
+
+echo "1. Boot throwaway Postgres on :$PG_PORT"
+docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+docker run -d --name "$CONTAINER" \
+  -e POSTGRES_PASSWORD=rehearsal -e POSTGRES_DB=fibreflow \
+  -p "$PG_PORT:5432" postgres:15
+# Wait for ready
+for i in $(seq 1 30); do
+  PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow \
+    -c 'SELECT 1' >/dev/null 2>&1 && break
+  sleep 1
+done
+
+echo "2. Restore production dump"
+gunzip -c "$DUMP_FILE" | PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow >/dev/null
+
+echo "3. Snapshot pre-mig-387 schema + counts"
+PRE_SCHEMA=$(PGPASSWORD=rehearsal pg_dump -h localhost -p "$PG_PORT" -U postgres -s fibreflow | sha256sum | awk '{print $1}')
+PRE_EVENTS=$(PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow -t -A -c \
+  "SELECT count(*) FROM stock_serial_events;")
+PRE_SERIALS=$(PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow -t -A -c \
+  "SELECT count(*) FROM stock_serials;")
+echo "  pre_schema_sha=$PRE_SCHEMA pre_events=$PRE_EVENTS pre_serials=$PRE_SERIALS"
+
+echo "4. Create the cutover marker + apply mig 387 + backfill"
+PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow -c \
+  "CREATE TABLE __sprint_e_cutover_gate__ (created_at timestamptz NOT NULL DEFAULT NOW());"
+PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow \
+  -1 -f scripts/migrations/sql/387_serial_lifecycle_state_machine.sql
+DATABASE_URL="postgresql://postgres:rehearsal@localhost:$PG_PORT/fibreflow" \
+  tsx scripts/backfill-serial-lifecycle.ts --commit
+
+echo "5. Apply the rollback"
+PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow \
+  -1 -f scripts/migrations/sql/rollback_387_serial_lifecycle_state_machine.sql
+PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow -c \
+  "DROP TABLE IF EXISTS __sprint_e_cutover_gate__;"
+
+echo "6. Compare post-rollback to pre-mig-387 snapshot"
+POST_SCHEMA=$(PGPASSWORD=rehearsal pg_dump -h localhost -p "$PG_PORT" -U postgres -s fibreflow | sha256sum | awk '{print $1}')
+POST_EVENTS=$(PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow -t -A -c \
+  "SELECT count(*) FROM stock_serial_events;")
+POST_SERIALS=$(PGPASSWORD=rehearsal psql -h localhost -p "$PG_PORT" -U postgres -d fibreflow -t -A -c \
+  "SELECT count(*) FROM stock_serials;")
+echo "  post_schema_sha=$POST_SCHEMA post_events=$POST_EVENTS post_serials=$POST_SERIALS"
+
+[ "$PRE_SCHEMA"  = "$POST_SCHEMA"  ] || { echo "FAIL: schema diverges"; exit 1; }
+[ "$PRE_EVENTS"  = "$POST_EVENTS"  ] || { echo "FAIL: event count diverges ($PRE_EVENTS -> $POST_EVENTS)"; exit 1; }
+[ "$PRE_SERIALS" = "$POST_SERIALS" ] || { echo "FAIL: serial count diverges"; exit 1; }
+
+echo "7. Cleanup"
+docker rm -f "$CONTAINER" >/dev/null
+
+echo "PASS: rollback restores pre-mig-387 schema + counts."
 ```
 
-Run on the week before cutover. Document the output in the cutover runbook.
+Run on the week before cutover. Document the output in the cutover runbook with the schema/event/serial counts captured in the log.
 
 - [ ] **Step 6.4.3: Commit**
 
@@ -1323,8 +1585,25 @@ This isn't a code PR — it's the scheduled execution of the runbooks.
 
 ### Task 7.2: Execute the Sprint E cutover
 
-- [ ] Follow `docs/runbooks/sprint-e-cutover.md`.
-- [ ] Apply mig 387 → run backfill → app deploy → release maintenance flag.
+- [ ] Follow `docs/runbooks/sprint-e-cutover.md`. Mandatory sequence:
+  1. **Pre-flight gate.** Run `tsx scripts/verify-no-direct-status-writes.ts` against `origin/master` HEAD — must exit 0. If it exits non-zero, abort and route the unrefactored caller through `promoteSerial` first.
+  2. **Create the cutover marker table.** This unlocks the mig 387 DO-block gate (see Cutover atomicity contract above):
+
+      ```sql
+      CREATE TABLE __sprint_e_cutover_gate__ (
+        created_at  timestamptz NOT NULL DEFAULT NOW(),
+        created_by  varchar(100) NOT NULL DEFAULT current_user,
+        notes       text
+      );
+      INSERT INTO __sprint_e_cutover_gate__ (notes)
+        VALUES ('Sprint E cutover authorised by Hein on <date>; verify-no-direct-status-writes.ts green at <commit-sha>');
+      ```
+
+  3. **Apply mig 387** via the migration runner. The DO-block will pass because the marker exists.
+  4. **Run the backfill** (`tsx scripts/backfill-serial-lifecycle.ts --commit`).
+  5. **App deploy** (`bash scripts/deploy-local.sh production`).
+  6. **Release the maintenance flag.**
+  7. **Drop the marker** (`DROP TABLE __sprint_e_cutover_gate__;`) so a re-run of mig 387 in a future environment would re-trip the gate.
 - [ ] First 4h: active monitoring per `docs/runbooks/sprint-e-detection-active.md`.
 - [ ] T+48h: confirm reconcile clean, lower cron frequency.
 
@@ -1350,7 +1629,7 @@ This isn't a code PR — it's the scheduled execution of the runbooks.
 - Cutover runbook ✓ Task 6.3
 - A/B/C/D prerequisite ✓ Task 7.1
 
-**Placeholder scan** — no "TBD", no "fill in later", no "similar to" without code. Two minor placeholders intentionally retained as documented-during-implementation: Task 1.4.2 says "skipping the full per-case body here for brevity" — that's the only one and it's explicitly flagged. **TODO before handoff: expand Task 1.4.2 to full code, or accept implementer fills it from the matrix.** Same for Task 2.6.1 (enumeration is a grep, output documented at runtime).
+**Placeholder scan** — no "TBD", no "fill in later", no "similar to" without code. Task 1.4.2 now contains the full per-case body (`seedAt` helper + the for-loop over ALLOWED/ILLEGAL + the afterAll cleanup). Task 2.6.1 (verb caller enumeration) remains as "grep at runtime" by design — the enumeration output is a discovery artefact, not a fixed list to author in advance.
 
 **Type consistency** — `promoteSerial` signature consistent across all caller refactors. `SerialStatus` enum used wherever a status string appears. `SerialEventContext` interface used in all GUC-setting paths.
 
