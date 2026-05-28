@@ -3,19 +3,22 @@
  * Polling logic lives in usePPLookupPoller to keep this file within 300 lines.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 import { usePPLookupPoller } from './usePPLookupPoller';
 import type { PPTicketBatch } from './CreatePPTicketsModal';
 import { type PPRecord, type PPCardCategory, type PPStats, type LookupStatus, isSelectable } from './ppDataShared';
+import type { DateFilter } from '@/modules/data-sync/types';
+import { getDateChipRangeYmd } from '@/modules/data-sync/components/dateChipRange';
 
 export interface PPDataActions {
   setPage: (p: number) => void;
   setFilterProject: (v: string) => void;
   setFilterStatus: (v: string) => void;
-  setFilterDateFrom: (v: string) => void;
-  setFilterDateTo: (v: string) => void;
+  setDateFilter: (v: DateFilter) => void;
+  setCustomDateFrom: (v: string) => void;
+  setCustomDateTo: (v: string) => void;
   setFilterPriority: (v: string) => void;
   setFilterAging: (v: string) => void;
   setFilterPon: (v: string) => void;
@@ -26,13 +29,7 @@ export interface PPDataActions {
   fetchStats: () => Promise<void>;
   fetchRecords: () => Promise<void>;
   handleResolveAll: () => Promise<void>;
-  handleCreateTickets: (params: {
-    ticket_type: string;
-    ticket_category: string;
-    priority: string;
-    notes: string;
-    batches: PPTicketBatch[];
-  }) => Promise<void>;
+  handleCreateTickets: (params: { ticket_type: string; ticket_category: string; priority: string; notes: string; batches: PPTicketBatch[] }) => Promise<void>;
   handleSelectAllUnticketed: () => Promise<void>;
   handleExport: () => void;
   handleImportOlt: (file: File) => Promise<void>;
@@ -54,8 +51,9 @@ export interface PPDataState {
   total: number;
   filterProject: string;
   filterStatus: string;
-  filterDateFrom: string;
-  filterDateTo: string;
+  dateFilter: DateFilter;
+  customDateFrom: string;
+  customDateTo: string;
   filterPriority: string;
   filterAging: string;
   filterPon: string;
@@ -80,8 +78,9 @@ export function usePPData(): { state: PPDataState; actions: PPDataActions } {
   const [total, setTotal] = useState(0);
   const [filterProject, setFilterProject] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterAging, setFilterAging] = useState('');
   const [filterPon, setFilterPon] = useState('');
@@ -108,29 +107,43 @@ export function usePPData(): { state: PPDataState; actions: PPDataActions } {
       .catch(err => log.error('Failed to fetch projects', { err }, 'usePPData'));
   }, []);
 
+  const { dateFrom: effectiveDateFrom, dateTo: effectiveDateTo } = useMemo(
+    () => getDateChipRangeYmd(dateFilter, customDateFrom, customDateTo),
+    [dateFilter, customDateFrom, customDateTo],
+  );
+
   useEffect(() => {
     setSelectedIds([]);
-  }, [page, filterProject, filterStatus, filterPriority, filterAging, filterDateFrom, filterDateTo, debouncedSearch, filterPon]);
+  }, [page, filterProject, filterStatus, filterPriority, filterAging, effectiveDateFrom, effectiveDateTo, debouncedSearch, filterPon]);
+
+  // Status is opt-in: stats cards ARE the status breakdown, so applying the
+  // active card's status would make every other card show 0.
+  const buildFilterParams = useCallback((includeStatus: boolean) => {
+    const params = new URLSearchParams();
+    if (filterProject) params.set('project', filterProject);
+    if (includeStatus && filterStatus) params.set('status', filterStatus);
+    if (filterPriority) params.set('priority', filterPriority);
+    if (filterAging) params.set('aging', filterAging);
+    if (effectiveDateFrom) params.set('dateFrom', effectiveDateFrom);
+    if (effectiveDateTo) params.set('dateTo', effectiveDateTo);
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (filterPon) params.set('pon', filterPon);
+    return params;
+  }, [filterProject, filterStatus, filterPriority, filterAging, effectiveDateFrom, effectiveDateTo, debouncedSearch, filterPon]);
 
   const fetchStats = useCallback(async () => {
+    const params = buildFilterParams(false); params.set('action', 'stats');
     try {
-      const res = await fetch('/api/activate/import-pp-data?action=stats');
+      const res = await fetch(`/api/activate/import-pp-data?${params}`);
       const data = await res.json();
       if (data.success) setStats(data.data);
     } catch (err) { log.error('Failed to fetch stats', { err }, 'usePPData'); }
-  }, []);
+  }, [buildFilterParams]);
 
   const fetchRecords = useCallback(async () => {
+    const params = buildFilterParams(true);
+    params.set('action', 'list'); params.set('page', String(page)); params.set('limit', '50');
     try {
-      const params = new URLSearchParams({ action: 'list', page: String(page), limit: '50' });
-      if (filterProject) params.set('project', filterProject);
-      if (filterStatus) params.set('status', filterStatus);
-      if (filterPriority) params.set('priority', filterPriority);
-      if (filterAging) params.set('aging', filterAging);
-      if (filterDateFrom) params.set('dateFrom', filterDateFrom);
-      if (filterDateTo) params.set('dateTo', filterDateTo);
-      if (debouncedSearch) params.set('search', debouncedSearch);
-      if (filterPon) params.set('pon', filterPon);
       const res = await fetch(`/api/activate/import-pp-data?${params}`);
       const data = await res.json();
       if (data.success) {
@@ -139,7 +152,7 @@ export function usePPData(): { state: PPDataState; actions: PPDataActions } {
         setTotal(data.pagination.total ?? data.data.length);
       }
     } catch (err) { log.error('Failed to fetch records', { err }, 'usePPData'); }
-  }, [page, filterProject, filterStatus, filterPriority, filterAging, filterDateFrom, filterDateTo, debouncedSearch, filterPon]);
+  }, [page, buildFilterParams]);
 
   const onLookupComplete = useCallback(() => { void fetchStats(); void fetchRecords(); }, [fetchStats, fetchRecords]);
   const { fetchLookupStatus, stopPolling } = usePPLookupPoller({ setLookupStatus, onComplete: onLookupComplete });
@@ -211,12 +224,7 @@ export function usePPData(): { state: PPDataState; actions: PPDataActions } {
   };
 
   const handleExport = () => {
-    const params = new URLSearchParams({ action: 'export' });
-    if (filterProject) params.set('project', filterProject);
-    if (filterStatus) params.set('status', filterStatus);
-    if (filterPriority) params.set('priority', filterPriority);
-    if (filterDateFrom) params.set('dateFrom', filterDateFrom);
-    if (filterDateTo) params.set('dateTo', filterDateTo);
+    const params = buildFilterParams(true); params.set('action', 'export');
     window.open(`/api/activate/import-pp-data?${params}`, '_blank');
   };
 
@@ -271,14 +279,15 @@ export function usePPData(): { state: PPDataState; actions: PPDataActions } {
   return {
     state: {
       isResolving, error, stats, records, page, totalPages, total,
-      filterProject, filterStatus, filterDateFrom, filterDateTo,
+      filterProject, filterStatus, dateFilter, customDateFrom, customDateTo,
       filterPriority, filterAging, filterPon, isImportingOlt,
       searchText, lookupStatus, selectedIds, showTicketModal,
       creatingTickets, activeCard, selectingAllUnticketed, projects,
     },
     actions: {
-      setPage, setFilterProject, setFilterStatus, setFilterDateFrom,
-      setFilterDateTo, setFilterPriority, setFilterAging, setFilterPon,
+      setPage, setFilterProject, setFilterStatus,
+      setDateFilter, setCustomDateFrom, setCustomDateTo,
+      setFilterPriority, setFilterAging, setFilterPon,
       setSearchText, setSelectedIds, setShowTicketModal, setLookupStatus,
       fetchStats, fetchRecords,
       handleResolveAll, handleCreateTickets, handleSelectAllUnticketed,

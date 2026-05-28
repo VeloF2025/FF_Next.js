@@ -21,7 +21,7 @@ export function PPDataTab() {
   const { state, actions } = usePPData();
   const {
     isResolving, error, stats, records, page, total,
-    filterProject, filterStatus, filterDateFrom, filterDateTo,
+    filterProject, filterStatus, dateFilter, customDateFrom, customDateTo,
     filterPriority, filterAging, filterPon, isImportingOlt,
     searchText, lookupStatus, selectedIds, showTicketModal,
     creatingTickets, activeCard, selectingAllUnticketed, projects,
@@ -30,7 +30,8 @@ export function PPDataTab() {
     setPage, fetchStats, fetchRecords,
     handleResolveAll, handleCreateTickets, handleSelectAllUnticketed,
     handleExport, handleImportOlt, handleCardClick, handleFilterChange,
-    setFilterProject, setFilterStatus, setFilterDateFrom, setFilterDateTo,
+    setFilterProject, setFilterStatus,
+    setDateFilter, setCustomDateFrom, setCustomDateTo,
     setFilterPriority, setFilterAging, setFilterPon,
     setSearchText, setSelectedIds, setShowTicketModal, setLookupStatus,
     toggleSelect, toggleSelectAll, allSelectableChecked, selectableOnPage,
@@ -98,10 +99,12 @@ export function PPDataTab() {
             onPriorityChange={handleFilterChange(setFilterPriority)}
             filterAging={filterAging}
             onAgingChange={handleFilterChange(setFilterAging)}
-            filterDateFrom={filterDateFrom}
-            onDateFromChange={handleFilterChange(setFilterDateFrom)}
-            filterDateTo={filterDateTo}
-            onDateToChange={handleFilterChange(setFilterDateTo)}
+            dateFilter={dateFilter}
+            onDateFilterChange={(f) => { setDateFilter(f); setPage(1); }}
+            customDateFrom={customDateFrom}
+            onCustomDateFromChange={(d) => { setCustomDateFrom(d); setPage(1); }}
+            customDateTo={customDateTo}
+            onCustomDateToChange={(d) => { setCustomDateTo(d); setPage(1); }}
             filterPon={filterPon}
             onPonChange={handleFilterChange(setFilterPon)}
             total={total}

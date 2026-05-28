@@ -1,7 +1,7 @@
 /**
- * PPFilterControls — left-side filter inputs: search, project, status chips,
- * date range, PON, Priority, and Aging selects.
- * Split from PPDataFilters to keep both components under 200 lines.
+ * PPFilterControls — non-date filter inputs: search, project, status chips,
+ * PON / Priority / Aging selects. Date filter lives in DateChipFilter, which
+ * is mounted alongside this component in PPDataFilters' first row.
  */
 
 'use client';
@@ -20,10 +20,6 @@ interface PPFilterControlsProps {
   onPriorityChange: (val: string) => void;
   filterAging: string;
   onAgingChange: (val: string) => void;
-  filterDateFrom: string;
-  onDateFromChange: (val: string) => void;
-  filterDateTo: string;
-  onDateToChange: (val: string) => void;
   filterPon: string;
   onPonChange: (val: string) => void;
 }
@@ -49,8 +45,6 @@ export function PPFilterControls({
   filterStatus, onStatusChange,
   filterPriority, onPriorityChange,
   filterAging, onAgingChange,
-  filterDateFrom, onDateFromChange,
-  filterDateTo, onDateToChange,
   filterPon, onPonChange,
 }: PPFilterControlsProps) {
   return (
@@ -100,28 +94,6 @@ export function PPFilterControls({
           {label}
         </button>
       ))}
-
-      {/* Date range */}
-      <span className="text-xs text-[var(--ff-text-secondary)]">From</span>
-      <input
-        type="date" value={filterDateFrom} onChange={e => onDateFromChange(e.target.value)}
-        className="px-2 py-1 text-xs rounded border bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)] focus:border-[var(--ff-accent)] outline-none"
-        aria-label="Date from"
-      />
-      <span className="text-xs text-[var(--ff-text-secondary)]">To</span>
-      <input
-        type="date" value={filterDateTo} onChange={e => onDateToChange(e.target.value)}
-        className="px-2 py-1 text-xs rounded border bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)] focus:border-[var(--ff-accent)] outline-none"
-        aria-label="Date to"
-      />
-      {(filterDateFrom || filterDateTo) && (
-        <button
-          onClick={() => { onDateFromChange(''); onDateToChange(''); }}
-          className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]" title="Clear dates"
-        >
-          <XCircle className="w-3.5 h-3.5" />
-        </button>
-      )}
 
       {/* PON / Priority / Aging selects */}
       <select value={filterPon} onChange={e => onPonChange(e.target.value)}

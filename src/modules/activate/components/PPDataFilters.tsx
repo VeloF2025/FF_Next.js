@@ -1,6 +1,9 @@
 /**
- * PPDataFilters — single filter bar row styled to match OltInvestigateTab's filter bar.
- * LEFT: delegated to PPFilterControls. RIGHT: action buttons.
+ * PPDataFilters — two-row filter bar matching the OLT Investigate layout.
+ *
+ * Row 1 (filters): DateChipFilter + PPFilterControls (search, project, status
+ * chips, sub-selects). Row 2 (actions): Export / Resolve All / Ticket All /
+ * Refresh / Import OLT Data.
  */
 
 'use client';
@@ -8,6 +11,8 @@
 import { useRef, type ChangeEvent } from 'react';
 import { Download, RefreshCw, Upload, Ticket, XCircle, Search } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
+import { DateChipFilter } from '@/modules/data-sync/components/DateChipFilter';
+import type { DateFilter } from '@/modules/data-sync/types';
 import { PPFilterControls } from './PPFilterControls';
 
 interface PPDataFiltersProps {
@@ -22,10 +27,12 @@ interface PPDataFiltersProps {
   onPriorityChange: (val: string) => void;
   filterAging: string;
   onAgingChange: (val: string) => void;
-  filterDateFrom: string;
-  onDateFromChange: (val: string) => void;
-  filterDateTo: string;
-  onDateToChange: (val: string) => void;
+  dateFilter: DateFilter;
+  onDateFilterChange: (val: DateFilter) => void;
+  customDateFrom: string;
+  onCustomDateFromChange: (val: string) => void;
+  customDateTo: string;
+  onCustomDateToChange: (val: string) => void;
   filterPon: string;
   onPonChange: (val: string) => void;
   // Action props
@@ -51,8 +58,9 @@ export function PPDataFilters({
   filterStatus, onStatusChange,
   filterPriority, onPriorityChange,
   filterAging, onAgingChange,
-  filterDateFrom, onDateFromChange,
-  filterDateTo, onDateToChange,
+  dateFilter, onDateFilterChange,
+  customDateFrom, onCustomDateFromChange,
+  customDateTo, onCustomDateToChange,
   filterPon, onPonChange,
   total, selectedCount,
   onExport, onImportOlt, isImportingOlt,
@@ -68,21 +76,30 @@ export function PPDataFilters({
   }
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ff-border-light)] gap-3 flex-wrap">
-      <PPFilterControls
-        projects={projects}
-        searchText={searchText} onSearchChange={onSearchChange}
-        filterProject={filterProject} onProjectChange={onProjectChange}
-        filterStatus={filterStatus} onStatusChange={onStatusChange}
-        filterPriority={filterPriority} onPriorityChange={onPriorityChange}
-        filterAging={filterAging} onAgingChange={onAgingChange}
-        filterDateFrom={filterDateFrom} onDateFromChange={onDateFromChange}
-        filterDateTo={filterDateTo} onDateToChange={onDateToChange}
-        filterPon={filterPon} onPonChange={onPonChange}
-      />
+    <div className="px-4 py-3 border-b border-[var(--ff-border-light)] space-y-3">
+      {/* Row 1: filters (date chips + search + project + status chips + sub-selects) */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <DateChipFilter
+          dateFilter={dateFilter}
+          customDateFrom={customDateFrom}
+          customDateTo={customDateTo}
+          onDateFilterChange={onDateFilterChange}
+          onCustomDateFromChange={onCustomDateFromChange}
+          onCustomDateToChange={onCustomDateToChange}
+        />
+        <PPFilterControls
+          projects={projects}
+          searchText={searchText} onSearchChange={onSearchChange}
+          filterProject={filterProject} onProjectChange={onProjectChange}
+          filterStatus={filterStatus} onStatusChange={onStatusChange}
+          filterPriority={filterPriority} onPriorityChange={onPriorityChange}
+          filterAging={filterAging} onAgingChange={onAgingChange}
+          filterPon={filterPon} onPonChange={onPonChange}
+        />
+      </div>
 
-      {/* RIGHT: action buttons */}
-      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+      {/* Row 2: action buttons */}
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={onExport} disabled={total === 0}
           className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)]
@@ -98,6 +115,16 @@ export function PPDataFilters({
           {isResolving ? <><InlineSpinner size="sm" /> Resolving...</>
             : isLookupRunning ? <><InlineSpinner size="sm" /> 1Map Searching...</>
             : <><Search className="w-3 h-3" /> Resolve All</>}
+        </button>
+
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+        <button
+          onClick={() => fileInputRef.current?.click()} disabled={isImportingOlt}
+          className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)]
+                     text-xs rounded hover:border-[var(--ff-accent)] disabled:opacity-50 flex items-center gap-1.5"
+          title="Import Velocity PPs Excel to populate OLT port data"
+        >
+          {isImportingOlt ? <><InlineSpinner size="sm" /> Importing...</> : <><Upload className="w-3 h-3" /> Import OLT Data</>}
         </button>
 
         {unticketedCount > 0 && (
@@ -130,20 +157,10 @@ export function PPDataFilters({
 
         <button
           onClick={onRefresh}
-          className="p-1.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)] transition-colors"
+          className="ml-auto p-1.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)] transition-colors"
           title="Refresh data" aria-label="Refresh PP data"
         >
           <RefreshCw className="w-4 h-4" />
-        </button>
-
-        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
-        <button
-          onClick={() => fileInputRef.current?.click()} disabled={isImportingOlt}
-          className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)]
-                     text-xs rounded hover:border-[var(--ff-accent)] disabled:opacity-50 flex items-center gap-1.5"
-          title="Import Velocity PPs Excel to populate OLT port data"
-        >
-          {isImportingOlt ? <><InlineSpinner size="sm" /> Importing...</> : <><Upload className="w-3 h-3" /> Import OLT Data</>}
         </button>
       </div>
     </div>
