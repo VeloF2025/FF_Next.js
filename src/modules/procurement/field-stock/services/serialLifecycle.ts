@@ -185,9 +185,10 @@ export async function promoteSerial(
   poolOrClient: Pool | PoolClient,
   args: PromoteSerialArgs,
 ): Promise<void> {
-  // Distinguish Pool from PoolClient: Pool exposes a `connect()` method;
-  // PoolClient (already-checked-out client) does not.
-  if ('connect' in poolOrClient) {
+  // Distinguish Pool from PoolClient. Both expose `connect()` (PoolClient
+  // inherits it from Client.prototype), so check for `release()` instead —
+  // pg-pool attaches `release` only to checked-out PoolClient instances.
+  if (!('release' in poolOrClient)) {
     // Pool path — manage the connection + transaction here.
     const pool = poolOrClient as Pool;
     const client = await pool.connect();

@@ -2,7 +2,7 @@
  * tests/db/serialLifecycleMatrix.test.ts
  *
  * Full transition-matrix coverage for mig 387 lifecycle triggers.
- * 14 forward ALLOWED transitions + 4 ILLEGAL cases = 18 tests.
+ * 14 forward ALLOWED + 4 ILLEGAL (FF001) + 2 HOLDER_MISMATCH (FF002) = 20 tests.
  *
  * Run: npx vitest run --config vitest.db.sprinte.config.ts \
  *        tests/db/serialLifecycleMatrix.test.ts
@@ -21,6 +21,7 @@ import { Pool } from 'pg';
 import {
   promoteSerial,
   LifecycleViolationError,
+  HolderMismatchError,
   type SerialStatus,
 } from '@/modules/procurement/field-stock/services/serialLifecycle';
 
@@ -48,6 +49,16 @@ interface IllegalCase {
   seedHolderId: string | null;
 }
 
+interface HolderMismatchCase {
+  from: SerialStatus;
+  to: SerialStatus;
+  seedHolderId: string | null;
+  /** undefined = leave holder unchanged; null = clear to NULL */
+  toHolderId?: string | null;
+  /** Allowed forward transition? If true, only the holder-validate trigger should fire. */
+  transitionAllowed: boolean;
+}
+
 // 14 forward transitions mirroring stock_serial_status_transitions (excludes
 // null → in_stock INSERT case covered by Task 1.3).
 const ALLOWED: AllowedCase[] = [
@@ -73,6 +84,30 @@ const ILLEGAL: IllegalCase[] = [
   { from: 'activated', to: 'in_stock',  seedHolderId: null }, // backwards
   { from: 'scrapped',  to: 'in_stock',  seedHolderId: null }, // terminal state
   { from: 'installed', to: 'in_stock',  seedHolderId: null }, // backwards skip
+];
+
+// Holder-mismatch cases (FF002). Trigger ordering is alphabetical so
+// trg_stock_serial_holder_validate_t fires BEFORE trg_stock_serial_status_validate_t.
+// Case 1 uses an ALLOWED forward transition with a bad holder so only FF002
+// can fire. Case 2 uses an allowed transition but leaves holder NULL when the
+// to-status requires a person holder (`issued` requires staff/contractor).
+const HOLDER_MISMATCH: HolderMismatchCase[] = [
+  {
+    // (installed, staff) is NOT in stock_serial_status_holder_pairs.
+    // Transition issued → installed IS in the matrix, so status-validate would pass.
+    from: 'issued', to: 'installed',
+    seedHolderId: STAFF_HOLDER_ID,
+    toHolderId: STAFF_HOLDER_ID,        // keep the staff holder past install
+    transitionAllowed: true,
+  },
+  {
+    // (issued, NULL) is NOT in pairs — issued requires staff or contractor.
+    // Transition in_stock → issued IS in the matrix.
+    from: 'in_stock', to: 'issued',
+    seedHolderId: null,
+    toHolderId: null,                   // explicitly NULL
+    transitionAllowed: true,
+  },
 ];
 
 // ============================================================================
@@ -204,6 +239,47 @@ describe('serial lifecycle transition matrix', () => {
           serial.rows[0].status,
           `status must remain '${from}' after rejection`,
         ).toBe(from);
+      } finally {
+        await purge(pool, serialId);
+      }
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // HOLDER MISMATCH — FF002 rejection cases (covers trg_stock_serial_holder_validate)
+  // --------------------------------------------------------------------------
+
+  HOLDER_MISMATCH.forEach(({ from, to, seedHolderId, toHolderId, transitionAllowed }, idx) => {
+    const n = String(ALLOWED.length + ILLEGAL.length + idx + 1).padStart(3, '0');
+    const serialNumber = `MATRIX-ALCLB-${n}`;
+    const sourceId     = `cc000000-0000-0000-0000-${n.padStart(12, '0')}`;
+    const holderLabel  = toHolderId === null ? 'NULL' : 'staff';
+
+    it(`rejects ${from} → ${to} (holder=${holderLabel}) with HolderMismatchError`, async () => {
+      const serialId = await seedAt(pool, serialNumber, from, seedHolderId);
+      try {
+        await expect(
+          promoteSerial(pool, {
+            serialId,
+            toStatus: to,
+            ...(toHolderId !== undefined ? { toHolderId } : {}),
+            sourceTable: SOURCE_TABLE,
+            sourceId,
+            payload: { case: `holder_mismatch_${from}_${to}`, transitionAllowed },
+          }),
+        ).rejects.toBeInstanceOf(HolderMismatchError);
+
+        const serial = await pool.query(
+          `SELECT status, holder_id FROM stock_serials WHERE id = $1`, [serialId],
+        );
+        expect(
+          serial.rows[0].status,
+          `status must remain '${from}' after holder rejection`,
+        ).toBe(from);
+        expect(
+          serial.rows[0].holder_id,
+          `holder_id must remain seeded value after rejection`,
+        ).toBe(seedHolderId);
       } finally {
         await purge(pool, serialId);
       }
