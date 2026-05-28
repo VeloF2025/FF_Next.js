@@ -45,6 +45,21 @@ ruleTester.run('no-direct-serial-status-write', rule, {
       code: 'const q = sql`UPDATE stock_serials SET status = $1`;',
       filename: 'scripts/backfill-serial-lifecycle-status.ts',
     },
+    // Writes a non-lifecycle column but FILTERS by status — must NOT fire.
+    {
+      code: 'const q = sql`UPDATE stock_serials SET notes = $1 WHERE status = $2`;',
+      filename: 'pages/api/foo.ts',
+    },
+    // Filters by holder_id, writes notes — must NOT fire.
+    {
+      code: 'const q = sql`UPDATE stock_serials SET notes = $1 WHERE holder_id = $2`;',
+      filename: 'pages/api/foo.ts',
+    },
+    // RETURNING status after a non-lifecycle write — must NOT fire.
+    {
+      code: 'const q = sql`UPDATE stock_serials SET notes = $1 WHERE id = $2 RETURNING status`;',
+      filename: 'pages/api/foo.ts',
+    },
   ],
   invalid: [
     // Direct status write in a normal API route — template literal.
@@ -69,6 +84,12 @@ ruleTester.run('no-direct-serial-status-write', rule, {
     {
       code: "const q = 'UPDATE stock_serials SET status = active';",
       filename: 'pages/api/bar.ts',
+      errors: [{ messageId: 'noDirectWrite', data: { column: 'status' } }],
+    },
+    // status written alongside another column, with a WHERE filter — still fires.
+    {
+      code: 'const q = sql`UPDATE stock_serials SET notes = $1, status = $2 WHERE id = $3`;',
+      filename: 'pages/api/foo.ts',
       errors: [{ messageId: 'noDirectWrite', data: { column: 'status' } }],
     },
   ],

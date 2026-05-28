@@ -23,7 +23,13 @@ const ALLOWED_FILES = [
   /scripts\/backfill-serial-lifecycle-status\.ts$/,
 ];
 
-const DIRECT_WRITE_RE = /UPDATE\s+stock_serials\s+SET[\s\S]*(status|holder_id)\s*=/i;
+// Capture ONLY the SET clause — everything between `SET` and the first
+// WHERE / RETURNING / ON CONFLICT / `;` / end-of-string boundary — so a query
+// that merely *filters* by status (`SET notes = $1 WHERE status = $2`) is not
+// mistaken for a status *write*. The boundary is a lookahead so it isn't consumed.
+const SET_CLAUSE_RE =
+  /UPDATE\s+stock_serials\s+SET\s+([\s\S]*?)(?=\sWHERE\b|\sRETURNING\b|\sON\s+CONFLICT\b|;|$)/i;
+const WRITTEN_COLUMN_RE = /\b(status|holder_id)\s*=/i;
 
 module.exports = {
   meta: {
@@ -45,9 +51,11 @@ module.exports = {
     if (ALLOWED_FILES.some((re) => re.test(filename))) return {};
 
     function check(node, text) {
-      if (DIRECT_WRITE_RE.test(text)) {
-        const m = text.match(/(status|holder_id)\s*=/i);
-        context.report({ node, messageId: 'noDirectWrite', data: { column: m[1] } });
+      const setClause = SET_CLAUSE_RE.exec(text);
+      if (!setClause) return;
+      const col = setClause[1].match(WRITTEN_COLUMN_RE);
+      if (col) {
+        context.report({ node, messageId: 'noDirectWrite', data: { column: col[1] } });
       }
     }
 
