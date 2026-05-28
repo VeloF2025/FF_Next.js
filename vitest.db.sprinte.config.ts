@@ -29,6 +29,8 @@ export default defineConfig({
       'tests/db/services/field-stock/serialLifecycle.test.ts',
       'tests/db/services/field-stock/consumptionService.lifecycle.test.ts',
       'tests/db/services/field-stock/pickingProcess.lifecycle.test.ts',
+      // Task 2.3 (Track 2) — returns accept handler serial lifecycle
+      'tests/db/services/field-stock/returnsAccept.lifecycle.test.ts',
       'tests/db/serialLifecycleMatrix.test.ts',
     ],
     globalSetup: ['./tests/db/setup/sprint-e-global-setup.ts'],

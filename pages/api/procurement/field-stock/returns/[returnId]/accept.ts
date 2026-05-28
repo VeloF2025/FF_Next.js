@@ -28,6 +28,7 @@ import {
   getOrCreateStaffHolder,
   getOrCreateContractorHolder,
 } from '@/modules/procurement/field-stock/services/stockHolderService';
+import { promoteSerial } from '@/modules/procurement/field-stock/services/serialLifecycle';
 
 interface ReturnLine {
   id: string;
@@ -186,19 +187,47 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           }
         } else if (disposition === 'scrap') {
           // TODO(sprintD-fast-follow): custody debit for scrap dispositions pending business rule
+          // Routes through promoteSerial so mig 387 AFTER trigger emits stock_serial_events
+          // post-cutover. Pre-cutover: same UPDATE behaviour, no triggers fire.
+          // Both paths clear holder_id (NULL) — warehouse-resident via stock_quants.
+          // Pre-cutover matrix constraint: serial must be in 'returned' or 'faulty' state.
+          // NOTE: (issued,scrapped) has no matrix row — a direct issued→scrapped UPDATE
+          // would succeed pre-cutover but will throw FF001 post-cutover. Deferred to Track 5/7.
           if (line.serial_id) {
-            await txn.query(
-              `UPDATE stock_serials SET status = 'scrapped', holder_id = NULL, updated_at = NOW() WHERE id = $1`,
-              [line.serial_id]
-            );
+            await promoteSerial(txn.client, {
+              serialId:    line.serial_id,
+              toStatus:    'scrapped',
+              toHolderId:  null,
+              sourceTable: 'stock_returns',
+              sourceId:    returnId,
+              actorStaffId: staffId,
+              payload: {
+                disposition,
+                line_id: line.id,
+                return_number: returnRecord.return_number,
+              },
+            });
           }
         } else if (disposition === 'repair') {
           // TODO(sprintD-fast-follow): custody debit for faulty/repair dispositions pending business rule
+          // Routes through promoteSerial so mig 387 AFTER trigger emits stock_serial_events
+          // post-cutover. Pre-cutover: same UPDATE behaviour, no triggers fire.
+          // Both paths clear holder_id (NULL) — warehouse-resident via stock_quants.
+          // Post-cutover matrix: requires serial in 'issued', 'installed', or 'activated' state.
           if (line.serial_id) {
-            await txn.query(
-              `UPDATE stock_serials SET status = 'faulty', holder_id = NULL, updated_at = NOW() WHERE id = $1`,
-              [line.serial_id]
-            );
+            await promoteSerial(txn.client, {
+              serialId:    line.serial_id,
+              toStatus:    'faulty',
+              toHolderId:  null,
+              sourceTable: 'stock_returns',
+              sourceId:    returnId,
+              actorStaffId: staffId,
+              payload: {
+                disposition,
+                line_id: line.id,
+                return_number: returnRecord.return_number,
+              },
+            });
           }
         }
 
