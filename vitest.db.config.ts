@@ -23,6 +23,8 @@ export default defineConfig({
       'tests/db/services/field-stock/pickingProcess.lifecycle.test.ts',
       // Task 2.3 (Track 2) — requires mig 387 triggers (Sprint E container only)
       'tests/db/services/field-stock/returnsAccept.lifecycle.test.ts',
+      // Task 2.4 (Track 2) — requires mig 387 triggers (Sprint E container only)
+      'tests/db/services/activate/cascadePpResolution.lifecycle.test.ts',
     ],
     globalSetup: ['./tests/db/setup/global-setup.ts'],
     // Docker startup on a cold image pull can take ~30s; hooks need 2x headroom.
