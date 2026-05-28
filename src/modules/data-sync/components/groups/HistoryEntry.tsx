@@ -75,6 +75,7 @@ export function HistoryEntry({ entry, isExpanded, onToggle }: HistoryEntryProps)
   return (
     <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
       <button
+        type="button"
         onClick={onToggle}
         className="w-full flex items-center gap-4 p-4 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors"
       >

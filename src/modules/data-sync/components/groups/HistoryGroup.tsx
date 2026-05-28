@@ -98,22 +98,28 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
 
   // Client-side date + status filtering. Date predicate uses the shared
   // getDateRange (ISO timestamps); started_at is also ISO so direct compare.
-  const visibleEntries = useMemo(() => {
+  // Stats compute from the date-filtered set (not the status-filtered set)
+  // so the "Total" card stays honest while a status filter is active.
+  const dateFilteredEntries = useMemo(() => {
     const range = getDateRange(dateFilter, customDateFrom, customDateTo);
     return entries.filter((e) => {
-      if (statusFilter !== 'all' && e.status !== statusFilter) return false;
       if (range.dateFrom && e.started_at < range.dateFrom) return false;
       if (range.dateTo && e.started_at >= range.dateTo) return false;
       return true;
     });
-  }, [entries, statusFilter, dateFilter, customDateFrom, customDateTo]);
+  }, [entries, dateFilter, customDateFrom, customDateTo]);
+
+  const visibleEntries = useMemo(() => {
+    if (statusFilter === 'all') return dateFilteredEntries;
+    return dateFilteredEntries.filter((e) => e.status === statusFilter);
+  }, [dateFilteredEntries, statusFilter]);
 
   const stats = useMemo(() => ({
-    all: visibleEntries.length,
-    success: visibleEntries.filter((e) => e.status === 'success').length,
-    failed: visibleEntries.filter((e) => e.status === 'failed').length,
-    running: visibleEntries.filter((e) => e.status === 'running').length,
-  }), [visibleEntries]);
+    all: dateFilteredEntries.length,
+    success: dateFilteredEntries.filter((e) => e.status === 'success').length,
+    failed: dateFilteredEntries.filter((e) => e.status === 'failed').length,
+    running: dateFilteredEntries.filter((e) => e.status === 'running').length,
+  }), [dateFilteredEntries]);
 
   if (permissionsLoading) {
     return <LoadingSpinner className="py-16" size="lg" label="Loading..." />;
@@ -140,6 +146,7 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
         {STAT_CARDS.map(({ key, label, color, ring }) => (
           <button
             key={key}
+            type="button"
             onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
             className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border text-left transition-all cursor-pointer ${
               statusFilter === key
@@ -172,6 +179,7 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
           return (
             <button
               key={opt.value}
+              type="button"
               onClick={() => setFilter(opt.value)}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
                 isActive
@@ -185,6 +193,7 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
           );
         })}
         <button
+          type="button"
           onClick={fetchHistory}
           disabled={loading}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] rounded-full border border-[var(--ff-border-light)] hover:border-[var(--ff-accent)] transition-colors disabled:opacity-50"
