@@ -7,5 +7,6 @@
 module.exports = {
   rules: {
     'no-silent-catch': require('./scripts/eslint-rules/no-silent-catch'),
+    'no-direct-serial-status-write': require('./scripts/eslint-rules/no-direct-serial-status-write'),
   },
 };

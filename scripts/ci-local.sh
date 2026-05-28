@@ -158,6 +158,25 @@ else
   pass "Zero Tolerance: no changed files"
 fi
 
+# ─── Serial Lifecycle Discipline (Sprint E Track 3) ──────────────────────────
+#
+# Enforcement at cutover is the ESLint rule `local/no-direct-serial-status-write`
+# (scripts/eslint-rules/), not a CI grep. To activate, the Sprint-E cutover PR
+# flips it "off" → "error" in .eslintrc.json; Gate 1 above runs ESLint with
+# MAX_LINT_ERRORS=0, so any direct `UPDATE stock_serials SET status/holder_id`
+# outside the allow-list (serialLifecycle / serialForceCorrectService /
+# backfill-serial-lifecycle-status) becomes a hard CI failure.
+#
+# A separate `git grep` gate was deliberately NOT added: every real writer
+# spans two lines (`UPDATE stock_serials\n  SET status = ...`), which `git grep`
+# (line-oriented, no multiline mode) cannot match, and a portable multiline
+# `grep -Pz` cannot be relied on across dev/CI shells (e.g. ugrep treats -z as
+# decompress). The AST-based ESLint rule matches these correctly; duplicating
+# it in fragile shell would be false safety. Until cutover the rule stays "off"
+# because Track 2's legitimate pre-cutover direct writers (import-serials,
+# fault-reports, movementReversalService, the dead markSerialInstalled,
+# grn-confirm) still write directly by design.
+
 # ─── Gate 5+6: Tests & Build (full mode only) ────────────────────────────────
 if [ "$MODE" = "--quick" ] || [ "$MODE" = "--pre-deploy" ]; then
   echo -e "\n${YELLOW}Skipped: tests + build (${MODE} mode)${NC}"
