@@ -10,7 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { queryOne } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -65,4 +65,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+// SOP 4.4: blocking a holder is an admin/manager action, gated by the
+// procurement.field-stock.block-holder permission (migration 389).
+export default withAuth(withPermission('procurement.field-stock.block-holder', 'edit')(handler));
