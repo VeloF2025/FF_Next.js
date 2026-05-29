@@ -10,6 +10,12 @@
 
 **Prerequisite:** Sub-project A (FibreFlow PWA API) must be merged and deployed to dev.fibreflow.app before end-to-end testing can happen.
 
+> **Implementation notes (2026-05-29):** Sub-project B was executed and the build passed. Additional fixes applied beyond the original 3 corrections:
+> - JSON imports (`@/../config/...`, `@/../tenant.json`) must use plain relative paths, not the `@/` alias (which already maps to root — `@/../` resolves outside the project). The number of `../` segments depends on the importing file's depth: `app/page.tsx` uses `../config/...`, `app/[jobType]/lookup/page.tsx` uses `../../config/...`, and `app/[jobType]/[siteId]/step/[stepNumber]/page.tsx` uses `../../../../config/...`. (Alternatively add a `tsconfig.json` `paths` alias pointing at the project root to avoid depth-sensitive paths.)
+> - `lib/store.ts` `StepResult.attemptHistory` entries need a `url: string` field to match the `escalateStep` payload type in `lib/api.ts`.
+> - `tsconfig.json` must include `"webworker"` in `lib` for `ServiceWorkerGlobalScope` to resolve in `app/sw.ts`.
+> - Repo is at `~/Workspace/PhotoGuide/` on Velocity. GitHub remote: needs Hein to create `VelocityFibre/PhotoGuide` and run `git remote add origin` + `git push`.
+
 **Repo location:** `~/Workspace/PhotoGuide/` (new standalone repo, not inside FF_Next.js)
 
 ---
@@ -67,16 +73,17 @@ git init && git add -A && git commit -m "chore: create-next-app scaffold"
 - [ ] **Step 2: Install dependencies**
 
 ```bash
-npm install zustand dexie serwist next-pwa
+# CORRECTION: use @serwist/next (not next-pwa which is a different package)
+npm install zustand dexie @serwist/next serwist
 npm install -D @types/node
 ```
 
 - [ ] **Step 3: Install shadcn/ui**
 
 ```bash
-npx shadcn-ui@latest init
-# Accept defaults: TypeScript, CSS variables, app dir, @/components
-npx shadcn-ui@latest add button card alert badge
+# CORRECTION: shadcn-ui is deprecated; use shadcn@latest
+npx shadcn@latest init --yes --defaults
+npx shadcn@latest add button card alert badge --yes
 ```
 
 - [ ] **Step 4: Verify dev server starts**
@@ -1442,35 +1449,42 @@ git commit -m "feat: job complete screen with summary and upload trigger"
 ### Task 10: PWA Manifest + Service Worker
 
 **Files:**
-- Modify: `next.config.mjs` (add Serwist)
+- Modify: `next.config.ts` (add Serwist)
 - Create: `public/manifest.json`
 
-- [ ] **Step 1: Configure Serwist in next.config.mjs**
+- [ ] **Step 1: Configure Serwist in next.config.ts**
 
-```javascript
-// next.config.mjs
-import withSerwist from '@serwist/next';
+```typescript
+// next.config.ts  (create-next-app generates .ts, not .mjs)
+import withSerwistInit from '@serwist/next';
+import type { NextConfig } from 'next';
 
-const withPwa = withSerwist({
+const withSerwist = withSerwistInit({
   swSrc: 'app/sw.ts',
   swDest: 'public/sw.js',
-  disable: process.env.NODE_ENV === 'development',
+  // CORRECTION: generate the SW only in production (disabled in dev/test)
+  disable: process.env.NODE_ENV !== 'production',
 });
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+const nextConfig: NextConfig = {
   reactStrictMode: true,
 };
 
-export default withPwa(nextConfig);
+export default withSerwist(nextConfig);
 ```
 
 - [ ] **Step 2: Create app/sw.ts (Serwist service worker)**
 
 ```typescript
 // app/sw.ts
-import { defaultCache } from '@serwist/next/worker';
+// CORRECTION: declare self.__SW_MANIFEST type to avoid TypeScript error
+import type { PrecacheEntry } from 'serwist';
 import { Serwist } from 'serwist';
+import { defaultCache } from '@serwist/next/worker';
+
+declare const self: ServiceWorkerGlobalScope & {
+  __SW_MANIFEST: Array<PrecacheEntry | string>;
+};
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
@@ -1481,6 +1495,11 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+```
+
+Also add `"webworker"` to `tsconfig.json` `compilerOptions.lib` so `ServiceWorkerGlobalScope` resolves:
+```json
+"lib": ["dom", "dom.iterable", "esnext", "webworker"]
 ```
 
 - [ ] **Step 3: Create public/manifest.json**
@@ -1519,7 +1538,7 @@ export const metadata: Metadata = {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add next.config.mjs app/sw.ts public/manifest.json app/layout.tsx
+git add next.config.ts app/sw.ts public/manifest.json app/layout.tsx
 git commit -m "feat: PWA setup — Serwist service worker, manifest, installable"
 ```
 
