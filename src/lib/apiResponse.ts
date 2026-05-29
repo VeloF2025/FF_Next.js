@@ -217,9 +217,10 @@ export class ApiResponseHelper {
    */
   static conflict(
     res: NextApiResponse,
-    message = 'Resource already exists'
+    message = 'Resource already exists',
+    details?: unknown
   ): void {
-    this.error(res, ErrorCode.CONFLICT, message);
+    this.error(res, ErrorCode.CONFLICT, message, details);
   }
 
   /**
