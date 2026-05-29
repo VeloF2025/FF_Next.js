@@ -339,31 +339,9 @@ export interface StockReturnLine {
 // ACCOUNTABILITY ENTITIES
 // ============================================================================
 
-export interface ContractorStockAccountability {
-  id: string;
-  contractorId: string;
-  contractorName: string;
-  totalIssuedCount: number;
-  totalIssuedValue: number;
-  totalConsumedCount: number;
-  totalConsumedValue: number;
-  totalReturnedCount: number;
-  totalReturnedValue: number;
-  unaccountedCount: number;
-  unaccountedValue: number;
-  currentHeldCount: number;
-  currentHeldValue: number;
-  isBlocked: boolean;
-  blockedReason?: string;
-  blockedAt?: Date;
-  blockedBy?: string;
-  pendingRecoveryAmount: number;
-  recoveredAmount: number;
-  lastReconciliationDate?: Date;
-  lastReconciliationBy?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// ContractorStockAccountability interface removed — the contractor-grain
+// accountability surface is retired (Sprint E Track 4.4); the table is dropped
+// at cutover (Track 4.5). Holder-grain accountability uses v_holder_accountability.
 
 export interface StockAccountabilityHistory {
   id: string;
@@ -623,13 +601,6 @@ export interface TechnicianStockSummary {
   currentHoldingCount: number;
   currentHoldingValue: number;
   serialsHeld: StockSerial[];
-}
-
-export interface ContractorAccountabilitySummary {
-  contractor: ContractorStockAccountability;
-  recentActivity: StockAccountabilityHistory[];
-  serialsUnaccounted: StockSerial[];
-  pendingReturns: StockReturn[];
 }
 
 // ============================================================================

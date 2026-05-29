@@ -22,8 +22,5 @@ export { PickingList, PickingDetail, SignatureCapture, CreatePickingForm } from 
 // Returns
 export { ReturnList, CreateReturnModal, ReturnInspectionForm } from './returns';
 
-// Accountability
-export { ContractorAccountabilityList } from './accountability';
-
 // Adjustments
 export { AdjustmentPanel, CreateAdjustmentForm } from './adjustments';

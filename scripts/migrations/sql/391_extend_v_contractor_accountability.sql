@@ -1,4 +1,5 @@
--- Migration 390: extend v_contractor_accountability (Sprint E Track 4.4b)
+-- Migration 391: extend v_contractor_accountability (Sprint E Track 4.4b)
+-- (390 was taken by 390_pwa_support.sql; version chosen as max(file, DB) + 1.)
 --
 -- Adds two columns the live dashboards need so they can read contractor
 -- accountability from the pure-custody live view instead of the legacy
@@ -57,7 +58,7 @@ WHERE h.contractor_id IS NOT NULL
 GROUP BY h.contractor_id, c.company_name;
 
 INSERT INTO migrations (version, name, executed_at)
-VALUES ('390', 'extend_v_contractor_accountability', NOW())
+VALUES ('391', 'extend_v_contractor_accountability', NOW())
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;
