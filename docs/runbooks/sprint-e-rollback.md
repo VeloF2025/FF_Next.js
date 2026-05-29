@@ -20,13 +20,20 @@ cat /tmp/sprint-e-rollback-target   # ROLLBACK_TARGET=<sha>
 source /tmp/sprint-e-rollback-target
 ```
 
-### 2. Apply the migration rollback (single txn)
+### 2. Apply the migration rollbacks (reverse numeric order)
+
+Roll back in reverse order: **rollback_392 first**, then rollback_387.
 
 ```bash
+# 2a. Track 4.5 (mig 392): recreate contractor_stock_accountability + indexes,
+#     restore the return-disposition trigger's accountability block, drop the 392 row.
+psql "$DATABASE_URL" -1 -f scripts/migrations/sql/rollback_392_drop_contractor_stock_accountability.sql
+
+# 2b. mig 387: the main lifecycle rollback.
 psql "$DATABASE_URL" -1 -f scripts/migrations/sql/rollback_387_serial_lifecycle_state_machine.sql
 ```
 
-This drops the new validate/emit/holder-validate triggers + their functions,
+rollback_387 drops the new validate/emit/holder-validate triggers + their functions,
 un-renames `stock_serials.status` (`in_stock → available`), restores the legacy
 11-value CHECK, drops the matrix/holder-pair/violations tables, re-creates the
 three legacy emit triggers, and deletes the `migrations` row for version 387.

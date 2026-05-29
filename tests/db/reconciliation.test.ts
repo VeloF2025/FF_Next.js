@@ -76,68 +76,44 @@ describe('reconcile-serials CLI', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 2: CLI exits 1 on drift (accountability counter artificially broken)
+  // Test 2: CLI exits 1 on drift.
+  // The former accountability_*_counter_drift checks were removed when
+  // contractor_stock_accountability was dropped (Sprint E Track 4.5, mig 392),
+  // so this exercises the surviving tolerance-0 check latest_event_matches_status:
+  // a serial whose status disagrees with the to_state of its most-recent event.
   // -------------------------------------------------------------------------
-  it('exits 1 when accountability counter has drift', async () => {
+  it('exits 1 when a serial status disagrees with its latest event', async () => {
     const pool = new Pool({ connectionString: URL });
-    const contractorId = 'dddddddd-eeee-eeee-eeee-dddddddddddd';
+    const serialNumber = 'ALCL-RECON-DRIFT-1';
 
     try {
-      // Insert a done picking with contractor_id so derived count = 1.
-      // Prod schema: stock_pickings needs picking_number/picking_type/source_location_id/
-      // destination_location_id; technician_id (not staff_id).
-      const { rows: [{ id: pickId }] } = await pool.query<{ id: string }>(`
-        INSERT INTO stock_pickings
-          (picking_number, picking_type, status,
-           source_location_id, destination_location_id,
-           technician_id, contractor_id, contractor_name, signed_at)
-        VALUES ('PICK-RECONCILE-' || substr(md5(random()::text), 1, 8),
-                'issue', 'done',
-                '10000000-0000-0000-0000-000000000001',
-                '10000000-0000-0000-0000-000000000002',
-                '33333333-3333-3333-3333-333333333333',
-                $1, 'Test Contractor', NOW())
-        RETURNING id`, [contractorId]);
+      // A serial sitting in 'available'...
+      const { rows: [{ id: serialId }] } = await pool.query<{ id: string }>(`
+        INSERT INTO stock_serials (stock_item_id, serial_number, status)
+        VALUES ((SELECT id FROM stock_items WHERE item_code = 'FT-ONT' LIMIT 1),
+                $1, 'available')
+        RETURNING id`, [serialNumber]);
 
-      // Prod schema: stock_picking_lines uses serial_ids UUID[]; stock_item_id NOT NULL.
+      // ...whose most-recent event says 'installed' → latest_event_matches_status
+      // drift (tolerance 0). source_table is a test-only tag for clean teardown.
       await pool.query(`
-        INSERT INTO stock_picking_lines
-          (picking_id, stock_item_id, serial_ids, serial_number)
-        VALUES ($1,
-                '55555555-5555-5555-5555-555555555555',
-                ARRAY['77777777-7777-7777-7777-777777777777'::uuid],
-                'ALCL12345001')`, [pickId]);
-
-      // Force the accountability counter to 999 — creates drift vs derived count (1).
-      // contractor_name is NOT NULL in prod, must provide on INSERT.
-      await pool.query(`
-        INSERT INTO contractor_stock_accountability
-          (contractor_id, contractor_name, total_issued_count, total_returned_count)
-        VALUES ($1, 'Test Contractor', 999, 0)
-        ON CONFLICT (contractor_id) DO UPDATE SET total_issued_count = 999`,
-        [contractorId]);
+        INSERT INTO stock_serial_events
+          (serial_id, event_type, from_state, to_state,
+           source_table, source_id, occurred_at)
+        VALUES ($1, 'installed', 'available', 'installed',
+                'test_reconcile', gen_random_uuid(), NOW())`, [serialId]);
 
       const { stdout, exitCode } = runCLI();
 
       expect(exitCode).toBe(1);
       expect(stdout).toContain('[FAIL]');
-      expect(stdout).toContain('accountability_issued_counter_drift');
+      expect(stdout).toContain('latest_event_matches_status');
     } finally {
+      // Delete events before the serial (events reference serial_id).
       await pool.query(`
-        DELETE FROM stock_picking_lines spl
-        USING  stock_pickings sp
-        WHERE  spl.picking_id = sp.id
-          AND  sp.contractor_id = $1`, [contractorId]);
+        DELETE FROM stock_serial_events WHERE source_table = 'test_reconcile'`);
       await pool.query(`
-        DELETE FROM stock_pickings WHERE contractor_id = $1`, [contractorId]);
-      await pool.query(`
-        DELETE FROM contractor_stock_accountability WHERE contractor_id = $1`,
-        [contractorId]);
-      // Reset serial status that the cleanup picking may have disturbed.
-      await pool.query(`
-        UPDATE stock_serials
-        SET    status = 'available', updated_at = NOW()
-        WHERE  id = '77777777-7777-7777-7777-777777777777'`);
+        DELETE FROM stock_serials WHERE serial_number = $1`, [serialNumber]);
       await pool.end();
     }
   });

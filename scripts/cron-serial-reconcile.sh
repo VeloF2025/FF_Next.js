@@ -11,8 +11,6 @@
 #   assets_without_serial              : 0
 #   issued_without_open_picking        : 100
 #   installed_serial_inconsistent_status : 100
-#   accountability_issued_counter_drift  : 0
-#   accountability_returned_counter_drift: 0
 #   latest_event_matches_status        : 0
 #
 # Schedule on velo (times are SAST — velo cron runs in local time, see
