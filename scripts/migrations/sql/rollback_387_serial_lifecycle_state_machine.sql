@@ -5,10 +5,19 @@
 -- must therefore RE-INSTALL those three triggers so the system is left with
 -- the same trigger set that existed before mig 387 was applied.
 --
--- Function bodies are copied verbatim from their LATEST definitions:
---   trg_emit_serial_event_on_picking_done()  ← mig 366 (366_fix_picking_trigger_done_at.sql)
+-- Function bodies are copied verbatim from their LATEST applied definitions
+-- (so a 387 rollback leaves these triggers exactly as prod had them pre-387,
+-- NOT reverted to an older migration's body):
+--   trg_emit_serial_event_on_picking_done()  ← mig 384 (384_pure_custody_model.sql)
 --   trg_emit_serial_event_on_oes_activate()  ← mig 365 (365_fix_qa_oes_triggers.sql, TRIGGER 3 FIX block)
---   trg_emit_serial_event_on_drop_install()  ← mig 367 (367_drops_install_trigger.sql)
+--   trg_emit_serial_event_on_drop_install()  ← mig 386 (386_drops_install_trigger_event_guard.sql)
+--
+-- NB (Track 6 rehearsal finding 2026-05-29): an earlier version of this file
+-- restored picking_done from mig 366 and drop_install from mig 367 — but mig 384
+-- (pure-custody: drops the contractor_stock_accountability counter block) and mig
+-- 386 (Pattern-A event guard) are independently-applied, non-gated migrations that
+-- superseded them. Restoring the older bodies silently reverted those two fixes on
+-- rollback. Now pinned to 384/386.
 --
 -- The two retained triggers (emit_serial_event_on_qa_install,
 -- emit_serial_event_on_return) are still installed after mig 387 runs, so
@@ -44,9 +53,9 @@ DROP TABLE IF EXISTS stock_serial_status_holder_pairs;
 DROP TABLE IF EXISTS stock_serial_status_transitions;
 
 -- ─── Re-install legacy trigger 1: trg_emit_serial_event_on_picking_done ────────
--- Source: mig 366 (366_fix_picking_trigger_done_at.sql) — LATEST definition.
--- Fixes: COALESCE(signed_at, effective_date, approved_at, NOW()) replaces the
---        invalid NEW.done_at reference that was in mig 364.
+-- Source: mig 384 (384_pure_custody_model.sql) — LATEST applied definition.
+-- vs mig 366: the contractor_stock_accountability counter block is REMOVED
+-- (Sprint D — the live v_holder_accountability view supersedes it).
 
 CREATE OR REPLACE FUNCTION trg_emit_serial_event_on_picking_done()
 RETURNS TRIGGER AS $$
@@ -54,69 +63,34 @@ DECLARE
   v_serial_id  UUID;
   v_event_type VARCHAR(50);
   v_to_state   VARCHAR(50);
-  v_count      INTEGER := 0;
 BEGIN
   BEGIN
     IF NEW.picking_type = 'transfer' THEN
-      v_event_type := 'transferred';
-      v_to_state   := 'in_transit';
+      v_event_type := 'transferred'; v_to_state := 'in_transit';
     ELSE
-      v_event_type := 'issued';
-      v_to_state   := 'issued';
+      v_event_type := 'issued';      v_to_state := 'issued';
     END IF;
 
     FOR v_serial_id IN
-      SELECT unnest(spl.serial_ids)
-      FROM   stock_picking_lines spl
-      WHERE  spl.picking_id      = NEW.id
-        AND  spl.serial_ids     IS NOT NULL
-        AND  array_length(spl.serial_ids, 1) > 0
+      SELECT unnest(spl.serial_ids) FROM stock_picking_lines spl
+      WHERE spl.picking_id = NEW.id AND spl.serial_ids IS NOT NULL
+        AND array_length(spl.serial_ids, 1) > 0
     LOOP
-      INSERT INTO stock_serial_events (
-        serial_id, event_type, from_state, to_state,
-        source_table, source_id, actor_staff_id, payload, occurred_at)
-      SELECT
-        v_serial_id,
-        v_event_type,
-        ss.status,
-        v_to_state,
-        'stock_pickings',
-        NEW.id,
-        NEW.technician_id,
-        jsonb_build_object('picking_type', NEW.picking_type),
-        COALESCE(NEW.signed_at, NEW.effective_date, NEW.approved_at, NOW())
-      FROM stock_serials ss
-      WHERE ss.id = v_serial_id
-      ON CONFLICT (serial_id, source_table, source_id, event_type)
-        WHERE source_id IS NOT NULL
-        DO NOTHING;
+      INSERT INTO stock_serial_events
+        (serial_id, event_type, from_state, to_state, source_table, source_id, actor_staff_id, payload, occurred_at)
+      SELECT v_serial_id, v_event_type, ss.status, v_to_state, 'stock_pickings', NEW.id, NEW.technician_id,
+             jsonb_build_object('picking_type', NEW.picking_type),
+             COALESCE(NEW.signed_at, NEW.effective_date, NEW.approved_at, NOW())
+      FROM stock_serials ss WHERE ss.id = v_serial_id
+      ON CONFLICT (serial_id, source_table, source_id, event_type) WHERE source_id IS NOT NULL DO NOTHING;
 
-      UPDATE stock_serials
-      SET    status     = v_to_state,
-             updated_at = NOW()
-      WHERE  id     = v_serial_id
-        AND  status NOT IN ('faulty', 'scrapped', 'in_repair', 'returned');
-
-      v_count := v_count + 1;
+      UPDATE stock_serials SET status = v_to_state, updated_at = NOW()
+      WHERE id = v_serial_id AND status NOT IN ('faulty','scrapped','in_repair','returned');
     END LOOP;
-
-    IF NEW.contractor_id IS NOT NULL AND v_count > 0 THEN
-      INSERT INTO contractor_stock_accountability
-        (contractor_id, contractor_name, total_issued_count, total_returned_count)
-      VALUES (
-        NEW.contractor_id,
-        COALESCE(NEW.contractor_name, 'unknown'),
-        v_count,
-        0)
-      ON CONFLICT (contractor_id) DO UPDATE
-        SET total_issued_count =
-              contractor_stock_accountability.total_issued_count + v_count;
-    END IF;
-
+    -- NOTE: contractor_stock_accountability counter block REMOVED (Sprint D — live view supersedes it).
   EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'trg_emit_serial_event_on_picking_done: % — %', SQLERRM, SQLSTATE;
   END;
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -206,15 +180,16 @@ CREATE TRIGGER emit_serial_event_on_oes_activate
   EXECUTE FUNCTION trg_emit_serial_event_on_oes_activate();
 
 -- ─── Re-install legacy trigger: trg_emit_serial_event_on_drop_install ──────────
--- Source: mig 367 (367_drops_install_trigger.sql) — full definition (this trigger
--- did not exist before mig 367, so there is only one version).
+-- Source: mig 386 (386_drops_install_trigger_event_guard.sql) — LATEST applied
+-- definition. vs mig 367: the Pattern-A guard moved BEFORE the event INSERT
+-- (early RETURN), so an already-activated/terminal serial gets NO phantom
+-- installed_at_drop event when drops fills ont_serial after OES activation.
 
 CREATE OR REPLACE FUNCTION trg_emit_serial_event_on_drop_install()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   v_serial RECORD;
 BEGIN
-  -- Skip if ont_serial isn't actually being set or changing
   IF NEW.ont_serial IS NULL OR NEW.ont_serial = '' THEN
     RETURN NEW;
   END IF;
@@ -229,9 +204,18 @@ BEGIN
      WHERE serial_number = NEW.ont_serial
      LIMIT 1;
 
-    -- Unknown serial — log notice, no event
     IF NOT FOUND THEN
       RAISE NOTICE 'trg_emit_serial_event_on_drop_install: serial % not in stock_serials', NEW.ont_serial;
+      RETURN NEW;
+    END IF;
+
+    -- Skip both event and status update if the serial is past the install
+    -- step (activated/faulty/scrapped/in_repair/returned) or already has an
+    -- install drop id recorded. Out-of-order data arrival (OES first, drops
+    -- later) would otherwise log a phantom installed_at_drop event whose
+    -- to_state contradicts the canonical status.
+    IF v_serial.status IN ('activated','faulty','scrapped','in_repair','returned')
+       OR v_serial.installed_at_drop_id IS NOT NULL THEN
       RETURN NEW;
     END IF;
 
@@ -246,17 +230,12 @@ BEGIN
       WHERE source_id IS NOT NULL
     DO NOTHING;
 
-    -- Status update: only promote pre-install states; never overwrite terminal
-    -- states or an existing installed_at_drop_id (avoid double-install).
-    IF v_serial.status NOT IN ('activated','faulty','scrapped','in_repair','returned')
-       AND v_serial.installed_at_drop_id IS NULL THEN
-      UPDATE stock_serials
-         SET status = 'installed',
-             installed_at_drop_id = NEW.id,
-             installed_at_drop_number = NEW.drop_number,
-             updated_at = NOW()
-       WHERE id = v_serial.id;
-    END IF;
+    UPDATE stock_serials
+       SET status = 'installed',
+           installed_at_drop_id = NEW.id,
+           installed_at_drop_number = NEW.drop_number,
+           updated_at = NOW()
+     WHERE id = v_serial.id;
   EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'trg_emit_serial_event_on_drop_install error: %', SQLERRM;
   END;
