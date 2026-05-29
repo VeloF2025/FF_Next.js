@@ -5,6 +5,8 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
+import { transaction } from '@/lib/db-pool';
+import { promoteSerial } from '@/modules/procurement/field-stock/services/serialLifecycle';
 import type { FaultReportListItem, FaultTypeValue, FaultSeverityValue, FaultResolutionStatusValue } from '@/types/procurement/fault.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -164,50 +166,51 @@ async function handlePost(
       return apiResponse.validationError(res, { description: 'Description is required' });
     }
 
-    // Insert fault report
-    const [faultReport] = await sql`
-      INSERT INTO fault_reports (
-        serial_id,
-        stock_item_id,
-        fault_type,
-        severity,
-        description,
-        evidence_urls,
-        reported_by,
-        reported_by_name,
-        project_id,
-        location_id,
-        supplier_id,
-        resolution_status
-      ) VALUES (
-        ${body.serialId ?? null},
-        ${body.stockItemId ?? null},
-        ${body.faultType},
-        ${body.severity},
-        ${body.description.trim()},
-        ${body.evidenceUrls ?? null},
-        ${userId},
-        ${userName},
-        ${body.projectId ?? null},
-        ${body.locationId ?? null},
-        ${body.supplierId ?? null},
-        'open'
-      )
-      RETURNING *
-    `;
+    // Insert the fault report and, if a serial is implicated, promote it to
+    // 'faulty' atomically. The serial status write routes through promoteSerial
+    // (the single sanctioned path — mig 387 emit trigger records the lifecycle
+    // event post-cutover) instead of a direct UPDATE. fault_report_id is plain
+    // metadata, set alongside in the same txn. (Sprint E Track 7 prep.)
+    const faultReport = await transaction(async (txn) => {
+      const created = await txn.queryOne<{ id: string } & Record<string, unknown>>(
+        `INSERT INTO fault_reports (
+           serial_id, stock_item_id, fault_type, severity, description,
+           evidence_urls, reported_by, reported_by_name, project_id,
+           location_id, supplier_id, resolution_status
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'open')
+         RETURNING *`,
+        [
+          body.serialId ?? null,
+          body.stockItemId ?? null,
+          body.faultType,
+          body.severity,
+          body.description.trim(),
+          body.evidenceUrls ?? null,
+          userId,
+          userName,
+          body.projectId ?? null,
+          body.locationId ?? null,
+          body.supplierId ?? null,
+        ],
+      );
 
-    // If serial_id provided, mark serial as faulty and record fault_report_id
-    if (body.serialId) {
-      await sql`
-        UPDATE stock_serials
-        SET previous_status = status,
-            status = 'faulty',
-            status_changed_at = NOW(),
-            status_changed_by = ${userName},
-            fault_report_id = ${faultReport!.id}
-        WHERE id = ${body.serialId}::uuid
-      `;
-    }
+      if (body.serialId) {
+        await promoteSerial(txn.client, {
+          serialId:    body.serialId,
+          toStatus:    'faulty',
+          sourceTable: 'fault_reports',
+          sourceId:    created!.id,
+          actorUserId: userId,
+          payload:     { faultType: body.faultType, severity: body.severity },
+        });
+        await txn.query(
+          `UPDATE stock_serials SET fault_report_id = $1 WHERE id = $2::uuid`,
+          [created!.id, body.serialId],
+        );
+      }
+
+      return created!;
+    });
 
     // Create audit log entry (fire-and-forget)
     createAuditLog({

@@ -80,6 +80,9 @@ const ALLOWED: AllowedCase[] = [
   { from: 'installed',           to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: null },
   { from: 'activated',           to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: null },
   { from: 'issued',              to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: STAFF_HOLDER_ID,toHolderId: null },
+  // Track 7 prep — fault report on a non-deployed serial (DOA / pre-issue fault)
+  { from: 'in_stock',            to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: null },
+  { from: 'allocated_to_project',to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: null },
   { from: 'installed',           to: 'returned',             expectedEventType: 'returned_to_warehouse', seedHolderId: null },
   { from: 'activated',           to: 'returned',             expectedEventType: 'returned_to_warehouse', seedHolderId: null },
   { from: 'faulty',              to: 'returned',             expectedEventType: 'returned_to_warehouse', seedHolderId: null },
