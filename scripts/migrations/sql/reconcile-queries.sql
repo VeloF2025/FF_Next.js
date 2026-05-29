@@ -43,57 +43,10 @@ FROM stock_serials ss
 WHERE ss.installed_at_drop_id IS NOT NULL
   AND ss.status NOT IN ('installed', 'activated', 'returned', 'faulty', 'scrapped');
 
--- @name accountability_issued_counter_drift
--- Tolerance: 0
--- Contractor accountability counter differs from derived count from done pickings.
--- Derived count = total number of serial_ids issued across all done pickings for
--- that contractor (UNNEST the serial_ids array to count per-serial).
--- Only checks contractors that have at least one done picking.
-SELECT COUNT(*) AS drift_count
-FROM (
-  SELECT
-    sp.contractor_id,
-    COALESCE(csa.total_issued_count, 0)         AS stored_count,
-    COUNT(*)::integer                            AS derived_count
-  FROM   stock_pickings           sp
-  JOIN   stock_picking_lines      spl ON spl.picking_id = sp.id
-                                      AND spl.serial_ids IS NOT NULL
-                                      AND array_length(spl.serial_ids, 1) > 0
-  JOIN   LATERAL unnest(spl.serial_ids) AS u(serial_id) ON TRUE
-  LEFT   JOIN contractor_stock_accountability csa
-           ON csa.contractor_id = sp.contractor_id
-  WHERE  sp.status        = 'done'
-    AND  sp.contractor_id IS NOT NULL
-  GROUP  BY sp.contractor_id, csa.total_issued_count
-  HAVING COALESCE(csa.total_issued_count, 0) <> COUNT(*)
-) sub;
-
--- @name accountability_returned_counter_drift
--- Tolerance: 0
--- Contractor accountability returned counter differs from derived count.
--- Derived count = number of stock_return_lines with disposition='restock'.
--- Mirrors the trigger 5 write path exactly: Trigger 5 increments
--- total_returned_count ONLY when NEW.disposition='restock' (the
--- restock branch in emit_serial_event_on_return_disposition). Filtering
--- on srl.disposition rather than sr.status keeps reconcile and trigger
--- aligned regardless of return workflow timing — a line restocked while
--- the parent return is still 'inspected' (pre-accepted) is still credited.
-SELECT COUNT(*) AS drift_count
-FROM (
-  SELECT
-    sr.contractor_id,
-    COALESCE(csa.total_returned_count, 0)        AS stored_count,
-    COUNT(*)::integer                             AS derived_count
-  FROM   stock_returns       sr
-  JOIN   stock_return_lines  srl ON srl.return_id = sr.id
-                                  AND srl.serial_id IS NOT NULL
-                                  AND srl.disposition = 'restock'
-  LEFT   JOIN contractor_stock_accountability csa
-           ON csa.contractor_id = sr.contractor_id
-  WHERE  sr.contractor_id IS NOT NULL
-  GROUP  BY sr.contractor_id, csa.total_returned_count
-  HAVING COALESCE(csa.total_returned_count, 0) <> COUNT(*)
-) sub;
+-- accountability_issued_counter_drift / accountability_returned_counter_drift
+-- REMOVED (Sprint E Track 4.5, mig 392): contractor_stock_accountability was dropped.
+-- The live v_contractor_accountability view (mig 391) supersedes the counter table,
+-- so there is no longer a stored counter to reconcile against.
 
 -- @name latest_event_matches_status
 -- Tolerance: 0
