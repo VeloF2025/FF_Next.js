@@ -11,7 +11,7 @@
 **Prerequisite:** Sub-project A (FibreFlow PWA API) must be merged and deployed to dev.fibreflow.app before end-to-end testing can happen.
 
 > **Implementation notes (2026-05-29):** Sub-project B was executed and the build passed. Additional fixes applied beyond the original 3 corrections:
-> - JSON imports (`@/../config/...`, `@/../tenant.json`) must use `../../config/...` relative paths, not the `@/` alias (which already maps to root — `@/../` resolves outside the project).
+> - JSON imports (`@/../config/...`, `@/../tenant.json`) must use plain relative paths, not the `@/` alias (which already maps to root — `@/../` resolves outside the project). The number of `../` segments depends on the importing file's depth: `app/page.tsx` uses `../config/...`, `app/[jobType]/lookup/page.tsx` uses `../../config/...`, and `app/[jobType]/[siteId]/step/[stepNumber]/page.tsx` uses `../../../../config/...`. (Alternatively add a `tsconfig.json` `paths` alias pointing at the project root to avoid depth-sensitive paths.)
 > - `lib/store.ts` `StepResult.attemptHistory` entries need a `url: string` field to match the `escalateStep` payload type in `lib/api.ts`.
 > - `tsconfig.json` must include `"webworker"` in `lib` for `ServiceWorkerGlobalScope` to resolve in `app/sw.ts`.
 > - Repo is at `~/Workspace/PhotoGuide/` on Velocity. GitHub remote: needs Hein to create `VelocityFibre/PhotoGuide` and run `git remote add origin` + `git push`.
@@ -1449,7 +1449,7 @@ git commit -m "feat: job complete screen with summary and upload trigger"
 ### Task 10: PWA Manifest + Service Worker
 
 **Files:**
-- Modify: `next.config.mjs` (add Serwist)
+- Modify: `next.config.ts` (add Serwist)
 - Create: `public/manifest.json`
 
 - [ ] **Step 1: Configure Serwist in next.config.ts**
@@ -1462,7 +1462,7 @@ import type { NextConfig } from 'next';
 const withSerwist = withSerwistInit({
   swSrc: 'app/sw.ts',
   swDest: 'public/sw.js',
-  // CORRECTION: disable in dev only (not production)
+  // CORRECTION: generate the SW only in production (disabled in dev/test)
   disable: process.env.NODE_ENV !== 'production',
 });
 
@@ -1538,7 +1538,7 @@ export const metadata: Metadata = {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add next.config.mjs app/sw.ts public/manifest.json app/layout.tsx
+git add next.config.ts app/sw.ts public/manifest.json app/layout.tsx
 git commit -m "feat: PWA setup — Serwist service worker, manifest, installable"
 ```
 
