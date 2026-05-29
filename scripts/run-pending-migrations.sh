@@ -85,6 +85,7 @@ echo "Migrations: ${#PENDING[@]} pending"
 
 applied_count=0
 reconciled_count=0
+deferred_count=0
 
 # --- Apply each pending migration in a transaction ---
 for sql_file in "${PENDING[@]}"; do
@@ -120,20 +121,34 @@ for sql_file in "${PENDING[@]}"; do
   fi
 
   echo "  applying $fname..."
-  if psql "$PGURL" -v ON_ERROR_STOP=1 -q -1 \
+  # Capture output + exit code without tripping `set -e` on a failing migration:
+  # `var=$(failing_cmd)` would abort here, so guard the substitution with `|| rc=$?`.
+  apply_rc=0
+  apply_out=$(psql "$PGURL" -v ON_ERROR_STOP=1 -q -1 \
        -c "\i $sql_file" \
        -c "INSERT INTO schema_migrations (filename) VALUES ('$fname') ON CONFLICT (filename) DO NOTHING;" \
-     > /dev/null; then
+     2>&1) || apply_rc=$?
+  if [[ "$apply_rc" -eq 0 ]]; then
     echo "    ✓ $fname"
     applied_count=$((applied_count + 1))
+  elif grep -q '__sprint_e_cutover_gate__' <<< "$apply_out"; then
+    # Intentionally-gated migration: it RAISEs (and rolls back its own txn, so
+    # nothing is recorded) until the __sprint_e_cutover_gate__ marker table
+    # exists — the Sprint E cutover safety contract. Treat as DEFERRED, not
+    # failed: leave it pending and continue to later migrations so an unrelated
+    # deploy isn't blocked by a not-yet-due cutover migration. It re-evaluates
+    # on every deploy and applies automatically once the gate is in place.
+    echo "    ⏸ $fname deferred — gate not yet met (left pending)"
+    deferred_count=$((deferred_count + 1))
+    continue
   else
     echo "    ✗ $fname FAILED — aborting"
+    echo "$apply_out" | sed 's/^/      /'
     exit 1
   fi
 done
 
-if [[ "$reconciled_count" -gt 0 ]]; then
-  echo "Migrations: applied $applied_count new, reconciled $reconciled_count already-applied"
-else
-  echo "Migrations: applied $applied_count new"
-fi
+summary="Migrations: applied $applied_count new"
+[[ "$reconciled_count" -gt 0 ]] && summary="$summary, reconciled $reconciled_count already-applied"
+[[ "$deferred_count" -gt 0 ]] && summary="$summary, deferred $deferred_count gated"
+echo "$summary"
