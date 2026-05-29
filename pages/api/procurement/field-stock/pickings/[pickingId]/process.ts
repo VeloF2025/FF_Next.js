@@ -22,6 +22,7 @@ import {
   getOrCreateContractorHolder,
 } from '@/modules/procurement/field-stock/services/stockHolderService';
 import { promotePickingSerials } from '@/modules/procurement/field-stock/services/pickingSerialPromotion';
+import { assertHolderNotBlocked, HolderBlockedError } from '@/modules/procurement/field-stock/services/holderBlockGuard';
 
 interface PickingLine {
   id: string;
@@ -151,6 +152,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       if (pickingType === 'issue' && toHolderId !== null) {
+        // Sprint E Track 4.1 (SOP-4.4): refuse to issue to a blocked holder.
+        // Runs first, inside the txn, before any custody/serial write — a block
+        // throws, rolling back this txn's writes (the 'processing' status flag,
+        // any serial promotion). Only a PRE-EXISTING holder can be blocked (the
+        // block lives in stock_accountability), so the getOrCreate* resolution
+        // above is a no-op on the throw path — nothing is left orphaned.
+        await assertHolderNotBlocked(txn, toHolderId);
+
         // Issue path — custody service handles: debit stock_quants, credit stock_custody,
         // insert field_stock_movements 'issue' row. No manual duplication.
         await postIssueToHolderWith(txn, {
@@ -261,6 +270,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return { picking: updated[0], linesProcessed: lines.length };
     });
   } catch (error: unknown) {
+    if (error instanceof HolderBlockedError) {
+      log.warn('Issue picking blocked: recipient holder is blocked',
+        { pickingId, holderId: error.holderId }, 'field-stock');
+      return apiResponse.conflict(res, 'holder_blocked', {
+        holderId: error.holderId,
+        blockedReason: error.blockedReason,
+      });
+    }
     if (error instanceof Error) {
       if (error.message === 'PICKING_NOT_FOUND') return apiResponse.notFound(res, 'Picking', pickingId);
       if (error.message === 'PICKING_INVALID_STATUS') {
