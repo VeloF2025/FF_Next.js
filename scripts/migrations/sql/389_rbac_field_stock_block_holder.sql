@@ -1,9 +1,11 @@
 -- Migration 389: RBAC — procurement.field-stock.block-holder
 -- Adds a new action-type permission under 'procurement.field-stock' that
--- gates the block/unblock accountability endpoints (SOP 4.4):
---   POST /api/procurement/field-stock/accountability/[contractorId]/block
---   POST /api/procurement/field-stock/accountability/[contractorId]/unblock
--- Both routes call withPermission('procurement.field-stock.block-holder', 'edit').
+-- gates the block/unblock accountability endpoints (SOP 4.4). Two route
+-- families both call withPermission('procurement.field-stock.block-holder', 'edit'):
+--   holders/[holderId]/block + unblock     (pure-custody model, UI-wired,
+--                                            writes stock_accountability.is_blocked
+--                                            which backs the Track 4.1 issue guard)
+--   [contractorId]/block + unblock          (legacy contractor_stock_accountability)
 --
 -- Granted to admin + manager (view + edit), matching the documented
 -- "Manage accountability (block/unblock)" row in the help-centre permission
