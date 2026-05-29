@@ -18,6 +18,27 @@ import { validateSerialForConsumption } from './serialService';
 import { promoteSerial } from './serialLifecycle';
 
 /**
+ * Thrown when a serialised consumption resolves to no holder (Sprint E Track 4.3,
+ * SOP-4.4 off-book guard). A serialised item must be debited from a holder's
+ * custody; consuming one with no holder would install it without any custody
+ * deduction — silently "off the books". The route maps this to HTTP 422.
+ *
+ * Bulk (non-serialised) consumption is unaffected: a null holder there simply
+ * skips the custody debit, which is legitimate for un-tracked materials.
+ */
+export class OffBookConsumptionError extends Error {
+  readonly serialId: string;
+  readonly serialNumber: string | null;
+
+  constructor(serialId: string, serialNumber: string | null) {
+    super(`off_book_consumption: serial ${serialId} consumed with no holder`);
+    this.name = 'OffBookConsumptionError';
+    this.serialId = serialId;
+    this.serialNumber = serialNumber;
+  }
+}
+
+/**
  * Metadata-only update for a serial install — does NOT touch status or holder_id.
  * Status and holder_id are written exclusively via promoteSerial (Sprint E Track 1).
  * Separated from promoteSerial so the validate trigger fires first, then this
@@ -116,6 +137,15 @@ export async function recordConsumption(
         LIMIT 1
       `;
       holderId = (holderRow[0]?.id as string) ?? null;
+    }
+
+    // ── Off-book guard (Sprint E Track 4.3, SOP-4.4) ─────────────────────────
+    // A serialised item must come from a holder's custody. If we got here with a
+    // serial but no resolvable holder, the install would proceed with no custody
+    // debit (step 4 is `if (holderId)`) — an off-book consumption. Reject before
+    // any write. Bulk items (no serialId) are unaffected.
+    if (input.serialId && !holderId) {
+      throw new OffBookConsumptionError(input.serialId, input.serialNumber ?? null);
     }
 
     // ── All writes in one ACID transaction ───────────────────────────────────

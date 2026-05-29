@@ -5,10 +5,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
-import { recordConsumption } from '@/modules/procurement/field-stock/services/consumptionService';
+import { recordConsumption, OffBookConsumptionError } from '@/modules/procurement/field-stock/services/consumptionService';
 import {
   getConsumptions,
   getConsumptionsByDrop,
@@ -87,6 +87,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   } catch (error) {
+    // Off-book guard (Track 4.3): serialised consumption with no holder is a
+    // business-rule violation, not a server fault → 422, not 500.
+    if (error instanceof OffBookConsumptionError) {
+      return apiResponse.error(res, ErrorCode.BUSINESS_RULE_VIOLATION, 'off_book_consumption', {
+        serialId: error.serialId,
+        serialNumber: error.serialNumber,
+      });
+    }
     log.error('Field stock consumptions API error', { error: error }, 'field-stock/consumptions');
     return apiResponse.internalError(res, error);
   }
