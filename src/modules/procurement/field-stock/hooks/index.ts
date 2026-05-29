@@ -9,6 +9,5 @@ export { useConsumptions } from './useConsumptions';
 export { useStockItems } from './useStockItems';
 export { usePickings } from './usePickings';
 export { useReturns } from './useReturns';
-export { useContractorAccountability } from './useContractorAccountability';
 export { useFieldStockDashboard } from './useFieldStockDashboard';
 export { useAdjustments } from './useAdjustments';
