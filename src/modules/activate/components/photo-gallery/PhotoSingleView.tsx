@@ -78,8 +78,25 @@ export function PhotoSingleView({
           )}
         </div>
 
+        {/* Decision status */}
+        <div className={`mt-2 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm font-semibold ${
+          decision === 'good'
+            ? 'bg-green-900/50 text-green-400'
+            : decision === 'bad'
+            ? 'bg-red-900/50 text-red-400'
+            : 'bg-gray-800 text-gray-500'
+        }`}>
+          {decision === 'good' ? (
+            <><CheckCircle2 className="h-4 w-4" /> PASS — marked as good example</>
+          ) : decision === 'bad' ? (
+            <><XCircle className="h-4 w-4" /> FAIL — marked as bad example</>
+          ) : (
+            'Unreviewed — mark as Good or Bad below'
+          )}
+        </div>
+
         {/* Meta */}
-        <div className="mt-2 text-center text-sm text-gray-400">
+        <div className="mt-1.5 text-center text-sm text-gray-400">
           {photo.drNumber} · {photo.filename}
           {photo.originalType && <span> · type: {photo.originalType}</span>}
           · confidence: {(photo.confidence * 100).toFixed(0)}%

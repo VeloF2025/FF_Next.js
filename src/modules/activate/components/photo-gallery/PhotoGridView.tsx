@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, MinusCircle, XCircle } from 'lucide-react';
 import { GalleryPhoto, PhotoDecision, photoKey } from './types';
 
 interface PhotoGridViewProps {
@@ -53,20 +53,24 @@ export function PhotoGridView({
               />
             )}
 
-            {/* Decision badge */}
-            {decision && (
-              <div
-                className={`absolute top-1 right-1 rounded-full p-0.5 ${
-                  decision === 'good' ? 'bg-green-500' : 'bg-red-500'
-                }`}
-              >
-                {decision === 'good' ? (
-                  <CheckCircle2 className="h-4 w-4 text-white" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-white" />
-                )}
-              </div>
-            )}
+            {/* Always-visible PASS / FAIL / Unreviewed banner */}
+            <div
+              className={`absolute inset-x-0 top-0 flex items-center justify-center gap-1 py-0.5 text-[11px] font-semibold ${
+                decision === 'good'
+                  ? 'bg-green-600/90 text-white'
+                  : decision === 'bad'
+                  ? 'bg-red-600/90 text-white'
+                  : 'bg-black/60 text-gray-500'
+              }`}
+            >
+              {decision === 'good' ? (
+                <><CheckCircle2 className="h-3 w-3" /> PASS</>
+              ) : decision === 'bad' ? (
+                <><XCircle className="h-3 w-3" /> FAIL</>
+              ) : (
+                <><MinusCircle className="h-3 w-3" /> Unreviewed</>
+              )}
+            </div>
 
             {/* Confidence badge */}
             <div className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-xs text-gray-300">

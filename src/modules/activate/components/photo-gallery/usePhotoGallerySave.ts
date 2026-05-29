@@ -39,10 +39,20 @@ export function usePhotoGallerySave({ photos, decisions, activeStep }: UsePhotoG
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Decisions that have been made for the current step but not yet persisted.
+  // A photo is skipped when: no decision, already saved this session, or the
+  // decision matches the pre-existing DB value (saved in a prior session).
   const pending = useMemo<SaveDecisionPayload[]>(
     () =>
       photos
-        .filter((p) => decisions[photoKey(p)] != null && !savedPhotoIds.has(photoKey(p)))
+        .filter((p) => {
+          const key = photoKey(p);
+          const decision = decisions[key];
+          if (decision == null) return false;
+          if (savedPhotoIds.has(key)) return false;
+          // Already curated in a prior session and user hasn't changed the value.
+          if (p.existingDecision === decision) return false;
+          return true;
+        })
         .map((p) => ({
           drNumber: p.drNumber,
           filename: p.filename,

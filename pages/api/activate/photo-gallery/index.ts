@@ -32,10 +32,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     if (allSteps) {
       // Return counts per step for the overview.
-      // Steps 1-10: count from VLM categorization results on PASS/approved DRs.
-      // Steps 11-12: count from photos_metadata by original_type (dome joints are
-      //   optional and rarely go through the full QA wizard, so qa_decision = 'PASS'
-      //   would return almost nothing).
+      // Steps 1-10: VLM results from QA-passed/approved DRs.
+      // Steps 11-12: VLM predictions from any categorized/approved DR — original_type
+      //   'ph_hh1'/'ph_hh2' proved too broad (matched thousands of non-dome-joint photos).
       const countResult = await pool.query<{ step: number; photo_count: string }>(`
         SELECT step, COUNT(*) AS photo_count FROM (
           -- Steps 1-10: VLM results from QA-passed DRs
@@ -50,27 +49,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
           UNION ALL
 
-          -- Step 11: ph_hh1 photos from any DR (attribute tag is reliable)
-          SELECT 11 AS step
+          -- Steps 11-12: VLM predictions from any categorized DR (dome-joint DRs
+          --   rarely reach qa_decision = 'PASS' so we drop that requirement here)
+          SELECT (photo_result->>'vlm_predicted_step')::int AS step
           FROM dr_photo_unified_reviews,
-               jsonb_array_elements(photos_metadata) AS p
-          WHERE photos_metadata IS NOT NULL
-            AND jsonb_typeof(photos_metadata) = 'array'
-            AND p->>'original_type' = 'ph_hh1'
-            AND p->>'filename' IS NOT NULL
-            AND p->>'filename' != ''
-
-          UNION ALL
-
-          -- Step 12: ph_hh2 photos from any DR
-          SELECT 12 AS step
-          FROM dr_photo_unified_reviews,
-               jsonb_array_elements(photos_metadata) AS p
-          WHERE photos_metadata IS NOT NULL
-            AND jsonb_typeof(photos_metadata) = 'array'
-            AND p->>'original_type' = 'ph_hh2'
-            AND p->>'filename' IS NOT NULL
-            AND p->>'filename' != ''
+               jsonb_array_elements(vlm_categorization_results::jsonb) AS photo_result
+          WHERE vlm_categorization_status IN ('categorized', 'approved')
+            AND vlm_categorization_results IS NOT NULL
+            AND jsonb_typeof(vlm_categorization_results::jsonb) = 'array'
+            AND (photo_result->>'vlm_predicted_step')::int BETWEEN 11 AND 12
+            AND photo_result->>'photo_filename' IS NOT NULL
+            AND photo_result->>'photo_filename' != ''
         ) combined
         GROUP BY step
         ORDER BY step
@@ -88,59 +77,85 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       return apiResponse.badRequest(res, 'Step must be between 1 and 12');
     }
 
-    // Steps 11-12 (dome joints) use photos_metadata by original_type because these
-    // DRs are rarely put through the full QA wizard, so qa_decision = 'PASS' would
-    // return almost nothing. The original_type attribute is a reliable 100% signal.
+    // Steps 1-10: must be from a qa_decision='PASS', vlm_status='approved' DR.
+    // Steps 11-12 (dome joints): original_type 'ph_hh1'/'ph_hh2' proved too broad —
+    //   it matched thousands of non-dome-joint photos. Use VLM vlm_predicted_step
+    //   instead, relaxing the qa_decision='PASS' requirement because dome-joint DRs
+    //   rarely go through the full QA wizard.
     const isDomeJoint = step === 11 || step === 12;
-    const domeJointType = step === 11 ? 'ph_hh1' : 'ph_hh2';
+
+    // Two separate query strings — avoids string interpolation into SQL.
+    // isDomeJoint is a server-side boolean, never derived from request params directly,
+    // but keeping the queries explicit makes the intent unambiguous.
+    const STEPS_1_10_QUERY = `
+      WITH photo_data AS (
+        SELECT
+          drop_number,
+          jsonb_array_elements(vlm_categorization_results::jsonb) AS photo_result
+        FROM dr_photo_unified_reviews
+        WHERE qa_decision = 'PASS'
+          AND vlm_categorization_status = 'approved'
+          AND vlm_categorization_results IS NOT NULL
+          AND jsonb_typeof(vlm_categorization_results::jsonb) = 'array'
+      )
+      SELECT
+        drop_number,
+        photo_result->>'photo_filename' AS filename,
+        (photo_result->>'vlm_confidence')::float AS confidence,
+        photo_result->>'original_type' AS original_type,
+        (SELECT CASE WHEN is_canonical THEN 'good'::text ELSE 'bad'::text END
+         FROM vlm_corrections
+         WHERE photo_url = '/api/activate/photo/' || drop_number || '/' || (photo_result->>'photo_filename')
+           AND module = 'activate'
+           AND analysis_type = 'photo_categorization'
+         LIMIT 1) AS existing_decision
+      FROM photo_data
+      WHERE (photo_result->>'vlm_predicted_step')::int = $1
+        AND photo_result->>'photo_filename' IS NOT NULL
+        AND photo_result->>'photo_filename' != ''
+      ORDER BY (photo_result->>'vlm_confidence')::float DESC NULLS LAST
+      LIMIT $2
+    `;
+
+    // Dome joints (steps 11-12): same shape, no PASS requirement.
+    const STEPS_11_12_QUERY = `
+      WITH photo_data AS (
+        SELECT
+          drop_number,
+          jsonb_array_elements(vlm_categorization_results::jsonb) AS photo_result
+        FROM dr_photo_unified_reviews
+        WHERE vlm_categorization_status IN ('categorized', 'approved')
+          AND vlm_categorization_results IS NOT NULL
+          AND jsonb_typeof(vlm_categorization_results::jsonb) = 'array'
+      )
+      SELECT
+        drop_number,
+        photo_result->>'photo_filename' AS filename,
+        (photo_result->>'vlm_confidence')::float AS confidence,
+        photo_result->>'original_type' AS original_type,
+        (SELECT CASE WHEN is_canonical THEN 'good'::text ELSE 'bad'::text END
+         FROM vlm_corrections
+         WHERE photo_url = '/api/activate/photo/' || drop_number || '/' || (photo_result->>'photo_filename')
+           AND module = 'activate'
+           AND analysis_type = 'photo_categorization'
+         LIMIT 1) AS existing_decision
+      FROM photo_data
+      WHERE (photo_result->>'vlm_predicted_step')::int = $1
+        AND photo_result->>'photo_filename' IS NOT NULL
+        AND photo_result->>'photo_filename' != ''
+      ORDER BY (photo_result->>'vlm_confidence')::float DESC NULLS LAST
+      LIMIT $2
+    `;
 
     const result = await pool.query<{
       drop_number: string;
       filename: string;
       confidence: number;
       original_type: string | null;
+      existing_decision: 'good' | 'bad' | null;
     }>(
-      isDomeJoint
-        ? `
-          SELECT
-            drop_number,
-            p->>'filename' AS filename,
-            1.0::float AS confidence,
-            p->>'original_type' AS original_type
-          FROM dr_photo_unified_reviews,
-               jsonb_array_elements(photos_metadata) AS p
-          WHERE photos_metadata IS NOT NULL
-            AND jsonb_typeof(photos_metadata) = 'array'
-            AND p->>'original_type' = $1
-            AND p->>'filename' IS NOT NULL
-            AND p->>'filename' != ''
-          ORDER BY drop_number DESC
-          LIMIT $2
-        `
-        : `
-          WITH photo_data AS (
-            SELECT
-              drop_number,
-              jsonb_array_elements(vlm_categorization_results::jsonb) AS photo_result
-            FROM dr_photo_unified_reviews
-            WHERE qa_decision = 'PASS'
-              AND vlm_categorization_status = 'approved'
-              AND vlm_categorization_results IS NOT NULL
-              AND jsonb_typeof(vlm_categorization_results::jsonb) = 'array'
-          )
-          SELECT
-            drop_number,
-            photo_result->>'photo_filename' AS filename,
-            (photo_result->>'vlm_confidence')::float AS confidence,
-            photo_result->>'original_type' AS original_type
-          FROM photo_data
-          WHERE (photo_result->>'vlm_predicted_step')::int = $1
-            AND photo_result->>'photo_filename' IS NOT NULL
-            AND photo_result->>'photo_filename' != ''
-          ORDER BY (photo_result->>'vlm_confidence')::float DESC NULLS LAST
-          LIMIT $2
-        `,
-      [isDomeJoint ? domeJointType : step, limit]
+      isDomeJoint ? STEPS_11_12_QUERY : STEPS_1_10_QUERY,
+      [step, limit]
     );
 
     const photos: GalleryPhoto[] = result.rows.map((row) => ({
@@ -151,6 +166,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       url: `/api/activate/photo/${row.drop_number}/${row.filename}`,
       confidence: row.confidence ?? 0,
       originalType: row.original_type,
+      existingDecision: row.existing_decision,
     }));
 
     log.info(`Photo gallery: step ${step}, ${photos.length} photos`, undefined, 'PhotoGallery');

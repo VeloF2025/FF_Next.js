@@ -12,6 +12,8 @@ export interface GalleryPhoto {
   url: string;
   confidence: number;
   originalType: string | null;
+  /** Pre-existing curated decision from vlm_corrections — null means not yet curated. */
+  existingDecision?: 'good' | 'bad' | null;
 }
 
 export interface GalleryStepData {

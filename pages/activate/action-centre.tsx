@@ -18,8 +18,9 @@ import { ReconTab } from '@/modules/action-centre/ReconTab';
 import { TicketsTab } from '@/modules/action-centre/TicketsTab';
 import { AutomationTab } from '@/modules/action-centre/AutomationTab';
 import { DisputesTab } from '@/modules/action-centre/DisputesTab';
+import { PwaEscalationsTab } from '@/modules/action-centre/PwaEscalationsTab';
 
-type TabId = 'overview' | 'items' | 'recon' | 'disputes' | 'tickets' | 'automation';
+type TabId = 'overview' | 'items' | 'recon' | 'disputes' | 'tickets' | 'automation' | 'pwa-escalations';
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: 'overview', label: 'Overview', icon: '📊' },
@@ -28,6 +29,7 @@ const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: 'disputes', label: 'Disputes', icon: '💼' },
   { id: 'tickets', label: 'Tickets', icon: '🎫' },
   { id: 'automation', label: 'Automation', icon: '⚡' },
+  { id: 'pwa-escalations', label: 'PWA Escalations', icon: '📱' },
 ];
 
 const ActionCentrePage: NextPage = () => {
@@ -80,6 +82,7 @@ const ActionCentrePage: NextPage = () => {
           {activeTab === 'disputes' && <DisputesTab />}
           {activeTab === 'tickets' && <TicketsTab />}
           {activeTab === 'automation' && <AutomationTab />}
+          {activeTab === 'pwa-escalations' && <PwaEscalationsTab />}
         </div>
       </ModulePage>
     </AppLayout>

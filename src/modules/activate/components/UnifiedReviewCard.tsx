@@ -42,7 +42,9 @@ interface UnifiedReviewCardProps {
   onBackToList?: () => void;
 }
 
-type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'maintenance' | 'qa' | 'categorization';
+import { PwaComparisonTab } from './PwaComparisonTab';
+
+type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'maintenance' | 'qa' | 'categorization' | 'pwa';
 
 export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCardProps) {
   const router = useRouter();
@@ -106,6 +108,7 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
     { key: 'maintenance' as const, label: 'Maintenance', icon: '🔧' },
     { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
     { key: 'qa' as const, label: 'Manual QA', icon: '✅' },
+    { key: 'pwa' as const, label: 'PWA Photos', icon: '📱' },
   ];
 
   const handleBackToList = () => {
@@ -211,6 +214,7 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
             onCategorizationApproved={refresh}
           />
         )}
+        {activeTab === 'pwa' && <PwaComparisonTab drNumber={dropNumber} />}
       </div>
     </div>
   );

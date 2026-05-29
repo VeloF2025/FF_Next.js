@@ -75,7 +75,20 @@ export default function PhotoGalleryPage() {
       const res = await fetch(`/api/activate/photo-gallery?step=${step}&limit=60`, { credentials: 'include' });
       const data = await res.json();
       if (data.success && data.data?.photos) {
-        setPhotos(data.data.photos);
+        const newPhotos = data.data.photos as GalleryPhoto[];
+        setPhotos(newPhotos);
+        // Restore previously-saved decisions so they survive page reloads.
+        // Only fill keys that are currently unset — in-session user changes win.
+        setDecisions((prev) => {
+          const next = { ...prev };
+          newPhotos.forEach((p) => {
+            const k = photoKey(p);
+            if (p.existingDecision != null && !(k in next)) {
+              next[k] = p.existingDecision;
+            }
+          });
+          return next;
+        });
       } else {
         setError(data.error?.message ?? 'Failed to load photos for this step.');
       }
