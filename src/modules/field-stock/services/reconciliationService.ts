@@ -13,7 +13,8 @@
  * - stock_consumptions: Items consumed at installations
  * - stock_serials: Serial status tracking
  * - qa_photo_reviews: Installation records with serials
- * - contractor_stock_accountability: Blocking status
+ * - v_contractor_accountability: Blocking status (pure-custody live view; the
+ *   legacy contractor_stock_accountability table is retired — Sprint E Track 4.4)
  *
  * TODO(field-stock-pwa-phase-5): migrate off the Neon shim.
  *   Phase 4 (PR #1730) ships a new aggregator at
@@ -200,14 +201,14 @@ export async function getDailyReconciliation(
 
   const returnedItems = await returnedQuery;
 
-  // Get contractor blocking status
-  // Note: contractor_stock_accountability uses contractor_id, not technician_id
+  // Get contractor blocking status from the pure-custody live view
+  // (v_contractor_accountability is contractor-grain, keyed by contractor_id).
   const blockingStatus = await sql`
     SELECT
       contractor_id,
       is_blocked,
       unaccounted_count AS pending_recovery
-    FROM contractor_stock_accountability
+    FROM v_contractor_accountability
   `;
 
   // Build technician map

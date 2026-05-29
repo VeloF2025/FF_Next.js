@@ -40,7 +40,7 @@ export async function getDashboardV2Summary(): Promise<DashboardV2Summary> {
              COALESCE(unaccounted_value, 0) AS unaccounted_value,
              COALESCE(pending_recovery_amount, 0) AS pending_recovery,
              COALESCE(is_blocked, false) AS is_blocked
-      FROM contractor_stock_accountability
+      FROM v_contractor_accountability
       ORDER BY unaccounted_value DESC NULLS LAST, current_held_value DESC NULLS LAST
     `,
     sql`
