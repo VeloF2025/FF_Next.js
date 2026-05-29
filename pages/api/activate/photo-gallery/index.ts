@@ -58,6 +58,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
             AND jsonb_typeof(photos_metadata) = 'array'
             AND p->>'original_type' = 'ph_hh1'
             AND p->>'filename' IS NOT NULL
+            AND p->>'filename' != ''
 
           UNION ALL
 
@@ -69,6 +70,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
             AND jsonb_typeof(photos_metadata) = 'array'
             AND p->>'original_type' = 'ph_hh2'
             AND p->>'filename' IS NOT NULL
+            AND p->>'filename' != ''
         ) combined
         GROUP BY step
         ORDER BY step
@@ -103,7 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           SELECT
             drop_number,
             p->>'filename' AS filename,
-            '1.0' AS confidence,
+            1.0::float AS confidence,
             p->>'original_type' AS original_type
           FROM dr_photo_unified_reviews,
                jsonb_array_elements(photos_metadata) AS p
