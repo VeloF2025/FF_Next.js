@@ -28,6 +28,7 @@ import {
 
 const BLOCKED_HOLDER_ID   = 'b1000000-0000-0000-0000-000000000001';
 const UNBLOCKED_HOLDER_ID = 'b1000000-0000-0000-0000-000000000002';
+const BLOCKED_STAFF_ID    = 'b1aff000-0000-0000-0000-000000000001';
 const BLOCK_REASON = 'TRACK41 test: unreturned stock over threshold';
 const SN_PREFIX = 'TRACK41-BLOCK-';
 
@@ -37,15 +38,21 @@ let itemId: string;
 let issueSerialId: string;
 
 beforeAll(async () => {
-  // Two holders: one blocked (accountability is_blocked=true), one with no
-  // accountability row at all (the COALESCE-to-false / no-row path).
-  // holder_type='external_person' needs no staff/contractor FK (stock_holders_ref_chk),
-  // so the holders stand alone without seeding staff/contractor rows.
+  // Two holders. The BLOCKED one is holder_type='staff' — the real issue-picking
+  // recipient type in production (a tech carrying stock) — so the guard is proven
+  // on the path it actually gates, not just an abstract holder. It needs a staff
+  // FK (stock_holders_ref_chk), so seed a dedicated staff row first. The UNBLOCKED
+  // one is external_person (no FK, no accountability row) to also cover the
+  // COALESCE-to-false / no-row path.
   await pool.query(
-    `INSERT INTO stock_holders (id, holder_type, name, is_active)
-     VALUES ($1, 'external_person', $3, true), ($2, 'external_person', $4, true)
+    `INSERT INTO staff (id, full_name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+    [BLOCKED_STAFF_ID, `${SN_PREFIX}Blocked Tech`],
+  );
+  await pool.query(
+    `INSERT INTO stock_holders (id, holder_type, staff_id, name, is_active)
+     VALUES ($1, 'staff', $3, $4, true), ($2, 'external_person', NULL, $5, true)
      ON CONFLICT (id) DO NOTHING`,
-    [BLOCKED_HOLDER_ID, UNBLOCKED_HOLDER_ID, `${SN_PREFIX}BLOCKED`, `${SN_PREFIX}OK`],
+    [BLOCKED_HOLDER_ID, UNBLOCKED_HOLDER_ID, BLOCKED_STAFF_ID, `${SN_PREFIX}BLOCKED`, `${SN_PREFIX}OK`],
   );
   await pool.query(
     `INSERT INTO stock_accountability (holder_id, is_blocked, blocked_reason, blocked_at)
@@ -98,6 +105,7 @@ afterAll(async () => {
       [BLOCKED_HOLDER_ID, UNBLOCKED_HOLDER_ID]);
     await pool.query(`DELETE FROM stock_holders WHERE id IN ($1, $2)`,
       [BLOCKED_HOLDER_ID, UNBLOCKED_HOLDER_ID]);
+    await pool.query(`DELETE FROM staff WHERE id = $1`, [BLOCKED_STAFF_ID]);
   } finally {
     await pool.end();
   }
@@ -121,6 +129,11 @@ describe('assertHolderNotBlocked — issue-time block enforcement (Task 4.1)', (
   });
 
   it('aborts the issue txn before promoteSerial — serial stays in_stock, zero events', async () => {
+    // Guard-UNIT test: it re-creates the handler's guard→promoteSerial ordering in
+    // a txn (the Sprint E test DB lacks the full stock_pickings columns to drive the
+    // HTTP handler — same constraint pickingProcess.lifecycle.test.ts notes). It
+    // proves the guard throws BEFORE promotion and the txn rolls back clean; the
+    // actual handler call-site ordering is covered by code review of process.ts.
     let caught: unknown;
     try {
       await transaction(async (txn) => {

@@ -51,6 +51,6 @@ export async function assertHolderNotBlocked(
   );
   const row = rows[0];
   if (row?.is_blocked) {
-    throw new HolderBlockedError(holderId, row.blocked_reason ?? null);
+    throw new HolderBlockedError(holderId, row.blocked_reason);
   }
 }
