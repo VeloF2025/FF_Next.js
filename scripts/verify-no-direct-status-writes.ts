@@ -1,0 +1,81 @@
+#!/usr/bin/env tsx
+/**
+ * verify-no-direct-status-writes.ts — Sprint E cutover T-1 readiness gate.
+ *
+ * Runs the `local/no-direct-serial-status-write` ESLint rule (Track 3) at
+ * "error" severity over src/ + pages/, regardless of its configured severity.
+ * The rule ships "off" in .eslintrc.json and only flips to "error" AT cutover
+ * (in the Track 7 PR), so a plain `npx eslint .` cannot catch anything before
+ * then — this script forces the rule on so the readiness check is meaningful
+ * pre-cutover.
+ *
+ * Exit codes:
+ *   0 — no direct stock_serials.status/holder_id writes outside the rule's
+ *       allow-list (serialLifecycle.ts, serialForceCorrectService.ts, the
+ *       backfill script). Safe to create __sprint_e_cutover_gate__.
+ *   1 — one or more direct writers remain; route them through promoteSerial()
+ *       before cutover.
+ *   2 — the check itself failed to run (ESLint/config error).
+ *
+ * mig 387's cutover gate message requires this to exit 0 against origin/master
+ * HEAD before the marker table is created. See docs/runbooks/sprint-e-cutover.md.
+ *
+ * Single source of truth: it executes the SAME rule the cutover PR flips on, so
+ * there is no second copy of the detection logic to drift from the rule.
+ *
+ * Scope note: scans runtime code (src/ + pages/). The allow-listed backfill
+ * script under scripts/ is an intentional direct writer and is not scanned.
+ *
+ * Usage:  npx tsx scripts/verify-no-direct-status-writes.ts
+ */
+import { ESLint } from 'eslint';
+import * as path from 'node:path';
+
+// Load the rule by BARE name via rulePaths (--rulesdir), mirroring how
+// scripts/ci-local.sh runs the sibling no-silent-catch rule. The .eslintrc
+// "local/"-prefixed copy stays "off"; this bare-id copy is forced to "error".
+const RULE_ID = 'no-direct-serial-status-write';
+const TARGETS = ['src/**/*.{ts,tsx}', 'pages/**/*.{ts,tsx}'];
+const ROOT = path.join(__dirname, '..');
+
+async function main(): Promise<void> {
+  const eslint = new ESLint({
+    cwd: ROOT,
+    useEslintrc: true, // load the TS parser + ignore patterns from .eslintrc.json
+    rulePaths: [path.join(ROOT, 'scripts', 'eslint-rules')],
+    // Force the rule on irrespective of its "off" pre-cutover setting.
+    overrideConfig: { rules: { [RULE_ID]: 'error' } },
+    extensions: ['.ts', '.tsx'],
+  });
+
+  const results = await eslint.lintFiles(TARGETS);
+
+  // lintFiles applies the whole config; only this rule's messages are relevant.
+  const violations = results.flatMap((r) =>
+    r.messages
+      .filter((m) => m.ruleId === RULE_ID)
+      .map((m) => `${path.relative(ROOT, r.filePath)}:${m.line}:${m.column}  ${m.message}`),
+  );
+
+  if (violations.length === 0) {
+    process.stdout.write(
+      `[OK ] ${RULE_ID}: 0 direct stock_serials.status/holder_id writes outside the allow-list.\n`,
+    );
+    process.exit(0);
+  }
+
+  process.stderr.write(
+    `[FAIL] ${RULE_ID}: direct serial status/holder writes must route through promoteSerial():\n`,
+  );
+  for (const v of violations) process.stderr.write(`  ${v}\n`);
+  process.stderr.write(
+    `\n${violations.length} violation(s) — fix before creating __sprint_e_cutover_gate__.\n`,
+  );
+  process.exit(1);
+}
+
+main().catch((err: unknown) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`verify-no-direct-status-writes: ERROR — ${msg}\n`);
+  process.exit(2);
+});
