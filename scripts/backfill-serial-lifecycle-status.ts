@@ -43,7 +43,9 @@ type CountRow = { count: string };
 
 async function scalar(pool: Pool, sql: string): Promise<number> {
   const res = await pool.query<CountRow>(sql);
-  return Number(res.rows[0].count);
+  const row = res.rows[0];
+  if (row === undefined) throw new Error(`query returned no rows: ${sql}`);
+  return Number(row.count);
 }
 
 async function main(): Promise<void> {
@@ -110,6 +112,19 @@ async function main(): Promise<void> {
     out(`serials with zero events (total): ${zeroEventTotal}`);
     out(`  └─ genesis gap-fill targets after rename (non-'available'): ${zeroEventNonAvailable}`);
 
+    // stock_serials.created_at is nullable; stock_serial_events.occurred_at is
+    // NOT NULL. Surface any gap-fill targets whose genesis would fall back to
+    // NOW() so a cutover operator isn't surprised (0 on live 2026-05-29).
+    const zeroEventNullCreated = await scalar(
+      pool,
+      `SELECT COUNT(*) FROM stock_serials ss
+        WHERE ss.created_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM stock_serial_events e WHERE e.serial_id = ss.id)`
+    );
+    if (zeroEventNullCreated > 0) {
+      out(`  └─ of which created_at IS NULL (genesis anchored at NOW()): ${zeroEventNullCreated}`);
+    }
+
     if (!commit) {
       out('DRY-RUN complete. No rows written. Re-run with --commit to apply.');
       await pool.end();
@@ -134,15 +149,17 @@ async function main(): Promise<void> {
 
       // 2. Gap-fill a genesis 'received' event for any serial that STILL has no
       //    events (e.g. 'activated' bulk seeds the rename never touched). This is
-      //    a direct INSERT (not a status change) so no trigger fires; occurred_at
-      //    = created_at anchors the event at the serial's true genesis. The
+      //    a direct INSERT (not a status change) so no trigger fires. occurred_at
+      //    anchors the event at the serial's genesis (created_at), falling back to
+      //    NOW() because stock_serials.created_at is nullable while occurred_at is
+      //    NOT NULL — a lone NULL created_at must not abort the cutover txn. The
       //    WHERE NOT EXISTS makes a re-run idempotent.
       const gapRes = await client.query(
         `INSERT INTO stock_serial_events
            (serial_id, event_type, from_state, to_state, source_table, payload, occurred_at)
          SELECT ss.id, 'received', NULL, ss.status, $1,
                 jsonb_build_object('reason', 'sprint-E-backfill-no-prior-events'),
-                ss.created_at
+                COALESCE(ss.created_at, NOW())
            FROM stock_serials ss
           WHERE NOT EXISTS (SELECT 1 FROM stock_serial_events e WHERE e.serial_id = ss.id)`,
         [SOURCE_TABLE]
@@ -151,7 +168,13 @@ async function main(): Promise<void> {
 
       await client.query('COMMIT');
     } catch (e) {
-      await client.query('ROLLBACK');
+      // Preserve the original error: if ROLLBACK also fails (e.g. dropped
+      // connection) log it but re-throw the root cause, not the rollback error.
+      await client.query('ROLLBACK').catch((rbErr) => {
+        process.stderr.write(
+          `ROLLBACK also failed: ${rbErr instanceof Error ? rbErr.message : String(rbErr)}\n`
+        );
+      });
       throw e;
     } finally {
       client.release();
