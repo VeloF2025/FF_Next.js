@@ -93,9 +93,9 @@ bash scripts/deploy-local.sh production
 ```
 
 This applies any remaining pending migrations — including the gated **mig 392**
-(Track 4.5: strips the residual `contractor_stock_accountability` counter write
-from `trg_emit_serial_event_on_return_disposition`, then `DROP TABLE
-contractor_stock_accountability`), whose `__sprint_e_cutover_gate__` guard is now
+(Track 4.5: `CREATE OR REPLACE` of `trg_emit_serial_event_on_return_disposition`
+that removes its residual `contractor_stock_accountability` counter block, then
+`DROP TABLE contractor_stock_accountability`), whose `__sprint_e_cutover_gate__` guard is now
 satisfied and which the runner applies in numeric order after 387 (387 already
 recorded → skipped). Then it runs the lint gate, stops the service, builds, swaps,
 and health-checks.

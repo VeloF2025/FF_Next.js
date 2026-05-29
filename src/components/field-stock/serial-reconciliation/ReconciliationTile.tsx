@@ -7,8 +7,6 @@ const CHECK_LABELS: Record<string, string> = {
   assets_without_serial: 'Assets without a serial row',
   issued_without_open_picking: 'Issued serials without an open picking',
   installed_serial_inconsistent_status: 'Installed serials with inconsistent status',
-  accountability_issued_counter_drift: 'Contractor issued-counter drift',
-  accountability_returned_counter_drift: 'Contractor returned-counter drift',
   latest_event_matches_status: 'Status matches latest event',
 };
 
