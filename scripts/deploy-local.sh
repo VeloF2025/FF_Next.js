@@ -245,7 +245,13 @@ fi
 # --- Step 3a: Apply pending DB migrations (fail fast before build) ---
 log "Checking DB migrations..."
 MIGRATION_EXIT=0
-sudo -u velo bash -c "cd $DIR && bash scripts/run-pending-migrations.sh 2>&1 | sed 's/^/  /'" || MIGRATION_EXIT=$?
+# `set -o pipefail` so the runner's real exit code propagates through the `| sed`
+# pretty-printer. Without it the pipeline exit is sed's (always 0), which silently
+# masked genuine migration failures and let broken deploys ship (observed when
+# mig 388 failed to apply, 2026-05). The runner itself treats intentionally-gated
+# migrations (Sprint E cutover gate) as deferred, not failed, so a clean deploy
+# still exits 0 here — only real SQL failures abort.
+sudo -u velo bash -c "cd $DIR && set -o pipefail && bash scripts/run-pending-migrations.sh 2>&1 | sed 's/^/  /'" || MIGRATION_EXIT=$?
 if [[ "$MIGRATION_EXIT" -ne 0 ]]; then
   error "DB migration failed (exit $MIGRATION_EXIT). Fix the SQL and redeploy."
 fi
