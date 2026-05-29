@@ -62,11 +62,12 @@ echo "1. Boot throwaway Postgres 15 on :$PG_PORT"
 docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 docker run -d --name "$CONTAINER" \
   -e POSTGRES_PASSWORD=rehearsal -e POSTGRES_DB=fibreflow \
-  -p "$PG_PORT:5432" postgres:15 >/dev/null
+  -p "127.0.0.1:${PG_PORT}:5432" postgres:15 >/dev/null   # loopback only — never expose the throwaway DB on velo's Tailscale iface
 for _ in $(seq 1 30); do
   pg -c 'SELECT 1' >/dev/null 2>&1 && break
   sleep 1
 done
+pg -c 'SELECT 1' >/dev/null 2>&1 || { echo "ERROR: Postgres container did not become ready within 30s"; docker logs "$CONTAINER" 2>&1 | tail -20; exit 1; }
 
 echo "2. Pre-create extensions the dump's public defaults need (search_path='' in dump)"
 # The dump references public.uuid_generate_v4() etc.; create them in public so the

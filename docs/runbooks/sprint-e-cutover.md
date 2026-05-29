@@ -46,8 +46,11 @@ All DB commands use the **postgres superuser** (prod migrations require it — s
 ### 1. Pre-flight (≈15 min)
 
 ```bash
-# Capture the rollback target BEFORE anything changes.
-echo "ROLLBACK_TARGET=$(git rev-parse origin/master~1)" > /tmp/sprint-e-rollback-target
+# Capture the rollback target BEFORE the cutover deploy. Use the deploy dir's
+# currently checked-out commit (the pre-cutover build) — more reliable than
+# origin/master~1, which assumes no intervening merges. Run from the deploy dir.
+git fetch origin master --quiet
+echo "ROLLBACK_TARGET=$(git rev-parse HEAD)" > /tmp/sprint-e-rollback-target
 cat /tmp/sprint-e-rollback-target   # record this SHA in the incident channel
 
 # Baseline reconcile — must be clean (or only the known pre-existing drift).
