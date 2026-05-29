@@ -134,10 +134,16 @@ afterAll(async () => {
        )`,
       [`${SN_PREFIX}%`],
     );
-    // field_stock_movements references stock_items(id) → must clear before the
-    // stock_items delete below or the FK blocks it.
+    // field_stock_movements + stock_custody both reference stock_items(id) → must
+    // clear before the stock_items delete below or the FK blocks it. (The custody
+    // debit on the success path is an UPDATE matching 0 rows, so this is usually a
+    // no-op, but it keeps teardown symmetric for any future credit path.)
     await pool.query(
       `DELETE FROM field_stock_movements WHERE stock_item_id = $1`,
+      [itemId],
+    );
+    await pool.query(
+      `DELETE FROM stock_custody WHERE stock_item_id = $1`,
       [itemId],
     );
     await pool.query(
