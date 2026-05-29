@@ -26,9 +26,10 @@
 8. **NEVER edit files in deploy dirs** (`/home/velo/fibreflow-dev/`, `/home/velo/fibreflow-production/`). Code changes happen in a worktree off `/home/hein/Workspace/FF_Next.js/`.
 9. **Production deploys**: blocked during business hours (08:00–17:00 SAST, Mon–Fri); require Hein's explicit approval; always via `bash scripts/deploy-local.sh` (never manual `git pull + build + restart` — causes 500s).
 10. **Destructive commands require confirmation.** Force-push, `git reset --hard`, branch deletion, `rm -rf`, merges into master, schema migrations, process kills (no `pkill -f node`/`pkill -f npm` — they kill Claude itself). When unsure if a command is destructive — ask.
+11. **NEVER commit credentials.** No real password, token, API key, connection string, or private key in any tracked file — this includes code, comments, commit messages, PR descriptions, and **docs** (handoff notes `.claude/handoffs/*`, plans/specs `docs/superpowers/**`, deploy/setup docs). Secrets live only in `.claude/credentials.local.md` (gitignored) or server env files. In docs/commands, use a placeholder + reference, never the value: `PGPASSWORD="$PGPASSWORD" psql …  # see .claude/credentials.local.md`. A secret-scan hook (`scripts/secret-scan.sh`, run by pre-commit, pre-push, and CI Gate 7) blocks new leaks — install with `bash scripts/install-hooks.sh`; never `--no-verify` past a real secret. A credential that has touched a tracked file is **compromised** — stop and tell Hein so it can be rotated (it was leaked once already: issue #1830).
 
 ### Code Quality (Zero Tolerance)
-11. No `console.log` — use `log` from `@/lib/logger`. No empty catch blocks. 100% type coverage. Files <300 lines, components <200 lines.
+12. No `console.log` — use `log` from `@/lib/logger`. No empty catch blocks. 100% type coverage. Files <300 lines, components <200 lines.
 
 ---
 

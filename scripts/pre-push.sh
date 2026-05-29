@@ -33,6 +33,8 @@ NC='\033[0m' # No Color
 
 echo "🔍 Auth isolation guard running..."
 
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
 VIOLATIONS_FOUND=0
 VIOLATION_FILES=()
 
@@ -52,6 +54,18 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     # Existing branch — check only new commits
     RANGE="$remote_sha..$local_sha"
     DIFF_CMD="git diff --name-only $RANGE"
+  fi
+
+  # ---------------------------------------------------------
+  # Secret scan over the pushed range (new credentials only)
+  # ---------------------------------------------------------
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    SCAN_BASE=$(git merge-base origin/master "$local_sha" 2>/dev/null || git rev-list --max-parents=0 "$local_sha" | tail -1)
+  else
+    SCAN_BASE="$remote_sha"
+  fi
+  if ! bash "$REPO_ROOT/scripts/secret-scan.sh" --range "$SCAN_BASE" "$local_sha"; then
+    VIOLATIONS_FOUND=$((VIOLATIONS_FOUND + 1))
   fi
 
   # Get changed TypeScript/JavaScript files in API routes and lib

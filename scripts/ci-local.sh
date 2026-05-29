@@ -204,6 +204,16 @@ else
   fi
 fi
 
+# ─── Gate 7: Secret scan (newly-added credentials) ───────────────────────────
+echo -e "\n${CYAN}── Gate 7: Secret Scan ──${NC}\n"
+
+if SECRET_OUT=$(bash scripts/secret-scan.sh --branch 2>&1); then
+  pass "Secret scan: no new credential-like content"
+else
+  fail "Secret scan: credential-like content detected"
+  echo "$SECRET_OUT" | sed 's/^/    /'
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
