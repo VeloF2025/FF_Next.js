@@ -74,6 +74,8 @@ INSERT INTO stock_serial_status_transitions (from_state, to_state, event_type, d
   ('installed',           'faulty',               'marked_faulty',         'RMA flagged pre-activation'),
   ('activated',           'faulty',               'marked_faulty',         'RMA flagged post-activation'),
   ('issued',              'faulty',               'marked_faulty',         'Tech-side fault before install'),
+  ('in_stock',            'faulty',               'marked_faulty',         'DOA — stock unit faulty on arrival (fault report on in_stock serial)'),
+  ('allocated_to_project','faulty',               'marked_faulty',         'Allocated unit found faulty before issue'),
   ('installed',           'returned',             'returned_to_warehouse', 'Pulled from drop'),
   ('activated',           'returned',             'returned_to_warehouse', 'Customer cancel + recovery'),
   ('faulty',              'returned',             'returned_to_warehouse', 'RMA returned'),
