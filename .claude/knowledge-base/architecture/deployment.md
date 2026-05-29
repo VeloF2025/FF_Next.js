@@ -103,7 +103,7 @@ Script: `/home/velo/scripts/fibreflow-health-check-v2.sh` (every 5 min)
 **Access:**
 - Local `sudo -u velo` — Claude Code runs directly on Velocity as `hein`; passwordless sudo configured via `/etc/sudoers.d/fibreflow-deploy`
 - `ssh velo@100.96.203.105` — SSH key auth from external machines (fallback)
-- `ssh zander@100.96.203.105` (password: zander2026) — sudo, full deploy access (fallback)
+- `ssh zander@100.96.203.105` (password: REDACTED_SEE_credentials.local.md) — sudo, full deploy access (fallback)
 
 **All deploy directories unified under /home/velo/ (2026-02-11).** No more permission issues.
 

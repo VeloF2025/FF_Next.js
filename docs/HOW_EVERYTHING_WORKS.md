@@ -293,7 +293,7 @@ const result = condition
 
 | User | Password | Sudo | Primary Use |
 |------|----------|------|-------------|
-| `zander` | `zander2026` (change it!) | Yes | Your personal account |
+| `zander` | `REDACTED_SEE_credentials.local.md` (change it!) | Yes | Your personal account |
 | `velo` | `velo2026` | Yes | Shared admin, owns all 3 deploy dirs |
 | `hein` | `0203` | Yes | Hein's personal account (SSH key auth to velo) |
 
@@ -358,7 +358,7 @@ git pull
 npm run build
 
 # Restart the service
-echo 'zander2026' | sudo -S systemctl restart fibreflow-production.service
+echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service
 
 # Verify it's running
 sudo systemctl status fibreflow-production.service
@@ -378,14 +378,14 @@ If you need all environments on the same commit (common after a batch of changes
 git push origin master
 
 # 2. Deploy production
-ssh zander@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'zander2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh zander@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service"
 
 # 3. Deploy staging
-ssh zander@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'zander2026' | sudo -S systemctl restart fibreflow.service"
+ssh zander@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow.service"
 
 # 4. Deploy dev (two-step)
 ssh hein@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull && npm run build"
-ssh zander@100.96.203.105 "echo 'zander2026' | sudo -S systemctl restart fibreflow-dev.service"
+ssh zander@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 ### Rollback

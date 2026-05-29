@@ -51,7 +51,7 @@ ssh-keygen -t ed25519 -C "zander-laptop"
 
 # 2. Copy the public key to Velocity
 ssh-copy-id zander@100.96.203.105
-# Password when prompted: zander2026
+# Password when prompted: REDACTED_SEE_credentials.local.md
 
 # 3. Verify it works without a password
 ssh zander@100.96.203.105
@@ -138,7 +138,7 @@ sudo systemctl status fibreflow-dev.service
 sudo systemctl status fibreflow.service          # staging
 sudo systemctl status fibreflow-production.service
 
-# Restart a service (sudo password is zander2026)
+# Restart a service (sudo password is REDACTED_SEE_credentials.local.md)
 sudo systemctl restart fibreflow-dev.service
 
 # Tail live logs
@@ -232,8 +232,8 @@ git pull
 |------|-------|
 | IP | `100.96.203.105` |
 | SSH user | `zander` |
-| SSH password | `zander2026` |
-| Sudo password | `zander2026` |
+| SSH password | `REDACTED_SEE_credentials.local.md` |
+| Sudo password | `REDACTED_SEE_credentials.local.md` |
 | Service sudo password | `velo2026` (used in deploy scripts) |
 | GitHub username | `Zander1798` |
 | GitHub repo | `VelocityFibre/FF_Next.js` |

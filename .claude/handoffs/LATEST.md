@@ -134,7 +134,7 @@ This is a meaningful schema change — recommend a brainstorm session on Opus be
 - **Logger gotcha:** `src/lib/logger.ts` only stores in `process.__appLogs`, never writes to file. The dev/error log gets pino entries from middleware `lib/api-error-handler.ts` (root `lib/logger.ts` which uses pino). When you need to see service-internal logs, use `process.stderr.write(...)` directly during diagnostic — it lands in `/var/log/fibreflow-dev.error.log` via the systemd service redirect.
 - **Clear test sheets** before re-uploading the same PDF (hash dedup will skip otherwise):
   ```bash
-  PGPASSWORD=a23f6104debd1d3e88e8f00c0067f22f psql -h 100.96.203.105 -p 5436 -U postgres.ironman-platform -d fibreflow -c "DELETE FROM eod_install_sheets WHERE created_at > NOW() - INTERVAL '1 hour';"
+  PGPASSWORD=REDACTED_SEE_credentials.local.md psql -h 100.96.203.105 -p 5436 -U postgres.ironman-platform -d fibreflow -c "DELETE FROM eod_install_sheets WHERE created_at > NOW() - INTERVAL '1 hour';"
   ```
 - **Browser debug:** playwriter MCP is already set up. Page reload, hook `window.__cap` on `fetch`, upload file via `input[type=file]`.
 

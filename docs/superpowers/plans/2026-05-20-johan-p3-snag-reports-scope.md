@@ -206,7 +206,7 @@ ALTER TABLE snag_reports
 
 - [ ] **Step 1.5: Apply migration**
 
-Run: `PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -f scripts/migrations/sql/358_snag_reports_scope.sql`
+Run: `PGPASSWORD='REDACTED_SEE_credentials.local.md' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -f scripts/migrations/sql/358_snag_reports_scope.sql`
 Expected: `ALTER TABLE` / `CREATE INDEX` outputs, no errors.
 
 - [ ] **Step 1.6: Run test to verify it passes**
@@ -1957,7 +1957,7 @@ ON CONFLICT (role, permission_key) DO UPDATE SET
 - [ ] **Step 11.5: Apply + verify**
 
 ```bash
-PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -f scripts/migrations/sql/359_snag_report_delete_permission.sql
+PGPASSWORD='REDACTED_SEE_credentials.local.md' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -f scripts/migrations/sql/359_snag_report_delete_permission.sql
 npx vitest run pages/api/snags/__tests__/reports-scope-delete.test.ts
 ```
 
@@ -2022,7 +2022,7 @@ test('P3: generate Zone 24 snag report from WorksQAPage', async ({ page, request
 - [ ] **Step 12.2: Replace `<LAWLEY_PROJECT_ID>` placeholders**
 
 ```bash
-PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c "SELECT id FROM projects WHERE project_name ILIKE 'lawley%' LIMIT 1"
+PGPASSWORD='REDACTED_SEE_credentials.local.md' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c "SELECT id FROM projects WHERE project_name ILIKE 'lawley%' LIMIT 1"
 ```
 
 Replace both `<LAWLEY_PROJECT_ID>` placeholders in the test with the returned UUID. (Do NOT commit a placeholder.)

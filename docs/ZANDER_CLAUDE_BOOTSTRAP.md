@@ -231,7 +231,7 @@ Hourly cron (`/opt/fibreflow/auto-update.sh`) keeps backup in sync with master:
 ```bash
 # Zander's personal account (full sudo)
 ssh zander@100.96.203.105
-# Password: zander2026
+# Password: REDACTED_SEE_credentials.local.md
 
 # Shared admin account (deploy dirs live here)
 ssh velo@100.96.203.105    # SSH key auth from Hein's workstation
@@ -250,33 +250,33 @@ All 3 environments live under `/home/velo/`. Same pattern for all:
 ```bash
 ssh zander@100.96.203.105
 cd /home/velo/fibreflow-dev && git pull && npm run build
-echo 'zander2026' | sudo -S systemctl restart fibreflow-dev.service
+echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-dev.service
 ```
 
 ### Staging
 ```bash
 ssh zander@100.96.203.105
 cd /home/velo/fibreflow-staging && git pull && npm run build
-echo 'zander2026' | sudo -S systemctl restart fibreflow.service
+echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow.service
 ```
 
 ### Production
 ```bash
 ssh zander@100.96.203.105
 cd /home/velo/fibreflow-production && git pull && npm run build
-echo 'zander2026' | sudo -S systemctl restart fibreflow-production.service
+echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service
 ```
 
 ### One-liner Deploy (from local machine)
 ```bash
 # Dev
-ssh zander@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull && npm run build && echo 'zander2026' | sudo -S systemctl restart fibreflow-dev.service"
+ssh zander@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-dev.service"
 
 # Staging
-ssh zander@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'zander2026' | sudo -S systemctl restart fibreflow.service"
+ssh zander@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow.service"
 
 # Production
-ssh zander@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'zander2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh zander@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 ### Verify All Servers Match
