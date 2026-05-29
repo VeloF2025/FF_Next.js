@@ -20,8 +20,26 @@ if [ ! -f "$PYTHON" ]; then
     PYTHON="python3"
 fi
 
-# DB URL from environment or production default
-DB_URL="${DATABASE_URL:-postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech:5432/neondb?sslmode=require}"
+# DB URL: prefer the process env, else read the deploy dir's env files.
+# Cron runs with a minimal env (no DATABASE_URL), so it falls through to the
+# files. Check both .env.local (dev) and .env (prod) — DATABASE_URL lives in a
+# different file per environment. The previous hardcoded Neon fallback died at
+# the 2026-04-18 Supabase cutover and silently failed this cron for weeks (auth
+# errors against the dead neondb_owner); reading the env file keeps the URL in
+# lockstep with the app and carries no stale credential in the repo.
+if [ -z "${DATABASE_URL:-}" ]; then
+    for env_file in "${SCRIPT_DIR}/../.env.local" "${SCRIPT_DIR}/../.env"; do
+        if [ -f "$env_file" ]; then
+            DATABASE_URL=$(grep -E '^DATABASE_URL=' "$env_file" | head -1 | cut -d= -f2- | tr -d '"')
+            [ -n "$DATABASE_URL" ] && break
+        fi
+    done
+fi
+DB_URL="${DATABASE_URL:-}"
+if [ -z "$DB_URL" ]; then
+    echo "  ERROR: DATABASE_URL not set and not found in ${SCRIPT_DIR}/../.env.local or ../.env — aborting"
+    exit 1
+fi
 
 # Cron secret for authenticated API calls
 CRON_SECRET="${CRON_SECRET:-ad2bd65646c1e1242ade2bbcf0b0a684c3cce0c53f2684e8369d7bb9bc27a3d7}"
