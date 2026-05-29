@@ -8,7 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -104,4 +104,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+// SOP 4.4: blocking a holder is an admin/manager action, gated by the
+// procurement.field-stock.block-holder permission (migration 389).
+export default withAuth(withPermission('procurement.field-stock.block-holder', 'edit')(handler));
