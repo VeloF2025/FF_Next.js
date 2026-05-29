@@ -28,10 +28,21 @@ does not exist (see `feedback_migration_runner_blocked_by_387_gate`). Cutover:
 - **T-7 days:** run the rollback rehearsal (`scripts/rehearse-sprint-e-rollback.sh`)
   against a fresh prod dump; record its output in `docs/runbooks/sprint-e-rollback.md`.
 - **T-1 day:** land the cutover code commit (Track-3 ESLint rule → `"error"`;
-  fold in Track 2.5 grn-confirm `in_stock` receive verb). Confirm `npx eslint .`
-  reports **0** violations of `local/no-direct-serial-status-write` — every
-  `stock_serials.status` writer must already route through `promoteSerial`
-  (Tracks 2.1–2.7) or be on the rule's allow-list. A non-zero count blocks cutover.
+  fold in Track 2.5 grn-confirm `in_stock` receive verb). Then run the readiness
+  gate (this is the check mig 387's gate message names):
+  ```bash
+  npx tsx scripts/verify-no-direct-status-writes.ts   # must exit 0
+  ```
+  It forces `local/no-direct-serial-status-write` to `"error"` over `src/` +
+  `pages/` regardless of its configured severity (a plain `npx eslint .` cannot
+  catch anything while the rule still ships `"off"`). **Exit 0 is required before
+  creating `__sprint_e_cutover_gate__`** — every `stock_serials.status`/`holder_id`
+  writer must route through `promoteSerial` (Tracks 2.1–2.7) or be on the rule's
+  allow-list. A non-zero count blocks cutover.
+  > NOTE (2026-05-29 audit): this gate currently reports **7 live violations**
+  > across `serialService.ts`, `movementReversalService.ts`, `serialStateMachine.ts`,
+  > and `pages/api/procurement/fault-reports/{index,[faultId]}.ts` — these must be
+  > routed through `promoteSerial` (with matching matrix rows) before cutover.
 - **T-1 day:** resolve / re-confirm the three open cutover concerns:
   - `project_sprint_e_matrix_gap_issued_scrapped` — `(issued, scrapped)` matrix row.
   - `project_sprint_e_mig_364_trigger_3_race` — mig 364 TRIGGER 3 vs cascade.

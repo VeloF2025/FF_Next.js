@@ -15,6 +15,7 @@
     "test": "vitest",
     "test:db": "vitest --config vitest.db.config.ts run",
     "reconcile:serials": "tsx scripts/reconcile-serials.ts",
+    "verify:no-direct-status-writes": "tsx scripts/verify-no-direct-status-writes.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:component": "vitest --run src/components src/modules",
