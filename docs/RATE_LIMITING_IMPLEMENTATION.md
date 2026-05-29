@@ -112,7 +112,7 @@ ARCJET_KEY=ajkey_your_actual_key_here
 
 ```bash
 # Restart the production service
-echo 'velo2026' | sudo -S systemctl restart fibreflow-production
+echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production
 
 # Wait 5 seconds
 sleep 5
@@ -217,7 +217,7 @@ git checkout 3420e12004bbe6ce2fbf9b3ea740baec9f28d82b
 npm run build
 
 # Restart
-echo 'velo2026' | sudo -S systemctl restart fibreflow-production
+echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production
 
 # Verify
 sleep 5

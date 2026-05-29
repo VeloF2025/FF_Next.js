@@ -21,7 +21,7 @@ FibreFlow uses a **three-environment setup** with time-gated deployments to prot
 |--------|-------|
 | **Host** | Velocity — 100.96.203.105 |
 | **SSH** | `ssh velo@100.96.203.105` (SSH key auth, no password needed) |
-| **Sudo** | `echo 'velo2026' \| sudo -S <command>` |
+| **Sudo** | `echo 'REDACTED_SEE_credentials.local.md' \| sudo -S <command>` |
 | **Process Manager** | systemd (NOT PM2) |
 | **Web Server** | Nginx with upstream failover to VPS backup |
 
@@ -67,7 +67,7 @@ git commit -m "feat: description"
 git push origin feature/<name>
 
 # Deploy feature branch to dev
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-dev.service"
 
 # Verify
 curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in
@@ -98,7 +98,7 @@ git push origin --delete feature/<name>
 DEV_COMMIT=$(ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git rev-parse HEAD")
 
 # Deploy that EXACT commit to staging
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout $DEV_COMMIT && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout $DEV_COMMIT && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow.service"
 
 # Verify
 curl -s -o /dev/null -w "%{http_code}" https://vf.fibreflow.app/sign-in
@@ -110,7 +110,7 @@ curl -s -o /dev/null -w "%{http_code}" https://vf.fibreflow.app/sign-in
 STG_COMMIT=$(ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git rev-parse HEAD")
 
 # Deploy that EXACT commit to production
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout $STG_COMMIT && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout $STG_COMMIT && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service"
 
 # Verify
 curl -s -o /dev/null -w "%{http_code}" https://app.fibreflow.app/sign-in
@@ -154,12 +154,12 @@ Each deployment runs this pipeline automatically:
 ssh velo@100.96.203.105 "systemctl is-active fibreflow-dev fibreflow fibreflow-production"
 
 # View logs
-ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow-dev -n 50"
-ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow -n 50"
-ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow-production -n 50"
+ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' | sudo -S journalctl -u fibreflow-dev -n 50"
+ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' | sudo -S journalctl -u fibreflow -n 50"
+ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' | sudo -S journalctl -u fibreflow-production -n 50"
 
 # Restart a service
-ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 ## Rollback
@@ -171,7 +171,7 @@ Each deploy keeps 3 build backups (`.next-backup-*`):
 ssh velo@100.96.203.105 "ls -lt /home/velo/fibreflow-production/.next-backup-* | head -3"
 
 # Restore most recent backup
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && mv .next .next-failed && mv \$(ls -dt .next-backup-* | head -1) .next && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && mv .next .next-failed && mv \$(ls -dt .next-backup-* | head -1) .next && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 ## Health Monitoring

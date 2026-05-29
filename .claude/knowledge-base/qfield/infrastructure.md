@@ -37,7 +37,7 @@ const qfieldPool = new Pool({
   port: 5433,
   database: 'qfieldcloud_db',
   user: 'qfieldcloud_db_admin',
-  password: 'c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753',
+  password: 'REDACTED_SEE_credentials.local.md',
 });
 ```
 
@@ -187,7 +187,7 @@ const pool = new Pool({
   port: 5433,
   database: 'qfieldcloud_db',
   user: 'qfieldcloud_db_admin',
-  password: 'c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753'
+  password: 'REDACTED_SEE_credentials.local.md'
 });
 pool.query('SELECT COUNT(*) FROM core_project').then(r => {
   console.log('Total projects:', r.rows[0].count);

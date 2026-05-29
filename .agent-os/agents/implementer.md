@@ -358,7 +358,7 @@ git commit -m "feat: description"
 git push origin feature/<name>
 
 # Deploy feature branch to dev
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 Test at https://dev.fibreflow.app
@@ -375,10 +375,10 @@ git merge feature/<name>
 git push origin master
 
 # Promote to staging (after hours only, with Hein's approval)
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow.service"
 
 # Promote to production (after hours only, with Hein's approval)
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 Verify at https://app.fibreflow.app

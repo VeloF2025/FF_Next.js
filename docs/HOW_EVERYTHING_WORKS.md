@@ -294,7 +294,7 @@ const result = condition
 | User | Password | Sudo | Primary Use |
 |------|----------|------|-------------|
 | `zander` | `REDACTED_SEE_credentials.local.md` (change it!) | Yes | Your personal account |
-| `velo` | `velo2026` | Yes | Shared admin, owns all 3 deploy dirs |
+| `velo` | `REDACTED_SEE_credentials.local.md` | Yes | Shared admin, owns all 3 deploy dirs |
 | `hein` | `0203` | Yes | Hein's personal account (SSH key auth to velo) |
 
 ### Systemd Services

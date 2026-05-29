@@ -182,7 +182,7 @@ Host: localhost (from VF server) / 100.96.203.105 (external)
 Port: 5433
 Database: qfieldcloud_db
 User: qfieldcloud_db_admin
-Password: c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753
+Password: REDACTED_SEE_credentials.local.md
 Container: qfieldcloud-db-1
 
 Table: ff_oes_activations
@@ -199,7 +199,7 @@ Table: ff_oes_activations
    - Port: `5433`
    - Database: `qfieldcloud_db`
    - User: `qfieldcloud_db_admin`
-   - Password: `c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753`
+   - Password: `REDACTED_SEE_credentials.local.md`
 
 2. **Add the layer** `ff_oes_activations` to your project
 
@@ -298,7 +298,7 @@ source /opt/qfield-sync/venv/bin/activate
 python3 -c "import psycopg2; c=psycopg2.connect('postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'); print('Neon OK')"
 
 # Test QFieldCloud connection
-python3 -c "import psycopg2; c=psycopg2.connect(host='localhost',port=5433,database='qfieldcloud_db',user='qfieldcloud_db_admin',password='c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753'); print('QField OK')"
+python3 -c "import psycopg2; c=psycopg2.connect(host='localhost',port=5433,database='qfieldcloud_db',user='qfieldcloud_db_admin',password='REDACTED_SEE_credentials.local.md'); print('QField OK')"
 ```
 
 ---

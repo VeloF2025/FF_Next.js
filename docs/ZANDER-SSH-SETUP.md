@@ -155,15 +155,15 @@ sudo lsof -i :3005
 ```bash
 # Deploy Dev
 cd /home/velo/fibreflow-dev && git pull && npm run build && \
-  echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service
+  echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-dev.service
 
 # Deploy Staging
 cd /home/velo/fibreflow-staging && git pull && npm run build && \
-  echo 'velo2026' | sudo -S systemctl restart fibreflow.service
+  echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow.service
 
 # Deploy Production
 cd /home/velo/fibreflow-production && git pull && npm run build && \
-  echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service
+  echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service
 ```
 
 ---
@@ -234,7 +234,7 @@ git pull
 | SSH user | `zander` |
 | SSH password | `REDACTED_SEE_credentials.local.md` |
 | Sudo password | `REDACTED_SEE_credentials.local.md` |
-| Service sudo password | `velo2026` (used in deploy scripts) |
+| Service sudo password | `REDACTED_SEE_credentials.local.md` (used in deploy scripts) |
 | GitHub username | `Zander1798` |
 | GitHub repo | `VelocityFibre/FF_Next.js` |
 

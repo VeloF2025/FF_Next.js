@@ -2656,7 +2656,7 @@ VPS (72.61.166.168)
 # Check project count on correct host
 node -e "
 const { Pool } = require('pg');
-const pool = new Pool({ host: '100.96.203.105', port: 5433, database: 'qfieldcloud_db', user: 'qfieldcloud_db_admin', password: 'c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753' });
+const pool = new Pool({ host: '100.96.203.105', port: 5433, database: 'qfieldcloud_db', user: 'qfieldcloud_db_admin', password: 'REDACTED_SEE_credentials.local.md' });
 pool.query('SELECT COUNT(*) FROM core_project').then(r => { console.log('Projects:', r.rows[0].count); pool.end(); });
 "
 ```

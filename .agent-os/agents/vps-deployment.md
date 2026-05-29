@@ -55,7 +55,7 @@ You are a DevOps specialist managing the **FibreFlow infrastructure** on the Vel
 ssh velo@100.96.203.105
 
 # Sudo commands
-echo 'velo2026' | sudo -S <command>
+echo 'REDACTED_SEE_credentials.local.md' | sudo -S <command>
 
 # VPS (WhatsApp services only)
 ssh root@72.61.197.178
@@ -65,15 +65,15 @@ ssh root@72.61.197.178
 
 | Task | Command |
 |------|---------|
-| **Deploy to dev** | `ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' \| sudo -S systemctl restart fibreflow-dev.service"` |
+| **Deploy to dev** | `ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' \| sudo -S systemctl restart fibreflow-dev.service"` |
 | **Check all services** | `ssh velo@100.96.203.105 "systemctl is-active fibreflow-dev fibreflow fibreflow-production"` |
-| **View dev logs** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S journalctl -u fibreflow-dev -n 50"` |
-| **View staging logs** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S journalctl -u fibreflow -n 50"` |
-| **View production logs** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S journalctl -u fibreflow-production -n 50"` |
-| **Restart dev** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S systemctl restart fibreflow-dev.service"` |
-| **Restart staging** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S systemctl restart fibreflow.service"` |
-| **Restart production** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S systemctl restart fibreflow-production.service"` |
-| **Check Nginx** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S systemctl status nginx"` |
+| **View dev logs** | `ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' \| sudo -S journalctl -u fibreflow-dev -n 50"` |
+| **View staging logs** | `ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' \| sudo -S journalctl -u fibreflow -n 50"` |
+| **View production logs** | `ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' \| sudo -S journalctl -u fibreflow-production -n 50"` |
+| **Restart dev** | `ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' \| sudo -S systemctl restart fibreflow-dev.service"` |
+| **Restart staging** | `ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' \| sudo -S systemctl restart fibreflow.service"` |
+| **Restart production** | `ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' \| sudo -S systemctl restart fibreflow-production.service"` |
+| **Check Nginx** | `ssh velo@100.96.203.105 "echo 'REDACTED_SEE_credentials.local.md' \| sudo -S systemctl status nginx"` |
 | **Test prod URL** | `curl -s -o /dev/null -w "%{http_code}" https://app.fibreflow.app/sign-in` |
 | **Test dev URL** | `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in` |
 
@@ -123,7 +123,7 @@ bash scripts/deploy-gate.sh status
 
 ```bash
 # Deploy feature branch to dev
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 Verify: `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in`
@@ -139,7 +139,7 @@ Verify: `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-i
 DEV_COMMIT=$(ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git rev-parse HEAD")
 
 # Deploy exact commit to staging
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout $DEV_COMMIT && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout $DEV_COMMIT && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow.service"
 ```
 
 ### Promote Staging → Production (After Hours Only)
@@ -149,7 +149,7 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && 
 STG_COMMIT=$(ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git rev-parse HEAD")
 
 # Deploy exact commit to production
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout $STG_COMMIT && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout $STG_COMMIT && npm install && npm run build && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 ## Rollback
@@ -161,7 +161,7 @@ Each deploy keeps 3 build backups:
 ssh velo@100.96.203.105 "ls -lt /home/velo/fibreflow-production/.next-backup-* | head -3"
 
 # Restore most recent backup
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && mv .next .next-failed && mv \$(ls -dt .next-backup-* | head -1) .next && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && mv .next .next-failed && mv \$(ls -dt .next-backup-* | head -1) .next && echo 'REDACTED_SEE_credentials.local.md' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 ## Troubleshooting
