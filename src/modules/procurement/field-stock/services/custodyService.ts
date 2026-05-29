@@ -88,7 +88,7 @@ const SQL_CREDIT_QUANT =
  */
 const SQL_CREDIT_CUSTODY =
   `INSERT INTO stock_custody (id, holder_id, stock_item_id, lot_number, quantity, total_value, created_at, updated_at) ` +
-  `VALUES (gen_random_uuid(), $1, $2, $3, $4, COALESCE($5, 0) * $4, NOW(), NOW()) ` +
+  `VALUES (gen_random_uuid(), $1, $2, $3, $4, COALESCE($5::numeric, 0) * $4::numeric, NOW(), NOW()) ` +
   `ON CONFLICT (holder_id, stock_item_id, COALESCE(lot_number, '')) ` +
   `DO UPDATE SET ` +
   `quantity = stock_custody.quantity + EXCLUDED.quantity, ` +
@@ -102,7 +102,7 @@ const SQL_CREDIT_CUSTODY =
 const SQL_DEBIT_CUSTODY =
   `UPDATE stock_custody ` +
   `SET quantity = stock_custody.quantity - $4, ` +
-  `total_value = COALESCE(stock_custody.total_value, 0) - (COALESCE($5, 0) * $4), ` +
+  `total_value = COALESCE(stock_custody.total_value, 0) - (COALESCE($5::numeric, 0) * $4::numeric), ` +
   `updated_at = NOW() ` +
   `WHERE holder_id = $1 AND stock_item_id = $2 ` +
   `AND COALESCE(lot_number, '') = COALESCE($3, '')`;
@@ -119,7 +119,7 @@ const SQL_DEBIT_CUSTODY =
 const SQL_MOVEMENT_ISSUE =
   `INSERT INTO field_stock_movements ` +
   `(id, stock_item_id, movement_type, from_location_id, to_holder_id, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at) ` +
-  `VALUES (gen_random_uuid(), $1, 'issue', $2, $3, $4, $5, COALESCE($5,0)*$4, $6, $7, NOW(), NOW())`;
+  `VALUES (gen_random_uuid(), $1, 'issue', $2, $3, $4, $5, COALESCE($5::numeric,0)*$4::numeric, $6, $7, NOW(), NOW())`;
 
 /**
  * Consumption movement: from holder, no to-side.
@@ -129,7 +129,7 @@ const SQL_MOVEMENT_ISSUE =
 const SQL_MOVEMENT_CONSUMPTION =
   `INSERT INTO field_stock_movements ` +
   `(id, stock_item_id, movement_type, from_holder_id, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at) ` +
-  `VALUES (gen_random_uuid(), $1, 'consumption', $2, $3, $4, COALESCE($4,0)*$3, $5, $6, NOW(), NOW())`;
+  `VALUES (gen_random_uuid(), $1, 'consumption', $2, $3, $4, COALESCE($4::numeric,0)*$3::numeric, $5, $6, NOW(), NOW())`;
 
 /**
  * Return movement: holder → location.
@@ -139,7 +139,7 @@ const SQL_MOVEMENT_CONSUMPTION =
 const SQL_MOVEMENT_RETURN =
   `INSERT INTO field_stock_movements ` +
   `(id, stock_item_id, movement_type, from_holder_id, to_location_id, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at) ` +
-  `VALUES (gen_random_uuid(), $1, 'return', $2, $3, $4, $5, COALESCE($5,0)*$4, $6, $7, NOW(), NOW())`;
+  `VALUES (gen_random_uuid(), $1, 'return', $2, $3, $4, $5, COALESCE($5::numeric,0)*$4::numeric, $6, $7, NOW(), NOW())`;
 
 // ============================================================================
 // Public API
