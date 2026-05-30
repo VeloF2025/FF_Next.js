@@ -2611,12 +2611,6 @@ Transitions happen automatically through normal workflows (allocations, returns,
 5. Enter a **reason** (mandatory for all transitions)
 6. Click **Confirm Transition**
 
-**API Access:**
-- **POST** \`/api/procurement/field-stock/serials/transition\` — Transition a serial to a new state
-  - Required: \`serialId\`, \`toStatus\`
-  - Optional: \`reason\`, \`notes\`
-  - Returns: Updated serial with transition logged in audit trail
-
 > **Important:** Invalid transitions are rejected by the system. For example, an item cannot move from \`faulty\` to \`assigned\` without first being repaired (transitioned to \`available\`).
 
 ### 7.13 Reports & Export

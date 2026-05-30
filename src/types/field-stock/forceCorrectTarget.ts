@@ -7,6 +7,7 @@
  */
 export type ForceCorrectStatus =
   | 'available'
+  | 'in_stock'
   | 'reserved'
   | 'allocated_to_project'
   | 'in_transit'

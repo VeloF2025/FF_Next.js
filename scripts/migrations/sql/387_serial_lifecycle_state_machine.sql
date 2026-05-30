@@ -79,9 +79,12 @@ INSERT INTO stock_serial_status_transitions (from_state, to_state, event_type, d
   ('installed',           'returned',             'returned_to_warehouse', 'Pulled from drop'),
   ('activated',           'returned',             'returned_to_warehouse', 'Customer cancel + recovery'),
   ('faulty',              'returned',             'returned_to_warehouse', 'RMA returned'),
+  ('issued',              'returned',             'returned_to_warehouse', 'Tech returns issued stock (return creation)'),
   ('returned',            'in_stock',             'restocked',             'Return disposition=restock'),
+  ('returned',            'faulty',               'marked_faulty',         'Return disposition=repair (inspected faulty)'),
   ('returned',            'scrapped',             'scrapped',              'Return disposition=scrap'),
-  ('faulty',              'scrapped',             'scrapped',              'Scrapped without restock')
+  ('faulty',              'scrapped',             'scrapped',              'Scrapped without restock'),
+  ('faulty',              'in_stock',             'fault_cleared',         'Fault report resolved — unit returned to stock')
 ON CONFLICT (from_state, to_state) DO NOTHING;
 
 -- 3. Holder cross-validation pairs (status × holder_type).
@@ -311,23 +314,38 @@ CREATE TRIGGER trg_stock_serial_holder_validate_t
 --      emit_serial_event_on_drop_install  (mig 367)
 --        → now Track 2.4 / 2.6 (cascade PP resolution / OES install path)
 --
+--      emit_serial_event_on_return       (mig 364 T4)  ON stock_returns
+--      emit_serial_event_on_return_line_insert (T4b)    ON stock_return_lines
+--        → now Track 7 (returns/index.ts createReturn → promoteSerial('returned')).
+--          These two legacy triggers do `UPDATE stock_serials SET status='returned'`
+--          from the line's current state on return creation. Post-387 the matrix
+--          validate trigger would reject creation-time transitions with no row
+--          (e.g. issued→returned), and the legacy trigger's own EXCEPTION WHEN
+--          OTHERS would silently swallow it (no status change, no event). Routing
+--          creation through promoteSerial emits one clean event via the generic
+--          emit trigger; retaining these would double-emit (NULL-source row).
+--
 --    Intentionally RETAINED (not superseded):
 --      emit_serial_event_on_qa_install  ON qa_photo_reviews
 --        (mig 364 T2 / mig 365 FIX) — dormant in prod (ont_serial_scanned=NULL);
 --        kept as a no-cost safety net; Track 2.x does not route QA installs.
---      emit_serial_event_on_return      ON stock_returns
---        (mig 364 T4) — fires on return creation; Track 2.3 refactored return
---        *acceptance* only; creation-time 'returned' emission still relies on this
---        trigger (different lifecycle point — no double-emit risk).
+--      emit_serial_event_on_return_disposition ON stock_return_lines
+--        (mig 364 / mig 392) — fires on disposition UPDATE (restock/scrap), a
+--        different lifecycle point owned by mig 392; return *acceptance* routing
+--        (Track 2.3 / returns/accept.ts) composes with it, not creation.
 --
 --    Triggers are dropped first (must precede their function drops).
-DROP TRIGGER IF EXISTS emit_serial_event_on_picking_done  ON stock_pickings;
-DROP TRIGGER IF EXISTS emit_serial_event_on_oes_activate  ON oes_pp_data;
-DROP TRIGGER IF EXISTS emit_serial_event_on_drop_install  ON drops;
+DROP TRIGGER IF EXISTS emit_serial_event_on_picking_done       ON stock_pickings;
+DROP TRIGGER IF EXISTS emit_serial_event_on_oes_activate       ON oes_pp_data;
+DROP TRIGGER IF EXISTS emit_serial_event_on_drop_install       ON drops;
+DROP TRIGGER IF EXISTS emit_serial_event_on_return            ON stock_returns;
+DROP TRIGGER IF EXISTS emit_serial_event_on_return_line_insert ON stock_return_lines;
 
 DROP FUNCTION IF EXISTS trg_emit_serial_event_on_picking_done();
 DROP FUNCTION IF EXISTS trg_emit_serial_event_on_oes_activate();
 DROP FUNCTION IF EXISTS trg_emit_serial_event_on_drop_install();
+DROP FUNCTION IF EXISTS trg_emit_serial_event_on_return();
+DROP FUNCTION IF EXISTS trg_emit_serial_event_on_return_line_insert();
 
 INSERT INTO migrations (version, name)
   VALUES (387, 'serial_lifecycle_state_machine')

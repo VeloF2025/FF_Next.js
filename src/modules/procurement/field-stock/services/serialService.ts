@@ -10,7 +10,6 @@ import type {
   StockSerial,
   RegisterSerialInput,
   SerialFilters,
-  SerialStatus,
 } from '../types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -184,7 +183,7 @@ export async function registerSerial(input: RegisterSerialInput): Promise<StockS
         ${input.macAddress || null},
         ${input.imei || null},
         ${input.locationId},
-        'available',
+        'in_stock',
         ${input.receivedDate || null},
         ${input.receivedReference || null},
         ${input.warrantyEndDate || null}
@@ -211,78 +210,6 @@ export async function registerSerial(input: RegisterSerialInput): Promise<StockS
 }
 
 /**
- * Update serial status
- */
-export async function updateSerialStatus(
-  id: string,
-  status: SerialStatus,
-  locationId?: string
-): Promise<StockSerial> {
-  try {
-    const results = await sql`
-      UPDATE stock_serials
-      SET
-        status = ${status},
-        current_location_id = COALESCE(${locationId || null}, current_location_id),
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING
-        id,
-        stock_item_id as "stockItemId",
-        serial_number as "serialNumber",
-        status,
-        current_location_id as "currentLocationId",
-        updated_at as "updatedAt"
-    `;
-
-    log.info(`Updated serial status: ${id} -> ${status}`, undefined, 'serialService');
-    return results[0] as StockSerial;
-  } catch (error) {
-    log.error('Failed to update serial status', { error }, 'serialService');
-    throw error;
-  }
-}
-
-/**
- * Mark serial as installed at a drop
- */
-export async function markSerialInstalled(
-  serialId: string,
-  dropId: string,
-  dropNumber: string,
-  installedBy: string
-): Promise<StockSerial> {
-  try {
-    const results = await sql`
-      UPDATE stock_serials
-      SET
-        status = 'installed',
-        installed_at_drop_id = ${dropId},
-        installed_at_drop_number = ${dropNumber},
-        installed_date = NOW(),
-        installed_by = ${installedBy},
-        updated_at = NOW()
-      WHERE id = ${serialId}
-      RETURNING
-        id,
-        stock_item_id as "stockItemId",
-        serial_number as "serialNumber",
-        status,
-        installed_at_drop_id as "installedAtDropId",
-        installed_at_drop_number as "installedAtDropNumber",
-        installed_date as "installedDate",
-        installed_by as "installedBy"
-    `;
-
-    log.info(`Serial ${serialId} installed at drop ${dropNumber}`, undefined, 'serialService');
-    return results[0] as StockSerial;
-  } catch (error) {
-    log.error('Failed to mark serial installed', { error }, 'serialService');
-    throw error;
-  }
-}
-
-/**
  * Get available serials for a specific item
  */
 export async function getAvailableSerials(stockItemId: string): Promise<StockSerial[]> {
@@ -302,7 +229,7 @@ export async function getAvailableSerials(stockItemId: string): Promise<StockSer
       FROM stock_serials s
       LEFT JOIN stock_locations l ON l.id = s.current_location_id
       WHERE s.stock_item_id = ${stockItemId}
-        AND s.status = 'available'
+        AND s.status IN ('available', 'in_stock')
       ORDER BY s.serial_number
     `;
 

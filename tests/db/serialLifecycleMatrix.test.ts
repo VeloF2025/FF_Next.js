@@ -2,7 +2,7 @@
  * tests/db/serialLifecycleMatrix.test.ts
  *
  * Full transition-matrix coverage for mig 387 lifecycle triggers.
- * 17 forward ALLOWED + 3 ILLEGAL (FF001) + 2 HOLDER_MISMATCH (FF002) = 22 tests.
+ * 22 forward ALLOWED + 3 ILLEGAL (FF001) + 2 HOLDER_MISMATCH (FF002) = 27 tests.
  *
  * Track 2.4 additions: mig 387 matrix extended with OES cascade paths:
  *   in_stock → installed       (was ILLEGAL: "skips issued")
@@ -89,6 +89,12 @@ const ALLOWED: AllowedCase[] = [
   { from: 'returned',            to: 'in_stock',             expectedEventType: 'restocked',             seedHolderId: null },
   { from: 'returned',            to: 'scrapped',             expectedEventType: 'scrapped',              seedHolderId: null },
   { from: 'faulty',              to: 'scrapped',             expectedEventType: 'scrapped',              seedHolderId: null },
+  // Track 7 cutover — return creation flips issued→returned (holder cleared);
+  // return disposition=repair is returned→faulty; fault report resolve is
+  // faulty→in_stock (fault_cleared).
+  { from: 'issued',              to: 'returned',             expectedEventType: 'returned_to_warehouse', seedHolderId: STAFF_HOLDER_ID,toHolderId: null },
+  { from: 'returned',            to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: null },
+  { from: 'faulty',              to: 'in_stock',             expectedEventType: 'fault_cleared',         seedHolderId: null },
 ];
 
 // 3 illegal transitions — holder valid for from-status so status-validate fires.

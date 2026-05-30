@@ -5,8 +5,10 @@
  */
 
 import { neon } from '@/lib/db-neon';
+import { pool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { createAuditLog } from '@/services/procurement/auditService';
+import { promoteSerial, type SerialStatus } from '@/modules/procurement/field-stock/services/serialLifecycle';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -152,7 +154,11 @@ export async function reverseMovement(
       `;
     }
 
-    // 5. If serial was involved, revert to previous_status
+    // 5. If serial was involved, revert it to its previous status. This is a
+    //    deliberate backwards/off-matrix correction, so it routes through
+    //    promoteSerial with bypass=true — the mig 387 validate trigger logs it to
+    //    the violations side-table and the emit trigger records a force_corrected
+    //    event. Legacy 'available' normalises to 'in_stock' (post-cutover vocab).
     for (const item of movementItems) {
       if (item.serial_numbers) {
         const serials: string[] = typeof item.serial_numbers === 'string'
@@ -160,15 +166,24 @@ export async function reverseMovement(
           : item.serial_numbers;
 
         for (const serialNum of serials) {
-          await sql`
-            UPDATE stock_serials
-            SET status = COALESCE(previous_status, 'available'),
-                previous_status = status,
-                status_changed_at = NOW(),
-                status_changed_by = ${performedByName},
-                updated_at = NOW()
-            WHERE serial_number = ${serialNum}
+          const serialRows = await sql`
+            SELECT id, previous_status FROM stock_serials WHERE serial_number = ${serialNum}
           `;
+          const serialRow = serialRows[0];
+          if (!serialRow) continue;
+
+          const prev = (serialRow.previous_status as string | null) ?? null;
+          const revertTo: SerialStatus = (!prev || prev === 'available') ? 'in_stock' : (prev as SerialStatus);
+
+          await promoteSerial(pool, {
+            serialId:    serialRow.id as string,
+            toStatus:    revertTo,
+            sourceTable: 'stock_movements',
+            sourceId:    movementId,
+            actorUserId: performedBy,
+            payload:     { reversal: true, reason },
+            bypass:      true,
+          });
         }
       }
     }

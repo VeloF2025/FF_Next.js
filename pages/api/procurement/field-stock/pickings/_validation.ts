@@ -162,7 +162,7 @@ export async function validateSerialsAvailable(
         SELECT id, serial_number FROM stock_serials
         WHERE serial_number = ${serialNumber}
           AND stock_item_id = ${line.stockItemId}
-          AND status = 'available'
+          AND status IN ('available', 'in_stock')
         LIMIT 1
       `;
       const row = (serialRows as Array<{ id: string; serial_number: string }>)[0];

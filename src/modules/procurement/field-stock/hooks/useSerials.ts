@@ -9,7 +9,6 @@ import type {
   StockSerial,
   RegisterSerialInput,
   SerialFilters,
-  SerialStatus,
 } from '../types';
 
 interface UseSerialsOptions {
@@ -25,7 +24,6 @@ interface UseSerialsReturn {
   getSerial: (serialNumber: string) => Promise<StockSerial | null>;
   getSerialWithHistory: (serialNumber: string) => Promise<StockSerial & { history: unknown[] } | null>;
   registerSerial: (input: RegisterSerialInput) => Promise<StockSerial>;
-  updateSerialStatus: (serialNumber: string, status: SerialStatus, locationId?: string) => Promise<StockSerial>;
   refresh: () => Promise<void>;
 }
 
@@ -143,34 +141,6 @@ export function useSerials(options: UseSerialsOptions = {}): UseSerialsReturn {
     }
   }, [fetchSerials]);
 
-  const updateSerialStatus = useCallback(async (
-    serialNumber: string,
-    status: SerialStatus,
-    locationId?: string
-  ): Promise<StockSerial> => {
-    try {
-      const response = await fetch(`/api/procurement/field-stock/serials/${encodeURIComponent(serialNumber)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, locationId }),
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to update serial status');
-      }
-
-      // Refresh the list
-      await fetchSerials();
-
-      return result.data;
-    } catch (err) {
-      log.error('Failed to update serial status', { error: err }, 'useSerials');
-      throw err;
-    }
-  }, [fetchSerials]);
-
   const refresh = useCallback(async () => {
     await fetchSerials(currentFilters);
   }, [fetchSerials, currentFilters]);
@@ -195,7 +165,6 @@ export function useSerials(options: UseSerialsOptions = {}): UseSerialsReturn {
     getSerial,
     getSerialWithHistory,
     registerSerial,
-    updateSerialStatus,
     refresh,
   };
 }

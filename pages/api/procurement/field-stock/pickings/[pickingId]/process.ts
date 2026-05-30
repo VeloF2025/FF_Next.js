@@ -227,17 +227,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           );
           if (Array.isArray(line.serial_ids) && line.serial_ids.length > 0) {
             // Metadata first; promoteSerial routes status through mig 387 triggers.
-            // toStatus='available' (not 'in_stock'): the legacy stock_serials_status_check
-            // constraint (mig 362) predates mig 387's vocabulary widening, so writing
-            // 'in_stock' would 23514 reject pre-cutover. 'available' is in both the legacy
-            // CHECK and mig 387's matrix; Track 5 backfill renames it after cutover.
+            // toStatus='in_stock' (Track 7 cutover vocabulary): a transfer leaves
+            // the serials in stock at the destination, so for already-in-stock
+            // units this is an in_stock→in_stock no-op that the validate/emit
+            // triggers short-circuit. This commit deploys only after mig 387 +
+            // the Track 5 backfill, when the widened CHECK accepts 'in_stock'.
             await txn.query(
               `UPDATE stock_serials SET current_location_id = $1, updated_at = NOW()
                WHERE id = ANY($2::uuid[])`,
               [destinationLocationId, line.serial_ids],
             );
             await promotePickingSerials(txn, line.serial_ids, {
-              toStatus:     'available',
+              toStatus:     'in_stock',
               sourceId:     pickingId,
               actorStaffId: picking.signed_by ?? null,
               payload:      { picking_number: picking.picking_number, picking_type: pickingType },

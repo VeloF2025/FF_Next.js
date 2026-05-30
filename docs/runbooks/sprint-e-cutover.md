@@ -39,14 +39,22 @@ does not exist (see `feedback_migration_runner_blocked_by_387_gate`). Cutover:
   creating `__sprint_e_cutover_gate__`** — every `stock_serials.status`/`holder_id`
   writer must route through `promoteSerial` (Tracks 2.1–2.7) or be on the rule's
   allow-list. A non-zero count blocks cutover.
-  > NOTE (2026-05-29 audit): this gate currently reports **7 live violations**
-  > across `serialService.ts`, `movementReversalService.ts`, `serialStateMachine.ts`,
-  > and `pages/api/procurement/fault-reports/{index,[faultId]}.ts` — these must be
-  > routed through `promoteSerial` (with matching matrix rows) before cutover.
-- **T-1 day:** resolve / re-confirm the three open cutover concerns:
-  - `project_sprint_e_matrix_gap_issued_scrapped` — `(issued, scrapped)` matrix row.
-  - `project_sprint_e_mig_364_trigger_3_race` — mig 364 TRIGGER 3 vs cascade.
-  - `project_sprint_e_return_trigger_double_emit` — retained `return` trigger.
+  > RESOLVED (2026-05-30, Track 7 cutover commit): the gate now exits **0**. All
+  > former writers were routed through `promoteSerial` or retired — `serialService`
+  > `updateSerialStatus`/`markSerialInstalled` (dead, deleted); `serialStateMachine`
+  > + `serials/transition` (dead vocab, deleted); `movementReversalService`
+  > (`promoteSerial` bypass); `fault-reports/[faultId]` (`promoteSerial`,
+  > faulty→in_stock/scrapped); `returns/[returnId]/accept` restock (`promoteSerial`
+  > in_stock). The ESLint rule is flipped to `"error"` in the same commit.
+- **T-1 day:** the three former cutover concerns are RESOLVED in the Track 7 commit:
+  - `(issued, scrapped)` — closed: return creation flips issued→returned, then
+    disposition does returned→scrapped (both matrixed). matrix row not needed.
+  - mig 364 TRIGGER 3 race — already handled: the live emitter is
+    `emit_serial_event_on_oes_activate`, dropped by mig 387's Track 2.7 block.
+  - return-trigger double-emit / FF001 — closed: the two return-creation triggers
+    (`emit_serial_event_on_return{,_line_insert}`) are dropped by mig 387 and
+    creation now routes through `promoteSerial('returned')` (single event).
+    New matrix rows: `issued→returned`, `returned→faulty`, `faulty→in_stock`.
 
 ## T-0 cutover window (ordered)
 
@@ -97,6 +105,17 @@ the script gap-fills a synthetic `received` genesis event for any serial still
 event-less afterwards. No `ff.bypass_validation` (the rename is a matrixed
 transition and every `available` serial has `holder_id IS NULL`).
 
+> **Expected non-fatal exit (2026-05-30 rehearsal).** The script's *pre-flight*
+> guards (retired status present, or an `available` serial carrying a `holder_id`)
+> abort BEFORE any write — those are the real abort triggers. Its *post-verify*
+> (`remaining available=0`, `zero-event=0`, `latest_event_matches_status drift=0`)
+> runs AFTER the rename has committed. If only `latest_event_matches_status` is
+> non-zero, the rename succeeded and the drift is the pre-existing **Pattern B**
+> historic data (serials `status=activated` whose latest event is `installed_at_drop`
+> from the live OES cascade — 3 such rows on 2026-05-29, and growing nightly).
+> This is NOT an abort trigger: proceed to step 6 historic cleanup, which clears
+> it. Characterise the exact set live at cutover (do not assume the old "8").
+
 ### 4. Deploy the app
 
 ```bash
@@ -125,9 +144,27 @@ is live and quiet.
 
 ### 6. Historic cleanup
 
-Apply the deferred historic fix: revert the **8** serials regressed by Pattern B
-to `activated` and reconcile the **19** spurious `installed_at_drop` events (see
-`project_serial_register_wave2`). Re-run `npm run reconcile:serials` after.
+Apply the deferred historic fix for **Pattern B** drift (serials `status=activated`
+whose latest event is `installed_at_drop` — the OES cascade emits the install event
+after activation). **Characterise the live set first — do NOT assume the old "8".**
+The cascade runs nightly, so the count grows: the 2026-05-30 rehearsal saw 3 fresh
+rows (`ALCLB48E004C`, `ALCLB48F2F05`, `ALCLB480E59D`, all 2026-05-29 20:11) on top
+of the originally documented 8.
+
+```sql
+-- The live Pattern B set at cutover time:
+WITH latest AS (
+  SELECT DISTINCT ON (serial_id) serial_id, to_state, event_type
+  FROM stock_serial_events ORDER BY serial_id, occurred_at DESC, id DESC)
+SELECT ss.id, ss.serial_number, ss.status, l.to_state, l.event_type
+FROM stock_serials ss JOIN latest l ON l.serial_id = ss.id
+WHERE l.to_state IS DISTINCT FROM ss.status
+  AND NOT (l.to_state = 'in_stock' AND ss.status = 'available');
+```
+
+Reconcile each (revert the serial or delete the spurious `installed_at_drop` event,
+per `project_serial_register_wave2`). Re-run `npm run reconcile:serials` after —
+`latest_event_matches_status` must reach tolerance.
 
 ### 7. Release the change flag / close the window.
 

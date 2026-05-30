@@ -176,12 +176,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             );
           }
 
-          // Update serial: return to warehouse location, clear holder.
+          // Return to warehouse stock. Status + holder route through promoteSerial
+          // (returned→in_stock, 'restocked' event, holder cleared); the location
+          // is non-status metadata so it stays a plain UPDATE.
           if (line.serial_id) {
+            await promoteSerial(txn.client, {
+              serialId:     line.serial_id,
+              toStatus:     'in_stock',
+              toHolderId:   null,
+              sourceTable:  'stock_returns',
+              sourceId:     returnId,
+              actorStaffId: staffId,
+              payload: {
+                disposition,
+                line_id: line.id,
+                return_number: returnRecord.return_number,
+              },
+            });
             await txn.query(
-              `UPDATE stock_serials
-               SET current_location_id = $1, holder_id = NULL, status = 'available', updated_at = NOW()
-               WHERE id = $2`,
+              `UPDATE stock_serials SET current_location_id = $1, updated_at = NOW() WHERE id = $2`,
               [returnToLocationId, line.serial_id]
             );
           }
@@ -190,9 +203,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           // Routes through promoteSerial so mig 387 AFTER trigger emits stock_serial_events
           // post-cutover. Pre-cutover: same UPDATE behaviour, no triggers fire.
           // Both paths clear holder_id (NULL) — warehouse-resident via stock_quants.
-          // Pre-cutover matrix constraint: serial must be in 'returned' or 'faulty' state.
-          // NOTE: (issued,scrapped) has no matrix row — a direct issued→scrapped UPDATE
-          // would succeed pre-cutover but will throw FF001 post-cutover. Deferred to Track 5/7.
+          // At acceptance the serial is already 'returned' (set at creation via
+          // promoteSerial), so this is the matrixed returned→scrapped transition.
           if (line.serial_id) {
             await promoteSerial(txn.client, {
               serialId:    line.serial_id,
@@ -213,7 +225,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           // Routes through promoteSerial so mig 387 AFTER trigger emits stock_serial_events
           // post-cutover. Pre-cutover: same UPDATE behaviour, no triggers fire.
           // Both paths clear holder_id (NULL) — warehouse-resident via stock_quants.
-          // Post-cutover matrix: requires serial in 'issued', 'installed', or 'activated' state.
+          // At acceptance the serial is already 'returned', so this is the matrixed
+          // returned→faulty transition (disposition=repair, inspected faulty).
           if (line.serial_id) {
             await promoteSerial(txn.client, {
               serialId:    line.serial_id,

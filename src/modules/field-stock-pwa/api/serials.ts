@@ -51,7 +51,7 @@ export async function validateSerial(serialNumber: string): Promise<{
       `/api/procurement/field-stock/serials/${encodeURIComponent(serialNumber)}`
     );
 
-    if (serial.status !== 'available') {
+    if (serial.status !== 'available' && serial.status !== 'in_stock') {
       return {
         valid: false,
         stockItemId: serial.stockItemId,

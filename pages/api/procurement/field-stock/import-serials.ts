@@ -136,7 +136,7 @@ async function handleImport(res: NextApiResponse, workbook: any, XLSX: any): Pro
             if (!existing) {
               await sql`
                 INSERT INTO stock_serials (stock_item_id, serial_number, current_location_id, status, received_reference, received_date, condition)
-                VALUES (${FT_ONT_ITEM_ID}, ${ontSerial}, ${locationId}, 'available', ${reference}, NOW(), 'new')
+                VALUES (${FT_ONT_ITEM_ID}, ${ontSerial}, ${locationId}, 'in_stock', ${reference}, NOW(), 'new')
               `;
               result.ontImported++;
               ontCount++;
@@ -162,7 +162,7 @@ async function handleImport(res: NextApiResponse, workbook: any, XLSX: any): Pro
             if (!existing) {
               await sql`
                 INSERT INTO stock_serials (stock_item_id, serial_number, current_location_id, status, received_reference, received_date, condition)
-                VALUES (${FT_GIZZU_ITEM_ID}, ${upsSerial}, ${locationId}, 'available', ${reference}, NOW(), 'new')
+                VALUES (${FT_GIZZU_ITEM_ID}, ${upsSerial}, ${locationId}, 'in_stock', ${reference}, NOW(), 'new')
               `;
               result.upsImported++;
               upsCount++;

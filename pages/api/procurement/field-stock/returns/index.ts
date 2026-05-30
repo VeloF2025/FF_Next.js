@@ -6,10 +6,16 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '@/lib/db';
+import { transaction } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { isReturnCreator } from '@/modules/field-stock-pwa/lib/storesRoles';
+import {
+  promoteSerial,
+  LifecycleViolationError,
+  HolderMismatchError,
+} from '@/modules/procurement/field-stock/services/serialLifecycle';
 import { handleList } from './_list';
 
 // Valid CHECK constraint values
@@ -111,62 +117,85 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
     const numResult = await sql`SELECT generate_return_number() AS num`;
     const returnNumber = numResult[0]?.num as string;
 
-    // ── Create return header ───────────────────────────────────────────────────
-    const returnResult = await sql`
-      INSERT INTO stock_returns (
-        return_number,
-        original_picking_id,
-        returned_by_id,
-        returned_by_name,
-        return_to_location_id,
-        status,
-        notes,
-        return_date,
-        idempotency_key
-      ) VALUES (
-        ${returnNumber},
-        ${originalPickingId || null},
-        ${staffId},
-        ${returnedByName || null},
-        ${returnToLocationId},
-        'pending',
-        ${notes || null},
-        NOW(),
-        ${(idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.trim() !== '') ? idempotencyKey : null}
-      )
-      RETURNING *
-    `;
+    // ── Create header + lines + flip serials to 'returned' (atomic) ────────────
+    // Track 7: each serialized line routes through promoteSerial('returned',
+    // holder cleared) so the mig 387 emit trigger records exactly one event. The
+    // legacy emit_serial_event_on_return{,_line_insert} triggers — which did a
+    // guarded `UPDATE … SET status='returned'` and would silently swallow an
+    // FF001 (e.g. issued→returned has no pre-387 matrix row) — are dropped by
+    // mig 387. This is now the only creation-time 'returned' write path.
+    const idempotencyValue =
+      (idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.trim() !== '')
+        ? idempotencyKey
+        : null;
 
-    const returnRecord = returnResult[0];
-    if (!returnRecord) {
-      return apiResponse.internalError(res, new Error('Failed to create return'));
-    }
+    let returnId: string;
+    try {
+      returnId = await transaction(async (txn) => {
+        const headerRow = await txn.queryOne<{ id: string }>(
+          `INSERT INTO stock_returns (
+             return_number, original_picking_id, returned_by_id, returned_by_name,
+             return_to_location_id, status, notes, return_date, idempotency_key
+           ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), $7)
+           RETURNING id`,
+          [
+            returnNumber,
+            originalPickingId || null,
+            staffId,
+            returnedByName || null,
+            returnToLocationId,
+            notes || null,
+            idempotencyValue,
+          ],
+        );
+        const newReturnId = headerRow?.id;
+        if (!newReturnId) {
+          throw new Error('Failed to create return header');
+        }
 
-    const returnId = returnRecord.id as string;
+        for (const line of lines) {
+          await txn.query(
+            `INSERT INTO stock_return_lines (
+               return_id, stock_item_id, serial_id, serial_number,
+               quantity, condition, return_reason, notes
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+              newReturnId,
+              line.stockItemId,
+              line.serialId || null,
+              line.serialNumber || null,
+              line.quantity || 1,
+              line.condition || 'good',
+              line.returnReason || 'unused',
+              line.notes || null,
+            ],
+          );
 
-    // ── Create return lines ────────────────────────────────────────────────────
-    for (const line of lines) {
-      await sql`
-        INSERT INTO stock_return_lines (
-          return_id,
-          stock_item_id,
-          serial_id,
-          serial_number,
-          quantity,
-          condition,
-          return_reason,
-          notes
-        ) VALUES (
-          ${returnId},
-          ${line.stockItemId},
-          ${line.serialId || null},
-          ${line.serialNumber || null},
-          ${line.quantity || 1},
-          ${line.condition || 'good'},
-          ${line.returnReason || 'unused'},
-          ${line.notes || null}
-        )
-      `;
+          // Flip the serial to 'returned' with holder cleared (back at warehouse).
+          if (line.serialId) {
+            await promoteSerial(txn.client, {
+              serialId:     line.serialId,
+              toStatus:     'returned',
+              toHolderId:   null,
+              sourceTable:  'stock_returns',
+              sourceId:     newReturnId,
+              actorStaffId: staffId,
+              payload: {
+                return_number: returnNumber,
+                line_reason: line.returnReason ?? 'unused',
+              },
+            });
+          }
+        }
+
+        return newReturnId;
+      });
+    } catch (err: unknown) {
+      if (err instanceof LifecycleViolationError || err instanceof HolderMismatchError) {
+        log.warn('returns.create.lifecycle_rejected', { error: err.message }, 'field-stock');
+        return apiResponse.validationError(res, { serial: err.message });
+      }
+      throw err;
     }
 
     // ── Fetch complete return with lines ───────────────────────────────────────

@@ -54,7 +54,7 @@ async function getStats(itemCode: string, project: string) {
   if (project) {
     const [row] = await sql`
       SELECT COUNT(*)::int as total,
-        COUNT(*) FILTER (WHERE ss.status = 'available')::int as available,
+        COUNT(*) FILTER (WHERE ss.status IN ('available', 'in_stock'))::int as available,
         COUNT(*) FILTER (WHERE ss.status = 'issued')::int as issued,
         COUNT(*) FILTER (WHERE ss.status = 'installed')::int as installed,
         COUNT(*) FILTER (WHERE ss.status = 'faulty')::int as faulty,
@@ -68,7 +68,7 @@ async function getStats(itemCode: string, project: string) {
   }
   const [row] = await sql`
     SELECT COUNT(*)::int as total,
-      COUNT(*) FILTER (WHERE ss.status = 'available')::int as available,
+      COUNT(*) FILTER (WHERE ss.status IN ('available', 'in_stock'))::int as available,
       COUNT(*) FILTER (WHERE ss.status = 'issued')::int as issued,
       COUNT(*) FILTER (WHERE ss.status = 'installed')::int as installed,
       COUNT(*) FILTER (WHERE ss.status = 'faulty')::int as faulty,
