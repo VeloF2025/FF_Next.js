@@ -1,10 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { neon } from '@neondatabase/serverless';
+import { transaction } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
+import {
+  promoteSerial,
+  LifecycleViolationError,
+  HolderMismatchError,
+} from '@/modules/procurement/field-stock/services/serialLifecycle';
 import type { FaultResolutionStatusValue } from '@/types/procurement/fault.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -106,51 +112,71 @@ async function handlePut(
   try {
     const body = req.body;
 
-    // Fetch current state
-    const current = await sql`
-      SELECT id, resolution_status, serial_id FROM fault_reports WHERE id = ${faultId}::uuid
-    `;
-    if (current.length === 0) {
-      return apiResponse.notFound(res, 'Fault report', faultId);
-    }
-    const oldRow = current[0]!;
-
-    // Validate resolution_status if provided
+    // Validate resolution_status if provided (before opening a transaction)
     if (body.resolutionStatus && !VALID_RESOLUTION_STATUSES.includes(body.resolutionStatus)) {
       return apiResponse.validationError(res, {
         resolutionStatus: `Must be one of: ${VALID_RESOLUTION_STATUSES.join(', ')}`,
       });
     }
 
-    const newStatus = body.resolutionStatus ?? oldRow.resolution_status;
-    const isResolving = newStatus === 'resolved' || newStatus === 'scrapped';
+    // Fault-report update + serial promotion are one atomic unit (Track 7): the
+    // serial status routes through promoteSerial so the mig 387 emit trigger
+    // records the lifecycle event. fault_report_id is non-status metadata, so it
+    // stays a plain UPDATE.
+    const outcome = await transaction(async (txn) => {
+      const oldRow = await txn.queryOne<{ resolution_status: string; serial_id: string | null }>(
+        `SELECT id, resolution_status, serial_id FROM fault_reports WHERE id = $1::uuid`,
+        [faultId],
+      );
+      if (!oldRow) {
+        return null;
+      }
 
-    const [updated] = await sql`
-      UPDATE fault_reports
-      SET resolution_status = ${newStatus},
-          resolution_notes  = COALESCE(${body.resolutionNotes ?? null}, resolution_notes),
-          resolved_by        = CASE WHEN ${isResolving} THEN ${userName} ELSE resolved_by END,
-          resolved_at        = CASE WHEN ${isResolving} THEN NOW() ELSE resolved_at END,
-          updated_at         = NOW()
-      WHERE id = ${faultId}::uuid
-      RETURNING id, project_id, serial_id, stock_item_id, fault_type, severity,
-                resolution_status, description, evidence_urls, reported_by,
-                reported_by_name, reported_at, supplier_id, location_id,
-                resolved_by, resolved_at, resolution_notes, created_at, updated_at
-    `;
+      const newStatus = body.resolutionStatus ?? oldRow.resolution_status;
+      const isResolving = newStatus === 'resolved' || newStatus === 'scrapped';
 
-    // If resolved/scrapped and serial exists, update serial status accordingly
-    if (isResolving && oldRow.serial_id) {
-      const newSerialStatus = newStatus === 'scrapped' ? 'scrapped' : 'available';
-      await sql`
-        UPDATE stock_serials
-        SET previous_status   = status,
-            status            = ${newSerialStatus},
-            status_changed_at = NOW(),
-            status_changed_by = ${userName},
-            fault_report_id   = CASE WHEN ${newSerialStatus} = 'available' THEN NULL ELSE fault_report_id END
-        WHERE id = ${oldRow.serial_id}::uuid
-      `;
+      const updated = await txn.queryOne(
+        `UPDATE fault_reports
+            SET resolution_status = $1,
+                resolution_notes  = COALESCE($2, resolution_notes),
+                resolved_by        = CASE WHEN $3 THEN $4 ELSE resolved_by END,
+                resolved_at        = CASE WHEN $3 THEN NOW() ELSE resolved_at END,
+                updated_at         = NOW()
+          WHERE id = $5::uuid
+          RETURNING id, project_id, serial_id, stock_item_id, fault_type, severity,
+                    resolution_status, description, evidence_urls, reported_by,
+                    reported_by_name, reported_at, supplier_id, location_id,
+                    resolved_by, resolved_at, resolution_notes, created_at, updated_at`,
+        [newStatus, body.resolutionNotes ?? null, isResolving, userName, faultId],
+      );
+
+      // Resolving a fault clears the unit back to stock (faulty→in_stock) or
+      // scraps it (faulty→scrapped). Both clear the holder (warehouse-resident).
+      if (isResolving && oldRow.serial_id) {
+        const toStatus = newStatus === 'scrapped' ? 'scrapped' : 'in_stock';
+        await promoteSerial(txn.client, {
+          serialId:    oldRow.serial_id,
+          toStatus,
+          toHolderId:  null,
+          sourceTable: 'fault_reports',
+          sourceId:    faultId,
+          actorUserId: userId,
+          payload: { resolution_status: newStatus },
+        });
+        // Cleared back to stock → drop the fault link (metadata only).
+        if (toStatus === 'in_stock') {
+          await txn.query(
+            `UPDATE stock_serials SET fault_report_id = NULL WHERE id = $1::uuid`,
+            [oldRow.serial_id],
+          );
+        }
+      }
+
+      return { updated, newStatus, oldStatus: oldRow.resolution_status };
+    });
+
+    if (!outcome) {
+      return apiResponse.notFound(res, 'Fault report', faultId);
     }
 
     // Audit log
@@ -160,17 +186,25 @@ async function handlePut(
       action: 'update',
       performedBy: userId,
       performedByName: userName,
-      oldValues: { resolutionStatus: oldRow.resolution_status },
-      newValues: { resolutionStatus: newStatus },
+      oldValues: { resolutionStatus: outcome.oldStatus },
+      newValues: { resolutionStatus: outcome.newStatus },
       changedFields: ['resolution_status'],
     });
 
+    if (!outcome.updated) {
+      return apiResponse.notFound(res, 'Fault report', faultId);
+    }
+
     log.info('[FaultReports] Updated fault report', {
-      data: { id: faultId, newStatus },
+      data: { id: faultId, newStatus: outcome.newStatus },
     }, 'fault-reports');
 
-    return apiResponse.success(res, updated!, 'Fault report updated');
+    return apiResponse.success(res, outcome.updated, 'Fault report updated');
   } catch (error) {
+    if (error instanceof LifecycleViolationError || error instanceof HolderMismatchError) {
+      log.warn('fault-reports.resolve.lifecycle_rejected', { error: error.message }, 'fault-reports');
+      return apiResponse.validationError(res, { serial: error.message });
+    }
     log.error('Failed to update fault report', { error: { error } }, 'FaultidApi');
     return apiResponse.databaseError(res, error, 'Failed to update fault report');
   }

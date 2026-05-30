@@ -2,7 +2,7 @@
  * tests/db/serialLifecycleMatrix.test.ts
  *
  * Full transition-matrix coverage for mig 387 lifecycle triggers.
- * 17 forward ALLOWED + 3 ILLEGAL (FF001) + 2 HOLDER_MISMATCH (FF002) = 22 tests.
+ * 22 forward ALLOWED + 3 ILLEGAL (FF001) + 2 HOLDER_MISMATCH (FF002) = 27 tests.
  *
  * Track 2.4 additions: mig 387 matrix extended with OES cascade paths:
  *   in_stock → installed       (was ILLEGAL: "skips issued")
@@ -64,7 +64,7 @@ interface HolderMismatchCase {
   transitionAllowed: boolean;
 }
 
-// 17 forward transitions mirroring stock_serial_status_transitions (excludes
+// 22 forward transitions mirroring stock_serial_status_transitions (excludes
 // null → in_stock INSERT case covered by Task 1.3).
 // Track 2.4 added 3 OES cascade paths: in_stock/available/allocated_to_project → installed.
 const ALLOWED: AllowedCase[] = [
@@ -89,6 +89,12 @@ const ALLOWED: AllowedCase[] = [
   { from: 'returned',            to: 'in_stock',             expectedEventType: 'restocked',             seedHolderId: null },
   { from: 'returned',            to: 'scrapped',             expectedEventType: 'scrapped',              seedHolderId: null },
   { from: 'faulty',              to: 'scrapped',             expectedEventType: 'scrapped',              seedHolderId: null },
+  // Track 7 cutover — return creation flips issued→returned (holder cleared);
+  // return disposition=repair is returned→faulty; fault report resolve is
+  // faulty→in_stock (fault_cleared).
+  { from: 'issued',              to: 'returned',             expectedEventType: 'returned_to_warehouse', seedHolderId: STAFF_HOLDER_ID,toHolderId: null },
+  { from: 'returned',            to: 'faulty',               expectedEventType: 'marked_faulty',         seedHolderId: null },
+  { from: 'faulty',              to: 'in_stock',             expectedEventType: 'fault_cleared',         seedHolderId: null },
 ];
 
 // 3 illegal transitions — holder valid for from-status so status-validate fires.
@@ -181,7 +187,7 @@ describe('serial lifecycle transition matrix', () => {
   });
 
   // --------------------------------------------------------------------------
-  // ALLOWED — 14 forward cases
+  // ALLOWED — 22 forward cases
   // --------------------------------------------------------------------------
 
   ALLOWED.forEach(({ from, to, expectedEventType, seedHolderId, toHolderId }, idx) => {

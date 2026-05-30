@@ -1,7 +1,10 @@
 /**
  * Field Stock Serial by Number API
  * GET /api/procurement/field-stock/serials/[serialNumber] - Get serial by number
- * PUT /api/procurement/field-stock/serials/[serialNumber] - Update serial status
+ *
+ * Status writes go through the serial lifecycle (promoteSerial) from the
+ * specific domain endpoints (pickings, returns, fault-reports); the generic
+ * PUT status-setter was retired at the Sprint E cutover (Track 7).
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -11,10 +14,8 @@ import { withAuth } from '@/lib/auth';
 import {
   getSerialByNumber,
   getSerialById,
-  updateSerialStatus,
   getSerialHistory,
 } from '@/modules/procurement/field-stock/services/serialService';
-import type { SerialStatus } from '@/modules/procurement/field-stock/types';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { serialNumber } = req.query;
@@ -48,29 +49,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.success(res, serial);
     }
 
-    if (req.method === 'PUT') {
-      const { status, locationId } = req.body;
-
-      if (!status) {
-        return apiResponse.validationError(res, { status: 'Status is required' });
-      }
-
-      // Get serial first to get its ID
-      const serial = await getSerialByNumber(serialNumber);
-      if (!serial) {
-        return apiResponse.notFound(res, 'Serial', serialNumber);
-      }
-
-      const updated = await updateSerialStatus(
-        serial.id,
-        status as SerialStatus,
-        locationId
-      );
-
-      return apiResponse.success(res, updated);
-    }
-
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT']);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   } catch (error) {
     log.error('Field stock serial API error', { error: error }, 'field-stock/serials/[number]');
     return apiResponse.internalError(res, error);

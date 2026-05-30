@@ -17,15 +17,15 @@ export interface DispositionOption {
   label: string;
   description: string;
   /** Resulting stock_serials.status applied by POST /accept. */
-  resultingSerialStatus: 'available' | 'faulty' | 'scrapped';
+  resultingSerialStatus: 'in_stock' | 'faulty' | 'scrapped';
 }
 
 export const DISPOSITION_OPTIONS: DispositionOption[] = [
   {
     code: 'restock',
     label: 'Restock',
-    description: 'Return to warehouse stock as available',
-    resultingSerialStatus: 'available',
+    description: 'Return to warehouse stock as in-stock',
+    resultingSerialStatus: 'in_stock',
   },
   {
     code: 'repair',

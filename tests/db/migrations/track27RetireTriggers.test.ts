@@ -1,21 +1,27 @@
 /**
  * tests/db/migrations/track27RetireTriggers.test.ts
  *
- * Sprint E Track 2.7 — verify that mig 387 (with the Track 2.7 DROP block)
+ * Sprint E Track 2.7 + Track 7 — verify that mig 387 (with the DROP block)
  * leaves the trigger + function set in exactly the expected post-cutover state.
  *
  * Assertions:
- *   ABSENT (dropped by Track 2.7 in mig 387):
- *     - emit_serial_event_on_picking_done  (mig 364 T1 / mig 366 fix)
- *     - emit_serial_event_on_oes_activate  (mig 364 T3 / mig 365 fix)
- *     - emit_serial_event_on_drop_install  (mig 367)
+ *   ABSENT (dropped in mig 387):
+ *     - emit_serial_event_on_picking_done       (mig 364 T1 / mig 366 fix)
+ *     - emit_serial_event_on_oes_activate       (mig 364 T3 / mig 365 fix)
+ *     - emit_serial_event_on_drop_install       (mig 367)
+ *     - emit_serial_event_on_return             (mig 364 T4)   — Track 7
+ *     - emit_serial_event_on_return_line_insert (mig 364 T4b)  — Track 7
  *     - trg_emit_serial_event_on_picking_done()
  *     - trg_emit_serial_event_on_oes_activate()
  *     - trg_emit_serial_event_on_drop_install()
+ *     - trg_emit_serial_event_on_return()             — Track 7
+ *     - trg_emit_serial_event_on_return_line_insert() — Track 7
  *
- *   PRESENT (retained — not yet superseded or out-of-scope for Track 2.7):
+ *   Track 7 retires the two return-creation triggers because return creation
+ *   now routes through promoteSerial('returned') (returns/index.ts).
+ *
+ *   PRESENT (retained — not superseded):
  *     - emit_serial_event_on_qa_install    (mig 364 T2 / mig 365 fix)
- *     - emit_serial_event_on_return        (mig 364 T4)
  *
  *   PRESENT (mig 387 generic set — installed by the same transaction):
  *     - trg_stock_serial_status_validate_t
@@ -34,24 +40,27 @@ if (!URL) {
   throw new Error('TEST_DATABASE_URL not set — run via vitest.db.sprinte.config.ts');
 }
 
-// ─── Retired triggers (dropped by Track 2.7) ─────────────────────────────────
+// ─── Retired triggers (dropped by Track 2.7 + Track 7) ───────────────────────
 const RETIRED_TRIGGERS = [
   'emit_serial_event_on_picking_done',
   'emit_serial_event_on_oes_activate',
   'emit_serial_event_on_drop_install',
+  'emit_serial_event_on_return',             // Track 7 — routed via promoteSerial
+  'emit_serial_event_on_return_line_insert', // Track 7 — routed via promoteSerial
 ] as const;
 
-// ─── Retired functions (dropped by Track 2.7) ────────────────────────────────
+// ─── Retired functions (dropped by Track 2.7 + Track 7) ──────────────────────
 const RETIRED_FUNCTIONS = [
   'trg_emit_serial_event_on_picking_done',
   'trg_emit_serial_event_on_oes_activate',
   'trg_emit_serial_event_on_drop_install',
+  'trg_emit_serial_event_on_return',             // Track 7
+  'trg_emit_serial_event_on_return_line_insert', // Track 7
 ] as const;
 
-// ─── Retained legacy triggers (NOT dropped — see task spec) ──────────────────
+// ─── Retained legacy triggers (NOT dropped) ──────────────────────────────────
 const RETAINED_TRIGGERS = [
   'emit_serial_event_on_qa_install',
-  'emit_serial_event_on_return',
 ] as const;
 
 // ─── mig 387 generic triggers (must be present post-cutover) ─────────────────
@@ -150,16 +159,11 @@ describe('Track 2.7: mig 387 trigger retirement assertions (Sprint E container)'
       );
       const installedFunctions = rows.map(r => r.proname);
 
-      // Functions backing the two retained triggers.
+      // Function backing the retained qa_install trigger.
       expect(
         installedFunctions,
         'trg_emit_serial_event_on_qa_install() must still exist',
       ).toContain('trg_emit_serial_event_on_qa_install');
-
-      expect(
-        installedFunctions,
-        'trg_emit_serial_event_on_return() must still exist',
-      ).toContain('trg_emit_serial_event_on_return');
     } finally {
       await pool.end();
     }

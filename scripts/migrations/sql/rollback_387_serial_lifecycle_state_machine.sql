@@ -19,9 +19,12 @@
 -- superseded them. Restoring the older bodies silently reverted those two fixes on
 -- rollback. Now pinned to 384/386.
 --
--- The two retained triggers (emit_serial_event_on_qa_install,
--- emit_serial_event_on_return) are still installed after mig 387 runs, so
--- they do NOT need to be re-created here.
+-- emit_serial_event_on_qa_install stays installed after mig 387 runs, so it is
+-- NOT re-created here. The two return-creation triggers (emit_serial_event_on_return,
+-- emit_serial_event_on_return_line_insert) ARE dropped by mig 387 (Track 7 routes
+-- return creation through promoteSerial), so this rollback re-installs them from
+-- their mig 364 bodies (their latest applied definition — no later migration
+-- redefined them).
 --
 -- Ordering: drop the mig 387 generic triggers first (they are the replacements),
 -- then re-install the legacy ones so the DB is left in the pre-387 state.
@@ -250,6 +253,129 @@ CREATE TRIGGER emit_serial_event_on_drop_install
   WHEN (NEW.ont_serial IS NOT NULL AND NEW.ont_serial <> ''
         AND (OLD.ont_serial IS NULL OR OLD.ont_serial <> NEW.ont_serial))
   EXECUTE FUNCTION trg_emit_serial_event_on_drop_install();
+
+-- ─── Re-install legacy trigger 4: emit_serial_event_on_return (mig 364 T4) ──────
+-- Source: mig 364 (364_serial_event_triggers.sql) — latest applied definition.
+-- Fires on stock_returns INSERT; emits 'returned' + updates serial status for any
+-- lines already present at header-insert time.
+
+CREATE OR REPLACE FUNCTION trg_emit_serial_event_on_return()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  v_line RECORD;
+BEGIN
+  BEGIN
+    FOR v_line IN
+      SELECT srl.serial_id, srl.id AS line_id, ss.status
+      FROM   stock_return_lines srl
+      JOIN   stock_serials ss ON ss.id = srl.serial_id
+      WHERE  srl.return_id  = NEW.id
+        AND  srl.serial_id IS NOT NULL
+    LOOP
+      INSERT INTO stock_serial_events (
+        serial_id, event_type, from_state, to_state,
+        source_table, source_id, actor_staff_id, payload, occurred_at)
+      VALUES (
+        v_line.serial_id,
+        'returned',
+        v_line.status,
+        'returned',
+        'stock_returns',
+        NEW.id,
+        NEW.returned_by_id,
+        '{}'::jsonb,
+        COALESCE(NEW.return_date, NEW.created_at, NOW()))
+      ON CONFLICT (serial_id, source_table, source_id, event_type)
+        WHERE source_id IS NOT NULL
+        DO NOTHING;
+
+      -- No-downgrade guard (Important I1) — preserve 'scrapped', 'faulty', 'in_repair'.
+      UPDATE stock_serials
+      SET    status     = 'returned',
+             updated_at = NOW()
+      WHERE  id     = v_line.serial_id
+        AND  status NOT IN ('scrapped', 'faulty', 'in_repair');
+    END LOOP;
+
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'trg_emit_serial_event_on_return: % — %', SQLERRM, SQLSTATE;
+  END;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS emit_serial_event_on_return ON stock_returns;
+CREATE TRIGGER emit_serial_event_on_return
+  AFTER INSERT ON stock_returns
+  FOR EACH ROW
+  EXECUTE FUNCTION trg_emit_serial_event_on_return();
+
+-- ─── Re-install legacy trigger 4b: emit_serial_event_on_return_line_insert ──────
+-- Source: mig 364 (364_serial_event_triggers.sql) — latest applied definition.
+-- Fires on stock_return_lines INSERT; covers lines added after the return header.
+
+CREATE OR REPLACE FUNCTION trg_emit_serial_event_on_return_line_insert()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  v_return RECORD;
+  v_serial RECORD;
+BEGIN
+  BEGIN
+    IF NEW.serial_id IS NULL THEN
+      RETURN NEW;
+    END IF;
+
+    SELECT returned_by_id, return_date, created_at
+    INTO   v_return
+    FROM   stock_returns
+    WHERE  id = NEW.return_id;
+
+    SELECT id, status
+    INTO   v_serial
+    FROM   stock_serials
+    WHERE  id = NEW.serial_id;
+
+    IF NOT FOUND THEN
+      RETURN NEW;
+    END IF;
+
+    INSERT INTO stock_serial_events (
+      serial_id, event_type, from_state, to_state,
+      source_table, source_id, actor_staff_id, payload, occurred_at)
+    VALUES (
+      NEW.serial_id,
+      'returned',
+      v_serial.status,
+      'returned',
+      'stock_returns',
+      NEW.return_id,
+      v_return.returned_by_id,
+      '{}'::jsonb,
+      COALESCE(v_return.return_date, v_return.created_at, NOW()))
+    ON CONFLICT (serial_id, source_table, source_id, event_type)
+      WHERE source_id IS NOT NULL
+      DO NOTHING;
+
+    UPDATE stock_serials
+    SET    status     = 'returned',
+           updated_at = NOW()
+    WHERE  id     = NEW.serial_id
+      AND  status NOT IN ('scrapped', 'faulty', 'in_repair');
+
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'trg_emit_serial_event_on_return_line_insert: % — %', SQLERRM, SQLSTATE;
+  END;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS emit_serial_event_on_return_line_insert ON stock_return_lines;
+CREATE TRIGGER emit_serial_event_on_return_line_insert
+  AFTER INSERT ON stock_return_lines
+  FOR EACH ROW
+  EXECUTE FUNCTION trg_emit_serial_event_on_return_line_insert();
 
 -- ─── Remove migration record ───────────────────────────────────────────────────
 

@@ -22,7 +22,7 @@ interface SerialScannerProps {
 export function SerialScanner({
   onSerialSelected,
   locationId,
-  allowedStatuses = ['issued', 'available'],
+  allowedStatuses = ['issued', 'available', 'in_stock'],
   placeholder = 'Enter or scan serial number...',
 }: SerialScannerProps) {
   const [inputValue, setInputValue] = useState('');

@@ -98,18 +98,29 @@ of prod (boots Docker PG15, restores a public-schema dump, applies mig 387 +
 backfill `--commit`, applies this rollback, then asserts). Re-run it the week
 before cutover and refresh the numbers below.
 
+> Track 7 update: mig 387 now also drops the two return-creation triggers
+> (`emit_serial_event_on_return{,_line_insert}`), so this rollback re-installs them
+> from their mig 364 bodies. The forward backfill leaves the pre-existing Pattern B
+> drift (`latest_event_matches_status`), so the rehearsal's strict post-verify is
+> non-fatal for that check; the rollback assertions are what matter here.
+
 ```
-# rehearsal output — 2026-05-29 (against prod snapshot: 36,264 serials / 377 events)
-pre_status_dist:  activated|1427  available|34594  installed|243
+# rehearsal output — 2026-05-30 (against prod snapshot: 36,264 serials / 388 events)
+pre_status_dist:  activated|1436  available|34583  installed|245
+# forward: mig 387 (25 transition rows incl. issued→returned / returned→faulty /
+#          faulty→in_stock; 11 holder pairs) applied; backfill renamed 34,583
+#          available→in_stock, gap-filled 1,379 genesis events.
+#          forward post-verify: latest_event_matches_status drift=3 (pre-existing
+#          Pattern B — activated serials w/ latest installed_at_drop; NOT cutover-caused).
 [PASS] mig-387 functions dropped (validate / emit / holder_validate)
 [PASS] mig-387 tables dropped (transitions / holder_pairs / violations / __sprint_e_cutover_gate__)
 [PASS] picking_done body restored      # == pre-387 baseline (mig 384)
 [PASS] oes_activate body restored      # == pre-387 baseline (mig 365)
 [PASS] drop_install body restored      # == pre-387 baseline (mig 386)
 [PASS] stock_serials count restored (36264)
-[PASS] status distribution restored    # activated 1427 / available 34594 / installed 243
-events: 377 -> 36350 (delta 35973)     # backfill audit rows rollback retains by design
-reconcile: 5/6 OK; latest_event_matches_status drift=34594 (the residual events — see above)
+[PASS] status distribution restored    # activated 1436 / available 34583 / installed 245
+events: 388 -> 36350 (delta 35962)     # backfill audit rows rollback retains by design
+reconcile: latest_event_matches_status drift=34586 (the residual events — see above)
 PASS: rolled back to the exact pre-387 trigger bodies, schema objects, serial count and status distribution.
 ```
 

@@ -13,7 +13,7 @@ import { forceCorrectSerials } from '@/modules/procurement/field-stock/services/
 import type { ForceCorrectStatus, ForceCorrectTarget } from '@/types/field-stock';
 
 const VALID_STATUSES: readonly ForceCorrectStatus[] = [
-  'available', 'reserved', 'allocated_to_project', 'in_transit', 'issued',
+  'available', 'in_stock', 'reserved', 'allocated_to_project', 'in_transit', 'issued',
   'installed', 'activated', 'faulty', 'in_repair', 'returned', 'scrapped',
 ];
 

@@ -46,10 +46,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           r.oes_drop || '',
           r.pp_resolution_status || '',
           r.activation_date || '',
-          r.wa_drop ? 'installed' : 'available',
+          r.wa_drop ? 'installed' : 'in_stock',
         );
       } else {
-        base.push(r.wa_drop ? 'installed' : 'available');
+        base.push(r.wa_drop ? 'installed' : 'in_stock');
       }
       return base;
     });
