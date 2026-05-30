@@ -165,3 +165,8 @@ metrics/
 
 # auto-improve-loop iteration log
 .claude/auto-improve-loop.log
+
+# CodeGraph local index (pilot — never commit)
+.codegraph/
+# Benchmark raw per-run JSON (large; keep only parsed CSV + results.md)
+docs/superpowers/benchmarks/2026-05-30-codegraph/raw/

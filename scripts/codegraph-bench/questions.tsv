@@ -1,0 +1,8 @@
+q1	Trace the photo-guide PWA upload flow end to end: which API route receives the upload, how does it reach VF Storage, and which database table/columns are written? List the exact files and functions in the path.
+q2	What functions call recordVlmCorrection, and what does recordVlmCorrection itself call? List every caller file and the functions it invokes.
+q3	List every file that imports the Neon serverless shim (directly or via the webpack alias). Which module defines the shim?
+q4	How does a NOC ticket get created from a WhatsApp mention? Trace the path from the WhatsApp mention ingestion to the ticket row insert, naming each file and function.
+q5	Where is RBAC / permission enforcement applied for the procurement module's API routes? List the routes and the auth middleware or permission checks they use.
+q6	Which API routes write (INSERT or UPDATE) to the `drops` table — not the qa_photo_reviews table? List each route file.
+q7	How does scripts/deploy-local.sh gate a release before swapping it live? Describe the ordered gates/checks it runs.
+q8	What is the component tree for the NOC KanbanBoard view: which components render which, and where does the board data come from? List the component files and the data source.
