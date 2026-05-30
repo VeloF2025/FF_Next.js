@@ -17,6 +17,41 @@ import type {
   AnalyticsQuery
 } from './analytics-types';
 
+/**
+ * Build a project-filter WHERE clause as a string with $N bound params.
+ * `prefix` qualifies the columns (e.g. 'p.' when projects is aliased `p`).
+ * `includeInactive` overrides all other filters to TRUE (matches prior behavior).
+ * Column names are fixed literals; only values are parameterised. Avoids the
+ * `conditions = sql`${conditions} ...`` accumulator (broken on the sql client).
+ */
+function buildProjectFilter(
+  query: AnalyticsQuery | undefined,
+  prefix: string
+): { whereClause: string; params: unknown[] } {
+  const params: unknown[] = [];
+  if (query?.includeInactive) {
+    return { whereClause: 'TRUE', params };
+  }
+  const parts = [`${prefix}status NOT IN ('archived', 'cancelled', 'deleted')`];
+  if (query?.startDate) {
+    params.push(query.startDate.toISOString());
+    parts.push(`${prefix}created_at >= $${params.length}`);
+  }
+  if (query?.endDate) {
+    params.push(query.endDate.toISOString());
+    parts.push(`${prefix}created_at <= $${params.length}`);
+  }
+  if (query?.clientId) {
+    params.push(query.clientId);
+    parts.push(`${prefix}client_id = $${params.length}`);
+  }
+  if (query?.status && query.status.length > 0) {
+    params.push(query.status);
+    parts.push(`${prefix}status = ANY($${params.length})`);
+  }
+  return { whereClause: parts.join(' AND '), params };
+}
+
 export class ProjectSummaryAnalytics {
   /**
    * Get project summary statistics
@@ -50,37 +85,7 @@ export class ProjectSummaryAnalytics {
    */
   static async getProjectsByStatus(query?: AnalyticsQuery): Promise<ProjectStatusStats[]> {
     try {
-      // Build the WHERE clause as a string with $N bound params. Column names
-      // are fixed literals; only values are parameterised. This avoids the
-      // `conditions = sql`${conditions} AND ...`` accumulator pattern, which
-      // does not work on this sql client (the wrapper executes each fragment
-      // immediately and returns rows, so the "fragment" interpolated into the
-      // next template is a rows array, not inlinable SQL).
-      const params: unknown[] = [];
-      let whereClause: string;
-      if (query?.includeInactive) {
-        // includeInactive overrode all other conditions in the original.
-        whereClause = 'TRUE';
-      } else {
-        const parts = [`status NOT IN ('archived', 'cancelled', 'deleted')`];
-        if (query?.startDate) {
-          params.push(query.startDate.toISOString());
-          parts.push(`created_at >= $${params.length}`);
-        }
-        if (query?.endDate) {
-          params.push(query.endDate.toISOString());
-          parts.push(`created_at <= $${params.length}`);
-        }
-        if (query?.clientId) {
-          params.push(query.clientId);
-          parts.push(`client_id = $${params.length}`);
-        }
-        if (query?.status && query.status.length > 0) {
-          params.push(query.status);
-          parts.push(`status = ANY($${params.length})`);
-        }
-        whereClause = parts.join(' AND ');
-      }
+      const { whereClause, params } = buildProjectFilter(query, '');
 
       const result = await rawSql.query(`
         SELECT status, COUNT(*) as count
@@ -105,32 +110,7 @@ export class ProjectSummaryAnalytics {
    */
   static async getProjectsByClient(query?: AnalyticsQuery): Promise<ClientProjectStats[]> {
     try {
-      // Build the JOIN filter as a string with $N bound params (see note in
-      // getProjectsByStatus — same accumulator pattern, same fix).
-      const params: unknown[] = [];
-      let projectConditions: string;
-      if (query?.includeInactive) {
-        projectConditions = 'TRUE';
-      } else {
-        const parts = [`p.status NOT IN ('archived', 'cancelled', 'deleted')`];
-        if (query?.startDate) {
-          params.push(query.startDate.toISOString());
-          parts.push(`p.created_at >= $${params.length}`);
-        }
-        if (query?.endDate) {
-          params.push(query.endDate.toISOString());
-          parts.push(`p.created_at <= $${params.length}`);
-        }
-        if (query?.clientId) {
-          params.push(query.clientId);
-          parts.push(`p.client_id = $${params.length}`);
-        }
-        if (query?.status && query.status.length > 0) {
-          params.push(query.status);
-          parts.push(`p.status = ANY($${params.length})`);
-        }
-        projectConditions = parts.join(' AND ');
-      }
+      const { whereClause: projectConditions, params } = buildProjectFilter(query, 'p.');
 
       const result = await rawSql.query(`
         SELECT

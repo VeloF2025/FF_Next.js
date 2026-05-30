@@ -41,6 +41,16 @@ ruleTester.run('no-neon-shim-sql-divergence', rule, {
     { code: 'const frag = sql.unsafe(orderBy);' },
     // A non-sql tagged template is irrelevant.
     { code: 'const x = css`color: red; ${theme}`;' },
+    // sql.unsafe(...) result assigned then interpolated — the sentinel is safe.
+    { code: 'const frag = sql.unsafe(orderBy); const r = await sql`SELECT ${frag} FROM t`;' },
+    // Cross-function scope: `conditions` is a fragment in a(), a plain string in
+    // b(). The fragment must NOT bleed into b() (scope-stack regression guard).
+    {
+      code: [
+        'function a() { const conditions = sql`WHERE x = ${x}`; return conditions; }',
+        'function b() { const conditions = "AND y = 1"; return sql`SELECT * FROM t ${conditions}`; }',
+      ].join('\n'),
+    },
   ],
   invalid: [
     // CLASS 1: nested sql`` fragment interpolation.

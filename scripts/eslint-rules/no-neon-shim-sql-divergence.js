@@ -44,21 +44,27 @@ function isSqlTaggedTemplate(node) {
  * True if the expression is, or (for ternaries/logicals) contains, a SQL
  * fragment — either an inline `sql`...`` tagged template, or an identifier
  * previously bound to one (the accumulator pattern `w = sql`${w} ...``).
+ * `isFragmentVar(name)` resolves whether an identifier is a fragment-bound
+ * variable in the current lexical scope.
  */
-function containsSqlFragment(node, fragmentVars) {
+function containsSqlFragment(node, isFragmentVar) {
   if (!node) return false;
   if (isSqlTaggedTemplate(node)) return true;
-  if (node.type === 'Identifier' && fragmentVars && fragmentVars.has(node.name)) return true;
+  if (node.type === 'Identifier' && isFragmentVar(node.name)) return true;
   if (node.type === 'ConditionalExpression') {
-    return containsSqlFragment(node.consequent, fragmentVars) || containsSqlFragment(node.alternate, fragmentVars);
+    return containsSqlFragment(node.consequent, isFragmentVar) || containsSqlFragment(node.alternate, isFragmentVar);
   }
   if (node.type === 'LogicalExpression') {
-    return containsSqlFragment(node.left, fragmentVars) || containsSqlFragment(node.right, fragmentVars);
+    return containsSqlFragment(node.left, isFragmentVar) || containsSqlFragment(node.right, isFragmentVar);
   }
   return false;
 }
 
-/** True for `sql.unsafe` / `<anything>.unsafe` member callee. */
+/**
+ * True for `sql.unsafe` / `<anything>.unsafe` member callee. Note: this matches
+ * any `.unsafe(` member call, not only `sql.unsafe(` — acceptable because no
+ * other `.unsafe()` API is used in this codebase; revisit if one is introduced.
+ */
 function isUnsafeCallee(callee) {
   return (
     callee &&
@@ -93,19 +99,32 @@ module.exports = {
   },
 
   create(context) {
-    // Identifiers bound to a sql`` fragment, so the accumulator pattern
-    // `let w = sql`...`; w = sql`${w} AND ...`` is caught even though the
-    // interpolated value is an identifier rather than an inline template.
-    // Declarations precede uses in the patterns we target, and ESLint traverses
-    // top-down, so on-the-fly collection is sufficient (no forward refs occur).
-    const fragmentVars = new Set();
+    // Per-function-scope stack of Sets of identifiers bound to a sql`` fragment.
+    // This catches the accumulator pattern (`let w = sql`...`; w = sql`${w} ...``)
+    // while NOT bleeding a fragment-named variable in one function into a
+    // same-named plain variable in another — important for the wider Stage 3
+    // sweep where names like `whereClause`/`conditions`/`dateFilter` recur across
+    // handlers in the same file. Declarations precede uses in the patterns we
+    // target and ESLint traverses top-down, so on-the-fly collection suffices.
+    const scopeStack = [new Set()];
+    const top = () => scopeStack[scopeStack.length - 1];
+    const isFragmentVar = (name) => scopeStack.some((s) => s.has(name));
+    const enterScope = () => { scopeStack.push(new Set()); };
+    const exitScope = () => { scopeStack.pop(); };
 
     function recordIfFragment(name, valueNode) {
       if (!name) return;
-      if (containsSqlFragment(valueNode, fragmentVars)) fragmentVars.add(name);
+      if (containsSqlFragment(valueNode, isFragmentVar)) top().add(name);
     }
 
     return {
+      FunctionDeclaration: enterScope,
+      'FunctionDeclaration:exit': exitScope,
+      FunctionExpression: enterScope,
+      'FunctionExpression:exit': exitScope,
+      ArrowFunctionExpression: enterScope,
+      'ArrowFunctionExpression:exit': exitScope,
+
       VariableDeclarator(node) {
         if (node.id && node.id.type === 'Identifier') {
           recordIfFragment(node.id.name, node.init);
@@ -124,7 +143,7 @@ module.exports = {
         if (!isSqlTaggedTemplate(node)) return;
         const expressions = (node.quasi && node.quasi.expressions) || [];
         for (const expr of expressions) {
-          if (containsSqlFragment(expr, fragmentVars)) {
+          if (containsSqlFragment(expr, isFragmentVar)) {
             context.report({ node: expr, messageId: 'fragmentInterpolation' });
           }
         }

@@ -12,66 +12,68 @@ import { dbLogger } from './logger';
  * call (logged here), plus `.query(text, params)` and `.unsafe(raw)` which pass
  * through to db-pool unchanged.
  */
+/** Run a DB call with timing + slow/error logging. Shared by the tagged-template
+ *  path and the `.query()` path so both are observable. */
+async function runLogged<T>(queryPreview: string, paramCount: number, exec: () => Promise<T>): Promise<T> {
+  const startTime = Date.now();
+  try {
+    const result = await exec();
+    const duration = Date.now() - startTime;
+    const logData = {
+      query: queryPreview,
+      paramCount,
+      rowCount: Array.isArray(result) ? result.length : 1,
+      duration: `${duration}ms`,
+      slow: duration > 1000,
+    };
+    if (duration > 1000) {
+      dbLogger.warn(logData, `Slow query detected: ${duration}ms`);
+    } else if (process.env.LOG_LEVEL === 'debug') {
+      dbLogger.debug(logData, 'Database query executed');
+    }
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    dbLogger.error({
+      query: queryPreview,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      duration: `${duration}ms`,
+      paramCount,
+    }, 'Database query failed');
+    throw error;
+  }
+}
+
+const preview = (query: string): string => (query.length > 200 ? query.substring(0, 200) + '...' : query);
+
 export function createLoggedSql(_databaseUrl?: string): NeonQueryFunction<false, false> {
   const baseSql = poolSql;
 
   return new Proxy(baseSql, {
-    apply: async (target, thisArg, argumentsList) => {
-      const startTime = Date.now();
+    // Tagged-template call: sql`SELECT ...` (and legacy sql(text, params)).
+    apply: (target, thisArg, argumentsList) => {
       const [first, ...rest] = argumentsList;
-
-      // Handle both tagged template and regular function call syntax
-      let query: string;
-      let paramCount: number;
-
-      if (Array.isArray(first)) {
-        // Tagged template literal: sql`SELECT * FROM ...`
-        query = first.join('$?');
-        paramCount = rest.length;
-      } else {
-        // Regular function call: sql('SELECT * FROM ...', [params])
-        query = String(first);
-        paramCount = Array.isArray(rest[0]) ? rest[0].length : rest.length;
+      const query = Array.isArray(first) ? first.join('$?') : String(first);
+      const paramCount = Array.isArray(first)
+        ? rest.length
+        : (Array.isArray(rest[0]) ? rest[0].length : rest.length);
+      return runLogged(preview(query), paramCount, () =>
+        target.apply(thisArg, argumentsList as [strings: TemplateStringsArray, ...params: unknown[]])
+      );
+    },
+    // Property access: wrap `.query(text, params)` so the parameterised path is
+    // logged too; pass everything else (incl. the `.unsafe(raw)` sentinel
+    // helper, which does NOT execute) through unchanged.
+    get: (target, prop, receiver) => {
+      if (prop === 'query') {
+        const originalQuery = target.query.bind(target);
+        return (text: string, params?: unknown[]) =>
+          runLogged(preview(String(text)), Array.isArray(params) ? params.length : 0, () =>
+            originalQuery(text, params)
+          );
       }
-
-      const queryPreview = query.length > 200 ? query.substring(0, 200) + '...' : query;
-      
-      try {
-        // Execute the query
-        const result = await target.apply(thisArg, argumentsList as [strings: TemplateStringsArray, ...params: unknown[]]);
-        const duration = Date.now() - startTime;
-        
-        // Log query details
-        const logData = {
-          query: queryPreview,
-          paramCount,
-          rowCount: Array.isArray(result) ? result.length : 1,
-          duration: `${duration}ms`,
-          slow: duration > 1000
-        };
-        
-        // Log based on performance
-        if (duration > 1000) {
-          dbLogger.warn(logData, `Slow query detected: ${duration}ms`);
-        } else if (process.env.LOG_LEVEL === 'debug') {
-          dbLogger.debug(logData, 'Database query executed');
-        }
-        
-        return result;
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        
-        // Log query error
-        dbLogger.error({
-          query: queryPreview,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          duration: `${duration}ms`,
-          paramCount
-        }, 'Database query failed');
-        
-        throw error;
-      }
-    }
+      return Reflect.get(target, prop, receiver);
+    },
   }) as unknown as NeonQueryFunction<false, false>;
 }
 

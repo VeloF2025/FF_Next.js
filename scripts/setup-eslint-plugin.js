@@ -17,6 +17,7 @@ module.exports = {
   rules: {
     'no-silent-catch': require(path.resolve(__dirname, '../../scripts/eslint-rules/no-silent-catch')),
     'no-direct-serial-status-write': require(path.resolve(__dirname, '../../scripts/eslint-rules/no-direct-serial-status-write')),
+    'no-neon-shim-sql-divergence': require(path.resolve(__dirname, '../../scripts/eslint-rules/no-neon-shim-sql-divergence')),
   },
 };
 `);

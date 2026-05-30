@@ -78,6 +78,7 @@ De-risk the highest-fan-in seams so all later swaps are mechanical.
 1. **`src/lib/db-pool.ts`** — confirm/harden as the single migration target (it already mirrors `.query`/`.unsafe`/tagged-template). Add a typed `query`/`queryOne`/`transaction` surface if missing.
 2. **`lib/db-logger.ts`** (54 callers / 56 symbols per codegraph) — re-implement `createLoggedSql` to wrap **`pg.Pool` via db-pool** instead of `neon()`, preserving **both** the tagged-template call and `.query()`/`.unsafe()` surface. This instantly moves 54 files off the shim with no per-file edits.
 3. **`lib/db/pool.js`** (mixed/HOT) — re-point its internal serverless client off `neon()`; keep the exported `query()`/`transaction()` API stable.
+   - **Deferred from this PR:** `lib/db/sql-helpers.ts` imports `{ sql, query } from './pool.js'` and casts `sql.query(...) as QueryResult<T>`. Those casts rely on `neon()`'s loosely-typed `.query`; swapping to db-pool's typed `.query<T>` (returns `SqlRow[]`) breaks ~20 casts in `sql-helpers.ts` + the pipeline/authorities routes that consume it. Re-point `pool.js` together with updating those casts to `as unknown as QueryResult<T>` in a Stage 3 batch — not worth the blast radius in the correctness PR.
 
 **Gate:** `npm run ci:quick`; smoke-test a sample of accounting + budget + projects routes (the db-logger cluster) on dev; `npm run antihall`.
 

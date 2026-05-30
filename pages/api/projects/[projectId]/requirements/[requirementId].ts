@@ -123,17 +123,25 @@ export default withAuth(withErrorHandler(async (
       // avoids `${cond ? value : sql`column`}` fragment interpolation, which
       // does not work on the pg-backed sql client (the fragment is a Promise,
       // not an inlinable SQL fragment) — and would corrupt every partial update.
-      const ALLOWED_UPDATE_COLUMNS = new Set([
-        'is_completed', 'completed_at', 'completed_by', 'requirement_name',
-        'description', 'document_url', 'expiry_date', 'sort_order',
-      ]);
+      // Faithfully mirror the original column semantics:
+      //  - COALESCE columns keep their existing value when the supplied value is
+      //    null/undefined (so an explicit null is ignored, not written).
+      //  - Conditional columns are written whenever the key is present in
+      //    `updates` (allowing an explicit NULL — e.g. clearing completed_at).
+      // Column names come from these fixed allow-lists, never from user input.
+      const COALESCE_COLUMNS = new Set(['is_completed', 'requirement_name', 'sort_order']);
+      const CONDITIONAL_COLUMNS = new Set(['completed_at', 'completed_by', 'description', 'document_url', 'expiry_date']);
 
       const setClauses: string[] = [];
       const params: unknown[] = [];
       for (const [column, value] of Object.entries(updates)) {
-        if (!ALLOWED_UPDATE_COLUMNS.has(column)) continue;
-        params.push(value);
-        setClauses.push(`${column} = $${params.length}`);
+        if (COALESCE_COLUMNS.has(column)) {
+          params.push(value ?? null);
+          setClauses.push(`${column} = COALESCE($${params.length}, ${column})`);
+        } else if (CONDITIONAL_COLUMNS.has(column)) {
+          params.push(value);
+          setClauses.push(`${column} = $${params.length}`);
+        }
       }
       setClauses.push('updated_at = NOW()');
 
