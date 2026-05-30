@@ -233,20 +233,46 @@ export interface UpdateReceiptArgs {
  * (locks once finance has acted on it).
  */
 export async function updateOwnSubmittedReceipt(args: UpdateReceiptArgs): Promise<ReceiptRow | null> {
-  const rows = await sql<ReceiptRow>`
+  // Build the SET clause with bound $N params. Column names are fixed literals
+  // (never user input). COALESCE columns keep their value unless a non-null
+  // value is supplied; the three nullable columns (vat_cents, description,
+  // project_id) are only assigned when the caller explicitly provides the key
+  // (so they can be set to NULL). This avoids `${cond ? value : sql`column`}`
+  // fragment interpolation, which does not work on the pg-backed sql client
+  // (the inner fragment is a Promise, not inlinable SQL — it corrupts the query).
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
+  const setCoalesce = (column: string, value: unknown) => {
+    params.push(value ?? null);
+    setClauses.push(`${column} = COALESCE($${params.length}, ${column})`);
+  };
+  const setIfProvided = (column: string, provided: boolean, value: unknown) => {
+    if (!provided) return;
+    params.push(value);
+    setClauses.push(`${column} = $${params.length}`);
+  };
+
+  setCoalesce('receipt_date', args.receiptDate);
+  setCoalesce('vendor', args.vendor);
+  setCoalesce('total_cents', args.totalCents);
+  setIfProvided('vat_cents', args.vatCents !== undefined, args.vatCents);
+  setCoalesce('category', args.category);
+  setIfProvided('description', args.description !== undefined, args.description);
+  setCoalesce('payment_method', args.paymentMethod);
+  setIfProvided('project_id', args.projectId !== undefined, args.projectId);
+  setClauses.push('updated_at = NOW()');
+
+  params.push(args.id);
+  const idParam = params.length;
+  params.push(args.staffIdScope);
+  const staffParam = params.length;
+
+  const rows = await sql.query<ReceiptRow>(`
     UPDATE staff_receipts
     SET
-      receipt_date    = COALESCE(${args.receiptDate ?? null}, receipt_date),
-      vendor          = COALESCE(${args.vendor ?? null}, vendor),
-      total_cents     = COALESCE(${args.totalCents ?? null}, total_cents),
-      vat_cents       = ${args.vatCents !== undefined ? args.vatCents : sql`vat_cents`},
-      category        = COALESCE(${args.category ?? null}, category),
-      description     = ${args.description !== undefined ? args.description : sql`description`},
-      payment_method  = COALESCE(${args.paymentMethod ?? null}, payment_method),
-      project_id      = ${args.projectId !== undefined ? args.projectId : sql`project_id`},
-      updated_at      = NOW()
-    WHERE id = ${args.id}
-      AND staff_id = ${args.staffIdScope}
+      ${setClauses.join(',\n      ')}
+    WHERE id = $${idParam}
+      AND staff_id = $${staffParam}
       AND status = 'submitted'
     RETURNING
       id, staff_id,
@@ -259,6 +285,6 @@ export async function updateOwnSubmittedReceipt(args: UpdateReceiptArgs): Promis
       ocr_raw, ocr_category_guess, ocr_confidence,
       status, reviewed_by, reviewed_at, review_note,
       created_at, updated_at
-  `;
+  `, params);
   return rows[0] ?? null;
 }

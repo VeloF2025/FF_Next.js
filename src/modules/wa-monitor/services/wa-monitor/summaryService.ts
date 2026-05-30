@@ -195,19 +195,28 @@ export async function getCompleteProjectStats(
 }>> {
   const sql = getDbConnection();
   try {
-    // Build date filter conditions
-    // Use whatsapp_message_date if available, otherwise fall back to created_at
-    let dateFilter = sql``;
+    // Build the date filter as a string with $N bound params. This avoids
+    // interpolating a `dateFilter` sql`` fragment into the main template: on
+    // this sql client each sql`` executes immediately, so the fragment (and the
+    // ${dateFrom}/${dateTo} params it carries) cannot be composed into another
+    // query. The TIME ZONE literal and column names are static; only the dates
+    // are parameterised.
+    const params: unknown[] = [];
+    let dateFilter = '';
+    const dateExpr = "DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg')";
 
     if (dateFrom && dateTo) {
-      dateFilter = sql`AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') BETWEEN ${dateFrom}::date AND ${dateTo}::date`;
+      params.push(dateFrom, dateTo);
+      dateFilter = `AND ${dateExpr} BETWEEN $${params.length - 1}::date AND $${params.length}::date`;
     } else if (dateFrom) {
-      dateFilter = sql`AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateFrom}::date`;
+      params.push(dateFrom);
+      dateFilter = `AND ${dateExpr} >= $${params.length}::date`;
     } else if (dateTo) {
-      dateFilter = sql`AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') <= ${dateTo}::date`;
+      params.push(dateTo);
+      dateFilter = `AND ${dateExpr} <= $${params.length}::date`;
     }
 
-    const results = await sql`
+    const results = await sql.query(`
       SELECT
         COALESCE(project, 'Unknown') as project,
         COUNT(DISTINCT drop_number) as total,
@@ -231,7 +240,7 @@ export async function getCompleteProjectStats(
         ${dateFilter}
       GROUP BY project
       ORDER BY total DESC
-    `;
+    `, params) as unknown as Array<{ project: string; total: string; complete: string }>;
 
     return results.map(row => ({
       project: row.project,

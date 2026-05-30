@@ -116,24 +116,49 @@ export default withAuth(withErrorHandler(async (
         return apiResponse.badRequest(res, 'No valid fields to update');
       }
 
-      // Update requirement
-      const result = await sql`
+      // Update requirement.
+      // Build the SET clause from only the fields present in `updates`, using
+      // bound $N params. Column names come from a fixed allow-list (never user
+      // input), so the assembled fragment is injection-safe. This deliberately
+      // avoids `${cond ? value : sql`column`}` fragment interpolation, which
+      // does not work on the pg-backed sql client (the fragment is a Promise,
+      // not an inlinable SQL fragment) — and would corrupt every partial update.
+      // Faithfully mirror the original column semantics:
+      //  - COALESCE columns keep their existing value when the supplied value is
+      //    null/undefined (so an explicit null is ignored, not written).
+      //  - Conditional columns are written whenever the key is present in
+      //    `updates` (allowing an explicit NULL — e.g. clearing completed_at).
+      // Column names come from these fixed allow-lists, never from user input.
+      const COALESCE_COLUMNS = new Set(['is_completed', 'requirement_name', 'sort_order']);
+      const CONDITIONAL_COLUMNS = new Set(['completed_at', 'completed_by', 'description', 'document_url', 'expiry_date']);
+
+      const setClauses: string[] = [];
+      const params: unknown[] = [];
+      for (const [column, value] of Object.entries(updates)) {
+        if (COALESCE_COLUMNS.has(column)) {
+          params.push(value ?? null);
+          setClauses.push(`${column} = COALESCE($${params.length}, ${column})`);
+        } else if (CONDITIONAL_COLUMNS.has(column)) {
+          params.push(value);
+          setClauses.push(`${column} = $${params.length}`);
+        }
+      }
+      setClauses.push('updated_at = NOW()');
+
+      params.push(requirementId);
+      const idParam = params.length;
+      params.push(projectId);
+      const projectParam = params.length;
+
+      const result = await sql.query(`
         UPDATE project_requirements SET
-          is_completed = COALESCE(${updates.is_completed ?? null}, is_completed),
-          completed_at = ${updates.completed_at !== undefined ? updates.completed_at : sql`completed_at`},
-          completed_by = ${updates.completed_by !== undefined ? updates.completed_by : sql`completed_by`},
-          requirement_name = COALESCE(${updates.requirement_name ?? null}, requirement_name),
-          description = ${updates.description !== undefined ? updates.description : sql`description`},
-          document_url = ${updates.document_url !== undefined ? updates.document_url : sql`document_url`},
-          expiry_date = ${updates.expiry_date !== undefined ? updates.expiry_date : sql`expiry_date`},
-          sort_order = COALESCE(${updates.sort_order ?? null}, sort_order),
-          updated_at = NOW()
-        WHERE id = ${requirementId}
-        AND project_id = ${projectId}
+          ${setClauses.join(',\n          ')}
+        WHERE id = $${idParam}
+        AND project_id = $${projectParam}
         RETURNING id, project_id, requirement_type, requirement_name, description,
                  is_completed, completed_at, completed_by, document_id, document_url,
                  expiry_date, expiry_alert_sent, stage, sort_order, created_at, updated_at
-      `;
+      `, params);
 
       const updated = result[0] as Record<string, unknown> | undefined;
 
