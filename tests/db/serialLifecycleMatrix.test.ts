@@ -64,7 +64,7 @@ interface HolderMismatchCase {
   transitionAllowed: boolean;
 }
 
-// 17 forward transitions mirroring stock_serial_status_transitions (excludes
+// 22 forward transitions mirroring stock_serial_status_transitions (excludes
 // null → in_stock INSERT case covered by Task 1.3).
 // Track 2.4 added 3 OES cascade paths: in_stock/available/allocated_to_project → installed.
 const ALLOWED: AllowedCase[] = [
@@ -187,7 +187,7 @@ describe('serial lifecycle transition matrix', () => {
   });
 
   // --------------------------------------------------------------------------
-  // ALLOWED — 14 forward cases
+  // ALLOWED — 22 forward cases
   // --------------------------------------------------------------------------
 
   ALLOWED.forEach(({ from, to, expectedEventType, seedHolderId, toHolderId }, idx) => {

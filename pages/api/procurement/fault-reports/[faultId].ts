@@ -191,11 +191,15 @@ async function handlePut(
       changedFields: ['resolution_status'],
     });
 
+    if (!outcome.updated) {
+      return apiResponse.notFound(res, 'Fault report', faultId);
+    }
+
     log.info('[FaultReports] Updated fault report', {
       data: { id: faultId, newStatus: outcome.newStatus },
     }, 'fault-reports');
 
-    return apiResponse.success(res, outcome.updated!, 'Fault report updated');
+    return apiResponse.success(res, outcome.updated, 'Fault report updated');
   } catch (error) {
     if (error instanceof LifecycleViolationError || error instanceof HolderMismatchError) {
       log.warn('fault-reports.resolve.lifecycle_rejected', { error: error.message }, 'fault-reports');

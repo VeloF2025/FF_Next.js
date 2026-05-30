@@ -28,7 +28,11 @@ import {
   getOrCreateStaffHolder,
   getOrCreateContractorHolder,
 } from '@/modules/procurement/field-stock/services/stockHolderService';
-import { promoteSerial } from '@/modules/procurement/field-stock/services/serialLifecycle';
+import {
+  promoteSerial,
+  LifecycleViolationError,
+  HolderMismatchError,
+} from '@/modules/procurement/field-stock/services/serialLifecycle';
 
 interface ReturnLine {
   id: string;
@@ -278,6 +282,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, result);
   } catch (error: unknown) {
+    if (error instanceof LifecycleViolationError || error instanceof HolderMismatchError) {
+      log.warn('returns.accept.lifecycle_rejected', { error: error.message, returnId }, 'field-stock');
+      return apiResponse.validationError(res, { serial: error.message });
+    }
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes('supplier_return is not yet supported')) {
       return apiResponse.validationError(res, { disposition: msg });
