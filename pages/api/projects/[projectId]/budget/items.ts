@@ -124,7 +124,11 @@ async function handleGet(
 
     query += ` ORDER BY ${sortColumn} ${sortDir}`;
 
-    const items = await sql.unsafe(query, params);
+    // Use .query(text, params) to execute a pre-built parameterized statement.
+    // (`sql.unsafe(raw)` is a 1-arg interpolation helper that returns a sentinel,
+    // not a query executor — `await sql.unsafe(text, params)` returns the
+    // sentinel object, not rows, and the later .map() then throws.)
+    const items = await sql.query(query, params);
 
     // Calculate totals
     const totalsQuery = `
@@ -136,7 +140,7 @@ async function handleGet(
       FROM budget_items
       WHERE project_budget_id = $1
     `;
-    const totalsResult = await sql.unsafe(totalsQuery, [projectBudgetId]);
+    const totalsResult = await sql.query(totalsQuery, [projectBudgetId]);
     const totals = totalsResult[0] || {};
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

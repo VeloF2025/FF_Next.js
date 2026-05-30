@@ -156,15 +156,21 @@ export default withAuth(withRole('super_admin')(withErrorHandler(async (
       const includeActivated = req.query.activated !== 'false';
       const onlyUninvoiced = req.query.uninvoiced === 'true';
 
-      let whereConditions = sql`WHERE d.client_po_id = ${poId}`;
+      // Build the WHERE clause from static SQL fragments only ($1 = poId is the
+      // single bound param; the optional clauses add no user input). This avoids
+      // `sql`${whereConditions} AND ...`` fragment-in-fragment interpolation,
+      // which does not work on the pg-backed sql client (the inner fragment is a
+      // Promise, not an inlinable SQL fragment).
+      const whereParts = ['d.client_po_id = $1'];
       if (!includeActivated) {
-        whereConditions = sql`${whereConditions} AND oa.id IS NULL`;
+        whereParts.push('oa.id IS NULL');
       }
       if (onlyUninvoiced) {
-        whereConditions = sql`${whereConditions} AND d.invoiced = false`;
+        whereParts.push('d.invoiced = false');
       }
+      const whereClause = `WHERE ${whereParts.join(' AND ')}`;
 
-      const drops = await sql`
+      const drops = await sql.query(`
         SELECT
           d.id,
           d.drop_number,
@@ -176,17 +182,17 @@ export default withAuth(withRole('super_admin')(withErrorHandler(async (
           oa.id as oes_activation_id
         FROM drops d
         LEFT JOIN oes_activations oa ON oa.drop_id = d.id
-        ${whereConditions}
+        ${whereClause}
         ORDER BY d.drop_number
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+        LIMIT $2 OFFSET $3
+      `, [poId, limit, offset]);
 
-      const countResult = await sql`
+      const countResult = await sql.query(`
         SELECT COUNT(*) as total
         FROM drops d
         LEFT JOIN oes_activations oa ON oa.drop_id = d.id
-        ${whereConditions}
-      `;
+        ${whereClause}
+      `, [poId]);
 
       const total = Number(countResult[0]?.total || 0);
 

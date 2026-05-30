@@ -50,32 +50,45 @@ export class ProjectSummaryAnalytics {
    */
   static async getProjectsByStatus(query?: AnalyticsQuery): Promise<ProjectStatusStats[]> {
     try {
-      // Build dynamic conditions using proper SQL fragments
-      let conditions = sql`status NOT IN ('archived', 'cancelled', 'deleted')`;
-      
-      if (query?.startDate) {
-        conditions = sql`${conditions} AND created_at >= ${query.startDate.toISOString()}`;
-      }
-      if (query?.endDate) {
-        conditions = sql`${conditions} AND created_at <= ${query.endDate.toISOString()}`;
-      }
-      if (query?.clientId) {
-        conditions = sql`${conditions} AND client_id = ${query.clientId}`;
-      }
-      if (query?.status && query.status.length > 0) {
-        conditions = sql`${conditions} AND status = ANY(${query.status})`;
-      }
+      // Build the WHERE clause as a string with $N bound params. Column names
+      // are fixed literals; only values are parameterised. This avoids the
+      // `conditions = sql`${conditions} AND ...`` accumulator pattern, which
+      // does not work on this sql client (the wrapper executes each fragment
+      // immediately and returns rows, so the "fragment" interpolated into the
+      // next template is a rows array, not inlinable SQL).
+      const params: unknown[] = [];
+      let whereClause: string;
       if (query?.includeInactive) {
-        conditions = sql`TRUE`;
+        // includeInactive overrode all other conditions in the original.
+        whereClause = 'TRUE';
+      } else {
+        const parts = [`status NOT IN ('archived', 'cancelled', 'deleted')`];
+        if (query?.startDate) {
+          params.push(query.startDate.toISOString());
+          parts.push(`created_at >= $${params.length}`);
+        }
+        if (query?.endDate) {
+          params.push(query.endDate.toISOString());
+          parts.push(`created_at <= $${params.length}`);
+        }
+        if (query?.clientId) {
+          params.push(query.clientId);
+          parts.push(`client_id = $${params.length}`);
+        }
+        if (query?.status && query.status.length > 0) {
+          params.push(query.status);
+          parts.push(`status = ANY($${params.length})`);
+        }
+        whereClause = parts.join(' AND ');
       }
-      
-      const result = await sql`
+
+      const result = await rawSql.query(`
         SELECT status, COUNT(*) as count
         FROM projects
-        WHERE ${conditions}
+        WHERE ${whereClause}
         GROUP BY status
         ORDER BY count DESC
-      `;
+      `, params) as unknown as SqlRow[];
       
       return result.map((row) => ({
         status: row.status as string,
@@ -92,27 +105,35 @@ export class ProjectSummaryAnalytics {
    */
   static async getProjectsByClient(query?: AnalyticsQuery): Promise<ClientProjectStats[]> {
     try {
-      // Build dynamic conditions for the project filter
-      let projectConditions = sql`p.status NOT IN ('archived', 'cancelled', 'deleted')`;
-      
-      if (query?.startDate) {
-        projectConditions = sql`${projectConditions} AND p.created_at >= ${query.startDate.toISOString()}`;
-      }
-      if (query?.endDate) {
-        projectConditions = sql`${projectConditions} AND p.created_at <= ${query.endDate.toISOString()}`;
-      }
-      if (query?.clientId) {
-        projectConditions = sql`${projectConditions} AND p.client_id = ${query.clientId}`;
-      }
-      if (query?.status && query.status.length > 0) {
-        projectConditions = sql`${projectConditions} AND p.status = ANY(${query.status})`;
-      }
+      // Build the JOIN filter as a string with $N bound params (see note in
+      // getProjectsByStatus — same accumulator pattern, same fix).
+      const params: unknown[] = [];
+      let projectConditions: string;
       if (query?.includeInactive) {
-        projectConditions = sql`TRUE`;
+        projectConditions = 'TRUE';
+      } else {
+        const parts = [`p.status NOT IN ('archived', 'cancelled', 'deleted')`];
+        if (query?.startDate) {
+          params.push(query.startDate.toISOString());
+          parts.push(`p.created_at >= $${params.length}`);
+        }
+        if (query?.endDate) {
+          params.push(query.endDate.toISOString());
+          parts.push(`p.created_at <= $${params.length}`);
+        }
+        if (query?.clientId) {
+          params.push(query.clientId);
+          parts.push(`p.client_id = $${params.length}`);
+        }
+        if (query?.status && query.status.length > 0) {
+          params.push(query.status);
+          parts.push(`p.status = ANY($${params.length})`);
+        }
+        projectConditions = parts.join(' AND ');
       }
-      
-      const result = await sql`
-        SELECT 
+
+      const result = await rawSql.query(`
+        SELECT
           c.id as client_id,
           c.name as client_name,
           COUNT(p.id) as project_count,
@@ -122,7 +143,7 @@ export class ProjectSummaryAnalytics {
         GROUP BY c.id, c.name
         HAVING COUNT(p.id) > 0
         ORDER BY project_count DESC
-      `;
+      `, params) as unknown as SqlRow[];
       
       return result.map((row) => ({
         clientId: row.client_id as string,

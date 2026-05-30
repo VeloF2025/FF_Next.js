@@ -90,6 +90,25 @@ else
   echo "$CATCH_OUTPUT" | grep "no-silent-catch" | tail -5 | sed 's/^/    /'
 fi
 
+# ─── Gate 2c: Neon-shim SQL divergence (must be 0) ───────────────────────────
+# Bans the two patterns that break the pg.Pool-backed sql clients (neon-shim and
+# @/lib/db-pool): (1) fragment-in-fragment interpolation `sql`...${sql`...`}...``,
+# and (2) `sql.unsafe(text, params)` used as a query executor. Both are runtime
+# bugs, not style — so this gate is hard-zero, not ratcheted. Run via --rulesdir
+# (same mechanism as Gate 2) so it reaches pages/ which `npm run lint` skips.
+# See docs/plans/2026-05-30-neon-shim-elimination-plan.md.
+echo -e "\n${CYAN}── Gate 2c: Neon-shim SQL divergence (no-neon-shim-sql-divergence) ──${NC}\n"
+
+DIVERGENCE_OUTPUT=$(npx eslint pages/api src lib --ext .ts,.tsx,.js --rulesdir scripts/eslint-rules --rule '{"no-neon-shim-sql-divergence": "error"}' 2>&1 || true)
+DIVERGENCE_COUNT=$( { echo "$DIVERGENCE_OUTPUT" | grep "no-neon-shim-sql-divergence" || true; } | wc -l | tr -d ' ')
+
+if [ "$DIVERGENCE_COUNT" -eq 0 ]; then
+  pass "Neon-shim SQL divergence: none"
+else
+  fail "Neon-shim SQL divergence: ${DIVERGENCE_COUNT} (must be 0) — fragment interpolation or sql.unsafe() executor"
+  echo "$DIVERGENCE_OUTPUT" | grep -B1 "no-neon-shim-sql-divergence" | tail -20 | sed 's/^/    /'
+fi
+
 # ─── Gate 3: TypeScript ──────────────────────────────────────────────────────
 echo -e "\n${CYAN}── Gate 3: TypeScript ──${NC}\n"
 

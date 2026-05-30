@@ -1,12 +1,20 @@
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import type { NeonQueryFunction } from '@neondatabase/serverless';
+import { sql as poolSql } from '@/lib/db-pool';
 import { dbLogger } from './logger';
 
 /**
- * Wraps Neon SQL queries with automatic logging and performance tracking
+ * Wraps SQL queries with automatic logging and performance tracking.
+ *
+ * Backed by the pg.Pool client from @/lib/db-pool (not the Neon driver). The
+ * `databaseUrl` argument is retained for call-site compatibility but ignored —
+ * db-pool uses the shared pg.Pool singleton (single dev+prod database). The
+ * returned proxy preserves the same surface callers rely on: the tagged-template
+ * call (logged here), plus `.query(text, params)` and `.unsafe(raw)` which pass
+ * through to db-pool unchanged.
  */
-export function createLoggedSql(databaseUrl: string): NeonQueryFunction<false, false> {
-  const baseSql = neon(databaseUrl);
-  
+export function createLoggedSql(_databaseUrl?: string): NeonQueryFunction<false, false> {
+  const baseSql = poolSql;
+
   return new Proxy(baseSql, {
     apply: async (target, thisArg, argumentsList) => {
       const startTime = Date.now();
@@ -64,7 +72,7 @@ export function createLoggedSql(databaseUrl: string): NeonQueryFunction<false, f
         throw error;
       }
     }
-  }) as NeonQueryFunction<false, false>;
+  }) as unknown as NeonQueryFunction<false, false>;
 }
 
 /**
