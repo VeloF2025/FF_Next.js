@@ -35,7 +35,10 @@ LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
 # .env.local, whereas the workspace .env.local has DATABASE_URL — so try, in order:
 # already-set env → .env.local DATABASE_URL → .env DATABASE_URL → .env.local
 # MIGRATION_DATABASE_URL (the 5437 direct conn; reconcile is read-only).
-env_value() { [ -f "$1" ] && grep "^$2=" "$1" 2>/dev/null | head -1 | cut -d= -f2-; }
+# `|| true` is required: under `set -euo pipefail` a no-match grep exits non-zero,
+# which would abort the standalone `DATABASE_URL="$(env_value …)"` assignment at the
+# first missing source before the later fallbacks run.
+env_value() { { [ -f "$1" ] && grep "^$2=" "$1" 2>/dev/null | head -1 | cut -d= -f2-; } || true; }
 
 if [ -z "${DATABASE_URL:-}" ]; then
   DATABASE_URL="$(env_value "$PROJECT_DIR/.env.local" DATABASE_URL)"
