@@ -30,13 +30,26 @@ cd "$PROJECT_DIR"
 
 LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
 
-# Load DATABASE_URL from .env.local (repo cron convention — see scripts/cron-qa-ingest.sh).
-if [ -f "$PROJECT_DIR/.env.local" ]; then
-  export DATABASE_URL="$(grep '^DATABASE_URL=' "$PROJECT_DIR/.env.local" | head -1 | cut -d= -f2-)"
-fi
+# Resolve DATABASE_URL without clobbering an inherited value. The prod deploy dir
+# keeps DATABASE_URL in .env (app conn) and only MIGRATION_DATABASE_URL in
+# .env.local, whereas the workspace .env.local has DATABASE_URL — so try, in order:
+# already-set env → .env.local DATABASE_URL → .env DATABASE_URL → .env.local
+# MIGRATION_DATABASE_URL (the 5437 direct conn; reconcile is read-only).
+env_value() { [ -f "$1" ] && grep "^$2=" "$1" 2>/dev/null | head -1 | cut -d= -f2-; }
 
 if [ -z "${DATABASE_URL:-}" ]; then
-  echo "$LOG_PREFIX ERROR: DATABASE_URL not set (checked .env.local)" >&2
+  DATABASE_URL="$(env_value "$PROJECT_DIR/.env.local" DATABASE_URL)"
+fi
+if [ -z "${DATABASE_URL:-}" ]; then
+  DATABASE_URL="$(env_value "$PROJECT_DIR/.env" DATABASE_URL)"
+fi
+if [ -z "${DATABASE_URL:-}" ]; then
+  DATABASE_URL="$(env_value "$PROJECT_DIR/.env.local" MIGRATION_DATABASE_URL)"
+fi
+export DATABASE_URL
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "$LOG_PREFIX ERROR: DATABASE_URL not set (checked env, .env.local, .env)" >&2
   exit 1
 fi
 
