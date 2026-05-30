@@ -199,15 +199,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           [toHolderId, pickingId],
         );
 
-        // Legacy stock_movements audit insert (feeds stock movement-history view)
-        for (const line of lines) {
-          await txn.query(
-            `INSERT INTO stock_movements (picking_id, stock_item_id, movement_type,
-               from_location_id, to_location_id, quantity, performed_at)
-             VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-            [pickingId, line.stock_item_id, pickingType, sourceLocationId, destinationLocationId, line.planned_quantity],
-          );
-        }
+        // NOTE: the issue movement is already recorded in field_stock_movements
+        // by postIssueToHolderWith() above. A previous "legacy" stock_movements
+        // INSERT here referenced columns (picking_id, stock_item_id,
+        // from_location_id, to_location_id, quantity, performed_at) that do NOT
+        // exist on the stock_movements table — they belong to
+        // field_stock_movements — so it threw `column "picking_id" of relation
+        // "stock_movements" does not exist` on every issue, 500-ing the whole
+        // process step. Removed (the field_stock_movements row is the audit record).
       } else {
         // Non-issue path (transfer, scrap, receipt, return) — original behavior
         for (const line of lines) {
