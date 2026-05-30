@@ -20,6 +20,19 @@ import type { PwaIssueDraft, PwaPickingResult } from '../types';
 
 /**
  * Submit a completed issue draft to the server.
+ *
+ * "Sign and submit" must COMPLETE the stock issue, not merely stage a draft.
+ * The picking lifecycle is draft → confirmed → (signed) → processed, and only
+ * the `process` step actually promotes the serials to `issued` and posts
+ * custody. So this drives all of those steps in sequence:
+ *
+ *   1. create   → POST /pickings                  (draft)
+ *   2. confirm  → POST /pickings/:id/confirm       (confirmed)
+ *   3. sign     → POST /pickings/:id/sign          (persist signature)
+ *   4. process  → POST /pickings/:id/process       (promote serials → issued)
+ *
+ * Any failed step throws (surfaced as an inline error in the UI) rather than
+ * returning a misleading "issued" result for a picking still sitting in draft.
  */
 export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResult> {
   const body = {
@@ -37,9 +50,9 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
         notes: draft.notes || undefined,
       },
     ],
-    ...(draft.signatureDataUrl ? { signatureDataUrl: draft.signatureDataUrl } : {}),
   };
 
+  // 1. Create the picking (draft).
   const picking = await request<{
     id: string;
     picking_number: string;
@@ -48,10 +61,30 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
     method: 'POST',
     body: JSON.stringify(body),
   });
+  const base = `/api/procurement/field-stock/pickings/${picking.id}`;
+
+  // 2. Confirm (draft → confirmed). process() rejects anything not 'confirmed'.
+  await request<unknown>(`${base}/confirm`, { method: 'POST', body: '{}' });
+
+  // 3. Persist the technician's signature. signedBy is the technician's staff
+  //    UUID (not a name): process() reads stock_pickings.signed_by as the
+  //    lifecycle-event actor and casts it to uuid, so a name would break it.
+  if (draft.signatureDataUrl) {
+    await request<unknown>(`${base}/sign`, {
+      method: 'POST',
+      body: JSON.stringify({
+        signatureData: draft.signatureDataUrl,
+        signedBy: draft.technicianId,
+      }),
+    });
+  }
+
+  // 4. Process (confirmed → done): promotes serials to 'issued' + posts custody.
+  await request<unknown>(`${base}/process`, { method: 'POST', body: '{}' });
 
   return {
     pickingId: picking.id,
     pickingNumber: picking.picking_number,
-    status: picking.status as PwaPickingResult['status'],
+    status: 'processed',
   };
 }
