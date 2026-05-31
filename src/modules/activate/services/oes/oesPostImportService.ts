@@ -213,16 +213,25 @@ interface ActivatedPpRow {
 /**
  * Mark PP pre-provision serials as 'activated' when they appear in OES (fire-and-forget).
  *
- * Side-effects on flip-to-activated:
- *   1. PP row → resolution_status = 'activated'
- *   2. DR timeline → pre_prov_resolved event
- *   3. Linked NOC ticket (if any, still in an open state) → status = 'resolved'
- *      with a system status_change activity describing the activation.
+ * Two promotion paths feed one downstream cascade:
+ *   A. SERIAL-keyed — a PP row whose serial_number now appears in oes_activations.
+ *   B. DROP-keyed (#1861/D4-1) — a still-`located_*` PP row whose resolved_drop_number
+ *      is in oes_activations. Without this the PP/OES overlap was understated, since
+ *      a located row whose serial differs from (or is absent in) OES never matched
+ *      path A. Serial CONFLICTS are skipped (promoted only when PP and OES agree on
+ *      the serial, or one side has none) so we never stamp 'activated' over a
+ *      genuine PP-vs-OES serial disagreement (#1861/D1-5, D4-2).
+ *
+ * On flip-to-activated each row also: sets activated_at from OES (#1861/D4-4),
+ * back-propagates drops.oes_confirmed (#1861/D4-5), emits a DR-timeline
+ * pre_prov_resolved event, promotes the stock_serials lifecycle, and auto-resolves
+ * any linked open NOC ticket.
  */
 export function triggerPpActivationCheck(): void {
   (async () => {
     try {
-      const activatedResult = await pool.query<ActivatedPpRow>(`
+      // Path A — serial-keyed promotion. Now also stamps activated_at (D4-4).
+      const serialResult = await pool.query<ActivatedPpRow>(`
         UPDATE oes_pp_data pp
         SET resolution_status = 'activated',
             resolved_drop_number = COALESCE(pp.resolved_drop_number, oa.drop_number),
@@ -231,6 +240,7 @@ export function triggerPpActivationCheck(): void {
               'activated_date', oa.activation_date::text,
               'activated_status', oa.status
             ),
+            activated_at = COALESCE(pp.activated_at, oa.activation_datetime, oa.activation_date::timestamptz),
             resolved_at = COALESCE(pp.resolved_at, NOW()),
             updated_at = NOW()
         FROM oes_activations oa
@@ -238,8 +248,63 @@ export function triggerPpActivationCheck(): void {
           AND pp.resolution_status != 'activated'
         RETURNING oa.drop_number, oa.activation_date::text, pp.serial_number, pp.maintenance_ticket_id
       `);
-      if ((activatedResult.rowCount ?? 0) > 0) {
-        logger.info(`PP activation check: ${activatedResult.rowCount} serials now activated`);
+
+      // Path B — drop-keyed promotion of located_* rows whose drop is in OES (D4-1),
+      // skipping serial conflicts (D1-5/D4-2). DISTINCT ON picks one activation per
+      // drop so a drop with >1 oes_activations row promotes the PP row exactly once.
+      const locatedResult = await pool.query<ActivatedPpRow>(`
+        WITH oa1 AS (
+          SELECT DISTINCT ON (drop_number)
+                 drop_number, serial_number, activation_date, activation_datetime, status
+          FROM oes_activations
+          ORDER BY drop_number, activation_datetime DESC NULLS LAST
+        )
+        UPDATE oes_pp_data pp
+        SET resolution_status = 'activated',
+            resolved_source = COALESCE(pp.resolved_source, 'oes_activations'),
+            resolved_details = COALESCE(pp.resolved_details, '{}'::jsonb) || jsonb_build_object(
+              'activated_date', oa1.activation_date::text,
+              'activated_status', oa1.status,
+              'promoted_from', pp.resolution_status
+            ),
+            activated_at = COALESCE(pp.activated_at, oa1.activation_datetime, oa1.activation_date::timestamptz),
+            resolved_at = COALESCE(pp.resolved_at, NOW()),
+            updated_at = NOW()
+        FROM oa1
+        WHERE oa1.drop_number = pp.resolved_drop_number
+          AND pp.resolution_status IN ('located_1map', 'located_local', 'located_unified')
+          AND NOT (
+            pp.serial_number IS NOT NULL AND TRIM(pp.serial_number) NOT IN ('', '-')
+            AND oa1.serial_number IS NOT NULL AND TRIM(oa1.serial_number) NOT IN ('', '-')
+            AND UPPER(TRIM(pp.serial_number)) <> UPPER(TRIM(oa1.serial_number))
+          )
+        RETURNING oa1.drop_number, oa1.activation_date::text, COALESCE(pp.serial_number, '') AS serial_number, pp.maintenance_ticket_id
+      `);
+
+      const promotedRows = [...serialResult.rows, ...locatedResult.rows];
+      if (promotedRows.length > 0) {
+        logger.info(
+          `PP activation check: ${serialResult.rowCount} serial-keyed + ${locatedResult.rowCount} located→activated`,
+        );
+
+        // Back-propagate drops.oes_confirmed for the drops just activated (D4-5).
+        const promotedDrops = [...new Set(promotedRows.map((r) => r.drop_number).filter(Boolean))];
+        if (promotedDrops.length > 0) {
+          await pool.query(
+            `UPDATE drops
+                SET oes_confirmed = true,
+                    oes_confirmed_at = COALESCE(oes_confirmed_at, NOW())
+              WHERE drop_number = ANY($1::text[])
+                AND (oes_confirmed = false OR oes_confirmed IS NULL)`,
+            [promotedDrops],
+          ).catch((err: unknown) => {
+            logger.warn('drops.oes_confirmed back-propagation skipped', {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
+
+        const activatedResult = { rowCount: promotedRows.length, rows: promotedRows };
 
         // ── Sprint E Track 2.6: OES installed → activated lifecycle promotion ──
         //
