@@ -240,7 +240,7 @@ export function triggerPpActivationCheck(): void {
               'activated_date', oa.activation_date::text,
               'activated_status', oa.status
             ),
-            activated_at = COALESCE(pp.activated_at, oa.activation_datetime),
+            activated_at = COALESCE(pp.activated_at, oa.activation_datetime, oa.activation_date::timestamptz),
             resolved_at = COALESCE(pp.resolved_at, NOW()),
             updated_at = NOW()
         FROM oes_activations oa
@@ -267,7 +267,7 @@ export function triggerPpActivationCheck(): void {
               'activated_status', oa1.status,
               'promoted_from', pp.resolution_status
             ),
-            activated_at = COALESCE(pp.activated_at, oa1.activation_datetime),
+            activated_at = COALESCE(pp.activated_at, oa1.activation_datetime, oa1.activation_date::timestamptz),
             resolved_at = COALESCE(pp.resolved_at, NOW()),
             updated_at = NOW()
         FROM oa1
@@ -278,7 +278,7 @@ export function triggerPpActivationCheck(): void {
             AND oa1.serial_number IS NOT NULL AND TRIM(oa1.serial_number) NOT IN ('', '-')
             AND UPPER(TRIM(pp.serial_number)) <> UPPER(TRIM(oa1.serial_number))
           )
-        RETURNING oa1.drop_number, oa1.activation_date::text, pp.serial_number, pp.maintenance_ticket_id
+        RETURNING oa1.drop_number, oa1.activation_date::text, COALESCE(pp.serial_number, '') AS serial_number, pp.maintenance_ticket_id
       `);
 
       const promotedRows = [...serialResult.rows, ...locatedResult.rows];
