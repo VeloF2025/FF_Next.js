@@ -10,26 +10,35 @@
  * in any drop_number-keyed aggregate.
  *
  * KEEPER SELECTION (per drop_number, deterministic, no guessing):
- *   1. The row that has FK children (oes_activations, checklist_items, etc.) —
- *      if EXACTLY one row does, it is the keeper (it is the real, referenced row).
- *   2. If NO row has children: prefer source='qfield' (real field capture over a
- *      bulk SOW import), then the oldest created_at.
- *   3. SAFETY ABORT: if MORE THAN ONE row for a drop_number has FK children, the
- *      group is ambiguous — skipped and reported for manual review (never
- *      auto-deleted). Likewise, every NON-keeper must have ZERO FK children; if a
- *      non-keeper is referenced, the whole group is skipped.
+ *   1. The row that has FK children — if EXACTLY one row does, it is the keeper
+ *      (it is the real, referenced row).
+ *   2. If NO row has children: prefer oes_confirmed=true, then source='qfield'
+ *      (real field capture over a bulk SOW import), then the oldest created_at.
+ *      (When all candidates are childless duplicates they are interchangeable;
+ *      this ordering just makes the choice deterministic.)
+ *   3. SAFETY ABORT: if MORE THAN ONE row for a drop_number has FK children the
+ *      group is ambiguous — skipped and reported in full for manual review.
+ *      Likewise, if any NON-keeper is referenced, the whole group is skipped.
  *
- * Children are counted across all 9 tables that FK-reference drops(id):
- *   pon_change_log, checklist_items, customer_invoice_items, drop_submissions,
- *   notification_logs, oes_activations, quality_metrics,
- *   spare_usage_log(replaced_drop_id|spare_drop_id).
- * (qa_photo_reviews joins drops by the drop_number STRING, not a FK to id, and
- * the keeper retains that same drop_number — so QA records are unaffected.)
+ * The set of tables that FK-reference drops(id) is discovered at RUNTIME from
+ * pg_constraint (not a hardcoded list), so it can never silently go stale as the
+ * schema grows. (qa_photo_reviews joins drops by the drop_number STRING, not a
+ * FK to id, and the keeper retains that same drop_number — so QA records are
+ * unaffected.)
  *
- * SAFETY: DRY RUN BY DEFAULT. Pass --commit to delete. A pre-delete snapshot of
- * every affected row (full row JSON) is written to /tmp for manual revert.
- * Deletes run in ONE transaction (all-or-nothing). Idempotent: re-running after
- * a successful commit finds no duplicates.
+ * SAFETY MODEL:
+ *   - DRY RUN BY DEFAULT. Pass --commit to delete.
+ *   - The child-count read, the decision, and the DELETE all run inside ONE
+ *     transaction. The advisory child-count check aborts a referenced group
+ *     early; the database FK constraints are the AUTHORITATIVE guard — if a
+ *     concurrent write adds a child to a to-delete row after our read, the
+ *     DELETE raises a foreign_key_violation and the whole transaction rolls
+ *     back. A silent bad delete is therefore impossible.
+ *   - If the DELETE affects a different row count than planned, ROLLBACK + exit
+ *     non-zero (never report a partial delete as success).
+ *   - A pre-delete snapshot of every affected row is written to /tmp for revert
+ *     (same convention as the Group A backfill #1866).
+ *   - Idempotent: re-running after a successful commit finds no duplicates.
  *
  * Usage:
  *   npx tsx scripts/backfill-dedup-cross-project-drops-1863.ts            # dry run
@@ -44,21 +53,7 @@ import { log } from '@/lib/logger';
 
 const COMMIT = process.argv.includes('--commit');
 
-// All tables (+ column) that FK-reference drops(id). Used to compute, per
-// candidate row, whether anything points at it.
-const FK_REFS: ReadonlyArray<{ table: string; col: string }> = [
-  { table: 'pon_change_log', col: 'drop_id' },
-  { table: 'checklist_items', col: 'drop_id' },
-  { table: 'customer_invoice_items', col: 'drop_id' },
-  { table: 'drop_submissions', col: 'drop_id' },
-  { table: 'notification_logs', col: 'drop_id' },
-  { table: 'oes_activations', col: 'drop_id' },
-  { table: 'quality_metrics', col: 'drop_id' },
-  { table: 'spare_usage_log', col: 'replaced_drop_id' },
-  { table: 'spare_usage_log', col: 'spare_drop_id' },
-];
-
-interface DropRow {
+export interface DropRow {
   id: string;
   drop_number: string;
   project_id: string | null;
@@ -69,13 +64,43 @@ interface DropRow {
   child_count: number;
 }
 
-// Build a single SELECT that returns every drops row whose drop_number is
-// duplicated, annotated with the total number of FK children referencing it.
-function buildSelect(): string {
-  const childSum = FK_REFS.map(
-    ({ table, col }) =>
-      `(SELECT count(*) FROM ${table} t WHERE t.${col} = d.id)`,
-  ).join(' + ');
+export interface Decision {
+  drop_number: string;
+  keeper: DropRow;
+  remove: DropRow[];
+  skipped?: string; // reason, if the group is left untouched
+}
+
+interface FkRef {
+  table: string;
+  col: string;
+}
+
+/** Discover every (table, column) that FK-references drops(id), from the catalog. */
+async function loadDropFkRefs(client: PoolClient): Promise<FkRef[]> {
+  const { rows } = await client.query<{ table: string; col: string }>(
+    `SELECT c.conrelid::regclass::text AS table, a.attname AS col
+       FROM pg_constraint c
+       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+      WHERE c.contype = 'f'
+        AND c.confrelid = 'drops'::regclass
+      ORDER BY 1, 2`,
+  );
+  if (rows.length === 0) {
+    throw new Error('No FK references to drops found — refusing to dedup without a child-count guard');
+  }
+  return rows;
+}
+
+/**
+ * Build the duplicate-rows SELECT, annotating each row with the total count of
+ * FK children referencing it. Identifiers come from the catalog (loadDropFkRefs)
+ * and are double-quoted; they are never user-supplied.
+ */
+function buildSelect(fkRefs: FkRef[]): string {
+  const childSum = fkRefs
+    .map(({ table, col }) => `(SELECT count(*) FROM ${table} t WHERE t."${col}" = d.id)`)
+    .join(' + ');
   return `
     WITH dups AS (
       SELECT drop_number FROM drops GROUP BY drop_number HAVING count(*) > 1
@@ -94,14 +119,8 @@ function buildSelect(): string {
   `;
 }
 
-interface Decision {
-  drop_number: string;
-  keeper: DropRow;
-  remove: DropRow[];
-  skipped?: string; // reason, if the group is left untouched
-}
-
-function decide(group: DropRow[]): Decision {
+/** Pure keeper-selection logic for one drop_number group. Exported for tests. */
+export function decide(group: DropRow[]): Decision {
   const drop_number = group[0].drop_number;
   const withChildren = group.filter((r) => r.child_count > 0);
 
@@ -118,8 +137,12 @@ function decide(group: DropRow[]): Decision {
   if (withChildren.length === 1) {
     keeper = withChildren[0];
   } else {
-    // No children anywhere: prefer source='qfield', then oldest created_at.
+    // No children anywhere — candidates are interchangeable duplicates.
+    // Deterministic order: oes_confirmed=true, then source='qfield', then oldest.
     const sorted = [...group].sort((a, b) => {
+      const ac = a.oes_confirmed ? 0 : 1;
+      const bc = b.oes_confirmed ? 0 : 1;
+      if (ac !== bc) return ac - bc;
       const aq = a.source === 'qfield' ? 0 : 1;
       const bq = b.source === 'qfield' ? 0 : 1;
       if (aq !== bq) return aq - bq;
@@ -141,8 +164,19 @@ function decide(group: DropRow[]): Decision {
   return { drop_number, keeper, remove };
 }
 
+/** Group rows by drop_number, preserving query order within each group. */
+export function groupByDropNumber(rows: DropRow[]): Map<string, DropRow[]> {
+  const groups = new Map<string, DropRow[]>();
+  for (const r of rows) {
+    const g = groups.get(r.drop_number) ?? [];
+    g.push(r);
+    groups.set(r.drop_number, g);
+  }
+  return groups;
+}
+
 function fmt(r: DropRow): string {
-  return `${r.id}  proj=${r.project_id ?? 'null'}  src=${r.source ?? 'null'}  status=${r.status ?? 'null'}  children=${r.child_count}`;
+  return `${r.id}  proj=${r.project_id ?? 'null'}  src=${r.source ?? 'null'}  status=${r.status ?? 'null'}  oes_confirmed=${r.oes_confirmed ?? 'null'}  children=${r.child_count}`;
 }
 
 async function main(): Promise<void> {
@@ -153,45 +187,52 @@ async function main(): Promise<void> {
   }
 
   const pool = new Pool({ connectionString: url });
+  const client = await pool.connect();
   try {
-    const { rows } = await pool.query<DropRow>(buildSelect());
-
     process.stdout.write(`\n=== Group E / D3-2 — cross-project duplicate drops dedup ===\n`);
     process.stdout.write(`Mode:        ${COMMIT ? 'LIVE (--commit)' : 'DRY RUN (default — no writes)'}\n`);
 
+    // Read child-counts, decide, and DELETE inside ONE transaction. FK
+    // constraints remain the authoritative delete-time guard (see header).
+    await client.query('BEGIN');
+
+    const fkRefs = await loadDropFkRefs(client);
+    process.stdout.write(`FK ref tables discovered: ${fkRefs.length}\n`);
+
+    const { rows } = await client.query<DropRow>(buildSelect(fkRefs));
     if (rows.length === 0) {
+      await client.query('ROLLBACK');
       process.stdout.write(`\nNo duplicate drop_numbers — clean.\n`);
       return;
     }
 
-    // Group by drop_number.
-    const groups = new Map<string, DropRow[]>();
-    for (const r of rows) {
-      const g = groups.get(r.drop_number) ?? [];
-      g.push(r);
-      groups.set(r.drop_number, g);
-    }
-
+    const groups = groupByDropNumber(rows);
     const decisions = [...groups.values()].map(decide);
-    const actionable = decisions.filter((d) => !d.skipped && d.remove.length > 0);
     const skipped = decisions.filter((d) => d.skipped);
-    const toRemove = actionable.flatMap((d) => d.remove);
+    const toRemove = decisions.filter((d) => !d.skipped).flatMap((d) => d.remove);
 
     process.stdout.write(`Duplicate drop_numbers: ${groups.size}\n`);
     process.stdout.write(`Rows to delete:         ${toRemove.length}\n`);
     process.stdout.write(`Groups skipped:         ${skipped.length}\n\n`);
 
     for (const d of decisions) {
+      const group = groups.get(d.drop_number) ?? [];
       process.stdout.write(`${d.drop_number}:\n`);
-      process.stdout.write(`  KEEP   ${fmt(d.keeper)}\n`);
       if (d.skipped) {
-        process.stdout.write(`  SKIP   (${d.skipped})\n`);
+        // Print the WHOLE group so the operator can act on the manual-review case.
+        process.stdout.write(`  SKIP (${d.skipped}):\n`);
+        for (const r of group) {
+          const mark = r.id === d.keeper.id ? 'keeper?' : 'row';
+          process.stdout.write(`    ${mark.padEnd(8)} ${fmt(r)}\n`);
+        }
       } else {
+        process.stdout.write(`  KEEP   ${fmt(d.keeper)}\n`);
         for (const r of d.remove) process.stdout.write(`  DELETE ${fmt(r)}\n`);
       }
     }
 
     if (toRemove.length === 0) {
+      await client.query('ROLLBACK');
       process.stdout.write(`\nNothing actionable.\n`);
       return;
     }
@@ -203,33 +244,39 @@ async function main(): Promise<void> {
     process.stdout.write(`\nSnapshot of rows to delete: ${snapshotPath}\n`);
 
     if (!COMMIT) {
+      await client.query('ROLLBACK');
       process.stdout.write(`\nDRY RUN complete. No rows changed. Re-run with --commit to apply.\n`);
       return;
     }
 
     const ids = toRemove.map((r) => r.id);
-    const client: PoolClient = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const res = await client.query(`DELETE FROM drops WHERE id = ANY($1::uuid[])`, [ids]);
-      await client.query('COMMIT');
-      process.stdout.write(`\n=== Dedup complete ===\nDeleted: ${res.rowCount} rows (expected ${ids.length})\n`);
-      process.stdout.write(`Snapshot for revert: ${snapshotPath}\n`);
-      process.stdout.write(`Verify: SELECT drop_number, count(*) FROM drops GROUP BY drop_number HAVING count(*)>1; -> 0 rows\n`);
-    } catch (err: unknown) {
+    const res = await client.query(`DELETE FROM drops WHERE id = ANY($1::uuid[])`, [ids]);
+    if (res.rowCount !== ids.length) {
       await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
+      process.stderr.write(
+        `\nABORT: DELETE affected ${res.rowCount} rows but ${ids.length} were planned — rolled back, no change.\n`,
+      );
+      process.exit(1);
     }
+    await client.query('COMMIT');
+    process.stdout.write(`\n=== Dedup complete ===\nDeleted: ${res.rowCount} rows (matched plan of ${ids.length})\n`);
+    process.stdout.write(`Snapshot for revert: ${snapshotPath}\n`);
+    process.stdout.write(`Verify: SELECT drop_number, count(*) FROM drops GROUP BY drop_number HAVING count(*)>1; -> 0 rows\n`);
+  } catch (err: unknown) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
   } finally {
+    client.release();
     await pool.end();
   }
 }
 
-main().catch((err: unknown) => {
-  log.error('backfill-dedup-cross-project-drops-1863: unexpected error', {
-    error: err instanceof Error ? err.message : String(err),
+// Only run when invoked directly (allows the pure helpers above to be unit-tested).
+if (process.argv[1] && process.argv[1].includes('backfill-dedup-cross-project-drops-1863')) {
+  main().catch((err: unknown) => {
+    log.error('backfill-dedup-cross-project-drops-1863: unexpected error', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    process.exit(1);
   });
-  process.exit(1);
-});
+}
