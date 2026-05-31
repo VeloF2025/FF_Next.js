@@ -16,6 +16,8 @@ import { RecordingPlayer } from './RecordingPlayer';
 import { MeetingSummaryPanel } from './MeetingSummaryPanel';
 import { MeetingActionItemsPanel } from './MeetingActionItemsPanel';
 import { MeetingMinutesPreviewModal } from './MeetingMinutesPreviewModal';
+import { CortexMeetingReviewPanel } from './CortexMeetingReviewPanel';
+import { PermissionGate } from '@/components/PermissionGate';
 import { log } from '@/lib/logger';
 
 interface MeetingDetailModalProps {
@@ -173,6 +175,18 @@ export function MeetingDetailModal({ meeting, isOpen, onClose, onRefresh }: Meet
             )}
             {activeTab === 'recording' && (
               <RecordingPlayer meetingId={meeting.id} hasRecording={meeting.hasRecording} source={meeting.source} />
+            )}
+
+            {/* Cortex Scribe reviewer panel — teams meetings, Action Items tab only.
+                Wrapped in a view PermissionGate (no fallback) so users without
+                cortex.review:view get nothing, not an error banner. The panel's own
+                query is also `enabled`-gated so it never round-trips Cortex when hidden. */}
+            {activeTab === 'action_items' && meeting.source === 'teams' && (
+              <PermissionGate permission="cortex.review" action="view">
+                <div className="mt-6 pt-6 border-t border-[var(--ff-border-light)]">
+                  <CortexMeetingReviewPanel meetingId={String(meeting.id)} active />
+                </div>
+              </PermissionGate>
             )}
           </div>
 

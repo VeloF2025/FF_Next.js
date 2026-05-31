@@ -15,7 +15,7 @@ export const cortexSection: NavSection = {
       icon: Brain,
       label: 'Cortex',
       shortLabel: 'Cortex',
-      // TODO: add rbacKey once RBAC row is provisioned (e.g. 'cortex.review')
+      rbacKey: 'cortex.review',
       permissions: [],
     },
   ],
