@@ -54,6 +54,34 @@ function cortexHeaders(reviewerEmail: string): Record<string, string> {
   };
 }
 
+/**
+ * Relay a non-OK upstream Cortex response to the client with a MEANINGFUL status +
+ * message. Without this, a Cortex 4xx (e.g. 422 "no field changes in edit", 409
+ * write-conflict) was masked as an opaque 500 "An internal error occurred". Only
+ * genuine upstream 5xx / unknown statuses become a 500.
+ */
+async function relayUpstreamError(
+  res: NextApiResponse,
+  op: string,
+  cortexMeetingId: string,
+  upstream: Response,
+): Promise<void> {
+  const raw = await upstream.text().catch(() => '');
+  let msg = `Cortex ${op} failed (${upstream.status})`;
+  try {
+    const j = JSON.parse(raw) as { detail?: unknown; message?: unknown };
+    if (typeof j.detail === 'string') msg = j.detail;
+    else if (Array.isArray(j.detail) && typeof (j.detail[0] as { msg?: string })?.msg === 'string') {
+      msg = (j.detail[0] as { msg: string }).msg;
+    } else if (typeof j.message === 'string') msg = j.message;
+  } catch { /* non-JSON upstream body — keep the default msg */ }
+  log.warn(`Cortex ${op} returned ${upstream.status}`, { cortexMeetingId, status: upstream.status, detail: raw.slice(0, 300) }, 'cortex-meeting-review');
+  if (upstream.status === 409) return apiResponse.conflict(res, msg);
+  if (upstream.status === 403) return apiResponse.forbidden(res, msg);
+  if (upstream.status >= 400 && upstream.status < 500) return apiResponse.badRequest(res, msg);
+  return apiResponse.internalError(res, new Error(`Cortex ${op} returned ${upstream.status}: ${msg}`));
+}
+
 // ── mutation body types ────────────────────────────────────────────────────────
 // NOTE: cortexMeetingId is intentionally NOT part of any op — the server resolves it
 // from the path param. Any client-supplied cortexMeetingId is ignored.
@@ -171,8 +199,7 @@ async function postHandler(
     });
 
     if (!upstream.ok) {
-      log.error('Cortex unpublish failed', { cortexMeetingId: sealed.cortexMeetingId, status: upstream.status }, 'cortex-meeting-review');
-      return apiResponse.internalError(res, new Error(`Cortex unpublish ${upstream.status}`));
+      return relayUpstreamError(res, 'unpublish', sealed.cortexMeetingId, upstream);
     }
 
     // §4.4: Delete local row so the panel does not show a stale "sealed" view.
@@ -214,8 +241,7 @@ async function postHandler(
   });
 
   if (!upstream.ok) {
-    log.error(`Cortex ${op} failed`, { cortexMeetingId, status: upstream.status }, 'cortex-meeting-review');
-    return apiResponse.internalError(res, new Error(`Cortex ${op} returned ${upstream.status}`));
+    return relayUpstreamError(res, op, cortexMeetingId, upstream);
   }
 
   const upstreamData = (await upstream.json()) as unknown;

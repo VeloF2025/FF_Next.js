@@ -257,3 +257,45 @@ describe('cortex/meeting-review route handler — body validation', () => {
     expect(res._getStatusCode()).toBe(405);
   });
 });
+
+describe('cortex/meeting-review route handler — upstream error propagation', () => {
+  beforeEach(reset);
+
+  // Make the edit/proposed-actions upstream call return a chosen non-OK status+body.
+  function installUpstream(status: number, body: unknown) {
+    global.fetch = (async (url: string) => {
+      if (url.includes('/proposed-actions/')) {
+        return { ok: false, status, text: async () => JSON.stringify(body), json: async () => body } as unknown as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as unknown as Response;
+    }) as unknown as typeof fetch;
+  }
+
+  it('Cortex 422 (no field changes) → 400 with the real message, NOT a masked 500', async () => {
+    principal.grantedActions = new Set(['view', 'edit']);
+    dbState.sealedRow = { cortex_meeting_id: 'mtg_real', seal_source: 'human', human_reviewed: true, sealed_at: null, summary: null, items: [] };
+    installUpstream(422, { detail: 'no field changes in edit' });
+    const { req, res } = createMocks({ method: 'POST', query: { meetingId: '92488' }, body: { op: 'edit', actionId: 'a1', text: 'x' } });
+    await handler(req as unknown as NextApiRequest, res as unknown as NextApiResponse);
+    expect(res._getStatusCode()).toBe(400); // not 500
+    expect(JSON.parse(res._getData()).error.message).toContain('no field changes');
+  });
+
+  it('Cortex 409 (write conflict) → 409 conflict, not 500', async () => {
+    principal.grantedActions = new Set(['view', 'edit']);
+    dbState.sealedRow = { cortex_meeting_id: 'mtg_real', seal_source: 'human', human_reviewed: true, sealed_at: null, summary: null, items: [] };
+    installUpstream(409, { detail: 'live-state write conflict, retry' });
+    const { req, res } = createMocks({ method: 'POST', query: { meetingId: '92488' }, body: { op: 'approve', actionId: 'a1' } });
+    await handler(req as unknown as NextApiRequest, res as unknown as NextApiResponse);
+    expect(res._getStatusCode()).toBe(409);
+  });
+
+  it('Cortex 500 stays a 500 (genuine upstream failure)', async () => {
+    principal.grantedActions = new Set(['view', 'edit']);
+    dbState.sealedRow = { cortex_meeting_id: 'mtg_real', seal_source: 'human', human_reviewed: true, sealed_at: null, summary: null, items: [] };
+    installUpstream(500, { detail: 'boom' });
+    const { req, res } = createMocks({ method: 'POST', query: { meetingId: '92488' }, body: { op: 'approve', actionId: 'a1' } });
+    await handler(req as unknown as NextApiRequest, res as unknown as NextApiResponse);
+    expect(res._getStatusCode()).toBe(500);
+  });
+});

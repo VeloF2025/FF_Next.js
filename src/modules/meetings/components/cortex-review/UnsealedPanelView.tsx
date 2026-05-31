@@ -45,6 +45,12 @@ function ActionCard({ action, meetingId }: ActionCardProps) {
   }
 
   const busy = mutation.isPending;
+  // Cortex rejects a no-op edit with 422 "no field changes" — disable Save until
+  // something actually changed so the user never fires a pointless failing request.
+  const hasChanges =
+    editText !== action.text ||
+    (editOwner || '') !== (action.owner ?? '') ||
+    (editDue || '') !== (action.due ?? '');
 
   return (
     <div className="border border-[var(--ff-border-light)] rounded-lg p-4 space-y-2">
@@ -111,7 +117,7 @@ function ActionCard({ action, meetingId }: ActionCardProps) {
                   op: 'edit', actionId: action.action_id,
                   text: editText, owner: editOwner || undefined, due: editDue || undefined,
                 })}
-                disabled={busy}
+                disabled={busy || !hasChanges}
                 className="flex items-center gap-1 px-3 py-1 text-xs font-medium bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg transition-colors disabled:opacity-50"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
