@@ -1,5 +1,7 @@
 # FibreFlow Data Integrity Audit — Read-Only Snapshot
-**As of: 2026-05-30 | Scope: 6 datasets | 34 detailed confirmed discrepancies (37 raw before dedup) across 5 data domains + 3 live Telegram-broadcast mismatches**
+**As of: 2026-05-30 | Scope: 6 datasets | 34 confirmed discrepancies across 5 data domains + 3 live Telegram-broadcast mismatches**
+
+> **Overlap note:** D1-3 and D2-2 below are the *same* 240-serial population surfaced from two different audit lenses (register-vs-OES reconciliation, and lifecycle-matrix integrity). They are retained as separate findings because each dataset's remediation owner needs to see it, but they represent **one** underlying issue, not two — verified: `intersect = 240, only-D1-3 = 0, only-D2-2 = 0`. Counting distinct underlying problems, the true total is 33.
 
 > Method: multi-agent read-only audit. One finder agent per dataset (live-schema discovery, `SELECT`-only under server-enforced `default_transaction_read_only=on`), each finding independently re-verified with a second, separately-formulated confirming query. Findings that could not be reproduced were dropped (default false-positive). Every row below carries the SQL that proves it.
 
@@ -44,7 +46,7 @@ SELECT
   COUNT(*) FILTER (WHERE resolution_status = 'activated')       AS activated_count,
   COUNT(*) FILTER (
     WHERE COALESCE(resolution_status,'') NOT ILIKE 'resolved'
-  )                                                              AS broken_backlog_filter,  -- returns 2,616 (entire table)
+  )                                                              AS broken_backlog_filter,  -- 2,616 at audit (2026-05-30); was 2,596 at report run (2026-05-29 19:00) — entire table either way
   COUNT(*) FILTER (
     WHERE resolution_status IS DISTINCT FROM 'activated'
   )                                                              AS correct_open_backlog,   -- returns 959
@@ -140,6 +142,8 @@ WHERE oa.status = 'Active'
 -- Returns 14,474
 ```
 
+> **Count-integrity note:** the bare `COUNT(*)` here equals `COUNT(DISTINCT ss.serial_number)` because `oes_activations` has no fan-out on Active serials — verified: `SELECT COUNT(*) - COUNT(DISTINCT serial_number) FROM oes_activations WHERE status='Active'` returns **0** (18,465 rows = 18,465 distinct). The join cannot inflate the figure.
+
 ---
 
 ### D1-2 — HIGH: 2,318 OES-active serials absent from the register entirely
@@ -164,8 +168,8 @@ WHERE oa.status = 'Active'
 
 **Key:** `oes_active_installed_not_activated_in_register`
 **Expected:** ONT serials 'Active' in OES should be 'activated' in the register, not 'installed'.
-**Actual:** 240 serials are 'Active' in `oes_activations` with `drop_number` and `activation_date`, but `stock_serials.status='installed'`. Sample confirms matching `installed_at_drop_number` values — OES activation completed, register lifecycle not advanced past 'installed'.
-**Severity:** High | **Record count:** 240
+**Actual:** 240 serials are 'Active' in `oes_activations` with `drop_number` and `activation_date`, but `stock_serials.status='installed'`. Sample confirms matching `installed_at_drop_number` values — OES activation completed, register lifecycle not advanced past 'installed'. **⚠️ Same 240-serial population as D2-2** (viewed here as a register-reconciliation gap; D2-2 frames it as a lifecycle-cascade miss). Verified identical: intersect = 240, no rows unique to either side.
+**Severity:** High | **Record count:** 240 (shared with D2-2)
 
 ```sql
 SELECT COUNT(DISTINCT ss.serial_number)
@@ -314,8 +318,8 @@ GROUP BY e.event_type, e.source_table;
 
 **Key:** `oes_active_installed_missed_activation`
 **Expected:** The OES cascade trigger should advance `installed→activated` when an OES activation is imported for a serial registered before its activation date.
-**Actual:** 240 serials have `oes_activations.status='Active'` with `activation_date` after `stock_serials.created_at`, yet `stock_serials.status='installed'`. Longest: 124 days (ALCLB48CB0B3, installed 2026-01-26). 5 serials stuck 30+ days.
-**Severity:** Critical | **Record count:** 240
+**Actual:** 240 serials have `oes_activations.status='Active'` with `activation_date` after `stock_serials.created_at`, yet `stock_serials.status='installed'`. Longest: 124 days (ALCLB48CB0B3, installed 2026-01-26). 5 serials stuck 30+ days. **⚠️ Same 240-serial population as D1-3** — one underlying issue counted under two datasets; do not sum them.
+**Severity:** Critical | **Record count:** 240 (shared with D1-3)
 
 ```sql
 SELECT COUNT(DISTINCT ss.serial_number) AS cnt_installed_but_oes_active
@@ -518,7 +522,7 @@ WHERE p.resolution_status IN ('located_1map','located_local','located_unified');
 
 **Key:** `serial-mismatch-pp-vs-oes-same-drop`
 **Expected:** For the same drop, the ONT serial in `oes_pp_data` should match `oes_activations`.
-**Actual:** 115 'activated' records in `oes_pp_data` have a different serial from `oes_activations` for the same drop (excluding '-' placeholders). `serial_change_history` explains 58 of these (recorded swaps); 57 remain genuinely unexplained. Breakdown: Lawley 34, Mamelodi 32, Mohadin 37 (adjusted), TEM 12. Unexplained cases likely represent stale PP serials or post-activation swaps not fed back to the PP table.
+**Actual:** 115 'activated' records in `oes_pp_data` have a different serial from `oes_activations` for the same drop (excluding '-' placeholders). `serial_change_history` explains 58 of these (recorded swaps); 57 remain genuinely unexplained. Breakdown: Lawley 34, Mamelodi 32, Mohadin 37 (verified figure — finder's original sub-count was 39; see Caveats), TEM 12. Unexplained cases likely represent stale PP serials or post-activation swaps not fed back to the PP table.
 **Severity:** High | **Record count:** 115
 
 ```sql
@@ -760,7 +764,7 @@ ORDER BY module, analysis_type;
 
 **Audit basis:** Read-only SQL queries against the FibreFlow Supabase PostgreSQL instance (`supabase-db` on `100.96.203.105:5437`). No data was modified; no Telegram messages were sent. Snapshot as of 2026-05-30.
 
-**Count note:** 37 raw confirmed findings were produced by the verifiers; the synthesizer merged duplicate/overlapping findings down to the 34 detailed rows above. Per-dataset section counts (8/6/4/7/6/3) sum to 34.
+**Count note:** 34 confirmed findings are detailed above; per-dataset section counts (8/6/4/7/6/3) sum to 34. One pair — **D1-3 and D2-2** — is the same 240-serial population surfaced from two audit lenses (verified: intersect = 240, none unique to either), so the number of *distinct underlying problems* is **33**. They are listed separately so each dataset's remediation owner sees the issue, but must not be summed when sizing the work. No other cross-dataset overlaps were found.
 
 **What was covered:**
 - `stock_serials`, `oes_activations`, `sp_pon_tracker`, `oes_pp_data`, `stock_serial_events`, `stock_serial_status_transitions`, `drops`, `qa_photo_reviews`, `vlm_corrections`, `dr_photo_unified_reviews`, `construction_qa_photos`, `eod_install_sheets`, `wa_photos`, `oes_pp_import_batches`, `serial_change_history`, Hermes cron output files (`~/.hermes/cron/output/`) and Cortex report attachments (`~/Workspace/Cortex/reports/`).
