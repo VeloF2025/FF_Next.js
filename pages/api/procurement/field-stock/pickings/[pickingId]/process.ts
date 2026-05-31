@@ -243,8 +243,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               payload:      { picking_number: picking.picking_number, picking_type: pickingType },
             });
           }
+          // field_stock_movements (NOT stock_movements): these columns exist only
+          // there; targeting stock_movements 500'd every non-issue picking — same
+          // wrong-table bug the issue path already removed (#1849).
           await txn.query(
-            `INSERT INTO stock_movements (picking_id, stock_item_id, movement_type,
+            `INSERT INTO field_stock_movements (picking_id, stock_item_id, movement_type,
                from_location_id, to_location_id, quantity, performed_at)
              VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
             [pickingId, line.stock_item_id, pickingType, sourceLocationId, destinationLocationId, line.planned_quantity],
