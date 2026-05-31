@@ -78,6 +78,11 @@ export async function promoteOesActivatedSerials(
       // Only 'installed' and 'in_stock' have a matrix transition to 'activated'
       // (mig 387 + mig 393). Any other state has no →activated edge: surface it
       // rather than silently skipping or letting promoteSerial raise FF001.
+      // Note: the legacy 'available' state is intentionally NOT promoted here —
+      // the Track 5 backfill renamed all 'available' rows to 'in_stock' (0
+      // remain), and there is no available→activated matrix row, so an
+      // 'available' serial would warn+skip safely rather than FF001. If
+      // 'available' rows ever reappear, this warning is the signal to act.
       if (serial.status !== 'installed' && serial.status !== 'in_stock') {
         logger.warn('OES activation: serial in a state with no transition to activated — skipped for triage', {
           serial_number: row.serial_number,

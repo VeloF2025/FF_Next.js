@@ -25,7 +25,8 @@
 -- event_type from this same row. Adding the row is therefore sufficient — no
 -- application code passes event_type.
 --
--- Idempotent: re-running is a no-op (WHERE NOT EXISTS guard + ON CONFLICT).
+-- Idempotent: the matrix INSERT is guarded by WHERE NOT EXISTS, and the
+-- migrations bookkeeping row uses ON CONFLICT (version) DO NOTHING.
 
 BEGIN;
 
