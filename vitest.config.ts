@@ -71,6 +71,9 @@ export default defineConfig({
       // @/lib/hooks/* lives at src/lib/hooks/ — needed after useStockSync was updated
       // to import from '@/lib/hooks/useOnlineStatus' (bucket B refactor).
       { find: /^@\/lib\/hooks/, replacement: path.resolve(__dirname, './src/lib/hooks') },
+      // @/lib/cortex/* lives at src/lib/cortex/ (Cortex Scribe outbox pull) — explicit
+      // override before the generic @/lib → ./lib fallback (mirrors tsconfig src-first).
+      { find: /^@\/lib\/cortex/, replacement: path.resolve(__dirname, './src/lib/cortex') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },
