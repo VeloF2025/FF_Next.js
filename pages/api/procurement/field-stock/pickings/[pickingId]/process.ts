@@ -243,12 +243,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               payload:      { picking_number: picking.picking_number, picking_type: pickingType },
             });
           }
-          // Audit row goes to field_stock_movements (NOT stock_movements): these
-          // columns (picking_id, stock_item_id, from/to_location_id, quantity,
-          // performed_at) exist on field_stock_movements only. Targeting
-          // stock_movements 500'd every transfer/scrap/receipt/return with
-          // `column "picking_id" of relation "stock_movements" does not exist`
-          // — the same wrong-table bug the issue path already removed (#1849).
+          // field_stock_movements (NOT stock_movements): these columns exist only
+          // there; targeting stock_movements 500'd every non-issue picking — same
+          // wrong-table bug the issue path already removed (#1849).
           await txn.query(
             `INSERT INTO field_stock_movements (picking_id, stock_item_id, movement_type,
                from_location_id, to_location_id, quantity, performed_at)
