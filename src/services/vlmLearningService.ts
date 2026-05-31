@@ -14,6 +14,7 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { createHash } from 'crypto';
+import { checkVlmCorrectionSource } from '@/services/vlmCorrectionSource';
 import type {
   VlmModule,
   VlmAnalysisType,
@@ -59,6 +60,16 @@ export async function recordVlmCorrection(
     correctedByName,
     correctedById,
   } = input;
+
+  // Provenance guard (#1862): reject an unknown source_table outright; warn (but
+  // still record) when a source_table carries no source_id/photo_url linkage.
+  const sourceCheck = checkVlmCorrectionSource({ sourceTable, sourceId, photoUrl });
+  if (sourceCheck.fatal) {
+    throw new Error(`recordVlmCorrection: ${sourceCheck.fatal}`);
+  }
+  if (sourceCheck.warning) {
+    log.warn(`recordVlmCorrection: ${sourceCheck.warning}`, { module, analysisType });
+  }
 
   // Auto-classify error pattern if not provided
   const errorPattern = classifyErrorPattern(vlmExtractedValue, correctedValue, analysisType);
