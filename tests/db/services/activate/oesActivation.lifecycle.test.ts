@@ -187,4 +187,105 @@ describe('promoteOesActivatedSerials — OES installed→activated lifecycle (Tr
     );
     expect(Number(cntAfter.rows[0]?.cnt)).toBe(eventCountBefore);
   });
+
+  /**
+   * Case C (mig 393 reconciliation path): in_stock serial is promoted directly
+   * to activated via the in_stock→activated transition, emitting a DEDICATED
+   * event_type 'activated_on_oes'. This is the Group A fix (#1860) — before
+   * mig 393 + the widened guard, an in_stock OES-active serial raised FF001 and
+   * stayed stuck. Requires migration 393 applied to the test container.
+   */
+  it('Case C — in_stock serial: promotes to activated, emits one activated_on_oes event', async () => {
+    const snRow = await pool.query<{ serial_number: string }>(
+      `SELECT serial_number FROM stock_serials WHERE id = $1`,
+      [fixture.inStockSerialId],
+    );
+    const serialNumber = snRow.rows[0].serial_number;
+
+    const before = await pool.query<{ status: string }>(
+      `SELECT status FROM stock_serials WHERE id = $1`,
+      [fixture.inStockSerialId],
+    );
+    expect(before.rows[0]?.status).toBe('in_stock');
+
+    const eventsBefore = await pool.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM stock_serial_events WHERE serial_id = $1`,
+      [fixture.inStockSerialId],
+    );
+    expect(Number(eventsBefore.rows[0]?.cnt)).toBe(0);
+
+    await promoteOesActivatedSerials([
+      { serial_number: serialNumber, drop_number: fixture.DROP_INSTOCK },
+    ]);
+
+    const after = await pool.query<{ status: string }>(
+      `SELECT status FROM stock_serials WHERE id = $1`,
+      [fixture.inStockSerialId],
+    );
+    expect(after.rows[0]?.status).toBe('activated');
+
+    const events = await pool.query<{
+      event_type:   string;
+      from_state:   string | null;
+      to_state:     string | null;
+      source_table: string | null;
+    }>(
+      `SELECT event_type, from_state, to_state, source_table
+         FROM stock_serial_events
+        WHERE serial_id = $1
+        ORDER BY occurred_at`,
+      [fixture.inStockSerialId],
+    );
+    expect(events.rows).toHaveLength(1);
+    // mig 393: ('in_stock', 'activated', 'activated_on_oes', 'OES reconciliation')
+    expect(events.rows[0]).toMatchObject({
+      event_type:   'activated_on_oes',
+      from_state:   'in_stock',
+      to_state:     'activated',
+      source_table: 'oes_activations',
+    });
+  });
+
+  /**
+   * Case D (guard — no →activated transition): a serial in 'issued' (no matrix
+   * edge to 'activated') is skipped with a warning, NOT promoted and NOT crashed
+   * with FF001. Status unchanged, no event emitted, no throw.
+   */
+  it('Case D — issued serial: no transition to activated, guard skips it, no event, no throw', async () => {
+    const snRow = await pool.query<{ serial_number: string }>(
+      `SELECT serial_number FROM stock_serials WHERE id = $1`,
+      [fixture.issuedSerialId],
+    );
+    const serialNumber = snRow.rows[0].serial_number;
+
+    const before = await pool.query<{ status: string }>(
+      `SELECT status FROM stock_serials WHERE id = $1`,
+      [fixture.issuedSerialId],
+    );
+    expect(before.rows[0]?.status).toBe('issued');
+
+    const cntBefore = await pool.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM stock_serial_events WHERE serial_id = $1`,
+      [fixture.issuedSerialId],
+    );
+    const eventCountBefore = Number(cntBefore.rows[0]?.cnt);
+
+    await expect(
+      promoteOesActivatedSerials([
+        { serial_number: serialNumber, drop_number: fixture.DROP_ISSUED },
+      ]),
+    ).resolves.toBeUndefined();
+
+    const after = await pool.query<{ status: string }>(
+      `SELECT status FROM stock_serials WHERE id = $1`,
+      [fixture.issuedSerialId],
+    );
+    expect(after.rows[0]?.status).toBe('issued');
+
+    const cntAfter = await pool.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM stock_serial_events WHERE serial_id = $1`,
+      [fixture.issuedSerialId],
+    );
+    expect(Number(cntAfter.rows[0]?.cnt)).toBe(eventCountBefore);
+  });
 });
