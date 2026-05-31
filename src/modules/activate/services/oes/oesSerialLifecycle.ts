@@ -21,25 +21,33 @@ export interface OesSerialRow {
  * Sprint E Track 2.6 — OES activation serial lifecycle step.
  *
  * For each serial whose `oes_pp_data.resolution_status` was just set to
- * 'activated', promote the corresponding `stock_serials` row from
- * `installed` → `activated` via the canonical promoteSerial() path
- * (mig 387 matrix row 73, event_type='activated').
+ * 'activated', promote the corresponding `stock_serials` row to `activated`
+ * via the canonical promoteSerial() path.
+ *
+ * Two source states are valid for an OES activation, both matrix-allowed:
+ *   - `installed` → `activated`  (mig 387, event_type='activated') — the normal
+ *     path: the serial was recorded as installed at a drop, OES then activates.
+ *   - `in_stock`  → `activated`  (mig 393, event_type='activated_on_oes') — the
+ *     reconciliation path: OES reports the serial Active but we never recorded
+ *     an install event for it (bulk-imported direct to stock, or a field
+ *     install we never captured). Without mig 393 these raised FF001 and stayed
+ *     stuck in_stock — the Group A bug (issue #1860, ~14,474 serials).
  *
  * DORMANT PRE-CUTOVER: mig 364 TRIGGER 3 (`trg_oes_pp_data_after_insert_activate`)
- * fires on `oes_pp_data` INSERT/UPDATE and directly sets `stock_serials.status →
- * 'activated'` before this application-layer code runs. By the time we reach
- * this point, TRIGGER 3 has already raced ahead — the per-serial guard
- * (`serial.status !== 'installed'`) sees status='activated' and skips the row.
- * This is expected and accepted (Hein, 2026-05-28).
- * See cascadePpResolution.ts inline doc and PR body for full background.
- *
- * POST-CUTOVER (Track 7): TRIGGER 3 is retired. This function becomes the
- * sole application-layer writer for the OES `installed → activated` transition.
+ * fired on `oes_pp_data` INSERT/UPDATE and directly set `stock_serials.status →
+ * 'activated'` before this code ran. POST-CUTOVER (Track 7) TRIGGER 3 is
+ * retired and this function is the sole application-layer activation writer.
  *
  * Guard logic:
- *   - Serial not in stock_serials → skip (no stock record to promote).
- *   - Serial status ≠ 'installed' → skip (already promoted by TRIGGER 3
- *     pre-cutover, or in a later/different state).
+ *   - Serial not in stock_serials → skip (no stock record; stock-receipt gap,
+ *     tracked separately in issue #1864 — NOT created here).
+ *   - status already 'activated' → skip (idempotent; TRIGGER 3 race pre-cutover
+ *     or a re-run).
+ *   - status 'installed' or 'in_stock' → promote to 'activated'.
+ *   - any OTHER state (issued / allocated_to_project / available / faulty /
+ *     returned / scrapped) has no matrix transition to 'activated' → LOG a
+ *     warning and skip. Never silently swallowed: an OES activation arriving
+ *     for such a serial is unexpected and worth surfacing for triage.
  *
  * Idempotency: sourceId=serial.id + sourceTable='oes_activations' → the
  * partial-index dedup on stock_serial_events (WHERE source_id IS NOT NULL)
@@ -64,8 +72,20 @@ export async function promoteOesActivatedSerials(
       );
 
       const serial = result.rows[0];
-      if (!serial) continue; // Serial not in stock_serials — skip.
-      if (serial.status !== 'installed') continue; // Guard: TRIGGER 3 pre-cutover race or wrong state — skip.
+      if (!serial) continue;                          // Not in stock_serials — out of scope (issue #1864).
+      if (serial.status === 'activated') continue;    // Idempotent: already activated (TRIGGER 3 race / re-run).
+
+      // Only 'installed' and 'in_stock' have a matrix transition to 'activated'
+      // (mig 387 + mig 393). Any other state has no →activated edge: surface it
+      // rather than silently skipping or letting promoteSerial raise FF001.
+      if (serial.status !== 'installed' && serial.status !== 'in_stock') {
+        logger.warn('OES activation: serial in a state with no transition to activated — skipped for triage', {
+          serial_number: row.serial_number,
+          status:        serial.status,
+          drop_number:   row.drop_number,
+        });
+        continue;
+      }
 
       await promoteSerial(pool, {
         serialId:    serial.id,
@@ -82,8 +102,11 @@ export async function promoteOesActivatedSerials(
         },
       });
 
-      logger.info('OES serial promoted installed→activated', {
+      // from_state determines the emitted event_type: 'installed'→activated
+      // emits 'activated'; 'in_stock'→activated emits 'activated_on_oes'.
+      logger.info('OES serial promoted to activated', {
         serial_number: row.serial_number,
+        from_status:   serial.status,
         drop_number:   row.drop_number,
       });
     } catch (err) {
