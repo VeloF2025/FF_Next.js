@@ -42,6 +42,17 @@ const batchArg = process.argv.find((_, i, arr) => arr[i - 1] === '--batch');
 const LIMIT = limitArg ? parseInt(limitArg, 10) : null;
 const BATCH = batchArg ? parseInt(batchArg, 10) : 500;
 
+// Guard mistyped flag values (e.g. `--batch --commit` → parseInt('--commit') = NaN)
+// before any DB work, so progress logging works and a NaN limit can't surprise.
+if (LIMIT !== null && (Number.isNaN(LIMIT) || LIMIT <= 0)) {
+  process.stderr.write('ERROR: --limit requires a positive integer\n');
+  process.exit(1);
+}
+if (Number.isNaN(BATCH) || BATCH <= 0) {
+  process.stderr.write('ERROR: --batch requires a positive integer\n');
+  process.exit(1);
+}
+
 interface StuckSerial {
   id: string;
   serial_number: string;
@@ -107,7 +118,7 @@ async function main(): Promise<void> {
     fs.writeFileSync(
       snapshotPath,
       JSON.stringify(
-        rows.map((r) => ({ id: r.id, prior_status: r.status, serial_number: r.serial_number, drop_number: r.drop_number })),
+        rows.map((r) => ({ id: r.id, prior_status: r.status, serial_number: r.serial_number, drop_number: r.drop_number, activation_date: r.activation_date })),
         null,
         2,
       ),
