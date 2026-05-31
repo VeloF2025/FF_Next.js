@@ -171,6 +171,11 @@ export function UnsealedPanelView({ meetingId, data }: UnsealedPanelViewProps) {
 
   const approvedCount = proposedActions.filter(a => a.state === 'approved').length;
   const totalCount = proposedActions.length;
+  const minutesText = (minutes ?? [])
+    .filter(m => !m.superseded_by)
+    .map(m => m.text)
+    .join('\n')
+    .trim();
 
   return (
     <div className="space-y-4">
@@ -183,10 +188,12 @@ export function UnsealedPanelView({ meetingId, data }: UnsealedPanelViewProps) {
         </span>
       </div>
 
-      {minutes && (
+      {minutesText && (
         <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-3">
           <p className="text-xs font-semibold text-[var(--ff-text-secondary)] mb-1">Meeting Minutes</p>
-          <p className="text-sm text-[var(--ff-text-primary)] whitespace-pre-wrap line-clamp-6">{minutes}</p>
+          <p className="text-sm text-[var(--ff-text-primary)] whitespace-pre-wrap line-clamp-6">
+            {minutesText}
+          </p>
         </div>
       )}
 

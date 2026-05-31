@@ -163,16 +163,21 @@ describe('resolveUnsealedMeetingId', () => {
 
 describe('fetchLiveState', () => {
   it('returns the proposed_actions from live-state', async () => {
+    // Cortex /live-state returns `minutes` as an ARRAY of running-minute entries,
+    // not a string (rendering the raw array previously crashed the panel, React #31).
     const liveState = {
       proposed_actions: [
         { action_id: 'a1', text: 'Do this', owner: 'Hein', due: null, confidence: 0.9, state: 'proposed', source_quotes: [], history: [] },
       ],
-      minutes: 'Meeting summary text',
+      minutes: [
+        { entry_id: 'min_1', kind: 'decision', text: 'Ship the reviewer', content_key: 'k1', segment_index: 0, superseded_by: null, created_at: '2026-05-31T00:00:00Z' },
+      ],
     };
     const result = await fetchLiveState('mtg_a', EMAIL, BRIDGE, KEY, makeFetch(liveState));
     expect(result).not.toBeNull();
     expect(result?.proposed_actions).toHaveLength(1);
-    expect(result?.minutes).toBe('Meeting summary text');
+    expect(Array.isArray(result?.minutes)).toBe(true);
+    expect(result?.minutes?.[0].text).toBe('Ship the reviewer');
   });
 
   it('returns null on a non-OK response', async () => {

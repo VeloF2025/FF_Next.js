@@ -34,11 +34,20 @@ export interface SealedPanel {
   items: SealedItem[];
 }
 
+// Cortex /live-state returns running-minute entries as an array of objects,
+// not a string — rendering the raw array crashed the panel (React #31).
+export interface Minute {
+  entry_id: string;
+  kind: string;
+  text: string;
+  superseded_by?: string | null;
+}
+
 export interface UnsealedPanel {
   panelState: 'unsealed';
   cortexMeetingId: string;
   proposedActions: ProposedAction[];
-  minutes: string | null;
+  minutes: Minute[] | null;
 }
 
 export interface NonePanel {

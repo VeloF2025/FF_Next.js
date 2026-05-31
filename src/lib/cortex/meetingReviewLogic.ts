@@ -35,9 +35,21 @@ export interface ProposedAction {
   history: unknown[];
 }
 
+// Cortex /live-state returns `minutes` as an array of running-minute entries
+// (NOT a string). Rendering the raw array crashed the panel (React #31).
+export interface CortexMinute {
+  entry_id: string;
+  kind: string;
+  text: string;
+  content_key?: string;
+  segment_index?: number;
+  superseded_by?: string | null;
+  created_at?: string;
+}
+
 export interface LiveStateResponse {
   proposed_actions: ProposedAction[];
-  minutes: string | null;
+  minutes: CortexMinute[] | null;
 }
 
 export interface SealedMeetingPanel {
@@ -54,7 +66,7 @@ export interface UnsealedMeetingPanel {
   panelState: 'unsealed';
   cortexMeetingId: string;
   proposedActions: ProposedAction[];
-  minutes: string | null;
+  minutes: CortexMinute[] | null;
 }
 
 export interface NoPanelResponse {
