@@ -22,6 +22,7 @@ import {
   History as HistoryIcon,
   AlertCircle,
   Package,
+  Camera,
 } from 'lucide-react';
 
 import { getHubSummary, requestFleetHandoff } from './api';
@@ -29,6 +30,9 @@ import type { AttendanceProfile, HubSummaryResponse } from './api';
 import { MyPortalShell } from './MyPortalShell';
 import { InstallPrompt } from './InstallPrompt';
 import { isStoresAuthorised } from '@/modules/field-stock-pwa/lib/storesRoles';
+
+const SITECAM_URL = 'https://field.fibreflow.app';
+const SITECAM_ROLES: ReadonlyArray<string> = ['technician', 'supervisor'];
 
 type HubSummary = HubSummaryResponse;
 
@@ -118,6 +122,9 @@ export function MyHub({ profile }: MyHubProps) {
         />
         {isStoresAuthorised(profile.role, profile.authRole) && (
           <StoresTile onClick={() => router.push('/my/stores')} />
+        )}
+        {(SITECAM_ROLES.includes(profile.role ?? '') || profile.authRole === 'super_admin' || profile.authRole === 'system') && (
+          <SiteCamTile />
         )}
       </div>
 
@@ -316,6 +323,18 @@ function StoresTile({ onClick }: { onClick: () => void }) {
       iconClass="bg-amber-500/15 text-amber-300"
       title="Stores"
       subtitle="Issue &amp; return field stock"
+    />
+  );
+}
+
+function SiteCamTile() {
+  return (
+    <Tile
+      onClick={() => window.location.assign(SITECAM_URL)}
+      icon={<Camera className="w-5 h-5" />}
+      iconClass="bg-sky-500/15 text-sky-300"
+      title="SiteCam"
+      subtitle="Capture installation photos"
     />
   );
 }

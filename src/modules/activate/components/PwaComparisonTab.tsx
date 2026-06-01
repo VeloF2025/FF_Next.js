@@ -3,7 +3,7 @@
 /**
  * PwaComparisonTab
  *
- * Shows photos submitted via the PhotoGuide PWA app for a DR.
+ * Shows photos submitted via the SiteCam app for a DR.
  * Appears as a tab inside UnifiedReviewCard when a PWA submission exists.
  */
 
@@ -36,7 +36,7 @@ export function PwaComparisonTab({ drNumber }: { drNumber: string }) {
   const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    fetch(`/api/photo-guide/submission/${drNumber}`, { credentials: 'include' })
+    fetch(`/api/sitecam/submission/${drNumber}`, { credentials: 'include' })
       .then((r) => r.json() as Promise<ApiResponse>)
       .then((d) => {
         if (d.success && d.data?.submission) setSubmission(d.data.submission);

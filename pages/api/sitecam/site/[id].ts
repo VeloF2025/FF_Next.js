@@ -1,5 +1,5 @@
 /**
- * GET /api/photo-guide/site/:id
+ * GET /api/sitecam/site/:id
  *
  * Look up a DR number or pole number and return display info for the PWA.
  * DR format: DR-XXXXXX or numeric only.

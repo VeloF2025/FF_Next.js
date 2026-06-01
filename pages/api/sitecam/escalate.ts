@@ -1,5 +1,5 @@
 /**
- * POST /api/photo-guide/escalate
+ * POST /api/sitecam/escalate
  *
  * Called by the PWA when a technician exhausts all retries for a step.
  * Creates a pwa_escalations row for supervisor review.

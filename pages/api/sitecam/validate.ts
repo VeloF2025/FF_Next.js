@@ -1,5 +1,5 @@
 /**
- * POST /api/photo-guide/validate
+ * POST /api/sitecam/validate
  *
  * Validates a single photo for a PWA job step.
  * Runs two fraud checks then a VLM quality check:

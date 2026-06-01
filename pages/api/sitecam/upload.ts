@@ -1,5 +1,5 @@
 /**
- * POST /api/photo-guide/upload
+ * POST /api/sitecam/upload
  *
  * Called when a technician completes all steps (all passed or escalated).
  * Receives base64 photos, uploads each to VF Storage, then updates the

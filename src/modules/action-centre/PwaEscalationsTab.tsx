@@ -3,7 +3,7 @@
 /**
  * PwaEscalationsTab
  *
- * Supervisor view for PhotoGuide PWA step escalations.
+ * Supervisor view for SiteCam step escalations.
  * Shows all pending escalations (steps that failed 3× on device).
  * Supervisors can approve (photo acceptable despite AI failure) or reject.
  */
@@ -45,7 +45,7 @@ export function PwaEscalationsTab() {
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetch('/api/photo-guide/escalations?status=pending', { credentials: 'include' })
+    fetch('/api/sitecam/escalations?status=pending', { credentials: 'include' })
       .then((r) => r.json() as Promise<ApiResponse>)
       .then((d) => {
         if (d.success && d.data?.escalations) setEscalations(d.data.escalations);
@@ -63,7 +63,7 @@ export function PwaEscalationsTab() {
   const resolve = async (id: string, resolution: 'approved' | 'rejected') => {
     setResolving(id);
     try {
-      const resp = await fetch('/api/photo-guide/escalation-resolve', {
+      const resp = await fetch('/api/sitecam/escalation-resolve', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

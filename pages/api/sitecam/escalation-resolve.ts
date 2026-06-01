@@ -1,5 +1,5 @@
 /**
- * POST /api/photo-guide/escalation-resolve
+ * POST /api/sitecam/escalation-resolve
  *
  * Supervisor approves or rejects a PWA escalation.
  * Body: { id: string, resolution: 'approved' | 'rejected', note?: string }
