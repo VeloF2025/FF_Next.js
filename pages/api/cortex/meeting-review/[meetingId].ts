@@ -42,17 +42,21 @@ import {
   type UnsealedMeetingPanel,
   type Sql,
 } from '@/lib/cortex/meetingReviewLogic';
+import { bridgeBearer } from '@/lib/cortex/bridgeAuth';
 
 // ── env ────────────────────────────────────────────────────────────────────────
 const BRIDGE_URL = process.env.CORTEX_BRIDGE_URL ?? 'http://localhost:7403';
-const API_KEY = process.env.CORTEX_API_KEY ?? '';
 // Upper bound for a human-edited executive summary (generous — summaries are short).
 const MAX_SUMMARY_LEN = 20_000;
 
-function cortexHeaders(reviewerEmail: string): Record<string, string> {
+// `bearer` is the per-request Cortex credential resolved by bridgeBearer(): a verified
+// per-user JWT when BRIDGE_JWT_SECRET is configured, else the shared service api key
+// (dark default). It already carries the reviewer identity, so Cortex narrows access
+// to the reviewer's own meetings. X-Cortex-Reviewer stays for the audit trail only.
+function cortexHeaders(reviewerEmail: string, bearer: string): Record<string, string> {
   return {
     'Content-Type': 'application/json',
-    ...(API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {}),
+    ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
     'X-Cortex-Reviewer': reviewerEmail,
   };
 }
@@ -112,6 +116,7 @@ async function resolveCortexMeetingId(
   sql: Sql,
   ffMeetingId: string,
   reviewerEmail: string,
+  bearer: string,
 ): Promise<string | null> {
   const sealed = await readSealedRow(sql, ffMeetingId);
   if (sealed) return sealed.cortexMeetingId;
@@ -119,7 +124,7 @@ async function resolveCortexMeetingId(
   const callRecordId = await resolveCallRecordId(sql, ffMeetingId);
   if (!callRecordId) return null;
 
-  return resolveUnsealedMeetingId(callRecordId, reviewerEmail, BRIDGE_URL, API_KEY);
+  return resolveUnsealedMeetingId(callRecordId, reviewerEmail, BRIDGE_URL, bearer);
 }
 
 // ── GET handler ────────────────────────────────────────────────────────────────
@@ -130,6 +135,7 @@ async function getHandler(
 ): Promise<void> {
   const { meetingId } = req.query as { meetingId: string };
   const reviewerEmail = req.user.email;
+  const bearer = await bridgeBearer(reviewerEmail);
   const sql: Sql = neon(process.env.DATABASE_URL!);
 
   // 1. Sealed? — check local table first (cheap DB query, no Cortex call)
@@ -144,18 +150,18 @@ async function getHandler(
     return apiResponse.success(res, { panelState: 'none' } satisfies NoPanelResponse);
   }
 
-  const cortexMeetingId = await resolveUnsealedMeetingId(callRecordId, reviewerEmail, BRIDGE_URL, API_KEY);
+  const cortexMeetingId = await resolveUnsealedMeetingId(callRecordId, reviewerEmail, BRIDGE_URL, bearer);
   if (!cortexMeetingId) {
     return apiResponse.success(res, { panelState: 'none' } satisfies NoPanelResponse);
   }
 
-  const liveState = await fetchLiveState(cortexMeetingId, reviewerEmail, BRIDGE_URL, API_KEY);
+  const liveState = await fetchLiveState(cortexMeetingId, reviewerEmail, BRIDGE_URL, bearer);
   if (!liveState) {
     return apiResponse.success(res, { panelState: 'none' } satisfies NoPanelResponse);
   }
 
   // Effective summary (human override or AI) for display + edit. Non-fatal if absent.
-  const summary = await fetchOutboxSummary(cortexMeetingId, reviewerEmail, BRIDGE_URL, API_KEY);
+  const summary = await fetchOutboxSummary(cortexMeetingId, reviewerEmail, BRIDGE_URL, bearer);
 
   const panel: UnsealedMeetingPanel = {
     panelState: 'unsealed',
@@ -175,6 +181,7 @@ async function postHandler(
 ): Promise<void> {
   const { meetingId } = req.query as { meetingId: string };
   const reviewerEmail = req.user.email;
+  const bearer = await bridgeBearer(reviewerEmail);
 
   // Guard null / non-object body (e.g. empty POST, non-JSON) → 400, not 500.
   const body = req.body;
@@ -202,7 +209,7 @@ async function postHandler(
     const url = `${BRIDGE_URL}/api/meetings/${encodeURIComponent(sealed.cortexMeetingId)}/unpublish`;
     const upstream = await fetchWithTimeout(fetch, url, {
       method: 'POST',
-      headers: cortexHeaders(reviewerEmail),
+      headers: cortexHeaders(reviewerEmail, bearer),
       body: JSON.stringify({}),
     });
 
@@ -218,7 +225,7 @@ async function postHandler(
 
   // ── approve / reject / edit / publish — cortex.review:edit enforced ────────
   // SECURITY: resolve the Cortex meeting id from the path param, NEVER the body.
-  const cortexMeetingId = await resolveCortexMeetingId(sql, meetingId, reviewerEmail);
+  const cortexMeetingId = await resolveCortexMeetingId(sql, meetingId, reviewerEmail, bearer);
   if (!cortexMeetingId) {
     return apiResponse.notFound(res, 'Cortex meeting', meetingId);
   }
@@ -257,7 +264,7 @@ async function postHandler(
 
   const upstream = await fetchWithTimeout(fetch, upstreamUrl, {
     method: 'POST',
-    headers: cortexHeaders(reviewerEmail),
+    headers: cortexHeaders(reviewerEmail, bearer),
     body: JSON.stringify(upstreamBody),
   });
 
