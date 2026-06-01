@@ -97,6 +97,19 @@ ALTERNATE_GPKGS = {
     "Thembisa POP 3": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label_1"},
 }
 
+# Per-pole OPTICAL dome-audit GPKGs (8 dome steps). Detected as discipline='optical'
+# by OPTICAL_STEP_PATTERNS and ingested as work_type='dome_joint' / feature_type='joint'.
+# label_col = 'label' holds the dome/splitter identifier, which becomes the optical
+# 'joint' feature_id (matching the existing optical-joint review convention).
+OPTICAL_GPKGS = {
+    "Mohadin": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optical_audit", "label_col": "label"},
+    "Mamelodi": {"gpkg_path": "Optical Audit 2.0.gpkg", "table_name": "optical_audit_", "label_col": "label"},
+    "Etwatwa": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optical_audit", "label_col": "label"},
+    "Thembisa POP 1": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optical_audit_", "label_col": "label"},
+    "Thembisa POP 3": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optical_audit", "label_col": "label"},
+    "Themb'elihle": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optica_audit", "label_col": "label"},
+}
+
 
 # ── Step column detection ─────────────────────────────────────────────────────
 
@@ -680,7 +693,9 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     ON CONFLICT (id) DO NOTHING
                 """, (
                     str(uuid.uuid4()), full_key, feature_id,
-                    "pole", "pole_installation", resolved_qf_id,
+                    "joint" if discipline == "optical" else "pole",
+                    "dome_joint" if discipline == "optical" else "pole_installation",
+                    resolved_qf_id,
                     step, step_label,
                 ))
                 existing_keys.add(full_key)
@@ -873,6 +888,14 @@ def main():
             f2, u2 = extract_project(conn, f"{name} (alt)", alt, args.dry_run, args.force)
             total_found += f2
             total_upserted += u2
+
+        # Also process the per-pole OPTICAL dome-audit GPKG if available
+        if name in OPTICAL_GPKGS:
+            opt = {**config, **OPTICAL_GPKGS[name]}
+            print(f"  Checking optical GPKG: {opt['gpkg_path']}")
+            f3, u3 = extract_project(conn, f"{name} (optical)", opt, args.dry_run, args.force)
+            total_found += f3
+            total_upserted += u3
 
     # ── Resolve previously-unversioned storage keys ──────────────────────────
     if not args.dry_run:

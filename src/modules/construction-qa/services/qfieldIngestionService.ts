@@ -143,9 +143,11 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
 
   try {
     // Build work_type filter
+    // Include ALL work_types for the discipline (e.g. optical = cable_stringing + dome_joint),
+    // not just the first match — otherwise a discipline-scoped ingest silently drops work_types.
     const workTypes: string[] = discipline === 'all'
       ? Object.keys(WORK_TYPE_MAP)
-      : [Object.entries(WORK_TYPE_MAP).find(([, v]) => v.discipline === discipline)?.[0]].filter((x): x is string => x !== undefined);
+      : Object.entries(WORK_TYPE_MAP).filter(([, v]) => v.discipline === discipline).map(([k]) => k);
 
     if (workTypes.length === 0) {
       result.errors.push(`No work types found for discipline: ${discipline}`);
