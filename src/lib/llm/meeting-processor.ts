@@ -257,15 +257,32 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
  * Persist the merged summary JSON to the meetings row.
  * If the LLM provided a suggested_title and the current title is still generic
  * ("Teams Meeting - ..."), update the title too.
+ *
+ * LOCK (Cortex Scribe Goal 3b): a human-reviewed summary
+ * (meetings.summary_source = 'cortex_human_reviewed', written back from the Cortex
+ * Scribe reviewer panel) is authoritative — "human wins & sticks". When locked, the
+ * guarded UPDATE matches no row, so the human summary (and its row) is left untouched;
+ * no regeneration (transcript cron, recording-bot, manual /process, graph, onedrive)
+ * can clobber it. A locked meeting is already processing_status='completed' (it was
+ * processed before a human reviewed it), so skipping the bookkeeping update is benign.
+ * Centralizing the guard here covers every processWithLLM caller.
+ *
+ * Exported for unit testing (the lock branch is asserted without the LLM path).
  */
-async function writeSummary(meetingId: number, summary: MeetingSummary): Promise<void> {
+export async function writeSummary(meetingId: number, summary: MeetingSummary): Promise<void> {
   const suggestedTitle = summary.suggested_title?.trim();
+  const summaryJson = JSON.stringify(summary);
 
+  // Single ATOMIC guarded UPDATE — no read-then-write. The `summary_source IS DISTINCT
+  // FROM 'cortex_human_reviewed'` predicate closes the TOCTOU window where a concurrent
+  // human write-back could be clobbered, and avoids an extra round-trip on the hot path.
+  // A locked (or absent) row matches 0 rows → the human summary is preserved.
+  let written: unknown[];
   if (suggestedTitle) {
     // Only override generic auto-generated titles, not calendar subjects
-    await sql`
+    written = (await sql`
       UPDATE meetings
-      SET summary            = ${JSON.stringify(summary)},
+      SET summary            = ${summaryJson},
           title              = CASE
                                  WHEN title LIKE 'Teams Meeting -%' THEN ${suggestedTitle}
                                  ELSE title
@@ -274,16 +291,29 @@ async function writeSummary(meetingId: number, summary: MeetingSummary): Promise
           processed_at       = NOW(),
           updated_at         = NOW()
       WHERE id = ${meetingId}
-    `;
+        AND summary_source IS DISTINCT FROM 'cortex_human_reviewed'
+      RETURNING id
+    `) as unknown[];
   } else {
-    await sql`
+    written = (await sql`
       UPDATE meetings
-      SET summary            = ${JSON.stringify(summary)},
+      SET summary            = ${summaryJson},
           processing_status  = 'completed',
           processed_at       = NOW(),
           updated_at         = NOW()
       WHERE id = ${meetingId}
-    `;
+        AND summary_source IS DISTINCT FROM 'cortex_human_reviewed'
+      RETURNING id
+    `) as unknown[];
+  }
+
+  if (written.length === 0) {
+    // Either the summary is locked (human-reviewed — preserve it) or the row is absent.
+    log.info(
+      'Summary not written — meeting is locked (cortex_human_reviewed) or absent; existing summary preserved',
+      { meetingId },
+      'LLMMeetingProcessor',
+    );
   }
 }
 

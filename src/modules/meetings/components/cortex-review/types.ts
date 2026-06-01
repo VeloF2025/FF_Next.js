@@ -48,6 +48,8 @@ export interface UnsealedPanel {
   cortexMeetingId: string;
   proposedActions: ProposedAction[];
   minutes: Minute[] | null;
+  // Effective executive summary (human override if set, else AI). Editable in the panel.
+  summary: string | null;
 }
 
 export interface NonePanel {
@@ -61,7 +63,7 @@ export type PanelData = SealedPanel | UnsealedPanel | NonePanel;
  * NOTE: no cortexMeetingId — the server resolves it from the path param (IDOR fix).
  */
 export interface MutationPayload {
-  op: 'approve' | 'reject' | 'edit' | 'publish' | 'unpublish';
+  op: 'approve' | 'reject' | 'edit' | 'editSummary' | 'publish' | 'unpublish';
   actionId?: string;
   text?: string;
   owner?: string;

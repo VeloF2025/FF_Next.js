@@ -40,9 +40,10 @@ export interface FeedResponse {
 }
 
 export interface SyncResult {
-  pulled: number;   // meetings returned by the feed
-  mapped: number;   // landed AND matched to a FibreFlow meeting
-  unmapped: number; // landed but no FibreFlow meeting matched the source_id
+  pulled: number;          // meetings returned by the feed
+  mapped: number;          // landed AND matched to a FibreFlow meeting
+  unmapped: number;        // landed but no FibreFlow meeting matched the source_id
+  summariesWritten: number; // human-reviewed summaries written back into meetings.summary
 }
 
 type Sql = NeonQueryFunction<false, false>;
@@ -74,6 +75,7 @@ export async function syncCortexMeetingActions(
   const meetings = data.meetings ?? [];
   let mapped = 0;
   let unmapped = 0;
+  let summariesWritten = 0;
 
   for (const m of meetings) {
     // Map the Cortex meeting to our own meetings row via source_id (teams_call_record_id).
@@ -104,9 +106,43 @@ export async function syncCortexMeetingActions(
         items          = EXCLUDED.items,
         pulled_at      = NOW()
     `;
+
+    // Goal 3b: write a HUMAN-reviewed summary back into meetings.summary as the
+    // authoritative override. Only a human seal (human_reviewed) with actual text,
+    // mapped to a FibreFlow meeting, qualifies — auto-sealed/AI summaries never
+    // overwrite the FibreFlow summary. The lock marker (summary_source) makes
+    // writeSummary() preserve it against future LLM/transcript regeneration.
+    // meetings.summary is JSONB ({overview, decisions, keywords, outline, action_items});
+    // the human free-text lands as `overview` (the executive-summary field the UI shows).
+    const humanSummary = m.summary?.trim();
+    if (ffMeetingId !== null && m.human_reviewed && humanSummary) {
+      const summaryJson = JSON.stringify({
+        overview: humanSummary,
+        decisions: [],
+        keywords: [],
+        outline: [],
+        action_items: [],
+      });
+      // Idempotent: the guard makes an unchanged re-pull a no-op (the 30-min cron would
+      // otherwise re-stamp summary_locked_at/updated_at every tick). It still writes when
+      // the human re-edits the text (summary differs) or the row isn't yet locked.
+      // RETURNING id → count only rows actually written.
+      const written = (await sql`
+        UPDATE meetings
+        SET summary           = ${summaryJson}::jsonb,
+            summary_source    = 'cortex_human_reviewed',
+            summary_locked_at = NOW(),
+            updated_at        = NOW()
+        WHERE id = ${ffMeetingId}
+          AND (summary_source IS DISTINCT FROM 'cortex_human_reviewed'
+               OR summary IS DISTINCT FROM ${summaryJson}::jsonb)
+        RETURNING id
+      `) as unknown[];
+      if (written.length > 0) summariesWritten++;
+    }
   }
 
-  return { pulled: meetings.length, mapped, unmapped };
+  return { pulled: meetings.length, mapped, unmapped, summariesWritten };
 }
 
 async function fetchWithTimeout(

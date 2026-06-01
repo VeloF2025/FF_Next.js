@@ -5,9 +5,12 @@ import { syncCortexMeetingActions, type FeedResponse } from '@/lib/cortex/pullMe
 // A fake neon tagged-template `sql`. Routes SELECT → the call-record→id map; records every
 // INSERT's bound values so we can assert what was landed. Mirrors how neon() is called
 // (sql`...` === sql(stringsArray, ...values)).
-function makeFakeSql(idByCallRecord: Record<string, number>) {
+// `writebackRows` controls what the guarded write-back UPDATE … RETURNING id returns:
+//   [{id}] → a row was written (default); [] → the idempotency guard matched nothing.
+function makeFakeSql(idByCallRecord: Record<string, number>, writebackRows: unknown[] = [{ id: 1 }]) {
   const inserts: unknown[][] = [];
   const selects: unknown[] = [];
+  const summaryWritebacks: { query: string; values: unknown[] }[] = [];
   const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const q = strings.join(' ? ');
     if (/SELECT id FROM meetings/i.test(q)) {
@@ -20,9 +23,13 @@ function makeFakeSql(idByCallRecord: Record<string, number>) {
       inserts.push(values);
       return Promise.resolve([]);
     }
+    if (/UPDATE meetings/i.test(q)) {
+      summaryWritebacks.push({ query: q, values });
+      return Promise.resolve(writebackRows);
+    }
     return Promise.resolve([]);
   }) as unknown as NeonQueryFunction<false, false>;
-  return { sql, inserts, selects };
+  return { sql, inserts, selects, summaryWritebacks };
 }
 
 function fakeFetch(body: unknown, ok = true, status = 200): typeof fetch {
@@ -54,7 +61,7 @@ describe('syncCortexMeetingActions', () => {
       fetchFn: fakeFetch(feed),
     });
 
-    expect(result).toEqual({ pulled: 1, mapped: 1, unmapped: 0 });
+    expect(result).toEqual({ pulled: 1, mapped: 1, unmapped: 0, summariesWritten: 1 });
     expect(selects).toEqual(['cr-1']);
     expect(inserts).toHaveLength(1);
     // INSERT bound order: meeting_id, source_id, ff_meeting_id, seal_source, human_reviewed,
@@ -74,7 +81,7 @@ describe('syncCortexMeetingActions', () => {
       fetchFn: fakeFetch(feed),
     });
 
-    expect(result).toEqual({ pulled: 1, mapped: 0, unmapped: 1 });
+    expect(result).toEqual({ pulled: 1, mapped: 0, unmapped: 1, summariesWritten: 0 });
     expect(inserts[0][2]).toBeNull(); // ff_meeting_id is null but the row is still landed
   });
 
@@ -87,7 +94,7 @@ describe('syncCortexMeetingActions', () => {
     });
 
     expect(selects).toEqual([]); // no SELECT issued
-    expect(result).toEqual({ pulled: 1, mapped: 0, unmapped: 1 });
+    expect(result).toEqual({ pulled: 1, mapped: 0, unmapped: 1, summariesWritten: 0 });
     expect(inserts[0][2]).toBeNull();
   });
 
@@ -96,7 +103,7 @@ describe('syncCortexMeetingActions', () => {
     const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', {
       fetchFn: fakeFetch({ meetings: [] }),
     });
-    expect(result).toEqual({ pulled: 0, mapped: 0, unmapped: 0 });
+    expect(result).toEqual({ pulled: 0, mapped: 0, unmapped: 0, summariesWritten: 0 });
     expect(inserts).toHaveLength(0);
   });
 
@@ -105,5 +112,73 @@ describe('syncCortexMeetingActions', () => {
     await expect(
       syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch({}, false, 500) }),
     ).rejects.toThrow('500');
+  });
+});
+
+// ── Goal 3b: write the human-reviewed summary back into meetings.summary ──────────
+describe('syncCortexMeetingActions — summary write-back (Goal 3b)', () => {
+  it('writes a human-reviewed summary into meetings.summary with the lock marker', async () => {
+    const { sql, summaryWritebacks } = makeFakeSql({ 'cr-1': 92488 });
+    const feed: FeedResponse = {
+      meetings: [meeting({ human_reviewed: true, summary: 'Human-edited exec summary.' })],
+    };
+
+    const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', {
+      fetchFn: fakeFetch(feed),
+    });
+
+    expect(result.summariesWritten).toBe(1);
+    expect(summaryWritebacks).toHaveLength(1);
+    const wb = summaryWritebacks[0];
+    // The lock marker is a SQL literal (in the query text); the FF meeting id is bound.
+    expect(wb.query).toMatch(/summary_source\s*=\s*'cortex_human_reviewed'/i);
+    expect(wb.query).toMatch(/summary_locked_at\s*=\s*NOW\(\)/i);
+    // Idempotency guard + RETURNING (so unchanged re-pulls are a no-op, counted correctly).
+    expect(wb.query).toMatch(/IS DISTINCT FROM/i);
+    expect(wb.query).toMatch(/RETURNING id/i);
+    expect(wb.values).toContain(92488);
+    // The human text lands as the JSONB summary's overview (structured-object shape).
+    const jsonArg = wb.values.find(v => typeof v === 'string' && v.includes('overview')) as string;
+    expect(jsonArg).toBeDefined();
+    expect(JSON.parse(jsonArg).overview).toBe('Human-edited exec summary.');
+  });
+
+  it('does NOT write back when the meeting was auto-sealed (human_reviewed=false)', async () => {
+    const { sql, summaryWritebacks } = makeFakeSql({ 'cr-1': 92488 });
+    const feed: FeedResponse = {
+      meetings: [meeting({ human_reviewed: false, summary: 'AI summary, not human.' })],
+    };
+    const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+    expect(result.summariesWritten).toBe(0);
+    expect(summaryWritebacks).toHaveLength(0);
+  });
+
+  it('does NOT write back when there is no summary text', async () => {
+    const { sql, summaryWritebacks } = makeFakeSql({ 'cr-1': 92488 });
+    const feed: FeedResponse = { meetings: [meeting({ human_reviewed: true, summary: null })] };
+    const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+    expect(result.summariesWritten).toBe(0);
+    expect(summaryWritebacks).toHaveLength(0);
+  });
+
+  it('does NOT write back when the meeting maps to no FibreFlow row (unmapped)', async () => {
+    const { sql, summaryWritebacks } = makeFakeSql({}); // no mapping
+    const feed: FeedResponse = {
+      meetings: [meeting({ human_reviewed: true, summary: 'Human summary but unmapped.' })],
+    };
+    const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+    expect(result.summariesWritten).toBe(0);
+    expect(summaryWritebacks).toHaveLength(0);
+  });
+
+  it('is idempotent: an unchanged re-pull issues the guarded UPDATE but counts 0 writes', async () => {
+    // Guard matches no row (already locked with the same text) → RETURNING id returns [].
+    const { sql, summaryWritebacks } = makeFakeSql({ 'cr-1': 92488 }, []);
+    const feed: FeedResponse = {
+      meetings: [meeting({ human_reviewed: true, summary: 'Same as last pull.' })],
+    };
+    const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+    expect(summaryWritebacks).toHaveLength(1); // the guarded UPDATE still runs…
+    expect(result.summariesWritten).toBe(0);   // …but writes nothing (no re-stamp)
   });
 });
