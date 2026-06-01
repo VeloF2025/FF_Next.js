@@ -37,13 +37,22 @@ export function cleanSerial(s: string): string {
   return cleaned;
 }
 
-export interface ParsedWorkbook {
-  /** Parsed ONT serials (stock_item = FT-ONT). */
+export interface ParsedProject {
+  /** Sheet (project) name as it appears in the workbook. */
+  name: string;
+  /** ONT serials parsed from this project's sheet. */
   ontItems: SerialIntakeItem[];
-  /** Parsed Gizzu/UPS serials (stock_item = FT-GIZZU). */
+  /** Gizzu/UPS serials parsed from this project's sheet. */
   gizzuItems: SerialIntakeItem[];
-  /** Per-project parsed counts (not insert counts). */
-  perProject: Record<string, { ont: number; ups: number }>;
+}
+
+export interface ParsedWorkbook {
+  /** All ONT serials, flattened across projects (stock_item = FT-ONT). */
+  ontItems: SerialIntakeItem[];
+  /** All Gizzu/UPS serials, flattened across projects (stock_item = FT-GIZZU). */
+  gizzuItems: SerialIntakeItem[];
+  /** Per-project grouping, so callers can report accurate per-project results. */
+  projects: ParsedProject[];
   /** Sheet names that did not map to a known project. */
   skippedSheets: string[];
 }
@@ -58,7 +67,7 @@ export function parseOntGizzuWorkbook(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   XLSX: any,
 ): ParsedWorkbook {
-  const out: ParsedWorkbook = { ontItems: [], gizzuItems: [], perProject: {}, skippedSheets: [] };
+  const out: ParsedWorkbook = { ontItems: [], gizzuItems: [], projects: [], skippedSheets: [] };
 
   for (const sheetName of workbook.SheetNames as string[]) {
     const projectKey = sheetName.toLowerCase().trim();
@@ -71,21 +80,20 @@ export function parseOntGizzuWorkbook(
     const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 }) as unknown[][];
     const rows = data.slice(1); // drop header row
 
-    let ont = 0;
-    let ups = 0;
+    const project: ParsedProject = { name: sheetName, ontItems: [], gizzuItems: [] };
     for (const row of rows) {
       const ontSerial = cleanSerial(String(row[1] ?? ''));
       const upsSerial = cleanSerial(String(row[2] ?? ''));
       if (ontSerial.length >= MIN_SERIAL_LEN) {
-        out.ontItems.push({ stockItemId: FT_ONT_ITEM_ID, serialNumber: ontSerial, locationId });
-        ont++;
+        project.ontItems.push({ stockItemId: FT_ONT_ITEM_ID, serialNumber: ontSerial, locationId });
       }
       if (upsSerial.length >= MIN_SERIAL_LEN) {
-        out.gizzuItems.push({ stockItemId: FT_GIZZU_ITEM_ID, serialNumber: upsSerial, locationId });
-        ups++;
+        project.gizzuItems.push({ stockItemId: FT_GIZZU_ITEM_ID, serialNumber: upsSerial, locationId });
       }
     }
-    out.perProject[sheetName] = { ont, ups };
+    out.projects.push(project);
+    out.ontItems.push(...project.ontItems);
+    out.gizzuItems.push(...project.gizzuItems);
   }
 
   return out;

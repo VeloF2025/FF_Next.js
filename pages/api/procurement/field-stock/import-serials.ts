@@ -93,29 +93,33 @@ async function handleImport(res: NextApiResponse, workbook: any, XLSX: any): Pro
     ontSkipped: 0,
     upsSkipped: 0,
     errors: parsed.skippedSheets.map((s) => `Unknown project "${s}" — skipped`),
-    perProject: parsed.perProject,
+    // Per-project counts hold serials actually RECEIVED (inserted), not parsed.
+    perProject: {},
   };
 
   const reference = `FT Master Import ${new Date().toISOString().split('T')[0]}`;
   const sourceId = randomUUID();
 
-  const ont = await receiveSerials(pool, parsed.ontItems, {
-    sourceTable: 'ont_serial_import',
-    sourceId,
-    receivedReference: reference,
-    payload: { source: 'manual_upload', kind: 'ont' },
-  });
-  result.ontImported = ont.received;
-  result.ontSkipped = ont.skipped;
-
-  const ups = await receiveSerials(pool, parsed.gizzuItems, {
-    sourceTable: 'ont_serial_import',
-    sourceId,
-    receivedReference: reference,
-    payload: { source: 'manual_upload', kind: 'gizzu' },
-  });
-  result.upsImported = ups.received;
-  result.upsSkipped = ups.skipped;
+  // Receive per project so perProject reflects accurate insert counts.
+  for (const project of parsed.projects) {
+    const ont = await receiveSerials(pool, project.ontItems, {
+      sourceTable: 'ont_serial_import',
+      sourceId,
+      receivedReference: reference,
+      payload: { source: 'manual_upload', kind: 'ont', project: project.name },
+    });
+    const ups = await receiveSerials(pool, project.gizzuItems, {
+      sourceTable: 'ont_serial_import',
+      sourceId,
+      receivedReference: reference,
+      payload: { source: 'manual_upload', kind: 'gizzu', project: project.name },
+    });
+    result.ontImported += ont.received;
+    result.ontSkipped += ont.skipped;
+    result.upsImported += ups.received;
+    result.upsSkipped += ups.skipped;
+    result.perProject[project.name] = { ont: ont.received, ups: ups.received };
+  }
 
   log.info('[Serial-Import] Complete', {
     ontImported: result.ontImported,

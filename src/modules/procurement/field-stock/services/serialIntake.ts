@@ -57,8 +57,13 @@ const CHUNK_SIZE = 500;
 
 /**
  * Receive serials into stock as `in_stock`, emitting one `received` genesis
- * event per newly-inserted serial. Processes in transactional chunks; a chunk
- * that fails rolls back and aborts the run (callers pre-validate rows).
+ * event per newly-inserted serial. Processes in transactional chunks.
+ *
+ * Atomicity is per-chunk, NOT per-run: if a later chunk throws, earlier chunks
+ * are already committed. This is safe because intake is idempotent
+ * (`ON CONFLICT DO NOTHING`) — re-running resumes from where it stopped — but
+ * callers receive the error and should surface that the run was partial. The
+ * count of serials received before the failure is logged here.
  */
 export async function receiveSerials(
   pool: Pool,
@@ -98,8 +103,13 @@ export async function receiveSerials(
     } catch (err) {
       await client.query('ROLLBACK');
       log.error(
-        'receiveSerials: chunk rolled back',
-        { chunkStart: i, chunkSize: chunk.length, error: err instanceof Error ? err.message : String(err) },
+        'receiveSerials: chunk rolled back — run is partial (prior chunks committed)',
+        {
+          chunkStart: i,
+          chunkSize: chunk.length,
+          receivedBeforeFailure: result.received,
+          error: err instanceof Error ? err.message : String(err),
+        },
         'serialIntake',
       );
       throw err;

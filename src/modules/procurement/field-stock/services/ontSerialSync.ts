@@ -72,11 +72,12 @@ async function downloadWorkbook(url: string): Promise<Buffer> {
 
 async function measureOesGap(pool: Pool): Promise<number> {
   const { rows } = await pool.query<{ gap: string }>(
-    `SELECT count(DISTINCT upper(oa.serial_number))::int AS gap
+    `SELECT count(DISTINCT upper(trim(oa.serial_number)))::int AS gap
        FROM oes_activations oa
       WHERE oa.serial_number ILIKE 'ALCL%'
         AND NOT EXISTS (
-          SELECT 1 FROM stock_serials ss WHERE ss.serial_number = oa.serial_number
+          SELECT 1 FROM stock_serials ss
+           WHERE ss.serial_number = upper(trim(oa.serial_number))
         )`,
   );
   return Number(rows[0]?.gap ?? 0);

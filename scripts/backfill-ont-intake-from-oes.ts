@@ -69,6 +69,9 @@ async function main(): Promise<void> {
     }
 
     // ---- Identify the gap set: OES-active ALCL% serials absent from stock.
+    // Scope is ONT only: OES tracks Nokia ONT activations (ALCL serials); Gizzu
+    // UPS units are not OES-tracked, so there is no OES-vs-stock gap to backfill
+    // for them. Gizzu intake flows solely through the SharePoint sync / import.
     const { rows: gapRows } = await pool.query<{ serial: string }>(
       `SELECT DISTINCT upper(trim(oa.serial_number)) AS serial
          FROM oes_activations oa
