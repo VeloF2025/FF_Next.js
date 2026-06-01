@@ -140,6 +140,32 @@ describe('syncCortexMeetingActions — M2 delivery to FibreFlow tasks', () => {
     expect(deliveredMarks).toHaveLength(0); // and local delivered_at NOT stamped
   });
 
+  it('isolates a meeting that throws: counts it as an error and still processes the rest', async () => {
+    // The first meeting's landing INSERT throws; the second must still be delivered.
+    let firstInsert = true;
+    const actionInserts: unknown[][] = [];
+    const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const q = strings.join(' ? ');
+      if (/SELECT id FROM meetings/i.test(q)) return Promise.resolve([{ id: 92488 }]);
+      if (/INSERT INTO cortex_meeting_actions/i.test(q)) {
+        if (firstInsert) { firstInsert = false; return Promise.reject(new Error('boom')); }
+        return Promise.resolve([{ delivered_at: null }]);
+      }
+      if (/INSERT INTO action_items/i.test(q)) { actionInserts.push(values); return Promise.resolve([{ id: 1 }]); }
+      return Promise.resolve([]);
+    }) as unknown as NeonQueryFunction<false, false>;
+    const { fetchFn, acks } = makeFakeFetch({
+      meetings: [meeting({ meeting_id: 'mtg_bad' }), meeting({ meeting_id: 'mtg_ok' })],
+    });
+
+    const r = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn });
+
+    expect(r.errors).toBe(1);              // the bad meeting was counted, not fatal
+    expect(r.delivered).toBe(1);           // the good meeting still delivered
+    expect(actionInserts).toHaveLength(1);
+    expect(acks).toEqual(['http://bridge:7403/api/meetings/mtg_ok/outbox/delivered']);
+  });
+
   it('does NOT create tasks for a human-reviewed but UNMAPPED meeting', async () => {
     const { sql, actionInserts, deliveredMarks } = makeFakeSql({ idByCallRecord: {} }); // no mapping
     const { fetchFn, acks } = makeFakeFetch({ meetings: [meeting()] });
