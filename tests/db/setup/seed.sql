@@ -98,6 +98,9 @@ CREATE TABLE stock_serials (
   -- Prod schema: lifecycle-timeline pseudo-entry columns. Types match prod
   -- (received_date is DATE; installed_date + status_changed_at are TIMESTAMPTZ).
   received_date DATE,
+  -- Prod intake columns written by the serial import / receive path (#1864).
+  received_reference VARCHAR(255),
+  condition VARCHAR(50),
   installed_date TIMESTAMPTZ,
   previous_status VARCHAR(50),
   status_changed_at TIMESTAMPTZ,

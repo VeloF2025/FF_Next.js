@@ -61,6 +61,7 @@ export async function setup() {
   const sprintEHoldersSeed = await readFile('tests/db/setup/sprint-e-holders-seed.sql');
   const mig384            = await readFile('scripts/migrations/sql/384_pure_custody_model.sql');
   const mig387            = await readFile('scripts/migrations/sql/387_serial_lifecycle_state_machine.sql');
+  const mig393            = await readFile('scripts/migrations/sql/393_oes_in_stock_activated_reconciliation_transition.sql');
 
   const pool = new Pool({ connectionString: URL });
 
@@ -82,6 +83,7 @@ export async function setup() {
   // environment; ephemeral Docker container, not the shared prod DB).
   await pool.query('CREATE TABLE IF NOT EXISTS __sprint_e_cutover_gate__ ();');
   await pool.query(mig387);         // lifecycle validate + emit + holder triggers
+  await pool.query(mig393);         // in_stock->activated OES reconciliation matrix row (#1860)
 
   await pool.end();
 
