@@ -98,9 +98,9 @@ ALTERNATE_GPKGS = {
 }
 
 # Per-pole OPTICAL dome-audit GPKGs (8 dome steps). Detected as discipline='optical'
-# by OPTICAL_STEP_PATTERNS and ingested as work_type='optical_dome'. label_col must
-# match the project's pole label so reviews join to poles.
-# label_col = 'label' holds the dome/splitter identifier → optical 'joint' feature_id.
+# by OPTICAL_STEP_PATTERNS and ingested as work_type='dome_joint' / feature_type='joint'.
+# label_col = 'label' holds the dome/splitter identifier, which becomes the optical
+# 'joint' feature_id (matching the existing optical-joint review convention).
 OPTICAL_GPKGS = {
     "Mohadin": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optical_audit", "label_col": "label"},
     "Mamelodi": {"gpkg_path": "Optical Audit 2.0.gpkg", "table_name": "optical_audit_", "label_col": "label"},
