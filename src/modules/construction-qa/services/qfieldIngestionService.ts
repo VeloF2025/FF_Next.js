@@ -58,6 +58,7 @@ const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   '47eb39f5-d6a8-4ce7-9421-9133872c1951': '7003dc06-9af7-4a7c-bc6c-a177d77784f2', // MAM Pole Audit (offline) → Mamelodi
   '380147aa-0c25-4b09-a745-2480addd8cca': 'c7255076-1d2f-41ce-97bb-858b8c87ee27', // ETWpoc1 → Etwatwa
   '7fe59cdc-b1d5-475d-8448-5cf2e9f7175b': 'ce3bf310-d6ba-4ede-ab36-a8c902a5efc6', // Tonga Site Audit 2026 → Tonga
+  '9af1fc72-f637-4ecb-b371-f7c08a4d4e68': '7bb7e022-dd75-4299-8575-cfc08abdfabb', // FT_Thembelihle → Themb'elihle
 };
 
 /** Reverse map: FibreFlow project UUID → QFieldCloud project UUIDs */
