@@ -42,6 +42,8 @@ export default defineConfig({
       'tests/db/migrations/track27RetireTriggers.test.ts',
       // Track 4.1 — issue-time block enforcement (SOP-4.4)
       'tests/db/services/field-stock/holderBlockGuard.lifecycle.test.ts',
+      // #1864 — ONT/Gizzu stock-receipt genesis intake
+      'tests/db/services/field-stock/serialIntake.lifecycle.test.ts',
     ],
     globalSetup: ['./tests/db/setup/sprint-e-global-setup.ts'],
     // Docker startup on cold pull can take ~30s; hooks need 2x headroom.

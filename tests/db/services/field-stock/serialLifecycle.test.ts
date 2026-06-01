@@ -100,15 +100,16 @@ describe('promoteSerial', () => {
   });
 
   it('rejects illegal transition with LifecycleViolationError', async () => {
-    // in_stock → activated is illegal (must go through issued → installed first).
-    // The serial has holder_id = NULL:
-    //   - holder-validate: ('activated', NULL) IS allowed → passes
-    //   - status-validate: ('in_stock', 'activated') NOT in matrix → raises FF001
+    // in_stock → scrapped is illegal (scrap only via faulty/returned disposition).
+    // (in_stock → activated is legal post-mig-393 OES reconciliation, so it can
+    // no longer serve as the illegal example.) The serial has holder_id = NULL:
+    //   - holder-validate: ('scrapped', NULL) IS allowed → passes
+    //   - status-validate: ('in_stock', 'scrapped') NOT in matrix → raises FF001
     // This isolates the status-validate trigger (lifecycle_violation path).
     await expect(
       promoteSerial(pool, {
         serialId:    rejectionSerialId,
-        toStatus:    'activated',
+        toStatus:    'scrapped',
         sourceTable: 'oes_pp_data',
         sourceId:    '33333333-3333-3333-3333-333333333333',
       }),
