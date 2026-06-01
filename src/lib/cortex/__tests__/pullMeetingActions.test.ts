@@ -61,7 +61,9 @@ describe('syncCortexMeetingActions', () => {
       fetchFn: fakeFetch(feed),
     });
 
-    expect(result).toEqual({ pulled: 1, mapped: 1, unmapped: 0, summariesWritten: 1 });
+    // human_reviewed + mapped → the delivery path also runs: action_items INSERT returns
+    // [] in this base harness (tasksCreated 0) and the ack is treated ok (delivered 1).
+    expect(result).toEqual({ pulled: 1, mapped: 1, unmapped: 0, summariesWritten: 1, tasksCreated: 0, delivered: 1 });
     expect(selects).toEqual(['cr-1']);
     expect(inserts).toHaveLength(1);
     // INSERT bound order: meeting_id, source_id, ff_meeting_id, seal_source, human_reviewed,
@@ -81,7 +83,7 @@ describe('syncCortexMeetingActions', () => {
       fetchFn: fakeFetch(feed),
     });
 
-    expect(result).toEqual({ pulled: 1, mapped: 0, unmapped: 1, summariesWritten: 0 });
+    expect(result).toEqual({ pulled: 1, mapped: 0, unmapped: 1, summariesWritten: 0, tasksCreated: 0, delivered: 0 });
     expect(inserts[0][2]).toBeNull(); // ff_meeting_id is null but the row is still landed
   });
 
@@ -94,7 +96,7 @@ describe('syncCortexMeetingActions', () => {
     });
 
     expect(selects).toEqual([]); // no SELECT issued
-    expect(result).toEqual({ pulled: 1, mapped: 0, unmapped: 1, summariesWritten: 0 });
+    expect(result).toEqual({ pulled: 1, mapped: 0, unmapped: 1, summariesWritten: 0, tasksCreated: 0, delivered: 0 });
     expect(inserts[0][2]).toBeNull();
   });
 
@@ -103,7 +105,7 @@ describe('syncCortexMeetingActions', () => {
     const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', {
       fetchFn: fakeFetch({ meetings: [] }),
     });
-    expect(result).toEqual({ pulled: 0, mapped: 0, unmapped: 0, summariesWritten: 0 });
+    expect(result).toEqual({ pulled: 0, mapped: 0, unmapped: 0, summariesWritten: 0, tasksCreated: 0, delivered: 0 });
     expect(inserts).toHaveLength(0);
   });
 

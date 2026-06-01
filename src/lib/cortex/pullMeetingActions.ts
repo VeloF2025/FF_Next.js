@@ -9,7 +9,12 @@
 // unit-testable without a live bridge or DB; the cron handler is a thin auth wrapper.
 //
 // Contract: references only — an item carries an action reference + summary metadata, never
-// raw media. We never auto-create tasks from this; it is a suggestion surface for review.
+// raw media. M2: a HUMAN-REVIEWED (human-Published) meeting's approved actions are turned into
+// real FibreFlow `action_items` (assigned via name→user match), then FibreFlow acks Cortex
+// (POST /{id}/outbox/delivered) which stamps `meeting_outbox.delivered_at`. Auto-sealed
+// (human_reviewed=false) meetings stay records only — they never spawn tasks. Delivery is
+// idempotent: a local `cortex_meeting_actions.delivered_at` marker + a NOT EXISTS guard on
+// `action_items(source_type,source_id)` make the 30-min re-pull a no-op.
 
 import type { NeonQueryFunction } from '@/lib/db-neon';
 
@@ -44,6 +49,8 @@ export interface SyncResult {
   mapped: number;          // landed AND matched to a FibreFlow meeting
   unmapped: number;        // landed but no FibreFlow meeting matched the source_id
   summariesWritten: number; // human-reviewed summaries written back into meetings.summary
+  tasksCreated: number;    // M2: action_items rows newly created from approved actions
+  delivered: number;       // M2: meetings whose actions were delivered + acked to Cortex
 }
 
 type Sql = NeonQueryFunction<false, false>;
@@ -76,6 +83,8 @@ export async function syncCortexMeetingActions(
   let mapped = 0;
   let unmapped = 0;
   let summariesWritten = 0;
+  let tasksCreated = 0;
+  let delivered = 0;
 
   for (const m of meetings) {
     // Map the Cortex meeting to our own meetings row via source_id (teams_call_record_id).
@@ -89,7 +98,10 @@ export async function syncCortexMeetingActions(
     if (ffMeetingId === null) unmapped++;
     else mapped++;
 
-    await sql`
+    // RETURNING delivered_at tells us whether THIS meeting was already delivered locally
+    // (the ON CONFLICT update deliberately leaves delivered_at untouched) so a re-pull
+    // never re-creates tasks or re-acks.
+    const landed = (await sql`
       INSERT INTO cortex_meeting_actions
         (cortex_meeting_id, source_id, ff_meeting_id, seal_source, human_reviewed,
          sealed_at, summary, items, pulled_at)
@@ -105,7 +117,9 @@ export async function syncCortexMeetingActions(
         summary        = EXCLUDED.summary,
         items          = EXCLUDED.items,
         pulled_at      = NOW()
-    `;
+      RETURNING delivered_at
+    `) as { delivered_at: string | null }[];
+    const alreadyDelivered = landed[0]?.delivered_at != null;
 
     // Goal 3b: write a HUMAN-reviewed summary back into meetings.summary as the
     // authoritative override. Only a human seal (human_reviewed) with actual text,
@@ -140,9 +154,59 @@ export async function syncCortexMeetingActions(
       `) as unknown[];
       if (written.length > 0) summariesWritten++;
     }
+
+    // M2: turn a HUMAN-reviewed, mapped meeting's approved actions into real FibreFlow
+    // action_items, then ack Cortex so it stamps meeting_outbox.delivered_at. Skipped for
+    // auto-sealed meetings (records only) and for anything already delivered locally.
+    if (ffMeetingId !== null && m.human_reviewed && !alreadyDelivered) {
+      let created = 0;
+      for (const item of m.items ?? []) {
+        const text = item.text?.trim();
+        if (!text) continue;
+        // Idempotent insert: NOT EXISTS keyed on the stable Cortex action_id. assignee is
+        // resolved by the same name→user rule FibreFlow's own action items use (exact
+        // first+last match, case-insensitive); no match → assigned_to_user_id stays NULL
+        // with the owner preserved in assignee_name (never mis-assigned).
+        const inserted = (await sql`
+          INSERT INTO action_items
+            (meeting_id, description, assignee_name, assigned_to_user_id,
+             status, priority, source, source_type, source_id)
+          SELECT
+            ${ffMeetingId}, ${text}, ${item.owner},
+            (SELECT u.id FROM users u
+               WHERE ${item.owner} IS NOT NULL AND length(trim(${item.owner})) >= 2
+                 AND lower(u.first_name || ' ' || u.last_name) = lower(trim(${item.owner}))
+               LIMIT 1),
+            'pending', 'medium', 'cortex-scribe', 'cortex_meeting', ${item.action_id}
+          WHERE NOT EXISTS (
+            SELECT 1 FROM action_items
+            WHERE source_type = 'cortex_meeting' AND source_id = ${item.action_id}
+          )
+          RETURNING id
+        `) as unknown[];
+        if (inserted.length > 0) created++;
+      }
+      tasksCreated += created;
+
+      // Ack Cortex (idempotent server-side). Only on a 2xx do we stamp the local
+      // delivered_at marker — if the ack fails the meeting stays undelivered locally and
+      // the next pull retries (the NOT EXISTS guard makes re-creation a no-op, so no dupes).
+      const ackUrl = `${bridgeUrl}/api/meetings/${m.meeting_id}/outbox/delivered`;
+      const ack = await fetchWithTimeout(fetchFn, ackUrl, FETCH_TIMEOUT_MS, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (ack.ok) {
+        await sql`
+          UPDATE cortex_meeting_actions SET delivered_at = NOW()
+          WHERE cortex_meeting_id = ${m.meeting_id} AND delivered_at IS NULL
+        `;
+        delivered++;
+      }
+    }
   }
 
-  return { pulled: meetings.length, mapped, unmapped, summariesWritten };
+  return { pulled: meetings.length, mapped, unmapped, summariesWritten, tasksCreated, delivered };
 }
 
 async function fetchWithTimeout(
