@@ -12,11 +12,13 @@ import { syncCortexMeetingActions, type FeedResponse } from '@/lib/cortex/pullMe
 function makeFakeSql(opts: {
   idByCallRecord?: Record<string, number>;
   landedDeliveredAt?: string | null;   // what the cortex_meeting_actions upsert RETURNS
-  actionInsertRows?: unknown[];          // [{id}] = inserted; [] = NOT EXISTS matched (dupe)
+  actionExists?: boolean;                // existence-check result (true → task already created)
+  assigneeUserId?: string | null;        // users name-match result
 } = {}) {
   const idByCallRecord = opts.idByCallRecord ?? { 'cr-1': 92488 };
   const landedDeliveredAt = opts.landedDeliveredAt ?? null;
-  const actionInsertRows = opts.actionInsertRows ?? [{ id: 7 }];
+  const actionExists = opts.actionExists ?? false;
+  const assigneeUserId = opts.assigneeUserId ?? null;
   const actionInserts: unknown[][] = [];
   const deliveredMarks: unknown[][] = [];
   const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -28,9 +30,15 @@ function makeFakeSql(opts: {
     if (/INSERT INTO cortex_meeting_actions/i.test(q)) {
       return Promise.resolve([{ delivered_at: landedDeliveredAt }]);
     }
-    if (/INSERT INTO action_items/i.test(q)) {
+    if (/SELECT id FROM action_items/i.test(q)) {       // idempotency existence check
+      return Promise.resolve(actionExists ? [{ id: 1 }] : []);
+    }
+    if (/SELECT id FROM users/i.test(q)) {              // assignee name match
+      return Promise.resolve(assigneeUserId ? [{ id: assigneeUserId }] : []);
+    }
+    if (/INSERT INTO action_items/i.test(q)) {          // plain VALUES insert
       actionInserts.push(values);
-      return Promise.resolve(actionInsertRows);
+      return Promise.resolve([]);
     }
     if (/UPDATE cortex_meeting_actions/i.test(q) && /delivered_at\s*=\s*NOW\(\)/i.test(q)) {
       deliveredMarks.push(values);
@@ -114,14 +122,14 @@ describe('syncCortexMeetingActions — M2 delivery to FibreFlow tasks', () => {
     expect(deliveredMarks).toHaveLength(0);
   });
 
-  it('re-pull before local mark: NOT EXISTS guard inserts 0 rows but still acks once', async () => {
-    const { sql, actionInserts, deliveredMarks } = makeFakeSql({ actionInsertRows: [] }); // dupe guard
+  it('re-pull before local mark: existing tasks are skipped but it still acks once', async () => {
+    const { sql, actionInserts, deliveredMarks } = makeFakeSql({ actionExists: true }); // already created
     const { fetchFn, acks } = makeFakeFetch({ meetings: [meeting()] });
 
     const r = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn });
 
-    expect(r.tasksCreated).toBe(0);       // nothing newly inserted
-    expect(actionInserts).toHaveLength(1); // the guarded INSERT still runs
+    expect(r.tasksCreated).toBe(0);        // existence check → no new insert
+    expect(actionInserts).toHaveLength(0); // INSERT skipped (not run)
     expect(r.delivered).toBe(1);           // ack + local mark still happen
     expect(acks).toHaveLength(1);
     expect(deliveredMarks).toHaveLength(1);
@@ -151,7 +159,9 @@ describe('syncCortexMeetingActions — M2 delivery to FibreFlow tasks', () => {
         if (firstInsert) { firstInsert = false; return Promise.reject(new Error('boom')); }
         return Promise.resolve([{ delivered_at: null }]);
       }
-      if (/INSERT INTO action_items/i.test(q)) { actionInserts.push(values); return Promise.resolve([{ id: 1 }]); }
+      if (/SELECT id FROM action_items/i.test(q)) return Promise.resolve([]); // not yet created
+      if (/SELECT id FROM users/i.test(q)) return Promise.resolve([]);        // no assignee match
+      if (/INSERT INTO action_items/i.test(q)) { actionInserts.push(values); return Promise.resolve([]); }
       return Promise.resolve([]);
     }) as unknown as NeonQueryFunction<false, false>;
     const { fetchFn, acks } = makeFakeFetch({
