@@ -61,9 +61,10 @@ describe('syncCortexMeetingActions', () => {
       fetchFn: fakeFetch(feed),
     });
 
-    // human_reviewed + mapped → the delivery path also runs: action_items INSERT returns
-    // [] in this base harness (tasksCreated 0) and the ack is treated ok (delivered 1).
-    expect(result).toEqual({ pulled: 1, mapped: 1, unmapped: 0, summariesWritten: 1, tasksCreated: 0, delivered: 1, errors: 0 });
+    // human_reviewed + mapped → the delivery path also runs: the existence check returns
+    // [] in this base harness (not yet created) so one action_items VALUES insert runs
+    // (tasksCreated 1) and the ack is treated ok (delivered 1).
+    expect(result).toEqual({ pulled: 1, mapped: 1, unmapped: 0, summariesWritten: 1, tasksCreated: 1, delivered: 1, errors: 0 });
     expect(selects).toEqual(['cr-1']);
     expect(inserts).toHaveLength(1);
     // INSERT bound order: meeting_id, source_id, ff_meeting_id, seal_source, human_reviewed,

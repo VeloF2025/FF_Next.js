@@ -17,6 +17,7 @@
 // `action_items(source_type,source_id)` make the 30-min re-pull a no-op.
 
 import type { NeonQueryFunction } from '@/lib/db-neon';
+import { log } from '@/lib/logger';
 
 export interface OutboxItem {
   action_id: string;
@@ -166,29 +167,43 @@ export async function syncCortexMeetingActions(
         for (const item of m.items ?? []) {
           const text = item.text?.trim();
           if (!text) continue;
-          // Idempotent insert: NOT EXISTS keyed on the stable Cortex action_id. assignee is
-          // resolved by an exact first+last name match (case-insensitive) — the same exact-match
-          // rule FibreFlow's action items use, minus the fuzzy partial fallback in
-          // resolveUserByName, so we never mis-assign. No match → assigned_to_user_id stays NULL
-          // with the owner preserved in assignee_name.
-          const inserted = (await sql`
+          // NOTE: three SIMPLE statements rather than one INSERT…SELECT…WHERE NOT EXISTS
+          // with an embedded scalar subquery. FibreFlow's `sql` driver silently fails on
+          // that compound shape; plain VALUES inserts / single-table SELECTs (the shapes
+          // used elsewhere in this module) work. Splitting keeps each query in a supported
+          // shape — the fix for the M2 delivery never landing tasks.
+
+          // Idempotency: skip if this Cortex action already produced a task (stable action_id).
+          const existing = (await sql`
+            SELECT id FROM action_items
+            WHERE source_type = 'cortex_meeting' AND source_id = ${item.action_id}
+            LIMIT 1
+          `) as { id: unknown }[];
+          if (existing.length > 0) continue;
+
+          // Assignee: exact first+last name match (case-insensitive) — the same exact-match
+          // rule FibreFlow's action items use, minus the fuzzy fallback, so we never
+          // mis-assign. No match → NULL, with the owner preserved in assignee_name.
+          const owner = item.owner?.trim();
+          let userId: string | null = null;
+          if (owner && owner.length >= 2) {
+            const u = (await sql`
+              SELECT id FROM users
+              WHERE lower(first_name || ' ' || last_name) = lower(${owner})
+              LIMIT 1
+            `) as { id: string }[];
+            userId = u[0]?.id ?? null;
+          }
+
+          await sql`
             INSERT INTO action_items
               (meeting_id, description, assignee_name, assigned_to_user_id,
                status, priority, source, source_type, source_id)
-            SELECT
-              ${ffMeetingId}, ${text}, ${item.owner},
-              (SELECT u.id FROM users u
-                 WHERE ${item.owner} IS NOT NULL AND length(trim(${item.owner})) >= 2
-                   AND lower(u.first_name || ' ' || u.last_name) = lower(trim(${item.owner}))
-                 LIMIT 1),
-              'pending', 'medium', 'cortex-scribe', 'cortex_meeting', ${item.action_id}
-            WHERE NOT EXISTS (
-              SELECT 1 FROM action_items
-              WHERE source_type = 'cortex_meeting' AND source_id = ${item.action_id}
-            )
-            RETURNING id
-          `) as unknown[];
-          if (inserted.length > 0) created++;
+            VALUES
+              (${ffMeetingId}, ${text}, ${item.owner}, ${userId},
+               'pending', 'medium', 'cortex-scribe', 'cortex_meeting', ${item.action_id})
+          `;
+          created++;
         }
         tasksCreated += created;
 
@@ -208,12 +223,16 @@ export async function syncCortexMeetingActions(
           delivered++;
         }
       }
-    } catch {
+    } catch (err) {
       // One malformed meeting must not abort delivery for the rest of the batch.
-      // Not silent: surfaced via SyncResult.errors, which the cron logs alongside the
-      // other counts. The next pull retries and idempotency (NOT EXISTS + delivered_at)
-      // prevents duplicate tasks or double delivery.
+      // Logged at error level (visible) AND surfaced via SyncResult.errors. The next pull
+      // retries; idempotency (existence check + delivered_at) prevents duplicate tasks or
+      // double delivery.
       errors++;
+      log.error('cortex pull: meeting failed', {
+        meetingId: m.meeting_id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
