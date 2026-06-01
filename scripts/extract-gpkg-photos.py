@@ -32,6 +32,13 @@ MINIO_BUCKET = "qfieldcloud-prod"
 # QFieldCloud project → FibreFlow project mapping
 # Each entry defines how to read the GPKG for that project
 PROJECTS = {
+    "Themb'elihle": {
+        "qf_project_id": "9af1fc72-f637-4ecb-b371-f7c08a4d4e68",
+        "ff_project_id": "7bb7e022-dd75-4299-8575-cfc08abdfabb",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "civil_audit",
+        "label_col": "label",
+    },
     "Lawley": {
         "qf_project_id": "2e988631-462b-448f-ae15-bb693a68cd55",
         "ff_project_id": "4eb13426-b2a1-472d-9b3c-277082ae9b55",
