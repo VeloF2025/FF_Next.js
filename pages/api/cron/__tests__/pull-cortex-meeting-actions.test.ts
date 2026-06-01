@@ -23,7 +23,7 @@ async function loadHandler() {
 describe('pull-cortex-meeting-actions cron handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    syncMock.mockResolvedValue({ pulled: 0, mapped: 0, unmapped: 0 });
+    syncMock.mockResolvedValue({ pulled: 0, mapped: 0, unmapped: 0, summariesWritten: 0 });
     process.env = { ...ORIG_ENV, DATABASE_URL: 'postgres://x' };
   });
   afterEach(() => {

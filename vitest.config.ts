@@ -74,6 +74,11 @@ export default defineConfig({
       // @/lib/cortex/* lives at src/lib/cortex/ (Cortex Scribe outbox pull) — explicit
       // override before the generic @/lib → ./lib fallback (mirrors tsconfig src-first).
       { find: /^@\/lib\/cortex/, replacement: path.resolve(__dirname, './src/lib/cortex') },
+      // @/lib/llm/* + @/lib/action-items/* live at src/lib/ (meeting LLM processor +
+      // assignee resolution) — explicit src-first overrides before the @/lib → ./lib
+      // fallback, needed by the Goal 3b summary-lock test.
+      { find: /^@\/lib\/llm/, replacement: path.resolve(__dirname, './src/lib/llm') },
+      { find: /^@\/lib\/action-items/, replacement: path.resolve(__dirname, './src/lib/action-items') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },

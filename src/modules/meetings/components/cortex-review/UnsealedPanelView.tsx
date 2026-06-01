@@ -14,6 +14,7 @@ import {
 import { PermissionGate } from '@/components/PermissionGate';
 import { log } from '@/lib/logger';
 import { useCortexReviewMutation } from './useCortexReview';
+import { SummaryEditor } from './SummaryEditor';
 import type { ProposedAction, UnsealedPanel } from './types';
 import { confidenceLabel, confidenceColor, stateColor } from './types';
 
@@ -171,7 +172,7 @@ interface UnsealedPanelViewProps {
 }
 
 export function UnsealedPanelView({ meetingId, data }: UnsealedPanelViewProps) {
-  const { proposedActions, minutes } = data;
+  const { proposedActions, minutes, summary } = data;
   const [showQuotes, setShowQuotes] = useState<Record<string, boolean>>({});
   const publish = useCortexReviewMutation(meetingId);
 
@@ -193,6 +194,8 @@ export function UnsealedPanelView({ meetingId, data }: UnsealedPanelViewProps) {
           {approvedCount}/{totalCount} approved
         </span>
       </div>
+
+      <SummaryEditor meetingId={meetingId} summary={summary} />
 
       {minutesText && (
         <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-3">

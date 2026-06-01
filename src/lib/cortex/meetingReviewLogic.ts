@@ -67,6 +67,9 @@ export interface UnsealedMeetingPanel {
   cortexMeetingId: string;
   proposedActions: ProposedAction[];
   minutes: CortexMinute[] | null;
+  // Effective executive summary (human override if set, else AI) from /{id}/outbox.
+  // null when the meeting is gated (not downstream-eligible) or the fetch failed.
+  summary: string | null;
 }
 
 export interface NoPanelResponse {
@@ -205,6 +208,36 @@ export async function fetchLiveState(
     return null;
   }
   return (await resp.json()) as LiveStateResponse;
+}
+
+/**
+ * Fetch the effective summary for a Cortex meeting from /{id}/outbox.
+ *
+ * The outbox endpoint returns the EFFECTIVE summary — the human override if one was
+ * set (Goal 3a), else the AI summary. Used to surface + pre-fill the summary editor in
+ * the unsealed panel. Returns null on a non-OK response or when the meeting is gated
+ * (not downstream-eligible) — both are non-fatal: the panel just shows no summary.
+ */
+export async function fetchOutboxSummary(
+  cortexMeetingId: string,
+  reviewerEmail: string,
+  bridgeUrl: string,
+  apiKey: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<string | null> {
+  const url = `${bridgeUrl}/api/meetings/${encodeURIComponent(cortexMeetingId)}/outbox`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Cortex-Reviewer': reviewerEmail,
+    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+  };
+  const resp = await fetchWithTimeout(fetchFn, url, { headers });
+  if (!resp.ok) {
+    log.warn('Cortex outbox returned non-OK', { cortexMeetingId, status: resp.status }, 'cortex-meeting-review');
+    return null;
+  }
+  const data = (await resp.json()) as { summary?: string | null };
+  return data.summary ?? null;
 }
 
 /**

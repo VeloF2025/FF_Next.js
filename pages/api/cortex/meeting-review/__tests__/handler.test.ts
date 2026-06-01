@@ -218,6 +218,50 @@ describe('cortex/meeting-review route handler — IDOR closure', () => {
   });
 });
 
+describe('cortex/meeting-review route handler — editSummary (Goal 3b)', () => {
+  beforeEach(reset);
+
+  it('editSummary requires :edit — a :view-only principal is refused (403)', async () => {
+    principal.grantedActions = new Set(['view']); // NOT edit
+    const { req, res } = createMocks({ method: 'POST', query: { meetingId: '92488' }, body: { op: 'editSummary', text: 'x' } });
+    await handler(req as unknown as NextApiRequest, res as unknown as NextApiResponse);
+    expect(res._getStatusCode()).toBe(403);
+  });
+
+  it('editSummary posts to the path-resolved meeting /summary, ignoring a foreign body id (IDOR-safe)', async () => {
+    principal.grantedActions = new Set(['view', 'edit']);
+    dbState.sealedRow = { cortex_meeting_id: 'mtg_real', seal_source: 'human', human_reviewed: true, sealed_at: null, summary: null, items: [] };
+    installFetch(null);
+
+    const { req, res } = createMocks({
+      method: 'POST',
+      query: { meetingId: '92488' },
+      body: { op: 'editSummary', text: 'Human exec summary', cortexMeetingId: 'mtg_VICTIM' },
+    });
+    await handler(req as unknown as NextApiRequest, res as unknown as NextApiResponse);
+
+    expect(res._getStatusCode()).toBe(200);
+    const summaryCall = fetchCalls.find(c => c.url.endsWith('/summary'));
+    expect(summaryCall).toBeDefined();
+    expect(summaryCall!.url).toContain('/meetings/mtg_real/summary');
+    expect(summaryCall!.url).not.toContain('mtg_VICTIM');
+    expect(summaryCall!.body).toEqual({ summary: 'Human exec summary' });
+  });
+
+  it('editSummary with no text clears the override (summary:null)', async () => {
+    principal.grantedActions = new Set(['view', 'edit']);
+    dbState.sealedRow = { cortex_meeting_id: 'mtg_real', seal_source: 'human', human_reviewed: true, sealed_at: null, summary: null, items: [] };
+    installFetch(null);
+
+    const { req, res } = createMocks({ method: 'POST', query: { meetingId: '92488' }, body: { op: 'editSummary' } });
+    await handler(req as unknown as NextApiRequest, res as unknown as NextApiResponse);
+
+    expect(res._getStatusCode()).toBe(200);
+    const summaryCall = fetchCalls.find(c => c.url.endsWith('/summary'));
+    expect(summaryCall!.body).toEqual({ summary: null });
+  });
+});
+
 describe('cortex/meeting-review route handler — body validation', () => {
   beforeEach(reset);
 

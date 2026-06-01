@@ -35,6 +35,7 @@ import {
   readSealedRow,
   resolveUnsealedMeetingId,
   fetchLiveState,
+  fetchOutboxSummary,
   deleteLocalSealedRow,
   fetchWithTimeout,
   type NoPanelResponse,
@@ -89,13 +90,14 @@ async function relayUpstreamError(
 type MutationOp =
   | { op: 'approve' | 'reject'; actionId: string }
   | { op: 'edit'; actionId: string; text?: string; owner?: string; due?: string }
+  | { op: 'editSummary'; text?: string }
   | { op: 'publish' }
   | { op: 'unpublish' };
 
 /** Allowed op → action-tier mapping (single source of truth, also used by dispatch) */
 export function opToAction(op: unknown): 'edit' | 'delete' | null {
   if (op === 'unpublish') return 'delete';
-  if (op === 'approve' || op === 'reject' || op === 'edit' || op === 'publish') return 'edit';
+  if (op === 'approve' || op === 'reject' || op === 'edit' || op === 'editSummary' || op === 'publish') return 'edit';
   return null;
 }
 
@@ -150,11 +152,15 @@ async function getHandler(
     return apiResponse.success(res, { panelState: 'none' } satisfies NoPanelResponse);
   }
 
+  // Effective summary (human override or AI) for display + edit. Non-fatal if absent.
+  const summary = await fetchOutboxSummary(cortexMeetingId, reviewerEmail, BRIDGE_URL, API_KEY);
+
   const panel: UnsealedMeetingPanel = {
     panelState: 'unsealed',
     cortexMeetingId,
     proposedActions: liveState.proposed_actions ?? [],
     minutes: liveState.minutes ?? null,
+    summary,
   };
   return apiResponse.success(res, panel);
 }
@@ -221,6 +227,12 @@ async function postHandler(
   if (op === 'publish') {
     upstreamUrl = `${BRIDGE_URL}/api/meetings/${encodeURIComponent(cortexMeetingId)}/publish`;
     upstreamBody = {};
+  } else if (op === 'editSummary') {
+    // Set (text) or clear (empty/undefined → revert to AI summary) the human summary
+    // override. Goal 3a normalises "" → null server-side, so passing the raw text is safe.
+    const { text } = body as { op: 'editSummary'; text?: string };
+    upstreamUrl = `${BRIDGE_URL}/api/meetings/${encodeURIComponent(cortexMeetingId)}/summary`;
+    upstreamBody = { summary: text ?? null };
   } else if (op === 'approve' || op === 'reject') {
     const { actionId } = body as { op: 'approve' | 'reject'; actionId: string };
     if (!actionId) return apiResponse.badRequest(res, 'actionId is required');

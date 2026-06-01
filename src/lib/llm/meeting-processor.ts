@@ -257,8 +257,36 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
  * Persist the merged summary JSON to the meetings row.
  * If the LLM provided a suggested_title and the current title is still generic
  * ("Teams Meeting - ..."), update the title too.
+ *
+ * LOCK (Cortex Scribe Goal 3b): a human-reviewed summary
+ * (meetings.summary_source = 'cortex_human_reviewed', written back from the Cortex
+ * Scribe reviewer panel) is authoritative — "human wins & sticks". When locked we
+ * preserve the human summary and only advance pipeline bookkeeping; we never let a
+ * regeneration (transcript cron, recording-bot, manual /process, graph, onedrive)
+ * clobber it. Centralizing the guard here covers every processWithLLM caller.
+ *
+ * Exported for unit testing (the lock branch is asserted without the LLM path).
  */
-async function writeSummary(meetingId: number, summary: MeetingSummary): Promise<void> {
+export async function writeSummary(meetingId: number, summary: MeetingSummary): Promise<void> {
+  const lockRows = (await sql`
+    SELECT summary_source FROM meetings WHERE id = ${meetingId}
+  `) as { summary_source: string | null }[];
+  if (lockRows[0]?.summary_source === 'cortex_human_reviewed') {
+    log.info(
+      'Summary locked (cortex_human_reviewed) — preserving human override, skipping regeneration',
+      { meetingId },
+      'LLMMeetingProcessor',
+    );
+    await sql`
+      UPDATE meetings
+      SET processing_status = 'completed',
+          processed_at      = NOW(),
+          updated_at        = NOW()
+      WHERE id = ${meetingId}
+    `;
+    return;
+  }
+
   const suggestedTitle = summary.suggested_title?.trim();
 
   if (suggestedTitle) {
