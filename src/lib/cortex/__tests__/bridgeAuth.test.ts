@@ -1,0 +1,100 @@
+// @vitest-environment node
+//
+// jose's signing primitives require the Node/WebCrypto build; the project-default
+// jsdom environment selects jose's browser build, which throws "payload must be an
+// instance of Uint8Array" on SignJWT.sign. This is pure server-side crypto (no DOM),
+// so the file runs under the node environment — matching the Next.js runtime that
+// actually executes bridgeBearer. Scoped to this file; no global config change.
+/**
+ * Tests for the Cortex Bridge per-user JWT minting helper.
+ *
+ * TDD — written before the implementation. `bridgeBearer` returns the credential
+ * FibreFlow sends to Cortex as `Authorization: Bearer <...>`:
+ *   - BRIDGE_JWT_SECRET set  → a short-lived HS256 JWT {email, instance_id, exp}
+ *     (the verified per-user identity Cortex narrows on).
+ *   - BRIDGE_JWT_SECRET unset → falls back to CORTEX_API_KEY (today's behaviour →
+ *     ships dark; per-user narrowing stays dormant until the secret is shared).
+ */
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { decodeProtectedHeader, jwtVerify } from 'jose';
+import { bridgeBearer } from '@/lib/cortex/bridgeAuth';
+
+const SECRET = 'test-bridge-secret-value-0123456789';
+const REVIEWER = 'bob@velocityfibre.co.za';
+
+let saved: Record<string, string | undefined>;
+
+beforeEach(() => {
+  saved = {
+    BRIDGE_JWT_SECRET: process.env.BRIDGE_JWT_SECRET,
+    CORTEX_API_KEY: process.env.CORTEX_API_KEY,
+    CORTEX_INSTANCE_ID: process.env.CORTEX_INSTANCE_ID,
+  };
+  delete process.env.BRIDGE_JWT_SECRET;
+  delete process.env.CORTEX_API_KEY;
+  delete process.env.CORTEX_INSTANCE_ID;
+});
+
+afterEach(() => {
+  for (const [k, v] of Object.entries(saved)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+});
+
+describe('bridgeBearer — dark fallback (no BRIDGE_JWT_SECRET)', () => {
+  it('returns the API key verbatim when the secret is unset', async () => {
+    process.env.CORTEX_API_KEY = 'ck_live_apikey';
+    const bearer = await bridgeBearer(REVIEWER);
+    expect(bearer).toBe('ck_live_apikey');
+  });
+
+  it('returns empty string when neither secret nor api key is set', async () => {
+    const bearer = await bridgeBearer(REVIEWER);
+    expect(bearer).toBe('');
+  });
+});
+
+describe('bridgeBearer — per-user JWT (BRIDGE_JWT_SECRET set)', () => {
+  it('mints a verifiable HS256 JWT carrying the reviewer email + instance_id', async () => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    process.env.CORTEX_API_KEY = 'ck_live_apikey';
+    const bearer = await bridgeBearer(REVIEWER);
+
+    // Not the API key — a freshly minted token instead.
+    expect(bearer).not.toBe('ck_live_apikey');
+    expect(decodeProtectedHeader(bearer).alg).toBe('HS256');
+
+    const { payload } = await jwtVerify(bearer, new TextEncoder().encode(SECRET));
+    expect(payload.email).toBe(REVIEWER);
+    expect(payload.instance_id).toBe('velocity-fibre'); // default tenant
+    expect(typeof payload.exp).toBe('number');
+    expect(typeof payload.iat).toBe('number');
+    expect(payload.exp! - payload.iat!).toBeLessThanOrEqual(600); // short-lived
+    expect(payload.exp! - payload.iat!).toBeGreaterThan(0);
+  });
+
+  it('honours CORTEX_INSTANCE_ID override', async () => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    process.env.CORTEX_INSTANCE_ID = 'blitz-fibre';
+    const bearer = await bridgeBearer(REVIEWER);
+    const { payload } = await jwtVerify(bearer, new TextEncoder().encode(SECRET));
+    expect(payload.instance_id).toBe('blitz-fibre');
+  });
+
+  it('a token minted for one reviewer carries that exact email', async () => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const bearer = await bridgeBearer('carol@velocityfibre.co.za');
+    const { payload } = await jwtVerify(bearer, new TextEncoder().encode(SECRET));
+    expect(payload.email).toBe('carol@velocityfibre.co.za');
+    expect(payload.email).not.toBe(REVIEWER);
+  });
+
+  it('a token minted with the secret does NOT verify under a different secret', async () => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const bearer = await bridgeBearer(REVIEWER);
+    await expect(
+      jwtVerify(bearer, new TextEncoder().encode('a-different-secret')),
+    ).rejects.toThrow();
+  });
+});
