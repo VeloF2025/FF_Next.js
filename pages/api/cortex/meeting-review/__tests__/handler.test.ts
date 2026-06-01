@@ -260,6 +260,21 @@ describe('cortex/meeting-review route handler — editSummary (Goal 3b)', () => 
     const summaryCall = fetchCalls.find(c => c.url.endsWith('/summary'));
     expect(summaryCall!.body).toEqual({ summary: null });
   });
+
+  it('editSummary rejects an over-long summary (400) without calling Cortex', async () => {
+    principal.grantedActions = new Set(['view', 'edit']);
+    dbState.sealedRow = { cortex_meeting_id: 'mtg_real', seal_source: 'human', human_reviewed: true, sealed_at: null, summary: null, items: [] };
+    installFetch(null);
+
+    const { req, res } = createMocks({
+      method: 'POST', query: { meetingId: '92488' },
+      body: { op: 'editSummary', text: 'x'.repeat(20001) },
+    });
+    await handler(req as unknown as NextApiRequest, res as unknown as NextApiResponse);
+
+    expect(res._getStatusCode()).toBe(400);
+    expect(fetchCalls.find(c => c.url.endsWith('/summary'))).toBeUndefined();
+  });
 });
 
 describe('cortex/meeting-review route handler — body validation', () => {

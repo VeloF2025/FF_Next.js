@@ -46,6 +46,8 @@ import {
 // ── env ────────────────────────────────────────────────────────────────────────
 const BRIDGE_URL = process.env.CORTEX_BRIDGE_URL ?? 'http://localhost:7403';
 const API_KEY = process.env.CORTEX_API_KEY ?? '';
+// Upper bound for a human-edited executive summary (generous — summaries are short).
+const MAX_SUMMARY_LEN = 20_000;
 
 function cortexHeaders(reviewerEmail: string): Record<string, string> {
   return {
@@ -230,7 +232,14 @@ async function postHandler(
   } else if (op === 'editSummary') {
     // Set (text) or clear (empty/undefined → revert to AI summary) the human summary
     // override. Goal 3a normalises "" → null server-side, so passing the raw text is safe.
-    const { text } = body as { op: 'editSummary'; text?: string };
+    const { text } = body as { op: 'editSummary'; text?: unknown };
+    if (text !== undefined && typeof text !== 'string') {
+      return apiResponse.badRequest(res, 'summary text must be a string');
+    }
+    // Bound the payload — an executive summary is short; cap defends the bridge.
+    if (typeof text === 'string' && text.length > MAX_SUMMARY_LEN) {
+      return apiResponse.badRequest(res, `summary is too long (max ${MAX_SUMMARY_LEN} characters)`);
+    }
     upstreamUrl = `${BRIDGE_URL}/api/meetings/${encodeURIComponent(cortexMeetingId)}/summary`;
     upstreamBody = { summary: text ?? null };
   } else if (op === 'approve' || op === 'reject') {

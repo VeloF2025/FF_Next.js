@@ -5,7 +5,9 @@ import { syncCortexMeetingActions, type FeedResponse } from '@/lib/cortex/pullMe
 // A fake neon tagged-template `sql`. Routes SELECT → the call-record→id map; records every
 // INSERT's bound values so we can assert what was landed. Mirrors how neon() is called
 // (sql`...` === sql(stringsArray, ...values)).
-function makeFakeSql(idByCallRecord: Record<string, number>) {
+// `writebackRows` controls what the guarded write-back UPDATE … RETURNING id returns:
+//   [{id}] → a row was written (default); [] → the idempotency guard matched nothing.
+function makeFakeSql(idByCallRecord: Record<string, number>, writebackRows: unknown[] = [{ id: 1 }]) {
   const inserts: unknown[][] = [];
   const selects: unknown[] = [];
   const summaryWritebacks: { query: string; values: unknown[] }[] = [];
@@ -23,7 +25,7 @@ function makeFakeSql(idByCallRecord: Record<string, number>) {
     }
     if (/UPDATE meetings/i.test(q)) {
       summaryWritebacks.push({ query: q, values });
-      return Promise.resolve([]);
+      return Promise.resolve(writebackRows);
     }
     return Promise.resolve([]);
   }) as unknown as NeonQueryFunction<false, false>;
@@ -131,6 +133,9 @@ describe('syncCortexMeetingActions — summary write-back (Goal 3b)', () => {
     // The lock marker is a SQL literal (in the query text); the FF meeting id is bound.
     expect(wb.query).toMatch(/summary_source\s*=\s*'cortex_human_reviewed'/i);
     expect(wb.query).toMatch(/summary_locked_at\s*=\s*NOW\(\)/i);
+    // Idempotency guard + RETURNING (so unchanged re-pulls are a no-op, counted correctly).
+    expect(wb.query).toMatch(/IS DISTINCT FROM/i);
+    expect(wb.query).toMatch(/RETURNING id/i);
     expect(wb.values).toContain(92488);
     // The human text lands as the JSONB summary's overview (structured-object shape).
     const jsonArg = wb.values.find(v => typeof v === 'string' && v.includes('overview')) as string;
@@ -164,5 +169,16 @@ describe('syncCortexMeetingActions — summary write-back (Goal 3b)', () => {
     const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
     expect(result.summariesWritten).toBe(0);
     expect(summaryWritebacks).toHaveLength(0);
+  });
+
+  it('is idempotent: an unchanged re-pull issues the guarded UPDATE but counts 0 writes', async () => {
+    // Guard matches no row (already locked with the same text) → RETURNING id returns [].
+    const { sql, summaryWritebacks } = makeFakeSql({ 'cr-1': 92488 }, []);
+    const feed: FeedResponse = {
+      meetings: [meeting({ human_reviewed: true, summary: 'Same as last pull.' })],
+    };
+    const result = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+    expect(summaryWritebacks).toHaveLength(1); // the guarded UPDATE still runs…
+    expect(result.summariesWritten).toBe(0);   // …but writes nothing (no re-stamp)
   });
 });

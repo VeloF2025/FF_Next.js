@@ -231,13 +231,21 @@ export async function fetchOutboxSummary(
     'X-Cortex-Reviewer': reviewerEmail,
     ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
   };
-  const resp = await fetchWithTimeout(fetchFn, url, { headers });
-  if (!resp.ok) {
-    log.warn('Cortex outbox returned non-OK', { cortexMeetingId, status: resp.status }, 'cortex-meeting-review');
+  // Non-fatal: a thrown fetch (timeout/abort/network) or non-OK response must not break
+  // the panel GET — the summary is supplementary, so swallow to null.
+  try {
+    const resp = await fetchWithTimeout(fetchFn, url, { headers });
+    if (!resp.ok) {
+      log.warn('Cortex outbox returned non-OK', { cortexMeetingId, status: resp.status }, 'cortex-meeting-review');
+      return null;
+    }
+    const data = (await resp.json()) as { summary?: unknown };
+    // Defend against an unexpected non-string summary (would render as [object Object]).
+    return typeof data.summary === 'string' ? data.summary : null;
+  } catch (err) {
+    log.warn('Cortex outbox fetch failed', { cortexMeetingId, error: err instanceof Error ? err.message : String(err) }, 'cortex-meeting-review');
     return null;
   }
-  const data = (await resp.json()) as { summary?: string | null };
-  return data.summary ?? null;
 }
 
 /**

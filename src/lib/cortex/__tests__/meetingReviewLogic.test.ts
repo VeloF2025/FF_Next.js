@@ -23,4 +23,16 @@ describe('fetchOutboxSummary', () => {
       fakeFetch({}, false, 404));
     expect(summary).toBeNull();
   });
+
+  it('returns null (does NOT throw) when the fetch itself throws — timeout/abort/network', async () => {
+    const throwingFetch = (async () => { throw new Error('aborted'); }) as unknown as typeof fetch;
+    const summary = await fetchOutboxSummary('mtg_a', 'r@test.com', 'http://bridge:7403', 'key', throwingFetch);
+    expect(summary).toBeNull();
+  });
+
+  it('returns null when the bridge returns a non-string summary (guards [object Object])', async () => {
+    const summary = await fetchOutboxSummary('mtg_a', 'r@test.com', 'http://bridge:7403', 'key',
+      fakeFetch({ summary: { not: 'a string' } }));
+    expect(summary).toBeNull();
+  });
 });

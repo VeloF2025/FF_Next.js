@@ -28,7 +28,7 @@ async function main() {
        ORDER BY column_name`);
     console.log('Applied 396. meetings now has:', r.rows.map((x) => x.column_name));
   } catch (e) {
-    console.error('Migration failed:', e.message);
+    console.error('Migration failed:', e); // full error (stack + pg code), not just .message
     process.exit(1);
   } finally {
     await pool.end();

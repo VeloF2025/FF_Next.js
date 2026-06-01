@@ -123,15 +123,22 @@ export async function syncCortexMeetingActions(
         outline: [],
         action_items: [],
       });
-      await sql`
+      // Idempotent: the guard makes an unchanged re-pull a no-op (the 30-min cron would
+      // otherwise re-stamp summary_locked_at/updated_at every tick). It still writes when
+      // the human re-edits the text (summary differs) or the row isn't yet locked.
+      // RETURNING id → count only rows actually written.
+      const written = (await sql`
         UPDATE meetings
         SET summary           = ${summaryJson}::jsonb,
             summary_source    = 'cortex_human_reviewed',
             summary_locked_at = NOW(),
             updated_at        = NOW()
         WHERE id = ${ffMeetingId}
-      `;
-      summariesWritten++;
+          AND (summary_source IS DISTINCT FROM 'cortex_human_reviewed'
+               OR summary IS DISTINCT FROM ${summaryJson}::jsonb)
+        RETURNING id
+      `) as unknown[];
+      if (written.length > 0) summariesWritten++;
     }
   }
 
