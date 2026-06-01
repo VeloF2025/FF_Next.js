@@ -1,5 +1,5 @@
 /**
- * GET /api/photo-guide/submission/:drNumber
+ * GET /api/sitecam/submission/:drNumber
  *
  * Returns the PWA submission data for a DR, if any.
  * Used by the PwaComparisonTab in the Activate DR detail view.

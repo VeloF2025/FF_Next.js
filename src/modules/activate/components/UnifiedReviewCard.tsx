@@ -108,7 +108,7 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
     { key: 'maintenance' as const, label: 'Maintenance', icon: '🔧' },
     { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
     { key: 'qa' as const, label: 'Manual QA', icon: '✅' },
-    { key: 'pwa' as const, label: 'PWA Photos', icon: '📱' },
+    { key: 'pwa' as const, label: 'SiteCam', icon: '📱' },
   ];
 
   const handleBackToList = () => {

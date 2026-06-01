@@ -1,5 +1,5 @@
 /**
- * GET /api/photo-guide/escalations
+ * GET /api/sitecam/escalations
  *
  * Returns pending (or filtered) PWA escalations for the supervisor view.
  * Query param: status = 'pending' | 'approved' | 'rejected' (default: 'pending')

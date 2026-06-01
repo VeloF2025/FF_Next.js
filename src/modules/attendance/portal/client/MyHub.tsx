@@ -10,27 +10,44 @@
  *   - Payslips — Phase 3 placeholder.
  *   - Corrections — always shown, badged with pending count.
  *   - History — always shown, full-width, badged with last 14 days entry count.
+ *
+ * Tile presentation lives in ./tiles; this file owns data loading, the
+ * role gates, and grid layout.
  */
 
 import React from 'react';
 import { useRouter } from 'next/router';
-import {
-  Clock as ClockIcon,
-  Car,
-  FileText,
-  Receipt,
-  History as HistoryIcon,
-  AlertCircle,
-  Package,
-} from 'lucide-react';
+import { History as HistoryIcon, AlertCircle } from 'lucide-react';
 
 import { getHubSummary, requestFleetHandoff } from './api';
-import type { AttendanceProfile, HubSummaryResponse } from './api';
+import type { AttendanceProfile, HubSummaryResponse, StaffRole } from './api';
 import { MyPortalShell } from './MyPortalShell';
 import { InstallPrompt } from './InstallPrompt';
-import { isStoresAuthorised } from '@/modules/field-stock-pwa/lib/storesRoles';
+import { isStoresAuthorised, STORES_AUTH_ROLES } from '@/modules/field-stock-pwa/lib/storesRoles';
+import {
+  ClockTile,
+  VehicleTile,
+  PayslipsTile,
+  ReceiptsTile,
+  CorrectionsTile,
+  StoresTile,
+  SiteCamTile,
+} from './tiles';
 
 type HubSummary = HubSummaryResponse;
+
+/** Staff roles whose holders capture installation photos via SiteCam. */
+const SITECAM_ROLES: ReadonlyArray<StaffRole> = ['technician', 'supervisor'];
+
+/**
+ * SiteCam is visible to field staff (technician/supervisor) and to the
+ * privileged auth roles that already see every operational tile
+ * (super_admin/system, shared with the Stores gate).
+ */
+function canSeeSiteCam(role: StaffRole | null, authRole: string | null): boolean {
+  if (role !== null && SITECAM_ROLES.includes(role)) return true;
+  return authRole !== null && (STORES_AUTH_ROLES as ReadonlyArray<string>).includes(authRole);
+}
 
 interface MyHubProps {
   profile: AttendanceProfile;
@@ -119,6 +136,7 @@ export function MyHub({ profile }: MyHubProps) {
         {isStoresAuthorised(profile.role, profile.authRole) && (
           <StoresTile onClick={() => router.push('/my/stores')} />
         )}
+        {canSeeSiteCam(profile.role, profile.authRole) && <SiteCamTile />}
       </div>
 
       <button
@@ -140,244 +158,4 @@ export function MyHub({ profile }: MyHubProps) {
       </button>
     </MyPortalShell>
   );
-}
-
-function ClockTile({ summary, onClick }: { summary: HubSummary | null; onClick: () => void }) {
-  const open = summary?.openEntry;
-  const sinceLabel = open ? formatTimeSAST(open.clockInAt) : null;
-
-  return (
-    <Tile
-      onClick={onClick}
-      icon={<ClockIcon className="w-5 h-5" />}
-      iconClass={open ? 'bg-emerald-500/15 text-emerald-300' : 'bg-blue-500/15 text-blue-300'}
-      title="Clock"
-      subtitle={
-        summary === null
-          ? 'Loading…'
-          : open
-            ? `On shift since ${sinceLabel}`
-            : 'Tap to clock in'
-      }
-      badge={open ? 'On shift' : null}
-      badgeClass="bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-    />
-  );
-}
-
-function VehicleTile({
-  summary,
-  hasVehicle,
-  pending,
-  onClick,
-}: {
-  summary: HubSummary | null;
-  hasVehicle: boolean;
-  pending: boolean;
-  onClick: () => void;
-}) {
-  // PRD §4.2 + FR-HUB-01: office staff with no vehicle should NOT
-  // see the vehicle tile at all (was rendering as a disabled placeholder).
-  if (!hasVehicle) return null;
-
-  const reg = summary?.assignedVehicle?.registration ?? '…';
-  return (
-    <Tile
-      onClick={onClick}
-      icon={<Car className="w-5 h-5" />}
-      iconClass="bg-emerald-500/15 text-emerald-300"
-      title="My Vehicle"
-      subtitle={pending ? 'Opening…' : reg}
-      disabled={pending}
-    />
-  );
-}
-
-function PayslipsTile({
-  summary,
-  onClick,
-}: {
-  summary: HubSummary | null;
-  onClick: () => void;
-}) {
-  // PRD §7.1 FR-HUB-01: "Payslips (if any)" — hide when summary has
-  // loaded with no payslips. While loading we still render a
-  // placeholder so the slot doesn't pop in suddenly.
-  const latest = summary?.latestPayslip;
-  if (summary === null) {
-    return (
-      <Tile
-        onClick={onClick}
-        icon={<FileText className="w-5 h-5" />}
-        iconClass="bg-neutral-800 text-neutral-500"
-        title="Payslips"
-        subtitle="Loading…"
-      />
-    );
-  }
-  if (!latest) return null;
-  return (
-    <Tile
-      onClick={onClick}
-      icon={<FileText className="w-5 h-5" />}
-      iconClass="bg-blue-500/15 text-blue-300"
-      title="Payslips"
-      subtitle={`Latest: ${formatPayslipPeriod(latest.payPeriodStart, latest.payPeriodEnd)}`}
-    />
-  );
-}
-
-function formatPayslipPeriod(start: string, end: string): string {
-  const startMonth = payslipMonth(start);
-  const endMonth = payslipMonth(end);
-  return startMonth === endMonth ? startMonth : `${startMonth} – ${endMonth}`;
-}
-
-function payslipMonth(iso: string): string {
-  const [year, month] = iso.split('-');
-  const monthIdx = Number(month) - 1;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[monthIdx] ?? month} ${year}`;
-}
-
-function ReceiptsTile({
-  summary,
-  onClick,
-}: {
-  summary: HubSummary | null;
-  onClick: () => void;
-}) {
-  const latest = summary?.latestReceipt;
-  if (!latest) {
-    return (
-      <Tile
-        onClick={onClick}
-        icon={<Receipt className="w-5 h-5" />}
-        iconClass="bg-neutral-800 text-neutral-500"
-        title="Receipts"
-        subtitle={summary === null ? 'Loading…' : 'Capture your first slip'}
-      />
-    );
-  }
-  const subtitle = latest.vendor
-    ? `${latest.vendor} · ${formatRand(latest.totalCents)}`
-    : `Latest · ${formatRand(latest.totalCents)}`;
-  return (
-    <Tile
-      onClick={onClick}
-      icon={<Receipt className="w-5 h-5" />}
-      iconClass="bg-emerald-500/15 text-emerald-300"
-      title="Receipts"
-      subtitle={subtitle}
-    />
-  );
-}
-
-function formatRand(cents: number): string {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-    minimumFractionDigits: 2,
-  }).format(cents / 100);
-}
-
-function CorrectionsTile({
-  summary,
-  onClick,
-}: {
-  summary: HubSummary | null;
-  onClick: () => void;
-}) {
-  const pending = summary?.pendingCorrectionsCount ?? 0;
-  return (
-    <Tile
-      onClick={onClick}
-      icon={<AlertCircle className="w-5 h-5" />}
-      iconClass="bg-blue-500/15 text-blue-300"
-      title="Corrections"
-      subtitle={
-        summary === null
-          ? 'Loading…'
-          : pending === 0
-            ? 'No pending'
-            : `${pending} pending`
-      }
-      badge={pending > 0 ? String(pending) : null}
-      badgeClass="bg-blue-600 text-white border-blue-500"
-    />
-  );
-}
-
-function StoresTile({ onClick }: { onClick: () => void }) {
-  return (
-    <Tile
-      onClick={onClick}
-      icon={<Package className="w-5 h-5" />}
-      iconClass="bg-amber-500/15 text-amber-300"
-      title="Stores"
-      subtitle="Issue &amp; return field stock"
-    />
-  );
-}
-
-interface TileProps {
-  icon: React.ReactNode;
-  iconClass: string;
-  title: string;
-  subtitle: string;
-  badge?: string | null;
-  badgeClass?: string;
-  onClick?: () => void;
-  disabled?: boolean;
-}
-
-function Tile({
-  icon,
-  iconClass,
-  title,
-  subtitle,
-  badge,
-  badgeClass = '',
-  onClick,
-  disabled = false,
-}: TileProps) {
-  const baseClass =
-    'rounded-2xl border border-neutral-800 bg-neutral-900 p-4 text-left transition-colors min-h-[110px] flex flex-col gap-2';
-  const interactiveClass = disabled
-    ? 'opacity-60 cursor-not-allowed'
-    : 'hover:bg-neutral-800/80 active:bg-neutral-800';
-
-  return (
-    <button
-      type="button"
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      className={`${baseClass} ${interactiveClass}`}
-    >
-      <div className="flex items-center justify-between">
-        <span className={`flex w-10 h-10 items-center justify-center rounded-xl ${iconClass}`}>
-          {icon}
-        </span>
-        {badge && (
-          <span className={`text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full border ${badgeClass}`}>
-            {badge}
-          </span>
-        )}
-      </div>
-      <div>
-        <div className="text-sm font-semibold text-neutral-100">{title}</div>
-        <div className="text-xs text-neutral-400 mt-0.5">{subtitle}</div>
-      </div>
-    </button>
-  );
-}
-
-function formatTimeSAST(iso: string): string {
-  const d = new Date(iso);
-  return new Intl.DateTimeFormat('en-ZA', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Africa/Johannesburg',
-  }).format(d);
 }
