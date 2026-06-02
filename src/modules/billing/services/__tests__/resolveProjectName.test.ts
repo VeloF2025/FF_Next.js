@@ -118,6 +118,48 @@ describe('resolveProjectNameAgainst', () => {
     });
   });
 
+  describe('POP-suffix fallback (single-project sites)', () => {
+    // Etwatwa is one project — the FT report labels it "Etwatwa POP02", but
+    // the FibreFlow project name has no POP code. The orphan pop/2 tokens
+    // miss every direct pass; the fallback retries with "POP02" stripped.
+    const WITH_ETWATWA: BillableProject[] = [...PROJECTS, { id: '7', name: 'Etwatwa' }];
+
+    it('resolves "Etwatwa POP02" to "Etwatwa" (PDF Site / payment filename)', () => {
+      const r = resolveProjectNameAgainst('Etwatwa POP02', WITH_ETWATWA);
+      expect(r.matched).toBe(true);
+      expect(r.project?.name).toBe('Etwatwa');
+      expect(r.rawInput).toBe('Etwatwa POP02');
+    });
+
+    it('resolves "ETW POP02" to "Etwatwa" (abbreviated notes filename)', () => {
+      const r = resolveProjectNameAgainst('ETW POP02', WITH_ETWATWA);
+      expect(r.matched).toBe(true);
+      expect(r.project?.name).toBe('Etwatwa');
+    });
+
+    it('still resolves "Etwatwa" plain exactly (fallback not needed)', () => {
+      const r = resolveProjectNameAgainst('Etwatwa', WITH_ETWATWA);
+      expect(r.matched).toBe(true);
+      expect(r.project?.name).toBe('Etwatwa');
+    });
+
+    it('does NOT collapse multi-POP sites: stripping POP leaves "Thembisa" ambiguous', () => {
+      // No "Thembisa POP 9" exists; the direct pass misses and the fallback
+      // strips to "Thembisa" → 3 candidates → not unique → stays unmatched
+      // rather than wrongly picking one POP.
+      const r = resolveProjectNameAgainst('Thembisa POP 9', WITH_ETWATWA);
+      expect(r.matched).toBe(false);
+      expect(r.project).toBeNull();
+    });
+
+    it('does not strip a leading/middle POP token (anchored to the end)', () => {
+      // "POP" not followed by a trailing number stays put; unrelated input
+      // remains unmatched.
+      const r = resolveProjectNameAgainst('Randomville', WITH_ETWATWA);
+      expect(r.matched).toBe(false);
+    });
+  });
+
   describe('abbreviation prefix', () => {
     it('resolves "TEM POP01" to "Thembisa POP 1" via prefix match', () => {
       const r = resolveProjectNameAgainst('TEM POP01', PROJECTS);
