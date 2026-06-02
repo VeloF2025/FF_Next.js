@@ -125,6 +125,72 @@ function dedupePons(pons: ZonePonUptakeRow[]): ZonePonUptakeRow[] {
   );
 }
 
+// ─── Grand Total ─────────────────────────────────────────────────────────────
+
+interface GrandTotal {
+  plannedDrops: number;
+  installed: number;
+  pctInstalled: number;
+}
+
+/**
+ * Resolve the uptake grand total. Prefers the explicit "Grand Total" footer
+ * line (authoritative when present). Some projects (Tembisa POP01/POP03) ship
+ * uptake PDFs with NO "Grand Total" row — only per-section "Drop Total" /
+ * "Spare Total" footers — so when it's absent we derive the total by summing
+ * the parsed rows (per-zone rows preferred; PON rows as a fallback for the
+ * per-pon variant). Reconcile relies on `grandTotal.installed`, so a missing
+ * footer would otherwise read as installed=0 and report a false mismatch
+ * against the FT payment summary.
+ *
+ * Exported for unit testing (the parser body itself needs real PDF buffers).
+ */
+export function computeGrandTotal(
+  grandTotalLine: string | undefined,
+  zones: ZoneUptakeRow[],
+  pons: ZonePonUptakeRow[],
+): { grandTotal: GrandTotal; warning: string | null } {
+  if (grandTotalLine) {
+    // Format: "Grand Total                  23706      6512         27%"
+    const nums = [...grandTotalLine.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => m[0]);
+    if (nums.length >= 3) {
+      return {
+        grandTotal: {
+          plannedDrops: toInt(nums[0]),
+          installed: toInt(nums[1]),
+          pctInstalled: parsePct(nums[2]!),
+        },
+        warning: null,
+      };
+    }
+    return {
+      grandTotal: { plannedDrops: 0, installed: 0, pctInstalled: 0 },
+      warning: `Grand Total line found but could not parse 3 numbers: "${grandTotalLine}"`,
+    };
+  }
+
+  const src = zones.length > 0 ? zones : pons;
+  if (src.length > 0) {
+    const plannedDrops = src.reduce((sum, r) => sum + r.plannedDrops, 0);
+    const installed = src.reduce((sum, r) => sum + r.installed, 0);
+    return {
+      grandTotal: {
+        plannedDrops,
+        installed,
+        pctInstalled: plannedDrops > 0 ? (installed / plannedDrops) * 100 : 0,
+      },
+      warning:
+        `No "Grand Total" line in uptake PDF — derived from ${src.length} parsed rows ` +
+        `(planned=${plannedDrops}, installed=${installed}).`,
+    };
+  }
+
+  return {
+    grandTotal: { plannedDrops: 0, installed: 0, pctInstalled: 0 },
+    warning: 'Grand Total line not found in uptake PDF',
+  };
+}
+
 // ─── Parser ────────────────────────────────────────────────────────────────
 
 /**
@@ -172,27 +238,19 @@ export async function parseZoneUptakePdf(
     parseZoneOnly(lines, zones, warnings);
   }
 
-  // Grand Total row — identical layout in both variants
-  const grandTotalLine = lines.find((l) => /grand\s+total/i.test(l));
-  if (grandTotalLine) {
-    // Format: "Grand Total                  23706      6512         27%"
-    const nums = [...grandTotalLine.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => m[0]);
-    if (nums.length >= 3) {
-      grandTotal = {
-        plannedDrops: toInt(nums[0]),
-        installed: toInt(nums[1]),
-        pctInstalled: parsePct(nums[2]!),
-      };
-    } else {
-      warnings.push(`Grand Total line found but could not parse 3 numbers: "${grandTotalLine}"`);
-    }
-  } else {
-    warnings.push('Grand Total line not found in uptake PDF');
-  }
-
   // Dedupe in case the PDF has a Drop + Spare split with overlapping zones.
+  // Done before the Grand Total step so the row-sum fallback below sees the
+  // merged totals.
   const dedupedZones = dedupeZones(zones);
   const dedupedPons = dedupePons(pons);
+
+  const gt = computeGrandTotal(
+    lines.find((l) => /grand\s+total/i.test(l)),
+    dedupedZones,
+    dedupedPons,
+  );
+  grandTotal = gt.grandTotal;
+  if (gt.warning) warnings.push(gt.warning);
 
   log.info('Uptake PDF parsed', {
     filename,
