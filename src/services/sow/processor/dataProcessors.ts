@@ -1,5 +1,6 @@
 import { NeonPoleData, NeonDropData, NeonFibreData } from '../../neonSOWService';
 import { extractValue, extractNumber, extractDate, parseBoolean } from './helpers';
+import { normalizeSaLatLon } from '@/lib/geo/normalizeSaLatLon';
 
 /**
  * Process Lawley-style poles data
@@ -13,10 +14,14 @@ export function processPoles(rawData: Record<string, unknown>[]): NeonPoleData[]
     
     if (!poleNumber) continue;
     
+    const poleCoords = normalizeSaLatLon(
+      extractNumber(row, ['lat', 'latitude', 'y', 'coord_y']),
+      extractNumber(row, ['lon', 'longitude', 'lng', 'x', 'coord_x']),
+    );
     const pole: NeonPoleData = {
       pole_number: poleNumber,
-      latitude: extractNumber(row, ['lat', 'latitude', 'y', 'coord_y']) || undefined,
-      longitude: extractNumber(row, ['lon', 'longitude', 'lng', 'x', 'coord_x']) || undefined,
+      latitude: poleCoords.latitude ?? undefined,
+      longitude: poleCoords.longitude ?? undefined,
       status: extractValue(row, ['status', 'pole_status']) || 'planned',
       pole_type: extractValue(row, ['type_1', 'type', 'pole_type']),
       pole_spec: extractValue(row, ['spec_1', 'spec', 'specification']),
@@ -49,7 +54,11 @@ export function processDrops(rawData: Record<string, unknown>[]): NeonDropData[]
     const dropNumber = extractValue(row, ['label', 'drop_number', 'drop_id', 'drop_label']);
     
     if (!dropNumber) continue;
-    
+
+    const dropCoords = normalizeSaLatLon(
+      extractNumber(row, ['lat', 'latitude', 'y']),
+      extractNumber(row, ['lon', 'longitude', 'lng', 'x']),
+    );
     const drop: NeonDropData = {
       drop_number: dropNumber,
       pole_number: extractValue(row, ['strtfeat', 'start_feature', 'pole_number', 'from_pole']) || '',
@@ -59,8 +68,8 @@ export function processDrops(rawData: Record<string, unknown>[]): NeonDropData[]
       cable_capacity: extractValue(row, ['cblcpty', 'capacity', 'cable_capacity']),
       start_point: extractValue(row, ['strtfeat', 'start_feature', 'from']),
       end_point: extractValue(row, ['endfeat', 'end_feature', 'to']),
-      latitude: extractNumber(row, ['lat', 'latitude', 'y']),
-      longitude: extractNumber(row, ['lon', 'longitude', 'lng', 'x']),
+      latitude: dropCoords.latitude,
+      longitude: dropCoords.longitude,
       address: extractValue(row, ['address', 'location', 'drop_address']),
       pon_no: extractNumber(row, ['pon_no', 'pon', 'pon_number']),
       zone_no: extractNumber(row, ['zone_no', 'zone', 'zone_number']),
