@@ -1,0 +1,171 @@
+/**
+ * Tests for the useSiteCamCapture state machine — attempt counting,
+ * escalation after maxAttempts, and the fail-open paths.
+ *
+ * FileReader is stubbed so readFileAsBase64 resolves deterministically
+ * without depending on jsdom's async file plumbing.
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+
+vi.mock('@/lib/logger', () => ({
+  log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
+import { useSiteCamCapture, type SiteInfo } from '../useSiteCamCapture';
+import type { SiteCamStep } from '../../lib/sitecamSteps';
+
+class MockFileReader {
+  result: string | null = null;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  error: unknown = null;
+  readAsDataURL(_file: Blob): void {
+    this.result = 'data:image/jpeg;base64,RkFLRQ==';
+    queueMicrotask(() => this.onload?.());
+  }
+}
+
+const STEPS: readonly SiteCamStep[] = [{ number: 1, label: 'Before Photo', hasVlm: true }];
+const SITE_INFO: SiteInfo = {
+  jobType: 'civils',
+  siteId: 'POLE-1',
+  customerName: null,
+  address: null,
+  projectName: null,
+};
+
+function file(): File {
+  return new File(['x'], 'p.jpg', { type: 'image/jpeg' });
+}
+
+let fetchMock: ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.stubGlobal('FileReader', MockFileReader as unknown as typeof FileReader);
+  fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+});
+
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+function jsonOk(data: unknown) {
+  return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
+}
+
+describe('useSiteCamCapture', () => {
+  it('marks a failing step "fail" while attempts remain, incrementing attemptNumber', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') {
+        return jsonOk({ data: { pass: false, reasons: ['bad'], corrections: ['retry'], maxAttempts: 3 } });
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+
+    await act(async () => {
+      await result.current.captureAndValidate(file());
+    });
+
+    expect(result.current.stepStates[0].status).toBe('fail');
+    expect(result.current.stepStates[0].attemptNumber).toBe(1);
+    expect(result.current.stepStates[0].failReasons).toEqual(['bad']);
+  });
+
+  it('escalates after maxAttempts consecutive failures', async () => {
+    let escalateCalled = false;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') {
+        return jsonOk({ data: { pass: false, reasons: ['bad'], corrections: [], maxAttempts: 3 } });
+      }
+      if (url === '/api/sitecam/escalate') {
+        escalateCalled = true;
+        return jsonOk({});
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        await result.current.captureAndValidate(file());
+      });
+    }
+
+    expect(result.current.stepStates[0].attemptNumber).toBe(3);
+    expect(result.current.stepStates[0].status).toBe('escalated');
+    expect(escalateCalled).toBe(true);
+  });
+
+  it('fails open (auto-pass) on a non-OK validate response and flags for manual review', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') {
+        return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) });
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+
+    await act(async () => {
+      await result.current.captureAndValidate(file());
+    });
+
+    expect(result.current.stepStates[0].status).toBe('pass');
+    expect(result.current.stepStates[0].needsManualReview).toBe(true);
+  });
+
+  it('flags a step for manual review when the server fails open (needsManualReview)', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') {
+        return jsonOk({ data: { pass: true, reasons: [], corrections: [], maxAttempts: 3, needsManualReview: true } });
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+    await act(async () => {
+      await result.current.captureAndValidate(file());
+    });
+
+    expect(result.current.stepStates[0].status).toBe('pass');
+    expect(result.current.stepStates[0].needsManualReview).toBe(true);
+  });
+
+  it('does not flag a genuine VLM pass for manual review', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') {
+        return jsonOk({ data: { pass: true, reasons: [], corrections: [], maxAttempts: 3 } });
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+    await act(async () => {
+      await result.current.captureAndValidate(file());
+    });
+
+    expect(result.current.stepStates[0].status).toBe('pass');
+    expect(result.current.stepStates[0].needsManualReview).toBe(false);
+  });
+
+  it('auto-passes a non-VLM step without calling the validate API', async () => {
+    const noVlmSteps: readonly SiteCamStep[] = [{ number: 3, label: 'Entry Outside', hasVlm: false }];
+    const { result } = renderHook(() => useSiteCamCapture(noVlmSteps, SITE_INFO));
+
+    await act(async () => {
+      await result.current.captureAndValidate(file());
+    });
+
+    expect(result.current.stepStates[0].status).toBe('pass');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

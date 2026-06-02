@@ -24,8 +24,10 @@ import { PhotoGridView } from './photo-gallery/PhotoGridView';
 import { PhotoSingleView } from './photo-gallery/PhotoSingleView';
 import { GalleryPhoto, PhotoDecision, StepCount, STEP_LABELS, photoKey } from './photo-gallery/types';
 import { usePhotoGallerySave } from './photo-gallery/usePhotoGallerySave';
+import { CivilsGalleryTab } from './photo-gallery/CivilsGalleryTab';
 
 export default function PhotoGalleryPage() {
+  const [galleryMode, setGalleryMode] = useState<'activations' | 'civils'>('activations');
   const [activeStep, setActiveStep] = useState(1);
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [stepCounts, setStepCounts] = useState<Record<number, number>>({});
@@ -135,7 +137,34 @@ export default function PhotoGalleryPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      <GalleryHeader
+      {/* Tab switcher */}
+      <div className="flex gap-1 border-b border-gray-800 bg-gray-900 px-4 pt-2">
+        <button
+          type="button"
+          onClick={() => setGalleryMode('activations')}
+          className={`rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
+            galleryMode === 'activations'
+              ? 'bg-gray-800 text-white'
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Activations
+        </button>
+        <button
+          type="button"
+          onClick={() => setGalleryMode('civils')}
+          className={`rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
+            galleryMode === 'civils'
+              ? 'bg-gray-800 text-white'
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Civils
+        </button>
+      </div>
+
+      {galleryMode === 'activations' && (
+      <><GalleryHeader
         viewMode={viewMode}
         onSetViewMode={setViewMode}
         goodCount={goodCount}
@@ -172,6 +201,7 @@ export default function PhotoGalleryPage() {
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => void loadPhotos(activeStep)}
                 className="flex items-center gap-1.5 rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-400 hover:text-white"
               >
@@ -221,6 +251,9 @@ export default function PhotoGalleryPage() {
           )}
         </div>
       </div>
+      </>)}
+
+      {galleryMode === 'civils' && <CivilsGalleryTab />}
     </div>
   );
 }

@@ -23,6 +23,14 @@ import {
   type QualityCheckStep,
 } from '@/modules/activate/services/stepQualityCriteria';
 import {
+  CIVIL_STEP_CRITERIA,
+  CIVIL_QUALITY_STEPS,
+  buildCivilMessageContent,
+  type CivilStep,
+} from '@/modules/sitecam/lib/civilStepCriteria';
+import { toGalleryJobType, type SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
+import { loadGalleryExamples } from '@/lib/vlmGallery';
+import {
   VLM_CHAT_ENDPOINT,
   VLM_CATEGORIZATION_MODEL,
   VLM_TIMEOUT_REALTIME,
@@ -35,7 +43,7 @@ const MODULE = 'PwaValidate';
 const MAX_ATTEMPTS = 3;
 
 interface ValidateBody {
-  jobType: 'activations' | 'civils';
+  jobType: SiteCamJobType;
   stepNumber: number;
   siteId: string;
   photoBase64: string;
@@ -47,6 +55,8 @@ interface VlmResult {
   pass: boolean;
   reasons: string[];
   corrections: string[];
+  /** True when pass is the result of failing open (VLM unavailable), not a real check. */
+  needsManualReview: boolean;
 }
 
 function hashBase64(b64: string): string {
@@ -73,7 +83,12 @@ async function recordPhotoHash(siteId: string, stepNumber: number, hash: string)
 function checkExifAge(exifTimestamp: string | undefined): { ok: boolean; reason?: string } {
   if (!exifTimestamp) return { ok: true };
   const exif = new Date(exifTimestamp).getTime();
-  if (isNaN(exif)) return { ok: true };
+  if (isNaN(exif)) {
+    // Unparsable client-supplied timestamp — accept (don't block) but surface
+    // it, since a garbage value would otherwise silently skip the age check.
+    log.warn('Unparsable exifTimestamp received — skipping EXIF age check', { exifTimestamp }, MODULE);
+    return { ok: true };
+  }
   const twoHours = 2 * 60 * 60 * 1000;
   if (Math.abs(Date.now() - exif) > twoHours) {
     return {
@@ -84,8 +99,22 @@ function checkExifAge(exifTimestamp: string | undefined): { ok: boolean; reason?
   return { ok: true };
 }
 
-async function runVlmCheck(step: QualityCheckStep, photoBase64: string): Promise<VlmResult> {
-  const { content } = buildMessageContent(step, photoBase64, undefined);
+async function runVlmCheck(
+  jobType: SiteCamJobType,
+  step: number,
+  photoBase64: string
+): Promise<VlmResult> {
+  const galleryExamples = await loadGalleryExamples(step, toGalleryJobType(jobType));
+
+  let content: unknown[];
+  if (jobType === 'civils') {
+    const { content: c } = buildCivilMessageContent(step as CivilStep, photoBase64, galleryExamples);
+    content = c;
+  } else {
+    const { content: c } = buildMessageContent(step as QualityCheckStep, photoBase64, galleryExamples);
+    content = c;
+  }
+
   const body = {
     model: VLM_CATEGORIZATION_MODEL,
     messages: [{ role: 'user', content }],
@@ -108,19 +137,35 @@ async function runVlmCheck(step: QualityCheckStep, photoBase64: string): Promise
     const raw = stripThinkTags(json.choices?.[0]?.message?.content ?? '');
     const match = raw.match(/\{[\s\S]*\}/);
     if (match) {
-      const parsed = JSON.parse(match[0]) as { pass?: boolean; reasons?: string[]; corrections?: string[] };
+      const parsed = JSON.parse(match[0]) as {
+        pass?: boolean;
+        passes?: boolean;
+        fail_reason?: string | null;
+        reasons?: string[];
+        corrections?: string[];
+      };
+      // VLM may return either "pass" or "passes" depending on prompt variant
+      const passed = parsed.passes !== undefined ? parsed.passes === true : parsed.pass === true;
+      const failReason = parsed.fail_reason ?? null;
       return {
-        pass: parsed.pass === true,
-        reasons: Array.isArray(parsed.reasons) ? parsed.reasons : [],
+        pass: passed,
+        reasons: passed || !failReason
+          ? (Array.isArray(parsed.reasons) ? parsed.reasons : [])
+          : [failReason],
         corrections: Array.isArray(parsed.corrections) ? parsed.corrections : [],
+        needsManualReview: false,
       };
     }
-    // No JSON in response — allow pass to avoid blocking tech on parse errors
-    return { pass: true, reasons: [], corrections: [] };
+    // No JSON in response — fail open to avoid blocking tech on parse errors,
+    // but log at error level so an operator is alerted that VLM is degraded.
+    log.error('VLM returned no parsable JSON — failing open (photo auto-passed)', { raw: raw.slice(0, 200) }, MODULE);
+    return { pass: true, reasons: [], corrections: [], needsManualReview: true };
   } catch (err) {
     clearTimeout(timeout);
-    log.warn('VLM validation failed — allowing pass to avoid blocking technician', { error: String(err) }, MODULE);
-    return { pass: true, reasons: [], corrections: [] };
+    // Fail open so a VLM outage never blocks a technician — but log at error
+    // level (Sentry) so the outage is visible and photos can be re-reviewed.
+    log.error('VLM validation failed — failing open (photo auto-passed)', { error: String(err) }, MODULE);
+    return { pass: true, reasons: [], corrections: [], needsManualReview: true };
   }
 }
 
@@ -134,9 +179,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     return apiResponse.badRequest(res, 'jobType, stepNumber, siteId, photoBase64, attemptNumber required');
   }
 
-  const step = stepNumber as QualityCheckStep;
-  if (!(QUALITY_CHECK_STEPS as readonly number[]).includes(step)) {
-    return apiResponse.badRequest(res, `Step ${stepNumber} has no VLM validation criteria`);
+  if (jobType !== 'activations' && jobType !== 'civils') {
+    return apiResponse.badRequest(res, 'jobType must be "activations" or "civils"');
+  }
+
+  // siteId is a DR/pole identifier used as a DB key — bound its length and charset.
+  if (siteId.length > 64 || !/^[A-Za-z0-9_-]+$/.test(siteId)) {
+    return apiResponse.badRequest(res, 'Invalid siteId format');
+  }
+
+  // Validate step number and resolve step label based on jobType
+  let stepLabel: string;
+  if (jobType === 'civils') {
+    if (!(CIVIL_QUALITY_STEPS as readonly number[]).includes(stepNumber)) {
+      return apiResponse.badRequest(res, `Step ${stepNumber} has no VLM validation criteria`);
+    }
+    stepLabel = CIVIL_STEP_CRITERIA[stepNumber as CivilStep].label;
+  } else {
+    if (!(QUALITY_CHECK_STEPS as readonly number[]).includes(stepNumber)) {
+      return apiResponse.badRequest(res, `Step ${stepNumber} has no VLM validation criteria`);
+    }
+    stepLabel = STEP_CRITERIA[stepNumber as QualityCheckStep].label;
   }
 
   // Fraud: EXIF age check
@@ -146,7 +209,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       pass: false,
       reasons: [ageCheck.reason!],
       corrections: ['Please take a fresh photo right now at the installation site.'],
-      stepLabel: STEP_CRITERIA[step].label,
+      stepLabel,
       attemptNumber,
       maxAttempts: MAX_ATTEMPTS,
       fraudDetected: 'exif_age',
@@ -161,7 +224,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       pass: false,
       reasons: ['This exact photo has already been submitted for this job.'],
       corrections: ['Take a new photo — do not reuse a previously submitted photo.'],
-      stepLabel: STEP_CRITERIA[step].label,
+      stepLabel,
       attemptNumber,
       maxAttempts: MAX_ATTEMPTS,
       fraudDetected: 'duplicate_hash',
@@ -169,16 +232,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   }
 
   // VLM quality check
-  const result = await runVlmCheck(step, photoBase64);
+  const result = await runVlmCheck(jobType, stepNumber, photoBase64);
 
-  // Record hash regardless of outcome (prevents reuse on retries)
-  await recordPhotoHash(siteId, step, hash).catch(() => undefined);
+  // Record hash regardless of outcome (prevents reuse on retries). A failure
+  // here silently disables duplicate detection for this site, so surface it.
+  await recordPhotoHash(siteId, stepNumber, hash).catch((err: unknown) => {
+    log.error('Failed to record photo hash — duplicate detection degraded', { error: String(err) }, MODULE);
+  });
 
   return apiResponse.success(res, {
     pass: result.pass,
     reasons: result.reasons,
     corrections: result.corrections,
-    stepLabel: STEP_CRITERIA[step].label,
+    needsManualReview: result.needsManualReview,
+    stepLabel,
     attemptNumber,
     maxAttempts: MAX_ATTEMPTS,
   });

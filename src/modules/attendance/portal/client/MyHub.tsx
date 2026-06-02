@@ -136,7 +136,9 @@ export function MyHub({ profile }: MyHubProps) {
         {isStoresAuthorised(profile.role, profile.authRole) && (
           <StoresTile onClick={() => router.push('/my/stores')} />
         )}
-        {canSeeSiteCam(profile.role, profile.authRole) && <SiteCamTile />}
+        {canSeeSiteCam(profile.role, profile.authRole) && (
+          <SiteCamTile onClick={() => router.push('/my/sitecam')} />
+        )}
       </div>
 
       <button

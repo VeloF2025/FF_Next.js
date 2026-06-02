@@ -21,9 +21,6 @@ import type { HubSummaryResponse } from './api';
 
 type HubSummary = HubSummaryResponse;
 
-/** SiteCam PWA — installation photo capture (separate field.fibreflow.app app). */
-const SITECAM_URL = 'https://field.fibreflow.app';
-
 export function ClockTile({ summary, onClick }: { summary: HubSummary | null; onClick: () => void }) {
   const open = summary?.openEntry;
   const sinceLabel = open ? formatTimeSAST(open.clockInAt) : null;
@@ -202,10 +199,10 @@ export function StoresTile({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function SiteCamTile() {
+export function SiteCamTile({ onClick }: { onClick: () => void }) {
   return (
     <Tile
-      onClick={() => window.location.assign(SITECAM_URL)}
+      onClick={onClick}
       icon={<Camera className="w-5 h-5" />}
       iconClass="bg-sky-500/15 text-sky-300"
       title="SiteCam"

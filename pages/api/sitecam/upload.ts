@@ -11,6 +11,7 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 
 const MODULE = 'PwaUpload';
 const VF_STORAGE_URL = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091';
@@ -29,10 +30,12 @@ interface PhotoRecord {
   stepLabel: string;
   filename: string;
   base64: string;
+  /** Photo auto-passed because the VLM was unavailable — flag for manual QA. */
+  needsManualReview?: boolean;
 }
 
 interface UploadBody {
-  jobType: 'activations' | 'civils';
+  jobType: SiteCamJobType;
   siteId: string;
   photos: PhotoRecord[];
 }
@@ -71,26 +74,43 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     }
   }
 
+  // If EVERY upload failed, do not record a zero-photo submission and report
+  // success — that would silently lose the technician's work. Fail loudly so
+  // the wizard surfaces the error and the photos can be retried.
+  if (Object.keys(uploadedUrls).length === 0) {
+    log.error('All photo uploads failed — aborting submission', { siteId, photoCount: photos.length }, MODULE);
+    return apiResponse.internalError(res, new Error('All photo uploads failed — nothing was saved'));
+  }
+
+  // Steps that auto-passed only because the VLM was unavailable — recorded so
+  // QA can manually review them. null (not []) when nothing needs review.
+  const flaggedSteps = photos
+    .filter((p) => p.needsManualReview && uploadedUrls[p.stepNumber] !== undefined)
+    .map((p) => p.stepNumber);
+  const vlmUnavailableSteps = flaggedSteps.length > 0 ? JSON.stringify(flaggedSteps) : null;
+
   if (jobType === 'activations') {
     const drNum = siteId.replace(/^DR-/i, '');
     await pool.query(
       `UPDATE dr_photo_unified_reviews
-       SET pwa_submission_at = NOW(),
-           pwa_tech_id       = $1,
-           pwa_photo_count   = $2,
-           pwa_completed_at  = NOW(),
-           pwa_photo_urls    = $3
-       WHERE drop_number = $4`,
-      [techId, Object.keys(uploadedUrls).length, JSON.stringify(uploadedUrls), drNum]
+       SET pwa_submission_at        = NOW(),
+           pwa_tech_id              = $1,
+           pwa_photo_count          = $2,
+           pwa_completed_at         = NOW(),
+           pwa_photo_urls           = $3,
+           pwa_vlm_unavailable_steps = $4
+       WHERE drop_number = $5`,
+      [techId, Object.keys(uploadedUrls).length, JSON.stringify(uploadedUrls), vlmUnavailableSteps, drNum]
     );
   } else {
     await pool.query(
       `UPDATE pole_install_sessions
-       SET pwa_submission_at = NOW(),
-           pwa_tech_id       = $1,
-           pwa_completed_at  = NOW()
-       WHERE pole_number = $2`,
-      [techId, siteId]
+       SET pwa_submission_at        = NOW(),
+           pwa_tech_id              = $1,
+           pwa_completed_at         = NOW(),
+           pwa_vlm_unavailable_steps = $2
+       WHERE pole_number = $3`,
+      [techId, vlmUnavailableSteps, siteId]
     );
   }
 
