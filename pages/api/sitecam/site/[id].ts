@@ -11,6 +11,27 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 
+/**
+ * Candidate drop_number values to match a normalized DR input against.
+ * `drops.drop_number` is stored DR-prefixed for ~99.8% of rows (e.g. "DR1854086")
+ * but bare-numeric for a few (e.g. "50"), so match both the prefixed and the
+ * bare digits rather than assuming one format.
+ */
+export function dropNumberCandidates(normalized: string): string[] {
+  const digits = normalized.replace(/^DR-?/, '');
+  return [`DR${digits}`, digits];
+}
+
+/**
+ * Canonical DR site id: always DR-prefixed. A few drops rows are stored
+ * bare-numeric ("50"), but the downstream submission table
+ * (dr_photo_unified_reviews) is 100% DR-prefixed, so the id sent to
+ * validate/upload must be prefixed for the submission record to match.
+ */
+export function toDrSiteId(dropNumber: string): string {
+  return /^\d+$/.test(dropNumber) ? `DR${dropNumber}` : dropNumber;
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
@@ -19,9 +40,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const normalized = id.trim().toUpperCase();
 
-  // DR lookup — accepts "DR-123456" or bare "123456"
+  // DR lookup — accepts "DR-123456", "DR123456" or bare "123456"
   if (/^(DR-?)?\d+$/.test(normalized)) {
-    const drNum = normalized.replace(/^DR-?/, '');
     const { rows } = await pool.query<{
       drop_number: string;
       customer_name: string | null;
@@ -34,15 +54,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
               p.project_name
        FROM drops d
        LEFT JOIN projects p ON p.id = d.project_id
-       WHERE d.drop_number = $1
+       WHERE d.drop_number = ANY($1)
        LIMIT 1`,
-      [drNum]
+      [dropNumberCandidates(normalized)]
     );
     if (!rows[0]) return apiResponse.notFound(res, 'DR', normalized);
     const r = rows[0];
     return apiResponse.success(res, {
       jobType: 'activations',
-      siteId: `DR-${r.drop_number}`,
+      // Canonical DR-prefixed id so it round-trips through the wizard /
+      // validate / upload (which match the DR-prefixed dr_photo_unified_reviews).
+      siteId: toDrSiteId(r.drop_number),
       customerName: r.customer_name ?? null,
       address: r.address ?? null,
       projectName: r.project_name ?? null,
