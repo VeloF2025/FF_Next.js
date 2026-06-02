@@ -169,6 +169,11 @@ export function computeGrandTotal(
     };
   }
 
+  // Prefer zone rows: in the per-pon variant they are built only from the
+  // "<N> Total" rollup lines (each the sum of that zone's PONs), so summing
+  // them equals summing every PON row — and avoids double-counting if both
+  // arrays are populated. PON rows are the fallback for PDFs (e.g. Tembisa's
+  // Drop/Spare split) where no zone rollup lines exist.
   const src = zones.length > 0 ? zones : pons;
   if (src.length > 0) {
     const plannedDrops = src.reduce((sum, r) => sum + r.plannedDrops, 0);

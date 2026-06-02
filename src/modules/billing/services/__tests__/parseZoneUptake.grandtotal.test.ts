@@ -49,6 +49,18 @@ describe('computeGrandTotal', () => {
     expect(warning).toMatch(/derived from 3 parsed rows/);
   });
 
+  it('prefers zone rollups over PON rows when both are present (no double-count)', () => {
+    // Per-pon variant: zone rows are "<N> Total" rollups = sum of that zone's
+    // PONs. Summing zones must equal summing pons; the function must pick one
+    // (zones) and not add both.
+    const zones = [zone(1, 231, 143), zone(2, 120, 0)];
+    const pons = [pon(1, 1, 119, 69), pon(1, 2, 112, 74), pon(2, 17, 120, 0)];
+    const { grandTotal, warning } = computeGrandTotal(undefined, zones, pons);
+    expect(grandTotal.installed).toBe(143); // zone sum, not 143+143
+    expect(grandTotal.plannedDrops).toBe(351);
+    expect(warning).toMatch(/derived from 2 parsed rows/); // 2 = zone rows used
+  });
+
   it('falls back to PON rows when there are no zone rollups (per-pon variant)', () => {
     const pons = [pon(1, 1, 119, 69), pon(1, 2, 112, 74), pon(2, 17, 120, 0)];
     const { grandTotal, warning } = computeGrandTotal(undefined, [], pons);
