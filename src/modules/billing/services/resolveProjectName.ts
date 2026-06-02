@@ -163,6 +163,8 @@ export async function fetchBillableProjects(): Promise<BillableProject[]> {
  *   1. Exact normalized token-set match
  *   2. Token-subset match (input tokens are a subset of candidate tokens)
  *   3. Fuzzy token-subset match (per-token edit distance ≤ 2, digits exact)
+ *   4. POP-suffix fallback: retry with a trailing "POP<digits>" stripped
+ *      (see the fallback note inside this function)
  */
 export function resolveProjectNameAgainst(
   rawInput: string,
@@ -173,6 +175,38 @@ export function resolveProjectNameAgainst(
     return { matched: false, project: null, candidates: [], rawInput };
   }
 
+  const direct = resolveTokenSets(trimmed, billable);
+  if (direct.matched) return direct;
+
+  // Fallback: some FT reports suffix a SINGLE-project site with a POP code
+  // that isn't part of the FibreFlow project name — e.g. the report says
+  // "Etwatwa POP02" / "ETW POP02" but the project is just "Etwatwa". The
+  // orphan "pop"/"2" tokens make the direct pass miss. Retry once with a
+  // trailing "POP<digits>" stripped, but ONLY accept the retry when it
+  // resolves UNIQUELY — so genuinely multi-POP sites like
+  // "Thembisa POP 1/2/3" never collapse onto the wrong project (stripping
+  // POP there leaves an ambiguous "Thembisa", which is rejected).
+  const stripped = trimmed.replace(/\s*pop\s*0*\d+\s*$/i, '').trim();
+  if (stripped && stripped.toLowerCase() !== trimmed.toLowerCase()) {
+    const retry = resolveTokenSets(stripped, billable);
+    if (retry.matched) {
+      return { ...retry, rawInput };
+    }
+  }
+
+  return direct;
+}
+
+/**
+ * Core token-set resolution (exact → subset → fuzzy). Returns a unique match,
+ * or the candidate list when ambiguous/unmatched. Wrapped by
+ * {@link resolveProjectNameAgainst}, which adds the POP-suffix fallback.
+ */
+function resolveTokenSets(
+  rawInput: string,
+  billable: BillableProject[],
+): ProjectResolution {
+  const trimmed = rawInput.trim();
   const inputTokens = normalizeTokens(trimmed);
 
   const exactMatches = billable.filter(p => tokensEqual(normalizeTokens(p.name), inputTokens));
