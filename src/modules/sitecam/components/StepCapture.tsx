@@ -29,11 +29,21 @@ export function StepCapture({ step, onCapture }: Props) {
         Step {step.stepNumber}: {step.label}
       </h2>
 
-      {/* Status: validating */}
-      {step.status === 'validating' && (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-neutral-700 bg-neutral-900 py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-sky-400" />
-          <p className="text-sm text-neutral-400">Checking photo…</p>
+      {/* Captured photo preview — lets the technician see the shot they took
+          while it is being checked and alongside the pass/fail result. */}
+      {step.photoBase64 && (
+        <div className="relative overflow-hidden rounded-xl border border-neutral-700 bg-black">
+          <img
+            src={`data:image/jpeg;base64,${step.photoBase64}`}
+            alt={`Captured photo for step ${step.stepNumber}: ${step.label}`}
+            className="mx-auto max-h-72 w-full object-contain"
+          />
+          {step.status === 'validating' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60">
+              <Loader2 className="h-8 w-8 animate-spin text-sky-400" />
+              <p className="text-sm font-medium text-neutral-200">Checking photo…</p>
+            </div>
+          )}
         </div>
       )}
 
