@@ -12,11 +12,27 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
+import type { GeofencePayload } from '@/modules/sitecam/lib/geofence';
 
 const MODULE = 'PwaUpload';
 const VF_STORAGE_URL = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091';
 // 12 activation steps + tolerance — guards against an oversized upload payload.
 const MAX_PHOTOS = 20;
+
+/**
+ * Flatten a geofence payload into the ordered column values for the UPDATE.
+ * Order: status, distance_m, device_lat, device_lon, planned_lat, planned_lon,
+ *        accuracy_m, submit_lat, submit_lon. All-null when no payload.
+ */
+export function geofenceColumns(
+  g: GeofencePayload | null | undefined,
+): Array<string | number | null> {
+  if (!g) return [null, null, null, null, null, null, null, null, null];
+  return [
+    g.status, g.distanceM, g.deviceLat, g.deviceLon,
+    g.plannedLat, g.plannedLon, g.accuracyM, g.submitLat, g.submitLon,
+  ];
+}
 
 /** Strip any path components / unsafe chars from a client-supplied filename. */
 function safeFilename(name: unknown): string {
@@ -38,6 +54,7 @@ interface UploadBody {
   jobType: SiteCamJobType;
   siteId: string;
   photos: PhotoRecord[];
+  geofence?: GeofencePayload | null;
 }
 
 async function uploadToVfStorage(filename: string, base64: string): Promise<string> {
@@ -54,7 +71,7 @@ async function uploadToVfStorage(filename: string, base64: string): Promise<stri
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
 
-  const { jobType, siteId, photos } = (req.body ?? {}) as Partial<UploadBody>;
+  const { jobType, siteId, photos, geofence } = (req.body ?? {}) as Partial<UploadBody>;
   if (!jobType || !siteId || !Array.isArray(photos) || photos.length === 0) {
     return apiResponse.badRequest(res, 'jobType, siteId, and photos (non-empty array) required');
   }
@@ -89,6 +106,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     .map((p) => p.stepNumber);
   const vlmUnavailableSteps = flaggedSteps.length > 0 ? JSON.stringify(flaggedSteps) : null;
 
+  const gf = geofenceColumns(geofence);
+
   if (jobType === 'activations') {
     const drNum = siteId.replace(/^DR-/i, '');
     await pool.query(
@@ -98,9 +117,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
            pwa_photo_count          = $2,
            pwa_completed_at         = NOW(),
            pwa_photo_urls           = $3,
-           pwa_vlm_unavailable_steps = $4
+           pwa_vlm_unavailable_steps = $4,
+           geofence_status          = $6,
+           geofence_distance_m      = $7,
+           device_lat               = $8,
+           device_lon               = $9,
+           planned_lat              = $10,
+           planned_lon              = $11,
+           gps_accuracy_m           = $12,
+           submit_lat               = $13,
+           submit_lon               = $14
        WHERE drop_number = $5`,
-      [techId, Object.keys(uploadedUrls).length, JSON.stringify(uploadedUrls), vlmUnavailableSteps, drNum]
+      [techId, Object.keys(uploadedUrls).length, JSON.stringify(uploadedUrls), vlmUnavailableSteps, drNum, ...gf]
     );
   } else {
     await pool.query(
@@ -108,9 +136,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
        SET pwa_submission_at        = NOW(),
            pwa_tech_id              = $1,
            pwa_completed_at         = NOW(),
-           pwa_vlm_unavailable_steps = $2
+           pwa_vlm_unavailable_steps = $2,
+           geofence_status          = $4,
+           geofence_distance_m      = $5,
+           device_lat               = $6,
+           device_lon               = $7,
+           planned_lat              = $8,
+           planned_lon              = $9,
+           gps_accuracy_m           = $10,
+           submit_lat               = $11,
+           submit_lon               = $12
        WHERE pole_number = $3`,
-      [techId, vlmUnavailableSteps, siteId]
+      [techId, vlmUnavailableSteps, siteId, ...gf]
     );
   }
 

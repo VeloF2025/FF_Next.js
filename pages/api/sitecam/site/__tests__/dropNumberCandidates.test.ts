@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dropNumberCandidates, toDrSiteId } from '../[id]';
+import { dropNumberCandidates, toDrSiteId, toSiteGeo } from '../[id]';
 
 describe('dropNumberCandidates', () => {
   it('matches DR-prefixed drops (the ~99.8% case) from a prefixed input', () => {
@@ -28,5 +28,22 @@ describe('toDrSiteId', () => {
 
   it('prefixes a bare-numeric drop so it matches the DR-prefixed review table', () => {
     expect(toDrSiteId('50')).toBe('DR50');
+  });
+});
+
+describe('toSiteGeo', () => {
+  it('coerces numeric strings (pg numeric) to numbers', () => {
+    expect(toSiteGeo({ latitude: '-26.12345', longitude: '27.56789', pon_no: 12, zone_no: 4 }))
+      .toEqual({ plannedLat: -26.12345, plannedLon: 27.56789, pon: 12, zone: 4 });
+  });
+
+  it('maps nulls through as null', () => {
+    expect(toSiteGeo({ latitude: null, longitude: null, pon_no: null, zone_no: null }))
+      .toEqual({ plannedLat: null, plannedLon: null, pon: null, zone: null });
+  });
+
+  it('treats NaN / undefined as null', () => {
+    expect(toSiteGeo({ latitude: 'x', longitude: undefined, pon_no: undefined, zone_no: 'y' }))
+      .toEqual({ plannedLat: null, plannedLon: null, pon: null, zone: null });
   });
 });

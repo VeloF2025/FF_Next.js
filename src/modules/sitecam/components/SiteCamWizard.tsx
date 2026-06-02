@@ -3,12 +3,14 @@ import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell'
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { useSiteCamCapture, type SiteInfo } from '../hooks/useSiteCamCapture';
 import { getStepsForJobType } from '../lib/sitecamSteps';
+import type { GeofenceReading } from '../lib/geofence';
 import { StepCapture } from './StepCapture';
 import { SiteCamSuccess } from './SiteCamSuccess';
 
 interface Props {
   profile: AttendanceProfile;
   siteInfo: SiteInfo;
+  entryGeofence?: GeofenceReading | null;
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -19,7 +21,7 @@ const STATUS_DOT: Record<string, string> = {
   pending: 'bg-neutral-600',
 };
 
-export function SiteCamWizard({ profile, siteInfo }: Props) {
+export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props) {
   const steps = getStepsForJobType(siteInfo.jobType);
   const {
     stepStates,
@@ -30,7 +32,7 @@ export function SiteCamWizard({ profile, siteInfo }: Props) {
     uploading,
     uploadError,
     uploadResult,
-  } = useSiteCamCapture(steps, siteInfo);
+  } = useSiteCamCapture(steps, siteInfo, entryGeofence);
 
   const total = stepStates.length;
   const doneCount = stepStates.filter(

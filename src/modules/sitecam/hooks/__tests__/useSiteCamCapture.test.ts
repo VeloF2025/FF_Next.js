@@ -15,6 +15,7 @@ vi.mock('@/lib/logger', () => ({
 
 import { useSiteCamCapture, type SiteInfo } from '../useSiteCamCapture';
 import type { SiteCamStep } from '../../lib/sitecamSteps';
+import { buildReading } from '../../lib/geofence';
 
 class MockFileReader {
   result: string | null = null;
@@ -34,6 +35,10 @@ const SITE_INFO: SiteInfo = {
   customerName: null,
   address: null,
   projectName: null,
+  plannedLat: null,
+  plannedLon: null,
+  pon: null,
+  zone: null,
 };
 
 function file(): File {
@@ -167,5 +172,44 @@ describe('useSiteCamCapture', () => {
 
     expect(result.current.stepStates[0].status).toBe('pass');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useSiteCamCapture geofence payload', () => {
+  it('includes the entry reading + submit-time stamp in the upload body', async () => {
+    vi.stubGlobal('navigator', {
+      geolocation: {
+        getCurrentPosition: (ok: PositionCallback) =>
+          ok({ coords: { latitude: -26.2, longitude: 27.6, accuracy: 9 } } as GeolocationPosition),
+      },
+    });
+
+    let uploadBody: Record<string, unknown> = {};
+    fetchMock.mockImplementation((url: string, opts: { body: string }) => {
+      if (url === '/api/sitecam/validate') {
+        return jsonOk({ data: { pass: true, reasons: [], corrections: [], maxAttempts: 3 } });
+      }
+      if (url === '/api/sitecam/upload') {
+        uploadBody = JSON.parse(opts.body);
+        return jsonOk({ data: { uploadedCount: 1 } });
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const entryReading = buildReading({
+      plannedLat: -26.1, plannedLon: 27.5, deviceLat: -26.101, deviceLon: 27.5, accuracyM: 5,
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO, entryReading));
+    await act(async () => { await result.current.captureAndValidate(file()); });
+    await act(async () => { await vi.runAllTimersAsync(); });
+    await act(async () => { await result.current.submitAll(); });
+
+    expect(uploadBody.geofence).toMatchObject({
+      status: 'out_of_range',
+      deviceLat: -26.101,
+      submitLat: -26.2,
+      submitLon: 27.6,
+    });
   });
 });

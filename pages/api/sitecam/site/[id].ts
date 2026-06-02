@@ -32,6 +32,35 @@ export function toDrSiteId(dropNumber: string): string {
   return /^\d+$/.test(dropNumber) ? `DR${dropNumber}` : dropNumber;
 }
 
+/** Coerce a possibly-string/null numeric DB value to number|null (NaN → null). */
+function num(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+export interface SiteGeo {
+  plannedLat: number | null;
+  plannedLon: number | null;
+  pon: number | null;
+  zone: number | null;
+}
+
+/** Map a drops/poles row's geo columns into the SiteInfo geo fields. */
+export function toSiteGeo(row: {
+  latitude?: unknown;
+  longitude?: unknown;
+  pon_no?: unknown;
+  zone_no?: unknown;
+}): SiteGeo {
+  return {
+    plannedLat: num(row.latitude),
+    plannedLon: num(row.longitude),
+    pon: num(row.pon_no),
+    zone: num(row.zone_no),
+  };
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
@@ -47,10 +76,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       customer_name: string | null;
       address: string | null;
       project_name: string | null;
+      latitude: string | null;
+      longitude: string | null;
+      pon_no: number | null;
+      zone_no: number | null;
     }>(
       `SELECT d.drop_number,
               d.customer_name,
               d.address,
+              d.latitude,
+              d.longitude,
+              d.pon_no,
+              d.zone_no,
               p.project_name
        FROM drops d
        LEFT JOIN projects p ON p.id = d.project_id
@@ -68,6 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       customerName: r.customer_name ?? null,
       address: r.address ?? null,
       projectName: r.project_name ?? null,
+      ...toSiteGeo(r),
     });
   }
 
@@ -75,8 +113,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const { rows } = await pool.query<{
     pole_number: string;
     project_name: string | null;
+    latitude: string | null;
+    longitude: string | null;
+    pon_no: number | null;
+    zone_no: number | null;
   }>(
     `SELECT po.pole_number,
+            po.latitude,
+            po.longitude,
+            po.pon_no,
+            po.zone_no,
             p.project_name
      FROM poles po
      LEFT JOIN projects p ON p.id = po.project_id
@@ -92,6 +138,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     customerName: null,
     address: null,
     projectName: r.project_name ?? null,
+    ...toSiteGeo(r),
   });
 }
 

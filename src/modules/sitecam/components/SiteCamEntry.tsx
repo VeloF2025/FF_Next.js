@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { useRouter } from 'next/router';
-import { MapPin } from 'lucide-react';
+import { MapPin, AlertTriangle } from 'lucide-react';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { log } from '@/lib/logger';
 import type { SiteInfo } from '../hooks/useSiteCamCapture';
+import { useStartCaptureGeofence } from '../hooks/useStartCaptureGeofence';
+import { SiteMetaGrid } from './SiteMetaGrid';
 
 const MODULE = 'SiteCamEntry';
 
@@ -14,7 +15,6 @@ interface Props {
 }
 
 export function SiteCamEntry({ profile }: Props) {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,27 +24,19 @@ export function SiteCamEntry({ profile }: Props) {
   const handleFind = async () => {
     const trimmed = query.trim();
     if (!trimmed) return;
-
     setLoading(true);
     setError(null);
     setSiteInfo(null);
-
     try {
       const res = await fetch(`/api/sitecam/site/${encodeURIComponent(trimmed)}`, {
         credentials: 'include',
       });
-
-      if (res.status === 404) {
-        setError('No site found for that DR / pole number.');
-        return;
-      }
-
+      if (res.status === 404) { setError('No site found for that DR / pole number.'); return; }
       if (!res.ok) {
         setError('Something went wrong. Please try again.');
         log.error('Site lookup failed', { status: res.status }, MODULE);
         return;
       }
-
       const json = (await res.json()) as { data: SiteInfo };
       setSiteInfo(json.data);
     } catch (err) {
@@ -55,13 +47,15 @@ export function SiteCamEntry({ profile }: Props) {
     }
   };
 
+  const { checking, pendingWarning, beginCapture, confirmContinue, dismiss } =
+    useStartCaptureGeofence({
+      siteId: siteInfo?.siteId ?? '',
+      plannedLat: siteInfo?.plannedLat ?? null,
+      plannedLon: siteInfo?.plannedLon ?? null,
+    });
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') void handleFind();
-  };
-
-  const handleStart = () => {
-    if (!siteInfo) return;
-    void router.push('/my/sitecam/' + encodeURIComponent(siteInfo.siteId));
   };
 
   return (
@@ -79,7 +73,6 @@ export function SiteCamEntry({ profile }: Props) {
           </p>
         </div>
 
-        {/* Search input */}
         <div className="space-y-2">
           <label htmlFor="site-query" className="text-sm font-medium text-neutral-300">
             DR / Pole Number
@@ -110,14 +103,12 @@ export function SiteCamEntry({ profile }: Props) {
           </div>
         </div>
 
-        {/* Error state */}
         {error && (
           <div className="rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-sm text-red-300">
             {error}
           </div>
         )}
 
-        {/* Site confirmation card */}
         {siteInfo && (
           <div className="rounded-xl border border-neutral-700 bg-neutral-900 overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-800">
@@ -137,9 +128,7 @@ export function SiteCamEntry({ profile }: Props) {
 
             <div className="px-4 py-3 space-y-2">
               {siteInfo.customerName && (
-                <div className="text-sm font-medium text-neutral-100">
-                  {siteInfo.customerName}
-                </div>
+                <div className="text-sm font-medium text-neutral-100">{siteInfo.customerName}</div>
               )}
               {siteInfo.address && (
                 <div className="flex items-start gap-2 text-sm text-neutral-400">
@@ -147,19 +136,56 @@ export function SiteCamEntry({ profile }: Props) {
                   <span>{siteInfo.address}</span>
                 </div>
               )}
+              <SiteMetaGrid
+                pon={siteInfo.pon}
+                zone={siteInfo.zone}
+                plannedLat={siteInfo.plannedLat}
+                plannedLon={siteInfo.plannedLon}
+              />
               {siteInfo.projectName && (
                 <div className="text-xs text-neutral-500">{siteInfo.projectName}</div>
               )}
             </div>
 
-            <div className="px-4 pb-4">
-              <button
-                type="button"
-                onClick={handleStart}
-                className="w-full rounded-lg bg-sky-600 py-3 text-sm font-semibold text-white hover:bg-sky-500 active:bg-sky-700"
-              >
-                Start Capture
-              </button>
+            <div className="px-4 pb-4 space-y-3">
+              {pendingWarning && (
+                <div className="rounded-lg border border-amber-800 bg-amber-950/50 px-3 py-3 text-sm text-amber-200">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      {pendingWarning.status === 'out_of_range'
+                        ? `You appear to be about ${Math.round(pendingWarning.distanceM ?? 0)} m from the planned location. You can continue — this visit will be flagged for QA review.`
+                        : `Location access is off, so your visit can't be GPS-verified. You can continue — this visit will be flagged for QA review.`}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={confirmContinue}
+                      className="flex-1 rounded-lg bg-amber-600 py-2 text-sm font-semibold text-white hover:bg-amber-500"
+                    >
+                      Continue anyway
+                    </button>
+                    <button
+                      type="button"
+                      onClick={dismiss}
+                      className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!pendingWarning && (
+                <button
+                  type="button"
+                  onClick={() => void beginCapture()}
+                  disabled={checking}
+                  className="w-full rounded-lg bg-sky-600 py-3 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50 active:bg-sky-700"
+                >
+                  {checking ? 'Checking location…' : 'Start Capture'}
+                </button>
+              )}
             </div>
           </div>
         )}

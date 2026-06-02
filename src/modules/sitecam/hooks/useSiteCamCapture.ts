@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { log } from '@/lib/logger';
 import type { SiteCamStep, SiteCamJobType } from '../lib/sitecamSteps';
+import { readDeviceLocation, type GeofenceReading, type GeofencePayload } from '../lib/geofence';
+import { readFileAsBase64 } from '../lib/fileToBase64';
 
 const MODULE = 'useSiteCamCapture';
 
@@ -29,6 +31,10 @@ export interface SiteInfo {
   customerName: string | null;
   address: string | null;
   projectName: string | null;
+  plannedLat: number | null;
+  plannedLon: number | null;
+  pon: number | null;
+  zone: number | null;
 }
 
 function initStepStates(steps: readonly SiteCamStep[]): StepState[] {
@@ -45,21 +51,11 @@ function initStepStates(steps: readonly SiteCamStep[]): StepState[] {
   }));
 }
 
-function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Strip the data:...;base64, prefix, keep only raw base64
-      const base64 = result.split(',')[1] ?? result;
-      resolve(base64);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-export function useSiteCamCapture(steps: readonly SiteCamStep[], siteInfo: SiteInfo) {
+export function useSiteCamCapture(
+  steps: readonly SiteCamStep[],
+  siteInfo: SiteInfo,
+  entryGeofence: GeofenceReading | null = null,
+) {
   const [stepStates, setStepStates] = useState<StepState[]>(() => initStepStates(steps));
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -226,6 +222,16 @@ export function useSiteCamCapture(steps: readonly SiteCamStep[], siteInfo: SiteI
         needsManualReview: s.needsManualReview,
       }));
 
+    let geofence: GeofencePayload | null = null;
+    if (entryGeofence) {
+      const submitPos = await readDeviceLocation(10_000);
+      geofence = {
+        ...entryGeofence,
+        submitLat: submitPos?.lat ?? null,
+        submitLon: submitPos?.lon ?? null,
+      };
+    }
+
     setUploading(true);
     setUploadError(null);
     setUploadResult(null);
@@ -239,6 +245,7 @@ export function useSiteCamCapture(steps: readonly SiteCamStep[], siteInfo: SiteI
           jobType: siteInfo.jobType,
           siteId: siteInfo.siteId,
           photos,
+          geofence,
         }),
       });
 
@@ -259,7 +266,7 @@ export function useSiteCamCapture(steps: readonly SiteCamStep[], siteInfo: SiteI
     } finally {
       setUploading(false);
     }
-  }, [stepStates, siteInfo]);
+  }, [stepStates, siteInfo, entryGeofence]);
 
   const currentStep: StepState | null = stepStates[currentStepIndex] ?? null;
 

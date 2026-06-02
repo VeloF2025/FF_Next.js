@@ -21,6 +21,7 @@ import { getSession } from '@/modules/attendance/portal/client/api';
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { isSiteCamAuthorised } from '@/modules/sitecam/lib/sitecamAuth';
 import type { SiteInfo } from '@/modules/sitecam/hooks/useSiteCamCapture';
+import { decodeGeofenceParam } from '@/modules/sitecam/lib/geofence';
 
 // =============================================================================
 // Page
@@ -183,7 +184,8 @@ const SiteCamWizardPage: NextPage & {
     );
   }
 
-  return <SiteCamWizard profile={profile!} siteInfo={siteInfo} />;
+  const entryGeofence = decodeGeofenceParam(router.query.gf);
+  return <SiteCamWizard profile={profile!} siteInfo={siteInfo} entryGeofence={entryGeofence} />;
 };
 
 SiteCamWizardPage.getLayout = (page: ReactElement) => page;
