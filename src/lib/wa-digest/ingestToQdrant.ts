@@ -2,7 +2,9 @@
  * Qdrant Ingestion for WA Daily Digests
  *
  * Reads a markdown digest file, chunks it into sections, generates
- * OpenAI embeddings, and upserts to the Qdrant fibreflow_kb collection.
+ * embeddings via the local Ollama-compatible endpoint (nomic-embed-text,
+ * 768-dim — same vector space as the chat read side), and upserts to the
+ * Qdrant fibreflow_kb collection.
  *
  * @module lib/wa-digest/ingestToQdrant
  */
@@ -15,14 +17,15 @@ const logger = createLogger('wa-digest-qdrant');
 
 const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
 const QDRANT_COLLECTION = 'fibreflow_kb';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const EMBEDDING_MODEL = 'text-embedding-3-small';
-const EMBEDDING_DIMS = 1536;
+// Local Ollama-compatible embedder (nomic-embed-text, 768-dim). Matches the
+// read side (pages/api/chat/send.ts) so writes and queries share one vector
+// space, and removes the OpenAI dependency from WA-digest ingestion.
+// EMBED_URL is read per-call inside generateEmbeddings (must not include a
+// trailing /v1 — the fetch path appends /v1/embeddings directly).
+const EMBED_MODEL = 'nomic-embed-text';
+const EMBEDDING_DIMS = 768;
 const CHUNK_MAX_CHARS = 500;
-const BATCH_SIZE = 50; // OpenAI embeddings batch limit
-const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com';
-// Note: captured at module load. Tests overriding OPENAI_BASE_URL must use vi.resetModules().
-// Value must not include a trailing /v1 — the fetch path appends /v1/embeddings directly.
+const BATCH_SIZE = 50;
 
 export interface IngestOptions {
   filePath: string;
@@ -60,11 +63,6 @@ interface QdrantPoint {
  */
 export async function ingestToQdrant(options: IngestOptions): Promise<IngestResult> {
   const { filePath, project, groupType, date, messageCount, photoCount } = options;
-
-  if (!OPENAI_API_KEY) {
-    logger.warn('OPENAI_API_KEY not set — skipping Qdrant ingestion', { filePath });
-    return { chunksIngested: 0 };
-  }
 
   if (!fs.existsSync(filePath)) {
     logger.warn('Digest file not found — skipping ingestion', { filePath });
@@ -166,25 +164,28 @@ function extractSectionTitle(chunk: string): string {
 }
 
 /**
- * Generates embeddings for a batch of texts via OpenAI text-embedding-3-small.
+ * Generates embeddings for a batch of texts via the local Ollama-compatible
+ * endpoint (nomic-embed-text, 768-dim). Same vector space the read side uses,
+ * so WA-digest writes are searchable by the chat RAG. No OpenAI dependency.
  */
 async function generateEmbeddings(texts: string[]): Promise<number[][]> {
-  const response = await fetch(`${OPENAI_BASE_URL}/v1/embeddings`, {
+  // Read EMBED_URL per-call (not at module load) so config changes and tests
+  // take effect without a module reset.
+  const embedUrl = process.env.EMBED_URL || 'http://localhost:11435';
+  const response = await fetch(`${embedUrl}/v1/embeddings`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENAI_API_KEY ?? ''}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
+    // nomic-embed-text (Ollama) has no `dimensions` override — output is fixed
+    // at 768 — so, unlike OpenAI's API, we deliberately omit that field.
     body: JSON.stringify({
-      model: EMBEDDING_MODEL,
+      model: EMBED_MODEL,
       input: texts,
-      dimensions: EMBEDDING_DIMS,
     }),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI embeddings API error ${response.status}: ${errorText}`);
+    const errorText = await response.text().catch(() => '<unreadable>');
+    throw new Error(`Local embeddings API error ${response.status}: ${errorText}`);
   }
 
   const result = (await response.json()) as {
@@ -193,7 +194,21 @@ async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 
   // Sort by index to preserve order
   const sorted = result.data.sort((a, b) => a.index - b.index);
-  return sorted.map((d) => d.embedding);
+  const vectors = sorted.map((d) => d.embedding);
+
+  // Guard: a dimension mismatch silently corrupts the collection (Qdrant rejects
+  // the upsert, or — worse — the vectors become unsearchable against queries).
+  // Check EVERY vector, not just the first — a malformed/truncated batch can
+  // return inconsistent sizes. This is exactly the bug this change fixes
+  // (1536-dim writes into a 768-dim collection).
+  const bad = vectors.find((v) => v.length !== EMBEDDING_DIMS);
+  if (bad) {
+    throw new Error(
+      `Embedder returned ${bad.length}-dim vectors, expected ${EMBEDDING_DIMS} (model ${EMBED_MODEL})`,
+    );
+  }
+
+  return vectors;
 }
 
 /**
