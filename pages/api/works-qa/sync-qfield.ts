@@ -60,8 +60,20 @@ function resolveSlotKey(checklist_step: number | null, work_type: string | null)
   return slotKey;
 }
 
+// Optical/dome validations are keyed by the dome/splice label, not the pole label
+// (e.g. "MAM.STS.16.DIS.DM.P.A352-C2P11.L5" belongs to pole "MAM.P.A352"). Map the
+// dome label back to its pole so the optical photos attach to the right pole row.
+// Returns null when the label isn't a recognised dome label.
+const DOME_LABEL_RE = /^(\w+)\.STS\..*?\.DM\.P\.([A-Za-z0-9]+)/i;
+function domeLabelToPole(label: string | null): string | null {
+  if (!label) return null;
+  const m = DOME_LABEL_RE.exec(label);
+  return m ? `${m[1]}.P.${m[2]}` : null;
+}
+
 interface QFieldRow {
   feature_id: string | null;
+  feature_type: string | null;
   photo_key: string;
   checklist_step: number | null;
   work_type: string | null;
@@ -94,12 +106,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Drill Survey). Without the translation those projects' photos are invisible
     // to this sync — see migration 376 which links them safely now.
     const qResult = await pool.query<QFieldRow>(`
-      SELECT q.feature_id, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback
+      SELECT q.feature_id, q.feature_type, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback
       FROM qfield_photo_validations q
       INNER JOIN qfield_projects qp ON qp.qfield_project_id = q.project_id::text
       INNER JOIN qfield_project_links l ON l.qfield_project_id = qp.id
       WHERE l.fibreflow_project_id = $1::uuid
-        AND q.feature_type = 'pole'
+        -- 'pole' = civil photos (keyed by pole label); 'joint' = optical/dome photos
+        -- (keyed by dome label, mapped back to the pole below). Without 'joint' the
+        -- optical Dome/Main-Joint slots never sync — every pole's optical photos were
+        -- invisible on works-qa until this was added.
+        AND q.feature_type IN ('pole', 'joint')
         ${poleFilter ? poleFilter.replace('feature_id', 'q.feature_id') : ''}
     `, params);
 
@@ -155,7 +171,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     for (const row of qResult.rows) {
-      const poleLabel = row.feature_id;
+      // Civil rows are keyed by the pole label directly; optical/dome ('joint')
+      // rows are keyed by the dome label and must be mapped back to the pole.
+      const poleLabel = row.feature_type === 'joint'
+        ? domeLabelToPole(row.feature_id)
+        : row.feature_id;
       if (!poleLabel) { skipped++; continue; }
 
       const slotKey = resolveSlotKey(row.checklist_step, row.work_type);
