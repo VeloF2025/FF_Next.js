@@ -9,7 +9,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withMySession } from '@/modules/attendance/portal/authMiddleware';
+import type { AttendanceSession } from '@/modules/attendance/portal/types';
 
 /**
  * Candidate drop_number values to match a normalized DR input against.
@@ -61,7 +62,7 @@ export function toSiteGeo(row: {
   };
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+async function handler(req: NextApiRequest, res: NextApiResponse, _session: AttendanceSession): Promise<void> {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
   const { id } = req.query;
@@ -142,4 +143,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   });
 }
 
-export default withAuth(handler);
+export default withMySession(handler);

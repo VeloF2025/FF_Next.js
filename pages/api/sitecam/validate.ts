@@ -15,7 +15,8 @@ import { createHash } from 'crypto';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withMySession } from '@/modules/attendance/portal/authMiddleware';
+import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import {
   STEP_CRITERIA,
   QUALITY_CHECK_STEPS,
@@ -169,7 +170,7 @@ async function runVlmCheck(
   }
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+async function handler(req: NextApiRequest, res: NextApiResponse, _session: AttendanceSession): Promise<void> {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
 
   const { jobType, stepNumber, siteId, photoBase64, attemptNumber, exifTimestamp } =
@@ -251,7 +252,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   });
 }
 
-export default withAuth(handler);
+export default withMySession(handler);
 
 export const config = {
   // photoBase64 is a full camera image — raise the body limit above the 1mb default.

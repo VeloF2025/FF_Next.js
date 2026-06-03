@@ -8,7 +8,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withMySession } from '@/modules/attendance/portal/authMiddleware';
+import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 // attempt_photos[].url is later rendered as <img src> in the supervisor UI, so
 // restrict it to VF Storage origins (shared with the gallery seed write path).
@@ -22,7 +23,7 @@ interface EscalateBody {
   attemptPhotos: Array<{ attempt: number; url: string; reasons: string[] }>;
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+async function handler(req: NextApiRequest, res: NextApiResponse, session: AttendanceSession): Promise<void> {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
 
   const { jobType, siteId, stepNumber, failReasons, attemptPhotos } =
@@ -38,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     return apiResponse.badRequest(res, 'attemptPhotos must reference VF Storage URLs');
   }
 
-  const techId = (req as AuthenticatedNextApiRequest).user?.id ?? null;
+  const techId = session.staffId ?? null;
 
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO pwa_escalations (job_type, site_id, step_number, tech_id, fail_reasons, attempt_photos)
@@ -50,4 +51,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   return apiResponse.success(res, { escalationId: rows[0]!.id });
 }
 
-export default withAuth(handler);
+export default withMySession(handler);
