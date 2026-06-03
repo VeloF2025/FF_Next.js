@@ -74,10 +74,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       [step, limit],
     );
 
+    // Civil photos are stored as Microsoft Graph URLs which require OAuth —
+    // route through the proxy endpoint so the browser can load them.
     const photos: CivilGalleryPhoto[] = result.rows.map((row) => ({
       id: row.id,
       stepNumber: row.step_number,
-      photoUrl: row.photo_url,
+      photoUrl: `/api/activate/civil-photo-gallery/photo?id=${encodeURIComponent(row.id)}`,
       label: row.label,
       confidence: row.confidence,
       savedAt: row.saved_at,
