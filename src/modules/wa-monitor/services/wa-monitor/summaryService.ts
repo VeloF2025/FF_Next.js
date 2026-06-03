@@ -49,8 +49,7 @@ export async function calculateSummary(): Promise<WaMonitorSummary> {
         END) as incomplete,
         COALESCE(AVG(completed_photos), 0) as "avgCompletedPhotos",
         COALESCE(SUM(CASE WHEN completed = true OR incomplete = true THEN 1 ELSE 0 END), 0) as "totalReviewed"
-      FROM qa_photo_reviews
-      WHERE project != 'Marketing Activations'
+      FROM qa_photo_reviews_counted
     `;
 
     // Get daily stats grouped by project and date (last 30 days only for performance)
@@ -89,9 +88,8 @@ export async function calculateSummary(): Promise<WaMonitorSummary> {
             OR step_12_customer_signature = false
           THEN 1
         END) as incomplete
-      FROM qa_photo_reviews
-      WHERE project != 'Marketing Activations'
-        AND created_at >= NOW() - INTERVAL '30 days'
+      FROM qa_photo_reviews_counted
+      WHERE created_at >= NOW() - INTERVAL '30 days'
       GROUP BY project, DATE(created_at AT TIME ZONE 'Africa/Johannesburg')
       ORDER BY date DESC, project ASC
     `;
@@ -135,8 +133,7 @@ export async function calculateSummaryFast(): Promise<WaMonitorSummary> {
           COUNT(*) as total,
           COUNT(CASE WHEN completed = true THEN 1 END) as complete,
           COUNT(CASE WHEN incomplete = true THEN 1 END) as incomplete_reviewed
-        FROM qa_photo_reviews
-        WHERE project != 'Marketing Activations'
+        FROM qa_photo_reviews_counted
       `,
       // Daily stats - last 7 days only for fast dashboard
       sql`
@@ -144,9 +141,8 @@ export async function calculateSummaryFast(): Promise<WaMonitorSummary> {
           COALESCE(project, 'Unknown') as project,
           TO_CHAR(DATE(created_at AT TIME ZONE 'Africa/Johannesburg'), 'YYYY-MM-DD') as date,
           COUNT(*) as total
-        FROM qa_photo_reviews
-        WHERE project != 'Marketing Activations'
-          AND created_at >= NOW() - INTERVAL '7 days'
+        FROM qa_photo_reviews_counted
+        WHERE created_at >= NOW() - INTERVAL '7 days'
         GROUP BY project, DATE(created_at AT TIME ZONE 'Africa/Johannesburg')
         ORDER BY date DESC, project ASC
       `,
@@ -235,8 +231,8 @@ export async function getCompleteProjectStats(
             AND step_12_customer_signature = true
           THEN drop_number
         END) as complete
-      FROM qa_photo_reviews
-      WHERE project != 'Marketing Activations'
+      FROM qa_photo_reviews_counted
+      WHERE TRUE
         ${dateFilter}
       GROUP BY project
       ORDER BY total DESC
@@ -278,9 +274,8 @@ export async function getDailyDropsPerProject(date?: string): Promise<Array<{ da
         ${targetDate} as date,
         COALESCE(project, 'Unknown') as project,
         COUNT(*) as count
-      FROM qa_photo_reviews
+      FROM qa_photo_reviews_counted
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') = ${targetDate}::date
-        AND project != 'Marketing Activations'
       GROUP BY project
       ORDER BY project ASC
     `;
