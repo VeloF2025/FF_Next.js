@@ -272,10 +272,9 @@ export async function getAllProjectsStatsSummary(
             AND step_11_green_lights = true AND step_12_customer_signature = true
           THEN drop_number
         END) as complete
-      FROM qa_photo_reviews
+      FROM qa_photo_reviews_counted
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg')
         BETWEEN ${queryStartDate}::date AND ${queryEndDate}::date
-        AND project != 'Marketing Activations'
       GROUP BY project
       ORDER BY total DESC
     `) as unknown as ProjectStatsRow[];
@@ -294,8 +293,7 @@ export async function getAllProjectsStatsSummary(
             AND step_11_green_lights = true AND step_12_customer_signature = true
           THEN drop_number
         END) as complete
-      FROM qa_photo_reviews
-      WHERE project != 'Marketing Activations'
+      FROM qa_photo_reviews_counted
       GROUP BY project
     `) as unknown as ProjectStatsRow[];
 
