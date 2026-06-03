@@ -10,7 +10,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withMySession } from '@/modules/attendance/portal/authMiddleware';
+import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 import type { GeofencePayload } from '@/modules/sitecam/lib/geofence';
 
@@ -68,7 +69,7 @@ async function uploadToVfStorage(filename: string, base64: string): Promise<stri
   return json.url;
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+async function handler(req: NextApiRequest, res: NextApiResponse, session: AttendanceSession): Promise<void> {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
 
   const { jobType, siteId, photos, geofence } = (req.body ?? {}) as Partial<UploadBody>;
@@ -79,7 +80,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     return apiResponse.badRequest(res, `Too many photos (max ${MAX_PHOTOS})`);
   }
 
-  const techId = (req as AuthenticatedNextApiRequest).user?.id ?? null;
+  const techId = session.staffId ?? null;
   const uploadedUrls: Record<number, string> = {};
 
   for (const photo of photos) {
@@ -157,7 +158,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   });
 }
 
-export default withAuth(handler);
+export default withMySession(handler);
 
 export const config = {
   api: { bodyParser: { sizeLimit: '50mb' } },
