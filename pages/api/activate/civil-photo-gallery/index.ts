@@ -79,7 +79,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     const photos: CivilGalleryPhoto[] = result.rows.map((row) => ({
       id: row.id,
       stepNumber: row.step_number,
-      photoUrl: `/api/activate/civil-photo-gallery/photo?id=${row.id}`,
+      photoUrl: `/api/activate/civil-photo-gallery/photo?id=${encodeURIComponent(row.id)}`,
       label: row.label,
       confidence: row.confidence,
       savedAt: row.saved_at,
