@@ -5,6 +5,7 @@
 'use client';
 
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { CheckCircle } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
@@ -39,6 +40,12 @@ export function OltResolveModal({ recordId, onClose, onResolved, setError }: Olt
       });
       const data = await res.json();
       if (data.success || data.data?.success) {
+        const result = data.data ?? data;
+        toast.success(
+          result.ticketClosed
+            ? 'Resolved — linked NOC ticket closed, resolution note added (AI summary refreshing)'
+            : 'Investigation resolved',
+        );
         onClose();
         onResolved();
       } else {
@@ -86,6 +93,10 @@ export function OltResolveModal({ recordId, onClose, onResolved, setError }: Olt
               placeholder="Add any notes about this resolution..."
             />
           </div>
+          <p className="text-xs text-[var(--ff-text-tertiary)]">
+            If a NOC ticket is linked to this record, it will be closed and a public
+            resolution note + AI history summary will be added to it.
+          </p>
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}

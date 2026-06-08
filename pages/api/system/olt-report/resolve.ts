@@ -39,6 +39,17 @@ const VALID_RESOLUTION_TYPES = [
   'closed_false_positive',
 ];
 
+// Human-readable labels for the auto-added NOC ticket resolution note.
+const RESOLUTION_LABELS: Record<string, string> = {
+  manually_fixed: 'Manually Fixed in 1Map',
+  closed_invalid: 'Closed - Invalid Record',
+  closed_no_data: 'Closed - Missing Data',
+  closed_false_positive: 'Closed - False Positive',
+};
+
+// Ticket statuses that are already terminal — no re-resolve.
+const TERMINAL_TICKET_STATUSES = ['resolved', 'verified', 'closed', 'cancelled'];
+
 interface ResolveRequest {
   recordId: string;
   action: 'resolve' | 'escalate';
@@ -120,11 +131,58 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         log.warn('Failed to log activity (non-blocking)', { activityError, drNumber }, 'OltReportResolve');
       }
 
+      // If a NOC ticket is linked, drive the full resolve cascade through it so
+      // the ticket is closed and its notes + history + AI summary update too —
+      // the same path NOC's own resolve uses. Best-effort: the record is already
+      // resolved, so a ticket-close failure must not 500 the request.
+      // (markLinkedDataSyncResolved inside the cascade skips this record because
+      //  it is already 'resolved', preserving the chosen resolution_type.)
+      let ticketClosed = false;
+      const linkedTicketId: string | null = record.maintenance_ticket_id ?? null;
+      if (linkedTicketId) {
+        try {
+          const { getTicketById, updateTicket, logTicketChanges } = await import('@/modules/noc/services/ticketService');
+          const { applyTicketResolvedSideEffects } = await import('@/modules/noc/services/ticketResolutionService');
+          const { TicketStatus } = await import('@/modules/noc/types/ticket');
+
+          const oldTicket = await getTicketById(linkedTicketId);
+          if (oldTicket && !TERMINAL_TICKET_STATUSES.includes(oldTicket.status)) {
+            const updatedTicket = await updateTicket(linkedTicketId, {
+              status: TicketStatus.RESOLVED,
+              resolved_at: new Date().toISOString(),
+            });
+            await logTicketChanges({
+              ticketId: linkedTicketId,
+              oldTicket: oldTicket as unknown as Record<string, unknown>,
+              newTicket: updatedTicket as unknown as Record<string, unknown>,
+              payload: { status: TicketStatus.RESOLVED },
+              userId: user?.id,
+              userName: user?.name,
+              userEmail: user?.email,
+            });
+            const label = RESOLUTION_LABELS[resolutionType] ?? resolutionType;
+            const note = `Resolved from OLT investigation as "${label}"${notes ? ` — ${notes}` : ''}.`;
+            await applyTicketResolvedSideEffects(updatedTicket, {
+              actingUser: { id: user?.id, name: user?.name, email: user?.email },
+              note,
+              noteVisibility: 'public',
+            });
+            ticketClosed = true;
+          } else if (oldTicket) {
+            ticketClosed = true; // already terminal — nothing to do
+          }
+        } catch (ticketError) {
+          log.warn('Linked NOC ticket close failed (non-blocking)', { ticketError, linkedTicketId, recordId }, 'OltReportResolve');
+        }
+      }
+
       log.info('Investigation resolved', {
         recordId,
         drNumber,
         resolutionType,
         resolvedBy: user?.email,
+        linkedTicketId,
+        ticketClosed,
       }, 'OltReportResolve');
 
       return apiResponse.success(res, {
@@ -132,6 +190,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         recordId,
         drNumber,
         resolutionType,
+        ticketClosed,
       });
     }
 
