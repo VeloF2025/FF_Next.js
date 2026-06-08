@@ -301,12 +301,16 @@ export async function PUT(
       }
     }
 
-    // When a ticket transitions to resolved, run the shared resolve cascade:
-    // creator notification, linked Data Sync resolution, snag back-sync, and an
-    // AI history-summary refresh. Same path the OLT investigate resolve uses, so
+    // On every resolved PUT, run the shared resolve cascade: linked Data Sync
+    // resolution + snag back-sync run unconditionally (as before — idempotent),
+    // while creator notification + AI-summary regen fire only on a real
+    // transition (isTransition). Same path the OLT investigate resolve uses, so
     // the two never drift. (Migration 364 removed 'closed'; 'resolved' is terminal.)
-    if (body.status === 'resolved' && oldTicket?.status !== 'resolved') {
-      applyTicketResolvedSideEffects(updatedTicket, { actingUser }).catch((err: unknown) => {
+    if (body.status === 'resolved') {
+      applyTicketResolvedSideEffects(updatedTicket, {
+        actingUser,
+        isTransition: oldTicket?.status !== 'resolved',
+      }).catch((err: unknown) => {
         logger.error('Ticket resolved side-effects error', { ticketId, error: err instanceof Error ? err.message : String(err) });
       });
     }

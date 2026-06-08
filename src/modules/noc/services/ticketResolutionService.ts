@@ -38,6 +38,14 @@ export interface ResolvedSideEffectOptions {
   note?: string;
   /** Note visibility. Public notes are surfaced in the public notes view. */
   noteVisibility?: 'public' | 'private';
+  /**
+   * Whether this is a genuine transition INTO resolved (default true). On an
+   * idempotent re-resolve (resolved → resolved) the data-sync resolution + snag
+   * back-sync still run (matching the original unconditional behaviour), but the
+   * one-shot effects — creator notification and AI-summary regen — are skipped to
+   * avoid duplicate emails and redundant LLM calls.
+   */
+  isTransition?: boolean;
 }
 
 /**
@@ -48,7 +56,7 @@ export async function applyTicketResolvedSideEffects(
   ticket: Ticket,
   options: ResolvedSideEffectOptions = {},
 ): Promise<void> {
-  const { actingUser, note, noteVisibility = 'public' } = options;
+  const { actingUser, note, noteVisibility = 'public', isTransition = true } = options;
   const trimmedNote = note?.trim();
 
   // 1. Resolution note (+ matching activity-feed entry) — only when supplied.
@@ -78,13 +86,15 @@ export async function applyTicketResolvedSideEffects(
     }
   }
 
-  // 2. Notify the ticket creator (email + in-app). Fire-and-forget.
-  triggerOnTicketResolution(ticket).catch((err) =>
-    logger.error('Resolution notification error', {
-      ticketId: ticket.id,
-      error: err instanceof Error ? err.message : String(err),
-    }),
-  );
+  // 2. Notify the ticket creator (email + in-app) — one-shot, transition only.
+  if (isTransition) {
+    triggerOnTicketResolution(ticket).catch((err) =>
+      logger.error('Resolution notification error', {
+        ticketId: ticket.id,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+  }
 
   // 3. Resolve linked Data Sync records (OLT mismatch + PP data). Awaited so the
   //    AI summary regen below observes the resolved state, not the stale one.
@@ -114,7 +124,7 @@ export async function applyTicketResolvedSideEffects(
   //    fire-and-forget — mirrors the regenerate-ai-summary route (drop the
   //    single ai_summary row, then regenerate).
   const drNumber = ticket.dr_number;
-  if (process.env.FF_AI_TICKET_SUMMARY === '1' && drNumber) {
+  if (isTransition && process.env.FF_AI_TICKET_SUMMARY === '1' && drNumber) {
     const ontSerial = ticket.ont_serial ?? null;
     void (async () => {
       try {

@@ -43,7 +43,7 @@ export function OltResolveModal({ recordId, onClose, onResolved, setError }: Olt
         const result = data.data ?? data;
         toast.success(
           result.ticketClosed
-            ? 'Resolved — linked NOC ticket closed and history/AI summary updated'
+            ? 'Resolved — linked NOC ticket closed, resolution note added (AI summary refreshing)'
             : 'Investigation resolved',
         );
         onClose();

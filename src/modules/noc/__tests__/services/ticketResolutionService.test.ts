@@ -122,4 +122,17 @@ describe('applyTicketResolvedSideEffects', () => {
     await new Promise(r => setTimeout(r, 10));
     expect(summarizeAndAttachDrHistory).not.toHaveBeenCalled();
   });
+
+  it('on a re-resolve (isTransition=false) still resolves data-sync + snag, but skips notify + AI', async () => {
+    process.env.FF_AI_TICKET_SUMMARY = '1';
+    await applyTicketResolvedSideEffects(makeTicket({ source: 'snags' }), { isTransition: false });
+    await new Promise(r => setTimeout(r, 10));
+    // Idempotent data-sync effects still run...
+    expect(markLinkedDataSyncResolved).toHaveBeenCalledWith('ticket-123');
+    expect(snagCalls()).toHaveLength(1);
+    // ...but one-shot effects are suppressed.
+    expect(triggerOnTicketResolution).not.toHaveBeenCalled();
+    expect(summarizeAndAttachDrHistory).not.toHaveBeenCalled();
+    expect(aiDeleteCalls()).toHaveLength(0);
+  });
 });
