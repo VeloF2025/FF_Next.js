@@ -95,7 +95,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
 
       pool.query<CountsRow>(
         `SELECT COUNT(*) AS total,
-           COUNT(*) FILTER (WHERE r.fix_status IN ('pending','empty_serial','not_found','needs_reinvestigation') AND r.maintenance_ticket_id IS NULL) AS open,
+           COUNT(*) FILTER (WHERE r.fix_status IN ('pending','empty_serial','not_found','needs_reinvestigation','serial_other_dr') AND r.maintenance_ticket_id IS NULL) AS open,
            COUNT(*) FILTER (WHERE r.maintenance_ticket_id IS NOT NULL AND r.fix_status NOT IN ('fixed','resolved')) AS ticketed,
            COUNT(*) FILTER (WHERE r.fix_status IN ('fixed','resolved')) AS resolved
          FROM olt_mismatch_records r ${oltJoin} ${oltWhere}`,
@@ -147,7 +147,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
       pool.query<ProjCountsRow>(
         `SELECT ri.project,
            COUNT(*) AS total,
-           COUNT(*) FILTER (WHERE r.fix_status IN ('pending','empty_serial','not_found','needs_reinvestigation') AND r.maintenance_ticket_id IS NULL) AS open,
+           COUNT(*) FILTER (WHERE r.fix_status IN ('pending','empty_serial','not_found','needs_reinvestigation','serial_other_dr') AND r.maintenance_ticket_id IS NULL) AS open,
            COUNT(*) FILTER (WHERE r.maintenance_ticket_id IS NOT NULL AND r.fix_status NOT IN ('fixed','resolved')) AS ticketed,
            COUNT(*) FILTER (WHERE r.fix_status IN ('fixed','resolved')) AS resolved
          FROM olt_mismatch_records r ${oltJoin} ${oltWhere}
