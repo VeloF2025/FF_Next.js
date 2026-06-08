@@ -44,7 +44,7 @@ export function OltResolveModal({ recordId, onClose, onResolved, setError }: Olt
         const base = result.ticketClosed
           ? 'Resolved — linked NOC ticket closed, resolution note added (AI summary refreshing)'
           : 'Investigation resolved';
-        const oneMapLine = result.oneMap?.summary ? `\n1Map: ${result.oneMap.summary}` : '';
+        const oneMapLine = result.oneMap?.summary ? `  ·  1Map: ${result.oneMap.summary}` : '';
         toast.success(base + oneMapLine, { duration: result.oneMap?.summary ? 7000 : 4000 });
         onClose();
         onResolved();

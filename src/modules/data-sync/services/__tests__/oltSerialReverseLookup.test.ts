@@ -74,11 +74,19 @@ describe('describeCurrentOneMapState', () => {
     expect(searchDR).not.toHaveBeenCalled();
   });
 
-  it('returns "unknown" — never throws — when the 1Map lookup fails', async () => {
+  it('returns "unknown" — never throws — when the DR lookup fails', async () => {
     searchDR.mockResolvedValue({ success: false, records: [], error: 'rate limited' });
     const r = await describeCurrentOneMapState('DR1', 'ALCLB48E205C');
     expect(r.state).toBe('unknown');
     expect(r.summary).toContain('unavailable');
+  });
+
+  it('returns "unknown" (not "absent") when the DR is gone but the serial lookup itself fails', async () => {
+    searchDR.mockResolvedValue({ success: true, records: [] });
+    searchBySerial.mockResolvedValue({ success: false, records: [], error: 'timeout' });
+    const r = await describeCurrentOneMapState('DR1', 'ALCLB48E205C');
+    expect(r.state).toBe('unknown');
+    expect(r.summary).toContain('serial check unavailable');
   });
 
   it('returns "unknown" when searchDR throws', async () => {
