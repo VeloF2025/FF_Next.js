@@ -6,6 +6,7 @@ import { log } from '@/lib/logger';
 import { PoleListTable } from './PoleListTable';
 import { PoleDetailPanel } from './PoleDetailPanel';
 import { WorksQADashboardView } from './WorksQADashboardView';
+import { RecentSubmissionsPanel } from './RecentSubmissionsPanel';
 import { WorksQAPageHeader } from './WorksQAPageHeader';
 import { ConfirmPlantedModal } from './ConfirmPlantedModal';
 import { usePoleList } from '../hooks/usePoleList';
@@ -107,13 +108,22 @@ export function WorksQAPage() {
   // ─── Level 1: Project dashboard ───────────────────────────────────────
   if (!projectId) {
     return (
-      <WorksQADashboardView
-        projects={projects}
-        loading={dashboardLoading}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onSelectProject={selectProject}
-      />
+      <div className="space-y-4">
+        <RecentSubmissionsPanel
+          onDrill={(pid, zone, pon) => pushQuery({
+            project_id: pid,
+            zone_no: zone === null ? null : String(zone),
+            pon_no: String(pon),
+          })}
+        />
+        <WorksQADashboardView
+          projects={projects}
+          loading={dashboardLoading}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onSelectProject={selectProject}
+        />
+      </div>
     );
   }
 
