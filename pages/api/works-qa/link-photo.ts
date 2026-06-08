@@ -80,13 +80,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const targetKey = row.tgt_key as string | null;
     const vlmResults = row.vlm_results ?? {};
 
-    if (!sourceKey) {
-      await client.query('ROLLBACK');
-      return apiResponse.badRequest(res, 'source slot has no photo to reuse');
-    }
-    if (targetKey === sourceKey) {
-      await client.query('ROLLBACK');
-      return apiResponse.badRequest(res, 'target slot already holds this photo');
+    if (!sourceKey || targetKey === sourceKey) {
+      // No writes have happened yet, but guard the rollback so a failed ROLLBACK
+      // can't leave the pooled connection in a broken state (matches the
+      // catch-block rollback below).
+      await client.query('ROLLBACK').catch(rbErr => {
+        log.warn('works-qa/link-photo: pre-write rollback failed', { error: rbErr instanceof Error ? rbErr.message : String(rbErr) });
+      });
+      return apiResponse.badRequest(
+        res,
+        sourceKey ? 'target slot already holds this photo' : 'source slot has no photo to reuse',
+      );
     }
 
     // If the target already holds a DIFFERENT photo, push it back to the

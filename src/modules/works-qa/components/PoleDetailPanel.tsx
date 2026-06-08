@@ -51,6 +51,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const [tab, setTab] = useState<'photos' | 'snags'>('photos');
   // Target slot for the "reuse an existing photo" picker (dual-step linking).
   const [linkTarget, setLinkTarget] = useState<{ slotKey: string; label: string } | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
   // Accordion state: multi-open SET of expanded disciplines. Defaults to all
   // three so every Droppable has measurable geometry at drag start (rfd
   // snapshots `display:none` slots as zero-area bboxes and silently rejects
@@ -63,6 +64,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     setExpanded(new Set(['civil', 'dome', 'main_joint']));
     setTab('photos');
     setLinkTarget(null);
+    setLinkError(null);
   }, [poleId]);
 
   function toggleSection(d: Discipline) {
@@ -217,6 +219,9 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
           {moveError && (
             <span className="text-xs text-red-400">Move failed: {moveError}</span>
           )}
+          {linkError && (
+            <span className="text-xs text-red-400">Link failed: {linkError}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -359,9 +364,10 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
           candidates={getLinkCandidates(pole, linkTarget.slotKey)}
           onSelect={(sourceSlot, reason) => {
             const target = linkTarget.slotKey;
+            setLinkError(null);
             linkPhoto(pole.id, sourceSlot, target, reason)
               .then(() => { setLinkTarget(null); return mutate(); })
-              .catch((e: unknown) => { setMoveError(e instanceof Error ? e.message : String(e)); setLinkTarget(null); });
+              .catch((e: unknown) => { setLinkError(e instanceof Error ? e.message : String(e)); setLinkTarget(null); });
           }}
           onClose={() => setLinkTarget(null)}
         />
