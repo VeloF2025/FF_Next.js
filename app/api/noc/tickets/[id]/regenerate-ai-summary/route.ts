@@ -87,7 +87,8 @@ export async function POST(
       !facts.olt_mismatch &&
       facts.onemap_props.length === 0 &&
       facts.prior_tickets.length === 0 &&
-      facts.offline_devices.length === 0;
+      facts.offline_devices.length === 0 &&
+      facts.ticket_notes.length === 0;
     if (empty) {
       return NextResponse.json(
         { success: false, error: { message: 'No DR history found in any source table' } },

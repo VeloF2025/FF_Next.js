@@ -14,12 +14,13 @@ import type {
   DrOnemapProp,
   DrPriorTicket,
   DrOfflineDevice,
+  DrTicketNote,
 } from './types';
 
 export async function gatherDrFacts(
   drNumber: string,
   ontSerial: string | null,
-  excludeTicketId: string | null,
+  currentTicketId: string | null,
 ): Promise<DrFacts> {
   const [
     dropRow,
@@ -30,6 +31,7 @@ export async function gatherDrFacts(
     onemapProps,
     priorTickets,
     offlineDevices,
+    ticketNotes,
   ] = await Promise.all([
     query<DrDrop>(
       `SELECT project_id, pole_number, installation_date, status, qc_status,
@@ -89,7 +91,7 @@ export async function gatherDrFacts(
          AND ($3::uuid IS NULL OR id <> $3)
        ORDER BY created_at DESC
        LIMIT 5`,
-      [drNumber, ontSerial, excludeTicketId],
+      [drNumber, ontSerial, currentTicketId],
     ),
     query<DrOfflineDevice>(
       `SELECT serial_number, last_inform_date, days_since_last_inform,
@@ -100,6 +102,22 @@ export async function gatherDrFacts(
        LIMIT 3`,
       [drNumber],
     ),
+    // Operator-authored notes on THIS ticket. currentTicketId scopes the
+    // lookup to the ticket being summarized. When null (no ticket context,
+    // e.g. a pre-insert call) we skip the query and return an empty set.
+    currentTicketId
+      ? query<DrTicketNote>(
+          `SELECT n.content, n.note_type, n.visibility,
+                  NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), '') AS author,
+                  n.created_at
+           FROM maintenance_notes n
+           LEFT JOIN users u ON n.created_by = u.id
+           WHERE n.ticket_id = $1::uuid
+           ORDER BY n.created_at DESC NULLS LAST
+           LIMIT 10`,
+          [currentTicketId],
+        )
+      : Promise.resolve([] as DrTicketNote[]),
   ]);
 
   return {
@@ -113,6 +131,7 @@ export async function gatherDrFacts(
     onemap_props: onemapProps,
     prior_tickets: priorTickets,
     offline_devices: offlineDevices,
+    ticket_notes: ticketNotes,
   };
 }
 
@@ -129,7 +148,8 @@ export function hasAnyHistory(facts: DrFacts): boolean {
     !!facts.olt_mismatch ||
     facts.onemap_props.length > 0 ||
     facts.prior_tickets.length > 0 ||
-    facts.offline_devices.length > 0
+    facts.offline_devices.length > 0 ||
+    facts.ticket_notes.length > 0
   );
 }
 
@@ -172,6 +192,11 @@ export function sanitizeFacts(facts: DrFacts): DrFacts {
     offline_devices: facts.offline_devices.map((d) => ({
       ...d,
       last_down_reason: clip(d.last_down_reason),
+    })),
+    ticket_notes: facts.ticket_notes.map((n) => ({
+      ...n,
+      content: clip(n.content),
+      author: clip(n.author),
     })),
   };
 }
