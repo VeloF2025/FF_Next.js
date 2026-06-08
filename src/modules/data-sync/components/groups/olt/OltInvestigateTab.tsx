@@ -63,7 +63,7 @@ const EMPTY_INVESTIGATE_STATS: OltStats = {
   escalated: 0,
   empty: 0,
   total: 0,
-  investigateBreakdown: { cross_dr: 0, not_found: 0, other: 0 },
+  investigateBreakdown: { cross_dr: 0, not_found: 0, serial_other_dr: 0, other: 0 },
   projectBreakdown: [],
 };
 
@@ -227,7 +227,7 @@ export function OltInvestigateTab({
     });
   };
 
-  const investigateSubCounts = filteredStats.investigateBreakdown || { cross_dr: 0, not_found: 0, other: 0 };
+  const investigateSubCounts = filteredStats.investigateBreakdown || { cross_dr: 0, not_found: 0, serial_other_dr: 0, other: 0 };
   const projectBreakdown = filteredStats.projectBreakdown || [];
   const selectedProjectLabel = selectedProjects.length === 0
     ? 'All Projects'
@@ -267,7 +267,7 @@ export function OltInvestigateTab({
   // Selection helpers
   const isSelectable = (record: OltRecord) =>
     !record.maintenance_ticket_id &&
-    ['needs_investigation', 'not_found', 'empty_serial'].includes(record.fix_status || '');
+    ['needs_investigation', 'not_found', 'empty_serial', 'serial_other_dr'].includes(record.fix_status || '');
 
   const selectableOnPage = records.filter(isSelectable);
 
@@ -299,7 +299,7 @@ export function OltInvestigateTab({
       const allRecords = (data.data?.records || data.records || []) as OltRecord[];
       const ticketable = allRecords.filter((r: OltRecord) =>
         !r.maintenance_ticket_id &&
-        ['needs_investigation', 'not_found', 'empty_serial'].includes(r.fix_status || '')
+        ['needs_investigation', 'not_found', 'empty_serial', 'serial_other_dr'].includes(r.fix_status || '')
       );
       setSelectedIds(new Set(ticketable.map((r: OltRecord) => r.id)));
       toast.success(`Selected ${ticketable.length} records for ticketing`);
@@ -807,6 +807,7 @@ export function OltInvestigateTab({
                 { key: 'all', label: 'All', count: filteredStats.needs_investigation },
                 { key: 'needs_investigation', label: 'Cross-DR Conflict', count: investigateSubCounts.cross_dr },
                 { key: 'not_found', label: 'Not on 1Map', count: investigateSubCounts.not_found },
+                { key: 'serial_other_dr', label: 'Serial on Other DR', count: investigateSubCounts.serial_other_dr },
                 { key: 'other', label: 'Other', count: investigateSubCounts.other },
               ] as const).map(({ key, label, count }) => (
                 <button

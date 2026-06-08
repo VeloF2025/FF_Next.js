@@ -44,7 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (status === 'pending') {
       whereClause = "WHERE r.fix_status = 'pending' AND r.olt_serial IS NOT NULL";
     } else if (status === 'needs_investigation') {
-      whereClause = "WHERE (r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial', 'rejected') OR r.olt_serial IS NULL)";
+      whereClause = "WHERE (r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial', 'rejected', 'serial_other_dr') OR r.olt_serial IS NULL)";
     } else if (status === 'fixed') {
       whereClause = "WHERE r.fix_status = 'fixed'";
     } else if (status === 'escalated') {
@@ -65,13 +65,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Optional sub-status filter (within needs_investigation group)
-    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'other'];
+    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'serial_other_dr', 'other'];
     if (subStatus && validSubStatuses.includes(subStatus)) {
       if (subStatus === 'needs_investigation') {
         const cond = `r.fix_status IN ('needs_investigation', 'needs_reinvestigation')`;
         whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
       } else if (subStatus === 'other') {
-        const cond = `(r.fix_status IS NULL OR r.fix_status NOT IN ('needs_investigation', 'needs_reinvestigation', 'not_found'))`;
+        const cond = `(r.fix_status IS NULL OR r.fix_status NOT IN ('needs_investigation', 'needs_reinvestigation', 'not_found', 'serial_other_dr'))`;
         whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
       } else {
         params.push(subStatus);

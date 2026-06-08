@@ -148,19 +148,27 @@ async function processOneItem(client: PoolClient, item: QueueItem, importId: str
   }
 
   if (searchResult.records.length === 0) {
+    // DR is absent from 1Map. Before settling on 'not_found', reverse-lookup the
+    // OES serial: if the unit IS on 1Map under a different drop, the serial is
+    // right and only the drop linkage is wrong — a distinct, actionable verdict.
+    const otherDr = await findSerialOnOtherDr(client, item);
+
+    const mismatchType = otherDr ? 'note2_serial_other_dr' : 'note2_not_on_1map';
     await client.query(
       `UPDATE olt_onemap_lookup_queue
-       SET status = 'completed', mismatch_type = 'note2_not_on_1map',
-           processed_at = NOW()
-       WHERE id = $1`,
-      [item.id]
+       SET status = 'completed', mismatch_type = $1, processed_at = NOW()
+       WHERE id = $2`,
+      [mismatchType, item.id]
     );
     if (importId) {
       await insertMismatchIfNew(client, {
         importId, dropNumber: item.drop_number,
-        oltSerial: item.oes_serial, wrongOneMapSerial: null,
-        fixStatus: 'not_found', hasUpsSwap: false,
+        oltSerial: item.oes_serial,
+        wrongOneMapSerial: null,
+        fixStatus: otherDr ? 'serial_other_dr' : 'not_found',
+        hasUpsSwap: false,
         oesBatchId: item.oes_batch_id, oesSource: 'api',
+        investigationContext: otherDr?.context ?? null,
       });
     }
     return;
@@ -244,6 +252,66 @@ async function processOneItem(client: PoolClient, item: QueueItem, importId: str
   }
 }
 
+/**
+ * When a DR returns nothing from 1Map, reverse-lookup its OES serial. If the
+ * serial is registered on 1Map under a *different* drop, return that drop plus
+ * a ready-built investigation_context. Returns null when the serial is also
+ * absent (genuine not_found) or only found on the same DR.
+ */
+async function findSerialOnOtherDr(
+  client: PoolClient,
+  item: QueueItem
+): Promise<{ foundOnDr: string; context: string } | null> {
+  const oesSerial = item.oes_serial.trim().toUpperCase();
+  if (!oesSerial) return null;
+
+  let serialResult;
+  try {
+    serialResult = await oneMapApi.searchBySerial(item.oes_serial);
+  } catch (err) {
+    // Reverse lookup is best-effort; fall back to not_found on any failure,
+    // but log it so we can tell "serial genuinely absent" from "lookup failed".
+    log.warn('Reverse serial lookup failed; defaulting to not_found', {
+      dropNumber: item.drop_number,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+  if (!serialResult.success || serialResult.records.length === 0) return null;
+
+  // Prefer a record on a different DR than the one we searched.
+  const match = serialResult.records.find(
+    (r) => r.drp && r.drp.toUpperCase() !== item.drop_number.toUpperCase()
+  );
+  if (!match || !match.drp) return null;
+
+  // Enrich with OES-side team/status for the drop the serial actually sits on.
+  let foundOnTeam: string | null = null;
+  let foundOnStatus: string | null = match.status ?? null;
+  const owner = await client.query(
+    `SELECT team, status FROM oes_activations
+     WHERE UPPER(drop_number) = $1 ORDER BY created_at DESC LIMIT 1`,
+    [match.drp.toUpperCase()]
+  );
+  if (owner.rows.length > 0) {
+    foundOnTeam = owner.rows[0].team ?? null;
+    foundOnStatus = owner.rows[0].status ?? foundOnStatus;
+  }
+
+  const where = [foundOnTeam, foundOnStatus].filter(Boolean).join(', ');
+  const context = JSON.stringify({
+    reason: 'serial_on_other_dr',
+    oesDr: item.drop_number,
+    oesSerial,
+    foundOnDr: match.drp,
+    foundOnTeam,
+    foundOnStatus,
+    message: `${item.drop_number} is not on 1Map, but its ONT serial ${oesSerial} is registered under ${match.drp}${where ? ` (${where})` : ''}. Unit is installed — the OES drop number is wrong, not the serial.`,
+  });
+
+  return { foundOnDr: match.drp, context };
+}
+
 async function insertMismatchIfNew(
   client: PoolClient,
   data: {
@@ -265,7 +333,7 @@ async function insertMismatchIfNew(
         && ex.olt_serial?.toUpperCase() === data.oltSerial.toUpperCase()) {
       return;
     }
-    if (['pending', 'empty_serial', 'not_found'].includes(ex.fix_status)) {
+    if (['pending', 'empty_serial', 'not_found', 'serial_other_dr'].includes(ex.fix_status)) {
       await client.query(
         `UPDATE olt_mismatch_records
          SET olt_serial = $1, wrong_onemap_serial = $2,
@@ -291,7 +359,7 @@ async function insertMismatchIfNew(
        has_ups_swap, detection_source, oes_batch_id, onemap_source, investigation_context)
      VALUES ($1, $2, $3, $4, $5, $6, 'auto', $7, $8, $9)
      ON CONFLICT (drop_number)
-       WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation')
+       WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation','serial_other_dr')
      DO UPDATE SET
        olt_serial = EXCLUDED.olt_serial,
        wrong_onemap_serial = EXCLUDED.wrong_onemap_serial,
