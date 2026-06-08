@@ -31,6 +31,7 @@ import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logActivity } from '@/modules/activate/services/activityLogService';
 import { sendEmailNotification } from '@/lib/email';
+import { describeCurrentOneMapState } from '@/modules/data-sync/services/oltSerialReverseLookup';
 
 const VALID_RESOLUTION_TYPES = [
   'manually_fixed',
@@ -102,7 +103,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         );
       }
 
-      // Update the record
+      // Live 1Map re-check so the resolution note records what actually changed
+      // on 1Map — the operator doesn't have to describe it, and a resolve that
+      // isn't backed by a real 1Map change is visible in the note. Advisory only:
+      // never blocks the resolve. Reused for resolution_notes, the DR activity
+      // log, and the linked NOC ticket comment.
+      const oneMap = await describeCurrentOneMapState(record.drop_number, record.olt_serial);
+      const resolutionLabel = RESOLUTION_LABELS[resolutionType] ?? resolutionType;
+      const resolutionNote = [
+        `Resolved from OLT investigation as "${resolutionLabel}".`,
+        `1Map: ${oneMap.summary}.`,
+        notes ? `Note: ${notes}` : null,
+      ].filter(Boolean).join(' ');
+
+      // Update the record (store the enriched, 1Map-aware resolution note)
       await client.query(
         `UPDATE olt_mismatch_records
          SET fix_status = 'resolved',
@@ -111,7 +125,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              resolved_at = NOW(),
              resolved_by = $3
          WHERE id = $4`,
-        [resolutionType, notes || null, user?.id, recordId]
+        [resolutionType, resolutionNote, user?.id, recordId]
       );
 
       // Log to DR activity (non-blocking - don't fail if logging fails)
@@ -120,9 +134,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           drNumber,
           'INVESTIGATION_RESOLVED',
           {
-            details: `OLT mismatch investigation resolved as: ${resolutionType}`,
+            details: resolutionNote,
             resolutionType,
             notes: notes || null,
+            oneMapState: oneMap.state,
             source: 'olt_report',
           },
           user?.id || 'system'
@@ -160,11 +175,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               userName: user?.name,
               userEmail: user?.email,
             });
-            const label = RESOLUTION_LABELS[resolutionType] ?? resolutionType;
-            const note = `Resolved from OLT investigation as "${label}"${notes ? ` — ${notes}` : ''}.`;
             await applyTicketResolvedSideEffects(updatedTicket, {
               actingUser: { id: user?.id, name: user?.name, email: user?.email },
-              note,
+              note: resolutionNote,
               noteVisibility: 'public',
             });
             ticketClosed = true;
@@ -183,6 +196,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         resolvedBy: user?.email,
         linkedTicketId,
         ticketClosed,
+        oneMapState: oneMap.state,
       }, 'OltReportResolve');
 
       return apiResponse.success(res, {
@@ -191,6 +205,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         drNumber,
         resolutionType,
         ticketClosed,
+        oneMap: { state: oneMap.state, changed: oneMap.changed, summary: oneMap.summary },
       });
     }
 

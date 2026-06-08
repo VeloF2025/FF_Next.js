@@ -41,11 +41,11 @@ export function OltResolveModal({ recordId, onClose, onResolved, setError }: Olt
       const data = await res.json();
       if (data.success || data.data?.success) {
         const result = data.data ?? data;
-        toast.success(
-          result.ticketClosed
-            ? 'Resolved — linked NOC ticket closed, resolution note added (AI summary refreshing)'
-            : 'Investigation resolved',
-        );
+        const base = result.ticketClosed
+          ? 'Resolved — linked NOC ticket closed, resolution note added (AI summary refreshing)'
+          : 'Investigation resolved';
+        const oneMapLine = result.oneMap?.summary ? `  ·  1Map: ${result.oneMap.summary}` : '';
+        toast.success(base + oneMapLine, { duration: result.oneMap?.summary ? 7000 : 4000 });
         onClose();
         onResolved();
       } else {
@@ -94,8 +94,9 @@ export function OltResolveModal({ recordId, onClose, onResolved, setError }: Olt
             />
           </div>
           <p className="text-xs text-[var(--ff-text-tertiary)]">
-            If a NOC ticket is linked to this record, it will be closed and a public
-            resolution note + AI history summary will be added to it.
+            On resolve we re-check 1Map live and record what it shows now in the note.
+            If a NOC ticket is linked, it will be closed with that note + an AI history
+            summary. Your note above is optional extra context.
           </p>
           <div className="flex justify-end gap-3">
             <button
