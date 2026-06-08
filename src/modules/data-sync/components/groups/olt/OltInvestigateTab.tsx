@@ -20,6 +20,7 @@ import {
   ClipboardList,
   Calendar,
   Download,
+  MapPin,
 } from 'lucide-react';
 import type { OltRecord, OltStats, InvestigationContext, SwapLookupResult, DateFilter } from '../../../types';
 import { getDateRange } from '../../../types';
@@ -535,6 +536,78 @@ export function OltInvestigateTab({
     try {
       const ctx: InvestigationContext = JSON.parse(record.investigation_context);
       const isExpanded = expandedContexts.has(record.id);
+
+      // Serial-on-other-DR: the DR isn't on 1Map at all, but its OES serial is
+      // registered under a *different* real drop. Distinct shape from the
+      // cross-DR conflict context — render its own panel (no swap workflow).
+      if (ctx.reason === 'serial_on_other_dr') {
+        const where = [ctx.foundOnTeam, ctx.foundOnStatus].filter(Boolean).join(', ');
+        const serial = ctx.oesSerial || record.olt_serial || '—';
+        const foundOnDr = ctx.foundOnDr;
+        // Encode the DR before interpolating: a stray '/', '#' or '&' would
+        // otherwise corrupt the path / query. Links render only when we know
+        // which DR the serial sits on (the field is optional on the type).
+        const oneMapHref = foundOnDr
+          ? `https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${encodeURIComponent(foundOnDr)}`
+          : null;
+        const reviewHref = foundOnDr ? `/activate/${encodeURIComponent(foundOnDr)}` : null;
+        return (
+          <tr key={`${record.id}-ctx`} className="border-b border-[var(--ff-border-light)]">
+            <td colSpan={7} className="py-1.5 px-4">
+              <button
+                onClick={() => toggleContext(record.id)}
+                className="w-full bg-teal-500/5 border border-teal-500/20 rounded-lg text-xs text-left hover:bg-teal-500/10 transition-colors"
+              >
+                <div className="flex items-center gap-2 px-3 py-2">
+                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />}
+                  <MapPin className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
+                  <span className="font-semibold text-teal-300">Serial on Other DR</span>
+                  <span className="text-[var(--ff-text-secondary)]">
+                    — ONT <span className="font-mono text-teal-200">{serial}</span> registered under <span className="font-mono text-[var(--ff-accent)]">{foundOnDr || 'unknown DR'}</span>{where && <> ({where})</>}
+                  </span>
+                </div>
+              </button>
+              {isExpanded && (
+                <div className="bg-teal-500/5 border border-t-0 border-teal-500/20 rounded-b-lg px-3 py-2.5 -mt-1 space-y-2">
+                  <p className="text-xs text-[var(--ff-text-secondary)] leading-relaxed">
+                    <span className="font-mono text-[var(--ff-accent)]">{ctx.oesDr || record.drop_number}</span> is not on 1Map,
+                    but its ONT serial <span className="font-mono text-teal-200">{serial}</span> is registered under {oneMapHref ? (
+                      <a
+                        href={oneMapHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[var(--ff-accent)] hover:underline"
+                        onClick={e => e.stopPropagation()}
+                      >{foundOnDr}</a>
+                    ) : (
+                      <span className="font-mono text-[var(--ff-accent)]">unknown DR</span>
+                    )}{where && <> ({where})</>}. The unit is installed — the OES drop number is wrong, not the serial.
+                  </p>
+                  {foundOnDr && (
+                    <div className="flex items-center gap-3 text-xs pt-1 border-t border-teal-500/10">
+                      <a
+                        href={reviewHref!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[var(--ff-accent)] hover:underline"
+                        onClick={e => e.stopPropagation()}
+                      ><Search className="w-3 h-3" /> Review {foundOnDr}</a>
+                      <a
+                        href={oneMapHref!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-blue-400 hover:underline"
+                        onClick={e => e.stopPropagation()}
+                      ><ExternalLink className="w-3 h-3" /> View in 1Map</a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </td>
+          </tr>
+        );
+      }
+
       return (
         <tr key={`${record.id}-ctx`} className="border-b border-[var(--ff-border-light)]">
           <td colSpan={7} className="py-1.5 px-4">
@@ -568,7 +641,7 @@ export function OltInvestigateTab({
                   <span>1Map records: {ctx.totalPropRecords}</span>
                   <span className="text-green-400">Correct: {ctx.correctRecords}</span>
                   <span className="text-red-400">Wrong: {ctx.wrongRecords}</span>
-                  {ctx.swappedRecords > 0 && <span className="text-orange-400">Swapped: {ctx.swappedRecords}</span>}
+                  {(ctx.swappedRecords ?? 0) > 0 && <span className="text-orange-400">Swapped: {ctx.swappedRecords}</span>}
                 </div>
                 {/* Cross-DR Swap Panel */}
                 <div className="mt-1 pt-2 border-t border-purple-500/10">
