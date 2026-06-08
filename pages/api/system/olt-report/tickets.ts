@@ -96,7 +96,7 @@ async function handler(
       // Exception: home_installation_status tickets may be created alongside an
       // existing serial-mismatch ticket — the home sign-up dispatch is a separate
       // action needed before the serial swap can proceed.
-      const eligibleStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
+      const eligibleStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'serial_other_dr'];
       const allowExistingTicket = ticket_type === 'home_installation_status';
 
       const eligible = await pool.query(

@@ -42,7 +42,7 @@ function appendStatusFilter(status: string, whereParts: string[]) {
   if (status === 'pending') {
     whereParts.push("r.fix_status = 'pending' AND r.olt_serial IS NOT NULL");
   } else if (status === 'needs_investigation') {
-    whereParts.push("(r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial', 'rejected') OR r.olt_serial IS NULL)");
+    whereParts.push("(r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial', 'rejected', 'serial_other_dr') OR r.olt_serial IS NULL)");
   } else if (status === 'fixed') {
     whereParts.push("r.fix_status = 'fixed'");
   } else if (status === 'escalated') {
@@ -53,7 +53,7 @@ function appendStatusFilter(status: string, whereParts: string[]) {
 }
 
 function appendSubStatusFilter(subStatus: string | null, whereParts: string[], params: SqlParam[]) {
-  const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'other'];
+  const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'serial_other_dr', 'other'];
   if (!subStatus || !validSubStatuses.includes(subStatus)) return;
 
   if (subStatus === 'needs_investigation') {
@@ -62,7 +62,7 @@ function appendSubStatusFilter(subStatus: string | null, whereParts: string[], p
   }
 
   if (subStatus === 'other') {
-    whereParts.push("(r.fix_status IS NULL OR r.fix_status NOT IN ('needs_investigation', 'needs_reinvestigation', 'not_found'))");
+    whereParts.push("(r.fix_status IS NULL OR r.fix_status NOT IN ('needs_investigation', 'needs_reinvestigation', 'not_found', 'serial_other_dr'))");
     return;
   }
 
@@ -131,7 +131,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       SELECT
         CASE
           WHEN r.fix_status = 'pending' AND r.olt_serial IS NOT NULL THEN 'pending'
-          WHEN r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial', 'rejected') OR r.olt_serial IS NULL THEN 'needs_investigation'
+          WHEN r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial', 'rejected', 'serial_other_dr') OR r.olt_serial IS NULL THEN 'needs_investigation'
           ELSE r.fix_status
         END as category,
         COUNT(DISTINCT r.id)::int as count
@@ -177,6 +177,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         CASE
           WHEN r.fix_status IN ('needs_investigation', 'needs_reinvestigation') THEN 'cross_dr'
           WHEN r.fix_status = 'not_found' THEN 'not_found'
+          WHEN r.fix_status = 'serial_other_dr' THEN 'serial_other_dr'
           ELSE 'other'
         END as sub_category,
         COUNT(DISTINCT r.id)::int as count
@@ -188,7 +189,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       GROUP BY sub_category
     `, investigateFilters.params);
 
-    const investigateBreakdown: Record<string, number> = { cross_dr: 0, not_found: 0, other: 0 };
+    const investigateBreakdown: Record<string, number> = { cross_dr: 0, not_found: 0, serial_other_dr: 0, other: 0 };
     for (const row of subResult.rows) {
       investigateBreakdown[row.sub_category] = row.count;
     }

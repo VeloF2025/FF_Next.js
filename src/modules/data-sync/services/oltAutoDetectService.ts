@@ -351,7 +351,7 @@ async function insertMismatchBatch(
              has_ups_swap, detection_source, oes_batch_id, onemap_source)
            VALUES ($1, $2, $3, $4, 'needs_reinvestigation', $5, 'auto', $6, $7)
            ON CONFLICT (drop_number)
-             WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation')
+             WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation','serial_other_dr')
            DO UPDATE SET
              olt_serial = EXCLUDED.olt_serial,
              wrong_onemap_serial = EXCLUDED.wrong_onemap_serial,
@@ -379,7 +379,7 @@ async function insertMismatchBatch(
       }
 
       if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial'
-          || ex.fix_status === 'not_found') {
+          || ex.fix_status === 'not_found' || ex.fix_status === 'serial_other_dr') {
         // Already tracked -> update serial data
         await client.query(
           `UPDATE olt_mismatch_records
@@ -403,7 +403,7 @@ async function insertMismatchBatch(
          has_ups_swap, detection_source, oes_batch_id, onemap_source)
        VALUES ($1, $2, $3, $4, $5, $6, 'auto', $7, $8)
        ON CONFLICT (drop_number)
-         WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation')
+         WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation','serial_other_dr')
        DO UPDATE SET
          olt_serial = EXCLUDED.olt_serial,
          wrong_onemap_serial = EXCLUDED.wrong_onemap_serial,

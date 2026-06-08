@@ -326,6 +326,75 @@ class OneMapApiService {
   }
 
   /**
+   * Reverse lookup: find 1Map property records whose ONT barcode (ph_ont)
+   * matches a given serial. Used when a DR search returns nothing, to tell a
+   * genuine "not on 1Map" from "serial is installed, but under a different DR".
+   *
+   * Matches on ph_ont only (the ONT barcode), NOT br_ser (the UPS serial):
+   * we are confirming an ONT serial is installed, and UPS-swap cases have their
+   * own note4_ups_swap path. The free-text `q` search returns a superset, so we
+   * filter to exact ph_ont matches client-side.
+   */
+  async searchBySerial(serial: string): Promise<SearchResult> {
+    const target = serial.trim().toUpperCase();
+    if (!target) return { success: true, records: [] };
+
+    try {
+      if (!(await this.ensureSession())) {
+        return { success: false, records: [], error: 'Authentication failed' };
+      }
+
+      const formData = new URLSearchParams({
+        ungeocoded: 'false',
+        left: '0',
+        bottom: '0',
+        right: '0',
+        top: '0',
+        selfilter: '',
+        action: 'get',
+        email: ONEMAP_EMAIL,
+        layerid: LAYER_ID,
+        sort: 'prop_id',
+        templateExpression: '',
+        q: serial,
+        page: '1',
+        start: '0',
+        limit: '50',
+      });
+
+      const response = await fetchWithTimeout(`${BASE_URL}/api/apps/app/getattributes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Cookie: `connect.sid=${this.sessionCookie}`,
+        },
+        body: formData.toString(),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        return { success: false, records: [], error: 'API returned failure' };
+      }
+
+      // Exact match on the ONT barcode
+      const records = (result.result || []).filter(
+        (r: OneMapRecord) => r.ph_ont?.trim().toUpperCase() === target
+      );
+
+      return { success: true, records };
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      logger.error(isTimeout ? 'Serial search timed out' : 'Serial search failed', { serial, error });
+      return {
+        success: false,
+        records: [],
+        error: isTimeout ? '1Map API timeout - try again' : (error instanceof Error ? error.message : 'Unknown error'),
+      };
+    }
+  }
+
+  /**
    * Update ONT serial in 1Map
    *
    * @param propId - The property ID to update
