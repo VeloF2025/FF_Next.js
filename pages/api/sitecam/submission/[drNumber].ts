@@ -22,6 +22,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     `SELECT r.pwa_submission_at,
             r.pwa_photo_count,
             r.pwa_photo_urls,
+            r.ont_serial_scanned,
+            r.ont_serial_status,
+            r.ups_serial_scanned,
+            r.ups_serial_status,
+            r.vlm_power_meter_dbm,
+            r.vlm_power_meter_status,
             s.first_name || ' ' || s.last_name AS tech_name
      FROM dr_photo_unified_reviews r
      LEFT JOIN staff s ON s.id = r.pwa_tech_id
@@ -37,6 +43,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     pwa_submission_at: string;
     pwa_photo_count: number;
     pwa_photo_urls: Record<number, string> | null;
+    ont_serial_scanned: string | null;
+    ont_serial_status: string | null;
+    ups_serial_scanned: string | null;
+    ups_serial_status: string | null;
+    vlm_power_meter_dbm: number | null;
+    vlm_power_meter_status: string | null;
     tech_name: string | null;
   };
 
@@ -46,6 +58,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       techName: row.tech_name ?? 'Unknown',
       photoCount: row.pwa_photo_count,
       photoUrls: row.pwa_photo_urls ?? {},
+      ontSerialScanned: row.ont_serial_scanned ?? null,
+      ontSerialStatus: row.ont_serial_status ?? null,
+      upsSerialScanned: row.ups_serial_scanned ?? null,
+      upsSerialStatus: row.ups_serial_status ?? null,
+      powerMeterDbm: row.vlm_power_meter_dbm ?? null,
+      powerMeterStatus: row.vlm_power_meter_status ?? null,
     },
   });
 }
