@@ -7,7 +7,7 @@
  * - Reports: Analytics and reporting dashboards
  */
 
-import { LayoutDashboard, ClipboardCheck, BarChart3, Users, Database, Target } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, BarChart3, Users, Database, Target, AlertTriangle } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
 export const activateConfig: ModuleNavigationConfig = {
@@ -64,6 +64,14 @@ export const activateConfig: ModuleNavigationConfig = {
       icon: Target,
       path: '/activate/action-centre',
       rbacKey: 'activate.action-centre',
+    },
+    {
+      id: 'sitecam-appeals',
+      label: 'SiteCam Appeals',
+      shortLabel: 'Appeals',
+      icon: AlertTriangle,
+      path: '/activate/sitecam-appeals',
+      rbacKey: 'activate.sitecam-appeals',
     },
   ],
 };
