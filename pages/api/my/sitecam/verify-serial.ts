@@ -25,7 +25,8 @@ async function handler(
 
   const { drNumber, step, scannedSerial, attemptNumber } = req.body as VerifySerialBody;
 
-  if (!drNumber || !step || !scannedSerial || !attemptNumber)
+  // attemptNumber is 1-based (caller sends serialAttempts + 1, min 1), so null/undefined check only
+  if (!drNumber || !step || !scannedSerial || attemptNumber == null)
     return apiResponse.badRequest(res, 'drNumber, step, scannedSerial, attemptNumber required');
 
   const isOnt = step === 6;
