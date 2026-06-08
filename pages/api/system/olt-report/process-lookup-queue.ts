@@ -11,6 +11,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
+import { findSerialOnOtherDr } from '@/modules/data-sync/services/oltQueueProcessorService';
 
 const BATCH_SIZE = 50;
 const CONCURRENCY = 2; // Reduced from 3 - fewer concurrent 1Map calls = faster individual responses
@@ -160,19 +161,24 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
   }
 
   if (searchResult.records.length === 0) {
+    // DR absent from 1Map. Reverse-lookup the serial: if it's installed under a
+    // different drop, classify serial_other_dr instead of a blind not_found.
+    // Shares the service's helper so both queue-processing paths stay in sync.
+    const otherDr = await findSerialOnOtherDr(client, item);
+    const mismatchType = otherDr ? 'note2_serial_other_dr' : 'note2_not_on_1map';
     await client.query(
       `UPDATE olt_onemap_lookup_queue
-       SET status = 'completed', mismatch_type = 'note2_not_on_1map',
-           processed_at = NOW()
-       WHERE id = $1`,
-      [item.id]
+       SET status = 'completed', mismatch_type = $1, processed_at = NOW()
+       WHERE id = $2`,
+      [mismatchType, item.id]
     );
     if (importId) {
       await insertMismatchIfNew(client, {
         importId, dropNumber: item.drop_number,
         oltSerial: item.oes_serial, wrongOneMapSerial: null,
-        fixStatus: 'not_found', hasUpsSwap: false,
+        fixStatus: otherDr ? 'serial_other_dr' : 'not_found', hasUpsSwap: false,
         oesBatchId: item.oes_batch_id, oesSource: 'api',
+        investigationContext: otherDr?.context ?? null,
       });
     }
     return;
@@ -331,7 +337,7 @@ async function insertMismatchIfNew(
         return; // Already fixed with same serial (or same status mismatch already fixed)
       }
     } else if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial'
-        || ex.fix_status === 'not_found') {
+        || ex.fix_status === 'not_found' || ex.fix_status === 'serial_other_dr') {
       // Don't overwrite a pending serial fix with a status mismatch
       if (isNewStatusMismatch && !isExistingStatusMismatch) {
         return; // Serial fix takes priority, don't overwrite
@@ -362,7 +368,7 @@ async function insertMismatchIfNew(
        has_ups_swap, detection_source, oes_batch_id, onemap_source, investigation_context)
      VALUES ($1, $2, $3, $4, $5, $6, 'auto', $7, $8, $9)
      ON CONFLICT (drop_number)
-       WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation')
+       WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation','serial_other_dr')
      DO UPDATE SET
        olt_serial = EXCLUDED.olt_serial,
        wrong_onemap_serial = EXCLUDED.wrong_onemap_serial,

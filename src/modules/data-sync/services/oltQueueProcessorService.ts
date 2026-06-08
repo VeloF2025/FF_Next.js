@@ -258,7 +258,7 @@ async function processOneItem(client: PoolClient, item: QueueItem, importId: str
  * a ready-built investigation_context. Returns null when the serial is also
  * absent (genuine not_found) or only found on the same DR.
  */
-async function findSerialOnOtherDr(
+export async function findSerialOnOtherDr(
   client: PoolClient,
   item: QueueItem
 ): Promise<{ foundOnDr: string; context: string } | null> {
@@ -279,9 +279,14 @@ async function findSerialOnOtherDr(
   }
   if (!serialResult.success || serialResult.records.length === 0) return null;
 
-  // Prefer a record on a different DR than the one we searched.
+  // Prefer a record on a different *real* DR than the one we searched.
+  // 'no drop allocated' is a 1Map placeholder (the auto-detect cache JOIN
+  // excludes it too) — a serial sitting on it is not a real other-DR case.
   const match = serialResult.records.find(
-    (r) => r.drp && r.drp.toUpperCase() !== item.drop_number.toUpperCase()
+    (r) =>
+      r.drp &&
+      r.drp.trim().toLowerCase() !== 'no drop allocated' &&
+      r.drp.toUpperCase() !== item.drop_number.toUpperCase()
   );
   if (!match || !match.drp) return null;
 
