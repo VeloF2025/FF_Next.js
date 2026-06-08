@@ -35,7 +35,7 @@ arrive **weeks apart**:
 
 | Discipline | Slots | Approve column | When (field sequence) |
 |---|---|---|---|
-| **Civil** | 7 (`civil_step_01..07`) | `civil_approved` | After pole **planted** |
+| **Civil** | 8 (`civil_step_01..08`) | `civil_approved` | After pole **planted** |
 | **Dome** (optical splice) | 8 (`optical_dome_01..08`) | `dome_approved` | After **stringing** |
 | **Main Joint** | 6 (`main_joint_11..16`) + ≥1 tray photo | `joint_approved` | Later still |
 
@@ -58,7 +58,7 @@ Per discipline lane, rolled up Site → Zone → PON:
   This is Johan's actionable worklist.
 - **Secondary — "Partial":** a per-lane **count** of disciplines with *some but not
   all* slots present, none approved, with activity in the window (e.g. *"+8 partial"*).
-  Click to expand; shows e.g. *"Civil 5/7 — latest 6 days ago"* so incomplete sets
+  Click to expand; shows e.g. *"Civil 5/8 — latest 6 days ago"* so incomplete sets
   don't slip through. Collapsed by default — keeps the worklist clean.
 
 **Recency anchor** for a `(pole, discipline)` = the timestamp of the **last photo that
@@ -108,7 +108,7 @@ Pick the strategy in Task 0; the rest of the build is identical.
 **Storage:** new table, one row per user, keyed by email (matches `approved_by`/`created_by`):
 
 ```sql
--- As built (migration 402). Two timestamps so a refresh doesn't blank the feed:
+-- As built (migration 403). Two timestamps so a refresh doesn't blank the feed:
 CREATE TABLE works_qa_view_watermark (
   user_email      TEXT PRIMARY KEY,
   cutoff_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),  -- "since I last opened" boundary

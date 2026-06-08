@@ -1,4 +1,4 @@
--- Migration 402: Works QA — per-user "since I last opened" watermark
+-- Migration 403: Works QA — per-user "since I last opened" watermark
 -- Purpose: back the Recent Submissions feed's "since I last opened" window.
 --   One row per user (keyed by email, matching pole_qa_photos.approved_by).
 --   cutoff_at      — the boundary the feed shows "new since" against.

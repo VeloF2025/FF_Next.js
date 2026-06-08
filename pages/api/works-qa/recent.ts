@@ -27,10 +27,15 @@ const APPROVE_COLUMN: Record<RecentDiscipline, string> = {
   main_joint: 'joint_approved',
 };
 
-// Column names are sourced from the SLOT_META constant, never user input, but we
-// assert the shape before interpolating — mirrors the ALLOWED_PHOTO_COLUMNS guard
-// in sync-qfield.ts.
+// Column names are sourced from constants (SLOT_META + APPROVE_COLUMN), never user
+// input, but we assert the shape before interpolating — mirrors the
+// ALLOWED_PHOTO_COLUMNS guard in sync-qfield.ts. Asserting at module load means a
+// future unsafe constant fails fast rather than reaching a query string.
 const SAFE_COL = /^[a-z0-9_]+$/;
+
+for (const col of Object.values(APPROVE_COLUMN)) {
+  if (!SAFE_COL.test(col)) throw new Error(`Unsafe approve column: ${col}`);
+}
 
 function columnsFor(d: RecentDiscipline): string[] {
   const cols = SLOT_META.filter(s => s.discipline === d).map(s => s.dbColumn);

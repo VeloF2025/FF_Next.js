@@ -25,22 +25,24 @@ const fetcher = async (url: string): Promise<RecentSubmissionsResponse> => {
  * watermark to now via POST /recent-seen, then revalidates.
  */
 export function useRecentSubmissions(initialWindow: RecentWindow = 'since_last') {
-  const [window, setWindow] = useState<RecentWindow>(initialWindow);
+  // Named timeWindow (not window) to avoid shadowing the browser global.
+  const [timeWindow, setTimeWindow] = useState<RecentWindow>(initialWindow);
 
   const { data, error, isLoading, mutate } = useSWR<RecentSubmissionsResponse>(
-    `/api/works-qa/recent?window=${window}`,
+    `/api/works-qa/recent?window=${timeWindow}`,
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 60_000 },
   );
 
   async function markCaughtUp() {
     try {
-      await fetch('/api/works-qa/recent-seen', { method: 'POST' });
+      const res = await fetch('/api/works-qa/recent-seen', { method: 'POST' });
+      if (!res.ok) throw new Error(String(res.status));
       await mutate();
     } catch (err) {
       log.error('works-qa: mark-caught-up failed', { error: err instanceof Error ? err.message : String(err) });
     }
   }
 
-  return { recent: data, error, isLoading, window, setWindow, markCaughtUp };
+  return { recent: data, error, isLoading, window: timeWindow, setWindow: setTimeWindow, markCaughtUp };
 }
