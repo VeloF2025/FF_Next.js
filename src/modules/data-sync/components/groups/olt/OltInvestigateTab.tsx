@@ -542,6 +542,15 @@ export function OltInvestigateTab({
       // cross-DR conflict context — render its own panel (no swap workflow).
       if (ctx.reason === 'serial_on_other_dr') {
         const where = [ctx.foundOnTeam, ctx.foundOnStatus].filter(Boolean).join(', ');
+        const serial = ctx.oesSerial || record.olt_serial || '—';
+        const foundOnDr = ctx.foundOnDr;
+        // Encode the DR before interpolating: a stray '/', '#' or '&' would
+        // otherwise corrupt the path / query. Links render only when we know
+        // which DR the serial sits on (the field is optional on the type).
+        const oneMapHref = foundOnDr
+          ? `https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${encodeURIComponent(foundOnDr)}`
+          : null;
+        const reviewHref = foundOnDr ? `/activate/${encodeURIComponent(foundOnDr)}` : null;
         return (
           <tr key={`${record.id}-ctx`} className="border-b border-[var(--ff-border-light)]">
             <td colSpan={7} className="py-1.5 px-4">
@@ -554,7 +563,7 @@ export function OltInvestigateTab({
                   <MapPin className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
                   <span className="font-semibold text-teal-300">Serial on Other DR</span>
                   <span className="text-[var(--ff-text-secondary)]">
-                    — ONT <span className="font-mono text-teal-200">{ctx.oesSerial}</span> registered under <span className="font-mono text-[var(--ff-accent)]">{ctx.foundOnDr}</span>{where && <> ({where})</>}
+                    — ONT <span className="font-mono text-teal-200">{serial}</span> registered under <span className="font-mono text-[var(--ff-accent)]">{foundOnDr || 'unknown DR'}</span>{where && <> ({where})</>}
                   </span>
                 </div>
               </button>
@@ -562,30 +571,36 @@ export function OltInvestigateTab({
                 <div className="bg-teal-500/5 border border-t-0 border-teal-500/20 rounded-b-lg px-3 py-2.5 -mt-1 space-y-2">
                   <p className="text-xs text-[var(--ff-text-secondary)] leading-relaxed">
                     <span className="font-mono text-[var(--ff-accent)]">{ctx.oesDr || record.drop_number}</span> is not on 1Map,
-                    but its ONT serial <span className="font-mono text-teal-200">{ctx.oesSerial}</span> is registered under <a
-                      href={`https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${ctx.foundOnDr}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-[var(--ff-accent)] hover:underline"
-                      onClick={e => e.stopPropagation()}
-                    >{ctx.foundOnDr}</a>{where && <> ({where})</>}. The unit is installed — the OES drop number is wrong, not the serial.
+                    but its ONT serial <span className="font-mono text-teal-200">{serial}</span> is registered under {oneMapHref ? (
+                      <a
+                        href={oneMapHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[var(--ff-accent)] hover:underline"
+                        onClick={e => e.stopPropagation()}
+                      >{foundOnDr}</a>
+                    ) : (
+                      <span className="font-mono text-[var(--ff-accent)]">unknown DR</span>
+                    )}{where && <> ({where})</>}. The unit is installed — the OES drop number is wrong, not the serial.
                   </p>
-                  <div className="flex items-center gap-3 text-xs pt-1 border-t border-teal-500/10">
-                    <a
-                      href={`/activate/${ctx.foundOnDr}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-[var(--ff-accent)] hover:underline"
-                      onClick={e => e.stopPropagation()}
-                    ><Search className="w-3 h-3" /> Review {ctx.foundOnDr}</a>
-                    <a
-                      href={`https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${ctx.foundOnDr}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-blue-400 hover:underline"
-                      onClick={e => e.stopPropagation()}
-                    ><ExternalLink className="w-3 h-3" /> View in 1Map</a>
-                  </div>
+                  {foundOnDr && (
+                    <div className="flex items-center gap-3 text-xs pt-1 border-t border-teal-500/10">
+                      <a
+                        href={reviewHref!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[var(--ff-accent)] hover:underline"
+                        onClick={e => e.stopPropagation()}
+                      ><Search className="w-3 h-3" /> Review {foundOnDr}</a>
+                      <a
+                        href={oneMapHref!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-blue-400 hover:underline"
+                        onClick={e => e.stopPropagation()}
+                      ><ExternalLink className="w-3 h-3" /> View in 1Map</a>
+                    </div>
+                  )}
                 </div>
               )}
             </td>
