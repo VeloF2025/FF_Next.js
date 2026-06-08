@@ -34,9 +34,8 @@ import {
   triggerOnTeamAssignment,
   triggerCreatorStatusUpdate,
   triggerOnReassignment,
-  triggerOnTicketResolution,
 } from '@/modules/noc/services/notificationTriggers';
-import { markLinkedDataSyncResolved } from '@/modules/noc/services/dataSyncResolution';
+import { applyTicketResolvedSideEffects } from '@/modules/noc/services/ticketResolutionService';
 import { notifySnagGroupOnStatusChange } from '@/modules/noc/services/snagGroupNotifications';
 import type { UpdateTicketPayload } from '@/modules/noc/types/ticket';
 import { TicketStatus } from '@/modules/noc/types/ticket';
@@ -302,32 +301,13 @@ export async function PUT(
       }
     }
 
-    // Notify ticket creator when ticket is resolved (email + in-app notification)
+    // When a ticket transitions to resolved, run the shared resolve cascade:
+    // creator notification, linked Data Sync resolution, snag back-sync, and an
+    // AI history-summary refresh. Same path the OLT investigate resolve uses, so
+    // the two never drift. (Migration 364 removed 'closed'; 'resolved' is terminal.)
     if (body.status === 'resolved' && oldTicket?.status !== 'resolved') {
-      triggerOnTicketResolution(updatedTicket).catch(err => {
-        logger.error('Resolution notification error', { ticketId, error: err.message });
-      });
-    }
-
-    // When ticket is resolved, mark linked Data Sync records as resolved.
-    // (Migration 364 removed the 'closed' status; 'resolved' is terminal.)
-    if (body.status === 'resolved') {
-      markLinkedDataSyncResolved(ticketId)
-        .catch(err => {
-          logger.error('Data Sync resolution error', { ticketId, error: err.message });
-        });
-    }
-
-    // Bi-directional sync: propagate NOC resolution back to linked snag
-    // (resolved → snag.status = 'fixed').
-    if (body.status === 'resolved' && updatedTicket.source === 'snags') {
-      const snagStatus = 'fixed';
-      sql`
-        UPDATE snags
-        SET status = ${snagStatus}, updated_at = NOW()
-        WHERE noc_ticket_id = ${ticketId}
-      `.catch(err => {
-        logger.error('Snag status sync error', { ticketId, snagStatus, error: err instanceof Error ? err.message : String(err) });
+      applyTicketResolvedSideEffects(updatedTicket, { actingUser }).catch((err: unknown) => {
+        logger.error('Ticket resolved side-effects error', { ticketId, error: err instanceof Error ? err.message : String(err) });
       });
     }
 
