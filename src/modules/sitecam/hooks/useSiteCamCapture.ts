@@ -6,12 +6,24 @@ import { readFileAsBase64 } from '../lib/fileToBase64';
 
 const MODULE = 'useSiteCamCapture';
 
-export type StepStatus = 'pending' | 'validating' | 'pass' | 'fail' | 'escalated';
+export type StepStatus =
+  | 'pending'
+  | 'validating'
+  | 'pass'
+  | 'fail'
+  | 'escalated'
+  | 'serial_scan'     // photo passed, waiting for barcode scan
+  | 'serial_pending'; // barcode scanned + format valid, saved as pending (cross-ref async)
 
 export interface StepState {
   stepNumber: number;
   label: string;
   hasVlm: boolean;
+  hasSerialScan: boolean;
+  serialLabel: string;
+  serialDevice: 'ont' | 'ups' | null;
+  serialAttempts: number;
+  serialScanned: string | null;
   status: StepStatus;
   photoBase64: string | null;
   attemptNumber: number;
@@ -37,11 +49,18 @@ export interface SiteInfo {
   zone: number | null;
 }
 
-function initStepStates(steps: readonly SiteCamStep[]): StepState[] {
+function initStepStates(
+  steps: readonly SiteCamStep[],
+): StepState[] {
   return steps.map((s) => ({
     stepNumber: s.number,
     label: s.label,
     hasVlm: s.hasVlm,
+    hasSerialScan: s.hasSerialScan,
+    serialLabel: s.serialLabel ?? '',
+    serialDevice: s.serialDevice ?? null,
+    serialAttempts: 0,
+    serialScanned: null,
     status: 'pending',
     photoBase64: null,
     attemptNumber: 0,
@@ -104,6 +123,24 @@ export function useSiteCamCapture(
     [steps, siteInfo, advanceStep],
   );
 
+  const handleSerialSaved = useCallback(
+    (idx: number, serial: string) => {
+      setStepStates((prev) =>
+        prev.map((s, i) => {
+          if (i !== idx) return s;
+          return {
+            ...s,
+            status: 'serial_pending',
+            serialScanned: serial,
+            serialAttempts: s.serialAttempts + 1,
+          };
+        }),
+      );
+      advanceStep(1500);
+    },
+    [advanceStep],
+  );
+
   const captureAndValidate = useCallback(
     async (file: File): Promise<void> => {
       const idx = currentStepIndex;
@@ -132,6 +169,14 @@ export function useSiteCamCapture(
       );
 
       if (!step.hasVlm) {
+        if (step.hasSerialScan && siteInfo.jobType === 'activations') {
+          setStepStates((prev) =>
+            prev.map((s, i) =>
+              i === idx ? { ...s, status: 'serial_scan', photoBase64: base64 } : s,
+            ),
+          );
+          return;
+        }
         setStepStates((prev) =>
           prev.map((s, i) => (i === idx ? { ...s, status: 'pass' } : s)),
         );
@@ -177,10 +222,21 @@ export function useSiteCamCapture(
         const { pass, reasons, corrections, maxAttempts, needsManualReview } = json.data;
 
         if (pass) {
-          // needsManualReview is set when the server failed open (VLM down).
           const flagged = needsManualReview === true;
+          if (step.hasSerialScan && siteInfo.jobType === 'activations') {
+            setStepStates((prev) =>
+              prev.map((s, i) =>
+                i === idx
+                  ? { ...s, status: 'serial_scan', needsManualReview: flagged }
+                  : s,
+              ),
+            );
+            return;
+          }
           setStepStates((prev) =>
-            prev.map((s, i) => (i === idx ? { ...s, status: 'pass', needsManualReview: flagged } : s)),
+            prev.map((s, i) =>
+              i === idx ? { ...s, status: 'pass', needsManualReview: flagged } : s,
+            ),
           );
           advanceStep(1500);
           return;
@@ -213,7 +269,7 @@ export function useSiteCamCapture(
 
   const submitAll = useCallback(async (): Promise<void> => {
     const photos = stepStates
-      .filter((s) => (s.status === 'pass' || s.status === 'escalated') && s.photoBase64 !== null)
+      .filter((s) => (s.status === 'pass' || s.status === 'escalated' || s.status === 'serial_pending') && s.photoBase64 !== null)
       .map((s) => ({
         stepNumber: s.stepNumber,
         stepLabel: s.label,
@@ -271,7 +327,7 @@ export function useSiteCamCapture(
   const currentStep: StepState | null = stepStates[currentStepIndex] ?? null;
 
   const allDone = stepStates.every(
-    (s) => s.status === 'pass' || s.status === 'escalated',
+    (s) => s.status === 'pass' || s.status === 'escalated' || s.status === 'serial_pending',
   );
 
   return {
@@ -280,11 +336,11 @@ export function useSiteCamCapture(
     currentStepIndex,
     allDone,
     captureAndValidate,
+    handleSerialSaved: (serial: string) => handleSerialSaved(currentStepIndex, serial),
     submitAll,
     uploading,
     uploadError,
     uploadResult,
-    // Exported for tests
     escalateStep,
   };
 }

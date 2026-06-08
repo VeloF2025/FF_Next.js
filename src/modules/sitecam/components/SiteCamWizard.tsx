@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
@@ -6,6 +7,8 @@ import { getStepsForJobType } from '../lib/sitecamSteps';
 import type { GeofenceReading } from '../lib/geofence';
 import { StepCapture } from './StepCapture';
 import { SiteCamSuccess } from './SiteCamSuccess';
+import { AppealModal } from './AppealModal';
+import { log } from '@/lib/logger';
 
 interface Props {
   profile: AttendanceProfile;
@@ -23,11 +26,13 @@ const STATUS_DOT: Record<string, string> = {
 
 export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props) {
   const steps = getStepsForJobType(siteInfo.jobType);
+  const [appealOpen, setAppealOpen] = useState(false);
   const {
     stepStates,
     currentStep,
     allDone,
     captureAndValidate,
+    handleSerialSaved,
     submitAll,
     uploading,
     uploadError,
@@ -36,7 +41,7 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
 
   const total = stepStates.length;
   const doneCount = stepStates.filter(
-    (s) => s.status === 'pass' || s.status === 'escalated',
+    (s) => s.status === 'pass' || s.status === 'escalated' || s.status === 'serial_pending',
   ).length;
   const passedCount = stepStates.filter((s) => s.status === 'pass').length;
   const escalatedCount = stepStates.filter((s) => s.status === 'escalated').length;
@@ -88,7 +93,32 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
         {!allDone && currentStep && (
           <StepCapture
             step={currentStep}
+            drNumber={siteInfo.siteId}
             onCapture={(f) => void captureAndValidate(f)}
+            onSerialSaved={handleSerialSaved}
+            onAppeal={() => setAppealOpen(true)}
+          />
+        )}
+
+        {/* Appeal modal */}
+        {currentStep && (
+          <AppealModal
+            isOpen={appealOpen}
+            onClose={() => setAppealOpen(false)}
+            onSubmitted={(appealId) => {
+              setAppealOpen(false);
+              log.info('Appeal submitted', { appealId }, 'SiteCamWizard');
+            }}
+            drNumber={siteInfo.siteId}
+            stepNumber={currentStep.stepNumber}
+            stepLabel={currentStep.label}
+            photoUrl={currentStep.photoBase64}
+            serialScanned={currentStep.serialScanned ?? undefined}
+            attemptNumber={
+              currentStep.status === 'serial_scan' || currentStep.status === 'serial_pending'
+                ? currentStep.serialAttempts
+                : currentStep.attemptNumber
+            }
           />
         )}
 

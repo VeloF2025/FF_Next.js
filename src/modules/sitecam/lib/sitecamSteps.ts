@@ -2,32 +2,35 @@ export interface SiteCamStep {
   number: number;
   label: string;
   hasVlm: boolean;
+  hasSerialScan: boolean;
+  serialLabel?: string;
+  serialDevice?: 'ont' | 'ups';
 }
 
 export const ACTIVATION_STEPS: readonly SiteCamStep[] = [
-  { number: 1,  label: 'House / Property Photo',   hasVlm: true  },
-  { number: 2,  label: 'Cable from Pole',           hasVlm: true  },
-  { number: 3,  label: 'Entry Outside',             hasVlm: false },
-  { number: 4,  label: 'Entry Inside',              hasVlm: false },
-  { number: 5,  label: 'Wall (ONT Mount)',          hasVlm: true  },
-  { number: 6,  label: 'ONT Back After Install',    hasVlm: false },
-  { number: 7,  label: 'Power Meter',               hasVlm: true  },
-  { number: 8,  label: 'Final Installation',        hasVlm: true  },
-  { number: 9,  label: 'Green Lights on ONT',       hasVlm: true  },
-  { number: 10, label: 'Signature',                 hasVlm: true  },
-  { number: 11, label: 'Dome Joint Open',           hasVlm: true  },
-  { number: 12, label: 'Dome Joint Closed',         hasVlm: true  },
+  { number: 1,  label: 'House / Property Photo',   hasVlm: true,  hasSerialScan: false },
+  { number: 2,  label: 'Cable from Pole',           hasVlm: true,  hasSerialScan: false },
+  { number: 3,  label: 'Entry Outside',             hasVlm: false, hasSerialScan: false },
+  { number: 4,  label: 'Entry Inside',              hasVlm: false, hasSerialScan: false },
+  { number: 5,  label: 'Wall (ONT Mount)',          hasVlm: true,  hasSerialScan: false },
+  { number: 6,  label: 'ONT Back After Install',    hasVlm: false, hasSerialScan: true,  serialLabel: 'ONT Serial',  serialDevice: 'ont' },
+  { number: 7,  label: 'Power Meter',               hasVlm: true,  hasSerialScan: false },
+  { number: 8,  label: 'Final Installation',        hasVlm: true,  hasSerialScan: true,  serialLabel: 'UPS Serial',  serialDevice: 'ups' },
+  { number: 9,  label: 'Green Lights on ONT',       hasVlm: true,  hasSerialScan: false },
+  { number: 10, label: 'Signature',                 hasVlm: true,  hasSerialScan: false },
+  { number: 11, label: 'Dome Joint Open',           hasVlm: true,  hasSerialScan: false },
+  { number: 12, label: 'Dome Joint Closed',         hasVlm: true,  hasSerialScan: false },
 ];
 
 export const CIVIL_STEPS: readonly SiteCamStep[] = [
-  { number: 1, label: 'Before Photo',  hasVlm: true },
-  { number: 2, label: 'During Photo',  hasVlm: true },
-  { number: 3, label: 'Depth Photo',   hasVlm: true },
-  { number: 4, label: 'End Plates',    hasVlm: true },
-  { number: 5, label: 'Compaction / Backfill', hasVlm: true },
-  { number: 6, label: 'Level Check',   hasVlm: true },
-  { number: 7, label: 'After Photo',   hasVlm: true },
-  { number: 8, label: 'Pole Label',    hasVlm: true },
+  { number: 1, label: 'Before Photo',          hasVlm: true, hasSerialScan: false },
+  { number: 2, label: 'During Photo',          hasVlm: true, hasSerialScan: false },
+  { number: 3, label: 'Depth Photo',           hasVlm: true, hasSerialScan: false },
+  { number: 4, label: 'End Plates',            hasVlm: true, hasSerialScan: false },
+  { number: 5, label: 'Compaction / Backfill', hasVlm: true, hasSerialScan: false },
+  { number: 6, label: 'Level Check',           hasVlm: true, hasSerialScan: false },
+  { number: 7, label: 'After Photo',           hasVlm: true, hasSerialScan: false },
+  { number: 8, label: 'Pole Label',            hasVlm: true, hasSerialScan: false },
 ];
 
 export const CIVIL_STEP_LABELS: Record<number, string> = Object.fromEntries(

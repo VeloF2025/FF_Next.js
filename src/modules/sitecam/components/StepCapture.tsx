@@ -2,26 +2,32 @@ import { useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { AlertTriangle, Camera, CheckCircle, Loader2 } from 'lucide-react';
 import type { StepState } from '../hooks/useSiteCamCapture';
+import { SerialScanStep } from './SerialScanStep';
 
 interface Props {
   step: StepState;
+  drNumber: string;
   onCapture: (file: File) => void;
+  onSerialSaved: (serial: string) => void;
+  onAppeal: () => void;
 }
 
-export function StepCapture({ step, onCapture }: Props) {
+export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       onCapture(file);
-      // Reset so the same file can be re-selected on retry
       e.target.value = '';
     }
   };
 
   const showCamera = step.status === 'pending' || step.status === 'fail';
+  const showSerialScan = step.status === 'serial_scan';
   const remaining = Math.max(0, 3 - step.attemptNumber);
+  const showAppeal =
+    (step.status === 'fail' && step.attemptNumber > 0) || step.status === 'escalated';
 
   return (
     <div className="space-y-4">
@@ -29,8 +35,6 @@ export function StepCapture({ step, onCapture }: Props) {
         Step {step.stepNumber}: {step.label}
       </h2>
 
-      {/* Captured photo preview — lets the technician see the shot they took
-          while it is being checked and alongside the pass/fail result. */}
       {step.photoBase64 && (
         <div className="relative overflow-hidden rounded-xl border border-neutral-700 bg-black">
           <img
@@ -47,15 +51,15 @@ export function StepCapture({ step, onCapture }: Props) {
         </div>
       )}
 
-      {/* Status: pass */}
-      {step.status === 'pass' && (
+      {(step.status === 'pass' || step.status === 'serial_pending') && (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-green-800 bg-green-950/40 py-8">
           <CheckCircle className="h-8 w-8 text-green-400" />
-          <p className="text-sm font-medium text-green-300">Photo accepted!</p>
+          <p className="text-sm font-medium text-green-300">
+            {step.status === 'serial_pending' ? 'Step complete' : 'Photo accepted!'}
+          </p>
         </div>
       )}
 
-      {/* Status: escalated */}
       {step.status === 'escalated' && (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-amber-800 bg-amber-950/40 py-8">
           <AlertTriangle className="h-8 w-8 text-amber-400" />
@@ -64,22 +68,17 @@ export function StepCapture({ step, onCapture }: Props) {
         </div>
       )}
 
-      {/* Status: fail */}
       {step.status === 'fail' && step.failReasons.length > 0 && (
         <div className="rounded-xl border border-red-800 bg-red-950/40 px-4 py-4 space-y-3">
           <div className="space-y-1">
             {step.failReasons.map((reason, i) => (
-              <p key={i} className="text-sm text-red-300">
-                {reason}
-              </p>
+              <p key={i} className="text-sm text-red-300">{reason}</p>
             ))}
           </div>
           {step.corrections.length > 0 && (
             <div className="space-y-1 border-t border-red-900 pt-3">
               {step.corrections.map((correction, i) => (
-                <p key={i} className="text-xs italic text-neutral-400">
-                  {correction}
-                </p>
+                <p key={i} className="text-xs italic text-neutral-400">{correction}</p>
               ))}
             </div>
           )}
@@ -89,7 +88,17 @@ export function StepCapture({ step, onCapture }: Props) {
         </div>
       )}
 
-      {/* Camera button (pending or fail) */}
+      {showSerialScan && step.serialDevice && (
+        <SerialScanStep
+          stepNumber={step.stepNumber}
+          serialLabel={step.serialLabel}
+          serialDevice={step.serialDevice}
+          serialAttempts={step.serialAttempts}
+          drNumber={drNumber}
+          onScanSaved={onSerialSaved}
+        />
+      )}
+
       {showCamera && (
         <div>
           <button
@@ -109,6 +118,16 @@ export function StepCapture({ step, onCapture }: Props) {
             onChange={handleInputChange}
           />
         </div>
+      )}
+
+      {showAppeal && (
+        <button
+          type="button"
+          onClick={onAppeal}
+          className="w-full rounded-xl border border-amber-700 bg-amber-950/30 py-3 text-sm font-medium text-amber-300 hover:bg-amber-950/50 transition-colors"
+        >
+          Appeal This Step
+        </button>
       )}
     </div>
   );

@@ -23,6 +23,30 @@ interface PwaSubmission {
   techName: string;
   photoCount: number;
   photoUrls: Record<number, string>;
+  ontSerialScanned: string | null;
+  ontSerialStatus: string | null;
+  upsSerialScanned: string | null;
+  upsSerialStatus: string | null;
+  powerMeterDbm: number | null;
+  powerMeterStatus: string | null;
+}
+
+function SerialBadge({ serial, status }: { serial: string | null; status: string | null }) {
+  if (!serial) return null;
+  const colour =
+    status === 'pass'    ? 'text-green-600 bg-green-50' :
+    status === 'fail'    ? 'text-red-600 bg-red-50' :
+    status === 'pending' ? 'text-amber-600 bg-amber-50' :
+    'text-neutral-500 bg-neutral-100';
+  const icon =
+    status === 'pass' ? '✓' :
+    status === 'fail' ? '✗' :
+    status === 'pending' ? '⏳' : '?';
+  return (
+    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-mono ${colour}`}>
+      {icon} {serial}
+    </span>
+  );
 }
 
 interface ApiResponse {
@@ -95,6 +119,25 @@ export function PwaComparisonTab({ drNumber }: { drNumber: string }) {
             ) : (
               <div className="flex h-32 items-center justify-center text-xs text-gray-600">
                 {url ? 'Image failed to load' : 'No photo'}
+              </div>
+            )}
+            {/* Serial badge for ONT (step 6) */}
+            {stepNumber === 6 && (
+              <div className="px-2 py-1">
+                <SerialBadge serial={submission.ontSerialScanned} status={submission.ontSerialStatus} />
+              </div>
+            )}
+            {/* Serial badge for UPS (step 8) */}
+            {stepNumber === 8 && (
+              <div className="px-2 py-1">
+                <SerialBadge serial={submission.upsSerialScanned} status={submission.upsSerialStatus} />
+              </div>
+            )}
+            {/* Power meter (step 7) */}
+            {stepNumber === 7 && submission.powerMeterDbm !== null && (
+              <div className="px-2 py-1 text-xs text-gray-400">
+                {submission.powerMeterDbm} dBm
+                {submission.powerMeterStatus === 'pass' ? ' ✓' : ' ✗'}
               </div>
             )}
           </div>
