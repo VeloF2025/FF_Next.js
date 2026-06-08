@@ -86,3 +86,69 @@ export async function findSerialOnOtherDr(
 
   return { foundOnDr: match.drp, context };
 }
+
+export interface OneMapStateSnapshot {
+  /** match = 1Map now agrees with OES; the others are flavours of "not fixed". */
+  state: 'match' | 'mismatch' | 'absent_serial_elsewhere' | 'absent_serial_missing' | 'unknown';
+  /** True only when 1Map now matches the OES serial (a genuine fix). */
+  changed: boolean;
+  /** Factual one-liner for the resolution note / NOC comment. */
+  summary: string;
+}
+
+/**
+ * Live 1Map re-check at manual-resolve time: what does 1Map show *now* for this
+ * DR + OES serial? Produces a factual one-line delta so the operator doesn't
+ * have to describe the change by hand, and so a resolve that isn't backed by an
+ * actual 1Map change is visible in the note.
+ *
+ * Advisory only — it never blocks a resolve. Best-effort: any 1Map failure
+ * returns state 'unknown' with an explanatory summary; never throws.
+ */
+export async function describeCurrentOneMapState(
+  dropNumber: string,
+  oesSerial: string | null,
+): Promise<OneMapStateSnapshot> {
+  const serial = oesSerial?.trim().toUpperCase() ?? '';
+  if (!serial) {
+    return { state: 'unknown', changed: false, summary: 'no OES serial on record — 1Map not checked' };
+  }
+
+  try {
+    const drResult = await oneMapApi.searchDR(dropNumber);
+    if (!drResult.success) {
+      return { state: 'unknown', changed: false, summary: `1Map check unavailable (${drResult.error || 'lookup failed'})` };
+    }
+
+    if (drResult.records.length > 0) {
+      const matched = drResult.records.some((r) => r.ph_ont?.trim().toUpperCase() === serial);
+      if (matched) {
+        return { state: 'match', changed: true, summary: `${dropNumber} now on 1Map with ONT ${oesSerial} ✓ (matches OES)` };
+      }
+      const current = drResult.records.find((r) => r.ph_ont)?.ph_ont ?? 'none';
+      return { state: 'mismatch', changed: false, summary: `${dropNumber} on 1Map with ONT ${current} — does not match OES ${oesSerial}` };
+    }
+
+    // DR absent from 1Map — locate where the serial currently sits.
+    const serialResult = await oneMapApi.searchBySerial(serial);
+    const elsewhere = serialResult.success
+      ? serialResult.records.find(
+          (r) =>
+            r.drp &&
+            r.drp.trim().toLowerCase() !== 'no drop allocated' &&
+            r.drp.toUpperCase() !== dropNumber.toUpperCase(),
+        )
+      : undefined;
+    if (elsewhere?.drp) {
+      const status = elsewhere.status ? ` (${elsewhere.status})` : '';
+      return {
+        state: 'absent_serial_elsewhere',
+        changed: false,
+        summary: `${dropNumber} still absent from 1Map; ONT ${oesSerial} is registered under ${elsewhere.drp}${status}`,
+      };
+    }
+    return { state: 'absent_serial_missing', changed: false, summary: `${dropNumber} absent from 1Map; ONT ${oesSerial} not found on 1Map` };
+  } catch (err) {
+    return { state: 'unknown', changed: false, summary: `1Map check unavailable (${err instanceof Error ? err.message : String(err)})` };
+  }
+}
