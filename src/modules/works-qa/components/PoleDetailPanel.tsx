@@ -11,6 +11,8 @@ import { ApproveDisciplineButton } from './ApprovePoleButton';
 import { DisciplineComments } from './DisciplineComments';
 import { UnassignedBucket } from './UnassignedBucket';
 import { PoleSnagsTab } from './PoleSnagsTab';
+import { SlotPhotoPicker } from './SlotPhotoPicker';
+import { getLinkCandidates } from '../utils/link-candidates';
 import { SLOT_META } from '../utils/slot-keys';
 import {
   APPROVED_FLAG,
@@ -24,7 +26,7 @@ import {
 } from '../utils/pole-detail-helpers';
 import {
   assignPhoto, overrideSlot, movePhoto, uploadTrayPhotos,
-  approvePhotoApi, snagPhotoApi,
+  approvePhotoApi, snagPhotoApi, linkPhoto,
 } from '../utils/pole-detail-api';
 import type { Discipline } from '../utils/approval-gates';
 import { log } from '@/lib/logger';
@@ -47,6 +49,8 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const [showSnagModal, setShowSnagModal] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [tab, setTab] = useState<'photos' | 'snags'>('photos');
+  // Target slot for the "reuse an existing photo" picker (dual-step linking).
+  const [linkTarget, setLinkTarget] = useState<{ slotKey: string; label: string } | null>(null);
   // Accordion state: multi-open SET of expanded disciplines. Defaults to all
   // three so every Droppable has measurable geometry at drag start (rfd
   // snapshots `display:none` slots as zero-area bboxes and silently rejects
@@ -58,6 +62,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     setMoveError(null);
     setExpanded(new Set(['civil', 'dome', 'main_joint']));
     setTab('photos');
+    setLinkTarget(null);
   }, [poleId]);
 
   function toggleSection(d: Discipline) {
@@ -173,6 +178,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                     if (!k) return;
                     movePhoto(pole.id, k, slot.key, 'unassigned').then(() => mutate()).catch((e: unknown) => setMoveError(e instanceof Error ? e.message : String(e)));
                   }}
+                  onLinkExisting={() => setLinkTarget({ slotKey: slot.key, label: slot.label })}
                   disabled={disciplineApproved}
                 />
               ))}
@@ -345,6 +351,19 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
           poleLabel={pole.pole_label}
           onClose={() => setShowSnagModal(false)}
           onChanged={() => { void mutate(); }}
+        />
+      )}
+      {pole && linkTarget && (
+        <SlotPhotoPicker
+          targetLabel={linkTarget.label}
+          candidates={getLinkCandidates(pole, linkTarget.slotKey)}
+          onSelect={(sourceSlot, reason) => {
+            const target = linkTarget.slotKey;
+            linkPhoto(pole.id, sourceSlot, target, reason)
+              .then(() => { setLinkTarget(null); return mutate(); })
+              .catch((e: unknown) => { setMoveError(e instanceof Error ? e.message : String(e)); setLinkTarget(null); });
+          }}
+          onClose={() => setLinkTarget(null)}
         />
       )}
       {pole && showCommentModal && (
