@@ -20,7 +20,7 @@ import type {
 export async function gatherDrFacts(
   drNumber: string,
   ontSerial: string | null,
-  excludeTicketId: string | null,
+  currentTicketId: string | null,
 ): Promise<DrFacts> {
   const [
     dropRow,
@@ -91,7 +91,7 @@ export async function gatherDrFacts(
          AND ($3::uuid IS NULL OR id <> $3)
        ORDER BY created_at DESC
        LIMIT 5`,
-      [drNumber, ontSerial, excludeTicketId],
+      [drNumber, ontSerial, currentTicketId],
     ),
     query<DrOfflineDevice>(
       `SELECT serial_number, last_inform_date, days_since_last_inform,
@@ -102,11 +102,10 @@ export async function gatherDrFacts(
        LIMIT 3`,
       [drNumber],
     ),
-    // Operator-authored notes on THIS ticket. excludeTicketId is the current
-    // ticket's id (it's reused as the exclusion key for prior_tickets); here
-    // it scopes the notes lookup. When null (no ticket context) we skip the
-    // query and return an empty set.
-    excludeTicketId
+    // Operator-authored notes on THIS ticket. currentTicketId scopes the
+    // lookup to the ticket being summarized. When null (no ticket context,
+    // e.g. a pre-insert call) we skip the query and return an empty set.
+    currentTicketId
       ? query<DrTicketNote>(
           `SELECT n.content, n.note_type, n.visibility,
                   NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), '') AS author,
@@ -115,8 +114,8 @@ export async function gatherDrFacts(
            LEFT JOIN users u ON n.created_by = u.id
            WHERE n.ticket_id = $1::uuid
            ORDER BY n.created_at DESC NULLS LAST
-           LIMIT 20`,
-          [excludeTicketId],
+           LIMIT 10`,
+          [currentTicketId],
         )
       : Promise.resolve([] as DrTicketNote[]),
   ]);
