@@ -56,10 +56,10 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
   8: {
     label: 'Final Installation',
     requirements:
-      'ALL of the following must be visible in a single wide shot: the white Fibertime/Nokia router, the black ONT box (behind or below the router), cables leading to a power outlet, and the power outlet (wall socket) itself.',
+      'A wide shot showing both the white Fibertime/Nokia router AND a power outlet (wall socket) visible somewhere in the frame. The router may be mounted on a wall, placed on a countertop, on top of a TV, or on any surface — placement does not matter. The power outlet does not need to be the main subject; it only needs to be visible somewhere in the frame, including partially visible at the edge or corner.',
     failInstruction:
-      'FAIL if the power outlet/wall socket is NOT visible anywhere in the frame, even if the router, ONT, and cables are all present.',
-    failReason: 'Power outlet not in view',
+      'FAIL only if the white router is completely absent from the frame, OR if no power outlet is visible anywhere in the frame at all. Do NOT fail because the router is not wall-mounted, or because the power outlet is small or in a corner. A partially visible outlet counts as visible.',
+    failReason: 'Router or power outlet not visible in frame',
   },
   9: {
     label: 'Green Lights on ONT',
