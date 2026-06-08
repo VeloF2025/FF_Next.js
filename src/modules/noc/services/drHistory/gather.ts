@@ -14,6 +14,7 @@ import type {
   DrOnemapProp,
   DrPriorTicket,
   DrOfflineDevice,
+  DrTicketNote,
 } from './types';
 
 export async function gatherDrFacts(
@@ -30,6 +31,7 @@ export async function gatherDrFacts(
     onemapProps,
     priorTickets,
     offlineDevices,
+    ticketNotes,
   ] = await Promise.all([
     query<DrDrop>(
       `SELECT project_id, pole_number, installation_date, status, qc_status,
@@ -100,6 +102,23 @@ export async function gatherDrFacts(
        LIMIT 3`,
       [drNumber],
     ),
+    // Operator-authored notes on THIS ticket. excludeTicketId is the current
+    // ticket's id (it's reused as the exclusion key for prior_tickets); here
+    // it scopes the notes lookup. When null (no ticket context) we skip the
+    // query and return an empty set.
+    excludeTicketId
+      ? query<DrTicketNote>(
+          `SELECT n.content, n.note_type, n.visibility,
+                  NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), '') AS author,
+                  n.created_at
+           FROM maintenance_notes n
+           LEFT JOIN users u ON n.created_by = u.id
+           WHERE n.ticket_id = $1::uuid
+           ORDER BY n.created_at DESC NULLS LAST
+           LIMIT 20`,
+          [excludeTicketId],
+        )
+      : Promise.resolve([] as DrTicketNote[]),
   ]);
 
   return {
@@ -113,6 +132,7 @@ export async function gatherDrFacts(
     onemap_props: onemapProps,
     prior_tickets: priorTickets,
     offline_devices: offlineDevices,
+    ticket_notes: ticketNotes,
   };
 }
 
@@ -129,7 +149,8 @@ export function hasAnyHistory(facts: DrFacts): boolean {
     !!facts.olt_mismatch ||
     facts.onemap_props.length > 0 ||
     facts.prior_tickets.length > 0 ||
-    facts.offline_devices.length > 0
+    facts.offline_devices.length > 0 ||
+    facts.ticket_notes.length > 0
   );
 }
 
@@ -172,6 +193,11 @@ export function sanitizeFacts(facts: DrFacts): DrFacts {
     offline_devices: facts.offline_devices.map((d) => ({
       ...d,
       last_down_reason: clip(d.last_down_reason),
+    })),
+    ticket_notes: facts.ticket_notes.map((n) => ({
+      ...n,
+      content: clip(n.content),
+      author: clip(n.author),
     })),
   };
 }

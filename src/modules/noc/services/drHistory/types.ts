@@ -67,6 +67,13 @@ export interface DrFacts {
     offline_bucket: string | null;
     last_down_reason: string | null;
   }>;
+  ticket_notes: Array<{
+    content: string | null;
+    note_type: string | null;
+    visibility: string | null;
+    author: string | null;
+    created_at: string | null;
+  }>;
 }
 
 export type DrDrop = NonNullable<DrFacts['drop']>;
@@ -77,3 +84,4 @@ export type DrOltMismatch = NonNullable<DrFacts['olt_mismatch']>;
 export type DrOnemapProp = DrFacts['onemap_props'][number];
 export type DrPriorTicket = DrFacts['prior_tickets'][number];
 export type DrOfflineDevice = DrFacts['offline_devices'][number];
+export type DrTicketNote = DrFacts['ticket_notes'][number];
