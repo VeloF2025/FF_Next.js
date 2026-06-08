@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
@@ -23,11 +24,13 @@ const STATUS_DOT: Record<string, string> = {
 
 export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props) {
   const steps = getStepsForJobType(siteInfo.jobType);
+  const [_appealOpen, setAppealOpen] = useState(false);
   const {
     stepStates,
     currentStep,
     allDone,
     captureAndValidate,
+    handleSerialSaved,
     submitAll,
     uploading,
     uploadError,
@@ -88,7 +91,10 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
         {!allDone && currentStep && (
           <StepCapture
             step={currentStep}
+            drNumber={siteInfo.siteId}
             onCapture={(f) => void captureAndValidate(f)}
+            onSerialSaved={handleSerialSaved}
+            onAppeal={() => setAppealOpen(true)}
           />
         )}
 

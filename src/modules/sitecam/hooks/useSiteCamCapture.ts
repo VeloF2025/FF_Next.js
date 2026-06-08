@@ -123,6 +123,24 @@ export function useSiteCamCapture(
     [steps, siteInfo, advanceStep],
   );
 
+  const handleSerialSaved = useCallback(
+    (idx: number, serial: string) => {
+      setStepStates((prev) =>
+        prev.map((s, i) => {
+          if (i !== idx) return s;
+          return {
+            ...s,
+            status: 'serial_pending',
+            serialScanned: serial,
+            serialAttempts: s.serialAttempts + 1,
+          };
+        }),
+      );
+      advanceStep(1500);
+    },
+    [advanceStep],
+  );
+
   const captureAndValidate = useCallback(
     async (file: File): Promise<void> => {
       const idx = currentStepIndex;
@@ -151,6 +169,14 @@ export function useSiteCamCapture(
       );
 
       if (!step.hasVlm) {
+        if (step.hasSerialScan && siteInfo.jobType === 'activations') {
+          setStepStates((prev) =>
+            prev.map((s, i) =>
+              i === idx ? { ...s, status: 'serial_scan', photoBase64: base64 } : s,
+            ),
+          );
+          return;
+        }
         setStepStates((prev) =>
           prev.map((s, i) => (i === idx ? { ...s, status: 'pass' } : s)),
         );
@@ -196,10 +222,21 @@ export function useSiteCamCapture(
         const { pass, reasons, corrections, maxAttempts, needsManualReview } = json.data;
 
         if (pass) {
-          // needsManualReview is set when the server failed open (VLM down).
           const flagged = needsManualReview === true;
+          if (step.hasSerialScan && siteInfo.jobType === 'activations') {
+            setStepStates((prev) =>
+              prev.map((s, i) =>
+                i === idx
+                  ? { ...s, status: 'serial_scan', needsManualReview: flagged }
+                  : s,
+              ),
+            );
+            return;
+          }
           setStepStates((prev) =>
-            prev.map((s, i) => (i === idx ? { ...s, status: 'pass', needsManualReview: flagged } : s)),
+            prev.map((s, i) =>
+              i === idx ? { ...s, status: 'pass', needsManualReview: flagged } : s,
+            ),
           );
           advanceStep(1500);
           return;
@@ -299,11 +336,11 @@ export function useSiteCamCapture(
     currentStepIndex,
     allDone,
     captureAndValidate,
+    handleSerialSaved: (serial: string) => handleSerialSaved(currentStepIndex, serial),
     submitAll,
     uploading,
     uploadError,
     uploadResult,
-    // Exported for tests
     escalateStep,
   };
 }
