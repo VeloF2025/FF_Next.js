@@ -119,6 +119,42 @@ export interface WorksQAZoneSummary {
   pons: { pon_no: number; pole_count: number; approved_count: number; outstanding_snag_count: number }[];
 }
 
+// ─── Recent Submissions feed ─────────────────────────────────────────────
+export type RecentDiscipline = 'civil' | 'dome' | 'main_joint';
+export type RecentWindow = 'since_last' | '3d' | '7d';
+
+export interface RecentPon {
+  ponNo: number;
+  readyCount: number;
+  partialCount: number;
+  latestAt: string | null;
+}
+
+export interface RecentZone {
+  zoneNo: number | null;
+  pons: RecentPon[];
+}
+
+export interface RecentSite {
+  projectId: string;
+  projectName: string;
+  zones: RecentZone[];
+}
+
+export interface RecentLane {
+  readyPoles: number;
+  partialPoles: number;
+  sites: RecentSite[];
+}
+
+export interface RecentSubmissionsResponse {
+  window: RecentWindow;
+  cutoffAt: string;            // boundary the feed is filtered to
+  watermarkAt: string | null;  // user's last-opened cutoff; drives the "NEW" flag
+  asOf: string;
+  lanes: Record<RecentDiscipline, RecentLane>;
+}
+
 export type SlotKey =
   | 'civil_01' | 'civil_02' | 'civil_03' | 'civil_04' | 'civil_05' | 'civil_06' | 'civil_07' | 'civil_08'
   | 'dome_01' | 'dome_02' | 'dome_03' | 'dome_04' | 'dome_05' | 'dome_06' | 'dome_07' | 'dome_08'
