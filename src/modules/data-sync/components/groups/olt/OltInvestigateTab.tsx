@@ -862,7 +862,7 @@ export function OltInvestigateTab({
             </div>
           </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 px-4 py-3 border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]/35">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 px-4 py-3 border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]/35">
           <div className="rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] px-3 py-2">
             <p className="text-[10px] uppercase tracking-wide text-[var(--ff-text-tertiary)]">Filtered Total</p>
             <p className="text-lg font-semibold text-[var(--ff-text-primary)]">{total}</p>
@@ -877,6 +877,11 @@ export function OltInvestigateTab({
             <p className="text-[10px] uppercase tracking-wide text-amber-300">Not on 1Map</p>
             <p className="text-lg font-semibold text-amber-200">{investigateSubCounts.not_found}</p>
             <p className="text-[10px] text-amber-300/80">Missing or empty 1Map serials</p>
+          </div>
+          <div className="rounded-lg border border-teal-500/20 bg-teal-500/10 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-teal-300">Serial on Other DR</p>
+            <p className="text-lg font-semibold text-teal-200">{investigateSubCounts.serial_other_dr}</p>
+            <p className="text-[10px] text-teal-300/80">Installed under a different drop</p>
           </div>
           <div className="rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] px-3 py-2">
             <p className="text-[10px] uppercase tracking-wide text-[var(--ff-text-tertiary)]">Projects</p>
