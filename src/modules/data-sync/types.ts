@@ -284,7 +284,7 @@ export interface OltStats {
   escalated: number;
   empty: number;
   total: number;
-  investigateBreakdown?: { cross_dr: number; not_found: number; other: number };
+  investigateBreakdown?: { cross_dr: number; not_found: number; serial_other_dr: number; other: number };
   projectBreakdown?: { project: string; count: number }[];
 }
 
