@@ -330,8 +330,10 @@ class OneMapApiService {
    * matches a given serial. Used when a DR search returns nothing, to tell a
    * genuine "not on 1Map" from "serial is installed, but under a different DR".
    *
-   * Matches on ph_ont only (the ONT barcode). The free-text `q` search returns
-   * a superset, so we filter to exact serial matches client-side.
+   * Matches on ph_ont only (the ONT barcode), NOT br_ser (the UPS serial):
+   * we are confirming an ONT serial is installed, and UPS-swap cases have their
+   * own note4_ups_swap path. The free-text `q` search returns a superset, so we
+   * filter to exact ph_ont matches client-side.
    */
   async searchBySerial(serial: string): Promise<SearchResult> {
     const target = serial.trim().toUpperCase();

@@ -268,8 +268,13 @@ async function findSerialOnOtherDr(
   let serialResult;
   try {
     serialResult = await oneMapApi.searchBySerial(item.oes_serial);
-  } catch {
-    // Reverse lookup is best-effort; fall back to not_found on any failure.
+  } catch (err) {
+    // Reverse lookup is best-effort; fall back to not_found on any failure,
+    // but log it so we can tell "serial genuinely absent" from "lookup failed".
+    log.warn('Reverse serial lookup failed; defaulting to not_found', {
+      dropNumber: item.drop_number,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
   if (!serialResult.success || serialResult.records.length === 0) return null;
