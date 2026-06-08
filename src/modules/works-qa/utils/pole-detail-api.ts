@@ -51,6 +51,18 @@ export async function movePhoto(poleId: string, photoKey: string, from: string, 
   }
 }
 
+export async function linkPhoto(poleId: string, sourceSlot: string, targetSlot: string, reason?: string): Promise<void> {
+  const res = await fetch('/api/works-qa/link-photo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pole_id: poleId, source_slot: sourceSlot, target_slot: targetSlot, reason }),
+  });
+  if (!res.ok) {
+    const body = await safeJson<{ error?: { message?: string } }>(res);
+    throw new Error(body?.error?.message ?? `Link failed (${res.status})`);
+  }
+}
+
 export async function uploadTrayPhotos(poleId: string, files: File[]): Promise<void> {
   // Surface the first failure so TrayBucket can show it inline. Subsequent files
   // are skipped — the user can retry the batch after fixing the issue.

@@ -4,6 +4,11 @@ export interface VlmSlotResult {
   feedback: string;
   overridden_by?: string;
   override_reason?: string;
+  // Set when a single photo is reused to satisfy a second step (e.g. a depth
+  // shot that also shows the end-plates). Distinct from a normal override so it
+  // can be excluded from VLM training — see pages/api/works-qa/link-photo.ts.
+  dual_step?: boolean;
+  source_slot?: string;
 }
 
 export interface PoleQaPhoto {

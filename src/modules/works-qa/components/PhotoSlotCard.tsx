@@ -21,6 +21,7 @@ interface PhotoSlotCardProps {
   onSnag?: (input: SnagSubmitInput) => Promise<SnagSubmitResult>;
   onView?: () => void;
   onUnassign?: () => void;
+  onLinkExisting?: () => void;
   disabled?: boolean;
 }
 
@@ -28,7 +29,7 @@ export function PhotoSlotCard({
   slotKey, label, photoKey, vlm, slotApproval,
   assignableUsers = [], loadingUsers,
   onUpload, onOverride, onApprove, onSnag,
-  onView, onUnassign, disabled,
+  onView, onUnassign, onLinkExisting, disabled,
 }: PhotoSlotCardProps) {
   const [showOverride, setShowOverride] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
@@ -215,6 +216,23 @@ export function PhotoSlotCard({
 
           {vlm?.feedback && (
             <p className="text-xs text-zinc-500 leading-tight">{vlm.feedback}</p>
+          )}
+
+          {vlm?.dual_step && (
+            <p className="text-[10px] text-amber-400/80 leading-tight">⧉ Same photo as another step</p>
+          )}
+
+          {/* Reuse an existing same-discipline photo for this step — e.g. a depth
+              shot that also shows the end-plates. Available whenever the
+              discipline isn't approved, regardless of current slot state. */}
+          {onLinkExisting && !disabled && (
+            <button
+              type="button"
+              onClick={onLinkExisting}
+              className="text-xs text-teal-400 hover:text-teal-300 underline self-start"
+            >
+              ⧉ Use existing photo
+            </button>
           )}
 
           {/* Per-photo Approve / Snag — orthogonal to discipline approval (Hein 2026-05-14).
