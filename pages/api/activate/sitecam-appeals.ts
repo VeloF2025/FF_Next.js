@@ -1,13 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET')
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
   const statusFilter = (req.query.status as string) || 'pending';
+  if (!['pending', 'approved', 'denied'].includes(statusFilter))
+    return apiResponse.badRequest(res, 'status must be pending, approved or denied');
 
   const { rows } = await pool.query(
     `SELECT a.id, a.dr_number, a.step_number, a.appeal_text, a.photo_url,
@@ -25,4 +27,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   return apiResponse.success(res, { appeals: rows });
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('manager')(handler));

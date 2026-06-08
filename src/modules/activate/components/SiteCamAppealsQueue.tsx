@@ -52,12 +52,16 @@ export function SiteCamAppealsQueue() {
   async function decide(id: string, decision: 'approved' | 'denied') {
     setDeciding(id);
     try {
-      await fetch(`/api/activate/sitecam-appeals/${id}/decision`, {
+      const res = await fetch(`/api/activate/sitecam-appeals/${id}/decision`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision, denialReason: decision === 'denied' ? denialText : undefined }),
       });
+      if (!res.ok) {
+        log.error('Decision rejected', { id, status: res.status }, MODULE);
+        return;
+      }
       setDenialText('');
       setExpanded(null);
       await load(tab);

@@ -3,7 +3,7 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import type { AttendanceSession } from '@/modules/attendance/portal/types';
-import { sendWhatsAppGroupImage } from '@/modules/notifications/services/whatsappDelivery';
+import { sendWhatsAppGroup } from '@/modules/notifications/services/whatsappDelivery';
 import { log } from '@/lib/logger';
 
 const MODULE = 'sitecam-appeal';
@@ -35,6 +35,11 @@ async function handler(
   if (!drNumber || !stepNumber || !appealText || !photoUrl || !attemptNumber)
     return apiResponse.badRequest(res, 'drNumber, stepNumber, appealText, photoUrl, attemptNumber required');
 
+  // photoUrl is a camera-captured base64 data URI. Enforce that shape: it keeps the value
+  // self-contained (no external fetch) and prevents a crafted URL being relayed to the WA bridge.
+  if (!photoUrl.startsWith('data:image/'))
+    return apiResponse.badRequest(res, 'photoUrl must be a data:image/ URI');
+
   const { rows: staffRows } = await pool.query<{ first_name: string; last_name: string }>(
     `SELECT first_name, last_name FROM staff WHERE id = $1 LIMIT 1`,
     [session.staffId],
@@ -64,12 +69,13 @@ async function handler(
         : '',
       `Attempt: ${attemptNumber}`,
       ``,
-      `Reply:`,
-      `  APPROVE sitecam-appeal-${appealId}`,
-      `  DENY sitecam-appeal-${appealId}`,
+      `Review (approve/deny) in the SiteCam appeals queue:`,
+      `  https://app.fibreflow.app/activate/sitecam-appeals`,
     ].filter(Boolean).join('\n');
 
-    sendWhatsAppGroupImage(APPEAL_GROUP_JID, waMessage, photoUrl).catch((err: unknown) => {
+    // Text-only: the photo is a base64 data URI the bridge cannot download as media_url.
+    // Reviewers open the in-app queue (linked above) to view the photo and decide.
+    sendWhatsAppGroup(APPEAL_GROUP_JID, waMessage).catch((err: unknown) => {
       log.warn('Appeal WA send failed (non-fatal)', { appealId, err: String(err) }, MODULE);
     });
   }

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 const MODULE = 'sitecam-appeal-decision';
@@ -51,4 +51,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('manager')(handler));
