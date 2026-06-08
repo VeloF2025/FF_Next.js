@@ -269,7 +269,7 @@ export function useSiteCamCapture(
 
   const submitAll = useCallback(async (): Promise<void> => {
     const photos = stepStates
-      .filter((s) => (s.status === 'pass' || s.status === 'escalated') && s.photoBase64 !== null)
+      .filter((s) => (s.status === 'pass' || s.status === 'escalated' || s.status === 'serial_pending') && s.photoBase64 !== null)
       .map((s) => ({
         stepNumber: s.stepNumber,
         stepLabel: s.label,

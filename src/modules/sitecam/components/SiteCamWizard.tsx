@@ -39,7 +39,7 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
 
   const total = stepStates.length;
   const doneCount = stepStates.filter(
-    (s) => s.status === 'pass' || s.status === 'escalated',
+    (s) => s.status === 'pass' || s.status === 'escalated' || s.status === 'serial_pending',
   ).length;
   const passedCount = stepStates.filter((s) => s.status === 'pass').length;
   const escalatedCount = stepStates.filter((s) => s.status === 'escalated').length;
