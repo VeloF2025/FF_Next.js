@@ -60,8 +60,20 @@ function resolveSlotKey(checklist_step: number | null, work_type: string | null)
   return slotKey;
 }
 
+// Optical/dome validations are keyed by the dome/splice label, not the pole label
+// (e.g. "MAM.STS.16.DIS.DM.P.A352-C2P11.L5" belongs to pole "MAM.P.A352"). Map the
+// dome label back to its pole so the optical photos attach to the right pole row.
+// Returns null when the label isn't a recognised dome label.
+const DOME_LABEL_RE = /^(\w+)\.STS\..*?\.DM\.P\.([A-Za-z0-9]+)/;
+function domeLabelToPole(label: string | null): string | null {
+  if (!label) return null;
+  const m = DOME_LABEL_RE.exec(label);
+  return m ? `${m[1]}.P.${m[2]}` : null;
+}
+
 interface QFieldRow {
   feature_id: string | null;
+  feature_type: 'pole' | 'joint' | null;
   photo_key: string;
   checklist_step: number | null;
   work_type: string | null;
@@ -76,13 +88,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!project_id) return apiResponse.badRequest(res, 'project_id required');
 
   try {
-    // Build query — filter by project_id and feature_type = 'pole'
+    // NOTE on pole_label filtering: civil rows are keyed by pole label, but optical
+    // ('joint') rows are keyed by the dome label — so a SQL `feature_id = pole_label`
+    // filter would silently drop ALL optical photos for the requested pole. We
+    // therefore fetch every pole/joint row for the project and filter by the
+    // resolved pole label in-process (see the loop below) so both types honour it.
     const params: (string | null)[] = [project_id];
-    let poleFilter = '';
-    if (pole_label) {
-      params.push(pole_label);
-      poleFilter = `AND feature_id = $${params.length}`;
-    }
 
     // project_id from the client is a FibreFlow project ID. qfield_photo_validations.project_id
     // stores the EXTERNAL QField project UUID. Translate it through
@@ -94,18 +105,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Drill Survey). Without the translation those projects' photos are invisible
     // to this sync — see migration 376 which links them safely now.
     const qResult = await pool.query<QFieldRow>(`
-      SELECT q.feature_id, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback
+      SELECT q.feature_id, q.feature_type, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback
       FROM qfield_photo_validations q
       INNER JOIN qfield_projects qp ON qp.qfield_project_id = q.project_id::text
       INNER JOIN qfield_project_links l ON l.qfield_project_id = qp.id
       WHERE l.fibreflow_project_id = $1::uuid
-        AND q.feature_type = 'pole'
-        ${poleFilter ? poleFilter.replace('feature_id', 'q.feature_id') : ''}
+        -- 'pole' = civil photos (keyed by pole label); 'joint' = optical/dome photos
+        -- (keyed by dome label, mapped back to the pole below). Without 'joint' the
+        -- optical Dome/Main-Joint slots never sync — every pole's optical photos were
+        -- invisible on works-qa until this was added.
+        AND q.feature_type IN ('pole', 'joint')
     `, params);
 
     let synced = 0;
     let skipped = 0;
     let unassigned = 0;
+    let unmappedDomeLabels = 0;
 
     // Push a photo into the per-pole `unassigned_photo_keys` bucket. Idempotent: only
     // appends if the key isn't already in a slot column, the tray array, or the bucket.
@@ -155,8 +170,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     for (const row of qResult.rows) {
-      const poleLabel = row.feature_id;
-      if (!poleLabel) { skipped++; continue; }
+      // Civil rows are keyed by the pole label directly; optical/dome ('joint')
+      // rows are keyed by the dome label and must be mapped back to the pole.
+      const poleLabel = row.feature_type === 'joint'
+        ? domeLabelToPole(row.feature_id)
+        : row.feature_id;
+      if (!poleLabel) {
+        // A joint row whose dome label doesn't parse can't be attached to a pole —
+        // count it so unexpected optical-sync gaps are diagnosable, not silent.
+        if (row.feature_type === 'joint') unmappedDomeLabels++;
+        skipped++;
+        continue;
+      }
+      // Honour an optional single-pole filter for BOTH civil and optical rows
+      // (the resolved pole label, not the raw dome label).
+      if (pole_label && poleLabel !== pole_label) { skipped++; continue; }
 
       const slotKey = resolveSlotKey(row.checklist_step, row.work_type);
       // No slot mapping for this step/work_type combo — surface the photo in
@@ -224,7 +252,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       synced++;
     }
 
-    return apiResponse.success(res, { synced, skipped, unassigned });
+    if (unmappedDomeLabels > 0) {
+      log.warn('works-qa/sync-qfield: optical rows with unparseable dome labels', {
+        project_id, unmappedDomeLabels,
+      });
+    }
+    return apiResponse.success(res, { synced, skipped, unassigned, unmappedDomeLabels });
   } catch (err) {
     log.error('works-qa/sync-qfield', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);

@@ -240,18 +240,25 @@ export interface OltRecord {
 
 export interface InvestigationContext {
   reason: string;
-  wrongSerial: string;
-  wrongUps?: string | null;
-  belongsToDr: string;
-  belongsToTeam: string;
-  belongsToStatus: string;
-  totalPropRecords: number;
-  correctRecords: number;
-  wrongRecords: number;
-  swappedRecords: number;
   message: string;
+  // Cross-DR conflict shape (reason === 'cross_dr_conflict')
+  wrongSerial?: string;
+  wrongUps?: string | null;
+  belongsToDr?: string;
+  belongsToTeam?: string;
+  belongsToStatus?: string;
+  totalPropRecords?: number;
+  correctRecords?: number;
+  wrongRecords?: number;
+  swappedRecords?: number;
   currentStatus?: string;
   propId?: string;
+  // Serial-on-other-DR shape (reason === 'serial_on_other_dr')
+  oesDr?: string;
+  oesSerial?: string;
+  foundOnDr?: string;
+  foundOnTeam?: string | null;
+  foundOnStatus?: string | null;
 }
 
 export interface SwapLookupResult {
@@ -284,7 +291,7 @@ export interface OltStats {
   escalated: number;
   empty: number;
   total: number;
-  investigateBreakdown?: { cross_dr: number; not_found: number; other: number };
+  investigateBreakdown?: { cross_dr: number; not_found: number; serial_other_dr: number; other: number };
   projectBreakdown?: { project: string; count: number }[];
 }
 

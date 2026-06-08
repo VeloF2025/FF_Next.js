@@ -194,6 +194,8 @@ export function OltRecordTable({
                           ? 'bg-red-500/20 text-red-400'
                           : record.fix_status === 'needs_investigation'
                           ? 'bg-purple-500/20 text-purple-400'
+                          : record.fix_status === 'serial_other_dr'
+                          ? 'bg-teal-500/20 text-teal-400'
                           : 'bg-amber-500/20 text-amber-400'
                       }`}
                     >
