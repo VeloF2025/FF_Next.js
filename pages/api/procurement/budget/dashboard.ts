@@ -78,7 +78,7 @@ async function handler(
     const recentTransactions = await sql`
       SELECT
         bt.id, bt.project_budget_id, bt.transaction_type, bt.source_type,
-        bt.amount, bt.description, bt.reference_id, bt.created_by, bt.created_at,
+        bt.amount, bt.description, bt.source_id AS reference_id, bt.created_by, bt.created_at,
         pb.project_id,
         p.project_code,
         p.project_name
