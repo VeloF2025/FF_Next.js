@@ -93,7 +93,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     // Count total — replace the SELECT list (the literal 'SELECT *' never matched
     // because of the comment, so the count query returned plain rows and
     // countResult[0] was undefined on an empty view, crashing the handler)
-    const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) AS count FROM');
+    const countQuery = query.replace(/^\s*SELECT[\s\S]*?\sFROM\s/, 'SELECT COUNT(*) AS count FROM ');
     const countResult = await sql.query(countQuery, params);
     const total = parseInt(countResult[0]?.count as string) || 0;
 

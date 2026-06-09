@@ -63,9 +63,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (!CHECKOUT_ELIGIBLE_CATEGORIES.includes(serial.category)) {
-      return res.status(400).json({
-        error: `Category "${serial.category}" is not eligible for checkout. Eligible: ${CHECKOUT_ELIGIBLE_CATEGORIES.join(', ')}`,
-      });
+      return apiResponse.badRequest(
+        res,
+        `Category "${serial.category}" is not eligible for checkout. Eligible: ${CHECKOUT_ELIGIBLE_CATEGORIES.join(', ')}`
+      );
     }
 
     // Create checkout record
