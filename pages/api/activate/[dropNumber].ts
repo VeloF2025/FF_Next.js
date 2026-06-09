@@ -188,7 +188,9 @@ async function handleGet(
         auto_qa_processed,
         auto_qa_processed_at,
         auto_qa_results,
-        vlm_categorization_results
+        vlm_categorization_results,
+        auto_feedback_sent_at,
+        auto_feedback_skip_reason
       FROM dr_photo_unified_reviews
       WHERE drop_number = $1
       LIMIT 1;

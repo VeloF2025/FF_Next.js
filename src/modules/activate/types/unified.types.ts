@@ -144,6 +144,8 @@ export interface UnifiedReview {
   feedback_sent: boolean;
   feedback_message: string | null;
   feedback_sent_at: Date | null;
+  auto_feedback_sent_at: Date | null;
+  auto_feedback_skip_reason: string | null;
 
   // Auto-QA
   auto_qa_processed: boolean;
