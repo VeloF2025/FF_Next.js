@@ -321,6 +321,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         upr.step_10_signature,
         upr.vlm_categorization_status as vlm_status,
         upr.feedback_sent,
+        upr.auto_feedback_sent_at,
         -- Serials (scanned from photos)
         upr.ont_serial_scanned,
         upr.ups_serial_scanned,

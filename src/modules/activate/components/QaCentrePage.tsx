@@ -813,7 +813,11 @@ function QaCentrePageContent() {
                     if (drop.feedbackSent && !isAutoQaDecision) {
                       return { label: 'Human ✓', color: 'bg-green-700 text-green-100' };
                     }
-                    // Auto-QA processed (with or without feedback sent) = awaiting human review
+                    // Auto-QA processed + auto-feedback already sent to tech
+                    if ((drop.autoQaProcessed || isAutoQaDecision) && drop.autoFeedbackSentAt) {
+                      return { label: 'AI Sent', color: 'bg-purple-600 text-purple-100' };
+                    }
+                    // Auto-QA processed but feedback not yet sent = awaiting
                     if (drop.autoQaProcessed || isAutoQaDecision) {
                       return { label: 'AI Review', color: 'bg-purple-600 text-purple-100' };
                     }
