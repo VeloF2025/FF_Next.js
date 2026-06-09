@@ -164,7 +164,9 @@ export function OltInvestigateTab({
     };
   }, [isProjectMenuOpen]);
 
-  // Re-fetch when sub-filter, search, project, or date changes
+  // Re-fetch when page, sub-filter, search, project, or date changes.
+  // `page` is included so pagination (Next/Previous) re-fetches with the active
+  // filters intact — the shared hook deliberately does not drive this tab.
   useEffect(() => {
     const sub = investigateSubFilter !== 'all' ? investigateSubFilter : undefined;
     fetchRecords(
@@ -178,7 +180,7 @@ export function OltInvestigateTab({
     );
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [investigateSubFilter, debouncedSearch, selectedProjects, customDateRange.dateFrom, customDateRange.dateTo]);
+  }, [page, investigateSubFilter, debouncedSearch, selectedProjects, customDateRange.dateFrom, customDateRange.dateTo]);
 
   // Fetch filtered counts for cards and filter pills
   useEffect(() => {

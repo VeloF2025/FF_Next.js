@@ -283,13 +283,13 @@ export function useOltState(
     setFixErrors({});
 
     fetchStats();
-    // Investigate tab manages its own date filter locally, so it intentionally
-    // re-fetches via its own effect — don't drive it from the shared filter.
+    // Investigate tab fully owns its own data fetching — filters AND pagination —
+    // via its local effect, so it must NOT be driven from here. Driving it on a
+    // `page` change would re-fetch without the tab's sub-filters and reset the
+    // table back to the unfiltered set when paging next/previous.
     const range = getDateRange(dateFilter, customDateFrom, customDateTo);
     if (currentTab === 'pending') {
       fetchRecords('pending', undefined, undefined, undefined, undefined, range.dateFrom, range.dateTo);
-    } else if (currentTab === 'investigate') {
-      fetchRecords('needs_investigation');
     } else if (currentTab === 'escalations') {
       fetchRecords('escalated', undefined, undefined, undefined, undefined, range.dateFrom, range.dateTo);
     } else if (currentTab === 'history') {
