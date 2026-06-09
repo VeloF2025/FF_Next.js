@@ -147,6 +147,16 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
                 ✓ Feedback Sent
               </span>
             )}
+            {review.auto_feedback_sent_at && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                Auto-sent
+              </span>
+            )}
+            {review.auto_feedback_skip_reason === 'no_wa_sender_jid' && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                No tech JID
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -839,7 +849,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
       {/* Previously sent notice */}
       {alreadySent && !justSent && (
         <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
-          Feedback was previously sent
+          {review.auto_feedback_sent_at ? 'Feedback was automatically sent' : 'Feedback was previously sent'}
           {review.feedback_sent_at && (
             <span> on {new Date(review.feedback_sent_at).toLocaleString()}</span>
           )}. You can edit the message below and resend.
