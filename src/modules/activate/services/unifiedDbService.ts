@@ -376,6 +376,8 @@ function mapRowToUnifiedReview(row: QueryResultRow): UnifiedReview {
     feedback_sent: row.feedback_sent,
     feedback_message: row.feedback_message,
     feedback_sent_at: row.feedback_sent_at,
+    auto_feedback_sent_at: row.auto_feedback_sent_at ?? null,
+    auto_feedback_skip_reason: row.auto_feedback_skip_reason ?? null,
 
     // Auto-QA
     auto_qa_processed: row.auto_qa_processed ?? false,
