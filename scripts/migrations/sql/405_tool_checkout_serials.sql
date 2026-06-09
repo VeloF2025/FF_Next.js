@@ -30,10 +30,11 @@ ALTER TABLE tool_checkouts
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
--- tool_checkouts is empty on the shared DB today (0 rows), but backfill the new
--- timestamps from checked_out_at for safety if rows exist when this runs.
-UPDATE tool_checkouts SET created_at = checked_out_at WHERE created_at IS NULL;
-UPDATE tool_checkouts SET updated_at = checked_out_at WHERE updated_at IS NULL;
+-- tool_checkouts is empty on the shared DB today (0 rows). If rows exist at
+-- apply time, ADD COLUMN ... DEFAULT NOW() fills them with the apply-time
+-- timestamp; align created_at with the row's real checkout time instead.
+UPDATE tool_checkouts SET created_at = checked_out_at
+WHERE checked_out_at IS NOT NULL AND created_at > checked_out_at;
 
 DO $$
 BEGIN
