@@ -90,10 +90,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       paramIndex++;
     }
 
-    // Count total
-    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
+    // Count total — replace the SELECT list (the literal 'SELECT *' never matched
+    // because of the comment, so the count query returned plain rows and
+    // countResult[0] was undefined on an empty view, crashing the handler)
+    const countQuery = query.replace(/^\s*SELECT[\s\S]*?\sFROM\s/, 'SELECT COUNT(*) AS count FROM ');
     const countResult = await sql.query(countQuery, params);
-    const total = parseInt(countResult[0]!.count as string) || 0;
+    const total = parseInt(countResult[0]?.count as string) || 0;
 
     // Add pagination and ordering
     const pageNum = parseInt(page as string) || 1;
