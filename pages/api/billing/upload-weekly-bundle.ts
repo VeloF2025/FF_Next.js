@@ -36,6 +36,7 @@ import {
 } from '@/modules/billing/services/bundleProcessor';
 import { fetchBillableProjects } from '@/modules/billing/services/resolveProjectName';
 import { reconcileBillingWeek } from '@/modules/billing/services/reconcileBillingWeek';
+import { computeVerdictsForWeek } from '@/modules/billing/services/deductionVerdictService';
 import {
   logNonInvoiceableFlagged,
   type NoteCode,
@@ -498,6 +499,26 @@ async function importProjectResult(
       }
     } catch (err) {
       logger.warn('Auto-reconcile failed (row still imported)', {
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Auto-verify the deductions we just imported so disputable rows land in
+    // the Action Centre Disputes candidates view. Best-effort — a failure
+    // here never fails the import; verdicts can be recomputed via
+    // POST /api/billing/verify-deductions.
+    try {
+      const verdicts = await computeVerdictsForWeek(billingWeekId);
+      logger.info('Deduction verdicts computed', {
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        judged: verdicts.judged,
+        disputable: verdicts.disputable,
+      });
+    } catch (err) {
+      logger.warn('Deduction verdict run failed (row still imported)', {
         project: canonicalName,
         weekEnding: summary.weekEnding,
         error: err instanceof Error ? err.message : String(err),

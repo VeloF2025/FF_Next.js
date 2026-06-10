@@ -24,6 +24,7 @@ import {
   logAnomalyFixedStillBilled,
   type NoteCode,
 } from '@/modules/activate/services/activity-log/eventLoggers';
+import { syncDisputePaymentStatus } from '@/modules/activate/services/disputeActions';
 
 const logger = createLogger('ActionCentreRuleEngine');
 
@@ -246,6 +247,18 @@ async function handleN4AfterFix(event: EventRow, ctx: RuleContext): Promise<numb
        AND resolution_status IN ('open', 'in_progress')`,
     [event.drop_number, weekEnding, weeksSinceFix],
   );
+
+  // Keep oes_activations.payment_status in step, exactly like a manual raise
+  // from the Disputes Candidates panel — both raise paths must produce the
+  // same billing state.
+  try {
+    await syncDisputePaymentStatus(event.drop_number, 'disputed');
+  } catch (err) {
+    logger.warn('payment_status sync failed for auto-raised n4 dispute', {
+      dr: event.drop_number,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   return 1;
 }

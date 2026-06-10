@@ -15,6 +15,7 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import pool from '@/lib/db';
 import { NOTE_TO_CATEGORY, type NonInvoiceableCategory } from '@/modules/non-invoiceables/types';
+import { selectSignalDbm } from '@/modules/billing/services/classifyDeductionVerdict';
 
 const logger = createLogger('api/activate/non-invoiceables/billing-crossref');
 
@@ -48,11 +49,13 @@ interface CrossRefRow {
   od_note5_id: string | null;
   od_note5_reason: string | null;
   od_note5_recovered_at: string | null;
+  // Auto-verifier verdict (deductionVerdictService)
+  verdict: string | null;
 }
 
 // ─── Response types ───────────────────────────────────────────────────────────
 
-/** Dispute flag derived from Note 5 offline evidence. */
+/** Dispute flag derived from the auto-verifier verdict + Note 5 offline evidence. */
 type DisputeFlag = 'none' | 'dispute_candidate' | 'recovered' | 'dying_gasp';
 
 interface CrossRefItem {
@@ -74,6 +77,7 @@ interface CrossRefItem {
 // conditional fragments). The $1 parameter is always the billing_week_id UUID.
 const CROSSREF_SQL = `
 SELECT d.id, d.dr_number, d.deduction_note, d.serial_number, d.team, d.deduction_reason,
+  d.verdict,
   oa.status AS oes_status, oa.activation_date AS oes_activation_date,
   oa.ont_rx_sig_dbm AS oes_signal_dbm, oa.current_ont_rx AS current_ont_rx,
   olt.id AS olt_record_id, olt.fix_status AS olt_fix_status,
@@ -128,14 +132,18 @@ function computeActionStatus(
 }
 
 /**
- * Derive dispute_flag for Note 5 deductions:
+ * Derive dispute_flag. Note 5 keeps its offline-evidence sub-flags:
  *   dispute_candidate — no offline evidence found in the 14-day window
  *   recovered         — offline record found but device already recovered
  *   dying_gasp        — offline reason is 'Dying Gasp' (transient signal loss)
- *   none              — not a Note 5 deduction, or evidence confirms offline state
+ *   none              — evidence confirms the offline state
+ * All other notes use the persisted auto-verifier verdict:
+ *   dispute_candidate — verdict = 'disputable' (see deductionVerdictService)
  */
 function computeDisputeFlag(row: CrossRefRow): DisputeFlag {
-  if (row.deduction_note !== 'note5') return 'none';
+  if (row.deduction_note !== 'note5') {
+    return row.verdict === 'disputable' ? 'dispute_candidate' : 'none';
+  }
   if (!row.od_note5_id) return 'dispute_candidate';
   if (row.od_note5_recovered_at) return 'recovered';
   if (row.od_note5_reason === 'Dying Gasp') return 'dying_gasp';
@@ -226,9 +234,8 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
       // For offline ONTs, prefer the latest-polled RX (current_ont_rx) over the
       // activation-date RX (ticket VF-20260422-002). Active ONTs keep the
       // activation-date reading which is the authoritative billing value.
-      const signal_dbm = row.oes_status === 'Inactive'
-        ? (row.current_ont_rx ?? row.oes_signal_dbm)
-        : row.oes_signal_dbm;
+      // Shared with the deduction verdict service so UI and verifier agree.
+      const signal_dbm = selectSignalDbm(row.oes_status, row.oes_signal_dbm, row.current_ont_rx);
 
       return {
         dr_number: row.dr_number,

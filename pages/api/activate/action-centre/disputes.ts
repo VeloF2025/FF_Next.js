@@ -2,29 +2,38 @@
  * Action Centre — Disputes
  *
  * GET  /api/activate/action-centre/disputes
- *   Returns ft_billing_deductions rows with resolution_status IN
+ *   Default view: ft_billing_deductions rows with resolution_status IN
  *   ('disputing', 'disputed', 'acknowledged') plus enrichment: latest
  *   OES serial, last 1Map fix, linked ticket.
+ *   view=candidates: rows the auto-verifier judged 'disputable' that have
+ *   NOT been raised yet (resolution_status open/in_progress/ticketed) —
+ *   the human review queue for raising disputes.
  *
  * POST /api/activate/action-centre/disputes
- *   Body: { deductionId, action: 'raise'|'mark_outcome'|'withdraw', outcome?, reason? }
- *   Flips resolution_status + records the change on ft_billing_deductions
- *   and emits a non_invoiceable_resolved event when outcome is set.
+ *   Body: { deductionId | deductionIds[], action: 'raise'|'mark_outcome'|'withdraw', outcome?, reason? }
+ *   Lifecycle writes live in disputeActions.ts (incl. oes_activations
+ *   payment_status sync + non_invoiceable_resolved event on win).
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import pool from '@/lib/db';
 import {
-  logNonInvoiceableResolved,
-  type NoteCode,
-} from '@/modules/activate/services/activity-log/eventLoggers';
+  applyDisputeAction,
+  applyDisputeActionBulk,
+  type DisputeAction,
+  type DisputeOutcome,
+} from '@/modules/activate/services/disputeActions';
+import { parseVerdictReasons } from '@/modules/billing/services/classifyDeductionVerdict';
 
 const logger = createLogger('api/activate/action-centre/disputes');
 
 const DISPUTE_STATUSES = ['disputing', 'disputed', 'acknowledged'];
+const CANDIDATE_STATUSES = ['open', 'in_progress', 'ticketed'];
+/** Bulk-raise ceiling — bounds the sequential DB writes one request can trigger. */
+const MAX_BULK_DEDUCTIONS = 200;
 
 interface DisputeRow {
   deductionId: string;
@@ -45,16 +54,29 @@ interface DisputeRow {
   disputeOutcome: string | null;
   disputeOpenedAt: string | null;
   weeksFlagged: number;
+  verdict: string | null;
+  verdictReasons: string[];
+  verdictComputedAt: string | null;
 }
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+  const view = req.query.view === 'candidates' ? 'candidates' : 'disputes';
   const project = typeof req.query.project === 'string' ? req.query.project.trim() : null;
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : null;
   const outcome = typeof req.query.outcome === 'string' ? req.query.outcome.trim() : null;
   const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
 
-  const params: unknown[] = [DISPUTE_STATUSES];
-  const clauses: string[] = [`d.resolution_status = ANY($1::text[])`];
+  const params: unknown[] = [];
+  const clauses: string[] = [];
+
+  if (view === 'candidates') {
+    params.push(CANDIDATE_STATUSES);
+    clauses.push(`d.resolution_status = ANY($1::text[])`);
+    clauses.push(`d.verdict = 'disputable'`);
+  } else {
+    params.push(DISPUTE_STATUSES);
+    clauses.push(`d.resolution_status = ANY($1::text[])`);
+  }
 
   if (project) {
     params.push(project);
@@ -64,7 +86,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
     params.push(`%${search}%`);
     clauses.push(`(d.dr_number ILIKE $${params.length} OR d.serial_number ILIKE $${params.length})`);
   }
-  if (outcome) {
+  if (outcome && view === 'disputes') {
     if (outcome === 'none') {
       clauses.push(`d.dispute_outcome IS NULL`);
     } else {
@@ -86,6 +108,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       oes_serial: string | null; oes_activated_at: string | null;
       last_fix_serial: string | null; last_fix_at: string | null;
       weeks_flagged: string;
+      verdict: string | null; verdict_reasons: string | null;
+      verdict_computed_at: string | null;
     }>(
       `
       WITH latest_oes AS (
@@ -104,6 +128,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
              d.resolution_status, d.dispute_reason, d.dispute_outcome,
              d.dispute_opened_at::text,
              d.ticket_id, t.ticket_uid,
+             d.verdict,
+             d.verdict_evidence->>'reasons' AS verdict_reasons,
+             d.verdict_computed_at::text,
              o.serial_number       AS oes_serial,
              o.activation_date::text AS oes_activated_at,
              f.last_fix_serial,
@@ -141,6 +168,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       disputeOutcome: r.dispute_outcome,
       disputeOpenedAt: r.dispute_opened_at,
       weeksFlagged: Number(r.weeks_flagged ?? '0'),
+      verdict: r.verdict,
+      verdictReasons: parseVerdictReasons(r.verdict_reasons),
+      verdictComputedAt: r.verdict_computed_at,
     }));
 
     const breakdown = {
@@ -152,9 +182,16 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       no_outcome: items.filter((x) => !x.disputeOutcome).length,
     };
 
+    const byNote = items.reduce<Record<string, number>>((acc, i) => {
+      acc[i.noteCode] = (acc[i.noteCode] ?? 0) + 1;
+      return acc;
+    }, {});
+
     return apiResponse.success(res, {
+      view,
       count: items.length,
       breakdown,
+      byNote,
       items,
     });
   } catch (err) {
@@ -166,107 +203,63 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
 async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   const body = req.body as {
     deductionId?: string;
-    action?: 'raise' | 'mark_outcome' | 'withdraw';
-    outcome?: 'won' | 'lost' | 'partial' | null;
+    deductionIds?: string[];
+    action?: DisputeAction;
+    outcome?: DisputeOutcome | null;
     reason?: string;
   };
 
-  if (!body.deductionId || !body.action) {
-    return apiResponse.badRequest(res, 'deductionId and action are required');
+  const ids = Array.isArray(body.deductionIds) && body.deductionIds.length > 0
+    ? body.deductionIds
+    : body.deductionId ? [body.deductionId] : [];
+
+  if (ids.length === 0 || !body.action) {
+    return apiResponse.badRequest(res, 'deductionId (or deductionIds[]) and action are required');
+  }
+  if (ids.length > MAX_BULK_DEDUCTIONS) {
+    return apiResponse.badRequest(res, `Bulk limit is ${MAX_BULK_DEDUCTIONS} deductions per request`);
   }
 
   try {
-    const { rows: current } = await pool.query<{
-      dr_number: string; deduction_note: string; week_ending: string;
-      resolution_status: string;
-    }>(
-      `SELECT dr_number, deduction_note, week_ending::text, resolution_status
-         FROM ft_billing_deductions WHERE id = $1`,
-      [body.deductionId],
-    );
-    const row = current[0];
-    if (!row) return apiResponse.notFound(res, 'Deduction', body.deductionId);
-
-    let targetStatus: string;
-    let emitResolution = false;
-    let resolvedReason: string | null = body.reason ?? null;
-
-    switch (body.action) {
-      case 'raise':
-        targetStatus = 'disputing';
-        break;
-      case 'mark_outcome':
-        if (!body.outcome || !['won', 'lost', 'partial'].includes(body.outcome)) {
-          return apiResponse.badRequest(res, 'mark_outcome requires outcome in (won|lost|partial)');
-        }
-        targetStatus = body.outcome === 'won' ? 'resolved' : 'disputed';
-        emitResolution = body.outcome === 'won';
-        resolvedReason = resolvedReason ?? `dispute ${body.outcome}`;
-        break;
-      case 'withdraw':
-        targetStatus = 'open';
-        break;
-      default:
-        return apiResponse.badRequest(res, `Unknown action ${body.action}`);
+    if (ids.length === 1) {
+      const result = await applyDisputeAction({
+        deductionId: ids[0]!,
+        action: body.action,
+        outcome: body.outcome ?? null,
+        reason: body.reason ?? null,
+      });
+      return apiResponse.success(res, result);
     }
 
-    const { rows: updated } = await pool.query<{
-      id: string; dr_number: string; deduction_note: string; week_ending: string;
-    }>(
-      `UPDATE ft_billing_deductions
-          SET resolution_status  = $2,
-              dispute_outcome    = $3,
-              dispute_reason     = COALESCE(NULLIF($4, ''), dispute_reason),
-              dispute_opened_at  = CASE
-                                     WHEN $2 = 'disputing' AND dispute_opened_at IS NULL THEN NOW()
-                                     ELSE dispute_opened_at
-                                   END,
-              resolved_at        = CASE WHEN $2 = 'resolved' THEN NOW() ELSE resolved_at END,
-              resolved_reason    = CASE WHEN $2 = 'resolved' THEN COALESCE($4, 'dispute won') ELSE resolved_reason END
-        WHERE id = $1
-        RETURNING id, dr_number, deduction_note, week_ending::text`,
-      [body.deductionId, targetStatus, body.outcome ?? null, body.reason ?? null],
-    );
-    const u = updated[0]!;
-
-    // Emit timeline event when marking a dispute as won (resolved)
-    if (emitResolution) {
-      try {
-        await logNonInvoiceableResolved(
-          u.dr_number,
-          {
-            weekEnding: u.week_ending,
-            noteCode: u.deduction_note as NoteCode,
-            resolutionReason: resolvedReason ?? 'dispute_won',
-            disputeOutcome: body.outcome ?? null,
-          },
-          'disputes-tab',
-        );
-      } catch (err) {
-        logger.warn('failed to emit non_invoiceable_resolved', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-
-    return apiResponse.success(res, {
-      id: u.id,
-      drNumber: u.dr_number,
-      noteCode: u.deduction_note,
-      weekEnding: u.week_ending,
-      newStatus: targetStatus,
-      previousStatus: row.resolution_status,
+    const { results, failures } = await applyDisputeActionBulk({
+      deductionIds: ids,
+      action: body.action,
       outcome: body.outcome ?? null,
+      reason: body.reason ?? null,
+    });
+    return apiResponse.success(res, {
+      applied: results.length,
+      failed: failures.length,
+      results,
+      failures,
     });
   } catch (err) {
-    logger.error('disputes POST failed', { error: err instanceof Error ? err.message : String(err) });
+    const message = err instanceof Error ? err.message : String(err);
+    if (/not found/i.test(message)) return apiResponse.notFound(res, 'Deduction', ids[0]!);
+    if (/requires outcome|Unknown action/.test(message)) return apiResponse.badRequest(res, message);
+    logger.error('disputes POST failed', { error: message });
     return apiResponse.internalError(res, err);
   }
 }
 
+// Dispute writes change billing state (resolution_status + oes_activations
+// payment_status) — manager or higher, matching the other billing-write
+// endpoints. Reads stay available to any authenticated user.
+const guardedPost = withRole('manager')(handlePost as Parameters<ReturnType<typeof withRole>>[0]);
+
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method === 'GET') return handleGet(req, res);
-  if (req.method === 'POST') return handlePost(req, res);
+  if (req.method === 'POST') return guardedPost(req, res) as Promise<void>;
   return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
