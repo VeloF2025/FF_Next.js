@@ -9,10 +9,14 @@
 --          returns. This was a seeding oversight; align checkin with checkout.
 -- Scope: storeman role only. technician/viewer stay view-only, contractor stays
 --        denied, deliberately matching their checkout grants.
--- Fully idempotent — safe to re-run.
+-- Fully idempotent — upsert so a fresh DB where the (storeman, assets.checkin)
+-- seed row does not yet exist gets the grant created rather than silently
+-- no-op'd into a denied state. role_id is nullable; the unique constraint is
+-- role_permissions_role_permission_key_key (role, permission_key).
 
-UPDATE role_permissions
-SET actions = '{"view": true, "create": true, "edit": true, "delete": false}'::jsonb,
-    updated_at = NOW()
-WHERE role = 'storeman'
-  AND permission_key = 'assets.checkin';
+INSERT INTO role_permissions (role, permission_key, actions)
+VALUES ('storeman', 'assets.checkin',
+        '{"view": true, "create": true, "edit": true, "delete": false}'::jsonb)
+ON CONFLICT (role, permission_key)
+DO UPDATE SET actions = EXCLUDED.actions,
+              updated_at = NOW();
