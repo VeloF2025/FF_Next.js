@@ -47,9 +47,17 @@ export function ScanSerialsStep({
   const hasPending = scanned.some((s) => s.state === 'pending-validation');
   const canDone = validCount > 0 && !hasPending;
 
-  // Camera scanner
+  // Camera scanner.
+  // Equipment serial labels (e.g. Nokia GPON ONT) carry the GPON SN in a
+  // DATA_MATRIX square plus a CODE_128 1D barcode under the printed S/N. The
+  // hook's default format set omits DATA_MATRIX, so the prominent square never
+  // decoded — the camera showed live video but read nothing. Enable DATA_MATRIX
+  // alongside the common 1D formats so either code on the label scans.
   const { state: scannerState, start, stop, error: scannerError } = useBarcodeScanner({
     elementId: SCANNER_ELEMENT_ID,
+    config: {
+      formatsToSupport: ['DATA_MATRIX', 'QR_CODE', 'CODE_128', 'CODE_39', 'EAN_13', 'EAN_8'],
+    },
     onScan: (result) => { handleRawSerial(result.decodedText); },
   });
 
