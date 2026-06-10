@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { assignmentService } from '@/modules/assets/services';
 import { CheckoutAssetSchema } from '@/modules/assets/utils/schemas';
 import { requireAuth } from '@/lib/auth/app-router';
+import { userHasPermission } from '@/lib/permissions';
 import { log } from '@/lib/logger';
 
 interface RouteParams {
@@ -19,6 +20,17 @@ interface RouteParams {
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+
+    // Authenticate request (user identity from JWT, never from client headers)
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
+    // Authorize: performing a checkout requires the assets.checkout grant.
+    // super_admin bypasses inside userHasPermission.
+    if (!(await userHasPermission(user.id, 'assets.checkout', 'create'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await req.json();
 
     // Add asset ID from URL to body
@@ -32,10 +44,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
-
-    // Authenticate request (user identity from JWT, never from client headers)
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
 
     const createdBy = user.id;
 
