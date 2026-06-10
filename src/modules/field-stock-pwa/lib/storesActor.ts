@@ -17,6 +17,7 @@
 import type { NextApiResponse } from 'next';
 import { sql } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import { isStoresAuthorised } from './storesRoles';
 import type { StaffRole } from '@/modules/attendance/portal/types';
 
@@ -55,9 +56,13 @@ export async function resolveStoresActor(staffId: string): Promise<StoresActor |
 }
 
 /**
- * Resolve + gate the actor for a /my/stores route. On failure, writes the
- * appropriate error to `res` and returns null — callers must `return` immediately
- * when this returns null. On success returns the authorised StoresActor.
+ * Resolve + gate the actor for a /my/stores route. On any failure — DB error,
+ * missing staff row, or insufficient role — writes the appropriate error to `res`
+ * and returns null; callers must `return` immediately when this returns null. On
+ * success returns the authorised StoresActor.
+ *
+ * The DB lookup is wrapped here so route handlers can call this BEFORE their own
+ * try/catch without a resolution failure escaping as an unhandled 500.
  *
  * Gate: staff.role in STORES_ROLES ('stores' | 'admin'), OR authRole in
  * STORES_AUTH_ROLES ('super_admin' | 'system') — see isStoresAuthorised.
@@ -66,7 +71,14 @@ export async function requireStoresActor(
   res: NextApiResponse,
   staffId: string,
 ): Promise<StoresActor | null> {
-  const actor = await resolveStoresActor(staffId);
+  let actor: StoresActor | null;
+  try {
+    actor = await resolveStoresActor(staffId);
+  } catch (error) {
+    log.error('requireStoresActor resolution failed', { error, staffId }, 'field-stock-pwa/storesActor');
+    apiResponse.internalError(res, error);
+    return null;
+  }
 
   if (!actor) {
     apiResponse.forbidden(res, 'No staff record for session');
