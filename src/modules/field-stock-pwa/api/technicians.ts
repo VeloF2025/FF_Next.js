@@ -110,7 +110,7 @@ export async function createTechnician(input: {
   phone: string;
   contractorId?: string | null;
 }): Promise<PwaTechSummary> {
-  const envelope = await request<{ user: FieldUserCreated }>('/api/field/users', {
+  const envelope = await request<{ user: FieldUserCreated }>('/api/my/stores/technicians', {
     method: 'POST',
     body: JSON.stringify({
       firstName: input.firstName,
