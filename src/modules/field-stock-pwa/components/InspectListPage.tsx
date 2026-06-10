@@ -63,7 +63,7 @@ function timeAgo(iso: string | null): string {
 
 async function fetchReturnsByStatus(status: 'pending' | 'inspected'): Promise<ReturnRow[]> {
   const res = await fetch(
-    `/api/procurement/field-stock/returns?status=${status}`,
+    `/api/my/stores/returns?status=${status}`,
     { credentials: 'same-origin' },
   );
   if (!res.ok) {

@@ -70,7 +70,7 @@ export interface InspectOrchestratorProps {
 async function fetchReturnById(id: string): Promise<ReturnDetail | null> {
   for (const status of ['pending', 'inspected'] as const) {
     const res = await fetch(
-      `/api/procurement/field-stock/returns?status=${status}`,
+      `/api/my/stores/returns?status=${status}`,
       { credentials: 'same-origin' },
     );
     if (!res.ok) continue;

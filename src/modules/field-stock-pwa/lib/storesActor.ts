@@ -18,7 +18,7 @@ import type { NextApiResponse } from 'next';
 import { sql } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { isStoresAuthorised } from './storesRoles';
+import { isStoresAuthorised, isReturnCreator, isReturnInspector } from './storesRoles';
 import type { StaffRole } from '@/modules/attendance/portal/types';
 
 export interface StoresActor {
@@ -55,6 +55,48 @@ export async function resolveStoresActor(staffId: string): Promise<StoresActor |
   };
 }
 
+// =============================================================================
+// Private helper
+// =============================================================================
+
+/**
+ * Shared resolve + gate body for all require* functions. Resolves the actor,
+ * wraps the DB call in a try/catch, checks for a missing staff row, and applies
+ * the caller-supplied predicate. Returns the actor on success; writes the
+ * appropriate error to `res` and returns null on any failure.
+ */
+async function requireActorWith(
+  res: NextApiResponse,
+  staffId: string,
+  predicate: (actor: StoresActor) => boolean,
+  denyMessage: string,
+): Promise<StoresActor | null> {
+  let actor: StoresActor | null;
+  try {
+    actor = await resolveStoresActor(staffId);
+  } catch (error) {
+    log.error('requireActorWith resolution failed', { error, staffId }, 'field-stock-pwa/storesActor');
+    apiResponse.internalError(res, error);
+    return null;
+  }
+
+  if (!actor) {
+    apiResponse.forbidden(res, 'No staff record for session');
+    return null;
+  }
+
+  if (!predicate(actor)) {
+    apiResponse.forbidden(res, denyMessage);
+    return null;
+  }
+
+  return actor;
+}
+
+// =============================================================================
+// Public gate functions
+// =============================================================================
+
 /**
  * Resolve + gate the actor for a /my/stores route. On any failure — DB error,
  * missing staff row, or insufficient role — writes the appropriate error to `res`
@@ -71,24 +113,47 @@ export async function requireStoresActor(
   res: NextApiResponse,
   staffId: string,
 ): Promise<StoresActor | null> {
-  let actor: StoresActor | null;
-  try {
-    actor = await resolveStoresActor(staffId);
-  } catch (error) {
-    log.error('requireStoresActor resolution failed', { error, staffId }, 'field-stock-pwa/storesActor');
-    apiResponse.internalError(res, error);
-    return null;
-  }
+  return requireActorWith(
+    res,
+    staffId,
+    (actor) => isStoresAuthorised(actor.staffRole, actor.authRole),
+    'Insufficient role to access stores',
+  );
+}
 
-  if (!actor) {
-    apiResponse.forbidden(res, 'No staff record for session');
-    return null;
-  }
+/**
+ * Resolve + gate the actor for a /my/stores/returns route (creator tier).
+ *
+ * Gate: isReturnCreator — staff.role in ('technician' | 'stores' | 'admin'), OR
+ * authRole in STORES_AUTH_ROLES. Technicians can create returns against their own
+ * stock; stores/admin can create on behalf of a tech.
+ */
+export async function requireReturnCreator(
+  res: NextApiResponse,
+  staffId: string,
+): Promise<StoresActor | null> {
+  return requireActorWith(
+    res,
+    staffId,
+    (actor) => isReturnCreator(actor.staffRole, actor.authRole),
+    'Insufficient role to create a return',
+  );
+}
 
-  if (!isStoresAuthorised(actor.staffRole, actor.authRole)) {
-    apiResponse.forbidden(res, 'Insufficient role to access stores');
-    return null;
-  }
-
-  return actor;
+/**
+ * Resolve + gate the actor for a /my/stores/returns/[returnId]/inspect|accept route.
+ *
+ * Gate: isReturnInspector — staff.role in ('stores' | 'admin'), OR authRole in
+ * STORES_AUTH_ROLES. Technicians are excluded from the inspection tier.
+ */
+export async function requireReturnInspector(
+  res: NextApiResponse,
+  staffId: string,
+): Promise<StoresActor | null> {
+  return requireActorWith(
+    res,
+    staffId,
+    (actor) => isReturnInspector(actor.staffRole, actor.authRole),
+    'Insufficient role to inspect a return',
+  );
 }

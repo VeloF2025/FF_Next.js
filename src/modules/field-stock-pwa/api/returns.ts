@@ -1,7 +1,7 @@
 /**
  * Returns API client for the field-stock PWA.
  *
- * Translates PwaReturnDraft → POST /api/procurement/field-stock/returns body.
+ * Translates PwaReturnDraft → POST /api/my/stores/returns body.
  * Two-step inspect+accept exposed as a single call submitInspectAndAccept().
  *
  * Idempotency: callers must pass a UUID; the server dedupes via the
@@ -61,7 +61,7 @@ export async function submitReturn(
   };
 
   const r = await request<ReturnsApiResponse>(
-    '/api/procurement/field-stock/returns',
+    '/api/my/stores/returns',
     { method: 'POST', body: JSON.stringify(body) },
   );
 
@@ -99,12 +99,12 @@ export async function submitInspectAndAccept(
   };
 
   await request<ReturnsApiResponse>(
-    `/api/procurement/field-stock/returns/${encodeURIComponent(draft.returnId)}/inspect`,
+    `/api/my/stores/returns/${encodeURIComponent(draft.returnId)}/inspect`,
     { method: 'POST', body: JSON.stringify(inspectBody) },
   );
 
   const accepted = await request<ReturnsApiResponse>(
-    `/api/procurement/field-stock/returns/${encodeURIComponent(draft.returnId)}/accept`,
+    `/api/my/stores/returns/${encodeURIComponent(draft.returnId)}/accept`,
     { method: 'POST', body: JSON.stringify({}) },
   );
 
@@ -118,7 +118,7 @@ export async function submitInspectAndAccept(
 /** Retry-accept only — used when previous accept failed but inspect succeeded. */
 export async function retryAccept(returnId: string): Promise<PwaReturnResult> {
   const accepted = await request<ReturnsApiResponse>(
-    `/api/procurement/field-stock/returns/${encodeURIComponent(returnId)}/accept`,
+    `/api/my/stores/returns/${encodeURIComponent(returnId)}/accept`,
     { method: 'POST', body: JSON.stringify({}) },
   );
   return {

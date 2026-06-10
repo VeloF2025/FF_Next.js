@@ -18,48 +18,33 @@ const sql = neon(process.env.DATABASE_URL!);
 const VALID_CONDITIONS = ['new', 'good', 'fair', 'poor', 'damaged', 'non_functional'] as const;
 const VALID_DISPOSITIONS = ['restock', 'repair', 'scrap', 'supplier_return'] as const;
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { returnId } = req.query;
+// =============================================================================
+// Shared inspect core
+// =============================================================================
 
-  if (typeof returnId !== 'string') {
-    return apiResponse.validationError(res, { returnId: 'Return ID is required' });
-  }
+export interface InspectActor {
+  /** staff.id — used for audit logging */
+  staffId: string;
+  /** "First Last" display name written to stock_returns.inspected_by */
+  inspectedBy: string;
+}
 
-  if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
-  }
+/**
+ * Core inspect logic, shared by the withAuth procurement route and the
+ * /my/stores/returns/[returnId]/inspect route (withMySession).
+ *
+ * Pre-condition: returnId has been validated as a string and req.method is POST.
+ * Pre-condition: role authorisation has already been verified.
+ */
+export async function inspectReturn(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  actor: InspectActor,
+): Promise<void> {
+  const { returnId } = req.query as { returnId: string };
+  const { inspectionNotes, lineDispositions } = req.body;
 
   try {
-    // ── Role gate ──────────────────────────────────────────────────────────────
-    const userId = (req as AuthenticatedNextApiRequest).user?.id;
-    if (!userId) {
-      return apiResponse.unauthorized(res, 'User session required');
-    }
-
-    const staffRows = await sql`
-      SELECT s.id, s.role, s.first_name, s.last_name, u.role AS auth_role
-      FROM staff s
-      JOIN users u ON u.id = s.user_id
-      WHERE u.id = ${userId}
-      LIMIT 1
-    `;
-    const staffRow = staffRows[0];
-
-    if (!staffRow) {
-      return apiResponse.forbidden(res, 'No staff record linked to user');
-    }
-
-    const staffId = staffRow.id as string;
-    const staffRole = staffRow.role as string;
-    const authRole = staffRow.auth_role as string;
-    const inspectedBy = `${staffRow.first_name ?? ''} ${staffRow.last_name ?? ''}`.trim();
-
-    if (!isReturnInspector(staffRole as Parameters<typeof isReturnInspector>[0], authRole)) {
-      return apiResponse.forbidden(res, 'Insufficient role to inspect a return');
-    }
-
-    const { inspectionNotes, lineDispositions } = req.body;
-
     // ── Validate lineDispositions values ───────────────────────────────────────
     if (lineDispositions && typeof lineDispositions === 'object') {
       for (const [lineId, disposition] of Object.entries(lineDispositions)) {
@@ -74,7 +59,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               field: 'condition',
               value: d.condition,
             });
-            return apiResponse.validationError(res, {
+            return void apiResponse.validationError(res, {
               [lineId]: `Invalid condition "${d.condition}" for line ${lineId}. Must be one of: ${VALID_CONDITIONS.join(', ')}`
             });
           }
@@ -88,7 +73,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               field: 'disposition',
               value: d.disposition,
             });
-            return apiResponse.validationError(res, {
+            return void apiResponse.validationError(res, {
               [lineId]: `Invalid disposition "${d.disposition}" for line ${lineId}. Must be one of: ${VALID_DISPOSITIONS.join(', ')}`
             });
           }
@@ -103,11 +88,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const returnRecord = existing[0];
     if (!returnRecord) {
-      return apiResponse.notFound(res, 'Return', returnId);
+      return void apiResponse.notFound(res, 'Return', returnId);
     }
 
     if (returnRecord.status !== 'pending') {
-      return apiResponse.validationError(res, {
+      return void apiResponse.validationError(res, {
         status: `Cannot inspect return with status "${returnRecord.status}". Only pending returns can be inspected.`
       });
     }
@@ -117,7 +102,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       UPDATE stock_returns
       SET
         status = 'inspected',
-        inspected_by = ${inspectedBy},
+        inspected_by = ${actor.inspectedBy},
         inspected_at = NOW(),
         inspection_notes = ${inspectionNotes || null},
         updated_at = NOW()
@@ -173,21 +158,73 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE r.id = ${returnId}
     `;
 
-    log.info('returns.inspect', { returnId, staffId, lineCount });
+    log.info('returns.inspect', { returnId, staffId: actor.staffId, lineCount });
 
     createAuditLog({
       entityType: 'stock_return',
       entityId: returnId,
       action: 'update',
-      performedBy: staffId,
-      newValues: { status: 'inspected', inspectedBy },
+      performedBy: actor.staffId,
+      newValues: { status: 'inspected', inspectedBy: actor.inspectedBy },
     });
 
-    return apiResponse.success(res, result[0]);
+    return void apiResponse.success(res, result[0]);
   } catch (error: unknown) {
     log.error('Error inspecting return', { error, returnId }, 'field-stock');
+    return void apiResponse.internalError(res, error);
+  }
+}
+
+// =============================================================================
+// withAuth handler (procurement route)
+// =============================================================================
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { returnId } = req.query;
+
+  if (typeof returnId !== 'string') {
+    return apiResponse.validationError(res, { returnId: 'Return ID is required' });
+  }
+
+  if (req.method !== 'POST') {
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
+  }
+
+  // ── Role gate ──────────────────────────────────────────────────────────────
+  const userId = (req as AuthenticatedNextApiRequest).user?.id;
+  if (!userId) {
+    return apiResponse.unauthorized(res, 'User session required');
+  }
+
+  let staffRow;
+  try {
+    const staffRows = await sql`
+      SELECT s.id, s.role, s.first_name, s.last_name, u.role AS auth_role
+      FROM staff s
+      JOIN users u ON u.id = s.user_id
+      WHERE u.id = ${userId}
+      LIMIT 1
+    `;
+    staffRow = staffRows[0];
+  } catch (error: unknown) {
+    log.error('Error resolving inspector staff', { error }, 'field-stock');
     return apiResponse.internalError(res, error);
   }
+
+  if (!staffRow) {
+    return apiResponse.forbidden(res, 'No staff record linked to user');
+  }
+
+  const staffId = staffRow.id as string;
+  const staffRole = staffRow.role as string;
+  const authRole = staffRow.auth_role as string;
+  const inspectedBy = `${staffRow.first_name ?? ''} ${staffRow.last_name ?? ''}`.trim();
+
+  if (!isReturnInspector(staffRole as Parameters<typeof isReturnInspector>[0], authRole)) {
+    return apiResponse.forbidden(res, 'Insufficient role to inspect a return');
+  }
+
+  return inspectReturn(req, res, { staffId, inspectedBy });
 }
 
 export default withAuth(handler);

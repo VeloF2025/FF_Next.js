@@ -1,15 +1,9 @@
 /**
- * handleList — GET /api/procurement/field-stock/returns
+ * handleList / listReturns — GET /api/procurement/field-stock/returns
  *
- * Extracted from index.ts for file-size compliance (CLAUDE.md hard rule 11,
- * 300-line max).
- *
- * Access model:
- *  - Inspectors (stores / admin / super_admin / system) see any return.
- *  - Creator-only callers (technician) see only returns they submitted
- *    (r.returned_by_id = callerStaffId). The client-supplied returnedBy
- *    param is silently ignored for non-inspectors — the server always
- *    enforces the ownership predicate.
+ * listReturns(req, res, ctx) — shared core: inspectors see all returns;
+ * creator-only callers (technician) see only their own submissions.
+ * handleList(req, res) — withAuth entry: resolves actor from req.user.id.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -19,33 +13,19 @@ import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { isReturnInspector } from '@/modules/field-stock-pwa/lib/storesRoles';
 
-export async function handleList(req: NextApiRequest, res: NextApiResponse) {
+export interface ListReturnsCtx {
+  callerStaffId: string;
+  callerIsInspector: boolean;
+}
+
+export async function listReturns(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  ctx: ListReturnsCtx,
+): Promise<void> {
+  const { callerStaffId, callerIsInspector } = ctx;
+
   try {
-    // ── Role gate + ownership scope ───────────────────────────────────────────
-    const userId = (req as AuthenticatedNextApiRequest).user?.id;
-    if (!userId) {
-      return apiResponse.unauthorized(res, 'User session required');
-    }
-
-    const staffRows = await sql`
-      SELECT s.id, s.role, u.role AS auth_role
-      FROM staff s
-      JOIN users u ON u.id = s.user_id
-      WHERE u.id = ${userId}
-      LIMIT 1
-    `;
-    const staffRow = staffRows[0];
-
-    if (!staffRow) {
-      return apiResponse.forbidden(res, 'No staff record linked to user');
-    }
-
-    const callerStaffId = staffRow.id as string;
-    const callerIsInspector = isReturnInspector(
-      staffRow.role as Parameters<typeof isReturnInspector>[0],
-      staffRow.auth_role as string,
-    );
-
     // For non-inspectors, ignore any client-supplied returnedBy and always
     // scope to the caller's own staff id.
     const { status } = req.query;
@@ -259,15 +239,39 @@ export async function handleList(req: NextApiRequest, res: NextApiResponse) {
     log.info('returns.list', {
       callerStaffId,
       callerIsInspector,
-      status: status ?? null,
+      status: (req.query.status as string) ?? null,
       returnedBy: returnedByParam ?? callerStaffId,
     }, 'field-stock');
 
-    return apiResponse.success(res, result);
+    return void apiResponse.success(res, result);
   } catch (error: unknown) {
     log.error('Error listing returns', { error }, 'field-stock');
-    return apiResponse.internalError(res, error);
+    return void apiResponse.internalError(res, error);
   }
+}
+
+export async function handleList(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+  const userId = (req as AuthenticatedNextApiRequest).user?.id;
+  if (!userId) return void apiResponse.unauthorized(res, 'User session required');
+  let staffRows;
+  try {
+    staffRows = await sql`
+      SELECT s.id, s.role, u.role AS auth_role FROM staff s
+      JOIN users u ON u.id = s.user_id WHERE u.id = ${userId} LIMIT 1
+    `;
+  } catch (error: unknown) {
+    log.error('Error resolving caller staff for returns list', { error }, 'field-stock');
+    return void apiResponse.internalError(res, error);
+  }
+  const staffRow = staffRows[0];
+  if (!staffRow) return void apiResponse.forbidden(res, 'No staff record linked to user');
+  return listReturns(req, res, {
+    callerStaffId: staffRow.id as string,
+    callerIsInspector: isReturnInspector(
+      staffRow.role as Parameters<typeof isReturnInspector>[0],
+      staffRow.auth_role as string,
+    ),
+  });
 }
 
 // Re-export withAuth for convenience (used by the index route only — this file

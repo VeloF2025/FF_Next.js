@@ -42,45 +42,20 @@ interface ReturnLine {
   disposition?: string;
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { returnId } = req.query;
+/** Actor passed to acceptReturn by both auth tiers. */
+export interface AcceptActor {
+  staffId: string;
+}
 
-  if (typeof returnId !== 'string') {
-    return apiResponse.validationError(res, { returnId: 'Return ID is required' });
-  }
-
-  if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
-  }
+/** Core accept logic reused by both auth tiers. */
+export async function acceptReturn(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  actor: AcceptActor,
+): Promise<void> {
+  const { returnId } = req.query as { returnId: string };
 
   try {
-    // ── Role gate ──────────────────────────────────────────────────────────────
-    const userId = (req as AuthenticatedNextApiRequest).user?.id;
-    if (!userId) {
-      return apiResponse.unauthorized(res, 'User session required');
-    }
-
-    const staffRow = await queryOne<{ id: string; role: string; auth_role: string }>(
-      `SELECT s.id, s.role, u.role AS auth_role
-       FROM staff s
-       JOIN users u ON u.id = s.user_id
-       WHERE u.id = $1
-       LIMIT 1`,
-      [userId]
-    );
-
-    if (!staffRow) {
-      return apiResponse.forbidden(res, 'No staff record linked to user');
-    }
-
-    const staffId = staffRow.id as string;
-    const staffRole = staffRow.role as string;
-    const authRole = staffRow.auth_role as string;
-
-    if (!isReturnInspector(staffRole as Parameters<typeof isReturnInspector>[0], authRole)) {
-      return apiResponse.forbidden(res, 'Insufficient role to accept a return');
-    }
-
     // ── Get return with lines ──────────────────────────────────────────────────
     const returnRecord = await queryOne(
       `SELECT
@@ -101,11 +76,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       [returnId]
     );
     if (!returnRecord) {
-      return apiResponse.notFound(res, 'Return', returnId);
+      return void apiResponse.notFound(res, 'Return', returnId);
     }
 
     if (returnRecord.status !== 'inspected') {
-      return apiResponse.validationError(res, {
+      return void apiResponse.validationError(res, {
         status: `Cannot accept return with status "${returnRecord.status}". Only inspected returns can be accepted.`
       });
     }
@@ -149,8 +124,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         if (disposition === 'restock') {
           if (fromHolderId) {
-            // Custody-aware path: debit holder custody + credit warehouse quant +
-            // insert field_stock_movements 'return' row — all via postReturnFromHolderWith.
+            // Custody-aware: debit holder, credit warehouse quant, insert movement row.
             const custodyLine: CustodyLine = {
               stockItemId: line.stock_item_id,
               quantity: Number(line.quantity ?? 1),
@@ -166,8 +140,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             });
           } else {
             // Null-holder fallback: no custody debit, credit warehouse quant directly.
-            // The stock_quants unique index is on
-            //   (stock_item_id, location_id, COALESCE(lot_number, ''))
             await txn.query(
               `INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
                VALUES ($1, $2, $3, NOW())
@@ -180,9 +152,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             );
           }
 
-          // Return to warehouse stock. Status + holder route through promoteSerial
-          // (returned→in_stock, 'restocked' event, holder cleared); the location
-          // is non-status metadata so it stays a plain UPDATE.
+          // Promote serial: returned→in_stock, holder cleared; location stays plain UPDATE.
           if (line.serial_id) {
             await promoteSerial(txn.client, {
               serialId:     line.serial_id,
@@ -190,7 +160,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               toHolderId:   null,
               sourceTable:  'stock_returns',
               sourceId:     returnId,
-              actorStaffId: staffId,
+              actorStaffId: actor.staffId,
               payload: {
                 disposition,
                 line_id: line.id,
@@ -203,12 +173,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             );
           }
         } else if (disposition === 'scrap') {
-          // TODO(sprintD-fast-follow): custody debit for scrap dispositions pending business rule
-          // Routes through promoteSerial so mig 387 AFTER trigger emits stock_serial_events
-          // post-cutover. Pre-cutover: same UPDATE behaviour, no triggers fire.
-          // Both paths clear holder_id (NULL) — warehouse-resident via stock_quants.
-          // At acceptance the serial is already 'returned' (set at creation via
-          // promoteSerial), so this is the matrixed returned→scrapped transition.
+          // TODO(sprintD-fast-follow): custody debit for scrap. returned→scrapped via promoteSerial.
           if (line.serial_id) {
             await promoteSerial(txn.client, {
               serialId:    line.serial_id,
@@ -216,7 +181,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               toHolderId:  null,
               sourceTable: 'stock_returns',
               sourceId:    returnId,
-              actorStaffId: staffId,
+              actorStaffId: actor.staffId,
               payload: {
                 disposition,
                 line_id: line.id,
@@ -225,12 +190,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             });
           }
         } else if (disposition === 'repair') {
-          // TODO(sprintD-fast-follow): custody debit for faulty/repair dispositions pending business rule
-          // Routes through promoteSerial so mig 387 AFTER trigger emits stock_serial_events
-          // post-cutover. Pre-cutover: same UPDATE behaviour, no triggers fire.
-          // Both paths clear holder_id (NULL) — warehouse-resident via stock_quants.
-          // At acceptance the serial is already 'returned', so this is the matrixed
-          // returned→faulty transition (disposition=repair, inspected faulty).
+          // TODO(sprintD-fast-follow): custody debit for repair. returned→faulty via promoteSerial.
           if (line.serial_id) {
             await promoteSerial(txn.client, {
               serialId:    line.serial_id,
@@ -238,7 +198,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               toHolderId:  null,
               sourceTable: 'stock_returns',
               sourceId:    returnId,
-              actorStaffId: staffId,
+              actorStaffId: actor.staffId,
               payload: {
                 disposition,
                 line_id: line.id,
@@ -270,27 +230,56 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       [returnId]
     );
 
-    log.info('returns.accept', { returnId, staffId, linesProcessed });
+    log.info('returns.accept', { returnId, staffId: actor.staffId, linesProcessed });
 
     createAuditLog({
       entityType: 'stock_return',
       entityId: returnId,
       action: 'update',
-      performedBy: staffId,
+      performedBy: actor.staffId,
       newValues: { status: 'restocked', linesProcessed },
     });
 
-    return apiResponse.success(res, result);
+    return void apiResponse.success(res, result);
   } catch (error: unknown) {
     if (error instanceof LifecycleViolationError || error instanceof HolderMismatchError) {
-      log.warn('returns.accept.lifecycle_rejected', { error: error.message, returnId }, 'field-stock');
-      return apiResponse.validationError(res, { serial: error.message });
+      log.warn('returns.accept.lifecycle_rejected', { error: (error as Error).message, returnId }, 'field-stock');
+      return void apiResponse.validationError(res, { serial: (error as Error).message });
     }
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes('supplier_return is not yet supported')) {
-      return apiResponse.validationError(res, { disposition: msg });
+      return void apiResponse.validationError(res, { disposition: msg });
     }
     log.error('Error accepting return', { error, returnId }, 'field-stock');
+    return void apiResponse.internalError(res, error);
+  }
+}
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { returnId } = req.query;
+  if (typeof returnId !== 'string') {
+    return apiResponse.validationError(res, { returnId: 'Return ID is required' });
+  }
+  if (req.method !== 'POST') {
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
+  }
+  const userId = (req as AuthenticatedNextApiRequest).user?.id;
+  if (!userId) return apiResponse.unauthorized(res, 'User session required');
+
+  try {
+    const staffRow = await queryOne<{ id: string; role: string; auth_role: string }>(
+      `SELECT s.id, s.role, u.role AS auth_role FROM staff s
+       JOIN users u ON u.id = s.user_id WHERE u.id = $1 LIMIT 1`,
+      [userId]
+    );
+    if (!staffRow) return apiResponse.forbidden(res, 'No staff record linked to user');
+    const staffId = staffRow.id as string;
+    if (!isReturnInspector(staffRow.role as Parameters<typeof isReturnInspector>[0], staffRow.auth_role)) {
+      return apiResponse.forbidden(res, 'Insufficient role to accept a return');
+    }
+    return acceptReturn(req, res, { staffId });
+  } catch (error: unknown) {
+    log.error('Error resolving acceptor staff', { error }, 'field-stock');
     return apiResponse.internalError(res, error);
   }
 }
