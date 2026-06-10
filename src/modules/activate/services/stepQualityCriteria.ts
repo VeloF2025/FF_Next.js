@@ -10,7 +10,7 @@
 import { loadStepReferences } from './qaReferencePhotos';
 
 /** Steps with explicit visual quality criteria that receive a VLM check. */
-export const QUALITY_CHECK_STEPS = [1, 2, 5, 7, 8, 9, 10, 11, 12] as const;
+export const QUALITY_CHECK_STEPS = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12] as const;
 export type QualityCheckStep = (typeof QUALITY_CHECK_STEPS)[number];
 
 export interface StepCriteria {
@@ -26,7 +26,7 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
     requirements:
       'The full property (or near-full property) must be visible: at minimum two sides/corners of the building in frame, OR the front face with roof and both edges visible. The roof must be visible and the structure identifiable as a complete building/home/shack/property.',
     failInstruction:
-      'FAIL if only one wall or side is visible (shot too close or side-on), if the roof or edges are cut off, or if it is a close-up of only a wall/door/window.',
+      'FAIL if only one wall or side is visible (shot too close or side-on), if the roof or edges are cut off, or if it is a close-up of only a wall/door/window. FAIL if the main subject is a utility pole or aerial cable span — that is a Cable from Pole photo (Step 2), not a house photo.',
     failReason: 'Full property not in view',
   },
   2: {
@@ -34,8 +34,24 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
     requirements:
       'A utility pole must be clearly visible in the frame. The cable or fiber span crossing through the air is also expected.',
     failInstruction:
-      'FAIL if no utility pole is visible anywhere in the frame, even if a cable span is present.',
+      'FAIL if no utility pole or electrical pole is visible anywhere in the frame, even if a cable span is present. FAIL if the photo shows mainly a property/building facade without a pole — that is a House Photo (Step 1), not a cable-from-pole photo.',
     failReason: 'The pole is not in view',
+  },
+  3: {
+    label: 'Cable Entry Outside',
+    requirements:
+      'The fiber optic cable entry point must be visible on the OUTSIDE of the building. A pipe, conduit, or hole in the exterior wall where the cable enters is expected. The cable or conduit must be visible entering or exiting through the wall from the outside.',
+    failInstruction:
+      'FAIL if no cable entry point, conduit, or pipe is visible on the outside wall. FAIL if the photo shows the inside of the building or is taken from inside looking out.',
+    failReason: 'Cable entry point not visible from outside',
+  },
+  4: {
+    label: 'Cable Entry Inside',
+    requirements:
+      'The fiber optic cable entry point must be visible from the INSIDE of the building. A pipe, conduit, or hole in the interior wall where the cable enters is expected. The cable or conduit must be visible entering through the wall from the inside.',
+    failInstruction:
+      'FAIL if no cable entry point, conduit, or pipe is visible on the interior wall. FAIL if the photo appears to be taken from outside the building.',
+    failReason: 'Cable entry point not visible from inside',
   },
   5: {
     label: 'Wall for Installation',
@@ -135,7 +151,7 @@ export function buildMessageContent(
       type: 'text',
       text: `You are performing a quality check on a photo classified as "${criteria.label}" for a fiber optic installation.
 
-I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evaluate a NEW photo.`,
+I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST be consistent with these examples — they are the authoritative standard.`,
     });
 
     // Static filesystem reference examples (existing behaviour)
@@ -173,7 +189,7 @@ I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evalu
     if (galleryExamples && galleryExamples.positiveBase64.length > 0) {
       content.push({
         type: 'text',
-        text: `GALLERY GOOD EXAMPLE${galleryExamples.positiveBase64.length > 1 ? 'S' : ''} — Approved by QA as passing "${criteria.label}" photos:`,
+        text: `PRIMARY APPROVED EXAMPLE${galleryExamples.positiveBase64.length > 1 ? 'S' : ''} — QA-confirmed PASSING "${criteria.label}" photos. Your decision MUST be consistent with these:`,
       });
       for (const b64 of galleryExamples.positiveBase64) {
         content.push({
@@ -186,7 +202,7 @@ I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evalu
     if (galleryExamples && galleryExamples.negativeBase64.length > 0) {
       content.push({
         type: 'text',
-        text: `GALLERY REJECT EXAMPLE${galleryExamples.negativeBase64.length > 1 ? 'S' : ''} — Rejected by QA as failing "${criteria.label}" photos:`,
+        text: `PRIMARY REJECT EXAMPLE${galleryExamples.negativeBase64.length > 1 ? 'S' : ''} — QA-confirmed FAILING "${criteria.label}" photos. If the new photo resembles these, it MUST fail:`,
       });
       for (const b64 of galleryExamples.negativeBase64) {
         content.push({
