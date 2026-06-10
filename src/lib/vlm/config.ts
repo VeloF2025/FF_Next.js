@@ -104,8 +104,9 @@ export const VLM_MAX_TOKENS_QA = 2000;
 /** Max tokens for document extraction (quotes, POs — complex structured output) */
 export const VLM_MAX_TOKENS_DOCUMENT = 4000;
 
-/** Max tokens for quick extractions (plate, odometer, fuel) */
-export const VLM_MAX_TOKENS_QUICK = 500;
+/** Max tokens for quick single-turn calls: extractions (plate, odometer, fuel)
+ *  and SiteCam real-time step validation (pass/fail + reason, few-shot gallery). */
+export const VLM_MAX_TOKENS_QUICK = 1200;
 
 /** Max tokens for orientation detection — response is a single number (0/90/180/270) */
 export const VLM_MAX_TOKENS_ORIENTATION = 10;
