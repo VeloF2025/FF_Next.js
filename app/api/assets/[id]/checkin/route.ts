@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { assignmentService } from '@/modules/assets/services';
 import { requireAuth } from '@/lib/auth/app-router';
+import { userHasPermission } from '@/lib/permissions';
 import { log } from '@/lib/logger';
 
 interface RouteParams {
@@ -18,6 +19,17 @@ interface RouteParams {
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const { id: assetId } = await params;
+
+    // Authenticate request (user identity from JWT, never from client headers)
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
+    // Authorize: performing a check-in requires the assets.checkin grant.
+    // super_admin bypasses inside userHasPermission.
+    if (!(await userHasPermission(user.id, 'assets.checkin', 'edit'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await req.json();
 
     // Get the active assignment for this asset
@@ -40,10 +52,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       newLocation: body.newLocation,
       maintenanceRequired: body.maintenanceRequired || false,
     };
-
-    // Authenticate request (user identity from JWT, never from client headers)
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
 
     const checkedInBy = user.id;
 
