@@ -7,7 +7,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle, XCircle, Undo2, Scale } from 'lucide-react';
+import { CheckCircle, XCircle, Undo2, Scale, Download, Sparkles } from 'lucide-react';
+import { DisputeCandidatesPanel } from './DisputeCandidatesPanel';
 
 interface DisputeRow {
   deductionId: string;
@@ -52,6 +53,7 @@ export function DisputesTab() {
   const [search, setSearch] = useState('');
   const [outcomeFilter, setOutcomeFilter] = useState<'all' | 'none' | 'won' | 'lost' | 'partial'>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [view, setView] = useState<'disputes' | 'candidates'>('disputes');
 
   const fetchAll = useCallback(async () => {
     try {
@@ -123,7 +125,29 @@ export function DisputesTab() {
         <p className="text-sm text-[var(--ff-text-tertiary)] flex-1 min-w-[16rem]">
           Deductions flagged for dispute with Fibertime. Set outcomes after each weekly meeting to track win rate.
         </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setView(view === 'candidates' ? 'disputes' : 'candidates')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border transition-colors ${
+              view === 'candidates'
+                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                : 'border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Candidates
+          </button>
+          <a
+            href="/api/billing/dispute-pack"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]"
+          >
+            <Download className="w-3.5 h-3.5" /> Export dispute pack
+          </a>
+        </div>
       </div>
+
+      {view === 'candidates' && (
+        <DisputeCandidatesPanel onRaised={() => { void fetchAll(); }} />
+      )}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-red-400 text-sm">
@@ -132,7 +156,7 @@ export function DisputesTab() {
       )}
 
       {/* Breakdown cards + outcome filter */}
-      {data && (
+      {view === 'disputes' && data && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <BreakdownChip
             active={outcomeFilter === 'all'}
@@ -179,6 +203,7 @@ export function DisputesTab() {
         </div>
       )}
 
+      {view === 'disputes' && (
       <div className="flex items-center gap-3">
         <input
           type="text"
@@ -191,8 +216,9 @@ export function DisputesTab() {
           {loading ? 'Loading…' : `${data?.items.length ?? 0} rows`}
         </span>
       </div>
+      )}
 
-      {!loading && (data?.items.length ?? 0) === 0 ? (
+      {view === 'candidates' ? null : !loading && (data?.items.length ?? 0) === 0 ? (
         <div className="text-center py-12 text-[var(--ff-text-tertiary)]">
           No disputes match the current filters.
         </div>

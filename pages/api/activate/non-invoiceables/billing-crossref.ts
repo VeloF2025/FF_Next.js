@@ -48,11 +48,13 @@ interface CrossRefRow {
   od_note5_id: string | null;
   od_note5_reason: string | null;
   od_note5_recovered_at: string | null;
+  // Auto-verifier verdict (deductionVerdictService)
+  verdict: string | null;
 }
 
 // ─── Response types ───────────────────────────────────────────────────────────
 
-/** Dispute flag derived from Note 5 offline evidence. */
+/** Dispute flag derived from the auto-verifier verdict + Note 5 offline evidence. */
 type DisputeFlag = 'none' | 'dispute_candidate' | 'recovered' | 'dying_gasp';
 
 interface CrossRefItem {
@@ -74,6 +76,7 @@ interface CrossRefItem {
 // conditional fragments). The $1 parameter is always the billing_week_id UUID.
 const CROSSREF_SQL = `
 SELECT d.id, d.dr_number, d.deduction_note, d.serial_number, d.team, d.deduction_reason,
+  d.verdict,
   oa.status AS oes_status, oa.activation_date AS oes_activation_date,
   oa.ont_rx_sig_dbm AS oes_signal_dbm, oa.current_ont_rx AS current_ont_rx,
   olt.id AS olt_record_id, olt.fix_status AS olt_fix_status,
@@ -128,14 +131,18 @@ function computeActionStatus(
 }
 
 /**
- * Derive dispute_flag for Note 5 deductions:
+ * Derive dispute_flag. Note 5 keeps its offline-evidence sub-flags:
  *   dispute_candidate — no offline evidence found in the 14-day window
  *   recovered         — offline record found but device already recovered
  *   dying_gasp        — offline reason is 'Dying Gasp' (transient signal loss)
- *   none              — not a Note 5 deduction, or evidence confirms offline state
+ *   none              — evidence confirms the offline state
+ * All other notes use the persisted auto-verifier verdict:
+ *   dispute_candidate — verdict = 'disputable' (see deductionVerdictService)
  */
 function computeDisputeFlag(row: CrossRefRow): DisputeFlag {
-  if (row.deduction_note !== 'note5') return 'none';
+  if (row.deduction_note !== 'note5') {
+    return row.verdict === 'disputable' ? 'dispute_candidate' : 'none';
+  }
   if (!row.od_note5_id) return 'dispute_candidate';
   if (row.od_note5_recovered_at) return 'recovered';
   if (row.od_note5_reason === 'Dying Gasp') return 'dying_gasp';
