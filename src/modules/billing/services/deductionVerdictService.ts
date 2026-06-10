@@ -12,11 +12,11 @@
  * on demand via POST /api/billing/verify-deductions.
  */
 
-import type { PoolClient } from 'pg';
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
 import {
   classifyDeductionVerdict,
+  selectSignalDbm,
   type DeductionEvidence,
   type DeductionVerdict,
 } from './classifyDeductionVerdict';
@@ -123,12 +123,11 @@ function toNumber(v: string | number | null): number | null {
 }
 
 function buildEvidence(r: EvidenceRow): DeductionEvidence {
-  const oesActive = (r.oes_status ?? '').toLowerCase() === 'active';
-  // For non-active ONTs prefer the latest polled reading over the
-  // activation-date reading (mirrors billing-crossref signal selection).
-  const activationRx = toNumber(r.ont_rx_sig_dbm);
-  const currentRx = toNumber(r.current_ont_rx);
-  const signalDbm = oesActive ? activationRx : (currentRx ?? activationRx);
+  const signalDbm = selectSignalDbm(
+    r.oes_status,
+    toNumber(r.ont_rx_sig_dbm),
+    toNumber(r.current_ont_rx),
+  );
 
   return {
     noteCode: r.deduction_note,
@@ -153,10 +152,8 @@ function buildEvidence(r: EvidenceRow): DeductionEvidence {
  */
 export async function computeVerdictsForWeek(
   billingWeekId: string,
-  client?: PoolClient,
 ): Promise<VerdictRunSummary> {
-  const db = client ?? pool;
-  const { rows } = await db.query<EvidenceRow>(EVIDENCE_SQL, [billingWeekId]);
+  const { rows } = await pool.query<EvidenceRow>(EVIDENCE_SQL, [billingWeekId]);
 
   const summary: VerdictRunSummary = {
     billingWeekId,
@@ -192,7 +189,7 @@ export async function computeVerdictsForWeek(
   }
 
   if (ids.length > 0) {
-    await db.query(
+    await pool.query(
       `UPDATE ft_billing_deductions d
           SET verdict             = v.verdict,
               verdict_evidence    = v.evidence::jsonb,

@@ -7,6 +7,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyDeductionVerdict,
+  selectSignalDbm,
+  parseVerdictReasons,
   type DeductionEvidence,
 } from '../classifyDeductionVerdict';
 
@@ -57,6 +59,14 @@ describe('note2 — No Field App entry', () => {
   it('is legitimate when no DR record exists on our side', () => {
     expect(classifyDeductionVerdict(evidence({ noteCode: 'note2', hasDrRecord: false })).verdict).toBe('legitimate');
   });
+
+  it('is disputable without a received date and omits it from the reason', () => {
+    const r = classifyDeductionVerdict(
+      evidence({ noteCode: 'note2', hasDrRecord: true, waReceivedAt: null }),
+    );
+    expect(r.verdict).toBe('disputable');
+    expect(r.reasons[0]).not.toContain('received');
+  });
 });
 
 describe('note3 — Degraded (monitor only)', () => {
@@ -106,6 +116,46 @@ describe('note4 — Serial mismatch', () => {
         }),
       ).verdict,
     ).toBe('legitimate');
+  });
+
+  it('is legitimate with no fix history and no OLT record', () => {
+    expect(
+      classifyDeductionVerdict(evidence({ noteCode: 'note4', oesSerial: 'ALCLB48E9A65' })).verdict,
+    ).toBe('legitimate');
+  });
+});
+
+describe('selectSignalDbm', () => {
+  it('uses the activation reading for active ONTs', () => {
+    expect(selectSignalDbm('active', -20, -35)).toBe(-20);
+    expect(selectSignalDbm('Active', -20, -35)).toBe(-20);
+  });
+
+  it('prefers the latest polled reading for non-active ONTs', () => {
+    expect(selectSignalDbm('Inactive', -20, -35)).toBe(-35);
+    expect(selectSignalDbm(null, -20, -35)).toBe(-35);
+  });
+
+  it('falls back to the activation reading when no polled reading exists', () => {
+    expect(selectSignalDbm('Inactive', -20, null)).toBe(-20);
+    expect(selectSignalDbm(null, null, null)).toBeNull();
+  });
+});
+
+describe('parseVerdictReasons', () => {
+  it('parses a valid JSON array', () => {
+    expect(parseVerdictReasons('["a","b"]')).toEqual(['a', 'b']);
+  });
+
+  it('returns [] for null and non-array JSON', () => {
+    expect(parseVerdictReasons(null)).toEqual([]);
+    expect(parseVerdictReasons('{"not":"array"}')).toEqual([]);
+  });
+
+  it('surfaces malformed JSON as a readable reason instead of throwing', () => {
+    const result = parseVerdictReasons('{broken');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('unparseable');
   });
 });
 

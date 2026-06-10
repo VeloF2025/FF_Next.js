@@ -18,6 +18,38 @@ export type DeductionVerdict = 'legitimate' | 'disputable' | 'insufficient_evide
 
 export const LOW_SIGNAL_THRESHOLD_DBM = -26;
 
+/**
+ * Single source of truth for picking the RX reading: active ONTs use the
+ * activation-date reading (the authoritative billing value); non-active ONTs
+ * prefer the latest polled reading (current_ont_rx), falling back to the
+ * activation reading. Shared by the verdict service and billing-crossref so
+ * the Disputes UI and the verifier always judge the same number.
+ */
+export function selectSignalDbm(
+  oesStatus: string | null,
+  activationRx: number | null,
+  currentRx: number | null,
+): number | null {
+  const active = (oesStatus ?? '').toLowerCase() === 'active';
+  return active ? activationRx : (currentRx ?? activationRx);
+}
+
+/**
+ * Parse the reasons array out of verdict_evidence->>'reasons'. Never throws —
+ * malformed JSON yields []. Callers log if the empty result matters to them.
+ */
+export function parseVerdictReasons(raw: string | null): string[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (err) {
+    // Pure module — no logger import; surface the parse problem in the value.
+    parsed = [`unparseable verdict reasons: ${err instanceof Error ? err.message : String(err)}`];
+  }
+  return Array.isArray(parsed) ? parsed.map(String) : [];
+}
+
 export interface DeductionEvidence {
   noteCode: string;
   // OES (network truth, latest sync)

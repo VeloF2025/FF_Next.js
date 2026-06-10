@@ -15,6 +15,7 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import pool from '@/lib/db';
 import { NOTE_TO_CATEGORY, type NonInvoiceableCategory } from '@/modules/non-invoiceables/types';
+import { selectSignalDbm } from '@/modules/billing/services/classifyDeductionVerdict';
 
 const logger = createLogger('api/activate/non-invoiceables/billing-crossref');
 
@@ -233,9 +234,8 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
       // For offline ONTs, prefer the latest-polled RX (current_ont_rx) over the
       // activation-date RX (ticket VF-20260422-002). Active ONTs keep the
       // activation-date reading which is the authoritative billing value.
-      const signal_dbm = row.oes_status === 'Inactive'
-        ? (row.current_ont_rx ?? row.oes_signal_dbm)
-        : row.oes_signal_dbm;
+      // Shared with the deduction verdict service so UI and verifier agree.
+      const signal_dbm = selectSignalDbm(row.oes_status, row.oes_signal_dbm, row.current_ont_rx);
 
       return {
         dr_number: row.dr_number,

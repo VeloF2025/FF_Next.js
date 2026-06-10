@@ -87,7 +87,8 @@ export function DisputeCandidatesPanel({ onRaised }: { onRaised?: () => void }) 
         body: JSON.stringify({ deductionIds: Array.from(selected), action: 'raise' }),
       });
       const j = await res.json();
-      if (!j.success) setError(j.error?.message ?? 'Failed to raise disputes');
+      if (j.success) setError(null);
+      else setError(j.error?.message ?? 'Failed to raise disputes');
       setSelected(new Set());
       await fetchCandidates();
       onRaised?.();

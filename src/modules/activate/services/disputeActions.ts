@@ -19,6 +19,7 @@ import {
   logNonInvoiceableResolved,
   type NoteCode,
 } from '@/modules/activate/services/activity-log/eventLoggers';
+import { parseVerdictReasons } from '@/modules/billing/services/classifyDeductionVerdict';
 
 const logger = createLogger('DisputeActions');
 
@@ -33,6 +34,8 @@ export interface DisputeActionResult {
   newStatus: string;
   previousStatus: string;
   outcome: DisputeOutcome | null;
+  /** false when the oes_activations payment_status sync failed (logged). */
+  paymentSynced: boolean;
 }
 
 interface DeductionRow {
@@ -54,25 +57,34 @@ async function loadDeduction(id: string): Promise<DeductionRow | null> {
   return rows[0] ?? null;
 }
 
-async function setPaymentStatus(drNumber: string, status: 'disputed' | 'paid' | 'deducted'): Promise<void> {
+/**
+ * Guarded payment_status transitions — never clobber states the dispute
+ * lifecycle doesn't own (oes_activations.drop_number is UNIQUE, so this
+ * touches at most one row):
+ *   disputed  ← only from not_yet_claimed/deducted (raise)
+ *   paid      ← only from disputed (dispute won)
+ *   deducted  ← only from disputed (lost/partial/withdraw)
+ */
+const PAYMENT_TRANSITION_GUARDS: Record<'disputed' | 'paid' | 'deducted', string[]> = {
+  disputed: ['not_yet_claimed', 'deducted'],
+  paid: ['disputed'],
+  deducted: ['disputed'],
+};
+
+export async function syncDisputePaymentStatus(
+  drNumber: string,
+  status: 'disputed' | 'paid' | 'deducted',
+): Promise<void> {
   await pool.query(
-    `UPDATE oes_activations SET payment_status = $2 WHERE drop_number = $1`,
-    [drNumber, status],
+    `UPDATE oes_activations SET payment_status = $2
+      WHERE drop_number = $1 AND payment_status = ANY($3::varchar[])`,
+    [drNumber, status, PAYMENT_TRANSITION_GUARDS[status]],
   );
 }
 
 function defaultRaiseReason(row: DeductionRow): string | null {
-  if (!row.verdict_reasons) return null;
-  try {
-    const reasons = JSON.parse(row.verdict_reasons) as string[];
-    return reasons.length > 0 ? `auto-verifier: ${reasons.join('; ')}` : null;
-  } catch (err) {
-    logger.warn('unparseable verdict reasons', {
-      deductionId: row.id,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
+  const reasons = parseVerdictReasons(row.verdict_reasons);
+  return reasons.length > 0 ? `auto-verifier: ${reasons.join('; ')}` : null;
 }
 
 /**
@@ -91,6 +103,8 @@ export async function applyDisputeAction(params: {
   let paymentStatus: 'disputed' | 'paid' | 'deducted';
   let emitResolution = false;
   let reason = params.reason?.trim() || null;
+  // Only mark_outcome may persist an outcome value.
+  let outcomeToWrite: DisputeOutcome | null = null;
 
   switch (params.action) {
     case 'raise':
@@ -107,6 +121,7 @@ export async function applyDisputeAction(params: {
       paymentStatus = outcome === 'won' ? 'paid' : 'deducted';
       emitResolution = outcome === 'won';
       reason = reason ?? `dispute ${outcome}`;
+      outcomeToWrite = outcome;
       break;
     }
     case 'withdraw':
@@ -114,7 +129,7 @@ export async function applyDisputeAction(params: {
       paymentStatus = 'deducted';
       break;
     default:
-      throw new Error(`Unknown action ${String(params.action)}`);
+      throw new Error('Unknown action — must be raise | mark_outcome | withdraw');
   }
 
   const { rows: updated } = await pool.query<{
@@ -132,14 +147,16 @@ export async function applyDisputeAction(params: {
             resolved_reason    = CASE WHEN $2 = 'resolved' THEN COALESCE($4, 'dispute won') ELSE resolved_reason END
       WHERE id = $1
       RETURNING id, dr_number, deduction_note, week_ending::text`,
-    [params.deductionId, targetStatus, params.outcome ?? null, reason],
+    [params.deductionId, targetStatus, outcomeToWrite, reason],
   );
   const u = updated[0]!;
 
   // Keep the billing payment state in step with the dispute claim.
+  let paymentSynced = true;
   try {
-    await setPaymentStatus(u.dr_number, paymentStatus);
+    await syncDisputePaymentStatus(u.dr_number, paymentStatus);
   } catch (err) {
+    paymentSynced = false;
     logger.warn('payment_status sync failed', {
       dr: u.dr_number,
       target: paymentStatus,
@@ -173,7 +190,8 @@ export async function applyDisputeAction(params: {
     weekEnding: u.week_ending,
     newStatus: targetStatus,
     previousStatus: row.resolution_status,
-    outcome: params.outcome ?? null,
+    outcome: outcomeToWrite,
+    paymentSynced,
   };
 }
 

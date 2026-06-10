@@ -15,7 +15,7 @@
 
 import type { NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import pool from '@/lib/db';
 import {
@@ -33,13 +33,16 @@ async function resolveWeekIds(body: {
   if (body.billing_week_id) return [body.billing_week_id];
 
   if (body.week_ending) {
-    const params: unknown[] = [body.week_ending];
-    let sql = `SELECT id FROM ft_weekly_billing WHERE week_ending = $1::date`;
-    if (body.project) {
-      params.push(body.project);
-      sql += ` AND project ILIKE $2`;
-    }
-    const { rows } = await pool.query<{ id: string }>(sql, params);
+    // Explicit query branches — no conditional SQL fragment building.
+    const { rows } = body.project
+      ? await pool.query<{ id: string }>(
+          `SELECT id FROM ft_weekly_billing WHERE week_ending = $1::date AND project ILIKE $2`,
+          [body.week_ending, body.project],
+        )
+      : await pool.query<{ id: string }>(
+          `SELECT id FROM ft_weekly_billing WHERE week_ending = $1::date`,
+          [body.week_ending],
+        );
     return rows.map((r) => r.id);
   }
 
@@ -58,6 +61,13 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
     week_ending?: string;
     project?: string;
   };
+
+  if (body.week_ending && !/^\d{4}-\d{2}-\d{2}$/.test(body.week_ending)) {
+    return apiResponse.badRequest(res, 'week_ending must be YYYY-MM-DD');
+  }
+  if (body.billing_week_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.billing_week_id)) {
+    return apiResponse.badRequest(res, 'billing_week_id must be a UUID');
+  }
 
   try {
     const weekIds = await resolveWeekIds(body);
@@ -92,4 +102,5 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
   }
 }
 
-export default withAuth(handler as Parameters<typeof withAuth>[0]);
+// Overwrites persisted verdicts — same tier as the other billing writes.
+export default withAuth(withRole('manager')(handler as Parameters<ReturnType<typeof withRole>>[0]));

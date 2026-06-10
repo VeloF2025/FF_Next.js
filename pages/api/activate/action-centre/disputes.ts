@@ -17,7 +17,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import pool from '@/lib/db';
 import {
@@ -26,11 +26,14 @@ import {
   type DisputeAction,
   type DisputeOutcome,
 } from '@/modules/activate/services/disputeActions';
+import { parseVerdictReasons } from '@/modules/billing/services/classifyDeductionVerdict';
 
 const logger = createLogger('api/activate/action-centre/disputes');
 
 const DISPUTE_STATUSES = ['disputing', 'disputed', 'acknowledged'];
 const CANDIDATE_STATUSES = ['open', 'in_progress', 'ticketed'];
+/** Bulk-raise ceiling — bounds the sequential DB writes one request can trigger. */
+const MAX_BULK_DEDUCTIONS = 200;
 
 interface DisputeRow {
   deductionId: string;
@@ -166,7 +169,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       disputeOpenedAt: r.dispute_opened_at,
       weeksFlagged: Number(r.weeks_flagged ?? '0'),
       verdict: r.verdict,
-      verdictReasons: parseReasons(r.verdict_reasons),
+      verdictReasons: parseVerdictReasons(r.verdict_reasons),
       verdictComputedAt: r.verdict_computed_at,
     }));
 
@@ -197,19 +200,6 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
   }
 }
 
-function parseReasons(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch (err) {
-    logger.warn('unparseable verdict reasons', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return [];
-  }
-}
-
 async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   const body = req.body as {
     deductionId?: string;
@@ -225,6 +215,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
   if (ids.length === 0 || !body.action) {
     return apiResponse.badRequest(res, 'deductionId (or deductionIds[]) and action are required');
+  }
+  if (ids.length > MAX_BULK_DEDUCTIONS) {
+    return apiResponse.badRequest(res, `Bulk limit is ${MAX_BULK_DEDUCTIONS} deductions per request`);
   }
 
   try {
@@ -259,9 +252,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
   }
 }
 
+// Dispute writes change billing state (resolution_status + oes_activations
+// payment_status) — manager or higher, matching the other billing-write
+// endpoints. Reads stay available to any authenticated user.
+const guardedPost = withRole('manager')(handlePost as Parameters<ReturnType<typeof withRole>>[0]);
+
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method === 'GET') return handleGet(req, res);
-  if (req.method === 'POST') return handlePost(req, res);
+  if (req.method === 'POST') return guardedPost(req, res) as Promise<void>;
   return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 

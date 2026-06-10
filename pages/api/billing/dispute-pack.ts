@@ -11,7 +11,7 @@
 
 import type { NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import pool from '@/lib/db';
 import {
@@ -38,11 +38,12 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
 
     if (!weekEnding) return apiResponse.badRequest(res, 'No billing deductions exist yet');
 
+    // Clauses-array pattern (matches disputes.ts) — no fragment interpolation.
     const params: unknown[] = [weekEnding];
-    let projectClause = '';
+    const clauses: string[] = [`d.week_ending = $1::date`, `d.resolution_status = 'disputing'`];
     if (project) {
       params.push(project);
-      projectClause = `AND d.project ILIKE $2`;
+      clauses.push(`d.project ILIKE $${params.length}`);
     }
 
     const { rows } = await pool.query<{
@@ -68,9 +69,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
         FROM ft_billing_deductions d
         LEFT JOIN maintenance_tickets t ON t.id = d.ticket_id
         LEFT JOIN latest_oes o ON o.drop_number = d.dr_number
-       WHERE d.week_ending = $1::date
-         AND d.resolution_status = 'disputing'
-         ${projectClause}
+       WHERE ${clauses.join(' AND ')}
        ORDER BY d.deduction_note, d.project, d.dr_number
       `,
       params,
@@ -115,4 +114,5 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
   }
 }
 
-export default withAuth(handler as Parameters<typeof withAuth>[0]);
+// Commercially sensitive dispute evidence — same tier as other billing routes.
+export default withAuth(withRole('manager')(handler as Parameters<ReturnType<typeof withRole>>[0]));
