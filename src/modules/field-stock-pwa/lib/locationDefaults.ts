@@ -18,7 +18,7 @@ import { ApiError } from '../api';
 export const FIELD_DEFAULT_LOCATION_ID = '00000000-0000-0000-0000-000000000001';
 
 // =============================================================================
-// Minimal location shape (camelCase, as returned by GET /api/procurement/field-stock/locations)
+// Minimal location shape (camelCase, as returned by GET /api/my/stores/locations)
 // =============================================================================
 
 export interface PwaStockLocation {
@@ -39,7 +39,7 @@ export interface PwaStockLocation {
 }
 
 // =============================================================================
-// Fetch helper — wraps GET /api/procurement/field-stock/locations
+// Fetch helper — wraps GET /api/my/stores/locations
 // =============================================================================
 
 interface ApiEnvelope<T> {
@@ -52,7 +52,7 @@ async function fetchLocationsRaw(): Promise<PwaStockLocation[]> {
   // Request warehouse-type only at the server to reduce payload size.
   // The server may still return non-warehouse rows if it doesn't support the
   // locationType query param yet, so we apply client-side filtering defensively.
-  const url = '/api/procurement/field-stock/locations?locationType=warehouse';
+  const url = '/api/my/stores/locations?locationType=warehouse';
   let res: Response;
   try {
     res = await fetch(url, {

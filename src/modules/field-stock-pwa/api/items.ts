@@ -14,7 +14,7 @@ import { request } from './request';
 // =============================================================================
 
 /**
- * Server row shape returned by GET /api/procurement/field-stock/items.
+ * Server row shape returned by GET /api/my/stores/items.
  * Only the fields needed for PickItemStep (and SignAndSubmitStep) are mapped.
  */
 interface StockItemRow {
@@ -33,7 +33,7 @@ interface StockItemRow {
 /**
  * Fetch all active stock items that use serial-number tracking.
  *
- * Uses GET /api/procurement/field-stock/items?trackingType=serial
+ * Uses GET /api/my/stores/items?trackingType=serial
  * which filters server-side (Branch 5 in items.ts). Client-side
  * search filtering is applied when `opts.search` is provided.
  *
@@ -49,7 +49,7 @@ export async function fetchSerialStockItems(
     params.set('search', opts.search);
   }
   const rows = await request<StockItemRow[]>(
-    `/api/procurement/field-stock/items?${params.toString()}`
+    `/api/my/stores/items?${params.toString()}`
   );
   return rows.map((r) => ({
     id: r.id,

@@ -1,7 +1,7 @@
 /**
  * Contractor API helpers for the field-stock PWA.
  *
- * Uses /api/contractors-list (not /api/contractors which is a detail endpoint).
+ * Uses /api/my/stores/contractors (PWA-session equivalent of /api/contractors-list).
  */
 
 import { request } from './request';
@@ -23,9 +23,9 @@ interface ContractorRow {
 
 /**
  * Fetch the contractor dropdown list.
- * Uses /api/contractors-list (not /api/contractors which is a detail endpoint).
+ * Uses /api/my/stores/contractors (PWA-session equivalent of /api/contractors-list).
  */
 export async function fetchContractors(): Promise<Array<{ id: string; name: string }>> {
-  const rows = await request<ContractorRow[]>('/api/contractors-list');
+  const rows = await request<ContractorRow[]>('/api/my/stores/contractors');
   return rows.map((r) => ({ id: r.id, name: r.company_name }));
 }

@@ -1,7 +1,7 @@
 /**
  * ScanMyStockStep — step 2 of the /my/stores/return flow.
  *
- * Loads serials currently held by the calling tech (GET /api/procurement/field-stock/my-serials).
+ * Loads serials currently held by the calling tech (GET /api/my/stores/my-serials).
  * Renders them as a tappable checklist.
  *
  * Mixed-source guard: once one serial is selected its source warehouse becomes the
@@ -53,7 +53,7 @@ export function ScanMyStockStep({
   // Load serials held by this tech on mount.
   React.useEffect(() => {
     let cancelled = false;
-    fetch('/api/procurement/field-stock/my-serials', { credentials: 'same-origin' })
+    fetch('/api/my/stores/my-serials', { credentials: 'same-origin' })
       .then(async (res) => {
         if (!res.ok) {
           const text = await res.text().catch(() => res.statusText);
