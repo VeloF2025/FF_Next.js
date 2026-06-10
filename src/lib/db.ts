@@ -38,11 +38,20 @@ const useSSL = process.env.DATABASE_URL?.includes('sslmode=require') ?? false;
 //   - min 2 → 1              smaller idle baseline; warm-up still primes 1
 //   - idleTimeout 300s → 30s evict idle quickly (matches lib/db/pool.js shim)
 //   - connectionTimeout 30s → 5s  fail fast on saturation rather than hanging
-// Footprint at full load: 4 pools (pg + Neon shim × dev + prod) × max 10 = 40
-// slots, well below the 100-slot ceiling.
+// Footprint note (revised 2026-06-10 after a recurrence): the app pools are NOT
+// the whole story. Supabase's own internals (supabase_admin/realtime/supavisor,
+// authenticator/PostgREST, storage) hold ~36 of the 100 slots, leaving only ~61
+// for fibreflow_user — against which the steady app idle floor (dev + prod × these
+// pools) plus concurrent cron node/tsx processes already sits near 60. So headroom
+// is thin and a cron spike tips it over, the DB refuses new connections, and the
+// WhatsApp bridge's per-DR insert fails → acks silently drop. The durable fix is
+// raising max_connections (host RAM is ample); these pools are already minimal.
+// `application_name` is set so the NEXT saturation is diagnosable per env/pool
+// (PORT 3000 = prod, 3005 = dev) instead of an anonymous block of idle connections.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: useSSL ? { rejectUnauthorized: false } : false,
+  application_name: `ff-pg-${process.env.PORT || 'app'}`,
   max: 10,
   min: 1,
   idleTimeoutMillis: 30_000,
