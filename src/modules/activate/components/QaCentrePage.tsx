@@ -815,7 +815,7 @@ function QaCentrePageContent() {
                     }
                     // Auto-QA processed + auto-feedback already sent to tech
                     if ((drop.autoQaProcessed || isAutoQaDecision) && drop.autoFeedbackSentAt) {
-                      return { label: 'AI Sent', color: 'bg-purple-600 text-purple-100' };
+                      return { label: 'AI Sent', color: 'bg-indigo-600 text-indigo-100' };
                     }
                     // Auto-QA processed but feedback not yet sent = awaiting
                     if (drop.autoQaProcessed || isAutoQaDecision) {
