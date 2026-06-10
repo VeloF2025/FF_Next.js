@@ -1,7 +1,7 @@
 /**
  * Pickings (issue submission) API helper for the field-stock PWA.
  *
- * Maps PwaIssueDraft to the POST /api/procurement/field-stock/pickings body.
+ * Maps PwaIssueDraft to the POST /api/my/stores/pickings body.
  * Both sourceLocationId and destinationLocationId are required fields on
  * PwaIssueDraft and must be valid FK references to stock_locations.id:
  *  - sourceLocationId: the warehouse chosen by the stores person (PickWarehouseStep).
@@ -57,11 +57,11 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
     id: string;
     picking_number: string;
     status: string;
-  }>('/api/procurement/field-stock/pickings', {
+  }>('/api/my/stores/pickings', {
     method: 'POST',
     body: JSON.stringify(body),
   });
-  const base = `/api/procurement/field-stock/pickings/${picking.id}`;
+  const base = `/api/my/stores/pickings/${picking.id}`;
 
   // 2. Confirm (draft → confirmed). process() rejects anything not 'confirmed'.
   await request<unknown>(`${base}/confirm`, { method: 'POST', body: '{}' });

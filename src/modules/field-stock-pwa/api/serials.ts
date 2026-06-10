@@ -2,7 +2,7 @@
  * Serial validation helpers for the field-stock PWA.
  *
  * Serial validation:
- *   GET /api/procurement/field-stock/serials/[serialNumber] returns a StockSerial
+ *   GET /api/my/stores/serials/[serialNumber] returns a StockSerial
  *   via getSerialByNumber which does NOT join stock_items, so itemName is absent.
  *   validateSerial therefore returns stockItemName: undefined when the serial exists
  *   but has no joined item name. Callers must handle the optional field gracefully.
@@ -14,7 +14,7 @@ import { request, ApiError } from './request';
 // Server row shape
 // =============================================================================
 
-/** Shape returned by GET /api/procurement/field-stock/serials/[serialNumber] */
+/** Shape returned by GET /api/my/stores/serials/[serialNumber] */
 interface SerialRow {
   id: string;
   stockItemId: string;
@@ -48,7 +48,7 @@ export async function validateSerial(serialNumber: string): Promise<{
 }> {
   try {
     const serial = await request<SerialRow>(
-      `/api/procurement/field-stock/serials/${encodeURIComponent(serialNumber)}`
+      `/api/my/stores/serials/${encodeURIComponent(serialNumber)}`
     );
 
     if (serial.status !== 'available' && serial.status !== 'in_stock') {

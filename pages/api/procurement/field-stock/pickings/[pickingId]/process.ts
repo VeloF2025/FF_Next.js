@@ -79,7 +79,7 @@ async function validateStockAvailability(
   return Object.keys(errors).length > 0 ? { valid: false, errors } : { valid: true };
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+export async function processPicking(req: NextApiRequest, res: NextApiResponse) {
   const { pickingId } = req.query;
   if (typeof pickingId !== 'string') {
     return apiResponse.validationError(res, { pickingId: 'Picking ID is required' });
@@ -314,4 +314,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return apiResponse.success(res, picking);
 }
 
-export default withAuth(handler);
+export default withAuth(processPicking);

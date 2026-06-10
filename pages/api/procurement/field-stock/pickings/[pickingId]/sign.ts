@@ -13,7 +13,7 @@ import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+export async function signPicking(req: NextApiRequest, res: NextApiResponse) {
   const { pickingId } = req.query;
 
   if (typeof pickingId !== 'string') {
@@ -73,4 +73,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(signPicking);

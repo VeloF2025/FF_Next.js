@@ -73,7 +73,7 @@ function mapFieldUserRow(row: FieldUserRow): PwaTechSummary {
 export async function fetchTechnicians(
   opts: { search?: string; contractorId?: string } = {}
 ): Promise<PwaTechSummary[]> {
-  const rows = await request<FieldUserRow[]>('/api/field/users?role=technician');
+  const rows = await request<FieldUserRow[]>('/api/my/stores/technicians?role=technician');
   const mapped = rows.map(mapFieldUserRow);
 
   let result = mapped;
@@ -110,7 +110,7 @@ export async function createTechnician(input: {
   phone: string;
   contractorId?: string | null;
 }): Promise<PwaTechSummary> {
-  const envelope = await request<{ user: FieldUserCreated }>('/api/field/users', {
+  const envelope = await request<{ user: FieldUserCreated }>('/api/my/stores/technicians', {
     method: 'POST',
     body: JSON.stringify({
       firstName: input.firstName,
