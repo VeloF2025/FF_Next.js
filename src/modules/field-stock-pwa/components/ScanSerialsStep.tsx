@@ -55,10 +55,16 @@ export function ScanSerialsStep({
   // hook's default format set omits DATA_MATRIX, so the prominent square never
   // decoded — the camera showed live video but read nothing. Enable DATA_MATRIX
   // alongside the common 1D formats so either code on the label scans.
+  // Dense Code128 (Gizzu 18-char serial on a ~3 cm sticker) additionally needs
+  // the native BarcodeDetector API (Android Chrome) + hi-res frames + a wide
+  // 1D-shaped scan box to reliably decode at live-video distances.
   const { state: scannerState, start, stop, error: scannerError } = useBarcodeScanner({
     elementId: SCANNER_ELEMENT_ID,
     config: {
       formatsToSupport: ['DATA_MATRIX', 'QR_CODE', 'CODE_128', 'CODE_39', 'EAN_13', 'EAN_8'],
+      useBarCodeDetectorIfSupported: true,
+      qrboxSize: { width: 300, height: 140 },
+      videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
     },
     onScan: (result) => { handleRawSerial(result.decodedText); },
   });
@@ -93,6 +99,9 @@ export function ScanSerialsStep({
       {scannerOpen && (
         <div className="rounded-lg overflow-hidden border border-neutral-700 bg-black">
           <div id={SCANNER_ELEMENT_ID} className="w-full" style={{ minHeight: '240px' }} />
+          <p className="px-3 py-1.5 text-[11px] text-neutral-500 text-center">
+            Hold barcodes horizontal and fill the box — or use &quot;Take a photo instead&quot;.
+          </p>
           {scannerState === 'initializing' && (
             <div className="flex items-center justify-center py-6 gap-2 text-neutral-400 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" /> Starting camera…

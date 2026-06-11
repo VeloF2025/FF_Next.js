@@ -19,8 +19,13 @@ import { DEFAULT_SCANNER_CONFIG } from '../types/scanner';
 // Minimal interface for html5-qrcode scanner instance (dynamic import, avoids SSR issues)
 interface Html5QrcodeInstance {
   start: (
-    constraints: { facingMode: string },
-    config: { fps: number; qrbox: number | { width: number; height: number }; aspectRatio: number },
+    constraints: { facingMode: string } | MediaTrackConstraints,
+    config: {
+      fps: number;
+      qrbox: number | { width: number; height: number };
+      aspectRatio: number;
+      videoConstraints?: MediaTrackConstraints;
+    },
     onSuccess: (decodedText: string, decodedResult: { result: { format?: { formatName?: string } } }) => void,
     onError: (errorMessage: string) => void
   ) => Promise<void>;
@@ -49,7 +54,7 @@ interface Html5QrcodeSupportedFormatsEnum {
 }
 
 interface Html5QrcodeModule {
-  Html5Qrcode: new (elementId: string, config: { verbose?: boolean; formatsToSupport?: number[] }) => Html5QrcodeInstance;
+  Html5Qrcode: new (elementId: string, config: { verbose?: boolean; formatsToSupport?: number[]; useBarCodeDetectorIfSupported?: boolean }) => Html5QrcodeInstance;
   Html5QrcodeSupportedFormats: Html5QrcodeSupportedFormatsEnum;
 }
 
@@ -140,17 +145,19 @@ export function useBarcodeScanner({
         scannerRef.current = new Html5Qrcode(elementId, {
           verbose: config.verbose,
           formatsToSupport: getSupportedFormats({ Html5Qrcode, Html5QrcodeSupportedFormats }),
+          useBarCodeDetectorIfSupported: config.useBarCodeDetectorIfSupported ?? false,
         });
       }
 
       const qrboxSize = config.qrboxSize ?? 250;
 
       await scannerRef.current.start(
-        { facingMode: config.facingMode ?? 'environment' },
+        config.videoConstraints ?? { facingMode: config.facingMode ?? 'environment' },
         {
           fps: config.fps ?? 10,
           qrbox: typeof qrboxSize === 'number' ? qrboxSize : qrboxSize,
           aspectRatio: config.aspectRatio ?? 1.0,
+          ...(config.videoConstraints ? { videoConstraints: config.videoConstraints } : {}),
         },
         (decodedText: string, decodedResult: { result: { format?: { formatName?: string } } }) => {
           // Successfully scanned
