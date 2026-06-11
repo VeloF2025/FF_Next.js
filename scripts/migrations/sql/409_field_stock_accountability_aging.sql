@@ -40,9 +40,12 @@ BEGIN;
 CREATE OR REPLACE VIEW v_holder_held_aging AS
 WITH held_units AS (
   -- Serial-tracked held units: one row per held serial, aged by issuing picking.
+  -- units=1 — each issued serial is one held unit (matches the serial custody
+  -- quantity that v_holder_accountability.held_count sums).
   SELECT
     s.holder_id,
-    COALESCE(iss.created_at, s.created_at) AS held_since
+    COALESCE(iss.created_at, s.created_at) AS held_since,
+    1::numeric AS units
   FROM stock_serials s
   LEFT JOIN LATERAL (
     SELECT p.created_at
@@ -59,10 +62,13 @@ WITH held_units AS (
   UNION ALL
 
   -- Non-serial (bulk) held lines: one row per non-empty custody line, aged by
-  -- the custody row's creation timestamp.
+  -- the custody row's creation timestamp. units=quantity so the bucket totals
+  -- reconcile with v_holder_accountability.held_count (which SUMs custody
+  -- quantity) — not one-per-line, which understated bulk lines with qty > 1.
   SELECT
     sc.holder_id,
-    sc.created_at AS held_since
+    sc.created_at AS held_since,
+    sc.quantity AS units
   FROM stock_custody sc
   JOIN stock_items si ON si.id = sc.stock_item_id
   WHERE sc.quantity > 0
@@ -70,16 +76,16 @@ WITH held_units AS (
 )
 SELECT
   h.id AS holder_id,
-  COUNT(hu.held_since) FILTER (
+  COALESCE(SUM(hu.units) FILTER (
     WHERE hu.held_since > NOW() - INTERVAL '7 days'
-  ) AS held_age_0_7,
-  COUNT(hu.held_since) FILTER (
+  ), 0) AS held_age_0_7,
+  COALESCE(SUM(hu.units) FILTER (
     WHERE hu.held_since <= NOW() - INTERVAL '7 days'
       AND hu.held_since >  NOW() - INTERVAL '30 days'
-  ) AS held_age_8_30,
-  COUNT(hu.held_since) FILTER (
+  ), 0) AS held_age_8_30,
+  COALESCE(SUM(hu.units) FILTER (
     WHERE hu.held_since <= NOW() - INTERVAL '30 days'
-  ) AS held_age_31_plus,
+  ), 0) AS held_age_31_plus,
   MIN(hu.held_since) AS oldest_held_at,
   COALESCE(
     FLOOR(EXTRACT(EPOCH FROM (NOW() - MIN(hu.held_since))) / 86400)::int,
@@ -98,7 +104,10 @@ SELECT
   COUNT(*) AS held_count,
   COALESCE(SUM(si.standard_cost), 0) AS held_value
 FROM stock_serials s
-JOIN LATERAL (
+-- LEFT JOIN LATERAL (not inner): a held serial promoted outside the picking flow
+-- has no issuing picking → iss.project_id is NULL → it rolls up under the NULL
+-- ("Unassigned") group rather than vanishing from the breakdown.
+LEFT JOIN LATERAL (
   SELECT p.project_id
   FROM stock_picking_lines pl
   JOIN stock_pickings p ON p.id = pl.picking_id

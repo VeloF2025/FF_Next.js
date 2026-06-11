@@ -85,6 +85,23 @@ describe('GET /accountability/holders — aging buckets', () => {
     const sqlText = String((listSql.mock.calls[0] as unknown[])[0]);
     expect(sqlText).toContain('va.is_blocked = true');
   });
+
+  it('qualifies the hasUnaccounted filter against the joined alias', async () => {
+    listSql.mockResolvedValueOnce([]);
+    const res = makeRes();
+    await listHandler(makeReq({ hasUnaccounted: 'true' }), res as unknown as NextApiResponse);
+
+    const sqlText = String((listSql.mock.calls[0] as unknown[])[0]);
+    expect(sqlText).toContain('va.unaccounted_count > 0');
+  });
+
+  it('405s on non-GET', async () => {
+    const res = makeRes();
+    const req = { method: 'POST', query: {}, body: {} } as unknown as NextApiRequest;
+    await listHandler(req, res as unknown as NextApiResponse);
+    expect(res.statusCode).toBe(405);
+    expect(listSql).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /accountability/holders/[holderId] — aging + project breakdown', () => {
@@ -123,5 +140,23 @@ describe('GET /accountability/holders/[holderId] — aging + project breakdown',
     await detailHandler(makeReq({ holderId: 'missing' }), res as unknown as NextApiResponse);
     expect(res.statusCode).toBe(404);
     expect(detailQuery).not.toHaveBeenCalled();
+  });
+
+  it('422s when holderId is not a string (route array)', async () => {
+    const res = makeRes();
+    await detailHandler(
+      makeReq({ holderId: ['a', 'b'] }),
+      res as unknown as NextApiResponse,
+    );
+    expect(res.statusCode).toBe(422);
+    expect(detailQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('405s on non-GET', async () => {
+    const res = makeRes();
+    const req = { method: 'DELETE', query: { holderId: 'h-1' }, body: {} } as unknown as NextApiRequest;
+    await detailHandler(req, res as unknown as NextApiResponse);
+    expect(res.statusCode).toBe(405);
+    expect(detailQueryOne).not.toHaveBeenCalled();
   });
 });

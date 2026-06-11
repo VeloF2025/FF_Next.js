@@ -89,6 +89,21 @@ describe('GET /api/my/stores/projects', () => {
     expect(flattened).toContain('%moh%');
   });
 
+  it('returns an empty array when no projects match the search', async () => {
+    mockSql.mockResolvedValueOnce([]);
+    const res = makeRes();
+    await handler(makeReq('GET', { search: 'zzz' }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonData?.data).toEqual([]);
+  });
+
+  it('500s when the query throws', async () => {
+    mockSql.mockRejectedValueOnce(new Error('db down'));
+    const res = makeRes();
+    await handler(makeReq('GET'), res);
+    expect(res.statusCode).toBe(500);
+  });
+
   it('rejects non-GET methods with 405', async () => {
     const res = makeRes();
     await handler(makeReq('POST'), res);

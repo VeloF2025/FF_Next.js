@@ -21,7 +21,10 @@ import { requireStoresActor } from '@/modules/field-stock-pwa/lib/storesActor';
 const TERMINAL_STATUSES = ['completed', 'cancelled', 'archived'];
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
-  const { search } = req.query as { search?: string };
+  // req.query values are string | string[] | undefined — collapse a repeated
+  // ?search=a&search=b to its first value rather than coercing the array.
+  const rawSearch = req.query.search;
+  const search = Array.isArray(rawSearch) ? rawSearch[0] : rawSearch;
 
   const rows = search
     ? await sql`
@@ -51,7 +54,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
   try {
     if (req.method === 'GET') return await handleGet(req, res);
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
-  } catch (error) {
+  } catch (error: unknown) {
     log.error('my-stores projects API error', { error }, 'my/stores/projects');
     return apiResponse.internalError(res, error);
   }
