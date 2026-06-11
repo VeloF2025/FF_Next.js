@@ -26,6 +26,8 @@ export interface StaffMember {
   position: Position | string; // Allow Position enum or custom string
   department: Department;
   level?: StaffLevel; // Optional for backward compatibility
+  /** Portal role (staff.role) — gates /my portal features such as Stores. */
+  role?: import('@/modules/attendance/portal/types').StaffRole | null;
   status: StaffStatus;
   isActive?: boolean;
   lastActiveDate?: Timestamp;

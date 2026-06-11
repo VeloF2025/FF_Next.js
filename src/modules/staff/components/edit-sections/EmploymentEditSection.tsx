@@ -23,6 +23,7 @@ import {
   getDefaultCompliance,
 } from '@/types/staff/compliance.types';
 import { useStaff } from '@/hooks/useStaff';
+import { STAFF_ROLES } from '@/modules/attendance/portal/types';
 import {
   Select,
   SelectContent,
@@ -42,13 +43,15 @@ interface EmploymentEditSectionProps {
   formData: StaffFormData;
   handleInputChange: (field: keyof StaffFormData, value: unknown) => void;
   toggleSkill: (skill: Skill) => void;
+  /** Render the admin-only Portal role dropdown (staff.role — gates /my Stores access). */
+  showPortalRole?: boolean;
 }
 
 const inputClasses = "w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-[var(--ff-text-secondary)]";
 const labelClasses = "block text-sm font-medium text-[var(--ff-text-secondary)] mb-1";
 const selectTriggerClasses = "w-full h-10 px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-export function EmploymentEditSection({ formData, handleInputChange, toggleSkill }: EmploymentEditSectionProps) {
+export function EmploymentEditSection({ formData, handleInputChange, toggleSkill, showPortalRole }: EmploymentEditSectionProps) {
   const { data: staffList } = useStaff();
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [isLoadingDepartments, setIsLoadingDepartments] = useState(true);
@@ -215,6 +218,31 @@ export function EmploymentEditSection({ formData, handleInputChange, toggleSkill
               className={inputClasses}
             />
           </div>
+
+          {showPortalRole && (
+            <div>
+              <label className={labelClasses}>Portal Role</label>
+              <Select
+                value={formData.portalRole || '__none__'}
+                onValueChange={(value) => handleInputChange('portalRole', value === '__none__' ? null : value)}
+              >
+                <SelectTrigger className={selectTriggerClasses}>
+                  <SelectValue placeholder="No portal role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {STAFF_ROLES.map(role => (
+                    <SelectItem key={role} value={role}>
+                      {formatLabel(role)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-[var(--ff-text-secondary)]">
+                Staff portal (/my) access level — &quot;Stores&quot; enables issuing stock to technicians
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

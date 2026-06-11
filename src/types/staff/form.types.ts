@@ -19,6 +19,8 @@ export interface StaffFormData {
   position: Position | string;
   department: Department | string; // Allow string for new departments
   level?: StaffLevel;
+  /** Portal role (staff.role) — gates /my portal features such as Stores. Admin-only field. */
+  portalRole?: import('@/modules/attendance/portal/types').StaffRole | null;
   bio?: string;
   specializations?: string[];
   status: StaffStatus;

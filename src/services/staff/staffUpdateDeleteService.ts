@@ -81,6 +81,8 @@ interface UpdateFields {
   probationExtensionReason: unknown; noticePeriod: unknown;
   isRehireable: boolean | null; exitProcessedBy: string | null;
   departmentId: string | null | undefined;
+  /** staff.role (portal role) — validated + admin-gated at the API layer */
+  portalRole: unknown;
 }
 
 async function extractFields(updates: StaffUpdateInput, sql: ReturnType<typeof getSql>): Promise<UpdateFields> {
@@ -149,6 +151,7 @@ async function extractFields(updates: StaffUpdateInput, sql: ReturnType<typeof g
     isRehireable: (updates.isRehireable ?? updates.is_rehireable ?? null) as boolean | null,
     exitProcessedBy: (updates.exitProcessedBy ?? updates.exit_processed_by ?? null) as string | null,
     departmentId,
+    portalRole: fv(updates, 'portalRole', 'portal_role'),
   };
 }
 
@@ -181,6 +184,7 @@ export async function updateStaff(staffId: string, updates: StaffUpdateInput): P
       department = COALESCE(${(updates.department as string) ?? null}, department),
       department_id = CASE WHEN ${f.departmentId !== undefined} THEN ${f.departmentId}::uuid ELSE department_id END,
       status = COALESCE(${(updates.status as string) ?? null}, status),
+      role = CASE WHEN ${f.portalRole !== undefined} THEN ${f.portalRole} ELSE role END,
       level = CASE WHEN ${f.level !== undefined} THEN ${f.level} ELSE level END,
       reports_to = CASE WHEN ${f.reportsTo !== undefined} THEN ${f.reportsTo}::uuid ELSE reports_to END,
       experience_years = CASE WHEN ${f.experienceYears !== undefined} THEN ${f.experienceYears} ELSE experience_years END,
