@@ -20,6 +20,7 @@ import { Camera, CameraOff, Loader2, ChevronDown } from 'lucide-react';
 import { useBarcodeScanner } from '@/modules/barcode-scanner/hooks/useBarcodeScanner';
 import { useScanSerial } from '@/modules/field-stock-pwa/hooks/useScanSerial';
 import { SerialChip } from '@/modules/field-stock-pwa/components/SerialChip';
+import { PhotoSerialFallback } from '@/modules/field-stock-pwa/components/PhotoSerialFallback';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 const SCANNER_ELEMENT_ID = 'serial-scanner-reader';
@@ -40,6 +41,7 @@ export function ScanSerialsStep({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualInput, setManualInput] = useState('');
+  const [fallbackHint, setFallbackHint] = useState<string | null>(null);
 
   const { handleRawSerial, handleRemove } = useScanSerial({ stockItem, scanned, onChange });
 
@@ -122,6 +124,13 @@ export function ScanSerialsStep({
           <Camera className="w-5 h-5" /> Open scanner
         </button>
       )}
+
+      {/* Photo-to-serial fallback */}
+      <PhotoSerialFallback
+        onSerial={(serial) => { setFallbackHint(null); setManualOpen(true); setManualInput(serial); }}
+        onNoSerial={(msg) => { setFallbackHint(msg); setManualOpen(true); }}
+      />
+      {fallbackHint && <p className="text-xs text-amber-400">{fallbackHint}</p>}
 
       {/* Manual entry disclosure */}
       <div>
