@@ -48,10 +48,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   log.info('Pull-cortex-meeting-actions triggered', {}, LOGGER);
   res.status(202).json({ message: 'Pulling sealed meeting actions from Cortex' });
 
+  // Kill-switch: CORTEX_DELIVERY_ENABLED=false halts NEW task creation/acks immediately
+  // (records still land). Default ON so tenant-wide auto-delivery runs unless explicitly off.
+  const deliveryEnabled = process.env.CORTEX_DELIVERY_ENABLED !== 'false';
+
   setImmediate(async () => {
     try {
-      const result = await syncCortexMeetingActions(sql, BRIDGE_URL, API_KEY);
-      log.info('Pull-cortex-meeting-actions complete', { ...result }, LOGGER);
+      const result = await syncCortexMeetingActions(sql, BRIDGE_URL, API_KEY, { deliveryEnabled });
+      log.info('Pull-cortex-meeting-actions complete', { deliveryEnabled, ...result }, LOGGER);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       log.error('Pull-cortex-meeting-actions failed', { error: msg }, LOGGER);

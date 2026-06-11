@@ -9,12 +9,15 @@
 // unit-testable without a live bridge or DB; the cron handler is a thin auth wrapper.
 //
 // Contract: references only — an item carries an action reference + summary metadata, never
-// raw media. M2: a HUMAN-REVIEWED (human-Published) meeting's approved actions are turned into
+// raw media. Phase 5 (auto-publish): EVERY sealed mapped meeting's actions are turned into
 // real FibreFlow `action_items` (assigned via name→user match), then FibreFlow acks Cortex
 // (POST /{id}/outbox/delivered) which stamps `meeting_outbox.delivered_at`. Auto-sealed
-// (human_reviewed=false) meetings stay records only — they never spawn tasks. Delivery is
-// idempotent: a local `cortex_meeting_actions.delivered_at` marker + a NOT EXISTS guard on
-// `action_items(source_type,source_id)` make the 30-min re-pull a no-op.
+// (human_reviewed=false) meetings deliver too, tagged `machine_published=true` so they are
+// filterable, visually flagged, and bulk-revocable; a human-reviewed seal lands the same way
+// with machine_published=false. Only the human summary write-back stays human-only. Delivery
+// is idempotent: a local `cortex_meeting_actions.delivered_at` marker + a NOT EXISTS guard on
+// `action_items(source_type,source_id)` make the 30-min re-pull a no-op. A kill-switch
+// (`deliveryEnabled=false`) halts NEW task creation immediately while still landing records.
 
 import type { NeonQueryFunction } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
@@ -50,9 +53,10 @@ export interface SyncResult {
   mapped: number;          // landed AND matched to a FibreFlow meeting
   unmapped: number;        // landed but no FibreFlow meeting matched the source_id
   summariesWritten: number; // human-reviewed summaries written back into meetings.summary
-  tasksCreated: number;    // M2: action_items rows newly created from approved actions
-  delivered: number;       // M2: meetings whose actions were delivered + acked to Cortex
-  errors: number;          // M2: meetings that threw mid-process (logged, skipped, retried next pull)
+  tasksCreated: number;    // action_items rows newly created from a sealed meeting's actions
+  machinePublished: number; // of tasksCreated, how many were auto-sealed (machine_published)
+  delivered: number;       // meetings whose actions were delivered + acked to Cortex
+  errors: number;          // meetings that threw mid-process (logged, skipped, retried next pull)
 }
 
 type Sql = NeonQueryFunction<false, false>;
@@ -68,9 +72,13 @@ export async function syncCortexMeetingActions(
   sql: Sql,
   bridgeUrl: string,
   apiKey: string,
-  opts: { fetchFn?: typeof fetch } = {},
+  opts: { fetchFn?: typeof fetch; deliveryEnabled?: boolean } = {},
 ): Promise<SyncResult> {
   const fetchFn = opts.fetchFn ?? fetch;
+  // Kill-switch (Phase 5): when false, we still PULL + land records into
+  // cortex_meeting_actions, but create NO new action_items and send NO acks — so a
+  // single env flip halts tenant-wide auto-delivery instantly without losing the feed.
+  const deliveryEnabled = opts.deliveryEnabled ?? true;
   // Key goes in the Authorization header (NOT a query param) so it can't leak into proxy logs.
   const url = `${bridgeUrl}/api/meetings/outbox/feed`;
   const resp = await fetchWithTimeout(fetchFn, url, FETCH_TIMEOUT_MS, {
@@ -86,6 +94,7 @@ export async function syncCortexMeetingActions(
   let unmapped = 0;
   let summariesWritten = 0;
   let tasksCreated = 0;
+  let machinePublished = 0;
   let delivered = 0;
   let errors = 0;
 
@@ -159,14 +168,31 @@ export async function syncCortexMeetingActions(
         if (written.length > 0) summariesWritten++;
       }
 
-      // M2: turn a HUMAN-reviewed, mapped meeting's approved actions into real FibreFlow
-      // action_items, then ack Cortex so it stamps meeting_outbox.delivered_at. Skipped for
-      // auto-sealed meetings (records only) and for anything already delivered locally.
-      if (ffMeetingId !== null && m.human_reviewed && !alreadyDelivered) {
+      // Phase 5 auto-publish: turn ANY sealed, mapped meeting's actions into real
+      // FibreFlow action_items, then ack Cortex so it stamps meeting_outbox.delivered_at.
+      // Auto-sealed actions are tagged machine_published=true (filterable + bulk-revocable);
+      // human seals land with machine_published=false. Skipped when the kill-switch is off
+      // or the meeting is already delivered locally.
+      const isMachinePublished = !m.human_reviewed;
+      // Defensive: the tag drives bulk-revoke blast radius, so surface any Cortex-side
+      // seal_source/human_reviewed inconsistency rather than mis-tagging silently.
+      if ((m.seal_source === 'auto') === m.human_reviewed) {
+        log.warn('cortex pull: seal_source/human_reviewed mismatch', {
+          meetingId: m.meeting_id, sealSource: m.seal_source, humanReviewed: m.human_reviewed,
+        });
+      }
+      if (deliveryEnabled && ffMeetingId !== null && !alreadyDelivered) {
         let created = 0;
         for (const item of m.items ?? []) {
           const text = item.text?.trim();
           if (!text) continue;
+          // Idempotency depends on a stable action_id (→ source_id dedup). Without one,
+          // the existence check below is `source_id = NULL` (never matches) and every
+          // 30-min pull would re-insert. Skip rather than create undedupable dupes.
+          if (!item.action_id) {
+            log.warn('cortex pull: item missing action_id; skipping', { meetingId: m.meeting_id });
+            continue;
+          }
           // NOTE: three SIMPLE statements rather than one INSERT…SELECT…WHERE NOT EXISTS
           // with an embedded scalar subquery. FibreFlow's `sql` driver silently fails on
           // that compound shape; plain VALUES inserts / single-table SELECTs (the shapes
@@ -198,14 +224,16 @@ export async function syncCortexMeetingActions(
           await sql`
             INSERT INTO action_items
               (meeting_id, description, assignee_name, assigned_to_user_id,
-               status, priority, source, source_type, source_id)
+               status, priority, source, source_type, source_id, machine_published)
             VALUES
               (${ffMeetingId}, ${text}, ${item.owner}, ${userId},
-               'pending', 'medium', 'cortex-scribe', 'cortex_meeting', ${item.action_id})
+               'pending', 'medium', 'cortex-scribe', 'cortex_meeting', ${item.action_id},
+               ${isMachinePublished})
           `;
           created++;
         }
         tasksCreated += created;
+        if (isMachinePublished) machinePublished += created;
 
         // Ack Cortex (idempotent server-side). Only on a 2xx do we stamp the local
         // delivered_at marker — if the ack fails the meeting stays undelivered locally and
@@ -236,7 +264,8 @@ export async function syncCortexMeetingActions(
     }
   }
 
-  return { pulled: meetings.length, mapped, unmapped, summariesWritten, tasksCreated, delivered, errors };
+  return { pulled: meetings.length, mapped, unmapped, summariesWritten, tasksCreated,
+           machinePublished, delivered, errors };
 }
 
 async function fetchWithTimeout(

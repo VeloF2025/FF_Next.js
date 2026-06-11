@@ -16,6 +16,9 @@
     "pages/api/cron/pull-cortex-transcripts.ts": {
       "maxDuration": 300
     },
+    "pages/api/cron/pull-cortex-meeting-actions.ts": {
+      "maxDuration": 60
+    },
     "app/api/**/*.ts": {
       "maxDuration": 30
     },
@@ -58,6 +61,10 @@
     },
     {
       "path": "/api/cron/pull-cortex-transcripts",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/pull-cortex-meeting-actions",
       "schedule": "*/30 * * * *"
     }
   ]

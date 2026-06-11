@@ -96,15 +96,48 @@ describe('syncCortexMeetingActions — M2 delivery to FibreFlow tasks', () => {
     expect(deliveredMarks).toHaveLength(1); // local delivered_at stamped after ack
   });
 
-  it('does NOT create tasks or ack for an auto-sealed meeting (human_reviewed=false)', async () => {
+  it('DOES create a machine_published task and acks for an auto-sealed meeting (Phase 5 auto-publish)', async () => {
     const { sql, actionInserts, deliveredMarks } = makeFakeSql();
-    const { fetchFn, acks } = makeFakeFetch({ meetings: [meeting({ human_reviewed: false })] });
+    const { fetchFn, acks } = makeFakeFetch({
+      meetings: [meeting({ human_reviewed: false, seal_source: 'auto' })],
+    });
 
     const r = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn });
 
+    expect(r.tasksCreated).toBe(1);
+    expect(r.machinePublished).toBe(1);
+    expect(r.delivered).toBe(1);
+    expect(actionInserts).toHaveLength(1);
+    // The INSERT carries machine_published=true (last bound value) so the task is
+    // visually flagged + bulk-revocable downstream.
+    expect(actionInserts[0]).toContain(true);
+    expect(acks).toHaveLength(1);
+    expect(deliveredMarks).toHaveLength(1);
+  });
+
+  it('a human-reviewed seal lands machine_published=false', async () => {
+    const { sql, actionInserts } = makeFakeSql();
+    const { fetchFn } = makeFakeFetch({ meetings: [meeting()] }); // default human_reviewed=true
+
+    const r = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key', { fetchFn });
+
+    expect(r.tasksCreated).toBe(1);
+    expect(r.machinePublished).toBe(0);
+    expect(actionInserts[0]).toContain(false); // machine_published bound false
+  });
+
+  it('kill-switch (deliveryEnabled=false) creates NO tasks and sends NO acks', async () => {
+    const { sql, actionInserts, deliveredMarks } = makeFakeSql();
+    const { fetchFn, acks } = makeFakeFetch({
+      meetings: [meeting({ human_reviewed: false, seal_source: 'auto' })],
+    });
+
+    const r = await syncCortexMeetingActions(sql, 'http://bridge:7403', 'key',
+      { fetchFn, deliveryEnabled: false });
+
     expect(r.tasksCreated).toBe(0);
     expect(r.delivered).toBe(0);
-    expect(actionInserts).toHaveLength(0);
+    expect(actionInserts).toHaveLength(0); // records still land, but no tasks created
     expect(acks).toHaveLength(0);
     expect(deliveredMarks).toHaveLength(0);
   });
