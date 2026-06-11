@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { assetService } from '@/modules/assets/services';
 import { UpdateAssetSchema } from '@/modules/assets/utils/schemas';
-import { requireAuth } from '@/lib/auth/app-router';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 
 interface RouteParams {
@@ -47,6 +47,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+
+    // Authenticate + authorize (updating an asset requires assets:edit)
+    const [user, deny] = await requirePermission(req, 'assets', 'edit');
+    if (deny) return deny;
+
     const body = await req.json();
 
     // Validate request body
@@ -57,10 +62,6 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
-
-    // Authenticate request (user identity from JWT, never from client headers)
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
 
     const updatedBy = user.id;
 
@@ -93,6 +94,10 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+
+    // Authenticate + authorize (deleting an asset requires assets:delete)
+    const [, deny] = await requirePermission(req, 'assets', 'delete');
+    if (deny) return deny;
 
     const result = await assetService.delete(id);
 

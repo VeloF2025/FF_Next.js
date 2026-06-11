@@ -7,8 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { assignmentService } from '@/modules/assets/services';
 import { CheckoutAssetSchema } from '@/modules/assets/utils/schemas';
-import { requireAuth } from '@/lib/auth/app-router';
-import { userHasPermission } from '@/lib/permissions';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 
 interface RouteParams {
@@ -21,15 +20,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
 
-    // Authenticate request (user identity from JWT, never from client headers)
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
-
-    // Authorize: performing a checkout requires the assets.checkout grant.
-    // super_admin bypasses inside userHasPermission.
-    if (!(await userHasPermission(user.id, 'assets.checkout', 'create'))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    // Authenticate + authorize (performing a checkout requires assets.checkout:create)
+    const [user, deny] = await requirePermission(req, 'assets.checkout', 'create');
+    if (deny) return deny;
 
     const body = await req.json();
 

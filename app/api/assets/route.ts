@@ -9,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { assetService } from '@/modules/assets/services';
 import { AssetFilterSchema, CreateAssetSchema } from '@/modules/assets/utils/schemas';
 import { log } from '@/lib/logger';
-import { requireAuth } from '@/lib/auth/app-router';
+import { requirePermission } from '@/lib/auth/app-router';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,9 +69,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Authenticate request (user identity from JWT, never from client headers)
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
+    // Authenticate + authorize (creating an asset requires assets:create)
+    const [user, deny] = await requirePermission(req, 'assets', 'create');
+    if (deny) return deny;
 
     const body = await req.json();
 
