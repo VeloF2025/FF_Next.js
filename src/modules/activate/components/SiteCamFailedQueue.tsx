@@ -20,6 +20,7 @@ export function SiteCamFailedQueue() {
     setError(null);
     try {
       const r = await fetch(`/api/activate/sitecam-failed?status=${status}`, { credentials: 'include' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = (await r.json()) as { data: { escalations: Escalation[] } };
       setItems(j.data.escalations);
     } catch (err) {
@@ -97,7 +98,12 @@ export function SiteCamFailedQueue() {
               <div>
                 <button
                   type="button"
-                  onClick={() => setExpanded(expanded === e.id ? null : e.id)}
+                  aria-expanded={expanded === e.id}
+                  onClick={() => {
+                    const next = expanded === e.id ? null : e.id;
+                    if (next !== expanded) setNote('');
+                    setExpanded(next);
+                  }}
                   className="font-medium text-sky-700 underline-offset-2 hover:underline"
                 >
                   {e.site_id}

@@ -64,6 +64,38 @@ describe('SiteCamFailedQueue', () => {
     expect((reject as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('clears note when switching expanded rows', async () => {
+    const escalation2 = { ...ESCALATION, id: 'esc-2', site_id: '9999991' };
+    global.fetch = mockFetchList([ESCALATION, escalation2]);
+    render(<SiteCamFailedQueue />);
+
+    // expand first row
+    fireEvent.click(await screen.findByRole('button', { name: '9999990' }));
+    // type a note
+    const textarea = await screen.findByRole('textbox');
+    fireEvent.change(textarea, { target: { value: 'some note' } });
+    expect((textarea as HTMLTextAreaElement).value).toBe('some note');
+
+    // click second row — note should clear
+    fireEvent.click(screen.getByRole('button', { name: '9999991' }));
+    const textarea2 = await screen.findByRole('textbox');
+    expect((textarea2 as HTMLTextAreaElement).value).toBe('');
+
+    // Reject button should be disabled (no note)
+    const reject = screen.getByRole('button', { name: /Reject/ });
+    expect((reject as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('shows error message when load() fails (non-ok response)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    });
+    render(<SiteCamFailedQueue />);
+    await screen.findByText('Could not load failed submissions');
+  });
+
   it('posts to escalation-resolve on approve and reloads', async () => {
     const fetchMock = mockFetchList([ESCALATION]);
     global.fetch = fetchMock;
