@@ -187,11 +187,13 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
         ${accountStatus},
         ${createdByStaffId}
       )
-      RETURNING id, role, account_status, created_by_staff_id
+      RETURNING id, first_name, last_name, role, account_status, created_by_staff_id
     `;
 
     const created = rows[0] as {
       id: string;
+      first_name: string | null;
+      last_name: string | null;
       role: string;
       account_status: string;
       created_by_staff_id: string | null;

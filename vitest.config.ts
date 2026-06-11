@@ -52,6 +52,10 @@ export default defineConfig({
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
       { find: '@/lib/neon', replacement: path.resolve(__dirname, './src/lib/neon') },
       { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
+      // @/lib/db-logger lives at root ./lib/ — without this explicit entry the
+      // /^@\/lib\/db/ regex below rewrites it to src/lib/db-logger (missing),
+      // killing collection of any test importing a module that uses db-logger.
+      { find: '@/lib/db-logger', replacement: path.resolve(__dirname, './lib/db-logger') },
       // @/lib/db/* lives at src/lib/db/ (serialEventContext etc.)
       { find: /^@\/lib\/db/, replacement: path.resolve(__dirname, './src/lib/db') },
       { find: '@/lib/serial-events', replacement: path.resolve(__dirname, './src/lib/serial-events') },

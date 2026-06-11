@@ -119,7 +119,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
         'Field Operations', 'Technician', 'contractor',
         'technician', 'pending', ${actor.staffId}
       )
-      RETURNING id, role, account_status, created_by_staff_id
+      RETURNING id, first_name, last_name, role, account_status, created_by_staff_id
     `;
 
     const created = rows[0];
