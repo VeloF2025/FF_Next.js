@@ -16,6 +16,7 @@ import {
   CreateReturnModal,
 } from '@/modules/procurement/field-stock/components';
 import { HolderAccountabilityList } from '@/modules/procurement/field-stock/components/accountability/HolderAccountabilityList';
+import { HolderDetailDrawer } from '@/modules/procurement/field-stock/components/accountability/HolderDetailDrawer';
 import { LocationFormModal } from '@/modules/procurement/field-stock/components/locations/LocationFormModal';
 import type { StockLocation } from '@/modules/procurement/field-stock/types';
 import {
@@ -192,6 +193,8 @@ function ReturnsTabContent() {
 /** Accountability tab — holder-centric (Sprint D custody model) */
 function AccountabilityTabContent() {
   const { holders, loading, refetch } = useHolderAccountability({ autoFetch: true });
+  const [selectedHolderId, setSelectedHolderId] = useState<string | null>(null);
+  const selectedName = holders.find((h) => h.holder_id === selectedHolderId)?.name;
 
   async function handleBlock(holderId: string, reason: string) {
     const res = await fetch(
@@ -224,12 +227,20 @@ function AccountabilityTabContent() {
   }
 
   return (
-    <HolderAccountabilityList
-      holders={holders}
-      loading={loading}
-      onBlock={handleBlock}
-      onUnblock={handleUnblock}
-    />
+    <>
+      <HolderAccountabilityList
+        holders={holders}
+        loading={loading}
+        onBlock={handleBlock}
+        onUnblock={handleUnblock}
+        onSelect={setSelectedHolderId}
+      />
+      <HolderDetailDrawer
+        holderId={selectedHolderId}
+        fallbackName={selectedName}
+        onClose={() => setSelectedHolderId(null)}
+      />
+    </>
   );
 }
 
