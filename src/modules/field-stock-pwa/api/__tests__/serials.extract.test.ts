@@ -50,7 +50,7 @@ describe('extractSerialFromPhoto', () => {
 
   it('(a) success response maps through', async () => {
     const result = {
-      serial: 'ALCLB4DEADBEEF',
+      serial: 'ALCLB4A1B2C3',
       family: 'ont' as const,
       method: 'barcode' as const,
       confidence: 0.99,
@@ -68,6 +68,8 @@ describe('extractSerialFromPhoto', () => {
     expect(url).toBe('/api/my/stores/serials/extract');
     expect(init.method).toBe('POST');
     expect(init.body).toBeInstanceOf(FormData);
+    const form = init.body as FormData;
+    expect(form.get('photo')).toBeTruthy();
   });
 
   it('(b) {success:false} throws ApiError with server message', async () => {

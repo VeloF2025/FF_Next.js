@@ -72,6 +72,10 @@ describe('validateSerialCandidate', () => {
     [''], ['ALHN-1234'], ['x'],
     ['ALCLB4923FA8'], // VLM prompt example — hallucination guard
     ['STN1234567'], ['3TN01414BA'],
+    // Near-miss rejections: family prefix present but wrong length → mis-read, not generic
+    ['ALCLB4918842A'],   // 13 chars — one extra
+    ['ALCLB491884'],     // 11 chars — one short
+    ['GU18W12V251204133'], // 17 chars — one short
   ])('rejects %s', (bad) => {
     expect(validateSerialCandidate(bad)).toBeNull();
   });
@@ -102,5 +106,11 @@ describe('parseVlmSerialResponse', () => {
 
   it('returns null on non-JSON garbage', () => {
     expect(parseVlmSerialResponse('I cannot see a serial')).toBeNull();
+  });
+
+  it('clamps confidence > 1 down to 1', () => {
+    expect(
+      parseVlmSerialResponse('{"serial":"GU18W12V2512041330","confidence":1.5}'),
+    ).toEqual({ serial: 'GU18W12V2512041330', confidence: 1 });
   });
 });

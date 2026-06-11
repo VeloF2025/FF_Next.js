@@ -42,6 +42,10 @@ export function validateSerialCandidate(
   const serial = raw.trim().toUpperCase();
   if (serial.length < 6 || PROMPT_EXAMPLE_SERIALS.has(serial)) return null;
   if (REJECT_PREFIXES.some((p) => serial.startsWith(p))) return null;
+  // A family-prefixed string that fails its exact pattern is a mis-read
+  // (e.g. 13-char ALCLB4…) — reject rather than degrade to generic.
+  if (serial.startsWith('ALCLB4') && !ONT_RE.test(serial)) return null;
+  if (serial.startsWith('GU18W12V25') && !GIZZU_RE.test(serial)) return null;
   if (ONT_RE.test(serial)) return { serial, family: 'ont' };
   if (GIZZU_RE.test(serial)) return { serial, family: 'gizzu' };
   if (GENERIC_RE.test(serial)) return { serial, family: 'generic' };
@@ -59,8 +63,15 @@ export async function decodeSerialFromImage(buffer: Buffer): Promise<string | nu
   try {
     const { readBarcodes } = await import('zxing-wasm/full');
 
-    // Decode to raw RGBA pixels; sharp handles any input format (JPEG/PNG/WebP).
-    const { data, info } = await sharp(buffer).raw().ensureAlpha().toBuffer({
+    // Cap the long edge before expanding to raw RGBA — an 8 MP JPEG otherwise
+    // inflates to ~80 MB. 4096 px keeps dense Code128 fully legible (~67 MB worst case).
+    const meta = await sharp(buffer).metadata();
+    const MAX_EDGE = 4096;
+    const needsShrink = (meta.width ?? 0) > MAX_EDGE || (meta.height ?? 0) > MAX_EDGE;
+    const pipeline = needsShrink
+      ? sharp(buffer).resize(MAX_EDGE, MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
+      : sharp(buffer);
+    const { data, info } = await pipeline.raw().ensureAlpha().toBuffer({
       resolveWithObject: true,
     });
 
@@ -114,7 +125,9 @@ export function parseVlmSerialResponse(
     const parsed = JSON.parse(match[0]) as { serial?: unknown; confidence?: unknown };
     return {
       serial: typeof parsed.serial === 'string' ? parsed.serial : null,
-      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
+      confidence: typeof parsed.confidence === 'number'
+        ? Math.min(1, Math.max(0, parsed.confidence))
+        : 0,
     };
   } catch (err) {
     log.warn('serial extract: VLM response was not valid JSON', { err }, 'my/stores/serials/extract');

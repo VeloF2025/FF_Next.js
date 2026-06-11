@@ -73,14 +73,16 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
   if (!file) return apiResponse.badRequest(res, 'Photo is required (form field "photo").');
 
   const mime = file.mimetype ?? 'application/octet-stream';
-  if (!ALLOWED_MIME.has(mime)) return apiResponse.badRequest(res, `Unsupported file type: ${mime}`);
+  if (!ALLOWED_MIME.has(mime)) {
+    fs.unlink(file.filepath).catch(() => undefined);
+    return apiResponse.badRequest(res, `Unsupported file type: ${mime}`);
+  }
 
   let buffer: Buffer;
   try {
     buffer = await fs.readFile(file.filepath);
   } catch (err) {
     log.error('serial extract temp read failed', { err }, 'my/stores/serials/extract');
-    fs.unlink(file.filepath).catch(() => undefined);
     return apiResponse.internalError(res, err);
   } finally {
     fs.unlink(file.filepath).catch(() => undefined);
@@ -103,11 +105,11 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
   try {
     // 1. Barcode pass on the ORIGINAL image.
     const decoded = await decodeSerialFromImage(buffer);
-    if (decoded) {
-      const valid = validateSerialCandidate(decoded);
-      log.info('serial extract: barcode hit', { family: valid?.family }, 'my/stores/serials/extract');
+    const decodedValid = decoded ? validateSerialCandidate(decoded) : null;
+    if (decodedValid) {
+      log.info('serial extract: barcode hit', { family: decodedValid.family }, 'my/stores/serials/extract');
       return apiResponse.success(res, {
-        serial: decoded, family: valid?.family ?? 'generic',
+        serial: decodedValid.serial, family: decodedValid.family,
         method: 'barcode', confidence: 1, photoUrl,
       });
     }
