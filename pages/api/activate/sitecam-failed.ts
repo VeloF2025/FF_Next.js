@@ -9,6 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET')
@@ -38,6 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     return apiResponse.success(res, { escalations: rows });
   } catch (err) {
+    log.error('Failed to list pwa_escalations', { err: String(err) }, 'sitecam-failed');
     return apiResponse.internalError(res, err);
   }
 }
