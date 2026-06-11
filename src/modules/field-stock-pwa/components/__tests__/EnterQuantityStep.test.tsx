@@ -14,7 +14,7 @@ const ITEM = {
 };
 
 describe('EnterQuantityStep', () => {
-  it('disables Continue at quantity 0 and propagates a positive quantity', () => {
+  it('disables Continue at quantity 0 and emits onChange for typed input', () => {
     const onDone = vi.fn();
     const onChange = vi.fn();
     render(<EnterQuantityStep stockItem={ITEM} quantity={0} onChange={onChange} onDone={onDone} />);
@@ -22,6 +22,17 @@ describe('EnterQuantityStep', () => {
     expect(btn).toBeDisabled();
     fireEvent.change(screen.getByLabelText(/quantity/i), { target: { value: '25' } });
     expect(onChange).toHaveBeenCalledWith(25);
+  });
+
+  it('rounds decimals to 3 places (numeric(12,3))', () => {
+    const onChange = vi.fn();
+    render(<EnterQuantityStep stockItem={ITEM} quantity={0} onChange={onChange} onDone={vi.fn()} />);
+    const input = screen.getByLabelText(/quantity/i);
+    fireEvent.change(input, { target: { value: '2.5' } });
+    expect(onChange).toHaveBeenCalledWith(2.5);
+    onChange.mockClear();
+    fireEvent.change(input, { target: { value: '0.0014' } });
+    expect(onChange).toHaveBeenCalledWith(0.001);
   });
 
   it('shows the uom and rejects negative input', () => {

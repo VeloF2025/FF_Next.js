@@ -28,6 +28,14 @@ export const config = { api: { bodyParser: false } };
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
 
+function isRealImage(buf: Buffer): boolean {
+  if (buf.length < 12) return false;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true; // JPEG
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return true; // PNG
+  if (buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP') return true; // WebP
+  return false;
+}
+
 function parseMultipart(
   req: NextApiRequest
 ): Promise<{ files: formidable.Files }> {
@@ -66,8 +74,16 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
   let buffer: Buffer;
   try {
     buffer = await fs.readFile(file.filepath);
+  } catch (err) {
+    log.error('upload-proof temp read failed', { err }, 'my/stores/upload-proof');
+    fs.unlink(file.filepath).catch(() => undefined);
+    return apiResponse.internalError(res, err);
   } finally {
     fs.unlink(file.filepath).catch(() => undefined);
+  }
+
+  if (!isRealImage(buffer)) {
+    return apiResponse.badRequest(res, 'File content is not a valid image.');
   }
 
   try {

@@ -46,4 +46,11 @@ describe('fetchIssuableStockItems', () => {
     const url = requestMock.mock.calls[0][0] as string;
     expect(url).toBe('/api/my/stores/items?search=cable');
   });
+
+  it('requests exactly /api/my/stores/items with no query string when called with no args', async () => {
+    requestMock.mockResolvedValue([]);
+    await fetchIssuableStockItems();
+    const url = requestMock.mock.calls[0][0] as string;
+    expect(url).toBe('/api/my/stores/items');
+  });
 });

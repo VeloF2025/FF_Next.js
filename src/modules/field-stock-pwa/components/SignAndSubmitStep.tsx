@@ -70,7 +70,11 @@ export function SignAndSubmitStep({
           setError('You are offline — quantity issues need a connection to upload the proof photo. Try again when you have signal.');
           return;
         }
-        const proof = await uploadIssueProof(proofPhoto!);
+        if (!proofPhoto) {
+          setError('Take the proof photo before submitting.');
+          return;
+        }
+        const proof = await uploadIssueProof(proofPhoto);
         onSubmitted(await submitIssue({ ...draft, quantity, proofPhotoKey: proof.photoKey, proofPhotoUrl: proof.photoUrl }));
         return;
       }
@@ -120,7 +124,10 @@ export function SignAndSubmitStep({
       {!isSerialIssue && (
         <ProofPhotoCapture
           preview={proofPreview}
-          onCapture={(b, u) => { setProofPhoto(b); setProofPreview(u); }}
+          onCapture={(b, u) => {
+            setProofPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return u; });
+            setProofPhoto(b);
+          }}
         />
       )}
 

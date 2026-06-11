@@ -57,10 +57,31 @@ describe('createPicking proof-photo enforcement', () => {
       { body: { ...NON_SERIAL_BODY,
         lines: [{ stockItemId: 'i1', plannedQuantity: 1, serialIds: ['S1'] }] } } as NextApiRequest,
       res, 'staff1');
-    // With the fully-mocked sql client the create proceeds past validation;
-    // assert it did NOT 400 on the proof rule (it may 500 later on mocked DB
-    // internals or 201 — anything but the proof-photo 400).
-    const bodyStr = JSON.stringify(res.body ?? {});
-    expect(res.statusCode === 400 && bodyStr.includes('proof')).toBe(false);
+    // With the fully-mocked sql client the create proceeds past validation and
+    // reaches pickingResult[0] undefined → internalError 500. Pin only that the
+    // proof gate (a 400) did NOT fire.
+    expect(res.statusCode).not.toBe(400);
+  });
+
+  it('classifies serialIds:[] as non-serial → 400 mentioning proof', async () => {
+    const res = mockRes();
+    await createPicking(
+      { body: { ...NON_SERIAL_BODY,
+        lines: [{ stockItemId: 'i1', plannedQuantity: 5, serialIds: [] }] } } as NextApiRequest,
+      res, 'staff1');
+    expect(res.statusCode).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('proof');
+  });
+
+  it('rejects proofPhotoUrl with an external origin → 400 INVALID_PROOF_PHOTO_URL', async () => {
+    const res = mockRes();
+    await createPicking(
+      { body: { ...NON_SERIAL_BODY,
+        proofPhotoKey: 'stores/picking-proof/valid.jpg',
+        proofPhotoUrl: 'https://evil.example/x.gif',
+        lines: [{ stockItemId: 'i1', plannedQuantity: 5 }] } } as NextApiRequest,
+      res, 'staff1');
+    expect(res.statusCode).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('INVALID_PROOF_PHOTO_URL');
   });
 });

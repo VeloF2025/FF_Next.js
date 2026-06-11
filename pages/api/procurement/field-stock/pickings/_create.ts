@@ -57,6 +57,15 @@ export async function createPicking(
     const { proofPhotoKey, proofPhotoUrl } = req.body as {
       proofPhotoKey?: string; proofPhotoUrl?: string;
     };
+
+    // Stored-XSS hardening: client-supplied proofPhotoUrl is persisted and may
+    // later be rendered as <img src>; only relative VF Storage paths are allowed.
+    if (proofPhotoUrl && !proofPhotoUrl.startsWith('/storage/')) {
+      return apiResponse.badRequest(res, 'proofPhotoUrl must be a VF Storage /storage/ path', {
+        code: 'INVALID_PROOF_PHOTO_URL',
+      });
+    }
+
     const nonSerialLines = (lines as PickingLine[]).filter(
       (l) => !Array.isArray(l.serialIds) || l.serialIds.length === 0,
     );
