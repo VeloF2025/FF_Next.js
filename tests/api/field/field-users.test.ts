@@ -101,9 +101,10 @@ describe('POST /api/field/users', () => {
       account_status: 'pending',
       created_by_staff_id: 'stores-staff-uuid',
     });
-    // Call 1: staff lookup — resolves the caller's users.id → staff.id
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
+    // Call 2: staff lookup — resolves the caller's users.id → staff.id
     mockSql.mockResolvedValueOnce([{ id: 'stores-staff-uuid' }]);
-    // Call 2: INSERT
+    // Call 3: INSERT
     mockSql.mockResolvedValueOnce([insertedRow]);
 
     const req = makeReq({
@@ -128,7 +129,7 @@ describe('POST /api/field/users', () => {
     // Regression guard: positional check that the INSERT args (call index 1) contain the
     // right values for status (col 6, values index 5) and account_status (col 11, values index 10).
     // callArgs[0] is the tagged-template strings array; callArgs[1..N] are the interpolated values.
-    const insertCallArgs = mockSql.mock.calls[1] as unknown[];
+    const insertCallArgs = mockSql.mock.calls[2] as unknown[];
     const values = insertCallArgs.slice(1);
     expect(values[5]).toBe('active');              // status column — must always be 'active' (NOT NULL)
     expect(values[10]).toBe('pending');            // account_status column — storeman caller → pending
@@ -139,6 +140,7 @@ describe('POST /api/field/users', () => {
 
   // 1c. Missing email falls back to phone for staff.email NOT NULL
   it('no email in body → email column uses phone as fallback', async () => {
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
     mockSql.mockResolvedValueOnce([{ id: 'stores-staff-uuid' }]);
     mockSql.mockResolvedValueOnce([staffRow({ account_status: 'pending' })]);
 
@@ -156,7 +158,7 @@ describe('POST /api/field/users', () => {
     await handler(req as NextApiRequest, res as NextApiResponse);
 
     expect(res._status).toBe(201);
-    const insertCallArgs = mockSql.mock.calls[1] as unknown[];
+    const insertCallArgs = mockSql.mock.calls[2] as unknown[];
     const values = insertCallArgs.slice(1);
     expect(values[3]).toBe('+27991234567@phone.local'); // email ← synthetic from phone
     expect(values[4]).toBe('+27991234567');             // phone column unchanged
@@ -164,6 +166,7 @@ describe('POST /api/field/users', () => {
 
   // 1d. Email provided → email used as-is, phone stays in phone column
   it('email in body → email used verbatim, phone untouched', async () => {
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
     mockSql.mockResolvedValueOnce([{ id: 'stores-staff-uuid' }]);
     mockSql.mockResolvedValueOnce([staffRow({ account_status: 'pending' })]);
 
@@ -182,7 +185,7 @@ describe('POST /api/field/users', () => {
     await handler(req as NextApiRequest, res as NextApiResponse);
 
     expect(res._status).toBe(201);
-    const insertCallArgs = mockSql.mock.calls[1] as unknown[];
+    const insertCallArgs = mockSql.mock.calls[2] as unknown[];
     const values = insertCallArgs.slice(1);
     expect(values[3]).toBe('tech@example.com'); // email column = body.email
     expect(values[4]).toBe('+27991234568');     // phone column = body.phone
@@ -194,9 +197,10 @@ describe('POST /api/field/users', () => {
       account_status: 'active',
       created_by_staff_id: null,
     });
-    // Call 1: staff lookup — no record found
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
+    // Call 2: staff lookup — no record found
     mockSql.mockResolvedValueOnce([]);
-    // Call 2: INSERT
+    // Call 3: INSERT
     mockSql.mockResolvedValueOnce([insertedRow]);
 
     const req = makeReq({
@@ -216,7 +220,7 @@ describe('POST /api/field/users', () => {
     expect(res._status).toBe(201);
 
     // Verify INSERT at call index 1 passes null for created_by_staff_id (index 11)
-    const insertCallArgs = mockSql.mock.calls[1] as unknown[];
+    const insertCallArgs = mockSql.mock.calls[2] as unknown[];
     const values = insertCallArgs.slice(1);
     expect(values[11]).toBeNull(); // created_by_staff_id must be null when lookup misses
   });
@@ -224,6 +228,7 @@ describe('POST /api/field/users', () => {
   // 2. Admin creates a stores user → 201, account_status='active'
   it('admin creates a stores user → 201, active', async () => {
     const insertedRow = staffRow({ role: 'stores', account_status: 'active', created_by_staff_id: 'admin-staff-uuid' });
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
     mockSql.mockResolvedValueOnce([{ id: 'admin-staff-uuid' }]); // staff lookup
     mockSql.mockResolvedValueOnce([insertedRow]);                 // INSERT
 
@@ -390,6 +395,7 @@ describe('Role gate — POST /api/field/users', () => {
   // Previously the inverted logic would have produced 'active' for manager callers.
   it('manager caller creates technician → 201, pending (not active)', async () => {
     const insertedRow = staffRow({ account_status: 'pending', created_by_staff_id: 'manager-staff-uuid' });
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
     mockSql.mockResolvedValueOnce([{ id: 'manager-staff-uuid' }]); // staff lookup
     mockSql.mockResolvedValueOnce([insertedRow]);                   // INSERT
 
@@ -415,6 +421,7 @@ describe('Role gate — POST /api/field/users', () => {
   // 11. Admin creates technician → 201, account_status='active' (admin bypass)
   it('admin caller creates technician → 201, active', async () => {
     const insertedRow = staffRow({ account_status: 'active', created_by_staff_id: 'admin-staff-uuid' });
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
     mockSql.mockResolvedValueOnce([{ id: 'admin-staff-uuid' }]); // staff lookup
     mockSql.mockResolvedValueOnce([insertedRow]);                 // INSERT
 
@@ -472,6 +479,7 @@ describe('Mass-assignment guard — POST /api/field/users', () => {
       created_by_staff_id: 'stores-staff-uuid',
       role: 'technician',
     });
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
     mockSql.mockResolvedValueOnce([{ id: 'stores-staff-uuid' }]); // staff lookup
     mockSql.mockResolvedValueOnce([insertedRow]);                  // INSERT
 
@@ -495,7 +503,7 @@ describe('Mass-assignment guard — POST /api/field/users', () => {
 
     // Verify the INSERT (call index 1) was called with role-default 'Field Operations' and 'Technician',
     // NOT with the caller-supplied 'Operations' / 'Director'.
-    const insertCallArgs: unknown[] = mockSql.mock.calls[1] as unknown[];
+    const insertCallArgs: unknown[] = mockSql.mock.calls[2] as unknown[];
     const allArgs = insertCallArgs.flat(Infinity);
     expect(allArgs).toContain('Field Operations');
     expect(allArgs).toContain('Technician');
@@ -509,6 +517,7 @@ describe('Mass-assignment guard — POST /api/field/users', () => {
       account_status: 'active',
       created_by_staff_id: 'admin-staff-uuid',
     });
+    mockSql.mockResolvedValueOnce([]); // phone dedup — no existing staff with this phone
     mockSql.mockResolvedValueOnce([{ id: 'admin-staff-uuid' }]); // staff lookup
     mockSql.mockResolvedValueOnce([insertedRow]);                 // INSERT
 
@@ -531,7 +540,7 @@ describe('Mass-assignment guard — POST /api/field/users', () => {
     expect(res._status).toBe(201);
 
     // INSERT is call index 1; check args contain the admin-supplied values
-    const insertCallArgs: unknown[] = mockSql.mock.calls[1] as unknown[];
+    const insertCallArgs: unknown[] = mockSql.mock.calls[2] as unknown[];
     const allArgs = insertCallArgs.flat(Infinity);
     expect(allArgs).toContain('Special Projects');
     expect(allArgs).toContain('Lead Technician');

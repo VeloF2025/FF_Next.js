@@ -21,6 +21,7 @@ import { withAuth } from '@/lib/auth/middleware';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { logCreate } from '@/lib/db-logger';
 import type { AuthRole } from '@/lib/auth/types';
+import { findExistingStaffForRegistration } from '@/services/staff/staffPhoneDedup';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,22 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
     return;
   }
 
+  // Phone dedup: a staff row with this phone already exists → return it instead
+  // of inserting a duplicate. Duplicates split identity (custody lands on one
+  // row, the phone-keyed /my OTP login resolves another). The existing row is
+  // returned as-is — its role/status are never changed by a re-registration.
+  try {
+    const existing = await findExistingStaffForRegistration(phone, firstName, lastName);
+    if (existing) {
+      log.info('Field user create matched existing staff by phone', { id: existing.id }, 'FieldUsersAPI');
+      apiResponse.success(res, { user: existing, existing: true });
+      return;
+    }
+  } catch (dedupError) {
+    // Dedup is a guard, not a gate — log and fall through to the INSERT.
+    log.error('Field user phone dedup failed', { error: dedupError }, 'FieldUsersAPI');
+  }
+
   // Determine account_status based on caller role.
   // Admin-tier callers create accounts immediately active; everyone else (storeman, manager)
   // creates pending accounts that require admin approval.
@@ -170,11 +187,13 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
         ${accountStatus},
         ${createdByStaffId}
       )
-      RETURNING id, role, account_status, created_by_staff_id
+      RETURNING id, first_name, last_name, role, account_status, created_by_staff_id
     `;
 
     const created = rows[0] as {
       id: string;
+      first_name: string | null;
+      last_name: string | null;
       role: string;
       account_status: string;
       created_by_staff_id: string | null;

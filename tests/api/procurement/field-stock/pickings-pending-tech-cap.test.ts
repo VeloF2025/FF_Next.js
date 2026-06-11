@@ -109,8 +109,9 @@ function validBody(overrides: Record<string, unknown> = {}) {
 
 /**
  * SQL call sequence for a successful create after cap check passes:
- *   1. staff lookup → 2. stock_items (×lineCount) → 3. COUNT → 4. INSERT picking
- *   → 5. INSERT lines (×lineCount) → 6. refetch
+ *   1. staff lookup → 2. cap stock_items (×lineCount, pending only) → 3. COUNT
+ *   → 4. INSERT picking → 5. per line: unit-cost stock_items lookup + INSERT line
+ *   → 6. refetch
  */
 function mockSuccessfulCreate(
   accountStatus: string,
@@ -119,14 +120,20 @@ function mockSuccessfulCreate(
 ) {
   // 1. Staff lookup
   mockSql.mockResolvedValueOnce([{ account_status: accountStatus }]);
-  // 2. stock_items lookup — one call per line
-  for (let i = 0; i < lineCount; i++) {
-    mockSql.mockResolvedValueOnce([{ standard_cost: standardCost }]);
+  // 2. cap-check stock_items lookup — one call per line (pending techs only)
+  if (accountStatus === 'pending') {
+    for (let i = 0; i < lineCount; i++) {
+      mockSql.mockResolvedValueOnce([{ standard_cost: standardCost }]);
+    }
   }
   // 3. COUNT
   mockSql.mockResolvedValueOnce([{ count: '42' }]);
   mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-1', picking_number: 'PCK-000043', status: 'draft' }]);
-  for (let i = 0; i < lineCount; i++) mockSql.mockResolvedValueOnce([]);
+  // 5. per line: unit-cost stamp lookup, then the line INSERT
+  for (let i = 0; i < lineCount; i++) {
+    mockSql.mockResolvedValueOnce([{ standard_cost: standardCost }]);
+    mockSql.mockResolvedValueOnce([]);
+  }
   mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-1', picking_number: 'PCK-000043', lines: [] }]);
 }
 
@@ -194,6 +201,7 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);        // staff
     mockSql.mockResolvedValueOnce([{ count: '1' }]);
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-2', picking_number: 'PCK-000002', status: 'draft' }]);
+    mockSql.mockResolvedValueOnce([{ standard_cost: 5000 }]);  // line unit-cost stamp
     mockSql.mockResolvedValueOnce([]);  // line insert
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-2', picking_number: 'PCK-000002', lines: [] }]);
 
@@ -208,11 +216,14 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
 
     // Pre-existing handler quirk: apiResponse.success overrides res.status(201) with 200.
     expect(res._status).toBe(200);
-    // Confirm no stock_items price lookup happened (active tech bypasses price check)
+    // Confirm the CAP price check did not run for an active tech: the cap's
+    // stock_items lookup happens BEFORE the COUNT query, while the (legitimate)
+    // per-line unit-cost stamp happens after the picking INSERT.
     const allSqlStrings = mockSql.mock.calls.map(
       (c) => String((c[0] as TemplateStringsArray)?.[0] ?? '').toLowerCase(),
     );
-    expect(allSqlStrings.some((s) => s.includes('standard_cost'))).toBe(false);
+    const countIdx = allSqlStrings.findIndex((s) => s.includes('count(*)'));
+    expect(allSqlStrings.slice(0, countIdx).some((s) => s.includes('standard_cost'))).toBe(false);
   });
 
   // Case 5: Suspended tech → cap not enforced (picking succeeds at this endpoint).
@@ -221,6 +232,7 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     mockSql.mockResolvedValueOnce([{ account_status: 'suspended' }]);     // staff
     mockSql.mockResolvedValueOnce([{ count: '10' }]);
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-3', picking_number: 'PCK-000011', status: 'draft' }]);
+    mockSql.mockResolvedValueOnce([{ standard_cost: 10000 }]);  // line unit-cost stamp
     mockSql.mockResolvedValueOnce([]);  // line insert
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-3', picking_number: 'PCK-000011', lines: [] }]);
 
@@ -243,6 +255,7 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
       id: 'picking-uuid-4', picking_number: 'PCK-000006', status: 'draft',
       source_location_id: 'loc-warehouse-uuid', destination_location_id: 'loc-tech-uuid',
     }]);
+    mockSql.mockResolvedValueOnce([{ standard_cost: 100 }]);  // line unit-cost stamp
     mockSql.mockResolvedValueOnce([]);  // line insert
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-4', lines: [] }]);
 
@@ -337,6 +350,7 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);  // staff
     mockSql.mockResolvedValueOnce([{ count: '20' }]);               // COUNT
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-5', picking_number: 'PCK-000021', status: 'draft' }]);
+    mockSql.mockResolvedValueOnce([{ standard_cost: 100 }]);        // line unit-cost stamp
     mockSql.mockResolvedValueOnce([]);                              // line insert
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-5', lines: [] }]);
 
@@ -412,6 +426,7 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     mockSql.mockResolvedValueOnce([{ id: 'uuid-b', serial_number: 'SN-B' }]);
     mockSql.mockResolvedValueOnce([{ count: '15' }]);                 // COUNT
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-6', picking_number: 'PCK-000016', status: 'draft' }]);
+    mockSql.mockResolvedValueOnce([{ standard_cost: 100 }]);          // line unit-cost stamp
     mockSql.mockResolvedValueOnce([]);                                // line INSERT
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-6', lines: [] }]);
 
@@ -431,8 +446,9 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     expect(body.success).toBe(true);
 
     // Assert the line INSERT received the UUID array, not the original serial_number strings.
-    // The INSERT is call index 5 (0:staff, 1:SN-A, 2:SN-B, 3:COUNT, 4:INSERT picking, 5:INSERT line).
-    const lineInsertCall = mockSql.mock.calls[5];
+    // The INSERT is call index 6
+    // (0:staff, 1:SN-A, 2:SN-B, 3:COUNT, 4:INSERT picking, 5:unit-cost stamp, 6:INSERT line).
+    const lineInsertCall = mockSql.mock.calls[6];
     const lineInsertValues = lineInsertCall?.slice(1) as unknown[][];
     // The uuidArray ['uuid-a', 'uuid-b'] is passed as a single parameter after pickingId, stockItemId, plannedQuantity.
     // Position 3 (0-indexed) in the values list corresponds to serial_ids.
@@ -446,6 +462,7 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     // H7: NO serial check SQL — line has no serialIds
     mockSql.mockResolvedValueOnce([{ count: '3' }]);                  // COUNT
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-7', picking_number: 'PCK-000004', status: 'draft' }]);
+    mockSql.mockResolvedValueOnce([{ standard_cost: 100 }]);          // line unit-cost stamp
     mockSql.mockResolvedValueOnce([]);                                // line insert
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-7', lines: [] }]);
 

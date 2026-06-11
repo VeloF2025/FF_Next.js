@@ -142,11 +142,12 @@ function orchestratorBody(overrides: Record<string, unknown> = {}) {
  * `accountStatus === 'pending'` (handler skips the price lookup otherwise).
  *
  * SQL call order for active / suspended techs (no price check):
- *   1. staff lookup  2. COUNT  3. INSERT picking  4. INSERT line  5. refetch
+ *   1. staff lookup  2. COUNT  3. INSERT picking  4. line unit-cost lookup
+ *   5. INSERT line  6. refetch
  *
  * SQL call order for pending techs (price check added after staff lookup):
  *   1. staff lookup  2. stock_items  3. COUNT  4. INSERT picking
- *   5. INSERT line  6. refetch
+ *   5. line unit-cost lookup  6. INSERT line  7. refetch
  */
 function mockSuccessCreate(accountStatus: 'active' | 'suspended' | 'pending', standardCost = 1000) {
   // 1. Staff lookup
@@ -171,6 +172,8 @@ function mockSuccessCreate(accountStatus: 'active' | 'suspended' | 'pending', st
     picking_number: 'PCK-000100',
     status: 'draft',
   }]);
+  // Line unit-cost stamp lookup (one per line)
+  mockSql.mockResolvedValueOnce([{ standard_cost: standardCost }]);
   // INSERT line (one line in our test body)
   mockSql.mockResolvedValueOnce([]);
   // Refetch with joins
@@ -370,6 +373,7 @@ describe('POST /api/procurement/field-stock/pickings — orchestrator body shape
       picking_number: 'PCK-000201',
       status: 'draft',
     }]); // INSERT picking
+    mockSql.mockResolvedValueOnce([{ standard_cost: 624.74 }]); // line unit-cost stamp
     mockSql.mockResolvedValueOnce([]); // INSERT line
     mockSql.mockResolvedValueOnce([{
       id: 'picking-uuid-rt',
@@ -398,10 +402,10 @@ describe('POST /api/procurement/field-stock/pickings — orchestrator body shape
     const body = res._json as { success: boolean };
     expect(body.success).toBe(true);
 
-    // The line INSERT is call index 5:
+    // The line INSERT is call index 6:
     //   0: staff  1: ALCLB48CA1DC serial  2: ALCLB48CD7FF serial
-    //   3: COUNT  4: INSERT picking  5: INSERT line  6: refetch
-    const lineInsertParams = mockSql.mock.calls[5]?.slice(1) as unknown[];
+    //   3: COUNT  4: INSERT picking  5: unit-cost stamp  6: INSERT line  7: refetch
+    const lineInsertParams = mockSql.mock.calls[6]?.slice(1) as unknown[];
     // UUID array ['uuid-alc-dc', 'uuid-alc-ff'] must appear as a parameter, not
     // the original serial_number strings.
     expect(lineInsertParams).toContainEqual(['uuid-alc-dc', 'uuid-alc-ff']);
