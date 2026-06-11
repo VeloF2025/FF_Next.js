@@ -9,17 +9,25 @@ function pole(over: Record<string, unknown>): PoleQaPhoto {
 }
 
 describe('getLinkCandidates', () => {
-  it('returns same-discipline slots that hold a photo, excluding the target', () => {
+  it('returns every photo-holding slot, excluding the target — across disciplines', () => {
     const p = pole({
       civil_step_01_key: 'k1',
       civil_step_03_key: 'k3', // depth
       civil_step_04_key: null, // end-plates (target, empty)
-      optical_dome_01_key: 'dome-k', // different discipline — must NOT appear
+      optical_dome_01_key: 'dome-k', // different discipline — now INCLUDED
     });
     const candidates = getLinkCandidates(p, 'civil_04');
     const keys = candidates.map(c => c.slotKey).sort();
-    expect(keys).toEqual(['civil_01', 'civil_03']);
+    expect(keys).toEqual(['civil_01', 'civil_03', 'dome_01']);
     expect(candidates.find(c => c.slotKey === 'civil_03')?.photoKey).toBe('k3');
+  });
+
+  it('tags each candidate with its discipline + human label', () => {
+    const p = pole({ civil_step_01_key: 'civilk', optical_dome_01_key: 'd1', main_joint_11_key: 'm1' });
+    const candidates = getLinkCandidates(p, 'dome_02');
+    const byKey = Object.fromEntries(candidates.map(c => [c.slotKey, c]));
+    expect(byKey['civil_01']).toMatchObject({ discipline: 'civil', disciplineLabel: 'Civil' });
+    expect(byKey['main_joint_11']).toMatchObject({ discipline: 'main_joint', disciplineLabel: 'Main Joint' });
   });
 
   it('excludes the target slot even when it already holds a photo', () => {
@@ -28,21 +36,21 @@ describe('getLinkCandidates', () => {
     expect(candidates.map(c => c.slotKey)).toEqual(['civil_03']);
   });
 
-  it('never crosses disciplines (dome target sees only dome photos)', () => {
+  it('lets a dome target reuse photos from other disciplines (dome + main joint reuse)', () => {
     const p = pole({
       civil_step_01_key: 'civilk',
       optical_dome_01_key: 'd1',
-      optical_dome_03_key: 'd3',
+      main_joint_11_key: 'm1',
     });
     const candidates = getLinkCandidates(p, 'dome_02');
-    expect(candidates.map(c => c.slotKey).sort()).toEqual(['dome_01', 'dome_03']);
+    expect(candidates.map(c => c.slotKey).sort()).toEqual(['civil_01', 'dome_01', 'main_joint_11']);
   });
 
   it('returns empty for an unknown target slot', () => {
     expect(getLinkCandidates(pole({ civil_step_01_key: 'k' }), 'nope')).toEqual([]);
   });
 
-  it('returns empty when no same-discipline photos exist', () => {
-    expect(getLinkCandidates(pole({ optical_dome_01_key: 'd' }), 'civil_04')).toEqual([]);
+  it('returns empty when no other slot holds a photo', () => {
+    expect(getLinkCandidates(pole({ civil_step_04_key: 'only-target' }), 'civil_04')).toEqual([]);
   });
 });

@@ -1,11 +1,19 @@
+export type Discipline = 'civil' | 'dome' | 'main_joint';
+
 export interface SlotMeta {
   key: string;
   dbColumn: string;
   label: string;
-  discipline: 'civil' | 'dome' | 'main_joint';
+  discipline: Discipline;
   stepNumber: number;
   vlmCheck: string;
 }
+
+export const DISCIPLINE_LABELS: Record<Discipline, string> = {
+  civil: 'Civil',
+  dome: 'Dome',
+  main_joint: 'Main Joint',
+};
 
 export const SLOT_META: SlotMeta[] = [
   // Civil
