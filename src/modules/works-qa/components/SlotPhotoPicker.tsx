@@ -11,8 +11,10 @@ interface Props {
 }
 
 /**
- * Pick an existing same-discipline photo to reuse for another step (e.g. a depth
- * shot that also shows the end-plates). Selection marks the target slot as a
+ * Pick an existing photo on this pole to reuse for another step (e.g. a depth
+ * shot that also shows the end-plates, or a wide pole shot that evidences both
+ * the dome and the main-joint closure). Candidates span ALL disciplines, so each
+ * thumbnail is tagged with its discipline. Selection marks the target slot as a
  * dual-step override.
  */
 export function SlotPhotoPicker({ targetLabel, candidates, onSelect, onClose }: Props) {
@@ -37,7 +39,7 @@ export function SlotPhotoPicker({ targetLabel, candidates, onSelect, onClose }: 
         <div className="px-4 py-3">
           {candidates.length === 0 ? (
             <p className="text-xs text-zinc-500 py-4 text-center">
-              No other photos in this discipline to reuse yet.
+              No other photos on this pole to reuse yet.
             </p>
           ) : (
             <>
@@ -55,7 +57,8 @@ export function SlotPhotoPicker({ targetLabel, candidates, onSelect, onClose }: 
                     }`}
                   >
                     <img src={photoUrl(c.photoKey)} alt={c.label} className="w-full h-20 object-cover" />
-                    <span className="block text-[10px] text-zinc-400 px-1 py-0.5 truncate">{c.label}</span>
+                    <span className="block text-[10px] uppercase tracking-wide text-teal-500/80 px-1 pt-0.5 truncate">{c.disciplineLabel}</span>
+                    <span className="block text-[10px] text-zinc-400 px-1 pb-0.5 truncate">{c.label}</span>
                   </button>
                 ))}
               </div>

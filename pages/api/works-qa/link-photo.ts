@@ -2,9 +2,10 @@
  * POST /api/works-qa/link-photo
  *
  * Reuse ONE photo for a second step on the same pole — e.g. a depth-with-tape
- * shot that also clearly shows the end-plates. Copies the source slot's photo
- * key into the target slot (the source keeps its photo) and records a
- * dual-step override on the target.
+ * shot that also clearly shows the end-plates, or a wide pole shot that evidences
+ * both the dome and the main-joint closure. Copies the source slot's photo key
+ * into the target slot (the source keeps its photo) and records a dual-step
+ * override on the target. Source and target may be in DIFFERENT disciplines.
  *
  * Deliberately does NOT write qa_correction_examples: this is "one photo shows
  * two steps", NOT "the VLM mis-classified this photo". Logging it as a
@@ -15,7 +16,7 @@
  * Body:
  *   pole_id      UUID
  *   source_slot  slot key that holds the photo to reuse
- *   target_slot  slot key to populate (must differ; same discipline)
+ *   target_slot  slot key to populate (must differ; any discipline)
  *   reason       optional free-text note
  */
 
@@ -24,7 +25,7 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { SLOT_META, getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
+import { SLOT_META, getSlotMeta, DISCIPLINE_LABELS } from '@/modules/works-qa/utils/slot-keys';
 import type { VlmSlotResult } from '@/modules/works-qa/types/works-qa.types';
 
 const ALLOWED_PHOTO_COLUMNS = new Set(SLOT_META.map(s => s.dbColumn));
@@ -49,9 +50,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const targetMeta = getSlotMeta(target_slot);
   if (!sourceMeta) return apiResponse.badRequest(res, `Unknown source slot: ${source_slot}`);
   if (!targetMeta) return apiResponse.badRequest(res, `Unknown target slot: ${target_slot}`);
-  if (sourceMeta.discipline !== targetMeta.discipline) {
-    return apiResponse.badRequest(res, 'source and target must be the same discipline');
-  }
   if (!ALLOWED_PHOTO_COLUMNS.has(sourceMeta.dbColumn) || !ALLOWED_PHOTO_COLUMNS.has(targetMeta.dbColumn)) {
     return apiResponse.badRequest(res, 'illegal column');
   }
@@ -110,7 +108,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ...(vlmResults[target_slot] ?? { valid: true, confidence: 0, feedback: '' }),
       valid: true,
       overridden_by: userEmail,
-      override_reason: reason?.trim() || `Same photo as ${sourceMeta.label}`,
+      override_reason: reason?.trim()
+        || `Same photo as ${DISCIPLINE_LABELS[sourceMeta.discipline]} · ${sourceMeta.label}`,
       dual_step: true,
       source_slot,
     };

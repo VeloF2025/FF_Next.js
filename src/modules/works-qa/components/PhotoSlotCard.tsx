@@ -222,9 +222,11 @@ export function PhotoSlotCard({
             <p className="text-[10px] text-amber-400/80 leading-tight">⧉ Same photo as another step</p>
           )}
 
-          {/* Reuse an existing same-discipline photo for this step — e.g. a depth
-              shot that also shows the end-plates. Available whenever the
-              discipline isn't approved, regardless of current slot state. */}
+          {/* Reuse an existing photo on this pole for this step — e.g. a depth
+              shot that also shows the end-plates, or a wide pole shot evidencing
+              both the dome and the main joint. Candidates span all disciplines.
+              Available whenever the discipline isn't approved, regardless of
+              current slot state. */}
           {onLinkExisting && !disabled && (
             <button
               type="button"
