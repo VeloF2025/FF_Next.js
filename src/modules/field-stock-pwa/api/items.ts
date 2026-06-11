@@ -35,6 +35,8 @@ interface StockItemRow {
 
 export type PwaTrackingType = 'serial' | 'lot' | 'quantity' | 'none';
 
+const VALID_TRACKING_TYPES = new Set<string>(['serial', 'lot', 'quantity', 'none']);
+
 export interface PwaIssuableItem {
   id: string;
   name: string;
@@ -69,7 +71,11 @@ export async function fetchIssuableStockItems(
     id: r.id,
     name: r.name,
     sku: r.item_code ?? null,
-    trackingType: (r.tracking_type as PwaTrackingType) ?? 'serial',
+    // Unknown DB values default to 'quantity' — safest path (qty + proof
+    // photo) rather than pretending the item is serial-scannable.
+    trackingType: VALID_TRACKING_TYPES.has(r.tracking_type)
+      ? (r.tracking_type as PwaTrackingType)
+      : 'quantity',
     uom: r.uom ?? null,
     // standard_cost comes back as a numeric string from pg; parse to float.
     // Null means the item has no valuation — cap guard will warn but not block.
