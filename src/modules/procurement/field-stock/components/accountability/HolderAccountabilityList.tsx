@@ -15,6 +15,8 @@ interface Props {
   loading?: boolean;
   onBlock?: (holderId: string, reason: string) => Promise<void>;
   onUnblock?: (holderId: string) => Promise<void>;
+  /** Open the holder-detail drawer for the given holder. */
+  onSelect?: (holderId: string) => void;
 }
 
 const TYPE_LABEL: Record<HolderAccountability['holder_type'], string> = {
@@ -59,7 +61,7 @@ function StatCard({ icon, value, label }: { icon: React.ReactNode; value: number
   );
 }
 
-export function HolderAccountabilityList({ holders, loading, onBlock, onUnblock }: Props) {
+export function HolderAccountabilityList({ holders, loading, onBlock, onUnblock, onSelect }: Props) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'blocked' | 'unaccounted'>('all');
   const [blockReason, setBlockReason] = useState('');
@@ -140,7 +142,11 @@ export function HolderAccountabilityList({ holders, loading, onBlock, onUnblock 
                 <tr key={h.holder_id} className="hover:bg-accent">
                   <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground">{h.name}</span>
+                      {onSelect
+                        ? <button onClick={() => onSelect(h.holder_id)}
+                            className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                            title="View holder detail">{h.name}</button>
+                        : <span className="font-medium text-foreground">{h.name}</span>}
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_CLS[h.holder_type]}`}>{TYPE_LABEL[h.holder_type]}</span>
                     </div>
                   </td>
