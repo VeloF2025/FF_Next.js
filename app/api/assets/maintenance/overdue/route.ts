@@ -35,11 +35,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify cron secret for security
+    // Verify cron secret for security. Fail CLOSED: if CRON_SECRET is not
+    // configured, reject rather than allowing the mutation through (a missing
+    // secret must never mean "no auth required").
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

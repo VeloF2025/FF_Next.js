@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { assetService, maintenanceService } from '@/modules/assets/services';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // Authenticate + authorize (reading asset data requires assets:view)
+    const [, deny] = await requirePermission(req, 'assets', 'view');
+    if (deny) return deny;
+
     // Fetch both asset and maintenance stats in parallel
     const [assetStats, maintenanceStats] = await Promise.all([
       assetService.getDashboardStats(),

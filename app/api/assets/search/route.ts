@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { assetService } from '@/modules/assets/services';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // Authenticate + authorize (searching assets requires assets:view)
+    const [, deny] = await requirePermission(req, 'assets', 'view');
+    if (deny) return deny;
+
     const { searchParams } = new URL(req.url);
     const term = searchParams.get('q') || searchParams.get('term');
     const barcode = searchParams.get('barcode');

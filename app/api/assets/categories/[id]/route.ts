@@ -19,6 +19,10 @@ interface RouteParams {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
+    // Authenticate + authorize (reading a category requires assets.categories:view)
+    const [, deny] = await requirePermission(req, 'assets.categories', 'view');
+    if (deny) return deny;
+
     const { id } = await params;
 
     const result = await categoryService.getById(id);
