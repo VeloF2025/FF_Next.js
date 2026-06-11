@@ -19,6 +19,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import { requireStoresActor, type StoresActor } from '@/modules/field-stock-pwa/lib/storesActor';
+import { findExistingStaffForRegistration } from '@/services/staff/staffPhoneDedup';
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const { role, accountStatus } = req.query as { role?: string; accountStatus?: string };
@@ -78,6 +79,26 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
   // Stores actors may only create technicians (non-admin path). Any other role is rejected.
   if (role !== undefined && role !== 'technician') {
     return apiResponse.forbidden(res, 'Stores users may only create technician accounts');
+  }
+
+  // Phone dedup: a staff row with this phone already exists → return it instead
+  // of inserting a duplicate. Duplicates split identity (custody lands on one
+  // row, the phone-keyed /my OTP login resolves another). The existing row is
+  // returned regardless of its role — issuing stock to an existing 'stores' or
+  // 'office' person is correct; silently downgrading them to technician is not.
+  try {
+    const existing = await findExistingStaffForRegistration(phone, firstName, lastName);
+    if (existing) {
+      log.info(
+        'my-stores technician create matched existing staff by phone',
+        { id: existing.id, createdBy: actor.staffId },
+        'my/stores/technicians',
+      );
+      return apiResponse.success(res, { user: existing, existing: true });
+    }
+  } catch (error) {
+    // Dedup is a guard, not a gate — log and fall through to the INSERT.
+    log.error('my-stores technician phone dedup failed', { error }, 'my/stores/technicians');
   }
 
   const employeeId = `TECH-${String(Date.now()).slice(-8)}`;

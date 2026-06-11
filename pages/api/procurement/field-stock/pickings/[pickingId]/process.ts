@@ -140,7 +140,19 @@ export async function processPicking(req: NextApiRequest, res: NextApiResponse) 
           holder = await getHolderById(picking.holder_id);
           if (!holder) throw new Error(`Issue picking holder_id ${picking.holder_id} not found in stock_holders`);
         } else if (picking.technician_id) {
-          holder = await getOrCreateStaffHolder(picking.technician_id, picking.technician_name ?? 'technician');
+          // Legacy pickings may have technician_name NULL (the stores PWA only
+          // sent technicianId before _create.ts resolved the name server-side).
+          // Resolve here too so the holder is never stamped the literal 'technician'.
+          let techName = picking.technician_name;
+          if (!techName) {
+            const staffRows = await txn.query<{ first_name: string | null; last_name: string | null }>(
+              `SELECT first_name, last_name FROM staff WHERE id = $1 LIMIT 1`,
+              [picking.technician_id],
+            );
+            const s = staffRows[0];
+            techName = s ? `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim() : '';
+          }
+          holder = await getOrCreateStaffHolder(picking.technician_id, techName || 'technician');
         } else if (picking.contractor_id) {
           holder = await getOrCreateContractorHolder(picking.contractor_id, picking.contractor_name ?? 'contractor');
         } else {

@@ -103,11 +103,21 @@ export async function createPicking(
     // Server-side enforcement: a malicious or buggy client could bypass the
     // client-side guard in SignAndSubmitStep. We independently verify here,
     // BEFORE any INSERT, so no partial state is written on a cap breach.
+    let resolvedTechnicianName: string | null = technicianName || null;
     if (technicianId) {
       const techResults = await sql`
-        SELECT account_status FROM staff WHERE id = ${technicianId} LIMIT 1
+        SELECT account_status, first_name, last_name FROM staff WHERE id = ${technicianId} LIMIT 1
       `;
-      const techRow = (techResults as Array<{ account_status: string }>)[0];
+      const techRow = (techResults as Array<{ account_status: string; first_name: string | null; last_name: string | null }>)[0];
+
+      // Resolve the technician's display name server-side when the client did
+      // not send one (the stores PWA sends only technicianId). Without this the
+      // holder created at process time falls back to the literal 'technician',
+      // which renders the Accountability report nameless.
+      if (!resolvedTechnicianName && techRow) {
+        resolvedTechnicianName =
+          `${techRow.first_name ?? ''} ${techRow.last_name ?? ''}`.trim() || null;
+      }
 
       // Only enforce cap for pending technicians. Active/suspended fall through.
       if (techRow?.account_status === 'pending') {
@@ -182,7 +192,7 @@ export async function createPicking(
         ${sourceLocationId}, ${destinationLocationId},
         ${projectId || null}, ${jobReference || null}, ${jobType || null},
         ${contractorId || null}, ${contractorName || null}, ${teamName || null},
-        ${technicianId || null}, ${technicianName || null},
+        ${technicianId || null}, ${resolvedTechnicianName},
         ${scheduledDate || null}, 'draft', ${notes || null},
         ${createdByStaffId},
         ${proofPhotoKey || null}, ${proofPhotoUrl || null}
@@ -209,14 +219,23 @@ export async function createPicking(
             .filter((u): u is string => Boolean(u))
         : null;
 
+      // Snapshot the item's standard_cost onto the line at issue time. The
+      // process step passes line.unit_cost into custody (stock_custody.total_value
+      // and field_stock_movements.unit_cost) — without this stamp every holder's
+      // held_value in the Accountability report reads R0.
+      const costRows = await sql`
+        SELECT standard_cost FROM stock_items WHERE id = ${line.stockItemId} LIMIT 1
+      `;
+      const unitCost = (costRows as Array<{ standard_cost: number | null }>)[0]?.standard_cost ?? null;
+
       await sql`
         INSERT INTO stock_picking_lines (
           picking_id, stock_item_id, planned_quantity,
-          serial_ids, lot_number, notes, status
+          serial_ids, lot_number, notes, status, unit_cost
         ) VALUES (
           ${pickingId}, ${line.stockItemId}, ${line.plannedQuantity},
           ${uuidArray},
-          ${line.lotNumber || null}, ${line.notes || null}, 'pending'
+          ${line.lotNumber || null}, ${line.notes || null}, 'pending', ${unitCost}
         )
       `;
     }
