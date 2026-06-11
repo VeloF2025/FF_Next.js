@@ -19,8 +19,9 @@ export interface LinkCandidate {
  * "Strength Members" exists in both Dome and Main Joint).
  */
 export function getLinkCandidates(pole: PoleQaPhoto, targetSlotKey: string): LinkCandidate[] {
-  const target = SLOT_META.find(s => s.key === targetSlotKey);
-  if (!target) return [];
+  // Unknown target → nothing to offer. (No longer needs the target's discipline
+  // now that candidates span every discipline.)
+  if (!SLOT_META.some(s => s.key === targetSlotKey)) return [];
 
   const candidates: LinkCandidate[] = [];
   for (const slot of SLOT_META) {

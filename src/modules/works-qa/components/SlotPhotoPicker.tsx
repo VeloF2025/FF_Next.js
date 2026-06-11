@@ -57,7 +57,7 @@ export function SlotPhotoPicker({ targetLabel, candidates, onSelect, onClose }: 
                     }`}
                   >
                     <img src={photoUrl(c.photoKey)} alt={c.label} className="w-full h-20 object-cover" />
-                    <span className="block text-[9px] uppercase tracking-wide text-teal-500/80 px-1 pt-0.5 truncate">{c.disciplineLabel}</span>
+                    <span className="block text-[10px] uppercase tracking-wide text-teal-500/80 px-1 pt-0.5 truncate">{c.disciplineLabel}</span>
                     <span className="block text-[10px] text-zinc-400 px-1 pb-0.5 truncate">{c.label}</span>
                   </button>
                 ))}
