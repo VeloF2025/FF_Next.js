@@ -18,6 +18,10 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 if (!process.env.DATABASE_URL) dotenv.config({ path: '.env.production' });
+// The velo prod deploy keeps DATABASE_URL in .env (the systemd EnvironmentFile), not
+// .env.local — load it too so this standalone script works in prod without an explicit
+// DATABASE_URL= prefix.
+if (!process.env.DATABASE_URL) dotenv.config({ path: '.env' });
 
 const out = (m: string) => process.stdout.write(m + '\n');
 const err = (m: string) => process.stderr.write(m + '\n');
