@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CortexReviewPanel } from '@/components/cortex/CortexReviewPanel';
+import { CortexCitedSearch } from '@/components/cortex/CortexCitedSearch';
 
 export default function CortexPage() {
   return (
@@ -14,6 +15,9 @@ export default function CortexPage() {
           <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
             AI-enriched communications and meeting intelligence pending your review
           </p>
+        </div>
+        <div className="mb-6">
+          <CortexCitedSearch />
         </div>
         <CortexReviewPanel />
       </div>
