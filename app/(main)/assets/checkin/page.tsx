@@ -5,6 +5,8 @@
 
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
+import { log } from '@/lib/logger';
 import { CheckinClient } from './CheckinClient';
 
 interface PageProps {
@@ -15,13 +17,13 @@ async function getAssignedAssets() {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets?status=assigned&limit=100`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching assets:', error);
+    log.error('Failed to fetch assigned assets', { error }, 'CheckinPage');
     return [];
   }
 }

@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { CheckoutClient } from './CheckoutClient';
 import AssetsClient from '../client';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
+import { log } from '@/lib/logger';
 
 interface PageProps {
   searchParams: Promise<{ assetId?: string }>;
@@ -18,13 +20,13 @@ async function getAvailableAssets() {
   try {
     const response = await fetch(
       `${BASE_URL}/api/assets?status=available&limit=100`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching assets:', error);
+    log.error('Error fetching assets:', { error }, 'CheckoutPage');
     return [];
   }
 }
@@ -33,13 +35,13 @@ async function getStaffMembers() {
   try {
     const response = await fetch(
       `${BASE_URL}/api/staff?status=active`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching staff:', error);
+    log.error('Error fetching staff:', { error }, 'CheckoutPage');
     return [];
   }
 }
@@ -48,14 +50,14 @@ async function getProjects() {
   try {
     const response = await fetch(
       `${BASE_URL}/api/projects`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     // Filter to active projects only
     return (data.data || []).filter((p: any) => p.status === 'active' || p.status === 'in_progress');
   } catch (error) {
-    console.error('Error fetching projects:', error);
+    log.error('Error fetching projects:', { error }, 'CheckoutPage');
     return [];
   }
 }

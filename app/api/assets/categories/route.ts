@@ -16,6 +16,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // Authenticate + authorize (listing categories requires assets.categories:view)
+    const [, deny] = await requirePermission(req, 'assets.categories', 'view');
+    if (deny) return deny;
+
     const { searchParams } = new URL(req.url);
 
     // Parse filters

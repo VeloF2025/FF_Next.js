@@ -15,6 +15,8 @@ import {
   Clock,
 } from 'lucide-react';
 import AssetsClient from '../client';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
+import { log } from '@/lib/logger';
 
 interface MaintenanceRecord {
   id: string;
@@ -33,13 +35,13 @@ async function getUpcomingMaintenance(): Promise<MaintenanceRecord[]> {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/maintenance/upcoming?limit=20`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching maintenance:', error);
+    log.error('Error fetching maintenance:', { error }, 'MaintenancePage');
     return [];
   }
 }
@@ -48,13 +50,13 @@ async function getOverdueMaintenance(): Promise<MaintenanceRecord[]> {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/maintenance/overdue?limit=20`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching overdue:', error);
+    log.error('Error fetching overdue:', { error }, 'MaintenancePage');
     return [];
   }
 }

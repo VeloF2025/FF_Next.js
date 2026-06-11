@@ -6,6 +6,8 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { MaintenanceFormClient } from './MaintenanceFormClient';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
+import { log } from '@/lib/logger';
 
 interface PageProps {
   searchParams: Promise<{ assetId?: string; type?: string }>;
@@ -17,13 +19,13 @@ async function getAssets() {
   try {
     const response = await fetch(
       `${BASE_URL}/api/assets?limit=200`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching assets:', error);
+    log.error('Error fetching assets:', { error }, 'NewMaintenancePage');
     return [];
   }
 }

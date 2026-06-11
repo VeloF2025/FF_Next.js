@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { assignmentService } from '@/modules/assets/services';
+import { requirePermission } from '@/lib/auth/app-router';
+import { log } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -14,6 +16,10 @@ interface RouteParams {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
+    // Authenticate + authorize (reading an asset's history requires assets:view)
+    const [, deny] = await requirePermission(req, 'assets', 'view');
+    if (deny) return deny;
+
     const { id } = await params;
 
     const result = await assignmentService.getHistory(id);
@@ -24,7 +30,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error fetching assignment history:', error);
+    log.error('Failed to fetch assignment history', { error }, 'assets:history');
     return NextResponse.json(
       { error: 'Failed to fetch assignment history' },
       { status: 500 }
