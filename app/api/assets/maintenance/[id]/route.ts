@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
 import { CompleteMaintenanceSchema } from '@/modules/assets/utils/schemas';
 import { log } from '@/lib/logger';
-import { requireAuth } from '@/lib/auth/app-router';
+import { requirePermission } from '@/lib/auth/app-router';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,9 +47,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   try {
-    // Authenticate request (user identity from JWT, never from client headers)
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
+    // Authenticate + authorize (completing maintenance requires assets.maintenance:edit)
+    const [user, deny] = await requirePermission(req, 'assets.maintenance', 'edit');
+    if (deny) return deny;
 
     const { id } = await params;
     const body = await req.json();
@@ -91,9 +91,9 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
-    // Authenticate request (user identity from JWT, never from client headers)
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
+    // Authenticate + authorize (cancelling maintenance requires assets.maintenance:delete)
+    const [user, deny] = await requirePermission(req, 'assets.maintenance', 'delete');
+    if (deny) return deny;
 
     const { id } = await params;
     const { searchParams } = new URL(req.url);

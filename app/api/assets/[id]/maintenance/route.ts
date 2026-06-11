@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
 import { ScheduleMaintenanceSchema, MaintenanceFilterSchema } from '@/modules/assets/utils/schemas';
 import { log } from '@/lib/logger';
-import { requireAuth } from '@/lib/auth/app-router';
+import { requirePermission } from '@/lib/auth/app-router';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +54,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+
+    // Authenticate + authorize (scheduling maintenance requires assets.maintenance:create)
+    const [user, deny] = await requirePermission(req, 'assets.maintenance', 'create');
+    if (deny) return deny;
+
     const body = await req.json();
 
     // Add asset ID from URL to body
@@ -67,10 +72,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
-
-    // Authenticate request (user identity from JWT, never from client headers)
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
 
     const createdBy = user.id;
 

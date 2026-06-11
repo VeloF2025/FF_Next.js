@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categoryService } from '@/modules/assets/services';
 import { CategorySchema } from '@/modules/assets/utils/schemas';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -51,6 +52,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate + authorize (creating a category requires assets.categories:create)
+    const [, deny] = await requirePermission(req, 'assets.categories', 'create');
+    if (deny) return deny;
+
     const body = await req.json();
 
     // Validate request body

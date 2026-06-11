@@ -15,6 +15,7 @@ import { verifyToken } from './jwt';
 import { AUTH_COOKIE_NAME } from './middleware';
 import type { AuthUser } from './types';
 import { pool } from '@/lib/db';
+import { userHasPermission, type PermissionAction } from '@/lib/permissions';
 
 /**
  * Extract the JWT token from a NextRequest (cookie or Authorization header).
@@ -82,6 +83,29 @@ export async function requireAuth(
   const user = await getUserFromRequest(req);
   if (!user) {
     return [null, NextResponse.json({ error: 'Unauthorized' }, { status: 401 })];
+  }
+  return [user, null];
+}
+
+/**
+ * Convenience: require authentication AND an RBAC permission, or return a
+ * 401/403 response. Composes requireAuth() with userHasPermission() (which
+ * bypasses for super_admin and applies the parent-cascade rule).
+ *
+ * Returns [user, null] when allowed, [null, response] when denied — same
+ * tuple shape as requireAuth so callers stay uniform:
+ *   const [user, deny] = await requirePermission(req, 'assets', 'delete');
+ *   if (deny) return deny;
+ */
+export async function requirePermission(
+  req: NextRequest,
+  permissionKey: string,
+  action: PermissionAction = 'view'
+): Promise<[AuthUser, null] | [null, NextResponse]> {
+  const [user, unauth] = await requireAuth(req);
+  if (unauth) return [null, unauth];
+  if (!(await userHasPermission(user.id, permissionKey, action))) {
+    return [null, NextResponse.json({ error: 'Forbidden' }, { status: 403 })];
   }
   return [user, null];
 }

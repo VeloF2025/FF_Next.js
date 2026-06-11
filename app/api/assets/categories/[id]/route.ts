@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categoryService } from '@/modules/assets/services';
 import { CategorySchema } from '@/modules/assets/utils/schemas';
+import { requirePermission } from '@/lib/auth/app-router';
+import { log } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error fetching category:', error);
+    log.error('Error fetching category', { error });
     return NextResponse.json(
       { error: 'Failed to fetch category' },
       { status: 500 }
@@ -44,6 +46,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+
+    // Authenticate + authorize (updating a category requires assets.categories:edit)
+    const [, deny] = await requirePermission(req, 'assets.categories', 'edit');
+    if (deny) return deny;
+
     const body = await req.json();
 
     // Partial validation - all fields optional for update
@@ -66,7 +73,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error updating category:', error);
+    log.error('Error updating category', { error });
     return NextResponse.json(
       { error: 'Failed to update category' },
       { status: 500 }
@@ -80,6 +87,10 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
 
+    // Authenticate + authorize (deleting a category requires assets.categories:delete)
+    const [, deny] = await requirePermission(req, 'assets.categories', 'delete');
+    if (deny) return deny;
+
     const result = await categoryService.delete(id);
 
     if (!result.success) {
@@ -91,7 +102,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error('Error deleting category:', error);
+    log.error('Error deleting category', { error });
     return NextResponse.json(
       { error: 'Failed to delete category' },
       { status: 500 }

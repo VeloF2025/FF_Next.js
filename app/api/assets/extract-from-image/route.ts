@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { extractAssetFromLabel, extractAssetFromImageUrl } from '@/modules/assets/services/assetVlmService';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 import { z } from 'zod';
 
@@ -26,6 +27,11 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
+    // Authenticate + authorize (VLM extraction feeds asset creation; gate
+    // anonymous abuse of the 60s VLM call behind assets:view)
+    const [, deny] = await requirePermission(req, 'assets', 'view');
+    if (deny) return deny;
+
     const body = await req.json();
 
     // Validate request

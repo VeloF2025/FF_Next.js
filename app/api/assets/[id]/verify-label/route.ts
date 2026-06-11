@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAssetLabel } from '@/modules/assets/services/assetVerificationService';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 import { z } from 'zod';
 
@@ -31,6 +32,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
   const { id: assetId } = await context.params;
 
   try {
+    // Authenticate + authorize (VLM label verification requires asset access; gate
+    // anonymous abuse of the 60s VLM call behind assets:view)
+    const [, deny] = await requirePermission(req, 'assets', 'view');
+    if (deny) return deny;
+
     const body = await req.json();
 
     // Validate request

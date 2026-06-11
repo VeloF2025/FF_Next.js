@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbConnection } from '@/modules/assets/utils/db';
 import { v4 as uuidv4 } from 'uuid';
-import { requireAuth } from '@/lib/auth/app-router';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 
 interface RouteParams {
@@ -64,6 +64,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const { id: assetId } = await params;
+
+    // Authenticate + authorize (managing an asset's documents requires assets:edit)
+    const [user, deny] = await requirePermission(req, 'assets', 'edit');
+    if (deny) return deny;
+
     const sql = getDbConnection();
 
     // Check if asset exists
@@ -99,9 +104,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
 
     const id = uuidv4();
-    const [user, unauth] = await requireAuth(req);
-    if (unauth) return unauth;
-
     const uploadedBy = user.id;
 
     const [document] = await sql`
