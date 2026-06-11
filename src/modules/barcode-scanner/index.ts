@@ -11,7 +11,10 @@
 export { BarcodeScannerModal } from './components/BarcodeScannerModal';
 
 // Hooks
-export { useBarcodeScanner, lookupAssetByCode } from './hooks/useBarcodeScanner';
+export { useBarcodeScanner } from './hooks/useBarcodeScanner';
+
+// Utils
+export { lookupAssetByCode } from './utils/assetLookup';
 
 // Types
 export type {

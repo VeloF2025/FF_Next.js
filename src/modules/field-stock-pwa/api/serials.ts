@@ -6,9 +6,49 @@
  *   via getSerialByNumber which does NOT join stock_items, so itemName is absent.
  *   validateSerial therefore returns stockItemName: undefined when the serial exists
  *   but has no joined item name. Callers must handle the optional field gracefully.
+ *
+ * Photo-to-serial extraction:
+ *   extractSerialFromPhoto POSTs to /api/my/stores/serials/extract and returns
+ *   SerialExtractResult. Compress to 1920px (not 1280) to preserve barcode density.
  */
 
 import { request, ApiError } from './request';
+
+// =============================================================================
+// Photo-to-serial extraction
+// =============================================================================
+
+export interface SerialExtractResult {
+  serial: string | null;
+  family: 'ont' | 'gizzu' | 'generic' | null;
+  method: 'barcode' | 'vlm' | 'none';
+  confidence: number;
+  photoUrl: string | null;
+}
+
+/**
+ * Photo→serial fallback: POST the captured still to the extract endpoint.
+ * Caller compresses to 1920px max (NOT the receipts 1280 default — barcode
+ * density must survive for the server-side zxing pass).
+ */
+export async function extractSerialFromPhoto(photo: Blob): Promise<SerialExtractResult> {
+  const form = new FormData();
+  form.append('photo', photo, 'serial.jpg');
+  const res = await fetch('/api/my/stores/serials/extract', { method: 'POST', body: form });
+  const json = (await res.json()) as {
+    success: boolean;
+    data?: SerialExtractResult;
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok || !json.success || !json.data) {
+    throw new ApiError(
+      res.status,
+      json.error?.code ?? 'EXTRACT_ERROR',
+      json.error?.message ?? `Extraction failed (${res.status})`,
+    );
+  }
+  return json.data;
+}
 
 // =============================================================================
 // Server row shape

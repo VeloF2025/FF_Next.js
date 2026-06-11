@@ -19,8 +19,13 @@ import { DEFAULT_SCANNER_CONFIG } from '../types/scanner';
 // Minimal interface for html5-qrcode scanner instance (dynamic import, avoids SSR issues)
 interface Html5QrcodeInstance {
   start: (
-    constraints: { facingMode: string },
-    config: { fps: number; qrbox: number | { width: number; height: number }; aspectRatio: number },
+    constraints: { facingMode: string } | MediaTrackConstraints,
+    config: {
+      fps: number;
+      qrbox: number | { width: number; height: number };
+      aspectRatio: number;
+      videoConstraints?: MediaTrackConstraints;
+    },
     onSuccess: (decodedText: string, decodedResult: { result: { format?: { formatName?: string } } }) => void,
     onError: (errorMessage: string) => void
   ) => Promise<void>;
@@ -49,7 +54,7 @@ interface Html5QrcodeSupportedFormatsEnum {
 }
 
 interface Html5QrcodeModule {
-  Html5Qrcode: new (elementId: string, config: { verbose?: boolean; formatsToSupport?: number[] }) => Html5QrcodeInstance;
+  Html5Qrcode: new (elementId: string, config: { verbose?: boolean; formatsToSupport?: number[]; useBarCodeDetectorIfSupported?: boolean }) => Html5QrcodeInstance;
   Html5QrcodeSupportedFormats: Html5QrcodeSupportedFormatsEnum;
 }
 
@@ -140,6 +145,7 @@ export function useBarcodeScanner({
         scannerRef.current = new Html5Qrcode(elementId, {
           verbose: config.verbose,
           formatsToSupport: getSupportedFormats({ Html5Qrcode, Html5QrcodeSupportedFormats }),
+          useBarCodeDetectorIfSupported: config.useBarCodeDetectorIfSupported ?? false,
         });
       }
 
@@ -151,6 +157,7 @@ export function useBarcodeScanner({
           fps: config.fps ?? 10,
           qrbox: typeof qrboxSize === 'number' ? qrboxSize : qrboxSize,
           aspectRatio: config.aspectRatio ?? 1.0,
+          ...(config.videoConstraints ? { videoConstraints: config.videoConstraints } : {}),
         },
         (decodedText: string, decodedResult: { result: { format?: { formatName?: string } } }) => {
           // Successfully scanned
@@ -258,54 +265,3 @@ export function useBarcodeScanner({
   };
 }
 
-/**
- * Lookup asset by scanned code
- * Tries barcode first, then assetNumber
- */
-export async function lookupAssetByCode(
-  scannedCode: string
-): Promise<{ found: boolean; asset?: Record<string, unknown>; matchedBy?: 'barcode' | 'assetNumber'; error?: string }> {
-  try {
-    // First try barcode lookup
-    const barcodeResponse = await fetch(
-      `/api/assets/search?barcode=${encodeURIComponent(scannedCode)}`
-    );
-
-    if (barcodeResponse.ok) {
-      const data = await barcodeResponse.json() as { success: boolean; data?: Record<string, unknown> };
-      if (data.success && data.data) {
-        return {
-          found: true,
-          asset: data.data,
-          matchedBy: 'barcode',
-        };
-      }
-    }
-
-    // Fall back to assetNumber lookup
-    const assetNumberResponse = await fetch(
-      `/api/assets/search?assetNumber=${encodeURIComponent(scannedCode)}`
-    );
-
-    if (assetNumberResponse.ok) {
-      const data = await assetNumberResponse.json() as { success: boolean; data?: Record<string, unknown> };
-      if (data.success && data.data) {
-        return {
-          found: true,
-          asset: data.data,
-          matchedBy: 'assetNumber',
-        };
-      }
-    }
-
-    return {
-      found: false,
-      error: `No asset found with barcode or asset number: ${scannedCode}`,
-    };
-  } catch (err) {
-    return {
-      found: false,
-      error: err instanceof Error ? err.message : 'Failed to lookup asset',
-    };
-  }
-}
