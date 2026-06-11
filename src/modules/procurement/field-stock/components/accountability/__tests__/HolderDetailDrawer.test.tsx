@@ -101,4 +101,14 @@ describe('HolderDetailDrawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledOnce();
   });
+
+  it('invokes onClose when Escape is pressed', async () => {
+    vi.stubGlobal('fetch', mockFetchOk({ data: DETAIL_ROW }));
+    const onClose = vi.fn();
+    render(<HolderDetailDrawer holderId="h-1" onClose={onClose} />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Louis Ellis' })).toBeTruthy());
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });

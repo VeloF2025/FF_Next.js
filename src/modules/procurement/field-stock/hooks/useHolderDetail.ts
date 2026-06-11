@@ -135,7 +135,7 @@ export function useHolderDetail(holderId: string | null): UseHolderDetailReturn 
     setError(null);
     setDetail(null);
 
-    fetch(`/api/procurement/field-stock/accountability/holders/${holderId}`)
+    fetch(`/api/procurement/field-stock/accountability/holders/${encodeURIComponent(holderId)}`)
       .then(async (res) => {
         if (!res.ok) throw new Error('Failed to fetch holder detail');
         const result = await res.json();

@@ -122,4 +122,34 @@ describe('useHolderDetail', () => {
     expect(result.current.detail).toBeNull();
     expect(result.current.error).toBeNull();
   });
+
+  it('discards a stale in-flight response when holderId changes mid-flight', async () => {
+    // First request resolves slowly; second resolves fast. The hook must commit
+    // only the second holder's data, never the stale first response.
+    const slowRow = { ...DETAIL_ROW, holder_id: 'h-1', name: 'Slow Holder' };
+    const fastRow = { ...DETAIL_ROW, holder_id: 'h-2', name: 'Fast Holder' };
+    let resolveSlow!: (v: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => { resolveSlow = resolve; }),
+      )
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: fastRow }) } as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result, rerender } = renderHook(({ id }) => useHolderDetail(id), {
+      initialProps: { id: 'h-1' as string | null },
+    });
+    rerender({ id: 'h-2' });
+
+    // Second (fast) request commits first.
+    await waitFor(() => expect(result.current.detail?.holder_id).toBe('h-2'));
+
+    // Now let the stale first request resolve — it must be ignored.
+    resolveSlow({ ok: true, json: async () => ({ data: slowRow }) } as Response);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(result.current.detail?.holder_id).toBe('h-2');
+    expect(result.current.detail?.name).toBe('Fast Holder');
+  });
 });
