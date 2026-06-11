@@ -18,6 +18,10 @@ interface RouteParams {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
+    // Authenticate + authorize (reading an asset's documents requires assets:view)
+    const [, deny] = await requirePermission(req, 'assets', 'view');
+    if (deny) return deny;
+
     const { id: assetId } = await params;
     const sql = getDbConnection();
 
