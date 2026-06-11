@@ -30,6 +30,12 @@ export interface PwaIssueDraft {
   contractorId: string | null;
   stockItemId: string;
   serials: PwaScannedSerial[];
+  /** Quantity for non-serial (lot/quantity/none) items. Undefined for serial issues. */
+  quantity?: number;
+  /** VF Storage key of the mandatory proof photo (non-serial issues only). */
+  proofPhotoKey?: string;
+  /** Public /storage/... URL of the proof photo (non-serial issues only). */
+  proofPhotoUrl?: string;
   signatureDataUrl: string | null;
   notes: string;
   /** FK to stock_locations.id — the warehouse the stock is issued FROM. */

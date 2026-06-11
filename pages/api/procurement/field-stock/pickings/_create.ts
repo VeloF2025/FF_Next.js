@@ -50,6 +50,45 @@ export async function createPicking(
       return apiResponse.validationError(res, { lines: 'At least one picking line is required' });
     }
 
+    // ── Non-serial issue lines: proof photo + positive quantity (spec 2026-06-11) ──
+    // A line with no serialIds is a quantity-based issue (lot/quantity/none
+    // tracking). One proof photo per picking is mandatory for these; serial
+    // pickings carry the serials themselves as evidence.
+    const { proofPhotoKey, proofPhotoUrl } = req.body as {
+      proofPhotoKey?: string; proofPhotoUrl?: string;
+    };
+
+    // Stored-XSS hardening: client-supplied proofPhotoUrl is persisted and may
+    // later be rendered as <img src>; only relative VF Storage paths are allowed.
+    if (proofPhotoUrl && !proofPhotoUrl.startsWith('/storage/')) {
+      return apiResponse.badRequest(res, 'proofPhotoUrl must be a VF Storage /storage/ path', {
+        code: 'INVALID_PROOF_PHOTO_URL',
+      });
+    }
+
+    const nonSerialLines = (lines as PickingLine[]).filter(
+      (l) => !Array.isArray(l.serialIds) || l.serialIds.length === 0,
+    );
+    if ((pickingType ?? null) === 'issue' && nonSerialLines.length > 0) {
+      if (!proofPhotoKey) {
+        return apiResponse.badRequest(
+          res,
+          'A proof photo is required when issuing non-serial stock',
+          { proofPhotoKey: 'A proof photo is required when issuing non-serial stock' },
+        );
+      }
+      const badQty = nonSerialLines.find(
+        (l) => typeof l.plannedQuantity !== 'number' || !(l.plannedQuantity > 0),
+      );
+      if (badQty) {
+        return apiResponse.badRequest(
+          res,
+          'Quantity must be greater than zero for non-serial lines',
+          { plannedQuantity: 'Quantity must be greater than zero for non-serial lines' },
+        );
+      }
+    }
+
     // ── H5: Require technicianId for FIELD-DEFAULT destination ───────────────
     // Extracted to _validation.ts; see validateFieldDefaultDestination for rationale.
     const fieldDefaultCheck = await validateFieldDefaultDestination({
@@ -136,7 +175,8 @@ export async function createPicking(
         contractor_id, contractor_name, team_name,
         technician_id, technician_name,
         scheduled_date, status, notes,
-        created_by_staff_id
+        created_by_staff_id,
+        proof_photo_key, proof_photo_url
       ) VALUES (
         ${pickingNumber}, ${pickingType || null},
         ${sourceLocationId}, ${destinationLocationId},
@@ -144,7 +184,8 @@ export async function createPicking(
         ${contractorId || null}, ${contractorName || null}, ${teamName || null},
         ${technicianId || null}, ${technicianName || null},
         ${scheduledDate || null}, 'draft', ${notes || null},
-        ${createdByStaffId}
+        ${createdByStaffId},
+        ${proofPhotoKey || null}, ${proofPhotoUrl || null}
       )
       RETURNING *
     `;

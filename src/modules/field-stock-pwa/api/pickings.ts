@@ -7,11 +7,13 @@
  *  - sourceLocationId: the warehouse chosen by the stores person (PickWarehouseStep).
  *  - destinationLocationId: the fixed FIELD-DEFAULT UUID seeded by migration 357.
  *
- * serial_ids on each line are the stock serial number strings (not UUIDs); the
- * pickings endpoint stores them in the serial_ids column on the picking line.
+ * Serial issues: serial_ids on each line hold the stock serial number strings (not
+ * UUIDs); plannedQuantity = serials.length.
+ * Non-serial issues: serialIds is omitted; plannedQuantity comes from draft.quantity;
+ * proofPhotoKey + proofPhotoUrl are required and included in the picking body.
  */
 
-import { request } from './request';
+import { request, ApiError } from './request';
 import type { PwaIssueDraft, PwaPickingResult } from '../types';
 
 // =============================================================================
@@ -35,6 +37,7 @@ import type { PwaIssueDraft, PwaPickingResult } from '../types';
  * returning a misleading "issued" result for a picking still sitting in draft.
  */
 export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResult> {
+  const isSerialIssue = draft.serials.length > 0;
   const body = {
     pickingType: 'issue',
     sourceLocationId: draft.sourceLocationId,
@@ -42,11 +45,13 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
     technicianId: draft.technicianId,
     contractorId: draft.contractorId ?? undefined,
     notes: draft.notes || undefined,
+    proofPhotoKey: draft.proofPhotoKey,
+    proofPhotoUrl: draft.proofPhotoUrl,
     lines: [
       {
         stockItemId: draft.stockItemId,
-        plannedQuantity: draft.serials.length,
-        serialIds: draft.serials.map((s) => s.serialNumber),
+        plannedQuantity: isSerialIssue ? draft.serials.length : (draft.quantity ?? 0),
+        serialIds: isSerialIssue ? draft.serials.map((s) => s.serialNumber) : undefined,
         notes: draft.notes || undefined,
       },
     ],
@@ -87,4 +92,28 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
     pickingNumber: picking.picking_number,
     status: 'processed',
   };
+}
+
+/**
+ * Upload the mandatory proof photo for a non-serial issue. Multipart, so it
+ * bypasses the JSON request() helper. Returns the storage key+URL to include
+ * in the subsequent picking create.
+ */
+export async function uploadIssueProof(photo: Blob): Promise<{ photoKey: string; photoUrl: string }> {
+  const form = new FormData();
+  form.append('photo', photo, 'proof.jpg');
+  const res = await fetch('/api/my/stores/pickings/upload-proof', { method: 'POST', body: form });
+  const json = (await res.json()) as {
+    success: boolean;
+    data?: { photoKey: string; photoUrl: string };
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok || !json.success || !json.data) {
+    throw new ApiError(
+      res.status,
+      json.error?.code ?? 'UPLOAD_ERROR',
+      json.error?.message ?? `Proof upload failed (${res.status})`,
+    );
+  }
+  return json.data;
 }
