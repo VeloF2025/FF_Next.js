@@ -16,6 +16,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // Authenticate + authorize (reading maintenance data requires assets.maintenance:view)
+    const [, deny] = await requirePermission(req, 'assets.maintenance', 'view');
+    if (deny) return deny;
+
     const { searchParams } = new URL(req.url);
     const withinDays = searchParams.get('withinDays');
 

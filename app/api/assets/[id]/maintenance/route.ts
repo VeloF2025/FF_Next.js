@@ -20,6 +20,10 @@ interface RouteParams {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
+    // Authenticate + authorize (reading maintenance data requires assets.maintenance:view)
+    const [, deny] = await requirePermission(req, 'assets.maintenance', 'view');
+    if (deny) return deny;
+
     const { id } = await params;
     const { searchParams } = new URL(req.url);
 

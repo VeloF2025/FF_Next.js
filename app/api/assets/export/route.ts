@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbConnection } from '@/modules/assets/utils/db';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 import { escapeCSV } from '@/lib/csv';
 
@@ -70,6 +71,10 @@ const MONEY_KEYS = new Set([
 
 export async function GET(req: NextRequest) {
   try {
+    // Authenticate + authorize (exporting asset data requires assets:view)
+    const [, deny] = await requirePermission(req, 'assets', 'view');
+    if (deny) return deny;
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
     const statuses = searchParams.getAll('status').filter(Boolean);

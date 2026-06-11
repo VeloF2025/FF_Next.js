@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // Authenticate + authorize (reading maintenance data requires assets.maintenance:view)
+    const [, deny] = await requirePermission(req, 'assets.maintenance', 'view');
+    if (deny) return deny;
+
     const result = await maintenanceService.getOverdue();
 
     if (!result.success) {
@@ -35,11 +40,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify cron secret for security
+    // Verify cron secret for security. Fail CLOSED: if CRON_SECRET is not
+    // configured, reject rather than allowing the mutation through (a missing
+    // secret must never mean "no auth required").
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
