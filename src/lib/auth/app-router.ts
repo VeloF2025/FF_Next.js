@@ -100,7 +100,7 @@ export async function requireAuth(
 export async function requirePermission(
   req: NextRequest,
   permissionKey: string,
-  action: PermissionAction = 'view'
+  action: PermissionAction
 ): Promise<[AuthUser, null] | [null, NextResponse]> {
   const [user, unauth] = await requireAuth(req);
   if (unauth) return [null, unauth];

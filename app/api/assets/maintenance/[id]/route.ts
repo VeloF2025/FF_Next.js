@@ -91,8 +91,11 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
-    // Authenticate + authorize (cancelling maintenance requires assets.maintenance:delete)
-    const [user, deny] = await requirePermission(req, 'assets.maintenance', 'delete');
+    // Authenticate + authorize. Cancelling is a soft state change (calls
+    // maintenanceService.cancel, not a row delete), so it requires the same
+    // assets.maintenance:edit grant as completing — not :delete — otherwise
+    // managers/storemen who can complete maintenance couldn't cancel it.
+    const [user, deny] = await requirePermission(req, 'assets.maintenance', 'edit');
     if (deny) return deny;
 
     const { id } = await params;
