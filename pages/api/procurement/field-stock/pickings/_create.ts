@@ -50,6 +50,14 @@ export async function createPicking(
       return apiResponse.validationError(res, { lines: 'At least one picking line is required' });
     }
 
+    // projectId is a uuid FK (stock_pickings.project_id → projects.id). Validate
+    // shape up front so a malformed value returns a clean 400 instead of a 500
+    // from the FK/cast failure deep inside the INSERT.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (projectId != null && projectId !== '' && !UUID_RE.test(String(projectId))) {
+      return apiResponse.validationError(res, { projectId: 'projectId must be a valid UUID' });
+    }
+
     // ── Non-serial issue lines: proof photo + positive quantity (spec 2026-06-11) ──
     // A line with no serialIds is a quantity-based issue (lot/quantity/none
     // tracking). One proof photo per picking is mandatory for these; serial

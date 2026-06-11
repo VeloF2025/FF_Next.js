@@ -16,5 +16,7 @@ export { validateSerial, extractSerialFromPhoto } from './serials';
 export type { SerialExtractResult } from './serials';
 export { fetchIssuableStockItems } from './items';
 export type { PwaIssuableItem, PwaTrackingType } from './items';
+export { fetchProjects } from './projects';
+export type { PwaProjectSummary } from './projects';
 export { submitIssue, uploadIssueProof } from './pickings';
 export { submitReturn, submitInspectAndAccept, retryAccept } from './returns';

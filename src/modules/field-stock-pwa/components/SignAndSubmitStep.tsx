@@ -11,6 +11,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { SignaturePad } from './SignaturePad';
 import { ValueCapPanel } from './ValueCapPanel';
 import { ProofPhotoCapture } from './ProofPhotoCapture';
+import { PickProjectField } from './PickProjectField';
 import { submitIssue, uploadIssueProof } from '@/modules/field-stock-pwa/api';
 import { enqueueIssue } from '@/modules/field-stock-pwa/offline/queueIssue';
 import { checkPendingValueCap } from '@/modules/field-stock-pwa/lib/stockValueGuard';
@@ -36,6 +37,7 @@ export function SignAndSubmitStep({
   sourceLocationId, destinationLocationId, onSubmitted, onBack,
 }: SignAndSubmitStepProps) {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export function SignAndSubmitStep({
     const draft: PwaIssueDraft = {
       technicianId: technician.id, contractorId, stockItemId: stockItem.id,
       serials: validSerials, signatureDataUrl, notes, sourceLocationId, destinationLocationId,
+      projectId,
     };
     try {
       if (!isSerialIssue) {
@@ -91,7 +94,7 @@ export function SignAndSubmitStep({
     }
   }, [
     canSubmit, technician.id, contractorId, stockItem.id,
-    validSerials, signatureDataUrl, notes, onSubmitted,
+    validSerials, signatureDataUrl, notes, onSubmitted, projectId,
     sourceLocationId, destinationLocationId, isSerialIssue, quantity, proofPhoto,
   ]);
 
@@ -130,6 +133,8 @@ export function SignAndSubmitStep({
           }}
         />
       )}
+
+      <PickProjectField value={projectId} onChange={setProjectId} />
 
       <SignaturePad value={signatureDataUrl} onChange={setSignatureDataUrl} />
 

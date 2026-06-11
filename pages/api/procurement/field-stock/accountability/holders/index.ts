@@ -24,25 +24,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { isBlocked, hasUnaccounted } = req.query;
 
     const conditions: string[] = [];
-    if (isBlocked === 'true') conditions.push('is_blocked = true');
-    if (hasUnaccounted === 'true') conditions.push('unaccounted_count > 0');
+    if (isBlocked === 'true') conditions.push('va.is_blocked = true');
+    if (hasUnaccounted === 'true') conditions.push('va.unaccounted_count > 0');
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
+    // Aging buckets come from the v_holder_held_aging companion view (migration
+    // 409), LEFT JOINed on holder_id so holders with no held stock still appear
+    // with zeroed buckets.
     const rows = await sql.query(
       `SELECT
-        holder_id, holder_type, staff_id, contractor_id, name, is_active,
-        issued_count, issued_value,
-        consumed_count, consumed_value,
-        returned_count, returned_value,
-        held_count, held_value,
-        unaccounted_count,
-        is_blocked, blocked_reason, blocked_at, blocked_by,
-        pending_recovery_amount, recovered_amount,
-        last_reconciliation_date, last_reconciliation_by
-       FROM v_holder_accountability
+        va.holder_id, va.holder_type, va.staff_id, va.contractor_id, va.name, va.is_active,
+        va.issued_count, va.issued_value,
+        va.consumed_count, va.consumed_value,
+        va.returned_count, va.returned_value,
+        va.held_count, va.held_value,
+        va.unaccounted_count,
+        va.is_blocked, va.blocked_reason, va.blocked_at, va.blocked_by,
+        va.pending_recovery_amount, va.recovered_amount,
+        va.last_reconciliation_date, va.last_reconciliation_by,
+        COALESCE(ag.held_age_0_7, 0)     AS held_age_0_7,
+        COALESCE(ag.held_age_8_30, 0)    AS held_age_8_30,
+        COALESCE(ag.held_age_31_plus, 0) AS held_age_31_plus,
+        ag.oldest_held_at,
+        COALESCE(ag.oldest_held_days, 0) AS oldest_held_days
+       FROM v_holder_accountability va
+       LEFT JOIN v_holder_held_aging ag ON ag.holder_id = va.holder_id
        ${whereClause}
-       ORDER BY name`
+       ORDER BY va.name`
     );
 
     return apiResponse.success(res, rows);

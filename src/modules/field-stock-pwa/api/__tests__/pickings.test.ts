@@ -53,4 +53,16 @@ describe('submitIssue body mapping', () => {
     expect(body.lines[0].serialIds).toEqual(['S1']);
     expect(body.proofPhotoKey).toBeUndefined();
   });
+
+  it('threads projectId into the picking body (undefined when absent)', async () => {
+    await submitIssue({ ...BASE, quantity: 5, proofPhotoKey: 'k', proofPhotoUrl: '/storage/k', projectId: 'proj-1' });
+    const withProject = JSON.parse(requestMock.mock.calls[0][1].body as string);
+    expect(withProject.projectId).toBe('proj-1');
+
+    requestMock.mockClear();
+    requestMock.mockResolvedValue({ id: 'p2', picking_number: 'PCK-2', status: 'draft' });
+    await submitIssue({ ...BASE, quantity: 5, proofPhotoKey: 'k', proofPhotoUrl: '/storage/k' });
+    const noProject = JSON.parse(requestMock.mock.calls[0][1].body as string);
+    expect(noProject.projectId).toBeUndefined();
+  });
 });
