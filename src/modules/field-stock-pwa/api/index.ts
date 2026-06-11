@@ -15,5 +15,5 @@ export { fetchContractors } from './contractors';
 export { validateSerial } from './serials';
 export { fetchIssuableStockItems } from './items';
 export type { PwaIssuableItem, PwaTrackingType } from './items';
-export { submitIssue } from './pickings';
+export { submitIssue, uploadIssueProof } from './pickings';
 export { submitReturn, submitInspectAndAccept, retryAccept } from './returns';
