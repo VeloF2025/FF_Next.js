@@ -67,6 +67,22 @@ New script `scripts/sitecam/vlm-gallery-check.ts`, run via
 - Requires `DATABASE_URL` env var; VLM endpoint/model come from `@/lib/vlm`
   constants. Exits non-zero on no rows or total VLM failure.
 
+### C. Gallery examples were never reaching the VLM (found during build)
+
+All 835 activation rows in `vlm_visual_photo_examples` store the
+auth-protected proxy path `/api/activate/photo/{DR}/{file}`. Server-side
+`vlmGallery.ts` fetched that path with no session cookie → 401 → every
+gallery example was silently dropped (the catch logs a warn and filters
+nulls). SiteCam validate and auto-QA were therefore running with ZERO
+QA-curated examples in the prompt.
+
+Fix: new `src/lib/internalPhotoUrl.ts` — `resolveInternalPhotoUrl()` maps the
+proxy path to its backend source (wa_* → VPS `:8866`, else Velocity `:8003`,
+mirroring `pages/api/activate/photo/[...path].ts`); `vlmGallery.ts` and the
+harness resolve before fetching. Absolute URLs pass through unchanged (the 92
+civils Graph URLs still require OAuth and remain effectively unused —
+consistent with civils being un-curated; out of scope).
+
 ## Error handling
 
 - Script: per-photo VLM/network errors are reported as `ERROR` rows and

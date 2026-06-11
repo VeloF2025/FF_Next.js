@@ -6,6 +6,7 @@
 import { pool } from '@/lib/db';
 import { log } from '@/lib/logger';
 import { fetchPhotoAsBase64 } from '@/modules/activate/services/photoFetchService';
+import { resolveInternalPhotoUrl } from '@/lib/internalPhotoUrl';
 import type { GalleryExamples } from '@/modules/activate/services/stepQualityCriteria';
 
 const MODULE = 'vlmGallery';
@@ -39,7 +40,11 @@ export async function loadGalleryExamples(
 
     const toBase64 = async (url: string): Promise<string | null> => {
       try {
-        return await fetchPhotoAsBase64(url);
+        // Gallery rows store the auth-protected proxy path; server-side we have
+        // no session cookie, so resolve to the backend source URL first —
+        // otherwise every example 401s and is silently dropped (found 2026-06-11:
+        // the VLM was receiving ZERO gallery examples).
+        return await fetchPhotoAsBase64(resolveInternalPhotoUrl(url));
       } catch (err) {
         log.warn('Failed to fetch gallery example as base64', { url, err: String(err) }, MODULE);
         return null;
