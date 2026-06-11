@@ -85,3 +85,11 @@ async function handler(
 }
 
 export default withMySession(handler);
+
+// The appeal body carries the step photo as a base64 data URI (several MB for a
+// phone camera shot). Match the validate endpoint's limit — the Next.js default
+// of 1mb rejects the request with a 413 before the handler runs, which the PWA
+// surfaces as a misleading "Network error".
+export const config = {
+  api: { bodyParser: { sizeLimit: '15mb' } },
+};
