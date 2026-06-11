@@ -111,6 +111,15 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
   },
 };
 
+/**
+ * Shared fail_reason instruction. Free-text so the technician gets real
+ * direction instead of one canned per-step sentence (which masked issues
+ * like re-photographed screens as framing complaints).
+ */
+export const FAIL_REASON_INSTRUCTION = `If it fails, fail_reason must be ONE short sentence (max 140 characters) written for the field technician: state what is wrong AND what to do to pass — for example "Only the top floor is in frame — step back so the roof and both building edges are visible."
+
+SPECIAL CASE: if the image appears to be a photograph of a screen, monitor, or printed photo (moiré/interference patterns, screen bezels or borders, visible pixels, glare bands), fail_reason must say that — e.g. "This looks like a photo of a screen — take the photo of the real scene on site." — instead of a framing complaint.`;
+
 export type VlmContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } };
@@ -225,12 +234,12 @@ I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST
       text: `Required criteria: ${criteria.requirements}
 ${criteria.failInstruction}
 
-If it fails, the reason must be exactly: "${criteria.failReason}"
+${FAIL_REASON_INSTRUCTION}
 
 Return STRICT JSON only — no other text:
 {"passes": true, "fail_reason": null}
 OR
-{"passes": false, "fail_reason": "${criteria.failReason}"}`,
+{"passes": false, "fail_reason": "<one short sentence as instructed above>"}`,
     });
   } else {
     content.push({
@@ -248,10 +257,12 @@ Evaluate this photo:`,
     });
     content.push({
       type: 'text',
-      text: `Return STRICT JSON only — no other text:
+      text: `${FAIL_REASON_INSTRUCTION}
+
+Return STRICT JSON only — no other text:
 {"passes": true, "fail_reason": null}
 OR
-{"passes": false, "fail_reason": "${criteria.failReason}"}`,
+{"passes": false, "fail_reason": "<one short sentence as instructed above>"}`,
     });
   }
 
