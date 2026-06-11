@@ -15,6 +15,11 @@ import { getStaffById, getStaffList } from '@/services/staff/staffGetService';
 import { createStaff, deleteStaffMember } from '@/services/staff/staffCreateService';
 import { updateStaff } from '@/services/staff/staffUpdateDeleteService';
 import { apiResponse } from '@/lib/apiResponse';
+import { STAFF_ROLES } from '@/modules/attendance/portal/types';
+import type { AuthRole } from '@/lib/auth/types';
+
+/** AuthRoles allowed to change staff.role (the /my portal role, e.g. Stores access). */
+const PORTAL_ROLE_EDITORS = new Set<AuthRole>(['admin', 'super_admin', 'system']);
 
 export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const authReq = req as AuthenticatedNextApiRequest;
@@ -64,6 +69,18 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       case 'PUT': {
         if (!req.query.id) {
           return res.status(400).json({ success: false, error: 'Staff ID required' });
+        }
+        const portalRole = (req.body as Record<string, unknown>)?.portalRole;
+        if (portalRole !== undefined) {
+          if (!PORTAL_ROLE_EDITORS.has(authReq.user.role)) {
+            return apiResponse.forbidden(res, 'Only admin users may change the portal role');
+          }
+          if (portalRole !== null && !(STAFF_ROLES as readonly string[]).includes(portalRole as string)) {
+            return apiResponse.badRequest(
+              res,
+              `portalRole must be one of: ${STAFF_ROLES.join(', ')} (or null to clear)`
+            );
+          }
         }
         const result = await updateStaff(req.query.id as string, req.body);
         if (!result.ok) {

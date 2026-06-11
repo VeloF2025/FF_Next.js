@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Save, User, Briefcase, Shield } from 'lucide-react';
 import { useStaffMember, useUpdateStaff } from '@/hooks/useStaff';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/auth.types';
 import {
   StaffFormData,
   StaffStatus,
@@ -38,6 +40,10 @@ export function StaffEditForm() {
 
   const { data: staff, isLoading } = useStaffMember(id || '', { enabled: !!id });
   const updateMutation = useUpdateStaff();
+  const { hasAnyRole } = useAuth();
+  // Portal role (staff.role) is admin-only: non-admins never load or submit it,
+  // so the server-side 403 gate on portalRole is never tripped by normal edits.
+  const canEditPortalRole = hasAnyRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
 
   const [activeTab, setActiveTab] = useState<EditTabType>('overview');
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +103,7 @@ export function StaffEditForm() {
 
       // Add optional fields only if they exist
       if (staff.id) formUpdate.id = staff.id;
+      if (canEditPortalRole) formUpdate.portalRole = staff.role ?? null;
       if (staff.alternativePhone) formUpdate.alternativePhone = staff.alternativePhone;
       if (staff.whatsappId) formUpdate.whatsappId = staff.whatsappId;
       if (staff.level) formUpdate.level = staff.level;
@@ -162,7 +169,7 @@ export function StaffEditForm() {
 
       setFormData(prevData => ({ ...prevData, ...formUpdate }));
     }
-  }, [staff]);
+  }, [staff, canEditPortalRole]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,6 +370,7 @@ export function StaffEditForm() {
                 formData={formData}
                 handleInputChange={handleInputChange}
                 toggleSkill={toggleSkill}
+                showPortalRole={canEditPortalRole}
               />
             )}
 
