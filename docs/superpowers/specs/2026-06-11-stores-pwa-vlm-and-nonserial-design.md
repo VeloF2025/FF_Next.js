@@ -146,6 +146,11 @@ the evidence.
 - Server enforcement: `pickings/_create.ts` rejects (400) a picking whose
   lines are non-serial when `proofPhotoKey` is absent. Serial pickings ignore
   the fields.
+- **Offline (decided during planning):** non-serial issues are blocked
+  offline in v1 — the proof photo must upload before the picking exists, so
+  `SignAndSubmitStep` shows an inline "needs a connection" error instead of
+  enqueueing to the IndexedDB queue. Serial issues keep the offline queue
+  unchanged.
 
 ### Migration
 
