@@ -11,7 +11,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { SignaturePad } from './SignaturePad';
 import { ValueCapPanel } from './ValueCapPanel';
 import { ProofPhotoCapture } from './ProofPhotoCapture';
-import { submitIssue, uploadIssueProof, ApiError } from '@/modules/field-stock-pwa/api';
+import { submitIssue, uploadIssueProof } from '@/modules/field-stock-pwa/api';
 import { enqueueIssue } from '@/modules/field-stock-pwa/offline/queueIssue';
 import { checkPendingValueCap } from '@/modules/field-stock-pwa/lib/stockValueGuard';
 import type { StockItem } from './PickItemStep';
