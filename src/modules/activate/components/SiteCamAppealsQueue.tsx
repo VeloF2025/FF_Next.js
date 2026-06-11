@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { SiteCamFailedQueue } from './SiteCamFailedQueue';
 
 interface Appeal {
   id: string;
@@ -27,7 +28,7 @@ const STEP_LABELS: Record<number, string> = {
 const MODULE = 'SiteCamAppealsQueue';
 
 export function SiteCamAppealsQueue() {
-  const [tab, setTab] = useState<'pending' | 'approved' | 'denied'>('pending');
+  const [tab, setTab] = useState<'pending' | 'approved' | 'denied' | 'failed'>('pending');
   const [appeals, setAppeals] = useState<Appeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -47,7 +48,9 @@ export function SiteCamAppealsQueue() {
     }
   }, []);
 
-  useEffect(() => { void load(tab); }, [tab, load]);
+  useEffect(() => {
+    if (tab !== 'failed') void load(tab);
+  }, [tab, load]);
 
   async function decide(id: string, decision: 'approved' | 'denied') {
     setDeciding(id);
@@ -64,7 +67,7 @@ export function SiteCamAppealsQueue() {
       }
       setDenialText('');
       setExpanded(null);
-      await load(tab);
+      await load(tab === 'failed' ? 'pending' : tab);
     } catch (err) {
       log.error('Decision failed', { err: String(err) }, MODULE);
     } finally {
@@ -72,7 +75,7 @@ export function SiteCamAppealsQueue() {
     }
   }
 
-  const tabs: Array<'pending' | 'approved' | 'denied'> = ['pending', 'approved', 'denied'];
+  const tabs: Array<'pending' | 'approved' | 'denied' | 'failed'> = ['pending', 'approved', 'denied', 'failed'];
 
   return (
     <div className="space-y-4">
@@ -91,86 +94,92 @@ export function SiteCamAppealsQueue() {
         ))}
       </div>
 
-      {loading && (
-        <div className="flex justify-center py-10">
-          <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
-        </div>
-      )}
+      {tab === 'failed' ? (
+        <SiteCamFailedQueue />
+      ) : (
+        <>
+          {loading && (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+            </div>
+          )}
 
-      {!loading && appeals.length === 0 && (
-        <p className="py-10 text-center text-sm text-neutral-400">No {tab} appeals</p>
-      )}
+          {!loading && appeals.length === 0 && (
+            <p className="py-10 text-center text-sm text-neutral-400">No {tab} appeals</p>
+          )}
 
-      <div className="space-y-2">
-        {appeals.map((a) => (
-          <div key={a.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-4 py-3 text-left"
-              onClick={() => setExpanded(expanded === a.id ? null : a.id)}
-            >
-              <div>
-                <span className="font-medium text-neutral-800">{a.dr_number}</span>
-                <span className="mx-2 text-neutral-400">·</span>
-                <span className="text-sm text-neutral-600">
-                  Step {a.step_number}: {STEP_LABELS[a.step_number] ?? ''}
-                </span>
-                <span className="mx-2 text-neutral-400">·</span>
-                <span className="text-xs text-neutral-500">{a.tech_name ?? 'Unknown'}</span>
-              </div>
-              {expanded === a.id
-                ? <ChevronUp className="h-4 w-4 text-neutral-400" />
-                : <ChevronDown className="h-4 w-4 text-neutral-400" />}
-            </button>
-
-            {expanded === a.id && (
-              <div className="border-t border-neutral-100 px-4 py-4 space-y-4">
-                <p className="text-sm text-neutral-700">{a.appeal_text}</p>
-                {a.serial_scanned && (
-                  <div className="text-xs text-neutral-500 space-y-1">
-                    <p>Serial scanned: <span className="font-mono">{a.serial_scanned}</span></p>
-                    <p>Expected: <span className="font-mono">{a.serial_expected ?? 'unknown'}</span></p>
+          <div className="space-y-2">
+            {appeals.map((a) => (
+              <div key={a.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  onClick={() => setExpanded(expanded === a.id ? null : a.id)}
+                >
+                  <div>
+                    <span className="font-medium text-sky-700 underline-offset-2 hover:underline">{a.dr_number}</span>
+                    <span className="mx-2 text-neutral-400">·</span>
+                    <span className="text-sm text-neutral-600">
+                      Step {a.step_number}: {STEP_LABELS[a.step_number] ?? ''}
+                    </span>
+                    <span className="mx-2 text-neutral-400">·</span>
+                    <span className="text-xs text-neutral-500">{a.tech_name ?? 'Unknown'}</span>
                   </div>
-                )}
-                <img
-                  src={a.photo_url}
-                  alt="Appeal photo"
-                  className="h-48 w-full rounded-lg object-contain border border-neutral-200 bg-neutral-50"
-                />
-                {tab === 'pending' && (
-                  <div className="space-y-3">
-                    <textarea
-                      value={denialText}
-                      onChange={(e) => setDenialText(e.target.value)}
-                      placeholder="Denial reason (required if denying)…"
-                      rows={2}
-                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:border-sky-400"
+                  {expanded === a.id
+                    ? <ChevronUp className="h-4 w-4 text-neutral-400" />
+                    : <ChevronDown className="h-4 w-4 text-neutral-400" />}
+                </button>
+
+                {expanded === a.id && (
+                  <div className="border-t border-neutral-100 px-4 py-4 space-y-4">
+                    <p className="text-sm text-neutral-700">{a.appeal_text}</p>
+                    {a.serial_scanned && (
+                      <div className="text-xs text-neutral-500 space-y-1">
+                        <p>Serial scanned: <span className="font-mono">{a.serial_scanned}</span></p>
+                        <p>Expected: <span className="font-mono">{a.serial_expected ?? 'unknown'}</span></p>
+                      </div>
+                    )}
+                    <img
+                      src={a.photo_url}
+                      alt="Appeal photo"
+                      className="h-48 w-full rounded-lg object-contain border border-neutral-200 bg-neutral-50"
                     />
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        disabled={deciding === a.id}
-                        onClick={() => void decide(a.id, 'approved')}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50"
-                      >
-                        <CheckCircle className="h-4 w-4" /> Approve
-                      </button>
-                      <button
-                        type="button"
-                        disabled={deciding === a.id || !denialText.trim()}
-                        onClick={() => void decide(a.id, 'denied')}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
-                      >
-                        <XCircle className="h-4 w-4" /> Deny
-                      </button>
-                    </div>
+                    {tab === 'pending' && (
+                      <div className="space-y-3">
+                        <textarea
+                          value={denialText}
+                          onChange={(e) => setDenialText(e.target.value)}
+                          placeholder="Denial reason (required if denying)…"
+                          rows={2}
+                          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:border-sky-400"
+                        />
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            disabled={deciding === a.id}
+                            onClick={() => void decide(a.id, 'approved')}
+                            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50"
+                          >
+                            <CheckCircle className="h-4 w-4" /> Approve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deciding === a.id || !denialText.trim()}
+                            onClick={() => void decide(a.id, 'denied')}
+                            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                          >
+                            <XCircle className="h-4 w-4" /> Deny
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }
