@@ -75,11 +75,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           if (!PORTAL_ROLE_EDITORS.has(authReq.user.role)) {
             return apiResponse.forbidden(res, 'Only admin users may change the portal role');
           }
-          if (portalRole !== null && portalRole !== '' && !(STAFF_ROLES as readonly string[]).includes(portalRole as string)) {
-            return res.status(400).json({
-              success: false,
-              error: `portalRole must be one of: ${STAFF_ROLES.join(', ')} (or empty to clear)`,
-            });
+          if (portalRole !== null && !(STAFF_ROLES as readonly string[]).includes(portalRole as string)) {
+            return apiResponse.badRequest(
+              res,
+              `portalRole must be one of: ${STAFF_ROLES.join(', ')} (or null to clear)`
+            );
           }
         }
         const result = await updateStaff(req.query.id as string, req.body);

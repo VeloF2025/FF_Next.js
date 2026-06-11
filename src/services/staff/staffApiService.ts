@@ -102,6 +102,8 @@ interface DbStaff {
   // Additional API-only fields (camelCase aliases returned by RETURNING clause)
   saContractType?: string;
   benefitsPackage?: string;
+  /** staff.role (portal role) — admin-gated server-side on PUT */
+  portalRole?: string | null;
 }
 
 /**
@@ -353,6 +355,12 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
   if ('exitType' in staff) result.exitType = staff.exitType;
   if ('exitReason' in staff) result.exitReason = staff.exitReason;
   if ('isRehireable' in staff) result.isRehireable = staff.isRehireable;
+
+  // Portal role (staff.role) — present when the form was loaded by an admin.
+  // The payload is StaffFormData cast to Partial<StaffMember>, hence the cast.
+  if ('portalRole' in staff) {
+    result.portalRole = (staff as { portalRole?: string | null }).portalRole;
+  }
 
   return result;
 }
