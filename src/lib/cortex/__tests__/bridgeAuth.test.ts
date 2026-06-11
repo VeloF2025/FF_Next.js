@@ -27,10 +27,12 @@ let saved: Record<string, string | undefined>;
 beforeEach(() => {
   saved = {
     BRIDGE_JWT_SECRET: process.env.BRIDGE_JWT_SECRET,
+    BRIDGE_JWT_KID: process.env.BRIDGE_JWT_KID,
     CORTEX_API_KEY: process.env.CORTEX_API_KEY,
     CORTEX_INSTANCE_ID: process.env.CORTEX_INSTANCE_ID,
   };
   delete process.env.BRIDGE_JWT_SECRET;
+  delete process.env.BRIDGE_JWT_KID;
   delete process.env.CORTEX_API_KEY;
   delete process.env.CORTEX_INSTANCE_ID;
 });
@@ -96,5 +98,22 @@ describe('bridgeBearer — per-user JWT (BRIDGE_JWT_SECRET set)', () => {
     await expect(
       jwtVerify(bearer, new TextEncoder().encode('a-different-secret')),
     ).rejects.toThrow();
+  });
+});
+
+describe('bridgeBearer kid header (Cortex Phase 3 WP8 key rotation)', () => {
+  it('stamps BRIDGE_JWT_KID into the protected header when set', async () => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    process.env.BRIDGE_JWT_KID = '20260611';
+    const token = await bridgeBearer(REVIEWER);
+    expect(decodeProtectedHeader(token)).toMatchObject({ alg: 'HS256', kid: '20260611' });
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
+    expect(payload.email).toBe(REVIEWER);
+  });
+
+  it('omits kid when BRIDGE_JWT_KID is unset (legacy kid-less signing)', async () => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const token = await bridgeBearer(REVIEWER);
+    expect(decodeProtectedHeader(token).kid).toBeUndefined();
   });
 });

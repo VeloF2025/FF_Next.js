@@ -35,9 +35,13 @@ export async function bridgeBearer(reviewerEmail: string): Promise<string> {
     return process.env.CORTEX_API_KEY ?? '';
   }
   const instanceId = process.env.CORTEX_INSTANCE_ID ?? 'velocity-fibre';
+  // Cortex Phase 3 WP8 key rotation: when BRIDGE_JWT_KID is set, stamp it into
+  // the protected header so the bridge verifies STRICTLY against that key.
+  // Unset = legacy kid-less signing (bridge tries all trusted keys).
+  const kid = process.env.BRIDGE_JWT_KID || undefined;
   try {
     return await new SignJWT({ email: reviewerEmail, instance_id: instanceId })
-      .setProtectedHeader({ alg: 'HS256' })
+      .setProtectedHeader(kid ? { alg: 'HS256', kid } : { alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime(TOKEN_TTL)
       .sign(new TextEncoder().encode(secret));
