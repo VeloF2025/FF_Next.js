@@ -51,13 +51,13 @@ export function validateSerialCandidate(
 /**
  * Decode barcode from an image buffer.
  *
- * Uses readBarcodesFromImageData (ImageData path) rather than readBarcodes
- * (Blob path) because jsdom's Blob polyfill lacks .arrayBuffer(), which zxing
- * needs internally. The ImageData path works in both Node and test environments.
+ * Passes ImageData (not a Blob) to readBarcodes because jsdom's Blob polyfill
+ * lacks .arrayBuffer(), which zxing needs internally for the Blob path. The
+ * ImageData path works in both Node and test environments.
  */
 export async function decodeSerialFromImage(buffer: Buffer): Promise<string | null> {
   try {
-    const { readBarcodesFromImageData } = await import('zxing-wasm/full');
+    const { readBarcodes } = await import('zxing-wasm/full');
 
     // Decode to raw RGBA pixels; sharp handles any input format (JPEG/PNG/WebP).
     const { data, info } = await sharp(buffer).raw().ensureAlpha().toBuffer({
@@ -72,7 +72,7 @@ export async function decodeSerialFromImage(buffer: Buffer): Promise<string | nu
       height: info.height,
     } as unknown as ImageData;
 
-    const results = await readBarcodesFromImageData(imageData, {
+    const results = await readBarcodes(imageData, {
       tryHarder: true,
       tryRotate: true,
       tryInvert: true,
