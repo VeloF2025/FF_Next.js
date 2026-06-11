@@ -27,6 +27,13 @@ export interface HolderAccountability {
   blocked_by: string | null;
   pending_recovery_amount: number;
   recovered_amount: number;
+  /** Days-held aging buckets (migration 409). Count of held units per band. */
+  held_age_0_7: number;
+  held_age_8_30: number;
+  held_age_31_plus: number;
+  /** Age in days of the oldest held unit; 0 when nothing is held. */
+  oldest_held_days: number;
+  oldest_held_at: string | null;
 }
 
 /** Postgres numeric columns arrive as strings over JSON; coerce to real numbers. */
@@ -58,6 +65,11 @@ function toHolderAccountability(r: Record<string, unknown>): HolderAccountabilit
     blocked_by: (r.blocked_by as string) ?? null,
     pending_recovery_amount: num(r.pending_recovery_amount),
     recovered_amount: num(r.recovered_amount),
+    held_age_0_7: num(r.held_age_0_7),
+    held_age_8_30: num(r.held_age_8_30),
+    held_age_31_plus: num(r.held_age_31_plus),
+    oldest_held_days: num(r.oldest_held_days),
+    oldest_held_at: (r.oldest_held_at as string) ?? null,
   };
 }
 

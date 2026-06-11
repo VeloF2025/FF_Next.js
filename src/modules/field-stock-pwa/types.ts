@@ -32,6 +32,10 @@ export interface PwaIssueDraft {
   serials: PwaScannedSerial[];
   /** Quantity for non-serial (lot/quantity/none) items. Undefined for serial issues. */
   quantity?: number;
+  /** FK to projects.id — the project this stock is issued against. Optional:
+   *  legacy/ad-hoc issues may have no project (rolls up as "Unassigned" in the
+   *  Accountability per-project breakdown). */
+  projectId?: string | null;
   /** VF Storage key of the mandatory proof photo (non-serial issues only). */
   proofPhotoKey?: string;
   /** Public /storage/... URL of the proof photo (non-serial issues only). */

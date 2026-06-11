@@ -24,20 +24,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Get the holder's accountability row from the live view
+    // Get the holder's accountability row from the live view, plus aging buckets
+    // from the v_holder_held_aging companion view (migration 409).
     const holderRow = await queryOne(
       `SELECT
-        holder_id, holder_type, staff_id, contractor_id, name, is_active,
-        issued_count, issued_value,
-        consumed_count, consumed_value,
-        returned_count, returned_value,
-        held_count, held_value,
-        unaccounted_count,
-        is_blocked, blocked_reason, blocked_at, blocked_by,
-        pending_recovery_amount, recovered_amount,
-        last_reconciliation_date, last_reconciliation_by
-       FROM v_holder_accountability
-       WHERE holder_id = $1`,
+        va.holder_id, va.holder_type, va.staff_id, va.contractor_id, va.name, va.is_active,
+        va.issued_count, va.issued_value,
+        va.consumed_count, va.consumed_value,
+        va.returned_count, va.returned_value,
+        va.held_count, va.held_value,
+        va.unaccounted_count,
+        va.is_blocked, va.blocked_reason, va.blocked_at, va.blocked_by,
+        va.pending_recovery_amount, va.recovered_amount,
+        va.last_reconciliation_date, va.last_reconciliation_by,
+        COALESCE(ag.held_age_0_7, 0)     AS held_age_0_7,
+        COALESCE(ag.held_age_8_30, 0)    AS held_age_8_30,
+        COALESCE(ag.held_age_31_plus, 0) AS held_age_31_plus,
+        ag.oldest_held_at,
+        COALESCE(ag.oldest_held_days, 0) AS oldest_held_days
+       FROM v_holder_accountability va
+       LEFT JOIN v_holder_held_aging ag ON ag.holder_id = va.holder_id
+       WHERE va.holder_id = $1`,
       [holderId]
     );
 
@@ -69,10 +76,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       [holderId]
     );
 
+    // Per-project breakdown of held serial stock (migration 409). project_id is
+    // NULL for legacy issues that pre-date the PWA project picker → surfaced as
+    // "Unassigned" by the UI.
+    const projectBreakdown = await query(
+      `SELECT project_id, project_name, held_count, held_value
+       FROM v_holder_project_breakdown
+       WHERE holder_id = $1
+       ORDER BY held_count DESC, project_name NULLS LAST`,
+      [holderId]
+    );
+
     return apiResponse.success(res, {
       ...holderRow,
       custody,
       serials,
+      projectBreakdown,
     });
   } catch (error: unknown) {
     log.error('Error fetching holder accountability', { error, holderId }, 'field-stock');

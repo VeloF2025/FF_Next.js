@@ -42,6 +42,7 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
     pickingType: 'issue',
     sourceLocationId: draft.sourceLocationId,
     destinationLocationId: draft.destinationLocationId,
+    projectId: draft.projectId ?? undefined,
     technicianId: draft.technicianId,
     contractorId: draft.contractorId ?? undefined,
     notes: draft.notes || undefined,

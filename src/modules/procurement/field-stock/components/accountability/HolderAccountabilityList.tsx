@@ -26,6 +26,27 @@ const TYPE_CLS: Record<HolderAccountability['holder_type'], string> = {
   external_person: 'bg-gray-100 text-gray-700 dark:bg-gray-700/60 dark:text-gray-300',
 };
 
+/**
+ * Compact days-held aging cell: three bucket counts (0-7 / 8-30 / 30+) with the
+ * 30+ band styled as a warning, plus the oldest-held age in days underneath.
+ */
+function AgingCell({ h }: { h: HolderAccountability }) {
+  const total = h.held_age_0_7 + h.held_age_8_30 + h.held_age_31_plus;
+  if (total === 0) return <span className="text-sm text-muted-foreground">-</span>;
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="flex items-center gap-1 text-xs font-medium">
+        <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-800 dark:bg-green-900/30 dark:text-green-300" title="Held 0–7 days">{h.held_age_0_7}</span>
+        <span className={`rounded px-1.5 py-0.5 ${h.held_age_8_30 > 0 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}`} title="Held 8–30 days">{h.held_age_8_30}</span>
+        <span className={`rounded px-1.5 py-0.5 ${h.held_age_31_plus > 0 ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}`} title="Held 30+ days">{h.held_age_31_plus}</span>
+      </div>
+      <span className={`text-[10px] ${h.oldest_held_days > 30 ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+        oldest {h.oldest_held_days}d
+      </span>
+    </div>
+  );
+}
+
 function StatCard({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 dark:border-gray-700 dark:bg-gray-800">
@@ -109,8 +130,8 @@ export function HolderAccountabilityList({ holders, loading, onBlock, onUnblock 
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-input">
               <tr>
-                {['Holder', 'Status', 'Held Value', 'Unaccounted', 'Actions'].map((col, i) => (
-                  <th key={col} className={`px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground ${i === 0 ? 'text-left' : i === 1 ? 'text-center' : 'text-right'}`}>{col}</th>
+                {(['Holder', 'Status', 'Held Value', 'Aging', 'Unaccounted', 'Actions'] as const).map((col) => (
+                  <th key={col} className={`px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground ${col === 'Holder' ? 'text-left' : col === 'Status' || col === 'Aging' ? 'text-center' : 'text-right'}`}>{col}</th>
                 ))}
               </tr>
             </thead>
@@ -131,6 +152,7 @@ export function HolderAccountabilityList({ holders, loading, onBlock, onUnblock 
                         : <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"><CheckCircle className="h-3 w-3" /> Good</span>}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-muted-foreground">R{(h.held_value ?? 0).toFixed(2)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-center"><AgingCell h={h} /></td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {h.unaccounted_count > 0
                       ? <span className="text-sm font-medium text-red-600 dark:text-red-400">{h.unaccounted_count}</span>
