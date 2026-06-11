@@ -2,10 +2,11 @@
  * GET /api/my/stores/items — stock items for the /my stores PWA.
  *
  * PWA-session (withMySession) equivalent of GET /api/procurement/field-stock/items.
- * The PWA only ever requests serial-tracked items (trackingType=serial) with an
- * optional search term (see fetchSerialStockItems), so only those two branches are
- * implemented here. Uses pg.Pool via @/lib/db-pool (not the Neon shim); explicit
- * query branches mirror the source-of-truth route.
+ * Returns ALL tracking types when no trackingType filter is given (the PWA issue flow
+ * lists serial + lot + quantity items). When trackingType is omitted, serial items sort
+ * first. Client is `fetchIssuableStockItems` in
+ * `src/modules/field-stock-pwa/api/items.ts`. Uses pg.Pool via @/lib/db-pool (not the
+ * Neon shim); explicit query branches because of the tagged-template style.
  *
  * Gated to stores roles via requireStoresActor. Read-only.
  */
@@ -26,37 +27,44 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
   if (!actor) return;
 
   try {
-    const trackingType = (req.query.trackingType as string | undefined) ?? 'serial';
+    const trackingType = req.query.trackingType as string | undefined;
     const rawSearch = req.query.search as string | undefined;
     const search = rawSearch ? `%${rawSearch}%` : undefined;
 
     let rows: Record<string, unknown>[];
-    if (search) {
+    if (trackingType && search) {
       rows = await sql`
-        SELECT
-          id, item_code, name, description, category, tracking_type,
-          uom, standard_cost, currency, min_stock_level, max_stock_level,
-          reorder_quantity, is_returnable, is_active, qty_available,
-          created_at, updated_at
+        SELECT id, item_code, name, description, category, tracking_type,
+          uom, standard_cost, currency, is_returnable, is_active, qty_available
+        FROM stock_items
+        WHERE is_active = true AND tracking_type = ${trackingType}
+          AND (name ILIKE ${search} OR item_code ILIKE ${search})
+        ORDER BY category, name LIMIT 100
+      `;
+    } else if (trackingType) {
+      rows = await sql`
+        SELECT id, item_code, name, description, category, tracking_type,
+          uom, standard_cost, currency, is_returnable, is_active, qty_available
+        FROM stock_items
+        WHERE is_active = true AND tracking_type = ${trackingType}
+        ORDER BY category, name LIMIT 100
+      `;
+    } else if (search) {
+      rows = await sql`
+        SELECT id, item_code, name, description, category, tracking_type,
+          uom, standard_cost, currency, is_returnable, is_active, qty_available
         FROM stock_items
         WHERE is_active = true
-          AND tracking_type = ${trackingType}
           AND (name ILIKE ${search} OR item_code ILIKE ${search})
-        ORDER BY category, name
-        LIMIT 100
+        ORDER BY tracking_type = 'serial' DESC, category, name LIMIT 100
       `;
     } else {
       rows = await sql`
-        SELECT
-          id, item_code, name, description, category, tracking_type,
-          uom, standard_cost, currency, min_stock_level, max_stock_level,
-          reorder_quantity, is_returnable, is_active, qty_available,
-          created_at, updated_at
+        SELECT id, item_code, name, description, category, tracking_type,
+          uom, standard_cost, currency, is_returnable, is_active, qty_available
         FROM stock_items
         WHERE is_active = true
-          AND tracking_type = ${trackingType}
-        ORDER BY category, name
-        LIMIT 100
+        ORDER BY tracking_type = 'serial' DESC, category, name LIMIT 100
       `;
     }
 
