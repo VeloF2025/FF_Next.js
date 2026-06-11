@@ -152,7 +152,7 @@ export function useBarcodeScanner({
       const qrboxSize = config.qrboxSize ?? 250;
 
       await scannerRef.current.start(
-        config.videoConstraints ?? { facingMode: config.facingMode ?? 'environment' },
+        { facingMode: config.facingMode ?? 'environment' },
         {
           fps: config.fps ?? 10,
           qrbox: typeof qrboxSize === 'number' ? qrboxSize : qrboxSize,

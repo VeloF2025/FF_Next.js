@@ -73,9 +73,10 @@ export interface ScannerConfig {
   /** Delegate to the native BarcodeDetector when the browser has one
    *  (Android Chrome) — much stronger on dense 1D than the JS decoder. */
   useBarCodeDetectorIfSupported?: boolean;
-  /** Camera resolution request, e.g. { width: { ideal: 1920 } }. When set,
-   *  html5-qrcode uses THIS instead of the facingMode first-arg — always
-   *  include facingMode inside it. */
+  /** Camera resolution request, e.g. { width: { ideal: 1920 } }. Applied via
+   *  the scan config — when set, html5-qrcode resolves the camera from THESE
+   *  constraints and ignores the facingMode first-arg, so include facingMode
+   *  here too. */
   videoConstraints?: MediaTrackConstraints;
 }
 
