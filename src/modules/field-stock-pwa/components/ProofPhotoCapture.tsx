@@ -41,7 +41,6 @@ export function ProofPhotoCapture({ preview, onCapture }: ProofPhotoCaptureProps
       </p>
       {preview ? (
         <div className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview} alt="Proof of stock" className="w-full rounded-lg border border-neutral-700" />
           <label className="absolute bottom-2 right-2 px-3 py-1.5 rounded-lg bg-neutral-900/90 border border-neutral-700 text-xs text-white cursor-pointer">
             Retake
