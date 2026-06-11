@@ -13,6 +13,7 @@
 
 import { useCallback, useRef, useEffect } from 'react';
 import { validateSerial } from '@/modules/field-stock-pwa/api';
+import { extractScannedSerial } from '@/modules/field-stock-pwa/lib/scannedSerial';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 interface UseScanSerialOptions {
@@ -32,7 +33,10 @@ export function useScanSerial({ stockItem, scanned, onChange }: UseScanSerialOpt
 
   const handleRawSerial = useCallback(
     async (rawSerial: string) => {
-      const serial = rawSerial.trim().toUpperCase();
+      // DataMatrix labels (e.g. Nokia GPON ONT) wrap the serial in an ISO 15434
+      // envelope; extract the bare serial before validating. Bare 1D/manual
+      // input passes through unchanged.
+      const serial = extractScannedSerial(rawSerial).toUpperCase();
       if (!serial) return;
 
       if (scannedSet.has(serial)) {
