@@ -116,7 +116,8 @@ export function parseVlmSerialResponse(
       serial: typeof parsed.serial === 'string' ? parsed.serial : null,
       confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
     };
-  } catch {
+  } catch (err) {
+    log.warn('serial extract: VLM response was not valid JSON', { err }, 'my/stores/serials/extract');
     return null;
   }
 }

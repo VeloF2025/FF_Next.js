@@ -13,6 +13,7 @@ import type { ChangeEvent } from 'react';
 import { Image as ImageIcon, Loader2 } from 'lucide-react';
 import { compressFileToJpeg } from '@/modules/receipts/client/compressImage';
 import { extractSerialFromPhoto } from '@/modules/field-stock-pwa/api';
+import { log } from '@/lib/logger';
 
 export interface PhotoSerialFallbackProps {
   /** Candidate serial extracted — parent pre-fills the manual field. */
@@ -38,7 +39,8 @@ export function PhotoSerialFallback({ onSerial, onNoSerial }: PhotoSerialFallbac
         } else {
           onNoSerial("Couldn't read the label — type the serial below.");
         }
-      } catch {
+      } catch (err) {
+        log.warn('photo serial fallback failed', { err }, 'PhotoSerialFallback');
         onNoSerial('Photo upload failed — check your signal and try again, or type the serial.');
       } finally {
         setExtracting(false);
