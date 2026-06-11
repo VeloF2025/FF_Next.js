@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
+import { requirePermission } from '@/lib/auth/app-router';
 import { log } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // Authenticate + authorize (reading maintenance data requires assets.maintenance:view)
+    const [, deny] = await requirePermission(req, 'assets.maintenance', 'view');
+    if (deny) return deny;
+
     const result = await maintenanceService.getOverdue();
 
     if (!result.success) {
