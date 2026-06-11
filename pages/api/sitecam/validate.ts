@@ -147,7 +147,15 @@ async function runVlmCheck(
       };
       // VLM may return either "pass" or "passes" depending on prompt variant
       const passed = parsed.passes !== undefined ? parsed.passes === true : parsed.pass === true;
-      const failReason = parsed.fail_reason ?? null;
+      // Free-text reason from the VLM; fall back to the canned per-step reason
+      // so a failed photo never reaches the technician with no explanation.
+      const cannedReason = jobType === 'civils'
+        ? CIVIL_STEP_CRITERIA[step as CivilStep].failReason
+        : STEP_CRITERIA[step as QualityCheckStep].failReason;
+      const failReason =
+        (typeof parsed.fail_reason === 'string' && parsed.fail_reason.trim().length > 0
+          ? parsed.fail_reason.trim()
+          : null) ?? (passed ? null : cannedReason);
       return {
         pass: passed,
         reasons: passed || !failReason

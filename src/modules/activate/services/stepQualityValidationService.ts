@@ -152,10 +152,14 @@ async function checkOnePhoto(
   }
 
   const passes = parsed.passes === true;
+  // Free-text reason from the VLM; fall back to the canned per-step reason on
+  // fail so auto-QA comments are never empty.
   const failReason =
-    typeof parsed.fail_reason === 'string' && parsed.fail_reason.length > 0
-      ? parsed.fail_reason
-      : null;
+    typeof parsed.fail_reason === 'string' && parsed.fail_reason.trim().length > 0
+      ? parsed.fail_reason.trim()
+      : passes
+        ? null
+        : STEP_CRITERIA[step as QualityCheckStep].failReason;
 
   log.info(
     `Step ${step} quality check [${usedFewShot ? 'few-shot' : 'text-only'}]: ${photo.filename} → ${passes ? 'PASS' : `FAIL (${failReason})`}`,

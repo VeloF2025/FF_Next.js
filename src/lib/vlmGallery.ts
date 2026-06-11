@@ -6,9 +6,13 @@
 import { pool } from '@/lib/db';
 import { log } from '@/lib/logger';
 import { fetchPhotoAsBase64 } from '@/modules/activate/services/photoFetchService';
+import { resolveInternalPhotoUrl } from '@/lib/internalPhotoUrl';
 import type { GalleryExamples } from '@/modules/activate/services/stepQualityCriteria';
 
 const MODULE = 'vlmGallery';
+
+/** Max gallery examples injected per label (positive/negative) per step. */
+export const GALLERY_EXAMPLES_PER_LABEL = 6;
 
 export async function loadGalleryExamples(
   step: number,
@@ -25,7 +29,7 @@ export async function loadGalleryExamples(
            AND job_type = $2
            AND label = $3
          ORDER BY saved_at DESC
-         LIMIT 6`,
+         LIMIT ${GALLERY_EXAMPLES_PER_LABEL}`,
         [step, jobType, label]
       );
 
@@ -39,7 +43,11 @@ export async function loadGalleryExamples(
 
     const toBase64 = async (url: string): Promise<string | null> => {
       try {
-        return await fetchPhotoAsBase64(url);
+        // Gallery rows store the auth-protected proxy path; server-side we have
+        // no session cookie, so resolve to the backend source URL first —
+        // otherwise every example 401s and is silently dropped (found 2026-06-11:
+        // the VLM was receiving ZERO gallery examples).
+        return await fetchPhotoAsBase64(resolveInternalPhotoUrl(url));
       } catch (err) {
         log.warn('Failed to fetch gallery example as base64', { url, err: String(err) }, MODULE);
         return null;
