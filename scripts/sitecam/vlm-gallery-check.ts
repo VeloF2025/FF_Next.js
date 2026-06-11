@@ -36,7 +36,7 @@ import {
   stripThinkTags,
 } from '@/lib/vlm';
 
-const INJECTED_PER_LABEL = 6; // must match loadGalleryExamples LIMIT
+import { GALLERY_EXAMPLES_PER_LABEL as INJECTED_PER_LABEL } from '@/lib/vlmGallery';
 
 interface Args {
   step: QualityCheckStep;
@@ -193,7 +193,7 @@ async function main(): Promise<void> {
     summarise(nonExample, 'Excluding in-prompt examples (the honest number)');
   }
 
-  await pool.end?.();
+  await pool.end();
   const anyResult = results.some((r) => r.verdict !== 'ERROR');
   process.exit(anyResult ? 0 : 1);
 }

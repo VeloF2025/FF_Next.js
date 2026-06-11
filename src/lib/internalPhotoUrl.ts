@@ -25,6 +25,13 @@ export function resolveInternalPhotoUrl(photoUrl: string): string {
   if (!match) return photoUrl;
 
   const [, drNumber, filename] = match as unknown as [string, string, string];
+  // Mirror the proxy route's input validation ([...path].ts checks /^DR\d+$/i):
+  // [^/]+ alone admits '..' and %-encoded traversal sequences. The backend host
+  // is hardcoded so this is defence-in-depth, not SSRF — but a DB-sourced value
+  // must not be able to walk the photo server's filesystem.
+  if (!/^DR\d+$/i.test(drNumber) || !/^[A-Za-z0-9_.-]+$/.test(filename) || filename.includes('..')) {
+    return photoUrl;
+  }
   if (filename.toLowerCase().startsWith('wa_')) {
     return `${VPS_PHOTO_API}/photos/${drNumber}/${filename}`;
   }

@@ -29,4 +29,17 @@ describe('resolveInternalPhotoUrl', () => {
       '/api/activate/photo/DR1/extra/depth.jpg',
     );
   });
+
+  it('refuses traversal and malformed segments (mirrors the proxy route validation)', () => {
+    // drNumber must match /^DR\d+$/i — anything else is returned unchanged.
+    const badDr = '/api/activate/photo/../wa_x.jpg';
+    expect(resolveInternalPhotoUrl(badDr)).toBe(badDr);
+    const notDr = '/api/activate/photo/secrets/file.jpg';
+    expect(resolveInternalPhotoUrl(notDr)).toBe(notDr);
+    // filename: no '..' and only safe characters.
+    const dotDot = '/api/activate/photo/DR123/..%2fescape.jpg';
+    expect(resolveInternalPhotoUrl(dotDot)).toBe(dotDot);
+    const badChars = '/api/activate/photo/DR123/a b?.jpg';
+    expect(resolveInternalPhotoUrl(badChars)).toBe(badChars);
+  });
 });

@@ -11,6 +11,9 @@ import type { GalleryExamples } from '@/modules/activate/services/stepQualityCri
 
 const MODULE = 'vlmGallery';
 
+/** Max gallery examples injected per label (positive/negative) per step. */
+export const GALLERY_EXAMPLES_PER_LABEL = 6;
+
 export async function loadGalleryExamples(
   step: number,
   jobType: 'activation' | 'civils'
@@ -26,7 +29,7 @@ export async function loadGalleryExamples(
            AND job_type = $2
            AND label = $3
          ORDER BY saved_at DESC
-         LIMIT 6`,
+         LIMIT ${GALLERY_EXAMPLES_PER_LABEL}`,
         [step, jobType, label]
       );
 
