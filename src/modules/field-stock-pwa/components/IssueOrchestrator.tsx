@@ -1,6 +1,6 @@
 /**
  * IssueOrchestrator — state-machine orchestrator for /my/stores/issue.
- * State: pick-warehouse → pick-tech → pick-item → scan-serials → sign-submit → done
+ * State: pick-warehouse → pick-tech → pick-item → (scan-serials | enter-quantity) → sign-submit → done
  * Sub-components: StepProgress, IssueDirtyConfirmDialog.
  * ⚪ UNTESTED: integration tests in follow-on task.
  */
@@ -16,6 +16,7 @@ import { PickTechStep } from '@/modules/field-stock-pwa/components/PickTechStep'
 import { PickItemStep } from '@/modules/field-stock-pwa/components/PickItemStep';
 import type { StockItem } from '@/modules/field-stock-pwa/components/PickItemStep';
 import { ScanSerialsStep } from '@/modules/field-stock-pwa/components/ScanSerialsStep';
+import { EnterQuantityStep } from '@/modules/field-stock-pwa/components/EnterQuantityStep';
 import { SignAndSubmitStep } from '@/modules/field-stock-pwa/components/SignAndSubmitStep';
 import { IssueSuccess } from '@/modules/field-stock-pwa/components/IssueSuccess';
 import { StepProgress } from '@/modules/field-stock-pwa/components/StepProgress';
@@ -25,7 +26,7 @@ import type { PwaTechSummary, PwaScannedSerial, PwaPickingResult } from '@/modul
 
 // --- Types ---
 
-type IssueStep = 'pick-warehouse' | 'pick-tech' | 'pick-item' | 'scan-serials' | 'sign-submit' | 'done';
+type IssueStep = 'pick-warehouse' | 'pick-tech' | 'pick-item' | 'scan-serials' | 'enter-quantity' | 'sign-submit' | 'done';
 
 interface SourceLocation { id: string; name: string; }
 
@@ -35,20 +36,23 @@ interface IssueState {
   technician: PwaTechSummary | null;
   stockItem: StockItem | null;
   scanned: PwaScannedSerial[];
+  quantity: number;
   result: PwaPickingResult | null;
 }
 
 const INITIAL_ISSUE_STATE: IssueState = {
   step: 'pick-warehouse', sourceLocation: null, technician: null,
-  stockItem: null, scanned: [], result: null,
+  stockItem: null, scanned: [], quantity: 0, result: null,
 };
 
-/** 1-based progress index — done renders at same position as sign-submit. */
+/** 1-based progress index — done and enter-quantity render at same position as scan-serials. */
 const STEP_INDEX: Record<IssueStep, number> = {
   'pick-warehouse': 1, 'pick-tech': 2, 'pick-item': 3,
-  'scan-serials': 4, 'sign-submit': 5, 'done': 5,
+  'scan-serials': 4, 'enter-quantity': 4, 'sign-submit': 5, 'done': 5,
 };
-const STEP_LABELS = ['WH', 'Tech', 'Item', 'Serials', 'Sign'];
+
+const stepLabels = (item: StockItem | null): string[] =>
+  ['WH', 'Tech', 'Item', item && item.trackingType !== 'serial' ? 'Qty' : 'Serials', 'Sign'];
 
 // --- Props ---
 
@@ -66,7 +70,7 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
   const isDirty =
     flow.step !== 'pick-warehouse' &&
     flow.step !== 'done' &&
-    (flow.scanned.length > 0 || flow.technician !== null);
+    (flow.scanned.length > 0 || flow.quantity > 0 || flow.technician !== null);
 
   const handleBackToHub = React.useCallback(() => {
     if (isDirty) { setShowDiscardConfirm(true); } else { void router.push('/my/stores'); }
@@ -87,7 +91,7 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
           <ChevronLeft className="w-4 h-4" />Stores
         </button>
         {flow.step !== 'done' && (
-          <StepProgress current={STEP_INDEX[flow.step]} labels={STEP_LABELS} />
+          <StepProgress current={STEP_INDEX[flow.step]} labels={stepLabels(flow.stockItem)} />
         )}
       </div>
 
@@ -108,11 +112,22 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
       )}
       {flow.step === 'pick-item' && flow.technician && (
         <PickItemStep technician={flow.technician}
-          onPick={(item) => setFlow((s) => ({ ...s, step: 'scan-serials', stockItem: item }))} />
+          onPick={(item) => setFlow((s) => ({
+            ...s,
+            step: item.trackingType === 'serial' ? 'scan-serials' : 'enter-quantity',
+            stockItem: item,
+            scanned: [],
+            quantity: 0,
+          }))} />
       )}
       {flow.step === 'scan-serials' && flow.stockItem && (
         <ScanSerialsStep stockItem={flow.stockItem} scanned={flow.scanned}
           onChange={(next) => setFlow((s) => ({ ...s, scanned: next }))}
+          onDone={() => setFlow((s) => ({ ...s, step: 'sign-submit' }))} />
+      )}
+      {flow.step === 'enter-quantity' && flow.stockItem && (
+        <EnterQuantityStep stockItem={flow.stockItem} quantity={flow.quantity}
+          onChange={(q) => setFlow((s) => ({ ...s, quantity: q }))}
           onDone={() => setFlow((s) => ({ ...s, step: 'sign-submit' }))} />
       )}
       {flow.step === 'sign-submit' && flow.technician && flow.stockItem && flow.sourceLocation && (
@@ -120,8 +135,12 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
           scanned={flow.scanned} contractorId={flow.technician.contractorId}
           sourceLocationId={flow.sourceLocation.id}
           destinationLocationId={FIELD_DEFAULT_LOCATION_ID}
+          quantity={flow.quantity}
           onSubmitted={(result) => setFlow((s) => ({ ...s, step: 'done', result }))}
-          onBack={() => setFlow((s) => ({ ...s, step: 'scan-serials' }))} />
+          onBack={() => setFlow((s) => ({
+            ...s,
+            step: s.stockItem && s.stockItem.trackingType !== 'serial' ? 'enter-quantity' : 'scan-serials',
+          }))} />
       )}
       {flow.step === 'done' && flow.result && (
         <IssueSuccess result={flow.result} onStartAnother={resetAll}
