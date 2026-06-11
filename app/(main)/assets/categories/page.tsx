@@ -10,18 +10,20 @@ import { Plus, FolderOpen, Edit, Trash2 } from 'lucide-react';
 import type { AssetCategory } from '@/modules/assets/types';
 import { CategoriesClient } from './CategoriesClient';
 import AssetsClient from '../client';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
+import { log } from '@/lib/logger';
 
 async function getCategories(): Promise<AssetCategory[]> {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/categories`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    log.error('Error fetching categories:', { error }, 'CategoriesPage');
     return [];
   }
 }

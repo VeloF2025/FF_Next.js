@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { EditAssetClient } from './EditAssetClient';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
+import { log } from '@/lib/logger';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -16,13 +18,13 @@ async function getAsset(id: string) {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/${id}`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return null;
     const data = await response.json();
     return data.data;
   } catch (error) {
-    console.error('Error fetching asset:', error);
+    log.error('Error fetching asset:', { error }, 'EditAssetPage');
     return null;
   }
 }
@@ -31,13 +33,13 @@ async function getCategories() {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/categories?isActive=true`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    log.error('Error fetching categories:', { error }, 'EditAssetPage');
     return [];
   }
 }

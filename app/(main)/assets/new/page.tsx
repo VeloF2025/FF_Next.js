@@ -8,18 +8,20 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { AssetFormClient } from './AssetFormClient';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
+import { log } from '@/lib/logger';
 
 async function getCategories() {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/categories?isActive=true`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    log.error('Error fetching categories:', { error }, 'NewAssetPage');
     return [];
   }
 }

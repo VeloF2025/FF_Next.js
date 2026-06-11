@@ -15,6 +15,8 @@ import {
   FileText,
 } from 'lucide-react';
 import AssetsClient from '../client';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
+import { log } from '@/lib/logger';
 
 interface CalibrationRecord {
   id: string;
@@ -46,13 +48,13 @@ async function getCalibrationDue(): Promise<Asset[]> {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/maintenance/upcoming?type=calibration&limit=30`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching calibrations:', error);
+    log.error('Error fetching calibrations:', { error }, 'CalibrationPage');
     return [];
   }
 }
@@ -61,13 +63,13 @@ async function getAssetsRequiringCalibration(): Promise<Asset[]> {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets?requiresCalibration=true&limit=50`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Error fetching assets:', error);
+    log.error('Error fetching assets:', { error }, 'CalibrationPage');
     return [];
   }
 }

@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { DocumentUploadForm } from './DocumentUploadForm';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -14,7 +15,7 @@ async function getAsset(id: string) {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/${id}`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return null;
     const data = await response.json();

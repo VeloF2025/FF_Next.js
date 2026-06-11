@@ -29,6 +29,7 @@ import {
 import { DOCUMENT_TYPE_CONFIG, type DocumentTypeValue } from '@/modules/assets/types/document';
 import { ASSET_STATUS_CONFIG } from '@/modules/assets/constants/assetStatus';
 import { log } from '@/lib/logger';
+import { authCookieHeader } from '@/lib/auth/ssr-fetch';
 import { CheckInButton } from './CheckInButton';
 import { DeleteDocumentButton } from './DeleteDocumentButton';
 import { DeleteAssetButton } from './DeleteAssetButton';
@@ -42,7 +43,7 @@ async function getAsset(id: string) {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/${id}`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return null;
     const data = await response.json();
@@ -57,7 +58,7 @@ async function getAssignmentHistory(id: string) {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/${id}/history`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
@@ -72,7 +73,7 @@ async function getDocuments(id: string) {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/${id}/documents`,
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: await authCookieHeader() }
     );
     if (!response.ok) return [];
     const data = await response.json();
