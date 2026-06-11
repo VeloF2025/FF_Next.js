@@ -13,9 +13,11 @@ vi.mock('@/lib/db', () => ({
   db: { query: mockQuery },
 }));
 
+type AnyHandler = (req: NextApiRequest, res: NextApiResponse) => Promise<void> | void;
+
 vi.mock('@/lib/auth', () => ({
-  withAuth: (handler: Function) => handler,
-  withRole: () => (handler: Function) => handler,
+  withAuth: (handler: AnyHandler) => handler,
+  withRole: () => (handler: AnyHandler) => handler,
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -78,6 +80,14 @@ describe('GET /api/activate/sitecam-failed', () => {
     expect(res._getStatusCode()).toBe(200);
     const params = mockQuery.mock.calls[0][1] as unknown[];
     expect(params).toEqual([['approved', 'rejected']]);
+    expect(JSON.parse(res._getData()).data.escalations).toEqual([]);
+  });
+
+  it('returns 500 when the DB throws', async () => {
+    mockQuery.mockRejectedValueOnce(new Error('connection refused'));
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({ method: 'GET' });
+    await handler(req, res);
+    expect(res._getStatusCode()).toBe(500);
   });
 
   it('rejects an invalid status value', async () => {

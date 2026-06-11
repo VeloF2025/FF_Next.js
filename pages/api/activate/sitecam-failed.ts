@@ -20,22 +20,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const statuses = statusFilter === 'pending' ? ['pending'] : ['approved', 'rejected'];
 
-  const { rows } = await pool.query(
-    `SELECT e.id, e.job_type, e.site_id, e.step_number,
-            e.fail_reasons, e.attempt_photos, e.status,
-            e.resolved_at, e.resolution_note, e.created_at,
-            t.first_name || ' ' || t.last_name AS tech_name,
-            r.first_name || ' ' || r.last_name AS resolved_by_name
-     FROM pwa_escalations e
-     LEFT JOIN staff t ON t.id = e.tech_id
-     LEFT JOIN staff r ON r.id = e.resolved_by
-     WHERE e.status = ANY($1)
-     ORDER BY e.created_at DESC
-     LIMIT 100`,
-    [statuses],
-  );
+  try {
+    const { rows } = await pool.query(
+      `SELECT e.id, e.job_type, e.site_id, e.step_number,
+              e.fail_reasons, e.attempt_photos, e.status,
+              e.resolved_at, e.resolution_note, e.created_at,
+              t.first_name || ' ' || t.last_name AS tech_name,
+              r.first_name || ' ' || r.last_name AS resolved_by_name
+       FROM pwa_escalations e
+       LEFT JOIN staff t ON t.id = e.tech_id
+       LEFT JOIN staff r ON r.id = e.resolved_by
+       WHERE e.status = ANY($1)
+       ORDER BY e.created_at DESC
+       LIMIT 100`,
+      [statuses],
+    );
 
-  return apiResponse.success(res, { escalations: rows });
+    return apiResponse.success(res, { escalations: rows });
+  } catch (err) {
+    return apiResponse.internalError(res, err);
+  }
 }
 
 export default withAuth(withRole('manager')(handler));
