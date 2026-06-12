@@ -15,6 +15,7 @@ import { OltInvestigateTab } from './olt/OltInvestigateTab';
 import { OltEscalationsTab } from './olt/OltEscalationsTab';
 import { OltFixLogTab } from './olt/OltFixLogTab';
 import { OltReportingTab } from './olt/OltReportingTab';
+import { OltReconLedgerTab } from './olt/OltReconLedgerTab';
 
 interface OltReportGroupProps {
   activeTab: string | null;
@@ -194,6 +195,8 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       {state.currentTab === 'reporting' && (
         <OltReportingTab setError={state.setError} />
       )}
+
+      {state.currentTab === 'ledger' && <OltReconLedgerTab />}
     </div>
   );
 }

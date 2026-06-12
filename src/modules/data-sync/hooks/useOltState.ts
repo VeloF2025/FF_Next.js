@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   History,
   BarChart3,
+  Scale,
 } from 'lucide-react';
 import type {
   OltTabId,
@@ -37,6 +38,9 @@ const TABS: { id: OltTabId; label: string; icon: React.ElementType; permissionKe
   { id: 'escalations', label: 'Escalations', icon: AlertTriangle, permissionKey: 'system.data-sync.olt.escalations' },
   { id: 'history', label: 'Fix Log', icon: History, permissionKey: 'system.data-sync.olt.history' },
   { id: 'reporting', label: 'Reporting', icon: BarChart3, permissionKey: 'system.data-sync.olt.reporting' },
+  // Reuses the investigate permission (no new RBAC key needed) — the ledger is the
+  // three-way recon companion to the investigate tab.
+  { id: 'ledger', label: 'Ledger', icon: Scale, permissionKey: 'system.data-sync.olt.investigate' },
 ];
 
 export { TABS as OLT_TABS };
