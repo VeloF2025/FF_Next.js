@@ -101,6 +101,19 @@ describe('POST /api/cron/auto-feedback', () => {
     expect(res._getJSONData().data).toMatchObject({ paused: false, processed: 0, sent: 0, skipped: 0 });
   });
 
+  it('gates eligibility on the DR submitted_date, not just the processing time (backlog guard)', async () => {
+    await run(AUTH);
+    const eligibleSql = mockQuery.mock.calls
+      .map((c) => c[0] as string)
+      .find((sql) => sql.includes('FROM dr_photo_unified_reviews'));
+    expect(eligibleSql).toBeDefined();
+    // Re-processed backlog DRs pass the auto_qa_processed_at cutoff (they were
+    // just processed), so the DR's own submitted_date must also be gated —
+    // otherwise techs get auto-feedback about months-old installs.
+    expect(eligibleSql).toContain('submitted_date >= $1');
+    expect(eligibleSql).toContain('auto_qa_processed_at >= $1');
+  });
+
   it('skips a DR with no wa_sender_jid', async () => {
     stubQuery({ eligible: [{ ...eligibleDR, wa_sender_jid: null }] });
     const res = await run(AUTH);
