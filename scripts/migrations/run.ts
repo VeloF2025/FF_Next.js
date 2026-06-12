@@ -48,7 +48,7 @@ function runPendingMigrations() {
   // env-only superuser URL is still honoured (MIGRATION_URL is the runner's own
   // connection variable — seeding it skips its .env lookup).
   const env = { ...process.env };
-  if (!process.env.MIGRATION_DATABASE_URL && process.env.DATABASE_URL_MIGRATIONS) {
+  if (!process.env.MIGRATION_URL && process.env.DATABASE_URL_MIGRATIONS) {
     env.MIGRATION_URL = process.env.DATABASE_URL_MIGRATIONS;
   }
   execFileSync('bash', [runner], { stdio: 'inherit', cwd: REPO_ROOT, env });
@@ -103,8 +103,17 @@ async function rollbackMigration(version: string) {
     );
   }
 
-  out(`Using rollback file: ${path.basename(rollbackPath)}`);
+  const rollbackName = path.basename(rollbackPath);
+  out(`Using rollback file: ${rollbackName}`);
   const sqlText = fs.readFileSync(rollbackPath, 'utf-8');
+
+  // The forward migration's filename — needed to clear the canonical
+  // schema_migrations tracker (keyed by filename), so the deploy/forward runner
+  // will re-apply it after rollback. Derived exactly from the rollback filename
+  // (NOT by version prefix — files can share a version, e.g. two 411_*).
+  const forwardFilename = rollbackName.startsWith('rollback_')
+    ? rollbackName.slice('rollback_'.length)
+    : rollbackName.replace(/\.down\.sql$/, '.sql');
 
   const pool = resolveMigrationPool();
   const client = await pool.connect();
@@ -112,6 +121,7 @@ async function rollbackMigration(version: string) {
     await client.query('BEGIN');
     await client.query(sqlText);
     await client.query(`DELETE FROM migrations WHERE version = $1`, [version]);
+    await client.query(`DELETE FROM schema_migrations WHERE filename = $1`, [forwardFilename]);
     await client.query('COMMIT');
     out(`✓ Rollback ${version} completed`);
   } catch (error) {
