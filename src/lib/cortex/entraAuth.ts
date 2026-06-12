@@ -22,6 +22,10 @@
  * live `fetch` token exchange and the route round-trip are UNTESTED pending that.
  */
 import { randomBytes } from 'crypto';
+import { decodeJwt } from 'jose';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('cortex:entra');
 
 /** Server-only cookie holding the forwarded Entra ID token (httpOnly). */
 export const ENTRA_ID_TOKEN_COOKIE = 'ff_entra_id_token';
@@ -117,4 +121,52 @@ export async function exchangeCodeForIdToken(cfg: EntraConfig, code: string): Pr
 export function readEntraIdToken(cookies: Partial<Record<string, string>> | undefined): string | undefined {
   const v = cookies?.[ENTRA_ID_TOKEN_COOKIE];
   return v && v.trim() ? v : undefined;
+}
+
+/** The id-token identity claims we accept as the signed-in subject, in order. */
+const ENTRA_IDENTITY_CLAIMS = ['preferred_username', 'email', 'upn'] as const;
+
+/**
+ * Resolve the Entra ID token to forward to the bridge for `reviewerEmail`, BOUND to the
+ * FibreFlow session identity. The bridge keys its ACL on the forwarded bearer, so a token
+ * minted for a different Entra principal than the FF session must NEVER be forwarded —
+ * otherwise Cortex would scope to the wrong user. Returns the token only when:
+ *   - the cookie is present and non-blank, AND
+ *   - an identity claim (`preferred_username` | `email` | `upn`) equals `reviewerEmail`
+ *     (case-insensitive), AND
+ *   - it is not expired (`exp`, when present).
+ * Returns undefined otherwise → the caller falls back to the HS256 gateway JWT keyed on
+ * `reviewerEmail` (fail closed). Never throws: an unparseable token is treated as absent.
+ *
+ * The signature is NOT verified here (the bridge does real OIDC RS256/JWKS verification);
+ * this is an identity-binding + freshness gate only, defence-in-depth on top of that.
+ */
+export function getForwardableEntraIdToken(
+  cookies: Partial<Record<string, string>> | undefined,
+  reviewerEmail: string | undefined,
+): string | undefined {
+  const token = readEntraIdToken(cookies);
+  const want = reviewerEmail?.trim().toLowerCase();
+  if (!token || !want) return undefined;
+
+  let claims: ReturnType<typeof decodeJwt>;
+  try {
+    claims = decodeJwt(token);
+  } catch (err) {
+    // Unparseable cookie value (corrupted / tampered) → treat as no token (HS256
+    // fallback). Worth a warn: a well-behaved login never produces a malformed cookie.
+    log.warn(`Discarding unparseable Entra ID-token cookie: ${err instanceof Error ? err.message : String(err)}`);
+    return undefined;
+  }
+
+  const subject = ENTRA_IDENTITY_CLAIMS
+    .map((k) => claims[k])
+    .find((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    ?.trim()
+    .toLowerCase();
+  if (!subject || subject !== want) return undefined; // identity mismatch → fail closed
+
+  if (typeof claims.exp === 'number' && claims.exp * 1000 <= Date.now()) return undefined; // expired
+
+  return token;
 }

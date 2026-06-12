@@ -7,11 +7,13 @@
  * Azure config) — see entraAuth.ts.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { SignJWT } from 'jose';
 import {
   ENTRA_ID_TOKEN_COOKIE,
   buildAuthorizeUrl,
   entraSsoEnabled,
   getEntraConfig,
+  getForwardableEntraIdToken,
   randomToken,
   readEntraIdToken,
 } from '@/lib/cortex/entraAuth';
@@ -124,5 +126,69 @@ describe('randomToken', () => {
     expect(a).toMatch(/^[0-9a-f]+$/);
     expect(a).not.toBe(b);
     expect(a.length).toBe(64); // 32 bytes hex
+  });
+});
+
+describe('getForwardableEntraIdToken — identity binding + freshness', () => {
+  const REVIEWER = 'alice@velocityfibre.co.za';
+  const FUTURE = Math.floor(Date.now() / 1000) + 3600;
+  const PAST = Math.floor(Date.now() / 1000) - 60;
+
+  // Build an unsigned-but-decodable id token. The function only decodes (the bridge
+  // verifies sigs), so the signing secret is irrelevant.
+  async function idToken(claims: Record<string, unknown>): Promise<string> {
+    return new SignJWT(claims).setProtectedHeader({ alg: 'HS256' }).sign(
+      new TextEncoder().encode('irrelevant-test-secret-irrelevant-test'),
+    );
+  }
+  const cookie = (t: string) => ({ [ENTRA_ID_TOKEN_COOKIE]: t });
+
+  it('returns the token when preferred_username matches the FF reviewer', async () => {
+    const t = await idToken({ preferred_username: REVIEWER, exp: FUTURE });
+    expect(getForwardableEntraIdToken(cookie(t), REVIEWER)).toBe(t);
+  });
+
+  it('matches on `email` and `upn` claims too', async () => {
+    const byEmail = await idToken({ email: REVIEWER, exp: FUTURE });
+    const byUpn = await idToken({ upn: REVIEWER, exp: FUTURE });
+    expect(getForwardableEntraIdToken(cookie(byEmail), REVIEWER)).toBe(byEmail);
+    expect(getForwardableEntraIdToken(cookie(byUpn), REVIEWER)).toBe(byUpn);
+  });
+
+  it('is case-insensitive on the email comparison', async () => {
+    const t = await idToken({ preferred_username: 'Alice@VelocityFibre.co.za', exp: FUTURE });
+    expect(getForwardableEntraIdToken(cookie(t), REVIEWER)).toBe(t);
+  });
+
+  it('returns undefined when the token subject is a DIFFERENT user (cross-user guard)', async () => {
+    const t = await idToken({ preferred_username: 'mallory@velocityfibre.co.za', exp: FUTURE });
+    expect(getForwardableEntraIdToken(cookie(t), REVIEWER)).toBeUndefined();
+  });
+
+  it('returns undefined when the token carries no identity claim', async () => {
+    const t = await idToken({ sub: 'opaque-guid', exp: FUTURE });
+    expect(getForwardableEntraIdToken(cookie(t), REVIEWER)).toBeUndefined();
+  });
+
+  it('returns undefined for an EXPIRED token even when the subject matches', async () => {
+    const t = await idToken({ preferred_username: REVIEWER, exp: PAST });
+    expect(getForwardableEntraIdToken(cookie(t), REVIEWER)).toBeUndefined();
+  });
+
+  it('accepts a matching token with no exp claim (freshness optional)', async () => {
+    const t = await idToken({ preferred_username: REVIEWER });
+    expect(getForwardableEntraIdToken(cookie(t), REVIEWER)).toBe(t);
+  });
+
+  it('returns undefined for an unparseable token (never throws)', () => {
+    expect(getForwardableEntraIdToken(cookie('not-a-jwt'), REVIEWER)).toBeUndefined();
+  });
+
+  it('returns undefined when the cookie is absent or the reviewer email is blank', async () => {
+    const t = await idToken({ preferred_username: REVIEWER, exp: FUTURE });
+    expect(getForwardableEntraIdToken(undefined, REVIEWER)).toBeUndefined();
+    expect(getForwardableEntraIdToken({}, REVIEWER)).toBeUndefined();
+    expect(getForwardableEntraIdToken(cookie(t), '')).toBeUndefined();
+    expect(getForwardableEntraIdToken(cookie(t), undefined)).toBeUndefined();
   });
 });

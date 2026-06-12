@@ -6,9 +6,11 @@
  * only httpOnly cookie (`bridgeBearer` forwards it to the Cortex bridge), clears the
  * round-trip cookies, and redirects to /cortex. Inert (404) unless the flag is on.
  *
- * Fail closed: any missing/mismatched state, missing code, exchange failure, or nonce
- * mismatch redirects to an error and sets NO id-token cookie. UNTESTED end-to-end
- * until the Azure app registration is configured.
+ * Fail closed: any missing/mismatched state, missing code, exchange failure, aud/iss
+ * mismatch, nonce mismatch, or an already-expired token redirects to an error and sets
+ * NO id-token cookie. Identity binding to the FF session is enforced at FORWARD time
+ * (getForwardableEntraIdToken), so a token for a different principal is simply never
+ * forwarded. UNTESTED end-to-end until the Azure app registration is configured.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { timingSafeEqual } from 'crypto';
@@ -36,7 +38,15 @@ function safeEqual(a: string | undefined, b: string | undefined): boolean {
 }
 
 function clearRoundTripCookies(): string[] {
-  const expire = { httpOnly: true, sameSite: 'lax' as const, maxAge: 0, path: '/' };
+  // `secure` must match the attributes the cookie was SET with at login, otherwise a
+  // TLS browser ignores the deletion for a Secure cookie (RFC 6265) and it lingers.
+  const expire = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 0,
+    path: '/',
+  };
   return [serialize(ENTRA_STATE_COOKIE, '', expire), serialize(ENTRA_NONCE_COOKIE, '', expire)];
 }
 
@@ -106,18 +116,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fail(res, 'nonce mismatch');
       return;
     }
-  } catch {
+    // Freshness: decodeJwt does not check exp. Don't persist a token that is already
+    // expired (delayed callback / clock skew) — the bridge would 401 every forward.
+    if (typeof claims.exp === 'number' && claims.exp * 1000 <= Date.now()) {
+      fail(res, 'id_token expired');
+      return;
+    }
+  } catch (err) {
+    log.warn(`Entra id_token decode failed: ${err instanceof Error ? err.message : String(err)}`);
     fail(res, 'unparseable id_token');
     return;
   }
 
-  // Store the ID token server-side only; bridgeBearer forwards it to the bridge.
+  // Store the ID token server-side only; bridgeBearer forwards it to the bridge. Scope
+  // the path to /api/cortex — the only routes that read it — so it is not transmitted on
+  // every request to the domain (httpOnly already blocks JS access; this narrows the wire
+  // surface). The redirect target /cortex still triggers the page's /api/cortex/* calls.
   const idCookie = serialize(ENTRA_ID_TOKEN_COOKIE, idToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 3600,
-    path: '/',
+    path: '/api/cortex',
   });
   res.setHeader('Set-Cookie', [idCookie, ...clearRoundTripCookies()]);
   res.redirect(302, '/cortex');

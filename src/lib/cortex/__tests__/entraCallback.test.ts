@@ -52,11 +52,16 @@ async function idTokenWith(claims: Record<string, unknown>): Promise<string> {
 }
 
 let savedEnv: Record<string, string | undefined>;
-const ENV = ['ENTRA_SSO_ENABLED', 'ENTRA_TENANT_ID', 'ENTRA_CLIENT_ID', 'ENTRA_CLIENT_SECRET', 'ENTRA_REDIRECT_URI'];
+// Include GRAPH_* so the 503-unconfigured test can clear the fallback config without
+// leaking into other suites — all are saved and restored.
+const ENV = [
+  'ENTRA_SSO_ENABLED', 'ENTRA_TENANT_ID', 'ENTRA_CLIENT_ID', 'ENTRA_CLIENT_SECRET', 'ENTRA_REDIRECT_URI',
+  'GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET',
+];
 
 beforeEach(() => {
   savedEnv = {};
-  for (const k of ENV) { savedEnv[k] = process.env[k]; }
+  for (const k of ENV) { savedEnv[k] = process.env[k]; delete process.env[k]; }
   process.env.ENTRA_SSO_ENABLED = 'true';
   process.env.ENTRA_TENANT_ID = TENANT;
   process.env.ENTRA_CLIENT_ID = CLIENT;
@@ -74,6 +79,13 @@ const goodClaims = {
   nonce: NONCE,
   preferred_username: 'alice@velocityfibre.co.za',
 };
+
+/** Assert the response set NO id-token cookie (the core fail-closed invariant). */
+function noIdTokenCookie(res: Record<string, unknown>): boolean {
+  const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'] ?? [];
+  return !setCookie.some((c) => c.startsWith(`${ENTRA_ID_TOKEN_COOKIE}=`));
+}
+const validCookies = { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE };
 
 describe('Entra callback — targeting + replay guards', () => {
   it('stores the id-token cookie on a fully valid round trip', async () => {
@@ -97,22 +109,77 @@ describe('Entra callback — targeting + replay guards', () => {
   it('rejects a token from a DIFFERENT tenant issuer', async () => {
     exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, iss: 'https://login.microsoftonline.com/evil-tenant/v2.0' }));
     const res = makeRes();
-    await handler(makeReq({ code: 'c', state: STATE }, { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE }), res as never);
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('rejects an issuer that only PREFIXES the tenant (look-alike tenant) — trailing-slash guard', async () => {
+    // `.../tenant-guid.evil.com/...` starts with `.../tenant-guid` but NOT `.../tenant-guid/`.
+    exchangeMock.mockResolvedValue(await idTokenWith({
+      ...goodClaims,
+      iss: `https://login.microsoftonline.com/${TENANT}.evil.com/v2.0`,
+    }));
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
   });
 
   it('rejects a nonce mismatch (replay)', async () => {
     exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, nonce: 'attacker-nonce' }));
     const res = makeRes();
-    await handler(makeReq({ code: 'c', state: STATE }, { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE }), res as never);
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('rejects an already-EXPIRED token (no id-token cookie)', async () => {
+    exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, exp: Math.floor(Date.now() / 1000) - 60 }));
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('stores a token with a FUTURE exp (freshness ok)', async () => {
+    exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, exp: Math.floor(Date.now() / 1000) + 3600 }));
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex');
+    expect(noIdTokenCookie(res)).toBe(false);
+  });
+
+  it('fails closed when the token exchange THROWS (no id-token cookie)', async () => {
+    exchangeMock.mockRejectedValue(new Error('network down'));
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('fails closed when the exchange returns an UNPARSEABLE token', async () => {
+    exchangeMock.mockResolvedValue('this.is.not-a-valid-jwt');
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
   });
 
   it('rejects a state mismatch (CSRF) before exchanging', async () => {
     const res = makeRes();
-    await handler(makeReq({ code: 'c', state: 'wrong' }, { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE }), res as never);
+    await handler(makeReq({ code: 'c', state: 'wrong' }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
     expect(exchangeMock).not.toHaveBeenCalled();
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('rejects a missing authorization code (after a valid state)', async () => {
+    const res = makeRes();
+    await handler(makeReq({ state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(exchangeMock).not.toHaveBeenCalled();
+    expect(noIdTokenCookie(res)).toBe(true);
   });
 
   it('404s when the flag is off', async () => {
@@ -120,5 +187,21 @@ describe('Entra callback — targeting + replay guards', () => {
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, {}), res as never);
     expect(res.statusCode).toBe(404);
+  });
+
+  it('405s on a non-GET method', async () => {
+    const res = makeRes();
+    await handler({ method: 'POST', query: {}, cookies: {} } as never, res as never);
+    expect(res.statusCode).toBe(405);
+    expect((res.headers as Record<string, unknown>)['Allow']).toBe('GET');
+  });
+
+  it('503s when the flag is on but the app registration is unconfigured', async () => {
+    for (const k of ['ENTRA_TENANT_ID', 'ENTRA_CLIENT_ID', 'ENTRA_CLIENT_SECRET', 'ENTRA_REDIRECT_URI', 'GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET']) {
+      delete process.env[k];
+    }
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.statusCode).toBe(503);
   });
 });

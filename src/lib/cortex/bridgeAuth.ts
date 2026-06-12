@@ -37,9 +37,12 @@ function oidcForwardEnabled(): boolean {
  * the secret can be rotated / toggled without a process restart.
  *
  * @param reviewerEmail server-verified FibreFlow user email (never client-supplied).
- * @param opts.entraIdToken the verified Entra ID token for this user, read from the
- *   server-side session by the caller. When `CORTEX_OIDC_FORWARD=true` and this is
- *   present, it is forwarded verbatim (tier 1). Absent/flag-off → HS256/api-key.
+ * @param opts.entraIdToken the Entra ID token for this user, already BOUND to
+ *   `reviewerEmail` and read from the server-side cookie by the caller (via
+ *   `getForwardableEntraIdToken`, which rejects a mismatched-subject or expired token).
+ *   When `CORTEX_OIDC_FORWARD=true` and this is present, it is forwarded as the bearer
+ *   (tier 1). Absent/flag-off → HS256/api-key. This function does not re-bind identity;
+ *   it trusts the caller's binding, hence the strict typing of the call sites.
  */
 export async function bridgeBearer(
   reviewerEmail: string,
