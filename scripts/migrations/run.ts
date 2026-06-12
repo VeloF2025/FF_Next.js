@@ -1,152 +1,78 @@
 #!/usr/bin/env tsx
 /**
- * Migration runner — Supabase/Postgres (pg driver).
+ * Migration CLI — Supabase/Postgres.
  *
- * Applies raw SQL files from scripts/migrations/sql/ in filename order.
- * Each migration runs inside a single transaction on a dedicated client,
- * so BEGIN/COMMIT/ROLLBACK actually bind together. The whole file is
- * passed to pg as a multi-statement string — no naive `.split(';')`.
+ *   npm run db:migrate                # apply pending migrations
+ *   npm run db:migrate rollback 301   # roll back migration 301
  *
- * Connection:
- *   - Prefers DATABASE_URL_MIGRATIONS (must be a superuser / schema-owner URL)
- *   - Falls back to DATABASE_URL (will fail on CREATE TABLE in least-privilege
- *     setups like Supabase where the app user is `fibreflow_user`)
+ * Forward migrations are delegated to scripts/run-pending-migrations.sh — the
+ * single canonical runner, which tracks applied migrations by FILENAME in
+ * `schema_migrations`. Keying by filename (not the 3-digit version prefix) means
+ * files that share a version — e.g. two `411_*` from parallel branches — are BOTH
+ * applied, and a genuine conflict aborts loudly instead of silently skipping the
+ * second file (the bug this used to have). It is also the exact runner the deploy
+ * uses (scripts/deploy-local.sh), so `npm run db:migrate` and deploys cannot diverge.
  *
- * Usage:
- *   npm run db:migrate                    # apply pending migrations
- *   npm run db:migrate rollback 301       # rollback 301 using rollback_301_*.sql
+ * Rollback stays here (pg driver): it runs the matching rollback_<version>_*.sql
+ * and deletes the legacy `migrations` row.
  *
- * Rollback lookup order (first hit wins):
- *   1. scripts/migrations/sql/rollbacks/<version>_*.down.sql   (legacy path)
- *   2. scripts/migrations/sql/rollback_<version>_*.sql         (current convention)
+ * Rollback file lookup (first hit wins):
+ *   1. scripts/migrations/sql/rollbacks/<version>_*.down.sql   (legacy)
+ *   2. scripts/migrations/sql/rollback_<version>_*.sql         (current)
  */
 
 import { Pool } from 'pg';
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const migrationUrl = process.env.DATABASE_URL_MIGRATIONS ?? process.env.DATABASE_URL;
-if (!migrationUrl) {
-  console.error('ERROR: Neither DATABASE_URL_MIGRATIONS nor DATABASE_URL is set.');
-  process.exit(1);
-}
-if (!process.env.DATABASE_URL_MIGRATIONS) {
-  console.warn(
-    '⚠ DATABASE_URL_MIGRATIONS not set — falling back to DATABASE_URL. ' +
-    'This will fail if the connection user lacks CREATE TABLE rights on schema public ' +
-    '(typical for Supabase `fibreflow_user`). Set DATABASE_URL_MIGRATIONS to a superuser URL.'
-  );
-}
-
-const useSSL = migrationUrl.includes('sslmode=require');
-const pool = new Pool({
-  connectionString: migrationUrl,
-  ssl: useSSL ? { rejectUnauthorized: false } : false,
-  max: 3,
-  idleTimeoutMillis: 10_000,
-  connectionTimeoutMillis: 30_000,
-});
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MIGRATIONS_DIR = path.join(__dirname, 'sql');
+const REPO_ROOT = path.join(__dirname, '..', '..');
 
-async function ensureMigrationsTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS migrations (
-      id SERIAL PRIMARY KEY,
-      version VARCHAR(20) NOT NULL UNIQUE,
-      name VARCHAR(255) NOT NULL,
-      executed_at TIMESTAMP DEFAULT NOW(),
-      execution_time_ms INTEGER,
-      success BOOLEAN DEFAULT true,
-      error_message TEXT
-    )
-  `);
+// CLI output — this is a terminal tool, not app code, so write directly to the
+// streams (the pino app logger emits JSON and is silent under tsx).
+const out = (msg: string): void => { process.stdout.write(`${msg}\n`); };
+const err = (msg: string): void => { process.stderr.write(`${msg}\n`); };
+const asMessage = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+function runPendingMigrations() {
+  const runner = path.join(REPO_ROOT, 'scripts', 'run-pending-migrations.sh');
+  if (!fs.existsSync(runner)) {
+    throw new Error(`Canonical migration runner not found at ${runner}`);
+  }
+  // run.ts historically used DATABASE_URL_MIGRATIONS for the superuser URL; the
+  // shell runner reads MIGRATION_DATABASE_URL from .env*. Bridge them so an
+  // env-only superuser URL is still honoured (MIGRATION_URL is the runner's own
+  // connection variable — seeding it skips its .env lookup).
+  const env = { ...process.env };
+  if (!process.env.MIGRATION_DATABASE_URL && process.env.DATABASE_URL_MIGRATIONS) {
+    env.MIGRATION_URL = process.env.DATABASE_URL_MIGRATIONS;
+  }
+  execFileSync('bash', [runner], { stdio: 'inherit', cwd: REPO_ROOT, env });
 }
 
-async function getAppliedMigrations(): Promise<Set<string>> {
-  const { rows } = await pool.query<{ version: string }>(
-    `SELECT version FROM migrations WHERE success = true ORDER BY version`
-  );
-  return new Set(rows.map(r => r.version));
-}
-
-async function runMigration(filePath: string, fileName: string) {
-  const match = fileName.match(/^(\d{3})_(.+)\.sql$/);
-  if (!match) throw new Error(`Invalid migration filename: ${fileName}`);
-
-  const [, version, name] = match;
-  const sqlText = fs.readFileSync(filePath, 'utf-8');
-  const startedAt = Date.now();
-
-  console.log(`▶ ${version}: ${name}`);
-
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query(sqlText);
-    const elapsed = Date.now() - startedAt;
-    await client.query(
-      `INSERT INTO migrations (version, name, execution_time_ms, success)
-       VALUES ($1, $2, $3, true)
-       ON CONFLICT (version) DO NOTHING`,
-      [version, name.replace(/_/g, ' '), elapsed]
+function resolveMigrationPool(): Pool {
+  const migrationUrl = process.env.DATABASE_URL_MIGRATIONS ?? process.env.DATABASE_URL;
+  if (!migrationUrl) {
+    throw new Error('Neither DATABASE_URL_MIGRATIONS nor DATABASE_URL is set.');
+  }
+  if (!process.env.DATABASE_URL_MIGRATIONS) {
+    err(
+      '⚠ DATABASE_URL_MIGRATIONS not set — falling back to DATABASE_URL. ' +
+      'Rollback may fail if the connection user lacks the required privileges.'
     );
-    await client.query('COMMIT');
-    console.log(`✓ ${version} applied in ${elapsed}ms`);
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    const message = error instanceof Error ? error.message : String(error);
-    await pool.query(
-      `INSERT INTO migrations (version, name, execution_time_ms, success, error_message)
-       VALUES ($1, $2, $3, false, $4)
-       ON CONFLICT (version) DO UPDATE
-         SET error_message = EXCLUDED.error_message, success = false`,
-      [version, name.replace(/_/g, ' '), Date.now() - startedAt, message]
-    ).catch(() => {});
-    console.error(`✗ ${version} failed: ${message}`);
-    throw error;
-  } finally {
-    client.release();
   }
-}
-
-async function runPendingMigrations() {
-  console.log('Starting database migrations...\n');
-  await ensureMigrationsTable();
-
-  const applied = await getAppliedMigrations();
-  console.log(`Found ${applied.size} applied migrations`);
-
-  if (!fs.existsSync(MIGRATIONS_DIR)) {
-    fs.mkdirSync(MIGRATIONS_DIR, { recursive: true });
-    console.log('Created migrations/sql directory');
-  }
-
-  const pending = fs.readdirSync(MIGRATIONS_DIR)
-    .filter(f => /^\d{3}_.+\.sql$/.test(f))
-    .sort()
-    .filter(f => {
-      const version = f.match(/^(\d{3})_/)![1];
-      return !applied.has(version);
-    });
-
-  if (pending.length === 0) {
-    console.log('No pending migrations');
-    return;
-  }
-
-  console.log(`\nFound ${pending.length} pending migrations:`);
-  pending.forEach(m => console.log(`  - ${m}`));
-  console.log('');
-
-  for (const fileName of pending) {
-    await runMigration(path.join(MIGRATIONS_DIR, fileName), fileName);
-  }
-
-  console.log('\n✓ All migrations completed successfully');
+  const useSSL = migrationUrl.includes('sslmode=require');
+  return new Pool({
+    connectionString: migrationUrl,
+    ssl: useSSL ? { rejectUnauthorized: false } : false,
+    max: 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 30_000,
+  });
 }
 
 function findRollbackFile(version: string): string | null {
@@ -167,7 +93,7 @@ function findRollbackFile(version: string): string | null {
 }
 
 async function rollbackMigration(version: string) {
-  console.log(`Rolling back migration: ${version}`);
+  out(`Rolling back migration: ${version}`);
   const rollbackPath = findRollbackFile(version);
   if (!rollbackPath) {
     throw new Error(
@@ -177,22 +103,24 @@ async function rollbackMigration(version: string) {
     );
   }
 
-  console.log(`Using rollback file: ${path.basename(rollbackPath)}`);
+  out(`Using rollback file: ${path.basename(rollbackPath)}`);
   const sqlText = fs.readFileSync(rollbackPath, 'utf-8');
 
+  const pool = resolveMigrationPool();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query(sqlText);
     await client.query(`DELETE FROM migrations WHERE version = $1`, [version]);
     await client.query('COMMIT');
-    console.log(`✓ Rollback ${version} completed`);
+    out(`✓ Rollback ${version} completed`);
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    console.error(`✗ Rollback ${version} failed:`, error);
+    await client.query('ROLLBACK').catch(() => undefined);
+    err(`✗ Rollback ${version} failed: ${asMessage(error)}`);
     throw error;
   } finally {
     client.release();
+    await pool.end().catch(() => undefined);
   }
 }
 
@@ -202,18 +130,17 @@ async function main() {
     if (command === 'rollback') {
       const version = process.argv[3];
       if (!version) {
-        console.error('Please specify migration version to rollback (e.g., 301)');
-        process.exit(1);
+        err('Please specify migration version to rollback (e.g., 301)');
+        process.exitCode = 1;
+        return;
       }
       await rollbackMigration(version);
     } else {
-      await runPendingMigrations();
+      runPendingMigrations();
     }
   } catch (error) {
-    console.error('Migration failed:', error);
+    err(`Migration failed: ${asMessage(error)}`);
     process.exitCode = 1;
-  } finally {
-    await pool.end().catch(() => {});
   }
 }
 
