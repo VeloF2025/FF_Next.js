@@ -31,7 +31,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       deliveryAddress,
       expectedDeliveryDate,
       paymentTerms = 'Net 30',
-      taxRate = 15,
       internalNotes,
       createdBy = 'System',
       items: customItems, // Optional: override items from RFQ
@@ -77,6 +76,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const supplierResult = await sql`
       SELECT
         s.id, s.company_name, s.contact_email, s.contact_phone,
+        s.vat_registered,
         rs.status as rfq_supplier_status
       FROM suppliers s
       LEFT JOIN rfq_suppliers rs ON rs.supplier_id = s.id AND rs.rfq_id::text = ${rfqId}
@@ -88,6 +88,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     const supplier = supplierResult[0]!;
+
+    // VAT rate is derived from the supplier: registered -> 15%, not registered -> 0%
+    const taxRate = supplier.vat_registered === true ? 15 : 0;
 
     // Get RFQ items (or use custom items if provided)
     let poItems;

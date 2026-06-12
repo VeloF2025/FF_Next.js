@@ -76,7 +76,6 @@ export function ConvertToPOModal({
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [paymentTerms, setPaymentTerms] = useState('Net 30');
-  const [taxRate, setTaxRate] = useState(15);
   const [internalNotes, setInternalNotes] = useState('');
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,16 +87,13 @@ export function ConvertToPOModal({
       setDeliveryAddress('');
       setExpectedDeliveryDate('');
       setPaymentTerms('Net 30');
-      setTaxRate(15);
       setInternalNotes('');
       setError(null);
     }
   }, [isOpen, suppliers]);
 
-  // Calculate totals
+  // Subtotal only — VAT is derived server-side from the supplier's VAT registration on creation
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.estimatedUnitPrice, 0);
-  const taxAmount = subtotal * (taxRate / 100);
-  const total = subtotal + taxAmount;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-ZA', {
@@ -131,7 +127,6 @@ export function ConvertToPOModal({
           deliveryAddress,
           expectedDeliveryDate: expectedDeliveryDate || null,
           paymentTerms,
-          taxRate,
           internalNotes,
           createdBy: 'System',
         }),
@@ -282,21 +277,6 @@ export function ConvertToPOModal({
             </div>
           </div>
 
-          {/* Tax Rate */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
-              VAT Rate (%)
-            </label>
-            <input
-              type="number"
-              value={taxRate}
-              onChange={(e) => setTaxRate(Number(e.target.value))}
-              min={0}
-              max={25}
-              className="w-32 px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
-            />
-          </div>
-
           {/* Internal Notes */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
@@ -338,18 +318,14 @@ export function ConvertToPOModal({
 
             {/* Totals */}
             <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)] space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--ff-text-secondary)]">Subtotal</span>
-                <span className="text-[var(--ff-text-primary)]">{formatCurrency(subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--ff-text-secondary)]">VAT ({taxRate}%)</span>
-                <span className="text-[var(--ff-text-primary)]">{formatCurrency(taxAmount)}</span>
-              </div>
               <div className="flex justify-between text-base font-semibold">
-                <span className="text-[var(--ff-text-primary)]">Total</span>
-                <span className="text-blue-400">{formatCurrency(total)}</span>
+                <span className="text-[var(--ff-text-primary)]">Subtotal</span>
+                <span className="text-blue-400">{formatCurrency(subtotal)}</span>
               </div>
+              <p className="text-xs text-[var(--ff-text-tertiary)]">
+                VAT (15% for VAT-registered suppliers, 0% otherwise) is applied automatically
+                from the supplier&apos;s registration when the PO is created.
+              </p>
             </div>
           </div>
         </div>

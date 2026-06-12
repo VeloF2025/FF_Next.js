@@ -59,6 +59,7 @@ export class NeonSupplierService {
           categories,
           tags,
           notes,
+          vat_registered AS "vatRegistered",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
         FROM suppliers
@@ -168,6 +169,7 @@ export class NeonSupplierService {
           physical_country,
           categories,
           notes,
+          vat_registered,
           created_by,
           updated_by
         ) VALUES (
@@ -188,6 +190,7 @@ export class NeonSupplierService {
           ${sanitized.addresses?.physical?.country || 'South Africa'},
           ${sanitized.categories || []},
           ${sanitized.notes || ''},
+          ${sanitized.vatRegistered ?? false},
           ${userId},
           ${userId}
         )
@@ -227,6 +230,8 @@ export class NeonSupplierService {
         registration_number: 'registration_number',
         taxNumber: 'tax_number',
         tax_number: 'tax_number',
+        vatRegistered: 'vat_registered',
+        vat_registered: 'vat_registered',
         physicalAddress: 'physical_street1',
         physical_address: 'physical_street1',
         city: 'physical_city',
@@ -668,6 +673,7 @@ export class NeonSupplierService {
       isActive: row.isActive ?? row.is_active,
       isPreferred: row.isPreferred ?? row.is_preferred,
       isVerified: row.isVerified ?? row.is_verified,
+      vatRegistered: row.vatRegistered ?? row.vat_registered ?? false,
       email: row.email,
       phone: row.phone,
       fax: row.fax,

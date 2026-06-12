@@ -88,6 +88,7 @@ export interface Supplier {
   isActive: boolean;
   isPreferred?: boolean;
   isVerified?: boolean;
+  vatRegistered?: boolean; // Drives PO VAT rate: 15% if registered, 0% if not
   attachments?: Attachment[];
   compliance?: {
     beeLevel?: number;
@@ -287,5 +288,6 @@ export interface SupplierFormData {
   primaryContact: ContactInfo;
   registrationNumber?: string;
   taxNumber?: string;
+  vatRegistered?: boolean;
   notes?: string;
 }
