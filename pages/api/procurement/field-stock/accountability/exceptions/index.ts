@@ -24,6 +24,7 @@ import { withAuth } from '@/lib/auth';
 
 const EXCEPTION_CLASSES = ['cross_dr_conflict', 'installed_not_cleared', 'aged_no_evidence'] as const;
 const ALL_CLASSES = [...EXCEPTION_CLASSES, 'recent_no_evidence'] as const;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -32,6 +33,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const { holderId, projectId, class: cls, includeAll } = req.query;
+
+    // Defence-in-depth: validate UUID-shaped filters before they reach the DB so a
+    // malformed value returns a 400 rather than a leaked Postgres cast error.
+    if (typeof holderId === 'string' && !UUID_RE.test(holderId)) {
+      return apiResponse.validationError(res, { holderId: 'Must be a UUID' });
+    }
+    if (typeof projectId === 'string' && projectId !== 'unassigned' && !UUID_RE.test(projectId)) {
+      return apiResponse.validationError(res, { projectId: 'Must be a UUID or "unassigned"' });
+    }
 
     const conditions: string[] = [];
     const params: unknown[] = [];

@@ -97,10 +97,15 @@ enriched AS (
     LIMIT 1
   ) wa ON true
   LEFT JOIN LATERAL (
+    -- A serial can appear under multiple drops via swaps (oes_activations is NOT
+    -- unique on serial_number). Pick the most-recent ACTIVATION — activation_date
+    -- is the authoritative recency signal; created_at (ingest time) only breaks
+    -- ties — so cross_dr_conflict compares against the current activation, not a
+    -- stale backfilled row.
     SELECT oa.drop_number, oa.status, oa.activation_date
     FROM oes_activations oa
     WHERE UPPER(TRIM(oa.serial_number)) = UPPER(TRIM(h.serial_number))
-    ORDER BY oa.created_at DESC NULLS LAST
+    ORDER BY oa.activation_date DESC NULLS LAST, oa.created_at DESC NULLS LAST
     LIMIT 1
   ) oes ON true
 )
@@ -133,6 +138,9 @@ SELECT
     ELSE 'recent_no_evidence'
   END AS exception_class
 FROM enriched e
+-- INNER JOIN is safe: stock_serials.holder_id has FK stock_serials_holder_id_fkey
+-- → stock_holders(id), so a held serial can never reference a missing holder (0
+-- orphans confirmed). No held row is silently dropped here.
 JOIN stock_holders hd ON hd.id = e.holder_id
 LEFT JOIN stock_items si ON si.id = e.stock_item_id
 LEFT JOIN projects pr ON pr.id = e.project_id;

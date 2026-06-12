@@ -58,12 +58,13 @@ describe('useStockExceptions', () => {
     const fetchMock = mockFetchOk({ data: [] });
     vi.stubGlobal('fetch', fetchMock);
     renderHook(() =>
-      useStockExceptions({ exceptionClass: 'cross_dr_conflict', projectId: 'p-9', includeAll: true }),
+      useStockExceptions({ holderId: 'h-1', exceptionClass: 'cross_dr_conflict', projectId: 'p-9', includeAll: true }),
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
     const url = String(fetchMock.mock.calls[0]![0]);
     expect(url).toContain('/api/procurement/field-stock/accountability/exceptions?');
+    expect(url).toContain('holderId=h-1');
     expect(url).toContain('class=cross_dr_conflict');
     expect(url).toContain('projectId=p-9');
     expect(url).toContain('includeAll=true');

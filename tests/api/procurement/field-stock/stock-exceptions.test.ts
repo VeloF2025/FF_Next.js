@@ -93,17 +93,45 @@ describe('GET /accountability/exceptions', () => {
     expect(params[0]).toEqual(['cross_dr_conflict', 'installed_not_cleared', 'aged_no_evidence']);
   });
 
+  const HOLDER = '11111111-1111-1111-1111-111111111111';
+  const PROJECT = '22222222-2222-2222-2222-222222222222';
+
   it('parameterizes holderId and projectId filters', async () => {
     queryMock.mockResolvedValueOnce([]);
     const res = makeRes();
-    await handler(makeReq({ holderId: 'h-1', projectId: 'p-9' }), res as unknown as NextApiResponse);
+    await handler(makeReq({ holderId: HOLDER, projectId: PROJECT }), res as unknown as NextApiResponse);
 
     const { sql, params } = callOf(0);
     expect(sql).toContain('holder_id = $2');
     expect(sql).toContain('project_id = $3');
     expect(params).toEqual([
-      ['cross_dr_conflict', 'installed_not_cleared', 'aged_no_evidence'], 'h-1', 'p-9',
+      ['cross_dr_conflict', 'installed_not_cleared', 'aged_no_evidence'], HOLDER, PROJECT,
     ]);
+  });
+
+  it('binds holderId at $1 when the default class filter is dropped (includeAll)', async () => {
+    queryMock.mockResolvedValueOnce([]);
+    const res = makeRes();
+    await handler(makeReq({ holderId: HOLDER, includeAll: 'true' }), res as unknown as NextApiResponse);
+
+    const { sql, params } = callOf(0);
+    expect(sql).toContain('holder_id = $1');
+    expect(sql).not.toContain('ANY($');
+    expect(params).toEqual([HOLDER]);
+  });
+
+  it('rejects a non-UUID holderId with 422 (no DB call)', async () => {
+    const res = makeRes();
+    await handler(makeReq({ holderId: 'not-a-uuid' }), res as unknown as NextApiResponse);
+    expect(res.statusCode).toBe(422);
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-UUID projectId with 422, but allows "unassigned"', async () => {
+    const res = makeRes();
+    await handler(makeReq({ projectId: 'bogus' }), res as unknown as NextApiResponse);
+    expect(res.statusCode).toBe(422);
+    expect(queryMock).not.toHaveBeenCalled();
   });
 
   it('maps projectId=unassigned to IS NULL (no bind param)', async () => {

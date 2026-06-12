@@ -8,7 +8,7 @@
  * arrive as JSON strings and are coerced.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export type ExceptionClass =
   | 'cross_dr_conflict'
@@ -86,7 +86,9 @@ export function useStockExceptions(
 ): UseStockExceptionsReturn {
   const { holderId, projectId, exceptionClass, includeAll, autoFetch = true } = options;
   const [exceptions, setExceptions] = useState<StockException[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Start loading when we're going to auto-fetch, so the list shows the spinner
+  // rather than a one-frame "no exceptions" flash before the first fetch fires.
+  const [loading, setLoading] = useState(autoFetch);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
@@ -113,16 +115,11 @@ export function useStockExceptions(
     }
   }, [holderId, projectId, exceptionClass, includeAll]);
 
-  const initialFetchDone = useRef(false);
-
+  // Auto-fetch on mount and whenever a filter changes (refetch identity tracks
+  // the filter deps). StrictMode double-invokes this in dev; the GET is
+  // idempotent so the extra dev-only request is harmless.
   useEffect(() => {
-    if (!autoFetch) return;
-    // Skip the very first auto-run's duplicate in StrictMode, but always re-run
-    // when filters change after mount.
-    if (!initialFetchDone.current) {
-      initialFetchDone.current = true;
-    }
-    refetch();
+    if (autoFetch) refetch();
   }, [autoFetch, refetch]);
 
   return { exceptions, loading, error, refetch };

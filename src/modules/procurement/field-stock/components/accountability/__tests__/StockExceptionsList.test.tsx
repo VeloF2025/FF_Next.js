@@ -66,8 +66,8 @@ describe('StockExceptionsList', () => {
     expect(screen.getByText('ALCLB491AA22')).toBeTruthy();
     expect(screen.getByText('ALCLB492BB33')).toBeTruthy();
 
-    // Filter to cross_dr_conflict (the class <select> is the one with the "All Classes" option)
-    const classSelect = screen.getByRole('combobox');
+    // Target the class select by its aria-label (a project select may also exist).
+    const classSelect = screen.getByRole('combobox', { name: 'Filter by class' });
     fireEvent.change(classSelect, { target: { value: 'cross_dr_conflict' } });
 
     expect(screen.queryByText('ALCLB491AA22')).toBeNull();
@@ -77,5 +77,11 @@ describe('StockExceptionsList', () => {
   it('shows an empty state when there are no exceptions', () => {
     render(<StockExceptionsList exceptions={[]} onSelectHolder={vi.fn()} />);
     expect(screen.getByText('No exceptions found')).toBeTruthy();
+  });
+
+  it('renders the spinner (no table) while loading', () => {
+    render(<StockExceptionsList exceptions={[]} loading onSelectHolder={vi.fn()} />);
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText('No exceptions found')).toBeNull();
   });
 });
