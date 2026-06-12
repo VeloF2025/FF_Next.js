@@ -149,8 +149,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const shippingMethod = body.shippingMethod;
     const paymentTerms = body.paymentTerms;
     const currency = body.currency || 'ZAR';
-    // Accept both vatRate and taxRate
-    const taxRate = body.taxRate ?? body.vatRate ?? 15;
+    // VAT rate is derived from the supplier's registration status below (locked, not client-controlled)
     // Accept both note field names
     const internalNotes = body.internalNotes || body.notes;
     const supplierNotes = body.supplierNotes;
@@ -166,6 +165,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     if (!supplierId) {
       return apiResponse.badRequest(res, 'Supplier is required');
     }
+
+    // Derive VAT rate from the supplier: registered -> 15%, not registered -> 0%
+    const supplierVat = await sql`SELECT vat_registered FROM suppliers WHERE id = ${supplierId}`;
+    if (supplierVat.length === 0) {
+      return apiResponse.badRequest(res, 'Supplier not found');
+    }
+    const taxRate = supplierVat[0]!.vat_registered ? 15 : 0;
 
     if (!deliveryAddress || deliveryAddress.trim().length < 10) {
       return apiResponse.badRequest(res, 'Delivery address must be at least 10 characters');

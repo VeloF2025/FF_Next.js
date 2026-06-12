@@ -75,7 +75,7 @@ export default withAuth(withErrorHandler(async (
 
     // Get supplier info
     const suppliers = await sql`
-      SELECT id, company_name, contact_name, email, phone
+      SELECT id, company_name, contact_name, email, phone, vat_registered
       FROM suppliers WHERE id = ${body.supplierId}
     `;
 
@@ -121,8 +121,8 @@ export default withAuth(withErrorHandler(async (
 
     const items = itemsQuery;
 
-    // Calculate totals
-    const taxRate = 15;
+    // Calculate totals — VAT rate derived from supplier: registered -> 15%, not registered -> 0%
+    const taxRate = supplier.vat_registered ? 15 : 0;
     const subtotal = items.reduce((sum: number, item: Record<string, unknown>) => {
       const price = Number(item.estimated_unit_price) || 0;
       const qty = Number(item.quantity) || 0;

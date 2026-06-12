@@ -21,6 +21,7 @@ interface SupplierFormData {
   tradingName: string;
   registrationNumber: string;
   taxNumber: string;
+  vatRegistered: boolean;
   status: SupplierStatus;
   businessType: BusinessType;
   categories: ProductCategory[];
@@ -51,6 +52,7 @@ export function SupplierForm() {
     tradingName: '',
     registrationNumber: '',
     taxNumber: '',
+    vatRegistered: false,
     status: SupplierStatus.PENDING,
     businessType: BusinessType.DISTRIBUTOR,
     categories: [],
@@ -229,6 +231,22 @@ export function SupplierForm() {
                   onChange={(e) => handleInputChange('taxNumber', e.target.value)}
                   className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              <div className="flex items-center pt-7">
+                <input
+                  id="vatRegistered"
+                  type="checkbox"
+                  checked={formData.vatRegistered}
+                  onChange={(e) => handleInputChange('vatRegistered', e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-2 focus:ring-blue-500"
+                />
+                <label htmlFor="vatRegistered" className="ml-2 text-sm font-medium text-[var(--ff-text-secondary)]">
+                  VAT registered
+                  <span className="block text-xs font-normal text-[var(--ff-text-tertiary)]">
+                    Purchase orders add 15% VAT; unregistered suppliers are raised at 0%.
+                  </span>
+                </label>
               </div>
 
               <div>
