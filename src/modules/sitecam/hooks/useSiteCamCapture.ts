@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { log } from '@/lib/logger';
 import type { SiteCamStep, SiteCamJobType } from '../lib/sitecamSteps';
 import { readDeviceLocation, type GeofenceReading, type GeofencePayload } from '../lib/geofence';
-import { readFileAsBase64 } from '../lib/fileToBase64';
+import { watermarkPhoto } from '../lib/watermarkPhoto';
 
 const MODULE = 'useSiteCamCapture';
 
@@ -91,7 +91,7 @@ export function useSiteCamCapture(
   );
 
   const escalateStep = useCallback(
-    async (idx: number, photoBase64: string, failReasons: string[]) => {
+    async (idx: number, photoBase64: string, failReasons: string[], attemptNumber?: number) => {
       const step = steps[idx];
       if (!step) return;
 
@@ -106,6 +106,10 @@ export function useSiteCamCapture(
             stepNumber: step.number,
             failReasons,
             attemptPhotos: [],
+            // Final failed photo — uploaded server-side to VF Storage so the
+            // supervisor Failed tab shows exactly which photo failed.
+            finalPhotoBase64: photoBase64,
+            finalAttemptNumber: attemptNumber,
           }),
         });
       } catch (err) {
@@ -149,7 +153,9 @@ export function useSiteCamCapture(
 
       let base64: string;
       try {
-        base64 = await readFileAsBase64(file);
+        // Burn the site id + capture time into the pixels so the photo cannot
+        // be reused on another DR (and survives as proof in 1Map re-uploads).
+        base64 = await watermarkPhoto(file, siteInfo.siteId);
       } catch (err) {
         log.error('Failed to read file as base64', { err: String(err) }, MODULE);
         return;
@@ -253,7 +259,7 @@ export function useSiteCamCapture(
           );
         } else {
           // Exhausted attempts — escalate
-          await escalateStep(idx, base64, reasons);
+          await escalateStep(idx, base64, reasons, currentAttempt);
         }
       } catch (err) {
         // Network error — fail-open, but flag the photo for manual QA review.

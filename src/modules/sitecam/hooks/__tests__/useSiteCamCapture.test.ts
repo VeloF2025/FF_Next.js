@@ -13,6 +13,12 @@ vi.mock('@/lib/logger', () => ({
   log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
+// jsdom can't decode images, so the canvas watermark path would hang — stub
+// it to behave like its own fallback (returns the raw base64 unmarked).
+vi.mock('../../lib/watermarkPhoto', () => ({
+  watermarkPhoto: vi.fn(async () => 'RkFLRQ=='),
+}));
+
 import { useSiteCamCapture, type SiteInfo } from '../useSiteCamCapture';
 import type { SiteCamStep } from '../../lib/sitecamSteps';
 import { buildReading } from '../../lib/geofence';
@@ -84,14 +90,14 @@ describe('useSiteCamCapture', () => {
     expect(result.current.stepStates[0].failReasons).toEqual(['bad']);
   });
 
-  it('escalates after maxAttempts consecutive failures', async () => {
-    let escalateCalled = false;
-    fetchMock.mockImplementation((url: string) => {
+  it('escalates after maxAttempts consecutive failures, sending the final photo', async () => {
+    let escalateBody: Record<string, unknown> | null = null;
+    fetchMock.mockImplementation((url: string, init?: { body?: string }) => {
       if (url === '/api/sitecam/validate') {
         return jsonOk({ data: { pass: false, reasons: ['bad'], corrections: [], maxAttempts: 3 } });
       }
       if (url === '/api/sitecam/escalate') {
-        escalateCalled = true;
+        escalateBody = JSON.parse(init?.body ?? '{}') as Record<string, unknown>;
         return jsonOk({});
       }
       return Promise.reject(new Error(`unexpected ${url}`));
@@ -107,7 +113,10 @@ describe('useSiteCamCapture', () => {
 
     expect(result.current.stepStates[0].attemptNumber).toBe(3);
     expect(result.current.stepStates[0].status).toBe('escalated');
-    expect(escalateCalled).toBe(true);
+    expect(escalateBody).not.toBeNull();
+    expect(escalateBody!.finalPhotoBase64).toBe('RkFLRQ==');
+    expect(escalateBody!.finalAttemptNumber).toBe(3);
+    expect(escalateBody!.failReasons).toEqual(['bad']);
   });
 
   it('fails open (auto-pass) on a non-OK validate response and flags for manual review', async () => {

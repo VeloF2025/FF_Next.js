@@ -1,8 +1,10 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { AlertTriangle, Camera, CheckCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle, Download, Loader2 } from 'lucide-react';
+import { log } from '@/lib/logger';
 import type { StepState } from '../hooks/useSiteCamCapture';
 import { SerialScanStep } from './SerialScanStep';
+import { savePhotoToDevice, stepPhotoFilename } from '../lib/savePhotoToDevice';
 
 interface Props {
   step: StepState;
@@ -14,6 +16,17 @@ interface Props {
 
 export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [saved, setSaved] = useState(false);
+
+  const handleSavePhoto = async () => {
+    if (!step.photoBase64) return;
+    try {
+      await savePhotoToDevice(step.photoBase64, stepPhotoFilename(drNumber, step.stepNumber));
+      setSaved(true);
+    } catch (err) {
+      log.warn('Save photo to device failed', { err: String(err) }, 'StepCapture');
+    }
+  };
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,6 +70,16 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal
           <p className="text-sm font-medium text-green-300">
             {step.status === 'serial_pending' ? 'Step complete' : 'Photo accepted!'}
           </p>
+          {step.photoBase64 && (
+            <button
+              type="button"
+              onClick={() => void handleSavePhoto()}
+              className="flex items-center gap-2 rounded-lg border border-green-700 px-4 py-2 text-xs font-medium text-green-300 hover:bg-green-900/40 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              {saved ? 'Saved — save again' : 'Save photo to device'}
+            </button>
+          )}
         </div>
       )}
 
