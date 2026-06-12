@@ -11,6 +11,7 @@
  * until the Azure app registration is configured.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { timingSafeEqual } from 'crypto';
 import { serialize } from 'cookie';
 import { decodeJwt } from 'jose';
 import { createLogger } from '@/lib/logger';
@@ -24,6 +25,15 @@ import {
 } from '@/lib/cortex/entraAuth';
 
 const log = createLogger('auth:entra:callback');
+
+/** Constant-time compare of two opaque secrets (state / nonce). Length-guarded. */
+function safeEqual(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 function clearRoundTripCookies(): string[] {
   const expire = { httpOnly: true, sameSite: 'lax' as const, maxAge: 0, path: '/' };
@@ -41,6 +51,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(404).json({ success: false, error: 'Not found' });
     return;
   }
+  if (req.method !== 'GET') {
+    // The flow uses response_mode=query → the callback is a top-level GET redirect.
+    res.setHeader('Allow', 'GET');
+    res.status(405).json({ success: false, error: 'Method not allowed' });
+    return;
+  }
   const cfg = getEntraConfig();
   if (!cfg) {
     log.error('Entra SSO enabled but app registration is unconfigured');
@@ -53,8 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const stateCookie = req.cookies[ENTRA_STATE_COOKIE];
   const nonceCookie = req.cookies[ENTRA_NONCE_COOKIE];
 
-  // CSRF: the returned state must match the cookie set at login.
-  if (!state || !stateCookie || state !== stateCookie) {
+  // CSRF: the returned state must match the cookie set at login (constant-time).
+  if (!safeEqual(state, stateCookie)) {
     fail(res, 'state mismatch');
     return;
   }
@@ -72,10 +88,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  // Replay guard: the ID token's nonce must match the nonce cookie.
+  // Defence in depth: the token is server-fetched over TLS and the bridge fully
+  // re-verifies signature/iss/aud/exp, but FF independently checks the token is
+  // targeted at THIS app (aud) and THIS tenant (iss) before persisting/forwarding,
+  // and that the nonce matches (replay guard). decodeJwt does not verify the
+  // signature — that is the bridge's job — so these are targeting checks only.
   try {
     const claims = decodeJwt(idToken);
-    if (!nonceCookie || claims.nonce !== nonceCookie) {
+    const issOk = typeof claims.iss === 'string'
+      && claims.iss.startsWith(`https://login.microsoftonline.com/${cfg.tenantId}/`);
+    const audOk = claims.aud === cfg.clientId;
+    if (!issOk || !audOk) {
+      fail(res, 'id_token aud/iss mismatch');
+      return;
+    }
+    if (!safeEqual(typeof claims.nonce === 'string' ? claims.nonce : undefined, nonceCookie)) {
       fail(res, 'nonce mismatch');
       return;
     }
