@@ -9,7 +9,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { transaction } from '@/lib/db-pool';
+import { transaction, query } from '@/lib/db-pool';
 import type { TxnClient } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -22,7 +22,13 @@ import {
   getOrCreateContractorHolder,
 } from '@/modules/procurement/field-stock/services/stockHolderService';
 import { promotePickingSerials } from '@/modules/procurement/field-stock/services/pickingSerialPromotion';
-import { assertHolderNotBlocked, HolderBlockedError } from '@/modules/procurement/field-stock/services/holderBlockGuard';
+import {
+  assertHolderNotBlocked,
+  assertHolderAutoBlock,
+  autoBlockHolder,
+  HolderBlockedError,
+  HolderAutoBlockedError,
+} from '@/modules/procurement/field-stock/services/holderBlockGuard';
 
 interface PickingLine {
   id: string;
@@ -172,6 +178,13 @@ export async function processPicking(req: NextApiRequest, res: NextApiResponse) 
         // above is a no-op on the throw path — nothing is left orphaned.
         await assertHolderNotBlocked(txn, toHolderId);
 
+        // Tier 3.2 (SOP-4.4): threshold-driven auto-block. Runs only after the
+        // not-blocked check above, so it fires solely for a holder NEWLY crossing
+        // the aged-unaccounted threshold. It WRITES NOTHING here — it throws
+        // HolderAutoBlockedError, which the catch below commits as a side-effect
+        // (the block must survive this txn's rollback) before returning 409.
+        await assertHolderAutoBlock(txn, toHolderId);
+
         // Issue path — custody service handles: debit stock_quants, credit stock_custody,
         // insert field_stock_movements 'issue' row. No manual duplication.
         await postIssueToHolderWith(txn, {
@@ -285,6 +298,25 @@ export async function processPicking(req: NextApiRequest, res: NextApiResponse) 
       return { picking: updated[0], linesProcessed: lines.length };
     });
   } catch (error: unknown) {
+    if (error instanceof HolderAutoBlockedError) {
+      // The issue txn has rolled back. Commit the auto-block now via the pool
+      // (idempotent upsert) so it persists, then refuse the issue with 409.
+      try {
+        await autoBlockHolder(query, error.holderId, error.blockedReason, 'auto-block:issue-guard');
+      } catch (writeErr) {
+        // Don't mask the 409 if the block write fails — the next sweep/issue
+        // re-evaluates and retries. Surface it for diagnosis.
+        log.error('Auto-block write failed after threshold trip',
+          { pickingId, holderId: error.holderId, writeErr }, 'field-stock');
+      }
+      log.warn('Issue picking auto-blocked holder over aged-unaccounted threshold',
+        { pickingId, holderId: error.holderId, metrics: error.metrics }, 'field-stock');
+      return apiResponse.conflict(res, 'holder_blocked', {
+        holderId: error.holderId,
+        blockedReason: error.blockedReason,
+        autoBlocked: true,
+      });
+    }
     if (error instanceof HolderBlockedError) {
       log.warn('Issue picking blocked: recipient holder is blocked',
         { pickingId, holderId: error.holderId }, 'field-stock');
