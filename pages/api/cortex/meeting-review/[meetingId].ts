@@ -43,6 +43,7 @@ import {
   type Sql,
 } from '@/lib/cortex/meetingReviewLogic';
 import { bridgeBearer } from '@/lib/cortex/bridgeAuth';
+import { getForwardableEntraIdToken } from '@/lib/cortex/entraAuth';
 
 // ── env ────────────────────────────────────────────────────────────────────────
 const BRIDGE_URL = process.env.CORTEX_BRIDGE_URL ?? 'http://localhost:7403';
@@ -135,7 +136,10 @@ async function getHandler(
 ): Promise<void> {
   const { meetingId } = req.query as { meetingId: string };
   const reviewerEmail = req.user.email;
-  const bearer = await bridgeBearer(reviewerEmail);
+  // Forward the Entra ID token (bound to this FF session) when SSO forwarding is on;
+  // else bridgeBearer falls back to the HS256 gateway JWT. Mirrors /api/cortex/query.
+  const entraIdToken = getForwardableEntraIdToken(req.cookies, reviewerEmail);
+  const bearer = await bridgeBearer(reviewerEmail, { entraIdToken });
   const sql: Sql = neon(process.env.DATABASE_URL!);
 
   // 1. Sealed? — check local table first (cheap DB query, no Cortex call)
@@ -181,7 +185,8 @@ async function postHandler(
 ): Promise<void> {
   const { meetingId } = req.query as { meetingId: string };
   const reviewerEmail = req.user.email;
-  const bearer = await bridgeBearer(reviewerEmail);
+  const entraIdToken = getForwardableEntraIdToken(req.cookies, reviewerEmail);
+  const bearer = await bridgeBearer(reviewerEmail, { entraIdToken });
 
   // Guard null / non-object body (e.g. empty POST, non-JSON) → 400, not 500.
   const body = req.body;

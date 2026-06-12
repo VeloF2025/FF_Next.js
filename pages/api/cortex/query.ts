@@ -19,6 +19,7 @@ import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { bridgeBearer } from '@/lib/cortex/bridgeAuth';
+import { getForwardableEntraIdToken } from '@/lib/cortex/entraAuth';
 import { fetchWithTimeout } from '@/lib/cortex/meetingReviewLogic';
 
 const BRIDGE_URL = process.env.CORTEX_BRIDGE_URL ?? 'http://localhost:7403';
@@ -55,8 +56,13 @@ async function getHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse
 
   const limit = clampLimit(req.query.limit);
 
-  // Per-user gateway JWT — the bridge narrows the ACL to this reviewer.
-  const bearer = await bridgeBearer(user.email);
+  // Per-user identity for the bridge ACL. When Entra SSO forwarding is on and the user
+  // has a stored Entra ID token whose subject MATCHES this FF session, bridgeBearer
+  // forwards THAT (real OIDC); else it falls back to the HS256 gateway JWT / api key.
+  // getForwardableEntraIdToken binds the token to user.email (so a mismatched principal
+  // is never forwarded) and is read only from the server-side httpOnly cookie.
+  const entraIdToken = getForwardableEntraIdToken(req.cookies, user.email);
+  const bearer = await bridgeBearer(user.email, { entraIdToken });
   const params = new URLSearchParams({ q, include_citations: 'true', limit: String(limit) });
 
   const upstream = await fetchWithTimeout(fetch, `${BRIDGE_URL}/api/query?${params}`, {

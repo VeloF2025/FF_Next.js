@@ -1,0 +1,144 @@
+/**
+ * Entra SSO — auth-code callback (Phase 6, DARK behind ENTRA_SSO_ENABLED).
+ *
+ * Validates the state cookie (CSRF), exchanges the code for an ID token, checks the
+ * token's nonce against the nonce cookie (replay), stores the ID token in a server-
+ * only httpOnly cookie (`bridgeBearer` forwards it to the Cortex bridge), clears the
+ * round-trip cookies, and redirects to /cortex. Inert (404) unless the flag is on.
+ *
+ * Fail closed: any missing/mismatched state, missing code, exchange failure, aud/iss
+ * mismatch, nonce mismatch, or an already-expired token redirects to an error and sets
+ * NO id-token cookie. Identity binding to the FF session is enforced at FORWARD time
+ * (getForwardableEntraIdToken), so a token for a different principal is simply never
+ * forwarded. UNTESTED end-to-end until the Azure app registration is configured.
+ */
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { timingSafeEqual } from 'crypto';
+import { serialize } from 'cookie';
+import { decodeJwt } from 'jose';
+import { createLogger } from '@/lib/logger';
+import {
+  ENTRA_ID_TOKEN_COOKIE,
+  ENTRA_NONCE_COOKIE,
+  ENTRA_STATE_COOKIE,
+  entraSsoEnabled,
+  exchangeCodeForIdToken,
+  getEntraConfig,
+} from '@/lib/cortex/entraAuth';
+
+const log = createLogger('auth:entra:callback');
+
+/** Constant-time compare of two opaque secrets (state / nonce). Length-guarded. */
+function safeEqual(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
+
+function clearRoundTripCookies(): string[] {
+  // `secure` must match the attributes the cookie was SET with at login, otherwise a
+  // TLS browser ignores the deletion for a Secure cookie (RFC 6265) and it lingers.
+  const expire = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 0,
+    path: '/',
+  };
+  return [serialize(ENTRA_STATE_COOKIE, '', expire), serialize(ENTRA_NONCE_COOKIE, '', expire)];
+}
+
+function fail(res: NextApiResponse, reason: string): void {
+  log.warn(`Entra callback rejected: ${reason}`);
+  res.setHeader('Set-Cookie', clearRoundTripCookies());
+  res.redirect(302, '/cortex?entra_error=1');
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+  if (!entraSsoEnabled()) {
+    res.status(404).json({ success: false, error: 'Not found' });
+    return;
+  }
+  if (req.method !== 'GET') {
+    // The flow uses response_mode=query → the callback is a top-level GET redirect.
+    res.setHeader('Allow', 'GET');
+    res.status(405).json({ success: false, error: 'Method not allowed' });
+    return;
+  }
+  const cfg = getEntraConfig();
+  if (!cfg) {
+    log.error('Entra SSO enabled but app registration is unconfigured');
+    res.status(503).json({ success: false, error: 'Entra SSO not configured' });
+    return;
+  }
+
+  const code = typeof req.query.code === 'string' ? req.query.code : '';
+  const state = typeof req.query.state === 'string' ? req.query.state : '';
+  const stateCookie = req.cookies[ENTRA_STATE_COOKIE];
+  const nonceCookie = req.cookies[ENTRA_NONCE_COOKIE];
+
+  // CSRF: the returned state must match the cookie set at login (constant-time).
+  if (!safeEqual(state, stateCookie)) {
+    fail(res, 'state mismatch');
+    return;
+  }
+  if (!code) {
+    fail(res, 'missing authorization code');
+    return;
+  }
+
+  let idToken: string;
+  try {
+    idToken = await exchangeCodeForIdToken(cfg, code);
+  } catch (err) {
+    log.error(`Entra token exchange failed: ${err instanceof Error ? err.message : String(err)}`);
+    fail(res, 'token exchange failed');
+    return;
+  }
+
+  // Defence in depth: the token is server-fetched over TLS and the bridge fully
+  // re-verifies signature/iss/aud/exp, but FF independently checks the token is
+  // targeted at THIS app (aud) and THIS tenant (iss) before persisting/forwarding,
+  // and that the nonce matches (replay guard). decodeJwt does not verify the
+  // signature — that is the bridge's job — so these are targeting checks only.
+  try {
+    const claims = decodeJwt(idToken);
+    const issOk = typeof claims.iss === 'string'
+      && claims.iss.startsWith(`https://login.microsoftonline.com/${cfg.tenantId}/`);
+    const audOk = claims.aud === cfg.clientId;
+    if (!issOk || !audOk) {
+      fail(res, 'id_token aud/iss mismatch');
+      return;
+    }
+    if (!safeEqual(typeof claims.nonce === 'string' ? claims.nonce : undefined, nonceCookie)) {
+      fail(res, 'nonce mismatch');
+      return;
+    }
+    // Freshness: decodeJwt does not check exp. Don't persist a token that is already
+    // expired (delayed callback / clock skew) — the bridge would 401 every forward.
+    if (typeof claims.exp === 'number' && claims.exp * 1000 <= Date.now()) {
+      fail(res, 'id_token expired');
+      return;
+    }
+  } catch (err) {
+    log.warn(`Entra id_token decode failed: ${err instanceof Error ? err.message : String(err)}`);
+    fail(res, 'unparseable id_token');
+    return;
+  }
+
+  // Store the ID token server-side only; bridgeBearer forwards it to the bridge. Scope
+  // the path to /api/cortex — the only routes that read it — so it is not transmitted on
+  // every request to the domain (httpOnly already blocks JS access; this narrows the wire
+  // surface). The redirect target /cortex still triggers the page's /api/cortex/* calls.
+  const idCookie = serialize(ENTRA_ID_TOKEN_COOKIE, idToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 3600,
+    path: '/api/cortex',
+  });
+  res.setHeader('Set-Cookie', [idCookie, ...clearRoundTripCookies()]);
+  res.redirect(302, '/cortex');
+}
