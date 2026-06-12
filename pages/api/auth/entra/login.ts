@@ -1,8 +1,9 @@
 /**
  * Entra SSO — login initiator (Phase 6, DARK behind ENTRA_SSO_ENABLED).
  *
- * Starts the OAuth2 auth-code flow: sets short-lived httpOnly state + nonce cookies
- * (CSRF / replay guards) and redirects the browser to Entra's authorize endpoint.
+ * Starts the OAuth2 auth-code flow: sets short-lived httpOnly state + nonce + PKCE
+ * verifier cookies (CSRF / replay / code-interception guards) and redirects the
+ * browser to Entra's authorize endpoint (carrying the PKCE S256 challenge).
  * Inert (404) unless the flag is on; 503 if the app registration is unconfigured.
  *
  * Additive: does NOT touch FibreFlow's existing GoTrue/JWT login. UNTESTED end-to-end
@@ -14,8 +15,11 @@ import { createLogger } from '@/lib/logger';
 import {
   ENTRA_NONCE_COOKIE,
   ENTRA_STATE_COOKIE,
+  ENTRA_VERIFIER_COOKIE,
   buildAuthorizeUrl,
+  computeCodeChallenge,
   entraSsoEnabled,
+  generateCodeVerifier,
   getEntraConfig,
   randomToken,
 } from '@/lib/cortex/entraAuth';
@@ -41,6 +45,10 @@ export default function handler(req: NextApiRequest, res: NextApiResponse): void
 
   const state = randomToken();
   const nonce = randomToken();
+  // PKCE (RFC 7636, S256): the verifier is stored server-side only (httpOnly cookie)
+  // and replayed on the token exchange; only its SHA256 challenge travels to Entra.
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = computeCodeChallenge(codeVerifier);
   const cookieOpts = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -51,6 +59,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse): void
   res.setHeader('Set-Cookie', [
     serialize(ENTRA_STATE_COOKIE, state, cookieOpts),
     serialize(ENTRA_NONCE_COOKIE, nonce, cookieOpts),
+    serialize(ENTRA_VERIFIER_COOKIE, codeVerifier, cookieOpts),
   ]);
-  res.redirect(302, buildAuthorizeUrl(cfg, state, nonce));
+  res.redirect(302, buildAuthorizeUrl(cfg, state, nonce, codeChallenge));
 }

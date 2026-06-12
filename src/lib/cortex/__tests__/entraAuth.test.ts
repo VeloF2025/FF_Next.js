@@ -11,7 +11,9 @@ import { SignJWT } from 'jose';
 import {
   ENTRA_ID_TOKEN_COOKIE,
   buildAuthorizeUrl,
+  computeCodeChallenge,
   entraSsoEnabled,
+  generateCodeVerifier,
   getEntraConfig,
   getForwardableEntraIdToken,
   randomToken,
@@ -89,7 +91,7 @@ describe('buildAuthorizeUrl', () => {
   };
 
   it('targets the SINGLE-tenant authorize endpoint and requests an ID token', () => {
-    const url = new URL(buildAuthorizeUrl(cfg, 'st4te', 'n0nce'));
+    const url = new URL(buildAuthorizeUrl(cfg, 'st4te', 'n0nce', 'chal1enge'));
     expect(url.origin + url.pathname).toBe(
       'https://login.microsoftonline.com/tenant-guid/oauth2/v2.0/authorize',
     );
@@ -101,10 +103,42 @@ describe('buildAuthorizeUrl', () => {
     expect(url.searchParams.get('nonce')).toBe('n0nce');
   });
 
+  it('carries the PKCE S256 challenge', () => {
+    const url = new URL(buildAuthorizeUrl(cfg, 's', 'n', 'the-challenge'));
+    expect(url.searchParams.get('code_challenge')).toBe('the-challenge');
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+  });
+
   it('does NOT use a multi-tenant (common) endpoint', () => {
-    const url = buildAuthorizeUrl(cfg, 's', 'n');
+    const url = buildAuthorizeUrl(cfg, 's', 'n', 'c');
     expect(url).not.toContain('/common/');
     expect(url).not.toContain('/organizations/');
+  });
+});
+
+describe('PKCE — generateCodeVerifier / computeCodeChallenge (RFC 7636 S256)', () => {
+  it('generates a verifier within the 43–128 char unreserved-charset rule, unpredictable', () => {
+    const a = generateCodeVerifier();
+    const b = generateCodeVerifier();
+    expect(a).not.toBe(b);
+    expect(a.length).toBeGreaterThanOrEqual(43);
+    expect(a.length).toBeLessThanOrEqual(128);
+    // base64url charset only — no '+', '/', or '=' padding (RFC 7636 unreserved set).
+    expect(a).toMatch(/^[A-Za-z0-9\-_]+$/);
+  });
+
+  it('computes the challenge per the RFC 7636 Appendix B test vector', () => {
+    // verifier → BASE64URL(SHA256(verifier)) from RFC 7636 §B.
+    expect(computeCodeChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk')).toBe(
+      'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+    );
+  });
+
+  it('produces a URL-safe challenge (no padding / unsafe chars) for a generated verifier', () => {
+    const challenge = computeCodeChallenge(generateCodeVerifier());
+    expect(challenge).toMatch(/^[A-Za-z0-9\-_]+$/);
+    expect(challenge).not.toContain('=');
+    expect(challenge.length).toBe(43); // SHA-256 → 32 bytes → 43 base64url chars
   });
 });
 

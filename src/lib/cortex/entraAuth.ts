@@ -21,7 +21,7 @@
  * (config, authorize-URL building, cookie parsing, flag gating) are unit-tested; the
  * live `fetch` token exchange and the route round-trip are UNTESTED pending that.
  */
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { decodeJwt } from 'jose';
 import { createLogger } from '@/lib/logger';
 
@@ -32,6 +32,12 @@ export const ENTRA_ID_TOKEN_COOKIE = 'ff_entra_id_token';
 /** Short-lived cookies guarding the auth-code round trip. */
 export const ENTRA_STATE_COOKIE = 'ff_entra_state';
 export const ENTRA_NONCE_COOKIE = 'ff_entra_nonce';
+/**
+ * Short-lived cookie holding the PKCE `code_verifier` (RFC 7636). Set at login,
+ * replayed on the token exchange so a stolen/intercepted auth code cannot be
+ * redeemed without it. httpOnly + server-only, same lifecycle as state/nonce.
+ */
+export const ENTRA_VERIFIER_COOKIE = 'ff_entra_verifier';
 
 export interface EntraConfig {
   tenantId: string;
@@ -65,10 +71,38 @@ export function randomToken(bytes = 32): string {
 }
 
 /**
- * Build the Entra authorize URL for the auth-code flow. Requests an ID token
- * (`openid profile email`) for the configured app (single-tenant endpoint).
+ * Generate a PKCE `code_verifier` (RFC 7636 §4.1): a high-entropy random string of
+ * 43–128 chars from the unreserved set `[A-Za-z0-9-._~]`. base64url of 32 random
+ * bytes yields a 43-char value drawn from `[A-Za-z0-9_-]` — within both the length
+ * and charset rules.
  */
-export function buildAuthorizeUrl(cfg: EntraConfig, state: string, nonce: string): string {
+export function generateCodeVerifier(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/**
+ * Compute the PKCE `code_challenge` for the S256 method (RFC 7636 §4.2):
+ * `BASE64URL(SHA256(ASCII(code_verifier)))`. The challenge is sent on `/authorize`;
+ * the verifier is replayed (only) on the token exchange, so the authorization server
+ * binds the issued code to the holder of the verifier.
+ */
+export function computeCodeChallenge(verifier: string): string {
+  return createHash('sha256').update(verifier).digest('base64url');
+}
+
+/**
+ * Build the Entra authorize URL for the auth-code flow. Requests an ID token
+ * (`openid profile email`) for the configured app (single-tenant endpoint) and binds
+ * the request with a PKCE S256 challenge (RFC 7636) — defence-in-depth on top of the
+ * confidential-client secret. Entra accepts PKCE for confidential clients, so this is
+ * purely additive.
+ */
+export function buildAuthorizeUrl(
+  cfg: EntraConfig,
+  state: string,
+  nonce: string,
+  codeChallenge: string,
+): string {
   const base = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/authorize`;
   const params = new URLSearchParams({
     client_id: cfg.clientId,
@@ -78,6 +112,8 @@ export function buildAuthorizeUrl(cfg: EntraConfig, state: string, nonce: string
     scope: 'openid profile email',
     state,
     nonce,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
   });
   return `${base}?${params.toString()}`;
 }
@@ -89,7 +125,11 @@ export function buildAuthorizeUrl(cfg: EntraConfig, state: string, nonce: string
  *
  * UNTESTED end-to-end (live network); structured so the request shape is obvious.
  */
-export async function exchangeCodeForIdToken(cfg: EntraConfig, code: string): Promise<string> {
+export async function exchangeCodeForIdToken(
+  cfg: EntraConfig,
+  code: string,
+  codeVerifier: string,
+): Promise<string> {
   const tokenUrl = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/token`;
   const body = new URLSearchParams({
     client_id: cfg.clientId,
@@ -98,6 +138,9 @@ export async function exchangeCodeForIdToken(cfg: EntraConfig, code: string): Pr
     redirect_uri: cfg.redirectUri,
     grant_type: 'authorization_code',
     scope: 'openid profile email',
+    // PKCE (RFC 7636): the server recomputes SHA256(code_verifier) and matches it
+    // against the code_challenge sent at /authorize before issuing tokens.
+    code_verifier: codeVerifier,
   });
   const resp = await fetch(tokenUrl, {
     method: 'POST',

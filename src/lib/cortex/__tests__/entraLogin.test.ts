@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ENTRA_NONCE_COOKIE,
   ENTRA_STATE_COOKIE,
+  ENTRA_VERIFIER_COOKIE,
+  computeCodeChallenge,
 } from '@/lib/cortex/entraAuth';
 import handler from '../../../../pages/api/auth/entra/login';
 
@@ -68,12 +70,31 @@ describe('Entra login initiator', () => {
     expect(url.searchParams.get('response_type')).toBe('code');
 
     const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'];
-    expect(setCookie).toHaveLength(2);
+    expect(setCookie).toHaveLength(3); // state + nonce + PKCE verifier
     // The cookie values MUST equal the state/nonce embedded in the redirect — otherwise
     // the callback's constant-time comparison can never succeed.
     expect(cookieValue(setCookie, ENTRA_STATE_COOKIE)).toBe(url.searchParams.get('state'));
     expect(cookieValue(setCookie, ENTRA_NONCE_COOKIE)).toBe(url.searchParams.get('nonce'));
     expect(setCookie.every((c) => /HttpOnly/i.test(c))).toBe(true);
+  });
+
+  it('sets a PKCE verifier cookie whose S256 challenge matches the authorize URL', () => {
+    const res = makeRes();
+    handler(makeReq(), res as never);
+
+    const url = new URL(res.redirectedTo as string);
+    const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'];
+    const verifier = cookieValue(setCookie, ENTRA_VERIFIER_COOKIE);
+
+    // The verifier is the server-only secret; only its SHA256 challenge travels to Entra.
+    expect(verifier).toBeTruthy();
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(url.searchParams.get('code_challenge')).toBe(computeCodeChallenge(verifier as string));
+    // The raw verifier must NEVER appear in the redirect URL.
+    expect(res.redirectedTo as string).not.toContain(verifier as string);
+    // The verifier cookie is httpOnly (server-only).
+    const verifierCookie = setCookie.find((c) => c.startsWith(`${ENTRA_VERIFIER_COOKIE}=`));
+    expect(/HttpOnly/i.test(verifierCookie as string)).toBe(true);
   });
 
   it('generates a fresh state + nonce on each call (not static)', () => {

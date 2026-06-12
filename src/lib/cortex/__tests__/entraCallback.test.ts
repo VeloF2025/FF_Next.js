@@ -11,6 +11,7 @@ import {
   ENTRA_ID_TOKEN_COOKIE,
   ENTRA_NONCE_COOKIE,
   ENTRA_STATE_COOKIE,
+  ENTRA_VERIFIER_COOKIE,
 } from '@/lib/cortex/entraAuth';
 
 // Mock only the network exchange; keep the real flag/config/constants.
@@ -26,6 +27,7 @@ const TENANT = 'tenant-guid';
 const CLIENT = 'client-guid';
 const NONCE = 'the-nonce-value';
 const STATE = 'the-state-value';
+const VERIFIER = 'the-pkce-code-verifier-value';
 
 function makeRes() {
   const res: Record<string, unknown> = {};
@@ -85,25 +87,46 @@ function noIdTokenCookie(res: Record<string, unknown>): boolean {
   const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'] ?? [];
   return !setCookie.some((c) => c.startsWith(`${ENTRA_ID_TOKEN_COOKIE}=`));
 }
-const validCookies = { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE };
+const validCookies = {
+  [ENTRA_STATE_COOKIE]: STATE,
+  [ENTRA_NONCE_COOKIE]: NONCE,
+  [ENTRA_VERIFIER_COOKIE]: VERIFIER,
+};
 
 describe('Entra callback — targeting + replay guards', () => {
-  it('stores the id-token cookie on a fully valid round trip', async () => {
+  it('stores the id-token cookie on a fully valid round trip and replays the PKCE verifier', async () => {
     exchangeMock.mockResolvedValue(await idTokenWith(goodClaims));
     const res = makeRes();
-    await handler(makeReq({ code: 'c', state: STATE }, { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE }), res as never);
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex');
     const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'];
     expect(setCookie.some((c) => c.startsWith(`${ENTRA_ID_TOKEN_COOKIE}=`))).toBe(true);
+    // PKCE: the verifier cookie set at login must be passed to the token exchange.
+    expect(exchangeMock).toHaveBeenCalledWith(expect.anything(), 'c', VERIFIER);
+    // ...and cleared afterward (maxAge=0).
+    expect(setCookie.some((c) => /^ff_entra_verifier=;/.test(c) && /Max-Age=0/i.test(c))).toBe(true);
   });
 
   it('rejects a token whose aud is a DIFFERENT app (no id-token cookie)', async () => {
     exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, aud: 'some-other-app' }));
     const res = makeRes();
-    await handler(makeReq({ code: 'c', state: STATE }, { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE }), res as never);
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
     const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'];
     expect(setCookie.some((c) => c.startsWith(`${ENTRA_ID_TOKEN_COOKIE}=`))).toBe(false);
+  });
+
+  it('fails closed when the PKCE verifier cookie is MISSING (does not exchange)', async () => {
+    const res = makeRes();
+    // State + nonce present, but no verifier cookie → a callback that did not originate
+    // from our login. Must NOT call the token exchange and must set no id-token cookie.
+    await handler(
+      makeReq({ code: 'c', state: STATE }, { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE }),
+      res as never,
+    );
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(exchangeMock).not.toHaveBeenCalled();
+    expect(noIdTokenCookie(res)).toBe(true);
   });
 
   it('rejects a token from a DIFFERENT tenant issuer', async () => {

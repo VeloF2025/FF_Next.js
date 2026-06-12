@@ -1,14 +1,15 @@
 /**
  * Entra SSO — auth-code callback (Phase 6, DARK behind ENTRA_SSO_ENABLED).
  *
- * Validates the state cookie (CSRF), exchanges the code for an ID token, checks the
- * token's nonce against the nonce cookie (replay), stores the ID token in a server-
- * only httpOnly cookie (`bridgeBearer` forwards it to the Cortex bridge), clears the
- * round-trip cookies, and redirects to /cortex. Inert (404) unless the flag is on.
+ * Validates the state cookie (CSRF), replays the PKCE verifier cookie on the token
+ * exchange (RFC 7636, code-interception guard), checks the token's nonce against the
+ * nonce cookie (replay), stores the ID token in a server-only httpOnly cookie
+ * (`bridgeBearer` forwards it to the Cortex bridge), clears the round-trip cookies,
+ * and redirects to /cortex. Inert (404) unless the flag is on.
  *
- * Fail closed: any missing/mismatched state, missing code, exchange failure, aud/iss
- * mismatch, nonce mismatch, or an already-expired token redirects to an error and sets
- * NO id-token cookie. Identity binding to the FF session is enforced at FORWARD time
+ * Fail closed: any missing/mismatched state, missing code, missing PKCE verifier,
+ * exchange failure, aud/iss mismatch, nonce mismatch, or an already-expired token
+ * redirects to an error and sets NO id-token cookie. Identity binding to the FF session is enforced at FORWARD time
  * (getForwardableEntraIdToken), so a token for a different principal is simply never
  * forwarded. UNTESTED end-to-end until the Azure app registration is configured.
  */
@@ -21,6 +22,7 @@ import {
   ENTRA_ID_TOKEN_COOKIE,
   ENTRA_NONCE_COOKIE,
   ENTRA_STATE_COOKIE,
+  ENTRA_VERIFIER_COOKIE,
   entraSsoEnabled,
   exchangeCodeForIdToken,
   getEntraConfig,
@@ -47,7 +49,11 @@ function clearRoundTripCookies(): string[] {
     maxAge: 0,
     path: '/',
   };
-  return [serialize(ENTRA_STATE_COOKIE, '', expire), serialize(ENTRA_NONCE_COOKIE, '', expire)];
+  return [
+    serialize(ENTRA_STATE_COOKIE, '', expire),
+    serialize(ENTRA_NONCE_COOKIE, '', expire),
+    serialize(ENTRA_VERIFIER_COOKIE, '', expire),
+  ];
 }
 
 function fail(res: NextApiResponse, reason: string): void {
@@ -78,6 +84,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const state = typeof req.query.state === 'string' ? req.query.state : '';
   const stateCookie = req.cookies[ENTRA_STATE_COOKIE];
   const nonceCookie = req.cookies[ENTRA_NONCE_COOKIE];
+  // Trim once and use the trimmed value for BOTH the presence guard and the exchange,
+  // so a cookie that somehow carries whitespace can't pass the guard yet send a wrong
+  // verifier to Entra (invalid_grant). generateCodeVerifier() never produces whitespace.
+  const verifier = req.cookies[ENTRA_VERIFIER_COOKIE]?.trim();
 
   // CSRF: the returned state must match the cookie set at login (constant-time).
   if (!safeEqual(state, stateCookie)) {
@@ -88,10 +98,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     fail(res, 'missing authorization code');
     return;
   }
+  // PKCE: the verifier set at login MUST be present to complete the exchange. Its
+  // absence means a callback that did not originate from our login (or a stale/cross-
+  // deploy round trip) — fail closed rather than fall back to a non-PKCE exchange.
+  if (!verifier) {
+    fail(res, 'missing PKCE verifier');
+    return;
+  }
 
   let idToken: string;
   try {
-    idToken = await exchangeCodeForIdToken(cfg, code);
+    idToken = await exchangeCodeForIdToken(cfg, code, verifier);
   } catch (err) {
     log.error(`Entra token exchange failed: ${err instanceof Error ? err.message : String(err)}`);
     fail(res, 'token exchange failed');
