@@ -17,6 +17,7 @@ import {
 } from '@/modules/procurement/field-stock/components';
 import { HolderAccountabilityList } from '@/modules/procurement/field-stock/components/accountability/HolderAccountabilityList';
 import { HolderDetailDrawer } from '@/modules/procurement/field-stock/components/accountability/HolderDetailDrawer';
+import { StockExceptionsList } from '@/modules/procurement/field-stock/components/accountability/StockExceptionsList';
 import { LocationFormModal } from '@/modules/procurement/field-stock/components/locations/LocationFormModal';
 import type { StockLocation } from '@/modules/procurement/field-stock/types';
 import {
@@ -26,6 +27,7 @@ import {
   useConsumptions,
 } from '@/modules/procurement/field-stock/hooks';
 import { useHolderAccountability } from '@/modules/procurement/field-stock/hooks/useHolderAccountability';
+import { useStockExceptions } from '@/modules/procurement/field-stock/hooks/useStockExceptions';
 import {
   LayoutDashboard,
   MapPin,
@@ -38,13 +40,14 @@ import {
   Loader2,
   ShoppingCart,
   AlertTriangle,
+  ShieldAlert,
   Settings,
 } from 'lucide-react';
 import { FaultReportList } from '@/modules/procurement/field-stock/components/faults';
 import { AdjustmentPanel } from '@/modules/procurement/field-stock/components/adjustments';
 import { DashboardV2Body } from '@/components/field-stock/dashboard-v2/DashboardV2Body';
 
-type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability' | 'faults' | 'adjustments';
+type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability' | 'exceptions' | 'faults' | 'adjustments';
 
 interface TabConfig {
   id: TabType;
@@ -95,6 +98,12 @@ const tabs: TabConfig[] = [
     label: 'Accountability',
     icon: <Users className="h-5 w-5" />,
     description: 'Contractor stock accountability'
+  },
+  {
+    id: 'exceptions',
+    label: 'Exceptions',
+    icon: <ShieldAlert className="h-5 w-5" />,
+    description: 'Held stock vs OES/WA activation mismatches'
   },
   {
     id: 'faults',
@@ -244,6 +253,26 @@ function AccountabilityTabContent() {
   );
 }
 
+/** Exceptions tab — held serials cross-checked vs OES/WA activations */
+function ExceptionsTabContent() {
+  const { exceptions, loading } = useStockExceptions({ autoFetch: true });
+  const [selectedHolderId, setSelectedHolderId] = useState<string | null>(null);
+
+  return (
+    <>
+      <StockExceptionsList
+        exceptions={exceptions}
+        loading={loading}
+        onSelectHolder={setSelectedHolderId}
+      />
+      <HolderDetailDrawer
+        holderId={selectedHolderId}
+        onClose={() => setSelectedHolderId(null)}
+      />
+    </>
+  );
+}
+
 /** Consumptions tab with recent list */
 function ConsumptionsTabContent() {
   const router = useRouter();
@@ -343,6 +372,8 @@ export default function FieldStockPage() {
         return <PickingsTab />;
       case 'returns':
         return <ReturnsTabContent />;
+      case 'exceptions':
+        return <ExceptionsTabContent />;
       case 'accountability':
         return <AccountabilityTabContent />;
       case 'faults':
