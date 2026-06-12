@@ -92,7 +92,18 @@ export type OltTabId =
   | 'investigate'
   | 'escalations'
   | 'history'
-  | 'reporting';
+  | 'reporting'
+  | 'ledger';
+
+// Per-DR three-way reconciliation ledger (migration 414, v_dr_reconciliation_ledger).
+// Canonical definitions live in the pure services/reconLedgerQuery module (single
+// source of truth shared by the API handler, the query builder and the UI);
+// re-exported here so data-sync consumers keep importing from the types barrel.
+export {
+  RECON_CLASSES,
+  type ReconClass,
+  type ReconLedgerRow,
+} from './services/reconLedgerQuery';
 
 // QField tab IDs
 export type QFieldTabId = 'projects';
