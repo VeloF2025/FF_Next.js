@@ -9,13 +9,17 @@
  * policy.
  *
  * Usage:
- *   npx tsx scripts/cron/holder-auto-block-sweep.ts
+ *   ./node_modules/.bin/tsx scripts/cron/holder-auto-block-sweep.ts
  *
- * INERT until added to a crontab. Suggested VPS cron (daily 06:00 SAST — after the
- * nightly OES/WA syncs that feed the activation evidence the sweep cross-checks):
- *   0 6 * * * cd /home/velo/fibreflow-production && \
- *     /usr/bin/npx tsx scripts/cron/holder-auto-block-sweep.ts \
+ * INSTALLED 2026-06-12 — daily 06:00 SAST (after the nightly OES/WA syncs that feed
+ * the activation evidence the sweep cross-checks). Runs from the DEV deploy dir
+ * (same pattern as the attendance crons) because that is where DATABASE_URL resolves
+ * via .env.local/.env.production; the DB is shared, so the sweep acts on prod data:
+ *   0 6 * * * cd /home/velo/fibreflow-dev && \
+ *     ./node_modules/.bin/tsx scripts/cron/holder-auto-block-sweep.ts \
  *     >> /home/velo/logs/holder-auto-block-sweep.log 2>&1
+ * (Also runnable from the prod dir, where DATABASE_URL lives in `.env`.) No-op until
+ * the policy is armed (stock_accountability_config.auto_block_enabled).
  *
  * Output: stderr trail lines (start / done / fatal) for the cron log file — the
  * in-memory app logger does not flush to stdout in production, so success would be
@@ -32,14 +36,20 @@ function stderr(msg: string): void {
   process.stderr.write(`${new Date().toISOString()} ${msg}\n`);
 }
 
+// Refuse a prod run only when NO prod env file is present at all. The two deploy
+// dirs differ: the dev dir carries DATABASE_URL in .env.local/.env.production, the
+// prod dir in `.env` — so accept either.
 const isProd = process.env.NODE_ENV === 'production';
-if (isProd && !fs.existsSync('.env.production')) {
-  stderr('[holder-auto-block-sweep] NODE_ENV=production but .env.production missing — refusing to run');
+if (isProd && !fs.existsSync('.env.production') && !fs.existsSync('.env')) {
+  stderr('[holder-auto-block-sweep] NODE_ENV=production but no .env.production/.env present — refusing to run');
   process.exit(2);
 }
 
+// Load all three (override:false → first to set a var wins). Covers both deploy-dir
+// layouts: dev (.env.production/.env.local) and prod (.env).
 dotenv.config({ path: '.env.production' });
 dotenv.config({ path: '.env.local', override: false });
+dotenv.config({ path: '.env', override: false });
 
 if (!process.env.DATABASE_URL) {
   stderr('[holder-auto-block-sweep] DATABASE_URL not set — aborting');
