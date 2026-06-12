@@ -14,6 +14,7 @@
  * Writes are pool-level and individually committed (no wrapping transaction): one
  * holder failing must not roll back blocks already applied to others.
  */
+import { log } from '@/lib/logger';
 import {
   type Querier,
   loadAutoBlockPolicy,
@@ -39,6 +40,8 @@ export interface AutoBlockSweepResult {
   blocked: SweptHolder[];
   /** Holders over threshold that were already blocked (no-op upserts). */
   alreadyBlocked: number;
+  /** Holder IDs whose block write threw — skipped, not fatal (next run retries). */
+  errors: string[];
 }
 
 interface SweepRow extends Record<string, unknown> {
@@ -60,7 +63,7 @@ export async function runAutoBlockSweep(
 ): Promise<AutoBlockSweepResult> {
   const policy = await loadAutoBlockPolicy(q);
   if (!policy.enabled) {
-    return { enabled: false, evaluated: 0, blocked: [], alreadyBlocked: 0 };
+    return { enabled: false, evaluated: 0, blocked: [], alreadyBlocked: 0, errors: [] };
   }
 
   // One row per holder holding aged_no_evidence serials, with count + ZAR value.
@@ -79,6 +82,7 @@ export async function runAutoBlockSweep(
   );
 
   const blocked: SweptHolder[] = [];
+  const errors: string[] = [];
   let alreadyBlocked = 0;
 
   for (const row of rows) {
@@ -90,13 +94,21 @@ export async function runAutoBlockSweep(
     if (!decision.block) continue;
 
     const reason = formatBlockReason(metrics, decision);
-    const newlyBlocked = await autoBlockHolder(q, row.holder_id, reason, blockedBy);
-    if (newlyBlocked) {
-      blocked.push({ holderId: row.holder_id, ...metrics, reason });
-    } else {
-      alreadyBlocked += 1;
+    // Per-holder isolation: one holder's write failing must not abort the sweep —
+    // record it and continue so the rest of the fleet is still evaluated/blocked.
+    try {
+      const newlyBlocked = await autoBlockHolder(q, row.holder_id, reason, blockedBy);
+      if (newlyBlocked) {
+        blocked.push({ holderId: row.holder_id, ...metrics, reason });
+      } else {
+        alreadyBlocked += 1;
+      }
+    } catch (err) {
+      log.error('Auto-block sweep: block write failed for holder',
+        { holderId: row.holder_id, err }, 'field-stock');
+      errors.push(row.holder_id);
     }
   }
 
-  return { enabled: true, evaluated: rows.length, blocked, alreadyBlocked };
+  return { enabled: true, evaluated: rows.length, blocked, alreadyBlocked, errors };
 }

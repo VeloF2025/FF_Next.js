@@ -50,7 +50,9 @@ try {
   const dbHost = new URL(process.env.DATABASE_URL).host;
   stderr(`[holder-auto-block-sweep] starting dbHost=${dbHost} isProd=${isProd}`);
 } catch {
-  // Malformed URL — let the actual DB call fail with a clearer pg error.
+  // Malformed URL — let the actual DB call fail with a clearer pg error, but
+  // record that the startup host line was suppressed.
+  stderr('[holder-auto-block-sweep] DATABASE_URL not parseable as a URL — startup host line suppressed');
 }
 
 (async () => {
@@ -68,6 +70,7 @@ try {
         `evaluated=${result.evaluated} ` +
         `blocked=${result.blocked.length} ` +
         `alreadyBlocked=${result.alreadyBlocked} ` +
+        `errors=${result.errors.length} ` +
         `durationMs=${Date.now() - startedAt}`,
     );
     if (result.blocked.length > 0) {

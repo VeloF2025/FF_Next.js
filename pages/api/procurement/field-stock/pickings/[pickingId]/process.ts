@@ -25,7 +25,7 @@ import { promotePickingSerials } from '@/modules/procurement/field-stock/service
 import {
   assertHolderNotBlocked,
   assertHolderAutoBlock,
-  autoBlockHolder,
+  commitAutoBlockRefusal,
   HolderBlockedError,
   HolderAutoBlockedError,
 } from '@/modules/procurement/field-stock/services/holderBlockGuard';
@@ -299,23 +299,13 @@ export async function processPicking(req: NextApiRequest, res: NextApiResponse) 
     });
   } catch (error: unknown) {
     if (error instanceof HolderAutoBlockedError) {
-      // The issue txn has rolled back. Commit the auto-block now via the pool
-      // (idempotent upsert) so it persists, then refuse the issue with 409.
-      try {
-        await autoBlockHolder(query, error.holderId, error.blockedReason, 'auto-block:issue-guard');
-      } catch (writeErr) {
-        // Don't mask the 409 if the block write fails — the next sweep/issue
-        // re-evaluates and retries. Surface it for diagnosis.
-        log.error('Auto-block write failed after threshold trip',
-          { pickingId, holderId: error.holderId, writeErr }, 'field-stock');
-      }
+      // The issue txn has rolled back. commitAutoBlockRefusal writes the block via
+      // the pool (a fresh connection, so it survives the rollback) and returns the
+      // 409 payload. A failed write is logged inside the helper, never masking 409.
       log.warn('Issue picking auto-blocked holder over aged-unaccounted threshold',
         { pickingId, holderId: error.holderId, metrics: error.metrics }, 'field-stock');
-      return apiResponse.conflict(res, 'holder_blocked', {
-        holderId: error.holderId,
-        blockedReason: error.blockedReason,
-        autoBlocked: true,
-      });
+      const payload = await commitAutoBlockRefusal(query, error);
+      return apiResponse.conflict(res, 'holder_blocked', payload);
     }
     if (error instanceof HolderBlockedError) {
       log.warn('Issue picking blocked: recipient holder is blocked',

@@ -16,6 +16,8 @@ interface Routes {
   sweep?: Record<string, unknown>[];
   /** holderIds the upsert should report as newly-blocked (RETURNING a row). */
   newlyBlocked?: Set<string>;
+  /** holderIds whose upsert should throw (simulate a write failure). */
+  throwOn?: Set<string>;
 }
 
 function makeQuerier(routes: Routes): { q: Querier; inserts: string[] } {
@@ -25,6 +27,7 @@ function makeQuerier(routes: Routes): { q: Querier; inserts: string[] } {
     if (text.includes('INSERT INTO stock_accountability')) {
       const holderId = (params?.[0] as string) ?? '';
       inserts.push(holderId);
+      if (routes.throwOn?.has(holderId)) throw new Error(`write failed for ${holderId}`);
       return routes.newlyBlocked?.has(holderId) ? [{ holder_id: holderId }] : [];
     }
     // The grouped sweep SELECT over the exceptions view.
@@ -45,7 +48,7 @@ describe('runAutoBlockSweep', () => {
       sweep: [{ holder_id: H1, aged_count: '9', aged_value: '99999' }],
     });
     const result = await runAutoBlockSweep(q);
-    expect(result).toEqual({ enabled: false, evaluated: 0, blocked: [], alreadyBlocked: 0 });
+    expect(result).toEqual({ enabled: false, evaluated: 0, blocked: [], alreadyBlocked: 0, errors: [] });
     expect(inserts).toHaveLength(0);
   });
 
@@ -78,5 +81,22 @@ describe('runAutoBlockSweep', () => {
     expect(result.blocked).toHaveLength(0);
     expect(result.alreadyBlocked).toBe(1);
     expect(result.evaluated).toBe(1);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('isolates a per-holder write failure: records it in errors and still blocks the others', async () => {
+    const { q } = makeQuerier({
+      policy: ENABLED_POLICY,
+      sweep: [
+        { holder_id: H1, aged_count: '4', aged_value: '100' }, // write throws
+        { holder_id: H2, aged_count: '4', aged_value: '100' }, // blocks ok
+      ],
+      throwOn: new Set([H1]),
+      newlyBlocked: new Set([H2]),
+    });
+    const result = await runAutoBlockSweep(q);
+    expect(result.errors).toEqual([H1]);
+    expect(result.blocked.map((b) => b.holderId)).toEqual([H2]);
+    expect(result.evaluated).toBe(2);
   });
 });

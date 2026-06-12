@@ -12,7 +12,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { query } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { runAutoBlockSweep } from '@/modules/procurement/field-stock/services/autoBlockSweep';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -29,6 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         evaluated: result.evaluated,
         blocked: result.blocked.length,
         alreadyBlocked: result.alreadyBlocked,
+        errors: result.errors.length,
       },
       'field-stock',
     );
@@ -39,4 +40,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+// SOP 4.4: the sweep writes the same is_blocked flag as the manual block endpoint
+// (bulk equivalent), so it carries the SAME admin/manager gate (migration 389).
+export default withAuth(withPermission('procurement.field-stock.block-holder', 'edit')(handler));

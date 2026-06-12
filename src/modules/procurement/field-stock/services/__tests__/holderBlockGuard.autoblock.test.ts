@@ -14,6 +14,7 @@ import {
   getHolderAgedMetrics,
   autoBlockHolder,
   assertHolderAutoBlock,
+  commitAutoBlockRefusal,
   HolderAutoBlockedError,
 } from '../holderBlockGuard';
 
@@ -54,6 +55,24 @@ describe('loadAutoBlockPolicy', () => {
     const { q } = makeQuerier({ policy: [] });
     const policy = await loadAutoBlockPolicy(q);
     expect(policy.enabled).toBe(false);
+  });
+
+  it('falls back to disabled on 42P01 (config table not yet migrated) — never 500s the issue path', async () => {
+    const q = (async () => {
+      throw Object.assign(new Error('relation "stock_accountability_config" does not exist'), {
+        code: '42P01',
+      });
+    }) as Querier;
+    await expect(loadAutoBlockPolicy(q)).resolves.toEqual(
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it('re-throws non-42P01 errors (real failures must surface)', async () => {
+    const q = (async () => {
+      throw Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' });
+    }) as Querier;
+    await expect(loadAutoBlockPolicy(q)).rejects.toThrow('connection refused');
   });
 });
 
@@ -124,8 +143,50 @@ describe('assertHolderAutoBlock', () => {
       policy: [{ auto_block_enabled: true, aged_count_threshold: 3, aged_value_threshold: 5000 }],
       metrics: [{ aged_count: '4', aged_value: '5200' }],
     });
-    await assertHolderAutoBlock(asTxn(q), HOLDER).catch((e: unknown) => {
-      expect((e as HolderAutoBlockedError).blockedReason).toContain('Auto-blocked (SOP-4.4)');
+    // rejects.toMatchObject (not a .catch callback) so the assertion is not
+    // silently skipped if the function ever stops throwing.
+    await expect(assertHolderAutoBlock(asTxn(q), HOLDER)).rejects.toMatchObject({
+      blockedReason: expect.stringContaining('Auto-blocked (SOP-4.4)'),
+    });
+  });
+
+  it('is a no-op for a holder with all-zero metrics under an enabled policy (the common case)', async () => {
+    const { q, calls } = makeQuerier({
+      policy: [{ auto_block_enabled: true, aged_count_threshold: 3, aged_value_threshold: 5000 }],
+      metrics: [{ aged_count: '0', aged_value: '0' }],
+    });
+    await expect(assertHolderAutoBlock(asTxn(q), HOLDER)).resolves.toBeUndefined();
+    expect(calls.some((c) => c.text.includes('INSERT INTO stock_accountability'))).toBe(false);
+  });
+});
+
+describe('commitAutoBlockRefusal (issue-path catch helper)', () => {
+  const ERR = new HolderAutoBlockedError(HOLDER, 'Auto-blocked (SOP-4.4): test', {
+    agedCount: 4,
+    agedValue: 5200,
+  });
+
+  it('commits the block via the pool and returns the 409 payload', async () => {
+    const { q, calls } = makeQuerier({ insert: [{ holder_id: HOLDER }] });
+    const payload = await commitAutoBlockRefusal(q, ERR);
+    expect(payload).toEqual({
+      holderId: HOLDER,
+      blockedReason: 'Auto-blocked (SOP-4.4): test',
+      autoBlocked: true,
+    });
+    expect(calls[0].text).toContain('INSERT INTO stock_accountability');
+    expect(calls[0].params).toEqual([HOLDER, 'Auto-blocked (SOP-4.4): test', 'auto-block:issue-guard']);
+  });
+
+  it('still returns the 409 payload when the block write throws (failure is swallowed + logged)', async () => {
+    const q = (async () => {
+      throw new Error('write failed');
+    }) as Querier;
+    const payload = await commitAutoBlockRefusal(q, ERR);
+    expect(payload).toEqual({
+      holderId: HOLDER,
+      blockedReason: 'Auto-blocked (SOP-4.4): test',
+      autoBlocked: true,
     });
   });
 });

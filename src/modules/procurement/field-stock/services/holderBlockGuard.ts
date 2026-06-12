@@ -20,6 +20,7 @@
  * cron (pool-level query).
  */
 import type { TxnClient } from '@/lib/db-pool';
+import { log } from '@/lib/logger';
 import {
   type AutoBlockPolicy,
   type HolderAgedMetrics,
@@ -121,11 +122,21 @@ interface AgedMetricsRow extends Record<string, unknown> {
  * safe no-op before/without the migration.
  */
 export async function loadAutoBlockPolicy(q: Querier): Promise<AutoBlockPolicy> {
-  const rows = await q<PolicyRow>(
-    `SELECT auto_block_enabled, aged_count_threshold, aged_value_threshold
-       FROM stock_accountability_config
-      WHERE id = 1`,
-  );
+  let rows: PolicyRow[];
+  try {
+    rows = await q<PolicyRow>(
+      `SELECT auto_block_enabled, aged_count_threshold, aged_value_threshold
+         FROM stock_accountability_config
+        WHERE id = 1`,
+    );
+  } catch (err: unknown) {
+    // 42P01 = relation does not exist: migration 411 not yet applied (fresh clone,
+    // restored snapshot, partial migration). Treat as the disabled default so the
+    // issue-time guard never 500s a picking on a missing config table. Re-throw any
+    // other error (real connectivity/permission failures must surface).
+    if ((err as { code?: string }).code === '42P01') return DEFAULT_AUTO_BLOCK_POLICY;
+    throw err;
+  }
   const row = rows[0];
   if (!row) return DEFAULT_AUTO_BLOCK_POLICY;
   return {
@@ -204,12 +215,37 @@ export async function autoBlockHolder(
  * the threshold. A disabled policy is an immediate no-op.
  */
 export async function assertHolderAutoBlock(txn: TxnClient, holderId: string): Promise<void> {
-  const policy = await loadAutoBlockPolicy(txn.query.bind(txn));
+  // Inline wrapper (not txn.query.bind) so the Querier generic is preserved —
+  // .bind() on a generic method erases the type parameter.
+  const q: Querier = (text, params) => txn.query(text, params);
+
+  const policy = await loadAutoBlockPolicy(q);
   if (!policy.enabled) return;
 
-  const metrics = await getHolderAgedMetrics(txn.query.bind(txn), holderId);
+  const metrics = await getHolderAgedMetrics(q, holderId);
   const decision = evaluateAutoBlock(policy, metrics);
   if (!decision.block) return;
 
   throw new HolderAutoBlockedError(holderId, formatBlockReason(metrics, decision), metrics);
+}
+
+/**
+ * Commit an auto-block triggered at issue time, from OUTSIDE the (now rolled-back)
+ * issue transaction. The picking handler calls this from its catch block: the block
+ * must be written on a fresh pool connection so it survives the rollback that
+ * refused the issue. A failed write is swallowed + logged (never masks the 409) —
+ * the holder is genuinely over threshold, so the next issue attempt or the nightly
+ * sweep re-evaluates and re-blocks. Returns the 409 response payload.
+ */
+export async function commitAutoBlockRefusal(
+  q: Querier,
+  error: HolderAutoBlockedError,
+): Promise<{ holderId: string; blockedReason: string; autoBlocked: true }> {
+  try {
+    await autoBlockHolder(q, error.holderId, error.blockedReason, 'auto-block:issue-guard');
+  } catch (writeErr) {
+    log.error('Auto-block write failed after threshold trip',
+      { holderId: error.holderId, writeErr }, 'field-stock');
+  }
+  return { holderId: error.holderId, blockedReason: error.blockedReason, autoBlocked: true };
 }
