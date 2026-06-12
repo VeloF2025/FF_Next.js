@@ -1,6 +1,9 @@
 -- rollback_412_supplier_vat_registered_backfill.sql
--- Restores the pre-412 state: these rows were vat_registered=false under the
--- migration 411 default before this backfill set them true.
+-- Reverts only rows this backfill could have set: VAT-pattern suppliers that are
+-- currently true. Before migration 411 every supplier was false (411 default) and
+-- at backfill time 0 rows were manually true, so true + VAT-pattern == set by 412.
+-- The `AND vat_registered = true` guard avoids touching rows that are already false.
 UPDATE suppliers
 SET vat_registered = false
-WHERE tax_number ~ '^\s*4\d{9}\s*$';
+WHERE tax_number ~ '^4\d{9}$'
+  AND vat_registered = true;
