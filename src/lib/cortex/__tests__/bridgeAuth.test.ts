@@ -30,11 +30,13 @@ beforeEach(() => {
     BRIDGE_JWT_KID: process.env.BRIDGE_JWT_KID,
     CORTEX_API_KEY: process.env.CORTEX_API_KEY,
     CORTEX_INSTANCE_ID: process.env.CORTEX_INSTANCE_ID,
+    CORTEX_OIDC_FORWARD: process.env.CORTEX_OIDC_FORWARD,
   };
   delete process.env.BRIDGE_JWT_SECRET;
   delete process.env.BRIDGE_JWT_KID;
   delete process.env.CORTEX_API_KEY;
   delete process.env.CORTEX_INSTANCE_ID;
+  delete process.env.CORTEX_OIDC_FORWARD;
 });
 
 afterEach(() => {
@@ -115,5 +117,47 @@ describe('bridgeBearer kid header (Cortex Phase 3 WP8 key rotation)', () => {
     process.env.BRIDGE_JWT_SECRET = SECRET;
     const token = await bridgeBearer(REVIEWER);
     expect(decodeProtectedHeader(token).kid).toBeUndefined();
+  });
+});
+
+describe('bridgeBearer — Entra ID-token forward (Phase 6 CORTEX_OIDC_FORWARD)', () => {
+  const forward = { entraIdToken: 'eyJhbGciOiJSUzI1NiI.entra.idtoken' };
+
+  it('forwards the Entra ID token verbatim when the flag is ON and a token is present', async () => {
+    process.env.CORTEX_OIDC_FORWARD = 'true';
+    process.env.BRIDGE_JWT_SECRET = SECRET; // present, but Entra takes precedence
+    const bearer = await bridgeBearer(REVIEWER, forward);
+    expect(bearer).toBe(forward.entraIdToken);
+  });
+
+  it('does NOT forward when the flag is OFF — falls back to the HS256 mint', async () => {
+    delete process.env.CORTEX_OIDC_FORWARD;
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const bearer = await bridgeBearer(REVIEWER, forward);
+    expect(bearer).not.toBe(forward.entraIdToken);
+    expect(decodeProtectedHeader(bearer).alg).toBe('HS256'); // minted HS256, not forwarded
+  });
+
+  it('flag ON but NO Entra token → falls back to the HS256 mint (no crash)', async () => {
+    process.env.CORTEX_OIDC_FORWARD = 'true';
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const bearer = await bridgeBearer(REVIEWER);
+    const { payload } = await jwtVerify(bearer, new TextEncoder().encode(SECRET));
+    expect(payload.email).toBe(REVIEWER);
+  });
+
+  it('flag ON, Entra token present, NO secret → still forwards Entra (not the api key)', async () => {
+    process.env.CORTEX_OIDC_FORWARD = 'true';
+    process.env.CORTEX_API_KEY = 'ck_live_apikey';
+    const bearer = await bridgeBearer(REVIEWER, forward);
+    expect(bearer).toBe(forward.entraIdToken);
+    expect(bearer).not.toBe('ck_live_apikey');
+  });
+
+  it('empty/whitespace Entra token is ignored → HS256 fallback (never an empty bearer)', async () => {
+    process.env.CORTEX_OIDC_FORWARD = 'true';
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const bearer = await bridgeBearer(REVIEWER, { entraIdToken: '   ' });
+    expect(decodeProtectedHeader(bearer).alg).toBe('HS256');
   });
 });
