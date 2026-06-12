@@ -26,6 +26,8 @@ export function SerialScanStep({
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savedSerial, setSavedSerial] = useState<string | null>(null);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [crossRefStatus, setCrossRefStatus] = useState<'verified' | 'mismatch' | 'pending' | null>(null);
   const [invalidMsg, setInvalidMsg] = useState<string | null>(null);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   const scanElementId = useId().replace(/:/g, '-');
@@ -60,11 +62,24 @@ export function SerialScanStep({
         }),
       });
       const json = (await res.json()) as {
-        data: { result: 'saved' | 'invalid_format'; serial: string; message: string };
+        data?: {
+          result: 'saved' | 'invalid_format';
+          serial: string;
+          message: string;
+          crossRefStatus?: 'verified' | 'mismatch' | 'pending';
+        };
       };
-      const { result, serial, message } = json.data;
+      // A 4xx/5xx response has no data envelope — degrade to a retryable
+      // message instead of throwing on the destructure.
+      if (!json.data) {
+        setInvalidMsg('Could not save serial — please try again');
+        return;
+      }
+      const { result, serial, message, crossRefStatus: refStatus } = json.data;
       if (result === 'saved') {
         setSavedSerial(serial);
+        setSavedMessage(message);
+        setCrossRefStatus(refStatus ?? 'pending');
         onScanSaved(serial);
       } else {
         setInvalidMsg(message);
@@ -88,11 +103,21 @@ export function SerialScanStep({
   }
 
   if (savedSerial) {
+    const tone =
+      crossRefStatus === 'verified'
+        ? { border: 'border-green-800', bg: 'bg-green-950/40', text: 'text-green-300', icon: 'text-green-400' }
+        : crossRefStatus === 'mismatch'
+          ? { border: 'border-amber-800', bg: 'bg-amber-950/40', text: 'text-amber-300', icon: 'text-amber-400' }
+          : { border: 'border-sky-800', bg: 'bg-sky-950/40', text: 'text-sky-300', icon: 'text-sky-400' };
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-sky-800 bg-sky-950/40 py-8 px-4">
-        <Clock className="h-8 w-8 text-sky-400" />
-        <p className="text-sm font-medium text-sky-300">Serial saved — {savedSerial}</p>
-        <p className="text-xs text-neutral-500">Cross-reference pending (1Map + OES)</p>
+      <div className={`flex flex-col items-center gap-3 rounded-xl border ${tone.border} ${tone.bg} py-8 px-4`}>
+        {crossRefStatus === 'mismatch'
+          ? <AlertTriangle className={`h-8 w-8 ${tone.icon}`} />
+          : <Clock className={`h-8 w-8 ${tone.icon}`} />}
+        <p className={`text-sm font-medium ${tone.text}`}>Serial saved — {savedSerial}</p>
+        <p className="text-xs text-neutral-500 text-center">
+          {savedMessage ?? 'Cross-reference pending (1Map + OES)'}
+        </p>
       </div>
     );
   }
