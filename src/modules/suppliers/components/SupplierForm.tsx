@@ -223,12 +223,13 @@ export function SupplierForm() {
 
               <div>
                 <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                  Tax Number
+                  VAT Number
                 </label>
                 <input
                   type="text"
                   value={formData.taxNumber}
                   onChange={(e) => handleInputChange('taxNumber', e.target.value)}
+                  placeholder="e.g. 4xxxxxxxxx (10 digits)"
                   className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
