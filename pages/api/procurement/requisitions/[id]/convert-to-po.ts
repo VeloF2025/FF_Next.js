@@ -122,7 +122,7 @@ export default withAuth(withErrorHandler(async (
     const items = itemsQuery;
 
     // Calculate totals — VAT rate derived from supplier: registered -> 15%, not registered -> 0%
-    const taxRate = supplier.vat_registered ? 15 : 0;
+    const taxRate = supplier.vat_registered === true ? 15 : 0;
     const subtotal = items.reduce((sum: number, item: Record<string, unknown>) => {
       const price = Number(item.estimated_unit_price) || 0;
       const qty = Number(item.quantity) || 0;

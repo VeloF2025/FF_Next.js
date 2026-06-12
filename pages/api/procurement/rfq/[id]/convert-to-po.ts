@@ -90,7 +90,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const supplier = supplierResult[0]!;
 
     // VAT rate is derived from the supplier: registered -> 15%, not registered -> 0%
-    const taxRate = supplier.vat_registered ? 15 : 0;
+    const taxRate = supplier.vat_registered === true ? 15 : 0;
 
     // Get RFQ items (or use custom items if provided)
     let poItems;

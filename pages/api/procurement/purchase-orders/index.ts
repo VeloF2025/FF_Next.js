@@ -167,11 +167,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Derive VAT rate from the supplier: registered -> 15%, not registered -> 0%
-    const supplierVat = await sql`SELECT vat_registered FROM suppliers WHERE id = ${supplierId}`;
+    const supplierIdNum = Number.parseInt(String(supplierId), 10);
+    if (Number.isNaN(supplierIdNum)) {
+      return apiResponse.badRequest(res, 'Invalid supplier');
+    }
+    const supplierVat = await sql`SELECT vat_registered FROM suppliers WHERE id = ${supplierIdNum}`;
     if (supplierVat.length === 0) {
       return apiResponse.badRequest(res, 'Supplier not found');
     }
-    const taxRate = supplierVat[0]!.vat_registered ? 15 : 0;
+    const taxRate = supplierVat[0]!.vat_registered === true ? 15 : 0;
 
     if (!deliveryAddress || deliveryAddress.trim().length < 10) {
       return apiResponse.badRequest(res, 'Delivery address must be at least 10 characters');
@@ -193,10 +197,6 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const normalizedPaymentTerms = paymentTermsMap[paymentTerms];
     if (!paymentTerms || !normalizedPaymentTerms) {
       return apiResponse.badRequest(res, 'Valid payment terms are required (e.g., Net 30, COD)');
-    }
-
-    if (taxRate < 0 || taxRate > 25) {
-      return apiResponse.badRequest(res, 'Tax rate must be between 0 and 25%');
     }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
