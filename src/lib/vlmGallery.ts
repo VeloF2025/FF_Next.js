@@ -6,6 +6,7 @@
 import { pool } from '@/lib/db';
 import { log } from '@/lib/logger';
 import { fetchPhotoAsBase64 } from '@/modules/activate/services/photoFetchService';
+import { optimizeForVlm } from '@/modules/activate/services/imagePreprocessService';
 import { resolveInternalPhotoUrl } from '@/lib/internalPhotoUrl';
 import type { GalleryExamples } from '@/modules/activate/services/stepQualityCriteria';
 
@@ -47,7 +48,11 @@ export async function loadGalleryExamples(
         // no session cookie, so resolve to the backend source URL first —
         // otherwise every example 401s and is silently dropped (found 2026-06-11:
         // the VLM was receiving ZERO gallery examples).
-        return await fetchPhotoAsBase64(resolveInternalPhotoUrl(url));
+        const raw = await fetchPhotoAsBase64(resolveInternalPhotoUrl(url));
+        // Full-resolution gallery photos blow the VLM's 32k context once ~12
+        // examples are attached (found 2026-06-12: every validate request got
+        // HTTP 400 and failed open). Resize to the VLM working size first.
+        return await optimizeForVlm(raw, { maxWidth: 1024, maxHeight: 768 });
       } catch (err) {
         log.warn('Failed to fetch gallery example as base64', { url, err: String(err) }, MODULE);
         return null;

@@ -10,8 +10,10 @@ export interface SiteCamStep {
 export const ACTIVATION_STEPS: readonly SiteCamStep[] = [
   { number: 1,  label: 'House / Property Photo',   hasVlm: true,  hasSerialScan: false },
   { number: 2,  label: 'Cable from Pole',           hasVlm: true,  hasSerialScan: false },
-  { number: 3,  label: 'Entry Outside',             hasVlm: false, hasSerialScan: false },
-  { number: 4,  label: 'Entry Inside',              hasVlm: false, hasSerialScan: false },
+  // Steps 3 & 4 gained VLM criteria in PR #1916 (QUALITY_CHECK_STEPS) but this
+  // config was never flipped — photos were auto-accepted with no check at all.
+  { number: 3,  label: 'Entry Outside',             hasVlm: true,  hasSerialScan: false },
+  { number: 4,  label: 'Entry Inside',              hasVlm: true,  hasSerialScan: false },
   { number: 5,  label: 'Wall (ONT Mount)',          hasVlm: true,  hasSerialScan: false },
   { number: 6,  label: 'ONT Back After Install',    hasVlm: false, hasSerialScan: true,  serialLabel: 'ONT Serial',  serialDevice: 'ont' },
   { number: 7,  label: 'Power Meter',               hasVlm: true,  hasSerialScan: false },
