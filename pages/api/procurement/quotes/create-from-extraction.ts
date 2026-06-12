@@ -87,16 +87,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (!finalSupplierId) {
       const supplierCode = 'SUP-SCAN-' + Date.now();
       const createdBy = ((req as any).user?.id as string | undefined) || 'system';
+      const extractedVat = extraction.extracted_supplier_vat || null;
+      // The suppliers VAT number lives in `tax_number` (there is no vat_number
+      // column). A valid SA VAT number (10 digits starting with 4) means the
+      // supplier is VAT-registered → their POs get 15% (else 0%). Mirrors mig 412.
+      const vatRegistered = typeof extractedVat === 'string' && /^\s*4\d{9}\s*$/.test(extractedVat);
 
       const newSupplier = await sql`
-        INSERT INTO suppliers (code, name, company_name, email, phone, vat_number, status, created_by)
+        INSERT INTO suppliers (code, name, company_name, email, phone, tax_number, vat_registered, status, created_by)
         VALUES (
           ${supplierCode},
           ${supplierName || 'Unknown Supplier'},
           ${supplierName || 'Unknown Supplier'},
           ${extraction.extracted_supplier_email || null},
           ${extraction.extracted_supplier_phone || null},
-          ${extraction.extracted_supplier_vat || null},
+          ${extractedVat},
+          ${vatRegistered},
           'active',
           ${createdBy}
         )
