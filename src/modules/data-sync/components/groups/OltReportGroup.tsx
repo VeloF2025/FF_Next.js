@@ -192,10 +192,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         />
       )}
 
-      {state.currentTab === 'reporting' && (
-        <OltReportingTab setError={state.setError} />
-      )}
-
+      {state.currentTab === 'reporting' && <OltReportingTab setError={state.setError} />}
       {state.currentTab === 'ledger' && <OltReconLedgerTab />}
     </div>
   );

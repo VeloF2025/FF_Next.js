@@ -26,13 +26,17 @@
 -- not expose — this keeps the install-status logic single-sourced.
 --
 -- ── Join keys (raw drop_number; index-friendly) ──────────────────────────────
--- drop_number is verified clean (UPPER(TRIM(x)) = x for 100% of rows) in the spine
--- and in every child EXCEPT a handful of SOW dupes in drops (~100/180k). All child
--- tables carry a btree index on the raw drop_number, so we join raw `=` and hit the
--- index. (UPPER+TRIM normalisation is reserved for SERIAL values below, where dirty
--- variants do exist.) oes_activations and drops are UNIQUE on drop_number → safe
--- LEFT JOIN. olt_mismatch_records (1767 rows / 1717 DRs) and ft_billing_deductions
--- (5625 rows / 1250 DRs) are multi-row per DR → LATERAL ... LIMIT 1 by recency.
+-- drop_number is verified clean (UPPER(TRIM(x)) = x) for 100% of rows in the spine
+-- and in every child EXCEPT ~100/180k rows in drops whose drop_number carries a
+-- case/whitespace variant (NOT duplicates — drops is UNIQUE on drop_number). All
+-- child tables carry a btree index on the raw drop_number, so we join raw `=` and
+-- hit the index; the raw join may miss those ~100 dirty drops rows, which is
+-- acceptable (the other three serial legs still cover them). (UPPER+TRIM
+-- normalisation is reserved for SERIAL values below, where dirty variants exist.)
+-- dr_photo_unified_reviews, oes_activations and drops are UNIQUE on drop_number →
+-- safe 1:1 LEFT JOIN (no fan-out). olt_mismatch_records (1767 rows / 1717 DRs) and
+-- ft_billing_deductions (5625 rows / 1250 DRs) are multi-row per DR → LATERAL ...
+-- LIMIT 1 by recency with an id DESC tiebreaker for determinism.
 --
 -- ── Serial comparison (UPPER+TRIM, empty→NULL) ───────────────────────────────
 -- The three audited legs are WA-scanned (dr_photo_unified_reviews.ont_serial_scanned),
@@ -151,14 +155,18 @@ WITH ledger AS (
            m.maintenance_ticket_id, m.resolved_at
     FROM olt_mismatch_records m
     WHERE m.drop_number = base.drop_number
-    ORDER BY m.created_at DESC NULLS LAST
+    -- id DESC is the final tiebreaker so the chosen row is deterministic even when
+    -- two records share the same created_at.
+    ORDER BY m.created_at DESC NULLS LAST, m.id DESC
     LIMIT 1
   ) om ON true
   LEFT JOIN LATERAL (
     SELECT d.week_ending, d.deduction_note, d.verdict, d.resolution_status, d.dispute_outcome
     FROM ft_billing_deductions d
     WHERE d.dr_number = base.drop_number
-    ORDER BY d.week_ending DESC NULLS LAST, d.created_at DESC NULLS LAST
+    -- 455 DRs (live, 2026-06-12) have ≥2 deduction rows sharing (week_ending,
+    -- created_at) with DIVERGENT note/verdict; id DESC makes the displayed row stable.
+    ORDER BY d.week_ending DESC NULLS LAST, d.created_at DESC NULLS LAST, d.id DESC
     LIMIT 1
   ) ded ON true
 ),

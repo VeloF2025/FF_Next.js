@@ -96,47 +96,14 @@ export type OltTabId =
   | 'ledger';
 
 // Per-DR three-way reconciliation ledger (migration 414, v_dr_reconciliation_ledger).
-// recon_class is the explicit three-way conflict classification.
-export type ReconClass =
-  | 'all_agree'
-  | 'serial_other_dr'
-  | 'wa_no_oes'
-  | 'oes_no_1map'
-  | 'deducted_but_active'
-  | 'no_evidence';
-
-export const RECON_CLASSES: ReconClass[] = [
-  'serial_other_dr',
-  'wa_no_oes',
-  'oes_no_1map',
-  'deducted_but_active',
-  'all_agree',
-  'no_evidence',
-];
-
-export interface ReconLedgerRow {
-  drop_number: string;
-  project: string | null;
-  wa_serial: string | null;
-  oes_serial: string | null;
-  onemap_serial: string | null;
-  drops_serial: string | null;
-  distinct_serial_count: number;
-  wa_submitted_at: string | null;
-  has_wa_submission: boolean;
-  has_oes_activation: boolean;
-  activation_status: string | null;
-  oes_status: string | null;
-  oes_activated_at: string | null;
-  payment_status: string | null;
-  latest_deduction_week: string | null;
-  latest_deduction_note: string | null;
-  deduction_verdict: string | null;
-  onemap_fix_status: string | null;
-  onemap_mismatch_ticket_id: string | null;
-  is_offline: boolean | null;
-  recon_class: ReconClass;
-}
+// Canonical definitions live in the pure services/reconLedgerQuery module (single
+// source of truth shared by the API handler, the query builder and the UI);
+// re-exported here so data-sync consumers keep importing from the types barrel.
+export {
+  RECON_CLASSES,
+  type ReconClass,
+  type ReconLedgerRow,
+} from './services/reconLedgerQuery';
 
 // QField tab IDs
 export type QFieldTabId = 'projects';

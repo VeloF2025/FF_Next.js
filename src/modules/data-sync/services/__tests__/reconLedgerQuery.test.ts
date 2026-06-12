@@ -11,8 +11,9 @@ describe('buildLedgerQuery — pagination', () => {
     expect(buildLedgerQuery({ pageSize: '5000' }).pageSize).toBe(200);
   });
 
-  it('clamps pageSize and page to a floor of 1', () => {
+  it('clamps pageSize and page to a floor of 1 (incl. negatives)', () => {
     expect(buildLedgerQuery({ pageSize: '0' }).pageSize).toBe(1);
+    expect(buildLedgerQuery({ pageSize: '-5' }).pageSize).toBe(1);
     expect(buildLedgerQuery({ page: '0' }).page).toBe(1);
     expect(buildLedgerQuery({ page: '-3' }).page).toBe(1);
   });
@@ -69,6 +70,12 @@ describe('buildLedgerQuery — project + search', () => {
     expect(buildLedgerQuery({ project: '   ' }).whereClause).toBe('');
     expect(buildLedgerQuery({ search: '   ' }).whereClause).toBe('');
     expect(buildLedgerQuery({ project: '  Lawley  ' }).params).toEqual(['Lawley']);
+  });
+
+  it('escapes LIKE wildcards so they match literally, not as wildcards', () => {
+    expect(buildLedgerQuery({ search: '50%' }).params).toEqual(['%50\\%%']);
+    expect(buildLedgerQuery({ search: 'a_b' }).params).toEqual(['%a\\_b%']);
+    expect(buildLedgerQuery({ search: 'a\\b' }).params).toEqual(['%a\\\\b%']);
   });
 });
 

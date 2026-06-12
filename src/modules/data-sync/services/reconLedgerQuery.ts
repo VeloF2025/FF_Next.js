@@ -17,6 +17,34 @@ export const RECON_CLASSES = [
 
 export type ReconClass = (typeof RECON_CLASSES)[number];
 
+/**
+ * One row of v_dr_reconciliation_ledger. Canonical home is this pure module (no
+ * React/server deps → bundle-safe); the data-sync types barrel re-exports it.
+ */
+export interface ReconLedgerRow {
+  drop_number: string;
+  project: string | null;
+  wa_serial: string | null;
+  oes_serial: string | null;
+  onemap_serial: string | null;
+  drops_serial: string | null;
+  distinct_serial_count: number;
+  wa_submitted_at: string | null;
+  has_wa_submission: boolean;
+  has_oes_activation: boolean;
+  activation_status: string | null;
+  oes_status: string | null;
+  oes_activated_at: string | null;
+  payment_status: string | null;
+  latest_deduction_week: string | null;
+  latest_deduction_note: string | null;
+  deduction_verdict: string | null;
+  onemap_fix_status: string | null;
+  onemap_mismatch_ticket_id: string | null;
+  is_offline: boolean | null;
+  recon_class: ReconClass;
+}
+
 const MAX_PAGE_SIZE = 200;
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -75,7 +103,11 @@ export function buildLedgerQuery(input: LedgerQueryInput): LedgerQuery {
 
   const search = firstStr(input.search)?.trim();
   if (search) {
-    params.push(`%${search}%`);
+    // Escape LIKE wildcards so a literal '%'/'_' in the query matches literally
+    // rather than broadening the result set (backslash is Postgres' default LIKE
+    // escape char; the value is still bound, never interpolated).
+    const escaped = search.replace(/[\\%_]/g, '\\$&');
+    params.push(`%${escaped}%`);
     const i = params.length;
     conditions.push(
       `(drop_number ILIKE $${i} OR wa_serial ILIKE $${i} OR oes_serial ILIKE $${i} OR onemap_serial ILIKE $${i} OR drops_serial ILIKE $${i})`

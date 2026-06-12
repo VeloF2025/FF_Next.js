@@ -26,15 +26,24 @@ const INTEGRATION_ENABLED = process.env.SUPABASE_INTEGRATION_TEST === 'true';
 
 // recon_class → SQL predicate that must hold for EVERY row of that class.
 // A row of class X failing predicate(X) is a classification bug.
+const SERIAL_CONFLICT = `(distinct_serial_count > 1 OR onemap_fix_status = 'serial_other_dr')`;
+const WA_NO_OES = `(has_wa_submission AND NOT has_oes_activation)`;
+const OES_NO_1MAP = `(has_oes_activation AND onemap_fix_status IN
+                 ('not_found','empty_serial','pending','needs_investigation','needs_reinvestigation','escalated'))`;
+const DEDUCTED_ACTIVE = `(has_oes_activation AND payment_status = 'deducted' AND oes_status = 'Active')`;
+const ALL_AGREE = `(has_oes_activation AND distinct_serial_count <= 1
+               AND (onemap_fix_status IS NULL OR onemap_fix_status IN ('fixed','resolved')))`;
+
 const CLASS_INVARIANTS: Record<string, string> = {
-  serial_other_dr: `(distinct_serial_count > 1 OR onemap_fix_status = 'serial_other_dr')`,
-  wa_no_oes: `(has_wa_submission AND NOT has_oes_activation)`,
-  oes_no_1map: `(has_oes_activation AND onemap_fix_status IN
-                 ('not_found','empty_serial','pending','needs_investigation','needs_reinvestigation','escalated'))`,
-  deducted_but_active: `(has_oes_activation AND payment_status = 'deducted' AND oes_status = 'Active')`,
-  all_agree: `(has_oes_activation AND distinct_serial_count <= 1
-               AND (onemap_fix_status IS NULL OR onemap_fix_status IN ('fixed','resolved')))`,
-  no_evidence: `TRUE`, // ELSE bucket — no positive invariant beyond "valid enum value"
+  serial_other_dr: SERIAL_CONFLICT,
+  wa_no_oes: WA_NO_OES,
+  oes_no_1map: OES_NO_1MAP,
+  deducted_but_active: DEDUCTED_ACTIVE,
+  all_agree: ALL_AGREE,
+  // no_evidence is the ELSE bucket: by construction it must NOT satisfy any of the
+  // five positive class predicates (otherwise the CASE would have matched earlier).
+  // This is a real negative invariant, not a TRUE tautology.
+  no_evidence: `NOT (${SERIAL_CONFLICT} OR ${WA_NO_OES} OR ${OES_NO_1MAP} OR ${DEDUCTED_ACTIVE} OR ${ALL_AGREE})`,
 };
 
 describe.skipIf(!INTEGRATION_ENABLED)('v_dr_reconciliation_ledger (live DB)', () => {
@@ -64,9 +73,8 @@ describe.skipIf(!INTEGRATION_ENABLED)('v_dr_reconciliation_ledger (live DB)', ()
     const res = await pool.query(`SELECT DISTINCT recon_class FROM v_dr_reconciliation_ledger`);
     const seen = res.rows.map((r) => r.recon_class);
     expect(seen).not.toContain(null);
-    for (const cls of seen) {
-      expect(RECON_CLASSES as readonly string[]).toContain(cls);
-    }
+    // Full set equality — every known class is present AND no unknown class leaks.
+    expect(new Set(seen)).toEqual(new Set(RECON_CLASSES));
   });
 
   it('has one ledger row per DR — count matches the v_dr_installation_status spine', async () => {
@@ -97,9 +105,38 @@ describe.skipIf(!INTEGRATION_ENABLED)('v_dr_reconciliation_ledger (live DB)', ()
       `SELECT recon_class, distinct_serial_count
        FROM v_dr_reconciliation_ledger WHERE drop_number = 'DR1752844'`
     );
-    if (res.rows.length > 0) {
-      expect(res.rows[0].distinct_serial_count).toBeLessThanOrEqual(1);
-      expect(res.rows[0].recon_class).not.toBe('serial_other_dr');
-    }
+    expect(res.rows.length).toBe(1); // must exist in live data — no silent skip
+    expect(res.rows[0].distinct_serial_count).toBeLessThanOrEqual(1);
+    expect(res.rows[0].recon_class).not.toBe('serial_other_dr');
+  });
+
+  it('stale-snapshot guard: no fixed/resolved-1Map DR is left as serial_other_dr by its 1Map leg alone', async () => {
+    // When onemap_fix_status IN ('fixed','resolved') the 1Map intake snapshot is
+    // dropped from the conflict count. So any such DR still classed serial_other_dr
+    // MUST owe that to a non-1Map leg disagreeing (wa/oes/drops), never to the stale
+    // onemap snapshot. Verify there are fixed/resolved rows (test actually runs) and
+    // that none are serial_other_dr purely because onemap differs.
+    const present = await pool.query(
+      `SELECT count(*)::int AS n FROM v_dr_reconciliation_ledger
+       WHERE onemap_fix_status IN ('fixed','resolved')`
+    );
+    expect(present.rows[0].n).toBeGreaterThan(0);
+
+    const leak = await pool.query(
+      `SELECT count(*)::int AS violations
+       FROM v_dr_reconciliation_ledger
+       WHERE onemap_fix_status IN ('fixed','resolved')
+         AND recon_class = 'serial_other_dr'
+         -- the three non-1Map legs all agree (≤1 distinct), so the only thing that
+         -- could have tripped the conflict is the (now-dropped) stale 1Map snapshot:
+         AND cardinality(ARRAY(
+               SELECT DISTINCT s FROM unnest(ARRAY[
+                 CASE WHEN upper(trim(wa_serial))    ~ '^[A-Z0-9]{6,}$' THEN upper(trim(wa_serial))    END,
+                 CASE WHEN upper(trim(oes_serial))   ~ '^[A-Z0-9]{6,}$' THEN upper(trim(oes_serial))   END,
+                 CASE WHEN upper(trim(drops_serial)) ~ '^[A-Z0-9]{6,}$' THEN upper(trim(drops_serial)) END
+               ]) s WHERE s IS NOT NULL)) <= 1
+         AND onemap_fix_status <> 'serial_other_dr'`
+    );
+    expect(leak.rows[0].violations).toBe(0);
   });
 });

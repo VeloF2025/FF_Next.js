@@ -12,6 +12,7 @@ import type { ReconClass, ReconLedgerRow } from '../types';
 import { log } from '@/lib/logger';
 
 const PAGE_SIZE = 50;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export interface ReconSummary {
   recon_class: ReconClass;
@@ -43,9 +44,9 @@ export function useReconLedger(): UseReconLedger {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reconClass, setReconClassState] = useState<ReconClass | null>(null);
-  const [search, setSearchState] = useState('');
-  // Bump to force a refetch without changing filters.
-  const [nonce, setNonce] = useState(0);
+  const [search, setSearchState] = useState(''); // controlled input value
+  const [debouncedSearch, setDebouncedSearch] = useState(''); // value that drives fetches
+  const [nonce, setNonce] = useState(0); // bump to force a refetch
 
   // Reset to page 1 whenever a filter changes (avoids landing on an empty page).
   const setReconClass = useCallback((c: ReconClass | null) => {
@@ -58,6 +59,13 @@ export function useReconLedger(): UseReconLedger {
   }, []);
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
+  // Debounce the search term so typing doesn't fire a request per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Rows — refetch on page / class filter / debounced search / explicit refresh.
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -67,9 +75,8 @@ export function useReconLedger(): UseReconLedger {
         const params = new URLSearchParams();
         params.set('page', String(page));
         params.set('pageSize', String(PAGE_SIZE));
-        params.set('summary', '1');
         if (reconClass) params.set('recon_class', reconClass);
-        if (search.trim()) params.set('search', search.trim());
+        if (debouncedSearch) params.set('search', debouncedSearch);
 
         const res = await fetch(`/api/system/olt-report/ledger?${params.toString()}`);
         if (!res.ok) throw new Error(`Request failed (${res.status})`);
@@ -78,7 +85,6 @@ export function useReconLedger(): UseReconLedger {
         if (cancelled) return;
         setRecords(data.records || []);
         setTotal(data.total || 0);
-        if (data.summary) setSummary(data.summary);
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : String(err);
@@ -93,7 +99,31 @@ export function useReconLedger(): UseReconLedger {
     return () => {
       cancelled = true;
     };
-  }, [page, reconClass, search, nonce]);
+  }, [page, reconClass, debouncedSearch, nonce]);
+
+  // Summary cards — the per-class counts are GLOBAL (unfiltered) and independent of
+  // page/filter/search, so fetch once on mount (and on explicit refresh) rather than
+  // re-scanning the whole view on every page change.
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch('/api/system/olt-report/ledger?summary=1&pageSize=1');
+        if (!res.ok) return;
+        const json = await res.json();
+        const data = json.data || json;
+        if (!cancelled && data.summary) setSummary(data.summary);
+      } catch (err) {
+        if (!cancelled) {
+          log.error('useReconLedger:summary', { error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [nonce]);
 
   return {
     records,
