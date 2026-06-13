@@ -222,6 +222,12 @@ async function processOneQueueItem(client: PoolClient, item: QueueItem, importId
       investigationContext,
     });
   }
+  // NOTE: deliberate asymmetry — unlike the continuation service's processOneItem,
+  // this inline path has NO match-branch auto-resolve of stale mismatch rows. That
+  // is a queue side-effect, out of scope for this classification-only unification
+  // (activations audit rec #4). Classification is now shared; the match-resolution
+  // side-effect is the one remaining divergence, left for a follow-up so this PR
+  // changes no side-effects.
 }
 
 // Allow internal trigger via API key (for server-side fire-and-forget after restarts)

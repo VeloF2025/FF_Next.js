@@ -30,17 +30,19 @@ export interface MismatchUpsert {
   investigationContext?: string | null;
 }
 
-/** True when a serialised investigation_context describes a status_mismatch. */
-function isStatusMismatchContext(context: unknown): boolean {
+/**
+ * True when a serialised investigation_context describes a status_mismatch.
+ * `investigation_context` is a TEXT column, so `pg` always returns a JSON
+ * string (never a parsed object) — and every writer passes a JSON.stringify'd
+ * value or null. We therefore only need the string case.
+ */
+function isStatusMismatchContext(context: string | null | undefined): boolean {
   if (!context) return false;
-  if (typeof context === 'string') {
-    try {
-      return JSON.parse(context)?.reason === 'status_mismatch';
-    } catch {
-      return false;
-    }
+  try {
+    return JSON.parse(context)?.reason === 'status_mismatch';
+  } catch {
+    return false; // malformed JSON is not a status_mismatch
   }
-  return (context as { reason?: string }).reason === 'status_mismatch';
 }
 
 export async function insertMismatchIfNew(

@@ -61,10 +61,17 @@ export function classifyEmptyRecords(
       };
 }
 
+/** The verdict written to `olt_onemap_lookup_queue.mismatch_type` for a DR with records. */
+export type RecordMismatchType =
+  | 'match'
+  | 'note4_ups_swap'
+  | 'note4_wrong_serial'
+  | 'note4_empty_barcode'
+  | 'status_mismatch';
+
 /** Verdict for a DR that returned one or more records from 1Map. */
 export interface RecordClassification {
-  /** queue.mismatch_type: match | note4_ups_swap | note4_wrong_serial | note4_empty_barcode | status_mismatch */
-  mismatchType: string;
+  mismatchType: RecordMismatchType;
   /** olt_mismatch_records.fix_status before cross-DR finalisation: pending | needs_investigation */
   fixStatus: string;
   hasUpsSwap: boolean;
@@ -128,7 +135,7 @@ export function classifyOltRecords(
     }
   }
 
-  let mismatchType = 'match';
+  let mismatchType: RecordMismatchType = 'match';
   let fixStatus = 'pending';
   let hasUpsSwap = false;
   if (swapCount > 0) {
