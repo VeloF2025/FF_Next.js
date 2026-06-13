@@ -3,7 +3,14 @@
  *
  * SELECT-then-UPDATE/INSERT with an ON CONFLICT backstop: the partial unique
  * index `idx_olt_mismatch_drop_active_uniq` guarantees at most one active row
- * per drop even under concurrent workers. Shared by the queue processor.
+ * per drop even under concurrent workers. Shared by both queue-processing paths
+ * (the inline endpoint processor and the continuation service).
+ *
+ * Status-mismatch priority: a status_mismatch and a serial fix describe two
+ * independent problems on the same drop. A pending serial fix must NOT be
+ * overwritten by a status_mismatch, and a status_mismatch IS allowed to be
+ * created alongside an already-fixed serial. Non-status-mismatch upserts behave
+ * exactly as before (fixed→skip, pending/not_found/empty/other-dr→update).
  *
  * Status: WORKING
  * NLNH Confidence: HIGH
@@ -23,23 +30,48 @@ export interface MismatchUpsert {
   investigationContext?: string | null;
 }
 
+/** True when a serialised investigation_context describes a status_mismatch. */
+function isStatusMismatchContext(context: unknown): boolean {
+  if (!context) return false;
+  if (typeof context === 'string') {
+    try {
+      return JSON.parse(context)?.reason === 'status_mismatch';
+    } catch {
+      return false;
+    }
+  }
+  return (context as { reason?: string }).reason === 'status_mismatch';
+}
+
 export async function insertMismatchIfNew(
   client: PoolClient,
   data: MismatchUpsert
 ): Promise<void> {
+  const isNewStatusMismatch = isStatusMismatchContext(data.investigationContext);
+
   const existing = await client.query(
-    `SELECT id, fix_status, olt_serial FROM olt_mismatch_records
+    `SELECT id, fix_status, olt_serial, investigation_context
+     FROM olt_mismatch_records
      WHERE drop_number = $1 ORDER BY created_at DESC LIMIT 1`,
     [data.dropNumber]
   );
 
   if (existing.rows.length > 0) {
     const ex = existing.rows[0];
+    const isExistingStatusMismatch = isStatusMismatchContext(ex.investigation_context);
+
     if (ex.fix_status === 'fixed'
         && ex.olt_serial?.toUpperCase() === data.oltSerial.toUpperCase()) {
-      return;
-    }
-    if (['pending', 'empty_serial', 'not_found', 'serial_other_dr'].includes(ex.fix_status)) {
+      // Serial already fixed. A new status_mismatch is a distinct problem, so
+      // let it through to INSERT; anything else is a duplicate — skip.
+      if (!(isNewStatusMismatch && !isExistingStatusMismatch)) {
+        return;
+      }
+    } else if (['pending', 'empty_serial', 'not_found', 'serial_other_dr'].includes(ex.fix_status)) {
+      // A pending serial fix outranks a status_mismatch — don't overwrite it.
+      if (isNewStatusMismatch && !isExistingStatusMismatch) {
+        return;
+      }
       await client.query(
         `UPDATE olt_mismatch_records
          SET olt_serial = $1, wrong_onemap_serial = $2,

@@ -11,15 +11,21 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
-import { findSerialOnOtherDr } from '@/modules/data-sync/services/oltQueueProcessorService';
+import {
+  findSerialOnOtherDr,
+  type QueueItem,
+} from '@/modules/data-sync/services/oltQueueProcessorService';
+import {
+  classifyEmptyRecords,
+  classifyOltRecords,
+  findCrossDrOwner,
+  buildCrossDrContext,
+} from '@/modules/data-sync/services/oltMismatchClassifier';
+import { insertMismatchIfNew } from '@/modules/data-sync/services/oltMismatchUpsert';
 
 const BATCH_SIZE = 50;
 const CONCURRENCY = 2; // Reduced from 3 - fewer concurrent 1Map calls = faster individual responses
 const STAGGER_MS = 500; // Increased stagger to avoid overwhelming 1Map
-
-function isUpsSerial(serial: string | null): boolean {
-  return !!serial && serial.toUpperCase().startsWith('GU18');
-}
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -132,8 +138,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function processOneQueueItem(client: any, item: any, importId: string | undefined): Promise<void> {
+async function processOneQueueItem(client: PoolClient, item: QueueItem, importId: string | undefined): Promise<void> {
   // Item was already atomically claimed (status='processing', attempts incremented)
   // by the batch SELECT in the handler, so no pre-flight UPDATE is needed here.
   let searchResult;
@@ -165,223 +170,58 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
     // different drop, classify serial_other_dr instead of a blind not_found.
     // Shares the service's helper so both queue-processing paths stay in sync.
     const otherDr = await findSerialOnOtherDr(client, item);
-    const mismatchType = otherDr ? 'note2_serial_other_dr' : 'note2_not_on_1map';
+    const empty = classifyEmptyRecords(otherDr);
     await client.query(
       `UPDATE olt_onemap_lookup_queue
        SET status = 'completed', mismatch_type = $1, processed_at = NOW()
        WHERE id = $2`,
-      [mismatchType, item.id]
+      [empty.mismatchType, item.id]
     );
     if (importId) {
       await insertMismatchIfNew(client, {
         importId, dropNumber: item.drop_number,
         oltSerial: item.oes_serial, wrongOneMapSerial: null,
-        fixStatus: otherDr ? 'serial_other_dr' : 'not_found', hasUpsSwap: false,
+        fixStatus: empty.fixStatus, hasUpsSwap: false,
         oesBatchId: item.oes_batch_id, oesSource: 'api',
-        investigationContext: otherDr?.context ?? null,
+        investigationContext: empty.investigationContext,
       });
     }
     return;
   }
 
-  const oesSerial = item.oes_serial.trim().toUpperCase();
-  const records = searchResult.records;
-  let correctCount = 0, emptyCount = 0, wrongCount = 0, swapCount = 0;
-  let firstWrongSerial: string | null = null;
-  let firstUpsSerial: string | null = null;
-
-  for (const rec of records) {
-    const ont = rec.ph_ont?.trim().toUpperCase() || null;
-    const ups = rec.br_ser?.trim().toUpperCase() || null;
-    if (ont === oesSerial) { correctCount++; }
-    else if (!ont) { emptyCount++; }
-    else if (ups === oesSerial && isUpsSerial(ont)) {
-      swapCount++;
-      if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
-    } else {
-      wrongCount++;
-      if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
-    }
-  }
-
-  let mismatchType = 'match';
-  let fixStatus = 'pending';
-  let hasUpsSwap = false;
-  if (swapCount > 0) { mismatchType = 'note4_ups_swap'; hasUpsSwap = true; }
-  else if (wrongCount > 0) { mismatchType = 'note4_wrong_serial'; }
-  else if (emptyCount > 0 && correctCount === 0) { mismatchType = 'note4_empty_barcode'; }
-
-  // Status mismatch check: serial is correct but NO prop_id has "Installed" status
-  // A DR can have multiple prop_ids for different processes (sign-up, installation, etc.)
-  // Only flag if none of the correct-serial records have the installed status
-  const INSTALLED_STATUS = 'Home Installation: Installed';
-  let statusMismatchContext: string | null = null;
-  if (mismatchType === 'match' && correctCount > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correctSerialRecords = records.filter((r: any) =>
-      r.ph_ont?.trim().toUpperCase() === oesSerial
-    );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const hasInstalledRecord = correctSerialRecords.some((r: any) => r.status === INSTALLED_STATUS);
-    if (!hasInstalledRecord) {
-      // No prop_id with this serial has "Installed" status — flag the one closest to installed
-      const wrongStatusRecord = correctSerialRecords[0];
-      if (wrongStatusRecord) {
-        mismatchType = 'status_mismatch';
-        // Route blocked rows straight to Investigate — they cannot be auto-fixed
-        // until 1Map advances the prop status to Home Installation: Installed.
-        fixStatus = 'needs_investigation';
-        statusMismatchContext = JSON.stringify({
-          reason: 'status_mismatch',
-          propId: wrongStatusRecord.prop_id,
-          currentStatus: wrongStatusRecord.status || 'unknown',
-          expectedStatus: INSTALLED_STATUS,
-          message: `No prop record with correct serial has "${INSTALLED_STATUS}" status. Best match: "${wrongStatusRecord.status || 'unknown'}"`,
-        });
-      }
-    }
-  }
-
-  const bestRecord = records.find(r => r.ph_ont) || records[0]!;
+  // Shared classifier — the single source of truth for the mismatch verdict
+  // (incl. status_mismatch), so this inline path and the continuation service
+  // can never drift.
+  const cls = classifyOltRecords(item.oes_serial, searchResult.records);
   await client.query(
     `UPDATE olt_onemap_lookup_queue
      SET status = 'completed', onemap_serial = $1, onemap_ups_serial = $2,
          mismatch_type = $3, processed_at = NOW()
      WHERE id = $4`,
-    [bestRecord.ph_ont, bestRecord.br_ser, mismatchType, item.id]
+    [cls.bestRecord.ph_ont, cls.bestRecord.br_ser, cls.mismatchType, item.id]
   );
 
-  let investigationContext: string | null = statusMismatchContext;
-  if ((wrongCount > 0 || swapCount > 0) && firstWrongSerial) {
-    const ownerLookup = await client.query(
-      `SELECT drop_number, serial_number, team, status
-       FROM oes_activations
-       WHERE UPPER(serial_number) = $1
-       ORDER BY created_at DESC LIMIT 1`,
-      [firstWrongSerial.toUpperCase()]
-    );
-    if (ownerLookup.rows.length > 0) {
-      const owner = ownerLookup.rows[0];
-      if (owner.drop_number !== item.drop_number) {
-        fixStatus = 'needs_investigation';
-        investigationContext = JSON.stringify({
-          reason: 'cross_dr_conflict',
-          wrongSerial: firstWrongSerial,
-          wrongUps: firstUpsSerial,
-          belongsToDr: owner.drop_number,
-          belongsToTeam: owner.team,
-          belongsToStatus: owner.status,
-          totalPropRecords: records.length,
-          correctRecords: correctCount,
-          wrongRecords: wrongCount,
-          swappedRecords: swapCount,
-          message: `ONT ${firstWrongSerial} on 1Map belongs to ${owner.drop_number} (${owner.team}). Cannot auto-fix without losing equipment tracking.`,
-        });
-      }
+  let fixStatus = cls.fixStatus;
+  let investigationContext = cls.investigationContext;
+  if ((cls.wrongCount > 0 || cls.swapCount > 0) && cls.firstWrongSerial) {
+    const owner = await findCrossDrOwner(client, cls.firstWrongSerial);
+    const crossDr = buildCrossDrContext(cls, owner, item.drop_number);
+    if (crossDr) {
+      fixStatus = crossDr.fixStatus;
+      investigationContext = crossDr.investigationContext;
     }
   }
 
-  if (mismatchType !== 'match' && importId) {
+  if (cls.mismatchType !== 'match' && importId) {
     await insertMismatchIfNew(client, {
       importId, dropNumber: item.drop_number,
       oltSerial: item.oes_serial,
-      wrongOneMapSerial: mismatchType === 'status_mismatch' ? null : (firstWrongSerial || bestRecord.ph_ont),
-      fixStatus, hasUpsSwap,
+      wrongOneMapSerial: cls.wrongOneMapSerial,
+      fixStatus, hasUpsSwap: cls.hasUpsSwap,
       oesBatchId: item.oes_batch_id, oesSource: 'api',
       investigationContext,
     });
   }
-}
-
-/**
- * Insert a mismatch record with duplicate checking.
- */
-async function insertMismatchIfNew(
-  client: PoolClient,
-  data: {
-    importId: string;
-    dropNumber: string;
-    oltSerial: string;
-    wrongOneMapSerial: string | null;
-    fixStatus: string;
-    hasUpsSwap: boolean;
-    oesBatchId: string;
-    oesSource: string;
-    investigationContext?: string | null;
-  }
-): Promise<void> {
-  const isNewStatusMismatch = data.investigationContext
-    ? (() => { try { return JSON.parse(data.investigationContext!).reason === 'status_mismatch'; } catch { return false; } })()
-    : false;
-
-  const existing = await client.query(
-    `SELECT id, fix_status, olt_serial, investigation_context
-     FROM olt_mismatch_records
-     WHERE drop_number = $1
-     ORDER BY created_at DESC LIMIT 1`,
-    [data.dropNumber]
-  );
-
-  if (existing.rows.length > 0) {
-    const ex = existing.rows[0];
-    const exContext = ex.investigation_context
-      ? (typeof ex.investigation_context === 'string' ? (() => { try { return JSON.parse(ex.investigation_context); } catch { return null; } })() : ex.investigation_context)
-      : null;
-    const isExistingStatusMismatch = exContext?.reason === 'status_mismatch';
-
-    if (ex.fix_status === 'fixed' && ex.olt_serial?.toUpperCase() === data.oltSerial.toUpperCase()) {
-      // If existing was a serial fix and new issue is a status mismatch, allow creation
-      if (isNewStatusMismatch && !isExistingStatusMismatch) {
-        // Fall through to INSERT - serial was fixed, now status needs fixing
-      } else {
-        return; // Already fixed with same serial (or same status mismatch already fixed)
-      }
-    } else if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial'
-        || ex.fix_status === 'not_found' || ex.fix_status === 'serial_other_dr') {
-      // Don't overwrite a pending serial fix with a status mismatch
-      if (isNewStatusMismatch && !isExistingStatusMismatch) {
-        return; // Serial fix takes priority, don't overwrite
-      }
-      // Update existing pending
-      await client.query(
-        `UPDATE olt_mismatch_records
-         SET olt_serial = $1, wrong_onemap_serial = $2,
-             has_ups_swap = $3, detection_source = 'auto',
-             oes_batch_id = $4, onemap_source = $5,
-             fix_status = $6, investigation_context = $7
-         WHERE id = $8`,
-        [data.oltSerial, data.wrongOneMapSerial, data.hasUpsSwap,
-         data.oesBatchId, data.oesSource, data.fixStatus,
-         data.investigationContext || null, ex.id]
-      );
-      return;
-    }
-  }
-
-  // ON CONFLICT backstops the app-layer SELECT-then-INSERT above: if two workers
-  // race past the SELECT and both reach this INSERT for the same drop, the
-  // partial unique index (idx_olt_mismatch_drop_active_uniq) forces one side to
-  // take the UPDATE branch instead of creating a second row.
-  await client.query(
-    `INSERT INTO olt_mismatch_records
-      (import_id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
-       has_ups_swap, detection_source, oes_batch_id, onemap_source, investigation_context)
-     VALUES ($1, $2, $3, $4, $5, $6, 'auto', $7, $8, $9)
-     ON CONFLICT (drop_number)
-       WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation','serial_other_dr')
-     DO UPDATE SET
-       olt_serial = EXCLUDED.olt_serial,
-       wrong_onemap_serial = EXCLUDED.wrong_onemap_serial,
-       has_ups_swap = EXCLUDED.has_ups_swap,
-       detection_source = 'auto',
-       oes_batch_id = EXCLUDED.oes_batch_id,
-       onemap_source = EXCLUDED.onemap_source,
-       fix_status = EXCLUDED.fix_status,
-       investigation_context = EXCLUDED.investigation_context`,
-    [data.importId, data.dropNumber, data.oltSerial, data.wrongOneMapSerial,
-     data.fixStatus, data.hasUpsSwap, data.oesBatchId, data.oesSource,
-     data.investigationContext || null]
-  );
 }
 
 // Allow internal trigger via API key (for server-side fire-and-forget after restarts)
