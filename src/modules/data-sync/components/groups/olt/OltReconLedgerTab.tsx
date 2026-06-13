@@ -10,6 +10,7 @@ import { Search, ExternalLink } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useReconLedger } from '../../../hooks/useReconLedger';
 import { RECON_CLASSES, type ReconClass, type ReconLedgerRow } from '../../../types';
+import { Serial, WaSerialCell } from './serialCells';
 
 const CLASS_META: Record<ReconClass, { label: string; chip: string }> = {
   serial_other_dr: { label: 'Serial Conflict', chip: 'bg-red-500/20 text-red-400' },
@@ -19,15 +20,6 @@ const CLASS_META: Record<ReconClass, { label: string; chip: string }> = {
   all_agree: { label: 'All Agree', chip: 'bg-emerald-500/20 text-emerald-400' },
   no_evidence: { label: 'No Evidence', chip: 'bg-slate-500/20 text-slate-400' },
 };
-
-function Serial({ value, conflict }: { value: string | null; conflict: boolean }) {
-  if (!value) return <span className="text-[var(--ff-text-tertiary)]">—</span>;
-  return (
-    <span className={`font-mono text-xs ${conflict ? 'text-red-300 font-semibold' : 'text-[var(--ff-text-secondary)]'}`}>
-      {value}
-    </span>
-  );
-}
 
 function LedgerRow({ row }: { row: ReconLedgerRow }) {
   const conflict = row.recon_class === 'serial_other_dr';
@@ -45,7 +37,7 @@ function LedgerRow({ row }: { row: ReconLedgerRow }) {
         {row.project && <div className="text-[10px] text-[var(--ff-text-tertiary)] mt-0.5">{row.project}</div>}
       </td>
       <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${meta.chip}`}>{meta.label}</span></td>
-      <td className="px-3 py-2"><Serial value={row.wa_serial} conflict={conflict} /></td>
+      <WaSerialCell row={row} conflict={conflict} />
       <td className="px-3 py-2"><Serial value={row.oes_serial} conflict={conflict} /></td>
       <td className="px-3 py-2"><Serial value={row.onemap_serial} conflict={conflict} /></td>
       <td className="px-3 py-2"><Serial value={row.drops_serial} conflict={conflict} /></td>
