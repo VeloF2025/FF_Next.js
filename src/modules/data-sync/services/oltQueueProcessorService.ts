@@ -16,6 +16,12 @@ const log = createLogger('OltQueueProcessor');
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
 import { findSerialOnOtherDr } from './oltSerialReverseLookup';
 import { insertMismatchIfNew } from './oltMismatchUpsert';
+import {
+  classifyEmptyRecords,
+  classifyOltRecords,
+  findCrossDrOwner,
+  buildCrossDrContext,
+} from './oltMismatchClassifier';
 
 // Re-exported so existing importers (queue endpoint, backfill scripts) keep
 // resolving it from this module after the helper moved to its own file.
@@ -31,10 +37,6 @@ export interface QueueItem {
   oes_serial: string;
   oes_batch_id: string;
   team: string;
-}
-
-function isUpsSerial(serial: string | null): boolean {
-  return !!serial && serial.toUpperCase().startsWith('GU18');
 }
 
 /**
@@ -158,104 +160,59 @@ export async function processOneItem(client: PoolClient, item: QueueItem, import
     // OES serial: if the unit IS on 1Map under a different drop, the serial is
     // right and only the drop linkage is wrong — a distinct, actionable verdict.
     const otherDr = await findSerialOnOtherDr(client, item);
-
-    const mismatchType = otherDr ? 'note2_serial_other_dr' : 'note2_not_on_1map';
+    const empty = classifyEmptyRecords(otherDr);
     await client.query(
       `UPDATE olt_onemap_lookup_queue
        SET status = 'completed', mismatch_type = $1, processed_at = NOW()
        WHERE id = $2`,
-      [mismatchType, item.id]
+      [empty.mismatchType, item.id]
     );
     if (importId) {
       await insertMismatchIfNew(client, {
         importId, dropNumber: item.drop_number,
         oltSerial: item.oes_serial,
         wrongOneMapSerial: null,
-        fixStatus: otherDr ? 'serial_other_dr' : 'not_found',
+        fixStatus: empty.fixStatus,
         hasUpsSwap: false,
         oesBatchId: item.oes_batch_id, oesSource: 'api',
-        investigationContext: otherDr?.context ?? null,
+        investigationContext: empty.investigationContext,
       });
     }
     return;
   }
 
-  const oesSerial = item.oes_serial.trim().toUpperCase();
-  const records = searchResult.records;
-  let correctCount = 0, emptyCount = 0, wrongCount = 0, swapCount = 0;
-  let firstWrongSerial: string | null = null;
-  let firstUpsSerial: string | null = null;
-
-  for (const rec of records) {
-    const ont = rec.ph_ont?.trim().toUpperCase() || null;
-    const ups = rec.br_ser?.trim().toUpperCase() || null;
-    if (ont === oesSerial) { correctCount++; }
-    else if (!ont) { emptyCount++; }
-    else if (ups === oesSerial && isUpsSerial(ont)) {
-      swapCount++;
-      if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
-    } else {
-      wrongCount++;
-      if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
-    }
-  }
-
-  let mismatchType = 'match';
-  let fixStatus = 'pending';
-  let hasUpsSwap = false;
-  if (swapCount > 0) { mismatchType = 'note4_ups_swap'; hasUpsSwap = true; }
-  else if (wrongCount > 0) { mismatchType = 'note4_wrong_serial'; }
-  else if (emptyCount > 0 && correctCount === 0) { mismatchType = 'note4_empty_barcode'; }
-
-  const bestRecord = (records.find(r => r.ph_ont) || records[0])!;
+  // Shared classifier — the single source of truth for the mismatch verdict, so
+  // the service and the inline endpoint processor can never drift.
+  const cls = classifyOltRecords(item.oes_serial, searchResult.records);
   await client.query(
     `UPDATE olt_onemap_lookup_queue
      SET status = 'completed', onemap_serial = $1, onemap_ups_serial = $2,
          mismatch_type = $3, processed_at = NOW()
      WHERE id = $4`,
-    [bestRecord.ph_ont, bestRecord.br_ser, mismatchType, item.id]
+    [cls.bestRecord.ph_ont, cls.bestRecord.br_ser, cls.mismatchType, item.id]
   );
 
-  let investigationContext: string | null = null;
-  if ((wrongCount > 0 || swapCount > 0) && firstWrongSerial) {
-    const ownerLookup = await client.query(
-      `SELECT drop_number, serial_number, team, status
-       FROM oes_activations
-       WHERE UPPER(serial_number) = $1
-       ORDER BY created_at DESC LIMIT 1`,
-      [firstWrongSerial.toUpperCase()]
-    );
-    if (ownerLookup.rows.length > 0) {
-      const owner = ownerLookup.rows[0];
-      if (owner.drop_number !== item.drop_number) {
-        fixStatus = 'needs_investigation';
-        investigationContext = JSON.stringify({
-          reason: 'cross_dr_conflict',
-          wrongSerial: firstWrongSerial,
-          wrongUps: firstUpsSerial,
-          belongsToDr: owner.drop_number,
-          belongsToTeam: owner.team,
-          belongsToStatus: owner.status,
-          totalPropRecords: records.length,
-          correctRecords: correctCount,
-          wrongRecords: wrongCount,
-          swappedRecords: swapCount,
-          message: `ONT ${firstWrongSerial} on 1Map belongs to ${owner.drop_number} (${owner.team}). Cannot auto-fix without losing equipment tracking.`,
-        });
-      }
+  let fixStatus = cls.fixStatus;
+  let investigationContext = cls.investigationContext;
+  if ((cls.wrongCount > 0 || cls.swapCount > 0) && cls.firstWrongSerial) {
+    const owner = await findCrossDrOwner(client, cls.firstWrongSerial);
+    const crossDr = buildCrossDrContext(cls, owner, item.drop_number);
+    if (crossDr) {
+      fixStatus = crossDr.fixStatus;
+      investigationContext = crossDr.investigationContext;
     }
   }
 
-  if (mismatchType !== 'match' && importId) {
+  if (cls.mismatchType !== 'match' && importId) {
     await insertMismatchIfNew(client, {
       importId, dropNumber: item.drop_number,
       oltSerial: item.oes_serial,
-      wrongOneMapSerial: firstWrongSerial || bestRecord.ph_ont,
-      fixStatus, hasUpsSwap,
+      wrongOneMapSerial: cls.wrongOneMapSerial,
+      fixStatus, hasUpsSwap: cls.hasUpsSwap,
       oesBatchId: item.oes_batch_id, oesSource: 'api',
       investigationContext,
     });
-  } else if (mismatchType === 'match') {
+  } else if (cls.mismatchType === 'match') {
     // The OES serial now matches 1Map. If an earlier run left an auto-detected
     // record for this drop (e.g. a stale 'not_found' from before 1Map caught
     // up), it is reconciled — resolve it so it drops out of the investigate /
