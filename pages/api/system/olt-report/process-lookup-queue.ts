@@ -21,7 +21,7 @@ import {
   findCrossDrOwner,
   buildCrossDrContext,
 } from '@/modules/data-sync/services/oltMismatchClassifier';
-import { insertMismatchIfNew } from '@/modules/data-sync/services/oltMismatchUpsert';
+import { insertMismatchIfNew, resolveMatchedDrop } from '@/modules/data-sync/services/oltMismatchUpsert';
 
 const BATCH_SIZE = 50;
 const CONCURRENCY = 2; // Reduced from 3 - fewer concurrent 1Map calls = faster individual responses
@@ -221,13 +221,11 @@ async function processOneQueueItem(client: PoolClient, item: QueueItem, importId
       oesBatchId: item.oes_batch_id, oesSource: 'api',
       investigationContext,
     });
+  } else if (cls.mismatchType === 'match') {
+    // OES serial now matches 1Map — reconcile any stale auto-detected row for
+    // this drop, identical to the continuation service. Shared helper, no drift.
+    await resolveMatchedDrop(client, item.drop_number);
   }
-  // NOTE: deliberate asymmetry — unlike the continuation service's processOneItem,
-  // this inline path has NO match-branch auto-resolve of stale mismatch rows. That
-  // is a queue side-effect, out of scope for this classification-only unification
-  // (activations audit rec #4). Classification is now shared; the match-resolution
-  // side-effect is the one remaining divergence, left for a follow-up so this PR
-  // changes no side-effects.
 }
 
 // Allow internal trigger via API key (for server-side fire-and-forget after restarts)

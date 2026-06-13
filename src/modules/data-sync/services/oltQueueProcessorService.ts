@@ -15,7 +15,7 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('OltQueueProcessor');
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
 import { findSerialOnOtherDr } from './oltSerialReverseLookup';
-import { insertMismatchIfNew } from './oltMismatchUpsert';
+import { insertMismatchIfNew, resolveMatchedDrop } from './oltMismatchUpsert';
 import {
   classifyEmptyRecords,
   classifyOltRecords,
@@ -213,25 +213,9 @@ export async function processOneItem(client: PoolClient, item: QueueItem, import
       investigationContext,
     });
   } else if (cls.mismatchType === 'match') {
-    // The OES serial now matches 1Map. If an earlier run left an auto-detected
-    // record for this drop (e.g. a stale 'not_found' from before 1Map caught
-    // up), it is reconciled — resolve it so it drops out of the investigate /
-    // non-invoiceable lists instead of lingering forever. No-op when no such row.
-    // Deliberately scoped:
-    //  - only auto-detected states (NOT needs_investigation / needs_reinvestigation):
-    //    those are human-review verdicts and must not be silently auto-closed.
-    //  - skip rows with an open ticket: NOC owns that lifecycle.
-    await client.query(
-      `UPDATE olt_mismatch_records
-       SET fix_status = 'resolved',
-           resolution_type = 'auto_verified_match',
-           resolution_notes = 'Auto-resolved: OES serial now matches 1Map on re-check',
-           resolved_at = NOW()
-       WHERE drop_number = $1
-         AND maintenance_ticket_id IS NULL
-         AND fix_status IN ('pending','not_found','empty_serial','serial_other_dr')`,
-      [item.drop_number]
-    );
+    // OES serial now matches 1Map — reconcile any stale auto-detected row for
+    // this drop. Shared with the endpoint's inline path so it can't drift.
+    await resolveMatchedDrop(client, item.drop_number);
   }
 }
 
