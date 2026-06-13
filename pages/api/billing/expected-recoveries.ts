@@ -35,6 +35,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const status = req.query.status ? String(req.query.status) : null;
     const project = req.query.project ? String(req.query.project).trim() : null;
 
+    // whereClause carries only bound placeholder references ("status = $n",
+    // "project = $n"); every user value goes into params[], never into the SQL string.
     const conditions: string[] = [];
     const params: string[] = [];
     if (status && (STATUSES as readonly string[]).includes(status)) {

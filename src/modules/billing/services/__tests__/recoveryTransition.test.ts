@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decideRecovery, type RecoveryStatus } from '../recoveryTransition';
+import { decideRecovery } from '../recoveryTransition';
 
 const WEEK = '2026-06-07';
 const EARLIER = '2026-05-31';
@@ -17,12 +17,22 @@ describe('decideRecovery — first sighting (no existing row)', () => {
   });
 });
 
-describe('decideRecovery — terminal existing rows are never reopened', () => {
-  it.each<RecoveryStatus>(['recovered', 'not_returned'])('status %s → noop regardless of deduction', (status) => {
-    expect(decideRecovery({ existing: { status, detectedWeekEnding: EARLIER }, stillDeductedThisWeek: true, currentWeekEnding: WEEK }))
+describe('decideRecovery — terminal / re-deduction handling', () => {
+  it('not_returned is terminal → noop regardless of deduction', () => {
+    expect(decideRecovery({ existing: { status: 'not_returned', detectedWeekEnding: EARLIER }, stillDeductedThisWeek: true, currentWeekEnding: WEEK }))
       .toBe('noop');
-    expect(decideRecovery({ existing: { status, detectedWeekEnding: EARLIER }, stillDeductedThisWeek: false, currentWeekEnding: WEEK }))
+    expect(decideRecovery({ existing: { status: 'not_returned', detectedWeekEnding: EARLIER }, stillDeductedThisWeek: false, currentWeekEnding: WEEK }))
       .toBe('noop');
+  });
+
+  it('recovered + FT dropped it (still honoured) → noop', () => {
+    expect(decideRecovery({ existing: { status: 'recovered', detectedWeekEnding: EARLIER }, stillDeductedThisWeek: false, currentWeekEnding: WEEK }))
+      .toBe('noop');
+  });
+
+  it('recovered + FT RE-DEDUCTED it → mark_not_returned (re-billed a conceded DR)', () => {
+    expect(decideRecovery({ existing: { status: 'recovered', detectedWeekEnding: EARLIER }, stillDeductedThisWeek: true, currentWeekEnding: WEEK }))
+      .toBe('mark_not_returned');
   });
 });
 

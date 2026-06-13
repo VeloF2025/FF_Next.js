@@ -56,7 +56,10 @@ CREATE TABLE IF NOT EXISTS ft_billing_expected_recovery (
   updated_at                timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT ft_ber_status_chk CHECK (status IN ('pending', 'recovered', 'not_returned')),
   CONSTRAINT ft_ber_signal_chk CHECK (fix_signal IN ('onemap_fix', 'offline_recovery', 'pp_activation')),
-  -- one recovery row per (DR, note, deduction episode) — idempotent re-detection
+  -- one recovery row per (DR, note, deduction episode) — idempotent re-detection.
+  -- drop_number is globally unique across projects today (oes_activations_drop_number_key;
+  -- verified 0 DRs span >1 project), so project is not part of the key; the service
+  -- still scopes its mark_* UPDATEs by project defensively in case that ever changes.
   CONSTRAINT ft_ber_episode_uniq UNIQUE (drop_number, deduction_note, deduction_week_ending)
 );
 
