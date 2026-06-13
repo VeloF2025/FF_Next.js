@@ -10,6 +10,7 @@ import { Search, ExternalLink } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useReconLedger } from '../../../hooks/useReconLedger';
 import { RECON_CLASSES, type ReconClass, type ReconLedgerRow } from '../../../types';
+import { Serial, WaSerialCell } from './serialCells';
 
 const CLASS_META: Record<ReconClass, { label: string; chip: string }> = {
   serial_other_dr: { label: 'Serial Conflict', chip: 'bg-red-500/20 text-red-400' },
@@ -19,40 +20,6 @@ const CLASS_META: Record<ReconClass, { label: string; chip: string }> = {
   all_agree: { label: 'All Agree', chip: 'bg-emerald-500/20 text-emerald-400' },
   no_evidence: { label: 'No Evidence', chip: 'bg-slate-500/20 text-slate-400' },
 };
-
-function Serial({ value, conflict }: { value: string | null; conflict: boolean }) {
-  if (!value) return <span className="text-[var(--ff-text-tertiary)]">—</span>;
-  return (
-    <span className={`font-mono text-xs ${conflict ? 'text-red-300 font-semibold' : 'text-[var(--ff-text-secondary)]'}`}>
-      {value}
-    </span>
-  );
-}
-
-/**
- * WA serial cell. Adds a "typed" tag when the serial came from wa_original_text
- * rather than a scan (rec #5), and surfaces a typed serial that DISAGREES with the
- * scanned one as a muted sub-note so the discrepancy stays visible.
- */
-function WaSerialCell({ row, conflict }: { row: ReconLedgerRow; conflict: boolean }) {
-  const showTypedNote =
-    row.wa_typed_serial != null &&
-    row.wa_serial_source === 'scanned' &&
-    row.wa_typed_serial !== row.wa_serial;
-  return (
-    <td className="px-3 py-2">
-      <span className="inline-flex items-center gap-1">
-        <Serial value={row.wa_serial} conflict={conflict} />
-        {row.wa_serial_source === 'typed' && (
-          <span className="px-1 py-0.5 rounded text-[9px] bg-sky-500/20 text-sky-400">typed</span>
-        )}
-      </span>
-      {showTypedNote && (
-        <div className="text-[10px] text-[var(--ff-text-tertiary)] mt-0.5 font-mono">typed: {row.wa_typed_serial}</div>
-      )}
-    </td>
-  );
-}
 
 function LedgerRow({ row }: { row: ReconLedgerRow }) {
   const conflict = row.recon_class === 'serial_other_dr';

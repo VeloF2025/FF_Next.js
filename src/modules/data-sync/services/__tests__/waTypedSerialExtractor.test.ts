@@ -72,6 +72,10 @@ describe('extractTypedUpsSerial — Gizzu (GU…)', () => {
     expect(extractTypedUpsSerial(`DR1234567 UPS ${serial}`)).toBe(serial);
   });
 
+  it('strips a hyphen from a legacy Gizzu label so it equals the scanned/1Map value', () => {
+    expect(extractTypedUpsSerial('DR1234567 UPS GU18W12V25-09045437')).toBe('GU18W12V2509045437');
+  });
+
   it('returns null when no UPS serial is present', () => {
     expect(extractTypedUpsSerial('DR1234567 ONT ALCLB477AED3 only')).toBeNull();
   });

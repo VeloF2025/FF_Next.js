@@ -115,7 +115,7 @@ export function buildLedgerQuery(input: LedgerQueryInput): LedgerQuery {
     params.push(`%${escaped}%`);
     const i = params.length;
     conditions.push(
-      `(drop_number ILIKE $${i} OR wa_serial ILIKE $${i} OR oes_serial ILIKE $${i} OR onemap_serial ILIKE $${i} OR drops_serial ILIKE $${i})`
+      `(drop_number ILIKE $${i} OR wa_serial ILIKE $${i} OR wa_typed_serial ILIKE $${i} OR oes_serial ILIKE $${i} OR onemap_serial ILIKE $${i} OR drops_serial ILIKE $${i})`
     );
   }
 

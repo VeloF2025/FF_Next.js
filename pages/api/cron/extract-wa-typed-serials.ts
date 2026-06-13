@@ -49,8 +49,8 @@ export default async function handler(
   const limit = typeof rawLimit === 'number' && Number.isFinite(rawLimit) ? rawLimit : undefined;
 
   try {
+    // populateTypedSerials already logs the run summary; avoid a duplicate line here.
     const result = await populateTypedSerials(limit);
-    log.info('typed-serial extract triggered', { ...result }, 'extract-wa-typed-serials');
     return apiResponse.success(res, result, 'Typed serials extracted');
   } catch (error: unknown) {
     log.error('typed-serial extract failed', {

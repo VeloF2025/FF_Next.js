@@ -61,6 +61,7 @@ describe('buildLedgerQuery — project + search', () => {
     expect(q.params).toEqual(['%DR123%']);
     expect(q.whereClause).toContain('drop_number ILIKE $1');
     expect(q.whereClause).toContain('wa_serial ILIKE $1');
+    expect(q.whereClause).toContain('wa_typed_serial ILIKE $1');
     expect(q.whereClause).toContain('oes_serial ILIKE $1');
     expect(q.whereClause).toContain('onemap_serial ILIKE $1');
     expect(q.whereClause).toContain('drops_serial ILIKE $1');
@@ -85,7 +86,7 @@ describe('buildLedgerQuery — combined filters keep $-indices aligned', () => {
     expect(q.params).toEqual(['serial_other_dr', 'Mohadin', '%ALCLB%']);
     expect(q.whereClause).toBe(
       'WHERE recon_class = $1 AND project = $2 AND ' +
-        '(drop_number ILIKE $3 OR wa_serial ILIKE $3 OR oes_serial ILIKE $3 OR onemap_serial ILIKE $3 OR drops_serial ILIKE $3)'
+        '(drop_number ILIKE $3 OR wa_serial ILIKE $3 OR wa_typed_serial ILIKE $3 OR oes_serial ILIKE $3 OR onemap_serial ILIKE $3 OR drops_serial ILIKE $3)'
     );
   });
 

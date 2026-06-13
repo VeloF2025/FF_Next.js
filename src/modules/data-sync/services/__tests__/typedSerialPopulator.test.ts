@@ -8,20 +8,20 @@ import { populateTypedSerials, type QueryableDb } from '../typedSerialPopulator'
  */
 function makeDb(selectRows: Array<{ id: string; wa_original_text: string }>, remaining = 0) {
   const updates: Array<{ ont: unknown; ups: unknown; id: unknown }> = [];
-  const db: QueryableDb = {
-    query: vi.fn(async (text: string, params?: unknown[]) => {
-      if (text.includes('UPDATE dr_photo_unified_reviews')) {
-        updates.push({ ont: params?.[0], ups: params?.[1], id: params?.[2] });
-        return { rows: [] };
-      }
-      if (text.includes('COUNT(*)')) {
-        return { rows: [{ remaining: String(remaining) }] as never[] };
-      }
-      // the SELECT of unprocessed rows
-      return { rows: selectRows as never[] };
-    }),
-  };
-  return { db, updates };
+  const query = vi.fn(async (text: string, params?: unknown[]) => {
+    if (text.includes('UPDATE dr_photo_unified_reviews')) {
+      updates.push({ ont: params?.[0], ups: params?.[1], id: params?.[2] });
+      return { rows: [] };
+    }
+    if (text.includes('COUNT(*)')) {
+      return { rows: [{ remaining: String(remaining) }] };
+    }
+    // the SELECT of unprocessed rows
+    return { rows: selectRows };
+  });
+  // Single cast of the whole fake rather than per-return `as never[]`.
+  const db = { query } as unknown as QueryableDb;
+  return { db, updates, query };
 }
 
 describe('populateTypedSerials', () => {
@@ -69,9 +69,9 @@ describe('populateTypedSerials', () => {
   });
 
   it('binds a clamped LIMIT to the unprocessed-rows SELECT', async () => {
-    const { db } = makeDb([]);
+    const { db, query } = makeDb([]);
     await populateTypedSerials(999999, db);
-    const calls = (db.query as ReturnType<typeof vi.fn>).mock.calls;
+    const calls = query.mock.calls;
     const select = calls.find((c) => String(c[0]).includes('wa_typed_serial_extracted_at IS NULL') && String(c[0]).includes('LIMIT'));
     expect(select?.[1]).toEqual([50000]); // MAX_LIMIT cap
   });
