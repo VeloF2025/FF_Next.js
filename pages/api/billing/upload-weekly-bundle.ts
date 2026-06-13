@@ -37,6 +37,7 @@ import {
 import { fetchBillableProjects } from '@/modules/billing/services/resolveProjectName';
 import { reconcileBillingWeek } from '@/modules/billing/services/reconcileBillingWeek';
 import { computeVerdictsForWeek } from '@/modules/billing/services/deductionVerdictService';
+import { processExpectedRecoveries } from '@/modules/billing/services/processExpectedRecoveries';
 import {
   logNonInvoiceableFlagged,
   type NoteCode,
@@ -519,6 +520,30 @@ async function importProjectResult(
       });
     } catch (err) {
       logger.warn('Deduction verdict run failed (row still imported)', {
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Process FT expected-recoveries (audit rec #2): assert/confirm that DRs we
+    // fixed after a deduction return to the paid pool, flipping confirmed ones to
+    // 'paid' and flagging not_returned ones as dispute candidates. Best-effort —
+    // a failure here never fails the import; re-runnable via the same import.
+    try {
+      const client = await pool.connect();
+      try {
+        const recovery = await processExpectedRecoveries(client, billingWeekId);
+        logger.info('Expected-recovery processing complete', {
+          ...recovery,
+          project: canonicalName,
+          weekEnding: summary.weekEnding,
+        });
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      logger.warn('Expected-recovery processing failed (row still imported)', {
         project: canonicalName,
         weekEnding: summary.weekEnding,
         error: err instanceof Error ? err.message : String(err),
