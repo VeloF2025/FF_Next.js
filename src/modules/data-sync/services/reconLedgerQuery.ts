@@ -24,7 +24,12 @@ export type ReconClass = (typeof RECON_CLASSES)[number];
 export interface ReconLedgerRow {
   drop_number: string;
   project: string | null;
+  /** WA leg used by recon: scanned serial, falling back to the typed serial (rec #5). */
   wa_serial: string | null;
+  /** Raw serial parsed from wa_original_text (rec #5); shown even when a scan exists. */
+  wa_typed_serial: string | null;
+  /** Which source `wa_serial` came from. */
+  wa_serial_source: 'scanned' | 'typed' | null;
   oes_serial: string | null;
   onemap_serial: string | null;
   drops_serial: string | null;
@@ -120,7 +125,7 @@ export function buildLedgerQuery(input: LedgerQueryInput): LedgerQuery {
 
 export const LEDGER_COLUMNS = `
   drop_number, project,
-  wa_serial, oes_serial, onemap_serial, drops_serial, distinct_serial_count,
+  wa_serial, wa_typed_serial, wa_serial_source, oes_serial, onemap_serial, drops_serial, distinct_serial_count,
   wa_submitted_at, has_wa_submission, has_oes_activation,
   activation_status, oes_status, oes_activated_at,
   payment_status, latest_deduction_week, latest_deduction_note, deduction_verdict,

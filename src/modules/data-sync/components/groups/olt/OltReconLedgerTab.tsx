@@ -29,6 +29,31 @@ function Serial({ value, conflict }: { value: string | null; conflict: boolean }
   );
 }
 
+/**
+ * WA serial cell. Adds a "typed" tag when the serial came from wa_original_text
+ * rather than a scan (rec #5), and surfaces a typed serial that DISAGREES with the
+ * scanned one as a muted sub-note so the discrepancy stays visible.
+ */
+function WaSerialCell({ row, conflict }: { row: ReconLedgerRow; conflict: boolean }) {
+  const showTypedNote =
+    row.wa_typed_serial != null &&
+    row.wa_serial_source === 'scanned' &&
+    row.wa_typed_serial !== row.wa_serial;
+  return (
+    <td className="px-3 py-2">
+      <span className="inline-flex items-center gap-1">
+        <Serial value={row.wa_serial} conflict={conflict} />
+        {row.wa_serial_source === 'typed' && (
+          <span className="px-1 py-0.5 rounded text-[9px] bg-sky-500/20 text-sky-400">typed</span>
+        )}
+      </span>
+      {showTypedNote && (
+        <div className="text-[10px] text-[var(--ff-text-tertiary)] mt-0.5 font-mono">typed: {row.wa_typed_serial}</div>
+      )}
+    </td>
+  );
+}
+
 function LedgerRow({ row }: { row: ReconLedgerRow }) {
   const conflict = row.recon_class === 'serial_other_dr';
   const meta = CLASS_META[row.recon_class] ?? CLASS_META.no_evidence;
@@ -45,7 +70,7 @@ function LedgerRow({ row }: { row: ReconLedgerRow }) {
         {row.project && <div className="text-[10px] text-[var(--ff-text-tertiary)] mt-0.5">{row.project}</div>}
       </td>
       <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${meta.chip}`}>{meta.label}</span></td>
-      <td className="px-3 py-2"><Serial value={row.wa_serial} conflict={conflict} /></td>
+      <WaSerialCell row={row} conflict={conflict} />
       <td className="px-3 py-2"><Serial value={row.oes_serial} conflict={conflict} /></td>
       <td className="px-3 py-2"><Serial value={row.onemap_serial} conflict={conflict} /></td>
       <td className="px-3 py-2"><Serial value={row.drops_serial} conflict={conflict} /></td>
