@@ -1,10 +1,13 @@
 /**
- * Upsert a single OLT mismatch record with active-row dedup.
+ * Write helpers for `olt_mismatch_records`, shared by both queue-processing
+ * paths (the inline endpoint processor and the continuation service) so the
+ * mutations can never drift:
+ *  - `insertMismatchIfNew` — upsert a mismatch with active-row dedup.
+ *  - `resolveMatchedDrop`  — auto-resolve stale rows when a DR now matches.
  *
- * SELECT-then-UPDATE/INSERT with an ON CONFLICT backstop: the partial unique
- * index `idx_olt_mismatch_drop_active_uniq` guarantees at most one active row
- * per drop even under concurrent workers. Shared by both queue-processing paths
- * (the inline endpoint processor and the continuation service).
+ * `insertMismatchIfNew`: SELECT-then-UPDATE/INSERT with an ON CONFLICT backstop;
+ * the partial unique index `idx_olt_mismatch_drop_active_uniq` guarantees at
+ * most one active row per drop even under concurrent workers.
  *
  * Status-mismatch priority: a status_mismatch and a serial fix describe two
  * independent problems on the same drop. A pending serial fix must NOT be
@@ -112,5 +115,34 @@ export async function insertMismatchIfNew(
     [data.importId, data.dropNumber, data.oltSerial, data.wrongOneMapSerial,
      data.fixStatus, data.hasUpsSwap, data.oesBatchId, data.oesSource,
      data.investigationContext || null]
+  );
+}
+
+/**
+ * Auto-resolve a drop whose OES serial now matches 1Map on re-check. If an
+ * earlier run left an auto-detected record for this drop (e.g. a stale
+ * 'not_found' from before 1Map caught up), reconcile it so it drops out of the
+ * investigate / non-invoiceable lists instead of lingering forever. No-op when
+ * no such row exists.
+ *
+ * Deliberately scoped:
+ *  - only auto-detected states (NOT needs_investigation / needs_reinvestigation):
+ *    those are human-review verdicts and must not be silently auto-closed.
+ *  - skip rows with an open ticket: NOC owns that lifecycle.
+ */
+export async function resolveMatchedDrop(
+  client: PoolClient,
+  dropNumber: string
+): Promise<void> {
+  await client.query(
+    `UPDATE olt_mismatch_records
+     SET fix_status = 'resolved',
+         resolution_type = 'auto_verified_match',
+         resolution_notes = 'Auto-resolved: OES serial now matches 1Map on re-check',
+         resolved_at = NOW()
+     WHERE drop_number = $1
+       AND maintenance_ticket_id IS NULL
+       AND fix_status IN ('pending','not_found','empty_serial','serial_other_dr')`,
+    [dropNumber]
   );
 }
