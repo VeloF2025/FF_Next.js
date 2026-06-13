@@ -39,10 +39,16 @@ describe('resolveMatchedDrop', () => {
     const [sql] = query.mock.calls[0];
     // Ticket guard: NOC owns the lifecycle of any rows with an open ticket.
     expect(sql).toMatch(/maintenance_ticket_id IS NULL/);
-    // Whitelist: only auto-detected verdicts are auto-closed.
-    expect(sql).toMatch(/fix_status IN \('pending','not_found','empty_serial','serial_other_dr'\)/);
+    // Whitelist: only auto-detected verdicts are auto-closed. Assert the IN-clause
+    // CONTENTS (whitespace/formatting-tolerant), not its exact rendering.
+    const inClause = sql.match(/fix_status IN \(([^)]+)\)/);
+    expect(inClause).not.toBeNull();
+    const whitelist = inClause![1];
+    for (const allowed of ['pending', 'not_found', 'empty_serial', 'serial_other_dr']) {
+      expect(whitelist).toContain(`'${allowed}'`);
+    }
     // Human-review verdicts must NOT be in the whitelist.
-    expect(sql).not.toMatch(/needs_investigation/);
-    expect(sql).not.toMatch(/needs_reinvestigation/);
+    expect(whitelist).not.toContain('needs_investigation');
+    expect(whitelist).not.toContain('needs_reinvestigation');
   });
 });
