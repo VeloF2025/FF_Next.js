@@ -67,9 +67,11 @@ vi.mock('@/lib/cortex/meetingReviewLogic', () => ({
 import handler from '../mcp-token';
 
 let saved: string | undefined;
+let savedSecret: string | undefined;
 
 beforeEach(() => {
   saved = process.env.CORTEX_MCP_TOKEN_UI_ENABLED;
+  savedSecret = process.env.BRIDGE_JWT_SECRET;
   principal.authenticated = true;
   principal.email = 'reviewer@velocityfibre.co.za';
   principal.grantedActions = new Set<string>(['view']);
@@ -82,6 +84,8 @@ beforeEach(() => {
 afterEach(() => {
   if (saved === undefined) delete process.env.CORTEX_MCP_TOKEN_UI_ENABLED;
   else process.env.CORTEX_MCP_TOKEN_UI_ENABLED = saved;
+  if (savedSecret === undefined) delete process.env.BRIDGE_JWT_SECRET;
+  else process.env.BRIDGE_JWT_SECRET = savedSecret;
 });
 
 function run(method: 'GET' | 'POST' | 'DELETE') {
@@ -145,6 +149,7 @@ describe('POST /api/cortex/mcp-token — auth + permission (flag on)', () => {
 describe('DELETE /api/cortex/mcp-token — revoke (flag on)', () => {
   beforeEach(() => {
     process.env.CORTEX_MCP_TOKEN_UI_ENABLED = 'true';
+    process.env.BRIDGE_JWT_SECRET = 'test-bridge-secret-value-0123456789';
   });
 
   it('404s when the flag is off, and never calls the bridge', async () => {
@@ -195,5 +200,15 @@ describe('DELETE /api/cortex/mcp-token — revoke (flag on)', () => {
     const { res, done } = run('DELETE');
     await done;
     expect(res._getStatusCode()).toBe(500);
+  });
+
+  it('500s (fail loud) when BRIDGE_JWT_SECRET is unset, and never calls the bridge', async () => {
+    delete process.env.BRIDGE_JWT_SECRET;
+    const { res, done } = run('DELETE');
+    await done;
+    expect(res._getStatusCode()).toBe(500);
+    // Must not fall back to a broad service credential for a per-user revoke.
+    expect(fetchWithTimeout).not.toHaveBeenCalled();
+    expect(bridgeBearer).not.toHaveBeenCalled();
   });
 });

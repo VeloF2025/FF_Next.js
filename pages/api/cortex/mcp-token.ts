@@ -39,6 +39,12 @@ async function postHandler(req: AuthenticatedNextApiRequest, res: NextApiRespons
 }
 
 async function deleteHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {
+  // Fail LOUD (symmetric with mintMcpToken) rather than letting bridgeBearer fall
+  // back to the broad CORTEX_API_KEY service credential: a per-user revoke must be
+  // authorized by a per-user token, never a tenant-wide one.
+  if (!process.env.BRIDGE_JWT_SECRET) {
+    throw new Error('bridgeAuth: BRIDGE_JWT_SECRET is not set — cannot revoke MCP tokens');
+  }
   // Self-authorize the revoke with a short-lived, UNMARKED per-user gateway JWT.
   // bridgeBearer mints a token_use-less 5-minute HS256 token for this verified user,
   // so (a) the bridge revokes only THIS user's email (read from the token), and
