@@ -18,7 +18,7 @@ import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
 import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
 import { recordVlmCorrectionsFromOes } from './oesVlmLearningService';
-import { promoteOesActivatedSerials } from './oesSerialLifecycle';
+import { promoteOesActivatedSerials, reconcileInStockOesActivated } from './oesSerialLifecycle';
 
 const logger = createLogger('oes/oesPostImportService');
 
@@ -323,6 +323,24 @@ export function triggerPpActivationCheck(): void {
         // If status='installed', promote to 'activated' via the lifecycle state machine.
         // Serials already in 'activated' (TRIGGER 3 pre-cutover) are silently skipped.
         await promoteOesActivatedSerials(activatedResult.rows);
+
+        // ── Durable reconciliation (issue #1860 regrowth fix) ─────────────────
+        // The PP-delta promotion above only covers serials whose oes_pp_data row
+        // was just flipped to 'activated'. Serials that go Active on OES WITHOUT
+        // transiting the PP list accumulate stuck in_stock (D1-1 regrew 0 → 1155
+        // between 2026-05-31 and 2026-06-14, all NULL-holder June activations).
+        // A full reconciliation pass here promotes them too. Best-effort: a
+        // failure here never aborts the rest of the post-import work.
+        try {
+          const recon = await reconcileInStockOesActivated();
+          if (recon.scanned > 0) {
+            logger.info('OES in_stock reconciliation pass complete', { scanned: recon.scanned });
+          }
+        } catch (reconErr) {
+          logger.warn('OES in_stock reconciliation pass skipped (non-blocking)', {
+            error: reconErr instanceof Error ? reconErr.message : String(reconErr),
+          });
+        }
 
         // Action Centre timeline: emit pre_prov_resolved for each newly-activated
         // PP row so the DR timeline shows "pre-provisioned → active" transition.
