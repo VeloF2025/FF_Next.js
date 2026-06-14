@@ -20,7 +20,6 @@ import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withPermission } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { log } from '@/lib/logger';
 import { mintMcpToken } from '@/lib/cortex/bridgeAuth';
 
 function mcpTokenUiEnabled(): boolean {
@@ -46,7 +45,7 @@ const authedHandler = withAuth(async (req: NextApiRequest, res: NextApiResponse)
       try {
         await postHandler(r as AuthenticatedNextApiRequest, s);
       } catch (err) {
-        log.error('cortex-mcp-token error', { error: err }, 'cortex-mcp-token');
+        // apiResponse.internalError logs the error itself — no second log here.
         apiResponse.internalError(s, err instanceof Error ? err : new Error(String(err)));
       }
     },
@@ -57,7 +56,7 @@ const handler: NextApiHandler = (req, res) => {
   // Feature flag is the OUTERMOST gate: when off the endpoint does not exist for
   // anyone (even authenticated users), so the in-progress feature can't be probed.
   if (!mcpTokenUiEnabled()) {
-    return apiResponse.notFound(res, 'Not found');
+    return apiResponse.notFound(res, 'Endpoint');
   }
   return authedHandler(req, res);
 };

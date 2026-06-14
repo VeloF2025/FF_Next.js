@@ -32,8 +32,10 @@ const MCP_TOKEN_TTL = '30d';
 
 /** Marks a revocable MCP bearer token — the bridge applies per-user revocation
  *  (the min_iat epoch) ONLY to tokens carrying this claim, never to the 5-minute
- *  session tokens minted by bridgeBearer. Must match scripts/mint_user_token.py
- *  and plugins/memory/cortex/mcp_revocation.MCP_TOKEN_USE. */
+ *  session tokens minted by bridgeBearer. Forward-compatible with the Cortex-side
+ *  revocation marker (Cortex PR #109: scripts/mint_user_token.py +
+ *  plugins/memory/cortex/mcp_revocation.MCP_TOKEN_USE) — kept in sync with it. Inert
+ *  on a bridge that predates #109 (the extra claim is simply ignored by PyJWT). */
 const MCP_TOKEN_USE = 'mcp';
 
 function oidcForwardEnabled(): boolean {
@@ -117,10 +119,11 @@ export interface McpToken {
 /**
  * Mint a long-lived (30-day) per-user Cortex MCP bearer token for `userEmail`.
  *
- * Mirrors `scripts/mint_user_token.py` (the operator path) EXACTLY plus the
- * `token_use:"mcp"` revocation marker, so operator- and UI-minted tokens are
- * interchangeable and equally revocable. The bridge narrows every result to this
- * user's ACL; the token carries no extra privilege.
+ * Matches `scripts/mint_user_token.py` (the operator path) — claims
+ * `sub, email, instance_id, iat, exp` — plus the `token_use:"mcp"` revocation marker
+ * (Cortex PR #109), so operator- and UI-minted tokens are interchangeable and equally
+ * revocable once #109 lands. The bridge narrows every result to this user's ACL; the
+ * token carries no extra privilege.
  *
  * @param userEmail the server-verified FibreFlow session email — NEVER a
  *   client-supplied value (the route reads it from `req.user.email`).
