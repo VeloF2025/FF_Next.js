@@ -148,6 +148,41 @@ describe('fetchAndStoreTranscript', () => {
     expect(mockSql).toHaveBeenCalledWith(expect.anything(), 'VTT-FOR-this-occurrence-tx', 42);
   });
 
+  test('spills a >500KB transcript via DELETE-then-INSERT, never ON CONFLICT (no unique on meeting_id)', async () => {
+    // A transcript larger than TRANSCRIPT_INLINE_LIMIT (500_000) takes the spill branch
+    // into meeting_transcripts. That table's PK is `id` with only a NON-unique index on
+    // meeting_id, so `ON CONFLICT (meeting_id)` raises "no unique or exclusion constraint
+    // matching the ON CONFLICT specification" and the capture fails. The spill must instead
+    // DELETE this meeting's existing vtt row(s) then plain-INSERT the fresh transcript.
+    const bigVtt = 'WEBVTT\n' + 'x'.repeat(500_001);
+    mockListTranscripts.mockResolvedValue([
+      { id: 'this-occurrence-tx', createdDateTime: '2026-06-09T10:02:00Z' },
+    ]);
+    mockDownloadTranscriptContent.mockResolvedValue(bigVtt);
+
+    await fetchAndStoreTranscript(42, ORG, THREAD, '2026-06-09T10:00:00Z');
+
+    const sqlText = (call) => call[0].join(' ');
+
+    // The fix must not emit the unsupported ON CONFLICT upsert.
+    expect(mockSql.mock.calls.some((c) => /ON CONFLICT/i.test(sqlText(c)))).toBe(false);
+
+    // It must DELETE this meeting's existing vtt row(s), scoped to format='vtt' so a
+    // whisper-af/-en row for the same meeting is preserved...
+    const del = mockSql.mock.calls.find((c) => /DELETE FROM meeting_transcripts/i.test(sqlText(c)));
+    expect(del).toBeDefined();
+    expect(sqlText(del)).toMatch(/format = 'vtt'/);
+    expect(del).toContain(42); // meetingId interpolated
+
+    // ...then plain-INSERT the fresh occurrence transcript (no ON CONFLICT clause).
+    const ins = mockSql.mock.calls.find((c) => /INSERT INTO meeting_transcripts/i.test(sqlText(c)));
+    expect(ins).toBeDefined();
+    expect(ins).toContain(42);     // meetingId
+    expect(ins).toContain(bigVtt); // the >500KB content
+    // DELETE must run before INSERT.
+    expect(mockSql.mock.calls.indexOf(del)).toBeLessThan(mockSql.mock.calls.indexOf(ins));
+  });
+
   test('does not download or write when no transcript matches the occurrence window', async () => {
     mockListTranscripts.mockResolvedValue([
       { id: 'sibling-tx', createdDateTime: '2026-06-02T10:00:00Z' },

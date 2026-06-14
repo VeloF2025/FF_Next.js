@@ -31,9 +31,10 @@
  * Requires: DATABASE_URL, GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET
  *   (run from a fibreflow deploy env that has them, e.g. via `set -a; . .env.local`).
  *
- * NOTE: scripts/backfill-meeting-transcripts.js and scripts/reprocess-meetings.ts both
- *   still pick transcripts[0]/recordings[0] AND use the dead neon() driver — they have
- *   the SAME bug and will re-contaminate if revived. Retire/fix them.
+ * NOTE: the older scripts/backfill-meeting-transcripts.js and scripts/reprocess-meetings.ts
+ *   were RETIRED (deleted) — they picked transcripts[0]/recordings[0] AND used the dead
+ *   neon() driver, so they carried the same contamination bug and would re-contaminate if
+ *   revived. This script supersedes them.
  */
 
 const { Pool } = require('pg');
