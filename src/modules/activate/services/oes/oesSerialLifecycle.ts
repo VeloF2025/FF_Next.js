@@ -141,8 +141,18 @@ export async function promoteOesActivatedSerials(
  * drop_number) still stuck `in_stock`/`installed`, and promotes each via the
  * same sanctioned `promoteOesActivatedSerials()` helper — idempotent, because
  * already-'activated' serials are skipped by its status guard. Intended to run
- * once per nightly OES import, AFTER the PP-delta promotion. Returns the count
- * of stuck serials it scanned (and attempted to promote).
+ * once per nightly OES import, AFTER the PP-delta promotion.
+ *
+ * Returns `{ scanned }` — the number of pre-activated serials the scan found
+ * (i.e. candidates handed to the promoter), NOT a promoted count. Per-serial
+ * promote / skip / failure outcomes are already logged by
+ * promoteOesActivatedSerials.
+ *
+ * Cost: this is the same join the one-time backfill and the nightly verify
+ * monitor already run — a hash join over indexed serial_number columns
+ * (idx_oes_serial, idx_stock_serials_number) the planner keeps well under a
+ * second. It runs once per import, so no pagination or date bound is applied —
+ * a date bound would also defeat the "catch every stuck serial" contract.
  */
 export async function reconcileInStockOesActivated(): Promise<{ scanned: number }> {
   const { rows } = await pool.query<OesSerialRow>(

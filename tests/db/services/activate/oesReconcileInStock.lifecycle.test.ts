@@ -120,6 +120,9 @@ describe('reconcileInStockOesActivated — durable OES in_stock→activated forw
       `SELECT status FROM stock_serials WHERE id = $1`, [serialId]);
     expect(before.rows[0]?.status).toBe('in_stock');
 
+    // Global scan: assert >= 1 (this serial, plus any other in_stock+OES-Active
+    // rows that happen to exist in the ephemeral container). The status + event
+    // assertions below pin the actual outcome for THIS serial deterministically.
     const result = await reconcileInStockOesActivated();
     expect(result.scanned).toBeGreaterThanOrEqual(1);
 
