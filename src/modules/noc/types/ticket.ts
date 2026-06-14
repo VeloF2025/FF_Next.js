@@ -55,6 +55,7 @@ export enum TicketSource {
   OLT_MISMATCH = 'olt_mismatch', // From OLT report serial mismatch
   DEV_OPS = 'dev_ops', // FibreFlow application issues
   SNAGS = 'snags', // From TQR snag reports
+  WA_NO_OES = 'wa_no_oes', // WA submission that never activated (recon ledger; audit rec #5B)
 }
 
 /**
