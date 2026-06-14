@@ -49,9 +49,10 @@ const PLAN_PATH = process.env.DUPFIX_PLAN_PATH || '/home/hein/Workspace/ff-dupfi
 // not the @neondatabase/serverless HTTP driver (which can't reach a plain PG host
 // from a standalone script). ssl handling mirrors scripts/backfill-ai-ticket-summaries.ts.
 const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) throw new Error('DATABASE_URL is required (run from a fibreflow deploy env)');
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: DATABASE_URL && DATABASE_URL.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
+  ssl: DATABASE_URL.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
 });
 
 // Tagged-template adapter so `sql`...${v}...`` works like the neon drop-in:
@@ -74,6 +75,7 @@ const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
 const limitIdx = args.indexOf('--limit');
 const LIMIT = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : 1000;
+if (Number.isNaN(LIMIT) || LIMIT <= 0) throw new Error('--limit requires a positive integer');
 
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex');
 const short = (s) => (s ? String(s).slice(0, 10) : 'n/a');
@@ -118,6 +120,7 @@ async function graphFetch(url, opts = {}, attempt = 0) {
   }
   if (resp.status === 401 && attempt < 5) {
     tokenCache = null;
+    await sleep(backoff(attempt));
     return graphFetch(url, opts, attempt + 1);
   }
   if ((resp.status === 429 || resp.status >= 500) && attempt < 6) {
@@ -137,7 +140,11 @@ async function getUserId(email) {
   return id;
 }
 async function resolveOnlineMeeting(userId, joinUrl) {
-  const url = `${GRAPH_BASE}/users/${userId}/onlineMeetings?$filter=joinWebUrl eq '${encodeURIComponent(joinUrl)}'`;
+  // OData string literals escape a single quote by doubling it; encodeURIComponent does
+  // NOT encode ' — so a join URL containing one would break the $filter (and, here,
+  // mis-classify the row as unresolvable → CLEAR). Double-then-encode.
+  const odata = encodeURIComponent(joinUrl.replace(/'/g, "''"));
+  const url = `${GRAPH_BASE}/users/${userId}/onlineMeetings?$filter=joinWebUrl eq '${odata}'`;
   const resp = await graphFetch(url);
   if (!resp.ok) return null;
   const meeting = (await resp.json()).value?.[0];
@@ -241,7 +248,15 @@ async function clearMeeting(meeting) {
     WHERE id = ${meeting.id}
   `;
   await sql`DELETE FROM meeting_transcripts WHERE meeting_id = ${meeting.id} AND format = 'vtt'`;
-  await sql`DELETE FROM action_items WHERE meeting_id = ${meeting.id} AND (source = 'transcript' OR source IS NULL)`;
+  // Only PENDING transcript-sourced items — preserves any human-actioned item (status
+  // moved off 'pending'). Mirrors the app's writeActionItems delete-before-reinsert set,
+  // narrowed so a manually-actioned action item is never lost.
+  await sql`
+    DELETE FROM action_items
+    WHERE meeting_id = ${meeting.id}
+      AND (source = 'transcript' OR source IS NULL)
+      AND status = 'pending'
+  `;
 }
 
 async function applyTranscript(meeting, result) {
@@ -252,10 +267,12 @@ async function applyTranscript(meeting, result) {
     await sql`DELETE FROM meeting_transcripts WHERE meeting_id = ${meeting.id} AND format = 'vtt'`;
   } else {
     await sql`UPDATE meetings SET raw_transcript = NULL, updated_at = NOW() WHERE id = ${meeting.id}`;
+    // meeting_transcripts has no UNIQUE on meeting_id (PK is `id`), so ON CONFLICT
+    // (meeting_id) would error — delete the old vtt row(s) then insert fresh.
+    await sql`DELETE FROM meeting_transcripts WHERE meeting_id = ${meeting.id} AND format = 'vtt'`;
     await sql`
       INSERT INTO meeting_transcripts (meeting_id, format, content, created_at)
       VALUES (${meeting.id}, 'vtt', ${vtt}, NOW())
-      ON CONFLICT (meeting_id) DO UPDATE SET content = EXCLUDED.content
     `;
   }
 }
@@ -338,7 +355,7 @@ async function buildPlan() {
     if (i > 0 && i % 10 === 0) await sleep(800);
   }
 
-  fs.writeFileSync(PLAN_PATH, JSON.stringify({ tally, plan }));
+  fs.writeFileSync(PLAN_PATH, JSON.stringify({ generatedAt: new Date().toISOString(), tally, plan }));
   console.log('\n=== Plan summary ===');
   console.log(JSON.stringify(tally, null, 2));
   console.log(`\nPlan written: ${PLAN_PATH}`);
@@ -352,8 +369,12 @@ async function buildPlan() {
 // Phase 2 (--apply): replay the plan with DB-only writes. No Graph, fully deterministic.
 async function applyPlan() {
   if (!fs.existsSync(PLAN_PATH)) throw new Error(`No plan at ${PLAN_PATH} — run the dry run first`);
-  const { plan } = JSON.parse(fs.readFileSync(PLAN_PATH, 'utf8'));
-  console.log(`\n=== APPLY plan (${plan.length} rows; DB-only, no Graph) ===`);
+  const { plan, generatedAt } = JSON.parse(fs.readFileSync(PLAN_PATH, 'utf8'));
+  console.log(`\n=== APPLY plan (${plan.length} rows; DB-only, no Graph) — built ${generatedAt || 'unknown'} ===`);
+  const ageH = generatedAt ? (Date.now() - new Date(generatedAt).getTime()) / 3.6e6 : Infinity;
+  if (ageH > 4) {
+    console.log(`⚠ plan is ${ageH.toFixed(1)}h old — if the meetings table changed since (re-capture/resync), re-run the dry run before applying.`);
+  }
 
   const tally = { replace: 0, clear: 0, unchanged: 0, skip: 0, error: 0 };
   const replaceIds = [];
@@ -385,6 +406,6 @@ main()
   .then(() => pool.end())
   .catch(async (err) => {
     console.error('Fatal:', err);
-    try { await pool.end(); } catch { /* already closing */ }
+    try { await pool.end(); } catch (e) { console.error('pool.end error:', e.message); }
     process.exit(1);
   });
