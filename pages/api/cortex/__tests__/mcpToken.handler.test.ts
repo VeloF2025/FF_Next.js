@@ -49,8 +49,18 @@ const mintMcpToken = vi.fn(async (email: string) => ({
   token: `tok-for-${email}`,
   expiresAt: '2026-07-14T00:00:00.000Z',
 }));
+const bridgeBearer = vi.fn(async (_email: string) => 'self-auth-bearer');
 vi.mock('@/lib/cortex/bridgeAuth', () => ({
   mintMcpToken: (email: string) => mintMcpToken(email),
+  bridgeBearer: (email: string) => bridgeBearer(email),
+}));
+
+// ── Bridge call seam (revoke): control the upstream response ────────────────────
+const fetchWithTimeout = vi.fn(
+  async (..._args: unknown[]) => ({ ok: true, status: 200 }) as Partial<Response>,
+);
+vi.mock('@/lib/cortex/meetingReviewLogic', () => ({
+  fetchWithTimeout: (...args: unknown[]) => fetchWithTimeout(...args),
 }));
 
 // Import AFTER mocks are registered.
@@ -64,6 +74,9 @@ beforeEach(() => {
   principal.email = 'reviewer@velocityfibre.co.za';
   principal.grantedActions = new Set<string>(['view']);
   mintMcpToken.mockClear();
+  bridgeBearer.mockClear();
+  fetchWithTimeout.mockClear();
+  fetchWithTimeout.mockResolvedValue({ ok: true, status: 200 } as Partial<Response>);
 });
 
 afterEach(() => {
@@ -71,7 +84,7 @@ afterEach(() => {
   else process.env.CORTEX_MCP_TOKEN_UI_ENABLED = saved;
 });
 
-function run(method: 'GET' | 'POST') {
+function run(method: 'GET' | 'POST' | 'DELETE') {
   const { req, res } = createMocks<NextApiRequest, NextApiResponse>({ method });
   return { req, res, done: handler(req, res) };
 }
@@ -126,5 +139,61 @@ describe('POST /api/cortex/mcp-token — auth + permission (flag on)', () => {
     // Identity binding: minted for the session email, exactly once.
     expect(mintMcpToken).toHaveBeenCalledTimes(1);
     expect(mintMcpToken).toHaveBeenCalledWith('alice@velocityfibre.co.za');
+  });
+});
+
+describe('DELETE /api/cortex/mcp-token — revoke (flag on)', () => {
+  beforeEach(() => {
+    process.env.CORTEX_MCP_TOKEN_UI_ENABLED = 'true';
+  });
+
+  it('404s when the flag is off, and never calls the bridge', async () => {
+    delete process.env.CORTEX_MCP_TOKEN_UI_ENABLED;
+    const { res, done } = run('DELETE');
+    await done;
+    expect(res._getStatusCode()).toBe(404);
+    expect(fetchWithTimeout).not.toHaveBeenCalled();
+  });
+
+  it('401s when unauthenticated, and never calls the bridge', async () => {
+    principal.authenticated = false;
+    const { res, done } = run('DELETE');
+    await done;
+    expect(res._getStatusCode()).toBe(401);
+    expect(fetchWithTimeout).not.toHaveBeenCalled();
+  });
+
+  it('403s when the user lacks cortex.review:view, and never calls the bridge', async () => {
+    principal.grantedActions = new Set<string>();
+    const { res, done } = run('DELETE');
+    await done;
+    expect(res._getStatusCode()).toBe(403);
+    expect(fetchWithTimeout).not.toHaveBeenCalled();
+  });
+
+  it('200s and calls the bridge revoke with a self-auth bearer for the verified user', async () => {
+    principal.email = 'alice@velocityfibre.co.za';
+    const { res, done } = run('DELETE');
+    await done;
+    expect(res._getStatusCode()).toBe(200);
+    expect(res._getJSONData().data).toEqual({ revoked: true });
+    // Self-auth bearer minted for the verified session email.
+    expect(bridgeBearer).toHaveBeenCalledWith('alice@velocityfibre.co.za');
+    // Bridge revoke endpoint hit via POST with that bearer + reviewer attribution.
+    expect(fetchWithTimeout).toHaveBeenCalledTimes(1);
+    const [, url, opts] = fetchWithTimeout.mock.calls[0] as unknown as [unknown, string, RequestInit];
+    expect(url).toMatch(/\/api\/mcp-tokens\/revoke$/);
+    expect(opts.method).toBe('POST');
+    expect((opts.headers as Record<string, string>).Authorization).toBe('Bearer self-auth-bearer');
+    expect((opts.headers as Record<string, string>)['X-Cortex-Reviewer']).toBe(
+      'alice@velocityfibre.co.za',
+    );
+  });
+
+  it('500s when the bridge revoke returns non-OK', async () => {
+    fetchWithTimeout.mockResolvedValue({ ok: false, status: 502 } as Partial<Response>);
+    const { res, done } = run('DELETE');
+    await done;
+    expect(res._getStatusCode()).toBe(500);
   });
 });
