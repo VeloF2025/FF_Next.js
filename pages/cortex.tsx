@@ -1,9 +1,11 @@
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PermissionGate } from '@/components/PermissionGate';
 import { CortexReviewPanel } from '@/components/cortex/CortexReviewPanel';
 import { CortexCitedSearch } from '@/components/cortex/CortexCitedSearch';
+import { CortexConnectPanel } from '@/components/cortex/CortexConnectPanel';
 
-export default function CortexPage() {
+export default function CortexPage({ mcpEnabled }: { mcpEnabled: boolean }) {
   return (
     <AppLayout>
       <Head>
@@ -16,6 +18,13 @@ export default function CortexPage() {
             AI-enriched communications and meeting intelligence pending your review
           </p>
         </div>
+        {mcpEnabled && (
+          <PermissionGate permission="cortex.review" action="view">
+            <div className="mb-6">
+              <CortexConnectPanel />
+            </div>
+          </PermissionGate>
+        )}
         <div className="mb-6">
           <CortexCitedSearch />
         </div>
@@ -26,6 +35,10 @@ export default function CortexPage() {
 }
 
 // Auth enforced client-side via AppLayout — consistent with other non-sensitive pages.
+// The MCP connect panel is additionally gated server-side by CORTEX_MCP_TOKEN_UI_ENABLED
+// (so it stays hidden until the feature is flipped on) and client-side by cortex.review.
 export const getServerSideProps = async () => {
-  return { props: {} };
+  const mcpEnabled =
+    (process.env.CORTEX_MCP_TOKEN_UI_ENABLED ?? '').trim().toLowerCase() === 'true';
+  return { props: { mcpEnabled } };
 };
