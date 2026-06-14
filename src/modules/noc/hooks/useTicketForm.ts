@@ -555,6 +555,7 @@ export const TICKET_SOURCE_LABELS: Record<TicketSource, string> = {
   [TicketSource.OLT_MISMATCH]: 'OLT Mismatch',
   [TicketSource.DEV_OPS]: 'DevOps',
   [TicketSource.SNAGS]: 'Snags',
+  [TicketSource.WA_NO_OES]: 'WA Not Activated',
 };
 
 export const TICKET_TYPE_LABELS: Record<TicketType, string> = {

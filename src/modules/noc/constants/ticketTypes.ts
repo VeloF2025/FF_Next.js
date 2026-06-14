@@ -255,6 +255,13 @@ export const TICKET_SOURCE_DEFINITIONS: Record<TicketSource, TicketSourceMetadat
     icon: 'BugReport',
     automated: true,
   },
+  [TicketSource.WA_NO_OES]: {
+    value: TicketSource.WA_NO_OES,
+    label: 'WA Not Activated',
+    description: 'WhatsApp submission with no OES activation (recon ledger)',
+    icon: 'WhatsApp',
+    automated: true,
+  },
 };
 
 /**
