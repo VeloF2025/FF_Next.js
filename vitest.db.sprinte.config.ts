@@ -38,6 +38,8 @@ export default defineConfig({
       'tests/db/services/field-stock/scanSerialService.lifecycle.test.ts',
       'tests/db/services/field-stock/serialForceCorrect.lifecycle.test.ts',
       'tests/db/services/activate/oesActivation.lifecycle.test.ts',
+      // #1860 regrowth fix — durable OES in_stock→activated reconciliation
+      'tests/db/services/activate/oesReconcileInStock.lifecycle.test.ts',
       // Track 2.7 — verify legacy trigger retirement + generic trigger presence
       'tests/db/migrations/track27RetireTriggers.test.ts',
       // Track 4.1 — issue-time block enforcement (SOP-4.4)

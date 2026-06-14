@@ -123,3 +123,54 @@ export async function promoteOesActivatedSerials(
     }
   }
 }
+
+/**
+ * Durable reconciliation for the OES activation path (issue #1860 regrowth).
+ *
+ * `promoteOesActivatedSerials()` above only ever sees the *pre-provision
+ * resolution delta* — serials whose `oes_pp_data` row was just flipped to
+ * 'activated' by the nightly import (oesPostImportService passes
+ * `activatedResult.rows`). A serial that goes Active on OES WITHOUT transiting
+ * the PP list is never passed to it, so its `stock_serials` row stays
+ * 'in_stock' indefinitely. The one-time backfill
+ * (scripts/backfill-oes-in-stock-activated.ts) cleared the historical cohort,
+ * but without this pass the gap regrows (~tens/day: D1-1 climbed 0 → 1155
+ * between 2026-05-31 and 2026-06-14).
+ *
+ * This runs a full scan for serials Active on OES (with activation_date +
+ * drop_number) still stuck `in_stock`/`installed`, and promotes each via the
+ * same sanctioned `promoteOesActivatedSerials()` helper — idempotent, because
+ * already-'activated' serials are skipped by its status guard. Intended to run
+ * once per nightly OES import, AFTER the PP-delta promotion.
+ *
+ * Returns `{ scanned }` — the number of pre-activated serials the scan found
+ * (i.e. candidates handed to the promoter), NOT a promoted count. Per-serial
+ * promote / skip / failure outcomes are already logged by
+ * promoteOesActivatedSerials.
+ *
+ * Cost: this is the same join the one-time backfill and the nightly verify
+ * monitor already run — a hash join over indexed serial_number columns
+ * (idx_oes_serial, idx_stock_serials_number) the planner keeps well under a
+ * second. It runs once per import, so no pagination or date bound is applied —
+ * a date bound would also defeat the "catch every stuck serial" contract.
+ */
+export async function reconcileInStockOesActivated(): Promise<{ scanned: number }> {
+  const { rows } = await pool.query<OesSerialRow>(
+    `SELECT DISTINCT ON (ss.id) oa.serial_number, oa.drop_number
+       FROM oes_activations oa
+       JOIN stock_serials ss ON ss.serial_number = oa.serial_number
+      WHERE oa.status = 'Active'
+        AND oa.activation_date IS NOT NULL
+        AND oa.drop_number IS NOT NULL
+        AND ss.status IN ('in_stock', 'installed')
+      ORDER BY ss.id, oa.activation_date DESC`,
+  );
+
+  if (rows.length > 0) {
+    logger.info('OES reconciliation: serials Active on OES still pre-activated — promoting', {
+      count: rows.length,
+    });
+    await promoteOesActivatedSerials(rows);
+  }
+  return { scanned: rows.length };
+}
