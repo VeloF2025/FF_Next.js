@@ -19,7 +19,10 @@ export default function CortexPage({ mcpEnabled }: { mcpEnabled: boolean }) {
           </p>
         </div>
         {mcpEnabled && (
-          <PermissionGate permission="cortex.review" action="view">
+          // showLoading keeps the gate CLOSED while permissions are still fetching —
+          // usePermission optimistically allows 'view' before hasFetched, which would
+          // otherwise flash this credential panel to a user who lacks cortex.review.
+          <PermissionGate permission="cortex.review" action="view" showLoading>
             <div className="mb-6">
               <CortexConnectPanel />
             </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * "Connect to Claude (MCP)" — self-serve panel that mints a 30-day Cortex MCP
@@ -52,6 +52,12 @@ export function CortexConnectPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<'token' | 'config' | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear the "Copied!" timer on unmount so we never setState on an unmounted node.
+  useEffect(() => () => {
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+  }, []);
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -77,13 +83,17 @@ export function CortexConnectPanel() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(which);
-      window.setTimeout(() => setCopied(null), 1500);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(null), 1500);
     } catch {
       setError('Copy failed — select the text and copy manually.');
     }
   }, []);
 
   const expiry = formatExpiry(expiresAt);
+  // Computed once per render (and memoized across renders) — the token-in-snippet
+  // contract is then auditable in one place and JSON.stringify runs at most once.
+  const snippet = useMemo(() => (token ? configSnippet(token) : ''), [token]);
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
@@ -110,7 +120,7 @@ export function CortexConnectPanel() {
 
       {token && (
         <div className="flex flex-col gap-3">
-          <div className="rounded-md border border-border border-l-2 border-l-amber-500 bg-background p-3 text-xs text-muted-foreground">
+          <div className="rounded-md border border-border border-l-2 border-l-warning-500 bg-background p-3 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">Copy this token now</span> — it&apos;s shown
             only once and acts as a password (anyone holding it can query Cortex as you until it
             expires). Don&apos;t commit it or paste it in chat/tickets.
@@ -125,7 +135,8 @@ export function CortexConnectPanel() {
             </div>
             <div className="flex gap-2">
               <input
-                type="text"
+                type="password"
+                autoComplete="off"
                 readOnly
                 value={token}
                 aria-label="Cortex MCP token"
@@ -147,14 +158,14 @@ export function CortexConnectPanel() {
               <span className="text-xs font-medium text-foreground">MCP client config</span>
               <button
                 type="button"
-                onClick={() => void copy(configSnippet(token), 'config')}
+                onClick={() => void copy(snippet, 'config')}
                 className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
               >
                 {copied === 'config' ? 'Copied!' : 'Copy config'}
               </button>
             </div>
             <pre className="overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
-              {configSnippet(token)}
+              {snippet}
             </pre>
             <span className="text-[11px] text-muted-foreground">
               Paste into your Claude Desktop / Claude Code MCP settings. See the

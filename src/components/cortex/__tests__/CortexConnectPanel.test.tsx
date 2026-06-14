@@ -12,7 +12,7 @@ import { CortexConnectPanel } from '../CortexConnectPanel';
 
 const TOKEN = 'eyJhbGciOiJIUzI1NiIsImtpZCI6IjIwMjYwNjExIn0.payload.sig';
 
-const writeText = vi.fn(async () => undefined);
+const writeText = vi.fn(async (_text: string) => undefined);
 
 beforeEach(() => {
   Object.assign(navigator, { clipboard: { writeText } });
@@ -63,6 +63,22 @@ describe('CortexConnectPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^copy$/i }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(TOKEN));
+  });
+
+  it('copies the full config JSON with the token inlined', async () => {
+    mockFetchOnce(() => ({
+      ok: true,
+      json: async () => ({ data: { token: TOKEN, expiresAt: '2026-07-14T00:00:00.000Z' } }),
+    }));
+    render(<CortexConnectPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /generate token/i }));
+    await screen.findByLabelText(/cortex mcp token/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /copy config/i }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = writeText.mock.calls[0][0] as string;
+    // The config the user pastes must carry the bearer token under CORTEX_USER_TOKEN.
+    expect(JSON.parse(copied).mcpServers.cortex.env.CORTEX_USER_TOKEN).toBe(TOKEN);
   });
 
   it('shows an error and no token when the mint fails', async () => {
