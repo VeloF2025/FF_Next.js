@@ -14,6 +14,9 @@
  *   CRON_SECRET=... ./node_modules/.bin/tsx scripts/backfill-wa-no-oes-tickets.ts \
  *     [--project "Mohadin"] [--commit] [--base http://localhost:3000] [--limit 5000]
  *
+ * Env: CRON_SECRET (required), WA_NO_OES_BASE_URL (optional base-URL override;
+ * default http://localhost:3000 — same as the --base flag).
+ *
  * Examples:
  *   # dry-run, all real projects (totals + sample):
  *   CRON_SECRET=$SECRET tsx scripts/backfill-wa-no-oes-tickets.ts
@@ -80,52 +83,55 @@ async function callEndpoint(
   return json.data;
 }
 
+// CLI output primitives. The @/lib/logger is silent under tsx, and console.* is
+// the wrong channel for a tool whose stdout IS the result — write directly.
+const out = (s: string): void => void process.stdout.write(`${s}\n`);
+const err = (s: string): void => void process.stderr.write(`${s}\n`);
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const secret = process.env.CRON_SECRET;
   if (!secret) {
-    console.error('CRON_SECRET env var is required.');
+    err('CRON_SECRET env var is required.');
     process.exit(1);
   }
   if (args.commit && !args.project) {
-    console.error(
-      'Refusing to --commit without --project. Backfill one project at a time (flood control).'
-    );
+    err('Refusing to --commit without --project. Backfill one project at a time (flood control).');
     process.exit(1);
   }
 
   const scope = args.project ?? 'ALL real projects';
-  console.log(`\nwa_no_oes backfill — scope: ${scope} — base: ${args.base}`);
+  out(`\nwa_no_oes backfill — scope: ${scope} — base: ${args.base}`);
 
   // Always dry-run first and show the preview.
   const dry = await callEndpoint(args, secret, true);
-  console.log(
+  out(
     `\n[DRY-RUN] scanned=${dry.scanned} would-create=${dry.preview?.length ?? 0} ` +
       `skip-existing=${dry.skippedExisting} would-be-unassigned=${dry.unassigned}`
   );
   const byProject = new Map<string, number>();
   for (const p of dry.preview ?? []) byProject.set(p.project, (byProject.get(p.project) ?? 0) + 1);
   for (const [proj, n] of [...byProject.entries()].sort((a, b) => b[1] - a[1])) {
-    console.log(`   ${proj.padEnd(24)} ${n}`);
+    out(`   ${proj.padEnd(24)} ${n}`);
   }
   for (const p of (dry.preview ?? []).slice(0, 5)) {
-    console.log(`   e.g. ${p.drop_number} → team=${p.assigned_team_id ?? 'UNASSIGNED'} | ${p.title}`);
+    out(`   e.g. ${p.drop_number} → team=${p.assigned_team_id ?? 'UNASSIGNED'} | ${p.title}`);
   }
 
   if (!args.commit) {
-    console.log('\nDry-run only. Re-run with --project "<name>" --commit to create.\n');
+    out('\nDry-run only. Re-run with --project "<name>" --commit to create.\n');
     return;
   }
 
-  console.log(`\n[COMMIT] creating tickets for "${args.project}" …`);
+  out(`\n[COMMIT] creating tickets for "${args.project}" …`);
   const run = await callEndpoint(args, secret, false);
-  console.log(
+  out(
     `[COMMIT] created=${run.created} skip-existing=${run.skippedExisting} ` +
       `unassigned=${run.unassigned} auto-resolved=${run.resolved ?? 0}\n`
   );
 }
 
-main().catch((err) => {
-  console.error('backfill failed:', err instanceof Error ? err.message : err);
+main().catch((e) => {
+  err(`backfill failed: ${e instanceof Error ? e.message : String(e)}`);
   process.exit(1);
 });

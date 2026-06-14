@@ -1,14 +1,29 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   buildWaNoOesTitle,
   buildWaNoOesDescription,
   buildWaNoOesPayload,
   partitionForCreation,
+  clampSinceDays,
+  fetchCandidates,
   runWaNoOesTickets,
+  autoResolveWaNoOesTickets,
   type WaNoOesCandidate,
   type QueryableDb,
 } from '../waNoOesTicketService';
 import { TicketSource, TicketType, TicketStatus } from '@/modules/noc/types/ticket';
+import { logTicketActivity } from '@/modules/noc/services/ticketService';
+
+// Mock the noc ticket service so autoResolve's logTicketActivity fan-out never
+// hits a real DB, and the default createTicket import is inert (tests inject it).
+vi.mock('@/modules/noc/services/ticketService', () => ({
+  createTicket: vi.fn(),
+  logTicketActivity: vi.fn(async () => {}),
+}));
+
+beforeEach(() => {
+  vi.mocked(logTicketActivity).mockClear();
+});
 
 function candidate(over: Partial<WaNoOesCandidate> = {}): WaNoOesCandidate {
   return {
@@ -23,7 +38,9 @@ function candidate(over: Partial<WaNoOesCandidate> = {}): WaNoOesCandidate {
   };
 }
 
-/** Fake pg.Pool: routes by SQL target table. */
+/** Fake pg.Pool routed by SQL target: ledger-LATERAL → candidates; the dedup
+ *  `FROM maintenance_tickets` SELECT → open DRs. The auto-resolve UPDATE matches
+ *  neither (it is `UPDATE maintenance_tickets`), so it falls through to []. */
 function makeDb(candidates: WaNoOesCandidate[], openDrs: string[]): QueryableDb {
   return {
     query: vi.fn(async (text: string) => {
@@ -57,6 +74,11 @@ describe('buildWaNoOesDescription', () => {
     const d = buildWaNoOesDescription(candidate({ wa_serial: null, wa_serial_source: null }));
     expect(d).not.toContain('WA serial');
   });
+
+  it('omits the WA-submitted line when wa_submitted_at is null', () => {
+    const d = buildWaNoOesDescription(candidate({ wa_submitted_at: null }));
+    expect(d).not.toContain('WA submitted:');
+  });
 });
 
 describe('buildWaNoOesPayload', () => {
@@ -79,12 +101,55 @@ describe('buildWaNoOesPayload', () => {
   });
 });
 
+describe('clampSinceDays', () => {
+  it('passes null/undefined through as null', () => {
+    expect(clampSinceDays(null)).toBeNull();
+    expect(clampSinceDays(undefined)).toBeNull();
+  });
+  it('floors a negative window to 0', () => {
+    expect(clampSinceDays(-30)).toBe(0);
+  });
+  it('truncates a fractional window', () => {
+    expect(clampSinceDays(30.9)).toBe(30);
+  });
+});
+
 describe('partitionForCreation', () => {
   it('skips DRs that already have an open ticket', () => {
     const cands = [candidate({ drop_number: 'A' }), candidate({ drop_number: 'B' })];
     const { toCreate, skippedExisting } = partitionForCreation(cands, new Set(['A']));
     expect(skippedExisting).toBe(1);
     expect(toCreate.map((c) => c.drop_number)).toEqual(['B']);
+  });
+
+  it('creates all when none are open (fresh run)', () => {
+    const cands = [candidate({ drop_number: 'A' }), candidate({ drop_number: 'B' })];
+    const { toCreate, skippedExisting } = partitionForCreation(cands, new Set());
+    expect(skippedExisting).toBe(0);
+    expect(toCreate).toHaveLength(2);
+  });
+
+  it('creates none when all are open (idempotent re-run)', () => {
+    const cands = [candidate({ drop_number: 'A' }), candidate({ drop_number: 'B' })];
+    const { toCreate, skippedExisting } = partitionForCreation(cands, new Set(['A', 'B']));
+    expect(skippedExisting).toBe(2);
+    expect(toCreate).toEqual([]);
+  });
+});
+
+describe('fetchCandidates', () => {
+  it('binds [projectName, clampedSinceDays, limit] and defaults the limit', async () => {
+    const q = vi.fn(async () => ({ rows: [] }));
+    const db = { query: q } as unknown as QueryableDb;
+    await fetchCandidates(db, { sinceDays: 30 });
+    expect(q).toHaveBeenCalledWith(expect.stringContaining('v_dr_reconciliation_ledger'), [null, 30, 1000]);
+  });
+
+  it('clamps a negative sinceDays to 0 in the bound params', async () => {
+    const q = vi.fn(async () => ({ rows: [] }));
+    const db = { query: q } as unknown as QueryableDb;
+    await fetchCandidates(db, { sinceDays: -5, projectName: 'Lawley', limit: 10 });
+    expect(q).toHaveBeenCalledWith(expect.any(String), ['Lawley', 0, 10]);
   });
 });
 
@@ -144,5 +209,31 @@ describe('runWaNoOesTickets', () => {
         createTicketFn: create as never,
       }),
     ).rejects.toThrow('boom');
+  });
+});
+
+describe('autoResolveWaNoOesTickets', () => {
+  it('returns 0 and logs nothing when no tickets resolve', async () => {
+    const db = { query: vi.fn(async () => ({ rows: [] })) } as unknown as QueryableDb;
+    const n = await autoResolveWaNoOesTickets(db);
+    expect(n).toBe(0);
+    expect(logTicketActivity).not.toHaveBeenCalled();
+  });
+
+  it('resolves rows and logs a status_change per ticket', async () => {
+    const db = {
+      query: vi.fn(async () => ({
+        rows: [
+          { id: 'u1', dr_number: 'DR1' },
+          { id: 'u2', dr_number: 'DR2' },
+        ],
+      })),
+    } as unknown as QueryableDb;
+    const n = await autoResolveWaNoOesTickets(db);
+    expect(n).toBe(2);
+    expect(logTicketActivity).toHaveBeenCalledTimes(2);
+    expect(logTicketActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ activityType: 'status_change' }),
+    );
   });
 });

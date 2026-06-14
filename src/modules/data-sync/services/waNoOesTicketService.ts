@@ -16,6 +16,8 @@
  * migration 417's partial unique index is the race backstop (23505 → skipped).
  * Driven by pages/api/cron/wa-no-oes-tickets.ts (decoupled from the OES report).
  *
+ * Pure helpers + types live in ./waNoOesTicketHelpers (re-exported here).
+ *
  * @module data-sync/services/waNoOesTicketService
  */
 
@@ -23,129 +25,34 @@ import { pool as defaultPool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { createTicket, logTicketActivity } from '@/modules/noc/services/ticketService';
 import {
-  TicketSource,
-  TicketType,
-  TicketPriority,
-  TicketStatus,
-  type CreateTicketPayload,
-} from '@/modules/noc/types/ticket';
+  CLOSED_STATUSES,
+  DEFAULT_LIMIT,
+  MAX_LIMIT,
+  buildWaNoOesPayload,
+  buildWaNoOesTitle,
+  clampSinceDays,
+  isUniqueViolation,
+  partitionForCreation,
+  type QueryableDb,
+  type WaNoOesCandidate,
+  type WaNoOesRunResult,
+  type WaNoOesScope,
+} from './waNoOesTicketHelpers';
 
-/** system@fibreflow.app — the bot account authoring auto-created tickets. */
-const SYSTEM_USER_ID =
-  process.env.WA_BRIDGE_SYSTEM_USER_ID ?? '81abd560-48ae-414e-ad31-9d82f1a9ed49';
-
-const DEFAULT_LIMIT = 1000;
-const MAX_LIMIT = 5000;
-
-/** Statuses that count as "no longer open" for dedup + auto-resolve. */
-const CLOSED_STATUSES = ['resolved', 'closed', 'cancelled', 'verified'];
-
-/** Minimal surface of pg.Pool this service needs — lets tests inject a fake. */
-export interface QueryableDb {
-  query<R extends Record<string, unknown>>(
-    text: string,
-    params?: unknown[]
-  ): Promise<{ rows: R[] }>;
-}
-
-export interface WaNoOesCandidate extends Record<string, unknown> {
-  drop_number: string;
-  project: string;
-  /** resolved projects.id (uuid) — always present (INNER JOIN). */
-  project_id: string;
-  /** project Activations team uuid, or null when the project has none. */
-  activations_team_id: string | null;
-  wa_submitted_at: string | null;
-  wa_serial: string | null;
-  wa_serial_source: string | null;
-}
-
-export interface WaNoOesScope {
-  /** restrict to a single project name (case-insensitive); null = all real projects. */
-  projectName?: string | null;
-  /** only DRs WA-submitted within this many days; null = no window (backfill). */
-  sinceDays?: number | null;
-  limit?: number;
-}
-
-export interface WaNoOesRunResult {
-  scanned: number;
-  created: number;
-  skippedExisting: number;
-  /** of those created, how many had no Activations team (left unassigned). */
-  unassigned: number;
-  dryRun: boolean;
-  preview?: Array<{
-    drop_number: string;
-    project: string;
-    assigned_team_id: string | null;
-    title: string;
-  }>;
-}
-
-// ---- pure helpers (unit-tested) -------------------------------------------
-
-export function buildWaNoOesTitle(dropNumber: string, project: string): string {
-  return `WA install not activated — ${dropNumber} (${project})`;
-}
-
-export function buildWaNoOesDescription(c: WaNoOesCandidate): string {
-  const lines = [
-    `Drop ${c.drop_number} (project: ${c.project}) was submitted on WhatsApp but has no OES activation record.`,
-  ];
-  if (c.wa_submitted_at) {
-    lines.push(`WA submitted: ${new Date(c.wa_submitted_at).toISOString().slice(0, 10)}`);
-  }
-  if (c.wa_serial) {
-    lines.push(`WA serial (${c.wa_serial_source ?? 'unknown'} source): ${c.wa_serial}`);
-  }
-  lines.push(
-    'Source: three-way recon ledger (recon_class = wa_no_oes). Auto-created by rec #5 part B.'
-  );
-  return lines.join('\n');
-}
-
-export function buildWaNoOesPayload(c: WaNoOesCandidate): CreateTicketPayload {
-  const assigned = c.activations_team_id ?? undefined;
-  return {
-    source: TicketSource.WA_NO_OES,
-    source_type: 'wa_no_oes',
-    ticket_type: TicketType.ACTIVATIONS,
-    title: buildWaNoOesTitle(c.drop_number, c.project),
-    description: buildWaNoOesDescription(c),
-    priority: TicketPriority.NORMAL,
-    dr_number: c.drop_number,
-    project_id: c.project_id,
-    created_by: SYSTEM_USER_ID,
-    assigned_team_id: assigned,
-    status: assigned ? TicketStatus.ASSIGNED : undefined,
-  };
-}
-
-/** Split candidates into those to create vs skip (already have an open ticket). */
-export function partitionForCreation(
-  candidates: WaNoOesCandidate[],
-  openDrs: Set<string>
-): { toCreate: WaNoOesCandidate[]; skippedExisting: number } {
-  const toCreate: WaNoOesCandidate[] = [];
-  let skippedExisting = 0;
-  for (const c of candidates) {
-    if (openDrs.has(c.drop_number)) skippedExisting++;
-    else toCreate.push(c);
-  }
-  return { toCreate, skippedExisting };
-}
-
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    (err as { code: unknown }).code === '23505'
-  );
-}
-
-// ---- DB I/O ---------------------------------------------------------------
+// Re-export the public surface so existing importers/tests keep one entry point.
+export {
+  buildWaNoOesDescription,
+  buildWaNoOesPayload,
+  buildWaNoOesTitle,
+  clampSinceDays,
+  partitionForCreation,
+} from './waNoOesTicketHelpers';
+export type {
+  QueryableDb,
+  WaNoOesCandidate,
+  WaNoOesScope,
+  WaNoOesRunResult,
+} from './waNoOesTicketHelpers';
 
 /** wa_no_oes DRs joined to their real project + resolved Activations team. */
 export async function fetchCandidates(
@@ -153,6 +60,7 @@ export async function fetchCandidates(
   scope: WaNoOesScope
 ): Promise<WaNoOesCandidate[]> {
   const limit = Math.min(Math.max(1, Math.trunc(scope.limit ?? DEFAULT_LIMIT)), MAX_LIMIT);
+  const sinceDays = clampSinceDays(scope.sinceDays);
   const { rows } = await db.query<WaNoOesCandidate>(
     `SELECT
         l.drop_number,
@@ -174,10 +82,14 @@ export async function fetchCandidates(
        ) act ON TRUE
       WHERE l.recon_class = 'wa_no_oes'
         AND ($1::text IS NULL OR LOWER(l.project) = LOWER($1))
-        AND ($2::int  IS NULL OR l.wa_submitted_at >= NOW() - make_interval(days => $2::int))
+        -- NULL wa_submitted_at is kept in-window: has_wa_submission and
+        -- wa_submitted_at derive from different sources and can diverge.
+        AND ($2::int IS NULL
+             OR l.wa_submitted_at IS NULL
+             OR l.wa_submitted_at >= NOW() - make_interval(days => $2::int))
       ORDER BY l.wa_submitted_at DESC NULLS LAST, l.drop_number
       LIMIT $3::int`,
-    [scope.projectName ?? null, scope.sinceDays ?? null, limit]
+    [scope.projectName ?? null, sinceDays, limit]
   );
   return rows;
 }
@@ -199,7 +111,12 @@ export async function fetchOpenTicketDrs(
   return new Set(rows.map((r) => r.dr_number));
 }
 
-/** Resolve open wa_no_oes tickets whose DR has since gained an OES activation. */
+/**
+ * Resolve open wa_no_oes tickets whose DR has since gained an OES activation.
+ * Note: this covers the *activation* exit only. A DR that drifts to
+ * serial_other_dr without activating (has_oes_activation stays false) keeps its
+ * open ticket — defensible, since the install is genuinely still not activated.
+ */
 export async function autoResolveWaNoOesTickets(
   db: QueryableDb = defaultPool
 ): Promise<number> {
@@ -216,15 +133,18 @@ export async function autoResolveWaNoOesTickets(
       RETURNING id, dr_number`,
     [CLOSED_STATUSES]
   );
-  for (const r of rows) {
-    await logTicketActivity({
-      ticketId: r.id,
-      activityType: 'status_change',
-      description: `Auto-resolved: DR ${r.dr_number} now has an OES activation.`,
-      userName: 'System (wa_no_oes)',
-      userEmail: 'system@fibreflow.app',
-    });
-  }
+  // logTicketActivity swallows its own errors, so the fan-out can't break resolve.
+  await Promise.all(
+    rows.map((r) =>
+      logTicketActivity({
+        ticketId: r.id,
+        activityType: 'status_change',
+        description: `Auto-resolved: DR ${r.dr_number} now has an OES activation.`,
+        userName: 'System (wa_no_oes)',
+        userEmail: 'system@fibreflow.app',
+      })
+    )
+  );
   if (rows.length > 0) {
     log.info('wa_no_oes auto-resolve', { resolved: rows.length }, 'waNoOesTicketService');
   }
