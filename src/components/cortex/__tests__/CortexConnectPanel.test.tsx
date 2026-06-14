@@ -89,4 +89,27 @@ describe('CortexConnectPanel', () => {
     await waitFor(() => expect(screen.getByText(/could not generate a token/i)).toBeTruthy());
     expect(screen.queryByLabelText(/cortex mcp token/i)).toBeNull();
   });
+
+  it('revokes via DELETE, clears the shown token, and confirms', async () => {
+    // First mint, then revoke — two fetch calls.
+    const fetchMock = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { token: TOKEN, expiresAt: '2026-07-14T00:00:00.000Z' } }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { revoked: true } }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<CortexConnectPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /generate token/i }));
+    await screen.findByLabelText(/cortex mcp token/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /revoke my mcp access/i }));
+
+    await waitFor(() => expect(screen.getByText(/have been revoked/i)).toBeTruthy());
+    // The shown token is cleared so it can't be copied after revoke.
+    expect(screen.queryByLabelText(/cortex mcp token/i)).toBeNull();
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/cortex/mcp-token', { method: 'DELETE' });
+  });
 });

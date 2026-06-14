@@ -50,7 +50,9 @@ export function CortexConnectPanel() {
   const [token, setToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState<'token' | 'config' | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,6 +64,7 @@ export function CortexConnectPanel() {
   const generate = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setNotice(null);
     setCopied(null);
     try {
       const res = await fetch('/api/cortex/mcp-token', { method: 'POST' });
@@ -76,6 +79,24 @@ export function CortexConnectPanel() {
       setError(`Could not generate a token: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const revoke = useCallback(async () => {
+    setRevoking(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch('/api/cortex/mcp-token', { method: 'DELETE' });
+      if (!res.ok) throw new Error(`${res.status}`);
+      // Every previously minted MCP token now 401s at the bridge.
+      setToken(null);
+      setExpiresAt('');
+      setNotice('All your MCP tokens have been revoked. Generate a new one to reconnect.');
+    } catch (e) {
+      setError(`Could not revoke: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRevoking(false);
     }
   }, []);
 
@@ -105,18 +126,27 @@ export function CortexConnectPanel() {
         </span>
       </div>
 
-      <div>
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => void generate()}
-          disabled={loading}
+          disabled={loading || revoking}
           className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
           {loading ? 'Generating…' : token ? 'Regenerate token' : 'Generate token'}
         </button>
+        <button
+          type="button"
+          onClick={() => void revoke()}
+          disabled={loading || revoking}
+          className="rounded-md border border-border px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+        >
+          {revoking ? 'Revoking…' : 'Revoke my MCP access'}
+        </button>
       </div>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
+      {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
 
       {token && (
         <div className="flex flex-col gap-3">
