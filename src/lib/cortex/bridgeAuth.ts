@@ -22,13 +22,58 @@
  * a client-supplied value. The Entra ID token (tier 1) is likewise read only from the
  * server-side session, never a client-supplied header.
  */
-import { SignJWT } from 'jose';
+import { SignJWT, decodeJwt } from 'jose';
 
 /** Short-lived: the token only needs to outlive a single review request. */
 const TOKEN_TTL = '5m';
 
+/** Long-lived: a self-serve MCP token lives in a user's agent config (Phase 7). */
+const MCP_TOKEN_TTL = '30d';
+
+/** Marks a revocable MCP bearer token — the bridge applies per-user revocation
+ *  (the min_iat epoch) ONLY to tokens carrying this claim, never to the 5-minute
+ *  session tokens minted by bridgeBearer. Forward-compatible with the Cortex-side
+ *  revocation marker (Cortex PR #109: scripts/mint_user_token.py +
+ *  plugins/memory/cortex/mcp_revocation.MCP_TOKEN_USE) — kept in sync with it. Inert
+ *  on a bridge that predates #109 (the extra claim is simply ignored by PyJWT). */
+const MCP_TOKEN_USE = 'mcp';
+
 function oidcForwardEnabled(): boolean {
   return (process.env.CORTEX_OIDC_FORWARD ?? '').trim().toLowerCase() === 'true';
+}
+
+/**
+ * Sign an HS256 gateway JWT with the shared `BRIDGE_JWT_SECRET` (+ optional `kid`).
+ *
+ * The SINGLE place that reads the gateway secret and drives `jose.SignJWT`, so the
+ * secret never reaches a second code path. Returns `null` when the secret is unset
+ * (the caller decides the fallback). `setIssuedAt()` stamps `iat`; the bridge derives
+ * the revocation comparison and `exp` from these. Env is read at call time so the
+ * secret can be rotated / toggled without a process restart.
+ */
+async function signBridgeJwt(
+  claims: Record<string, unknown>,
+  ttl: string,
+): Promise<string | null> {
+  const secret = process.env.BRIDGE_JWT_SECRET ?? '';
+  if (!secret) return null;
+  // Cortex Phase 3 WP8 key rotation: when BRIDGE_JWT_KID is set, stamp it into the
+  // protected header so the bridge verifies STRICTLY against that key. Unset =
+  // legacy kid-less signing (bridge tries all trusted keys).
+  const kid = process.env.BRIDGE_JWT_KID || undefined;
+  try {
+    return await new SignJWT(claims)
+      .setProtectedHeader(kid ? { alg: 'HS256', kid } : { alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime(ttl)
+      .sign(new TextEncoder().encode(secret));
+  } catch (err) {
+    // Fail CLOSED, never silently downgrade to the broad service credential: if the
+    // gateway secret is present but signing fails, surface a clear error (without
+    // leaking the secret) and let the caller's error boundary return a 500.
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`bridgeAuth: failed to mint Bridge JWT: ${reason}`);
+  }
 }
 
 /**
@@ -54,27 +99,48 @@ export async function bridgeBearer(
     return entra;
   }
 
-  const secret = process.env.BRIDGE_JWT_SECRET ?? '';
-  if (!secret) {
+  const instanceId = process.env.CORTEX_INSTANCE_ID ?? 'velocity-fibre';
+  const token = await signBridgeJwt({ email: reviewerEmail, instance_id: instanceId }, TOKEN_TTL);
+  if (token === null) {
     // Dark fallback — service-scoped api key (or empty when unconfigured).
     return process.env.CORTEX_API_KEY ?? '';
   }
+  return token;
+}
+
+/** A minted MCP bearer token plus its expiry, for display in the connect UI. */
+export interface McpToken {
+  /** The HS256 JWT to paste into an MCP client config as CORTEX_USER_TOKEN. */
+  token: string;
+  /** ISO-8601 expiry, decoded from the token's own `exp` (what the bridge enforces). */
+  expiresAt: string;
+}
+
+/**
+ * Mint a long-lived (30-day) per-user Cortex MCP bearer token for `userEmail`.
+ *
+ * Matches `scripts/mint_user_token.py` (the operator path) — claims
+ * `sub, email, instance_id, iat, exp` — plus the `token_use:"mcp"` revocation marker
+ * (Cortex PR #109), so operator- and UI-minted tokens are interchangeable and equally
+ * revocable once #109 lands. The bridge narrows every result to this user's ACL; the
+ * token carries no extra privilege.
+ *
+ * @param userEmail the server-verified FibreFlow session email — NEVER a
+ *   client-supplied value (the route reads it from `req.user.email`).
+ * @throws if `BRIDGE_JWT_SECRET` is unset — fail LOUD rather than silently issuing a
+ *   broad service credential or an empty bearer.
+ */
+export async function mintMcpToken(userEmail: string): Promise<McpToken> {
   const instanceId = process.env.CORTEX_INSTANCE_ID ?? 'velocity-fibre';
-  // Cortex Phase 3 WP8 key rotation: when BRIDGE_JWT_KID is set, stamp it into
-  // the protected header so the bridge verifies STRICTLY against that key.
-  // Unset = legacy kid-less signing (bridge tries all trusted keys).
-  const kid = process.env.BRIDGE_JWT_KID || undefined;
-  try {
-    return await new SignJWT({ email: reviewerEmail, instance_id: instanceId })
-      .setProtectedHeader(kid ? { alg: 'HS256', kid } : { alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime(TOKEN_TTL)
-      .sign(new TextEncoder().encode(secret));
-  } catch (err) {
-    // Fail CLOSED, never silently downgrade to the broad service credential: if the
-    // gateway secret is present but signing fails, surface a clear error (without
-    // leaking the secret) and let the route's error boundary return a 500.
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`bridgeAuth: failed to mint per-user Bridge JWT: ${reason}`);
+  const token = await signBridgeJwt(
+    { sub: userEmail, email: userEmail, instance_id: instanceId, token_use: MCP_TOKEN_USE },
+    MCP_TOKEN_TTL,
+  );
+  if (token === null) {
+    throw new Error('bridgeAuth: BRIDGE_JWT_SECRET is not set — cannot mint an MCP token');
   }
+  // Read exp back from the signed token so expiresAt is exactly what the bridge sees.
+  const { exp } = decodeJwt(token);
+  const expiresAt = typeof exp === 'number' ? new Date(exp * 1000).toISOString() : '';
+  return { token, expiresAt };
 }
