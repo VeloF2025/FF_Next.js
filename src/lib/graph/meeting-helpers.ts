@@ -78,14 +78,57 @@ export async function resolveOnlineMeeting(
 }
 
 /**
- * Fetches the transcript for an online meeting and persists it.
+ * Match window between an artifact's createdDateTime and the occurrence start.
+ *
+ * A recurring onlineMeeting's /transcripts and /recordings endpoints return the
+ * artifacts for EVERY occurrence (the onlineMeetingId is the shared recurring
+ * thread id, not the occurrence id). Teams stamps each artifact's createdDateTime
+ * at creation ≈ the occurrence start, so the artifact closest to this occurrence's
+ * start within the window is the match. 2h mirrors ONEDRIVE_MATCH_WINDOW_MS and
+ * absorbs skew between the callRecord start and the artifact timestamp.
+ */
+const OCCURRENCE_MATCH_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Selects the artifact whose createdDateTime is closest to the occurrence start,
+ * within OCCURRENCE_MATCH_WINDOW_MS. Returns null when none fall inside the window
+ * (fail closed) so a sibling occurrence's artifact is never attached to a meeting
+ * that has none of its own — the root cause of the recurring-meeting duplication.
+ */
+export function selectArtifactForOccurrence<T extends { createdDateTime: string }>(
+  artifacts: T[],
+  occurrenceStart: string
+): T | null {
+  const startMs = new Date(occurrenceStart).getTime();
+  if (Number.isNaN(startMs)) return null;
+
+  let best: T | null = null;
+  let bestDelta = Infinity;
+  for (const artifact of artifacts) {
+    const artifactMs = new Date(artifact.createdDateTime).getTime();
+    if (Number.isNaN(artifactMs)) continue;
+    const delta = Math.abs(artifactMs - startMs);
+    if (delta <= OCCURRENCE_MATCH_WINDOW_MS && delta < bestDelta) {
+      best = artifact;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
+/**
+ * Fetches the transcript for a specific meeting occurrence and persists it.
  * Transcripts under TRANSCRIPT_INLINE_LIMIT are stored inline on the meetings row.
  * Larger transcripts are written to the meeting_transcripts table.
+ *
+ * @param occurrenceStart - ISO start time of THIS occurrence (callRecord.startDateTime),
+ *   used to pick the right artifact out of a recurring thread's shared transcript list.
  */
 export async function fetchAndStoreTranscript(
   meetingId: number,
   organizerUserId: string,
-  onlineMeetingId: string
+  onlineMeetingId: string,
+  occurrenceStart: string
 ): Promise<void> {
   const transcripts = await listTranscripts(organizerUserId, onlineMeetingId);
 
@@ -94,11 +137,23 @@ export async function fetchAndStoreTranscript(
     return;
   }
 
-  // Take the most recent transcript (first in list from Graph)
+  // A recurring onlineMeeting returns every occurrence's transcript here; pick the
+  // one created at THIS occurrence rather than transcripts[0] (which attached one
+  // occurrence's transcript to the whole recurring series).
+  const transcript = selectArtifactForOccurrence(transcripts, occurrenceStart);
+  if (!transcript) {
+    log.info(
+      'No transcript matched the occurrence window',
+      { meetingId, onlineMeetingId, occurrenceStart, candidates: transcripts.length },
+      LOGGER
+    );
+    return;
+  }
+
   const vtt = await downloadTranscriptContent(
     organizerUserId,
     onlineMeetingId,
-    transcripts[0]!.id
+    transcript.id
   );
 
   if (vtt.length <= TRANSCRIPT_INLINE_LIMIT) {
@@ -119,13 +174,17 @@ export async function fetchAndStoreTranscript(
 }
 
 /**
- * Downloads the first recording for an online meeting and persists the path + size.
- * Returns true if a recording was found and stored, false if none exist.
+ * Downloads the recording for a specific meeting occurrence and persists the path + size.
+ * Returns true if a recording was found and stored, false if none exist or match.
+ *
+ * @param occurrenceStart - ISO start time of THIS occurrence (callRecord.startDateTime),
+ *   used to pick the right artifact out of a recurring thread's shared recording list.
  */
 export async function fetchAndStoreRecording(
   meetingId: number,
   organizerUserId: string,
-  onlineMeetingId: string
+  onlineMeetingId: string,
+  occurrenceStart: string
 ): Promise<boolean> {
   const recordings = await listRecordings(organizerUserId, onlineMeetingId);
 
@@ -134,10 +193,22 @@ export async function fetchAndStoreRecording(
     return false;
   }
 
+  // Same recurring-thread trap as transcripts: pick this occurrence's recording
+  // rather than recordings[0], which contaminated every sibling occurrence.
+  const recording = selectArtifactForOccurrence(recordings, occurrenceStart);
+  if (!recording) {
+    log.info(
+      'No recording matched the occurrence window',
+      { meetingId, onlineMeetingId, occurrenceStart, candidates: recordings.length },
+      LOGGER
+    );
+    return false;
+  }
+
   const { filePath, sizeBytes } = await downloadRecordingToDisk(
     organizerUserId,
     onlineMeetingId,
-    recordings[0]!.id,
+    recording.id,
     meetingId
   );
 

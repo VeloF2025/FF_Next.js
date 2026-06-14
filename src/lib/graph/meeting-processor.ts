@@ -192,8 +192,11 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
       }
 
       if (meetingInfo?.id && resolvedUserId) {
-        await fetchAndStoreTranscript(meetingId, resolvedUserId, meetingInfo.id);
-        hasRecording = await fetchAndStoreRecording(meetingId, resolvedUserId, meetingInfo.id);
+        // Pass this occurrence's start so the helpers pick the right artifact out
+        // of a recurring thread's shared transcript/recording list (callRecord.id
+        // is per-occurrence but meetingInfo.id is the shared recurring thread id).
+        await fetchAndStoreTranscript(meetingId, resolvedUserId, meetingInfo.id, callRecord.startDateTime);
+        hasRecording = await fetchAndStoreRecording(meetingId, resolvedUserId, meetingInfo.id, callRecord.startDateTime);
       }
     }
 
