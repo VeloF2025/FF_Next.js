@@ -130,6 +130,7 @@ export function WorksQAPage() {
   // ─── Level 2: Project detail (zone+PON filters + pole table) ───────────
   const approvedCount = poles.filter(p => p.status === 'approved').length;
   const readyCount = poles.filter(p => p.status === 'ready').length;
+  const snaggedCount = poles.filter(p => p.status === 'snagged').length;
   const inProgressCount = poles.filter(p => p.status === 'in_progress').length;
 
   return (
@@ -160,6 +161,7 @@ export function WorksQAPage() {
           <span><span className="font-medium text-zinc-300">{poles.length}</span> poles</span>
           <span><span className="font-medium text-green-400">{approvedCount}</span> approved</span>
           <span><span className="font-medium text-teal-400">{readyCount}</span> ready</span>
+          <span><span className="font-medium text-red-400">{snaggedCount}</span> snagged</span>
           <span><span className="font-medium text-yellow-400">{inProgressCount}</span> in progress</span>
         </div>
       )}
@@ -181,6 +183,7 @@ export function WorksQAPage() {
           selectedPoleId={selectedPoleId}
           onSelect={setSelectedPoleId}
           onSnagPole={(p) => setSnagPole({ id: p.id, pole_label: p.pole_label })}
+          onApproved={() => { void mutatePoles(); }}
         />
       )}
 

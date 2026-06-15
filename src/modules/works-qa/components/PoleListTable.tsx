@@ -1,26 +1,46 @@
-import type { PoleSummary } from '../types/works-qa.types';
+import type { PoleSummary, SlotState } from '../types/works-qa.types';
+import { ApproveReadyButton } from './ApproveReadyButton';
 
 interface PoleListTableProps {
   poles: PoleSummary[];
   selectedPoleId: string | null;
   onSelect: (id: string) => void;
   onSnagPole: (pole: PoleSummary) => void;
+  onApproved: () => void;
 }
 
-function PixelStrip({ filled, total, hasFailures }: { filled: number; total: number; hasFailures: boolean }) {
+// Dot colours for the per-slot review state (see SlotState in works-qa.types).
+const SLOT_COLOR: Record<SlotState, string> = {
+  approved: 'bg-green-500',       // strong green — a person approved this photo
+  pass:     'bg-green-500/30',    // faint green  — VLM-passed, not yet approved
+  fail:     'bg-red-500/60',      // red          — snagged or un-overridden VLM fail
+  empty:    'bg-zinc-800',        // grey         — no photo
+};
+
+function PixelStrip({ states }: { states: SlotState[] }) {
   return (
     <div className="flex gap-[2px] items-center">
-      {Array.from({ length: total }).map((_, i) => (
-        <div
-          key={i}
-          className={`h-[10px] w-[10px] rounded-[2px] ${
-            i < filled
-              ? hasFailures
-                ? 'bg-red-500/50'
-                : 'bg-green-500/30'
-              : 'bg-zinc-800'
-          }`}
-        />
+      {states.map((s, i) => (
+        <div key={i} className={`h-[10px] w-[10px] rounded-[2px] ${SLOT_COLOR[s]}`} />
+      ))}
+    </div>
+  );
+}
+
+function DotLegend() {
+  const items: [SlotState, string][] = [
+    ['approved', 'Approved'],
+    ['pass', 'VLM-passed'],
+    ['fail', 'Snag / VLM fail'],
+    ['empty', 'No photo'],
+  ];
+  return (
+    <div className="flex flex-wrap gap-3 text-[11px] text-zinc-500 mb-2">
+      {items.map(([state, label]) => (
+        <span key={state} className="flex items-center gap-1">
+          <span className={`h-[10px] w-[10px] rounded-[2px] ${SLOT_COLOR[state]}`} />
+          {label}
+        </span>
       ))}
     </div>
   );
@@ -30,6 +50,7 @@ const STATUS_BADGE: Record<PoleSummary['status'], string> = {
   empty:       'bg-zinc-800 text-zinc-500',
   in_progress: 'bg-amber-500/20 text-amber-400',
   ready:       'bg-blue-500/20 text-blue-400',
+  snagged:     'bg-red-500/20 text-red-400',
   approved:    'bg-green-500/20 text-green-400',
 };
 
@@ -37,6 +58,7 @@ const STATUS_LABEL: Record<PoleSummary['status'], string> = {
   empty:       'Empty',
   in_progress: 'In Progress',
   ready:       'Ready ▶',
+  snagged:     'Snagged',
   approved:    '✓ Approved',
 };
 
@@ -59,7 +81,7 @@ function VerifyFlag({ pole, onClick }: { pole: PoleSummary; onClick: (e: React.M
   );
 }
 
-export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: PoleListTableProps) {
+export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole, onApproved }: PoleListTableProps) {
   if (poles.length === 0) {
     return (
       <div className="text-sm text-zinc-500 text-center py-12">
@@ -70,6 +92,7 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: P
 
   return (
     <div className="overflow-x-auto">
+      <DotLegend />
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-800">
@@ -77,8 +100,9 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: P
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Civil</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Dome</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Main Joint + Trays</th>
+            <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-16">Photos</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-20">Snags</th>
-            <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-28">Status</th>
+            <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-36">Status</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-12">Verify</th>
           </tr>
         </thead>
@@ -93,18 +117,28 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: P
             >
               <td className="py-2 px-3 font-semibold text-zinc-100">{pole.pole_label}</td>
               <td className="py-2 px-3">
-                <PixelStrip filled={pole.civil_filled} total={8} hasFailures={pole.status !== 'approved' && pole.vlm_failures > 0} />
+                <PixelStrip states={pole.civil_slots} />
               </td>
               <td className="py-2 px-3">
-                <PixelStrip filled={pole.dome_filled} total={8} hasFailures={pole.status !== 'approved' && pole.vlm_failures > 0} />
+                <PixelStrip states={pole.dome_slots} />
               </td>
               <td className="py-2 px-3">
                 <div className="flex items-center gap-2">
-                  <PixelStrip filled={pole.joint_filled} total={6} hasFailures={false} />
+                  <PixelStrip states={pole.joint_slots} />
                   {(pole.tray_count ?? 0) > 0 && (
                     <span className="text-xs text-zinc-500">+{pole.tray_count}t</span>
                   )}
                 </div>
+              </td>
+              <td className="py-2 px-3">
+                <span className={pole.total_photos > 0 ? 'text-xs text-zinc-300' : 'text-xs text-zinc-600'}>
+                  {pole.total_photos}
+                </span>
+                {pole.unassigned_count > 0 && (
+                  <span className="text-[10px] text-amber-400 ml-1" title={`${pole.unassigned_count} unassigned photo(s)`}>
+                    +{pole.unassigned_count}
+                  </span>
+                )}
               </td>
               <td className="py-2 px-3">
                 {pole.outstanding_snag_count > 0 ? (
@@ -116,9 +150,18 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: P
                 )}
               </td>
               <td className="py-2 px-3">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[pole.status]}`}>
-                  {STATUS_LABEL[pole.status]}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[pole.status]}`}>
+                    {STATUS_LABEL[pole.status]}
+                  </span>
+                  {pole.status === 'ready' && (
+                    <ApproveReadyButton
+                      poleId={pole.id}
+                      onApproved={onApproved}
+                      onNeedsDetail={() => onSelect(pole.id)}
+                    />
+                  )}
+                </div>
               </td>
               <td className="py-2 px-3">
                 <VerifyFlag pole={pole} onClick={(e) => { e.stopPropagation(); onSnagPole(pole); }} />

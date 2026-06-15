@@ -86,6 +86,13 @@ export interface PoleQaComment {
   created_at: string;
 }
 
+// Per-slot review state shown as a dot on the PON overview (Works QA).
+//  - 'approved' → a person approved this photo (slot_approvals.decision)   → strong green
+//  - 'pass'     → has a photo, VLM-valid (or overridden), not yet approved → faint green
+//  - 'fail'     → snagged by a person OR an un-overridden VLM failure      → red
+//  - 'empty'    → no photo in this slot                                    → grey
+export type SlotState = 'empty' | 'approved' | 'pass' | 'fail';
+
 export interface PoleSummary {
   id: string;
   pole_label: string;
@@ -96,7 +103,14 @@ export interface PoleSummary {
   joint_filled: number;     // 0-6
   tray_count: number;
   vlm_failures: number;
-  status: 'empty' | 'in_progress' | 'ready' | 'approved';
+  // Per-slot states for the overview dots (lengths: 8 civil, 8 dome, 6 joint).
+  civil_slots: SlotState[];
+  dome_slots: SlotState[];
+  joint_slots: SlotState[];
+  // Total photos uploaded on the pole, including unassigned (Johan's overview ask).
+  total_photos: number;
+  unassigned_count: number;
+  status: 'empty' | 'in_progress' | 'ready' | 'snagged' | 'approved';
   approved_at: string | null;
   outstanding_snag_count: number;
   has_open_verification_snag: boolean;

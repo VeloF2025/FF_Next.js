@@ -3,6 +3,15 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
+import { computePoleSummary, type PoleOverviewRow } from '@/modules/works-qa/utils/pole-overview';
+
+// SLOT_META is a trusted in-code constant (no user input), so its column/key
+// names are safe to interpolate. Returning a bounded `present_slots` array (≤22
+// short keys) instead of the raw jsonb keeps this 30s-polled endpoint light.
+const PRESENT_SLOTS_EXPR = `ARRAY_REMOVE(ARRAY[
+        ${SLOT_META.map(s => `CASE WHEN ${s.dbColumn} IS NOT NULL THEN '${s.key}' END`).join(',\n        ')}
+      ], NULL)`;
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
@@ -22,54 +31,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const result = await pool.query(`
       SELECT
-        id, pole_label, zone_no, pon_no,
-        (civil_step_01_key IS NOT NULL)::int + (civil_step_02_key IS NOT NULL)::int +
-        (civil_step_03_key IS NOT NULL)::int + (civil_step_04_key IS NOT NULL)::int +
-        (civil_step_05_key IS NOT NULL)::int + (civil_step_06_key IS NOT NULL)::int +
-        (civil_step_07_key IS NOT NULL)::int + (civil_step_08_key IS NOT NULL)::int AS civil_filled,
-        (optical_dome_01_key IS NOT NULL)::int + (optical_dome_02_key IS NOT NULL)::int +
-        (optical_dome_03_key IS NOT NULL)::int + (optical_dome_04_key IS NOT NULL)::int +
-        (optical_dome_05_key IS NOT NULL)::int + (optical_dome_06_key IS NOT NULL)::int +
-        (optical_dome_07_key IS NOT NULL)::int + (optical_dome_08_key IS NOT NULL)::int AS dome_filled,
-        (main_joint_11_key IS NOT NULL)::int + (main_joint_12_key IS NOT NULL)::int +
-        (main_joint_13_key IS NOT NULL)::int + (main_joint_14_key IS NOT NULL)::int +
-        (main_joint_15_key IS NOT NULL)::int + (main_joint_16_key IS NOT NULL)::int AS joint_filled,
+        id, pole_label, zone_no, pon_no, approved_at, slot_approvals,
         COALESCE(array_length(main_joint_tray_keys, 1), 0) AS tray_count,
-        (SELECT count(*) FROM jsonb_each(vlm_results) WHERE (value->>'valid')::boolean = false AND value->>'overridden_by' IS NULL) AS vlm_failures,
-        CASE
-          WHEN approved_at IS NOT NULL THEN 'approved'
-          WHEN (
-            civil_step_01_key IS NOT NULL OR civil_step_02_key IS NOT NULL OR
-            civil_step_03_key IS NOT NULL OR civil_step_04_key IS NOT NULL OR
-            civil_step_05_key IS NOT NULL OR civil_step_06_key IS NOT NULL OR
-            civil_step_07_key IS NOT NULL OR civil_step_08_key IS NOT NULL OR
-            optical_dome_01_key IS NOT NULL OR optical_dome_02_key IS NOT NULL OR
-            optical_dome_03_key IS NOT NULL OR optical_dome_04_key IS NOT NULL OR
-            optical_dome_05_key IS NOT NULL OR optical_dome_06_key IS NOT NULL OR
-            optical_dome_07_key IS NOT NULL OR optical_dome_08_key IS NOT NULL OR
-            main_joint_11_key IS NOT NULL OR main_joint_12_key IS NOT NULL OR
-            main_joint_13_key IS NOT NULL OR main_joint_14_key IS NOT NULL OR
-            main_joint_15_key IS NOT NULL OR main_joint_16_key IS NOT NULL OR
-            array_length(main_joint_tray_keys, 1) >= 1
-          ) THEN
-            CASE WHEN (
-              civil_step_01_key IS NOT NULL AND civil_step_02_key IS NOT NULL AND
-              civil_step_03_key IS NOT NULL AND civil_step_04_key IS NOT NULL AND
-              civil_step_05_key IS NOT NULL AND civil_step_06_key IS NOT NULL AND
-              civil_step_07_key IS NOT NULL AND civil_step_08_key IS NOT NULL AND
-              optical_dome_01_key IS NOT NULL AND optical_dome_02_key IS NOT NULL AND
-              optical_dome_03_key IS NOT NULL AND optical_dome_04_key IS NOT NULL AND
-              optical_dome_05_key IS NOT NULL AND optical_dome_06_key IS NOT NULL AND
-              optical_dome_07_key IS NOT NULL AND optical_dome_08_key IS NOT NULL AND
-              main_joint_11_key IS NOT NULL AND main_joint_12_key IS NOT NULL AND
-              main_joint_13_key IS NOT NULL AND main_joint_14_key IS NOT NULL AND
-              main_joint_15_key IS NOT NULL AND main_joint_16_key IS NOT NULL AND
-              array_length(main_joint_tray_keys, 1) >= 1
-            ) AND (SELECT count(*) FROM jsonb_each(vlm_results) WHERE (value->>'valid')::boolean = false AND value->>'overridden_by' IS NULL) = 0
-            THEN 'ready' ELSE 'in_progress' END
-          ELSE 'empty'
-        END AS status,
-        approved_at,
+        COALESCE(array_length(unassigned_photo_keys, 1), 0) AS unassigned_count,
+        ${PRESENT_SLOTS_EXPR} AS present_slots,
+        COALESCE(ARRAY(
+          SELECT e.key FROM jsonb_each(COALESCE(vlm_results, '{}'::jsonb)) AS e(key, value)
+           WHERE (e.value->>'valid')::boolean = false AND e.value->>'overridden_by' IS NULL
+        ), '{}'::text[]) AS vlm_fail_keys,
         COALESCE((
           SELECT COUNT(*)::int
             FROM snags s
@@ -94,7 +63,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ORDER BY pon_no ASC NULLS LAST, pole_label ASC
     `, params);
 
-    return apiResponse.success(res, result.rows);
+    const summaries = result.rows.map(r => computePoleSummary(r as PoleOverviewRow));
+    return apiResponse.success(res, summaries);
   } catch (err) {
     log.error('works-qa/poles', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
