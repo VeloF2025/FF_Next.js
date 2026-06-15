@@ -95,6 +95,8 @@ export function MyHub({ profile }: MyHubProps) {
     };
   }, []);
 
+  const isPending = profile.accountStatus === 'pending';
+
   return (
     <MyPortalShell title="My Hub" staffName={profile.name} staffPhotoUrl={profile.profilePhotoUrl} showFooterNav={false}>
       <InstallPrompt />
@@ -119,27 +121,40 @@ export function MyHub({ profile }: MyHubProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <ClockTile summary={summary} onClick={() => router.push('/my/attendance')} />
-        <VehicleTile
-          summary={summary}
-          hasVehicle={profile.hasAssignedVehicle}
-          pending={vehicleHandoffPending}
-          onClick={handleVehicleTap}
-        />
-        <PayslipsTile summary={summary} onClick={() => router.push('/my/payslips')} />
-        <ReceiptsTile summary={summary} onClick={() => router.push('/my/receipts')} />
-        <CorrectionsTile
-          summary={summary}
-          onClick={() => router.push('/my/attendance/corrections')}
-        />
-        {isStoresAuthorised(profile.role, profile.authRole) && (
-          <StoresTile onClick={() => router.push('/my/stores')} />
-        )}
-        {canSeeSiteCam(profile.role, profile.authRole) && (
-          <SiteCamTile onClick={() => router.push('/my/sitecam')} />
-        )}
-      </div>
+      {isPending && (
+        <div className="mb-4 rounded-xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+          Your registration is pending approval by an admin. You can clock in now —
+          stock issued to you is limited to R5,000 until you&apos;re approved.
+        </div>
+      )}
+
+      {isPending ? (
+        <div className="grid grid-cols-1 gap-3">
+          <ClockTile summary={summary} onClick={() => router.push('/my/attendance')} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <ClockTile summary={summary} onClick={() => router.push('/my/attendance')} />
+          <VehicleTile
+            summary={summary}
+            hasVehicle={profile.hasAssignedVehicle}
+            pending={vehicleHandoffPending}
+            onClick={handleVehicleTap}
+          />
+          <PayslipsTile summary={summary} onClick={() => router.push('/my/payslips')} />
+          <ReceiptsTile summary={summary} onClick={() => router.push('/my/receipts')} />
+          <CorrectionsTile
+            summary={summary}
+            onClick={() => router.push('/my/attendance/corrections')}
+          />
+          {isStoresAuthorised(profile.role, profile.authRole) && (
+            <StoresTile onClick={() => router.push('/my/stores')} />
+          )}
+          {canSeeSiteCam(profile.role, profile.authRole) && (
+            <SiteCamTile onClick={() => router.push('/my/sitecam')} />
+          )}
+        </div>
+      )}
 
       <button
         type="button"

@@ -284,6 +284,33 @@ export function verifyOtp(args: {
 }
 
 // =============================================================================
+// Self-registration (field workers)
+// =============================================================================
+
+export interface RegisterSite { id: string; name: string; }
+
+export function getRegisterSites(): Promise<{ sites: RegisterSite[] }> {
+  return request<{ sites: RegisterSite[] }>('/api/my/register-sites', { method: 'GET' });
+}
+
+export interface RegisterFieldWorkerPayload {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  projectId: string;
+  role: 'technician' | 'casual';
+  idNumber?: string;
+  selfieBase64?: string;
+}
+
+export function registerFieldWorker(p: RegisterFieldWorkerPayload): Promise<{ ok: true }> {
+  return request<{ ok: true }>('/api/my/register', {
+    method: 'POST',
+    body: JSON.stringify(p),
+  });
+}
+
+// =============================================================================
 // Attendance
 // =============================================================================
 

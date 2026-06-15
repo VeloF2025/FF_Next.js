@@ -15,10 +15,10 @@ export interface AttendanceSession {
 }
 
 /** Staff role values matching the `role` column on the `staff` table. */
-export type StaffRole = 'technician' | 'stores' | 'supervisor' | 'admin' | 'driver' | 'office';
+export type StaffRole = 'technician' | 'casual' | 'stores' | 'supervisor' | 'admin' | 'driver' | 'office';
 
 /** Runtime list of all StaffRole values — mirrors the staff_role_check DB constraint. */
-export const STAFF_ROLES: readonly StaffRole[] = ['technician', 'stores', 'supervisor', 'admin', 'driver', 'office'];
+export const STAFF_ROLES: readonly StaffRole[] = ['technician', 'casual', 'stores', 'supervisor', 'admin', 'driver', 'office'];
 
 /** Account lifecycle status matching the `account_status` column on the `staff` table. */
 export type AccountStatus = 'pending' | 'active' | 'suspended';

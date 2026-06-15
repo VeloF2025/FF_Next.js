@@ -206,6 +206,13 @@ export function MyLoginScreen() {
           aria-hidden="true"
         />
       </Link>
+
+      <Link
+        href="/my/register"
+        className="mt-3 block text-center text-sm text-blue-400 hover:text-blue-300"
+      >
+        New field worker? Register here
+      </Link>
     </MyPortalShell>
   );
 }
