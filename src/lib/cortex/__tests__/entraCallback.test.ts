@@ -1,12 +1,14 @@
 // @vitest-environment node
 /**
- * Tests for the Entra callback's server-side targeting/replay checks (Phase 6).
- * Mocks the network token exchange; exercises the aud/iss defence-in-depth check,
- * nonce replay guard, state CSRF guard, and method/flag gating with minimal req/res
- * doubles. The live OAuth round-trip itself remains UNTESTED (Azure config).
+ * Tests for the Entra callback's server-side targeting/replay checks (Phase 6) and the
+ * Phase 6h #102 access-token forwarding (dark behind CORTEX_FORWARD_TOKEN). Mocks the
+ * network token exchange; exercises the ID-token aud/iss defence-in-depth check, nonce
+ * replay guard, state CSRF guard, method/flag gating, and — in access-token mode — that
+ * the stored/forwarded cookie holds the ACCESS token (validated for aud/exp), not the ID
+ * token. The live OAuth round-trip itself remains UNTESTED (Azure config).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SignJWT } from 'jose';
+import { SignJWT, decodeJwt } from 'jose';
 import {
   ENTRA_ID_TOKEN_COOKIE,
   ENTRA_NONCE_COOKIE,
@@ -18,7 +20,7 @@ import {
 const exchangeMock = vi.fn();
 vi.mock('@/lib/cortex/entraAuth', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/cortex/entraAuth')>();
-  return { ...actual, exchangeCodeForIdToken: (...a: unknown[]) => exchangeMock(...a) };
+  return { ...actual, exchangeCodeForTokens: (...a: unknown[]) => exchangeMock(...a) };
 });
 
 import handler from '../../../../pages/api/auth/entra/callback';
@@ -46,19 +48,25 @@ function makeReq(query: Record<string, string>, cookies: Record<string, string>)
   return { method: 'GET', query, cookies } as never;
 }
 
-async function idTokenWith(claims: Record<string, unknown>): Promise<string> {
+async function jwtWith(claims: Record<string, unknown>): Promise<string> {
   // Signature is irrelevant — the callback only decodes (the bridge verifies sigs).
   return new SignJWT(claims).setProtectedHeader({ alg: 'HS256' }).sign(
     new TextEncoder().encode('irrelevant-test-secret-irrelevant-test'),
   );
 }
+const idTokenWith = jwtWith;
+
+/** Resolve the exchange mock to `{ idToken, accessToken? }` like exchangeCodeForTokens. */
+function resolveTokens(idToken: string, accessToken?: string): void {
+  exchangeMock.mockResolvedValue({ idToken, accessToken });
+}
 
 let savedEnv: Record<string, string | undefined>;
 // Include GRAPH_* so the 503-unconfigured test can clear the fallback config without
-// leaking into other suites — all are saved and restored.
+// leaking into other suites, and CORTEX_FORWARD_TOKEN so the access-token tests are isolated.
 const ENV = [
   'ENTRA_SSO_ENABLED', 'ENTRA_TENANT_ID', 'ENTRA_CLIENT_ID', 'ENTRA_CLIENT_SECRET', 'ENTRA_REDIRECT_URI',
-  'GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET',
+  'GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET', 'CORTEX_FORWARD_TOKEN',
 ];
 
 beforeEach(() => {
@@ -87,15 +95,22 @@ function noIdTokenCookie(res: Record<string, unknown>): boolean {
   const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'] ?? [];
   return !setCookie.some((c) => c.startsWith(`${ENTRA_ID_TOKEN_COOKIE}=`));
 }
+/** Extract the JWT value stored in the forward cookie (or undefined when none). */
+function forwardCookieJwt(res: Record<string, unknown>): string | undefined {
+  const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'] ?? [];
+  const c = setCookie.find((x) => x.startsWith(`${ENTRA_ID_TOKEN_COOKIE}=`));
+  if (!c) return undefined;
+  return decodeURIComponent(c.slice(`${ENTRA_ID_TOKEN_COOKIE}=`.length).split(';')[0]);
+}
 const validCookies = {
   [ENTRA_STATE_COOKIE]: STATE,
   [ENTRA_NONCE_COOKIE]: NONCE,
   [ENTRA_VERIFIER_COOKIE]: VERIFIER,
 };
 
-describe('Entra callback — targeting + replay guards', () => {
+describe('Entra callback — targeting + replay guards (ID-token default path)', () => {
   it('stores the id-token cookie on a fully valid round trip and replays the PKCE verifier', async () => {
-    exchangeMock.mockResolvedValue(await idTokenWith(goodClaims));
+    resolveTokens(await idTokenWith(goodClaims));
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex');
@@ -108,18 +123,15 @@ describe('Entra callback — targeting + replay guards', () => {
   });
 
   it('rejects a token whose aud is a DIFFERENT app (no id-token cookie)', async () => {
-    exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, aud: 'some-other-app' }));
+    resolveTokens(await idTokenWith({ ...goodClaims, aud: 'some-other-app' }));
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
-    const setCookie = (res.headers as Record<string, string[]>)['Set-Cookie'];
-    expect(setCookie.some((c) => c.startsWith(`${ENTRA_ID_TOKEN_COOKIE}=`))).toBe(false);
+    expect(noIdTokenCookie(res)).toBe(true);
   });
 
   it('fails closed when the PKCE verifier cookie is MISSING (does not exchange)', async () => {
     const res = makeRes();
-    // State + nonce present, but no verifier cookie → a callback that did not originate
-    // from our login. Must NOT call the token exchange and must set no id-token cookie.
     await handler(
       makeReq({ code: 'c', state: STATE }, { [ENTRA_STATE_COOKIE]: STATE, [ENTRA_NONCE_COOKIE]: NONCE }),
       res as never,
@@ -130,7 +142,7 @@ describe('Entra callback — targeting + replay guards', () => {
   });
 
   it('rejects a token from a DIFFERENT tenant issuer', async () => {
-    exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, iss: 'https://login.microsoftonline.com/evil-tenant/v2.0' }));
+    resolveTokens(await idTokenWith({ ...goodClaims, iss: 'https://login.microsoftonline.com/evil-tenant/v2.0' }));
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
@@ -138,8 +150,7 @@ describe('Entra callback — targeting + replay guards', () => {
   });
 
   it('rejects an issuer that only PREFIXES the tenant (look-alike tenant) — trailing-slash guard', async () => {
-    // `.../tenant-guid.evil.com/...` starts with `.../tenant-guid` but NOT `.../tenant-guid/`.
-    exchangeMock.mockResolvedValue(await idTokenWith({
+    resolveTokens(await idTokenWith({
       ...goodClaims,
       iss: `https://login.microsoftonline.com/${TENANT}.evil.com/v2.0`,
     }));
@@ -150,7 +161,7 @@ describe('Entra callback — targeting + replay guards', () => {
   });
 
   it('rejects a nonce mismatch (replay)', async () => {
-    exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, nonce: 'attacker-nonce' }));
+    resolveTokens(await idTokenWith({ ...goodClaims, nonce: 'attacker-nonce' }));
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
@@ -158,7 +169,7 @@ describe('Entra callback — targeting + replay guards', () => {
   });
 
   it('rejects an already-EXPIRED token (no id-token cookie)', async () => {
-    exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, exp: Math.floor(Date.now() / 1000) - 60 }));
+    resolveTokens(await idTokenWith({ ...goodClaims, exp: Math.floor(Date.now() / 1000) - 60 }));
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
@@ -166,7 +177,7 @@ describe('Entra callback — targeting + replay guards', () => {
   });
 
   it('stores a token with a FUTURE exp (freshness ok)', async () => {
-    exchangeMock.mockResolvedValue(await idTokenWith({ ...goodClaims, exp: Math.floor(Date.now() / 1000) + 3600 }));
+    resolveTokens(await idTokenWith({ ...goodClaims, exp: Math.floor(Date.now() / 1000) + 3600 }));
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex');
@@ -182,7 +193,7 @@ describe('Entra callback — targeting + replay guards', () => {
   });
 
   it('fails closed when the exchange returns an UNPARSEABLE token', async () => {
-    exchangeMock.mockResolvedValue('this.is.not-a-valid-jwt');
+    resolveTokens('this.is.not-a-valid-jwt');
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.redirectedTo).toBe('/cortex?entra_error=1');
@@ -226,5 +237,101 @@ describe('Entra callback — targeting + replay guards', () => {
     const res = makeRes();
     await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
     expect(res.statusCode).toBe(503);
+  });
+});
+
+describe('Entra callback — access-token forwarding (Phase 6h #102, dark behind CORTEX_FORWARD_TOKEN)', () => {
+  const FUTURE = Math.floor(Date.now() / 1000) + 3600;
+  const accessClaims = {
+    iss: `https://login.microsoftonline.com/${TENANT}/v2.0`,
+    aud: `api://${CLIENT}`,
+    scp: 'access_as_user',
+    preferred_username: 'alice@velocityfibre.co.za',
+    marker: 'ACCESS',
+    exp: FUTURE,
+  };
+
+  it('forwards the ACCESS token (not the ID token) when CORTEX_FORWARD_TOKEN=access_token', async () => {
+    process.env.CORTEX_FORWARD_TOKEN = 'access_token';
+    const idTok = await idTokenWith({ ...goodClaims, marker: 'ID' });
+    const accessTok = await jwtWith(accessClaims);
+    resolveTokens(idTok, accessTok);
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex');
+    const stored = forwardCookieJwt(res);
+    expect(stored).toBe(accessTok);
+    expect(decodeJwt(stored as string).marker).toBe('ACCESS'); // the access token, NOT the id token
+  });
+
+  it('accepts an access token whose aud is the bare client-id GUID (v2 aud may be either)', async () => {
+    process.env.CORTEX_FORWARD_TOKEN = 'access_token';
+    const accessTok = await jwtWith({ ...accessClaims, aud: CLIENT });
+    resolveTokens(await idTokenWith(goodClaims), accessTok);
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex');
+    expect(forwardCookieJwt(res)).toBe(accessTok);
+  });
+
+  it('fails closed when access-token mode but the exchange returns NO access token', async () => {
+    process.env.CORTEX_FORWARD_TOKEN = 'access_token';
+    resolveTokens(await idTokenWith(goodClaims)); // accessToken undefined
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('fails closed when the access token targets a DIFFERENT api (aud mismatch)', async () => {
+    process.env.CORTEX_FORWARD_TOKEN = 'access_token';
+    resolveTokens(await idTokenWith(goodClaims), await jwtWith({ ...accessClaims, aud: 'api://someone-else' }));
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('fails closed when the access token is from a DIFFERENT tenant issuer', async () => {
+    process.env.CORTEX_FORWARD_TOKEN = 'access_token';
+    resolveTokens(
+      await idTokenWith(goodClaims),
+      await jwtWith({ ...accessClaims, iss: 'https://login.microsoftonline.com/evil-tenant/v2.0' }),
+    );
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('fails closed when the access token is EXPIRED', async () => {
+    process.env.CORTEX_FORWARD_TOKEN = 'access_token';
+    resolveTokens(
+      await idTokenWith(goodClaims),
+      await jwtWith({ ...accessClaims, exp: Math.floor(Date.now() / 1000) - 60 }),
+    );
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('still runs the ID-token nonce/replay gate in access-token mode (rejects a bad nonce)', async () => {
+    process.env.CORTEX_FORWARD_TOKEN = 'access_token';
+    resolveTokens(await idTokenWith({ ...goodClaims, nonce: 'attacker-nonce' }), await jwtWith(accessClaims));
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex?entra_error=1');
+    expect(noIdTokenCookie(res)).toBe(true);
+  });
+
+  it('still forwards the ID token when the flag is unset (default), even if an access token is present', async () => {
+    const idTok = await idTokenWith({ ...goodClaims, marker: 'ID' });
+    resolveTokens(idTok, await jwtWith(accessClaims));
+    const res = makeRes();
+    await handler(makeReq({ code: 'c', state: STATE }, validCookies), res as never);
+    expect(res.redirectedTo).toBe('/cortex');
+    expect(forwardCookieJwt(res)).toBe(idTok);
+    expect(decodeJwt(forwardCookieJwt(res) as string).marker).toBe('ID');
   });
 });

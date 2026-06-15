@@ -52,6 +52,30 @@ export function entraSsoEnabled(): boolean {
 }
 
 /**
+ * The OAuth scope requested on `/authorize` and the token exchange. DARK by default:
+ * unset (or blank) → today's `openid profile email` (an ID token for the client). The
+ * dedicated-app access-token cutover (Phase 6h #102) sets `ENTRA_SCOPE` to also request
+ * `offline_access api://<cortex>/access_as_user`, which yields an access token whose
+ * `aud` is the Cortex API — the artifact the bridge then verifies (`scp` + email). Read
+ * at call time so the cutover is an env edit, no code redeploy.
+ */
+export function entraScope(): string {
+  const s = (process.env.ENTRA_SCOPE ?? '').trim();
+  return s || 'openid profile email';
+}
+
+/**
+ * Whether to forward the Entra **access** token (vs the ID token) to the Cortex bridge.
+ * DARK by default: only `CORTEX_FORWARD_TOKEN=access_token` (case-insensitive) flips it;
+ * any other value / unset keeps forwarding the ID token (today's behaviour). Pairs with
+ * `entraScope()` — forwarding an access token only makes sense once the scope requests
+ * `api://<cortex>/access_as_user`, otherwise the access token targets Graph, not Cortex.
+ */
+export function forwardAccessToken(): boolean {
+  return (process.env.CORTEX_FORWARD_TOKEN ?? '').trim().toLowerCase() === 'access_token';
+}
+
+/**
  * Read Entra config from env, reusing the existing Graph app registration when the
  * dedicated ENTRA_* vars are unset. Returns null when incomplete (caller 503s) so a
  * misconfigured deploy fails closed rather than building a broken authorize URL.
@@ -91,8 +115,9 @@ export function computeCodeChallenge(verifier: string): string {
 }
 
 /**
- * Build the Entra authorize URL for the auth-code flow. Requests an ID token
- * (`openid profile email`) for the configured app (single-tenant endpoint) and binds
+ * Build the Entra authorize URL for the auth-code flow. Requests `entraScope()` (default
+ * `openid profile email` → an ID token; the dedicated-app cutover adds the Cortex API
+ * scope → also an access token) for the configured app (single-tenant endpoint) and binds
  * the request with a PKCE S256 challenge (RFC 7636) — defence-in-depth on top of the
  * confidential-client secret. Entra accepts PKCE for confidential clients, so this is
  * purely additive.
@@ -109,7 +134,7 @@ export function buildAuthorizeUrl(
     response_type: 'code',
     redirect_uri: cfg.redirectUri,
     response_mode: 'query',
-    scope: 'openid profile email',
+    scope: entraScope(),
     state,
     nonce,
     code_challenge: codeChallenge,
@@ -118,18 +143,31 @@ export function buildAuthorizeUrl(
   return `${base}?${params.toString()}`;
 }
 
+/** Tokens returned by the Entra auth-code exchange. `accessToken` is present only when
+ *  the requested scope (`entraScope()`) includes a resource scope — for the default
+ *  `openid profile email` Entra still returns an access token (for Graph), but in the
+ *  dedicated-app cutover it targets the Cortex API (`aud = api://<cortex>`). */
+export interface EntraTokens {
+  idToken: string;
+  accessToken?: string;
+}
+
 /**
- * Exchange an auth-code for tokens at the Entra token endpoint and return the raw
- * ID token. Throws on any failure (caller maps to a 502/redirect-to-error) — never
- * returns a partial/empty token silently.
+ * Exchange an auth-code for tokens at the Entra token endpoint and return BOTH the raw
+ * ID token (always required — used for session identity / replay checks) and the access
+ * token (forwarded to the bridge once `CORTEX_FORWARD_TOKEN=access_token`). Throws on any
+ * failure or a missing `id_token` (caller maps to a redirect-to-error) — never returns a
+ * partial/empty result silently. Uses `entraScope()` so the requested scope is the same
+ * on `/authorize` and here (Entra rejects a mismatch).
  *
- * UNTESTED end-to-end (live network); structured so the request shape is obvious.
+ * UNTESTED end-to-end (live network); the request shape + token capture are unit-tested
+ * with a mocked `fetch`.
  */
-export async function exchangeCodeForIdToken(
+export async function exchangeCodeForTokens(
   cfg: EntraConfig,
   code: string,
   codeVerifier: string,
-): Promise<string> {
+): Promise<EntraTokens> {
   const tokenUrl = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/token`;
   const body = new URLSearchParams({
     client_id: cfg.clientId,
@@ -137,7 +175,7 @@ export async function exchangeCodeForIdToken(
     code,
     redirect_uri: cfg.redirectUri,
     grant_type: 'authorization_code',
-    scope: 'openid profile email',
+    scope: entraScope(),
     // PKCE (RFC 7636): the server recomputes SHA256(code_verifier) and matches it
     // against the code_challenge sent at /authorize before issuing tokens.
     code_verifier: codeVerifier,
@@ -150,11 +188,11 @@ export async function exchangeCodeForIdToken(
   if (!resp.ok) {
     throw new Error(`entraAuth: token exchange failed (${resp.status})`);
   }
-  const json = (await resp.json()) as { id_token?: string };
+  const json = (await resp.json()) as { id_token?: string; access_token?: string };
   if (!json.id_token) {
     throw new Error('entraAuth: token response carried no id_token');
   }
-  return json.id_token;
+  return { idToken: json.id_token, accessToken: json.access_token };
 }
 
 /**
