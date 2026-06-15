@@ -55,9 +55,14 @@ const OTP_BCRYPT_ROUNDS = 10;
 //
 // Renamed from WA_SENDER_URL: the local const name now matches the
 // endpoint it actually hits (the bridge, not a "sender" proxy).
+//
+// Do NOT fall back to WA_FEEDBACK_URL: that points at the wa-feedback service
+// (:8092), which only exposes /send-feedback (group feedback) — it has no
+// /send-message endpoint, so OTP sends 404 there and are silently dropped
+// (the register handler swallows the error and still returns 200). OTP must
+// use the message bridge (:8083) which serves /send-message.
 const WA_BRIDGE_URL =
   process.env.WA_BRIDGE_URL ||
-  process.env.WA_FEEDBACK_URL ||
   'http://72.61.197.178:8083';
 
 // Allowlist of hosts the OTP sender is permitted to call. A misconfigured

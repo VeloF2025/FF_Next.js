@@ -333,7 +333,7 @@ describe('sendOtpViaWhatsApp', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('POSTs to the configured WA sender with chatId + message', async () => {
+  it('POSTs to the 8083 message bridge /send-message with group_jid + message', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       text: async () => 'ok',
@@ -347,15 +347,36 @@ describe('sendOtpViaWhatsApp', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, init] = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [
+    const [url, init] = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [
       string,
       RequestInit,
     ];
-    const body = JSON.parse(init.body as string) as { chatId: string; message: string };
-    expect(body.chatId).toBe('27821234567@s.whatsapp.net');
+    // Must hit the message bridge's /send-message — never the wa-feedback
+    // service (:8092), which has no /send-message and 404s OTP sends.
+    expect(url).toBe('http://72.61.197.178:8083/send-message');
+    // The bridge's POST body key is `group_jid` even for a DM (see otpUtils).
+    const body = JSON.parse(init.body as string) as { group_jid: string; message: string };
+    expect(body.group_jid).toBe('27821234567@s.whatsapp.net');
     expect(body.message).toContain('123456');
     expect(body.message).toContain('Test Smoke');
     expect(body.message).toContain(String(Math.round(OTP_TTL_MS / 60_000)));
+  });
+
+  it('does NOT fall back to WA_FEEDBACK_URL (:8092) when it is set but WA_BRIDGE_URL is not', async () => {
+    // Regression guard: WA_FEEDBACK_URL points at the wa-feedback service,
+    // which lacks /send-message. OTP must default to the 8083 message bridge.
+    vi.resetModules();
+    vi.stubEnv('WA_BRIDGE_URL', '');
+    vi.stubEnv('WA_FEEDBACK_URL', 'http://100.96.203.105:8092');
+    const fetchMock = vi.fn(async () => ({ ok: true, text: async () => 'ok' })) as unknown as typeof fetch;
+    globalThis.fetch = fetchMock;
+    const mod = await import('../otpUtils');
+    await mod.sendOtpViaWhatsApp({ phone: '+27821234567', otp: '123456' });
+    const [url] = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://72.61.197.178:8083/send-message');
+    expect(url).not.toContain('8092');
+    vi.unstubAllEnvs();
+    vi.resetModules();
   });
 
   it('omits the name segment when staffName is nullish', async () => {
