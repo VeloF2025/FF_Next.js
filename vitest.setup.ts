@@ -20,6 +20,9 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@neondatabase/serverless', () => ({
   neon: vi.fn(() => {
     const sqlFunction = vi.fn().mockResolvedValue([]);
+    // Faithful to the real client / shim: `sql.unsafe(raw)` inlines a trusted
+    // fragment verbatim. The mock ignores query text, so a passthrough suffices.
+    (sqlFunction as unknown as { unsafe: (raw: string) => string }).unsafe = (raw: string) => raw;
     return sqlFunction;
   }),
   neonConfig: { fetchConnectionCache: false },

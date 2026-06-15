@@ -30,6 +30,7 @@
 import { sql } from '@/lib/db-pool';
 import { staffIdsSupervisedBy } from './supervisorScope';
 import { getStaffIdForUser } from '@/services/staff/staffAccessService';
+import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
 import type { AuthUser } from '@/lib/auth/types';
 
 /** Hard cap on rows returned by a single Search query — FR-SEARCH-06 / FR-REPORT-COM-03. */
@@ -448,6 +449,11 @@ function buildBaseWhere(
 
   params.push(filters.dateTo);
   parts.push(`ds.work_date <= $${params.length}::date`);
+
+  // Rule P — hide unapproved (pending) workers from attendance search/export.
+  // Approved technicians keep showing their hours; only account_status='pending'
+  // is excluded. Every query through buildBaseWhere joins `staff s`.
+  parts.push(approvedAccountPredicate('s'));
 
   if (scopedStaffIds !== null) {
     params.push(scopedStaffIds);

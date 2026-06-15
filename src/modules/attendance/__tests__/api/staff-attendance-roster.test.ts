@@ -5,7 +5,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ sql: vi.fn() }));
+const mocks = vi.hoisted(() => {
+  const sql = vi.fn();
+  // Faithful to the real client: `sql.unsafe(raw)` inlines a trusted fragment.
+  // The mock ignores query text, so a passthrough suffices.
+  (sql as unknown as { unsafe: (raw: string) => string }).unsafe = (raw: string) => raw;
+  return { sql };
+});
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));

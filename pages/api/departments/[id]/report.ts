@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { createLogger } from '@/lib/logger';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 import type { DepartmentReport } from '@/types/staff/department.types';
 
 const log = createLogger('DepartmentReportAPI');
@@ -36,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const statusCounts = await sql`
     SELECT status, COUNT(*) as count
     FROM staff
-    WHERE department_id = ${id}
+    WHERE department_id = ${id} ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
     GROUP BY status
   ` as { status: string; count: string }[];
 
@@ -53,6 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     FROM staff s
     WHERE s.department_id = ${id}
       AND s.status NOT IN ('terminated', 'resigned', 'retired')
+      ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
   ` as { with_id: string; total: string }[];
 
   const total = Number(complianceData[0]?.total) || 0;
@@ -66,6 +68,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     JOIN staff s ON sp.staff_id = s.id
     WHERE s.department_id = ${id}
       AND s.status NOT IN ('terminated', 'resigned', 'retired')
+      ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
   ` as { count: string }[];
 
   const projectCount = Number(projectData[0]?.count) || 0;
@@ -77,6 +80,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     WHERE s.department_id = ${id}
       AND s.join_date IS NOT NULL
       AND s.status NOT IN ('terminated', 'resigned', 'retired')
+      ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
   ` as { avg_tenure: string | null }[];
 
   const avgTenureDays = Math.round(Number(tenureData[0]?.avg_tenure) || 0);
@@ -93,6 +97,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       JOIN staff s ON sc.staff_id = s.id
       WHERE s.department_id = ${id}
         AND s.status NOT IN ('terminated', 'resigned', 'retired')
+        ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ` as { total: string; expiring_soon: string; expired: string }[];
     certifications = {
       total: Number(certData[0]?.total) || 0,
@@ -122,6 +127,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     FROM staff s
     WHERE s.department_id = ${id}
       AND s.join_date >= NOW() - INTERVAL '30 days'
+      ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     UNION ALL
     SELECT
       'left' as type,
@@ -133,6 +139,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     WHERE s.department_id = ${id}
       AND s.end_date >= NOW() - INTERVAL '30 days'
       AND s.status IN ('terminated', 'resigned', 'retired')
+      ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY date DESC
     LIMIT 10
   ` as ActivityRow[];

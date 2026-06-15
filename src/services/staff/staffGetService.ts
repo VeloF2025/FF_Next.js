@@ -7,6 +7,7 @@
 
 import { getSql } from '@/lib/neon-sql';
 import { createLogger } from '@/lib/logger';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 import { checkStaffAccess, filterStaffFields, filterStaffList } from './staffAccessService';
 
 const log = createLogger('StaffGetService');
@@ -89,7 +90,8 @@ async function listAll(sql: SqlClient): Promise<StaffRow[]> {
       (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
        FROM staff_projects sp JOIN projects p ON p.id = sp.project_id
        WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
-    FROM staff s ORDER BY s.first_name ASC, s.last_name ASC
+    FROM staff s WHERE ${sql.unsafe(hrEmployeePredicate('s'))}
+    ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
 
@@ -101,7 +103,7 @@ async function listByStatus(sql: SqlClient, status: string): Promise<StaffRow[]>
       (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
        FROM staff_projects sp JOIN projects p ON p.id = sp.project_id
        WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
-    FROM staff s WHERE s.status = ${status}
+    FROM staff s WHERE s.status = ${status} ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
@@ -115,7 +117,7 @@ async function listByPosition(sql: SqlClient, position: string): Promise<StaffRo
       (SELECT STRING_AGG(p2.project_name, ', ' ORDER BY p2.project_name)
        FROM staff_projects sp JOIN projects p2 ON p2.id = sp.project_id
        WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
-    FROM staff s WHERE LOWER(s.position) LIKE LOWER(${p})
+    FROM staff s WHERE LOWER(s.position) LIKE LOWER(${p}) ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
@@ -128,7 +130,7 @@ async function listByDept(sql: SqlClient, dept: string): Promise<StaffRow[]> {
       (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
        FROM staff_projects sp JOIN projects p ON p.id = sp.project_id
        WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
-    FROM staff s WHERE s.department = ${dept}
+    FROM staff s WHERE s.department = ${dept} ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
@@ -141,7 +143,7 @@ async function listByDeptStatus(sql: SqlClient, dept: string, status: string): P
       (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
        FROM staff_projects sp JOIN projects p ON p.id = sp.project_id
        WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
-    FROM staff s WHERE s.department = ${dept} AND s.status = ${status}
+    FROM staff s WHERE s.department = ${dept} AND s.status = ${status} ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
@@ -156,7 +158,7 @@ async function listByDeptStatusPos(sql: SqlClient, dept: string, status: string,
        FROM staff_projects sp JOIN projects p2 ON p2.id = sp.project_id
        WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
     FROM staff s WHERE s.department = ${dept} AND s.status = ${status}
-      AND LOWER(s.position) LIKE LOWER(${p})
+      AND LOWER(s.position) LIKE LOWER(${p}) ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
@@ -174,7 +176,8 @@ async function listBySearch(sql: SqlClient, search: string): Promise<StaffRow[]>
       LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${t}) OR
       LOWER(s.first_name) LIKE LOWER(${t}) OR LOWER(s.last_name) LIKE LOWER(${t}) OR
       LOWER(s.email) LIKE LOWER(${t}) OR LOWER(s.employee_id) LIKE LOWER(${t})
-    ) ORDER BY s.first_name ASC, s.last_name ASC
+    ) ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
+    ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
 
@@ -191,7 +194,7 @@ async function listBySearchDept(sql: SqlClient, search: string, dept: string): P
       LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${t}) OR
       LOWER(s.first_name) LIKE LOWER(${t}) OR LOWER(s.last_name) LIKE LOWER(${t}) OR
       LOWER(s.email) LIKE LOWER(${t}) OR LOWER(s.employee_id) LIKE LOWER(${t})
-    ) AND s.department = ${dept}
+    ) AND s.department = ${dept} ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
@@ -209,7 +212,7 @@ async function listBySearchDeptStatus(sql: SqlClient, search: string, dept: stri
       LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${t}) OR
       LOWER(s.first_name) LIKE LOWER(${t}) OR LOWER(s.last_name) LIKE LOWER(${t}) OR
       LOWER(s.email) LIKE LOWER(${t}) OR LOWER(s.employee_id) LIKE LOWER(${t})
-    ) AND s.department = ${dept} AND s.status = ${status}
+    ) AND s.department = ${dept} AND s.status = ${status} ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }
@@ -229,7 +232,7 @@ async function listBySearchDeptStatusPos(sql: SqlClient, search: string, dept: s
       LOWER(s.first_name) LIKE LOWER(${t}) OR LOWER(s.last_name) LIKE LOWER(${t}) OR
       LOWER(s.email) LIKE LOWER(${t}) OR LOWER(s.employee_id) LIKE LOWER(${t})
     ) AND s.department = ${dept} AND s.status = ${status}
-      AND LOWER(s.position) LIKE LOWER(${p})
+      AND LOWER(s.position) LIKE LOWER(${p}) ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
     ORDER BY s.first_name ASC, s.last_name ASC
   `) as StaffRow[];
 }

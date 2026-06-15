@@ -86,6 +86,9 @@ export default defineConfig({
       // fallback, needed by the Goal 3b summary-lock test.
       { find: /^@\/lib\/llm/, replacement: path.resolve(__dirname, './src/lib/llm') },
       { find: /^@\/lib\/action-items/, replacement: path.resolve(__dirname, './src/lib/action-items') },
+      // @/lib/staff/* lives at src/lib/ (hrVisibilityFilters — Slice B HR-hiding
+      // filters) — explicit src-first override before the @/lib → ./lib fallback.
+      { find: /^@\/lib\/staff/, replacement: path.resolve(__dirname, './src/lib/staff') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },

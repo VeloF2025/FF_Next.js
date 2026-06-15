@@ -15,6 +15,7 @@
  */
 
 import { sql } from '@/lib/db-pool';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 
 import type { ExtractedPayslipPage } from './pdfSplitter';
 
@@ -61,7 +62,7 @@ export async function matchPagesToStaff(
            sa_id_number,
            payroll_code
     FROM staff
-    WHERE status IS DISTINCT FROM 'archived'
+    WHERE status IS DISTINCT FROM 'archived' ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
   `;
 
   const byPayrollCode = new Map<string, StaffRow>();

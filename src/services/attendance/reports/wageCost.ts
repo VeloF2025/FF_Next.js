@@ -39,6 +39,7 @@ export async function runWageCost(input: ReportInput): Promise<ReportRunResult> 
     departments: input.departments,
     deptRef: 's.department',
     activeStaffRefs: { isActive: 's.is_active', endDate: 's.end_date' },
+    accountStatusRef: 's.account_status',
   });
 
   let groupCol: string;
