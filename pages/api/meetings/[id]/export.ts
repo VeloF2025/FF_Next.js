@@ -88,8 +88,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       let transcript = meeting.raw_transcript;
 
       if (!transcript) {
+        // A meeting can hold multiple meeting_transcripts rows (vtt + whisper-af/-en),
+        // so order deterministically and take the most recent — mirrors the resolver in
+        // pages/api/meetings/[id]/transcript.ts (an unordered LIMIT 1 returned an arbitrary
+        // format's content).
         const [tx] = await sql`
-          SELECT content FROM meeting_transcripts WHERE meeting_id = ${meetingId} LIMIT 1
+          SELECT content FROM meeting_transcripts
+          WHERE meeting_id = ${meetingId}
+          ORDER BY created_at DESC
+          LIMIT 1
         `;
         transcript = tx?.content;
       }

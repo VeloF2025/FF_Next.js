@@ -160,16 +160,18 @@ export async function fetchAndStoreTranscript(
     await sql`UPDATE meetings SET raw_transcript = ${vtt}, updated_at = NOW() WHERE id = ${meetingId}`;
   } else {
     // Spill to meeting_transcripts; store first 50 speakers in speaker_map for quick lookup.
-    // meeting_transcripts has NO unique/exclusion constraint on meeting_id (PK is `id`,
-    // meeting_id only has a non-unique index), so `ON CONFLICT (meeting_id)` errors with
-    // "no unique or exclusion constraint matching the ON CONFLICT specification" and the
-    // >500KB capture is lost. Delete this meeting's existing vtt row(s) then plain-INSERT.
-    // Scoped to format='vtt' so a sibling whisper-af/-en row for the same meeting is kept.
+    // Atomic upsert against the partial unique index `(meeting_id) WHERE format='vtt'`
+    // (migration 419) — one vtt row per meeting, race-safe (no DELETE-then-INSERT window).
+    // The `WHERE format = 'vtt'` on the conflict target is required so Postgres infers the
+    // PARTIAL index; it also scopes the upsert so a sibling whisper-af/-en row is untouched.
     const speakerMap = JSON.stringify(parseVttSpeakers(vtt).slice(0, 50));
-    await sql`DELETE FROM meeting_transcripts WHERE meeting_id = ${meetingId} AND format = 'vtt'`;
     await sql`
       INSERT INTO meeting_transcripts (meeting_id, format, content, speaker_map, created_at)
       VALUES (${meetingId}, 'vtt', ${vtt}, ${speakerMap}, NOW())
+      ON CONFLICT (meeting_id) WHERE format = 'vtt' DO UPDATE SET
+        content     = EXCLUDED.content,
+        speaker_map = EXCLUDED.speaker_map,
+        created_at  = NOW()
     `;
   }
 

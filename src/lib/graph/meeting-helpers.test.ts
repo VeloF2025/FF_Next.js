@@ -148,12 +148,12 @@ describe('fetchAndStoreTranscript', () => {
     expect(mockSql).toHaveBeenCalledWith(expect.anything(), 'VTT-FOR-this-occurrence-tx', 42);
   });
 
-  test('spills a >500KB transcript via DELETE-then-INSERT, never ON CONFLICT (no unique on meeting_id)', async () => {
+  test('spills a >500KB transcript via an atomic ON CONFLICT upsert on the partial vtt unique index', async () => {
     // A transcript larger than TRANSCRIPT_INLINE_LIMIT (500_000) takes the spill branch
-    // into meeting_transcripts. That table's PK is `id` with only a NON-unique index on
-    // meeting_id, so `ON CONFLICT (meeting_id)` raises "no unique or exclusion constraint
-    // matching the ON CONFLICT specification" and the capture fails. The spill must instead
-    // DELETE this meeting's existing vtt row(s) then plain-INSERT the fresh transcript.
+    // into meeting_transcripts. The partial unique index (meeting_id) WHERE format='vtt'
+    // (migration 419) makes this a single atomic upsert — no DELETE, no race window, no
+    // duplicate-row risk. The conflict target MUST carry the index predicate so Postgres
+    // can infer the partial index (a bare `ON CONFLICT (meeting_id)` would error at runtime).
     const bigVtt = 'WEBVTT\n' + 'x'.repeat(500_001);
     mockListTranscripts.mockResolvedValue([
       { id: 'this-occurrence-tx', createdDateTime: '2026-06-09T10:02:00Z' },
@@ -164,23 +164,18 @@ describe('fetchAndStoreTranscript', () => {
 
     const sqlText = (call) => call[0].join(' ');
 
-    // The fix must not emit the unsupported ON CONFLICT upsert.
-    expect(mockSql.mock.calls.some((c) => /ON CONFLICT/i.test(sqlText(c)))).toBe(false);
+    // Single atomic upsert — no separate DELETE statement.
+    expect(mockSql.mock.calls.some((c) => /DELETE FROM meeting_transcripts/i.test(sqlText(c)))).toBe(false);
 
-    // It must DELETE this meeting's existing vtt row(s), scoped to format='vtt' so a
-    // whisper-af/-en row for the same meeting is preserved...
-    const del = mockSql.mock.calls.find((c) => /DELETE FROM meeting_transcripts/i.test(sqlText(c)));
-    expect(del).toBeDefined();
-    expect(sqlText(del)).toMatch(/format = 'vtt'/);
-    expect(del).toContain(42); // meetingId interpolated
-
-    // ...then plain-INSERT the fresh occurrence transcript (no ON CONFLICT clause).
     const ins = mockSql.mock.calls.find((c) => /INSERT INTO meeting_transcripts/i.test(sqlText(c)));
     expect(ins).toBeDefined();
+    const insText = sqlText(ins);
+    // Conflict target + partial-index predicate + DO UPDATE.
+    expect(insText).toMatch(/ON CONFLICT \(meeting_id\)/i);
+    expect(insText).toMatch(/WHERE format = 'vtt'/i);
+    expect(insText).toMatch(/DO UPDATE/i);
     expect(ins).toContain(42);     // meetingId
     expect(ins).toContain(bigVtt); // the >500KB content
-    // DELETE must run before INSERT.
-    expect(mockSql.mock.calls.indexOf(del)).toBeLessThan(mockSql.mock.calls.indexOf(ins));
   });
 
   test('does not download or write when no transcript matches the occurrence window', async () => {
