@@ -47,6 +47,14 @@ export async function persistAutoQaResults(
        qa_phase = 'feedback',
        human_review_status = 'pending_hitl',
        vlm_qa_status = 'completed',
+       -- New QA cycle ⇒ new feedback cycle. Without this reset, a stale
+       -- feedback_sent=true from a previous cycle (e.g. the 2026-03-18 bulk
+       -- backfill) makes the auto-feedback cron skip the DR forever
+       -- (found 2026-06-12: 101 re-processed DRs stuck at 'AI Review').
+       feedback_sent = false,
+       auto_feedback_sent_at = NULL,
+       auto_feedback_attempts = 0,
+       auto_feedback_skip_reason = NULL,
        step_01_house_photo = $5,
        step_02_cable_from_pole = $6,
        step_03_entry_outside = $7,

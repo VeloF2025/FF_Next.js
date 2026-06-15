@@ -24,7 +24,8 @@ import {
   ENTRA_STATE_COOKIE,
   ENTRA_VERIFIER_COOKIE,
   entraSsoEnabled,
-  exchangeCodeForIdToken,
+  exchangeCodeForTokens,
+  forwardAccessToken,
   getEntraConfig,
 } from '@/lib/cortex/entraAuth';
 
@@ -107,8 +108,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   let idToken: string;
+  let accessToken: string | undefined;
   try {
-    idToken = await exchangeCodeForIdToken(cfg, code, verifier);
+    ({ idToken, accessToken } = await exchangeCodeForTokens(cfg, code, verifier));
   } catch (err) {
     log.error(`Entra token exchange failed: ${err instanceof Error ? err.message : String(err)}`);
     fail(res, 'token exchange failed');
@@ -145,17 +147,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  // Store the ID token server-side only; bridgeBearer forwards it to the bridge. Scope
-  // the path to /api/cortex — the only routes that read it — so it is not transmitted on
-  // every request to the domain (httpOnly already blocks JS access; this narrows the wire
-  // surface). The redirect target /cortex still triggers the page's /api/cortex/* calls.
-  const idCookie = serialize(ENTRA_ID_TOKEN_COOKIE, idToken, {
+  // Phase 6h #102: choose which token to forward to the bridge. DARK by default — forward
+  // the ID token (today). When CORTEX_FORWARD_TOKEN=access_token, forward the Entra ACCESS
+  // token instead: its aud is the Cortex API and the bridge verifies sig + iss + aud + scp
+  // (access_as_user) + email. FF does a defence-in-depth targeting check (iss = our tenant,
+  // aud = our API, not expired) before forwarding; a missing/mistargeted access token fails
+  // closed. The ID token still drove the nonce/identity/replay checks above regardless of
+  // which token is forwarded (access tokens carry no nonce).
+  let forwardToken = idToken;
+  if (forwardAccessToken()) {
+    if (!accessToken) {
+      fail(res, 'access-token forwarding on but the exchange returned no access_token');
+      return;
+    }
+    try {
+      const ac = decodeJwt(accessToken);
+      const issOk = typeof ac.iss === 'string'
+        && ac.iss.startsWith(`https://login.microsoftonline.com/${cfg.tenantId}/`);
+      // A v2 access token's aud is EITHER the App ID URI (api://<client>) or the bare
+      // client-id GUID, per requestedAccessTokenVersion / scope registration — accept both,
+      // never assume (the bridge pins the exact value via CORTEX_OIDC_AUDIENCE).
+      const audOk = ac.aud === `api://${cfg.clientId}` || ac.aud === cfg.clientId;
+      if (!issOk || !audOk) {
+        fail(res, 'access_token aud/iss not targeted at the Cortex API');
+        return;
+      }
+      if (typeof ac.exp === 'number' && ac.exp * 1000 <= Date.now()) {
+        fail(res, 'access_token expired');
+        return;
+      }
+    } catch (err) {
+      log.warn(`Entra access_token decode failed: ${err instanceof Error ? err.message : String(err)}`);
+      fail(res, 'unparseable access_token');
+      return;
+    }
+    forwardToken = accessToken;
+  }
+
+  // Store the forwarded token server-side only; bridgeBearer forwards it to the bridge.
+  // (Cookie name is historical — ff_entra_id_token — but in access-token mode it holds the
+  // access token. getForwardableEntraIdToken binds it to the FF session email at forward
+  // time and works on EITHER kind by keying on preferred_username|email|upn — which an ID
+  // token carries by default, and an ACCESS token carries ONLY if those are configured as
+  // access-token optional claims on the resource app reg. If none are present it returns
+  // undefined → fail closed to HS256, never a cross-user forward.) Scope the path to
+  // /api/cortex — the only routes that read it — so it is not transmitted on every request
+  // (httpOnly already blocks JS access; this narrows the wire surface). The redirect target
+  // /cortex still triggers the page's /api/cortex/* calls.
+  const fwdCookie = serialize(ENTRA_ID_TOKEN_COOKIE, forwardToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 3600,
     path: '/api/cortex',
   });
-  res.setHeader('Set-Cookie', [idCookie, ...clearRoundTripCookies()]);
+  res.setHeader('Set-Cookie', [fwdCookie, ...clearRoundTripCookies()]);
   res.redirect(302, '/cortex');
 }

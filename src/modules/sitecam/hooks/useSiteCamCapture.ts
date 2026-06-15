@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { log } from '@/lib/logger';
 import type { SiteCamStep, SiteCamJobType } from '../lib/sitecamSteps';
 import { readDeviceLocation, type GeofenceReading, type GeofencePayload } from '../lib/geofence';
-import { readFileAsBase64 } from '../lib/fileToBase64';
+import { prepareCapturePhotos } from '../lib/watermarkPhoto';
 
 const MODULE = 'useSiteCamCapture';
 
@@ -91,7 +91,7 @@ export function useSiteCamCapture(
   );
 
   const escalateStep = useCallback(
-    async (idx: number, photoBase64: string, failReasons: string[]) => {
+    async (idx: number, photoBase64: string, failReasons: string[], attemptNumber?: number) => {
       const step = steps[idx];
       if (!step) return;
 
@@ -106,6 +106,10 @@ export function useSiteCamCapture(
             stepNumber: step.number,
             failReasons,
             attemptPhotos: [],
+            // Final failed photo — uploaded server-side to VF Storage so the
+            // supervisor Failed tab shows exactly which photo failed.
+            finalPhotoBase64: photoBase64,
+            finalAttemptNumber: attemptNumber,
           }),
         });
       } catch (err) {
@@ -147,9 +151,14 @@ export function useSiteCamCapture(
       const step = steps[idx];
       if (!step) return;
 
-      let base64: string;
+      let clean: string;
+      let watermarked: string;
       try {
-        base64 = await readFileAsBase64(file);
+        // Downscale once and produce two copies: a CLEAN image for the VLM (so
+        // the banner is never burned into the pixels it grades for quality) and
+        // a WATERMARKED image — site id + capture time in the pixels — for
+        // storage/upload so the photo cannot be reused on another DR.
+        ({ clean, watermarked } = await prepareCapturePhotos(file, siteInfo.siteId));
       } catch (err) {
         log.error('Failed to read file as base64', { err: String(err) }, MODULE);
         return;
@@ -163,7 +172,7 @@ export function useSiteCamCapture(
       setStepStates((prev) =>
         prev.map((s, i) =>
           i === idx
-            ? { ...s, photoBase64: base64, status: 'validating', attemptNumber: currentAttempt, failReasons: [], corrections: [] }
+            ? { ...s, photoBase64: watermarked, status: 'validating', attemptNumber: currentAttempt, failReasons: [], corrections: [] }
             : s,
         ),
       );
@@ -172,7 +181,7 @@ export function useSiteCamCapture(
         if (step.hasSerialScan && siteInfo.jobType === 'activations') {
           setStepStates((prev) =>
             prev.map((s, i) =>
-              i === idx ? { ...s, status: 'serial_scan', photoBase64: base64 } : s,
+              i === idx ? { ...s, status: 'serial_scan', photoBase64: watermarked } : s,
             ),
           );
           return;
@@ -194,7 +203,7 @@ export function useSiteCamCapture(
             jobType: siteInfo.jobType,
             stepNumber: step.number,
             siteId: siteInfo.siteId,
-            photoBase64: base64,
+            photoBase64: clean,
             attemptNumber: currentAttempt,
           }),
         });
@@ -252,8 +261,8 @@ export function useSiteCamCapture(
             ),
           );
         } else {
-          // Exhausted attempts — escalate
-          await escalateStep(idx, base64, reasons);
+          // Exhausted attempts — escalate (store/upload the watermarked copy)
+          await escalateStep(idx, watermarked, reasons, currentAttempt);
         }
       } catch (err) {
         // Network error — fail-open, but flag the photo for manual QA review.

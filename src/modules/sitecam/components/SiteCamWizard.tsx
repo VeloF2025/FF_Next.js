@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Download } from 'lucide-react';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { useSiteCamCapture, type SiteInfo } from '../hooks/useSiteCamCapture';
 import { getStepsForJobType } from '../lib/sitecamSteps';
 import type { GeofenceReading } from '../lib/geofence';
 import { StepCapture } from './StepCapture';
+import { saveAllPhotosToDevice, stepPhotoFilename } from '../lib/savePhotoToDevice';
 import { SiteCamSuccess } from './SiteCamSuccess';
 import { AppealModal } from './AppealModal';
 import { log } from '@/lib/logger';
@@ -146,6 +147,26 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
               className="w-full rounded-lg bg-sky-600 py-3 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50 active:bg-sky-700"
             >
               {uploading ? 'Uploading…' : 'Submit All Photos'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                void saveAllPhotosToDevice(
+                  stepStates
+                    .filter((s) => s.photoBase64 !== null)
+                    .map((s) => ({
+                      base64: s.photoBase64 as string,
+                      filename: stepPhotoFilename(siteInfo.siteId, s.stepNumber),
+                    })),
+                ).catch((err: unknown) => {
+                  log.warn('Save all photos failed', { err: String(err) }, 'SiteCamWizard');
+                });
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-600 py-3 text-sm font-medium text-neutral-300 hover:bg-neutral-800 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Save Photos to Device (for 1Map)
             </button>
           </div>
         )}

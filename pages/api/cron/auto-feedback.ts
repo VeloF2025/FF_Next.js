@@ -14,8 +14,11 @@ import {
 } from '@/modules/activate/services/feedbackSendService';
 
 const MODULE = 'AutoFeedbackCron';
-// Only DRs auto-QA'd from launch day onward; the pre-cutover backlog is handled
-// separately by human HITL, not auto-send.
+// Only DRs from launch day onward; the pre-cutover backlog is handled
+// separately by human HITL, not auto-send. Applied to BOTH the processing
+// time and the DR's own submitted_date — re-processing an old backlog DR
+// must not queue it for auto-send (its techs shouldn't get feedback about
+// months-old installs).
 const CUTOFF_DATE = '2026-06-09T00:00:00+02:00';
 const BATCH_LIMIT = 10;
 // After this many failed WA sends a DR is parked (skip reason 'wa_send_failed')
@@ -52,6 +55,7 @@ async function findEligibleDRs(): Promise<EligibleDR[]> {
        AND COALESCE(auto_feedback_attempts, 0) < $2
        AND auto_qa_processed_at <= NOW() - INTERVAL '30 minutes'
        AND auto_qa_processed_at >= $1
+       AND submitted_date >= $1
      ORDER BY auto_qa_processed_at ASC
      LIMIT $3`,
     [CUTOFF_DATE, MAX_SEND_ATTEMPTS, BATCH_LIMIT]
