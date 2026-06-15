@@ -324,24 +324,6 @@ export function triggerPpActivationCheck(): void {
         // Serials already in 'activated' (TRIGGER 3 pre-cutover) are silently skipped.
         await promoteOesActivatedSerials(activatedResult.rows);
 
-        // ── Durable reconciliation (issue #1860 regrowth fix) ─────────────────
-        // The PP-delta promotion above only covers serials whose oes_pp_data row
-        // was just flipped to 'activated'. Serials that go Active on OES WITHOUT
-        // transiting the PP list accumulate stuck in_stock (D1-1 regrew 0 → 1155
-        // between 2026-05-31 and 2026-06-14, all NULL-holder June activations).
-        // A full reconciliation pass here promotes them too. Best-effort: a
-        // failure here never aborts the rest of the post-import work.
-        try {
-          const recon = await reconcileInStockOesActivated();
-          if (recon.scanned > 0) {
-            logger.info('OES in_stock reconciliation pass complete', { scanned: recon.scanned });
-          }
-        } catch (reconErr) {
-          logger.warn('OES in_stock reconciliation pass skipped (non-blocking)', {
-            error: reconErr instanceof Error ? reconErr.message : String(reconErr),
-          });
-        }
-
         // Action Centre timeline: emit pre_prov_resolved for each newly-activated
         // PP row so the DR timeline shows "pre-provisioned → active" transition.
         // Best-effort — never fail the check on a log error.
@@ -373,6 +355,31 @@ export function triggerPpActivationCheck(): void {
         if (ticketRows.length > 0) {
           await autoResolveActivatedPpTickets(ticketRows);
         }
+      }
+
+      // ── Durable reconciliation (issue #1860 regrowth fix) ───────────────────
+      // MUST run on EVERY import, NOT gated by promotedRows above. The PP-delta
+      // promotion only covers serials whose oes_pp_data row was just flipped to
+      // 'activated'. Serials that go Active on OES WITHOUT transiting the PP list
+      // accumulate stuck in_stock (D1-1 regrew 0 → 1155 between 2026-05-31 and
+      // 2026-06-14, all NULL-holder June activations); a quiet-PP night (delta=0)
+      // is exactly when they get stranded, so this pass cannot live inside the
+      // `if (promotedRows.length > 0)` block. Best-effort: a failure here never
+      // aborts the rest of the post-import work.
+      try {
+        const recon = await reconcileInStockOesActivated();
+        if (recon.scanned > 0) {
+          logger.info('OES in_stock reconciliation pass complete', { scanned: recon.scanned });
+        } else {
+          // Always leave a trace, even on a zero-candidate night, so "reconcile
+          // ran and found nothing" is distinguishable from "reconcile never ran"
+          // — the exact blind spot that hid the PP-delta gating bug (#1860).
+          logger.debug('OES in_stock reconciliation pass: 0 candidates');
+        }
+      } catch (reconErr) {
+        logger.warn('OES in_stock reconciliation pass skipped (non-blocking)', {
+          error: reconErr instanceof Error ? reconErr.message : String(reconErr),
+        });
       }
     } catch (err) {
       logger.error('PP activation check failed', { error: err instanceof Error ? err.message : String(err) });
