@@ -96,4 +96,13 @@ describe('computePoleSummary — photo count', () => {
     expect(s.civil_filled).toBe(2);
     expect(s.dome_filled).toBe(1);
   });
+
+  it('unassigned-only pole: counts toward total but stays empty (not progress)', () => {
+    // Photos uploaded but none assigned to a slot — Johan still wants to see
+    // them in the count, but they must not advance QA status.
+    const s = computePoleSummary(row({ present_slots: [], tray_count: 0, unassigned_count: 3 }));
+    expect(s.total_photos).toBe(3);
+    expect(s.unassigned_count).toBe(3);
+    expect(s.status).toBe('empty');
+  });
 });

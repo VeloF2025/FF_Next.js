@@ -135,8 +135,8 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole, onA
                   {pole.total_photos}
                 </span>
                 {pole.unassigned_count > 0 && (
-                  <span className="text-[10px] text-amber-400 ml-1" title={`${pole.unassigned_count} unassigned photo(s)`}>
-                    +{pole.unassigned_count}
+                  <span className="text-[10px] text-amber-400 ml-1" title={`${pole.unassigned_count} unassigned photo(s) — already included in the total`}>
+                    ({pole.unassigned_count})
                   </span>
                 )}
               </td>
