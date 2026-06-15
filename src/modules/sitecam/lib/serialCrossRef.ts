@@ -9,7 +9,7 @@
 import { log } from '@/lib/logger';
 import { serialsMatch, type SerialDevice } from './verifySerial';
 
-const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
+const ONEMAP_HOST = process.env.ONEMAP_HOST ?? 'http://100.96.203.105:8003';
 const CROSS_REF_TIMEOUT_MS = 5_000;
 
 export type CrossRefStatus = 'verified' | 'mismatch' | 'pending';

@@ -14,9 +14,9 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // jsdom can't decode images, so the canvas watermark path would hang — stub
-// it to behave like its own fallback (returns the raw base64 unmarked).
+// it to behave like its own fallback (clean + watermarked both the raw base64).
 vi.mock('../../lib/watermarkPhoto', () => ({
-  watermarkPhoto: vi.fn(async () => 'RkFLRQ=='),
+  prepareCapturePhotos: vi.fn(async () => ({ clean: 'RkFLRQ==', watermarked: 'RkFLRQ==' })),
 }));
 
 import { useSiteCamCapture, type SiteInfo } from '../useSiteCamCapture';
