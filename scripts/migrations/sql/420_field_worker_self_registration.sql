@@ -9,7 +9,7 @@
 
 ALTER TABLE staff
   ADD COLUMN IF NOT EXISTS source              varchar(32) NOT NULL DEFAULT 'hr',
-  ADD COLUMN IF NOT EXISTS declared_project_id uuid,
+  ADD COLUMN IF NOT EXISTS declared_project_id uuid REFERENCES projects(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS id_number           varchar(32),
   ADD COLUMN IF NOT EXISTS selfie_url          text;
 

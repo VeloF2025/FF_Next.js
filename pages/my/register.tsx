@@ -17,24 +17,17 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-import { ApiError, verifyOtp } from '@/modules/attendance/portal/client/api';
-import { useDeviceFingerprint } from '@/modules/attendance/portal/client/useDeviceFingerprint';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import { RegisterProfileForm } from '@/modules/attendance/portal/client/RegisterProfileForm';
+import { RegisterVerifyForm } from '@/modules/attendance/portal/client/RegisterVerifyForm';
 
 type Step = 'profile' | 'verify' | 'done_pin_only';
 
 const MyRegisterPage: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactElement } = () => {
   const router = useRouter();
-  const deviceFingerprint = useDeviceFingerprint();
 
   const [step, setStep] = React.useState<Step>('profile');
   const [phone, setPhone] = React.useState('');
-  const [otp, setOtp] = React.useState('');
-  const [newPin, setNewPin] = React.useState('');
-  const [confirmPin, setConfirmPin] = React.useState('');
-  const [submitting, setSubmitting] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
 
   const handleProfileSuccess = (registeredPhone: string) => {
@@ -43,51 +36,18 @@ const MyRegisterPage: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     setInfo('We sent a 6-digit code to your WhatsApp.');
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submitting) return;
-    setError(null);
+  const handleVerifySuccess = async () => {
+    await router.push('/my/attendance');
+  };
 
-    if (!/^\d{6}$/.test(otp)) {
-      setError('Enter the 6-digit code from WhatsApp');
-      return;
-    }
-    if (!/^\d{6}$/.test(newPin)) {
-      setError('PIN must be exactly 6 digits');
-      return;
-    }
-    if (newPin !== confirmPin) {
-      setError('Those PINs don’t match. Try again.');
-      return;
-    }
+  const handlePinOnly = () => {
+    setStep('done_pin_only');
+    setInfo(null);
+  };
 
-    setSubmitting(true);
-    try {
-      const result = await verifyOtp({
-        phone: phone.trim(),
-        otp,
-        newPin,
-        deviceFingerprint: deviceFingerprint ?? undefined,
-      });
-
-      if (result.sessionIssued) {
-        await router.push('/my/attendance');
-        return;
-      }
-
-      setStep('done_pin_only');
-      setInfo(null);
-    } catch (err) {
-      if (err instanceof ApiError && err.code === 'NETWORK_ERROR') {
-        setError('Could not reach the server. Check your connection.');
-      } else if (err instanceof ApiError && err.status === 400) {
-        setError(err.message);
-      } else {
-        setError('That code didn’t match. Please try again or request a new code.');
-      }
-    } finally {
-      setSubmitting(false);
-    }
+  const handleBack = () => {
+    setStep('profile');
+    setInfo(null);
   };
 
   const stepSubtitle =
@@ -132,75 +92,12 @@ const MyRegisterPage: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       )}
 
       {step === 'verify' && (
-        <form onSubmit={handleVerifyOtp} className="space-y-4">
-          <label className="block">
-            <span className="text-sm font-medium text-neutral-300">Verification code</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              pattern="\d{6}"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="123456"
-              className="mt-1 w-full px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-base tracking-widest text-center"
-              required
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-neutral-300">Create a 6-digit PIN</span>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="new-password"
-              maxLength={6}
-              pattern="\d{6}"
-              value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="mt-1 w-full px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-base tracking-widest"
-              required
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-neutral-300">Confirm PIN</span>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="new-password"
-              maxLength={6}
-              pattern="\d{6}"
-              value={confirmPin}
-              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="mt-1 w-full px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-base tracking-widest"
-              required
-            />
-          </label>
-
-          {error && (
-            <div role="alert" className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base shadow-lg shadow-blue-600/20"
-          >
-            {submitting ? 'Verifying…' : 'Set PIN & sign in'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setStep('profile'); setOtp(''); setNewPin(''); setConfirmPin(''); setInfo(null); }}
-            className="w-full py-2 text-sm text-neutral-400 hover:text-neutral-200"
-          >
-            Go back and edit details
-          </button>
-        </form>
+        <RegisterVerifyForm
+          phone={phone}
+          onSuccess={handleVerifySuccess}
+          onPinOnly={handlePinOnly}
+          onBack={handleBack}
+        />
       )}
 
       {step === 'done_pin_only' && (

@@ -10,7 +10,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import {
   createSelfRegisteredFieldWorker,
@@ -25,6 +25,8 @@ import {
 } from '@/modules/attendance/portal/otpUtils';
 import { findExistingStaffForRegistration } from '@/services/staff/staffPhoneDedup';
 import { sql } from '@/lib/db-pool';
+import rateLimiter, { RateLimits } from '@/lib/rateLimiter';
+import { lockoutMsRemaining } from '@/modules/attendance/portal/credentialUtils';
 
 export const config = { api: { bodyParser: { sizeLimit: '2mb' } } };
 
@@ -45,6 +47,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
   }
 
+  // FIX 1: IP rate limit — 5 attempts per minute per IP
+  const forwardedFor = (req.headers['x-forwarded-for'] as string | undefined) ?? '';
+  const firstForwarded = forwardedFor.split(',')[0]?.trim() ?? '';
+  const ip: string = firstForwarded || req.socket?.remoteAddress || 'unknown';
+  const rl = rateLimiter.check(
+    `my-register:${ip}`,
+    RateLimits.DATA_QUERY.limit,
+    RateLimits.DATA_QUERY.windowMs,
+  );
+  if (!rl.success) {
+    return apiResponse.error(
+      res,
+      ErrorCode.RATE_LIMIT,
+      'Too many registration attempts. Please try again shortly.',
+    );
+  }
+
   const b = (req.body ?? {}) as RegisterBody;
   const firstName = typeof b.firstName === 'string' ? b.firstName.trim() : '';
   const lastName = typeof b.lastName === 'string' ? b.lastName.trim() : '';
@@ -56,8 +75,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     typeof b.selfieBase64 === 'string' && b.selfieBase64 ? b.selfieBase64 : null;
   const rawPhone = typeof b.phone === 'string' ? b.phone.trim() : '';
 
-  if (!firstName || !lastName || !projectId) {
-    return apiResponse.badRequest(res, 'firstName, lastName and projectId are required');
+  if (!firstName || !lastName || !rawPhone || !projectId) {
+    return apiResponse.badRequest(res, 'firstName, lastName, phone and projectId are required');
   }
   if (!ALLOWED_ROLES.has(role)) {
     return apiResponse.badRequest(res, "role must be 'technician' or 'casual'");
@@ -98,6 +117,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         }
       }
+    }
+
+    // FIX 2: lockout guard — skip OTP send if the account is locked
+    stage = 'lockout_check';
+    const lockRows = await sql<{ failed_attempts: number; locked_until: string | null }>`
+      SELECT failed_attempts, locked_until FROM attendance_credentials WHERE staff_id = ${staffId} LIMIT 1
+    `;
+    const lockRow = lockRows[0];
+    if (lockRow && lockoutMsRemaining(lockRow) > 0) {
+      log.info('[my-register] locked account — skipping OTP send', { staffId });
+      return apiResponse.success(res, { ok: true }); // anti-enumeration: same 200
     }
 
     stage = 'otp';

@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   upsertPendingOtp: vi.fn(async () => ({ sent: true, cooldownMs: 0 })),
   sendOtpViaWhatsApp: vi.fn(async () => undefined),
   sql: vi.fn(),
+  rateLimiterCheck: vi.fn(() => ({ success: true, remaining: 4, resetAt: Date.now() + 60000 })),
+  lockoutMsRemaining: vi.fn(() => 0),
 }));
 vi.mock('@/lib/logger', () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
 vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
@@ -22,6 +24,13 @@ vi.mock('@/modules/attendance/portal/otpUtils', () => ({
   generateOtp: mocks.generateOtp, hashOtp: mocks.hashOtp, upsertPendingOtp: mocks.upsertPendingOtp,
   sendOtpViaWhatsApp: mocks.sendOtpViaWhatsApp,
   normaliseSaPhone: (s: string) => (/^0\d{9}$/.test(s) ? '+27' + s.slice(1) : null),
+}));
+vi.mock('@/lib/rateLimiter', () => ({
+  default: { check: () => mocks.rateLimiterCheck(), reset: vi.fn() },
+  RateLimits: { DATA_QUERY: { limit: 5, windowMs: 60000 } },
+}));
+vi.mock('@/modules/attendance/portal/credentialUtils', () => ({
+  lockoutMsRemaining: () => mocks.lockoutMsRemaining(),
 }));
 
 import handler from '../../../../../pages/api/my/register';
@@ -37,10 +46,13 @@ function makeRes() {
 const VALID = { firstName: 'Thabo', lastName: 'M', phone: '0821234567', projectId: 'p1', role: 'technician', idNumber: '9001015800087', selfieBase64: 'AAAA' };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.rateLimiterCheck.mockReturnValue({ success: true, remaining: 4, resetAt: Date.now() + 60000 });
+  mocks.lockoutMsRemaining.mockReturnValue(0);
   mocks.upsertPendingOtp.mockResolvedValue({ sent: true, cooldownMs: 0 });
   mocks.createSelfRegisteredFieldWorker.mockResolvedValue('fw-1');
   mocks.storeRegistrationSelfie.mockResolvedValue('/storage/registrations/fw-1/selfie.jpg');
   mocks.sql.mockResolvedValue([]);
+  mocks.findExistingStaffForRegistration.mockResolvedValue({ id: 'staff-x' });
 });
 
 describe('POST /api/my/register', () => {
@@ -82,5 +94,34 @@ describe('POST /api/my/register', () => {
     expect(captured.statusCode).toBe(200);
     expect(mocks.createSelfRegisteredFieldWorker).not.toHaveBeenCalled();
     expect(mocks.upsertPendingOtp).toHaveBeenCalledWith(expect.objectContaining({ staffId: 'staff-x' }));
+  });
+
+  // FIX 7: cooldown branch
+  it('cooldown — upsertPendingOtp returns sent:false → 200 and WA not called', async () => {
+    mocks.upsertPendingOtp.mockResolvedValue({ sent: false, cooldownMs: 45000 });
+    const { res, captured } = makeRes();
+    await handler(makeReq(VALID), res);
+    expect(captured.statusCode).toBe(200);
+    expect(mocks.sendOtpViaWhatsApp).not.toHaveBeenCalled();
+  });
+
+  // FIX 7: lockout branch
+  it('locked account — lockoutMsRemaining > 0 → 200 and WA not called', async () => {
+    // The lockout SELECT returns a locked row; lockoutMsRemaining returns >0
+    mocks.sql.mockResolvedValue([{ failed_attempts: 5, locked_until: new Date(Date.now() + 900000).toISOString() }]);
+    mocks.lockoutMsRemaining.mockReturnValue(900000);
+    const { res, captured } = makeRes();
+    await handler(makeReq(VALID), res);
+    expect(captured.statusCode).toBe(200);
+    expect(mocks.sendOtpViaWhatsApp).not.toHaveBeenCalled();
+  });
+
+  // FIX 7: rate-limit branch
+  it('rate limited → 429', async () => {
+    mocks.rateLimiterCheck.mockReturnValue({ success: false, remaining: 0, resetAt: Date.now() + 60000 });
+    const { res, captured } = makeRes();
+    await handler(makeReq(VALID), res);
+    expect(captured.statusCode).toBe(429);
+    expect(mocks.sendOtpViaWhatsApp).not.toHaveBeenCalled();
   });
 });

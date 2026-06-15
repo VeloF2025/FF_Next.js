@@ -47,11 +47,18 @@ export async function createSelfRegisteredFieldWorker(
       ${input.role}, 'pending', 'self_registered',
       ${input.declaredProjectId}, ${input.idNumber}, ${input.selfieUrl}
     )
+    ON CONFLICT (email) DO NOTHING
     RETURNING id
   `;
 
-  const id = rows[0]?.id;
-  if (!id) throw new Error('createSelfRegisteredFieldWorker: insert returned no id');
+  if (rows[0]?.id) return rows[0].id;
+
+  // FIX 4: concurrent duplicate — INSERT was a no-op; fall back to SELECT
+  const existing = await sql<{ id: string }>`
+    SELECT id FROM staff WHERE email = ${resolvedEmail} LIMIT 1
+  `;
+  const id = existing[0]?.id;
+  if (!id) throw new Error('createSelfRegisteredFieldWorker: insert returned no id and fallback select also found nothing');
   return id;
 }
 

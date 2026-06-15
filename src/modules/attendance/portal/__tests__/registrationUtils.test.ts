@@ -20,10 +20,24 @@ describe('createSelfRegisteredFieldWorker', () => {
     expect(mocks.sql).toHaveBeenCalledTimes(1);
   });
   it('throws if insert returns no id', async () => {
+    // Both INSERT and fallback SELECT return nothing — should throw
     mocks.sql.mockResolvedValue([]);
     await expect(createSelfRegisteredFieldWorker({
       firstName: 'A', lastName: 'B', phone: '+27820000000', role: 'casual',
       declaredProjectId: 'p1', idNumber: null, selfieUrl: null,
     })).rejects.toThrow();
+  });
+  it('concurrent duplicate — INSERT returns [], SELECT returns existing id', async () => {
+    // First call: INSERT ON CONFLICT DO NOTHING → no rows returned
+    // Second call: fallback SELECT → existing row
+    mocks.sql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'existing' }]);
+    const id = await createSelfRegisteredFieldWorker({
+      firstName: 'Thabo', lastName: 'M', phone: '+27821234567', role: 'technician',
+      declaredProjectId: 'p1', idNumber: null, selfieUrl: null,
+    });
+    expect(id).toBe('existing');
+    expect(mocks.sql).toHaveBeenCalledTimes(2);
   });
 });
