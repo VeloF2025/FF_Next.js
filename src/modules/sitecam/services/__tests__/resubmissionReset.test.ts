@@ -36,6 +36,7 @@ describe('resetPriorQaCycleForResubmission', () => {
     // Badge inputs (QaCentrePage.getQaReviewStatus) must be cleared
     expect(sql).toContain('feedback_sent = false');
     expect(sql).toContain('feedback_sent_at = NULL');
+    expect(sql).toContain('feedback_message = NULL');
     expect(sql).toContain('qa_decision = NULL');
     expect(sql).toContain('qa_decision_by = NULL');
     // Auto-QA / auto-feedback markers cleared so the new submission is re-evaluated

@@ -62,6 +62,8 @@ export default defineConfig({
       { find: '@/lib/serial-events', replacement: path.resolve(__dirname, './src/lib/serial-events') },
       { find: '@/lib/vlmGallery', replacement: path.resolve(__dirname, './src/lib/vlmGallery') },
       { find: '@/lib/internalPhotoUrl', replacement: path.resolve(__dirname, './src/lib/internalPhotoUrl') },
+      { find: '@/lib/vfStoragePhotoUrl', replacement: path.resolve(__dirname, './src/lib/vfStoragePhotoUrl') },
+      { find: '@/lib/vfStorageUpload', replacement: path.resolve(__dirname, './src/lib/vfStorageUpload') },
       { find: '@/lib/vlm', replacement: path.resolve(__dirname, './src/lib/vlm') },
       { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
       { find: '@/lib/email', replacement: path.resolve(__dirname, './src/lib/email') },

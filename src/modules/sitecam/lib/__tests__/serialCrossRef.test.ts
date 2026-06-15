@@ -19,14 +19,14 @@ describe('decideCrossRefStatus', () => {
     expect(r.expectedSerial).toBe('ALCLB1234567');
   });
 
-  it('verifies within 2 edits (scan noise tolerance)', () => {
-    expect(decideCrossRefStatus('ALCLB1234567', 'ALCLB1234561').status).toBe('verified'); // 1 edit
-    expect(decideCrossRefStatus('ALCLB1234567', 'ALCLB1234500').status).toBe('verified'); // 2 edits
+  it('flags ANY character difference as mismatch (exact match — no fuzzy tolerance)', () => {
+    expect(decideCrossRefStatus('ALCLB1234567', 'ALCLB1234561').status).toBe('mismatch'); // 1 edit
+    expect(decideCrossRefStatus('ALCLB1234567', 'ALCLB1234500').status).toBe('mismatch'); // 2 edits
+    expect(decideCrossRefStatus('ALCLB1234567', 'ALCLB9999999').status).toBe('mismatch');
   });
 
-  it('flags 3+ edits as mismatch (tolerance boundary)', () => {
-    expect(decideCrossRefStatus('ALCLB1234567', 'ALCLB1234000').status).toBe('mismatch'); // 3 edits
-    expect(decideCrossRefStatus('ALCLB1234567', 'ALCLB9999999').status).toBe('mismatch');
+  it('verifies after trimming surrounding whitespace on the scanned value', () => {
+    expect(decideCrossRefStatus('  ALCLB1234567 ', 'ALCLB1234567').status).toBe('verified');
   });
 });
 

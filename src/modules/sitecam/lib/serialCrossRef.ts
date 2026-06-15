@@ -7,7 +7,7 @@
  */
 
 import { log } from '@/lib/logger';
-import { serialsMatch, type SerialDevice } from './verifySerial';
+import { type SerialDevice } from './verifySerial';
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST ?? 'http://100.96.203.105:8003';
 const CROSS_REF_TIMEOUT_MS = 5_000;
@@ -20,7 +20,12 @@ export interface CrossRefResult {
   expectedSerial: string | null;
 }
 
-/** Pure decision: compare a scanned serial to the reference value (fuzzy, ≤2 edits). */
+/**
+ * Pure decision: compare a scanned serial to the reference value. EXACT match
+ * (case- and whitespace-normalised) — for authority-grade ONT/UPS asset
+ * cross-reference any character difference is a mismatch, so a single mis-scanned
+ * digit surfaces for QA rather than silently "verifying" the wrong device.
+ */
 export function decideCrossRefStatus(
   scanned: string,
   expected: string | null | undefined,
@@ -30,7 +35,7 @@ export function decideCrossRefStatus(
   }
   const normalised = expected.trim().toUpperCase();
   return {
-    status: serialsMatch(scanned, normalised) ? 'verified' : 'mismatch',
+    status: scanned.trim().toUpperCase() === normalised ? 'verified' : 'mismatch',
     expectedSerial: normalised,
   };
 }
