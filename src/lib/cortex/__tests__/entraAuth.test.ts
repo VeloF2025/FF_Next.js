@@ -6,13 +6,16 @@
  * live token-exchange `fetch` and the route round-trip are UNTESTED here (network /
  * Azure config) — see entraAuth.ts.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignJWT } from 'jose';
 import {
   ENTRA_ID_TOKEN_COOKIE,
   buildAuthorizeUrl,
   computeCodeChallenge,
+  entraScope,
   entraSsoEnabled,
+  exchangeCodeForTokens,
+  forwardAccessToken,
   generateCodeVerifier,
   getEntraConfig,
   getForwardableEntraIdToken,
@@ -23,6 +26,7 @@ import {
 const ENV_KEYS = [
   'ENTRA_SSO_ENABLED', 'ENTRA_TENANT_ID', 'ENTRA_CLIENT_ID', 'ENTRA_CLIENT_SECRET',
   'ENTRA_REDIRECT_URI', 'GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET',
+  'ENTRA_SCOPE', 'CORTEX_FORWARD_TOKEN',
 ] as const;
 
 let saved: Record<string, string | undefined>;
@@ -114,6 +118,86 @@ describe('buildAuthorizeUrl', () => {
     expect(url).not.toContain('/common/');
     expect(url).not.toContain('/organizations/');
   });
+
+  it('requests the configured ENTRA_SCOPE when set (dedicated-app access-token cutover)', () => {
+    process.env.ENTRA_SCOPE =
+      'openid profile email offline_access api://cortex-app/access_as_user';
+    const url = new URL(buildAuthorizeUrl(cfg, 's', 'n', 'c'));
+    expect(url.searchParams.get('scope')).toBe(
+      'openid profile email offline_access api://cortex-app/access_as_user',
+    );
+  });
+});
+
+describe('entraScope — default vs dedicated-app override (dark by default)', () => {
+  it('defaults to "openid profile email" when unset', () => {
+    expect(entraScope()).toBe('openid profile email');
+  });
+  it('defaults when set to blank/whitespace (fail safe to today)', () => {
+    process.env.ENTRA_SCOPE = '   ';
+    expect(entraScope()).toBe('openid profile email');
+  });
+  it('returns the configured scope (trimmed) when set', () => {
+    process.env.ENTRA_SCOPE = '  openid profile email offline_access api://x/access_as_user  ';
+    expect(entraScope()).toBe('openid profile email offline_access api://x/access_as_user');
+  });
+});
+
+describe('forwardAccessToken — inert unless explicitly access_token', () => {
+  it('false when unset (forward the ID token, today)', () => expect(forwardAccessToken()).toBe(false));
+  it('false for any other value', () => {
+    process.env.CORTEX_FORWARD_TOKEN = 'id_token';
+    expect(forwardAccessToken()).toBe(false);
+  });
+  it('true only for "access_token" (case-insensitive, trimmed)', () => {
+    process.env.CORTEX_FORWARD_TOKEN = '  Access_Token ';
+    expect(forwardAccessToken()).toBe(true);
+  });
+});
+
+describe('exchangeCodeForTokens — returns both tokens + forwards the configured scope', () => {
+  const cfg = {
+    tenantId: 'tenant-guid', clientId: 'client-guid', clientSecret: 'secret',
+    redirectUri: 'https://ff.example/api/auth/entra/callback',
+  };
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('returns { idToken, accessToken } and sends entraScope() + PKCE verifier in the body', async () => {
+    process.env.ENTRA_SCOPE = 'openid profile email offline_access api://x/access_as_user';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id_token: 'the.id.token', access_token: 'the.access.token' }),
+    });
+    const tokens = await exchangeCodeForTokens(cfg, 'the-code', 'the-verifier');
+    expect(tokens).toEqual({ idToken: 'the.id.token', accessToken: 'the.access.token' });
+    const body = new URLSearchParams(fetchMock.mock.calls[0][1].body as string);
+    expect(body.get('scope')).toBe('openid profile email offline_access api://x/access_as_user');
+    expect(body.get('code')).toBe('the-code');
+    expect(body.get('code_verifier')).toBe('the-verifier');
+    expect(body.get('grant_type')).toBe('authorization_code');
+  });
+
+  it('accessToken is undefined when the response omits it (id-token-only default)', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ id_token: 'only.id.token' }) });
+    const tokens = await exchangeCodeForTokens(cfg, 'c', 'v');
+    expect(tokens.idToken).toBe('only.id.token');
+    expect(tokens.accessToken).toBeUndefined();
+  });
+
+  it('throws (never returns partial) on a non-OK response', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 400, json: async () => ({}) });
+    await expect(exchangeCodeForTokens(cfg, 'c', 'v')).rejects.toThrow();
+  });
+
+  it('throws when the response carries no id_token', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ access_token: 'a' }) });
+    await expect(exchangeCodeForTokens(cfg, 'c', 'v')).rejects.toThrow();
+  });
 });
 
 describe('PKCE — generateCodeVerifier / computeCodeChallenge (RFC 7636 S256)', () => {
@@ -202,6 +286,14 @@ describe('getForwardableEntraIdToken — identity binding + freshness', () => {
   it('returns undefined when the token carries no identity claim', async () => {
     const t = await idToken({ sub: 'opaque-guid', exp: FUTURE });
     expect(getForwardableEntraIdToken(cookie(t), REVIEWER)).toBeUndefined();
+  });
+
+  it('fails closed for an ACCESS-token-shaped artifact lacking an email-bearing claim', async () => {
+    // An Entra v2 access token carries email/preferred_username/upn ONLY when configured as
+    // access-token optional claims on the resource app. Without one, the ACL has no subject —
+    // forwarding must NOT happen (→ undefined → HS256 fallback), never a no-email admit.
+    const accessNoEmail = await idToken({ oid: 'durable-oid', sub: 'sub', scp: 'access_as_user', exp: FUTURE });
+    expect(getForwardableEntraIdToken(cookie(accessNoEmail), REVIEWER)).toBeUndefined();
   });
 
   it('returns undefined for an EXPIRED token even when the subject matches', async () => {
