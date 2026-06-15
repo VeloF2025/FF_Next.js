@@ -73,20 +73,28 @@ describe('Slice B surface coverage', () => {
   );
 });
 
-// ── 2. Behavioural truth-table (DB-gated) ──────────────────────────────────
+// ── 2. Behavioural truth-table (opt-in, live predicate SQL) ─────────────────
+// Reads the REAL .env.local connection (not the fake test URL vitest injects
+// into process.env), so the audit exercises the live engine.
 function loadDatabaseUrl(): string | null {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
   try {
     const env = fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8');
     const m = env.match(/^DATABASE_URL=(.*)$/m);
     if (m) return m[1].trim().replace(/^["']|["']$/g, '');
   } catch {
-    /* no env file — soft-skip below */
+    /* no env file */
   }
-  return null;
+  return process.env.DATABASE_URL ?? null;
 }
 
 const DB_URL = loadDatabaseUrl();
+// OFF by default. This suite hits the live shared DB (read-only VALUES — zero
+// mutation). It is opt-in so it can NEVER silently pass against the fake test
+// URL vitest injects: when enabled it asserts-or-fails-loudly; otherwise it is
+// honestly SKIPPED (not falsely green). The always-on fragment + surface
+// coverage tests are the hermetic floor. Run locally with:
+//   RUN_DB_AUDIT=1 npx vitest run src/lib/staff/__tests__/hrVisibility.audit.test.ts
+const RUN_DB_AUDIT = !!DB_URL && process.env.RUN_DB_AUDIT === '1';
 
 interface AuditRow {
   role: string | null;
@@ -95,11 +103,10 @@ interface AuditRow {
   passes_attendance: boolean;
 }
 
-describe.skipIf(!DB_URL)('Slice B hiding-audit (live predicate SQL)', () => {
+describe.skipIf(!RUN_DB_AUDIT)('Slice B hiding-audit (live predicate SQL)', () => {
   // pg is the real driver here (only @neondatabase/serverless is mocked).
   let pool: import('pg').Pool | null = null;
-  let rows: AuditRow[] | null = null;
-  let skipReason = '';
+  let rows: AuditRow[] = [];
 
   beforeAll(async () => {
     const { Pool } = await import('pg');
@@ -112,7 +119,9 @@ describe.skipIf(!DB_URL)('Slice B hiding-audit (live predicate SQL)', () => {
       ssl: DB_URL!.includes('sslmode=require') ? { ca: process.env.PGSSLROOTCERT } : false,
     });
     // Build the WHERE predicates from the SAME helpers the surfaces use, then
-    // evaluate them against synthetic rows — no real table is touched.
+    // evaluate them against synthetic rows — no real table is touched. No
+    // try/catch: if the DB is unreachable (opt-in implies it must be), the
+    // suite fails loudly rather than silently passing.
     const hr = hrEmployeePredicate('');
     const att = approvedAccountPredicate('');
     const text = `
@@ -122,6 +131,7 @@ describe.skipIf(!DB_URL)('Slice B hiding-audit (live predicate SQL)', () => {
       FROM (VALUES
         ('technician', 'pending'),
         ('technician', 'active'),
+        ('technician', 'suspended'),
         ('casual', 'pending'),
         ('casual', 'active'),
         ('manager', NULL),
@@ -129,12 +139,8 @@ describe.skipIf(!DB_URL)('Slice B hiding-audit (live predicate SQL)', () => {
         ('admin', 'Pending')
       ) AS t(role, account_status)
     `;
-    try {
-      const res = await pool.query<AuditRow>(text);
-      rows = res.rows;
-    } catch (err) {
-      skipReason = `DB unreachable: ${(err as Error).message}`;
-    }
+    const res = await pool.query<AuditRow>(text);
+    rows = res.rows;
   }, 15000);
 
   afterAll(async () => {
@@ -142,36 +148,34 @@ describe.skipIf(!DB_URL)('Slice B hiding-audit (live predicate SQL)', () => {
   });
 
   function find(role: string | null, status: string | null): AuditRow {
-    const r = rows!.find((x) => x.role === role && x.account_status === status);
+    const r = rows.find((x) => x.role === role && x.account_status === status);
     if (!r) throw new Error(`fixture row not found: ${role}/${status}`);
     return r;
   }
 
-  it('connected and evaluated the predicates', () => {
-    if (!rows) {
-      // Network flake (e.g. Tailscale down) — soft-skip rather than fail.
-      console.warn(`[hiding-audit] skipped: ${skipReason}`);
-      return;
-    }
-    expect(rows.length).toBe(7);
+  it('evaluated every fixture row', () => {
+    expect(rows.length).toBe(8);
   });
 
   it('technician/pending is hidden from HR AND attendance', () => {
-    if (!rows) return;
     const r = find('technician', 'pending');
     expect(r.passes_hr).toBe(false);
     expect(r.passes_attendance).toBe(false);
   });
 
   it('technician/active is hidden from HR but visible in attendance', () => {
-    if (!rows) return;
     const r = find('technician', 'active');
     expect(r.passes_hr).toBe(false);
     expect(r.passes_attendance).toBe(true);
   });
 
+  it('technician/suspended is hidden from HR but visible in attendance (not pending)', () => {
+    const r = find('technician', 'suspended');
+    expect(r.passes_hr).toBe(false);
+    expect(r.passes_attendance).toBe(true);
+  });
+
   it('casual/pending and casual/active are hidden from HR', () => {
-    if (!rows) return;
     expect(find('casual', 'pending').passes_hr).toBe(false);
     expect(find('casual', 'active').passes_hr).toBe(false);
     // approved casual still shows hours
@@ -179,19 +183,39 @@ describe.skipIf(!DB_URL)('Slice B hiding-audit (live predicate SQL)', () => {
   });
 
   it('a real employee (manager / NULL account_status) is visible everywhere', () => {
-    if (!rows) return;
     const r = find('manager', null);
     expect(r.passes_hr).toBe(true);
     expect(r.passes_attendance).toBe(true);
   });
 
   it('NULL-role legacy employee stays visible to HR', () => {
-    if (!rows) return;
     expect(find(null, 'active').passes_hr).toBe(true);
   });
 
   it('mixed-case "Pending" is still hidden from attendance (LOWER)', () => {
-    if (!rows) return;
     expect(find('admin', 'Pending').passes_attendance).toBe(false);
+  });
+});
+
+// ── 3. Precedence guard — alerts.ts compliance counts ───────────────────────
+// The two compliance COUNTs in alerts.ts had an unparenthesised
+// `status='active' OR is_active=true`; ANDing Rule H without wrapping would bind
+// as `status='active' OR (is_active=true AND <rule>)`, leaking active-status
+// field workers. This pins the parenthesisation so a future reformat can't
+// silently reintroduce the precedence leak.
+describe('Slice B precedence guard (alerts.ts)', () => {
+  const alerts = fs.readFileSync(path.join(ROOT, 'pages/api/staff/alerts.ts'), 'utf8');
+
+  it('never AND-injects Rule H directly onto an unparenthesised OR', () => {
+    expect(alerts).not.toMatch(
+      /status = 'active' OR is_active = true\s*\$\{sql\.unsafe\('AND/
+    );
+  });
+
+  it('wraps the OR disjunction before AND-ing in both compliance counts', () => {
+    const wrapped = alerts.match(
+      /\(status = 'active' OR is_active = true\)\s*\$\{sql\.unsafe\('AND/g
+    ) || [];
+    expect(wrapped.length).toBeGreaterThanOrEqual(2);
   });
 });

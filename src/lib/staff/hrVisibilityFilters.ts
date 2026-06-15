@@ -48,6 +48,10 @@ export function hrEmployeePredicate(alias = 's'): string {
  * `LOWER()` because `account_status` casing is mixed in the shared DB. The
  * `IS NULL OR` keeps legacy employees (NULL account_status) visible —
  * `NULL <> 'pending'` is NULL (not TRUE), which would otherwise drop them.
+ *
+ * SECURITY: `accountStatusRef` is inlined VERBATIM into SQL (no
+ * parameterisation). It MUST be a hard-coded column reference such as
+ * `'s.account_status'` — NEVER a request/user/DB-supplied string.
  */
 export function approvedAccountPredicateRef(accountStatusRef: string): string {
   return `(${accountStatusRef} IS NULL OR LOWER(${accountStatusRef}) <> 'pending')`;

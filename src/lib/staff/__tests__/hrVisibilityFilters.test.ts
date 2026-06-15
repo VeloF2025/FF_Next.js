@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import {
   hrEmployeePredicate,
   approvedAccountPredicate,
+  approvedAccountPredicateRef,
   HR_EXCLUDED_ROLES,
 } from '../hrVisibilityFilters';
 
@@ -65,5 +66,19 @@ describe('approvedAccountPredicate (Rule P)', () => {
     expect(approvedAccountPredicate('s')).toContain("<> 'pending'");
     expect(approvedAccountPredicate('s')).not.toContain('active');
     expect(approvedAccountPredicate('s')).not.toContain('suspended');
+  });
+});
+
+describe('approvedAccountPredicateRef (Rule P, ref form used by report sqlHelpers)', () => {
+  it('builds the predicate from a full column reference', () => {
+    expect(approvedAccountPredicateRef('s.account_status')).toBe(
+      "(s.account_status IS NULL OR LOWER(s.account_status) <> 'pending')"
+    );
+  });
+
+  it('is the core that approvedAccountPredicate delegates to', () => {
+    expect(approvedAccountPredicate('s')).toBe(
+      approvedAccountPredicateRef('s.account_status')
+    );
   });
 });
