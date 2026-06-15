@@ -31,6 +31,7 @@ import {
 } from '@/modules/sitecam/lib/civilStepCriteria';
 import { toGalleryJobType, type SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 import { loadGalleryExamples } from '@/lib/vlmGallery';
+import { optimizeForVlm } from '@/modules/activate/services/imagePreprocessService';
 import {
   VLM_CHAT_ENDPOINT,
   VLM_CATEGORIZATION_MODEL,
@@ -103,9 +104,14 @@ function checkExifAge(exifTimestamp: string | undefined): { ok: boolean; reason?
 async function runVlmCheck(
   jobType: SiteCamJobType,
   step: number,
-  photoBase64: string
+  rawPhotoBase64: string
 ): Promise<VlmResult> {
   const galleryExamples = await loadGalleryExamples(step, toGalleryJobType(jobType));
+
+  // Phone photos arrive at full camera resolution; together with the gallery
+  // examples they exceed the VLM's 32k context and every request 400s (and
+  // fails open). Resize to the VLM working size before building the prompt.
+  const photoBase64 = await optimizeForVlm(rawPhotoBase64, { maxWidth: 1024, maxHeight: 768 });
 
   let content: unknown[];
   if (jobType === 'civils') {

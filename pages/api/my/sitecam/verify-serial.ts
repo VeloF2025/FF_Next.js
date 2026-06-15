@@ -4,6 +4,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import { validateSerialFormat, type SerialDevice } from '@/modules/sitecam/lib/verifySerial';
+import { crossReferenceSerial } from '@/modules/sitecam/lib/serialCrossRef';
 import { log } from '@/lib/logger';
 
 const MODULE = 'verify-serial';
@@ -45,30 +46,43 @@ async function handler(
     });
   }
 
-  // Valid format — save to DB as pending (no comparison at scan time)
+  // Valid format — cross-reference against the DR's 1Map/OES record. Falls
+  // back to 'pending' when the DR has no reference data yet (best-effort,
+  // never blocks the scan flow).
+  const crossRef = await crossReferenceSerial(drNumber, device, validation.normalised);
+
   const attemptsCol = isOnt ? 'ont_serial_attempts' : 'ups_serial_attempts';
   const statusCol   = isOnt ? 'ont_serial_status'   : 'ups_serial_status';
   const scannedCol  = isOnt ? 'ont_serial_scanned'  : 'ups_serial_scanned';
 
   await pool.query(
     `INSERT INTO dr_photo_unified_reviews (drop_number, ${attemptsCol}, ${statusCol}, ${scannedCol})
-     VALUES ($1, $2, 'pending', $3)
+     VALUES ($1, $2, $4, $3)
      ON CONFLICT (drop_number)
      DO UPDATE SET
        ${attemptsCol} = $2,
-       ${statusCol}   = 'pending',
+       ${statusCol}   = $4,
        ${scannedCol}  = $3`,
-    [drNumber, attemptNumber, validation.normalised],
+    [drNumber, attemptNumber, validation.normalised, crossRef.status],
   );
 
-  log.info('Serial scan saved as pending', {
+  log.info('Serial scan saved', {
     drNumber, step, serial: validation.normalised, attemptNumber,
+    crossRefStatus: crossRef.status, expectedSerial: crossRef.expectedSerial,
   }, MODULE);
+
+  const message =
+    crossRef.status === 'verified'
+      ? 'Serial verified against FibreFlow records'
+      : crossRef.status === 'mismatch'
+        ? `Serial does not match the recorded ${device.toUpperCase()} serial for this DR — flagged for QA review`
+        : 'Serial saved — cross-reference pending (1Map + OES)';
 
   return apiResponse.success(res, {
     result: 'saved',
     serial: validation.normalised,
-    message: 'Serial saved — cross-reference pending (1Map + OES)',
+    crossRefStatus: crossRef.status,
+    message,
   });
 }
 

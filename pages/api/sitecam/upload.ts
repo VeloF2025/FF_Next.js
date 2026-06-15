@@ -14,9 +14,9 @@ import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 import type { GeofencePayload } from '@/modules/sitecam/lib/geofence';
+import { uploadToVfStorage, safeFilename } from '@/lib/vfStorageUpload';
 
 const MODULE = 'PwaUpload';
-const VF_STORAGE_URL = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091';
 // 12 activation steps + tolerance — guards against an oversized upload payload.
 const MAX_PHOTOS = 20;
 
@@ -35,13 +35,6 @@ export function geofenceColumns(
   ];
 }
 
-/** Strip any path components / unsafe chars from a client-supplied filename. */
-function safeFilename(name: unknown): string {
-  const base = typeof name === 'string' ? name.split(/[/\\]/).pop() ?? '' : '';
-  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 128);
-  return cleaned || `photo_${Date.now()}.jpg`;
-}
-
 interface PhotoRecord {
   stepNumber: number;
   stepLabel: string;
@@ -56,17 +49,6 @@ interface UploadBody {
   siteId: string;
   photos: PhotoRecord[];
   geofence?: GeofencePayload | null;
-}
-
-async function uploadToVfStorage(filename: string, base64: string): Promise<string> {
-  const buffer = Buffer.from(base64, 'base64');
-  const formData = new FormData();
-  formData.append('file', new Blob([buffer], { type: 'image/jpeg' }), filename);
-  const resp = await fetch(`${VF_STORAGE_URL}/upload`, { method: 'POST', body: formData });
-  if (!resp.ok) throw new Error(`VF Storage upload failed: HTTP ${resp.status}`);
-  const json = await resp.json() as { url?: string };
-  if (!json.url) throw new Error('VF Storage returned no url');
-  return json.url;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse, session: AttendanceSession): Promise<void> {

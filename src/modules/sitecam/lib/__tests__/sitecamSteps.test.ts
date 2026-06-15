@@ -44,3 +44,15 @@ describe('toGalleryJobType', () => {
     expect(toGalleryJobType('civils')).toBe('civils');
   });
 });
+
+describe('activation VLM coverage', () => {
+  it('steps 3 and 4 are VLM-checked (regression: they were silently auto-accepted)', () => {
+    expect(ACTIVATION_STEPS.find((s) => s.number === 3)?.hasVlm).toBe(true);
+    expect(ACTIVATION_STEPS.find((s) => s.number === 4)?.hasVlm).toBe(true);
+  });
+
+  it('only step 6 (serial-scan) skips the VLM among activation steps', () => {
+    const nonVlm = ACTIVATION_STEPS.filter((s) => !s.hasVlm).map((s) => s.number);
+    expect(nonVlm).toEqual([6]);
+  });
+});
