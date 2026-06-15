@@ -14,6 +14,7 @@ import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 import type { GeofencePayload } from '@/modules/sitecam/lib/geofence';
+import { resetPriorQaCycleForResubmission } from '@/modules/sitecam/services/resubmissionReset';
 import { uploadToVfStorage, safeFilename } from '@/lib/vfStorageUpload';
 
 const MODULE = 'PwaUpload';
@@ -93,6 +94,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse, session: Atten
 
   if (jobType === 'activations') {
     const drNum = siteId.replace(/^DR-/i, '');
+    // A SiteCam submission starts a fresh QA cycle. Clear any stale QA decision /
+    // feedback markers left from a prior review (e.g. an earlier activation that
+    // is being re-photographed) so the QA Centre does not show a false
+    // "Human ✓" badge and the auto-feedback cron re-evaluates the new photos.
+    await resetPriorQaCycleForResubmission(drNum);
     await pool.query(
       `UPDATE dr_photo_unified_reviews
        SET pwa_submission_at        = NOW(),
