@@ -370,6 +370,11 @@ export function triggerPpActivationCheck(): void {
         const recon = await reconcileInStockOesActivated();
         if (recon.scanned > 0) {
           logger.info('OES in_stock reconciliation pass complete', { scanned: recon.scanned });
+        } else {
+          // Always leave a trace, even on a zero-candidate night, so "reconcile
+          // ran and found nothing" is distinguishable from "reconcile never ran"
+          // — the exact blind spot that hid the PP-delta gating bug (#1860).
+          logger.debug('OES in_stock reconciliation pass: 0 candidates');
         }
       } catch (reconErr) {
         logger.warn('OES in_stock reconciliation pass skipped (non-blocking)', {
