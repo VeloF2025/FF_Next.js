@@ -63,6 +63,7 @@ export async function resetPriorQaCycleForResubmission(
          -- Clear feedback markers (drives the false "Human ✓" + blocks auto-feedback cron)
          feedback_sent = false,
          feedback_sent_at = NULL,
+         feedback_message = NULL,
          -- Clear auto-QA markers so the new submission is re-evaluated
          auto_qa_processed = false,
          auto_qa_processed_at = NULL,

@@ -72,9 +72,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse, session: Atten
 
   const techId = session.staffId ?? null;
 
+  // Idempotent on (site_id, step_number) for PENDING rows (partial unique index,
+  // migration 421): a retried/double-fired escalation refreshes the existing pending
+  // row instead of creating a duplicate supervisor-review entry. A step that
+  // re-escalates after a prior escalation is resolved/rejected still gets a fresh row.
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO pwa_escalations (job_type, site_id, step_number, tech_id, fail_reasons, attempt_photos)
      VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (site_id, step_number) WHERE status = 'pending'
+     DO UPDATE SET
+       job_type       = EXCLUDED.job_type,
+       tech_id        = EXCLUDED.tech_id,
+       fail_reasons   = EXCLUDED.fail_reasons,
+       attempt_photos = EXCLUDED.attempt_photos
      RETURNING id`,
     [jobType, siteId, stepNumber, techId, failReasons ?? [], JSON.stringify(photos)]
   );
