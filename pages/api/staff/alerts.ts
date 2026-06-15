@@ -12,6 +12,7 @@ import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffAlertsAPI');
@@ -138,6 +139,7 @@ async function getUpcomingBirthdays(days: number): Promise<BirthdayAlert[]> {
       FROM staff
       WHERE date_of_birth IS NOT NULL
         AND (status = 'active' OR is_active = true)
+        ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
     )
     SELECT
       id,
@@ -190,6 +192,7 @@ async function getExpiringDocuments(days: number): Promise<ExpiryAlert[]> {
       work_permit_expiry
     FROM staff
     WHERE (status = 'active' OR is_active = true)
+      ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
       AND (
         (drivers_license_expiry IS NOT NULL AND drivers_license_expiry <= CURRENT_DATE + ${daysInt}::integer)
         OR (passport_expiry IS NOT NULL AND passport_expiry <= CURRENT_DATE + ${daysInt}::integer)
@@ -251,6 +254,7 @@ async function getExpiringDocuments(days: number): Promise<ExpiryAlert[]> {
       AND sd.expiry_date <= CURRENT_DATE + ${daysInt}::integer
       AND sd.verification_status = 'verified'
       AND (s.status = 'active' OR s.is_active = true)
+      ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
   `;
 
   for (const doc of docExpiry) {
@@ -285,7 +289,8 @@ async function getExpiringDocuments(days: number): Promise<ExpiryAlert[]> {
 async function getComplianceStats(): Promise<ComplianceStats> {
   // Get total active staff count
   const countRows = await sql`
-    SELECT COUNT(*) as total FROM staff WHERE status = 'active' OR is_active = true
+    SELECT COUNT(*) as total FROM staff
+    WHERE (status = 'active' OR is_active = true) ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
   `;
   const countResult = countRows[0]!;
   const totalStaff = parseInt(countResult.total as string);
@@ -299,7 +304,7 @@ async function getComplianceStats(): Promise<ComplianceStats> {
       COUNT(*) FILTER (WHERE bank_account_number IS NOT NULL) as with_bank,
       COUNT(*) FILTER (WHERE date_of_birth IS NOT NULL) as with_dob
     FROM staff
-    WHERE status = 'active' OR is_active = true
+    WHERE (status = 'active' OR is_active = true) ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
   `;
   const statsResult = statsRows[0]!;
 
@@ -333,6 +338,7 @@ async function getComplianceStats(): Promise<ComplianceStats> {
     FROM staff s
     LEFT JOIN staff_contracts sc ON sc.staff_id = s.id
     WHERE (s.status = 'active' OR s.is_active = true)
+      ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
       AND (s.sa_id_number IS NULL OR s.bank_account_number IS NULL OR s.date_of_birth IS NULL OR sc.staff_id IS NULL)
     LIMIT 50
   `;

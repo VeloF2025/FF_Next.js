@@ -7,6 +7,8 @@
  * scope clause.
  */
 
+import { approvedAccountPredicateRef } from '@/lib/staff/hrVisibilityFilters';
+
 export interface ParamBuilder {
   params: unknown[];
   /** Push a value onto `params` and return its `$N` placeholder. */
@@ -41,6 +43,12 @@ export interface BaseFilterArgs {
   siteRef?: string;
   /** Reference for the staff active flag — when set, only-active is enforced. */
   activeStaffRefs?: { isActive: string; endDate: string };
+  /**
+   * Full column reference for staff.account_status (e.g. `s.account_status`).
+   * When set, Rule P (hide unapproved/pending field workers) is enforced.
+   * Only set it when the FROM/JOIN exposes a staff row.
+   */
+  accountStatusRef?: string;
 }
 
 /**
@@ -67,6 +75,10 @@ export function buildBaseWhere(args: BaseFilterArgs): string {
   if (args.activeStaffRefs) {
     const { isActive, endDate } = args.activeStaffRefs;
     parts.push(`(${isActive} = true OR ${isActive} IS NULL) AND ${endDate} IS NULL`);
+  }
+  if (args.accountStatusRef) {
+    // Rule P — hide unapproved (pending) field workers from reports.
+    parts.push(approvedAccountPredicateRef(args.accountStatusRef));
   }
   return parts.join(' AND ');
 }

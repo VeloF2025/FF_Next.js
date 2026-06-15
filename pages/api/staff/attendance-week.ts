@@ -12,6 +12,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
+import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { lookupActiveLock } from '@/modules/attendance/corrections/lockQueries';
 
@@ -173,6 +174,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ON wv.staff_id = ds.staff_id AND wv.work_date = ds.work_date
       WHERE ds.work_date >= ${weekStart}::date
         AND ds.work_date <= ${weekEnd}::date
+        ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
       ORDER BY full_name ASC, ds.work_date ASC
     `;
 

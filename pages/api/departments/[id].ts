@@ -11,6 +11,7 @@ import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { createLogger } from '@/lib/logger';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 import type { DepartmentDetail, DepartmentStaffMember, UpdateDepartmentRequest } from '@/types/staff/department.types';
 
 const log = createLogger('DepartmentDetailAPI');
@@ -76,7 +77,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SELECT COUNT(*) FROM staff_projects sp WHERE sp.staff_id = s.id
         ) as "projectCount"
       FROM staff s
-      WHERE s.department_id = ${id}
+      WHERE s.department_id = ${id} ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
       ORDER BY s.status = 'active' DESC, s.name ASC
     ` as DepartmentStaffMember[];
 
@@ -171,6 +172,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       SELECT COUNT(*) as count FROM staff
       WHERE department_id = ${id}
         AND status NOT IN ('terminated', 'resigned', 'retired')
+        ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
     ` as { count: string }[];
 
     if (staffCount[0] && Number(staffCount[0].count) > 0) {

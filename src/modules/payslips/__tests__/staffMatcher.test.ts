@@ -11,9 +11,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ExtractedPayslipPage } from '../pdfSplitter';
 
 const sqlMock = vi.fn();
-vi.mock('@/lib/db-pool', () => ({
-  sql: (...args: unknown[]) => sqlMock(...args),
-}));
+vi.mock('@/lib/db-pool', () => {
+  const sql = (...args: unknown[]) => sqlMock(...args);
+  // Faithful to the real client: `sql.unsafe(raw)` inlines a trusted fragment.
+  // The mock ignores query text, so a passthrough suffices.
+  sql.unsafe = (raw: string) => raw;
+  return { sql };
+});
 
 import { matchPagesToStaff } from '../staffMatcher';
 

@@ -58,6 +58,7 @@ export async function runMonthlyTotals(input: ReportInput): Promise<ReportRunRes
     departments: input.departments,
     deptRef: 's.department',
     activeStaffRefs: { isActive: 's.is_active', endDate: 's.end_date' },
+    accountStatusRef: 's.account_status',
   });
   const siteFilterSql = input.siteIds.length > 0
     ? ` AND EXISTS (

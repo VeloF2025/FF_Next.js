@@ -27,6 +27,7 @@ import {
   type AuthenticatedNextApiRequest,
 } from '@/lib/auth/middleware';
 import { sql } from '@/lib/db-pool';
+import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
 import { resolveScope, type ResolvedScope } from '@/services/attendance/searchQueries';
 
 /** No-show threshold in calendar days. Server-config per FR-ACTION-04. */
@@ -114,6 +115,7 @@ async function countNoShowAlerts(scope: ResolvedScope, today: string): Promise<n
       FROM staff s
       WHERE (s.is_active = true OR s.is_active IS NULL)
         AND s.end_date IS NULL
+        ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
         AND NOT EXISTS (
           SELECT 1 FROM attendance_entries e
           WHERE e.staff_id = s.id
@@ -130,6 +132,7 @@ async function countNoShowAlerts(scope: ResolvedScope, today: string): Promise<n
     WHERE s.id = ANY(${scope.allowedStaffIds}::uuid[])
       AND (s.is_active = true OR s.is_active IS NULL)
       AND s.end_date IS NULL
+      ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
       AND NOT EXISTS (
         SELECT 1 FROM attendance_entries e
         WHERE e.staff_id = s.id

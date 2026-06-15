@@ -5,6 +5,7 @@
 
 import { getSql } from '@/lib/neon-sql';
 import { StaffSummary } from '@/types/staff.types';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 import { log } from '@/lib/logger';
 
 /**
@@ -12,15 +13,20 @@ import { log } from '@/lib/logger';
  */
 export async function getStaffSummary(): Promise<StaffSummary> {
   try {
-    const totalResult = await getSql()`SELECT COUNT(*) as count FROM staff`;
-    const activeResult = await getSql()`SELECT COUNT(*) as count FROM staff WHERE status = 'ACTIVE'`;
-    const inactiveResult = await getSql()`SELECT COUNT(*) as count FROM staff WHERE status = 'INACTIVE'`;
-    const onLeaveResult = await getSql()`SELECT COUNT(*) as count FROM staff WHERE status = 'ON_LEAVE'`;
-    
+    // Rule H — exclude self-registered field workers (technician/casual) from
+    // every HR statistic. Bare column refs: single-table queries, no alias.
+    const sql = getSql();
+    const hrOnly = hrEmployeePredicate('');
+    const totalResult = await sql`SELECT COUNT(*) as count FROM staff WHERE ${sql.unsafe(hrOnly)}`;
+    const activeResult = await sql`SELECT COUNT(*) as count FROM staff WHERE status = 'ACTIVE' ${sql.unsafe('AND ' + hrOnly)}`;
+    const inactiveResult = await sql`SELECT COUNT(*) as count FROM staff WHERE status = 'INACTIVE' ${sql.unsafe('AND ' + hrOnly)}`;
+    const onLeaveResult = await sql`SELECT COUNT(*) as count FROM staff WHERE status = 'ON_LEAVE' ${sql.unsafe('AND ' + hrOnly)}`;
+
     // Get department breakdown
-    const departmentResult = await getSql()`
-      SELECT department, COUNT(*) as count 
-      FROM staff 
+    const departmentResult = await sql`
+      SELECT department, COUNT(*) as count
+      FROM staff
+      WHERE ${sql.unsafe(hrOnly)}
       GROUP BY department
     `;
     

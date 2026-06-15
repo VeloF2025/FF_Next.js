@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { withAuth, withRole, AuthenticatedNextApiRequest, type AuthRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import logger from '@/lib/logger';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -61,6 +62,7 @@ async function handler(
         AND s.email IS NOT NULL
         AND s.email != ''
         AND s.is_active = true
+        ${sql.unsafe('AND ' + hrEmployeePredicate('s'))}
       ORDER BY s.first_name, s.last_name
     `;
 

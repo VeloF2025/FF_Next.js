@@ -11,6 +11,7 @@
 
 import { sql } from '@/lib/db-pool';
 import { makeParamBuilder } from './sqlHelpers';
+import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
 import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
 
@@ -53,6 +54,8 @@ export async function runGeoMismatch(input: ReportInput): Promise<ReportRunResul
     `xe.work_date <= ${pb.next(input.dateTo)}::date`,
     `x.resolved_at IS NULL`,
     `x.exception_kind = ANY(${pb.next([...RELEVANT_KINDS])}::text[])`,
+    // Rule P — hide unapproved (pending) field workers from the report.
+    approvedAccountPredicate('s'),
   ];
   if (input.scopedStaffIds !== null) {
     parts.push(`xe.staff_id = ANY(${pb.next(input.scopedStaffIds)}::uuid[])`);

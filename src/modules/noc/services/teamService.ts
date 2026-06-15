@@ -7,6 +7,7 @@
 
 import { query, queryOne } from '../utils/db';
 import { createLogger } from '@/lib/logger';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 import type {
   Team,
   TeamMember,
@@ -504,6 +505,7 @@ export async function getUsersForDropdown(): Promise<UserDropdownOption[]> {
         department
       FROM staff
       WHERE status = 'active'
+        AND ${hrEmployeePredicate('')}
       ORDER BY first_name ASC, last_name ASC
     `;
 

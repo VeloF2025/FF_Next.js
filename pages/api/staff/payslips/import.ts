@@ -21,6 +21,7 @@ import fs from 'fs/promises';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 import { withAuth } from '@/lib/auth';
 import { withPermission } from '@/lib/auth/middleware';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
@@ -287,7 +288,7 @@ async function resolveStaffByEmail(emails: string[]): Promise<Map<string, StaffM
   const rows = await sql<{ id: string; email: string; first_name: string; last_name: string }>`
     SELECT id, LOWER(email) AS email, first_name, last_name
     FROM staff
-    WHERE LOWER(email) = ANY(${emails}::text[])
+    WHERE LOWER(email) = ANY(${emails}::text[]) ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
   `;
   const map = new Map<string, StaffMatch>();
   for (const r of rows) {

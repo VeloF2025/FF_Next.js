@@ -8,6 +8,7 @@
  */
 
 import { sql } from '@/lib/db-pool';
+import { hrEmployeePredicate } from '@/lib/staff/hrVisibilityFilters';
 
 import { matchPagesToStaff, type StaffMatchResult } from '../staffMatcher';
 import {
@@ -163,7 +164,7 @@ export async function runPreviewImport(
   }>`
     SELECT id, first_name, last_name, LOWER(email) AS email, employment_type
     FROM staff
-    WHERE status IS DISTINCT FROM 'archived'
+    WHERE status IS DISTINCT FROM 'archived' ${sql.unsafe('AND ' + hrEmployeePredicate(''))}
     ORDER BY last_name ASC, first_name ASC
   `;
   const staffOptions: StaffOption[] = staffList.map((s) => ({

@@ -16,6 +16,7 @@
 
 import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
+import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
 import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import { makeParamBuilder } from './sqlHelpers';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
@@ -182,6 +183,7 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
     LEFT JOIN per_staff_aggregates psa ON psa.staff_id = s.id
     LEFT JOIN active_assignments aa ON aa.staff_id = s.id
     WHERE s.status = 'active'
+      AND ${approvedAccountPredicate('s')}
       ${deptClause}
       ${staffScopeClause}
     ORDER BY full_name ASC

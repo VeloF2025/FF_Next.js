@@ -17,6 +17,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
+import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 
 function todayInSast(): string {
@@ -81,7 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN day_entries d ON d.staff_id = s.id
       LEFT JOIN fleet_authorized_locations home_site ON home_site.id = s.home_site_id
       LEFT JOIN fleet_authorized_locations entry_site ON entry_site.id = d.site_geofence_id
-      WHERE LOWER(s.status) = 'active'
+      WHERE LOWER(s.status) = 'active' ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
       ORDER BY full_name ASC
     `;
 
