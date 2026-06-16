@@ -16,7 +16,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { pool, getDbCircuitStats, resetDbCircuit } from '@/lib/db';
 import { log } from '@/lib/logger';
 
-const WA_FEEDBACK_URL = process.env.WA_FEEDBACK_URL || 'http://100.96.203.105:8092';
+// Infra alerts go to a WhatsApp GROUP via the message bridge's /send-message.
+// NOT the wa-feedback service (:8092) — that only exposes /send-feedback, so
+// /send-message there 404s and the alert is silently dropped. Use the message
+// bridge (:8083), same as the canonical sender (communications/whatsapp).
+const WA_BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL || 'http://72.61.197.178:8083';
 const WA_GROUP_JID = process.env.WA_INFRA_GROUP_JID || '120363421664266245@g.us';
 const DEGRADED_THRESHOLD_MS = 5000;
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -131,7 +135,7 @@ async function maybeSendAlert(
     .join('\n');
 
   try {
-    await fetch(`${WA_FEEDBACK_URL}/send-message`, {
+    await fetch(`${WA_BRIDGE_URL}/send-message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ group_jid: WA_GROUP_JID, message }),
