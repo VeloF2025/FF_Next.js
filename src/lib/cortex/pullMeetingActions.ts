@@ -36,7 +36,14 @@ export interface OutboxItem {
 
 export interface OutboxMeeting {
   meeting_id: string;            // Cortex mtg_ hash
-  source_id: string | null;     // = teams_call_record_id (join key)
+  source_id: string | null;     // = teams_call_record_id for teams_native; a base64
+                                 // getAllTranscripts id for teams_artifacts (no GUID match)
+  // #103 natural-key fallback: a teams_artifacts source_id never matches a callRecord GUID,
+  // so Cortex also exposes the occurrence's organizer + start so we can map by natural key.
+  organizer_email?: string | null;
+  started_at?: string | null;    // ISO-8601 (UTC); compared to meetings.meeting_date (UTC)
+  title?: string | null;
+  duration_secs?: number | null;
   seal_source: string;          // 'human' | 'auto'
   human_reviewed: boolean;
   sealed_at: string | null;
@@ -62,6 +69,12 @@ export interface SyncResult {
 type Sql = NeonQueryFunction<false, false>;
 
 const FETCH_TIMEOUT_MS = 15_000;
+// #103 natural-key fallback window: a Cortex occurrence's started_at and our meeting_date for
+// the SAME Teams occurrence agree within a couple of minutes; ±5 min absorbs clock/rounding
+// skew while staying tight enough to rarely overlap an adjacent meeting. The fallback is also
+// FAIL-CLOSED on ambiguity (2+ candidates in-window → leave unmapped), so the window only
+// needs to be tight enough to keep the unique-match rate high, not to guarantee uniqueness.
+const NATURAL_KEY_WINDOW_MS = 5 * 60_000;
 
 /**
  * Pull the Cortex outbox feed and upsert each sealed meeting into cortex_meeting_actions.
@@ -107,6 +120,40 @@ export async function syncCortexMeetingActions(
           SELECT id FROM meetings WHERE teams_call_record_id = ${m.source_id} LIMIT 1
         `) as { id: number }[];
         ffMeetingId = rows[0]?.id ?? null;
+      }
+      // #103 fallback: a teams_artifacts meeting's source_id is a base64 getAllTranscripts id,
+      // never a callRecord GUID, so the join above misses ~half of sealed meetings. Cortex now
+      // exposes organizer_email + started_at, so map by the occurrence natural key (organizer +
+      // meeting_date within a window) — the same key our transcript dup-fix already uses. The
+      // match is FAIL-CLOSED: map only when exactly ONE meeting is in-window; on 2+ we leave it
+      // unmapped (never guess) since a wrong map writes a locked summary + tasks + an irreversible
+      // delivery ack. meeting_date is UTC wall-clock (timestamp w/o tz) and Cortex's started_at is
+      // UTC ISO, so we compare both as naive UTC.
+      if (ffMeetingId === null && m.organizer_email && m.started_at) {
+        const startMs = Date.parse(m.started_at);
+        if (Number.isFinite(startMs)) {
+          const naiveUtc = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+          const lo = naiveUtc(startMs - NATURAL_KEY_WINDOW_MS);
+          const hi = naiveUtc(startMs + NATURAL_KEY_WINDOW_MS);
+          // Fetch up to 2 so we can detect ambiguity. We deliberately do NOT nearest-match-and-pick:
+          // writing a (locked) summary + action_items + an irreversible delivery ack against the
+          // WRONG meeting is far worse than leaving it unmapped (FF just keeps summarising it).
+          const rows = (await sql`
+            SELECT id FROM meetings
+            WHERE lower(organizer_email) = lower(${m.organizer_email})
+              AND meeting_date BETWEEN ${lo}::timestamp AND ${hi}::timestamp
+            LIMIT 2
+          `) as { id: number }[];
+          if (rows.length === 1) {
+            ffMeetingId = rows[0]?.id ?? null;
+          } else if (rows.length > 1) {
+            // Fail-closed: 2+ same-organizer meetings in the window — can't disambiguate safely.
+            log.warn('cortex pull: ambiguous natural-key match; left unmapped', {
+              meetingId: m.meeting_id, organizer: m.organizer_email, startedAt: m.started_at,
+              candidates: rows.map((r) => r.id),
+            });
+          }
+        }
       }
       if (ffMeetingId === null) unmapped++;
       else mapped++;

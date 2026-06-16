@@ -185,3 +185,102 @@ describe('syncCortexMeetingActions — summary write-back (Goal 3b)', () => {
     expect(result.summariesWritten).toBe(0);   // …but writes nothing (no re-stamp)
   });
 });
+
+// ── #103: natural-key fallback for teams_artifacts meetings ──────────────────────
+// A teams_artifacts meeting's source_id is a base64 getAllTranscripts identity, never a
+// callRecord GUID, so `teams_call_record_id = source_id` misses ~half of sealed meetings.
+// Cortex now exposes organizer_email + started_at on the feed; fall back to an occurrence
+// natural-key match (organizer + meeting_date ± window) when the source_id join finds nothing.
+describe('syncCortexMeetingActions — natural-key fallback (#103)', () => {
+  // Distinguishes the two SELECTs: the GUID lookup (teams_call_record_id) vs the natural-key
+  // lookup (lower(organizer_email) + meeting_date BETWEEN …). `natRows` is what the natural-key
+  // SELECT returns — [] (no match), one row (unique → map), or 2 rows (ambiguous → fail-closed).
+  function makeNatSql(opts: { guidId?: number | null; natRows?: { id: number }[] } = {}) {
+    const guidId = opts.guidId ?? null;
+    const natRows = opts.natRows ?? [];
+    const natSelects: unknown[][] = [];
+    const guidSelects: unknown[][] = [];
+    const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const q = strings.join(' ? ');
+      if (/SELECT id FROM meetings\s+WHERE teams_call_record_id/i.test(q)) {
+        guidSelects.push(values);
+        return Promise.resolve(guidId != null ? [{ id: guidId }] : []);
+      }
+      if (/SELECT id FROM meetings\s+WHERE lower\(organizer_email\)/i.test(q)) {
+        natSelects.push(values);
+        return Promise.resolve(natRows);
+      }
+      if (/INSERT INTO cortex_meeting_actions/i.test(q)) return Promise.resolve([{ delivered_at: null }]);
+      if (/SELECT id FROM action_items/i.test(q)) return Promise.resolve([]);
+      if (/SELECT id FROM users/i.test(q)) return Promise.resolve([]);
+      return Promise.resolve([]);
+    }) as unknown as NeonQueryFunction<false, false>;
+    return { sql, natSelects, guidSelects };
+  }
+
+  const artifact = (over: Partial<FeedResponse['meetings'][number]> = {}) =>
+    meeting({
+      meeting_id: 'mtg_art',
+      source_id: 'MSpiZTQ4ZTM2Ny0z',     // base64 getAllTranscripts id → no GUID match
+      seal_source: 'auto', human_reviewed: false, summary: 'AI summary', items: [],
+      organizer_email: 'lew@velocityfibre.co.za',
+      started_at: '2026-06-05T10:00:00+00:00',
+      title: 'Prospective', duration_secs: 1800,
+      ...over,
+    });
+
+  it('maps + delivers an artifact meeting via organizer+start when source_id misses (unique match)', async () => {
+    const { sql, natSelects } = makeNatSql({ guidId: null, natRows: [{ id: 96578 }] });
+    const result = await syncCortexMeetingActions(sql, 'http://b', 'k', { fetchFn: fakeFetch({ meetings: [artifact()] }) });
+    expect(result.mapped).toBe(1);
+    expect(result.unmapped).toBe(0);
+    expect(result.delivered).toBe(1);            // mapped → acked
+    expect(natSelects).toHaveLength(1);          // fallback ran
+    // Window is pinned: ±5 min around 10:00:00Z → 09:55:00 .. 10:05:00 (naive UTC), organizer bound.
+    expect(natSelects[0]).toEqual(['lew@velocityfibre.co.za', '2026-06-05 09:55:00', '2026-06-05 10:05:00']);
+  });
+
+  it('FAILS CLOSED on an ambiguous match — 2+ candidates in window → unmapped, not delivered', async () => {
+    const { sql, natSelects } = makeNatSql({ guidId: null, natRows: [{ id: 96578 }, { id: 96579 }] });
+    const result = await syncCortexMeetingActions(sql, 'http://b', 'k', { fetchFn: fakeFetch({ meetings: [artifact()] }) });
+    expect(natSelects).toHaveLength(1);          // fallback ran…
+    expect(result.mapped).toBe(0);               // …but did NOT pick one of the two
+    expect(result.unmapped).toBe(1);
+    expect(result.delivered).toBe(0);            // never acks/writes against a guessed meeting
+  });
+
+  it('does not run the fallback when the source_id GUID match succeeds', async () => {
+    const { sql, natSelects, guidSelects } = makeNatSql({ guidId: 92488, natRows: [{ id: 96578 }] });
+    const result = await syncCortexMeetingActions(sql, 'http://b', 'k', { fetchFn: fakeFetch({ meetings: [artifact({ source_id: 'cr-1' })] }) });
+    expect(result.mapped).toBe(1);
+    expect(guidSelects).toHaveLength(1);
+    expect(natSelects).toHaveLength(0);          // GUID matched → no fallback
+  });
+
+  it('stays unmapped when neither source_id nor the natural key matches', async () => {
+    const { sql, natSelects } = makeNatSql({ guidId: null, natRows: [] });
+    const result = await syncCortexMeetingActions(sql, 'http://b', 'k', { fetchFn: fakeFetch({ meetings: [artifact()] }) });
+    expect(result.unmapped).toBe(1);
+    expect(result.delivered).toBe(0);
+    expect(natSelects).toHaveLength(1);          // attempted, found nothing
+  });
+
+  it('does not run the fallback without organizer_email + started_at', async () => {
+    const { sql, natSelects } = makeNatSql({ guidId: null, natRows: [{ id: 96578 }] });
+    const result = await syncCortexMeetingActions(sql, 'http://b', 'k', {
+      fetchFn: fakeFetch({ meetings: [artifact({ organizer_email: null, started_at: null })] }),
+    });
+    expect(natSelects).toHaveLength(0);          // no key → no fallback query
+    expect(result.unmapped).toBe(1);
+  });
+
+  it('skips the fallback (no throw) when started_at is unparseable', async () => {
+    const { sql, natSelects } = makeNatSql({ guidId: null, natRows: [{ id: 96578 }] });
+    const result = await syncCortexMeetingActions(sql, 'http://b', 'k', {
+      fetchFn: fakeFetch({ meetings: [artifact({ started_at: 'not-a-date' })] }),
+    });
+    expect(natSelects).toHaveLength(0);          // Number.isFinite guard → no query
+    expect(result.unmapped).toBe(1);
+    expect(result.errors).toBe(0);               // did not throw
+  });
+});
