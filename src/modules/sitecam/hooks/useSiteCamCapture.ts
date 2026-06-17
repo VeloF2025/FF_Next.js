@@ -1,10 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { log } from '@/lib/logger';
 import type { SiteCamStep, SiteCamJobType } from '../lib/sitecamSteps';
 import { readDeviceLocation, type GeofenceReading, type GeofencePayload } from '../lib/geofence';
 import { prepareCapturePhotos } from '../lib/watermarkPhoto';
+import { loadDraft, saveDraft, clearDraft, type SiteCamDraft } from '../lib/sitecamDraft';
 
 const MODULE = 'useSiteCamCapture';
+
+/** Poll cadence for an appeal awaiting a supervisor decision. */
+const APPEAL_POLL_MS = 8000;
 
 export type StepStatus =
   | 'pending'
@@ -75,11 +79,109 @@ export function useSiteCamCapture(
   siteInfo: SiteInfo,
   entryGeofence: GeofenceReading | null = null,
 ) {
-  const [stepStates, setStepStates] = useState<StepState[]>(() => initStepStates(steps));
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  // Read any saved draft ONCE (cached in a ref) so the three state initialisers
+  // below don't each hit localStorage. The wizard mounts client-side only, so
+  // restoring in the lazy initialiser causes no SSR hydration mismatch.
+  const draftRef = useRef<SiteCamDraft | null | undefined>(undefined);
+  const initialDraft = (): SiteCamDraft | null => {
+    if (draftRef.current === undefined) {
+      draftRef.current = loadDraft(siteInfo.jobType, siteInfo.siteId, steps);
+    }
+    return draftRef.current;
+  };
+
+  const [stepStates, setStepStates] = useState<StepState[]>(
+    () => initialDraft()?.stepStates ?? initStepStates(steps),
+  );
+  const [currentStepIndex, setCurrentStepIndex] = useState(
+    () => initialDraft()?.currentStepIndex ?? 0,
+  );
+  // Index of a step whose appeal is awaiting a supervisor decision, if any.
+  const [appealedIndex, setAppealedIndex] = useState<number | null>(
+    () => initialDraft()?.appealedIndex ?? null,
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<{ uploadedCount: number } | null>(null);
+
+  // Mirror progress into localStorage so a refresh / PWA reload restores it.
+  useEffect(() => {
+    saveDraft(siteInfo.jobType, siteInfo.siteId, stepStates, currentStepIndex, appealedIndex);
+  }, [siteInfo.jobType, siteInfo.siteId, stepStates, currentStepIndex, appealedIndex]);
+
+  // Once the job is submitted there is nothing left to resume — drop the draft.
+  useEffect(() => {
+    if (uploadResult) clearDraft(siteInfo.jobType, siteInfo.siteId);
+  }, [uploadResult, siteInfo.jobType, siteInfo.siteId]);
+
+  // Poll for a supervisor's appeal decision. An approved appeal marks the step
+  // passed and advances (if it is still the current step); a denied appeal
+  // returns the step to the failed state with the supervisor's reason. Without
+  // this the wizard never learned the outcome and a refresh wiped progress.
+  useEffect(() => {
+    if (appealedIndex === null) return;
+    const step = steps[appealedIndex];
+    if (!step) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `/api/my/sitecam/appeal-status/${encodeURIComponent(siteInfo.siteId)}/${step.number}`,
+          { credentials: 'include' },
+        );
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          data?: { status?: string; denialReason?: string | null };
+        };
+        if (cancelled) return;
+        const status = json.data?.status;
+        if (status === 'approved') {
+          setStepStates((prev) =>
+            prev.map((s, i) =>
+              i === appealedIndex
+                ? { ...s, status: 'pass', failReasons: [], corrections: [] }
+                : s,
+            ),
+          );
+          // Advance only if the technician is still sitting on the appealed step
+          // (an escalated step has already auto-advanced past it).
+          setCurrentStepIndex((i) =>
+            i === appealedIndex ? Math.min(i + 1, steps.length - 1) : i,
+          );
+          setAppealedIndex(null);
+        } else if (status === 'denied') {
+          setStepStates((prev) =>
+            prev.map((s, i) =>
+              i === appealedIndex
+                ? {
+                    ...s,
+                    status: 'fail',
+                    failReasons: [json.data?.denialReason || 'Appeal denied by supervisor.'],
+                  }
+                : s,
+            ),
+          );
+          setAppealedIndex(null);
+        }
+      } catch (err) {
+        log.warn('Appeal status poll failed (will retry)', { err: String(err) }, MODULE);
+      }
+    };
+
+    void poll();
+    const id = setInterval(() => void poll(), APPEAL_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [appealedIndex, steps, siteInfo.siteId]);
+
+  // Called when the technician submits an appeal for the current step — kicks
+  // off the polling effect above.
+  const onAppealSubmitted = useCallback(() => {
+    setAppealedIndex(currentStepIndex);
+  }, [currentStepIndex]);
 
   const advanceStep = useCallback(
     (delayMs: number) => {
@@ -339,6 +441,9 @@ export function useSiteCamCapture(
     (s) => s.status === 'pass' || s.status === 'escalated' || s.status === 'serial_pending',
   );
 
+  // True while the CURRENT step has an appeal awaiting a supervisor decision.
+  const appealPending = appealedIndex !== null && appealedIndex === currentStepIndex;
+
   return {
     stepStates,
     currentStep,
@@ -351,5 +456,7 @@ export function useSiteCamCapture(
     uploadError,
     uploadResult,
     escalateStep,
+    onAppealSubmitted,
+    appealPending,
   };
 }
