@@ -30,6 +30,7 @@ import { OltResolveModal } from './OltResolveModal';
 import { OltEscalateModal } from './OltEscalateModal';
 import { CreateOltTicketsModal } from './CreateOltTicketsModal';
 import type { OltTicketBatch } from './CreateOltTicketsModal';
+import { isCrossDrSwappable } from './investigationContext';
 import { log } from '@/lib/logger';
 
 interface OltInvestigateTabProps {
@@ -605,6 +606,35 @@ export function OltInvestigateTab({
                   )}
                 </div>
               )}
+            </td>
+          </tr>
+        );
+      }
+
+      // Any other investigation reason (e.g. status_mismatch) has no cross-DR
+      // swap workflow and lacks the wrongSerial/belongsToDr fields the purple
+      // panel below assumes. Render a read-only info panel — its "Check Other
+      // DR" button would otherwise 400 the cross-dr-lookup and the header would
+      // show "ONT undefined belongs to undefined".
+      if (!isCrossDrSwappable(ctx)) {
+        const title = ctx.reason === 'status_mismatch' ? 'Status Not Installed' : 'Investigation Needed';
+        return (
+          <tr key={`${record.id}-ctx`} className="border-b border-[var(--ff-border-light)]">
+            <td colSpan={7} className="py-1.5 px-4">
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg text-xs">
+                <div className="flex items-start gap-2 px-3 py-2">
+                  <Wrench className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-semibold text-amber-300">{title}</span>
+                    <p className="text-[var(--ff-text-secondary)] leading-relaxed">{ctx.message}</p>
+                    {ctx.reason === 'status_mismatch' && ctx.currentStatus && (
+                      <p className="text-[var(--ff-text-tertiary)]">
+                        Current 1Map status: <span className="font-mono text-amber-200">{ctx.currentStatus}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </td>
           </tr>
         );
