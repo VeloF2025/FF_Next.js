@@ -84,7 +84,9 @@ export function useSiteCamCapture(
   // restoring in the lazy initialiser causes no SSR hydration mismatch.
   const draftRef = useRef<SiteCamDraft | null | undefined>(undefined);
   const initialDraft = (): SiteCamDraft | null => {
-    if (draftRef.current === undefined) draftRef.current = loadDraft(siteInfo.siteId, steps);
+    if (draftRef.current === undefined) {
+      draftRef.current = loadDraft(siteInfo.jobType, siteInfo.siteId, steps);
+    }
     return draftRef.current;
   };
 
@@ -104,13 +106,13 @@ export function useSiteCamCapture(
 
   // Mirror progress into localStorage so a refresh / PWA reload restores it.
   useEffect(() => {
-    saveDraft(siteInfo.siteId, stepStates, currentStepIndex, appealedIndex);
-  }, [siteInfo.siteId, stepStates, currentStepIndex, appealedIndex]);
+    saveDraft(siteInfo.jobType, siteInfo.siteId, stepStates, currentStepIndex, appealedIndex);
+  }, [siteInfo.jobType, siteInfo.siteId, stepStates, currentStepIndex, appealedIndex]);
 
   // Once the job is submitted there is nothing left to resume — drop the draft.
   useEffect(() => {
-    if (uploadResult) clearDraft(siteInfo.siteId);
-  }, [uploadResult, siteInfo.siteId]);
+    if (uploadResult) clearDraft(siteInfo.jobType, siteInfo.siteId);
+  }, [uploadResult, siteInfo.jobType, siteInfo.siteId]);
 
   // Poll for a supervisor's appeal decision. An approved appeal marks the step
   // passed and advances (if it is still the current step); a denied appeal

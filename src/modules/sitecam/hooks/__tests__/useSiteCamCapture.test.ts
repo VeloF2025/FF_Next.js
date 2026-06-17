@@ -245,6 +245,7 @@ describe('useSiteCamCapture geofence payload', () => {
 describe('useSiteCamCapture draft persistence', () => {
   it('restores saved progress instead of starting at step 1', () => {
     saveDraft(
+      SITE_INFO.jobType,
       SITE_INFO.siteId,
       [stepFixture(1, { status: 'pass', photoBase64: 'AAAA' }), stepFixture(2)],
       1,
