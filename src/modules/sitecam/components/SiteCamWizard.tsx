@@ -38,6 +38,8 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
     uploading,
     uploadError,
     uploadResult,
+    onAppealSubmitted,
+    appealPending,
   } = useSiteCamCapture(steps, siteInfo, entryGeofence);
 
   const total = stepStates.length;
@@ -98,6 +100,7 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
             onCapture={(f) => void captureAndValidate(f)}
             onSerialSaved={handleSerialSaved}
             onAppeal={() => setAppealOpen(true)}
+            appealPending={appealPending}
           />
         )}
 
@@ -108,6 +111,7 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
             onClose={() => setAppealOpen(false)}
             onSubmitted={(appealId) => {
               setAppealOpen(false);
+              onAppealSubmitted();
               log.info('Appeal submitted', { appealId }, 'SiteCamWizard');
             }}
             drNumber={siteInfo.siteId}

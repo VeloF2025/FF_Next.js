@@ -22,9 +22,11 @@ interface Props {
   onCapture: (file: File) => void;
   onSerialSaved: (serial: string) => void;
   onAppeal: () => void;
+  /** True while this step's appeal is awaiting a supervisor decision. */
+  appealPending?: boolean;
 }
 
-export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal }: Props) {
+export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal, appealPending = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null); // TEMP: test-only gallery upload
   const [saved, setSaved] = useState(false);
@@ -51,7 +53,8 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal
   const showSerialScan = step.status === 'serial_scan';
   const remaining = Math.max(0, 3 - step.attemptNumber);
   const showAppeal =
-    (step.status === 'fail' && step.attemptNumber > 0) || step.status === 'escalated';
+    !appealPending &&
+    ((step.status === 'fail' && step.attemptNumber > 0) || step.status === 'escalated');
 
   return (
     <div className="space-y-4">
@@ -176,6 +179,13 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal
               />
             </>
           )}
+        </div>
+      )}
+
+      {appealPending && (
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-amber-800 bg-amber-950/30 py-3 text-sm font-medium text-amber-300">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Appeal sent — waiting for supervisor review…
         </div>
       )}
 

@@ -19,9 +19,24 @@ vi.mock('../../lib/watermarkPhoto', () => ({
   prepareCapturePhotos: vi.fn(async () => ({ clean: 'RkFLRQ==', watermarked: 'RkFLRQ==' })),
 }));
 
-import { useSiteCamCapture, type SiteInfo } from '../useSiteCamCapture';
+import { useSiteCamCapture, type SiteInfo, type StepState } from '../useSiteCamCapture';
 import type { SiteCamStep } from '../../lib/sitecamSteps';
 import { buildReading } from '../../lib/geofence';
+import { saveDraft } from '../../lib/sitecamDraft';
+
+const TWO_STEPS: readonly SiteCamStep[] = [
+  { number: 1, label: 'A', hasVlm: true },
+  { number: 2, label: 'B', hasVlm: true },
+];
+
+function stepFixture(num: number, over: Partial<StepState> = {}): StepState {
+  return {
+    stepNumber: num, label: `Step ${num}`, hasVlm: true, hasSerialScan: false,
+    serialLabel: '', serialDevice: null, serialAttempts: 0, serialScanned: null,
+    status: 'pending', photoBase64: null, attemptNumber: 0, failReasons: [],
+    corrections: [], needsManualReview: false, ...over,
+  };
+}
 
 class MockFileReader {
   result: string | null = null;
@@ -54,6 +69,9 @@ function file(): File {
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  // The hook now persists progress to localStorage keyed by siteId; clear it so
+  // a draft from one test never restores into the next (they share 'POLE-1').
+  window.localStorage.clear();
   vi.useFakeTimers();
   vi.stubGlobal('FileReader', MockFileReader as unknown as typeof FileReader);
   fetchMock = vi.fn();
@@ -64,6 +82,7 @@ afterEach(() => {
   vi.clearAllTimers();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  window.localStorage.clear();
 });
 
 function jsonOk(data: unknown) {
@@ -220,5 +239,71 @@ describe('useSiteCamCapture geofence payload', () => {
       submitLat: -26.2,
       submitLon: 27.6,
     });
+  });
+});
+
+describe('useSiteCamCapture draft persistence', () => {
+  it('restores saved progress instead of starting at step 1', () => {
+    saveDraft(
+      SITE_INFO.siteId,
+      [stepFixture(1, { status: 'pass', photoBase64: 'AAAA' }), stepFixture(2)],
+      1,
+      null,
+    );
+
+    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, SITE_INFO));
+
+    expect(result.current.currentStepIndex).toBe(1);
+    expect(result.current.stepStates[0].status).toBe('pass');
+    expect(result.current.stepStates[0].photoBase64).toBe('AAAA');
+  });
+});
+
+describe('useSiteCamCapture appeal resolution', () => {
+  it('marks the step passed and advances when the appeal is approved', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') {
+        return jsonOk({ data: { pass: false, reasons: ['nope'], corrections: [], maxAttempts: 3 } });
+      }
+      if (url.startsWith('/api/my/sitecam/appeal-status/')) {
+        return jsonOk({ data: { status: 'approved' } });
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, SITE_INFO));
+
+    await act(async () => { await result.current.captureAndValidate(file()); });
+    expect(result.current.stepStates[0].status).toBe('fail');
+
+    await act(async () => { result.current.onAppealSubmitted(); });
+    // The polling effect fires once immediately — flush its async fetch chain.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+
+    expect(result.current.stepStates[0].status).toBe('pass');
+    expect(result.current.currentStepIndex).toBe(1);
+    expect(result.current.appealPending).toBe(false);
+  });
+
+  it('returns the step to failed with the supervisor reason when the appeal is denied', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') {
+        return jsonOk({ data: { pass: false, reasons: ['nope'], corrections: [], maxAttempts: 3 } });
+      }
+      if (url.startsWith('/api/my/sitecam/appeal-status/')) {
+        return jsonOk({ data: { status: 'denied', denialReason: 'Still wrong angle' } });
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, SITE_INFO));
+
+    await act(async () => { await result.current.captureAndValidate(file()); });
+    await act(async () => { result.current.onAppealSubmitted(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+
+    expect(result.current.stepStates[0].status).toBe('fail');
+    expect(result.current.stepStates[0].failReasons).toEqual(['Still wrong angle']);
+    expect(result.current.currentStepIndex).toBe(0);
   });
 });

@@ -40,9 +40,9 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
   3: {
     label: 'Cable Entry Outside',
     requirements:
-      'The fiber optic cable entry point must be visible on the OUTSIDE of the building. A pipe, conduit, or hole in the exterior wall where the cable enters is expected. The cable or conduit must be visible entering or exiting through the wall from the outside.',
+      'The fiber optic cable entry point must be visible on the OUTSIDE of the building. A pipe, conduit, or hole in the exterior wall where the cable enters is expected. The cable or conduit must be visible entering or exiting through the wall from the outside. An upward-angle shot taken from outside — looking up at the eave, soffit, fascia or roofline where the drop cable runs down the exterior wall or enters under the roof overhang — IS a valid outside view. Visible sky, gutters, the underside of a roof overhang, or outdoor surroundings confirm the photo was taken from OUTSIDE.',
     failInstruction:
-      'FAIL if no cable entry point, conduit, or pipe is visible on the outside wall. FAIL if the photo shows the inside of the building or is taken from inside looking out.',
+      'FAIL if no cable entry point, conduit, or pipe is visible on the outside wall. FAIL if the photo shows the inside of the building (interior ceiling, indoor room, furniture) or is taken from inside looking out. Do NOT fail an outdoor upward shot of the eave / soffit / roofline as "inside" — the underside of a roof overhang with sky or outdoor surroundings visible is OUTSIDE, not a ceiling.',
     failReason: 'Cable entry point not visible from outside',
   },
   4: {
