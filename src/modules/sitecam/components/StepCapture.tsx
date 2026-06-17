@@ -1,10 +1,20 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { AlertTriangle, Camera, CheckCircle, Download, Loader2 } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle, Download, Loader2, Upload } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { StepState } from '../hooks/useSiteCamCapture';
 import { SerialScanStep } from './SerialScanStep';
 import { savePhotoToDevice, stepPhotoFilename } from '../lib/savePhotoToDevice';
+
+// ─── TEMPORARY: test-only gallery upload ─────────────────────────────────────
+// Lets QA pick an existing image (e.g. a screenshot) from the device gallery
+// instead of forcing the camera, so the SiteCam wizard can be exercised
+// end-to-end without being on-site. Gated to dev via the build-time flag and
+// NEVER enabled in production (uploads would defeat the live-capture guarantee).
+// To remove this feature: delete this constant, the `uploadInputRef`, and the
+// `{ALLOW_TEST_UPLOAD && …}` block below, then drop the env var.
+const ALLOW_TEST_UPLOAD = process.env.NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD === 'true';
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface Props {
   step: StepState;
@@ -16,6 +26,7 @@ interface Props {
 
 export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null); // TEMP: test-only gallery upload
   const [saved, setSaved] = useState(false);
 
   const handleSavePhoto = async () => {
@@ -140,6 +151,31 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal
             className="hidden"
             onChange={handleInputChange}
           />
+
+          {/* ─── TEMPORARY: test-only gallery upload (remove with ALLOW_TEST_UPLOAD) ───
+              No `capture` attribute → on a phone this opens the gallery/file
+              picker instead of the camera, so QA can select a screenshot. The
+              chosen file flows through the exact same onCapture → watermark →
+              validate pipeline as a camera photo. */}
+          {ALLOW_TEST_UPLOAD && (
+            <>
+              <button
+                type="button"
+                onClick={() => uploadInputRef.current?.click()}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-amber-600/70 bg-amber-950/20 py-3 text-sm font-medium text-amber-300 hover:bg-amber-950/40 transition-colors"
+              >
+                <Upload className="h-5 w-5" />
+                Upload Photo (test)
+              </button>
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleInputChange}
+              />
+            </>
+          )}
         </div>
       )}
 
