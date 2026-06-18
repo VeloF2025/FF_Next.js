@@ -48,10 +48,10 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
   4: {
     label: 'Cable Entry Inside',
     requirements:
-      'The fiber optic cable entry point must be visible from the INSIDE of the building. A pipe, conduit, or hole in the interior wall where the cable enters is expected. The cable or conduit must be visible entering through the wall from the inside.',
+      'An INTERIOR view of the fiber drop cable where it enters and is routed inside the building. ACCEPTABLE either way: (a) the cable entering through a hole, conduit or pipe in the interior wall, OR (b) the cable running down/along an interior wall or ceiling from the entry point — including a thin cable routed in a wall corner, secured with clips, or trailing toward its destination. Visible interior surroundings (room walls, a ceiling corner, indoor finish) confirm the photo was taken from INSIDE.',
     failInstruction:
-      'FAIL if no cable entry point, conduit, or pipe is visible on the interior wall. FAIL if the photo appears to be taken from outside the building.',
-    failReason: 'Cable entry point not visible from inside',
+      'FAIL only if no drop cable is visible inside at all, or if the photo is clearly taken from OUTSIDE the building (exterior wall, sky, outdoor surroundings). Do NOT fail just because a distinct hole, conduit or pipe is not visible — an interior cable routed along the wall or ceiling from the entry point is a valid Cable Entry Inside photo.',
+    failReason: 'No interior cable entry or routing visible',
   },
   5: {
     label: 'Wall for Installation',
