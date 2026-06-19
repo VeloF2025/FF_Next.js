@@ -81,9 +81,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   // Compute window: [earliestMonday, todaySAST]. We anchor to SAST
   // mondays so the buckets line up with the weekly export surface.
-  const todaySast = new Date(
-    new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })
-  );
+  // SAST calendar date via Intl (robust); anchor a Date at UTC-midnight of
+  // that day so the UTC-based isoWeekMonday()/ymd() helpers line up. The
+  // previous `new Date(toLocaleString(...))` round-trip is spec-undefined and
+  // can yield Invalid Date on a future Node. (#2000)
+  const todaySastYmd = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const todaySast = new Date(`${todaySastYmd}T00:00:00Z`);
   const latestMonday = isoWeekMonday(todaySast);
   const earliestMonday = new Date(latestMonday);
   earliestMonday.setUTCDate(earliestMonday.getUTCDate() - 7 * (weeks - 1));
@@ -206,7 +214,7 @@ async function loadWeeklyTotals(
             COALESCE(SUM(s.sunday_hrs), 0)::text   AS sunday_hrs,
             COALESCE(SUM(s.holiday_hrs), 0)::text  AS holiday_hrs,
             COALESCE(SUM(s.night_hrs), 0)::text    AS night_hrs,
-            COALESCE(SUM(s.wage_amount_cents), 0)::text AS wage_amount_cents,
+            SUM(s.wage_amount_cents)::text AS wage_amount_cents,
             COALESCE(wx.exceptions_count, '0') AS exceptions_count,
             COALESCE(wm.mismatch_count, '0') AS mismatch_count
           FROM summaries s
@@ -255,7 +263,7 @@ async function loadWeeklyTotals(
             COALESCE(SUM(s.sunday_hrs), 0)::text   AS sunday_hrs,
             COALESCE(SUM(s.holiday_hrs), 0)::text  AS holiday_hrs,
             COALESCE(SUM(s.night_hrs), 0)::text    AS night_hrs,
-            COALESCE(SUM(s.wage_amount_cents), 0)::text AS wage_amount_cents,
+            SUM(s.wage_amount_cents)::text AS wage_amount_cents,
             COALESCE(wx.exceptions_count, '0') AS exceptions_count,
             COALESCE(wm.mismatch_count, '0') AS mismatch_count
           FROM summaries s

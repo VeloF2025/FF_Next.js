@@ -22,7 +22,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { sql } from '@/lib/db-pool';
+import { transaction } from '@/lib/db-pool';
 import {
   withAuth,
   withPermission,
@@ -34,6 +34,12 @@ import {
   lookupActiveLock,
 } from '@/modules/attendance/corrections/lockQueries';
 import { authorizedToSuperviseStaff } from '@/services/attendance/supervisorScope';
+
+// Strict UUID format. A malformed staff_id otherwise reaches a parameterized
+// query and surfaces as an unlogged 500 ("invalid input syntax for type
+// uuid") instead of a clean 400. (#2001)
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -56,6 +62,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   if (!staffId) {
     apiResponse.badRequest(res, 'staff_id is required');
+    return;
+  }
+  if (!UUID_RE.test(staffId)) {
+    apiResponse.badRequest(res, 'staff_id must be a valid UUID');
     return;
   }
   // Scope gate: supervisor can only act on staff in their supervisor
@@ -107,46 +117,59 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   }
 
   try {
-    const rows = await sql<{ id: string }>`
-      INSERT INTO attendance_entries (
-        staff_id, work_date,
-        clock_in_at, clock_out_at,
-        client_occurred_at_in, client_occurred_at_out,
-        received_at_in, received_at_out,
-        site_geofence_id,
-        status, notes
-      ) VALUES (
-        ${staffId}, ${workDate}::date,
-        ${clockInAt.toISOString()}, ${clockOutAt.toISOString()},
-        ${clockInAt.toISOString()}, ${clockOutAt.toISOString()},
-        NOW(), NOW(),
-        ${siteGeofenceId},
-        'manual', ${notes}
-      )
-      RETURNING id
-    `;
-    const created = rows[0];
-    if (!created) {
-      throw new Error('INSERT returned no row');
-    }
-    await sql`
-      INSERT INTO attendance_exceptions (entry_id, exception_kind, severity, details)
-      VALUES (
-        ${created.id},
-        'manual_override',
-        'info',
-        jsonb_build_object(
-          'supervisor_user_id', ${actor}::text,
-          'reason', ${notes}
-        )
-      )
-    `;
-    // Invalidate any existing summary so reconcile re-creates it from the new entry.
-    await sql`
-      DELETE FROM attendance_daily_summaries
-      WHERE staff_id = ${staffId} AND work_date = ${workDate}::date
-    `;
-    apiResponse.success(res, { entry_id: created.id, work_date: workDate });
+    // All three writes (entry insert, manual_override audit-exception
+    // insert, summary invalidation) must be atomic — a partial failure
+    // previously left a 'manual' entry with no audit row, breaking the
+    // attestation trail. (#1997)
+    const entryId = await transaction(async (txn) => {
+      const inserted = await txn.queryOne<{ id: string }>(
+        `INSERT INTO attendance_entries (
+           staff_id, work_date,
+           clock_in_at, clock_out_at,
+           client_occurred_at_in, client_occurred_at_out,
+           received_at_in, received_at_out,
+           site_geofence_id,
+           status, notes
+         ) VALUES (
+           $1, $2::date,
+           $3, $4,
+           $5, $6,
+           NOW(), NOW(),
+           $7,
+           'manual', $8
+         )
+         RETURNING id`,
+        [
+          staffId,
+          workDate,
+          clockInAt.toISOString(),
+          clockOutAt.toISOString(),
+          clockInAt.toISOString(),
+          clockOutAt.toISOString(),
+          siteGeofenceId,
+          notes,
+        ]
+      );
+      if (!inserted) {
+        throw new Error('INSERT returned no row');
+      }
+      await txn.query(
+        `INSERT INTO attendance_exceptions (entry_id, exception_kind, severity, details)
+         VALUES (
+           $1, 'manual_override', 'info',
+           jsonb_build_object('supervisor_user_id', $2::text, 'reason', $3)
+         )`,
+        [inserted.id, actor, notes]
+      );
+      // Invalidate any existing summary so reconcile re-creates it from the new entry.
+      await txn.query(
+        `DELETE FROM attendance_daily_summaries
+          WHERE staff_id = $1 AND work_date = $2::date`,
+        [staffId, workDate]
+      );
+      return inserted.id;
+    });
+    apiResponse.success(res, { entry_id: entryId, work_date: workDate });
   } catch (err) {
     log.error('[staff-manual-entry] insert failed', {
       staffId,

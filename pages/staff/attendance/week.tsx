@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Calendar, AlertTriangle } from 'lucide-react';
+import { Download, Calendar, AlertTriangle, Lock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AttendanceNav } from '@/components/attendance/AttendanceNav';
 import {
@@ -37,6 +37,13 @@ interface WeekPayload {
     exceptionsCount: number;
     staffCount: number;
   };
+  // Payroll-week lock state (#1993). Non-null when the week is locked; the
+  // page paints an informational banner. Edits are enforced server-side on
+  // the corrections / manual-entry APIs, not here.
+  lock: {
+    lockedAt: string;
+    reason: string | null;
+  } | null;
 }
 
 function todayInSast(): string {
@@ -64,6 +71,19 @@ function parseApiError(body: unknown, status: number): string {
   const e = (body as { error?: { message?: string } | string } | null)?.error;
   if (typeof e === 'string') return e;
   return e?.message ?? `HTTP ${status}`;
+}
+
+function formatLockDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('en-ZA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function StaffAttendanceWeekPage() {
@@ -235,6 +255,17 @@ export default function StaffAttendanceWeekPage() {
 
         {!loading && payload && (
           <>
+            {payload.lock && (
+              <div className="rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200 flex items-start gap-2">
+                <Lock className="w-4 h-4 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-medium">This payroll week is locked.</span>{' '}
+                  Corrections and manual entries are blocked until it is unlocked.
+                  {payload.lock.reason ? ` Reason: ${payload.lock.reason}.` : ''}
+                  {payload.lock.lockedAt ? ` Locked ${formatLockDate(payload.lock.lockedAt)}.` : ''}
+                </div>
+              </div>
+            )}
             <section className="grid grid-cols-2 md:grid-cols-6 gap-2 text-sm">
               <Metric label="Staff" value={String(payload.totals.staffCount)} />
               <Metric label="Regular" value={`${payload.totals.regularHrs.toFixed(1)}h`} />
