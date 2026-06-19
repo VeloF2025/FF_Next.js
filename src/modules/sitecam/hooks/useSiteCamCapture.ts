@@ -247,6 +247,25 @@ export function useSiteCamCapture(
     [advanceStep],
   );
 
+  // Dev/testing only — gated in the UI by NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD (off
+  // in production). Lets a tester advance past a serial-scan step without a
+  // physical ONT/UPS barcode in front of the lens, so the rest of the wizard can
+  // be exercised end-to-end. Marks the step done (advances + still uploads the
+  // photo) but records no serial and flags it for manual review.
+  const skipSerialStep = useCallback(
+    (idx: number) => {
+      setStepStates((prev) =>
+        prev.map((s, i) =>
+          i === idx
+            ? { ...s, status: 'serial_pending', serialScanned: null, needsManualReview: true }
+            : s,
+        ),
+      );
+      advanceStep(600);
+    },
+    [advanceStep],
+  );
+
   const captureAndValidate = useCallback(
     async (file: File): Promise<void> => {
       const idx = currentStepIndex;
@@ -451,6 +470,7 @@ export function useSiteCamCapture(
     allDone,
     captureAndValidate,
     handleSerialSaved: (serial: string) => handleSerialSaved(currentStepIndex, serial),
+    skipSerialStep: () => skipSerialStep(currentStepIndex),
     submitAll,
     uploading,
     uploadError,
