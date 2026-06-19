@@ -191,10 +191,9 @@ export function buildMessageContent(
       type: 'text',
       text: `You are performing a quality check on a photo classified as "${criteria.label}" for a fiber optic installation.
 
-I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST be consistent with these examples — they are the authoritative standard.`,
+${crossStep}I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST be consistent with these examples — they are the authoritative standard.`,
     });
 
-    // Static filesystem reference examples (existing behaviour)
     if (refs && refs.correct.length > 0) {
       content.push({
         type: 'text',
@@ -225,7 +224,6 @@ I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST
       }
     }
 
-    // Gallery-curated visual examples from vlm_visual_photo_examples
     if (galleryExamples && galleryExamples.positiveBase64.length > 0) {
       content.push({
         type: 'text',
@@ -262,7 +260,7 @@ I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST
     });
     content.push({
       type: 'text',
-      text: `${crossStep}Required criteria: ${criteria.requirements}
+      text: `Required criteria: ${criteria.requirements}
 ${criteria.failInstruction}
 
 ${FAIL_REASON_INSTRUCTION}
