@@ -34,6 +34,7 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
     allDone,
     captureAndValidate,
     handleSerialSaved,
+    skipSerialStep,
     submitAll,
     uploading,
     uploadError,
@@ -99,6 +100,7 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
             drNumber={siteInfo.siteId}
             onCapture={(f) => void captureAndValidate(f)}
             onSerialSaved={handleSerialSaved}
+            onSkipSerial={skipSerialStep}
             onAppeal={() => setAppealOpen(true)}
             appealPending={appealPending}
           />

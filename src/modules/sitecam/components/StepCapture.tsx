@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { AlertTriangle, Camera, CheckCircle, Download, Loader2, Upload } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle, Download, Loader2, SkipForward, Upload } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { StepState } from '../hooks/useSiteCamCapture';
 import { SerialScanStep } from './SerialScanStep';
@@ -21,12 +21,14 @@ interface Props {
   drNumber: string;
   onCapture: (file: File) => void;
   onSerialSaved: (serial: string) => void;
+  /** Dev/testing only — advance past the serial scan without a physical device. */
+  onSkipSerial: () => void;
   onAppeal: () => void;
   /** True while this step's appeal is awaiting a supervisor decision. */
   appealPending?: boolean;
 }
 
-export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal, appealPending = false }: Props) {
+export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSerial, onAppeal, appealPending = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null); // TEMP: test-only gallery upload
   const [saved, setSaved] = useState(false);
@@ -126,14 +128,32 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onAppeal
       )}
 
       {showSerialScan && step.serialDevice && (
-        <SerialScanStep
-          stepNumber={step.stepNumber}
-          serialLabel={step.serialLabel}
-          serialDevice={step.serialDevice}
-          serialAttempts={step.serialAttempts}
-          drNumber={drNumber}
-          onScanSaved={onSerialSaved}
-        />
+        <>
+          <SerialScanStep
+            stepNumber={step.stepNumber}
+            serialLabel={step.serialLabel}
+            serialDevice={step.serialDevice}
+            serialAttempts={step.serialAttempts}
+            drNumber={drNumber}
+            onScanSaved={onSerialSaved}
+          />
+
+          {/* ─── TEMPORARY: test-only skip (remove with ALLOW_TEST_UPLOAD) ───
+              Lets a tester advance past the serial scan when no physical
+              ONT/UPS barcode is on hand, so the downstream steps can be
+              exercised. Gated to dev by the same build-time flag as the test
+              upload above — never compiled into production. */}
+          {ALLOW_TEST_UPLOAD && (
+            <button
+              type="button"
+              onClick={onSkipSerial}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-amber-600/70 bg-amber-950/20 py-3 text-sm font-medium text-amber-300 hover:bg-amber-950/40 transition-colors"
+            >
+              <SkipForward className="h-5 w-5" />
+              Skip serial scan (test)
+            </button>
+          )}
+        </>
       )}
 
       {showCamera && (
