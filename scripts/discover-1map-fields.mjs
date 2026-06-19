@@ -1,7 +1,11 @@
 // Standalone 1Map field discovery - no TS path aliases
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 const BASE_URL = 'https://www.1map.co.za';
-const EMAIL = 'hein@velocityfibre.co.za';
-const PASSWORD = 'VeloF@2025';
+const EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
+const PASSWORD = process.env.ONEMAP_PASSWORD;
+if (!PASSWORD) throw new Error('ONEMAP_PASSWORD not set');
 
 async function discover() {
   // Step 1: Get CSRF token

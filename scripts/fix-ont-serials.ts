@@ -6,11 +6,18 @@
  * Usage:
  *   npx tsx scripts/fix-ont-serials.ts
  *   npx tsx scripts/fix-ont-serials.ts --dry-run
+ *
+ * Required env vars (set in .env.local or shell):
+ *   ONEMAP_PASSWORD — see .claude/credentials.local.md
  */
+
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
 const BASE_URL = 'https://www.1map.co.za';
 const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
-const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD || 'VeloF@2025';
+const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD;
+if (!ONEMAP_PASSWORD) throw new Error('ONEMAP_PASSWORD not set');
 const LAYER_ID = '5121';
 
 // DRs to fix: [DR Number, Correct ONT, Wrong ONT (current)]

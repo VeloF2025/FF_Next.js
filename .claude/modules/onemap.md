@@ -75,7 +75,7 @@ drops (mini_ups_serial, ont_serial)
 
 ## Auth
 - Email: `hein@velocityfibre.co.za` (env: `ONEMAP_EMAIL`)
-- Password: `VeloF@2025` (env: `ONEMAP_PASSWORD`)
+- Password: see `.claude/credentials.local.md` (env: `ONEMAP_PASSWORD`)
 
 ## Gotchas
 - **`onemap_properties` is stale**: Always use live API for current data
