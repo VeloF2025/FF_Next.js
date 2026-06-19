@@ -2,7 +2,8 @@
  * Handler tests for GET /api/staff/attendance-selfie.
  *
  * Security-sensitive contract: logSelfieAccess MUST be called BEFORE the
- * response fires (audit on intent, not on successful byte delivery).
+ * response fires (audit on intent, not on successful byte delivery), and the
+ * viewer must be inside their supervisor scope for the entry's staff (#1991).
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -11,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   sql: vi.fn(),
   logSelfieAccess: vi.fn().mockResolvedValue(undefined),
+  authorizedToSuperviseStaff: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -27,6 +29,9 @@ vi.mock('@/lib/auth/middleware', () => ({
     },
   withPermission: () => (h: unknown) => h,
 }));
+vi.mock('@/services/attendance/supervisorScope', () => ({
+  authorizedToSuperviseStaff: mocks.authorizedToSuperviseStaff,
+}));
 vi.mock('@/modules/attendance/portal/retentionUtils', async () => {
   const actual =
     await vi.importActual<typeof import('@/modules/attendance/portal/retentionUtils')>(
@@ -41,6 +46,7 @@ vi.mock('@/modules/attendance/portal/retentionUtils', async () => {
 import handler from '../../../../../pages/api/staff/attendance-selfie';
 
 const VALID_UUID = '11111111-2222-3333-4444-555555555555';
+const STAFF_ID = '99999999-8888-7777-6666-555555555555';
 
 function makeReq(query: Record<string, string>, method: string = 'GET'): NextApiRequest {
   return {
@@ -65,6 +71,7 @@ function makeRes() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.logSelfieAccess.mockResolvedValue(undefined);
+  mocks.authorizedToSuperviseStaff.mockResolvedValue(true);
 });
 
 describe('GET /api/staff/attendance-selfie', () => {
@@ -77,6 +84,12 @@ describe('GET /api/staff/attendance-selfie', () => {
   it('400 when entryId is malformed', async () => {
     const { res, captured } = makeRes();
     await handler(makeReq({ entryId: 'no', kind: 'in' }), res);
+    expect(captured.statusCode).toBe(400);
+  });
+
+  it('400 when entryId is 36 hyphens (strict UUID format)', async () => {
+    const { res, captured } = makeRes();
+    await handler(makeReq({ entryId: '-'.repeat(36), kind: 'in' }), res);
     expect(captured.statusCode).toBe(400);
   });
 
@@ -94,8 +107,21 @@ describe('GET /api/staff/attendance-selfie', () => {
     expect(mocks.logSelfieAccess).not.toHaveBeenCalled();
   });
 
+  it('403 when the viewer is outside their supervisor scope — no audit, no URL', async () => {
+    mocks.authorizedToSuperviseStaff.mockResolvedValueOnce(false);
+    mocks.sql.mockResolvedValue([
+      { id: VALID_UUID, staff_id: STAFF_ID, selfie_in_url: '/storage/attendance/u/2026-04-20/in.jpg', selfie_out_url: null },
+    ]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({ entryId: VALID_UUID, kind: 'in' }), res);
+    expect(captured.statusCode).toBe(403);
+    // An out-of-scope viewer must NOT trigger an access-log row or see the URL.
+    expect(mocks.logSelfieAccess).not.toHaveBeenCalled();
+    expect(JSON.stringify(captured.body)).not.toMatch(/in\.jpg/);
+  });
+
   it('404 with reason=unavailable when the requested selfie URL is null (never captured or retention-swept)', async () => {
-    mocks.sql.mockResolvedValue([{ id: VALID_UUID, selfie_in_url: null, selfie_out_url: null }]);
+    mocks.sql.mockResolvedValue([{ id: VALID_UUID, staff_id: STAFF_ID, selfie_in_url: null, selfie_out_url: null }]);
     const { res, captured } = makeRes();
     await handler(makeReq({ entryId: VALID_UUID, kind: 'in' }), res);
     expect(captured.statusCode).toBe(404);
@@ -107,7 +133,7 @@ describe('GET /api/staff/attendance-selfie', () => {
   it('503 with reason=audit_write_failed when the POPIA audit INSERT throws — URL is NOT returned', async () => {
     const { AuditWriteError } = await import('@/modules/attendance/portal/retentionUtils');
     mocks.sql.mockResolvedValue([
-      { id: VALID_UUID, selfie_in_url: '/storage/attendance/u/2026-04-20/in.jpg', selfie_out_url: null },
+      { id: VALID_UUID, staff_id: STAFF_ID, selfie_in_url: '/storage/attendance/u/2026-04-20/in.jpg', selfie_out_url: null },
     ]);
     mocks.logSelfieAccess.mockRejectedValue(new AuditWriteError('boom'));
     const { res, captured } = makeRes();
@@ -121,7 +147,7 @@ describe('GET /api/staff/attendance-selfie', () => {
 
   it('logs access with viewer id + ip + context BEFORE returning the URL', async () => {
     mocks.sql.mockResolvedValue([
-      { id: VALID_UUID, selfie_in_url: '/storage/attendance/u/2026-04-20/in.jpg', selfie_out_url: null },
+      { id: VALID_UUID, staff_id: STAFF_ID, selfie_in_url: '/storage/attendance/u/2026-04-20/in.jpg', selfie_out_url: null },
     ]);
     const { res, captured } = makeRes();
     await handler(
@@ -143,7 +169,7 @@ describe('GET /api/staff/attendance-selfie', () => {
 
   it('serves the out URL when kind=out', async () => {
     mocks.sql.mockResolvedValue([
-      { id: VALID_UUID, selfie_in_url: null, selfie_out_url: '/storage/attendance/u/2026-04-20/out.jpg' },
+      { id: VALID_UUID, staff_id: STAFF_ID, selfie_in_url: null, selfie_out_url: '/storage/attendance/u/2026-04-20/out.jpg' },
     ]);
     const { res, captured } = makeRes();
     await handler(makeReq({ entryId: VALID_UUID, kind: 'out' }), res);

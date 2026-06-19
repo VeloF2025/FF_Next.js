@@ -8,12 +8,19 @@
  */
 
 import Link from 'next/link';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Lock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AttendanceNav } from '@/components/attendance/AttendanceNav';
 import { REPORT_CATALOGUE } from '@/services/attendance/reports/types';
+import { usePermission } from '@/hooks/usePermission';
 
 export default function ReportsIndexPage() {
+  // #1992: the report APIs require people.staff.attendance.manage (they expose
+  // wage / BCEA data). Hide the tile grid for users who lack it (e.g. the
+  // search-only roles) instead of letting them click through to a 403.
+  const { can } = usePermission();
+  const allowed = can('people.staff.attendance.manage', 'view');
+
   return (
     <AppLayout>
       <AttendanceNav />
@@ -25,33 +32,46 @@ export default function ReportsIndexPage() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {REPORT_CATALOGUE.map((r) => (
-            <Link
-              key={r.slug}
-              href={`/staff/attendance/reports/${r.slug}`}
-              className="block rounded-xl border border-neutral-800 bg-neutral-900 p-4 hover:border-emerald-700 hover:bg-neutral-900/80 transition-colors"
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300">
-                  <BarChart3 className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">{r.title}</div>
-                  <div className="mt-1 text-xs text-neutral-400">{r.blurb}</div>
-                  <div className="mt-2 text-[10px] uppercase tracking-wide text-neutral-500 font-mono">
-                    /{r.slug}
+        {!allowed ? (
+          <div className="rounded-xl border border-amber-800/60 bg-amber-950/20 p-4 text-sm text-amber-200 flex items-start gap-2 max-w-xl">
+            <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              You don&apos;t have access to HR reports. These carry wage and labour-law
+              figures and require the attendance-management permission — ask an admin
+              if you need access.
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {REPORT_CATALOGUE.map((r) => (
+                <Link
+                  key={r.slug}
+                  href={`/staff/attendance/reports/${r.slug}`}
+                  className="block rounded-xl border border-neutral-800 bg-neutral-900 p-4 hover:border-emerald-700 hover:bg-neutral-900/80 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300">
+                      <BarChart3 className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium">{r.title}</div>
+                      <div className="mt-1 text-xs text-neutral-400">{r.blurb}</div>
+                      <div className="mt-2 text-[10px] uppercase tracking-wide text-neutral-500 font-mono">
+                        /{r.slug}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+                </Link>
+              ))}
+            </div>
 
-        <p className="mt-6 text-xs text-neutral-500">
-          Looking for late-arrivals? It&apos;s deferred to a follow-up release — the underlying shift
-          schedule isn&apos;t recorded in attendance entries yet, so we can&apos;t compute lateness deterministically.
-        </p>
+            <p className="mt-6 text-xs text-neutral-500">
+              Looking for late-arrivals? It&apos;s deferred to a follow-up release — the underlying shift
+              schedule isn&apos;t recorded in attendance entries yet, so we can&apos;t compute lateness deterministically.
+            </p>
+          </>
+        )}
       </div>
     </AppLayout>
   );
