@@ -21,6 +21,9 @@ import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { pool } from '@/lib/db';
 import { log } from '@/lib/logger';
+import { fetchPhotoAsBase64 } from '@/modules/activate/services/photoFetchService';
+import { resolveInternalPhotoUrl } from '@/lib/internalPhotoUrl';
+import { computeDHash } from '@/lib/imageHash';
 import { STEP_LABELS } from '@/modules/activate/components/photo-gallery/types';
 
 /** Upper bound on decisions per request — one gallery step loads <= 60 photos. */
@@ -126,13 +129,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         ],
       );
 
+      // Perceptual hash for relevance-based few-shot selection (best-effort:
+      // a fetch/decode failure must not block curation — the backfill script
+      // and recency fallback cover a NULL phash). See src/lib/vlmGallery.ts.
+      let phash: string | null = null;
+      try {
+        const b64 = await fetchPhotoAsBase64(resolveInternalPhotoUrl(d.url));
+        phash = await computeDHash(b64);
+      } catch (err) {
+        log.warn('[SaveDecisions] Could not compute phash (will backfill later)', { url: d.url, error: String(err) }, 'PhotoGallery');
+      }
+
       // Visual few-shot pipeline.
       await pool.query(
         `INSERT INTO vlm_visual_photo_examples
-           (step_number, photo_url, label, dr_number, filename, confidence)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (step_number, photo_url, label, dr_number, filename, confidence, phash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (photo_url) DO NOTHING`,
-        [d.stepNumber, d.url, isGood ? 'positive' : 'negative', d.drNumber, d.filename, d.confidence],
+        [d.stepNumber, d.url, isGood ? 'positive' : 'negative', d.drNumber, d.filename, d.confidence, phash],
       );
 
       result.saved++;

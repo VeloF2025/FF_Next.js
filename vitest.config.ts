@@ -61,6 +61,7 @@ export default defineConfig({
       { find: /^@\/lib\/db/, replacement: path.resolve(__dirname, './src/lib/db') },
       { find: '@/lib/serial-events', replacement: path.resolve(__dirname, './src/lib/serial-events') },
       { find: '@/lib/vlmGallery', replacement: path.resolve(__dirname, './src/lib/vlmGallery') },
+      { find: '@/lib/imageHash', replacement: path.resolve(__dirname, './src/lib/imageHash') },
       { find: '@/lib/internalPhotoUrl', replacement: path.resolve(__dirname, './src/lib/internalPhotoUrl') },
       { find: '@/lib/vfStoragePhotoUrl', replacement: path.resolve(__dirname, './src/lib/vfStoragePhotoUrl') },
       { find: '@/lib/vfStorageUpload', replacement: path.resolve(__dirname, './src/lib/vfStorageUpload') },

@@ -108,7 +108,9 @@ async function runVlmCheck(
   step: number,
   rawPhotoBase64: string
 ): Promise<VlmResult> {
-  const galleryExamples = await loadGalleryExamples(step, toGalleryJobType(jobType));
+  // Pass the raw photo so gallery examples are ranked by visual similarity to
+  // it (nearest approved examples anchor the VLM far better than the newest).
+  const galleryExamples = await loadGalleryExamples(step, toGalleryJobType(jobType), rawPhotoBase64);
 
   // Phone photos arrive at full camera resolution; together with the gallery
   // examples they exceed the VLM's 32k context and every request 400s (and
