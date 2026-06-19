@@ -28,7 +28,8 @@
  *   - Wage amount computation (no staff hourly rate column yet).
  */
 
-import { isSunday } from './saPublicHolidays';
+import { computeDayTypeHours, MS_PER_HOUR } from './dayTypeHours';
+import { computeNightHours, parseHm } from './nightHours';
 
 export interface AttendanceEntryInput {
   /** 'YYYY-MM-DD' in SAST — the day this entry belongs to for payroll. */
@@ -68,6 +69,15 @@ export interface DailySummary {
   sundayHrs: number;
   holidayHrs: number;
   nightHrs: number;
+  /**
+   * Of `overtimeHrs`, how many fall on ORDINARY (non-Sunday, non-holiday)
+   * calendar time. The wage calculator pays these at the s9/s10 OT
+   * multiplier; the remaining OT coincides with a Sunday/holiday and is
+   * paid at that day's premium (no stacking — matches single-day behaviour).
+   * Derived from the time-ordered split (#2028); NOT persisted — the daily
+   * summaries table only stores bucket totals.
+   */
+  overtimeOnNonPremiumHrs: number;
   ruleId: string;
   computationMode: ComputationMode;
   /** True when the entry is still open or has zero/negative duration. */
@@ -133,6 +143,7 @@ export function calculateDailySummary(args: CalculateDailySummaryArgs): DailySum
     sundayHrs: 0,
     holidayHrs: 0,
     nightHrs: 0,
+    overtimeOnNonPremiumHrs: 0,
   };
 
   if (!entry.clockOutAt) {
@@ -181,6 +192,7 @@ export function calculateDailySummary(args: CalculateDailySummaryArgs): DailySum
       sundayHrs: 0,
       holidayHrs: 0,
       nightHrs: 0,
+      overtimeOnNonPremiumHrs: 0,
       ruleId: rule.id,
       computationMode: 'bcea_exempt',
       incomplete: false,
@@ -205,10 +217,24 @@ export function calculateDailySummary(args: CalculateDailySummaryArgs): DailySum
     overtimeHrs = roundHours(rawTotalHrs - rule.dailyOrdinaryHrs);
   }
 
-  // #1990 disjoint: holiday takes precedence over Sunday on the same calendar day.
-  const dayType = computeDayTypeHours(entry.clockInAt, entry.clockOutAt, publicHolidays);
+  // #1990 disjoint: holiday takes precedence over Sunday on the same calendar
+  // day. #2028: the same time-ordered split also tells us how much of the OT
+  // tail lands on ordinary (non-premium) time, which the wage calculator
+  // needs to pay the OT premium correctly on cross-midnight shifts.
+  const dayType = computeDayTypeHours(
+    entry.clockInAt,
+    entry.clockOutAt,
+    publicHolidays,
+    rule.dailyOrdinaryHrs,
+  );
   const sundayHrs = roundHours(dayType.sundayHrs);
   const holidayHrs = roundHours(dayType.holidayHrs);
+  // Clamp to [0, overtimeHrs] before rounding: the split is computed from raw
+  // clock times while overtimeHrs uses the rounded threshold, so guard against
+  // a sub-cent overshoot crediting more OT premium than OT exists.
+  const overtimeOnNonPremiumHrs = roundHours(
+    Math.min(overtimeHrs, Math.max(0, dayType.overtimeOnNonPremiumHrs)),
+  );
 
   const weeklyOvertimeHrsAfter = weeklyOvertimeHrsBefore + overtimeHrs;
   const weeklyOvertimeOverCap = weeklyOvertimeHrsAfter > rule.weeklyOtCapHrs;
@@ -219,6 +245,7 @@ export function calculateDailySummary(args: CalculateDailySummaryArgs): DailySum
     sundayHrs,
     holidayHrs,
     nightHrs,
+    overtimeOnNonPremiumHrs,
     ruleId: rule.id,
     computationMode: 'bcea_default',
     incomplete: false,
@@ -226,119 +253,14 @@ export function calculateDailySummary(args: CalculateDailySummaryArgs): DailySum
   };
 }
 
-const MS_PER_HOUR = 3600_000;
-const MS_PER_DAY = 86_400_000;
-
 function roundHours(hrs: number): number {
   return Math.round(hrs * 100) / 100;
 }
 
-function parseHm(s: string): { hour: number; minute: number } {
-  const m = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s);
-  if (!m) throw new Error(`parseHm: invalid time '${s}' (expected HH:MM or HH:MM:SS)`);
-  const hour = Number(m[1]);
-  const minute = Number(m[2]);
-  if (hour > 23 || minute > 59) {
-    throw new Error(`parseHm: out-of-range time '${s}'`);
-  }
-  return { hour, minute };
-}
-
-function sastMidnight(d: Date): Date {
-  const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Johannesburg',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const ymd = fmt.format(d);
-  return new Date(`${ymd}T00:00:00+02:00`);
-}
-
-function addSastHm(midnight: Date, hm: { hour: number; minute: number }): Date {
-  return new Date(midnight.getTime() + (hm.hour * 60 + hm.minute) * 60 * 1000);
-}
-
-function overlapMs(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): number {
-  const lo = Math.max(aStart.getTime(), bStart.getTime());
-  const hi = Math.min(aEnd.getTime(), bEnd.getTime());
-  return Math.max(0, hi - lo);
-}
-
-function sastYmd(d: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Johannesburg',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(d);
-}
-
-/**
- * #1990: split the shift across SAST calendar days and tally hours on Sunday
- * or a public holiday. Holiday takes precedence over Sunday on the same day
- * (disjoint buckets: a given millisecond belongs to at most one bucket).
- */
-function computeDayTypeHours(
-  clockIn: Date,
-  clockOut: Date,
-  publicHolidays: ReadonlySet<string>
-): { sundayHrs: number; holidayHrs: number } {
-  let sundayMs = 0;
-  let holidayMs = 0;
-  const startMidnight = sastMidnight(clockIn);
-  for (let offsetDays = 0; offsetDays <= 2; offsetDays++) {
-    const mid = new Date(startMidnight.getTime() + offsetDays * MS_PER_DAY);
-    const nextMid = new Date(mid.getTime() + MS_PER_DAY);
-    const workedMs = overlapMs(clockIn, clockOut, mid, nextMid);
-    if (workedMs === 0) continue;
-    const ymd = sastYmd(mid);
-    if (publicHolidays.has(ymd)) holidayMs += workedMs;
-    else if (isSunday(ymd)) sundayMs += workedMs;
-  }
-  return { sundayHrs: sundayMs / MS_PER_HOUR, holidayHrs: holidayMs / MS_PER_HOUR };
-}
-
-function computeNightHours(
-  clockIn: Date,
-  clockOut: Date,
-  nightStart: { hour: number; minute: number },
-  nightEnd: { hour: number; minute: number }
-): number {
-  const totalMs = clockOut.getTime() - clockIn.getTime();
-  if (totalMs <= 0) return 0;
-
-  const dayStart = nightEnd;
-  const dayEnd = nightStart;
-
-  const startMidnight = sastMidnight(clockIn);
-  let nightMs = 0;
-
-  for (let offsetDays = -1; offsetDays <= 2; offsetDays++) {
-    const mid = new Date(startMidnight.getTime() + offsetDays * MS_PER_DAY);
-    const nextMid = new Date(mid.getTime() + MS_PER_DAY);
-
-    const workedOnDayMs = overlapMs(clockIn, clockOut, mid, nextMid);
-    if (workedOnDayMs === 0) continue;
-
-    const dayPeriodStart = addSastHm(mid, dayStart);
-    const dayPeriodEnd = addSastHm(mid, dayEnd);
-    if (dayPeriodStart.getTime() >= dayPeriodEnd.getTime()) {
-      nightMs += workedOnDayMs;
-      continue;
-    }
-
-    const dayPeriodMs = overlapMs(clockIn, clockOut, dayPeriodStart, dayPeriodEnd);
-    nightMs += workedOnDayMs - dayPeriodMs;
-  }
-
-  return nightMs / MS_PER_HOUR;
-}
-
+// Helpers now live in sibling modules and are tested there:
+//   - computeNightHours / parseHm → ./nightHours
+//   - computeDayTypeHours / sastMidnight / sastYmd / overlapMs → ./dayTypeHours
 export const __testing = {
   computeNightHours,
-  computeDayTypeHours,
-  sastMidnight,
-  sastYmd,
   parseHm,
 };

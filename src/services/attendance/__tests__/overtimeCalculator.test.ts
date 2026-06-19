@@ -1,13 +1,9 @@
 /**
  * Unit tests for the pure BCEA overtime calculator.
  *
- * Calendar anchors used throughout:
- *   - 2026-04-20 is a Monday  — weekday baseline
- *   - 2026-04-19 is a Sunday  — Sunday multiplier path
- *   - 2026-04-27 (Freedom Day) is a Monday public holiday (migration 310)
- *
- * We only import indirectly via the calculator; db-pool is mocked at module
- * load to avoid the pg.Pool initialising against a real DATABASE_URL.
+ * Calendar anchors: 2026-04-20 Mon (weekday) · 2026-04-19 Sun (Sunday path) ·
+ * 2026-04-27 Freedom Day (Mon holiday, migration 310). db-pool is mocked at
+ * load so the pg.Pool never initialises against a real DATABASE_URL.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -91,11 +87,8 @@ describe('calculateDailySummary — BCEA default path', () => {
 
   it('Sunday non-ordinary worker, 11h — regular/OT still split; sundayHrs dual-counts full 11h', () => {
     // Regression guard against a bug that aliases sundayHrs = regularHrs.
-    // Using an 11h shift so total > dailyOrdinaryHrs; makes the OT assertion
-    // non-trivial (unlike a 9h shift where OT would be 0 either way).
-    const s = call({
-      entry: entry('2026-04-19', '06:00', '17:00'),
-    });
+    // 11h shift makes the OT assertion non-trivial (a 9h shift has OT 0).
+    const s = call({ entry: entry('2026-04-19', '06:00', '17:00') });
     expect(s.regularHrs).toBe(9);
     expect(s.overtimeHrs).toBe(2);
     expect(s.sundayHrs).toBe(11);
@@ -161,59 +154,7 @@ describe('calculateDailySummary — BCEA s6 exemption', () => {
   });
 });
 
-describe('calculateDailySummary — night hours (s17)', () => {
-  it('shift fully at night (22:00 → 06:00 next day) — 8h night', () => {
-    const s = call({
-      entry: {
-        workDate: '2026-04-20',
-        clockInAt: sast('2026-04-20', '22:00'),
-        clockOutAt: sast('2026-04-21', '06:00'),
-      },
-    });
-    expect(s.nightHrs).toBe(8);
-  });
-
-  it('day shift (08:00 → 17:00) — 0h night', () => {
-    const s = call({ entry: entry('2026-04-20', '08:00', '17:00') });
-    expect(s.nightHrs).toBe(0);
-  });
-
-  it('mixed shift 16:00 → 02:00 — 8h night, regular 9 + OT 1', () => {
-    const s = call({
-      entry: {
-        workDate: '2026-04-20',
-        clockInAt: sast('2026-04-20', '16:00'),
-        clockOutAt: sast('2026-04-21', '02:00'),
-      },
-    });
-    expect(s.nightHrs).toBe(8);
-    expect(s.regularHrs).toBe(9);
-    expect(s.overtimeHrs).toBe(1);
-  });
-
-  it('shift crossing two night windows (20:00 Mon → 20:00 Tue, 24h) — 12h night total', () => {
-    // Exercises the offsetDays scan across multiple days. 18:00 → 06:00 each
-    // SAST day is 12h night; a 24h shift from 20:00 to 20:00 hits the tail
-    // of night day-1 (2h), the wrap (6h + 0h), and a full 18:00→20:00 of
-    // day-2 day period (0h night). Total: 2h (20-22 day1 before midnight is
-    // actually IS night) … let me recompute: night = [18:00,06:00] wraps.
-    //   20:00 Mon → 24:00 Mon: 4h night
-    //   00:00 Tue → 06:00 Tue: 6h night
-    //   06:00 Tue → 18:00 Tue: 0h night
-    //   18:00 Tue → 20:00 Tue: 2h night
-    //   Total: 12h
-    const s = call({
-      entry: {
-        workDate: '2026-04-20',
-        clockInAt: sast('2026-04-20', '20:00'),
-        clockOutAt: sast('2026-04-21', '20:00'),
-      },
-    });
-    // 24h is our MAX_PLAUSIBLE_SHIFT_HRS — exactly at boundary is allowed.
-    expect(s.incomplete).toBe(false);
-    expect(s.nightHrs).toBe(12);
-  });
-});
+// Night-hours (s17) tests moved to __tests__/nightHours.test.ts (#2028 split).
 
 describe('calculateDailySummary — weekly cap detection (s10)', () => {
   it('OT pushes weekly total over cap — flag raised, not silently capped', () => {
@@ -346,35 +287,9 @@ describe('calculateDailySummary — rule + cross-midnight behaviour', () => {
     expect(s.holidayHrs).toBe(2);
   });
 
-  it('shift crossing midnight into a public holiday dual-reports the holiday hours (#1990)', () => {
-    // Thu 18:00 → Fri(May Day) 06:00 (12h total). Thursday portion is ordinary;
-    // only the 6h on Friday earn the s18 premium.
-    const s = call({
-      entry: {
-        workDate: '2026-04-30', // Thursday
-        clockInAt: sast('2026-04-30', '18:00'),
-        clockOutAt: sast('2026-05-01', '06:00'), // Friday 06:00
-      },
-      publicHolidays: new Set(['2026-05-01']), // Workers Day
-    });
-    expect(s.holidayHrs).toBe(6);
-    expect(s.sundayHrs).toBe(0);
-  });
-
-  it('shift crossing midnight into Sunday dual-reports the Sunday hours (#1990)', () => {
-    // Sat 22:00 → Sun 06:00 (8h total). Only the 6h on Sunday earn the s16
-    // premium; Saturday portion is ordinary.
-    const s = call({
-      entry: {
-        workDate: '2026-04-18', // Saturday
-        clockInAt: sast('2026-04-18', '22:00'),
-        clockOutAt: sast('2026-04-19', '06:00'), // Sunday 06:00
-      },
-      publicHolidays: new Set(),
-    });
-    expect(s.sundayHrs).toBe(6);
-    expect(s.holidayHrs).toBe(0);
-  });
+  // The exhaustive cross-midnight day-type split cases (Sat→Sun, weekday→
+  // holiday, Sun→Mon, OT-tail attribution) live in dayTypeHours.test.ts; the
+  // producer→wage wiring lives in splitShiftWage.integration.test.ts.
 });
 
 // Intentional stubs so coverage gaps are visible in test output without

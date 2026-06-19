@@ -1,17 +1,14 @@
 /**
- * Unit tests for computeWageCents + hourlyRateCentsFromDbValue.
+ * Unit tests for computeWageCents.
  *
- * Pure function — no mocks. Exercises every BCEA branch: weekday with
- * and without OT, bcea_exempt, Sunday ordinary/non-ordinary, public
- * holiday, Sunday∩holiday (max rule), night allowance addition, and
- * the null/degenerate cases.
+ * Pure function — no mocks. Exercises every BCEA branch: weekday with and
+ * without OT, bcea_exempt, Sunday ordinary/non-ordinary, public holiday,
+ * disjoint Sunday/holiday (additive), split-shift OT-on-non-premium-tail
+ * (#2028), night allowance addition, and the null/degenerate cases.
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  computeWageCents,
-  hourlyRateCentsFromDbValue,
-} from '../wageCalculator';
+import { computeWageCents } from '../wageCalculator';
 import type { DailySummary, OvertimeRuleInput } from '../overtimeCalculator';
 
 const RULE: OvertimeRuleInput = {
@@ -38,6 +35,7 @@ function summary(overrides: Partial<DailySummary> = {}): DailySummary {
     sundayHrs: 0,
     holidayHrs: 0,
     nightHrs: 0,
+    overtimeOnNonPremiumHrs: 0,
     ruleId: RULE.id,
     computationMode: 'bcea_default',
     incomplete: false,
@@ -59,8 +57,9 @@ describe('computeWageCents', () => {
 
   it('weekday with OT: regular @ 1x + overtime @ 1.5x', () => {
     // 9h regular + 2h OT = R120 × 9 + R120 × 2 × 1.5 = R1080 + R360 = R1440
+    // Pure weekday: all OT is non-premium.
     const cents = computeWageCents({
-      summary: summary({ regularHrs: 9, overtimeHrs: 2 }),
+      summary: summary({ regularHrs: 9, overtimeHrs: 2, overtimeOnNonPremiumHrs: 2 }),
       rule: RULE,
       hourlyRateCents: RATE,
       ordinarilyWorksSundays: false,
@@ -69,17 +68,9 @@ describe('computeWageCents', () => {
   });
 
   it('bcea_exempt on Sunday: pays regular only, no stacking', () => {
-    // Exempt staff with buckets showing nonzero Sunday data shouldn't happen —
-    // the overtime calculator zeros them for exempt. Test the guard regardless.
+    // Exempt staff buckets are zeroed by the calculator; guard regardless.
     const cents = computeWageCents({
-      summary: summary({
-        regularHrs: 8,
-        overtimeHrs: 0,
-        sundayHrs: 0,
-        holidayHrs: 0,
-        nightHrs: 0,
-        computationMode: 'bcea_exempt',
-      }),
+      summary: summary({ regularHrs: 8, computationMode: 'bcea_exempt' }),
       rule: RULE,
       hourlyRateCents: RATE,
       ordinarilyWorksSundays: true,
@@ -110,10 +101,17 @@ describe('computeWageCents', () => {
   });
 
   it('Sunday with OT: no OT stacking — whole shift at Sunday multiplier', () => {
-    // 11h on Sunday (9 regular + 2 OT). Non-regular Sunday worker.
+    // 11h on Sunday (9 regular + 2 OT). Non-regular Sunday worker. The OT is
+    // entirely on the Sunday (overtimeOnNonPremiumHrs=0), so the Sunday
+    // premium absorbs it — no s9/s10 OT stacking.
     // Expected: 11 × R120 × 2 = R2640. NOT R120 × 9 × 2 + R120 × 2 × 1.5 × 2.
     const cents = computeWageCents({
-      summary: summary({ regularHrs: 9, overtimeHrs: 2, sundayHrs: 11 }),
+      summary: summary({
+        regularHrs: 9,
+        overtimeHrs: 2,
+        sundayHrs: 11,
+        overtimeOnNonPremiumHrs: 0,
+      }),
       rule: RULE,
       hourlyRateCents: RATE,
       ordinarilyWorksSundays: false,
@@ -134,10 +132,18 @@ describe('computeWageCents', () => {
 
   it('cross-midnight Sunday into holiday: premiums are additive per disjoint bucket (#1990)', () => {
     // Sun 16:00 → Mon-holiday 02:00 → sundayHrs=8, holidayHrs=2 (disjoint).
+    // The 1h OT tail (Mon 01:00–02:00) is ON the holiday, so
+    // overtimeOnNonPremiumHrs=0 and the premium absorbs it.
     // ordinarilyWorksSundays=true → sundayMult=1.5.
     // 8h × R120 × 1.5 + 2h × R120 × 2 = R1440 + R480 = R1920.
     const cents = computeWageCents({
-      summary: summary({ regularHrs: 9, overtimeHrs: 1, sundayHrs: 8, holidayHrs: 2 }),
+      summary: summary({
+        regularHrs: 9,
+        overtimeHrs: 1,
+        sundayHrs: 8,
+        holidayHrs: 2,
+        overtimeOnNonPremiumHrs: 0,
+      }),
       rule: RULE,
       hourlyRateCents: RATE,
       ordinarilyWorksSundays: true,
@@ -146,11 +152,17 @@ describe('computeWageCents', () => {
   });
 
   it('cross-midnight non-premium tail — ordinary hours paid at 1x, not dropped', () => {
-    // Sat 22:00 → Sun 06:00 (8h total). The 2h Saturday portion is ordinary (1x);
-    // only the 6h Sunday portion earns the Sunday multiplier.
-    // ordinaryHrs = max(0, 8+0 - 6 - 0) = 2; baseCents = 2×1x + 6×2x.
+    // Sat 22:00 → Sun 06:00 (8h total, no OT). The 2h Saturday portion is
+    // ordinary (1x); only the 6h Sunday portion earns the Sunday multiplier.
+    // nonPremiumOrdinary = 8+0 - 6 - 0 - 0(OT-on-tail) = 2; base = 2×1x + 6×2x.
     const cents = computeWageCents({
-      summary: summary({ regularHrs: 8, overtimeHrs: 0, sundayHrs: 6, holidayHrs: 0 }),
+      summary: summary({
+        regularHrs: 8,
+        overtimeHrs: 0,
+        sundayHrs: 6,
+        holidayHrs: 0,
+        overtimeOnNonPremiumHrs: 0,
+      }),
       rule: RULE,
       hourlyRateCents: RATE,
       ordinarilyWorksSundays: false,
@@ -158,12 +170,61 @@ describe('computeWageCents', () => {
     expect(cents).toBe(2 * RATE + 6 * RATE * 2);
   });
 
-  it('holiday-on-Sunday (disjoint: sundayHrs=0) — wage unchanged vs old max rule', () => {
-    // After #1990 disjoint fix the calculator emits sundayHrs=0, holidayHrs=11
-    // for a day that is both Sunday and a public holiday. Wage must equal
-    // old Math.max(1.5, 2) × 11 = 2 × 11 = the same 22 × RATE.
+  it('split shift, OT tail on the ordinary Saturday — OT premium paid, not folded into 1x (#2028)', () => {
+    // Sat 13:00 → Sun 01:00 (12h): regular=9, overtime=3, sundayHrs=1,
+    // overtimeOnNonPremiumHrs=2 (OT tail = Sat 22:00–24:00 + Sun 00:00–01:00).
+    // Correct (non-regular Sunday, sundayMult=2):
+    //   9h ordinary @1x + 2h OT @1.5x + 1h Sunday @2x = R1080 + R360 + R240
+    //   = R1680 = 168000c. BEFORE the fix the 2 Sat OT hours folded into 1x
+    //   → R1560 (under-pay R120).
     const cents = computeWageCents({
-      summary: summary({ regularHrs: 9, overtimeHrs: 2, sundayHrs: 0, holidayHrs: 11 }),
+      summary: summary({
+        regularHrs: 9,
+        overtimeHrs: 3,
+        sundayHrs: 1,
+        holidayHrs: 0,
+        overtimeOnNonPremiumHrs: 2,
+      }),
+      rule: RULE,
+      hourlyRateCents: RATE,
+      ordinarilyWorksSundays: false,
+    });
+    expect(cents).toBe(9 * RATE + 2 * RATE * 1.5 + 1 * RATE * 2);
+  });
+
+  it('Sun→Mon, OT tail on the ordinary Monday — OT premium paid on the tail (#2028)', () => {
+    // Sun 20:00 → Mon 06:00 (10h): regular=9, overtime=1, sundayHrs=4,
+    // overtimeOnNonPremiumHrs=1 (OT tail = Mon 05:00–06:00, ordinary).
+    // Correct (sundayMult=2): 5h @1x + 1h OT @1.5x + 4h Sunday @2x
+    //   = R600 + R180 + R960 = R1740 = 174000c. This is the case a
+    //   bucket-totals-only model gets WRONG (can't tell OT tail is on the
+    //   ordinary Monday vs. on the Sunday).
+    const cents = computeWageCents({
+      summary: summary({
+        regularHrs: 9,
+        overtimeHrs: 1,
+        sundayHrs: 4,
+        holidayHrs: 0,
+        overtimeOnNonPremiumHrs: 1,
+      }),
+      rule: RULE,
+      hourlyRateCents: RATE,
+      ordinarilyWorksSundays: false,
+    });
+    expect(cents).toBe(5 * RATE + 1 * RATE * 1.5 + 4 * RATE * 2);
+  });
+
+  it('holiday-on-Sunday (disjoint: sundayHrs=0) — holiday 2× on all hours', () => {
+    // #1990: a day that is both Sunday and a holiday emits sundayHrs=0,
+    // holidayHrs=11. Wage = 11h × 2× (holiday wins).
+    const cents = computeWageCents({
+      summary: summary({
+        regularHrs: 9,
+        overtimeHrs: 2,
+        sundayHrs: 0,
+        holidayHrs: 11,
+        overtimeOnNonPremiumHrs: 0,
+      }),
       rule: RULE,
       hourlyRateCents: RATE,
       ordinarilyWorksSundays: true,
@@ -229,33 +290,5 @@ describe('computeWageCents', () => {
   });
 });
 
-describe('hourlyRateCentsFromDbValue', () => {
-  it('parses numeric(8,2) string from pg to cents', () => {
-    expect(hourlyRateCentsFromDbValue('120.00')).toBe(12000);
-    expect(hourlyRateCentsFromDbValue('99.99')).toBe(9999);
-    expect(hourlyRateCentsFromDbValue('0.01')).toBe(1);
-  });
-
-  it('parses a plain number', () => {
-    expect(hourlyRateCentsFromDbValue(120)).toBe(12000);
-    expect(hourlyRateCentsFromDbValue(0)).toBe(0);
-  });
-
-  it('returns null for null/undefined', () => {
-    expect(hourlyRateCentsFromDbValue(null)).toBeNull();
-    expect(hourlyRateCentsFromDbValue(undefined)).toBeNull();
-  });
-
-  it('returns null for unparseable / negative / non-finite', () => {
-    expect(hourlyRateCentsFromDbValue('abc')).toBeNull();
-    expect(hourlyRateCentsFromDbValue('-10')).toBeNull();
-    expect(hourlyRateCentsFromDbValue(-0.01)).toBeNull();
-    expect(hourlyRateCentsFromDbValue('NaN')).toBeNull();
-  });
-
-  it('rounds half-to-even at the cents boundary via Math.round', () => {
-    // 99.995 × 100 = 9999.5 → Math.round returns 10000 (half up on exact halves
-    // in JS — acceptable for payroll; legal precision is 1¢).
-    expect(hourlyRateCentsFromDbValue('99.995')).toBe(10000);
-  });
-});
+// hourlyRateCentsFromDbValue tests live in
+// __tests__/hourlyRateCentsFromDbValue.test.ts (#2028 file-size split).

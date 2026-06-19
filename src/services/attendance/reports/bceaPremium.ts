@@ -1,12 +1,22 @@
 /**
  * bcea-premium report (PRD-061 FR-REPORT-BC-*).
  *
- * Hours worked on Sundays and public holidays per staff per day. Joins
- * `attendance_daily_summaries.work_date` against `public_holidays` to
- * label the day type — Sunday OR a specific holiday name. Premium rate
- * is the BCEA-default rule (1.5× ordinary for Sundays s16, 2× for
- * holidays s18, 2× for Sunday-non-ordinary). We use the staff's
+ * Hours worked on Sundays and public holidays per staff per day. Premium rate
+ * is the BCEA-default rule (1.5× ordinary for Sundays s16, 2× for holidays
+ * s18, 2× for Sunday-non-ordinary). We use the staff's
  * `ordinarily_works_sundays` flag to pick the Sunday multiplier.
+ *
+ * Cross-midnight attribution (#2028):
+ *   `attendance_daily_summaries` is keyed to the CLOCK-IN day (`work_date`),
+ *   but a shift that crosses midnight earns its Sunday/holiday premium on
+ *   `work_date + 1`. The persisted summary stores only bucket totals, not the
+ *   per-day split, so we DERIVE the premium calendar day from `work_date`:
+ *     - sunday_hrs belong to whichever of {work_date, work_date+1} is a Sunday
+ *       (two consecutive days can't both be Sunday → unambiguous).
+ *     - holiday_hrs belong to whichever of {work_date, work_date+1} is a public
+ *       holiday; the holiday NAME is joined on that derived day.
+ *   The premium AMOUNT was always correct (totals × multiplier); this fixes
+ *   the DATE and LABEL the payroll team reads.
  *
  * Premium amount is `hours × multiplier × hourly_rate_at_clock_in`.
  * Where the snapshot is missing, multiplier and amount are still shown
@@ -34,7 +44,11 @@ interface Row extends Record<string, unknown> {
   full_name: string;
   department: string | null;
   ordinarily_works_sundays: boolean | null;
-  is_sunday: boolean;
+  /** SAST day the sunday_hrs fall on (work_date or work_date+1). */
+  sunday_date: string;
+  /** SAST day the holiday_hrs fall on (work_date or work_date+1). */
+  holiday_date: string;
+  /** Name of the holiday on holiday_date, resolved via public_holidays. */
   holiday_name: string | null;
   sunday_hrs: string;
   holiday_hrs: string;
@@ -67,6 +81,19 @@ export async function runBceaPremium(input: ReportInput): Promise<ReportRunResul
            AND e.site_geofence_id = ANY(${pb.next(input.siteIds)}::uuid[]))`
     : '';
 
+  // Derive the premium calendar day from the clock-in day (#2028). A ≤24h
+  // shift touches at most work_date and work_date+1.
+  //   sunday_date  = whichever of the two is a Sunday (DOW 0).
+  //   holiday_date = whichever of the two is a public holiday (else fall back
+  //                  to work_date+1 so a cross-midnight-into-holiday shift
+  //                  resolves the name on the correct day).
+  const sundayDateExpr = `
+    CASE WHEN EXTRACT(DOW FROM ds.work_date) = 0
+         THEN ds.work_date ELSE ds.work_date + 1 END`;
+  const holidayDateExpr = `
+    CASE WHEN EXISTS (SELECT 1 FROM public_holidays ph0 WHERE ph0.date = ds.work_date)
+         THEN ds.work_date ELSE ds.work_date + 1 END`;
+
   const text = `
     SELECT
       ds.work_date::text                           AS work_date,
@@ -74,14 +101,16 @@ export async function runBceaPremium(input: ReportInput): Promise<ReportRunResul
       TRIM(COALESCE(s.first_name,'') || ' ' || COALESCE(s.last_name,'')) AS full_name,
       s.department                                 AS department,
       s.ordinarily_works_sundays                   AS ordinarily_works_sundays,
-      (EXTRACT(DOW FROM ds.work_date) = 0)         AS is_sunday,
+      (${sundayDateExpr})::text                     AS sunday_date,
+      (${holidayDateExpr})::text                    AS holiday_date,
       ph.name                                      AS holiday_name,
       ds.sunday_hrs::text                          AS sunday_hrs,
       ds.holiday_hrs::text                         AS holiday_hrs,
       sras.hourly_rate_cents::text                 AS hourly_rate_cents
     FROM attendance_daily_summaries ds
     JOIN staff s ON s.id = ds.staff_id
-    LEFT JOIN public_holidays ph ON ph.date = ds.work_date
+    -- Resolve the holiday name on the DERIVED holiday day, not the clock-in day.
+    LEFT JOIN public_holidays ph ON ph.date = (${holidayDateExpr})
     -- Pick a single representative entry per (staff, day) for the rate snapshot.
     LEFT JOIN LATERAL (
       SELECT id FROM attendance_entries e
@@ -96,30 +125,31 @@ export async function runBceaPremium(input: ReportInput): Promise<ReportRunResul
 
   const rows = await sql.query<Row>(text, pb.params);
   if (rows.length > REPORT_ROW_CAP) throw new ReportTooLargeError(rows.length);
-  let missingRate = 0;
+  // Count OUTPUT rows that show R0 because the rate snapshot is missing —
+  // not DB rows. A single DB row can emit a Sunday row AND a holiday row,
+  // so counting DB rows would under-report the footnote.
+  let missingRateRows = 0;
   const out: Array<Record<string, unknown>> = [];
   for (const r of rows) {
-    // BCEA s16 (Sunday work) and s18 (holiday work) each set a *minimum*
-    // multiplier; the higher applies when both classifications hit the
-    // same hour. We emit ONE row per (staff, date) with the higher
-    // multiplier — emitting two would double-count the same hours and
-    // overstate the premium total payroll consumers SUM out of the
-    // spreadsheet.
+    // #1990 disjoint model: sunday_hrs and holiday_hrs cover DIFFERENT hours
+    // (holiday wins on a day that is both). We emit a separate row for each
+    // non-zero bucket — they are additive, not double-counted:
+    //   - whole-day Sunday OR whole-day holiday → one row
+    //   - cross-midnight Sunday→holiday → two rows (one per day type/date)
+    //   - holiday-on-Sunday → calculator sets sunday_hrs=0, so only the
+    //     holiday row emits.
     const sundayHrs = Number(r.sunday_hrs);
     const holidayHrs = Number(r.holiday_hrs);
     if (sundayHrs === 0 && holidayHrs === 0) continue;
     const rateCents = r.hourly_rate_cents !== null ? Number(r.hourly_rate_cents) : null;
-    if (rateCents === null) missingRate += 1;
 
     const sundayMultiplier = r.ordinarily_works_sundays ? 1.5 : 2.0;
-    // #1990 disjoint model: emit a separate row for each non-zero bucket.
-    // For cross-midnight Sunday->holiday shifts both emit (additive); for
-    // whole-day Sunday or holiday only one emits; for holiday-on-Sunday the
-    // calculator now sets sundayHrs=0 so only the holiday row emits.
     if (sundayHrs > 0) {
       const sundayAmount = rateCents === null ? 0 : (sundayHrs * sundayMultiplier * rateCents) / 100;
+      if (rateCents === null) missingRateRows += 1;
       out.push({
-        work_date: r.work_date,
+        // #2028: attribute to the derived Sunday day, not the clock-in day.
+        work_date: r.sunday_date,
         day_type: 'Sunday',
         staff: r.full_name,
         department: r.department ?? '',
@@ -130,8 +160,11 @@ export async function runBceaPremium(input: ReportInput): Promise<ReportRunResul
     }
     if (holidayHrs > 0) {
       const holAmount = rateCents === null ? 0 : (holidayHrs * 2.0 * rateCents) / 100;
+      if (rateCents === null) missingRateRows += 1;
       out.push({
-        work_date: r.work_date,
+        // #2028: attribute to the derived holiday day with the holiday name
+        // resolved on that day (not the clock-in day's name).
+        work_date: r.holiday_date,
         day_type: r.holiday_name ?? 'Public holiday',
         staff: r.full_name,
         department: r.department ?? '',
@@ -142,9 +175,9 @@ export async function runBceaPremium(input: ReportInput): Promise<ReportRunResul
     }
   }
   const notes: string[] = [];
-  if (missingRate > 0) {
-    notes.push(`${missingRate} row(s) had no captured hourly rate; premium amount shows R0 — verify via payroll.`);
+  if (missingRateRows > 0) {
+    notes.push(`${missingRateRows} row(s) had no captured hourly rate; premium amount shows R0 — verify via payroll.`);
   }
-  notes.push('Sunday 1.5× (ordinarily) or 2× (BCEA s16). Holiday 2× (BCEA s18). Cross-midnight Sunday→holiday shifts emit two rows — one per day type.');
+  notes.push('Sunday 1.5× (ordinarily) or 2× (BCEA s16). Holiday 2× (BCEA s18). Cross-midnight shifts attribute premium hours to the day they fall on; a Sunday→holiday shift emits two rows — one per day type.');
   return { rows: out, columns: COLUMNS, notes };
 }
