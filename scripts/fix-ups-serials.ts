@@ -16,7 +16,7 @@
 
 import { Pool } from 'pg';
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: ['.env.local', '.env'] });
 
 const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
 const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD;

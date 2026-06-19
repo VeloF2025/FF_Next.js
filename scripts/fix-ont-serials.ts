@@ -12,7 +12,7 @@
  */
 
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: ['.env.local', '.env'] });
 
 const BASE_URL = 'https://www.1map.co.za';
 const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
