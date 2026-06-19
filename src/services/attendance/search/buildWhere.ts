@@ -42,10 +42,14 @@ export function buildBaseWhere(
 ): BuiltWhere {
   const parts: string[] = [];
   const params: unknown[] = [];
-  const next = () => `$${params.length + 1}`;
 
+  // Reference $${params.length} *after* each push so the placeholder matches
+  // the value just bound. The date range is pushed first and unconditionally,
+  // so dateFrom is always $1 and dateTo always $2. (A `params.length + 1`
+  // helper here was off-by-one: it made the dateFrom predicate reference $2
+  // too, collapsing every range to its last day — a real search regression.)
   params.push(filters.dateFrom);
-  parts.push(`ds.work_date >= ${next()}::date`);
+  parts.push(`ds.work_date >= $${params.length}::date`);
 
   params.push(filters.dateTo);
   parts.push(`ds.work_date <= $${params.length}::date`);

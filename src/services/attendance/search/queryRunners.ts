@@ -65,11 +65,9 @@ export async function runTotalsQuery(
   // Pre-aggregate unresolved exceptions per (staff_id, work_date) so the
   // join is 1:1 with attendance_daily_summaries instead of a correlated subquery.
   //
-  // buildBaseWhere (search) always stores dateFrom as params[0] ($1) and dateTo as
-  // params[1] ($2). The where.text has a pre-existing off-by-one in next() that makes
-  // both date predicates reference $2, leaving $1 unreferenced. Postgres rejects queries
-  // with unreferenced parameters. Referencing $1::date in the CTE resolves this — $1 IS
-  // dateFrom (params[0]), so the CTE date bounds are semantically correct.
+  // buildBaseWhere pushes the date range first and unconditionally, so dateFrom
+  // is params[0] ($1) and dateTo is params[1] ($2). The CTE reuses those same
+  // bindings for its own date bound.
   const text = `
     WITH ex AS (
       SELECT xe.staff_id, xe.work_date, COUNT(*)::int AS cnt
