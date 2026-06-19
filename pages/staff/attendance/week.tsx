@@ -42,7 +42,6 @@ interface WeekPayload {
   // the corrections / manual-entry APIs, not here.
   lock: {
     lockedAt: string;
-    lockedBy: string;
     reason: string | null;
   } | null;
 }

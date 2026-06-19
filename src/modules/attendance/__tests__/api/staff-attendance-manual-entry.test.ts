@@ -155,6 +155,24 @@ describe('POST /api/staff/attendance-manual-entry', () => {
     // All three writes go through a single transaction (#1997).
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
 
+    // Entry INSERT param order must match the column list — guards against a
+    // $-placeholder transposition that would silently swap clock-in/out or
+    // staff/site without changing any other assertion.
+    const entryCall = mocks.txnQueryOne.mock.calls.find((c) =>
+      /INSERT\s+INTO\s+attendance_entries/i.test(c[0] as string)
+    ) as [string, unknown[]] | undefined;
+    expect(entryCall).toBeDefined();
+    expect(entryCall![1]).toEqual([
+      STAFF_UUID,
+      '2026-04-20',
+      '2026-04-20T06:00:00.000Z',
+      '2026-04-20T14:00:00.000Z',
+      '2026-04-20T06:00:00.000Z',
+      '2026-04-20T14:00:00.000Z',
+      null,
+      'phone battery died; supervisor attests shift',
+    ]);
+
     const calls = mocks.txnQuery.mock.calls as [string, unknown[]][];
     const exceptionCall = calls.find((c) =>
       /INSERT\s+INTO\s+attendance_exceptions/i.test(c[0])
