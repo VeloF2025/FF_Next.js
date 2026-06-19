@@ -119,14 +119,23 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         return;
       }
     } catch (err) {
-      // Cartrack is unreachable — fall through rather than block all
-      // mapping writes. Log loud so ops sees it; the admin can retry
-      // with ?allow_unknown=true if it's a sustained outage.
-      log.warn('[cartrack-mapping] validation against Cartrack failed — persisting anyway', {
+      // Cartrack is unreachable — do NOT silently persist an unvalidated ID
+      // (that produces permanent vehicle_not_mapped verdicts nobody notices
+      // until a supervisor eyeballs the week view). Return a distinct 503 so
+      // the operator knows validation was skipped and can explicitly opt in
+      // via ?allow_unknown=true (the UI offers a "Save without validation"
+      // action that re-POSTs with that flag). (#1999)
+      log.warn('[cartrack-mapping] validation against Cartrack failed — refusing to persist unvalidated', {
         fleetVehicleId,
         cartrackVehicleId,
         error: err instanceof Error ? err.message : String(err),
       });
+      apiResponse.error(
+        res,
+        ErrorCode.SERVICE_UNAVAILABLE,
+        'Could not reach Cartrack to validate this vehicle ID. Use "Save without validation" to persist it without the cross-check.'
+      );
+      return;
     }
   }
 

@@ -5,12 +5,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ sql: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  sql: vi.fn(),
+  transaction: vi.fn(),
+  txnQuery: vi.fn(),
+  txnQueryOne: vi.fn(),
+}));
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
-vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
+vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql, transaction: mocks.transaction }));
 vi.mock('@/services/attendance/supervisorScope', () => ({
   authorizedToSuperviseStaff: vi.fn().mockResolvedValue(true),
   staffIdsSupervisedBy: vi.fn().mockResolvedValue(null),
@@ -53,8 +58,10 @@ function makeRes() {
   return { res: res as unknown as NextApiResponse, captured };
 }
 
+// staff_id must be a real UUID since the handler now format-validates it (#2001).
+const STAFF_UUID = '11111111-1111-1111-1111-111111111111';
 const VALID_BODY = {
-  staff_id: 'staff-1',
+  staff_id: STAFF_UUID,
   clock_in_at: '2026-04-20T06:00:00Z',
   clock_out_at: '2026-04-20T14:00:00Z',
   notes: 'phone battery died; supervisor attests shift',
@@ -62,6 +69,17 @@ const VALID_BODY = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // transaction(cb) runs the callback with a fake txn whose query/queryOne
+  // are the per-test mocks, then "commits" by returning the callback result.
+  mocks.transaction.mockImplementation(
+    async (
+      cb: (txn: {
+        client: unknown;
+        query: typeof mocks.txnQuery;
+        queryOne: typeof mocks.txnQueryOne;
+      }) => unknown
+    ) => cb({ client: {}, query: mocks.txnQuery, queryOne: mocks.txnQueryOne })
+  );
 });
 
 describe('POST /api/staff/attendance-manual-entry', () => {
@@ -69,6 +87,14 @@ describe('POST /api/staff/attendance-manual-entry', () => {
     const { res, captured } = makeRes();
     await handler(makeReq({}, 'GET'), res);
     expect(captured.statusCode).toBe(405);
+  });
+
+  it('400 when staff_id is not a valid UUID', async () => {
+    const { res, captured } = makeRes();
+    await handler(makeReq({ ...VALID_BODY, staff_id: 'staff-1' }), res);
+    expect(captured.statusCode).toBe(400);
+    // Reached neither the scope check nor any DB write.
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it("400 when clock_out_at is before clock_in_at", async () => {
@@ -110,14 +136,14 @@ describe('POST /api/staff/attendance-manual-entry', () => {
     const { res, captured } = makeRes();
     await handler(makeReq(VALID_BODY), res);
     expect(captured.statusCode).toBe(409);
+    // No writes attempted on a locked week.
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it('happy path — inserts entry, raises manual_override exception (binds supervisor_user_id), deletes existing summary', async () => {
-    mocks.sql
-      .mockResolvedValueOnce([]) // no lock
-      .mockResolvedValueOnce([{ id: 'new-entry' }]) // INSERT entry
-      .mockResolvedValueOnce([]) // INSERT exception
-      .mockResolvedValueOnce([]); // DELETE summary
+  it('happy path — atomically inserts entry, raises manual_override exception (binds supervisor_user_id), deletes existing summary', async () => {
+    mocks.sql.mockResolvedValueOnce([]); // no lock
+    mocks.txnQueryOne.mockResolvedValueOnce({ id: 'new-entry' }); // INSERT entry RETURNING id
+    mocks.txnQuery.mockResolvedValue([]); // exception insert + summary delete
 
     const { res, captured } = makeRes();
     await handler(makeReq(VALID_BODY), res);
@@ -126,18 +152,26 @@ describe('POST /api/staff/attendance-manual-entry', () => {
     expect(body.data.entry_id).toBe('new-entry');
     expect(body.data.work_date).toBe('2026-04-20');
 
-    const calls = mocks.sql.mock.calls as [readonly string[], ...unknown[]][];
+    // All three writes go through a single transaction (#1997).
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+
+    const calls = mocks.txnQuery.mock.calls as [string, unknown[]][];
     const exceptionCall = calls.find((c) =>
-      /INSERT\s+INTO\s+attendance_exceptions/i.test(c[0].join(' '))
+      /INSERT\s+INTO\s+attendance_exceptions/i.test(c[0])
     );
     expect(exceptionCall).toBeDefined();
-    const sqlText = exceptionCall![0].join(' ');
+    const sqlText = exceptionCall![0];
     expect(sqlText).toMatch(/'manual_override'/);
     // Defence-in-depth: the exception details MUST embed the supervisor
     // user id so audit can answer "who clocked this staff in". A refactor
     // that drops the column from jsonb_build_object would silently erase
     // that trail.
     expect(sqlText).toMatch(/supervisor_user_id/);
-    expect(exceptionCall!.slice(1)).toContain('supervisor-1');
+    expect(exceptionCall![1]).toContain('supervisor-1');
+
+    const deleteCall = calls.find((c) =>
+      /DELETE\s+FROM\s+attendance_daily_summaries/i.test(c[0])
+    );
+    expect(deleteCall).toBeDefined();
   });
 });

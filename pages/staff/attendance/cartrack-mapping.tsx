@@ -48,6 +48,9 @@ export default function CartrackMappingPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  // Set to a vehicle id when the API returns 503 (Cartrack unreachable) so we
+  // can offer a "Save without validation" affordance for that row only.
+  const [overrideFor, setOverrideFor] = useState<string | null>(null);
 
   const load = useCallback(async (withCandidates: boolean) => {
     setLoading(true);
@@ -107,14 +110,18 @@ export default function CartrackMappingPage() {
     return m;
   }, [candidates]);
 
-  async function save(fleetVehicleId: string) {
+  async function save(fleetVehicleId: string, opts?: { allowUnknown?: boolean }) {
     const value = draft[fleetVehicleId];
     if (value === undefined) return;
     const cartrackVehicleId = value.trim().length > 0 ? value.trim() : null;
     setBusy(fleetVehicleId);
     setError(null);
+    setOverrideFor(null);
     try {
-      const res = await fetch('/api/staff/attendance-cartrack-mapping', {
+      const url = `/api/staff/attendance-cartrack-mapping${
+        opts?.allowUnknown ? '?allow_unknown=true' : ''
+      }`;
+      const res = await fetch(url, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
@@ -132,6 +139,13 @@ export default function CartrackMappingPage() {
             status: res.status,
             err: parseErr instanceof Error ? parseErr.message : String(parseErr),
           });
+        }
+        // 503 = Cartrack unreachable. The server refuses to persist an
+        // unvalidated ID by default; offer an explicit override for this row
+        // rather than leaving the operator at a dead end.
+        const code = (body as { error?: { code?: string } } | null)?.error?.code;
+        if (code === 'SERVICE_UNAVAILABLE' && !opts?.allowUnknown) {
+          setOverrideFor(fleetVehicleId);
         }
         throw new Error(parseApiError(body, res.status));
       }
@@ -279,6 +293,16 @@ export default function CartrackMappingPage() {
                           >
                             <X className="w-3 h-3" /> Cancel
                           </button>
+                          {overrideFor === v.id && (
+                            <button
+                              type="button"
+                              disabled={busy === v.id}
+                              onClick={() => save(v.id, { allowUnknown: true })}
+                              className="px-2 py-1 rounded bg-amber-900/40 border border-amber-700 hover:bg-amber-800/60 disabled:opacity-50 text-xs flex items-center gap-1"
+                            >
+                              Save without validation
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

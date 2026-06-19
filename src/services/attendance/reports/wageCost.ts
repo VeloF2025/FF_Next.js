@@ -102,7 +102,7 @@ export async function runWageCost(input: ReportInput): Promise<ReportRunResult> 
     { key: 'group_label', label: groupLabel || 'Total' },
     { key: 'headcount', label: 'Active staff', align: 'right', format: 'integer' },
     { key: 'hours', label: 'Hours', align: 'right', format: 'number' },
-    { key: 'ot_wage_rand', label: 'OT wage (R, est.)', align: 'right', format: 'currency_rand' },
+    { key: 'ot_wage_rand', label: 'OT wage (R, incl. in total)', align: 'right', format: 'currency_rand' },
     { key: 'total_wage_rand', label: 'Total wage (R)', align: 'right', format: 'currency_rand' },
   ];
 
@@ -116,6 +116,7 @@ export async function runWageCost(input: ReportInput): Promise<ReportRunResult> 
     })),
     columns,
     notes: [
+      'OT wage (1.5× overtime hours × captured rate) is ALREADY INCLUDED in Total wage — it is a component of it, not an addition. Do not sum the two columns.',
       'OT wage is best-effort — rows without a captured hourly_rate snapshot contribute 0.',
       groupBy === 'none' ? 'Grouping = none → single-row total.' : `Grouping = ${groupLabel.toLowerCase()}.`,
     ],
