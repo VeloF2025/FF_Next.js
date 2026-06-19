@@ -34,6 +34,13 @@ function stderr(msg: string): void {
   process.stderr.write(`${new Date().toISOString()} ${msg}\n`);
 }
 
+// Default WhatsApp ops group ("Velo Test" — a non-secret group JID), mirroring
+// src/lib/dbCircuitBreaker.ts. Intentional fallback so an unconfigured install
+// still routes alerts somewhere visible; set ATTENDANCE_OPS_WA_GROUP_JID or
+// WA_INFRA_GROUP_JID to override. A runtime log fires below when it's used so
+// ops can see the env vars aren't configured. (#2008)
+const DEFAULT_OPS_WA_GROUP_JID = '120363421664266245@g.us';
+
 const isProd = process.env.NODE_ENV === 'production';
 if (isProd && !fs.existsSync('.env.production')) {
   stderr(
@@ -123,7 +130,12 @@ function parseArg(name: string): string | undefined {
       const groupJid =
         process.env.ATTENDANCE_OPS_WA_GROUP_JID ||
         process.env.WA_INFRA_GROUP_JID ||
-        '120363421664266245@g.us';
+        DEFAULT_OPS_WA_GROUP_JID;
+      if (groupJid === DEFAULT_OPS_WA_GROUP_JID) {
+        stderr(
+          '[cartrack-reconcile] no ATTENDANCE_OPS_WA_GROUP_JID / WA_INFRA_GROUP_JID set — routing the alert to the default ops group'
+        );
+      }
       const thresholdRaw = process.env.ATTENDANCE_WA_MISMATCH_THRESHOLD;
       const threshold =
         thresholdRaw && Number.isFinite(Number(thresholdRaw))
