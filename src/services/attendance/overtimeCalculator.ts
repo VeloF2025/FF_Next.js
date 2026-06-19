@@ -188,9 +188,6 @@ export function calculateDailySummary(args: CalculateDailySummaryArgs): DailySum
     };
   }
 
-  const isHoliday = publicHolidays.has(entry.workDate);
-  const sunday = isSunday(entry.workDate);
-
   const nightHrs = roundHours(
     computeNightHours(entry.clockInAt, entry.clockOutAt, nightStart, nightEnd)
   );
@@ -208,8 +205,10 @@ export function calculateDailySummary(args: CalculateDailySummaryArgs): DailySum
     overtimeHrs = roundHours(rawTotalHrs - rule.dailyOrdinaryHrs);
   }
 
-  const sundayHrs = sunday ? totalHrs : 0;
-  const holidayHrs = isHoliday ? totalHrs : 0;
+  // #1990 disjoint: holiday takes precedence over Sunday on the same calendar day.
+  const dayType = computeDayTypeHours(entry.clockInAt, entry.clockOutAt, publicHolidays);
+  const sundayHrs = roundHours(dayType.sundayHrs);
+  const holidayHrs = roundHours(dayType.holidayHrs);
 
   const weeklyOvertimeHrsAfter = weeklyOvertimeHrsBefore + overtimeHrs;
   const weeklyOvertimeOverCap = weeklyOvertimeHrsAfter > rule.weeklyOtCapHrs;
@@ -266,6 +265,40 @@ function overlapMs(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): number {
   return Math.max(0, hi - lo);
 }
 
+function sastYmd(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+/**
+ * #1990: split the shift across SAST calendar days and tally hours on Sunday
+ * or a public holiday. Holiday takes precedence over Sunday on the same day
+ * (disjoint buckets: a given millisecond belongs to at most one bucket).
+ */
+function computeDayTypeHours(
+  clockIn: Date,
+  clockOut: Date,
+  publicHolidays: ReadonlySet<string>
+): { sundayHrs: number; holidayHrs: number } {
+  let sundayMs = 0;
+  let holidayMs = 0;
+  const startMidnight = sastMidnight(clockIn);
+  for (let offsetDays = 0; offsetDays <= 2; offsetDays++) {
+    const mid = new Date(startMidnight.getTime() + offsetDays * MS_PER_DAY);
+    const nextMid = new Date(mid.getTime() + MS_PER_DAY);
+    const workedMs = overlapMs(clockIn, clockOut, mid, nextMid);
+    if (workedMs === 0) continue;
+    const ymd = sastYmd(mid);
+    if (publicHolidays.has(ymd)) holidayMs += workedMs;
+    else if (isSunday(ymd)) sundayMs += workedMs;
+  }
+  return { sundayHrs: sundayMs / MS_PER_HOUR, holidayHrs: holidayMs / MS_PER_HOUR };
+}
+
 function computeNightHours(
   clockIn: Date,
   clockOut: Date,
@@ -304,6 +337,8 @@ function computeNightHours(
 
 export const __testing = {
   computeNightHours,
+  computeDayTypeHours,
   sastMidnight,
+  sastYmd,
   parseHm,
 };

@@ -14,7 +14,6 @@
  */
 
 import { sql } from '@/lib/db-pool';
-import { log } from '@/lib/logger';
 import { buildBaseWhere, makeParamBuilder } from './sqlHelpers';
 import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
@@ -113,52 +112,39 @@ export async function runBceaPremium(input: ReportInput): Promise<ReportRunResul
     if (rateCents === null) missingRate += 1;
 
     const sundayMultiplier = r.ordinarily_works_sundays ? 1.5 : 2.0;
-    const isBoth = sundayHrs > 0 && holidayHrs > 0;
-    const isHolidayOnly = sundayHrs === 0 && holidayHrs > 0;
-    let dayType: string;
-    let multiplier: number;
-    let hours: number;
-    if (isBoth) {
-      // Holiday on a Sunday: take the higher multiplier (2× holiday) and
-      // the larger of the two hour buckets (they should coincide, but the
-      // calculator could conceivably populate them differently).
-      if (sundayHrs !== holidayHrs) {
-        // Flags calculator drift: the two buckets for the same day diverged.
-        // Math.max below masks it — the warn ensures it doesn't go unnoticed.
-        log.warn('[bcea-premium] sunday_hrs !== holiday_hrs on same day — possible calculator drift', {
-          staffId: r.staff_id,
-          workDate: r.work_date,
-          sundayHrs,
-          holidayHrs,
-        });
-      }
-      dayType = `${r.holiday_name ?? 'Public holiday'} (Sunday)`;
-      multiplier = Math.max(sundayMultiplier, 2.0);
-      hours = Math.max(sundayHrs, holidayHrs);
-    } else if (isHolidayOnly) {
-      dayType = r.holiday_name ?? 'Public holiday';
-      multiplier = 2.0;
-      hours = holidayHrs;
-    } else {
-      dayType = 'Sunday';
-      multiplier = sundayMultiplier;
-      hours = sundayHrs;
+    // #1990 disjoint model: emit a separate row for each non-zero bucket.
+    // For cross-midnight Sunday->holiday shifts both emit (additive); for
+    // whole-day Sunday or holiday only one emits; for holiday-on-Sunday the
+    // calculator now sets sundayHrs=0 so only the holiday row emits.
+    if (sundayHrs > 0) {
+      const sundayAmount = rateCents === null ? 0 : (sundayHrs * sundayMultiplier * rateCents) / 100;
+      out.push({
+        work_date: r.work_date,
+        day_type: 'Sunday',
+        staff: r.full_name,
+        department: r.department ?? '',
+        hours_worked: sundayHrs,
+        multiplier: sundayMultiplier,
+        premium_amount_rand: Number(sundayAmount.toFixed(2)),
+      });
     }
-    const amount = rateCents === null ? 0 : (hours * multiplier * rateCents) / 100;
-    out.push({
-      work_date: r.work_date,
-      day_type: dayType,
-      staff: r.full_name,
-      department: r.department ?? '',
-      hours_worked: hours,
-      multiplier,
-      premium_amount_rand: Number(amount.toFixed(2)),
-    });
+    if (holidayHrs > 0) {
+      const holAmount = rateCents === null ? 0 : (holidayHrs * 2.0 * rateCents) / 100;
+      out.push({
+        work_date: r.work_date,
+        day_type: r.holiday_name ?? 'Public holiday',
+        staff: r.full_name,
+        department: r.department ?? '',
+        hours_worked: holidayHrs,
+        multiplier: 2.0,
+        premium_amount_rand: Number(holAmount.toFixed(2)),
+      });
+    }
   }
   const notes: string[] = [];
   if (missingRate > 0) {
     notes.push(`${missingRate} row(s) had no captured hourly rate; premium amount shows R0 — verify via payroll.`);
   }
-  notes.push('Sunday multiplier 1.5× when staff ordinarily works Sundays, 2× otherwise (BCEA s16). Holiday 2× (BCEA s18). Holiday-on-Sunday: higher multiplier wins, single row per day.');
+  notes.push('Sunday 1.5× (ordinarily) or 2× (BCEA s16). Holiday 2× (BCEA s18). Cross-midnight Sunday→holiday shifts emit two rows — one per day type.');
   return { rows: out, columns: COLUMNS, notes };
 }

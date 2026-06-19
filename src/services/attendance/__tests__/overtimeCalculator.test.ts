@@ -113,12 +113,12 @@ describe('calculateDailySummary — BCEA default path', () => {
     expect(s.sundayHrs).toBe(0);
   });
 
-  it('public holiday on Sunday — both sundayHrs and holidayHrs populated', () => {
+  it('public holiday on Sunday — holiday takes precedence; sundayHrs = 0 (#1990 disjoint)', () => {
     const s = call({
       entry: entry('2026-04-19', '07:00', '18:00'), // 11h Sunday also flagged holiday
       publicHolidays: new Set(['2026-04-19']),
     });
-    expect(s.sundayHrs).toBe(11);
+    expect(s.sundayHrs).toBe(0);
     expect(s.holidayHrs).toBe(11);
     expect(s.regularHrs).toBe(9);
     expect(s.overtimeHrs).toBe(2);
@@ -331,12 +331,9 @@ describe('calculateDailySummary — rule + cross-midnight behaviour', () => {
     expect(s.ruleId).toBe('alt-rule-99');
   });
 
-  it('shift crossing midnight into a holiday does NOT dual-report holiday (workDate only)', () => {
-    // Locks current behaviour: holidayHrs is keyed to entry.workDate. A
-    // 16:00 Sun → 02:00 Mon shift where Monday is a holiday books zero
-    // holiday hours. If the reconcile cron wants s18-accurate splitting,
-    // it must pre-split the entry by SAST midnight before calling this
-    // function. Changing this contract requires a new test.
+  it('shift crossing midnight into a holiday dual-reports the holiday portion per SAST day (#1990)', () => {
+    // Sun 16:00 → Mon(holiday) 02:00 (10h total). Sunday portion 8h earns s16
+    // premium; Monday holiday portion 2h earns s18 premium. Buckets are disjoint.
     const s = call({
       entry: {
         workDate: '2026-04-19', // Sunday, the clock-in day
@@ -345,9 +342,38 @@ describe('calculateDailySummary — rule + cross-midnight behaviour', () => {
       },
       publicHolidays: new Set(['2026-04-20']), // Monday is the holiday
     });
+    expect(s.sundayHrs).toBe(8);
+    expect(s.holidayHrs).toBe(2);
+  });
+
+  it('shift crossing midnight into a public holiday dual-reports the holiday hours (#1990)', () => {
+    // Thu 18:00 → Fri(May Day) 06:00 (12h total). Thursday portion is ordinary;
+    // only the 6h on Friday earn the s18 premium.
+    const s = call({
+      entry: {
+        workDate: '2026-04-30', // Thursday
+        clockInAt: sast('2026-04-30', '18:00'),
+        clockOutAt: sast('2026-05-01', '06:00'), // Friday 06:00
+      },
+      publicHolidays: new Set(['2026-05-01']), // Workers Day
+    });
+    expect(s.holidayHrs).toBe(6);
+    expect(s.sundayHrs).toBe(0);
+  });
+
+  it('shift crossing midnight into Sunday dual-reports the Sunday hours (#1990)', () => {
+    // Sat 22:00 → Sun 06:00 (8h total). Only the 6h on Sunday earn the s16
+    // premium; Saturday portion is ordinary.
+    const s = call({
+      entry: {
+        workDate: '2026-04-18', // Saturday
+        clockInAt: sast('2026-04-18', '22:00'),
+        clockOutAt: sast('2026-04-19', '06:00'), // Sunday 06:00
+      },
+      publicHolidays: new Set(),
+    });
+    expect(s.sundayHrs).toBe(6);
     expect(s.holidayHrs).toBe(0);
-    // Sunday dual-reports (workDate = Sunday)
-    expect(s.sundayHrs).toBe(10);
   });
 });
 

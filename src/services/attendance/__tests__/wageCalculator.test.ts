@@ -132,15 +132,43 @@ describe('computeWageCents', () => {
     expect(cents).toBe(9 * RATE * 2);
   });
 
-  it('Sunday AND public holiday: picks max(sundayMult, holidayMult)', () => {
-    // ordinarilyWorksSundays=true → sundayMult=1.5, holidayMult=2 → pick 2.
+  it('cross-midnight Sunday into holiday: premiums are additive per disjoint bucket (#1990)', () => {
+    // Sun 16:00 → Mon-holiday 02:00 → sundayHrs=8, holidayHrs=2 (disjoint).
+    // ordinarilyWorksSundays=true → sundayMult=1.5.
+    // 8h × R120 × 1.5 + 2h × R120 × 2 = R1440 + R480 = R1920.
     const cents = computeWageCents({
-      summary: summary({ regularHrs: 8, sundayHrs: 8, holidayHrs: 8 }),
+      summary: summary({ regularHrs: 9, overtimeHrs: 1, sundayHrs: 8, holidayHrs: 2 }),
       rule: RULE,
       hourlyRateCents: RATE,
       ordinarilyWorksSundays: true,
     });
-    expect(cents).toBe(8 * RATE * 2);
+    expect(cents).toBe(8 * RATE * 1.5 + 2 * RATE * 2);
+  });
+
+  it('cross-midnight non-premium tail — ordinary hours paid at 1x, not dropped', () => {
+    // Sat 22:00 → Sun 06:00 (8h total). The 2h Saturday portion is ordinary (1x);
+    // only the 6h Sunday portion earns the Sunday multiplier.
+    // ordinaryHrs = max(0, 8+0 - 6 - 0) = 2; baseCents = 2×1x + 6×2x.
+    const cents = computeWageCents({
+      summary: summary({ regularHrs: 8, overtimeHrs: 0, sundayHrs: 6, holidayHrs: 0 }),
+      rule: RULE,
+      hourlyRateCents: RATE,
+      ordinarilyWorksSundays: false,
+    });
+    expect(cents).toBe(2 * RATE + 6 * RATE * 2);
+  });
+
+  it('holiday-on-Sunday (disjoint: sundayHrs=0) — wage unchanged vs old max rule', () => {
+    // After #1990 disjoint fix the calculator emits sundayHrs=0, holidayHrs=11
+    // for a day that is both Sunday and a public holiday. Wage must equal
+    // old Math.max(1.5, 2) × 11 = 2 × 11 = the same 22 × RATE.
+    const cents = computeWageCents({
+      summary: summary({ regularHrs: 9, overtimeHrs: 2, sundayHrs: 0, holidayHrs: 11 }),
+      rule: RULE,
+      hourlyRateCents: RATE,
+      ordinarilyWorksSundays: true,
+    });
+    expect(cents).toBe(11 * RATE * 2);
   });
 
   it('night allowance: additive on top of base', () => {
