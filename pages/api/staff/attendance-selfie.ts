@@ -15,9 +15,11 @@ import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 import { withAuth, withPermission, AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { AuditWriteError, logSelfieAccess } from '@/modules/attendance/portal/retentionUtils';
+import { authorizedToSuperviseStaff } from '@/services/attendance/supervisorScope';
 
 interface EntryRow extends Record<string, unknown> {
   id: string;
+  staff_id: string;
   selfie_in_url: string | null;
   selfie_out_url: string | null;
 }
@@ -42,7 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const kindRaw = typeof req.query.kind === 'string' ? req.query.kind : '';
   const context = typeof req.query.context === 'string' ? req.query.context : null;
 
-  if (!/^[0-9a-f-]{36}$/i.test(entryId)) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entryId)) {
     return apiResponse.badRequest(res, 'entryId must be a UUID');
   }
   if (kindRaw !== 'in' && kindRaw !== 'out') {
@@ -53,7 +55,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const rows = await sql<EntryRow>`
-      SELECT id, selfie_in_url, selfie_out_url
+      SELECT id, staff_id, selfie_in_url, selfie_out_url
       FROM attendance_entries
       WHERE id = ${entryId}
       LIMIT 1
@@ -61,6 +63,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const row = rows[0];
     if (!row) {
       return apiResponse.notFound(res, 'attendance_entry', entryId);
+    }
+
+    // #1991: scope the biometric selfie to the viewer's supervisor scope.
+    // super_admin / admin bypass inside the helper; managers and supervisors
+    // may only view selfies for staff they supervise. Checked BEFORE revealing
+    // whether a selfie exists and before the POPIA audit write, so an
+    // out-of-scope viewer learns nothing and triggers no access-log row.
+    const scopeOk = await authorizedToSuperviseStaff(authReq.user, row.staff_id);
+    if (!scopeOk) {
+      log.warn('[staff-attendance-selfie] scope denied', {
+        entryId,
+        staffId: row.staff_id,
+        viewedBy: authReq.user.id,
+      });
+      return apiResponse.forbidden(
+        res,
+        'You are not authorized to view this staff member’s selfie'
+      );
     }
 
     const url = kind === 'in' ? row.selfie_in_url : row.selfie_out_url;

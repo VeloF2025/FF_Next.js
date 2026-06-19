@@ -82,6 +82,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN day_entries d ON d.staff_id = s.id
       LEFT JOIN fleet_authorized_locations home_site ON home_site.id = s.home_site_id
       LEFT JOIN fleet_authorized_locations entry_site ON entry_site.id = d.site_geofence_id
+      -- #2010: approvedAccountPredicate('s') is a compile-time-constant column
+      -- predicate (hardcoded alias, no user/DB input); sql.unsafe is db-pool's
+      -- sanctioned fragment-interpolation API, safe by construction here.
       WHERE LOWER(s.status) = 'active' ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
       ORDER BY full_name ASC
     `;

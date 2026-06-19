@@ -13,6 +13,7 @@ import { BulkLockSection } from '@/components/attendance/BulkLockSection';
 import { thisWeekMondaySast } from '@/components/attendance/dateUtils';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
+import { useCanDo } from '@/hooks/usePermission';
 
 interface LockRow {
   week_start_date: string;
@@ -50,33 +51,12 @@ export default function StaffAttendanceLocksPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [newWeek, setNewWeek] = useState(thisWeekMondaySast());
   const [newReason, setNewReason] = useState('');
-  // Server is the authority on permissions; this is just to hide the
-  // bulk-lock UI for users who'd hit a 403 anyway. Probed via a HEAD-style
-  // call once the page mounts; conservatively defaults to false until known.
-  const [canBulkLock, setCanBulkLock] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
-        if (cancelled || !res.ok) return;
-        const body = await res.json().catch(() => null) as
-          | { success: true; data: { user: { role: string } } }
-          | null;
-        // Server-side guard is what enforces — this is just to hide the
-        // form for users who'd hit a 403 anyway. Mirrors migration 332's
-        // grants: super_admin and admin only.
-        const role = body?.success ? body.data.user.role : null;
-        if (role === 'super_admin' || role === 'admin') setCanBulkLock(true);
-      } catch (err) {
-        log.warn('[locks] role probe failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // #2006: gate the bulk-lock UI on the actual RBAC permission rather than a
+  // hard-coded role-name list. Server-side withPermission is the real
+  // enforcement; this only hides the form for users who'd hit a 403. The hook
+  // resolves the effective permission (super_admin short-circuits to true), so
+  // it stays correct if bulk_lock is ever granted to a new role.
+  const canBulkLock = useCanDo('people.staff.attendance.bulk_lock', 'create');
 
   const load = useCallback(async () => {
     setLoading(true);

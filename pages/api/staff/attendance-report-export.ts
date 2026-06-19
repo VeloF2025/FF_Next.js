@@ -141,6 +141,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   }
 }
 
+// #1992: the report export carries the same wage/BCEA data as the report
+// itself, so it requires the stricter management permission too.
 export default withAuth(
-  withPermission('people.staff.attendance.search', 'view')(handler)
+  withPermission('people.staff.attendance.manage', 'view')(handler)
 );

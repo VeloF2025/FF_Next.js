@@ -174,6 +174,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ON wv.staff_id = ds.staff_id AND wv.work_date = ds.work_date
       WHERE ds.work_date >= ${weekStart}::date
         AND ds.work_date <= ${weekEnd}::date
+        -- #2010: constant column predicate (hardcoded alias, no user input);
+        -- sql.unsafe is db-pool's sanctioned fragment API, safe by construction.
         ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
       ORDER BY full_name ASC, ds.work_date ASC
     `;

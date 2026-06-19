@@ -90,6 +90,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   }
 }
 
+// #1992: financial reports (wage-cost, BCEA premium, monthly wage) require the
+// stricter management permission, not the broader search/list permission, so
+// wage data isn't exposed to every search-permissioned role.
 export default withAuth(
-  withPermission('people.staff.attendance.search', 'view')(handler)
+  withPermission('people.staff.attendance.manage', 'view')(handler)
 );
