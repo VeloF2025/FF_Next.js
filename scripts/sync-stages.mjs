@@ -137,17 +137,25 @@ function log(msg) {
 
 /** Get-or-create the single "live API sync" onemap_imports row; returns its id. */
 async function ensureLiveImport(client) {
-  const found = await client.query(
-    `SELECT id FROM onemap_imports WHERE filename = $1 ORDER BY id LIMIT 1`,
-    [LIVE_IMPORT_FILENAME],
-  );
-  if (found.rows[0]) return found.rows[0].id;
-  const created = await client.query(
-    `INSERT INTO onemap_imports (filename, status, imported_by, created_at)
-     VALUES ($1, 'completed', 'sync-stages', NOW()) RETURNING id`,
-    [LIVE_IMPORT_FILENAME],
-  );
-  return created.rows[0].id;
+  // onemap_imports.filename has no UNIQUE constraint, so a bare SELECT→INSERT
+  // could race two concurrent runs into duplicate live-sync rows. Serialise
+  // with a session advisory lock (no schema migration needed).
+  await client.query(`SELECT pg_advisory_lock(hashtext($1))`, [LIVE_IMPORT_FILENAME]);
+  try {
+    const found = await client.query(
+      `SELECT id FROM onemap_imports WHERE filename = $1 ORDER BY id LIMIT 1`,
+      [LIVE_IMPORT_FILENAME],
+    );
+    if (found.rows[0]) return found.rows[0].id;
+    const created = await client.query(
+      `INSERT INTO onemap_imports (filename, status, imported_by, created_at)
+       VALUES ($1, 'completed', 'sync-stages', NOW()) RETURNING id`,
+      [LIVE_IMPORT_FILENAME],
+    );
+    return created.rows[0].id;
+  } finally {
+    await client.query(`SELECT pg_advisory_unlock(hashtext($1))`, [LIVE_IMPORT_FILENAME]);
+  }
 }
 
 /**

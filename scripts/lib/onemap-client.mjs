@@ -82,7 +82,14 @@ export async function fetchPage(cookieStr, query, page = 1, limit = 500) {
     redirect: 'manual',
     signal: AbortSignal.timeout(60000),
   });
-  return res.json();
+  // A redirect (session expired, status 0 under redirect:'manual') or any
+  // non-JSON body would make res.json() throw an opaque TypeError. Return a
+  // typed failure instead so callers stop cleanly.
+  try {
+    return await res.json();
+  } catch {
+    return { success: false, result: [], total_pages: 0 };
+  }
 }
 
 /** Fetch every record for a site prefix, paginating until total_pages, with a throttle. */
@@ -96,7 +103,9 @@ export async function fetchAllRecords(cookieStr, query, onProgress) {
     if (typeof onProgress === 'function' && (page % 5 === 0 || page >= data.total_pages)) {
       onProgress(query, page, data.total_pages, all.length);
     }
-    if (page >= data.total_pages) break;
+    // Guard against a missing/NaN total_pages (malformed/error response) that
+    // would make `page >= total_pages` perpetually false → infinite loop.
+    if (!data.total_pages || page >= data.total_pages) break;
     page++;
     await new Promise((r) => setTimeout(r, 200));
   }
