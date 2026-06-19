@@ -54,13 +54,15 @@ beforeEach(() => {
 });
 
 describe('POST /api/sitecam/validate', () => {
-  it('resizes the photo via optimizeForVlm (1024×768) before the VLM call', async () => {
+  it('resizes the judged photo via optimizeForVlm (1280×960) before the VLM call', async () => {
     const res = await run({ ...base });
 
     expect(res._getStatusCode()).toBe(200);
     expect(res._getJSONData().data.pass).toBe(true);
     expect(h.optimizeForVlm).toHaveBeenCalledTimes(1);
-    expect(h.optimizeForVlm).toHaveBeenCalledWith('RAWFULLRES', { maxWidth: 1024, maxHeight: 768 });
+    // The judged photo gets the larger budget so small step-deciding features
+    // survive; gallery examples are downscaled separately in vlmGallery.ts.
+    expect(h.optimizeForVlm).toHaveBeenCalledWith('RAWFULLRES', { maxWidth: 1280, maxHeight: 960 });
     // The VLM must receive the RESIZED image, never the raw full-res one.
     expect(h.optimizeForVlm.mock.invocationCallOrder[0])
       .toBeLessThan(h.fetchFn.mock.invocationCallOrder[0]);

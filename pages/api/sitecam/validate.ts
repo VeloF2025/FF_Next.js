@@ -38,6 +38,8 @@ import {
   VLM_TIMEOUT_REALTIME,
   VLM_MAX_TOKENS_QUICK,
   VLM_TEMPERATURE,
+  VLM_MAX_IMAGE_WIDTH,
+  VLM_MAX_IMAGE_HEIGHT,
   stripThinkTags,
 } from '@/lib/vlm';
 
@@ -110,8 +112,14 @@ async function runVlmCheck(
 
   // Phone photos arrive at full camera resolution; together with the gallery
   // examples they exceed the VLM's 32k context and every request 400s (and
-  // fails open). Resize to the VLM working size before building the prompt.
-  const photoBase64 = await optimizeForVlm(rawPhotoBase64, { maxWidth: 1024, maxHeight: 768 });
+  // fails open). The JUDGED photo gets the larger budget (1280×960) — the small
+  // features that decide a step (a wall hole, 4 LEDs, a meter reading) only
+  // survive at higher resolution — while gallery examples are downscaled
+  // smaller (see vlmGallery.ts), so total context stays below where it 400'd.
+  const photoBase64 = await optimizeForVlm(rawPhotoBase64, {
+    maxWidth: VLM_MAX_IMAGE_WIDTH,
+    maxHeight: VLM_MAX_IMAGE_HEIGHT,
+  });
 
   let content: unknown[];
   if (jobType === 'civils') {
