@@ -1,7 +1,11 @@
 // Deep 1Map field discovery - fetch more records to see all status values
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 const BASE_URL = 'https://www.1map.co.za';
-const EMAIL = 'hein@velocityfibre.co.za';
-const PASSWORD = 'VeloF@2025';
+const EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
+const PASSWORD = process.env.ONEMAP_PASSWORD;
+if (!PASSWORD) throw new Error('ONEMAP_PASSWORD not set');
 
 async function authenticate() {
   const loginPage = await fetch(BASE_URL + '/login', { signal: AbortSignal.timeout(30000) });

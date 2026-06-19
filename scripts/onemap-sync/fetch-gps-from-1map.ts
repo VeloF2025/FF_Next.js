@@ -5,15 +5,23 @@
  *   ONEMAP_EMAIL=... ONEMAP_PASSWORD=... npx tsx scripts/onemap-sync/fetch-gps-from-1map.ts
  *   npx tsx scripts/onemap-sync/fetch-gps-from-1map.ts --site LAW
  *   npx tsx scripts/onemap-sync/fetch-gps-from-1map.ts --dry-run
+ *
+ * Required env vars (set in .env.local or shell):
+ *   DATABASE_URL    — see .claude/credentials.local.md
+ *   ONEMAP_PASSWORD — see .claude/credentials.local.md
  */
+
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
 import { neon } from '@neondatabase/serverless';
 
-const DATABASE_URL = process.env.DATABASE_URL ||
-  'process.env.DATABASE_URL';
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) throw new Error('DATABASE_URL not set');
 
 const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
-const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD || 'VeloF@2025';
+const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD;
+if (!ONEMAP_PASSWORD) throw new Error('ONEMAP_PASSWORD not set');
 const BASE_URL = 'https://www.1map.co.za';
 
 const sql = neon(DATABASE_URL);

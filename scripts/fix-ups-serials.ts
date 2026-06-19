@@ -15,9 +15,12 @@
  */
 
 import { Pool } from 'pg';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
 const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
-const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD || 'VeloF@2025';
+const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD;
+if (!ONEMAP_PASSWORD) throw new Error('ONEMAP_PASSWORD not set');
 const LAYER_ID = '5121';
 const BASE_URL = 'https://www.1map.co.za';
 

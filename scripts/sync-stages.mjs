@@ -14,102 +14,25 @@
  * Cron (every 4 hours): see crontab on Velocity (velo user)
  */
 
+import { config } from 'dotenv';
 import pg from 'pg';
+import { authenticate, fetchAllRecords } from './lib/onemap-client.mjs';
+config({ path: '.env.local' });
 const { Pool } = pg;
 
-const BASE_URL = 'https://www.1map.co.za';
-const EMAIL = 'hein@velocityfibre.co.za';
-const PASSWORD = 'VeloF@2025';
+// Env-only config (issue #2029 — no hardcoded creds, no retired Neon URL).
+const DB_URL = process.env.DATABASE_URL;
+if (!DB_URL) throw new Error('DATABASE_URL not set');
 
-const DB_URL = 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+// 1Map site codes swept into onemap_properties (flat, property-keyed). LAW/MAM/MOH/ETW
+// map 1:1 to a project (so they also drive pon_stage_tracking); TEM is shared by
+// Thembisa POP1 + POP3, so it is property-only here (no unique project to attribute).
+const ALL_SITE_CODES = ['LAW', 'MAM', 'MOH', 'TEM', 'ETW'];
 
-// ============================================================================
-// 1MAP AUTH + FETCH
-// ============================================================================
-
-async function authenticate() {
-  const loginPage = await fetch(BASE_URL + '/login', { signal: AbortSignal.timeout(30000) });
-  const html = await loginPage.text();
-  const csrfMatch = html.match(/name="_csrf".*?value="([^"]+)"/);
-  const csrf = csrfMatch ? csrfMatch[1] : '';
-
-  const pageCookies = loginPage.headers.get('set-cookie') || '';
-  const sidMatch = pageCookies.match(/connect\.sid=([^;]+)/);
-  const csrfCookie = pageCookies.match(/csrfToken=([^;]+)/);
-
-  const cookies = [];
-  if (sidMatch) cookies.push('connect.sid=' + sidMatch[1]);
-  if (csrfCookie) cookies.push('csrfToken=' + csrfCookie[1]);
-
-  const loginRes = await fetch(BASE_URL + '/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Cookie': cookies.join('; '),
-    },
-    body: new URLSearchParams({ _csrf: csrf, email: EMAIL, password: PASSWORD }).toString(),
-    redirect: 'manual',
-    signal: AbortSignal.timeout(30000),
-  });
-
-  const setCookie = loginRes.headers.get('set-cookie') || '';
-  const newSid = setCookie.match(/connect\.sid=([^;]+)/);
-  const newCsrf = setCookie.match(/csrfToken=([^;]+)/);
-
-  const authCookies = [];
-  if (newSid) authCookies.push('connect.sid=' + newSid[1]);
-  if (newCsrf) authCookies.push('csrfToken=' + newCsrf[1]);
-
-  await fetch(BASE_URL + '/app?layer=5121', {
-    headers: { 'Cookie': authCookies.join('; ') },
-    signal: AbortSignal.timeout(30000),
-  });
-
-  return authCookies.join('; ');
-}
-
-async function fetchPage(cookieStr, query, page = 1, limit = 500) {
-  const formData = new URLSearchParams({
-    ungeocoded: 'false', left: '0', bottom: '0', right: '0', top: '0',
-    selfilter: '', action: 'get', email: EMAIL, layerid: '5121',
-    sort: 'prop_id', templateExpression: '', q: query,
-    page: String(page), start: String((page - 1) * limit), limit: String(limit),
-  });
-
-  const res = await fetch(BASE_URL + '/api/apps/app/getattributes', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'Cookie': cookieStr,
-    },
-    body: formData.toString(),
-    redirect: 'manual',
-    signal: AbortSignal.timeout(60000),
-  });
-
-  return await res.json();
-}
-
-async function fetchAllRecords(cookieStr, site) {
-  const allRecords = [];
-  let page = 1;
-
-  while (true) {
-    const data = await fetchPage(cookieStr, site, page, 500);
-    if (!data.result || data.result.length === 0) break;
-    allRecords.push(...data.result);
-
-    if (page % 5 === 0 || page >= data.total_pages) {
-      log(`  ${site}: page ${page}/${data.total_pages} (${allRecords.length} records)`);
-    }
-
-    if (page >= data.total_pages) break;
-    page++;
-    await new Promise(r => setTimeout(r, 200));
-  }
-
-  return allRecords;
-}
+// onemap_properties is keyed by (import_id, property_id). Recurring syncs reuse ONE
+// "live API" import row so upserts are idempotent and don't bloat the table; the old
+// NULL-import rows are left untouched.
+const LIVE_IMPORT_FILENAME = 'live-1map-api-sync';
 
 // ============================================================================
 // STATUS → STAGE MAPPING
@@ -208,18 +131,71 @@ function log(msg) {
   console.log(`[${ts}] ${msg}`);
 }
 
-async function syncSite(site, projectId, cookieStr, pool, projectName) {
-  const startTime = Date.now();
-  log(`--- ${site} (${projectName}) ---`);
+// ============================================================================
+// onemap_properties UPSERT (flat, current 1Map snapshot per property)
+// ============================================================================
 
-  // Fetch from 1Map
-  const records = await fetchAllRecords(cookieStr, site);
-  log(`  ${site}: fetched ${records.length} records from 1Map`);
+/** Get-or-create the single "live API sync" onemap_imports row; returns its id. */
+async function ensureLiveImport(client) {
+  const found = await client.query(
+    `SELECT id FROM onemap_imports WHERE filename = $1 ORDER BY id LIMIT 1`,
+    [LIVE_IMPORT_FILENAME],
+  );
+  if (found.rows[0]) return found.rows[0].id;
+  const created = await client.query(
+    `INSERT INTO onemap_imports (filename, status, imported_by, created_at)
+     VALUES ($1, 'completed', 'sync-stages', NOW()) RETURNING id`,
+    [LIVE_IMPORT_FILENAME],
+  );
+  return created.rows[0].id;
+}
 
-  if (records.length === 0) {
-    log(`  ${site}: no records found, skipping`);
-    return null;
+/**
+ * Upsert live 1Map records into onemap_properties keyed by (import_id, property_id).
+ * Maps the raw getattributes fields; leaves contact PII untouched (not needed here).
+ */
+async function upsertProperties(client, records, importId) {
+  let n = 0;
+  for (const r of records) {
+    if (!r.prop_id) continue;
+    await client.query(
+      `INSERT INTO onemap_properties (
+         import_id, property_id, drop_number, ont_barcode, ups_serial, status,
+         site, pole_number, location_address, latitude, longitude,
+         home_signup_date, installation_date, last_modified_by, last_modified_date, updated_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
+       ON CONFLICT (import_id, property_id) DO UPDATE SET
+         drop_number = EXCLUDED.drop_number,
+         ont_barcode = EXCLUDED.ont_barcode,
+         ups_serial = EXCLUDED.ups_serial,
+         status = EXCLUDED.status,
+         site = EXCLUDED.site,
+         pole_number = EXCLUDED.pole_number,
+         location_address = EXCLUDED.location_address,
+         latitude = EXCLUDED.latitude,
+         longitude = EXCLUDED.longitude,
+         home_signup_date = EXCLUDED.home_signup_date,
+         installation_date = EXCLUDED.installation_date,
+         last_modified_by = EXCLUDED.last_modified_by,
+         last_modified_date = EXCLUDED.last_modified_date,
+         updated_at = NOW()`,
+      [
+        importId, String(r.prop_id), r.drp || null, r.ph_ont || null, r.br_ser || null, r.status || null,
+        r.site || null, r.pole || null, r.address || null,
+        Number.isFinite(Number(r.latitude)) ? Number(r.latitude) : null,
+        Number.isFinite(Number(r.longitude)) ? Number(r.longitude) : null,
+        r.last_modified_signup_date || null, r.last_modified_install_date || null,
+        r.last_modified_by || null, r.last_modified_date || null,
+      ],
+    );
+    n++;
   }
+  return n;
+}
+
+async function syncSite(site, projectId, pool, projectName, records) {
+  const startTime = Date.now();
+  log(`  ${site}: stage tracking (${projectName})`);
 
   const parsed = records.map(parseRecord);
 
@@ -494,43 +470,68 @@ async function discoverProjects(pool, filterPrefixes) {
 
 async function main() {
   const args = process.argv.slice(2).map(s => s.toUpperCase());
+  const sites = args.length > 0 ? ALL_SITE_CODES.filter(s => args.includes(s)) : ALL_SITE_CODES;
 
   const totalStart = Date.now();
   const pool = new Pool({ connectionString: DB_URL });
 
   try {
-    // Discover projects from DB
-    const projects = await discoverProjects(pool, args);
-
-    if (projects.length === 0) {
-      log('No projects found with onemap_prefix set. Set metadata.onemap_prefix on projects to enable sync.');
-      process.exit(0);
+    // 1:1 prefix → project map (for pon_stage_tracking). A prefix shared by >1
+    // project (TEM = Thembisa POP1+POP3) is marked ambiguous → property-only.
+    const projects = await discoverProjects(pool, []);
+    const projectByPrefix = new Map();
+    for (const p of projects) {
+      const k = p.prefix.toUpperCase();
+      projectByPrefix.set(k, projectByPrefix.has(k) ? null : p);
     }
 
-    log(`=== Stage Sync Starting: ${projects.map(p => `${p.prefix} (${p.name})`).join(', ')} ===`);
-
-    // Authenticate once, reuse for all sites
+    log(`=== 1Map Sync Starting: ${sites.join(', ')} ===`);
     log('Authenticating with 1Map...');
     const cookieStr = await authenticate();
     log('Authenticated OK');
 
-    const results = [];
+    const client = await pool.connect();
+    let liveImportId;
+    try {
+      liveImportId = await ensureLiveImport(client);
+    } finally {
+      client.release();
+    }
 
-    for (const project of projects) {
+    let totalProps = 0;
+    let stagedProjects = 0;
+
+    for (const site of sites) {
       try {
-        const result = await syncSite(project.prefix, project.uuid, cookieStr, pool, project.name);
-        if (result) results.push(result);
+        const records = await fetchAllRecords(cookieStr, site, (q, page, total, n) =>
+          log(`  ${q}: page ${page}/${Math.ceil(total)} (${n} records)`));
+        log(`  ${site}: fetched ${records.length} records from 1Map`);
+        if (records.length === 0) continue;
+
+        // Always: refresh the flat onemap_properties snapshot.
+        const propClient = await pool.connect();
+        try {
+          const n = await upsertProperties(propClient, records, liveImportId);
+          totalProps += n;
+          log(`  ${site}: upserted ${n} onemap_properties rows`);
+        } finally {
+          propClient.release();
+        }
+
+        // 1:1 project → also refresh pon_stage_tracking from the same records.
+        const project = projectByPrefix.get(site);
+        if (project) {
+          if (await syncSite(site, project.uuid, pool, project.name, records)) stagedProjects++;
+        } else {
+          log(`  ${site}: no unique project — onemap_properties only (no stage tracking)`);
+        }
       } catch (err) {
-        log(`  ${project.prefix}: ERROR — ${err.message}`);
+        log(`  ${site}: ERROR — ${err.message}`);
       }
     }
 
     const totalDuration = ((Date.now() - totalStart) / 1000).toFixed(1);
-    log(`=== Stage Sync Complete: ${results.length}/${projects.length} projects, ${totalDuration}s total ===`);
-
-    for (const r of results) {
-      log(`  ${r.site}: ${r.records} records → ${r.pons} PONs (${r.duration}s)`);
-    }
+    log(`=== 1Map Sync Complete: ${totalProps} properties upserted, ${stagedProjects} projects staged, ${totalDuration}s total ===`);
   } finally {
     await pool.end();
   }
