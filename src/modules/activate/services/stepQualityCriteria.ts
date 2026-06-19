@@ -48,10 +48,10 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
   4: {
     label: 'Cable Entry Inside',
     requirements:
-      'The fiber optic cable entry point must be visible from the INSIDE of the building. A pipe, conduit, or hole in the interior wall where the cable enters is expected. The cable or conduit must be visible entering through the wall from the inside.',
+      'An INTERIOR view of the fiber drop cable where it enters and is routed inside the building. ACCEPTABLE either way: (a) the cable entering through a hole, conduit or pipe in the interior wall, OR (b) the cable running down/along an interior wall or ceiling from the entry point — including a thin cable routed in a wall corner, secured with clips, or trailing toward its destination. Visible interior surroundings (room walls, a ceiling corner, indoor finish) confirm the photo was taken from INSIDE.',
     failInstruction:
-      'FAIL if no cable entry point, conduit, or pipe is visible on the interior wall. FAIL if the photo appears to be taken from outside the building.',
-    failReason: 'Cable entry point not visible from inside',
+      'FAIL only if no drop cable is visible inside at all, or if the photo is clearly taken from OUTSIDE the building (exterior wall, sky, outdoor surroundings). Do NOT fail just because a distinct hole, conduit or pipe is not visible — an interior cable routed along the wall or ceiling from the entry point is a valid Cable Entry Inside photo.',
+    failReason: 'No interior cable entry or routing visible',
   },
   5: {
     label: 'Wall for Installation',
@@ -120,6 +120,29 @@ export const FAIL_REASON_INSTRUCTION = `If it fails, fail_reason must be ONE sho
 
 SPECIAL CASE: if the image appears to be a photograph of a screen, monitor, or printed photo (moiré/interference patterns, screen bezels or borders, visible pixels, glare bands), fail_reason must say that — e.g. "This looks like a photo of a screen — take the photo of the real scene on site." — instead of a framing complaint.`;
 
+/**
+ * Cross-step "wrong subject" instruction (opt-in via buildMessageContent's
+ * `crossStepClassification` flag — SiteCam live-capture only).
+ *
+ * The per-step prompt otherwise shows the model ONLY the criteria for the step
+ * being checked, so when the wrong photo is submitted the model rationalises a
+ * misleading reason against that step ("entry point not clearly visible") and
+ * may invent details. Listing every step's subject lets the model recognise the
+ * photo actually belongs to a different step and say so, instead of guessing.
+ * Also folds in an anti-hallucination guard (describe only what is visible).
+ */
+export function buildCrossStepInstruction(step: QualityCheckStep): string {
+  const expected = STEP_CRITERIA[step].label;
+  const taxonomy = (QUALITY_CHECK_STEPS as readonly QualityCheckStep[])
+    .map((s) => `- ${STEP_CRITERIA[s].label}`)
+    .join('\n');
+  return `WRONG-SUBJECT CHECK (do this FIRST): an installation photo shows one of these subjects:
+${taxonomy}
+This step expects "${expected}". Decide what the photo PRIMARILY shows. If it clearly shows one of the OTHER subjects above instead of "${expected}", FAIL and your fail_reason must name the subject it actually shows and that it belongs to a different step — e.g. "This is a Wall for Installation photo, not a ${expected} — retake the ${expected} shot."
+
+ONLY DESCRIBE WHAT YOU CAN SEE: do not invent a cable, hole, conduit, pipe, bracket or device that is not clearly visible. If the required subject is simply absent, say what the photo actually shows rather than guessing why a feature is "unclear".`;
+}
+
 export type VlmContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } };
@@ -141,14 +164,22 @@ export interface GalleryExamples {
  *
  * @param galleryExamples - Optional gallery-curated examples fetched from
  *   vlm_visual_photo_examples. Injected after the static filesystem references.
+ * @param opts.crossStepClassification - When true, prepend the wrong-subject /
+ *   anti-hallucination instruction so a misfiled photo fails with a reason that
+ *   names what it actually shows. Opt-in (SiteCam live-capture); auto-QA leaves
+ *   it off to keep its prompt unchanged.
  */
 export function buildMessageContent(
   step: QualityCheckStep,
   newPhotoBase64: string,
-  galleryExamples?: GalleryExamples
+  galleryExamples?: GalleryExamples,
+  opts?: { crossStepClassification?: boolean }
 ): BuiltPrompt {
   const criteria = STEP_CRITERIA[step];
   const refs = loadStepReferences(step);
+  const crossStep = opts?.crossStepClassification
+    ? `${buildCrossStepInstruction(step)}\n\n`
+    : '';
   const content: VlmContentPart[] = [];
   const hasGallery =
     (galleryExamples?.positiveBase64.length ?? 0) > 0 ||
@@ -160,10 +191,9 @@ export function buildMessageContent(
       type: 'text',
       text: `You are performing a quality check on a photo classified as "${criteria.label}" for a fiber optic installation.
 
-I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST be consistent with these examples — they are the authoritative standard.`,
+${crossStep}I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST be consistent with these examples — they are the authoritative standard.`,
     });
 
-    // Static filesystem reference examples (existing behaviour)
     if (refs && refs.correct.length > 0) {
       content.push({
         type: 'text',
@@ -194,7 +224,6 @@ I will show you APPROVED EXAMPLES from our QA team. Your pass/fail decision MUST
       }
     }
 
-    // Gallery-curated visual examples from vlm_visual_photo_examples
     if (galleryExamples && galleryExamples.positiveBase64.length > 0) {
       content.push({
         type: 'text',
@@ -246,7 +275,7 @@ OR
       type: 'text',
       text: `You are performing a quality check on a photo classified as "${criteria.label}" for a fiber optic installation.
 
-Required: ${criteria.requirements}
+${crossStep}Required: ${criteria.requirements}
 ${criteria.failInstruction}
 
 Evaluate this photo:`,

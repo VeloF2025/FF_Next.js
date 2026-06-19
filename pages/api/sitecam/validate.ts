@@ -126,7 +126,13 @@ async function runVlmCheck(
     const { content: c } = buildCivilMessageContent(step as CivilStep, photoBase64, galleryExamples);
     content = c;
   } else {
-    const { content: c } = buildMessageContent(step as QualityCheckStep, photoBase64, galleryExamples);
+    // crossStepClassification: SiteCam live-capture only. Lets the VLM fail a
+    // misfiled photo with a reason naming what it actually shows (e.g. a wall
+    // mount sent to "Cable Entry Inside") instead of rationalising a misleading
+    // single-step reason. Auto-QA uses the same builder without this flag.
+    const { content: c } = buildMessageContent(step as QualityCheckStep, photoBase64, galleryExamples, {
+      crossStepClassification: true,
+    });
     content = c;
   }
 
