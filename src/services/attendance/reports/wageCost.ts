@@ -12,6 +12,7 @@
 
 import { sql } from '@/lib/db-pool';
 import { buildBaseWhere, makeParamBuilder } from './sqlHelpers';
+import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
 
 interface Row extends Record<string, unknown> {
@@ -95,8 +96,12 @@ export async function runWageCost(input: ReportInput): Promise<ReportRunResult> 
     WHERE ${where}
     GROUP BY group_label
     ORDER BY group_label ASC
+    LIMIT ${pb.next(REPORT_ROW_CAP + 1)}
   `;
   const rows = await sql.query<Row>(text, pb.params);
+  if (rows.length > REPORT_ROW_CAP) {
+    throw new ReportTooLargeError(rows.length);
+  }
 
   const columns: ReportColumn[] = [
     { key: 'group_label', label: groupLabel || 'Total' },

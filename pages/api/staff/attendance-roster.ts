@@ -53,7 +53,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const rows = await sql<RosterRow>`
-      WITH day_entries AS (
+      WITH entry_ex AS (
+        -- Pre-aggregate unresolved exceptions per entry_id to avoid a
+        -- correlated subquery evaluated for every row in DISTINCT ON.
+        -- Scoped to the requested work_date so only relevant entries are read.
+        SELECT x.entry_id, COUNT(*)::int AS cnt
+        FROM attendance_exceptions x
+        JOIN attendance_entries e ON e.id = x.entry_id
+        WHERE x.resolved_at IS NULL
+          AND e.work_date = ${workDate}::date
+        GROUP BY x.entry_id
+      ),
+      day_entries AS (
         SELECT DISTINCT ON (e.staff_id)
           e.staff_id,
           e.id AS entry_id,
@@ -61,11 +72,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           e.clock_out_at,
           e.status,
           e.site_geofence_id,
-          (
-            SELECT COUNT(*) FROM attendance_exceptions x
-            WHERE x.entry_id = e.id AND x.resolved_at IS NULL
-          )::int AS open_exception_count
+          COALESCE(ex.cnt, 0)::int AS open_exception_count
         FROM attendance_entries e
+        LEFT JOIN entry_ex ex ON ex.entry_id = e.id
         WHERE e.work_date = ${workDate}::date
         ORDER BY e.staff_id, e.clock_in_at DESC
       )

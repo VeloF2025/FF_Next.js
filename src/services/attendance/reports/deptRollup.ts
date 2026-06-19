@@ -13,6 +13,7 @@
 
 import { sql } from '@/lib/db-pool';
 import { buildBaseWhere, makeParamBuilder } from './sqlHelpers';
+import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
 
 const COLUMNS: ReadonlyArray<ReportColumn> = [
@@ -51,27 +52,39 @@ export async function runDeptRollup(input: ReportInput): Promise<ReportRunResult
     activeStaffRefs: { isActive: 's.is_active', endDate: 's.end_date' },
     accountStatusRef: 's.account_status',
   });
+  // Pre-aggregate unresolved exceptions per (staff_id, work_date) to eliminate
+  // the correlated per-row subquery. Date-range bound mirrors outer WHERE.
+  const dateFromP = pb.next(input.dateFrom);
+  const dateToP   = pb.next(input.dateTo);
   const text = `
+    WITH ex AS (
+      SELECT xe.staff_id, xe.work_date, COUNT(*)::int AS cnt
+      FROM attendance_exceptions x
+      JOIN attendance_entries xe ON xe.id = x.entry_id
+      WHERE x.resolved_at IS NULL
+        AND xe.work_date >= ${dateFromP}::date
+        AND xe.work_date <= ${dateToP}::date
+      GROUP BY xe.staff_id, xe.work_date
+    )
     SELECT
       COALESCE(s.department, '(unassigned)')       AS department,
       COUNT(DISTINCT ds.staff_id)::int             AS headcount,
       COALESCE(SUM(ds.regular_hrs + ds.overtime_hrs), 0)::text AS total_hours,
       COALESCE(SUM(ds.overtime_hrs), 0)::text      AS ot_hours,
-      COALESCE(SUM((
-        SELECT COUNT(*) FROM attendance_exceptions x
-        JOIN attendance_entries xe ON xe.id = x.entry_id
-        WHERE xe.staff_id = ds.staff_id
-          AND xe.work_date = ds.work_date
-          AND x.resolved_at IS NULL
-      )), 0)::int                                  AS exceptions_count,
+      COALESCE(SUM(ex.cnt), 0)::int                AS exceptions_count,
       COALESCE(SUM(ds.wage_amount_cents), 0)::text AS total_wage_cents
     FROM attendance_daily_summaries ds
     JOIN staff s ON s.id = ds.staff_id
+    LEFT JOIN ex ON ex.staff_id = ds.staff_id AND ex.work_date = ds.work_date
     WHERE ${where}
     GROUP BY s.department
     ORDER BY department ASC
+    LIMIT ${pb.next(REPORT_ROW_CAP + 1)}
   `;
   const rows = await sql.query<Row>(text, pb.params);
+  if (rows.length > REPORT_ROW_CAP) {
+    throw new ReportTooLargeError(rows.length);
+  }
   return {
     rows: rows.map((r) => {
       const total = Number(r.total_hours);

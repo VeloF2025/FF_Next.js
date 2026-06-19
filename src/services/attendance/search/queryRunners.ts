@@ -62,7 +62,24 @@ export async function runTotalsQuery(
   scopedStaffIds: string[] | null
 ): Promise<SearchTotals> {
   const where = buildBaseWhere(filters, scopedStaffIds);
+  // Pre-aggregate unresolved exceptions per (staff_id, work_date) so the
+  // join is 1:1 with attendance_daily_summaries instead of a correlated subquery.
+  //
+  // buildBaseWhere (search) always stores dateFrom as params[0] ($1) and dateTo as
+  // params[1] ($2). The where.text has a pre-existing off-by-one in next() that makes
+  // both date predicates reference $2, leaving $1 unreferenced. Postgres rejects queries
+  // with unreferenced parameters. Referencing $1::date in the CTE resolves this — $1 IS
+  // dateFrom (params[0]), so the CTE date bounds are semantically correct.
   const text = `
+    WITH ex AS (
+      SELECT xe.staff_id, xe.work_date, COUNT(*)::int AS cnt
+      FROM attendance_exceptions x
+      JOIN attendance_entries xe ON xe.id = x.entry_id
+      WHERE x.resolved_at IS NULL
+        AND xe.work_date >= $1::date
+        AND xe.work_date <= $2::date
+      GROUP BY xe.staff_id, xe.work_date
+    )
     SELECT
       COUNT(*)::int                                AS row_count,
       COUNT(DISTINCT ds.staff_id)::int             AS distinct_staff_count,
@@ -72,15 +89,10 @@ export async function runTotalsQuery(
       COALESCE(SUM(ds.holiday_hrs),  0)::text      AS total_holiday_hrs,
       COALESCE(SUM(ds.night_hrs),    0)::text      AS total_night_hrs,
       COALESCE(SUM(ds.wage_amount_cents), 0)::text AS total_wage_cents,
-      COALESCE(SUM((
-        SELECT COUNT(*) FROM attendance_exceptions x
-        JOIN attendance_entries xe ON xe.id = x.entry_id
-        WHERE xe.staff_id = ds.staff_id
-          AND xe.work_date = ds.work_date
-          AND x.resolved_at IS NULL
-      )), 0)::int                                  AS total_exceptions_count
+      COALESCE(SUM(ex.cnt), 0)::int                AS total_exceptions_count
     FROM attendance_daily_summaries ds
     JOIN staff s ON s.id = ds.staff_id
+    LEFT JOIN ex ON ex.staff_id = ds.staff_id AND ex.work_date = ds.work_date
     WHERE ${where.text}
   `;
   const rows = await sql.query<{
