@@ -133,7 +133,7 @@ export async function sweepExpiredSelfies(opts: SweepOptions = {}): Promise<Swee
   const rows = await sql<ExpiredRow>`
     SELECT id, staff_id, work_date::text AS work_date, selfie_in_url, selfie_out_url
     FROM attendance_entries
-    WHERE clock_in_at < NOW() - (${retentionDays}::text || ' days')::interval
+    WHERE clock_in_at < NOW() - ${retentionDays} * INTERVAL '1 day'
       AND (selfie_in_url IS NOT NULL OR selfie_out_url IS NOT NULL)
     ORDER BY clock_in_at ASC
     LIMIT ${maxEntries}

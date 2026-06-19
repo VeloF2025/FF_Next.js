@@ -87,6 +87,10 @@ export default function ReportSlugPage() {
       return {
         ...s,
         groupBy: gb ? gb.default : '',
+        // `last_12_weeks` is the ot-trend server-side window (fixed, not
+        // driven by the form date-range). Coerce to `last_30d` so the form
+        // control shows a valid preset — the displayed value is cosmetic only;
+        // the API ignores it for ot-trend and always uses its 12-week window.
         dateRange: dr
           ? (dr.defaultPreset === 'last_12_weeks' ? 'last_30d' : dr.defaultPreset)
           : s.dateRange,

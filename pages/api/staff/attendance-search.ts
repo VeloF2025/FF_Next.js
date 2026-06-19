@@ -82,8 +82,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       totals: result.totals,
       scopeNote: result.scopeNote,
       pagination: result.pagination,
-      filters,
-      sort,
     });
   } catch (err) {
     log.error('[attendance-search] failed', {

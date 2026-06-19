@@ -25,6 +25,7 @@ export function fmtTime(iso: string | null): string {
       hour12: false,
     }).format(new Date(iso));
   } catch {
+    /* invalid ISO string — fall back to the raw HH:MM substring */
     return iso.slice(11, 16);
   }
 }

@@ -17,6 +17,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { AttendanceNav } from '@/components/attendance/AttendanceNav';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
+import { todayInSast } from '@/components/attendance/dateUtils';
 
 interface RosterEntry {
   staffId: string;
@@ -38,15 +39,6 @@ interface RosterSummary {
   clockedOut: number;
   absent: number;
   exceptions: number;
-}
-
-function todayInSast(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Johannesburg',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
 }
 
 type FilterCategory = 'all' | RosterEntry['category'];

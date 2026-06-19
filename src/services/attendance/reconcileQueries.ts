@@ -122,6 +122,8 @@ export async function loadClosedEntriesMissingSummary(
     LEFT JOIN staff_rate_at_clock_in rac ON rac.entry_id = e.id
     LEFT JOIN attendance_daily_summaries ds
       ON ds.staff_id = e.staff_id AND ds.work_date = e.work_date
+    -- 'manual' = supervisor-entered entries; intentionally included so they
+    -- receive a wage computation during reconcile, just like clocked entries.
     WHERE e.status IN ('closed', 'auto_closed', 'manual')
       AND e.clock_out_at IS NOT NULL
       AND e.work_date >= ${fromDate}::date

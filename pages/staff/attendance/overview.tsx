@@ -204,8 +204,8 @@ export default function StaffAttendanceOverviewPage() {
               />
               <KpiTile
                 icon={<Users className="w-4 h-4" />}
-                label="Top OT staff this week"
-                value={data.topOvertimeStaff.length.toString()}
+                label="Top-5 OT hours"
+                value={`${data.topOvertimeStaff.reduce((sum, s) => sum + s.overtimeHrs, 0).toFixed(1)}h`}
                 sublabel="See breakdown below"
                 accent="sky"
               />
@@ -373,7 +373,7 @@ function KpiTile({
         {icon}
         {label}
       </div>
-      <div className="mt-1 text-2xl font-semibold text-white tabular-nums">
+      <div className="mt-1 text-2xl font-semibold text-neutral-100 tabular-nums">
         {value}
       </div>
       {sublabel && <div className="mt-0.5 text-xs text-neutral-400">{sublabel}</div>}

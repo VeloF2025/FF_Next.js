@@ -23,6 +23,7 @@ import {
 } from '@/components/attendance/WeekSummaryTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
+import { todayInSast } from '@/components/attendance/dateUtils';
 
 interface WeekPayload {
   weekStart: string;
@@ -44,15 +45,6 @@ interface WeekPayload {
     lockedAt: string;
     reason: string | null;
   } | null;
-}
-
-function todayInSast(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Johannesburg',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
 }
 
 function thisWeekMonday(): string {

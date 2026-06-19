@@ -265,6 +265,9 @@ export async function writeAuditRows(
   const tuples: string[] = [];
   const params: unknown[] = [];
   for (const r of args.rows) {
+    // Push 6 values per row; `base` is the 0-based index of the first
+    // value in this tuple so that $${base+1}..$${base+6} are the correct
+    // 1-based positional placeholders for this iteration.
     params.push(args.batchId, args.actorUserId, args.action, r.staffId, r.targetDate, args.reason);
     const base = params.length - 6;
     tuples.push(

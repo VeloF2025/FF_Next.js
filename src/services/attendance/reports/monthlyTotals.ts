@@ -113,7 +113,7 @@ export async function runMonthlyTotals(input: ReportInput): Promise<ReportRunRes
   const notes: string[] = [];
   const out = rows.map((r) => {
     const wageCents = r.total_wage_cents === null ? null : Number(r.total_wage_cents);
-    if (wageCents === null || wageCents === 0) nullWage += 1;
+    if (wageCents === null) nullWage += 1;
     return {
       staff_id: r.staff_id,
       employee_id: r.employee_id ?? '',
