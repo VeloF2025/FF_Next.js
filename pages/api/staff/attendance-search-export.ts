@@ -67,6 +67,21 @@ const EXPORT_COLUMNS: ReadonlyArray<keyof ExportRow> = [
   'exception_kinds',
 ];
 
+// #2002: clock columns as SAST wall-clock HH:MM (the `date` column carries the
+// day). Emitting the raw ISO timestamp made Excel re-parse it as a UTC datetime
+// and silently shift the displayed time.
+function fmtSastTime(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-ZA', {
+    timeZone: 'Africa/Johannesburg',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 function shapeRow(r: SearchRow): ExportRow {
   return {
     date: r.work_date,
@@ -74,8 +89,8 @@ function shapeRow(r: SearchRow): ExportRow {
     staff: r.full_name,
     department: r.department ?? '',
     site: r.primary_site_name ?? '',
-    clock_in: r.first_clock_in_at ?? '',
-    clock_out: r.last_clock_out_at ?? '',
+    clock_in: fmtSastTime(r.first_clock_in_at),
+    clock_out: fmtSastTime(r.last_clock_out_at),
     regular_hrs: r.regular_hrs,
     overtime_hrs: r.overtime_hrs,
     sunday_hrs: r.sunday_hrs,
