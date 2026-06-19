@@ -14,6 +14,7 @@
  */
 
 import { sql } from '@/lib/db-pool';
+import { log } from '@/lib/logger';
 import { buildBaseWhere, makeParamBuilder } from './sqlHelpers';
 import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
@@ -121,6 +122,16 @@ export async function runBceaPremium(input: ReportInput): Promise<ReportRunResul
       // Holiday on a Sunday: take the higher multiplier (2× holiday) and
       // the larger of the two hour buckets (they should coincide, but the
       // calculator could conceivably populate them differently).
+      if (sundayHrs !== holidayHrs) {
+        // Flags calculator drift: the two buckets for the same day diverged.
+        // Math.max below masks it — the warn ensures it doesn't go unnoticed.
+        log.warn('[bcea-premium] sunday_hrs !== holiday_hrs on same day — possible calculator drift', {
+          staffId: r.staff_id,
+          workDate: r.work_date,
+          sundayHrs,
+          holidayHrs,
+        });
+      }
       dayType = `${r.holiday_name ?? 'Public holiday'} (Sunday)`;
       multiplier = Math.max(sundayMultiplier, 2.0);
       hours = Math.max(sundayHrs, holidayHrs);

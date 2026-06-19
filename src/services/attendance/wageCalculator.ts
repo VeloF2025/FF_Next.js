@@ -38,8 +38,8 @@
  *   the Sunday/holiday multiplier. Night overlaps regular/OT/Sun/Hol,
  *   so the total is base + (night × rate × allowance).
  *
- * Returns integer cents (ROUND-HALF-TO-EVEN via Math.round's banker's
- * rounding on the final sum) so the DB BIGINT stays exact.
+ * Returns integer cents (Math.round on the final sum, which rounds half
+ * AWAY from zero — not banker's rounding) so the DB BIGINT stays exact.
  */
 
 import type { DailySummary, OvertimeRuleInput } from './overtimeCalculator';

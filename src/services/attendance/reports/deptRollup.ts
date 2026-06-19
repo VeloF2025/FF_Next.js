@@ -85,20 +85,24 @@ export async function runDeptRollup(input: ReportInput): Promise<ReportRunResult
   if (rows.length > REPORT_ROW_CAP) {
     throw new ReportTooLargeError(rows.length);
   }
-  return {
-    rows: rows.map((r) => {
-      const total = Number(r.total_hours);
-      return {
-        department: r.department ?? '(unassigned)',
-        headcount: r.headcount,
-        total_hours: total,
-        ot_hours: Number(r.ot_hours),
-        avg_hours_per_head: r.headcount > 0 ? Number((total / r.headcount).toFixed(2)) : 0,
-        exceptions_count: r.exceptions_count,
-        total_wage_rand: r.total_wage_cents === null ? 0 : Number(r.total_wage_cents) / 100,
-      };
-    }),
-    columns: COLUMNS,
-    notes: [],
-  };
+  let nullWage = 0;
+  const out = rows.map((r) => {
+    const total = Number(r.total_hours);
+    const wageCents = r.total_wage_cents === null ? null : Number(r.total_wage_cents);
+    if (wageCents === null) nullWage += 1;
+    return {
+      department: r.department ?? '(unassigned)',
+      headcount: r.headcount,
+      total_hours: total,
+      ot_hours: Number(r.ot_hours),
+      avg_hours_per_head: r.headcount > 0 ? Number((total / r.headcount).toFixed(2)) : 0,
+      exceptions_count: r.exceptions_count,
+      total_wage_rand: wageCents === null ? 0 : wageCents / 100,
+    };
+  });
+  const notes: string[] = [];
+  if (nullWage > 0) {
+    notes.push(`${nullWage} row(s) had no wage amount (rate not captured at clock-in).`);
+  }
+  return { rows: out, columns: COLUMNS, notes };
 }

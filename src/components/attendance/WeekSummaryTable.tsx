@@ -133,7 +133,7 @@ export function WeekSummaryTable({
         <tbody>
           {staff.length === 0 && (
             <tr>
-              <td colSpan={days.length + 7} className="text-center py-6 text-neutral-500">
+              <td colSpan={1 + days.length + 6} className="text-center py-6 text-neutral-500">
                 No summaries for this week yet. Run the nightly reconcile cron, or wait
                 for it to land.
               </td>

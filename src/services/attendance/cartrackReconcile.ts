@@ -316,6 +316,10 @@ export async function cartrackReconcile(
 ): Promise<CartrackReconcileReport> {
   const startedAt = new Date();
   const today = todayInSast();
+  // Default window = yesterday only. Intentional: the nightly cron processes
+  // exactly one day back so it never double-counts a live shift. Use
+  // options.fromDate / options.toDate for backfill runs; do NOT change this
+  // default or the cron load will grow unbounded on each nightly invocation.
   const toDate = options.toDate ?? addDays(today, -1);
   const fromDate = options.fromDate ?? toDate;
   const thresholdM = options.thresholdM ?? DEFAULT_MISMATCH_THRESHOLD_M;

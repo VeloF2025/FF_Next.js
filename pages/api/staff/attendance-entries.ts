@@ -99,7 +99,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         selfie_in_url, selfie_out_url, notes
       FROM attendance_entries
       WHERE staff_id = ${staffId}
-        AND clock_in_at > NOW() - (${days}::text || ' days')::interval
+        AND clock_in_at >= NOW() - (${days}::text || ' days')::interval
       ORDER BY clock_in_at DESC
       LIMIT ${MAX_ENTRIES}
     `;
