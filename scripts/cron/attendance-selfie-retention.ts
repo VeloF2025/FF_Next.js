@@ -33,13 +33,19 @@
 import * as dotenv from 'dotenv';
 import { sweepExpiredSelfies, DEFAULT_RETENTION_DAYS } from '../../src/modules/attendance/portal/retentionUtils';
 
+// Cron entry points log to stderr (consistent with the sibling attendance
+// crons): @/lib/logger is a no-op in standalone tsx scripts and console.* is
+// disallowed by lint. (#2007)
+function stderr(msg: string): void {
+  process.stderr.write(`${new Date().toISOString()} ${msg}\n`);
+}
+
 // Environment: .env.production in prod, .env.local for dev runs.
 dotenv.config({ path: '.env.production' });
 dotenv.config({ path: '.env.local', override: false });
 
 if (!process.env.DATABASE_URL) {
-  // eslint-disable-next-line no-console
-  console.error('DATABASE_URL not set — aborting retention sweep');
+  stderr('[attendance-retention] DATABASE_URL not set — aborting retention sweep');
   process.exit(2);
 }
 
@@ -51,23 +57,20 @@ const retentionDays = retentionDaysArg
   : DEFAULT_RETENTION_DAYS;
 
 if (!Number.isFinite(retentionDays) || retentionDays < 1) {
-  // eslint-disable-next-line no-console
-  console.error(`Invalid --days=${retentionDaysArg} — must be a positive integer`);
+  stderr(`[attendance-retention] invalid --days=${retentionDaysArg} — must be a positive integer`);
   process.exit(2);
 }
 
 (async () => {
   const startedAt = new Date();
-  // eslint-disable-next-line no-console
-  console.log(
+  stderr(
     `[attendance-retention] starting sweep (days=${retentionDays}, dryRun=${dryRun}, at=${startedAt.toISOString()})`
   );
 
   try {
     const report = await sweepExpiredSelfies({ retentionDays, dryRun });
     const elapsedMs = Date.now() - startedAt.getTime();
-    // eslint-disable-next-line no-console
-    console.log(
+    stderr(
       `[attendance-retention] done in ${elapsedMs}ms — scanned=${report.entriesScanned} ` +
       `inDeleted=${report.inSelfiesDeleted} outDeleted=${report.outSelfiesDeleted} ` +
       `storageFailures=${report.storageFailures} dbFailures=${report.dbFailures} ` +
@@ -77,16 +80,18 @@ if (!Number.isFinite(retentionDays) || retentionDays < 1) {
     // treat as an alert-worthy run so ops wakes up.
     const threshold = Math.max(5, Math.floor(report.entriesScanned * 0.1));
     if (report.storageFailures + report.dbFailures > threshold) {
-      // eslint-disable-next-line no-console
-      console.error(
+      stderr(
         `[attendance-retention] failure rate above threshold (${threshold}); check logs`
       );
       process.exit(1);
     }
     process.exit(0);
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('[attendance-retention] sweep threw unhandled error', err);
+    stderr(
+      `[attendance-retention] sweep threw unhandled error: ${
+        err instanceof Error ? err.stack ?? err.message : String(err)
+      }`
+    );
     process.exit(1);
   }
 })();

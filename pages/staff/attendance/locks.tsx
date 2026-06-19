@@ -6,42 +6,21 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Lock, Unlock } from 'lucide-react';
+import { AlertTriangle, Lock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AttendanceNav } from '@/components/attendance/AttendanceNav';
 import { BulkLockSection } from '@/components/attendance/BulkLockSection';
+import { LockReasonPrompt } from '@/components/attendance/LockReasonPrompt';
+import { LockRowsTable, type LockRow } from '@/components/attendance/LockRowsTable';
 import { thisWeekMondaySast } from '@/components/attendance/dateUtils';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { useCanDo } from '@/hooks/usePermission';
 
-interface LockRow {
-  week_start_date: string;
-  locked_at: string;
-  locked_by: string;
-  lock_reason: string | null;
-  unlocked_at: string | null;
-  unlocked_by: string | null;
-  unlock_reason: string | null;
-}
-
 function parseApiError(body: unknown, status: number): string {
   const e = (body as { error?: { message?: string } | string } | null)?.error;
   if (typeof e === 'string') return e;
   return e?.message ?? `HTTP ${status}`;
-}
-
-function formatTs(ts: string | null): string {
-  if (!ts) return '—';
-  try {
-    return new Date(ts).toLocaleString('en-ZA', {
-      timeZone: 'Africa/Johannesburg',
-      dateStyle: 'short',
-      timeStyle: 'short',
-    });
-  } catch {
-    return ts;
-  }
 }
 
 export default function StaffAttendanceLocksPage() {
@@ -53,10 +32,12 @@ export default function StaffAttendanceLocksPage() {
   const [newReason, setNewReason] = useState('');
   // #2006: gate the bulk-lock UI on the actual RBAC permission rather than a
   // hard-coded role-name list. Server-side withPermission is the real
-  // enforcement; this only hides the form for users who'd hit a 403. The hook
-  // resolves the effective permission (super_admin short-circuits to true), so
-  // it stays correct if bulk_lock is ever granted to a new role.
+  // enforcement; this only hides the form for users who'd hit a 403.
   const canBulkLock = useCanDo('people.staff.attendance.bulk_lock', 'create');
+  // #2005: capture unlock / re-lock reasons via an inline prompt instead of
+  // window.prompt and a hard-coded 'manual-relock' reason.
+  const [pending, setPending] = useState<{ week: string; action: 'lock' | 'unlock' } | null>(null);
+  const [pendingReason, setPendingReason] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,6 +117,28 @@ export default function StaffAttendanceLocksPage() {
     }
   }
 
+  function openPrompt(week: string, action: 'lock' | 'unlock') {
+    setPendingReason('');
+    setPending({ week, action });
+  }
+  function closePrompt() {
+    setPending(null);
+    setPendingReason('');
+  }
+  function confirmPending() {
+    if (!pending) return;
+    const reason = pendingReason.trim();
+    // Unlock needs a ≥10-char audit reason (server enforces the same); re-lock
+    // needs a short one so the audit trail isn't empty.
+    const minLen = pending.action === 'unlock' ? 10 : 3;
+    if (reason.length < minLen) {
+      setError(`Reason must be at least ${minLen} characters.`);
+      return;
+    }
+    void call(pending.action, pending.week, reason);
+    closePrompt();
+  }
+
   return (
     <AppLayout>
       <AttendanceNav />
@@ -183,6 +186,18 @@ export default function StaffAttendanceLocksPage() {
           </div>
         </section>
 
+        {pending && (
+          <LockReasonPrompt
+            action={pending.action}
+            week={pending.week}
+            reason={pendingReason}
+            busy={busy === pending.week}
+            onReasonChange={setPendingReason}
+            onConfirm={confirmPending}
+            onCancel={closePrompt}
+          />
+        )}
+
         {loading && (
           <div className="flex items-center gap-2 text-neutral-400 text-sm">
             <LoadingSpinner /> Loading…
@@ -190,88 +205,9 @@ export default function StaffAttendanceLocksPage() {
         )}
 
         {!loading && locks && (
-          <div className="overflow-x-auto border border-neutral-800 rounded">
-            <table className="min-w-full text-sm">
-              <thead className="bg-neutral-900 text-neutral-300">
-                <tr>
-                  <th className="text-left px-3 py-2">Week Start</th>
-                  <th className="text-left px-3 py-2">State</th>
-                  <th className="text-left px-3 py-2">Locked</th>
-                  <th className="text-left px-3 py-2">Unlocked</th>
-                  <th className="text-left px-3 py-2">Reason</th>
-                  <th className="text-left px-3 py-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {locks.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="text-center py-6 text-neutral-500">
-                      No locks yet. Exports will create them automatically.
-                    </td>
-                  </tr>
-                )}
-                {locks.map((l) => {
-                  const isLocked = l.unlocked_at == null;
-                  return (
-                    <tr key={l.week_start_date} className="border-t border-neutral-800 hover:bg-neutral-900/50">
-                      <td className="px-3 py-2 font-medium">{l.week_start_date}</td>
-                      <td className="px-3 py-2">
-                        {isLocked ? (
-                          <span className="text-amber-400 inline-flex items-center gap-1">
-                            <Lock className="w-3 h-3" /> locked
-                          </span>
-                        ) : (
-                          <span className="text-emerald-400 inline-flex items-center gap-1">
-                            <Unlock className="w-3 h-3" /> unlocked
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-neutral-400">
-                        {formatTs(l.locked_at)}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-neutral-400">
-                        {formatTs(l.unlocked_at)}
-                      </td>
-                      <td className="px-3 py-2 max-w-sm text-xs">
-                        {isLocked ? l.lock_reason : l.unlock_reason}
-                      </td>
-                      <td className="px-3 py-2">
-                        {isLocked ? (
-                          <button
-                            type="button"
-                            disabled={busy === l.week_start_date}
-                            onClick={() => {
-                              const reason = window.prompt(
-                                'Unlock reason (≥ 10 chars, audit trail):'
-                              );
-                              if (reason && reason.length >= 10) {
-                                call('unlock', l.week_start_date, reason);
-                              }
-                            }}
-                            className="px-2 py-1 rounded bg-emerald-900/40 border border-emerald-700 hover:bg-emerald-800/60 disabled:opacity-50 text-xs flex items-center gap-1"
-                          >
-                            <Unlock className="w-3 h-3" /> Unlock
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={busy === l.week_start_date}
-                            onClick={() => call('lock', l.week_start_date, 'manual-relock')}
-                            className="px-2 py-1 rounded bg-amber-900/40 border border-amber-700 hover:bg-amber-800/60 disabled:opacity-50 text-xs flex items-center gap-1"
-                          >
-                            <Lock className="w-3 h-3" /> Re-lock
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <LockRowsTable locks={locks} busy={busy} onAction={openPrompt} />
         )}
       </div>
     </AppLayout>
   );
 }
-
