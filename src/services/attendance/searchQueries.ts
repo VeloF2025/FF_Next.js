@@ -460,8 +460,10 @@ function buildBaseWhere(
     parts.push(`ds.staff_id = ANY($${params.length}::uuid[])`);
   }
   if (filters.departments.length > 0) {
-    params.push(filters.departments);
-    parts.push(`s.department = ANY($${params.length}::text[])`);
+    // #2003: case-insensitive match so "civil" finds "Civil". Lowercase both
+    // the stored value and the supplied filter values.
+    params.push(filters.departments.map((d) => d.toLowerCase()));
+    parts.push(`LOWER(s.department) = ANY($${params.length}::text[])`);
   }
   if (filters.daysOfWeek.length > 0) {
     params.push(filters.daysOfWeek);

@@ -287,6 +287,8 @@ export default function PulseSearchPage() {
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // #2004: surfaced when the server caps the export at MAX_TOTAL_ROWS.
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [confirmLong, setConfirmLong] = useState(false);
   const [exportLoading, setExportLoading] = useState<'csv' | 'xlsx' | null>(null);
   const initialFromUrl = useRef(false);
@@ -400,7 +402,9 @@ export default function PulseSearchPage() {
     if (!router.isReady || !initialFromUrl.current) return;
     const target = `/staff/attendance/search?${buildSearchUrl()}`;
     if (target !== router.asPath) {
-      router.replace(target, undefined, { shallow: true }).catch(() => {});
+      router.replace(target, undefined, { shallow: true }).catch((err) => {
+        log.warn('PulseSearch URL sync failed', err instanceof Error ? { message: err.message } : { err });
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, router.asPath, buildSearchUrl]);
@@ -559,6 +563,7 @@ export default function PulseSearchPage() {
 
   const onExport = async (format: 'csv' | 'xlsx') => {
     setExportLoading(format);
+    setExportNotice(null);
     try {
       const url = `/api/staff/attendance-search-export?format=${format}&${buildSearchUrl()}`;
       const res = await fetch(url, { credentials: 'include' });
@@ -573,6 +578,13 @@ export default function PulseSearchPage() {
         }
         setError(message);
         return;
+      }
+      // #2004: the server caps the export at MAX_TOTAL_ROWS and flags it via
+      // this header. Surface it so the user knows the file is partial.
+      if (res.headers.get('X-Pulse-Truncated') === 'true') {
+        setExportNotice(
+          'Export truncated to the first 5,000 rows — narrow your filters to export everything.'
+        );
       }
       const blob = await res.blob();
       const dispo = res.headers.get('Content-Disposition') ?? '';
@@ -674,6 +686,12 @@ export default function PulseSearchPage() {
           confirmLong={confirmLong}
           loading={loading}
         />
+
+        {exportNotice && (
+          <div role="status" className="mt-4 rounded border border-amber-800 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            {exportNotice}
+          </div>
+        )}
 
         {error && (
           <div role="alert" className="mt-4 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">
