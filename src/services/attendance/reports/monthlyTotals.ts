@@ -11,6 +11,7 @@
 
 import { sql } from '@/lib/db-pool';
 import { buildBaseWhere, makeParamBuilder } from './sqlHelpers';
+import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
 
 const COLUMNS: ReadonlyArray<ReportColumn> = [
@@ -68,7 +69,22 @@ export async function runMonthlyTotals(input: ReportInput): Promise<ReportRunRes
            AND e.site_geofence_id = ANY(${pb.next(input.siteIds)}::uuid[]))`
     : '';
 
+  // Pre-aggregate unresolved exceptions per (staff_id, work_date) to eliminate
+  // the correlated per-row subquery. The date-range bound mirrors the outer
+  // WHERE so Postgres can apply the index; the 1:1 LEFT JOIN is safe because
+  // attendance_daily_summaries is unique per (staff_id, work_date).
+  const dateFromP = pb.next(input.dateFrom);
+  const dateToP   = pb.next(input.dateTo);
   const text = `
+    WITH ex AS (
+      SELECT xe.staff_id, xe.work_date, COUNT(*)::int AS cnt
+      FROM attendance_exceptions x
+      JOIN attendance_entries xe ON xe.id = x.entry_id
+      WHERE x.resolved_at IS NULL
+        AND xe.work_date >= ${dateFromP}::date
+        AND xe.work_date <= ${dateToP}::date
+      GROUP BY xe.staff_id, xe.work_date
+    )
     SELECT
       ds.staff_id,
       s.employee_id,
@@ -79,21 +95,20 @@ export async function runMonthlyTotals(input: ReportInput): Promise<ReportRunRes
       COALESCE(SUM(ds.overtime_hrs), 0)::text      AS ot_hours,
       COALESCE(SUM(ds.sunday_hrs),   0)::text      AS sunday_hours,
       COALESCE(SUM(ds.holiday_hrs),  0)::text      AS holiday_hours,
-      COALESCE(SUM((
-        SELECT COUNT(*) FROM attendance_exceptions x
-        JOIN attendance_entries xe ON xe.id = x.entry_id
-        WHERE xe.staff_id = ds.staff_id
-          AND xe.work_date = ds.work_date
-          AND x.resolved_at IS NULL
-      )), 0)::int                                  AS exceptions_count,
+      COALESCE(SUM(ex.cnt), 0)::int                AS exceptions_count,
       COALESCE(SUM(ds.wage_amount_cents), 0)::text AS total_wage_cents
     FROM attendance_daily_summaries ds
     JOIN staff s ON s.id = ds.staff_id
+    LEFT JOIN ex ON ex.staff_id = ds.staff_id AND ex.work_date = ds.work_date
     WHERE ${where}${siteFilterSql}
     GROUP BY ds.staff_id, s.employee_id, s.first_name, s.last_name, s.department
     ORDER BY full_name ASC
+    LIMIT ${pb.next(REPORT_ROW_CAP + 1)}
   `;
   const rows = await sql.query<Row>(text, pb.params);
+  if (rows.length > REPORT_ROW_CAP) {
+    throw new ReportTooLargeError(rows.length);
+  }
   let nullWage = 0;
   const notes: string[] = [];
   const out = rows.map((r) => {

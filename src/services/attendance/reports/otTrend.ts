@@ -12,6 +12,7 @@
 
 import { sql } from '@/lib/db-pool';
 import { buildBaseWhere, makeParamBuilder } from './sqlHelpers';
+import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
 
 const NUM_WEEKS = 12;
@@ -43,6 +44,11 @@ export async function runOtTrend(input: ReportInput): Promise<ReportRunResult> {
     accountStatusRef: 's.account_status',
   });
 
+  // Limit raw SQL rows at (cap + 1) * NUM_WEEKS: the output rows are one per
+  // staff (pivot), and each staff contributes at most NUM_WEEKS SQL rows, so
+  // cap+1 staff ≡ (cap+1)*NUM_WEEKS raw rows. After pivoting, if byStaff
+  // exceeds the cap we throw ReportTooLargeError matching the runner contract.
+  const limitP = pb.next((REPORT_ROW_CAP + 1) * NUM_WEEKS);
   const text = `
     SELECT
       ds.staff_id::text                            AS staff_id,
@@ -55,6 +61,7 @@ export async function runOtTrend(input: ReportInput): Promise<ReportRunResult> {
     WHERE ${where}
     GROUP BY ds.staff_id, s.first_name, s.last_name, s.department, date_trunc('week', ds.work_date)
     ORDER BY full_name ASC, week_monday ASC
+    LIMIT ${limitP}
   `;
   const rows = await sql.query<Row>(text, pb.params);
 
@@ -100,6 +107,9 @@ export async function runOtTrend(input: ReportInput): Promise<ReportRunResult> {
       });
     }
     byStaff.get(r.staff_id)!.weeks.set(r.week_monday, ot);
+  }
+  if (byStaff.size > REPORT_ROW_CAP) {
+    throw new ReportTooLargeError(byStaff.size);
   }
   const out = Array.from(byStaff.values())
     .map((rec) => {
