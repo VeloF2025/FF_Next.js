@@ -46,7 +46,9 @@ export async function loadGalleryExamples(
 ): Promise<GalleryExamples | undefined> {
   try {
     const queryHash = queryPhotoBase64 ? await computeDHash(queryPhotoBase64) : null;
-    const useRelevance = queryHash !== null;
+    // Narrow to a non-null const so the closure in pickRows avoids the `!` assertion.
+    const resolvedQueryHash: string | null = queryHash;
+    const useRelevance = resolvedQueryHash !== null;
 
     // With relevance we pull a larger candidate pool and rank in JS; without it
     // the DB LIMIT already gives the newest N.
@@ -72,12 +74,12 @@ export async function loadGalleryExamples(
     // Rank by similarity (closest first); rows without a phash keep recency
     // order and sort after the hashed ones, then trim to the injected count.
     const pickRows = (rows: ExampleRow[]): ExampleRow[] => {
-      if (!useRelevance) return rows.slice(0, GALLERY_EXAMPLES_PER_LABEL);
+      if (!resolvedQueryHash) return rows.slice(0, GALLERY_EXAMPLES_PER_LABEL);
       return rows
         .map((r, i) => ({
           r,
           i,
-          d: r.phash ? hammingDistance(queryHash!, r.phash) : Infinity,
+          d: r.phash ? hammingDistance(resolvedQueryHash, r.phash) : Infinity,
         }))
         .sort((a, b) => a.d - b.d || a.i - b.i)
         .slice(0, GALLERY_EXAMPLES_PER_LABEL)

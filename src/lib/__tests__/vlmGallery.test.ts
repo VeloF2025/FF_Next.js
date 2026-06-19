@@ -14,6 +14,18 @@ vi.mock('@/modules/activate/services/photoFetchService', () => ({
   fetchPhotoAsBase64: (...a: unknown[]) => fetchPhotoAsBase64(...a),
 }));
 
+// optimizeForVlm is a resize step; pass the input through so selection-logic
+// tests are not coupled to image-processing internals.
+vi.mock('@/modules/activate/services/imagePreprocessService', () => ({
+  optimizeForVlm: (b64: string) => Promise.resolve(b64),
+}));
+
+// resolveInternalPhotoUrl rewrites proxy paths to backend URLs; pass through
+// so tests stay independent of the URL-rewriting implementation.
+vi.mock('@/lib/internalPhotoUrl', () => ({
+  resolveInternalPhotoUrl: (url: string) => url,
+}));
+
 const computeDHash = vi.fn();
 const hammingDistance = vi.fn();
 vi.mock('@/lib/imageHash', () => ({

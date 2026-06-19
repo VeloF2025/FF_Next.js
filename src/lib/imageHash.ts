@@ -16,6 +16,9 @@
  */
 
 import sharp from 'sharp';
+import { log } from '@/lib/logger';
+
+const MODULE = 'imageHash';
 
 /** Hash width in pixels; emits (HASH_W-1) bits per row. */
 const HASH_W = 9;
@@ -51,7 +54,8 @@ export async function computeDHash(imageBase64: string): Promise<string | null> 
       hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
     }
     return hex;
-  } catch {
+  } catch (err) {
+    log.warn('dHash compute failed', { err: String(err) }, MODULE);
     return null;
   }
 }
