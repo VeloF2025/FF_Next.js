@@ -1,6 +1,6 @@
 // Deep 1Map field discovery - fetch more records to see all status values
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: ['.env.local', '.env'] });
 
 const BASE_URL = 'https://www.1map.co.za';
 const EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';

@@ -12,7 +12,7 @@
  */
 
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: ['.env.local', '.env'] });
 
 import { neon } from '@neondatabase/serverless';
 

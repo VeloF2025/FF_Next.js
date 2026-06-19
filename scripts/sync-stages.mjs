@@ -17,7 +17,9 @@
 import { config } from 'dotenv';
 import pg from 'pg';
 import { authenticate, fetchAllRecords } from './lib/onemap-client.mjs';
-config({ path: '.env.local' });
+// Load both: prod keeps DATABASE_URL in .env and ONEMAP_PASSWORD in .env.local
+// (.env.local wins for overlapping keys). On the workstation .env.local has both.
+config({ path: ['.env.local', '.env'] });
 const { Pool } = pg;
 
 // Env-only config (issue #2029 — no hardcoded creds, no retired Neon URL).
