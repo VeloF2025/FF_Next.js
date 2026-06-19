@@ -19,18 +19,30 @@
  *   trusts that invariant and multiplies through.
  *
  * BCEA §15 Sunday + §18 holiday collision:
- *   A Sunday that also happens to be a public holiday (e.g. Christmas
- *   2022) pays the HIGHER of the two multipliers, not the sum. This
- *   module picks max(sundayMult, holidayMult) and applies it once.
+ *   With the #1990 disjoint-bucket model, sundayHrs and holidayHrs never
+ *   overlap: a millisecond belongs to at most one bucket (holiday wins).
+ *   For a cross-midnight Sunday→holiday shift both buckets are > 0 but
+ *   cover different hours. We ADD each bucket × its multiplier — no Max.
  *
  * Sunday multiplier selection:
  *   - ordinarilyWorksSundays=true  → sundayOrdinaryMultiplier (1.5x typical)
  *   - ordinarilyWorksSundays=false → sundayMultiplierDefault  (2x typical)
  *
- * Weekday OT stacking:
- *   Weekday = regular × 1x + overtime × otMultiplier. On Sunday/holiday
- *   we don't stack OT — the Sunday/holiday multiplier rewards the whole
- *   shift. (regularHrs + overtimeHrs) × day-multiplier.
+ * Weekday OT stacking (#2028):
+ *   The stacking model matches single-day behaviour: an OT hour that
+ *   COINCIDES with a Sunday/holiday is paid at that day's premium multiplier
+ *   only — the s9/s10 OT premium does NOT stack on top (this is the reference
+ *   set by the single-day "Sunday with OT → whole shift at Sunday multiplier"
+ *   case). An OT hour that lands on ORDINARY calendar time pays at
+ *   otMultiplier. `summary.overtimeOnNonPremiumHrs` (computed time-ordered in
+ *   the producer) tells us exactly how many OT hours fall on the non-premium
+ *   tail, so a cross-midnight shift no longer folds those OT hours into flat
+ *   1× pay (the bug fixed here):
+ *     nonPremiumOrdinary = (regular + overtime) − sunday − holiday
+ *                          − overtimeOnNonPremium   → paid 1×
+ *     overtimeOnNonPremium                          → paid otMultiplier
+ *     sunday                                        → paid sundayMult
+ *     holiday                                       → paid holidayMult
  *
  * BCEA §17 night allowance:
  *   Additive on top of whatever rate applied. Each night hour pays an
@@ -77,15 +89,27 @@ export function computeWageCents(args: ComputeWageArgs): number | null {
     const sundayMult = ordinarilyWorksSundays
       ? rule.sundayOrdinaryMultiplier
       : rule.sundayMultiplierDefault;
-    const dayMult =
-      onSunday && onHoliday
-        ? Math.max(sundayMult, rule.holidayMultiplier)
-        : onSunday
-          ? sundayMult
-          : rule.holidayMultiplier;
-    // No OT stacking on Sunday/holiday: the whole shift earns dayMult.
+    // Disjoint buckets: ADD each portion × its multiplier (#1990/#2028).
+    //  - Sunday/holiday hours pay their day multiplier (these absorb any OT
+    //    that coincides with them — no s9/s10 stacking, matching single-day).
+    //  - OT hours on the ORDINARY (non-premium) tail pay otMultiplier.
+    //  - The rest of the ordinary tail pays 1×.
+    // For a whole-day Sunday/holiday shift both ordinary terms are 0 and the
+    // result equals the old (totalHrs × dayMult) formula.
+    const overtimeOnNonPremiumHrs = Math.max(0, summary.overtimeOnNonPremiumHrs);
+    const nonPremiumOrdinaryHrs = Math.max(
+      0,
+      summary.regularHrs +
+        summary.overtimeHrs -
+        summary.sundayHrs -
+        summary.holidayHrs -
+        overtimeOnNonPremiumHrs,
+    );
     baseCents =
-      (summary.regularHrs + summary.overtimeHrs) * hourlyRateCents * dayMult;
+      nonPremiumOrdinaryHrs * hourlyRateCents +
+      overtimeOnNonPremiumHrs * hourlyRateCents * rule.otMultiplier +
+      summary.sundayHrs * hourlyRateCents * sundayMult +
+      summary.holidayHrs * hourlyRateCents * rule.holidayMultiplier;
   } else {
     // Weekday: regular @ 1x, overtime @ otMultiplier.
     baseCents =
