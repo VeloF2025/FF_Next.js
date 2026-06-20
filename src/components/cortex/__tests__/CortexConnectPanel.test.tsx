@@ -78,7 +78,9 @@ describe('CortexConnectPanel', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied = writeText.mock.calls[0][0] as string;
     // The config the user pastes must carry the bearer token and the FibreFlow proxy URL.
-    const env = JSON.parse(copied).mcpServers.cortex.env;
+    const config = JSON.parse(copied).mcpServers.cortex;
+    expect(config.args).toEqual(['run', '--directory', '/path/to/Cortex', '--package', 'cortex-mcp', 'cortex-mcp']);
+    const env = config.env;
     expect(env.CORTEX_USER_TOKEN).toBe(TOKEN);
     expect(env.CORTEX_BRIDGE_URL).toBe('https://app.fibreflow.app/api/cortex-bridge');
   });

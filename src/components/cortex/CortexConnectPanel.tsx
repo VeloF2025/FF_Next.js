@@ -26,7 +26,7 @@ function configSnippet(token: string): string {
       mcpServers: {
         cortex: {
           command: 'uv',
-          args: ['run', '--directory', '/path/to/Cortex', 'cortex-mcp'],
+          args: ['run', '--directory', '/path/to/Cortex', '--package', 'cortex-mcp', 'cortex-mcp'],
           env: { CORTEX_USER_TOKEN: token, CORTEX_BRIDGE_URL: BRIDGE_URL },
         },
       },
