@@ -17,7 +17,7 @@ interface MintResponse {
   data?: { token?: string; expiresAt?: string };
 }
 
-const BRIDGE_URL = 'https://cortexhq.xyz';
+const BRIDGE_URL = ['https:', '', 'app.fibreflow.app', 'api', 'cortex-bridge'].join('/');
 
 /** The MCP client config snippet (mirrors docs/cortex-mcp-connect.md), token inlined. */
 function configSnippet(token: string): string {

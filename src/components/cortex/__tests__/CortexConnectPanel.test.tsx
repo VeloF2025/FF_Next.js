@@ -77,8 +77,10 @@ describe('CortexConnectPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /copy config/i }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied = writeText.mock.calls[0][0] as string;
-    // The config the user pastes must carry the bearer token under CORTEX_USER_TOKEN.
-    expect(JSON.parse(copied).mcpServers.cortex.env.CORTEX_USER_TOKEN).toBe(TOKEN);
+    // The config the user pastes must carry the bearer token and the FibreFlow proxy URL.
+    const env = JSON.parse(copied).mcpServers.cortex.env;
+    expect(env.CORTEX_USER_TOKEN).toBe(TOKEN);
+    expect(env.CORTEX_BRIDGE_URL).toBe('https://app.fibreflow.app/api/cortex-bridge');
   });
 
   it('shows an error and no token when the mint fails', async () => {
