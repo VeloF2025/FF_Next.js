@@ -1,9 +1,29 @@
 import { useEffect, useState } from 'react';
 import type { UseFormReturn, Path } from 'react-hook-form';
 import type { FormData } from '../../../types';
-import { reverseGeocode, getCurrentLocation, validateSouthAfricanGPS, parseGPSCoordinates } from '@/utils/geoLocation';
+import { getCurrentLocation, validateSouthAfricanGPS, parseGPSCoordinates } from '@/utils/geoLocation';
+import type { LocationData } from '@/utils/geoLocation';
 import type { GpsState } from '../types/basicInfo.types';
 import { log } from '@/lib/logger';
+
+/**
+ * Reverse-geocode via our same-origin proxy. A direct browser fetch to
+ * nominatim.openstreetmap.org is blocked by the app CSP (connect-src in
+ * middleware.ts), so we go through /api/geocode which calls OSM
+ * server-side. Returns null on any failure — caller renders gracefully.
+ */
+async function fetchReverseGeocode(lat: number, lng: number): Promise<LocationData | null> {
+  try {
+    const res = await fetch(`/api/geocode?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return (json?.data?.geocode as LocationData | null) ?? null;
+  } catch {
+    // Network/parse failure — the effect's caller surfaces a user-facing
+    // "Could not find location information" message, so swallow to null here.
+    return null;
+  }
+}
 
 export function useBasicInfoForm(form: UseFormReturn<FormData>) {
   const { watch, setValue } = form;
@@ -53,11 +73,13 @@ export function useBasicInfoForm(form: UseFormReturn<FormData>) {
       setGpsState(prev => ({ ...prev, isGeocoding: true, geocodingError: null }));
 
       try {
-        const locationData = await reverseGeocode(lat, lng);
-        
+        const locationData = await fetchReverseGeocode(lat, lng);
+
         if (locationData) {
           setValue('location.city', locationData.city);
           setValue('location.province', locationData.province);
+          // 'location.region' is the "Municipal District" field in the UI
+          setValue('location.region' as Path<FormData>, locationData.municipalDistrict);
         } else {
           setGpsState(prev => ({ ...prev, geocodingError: 'Could not find location information' }));
         }
