@@ -13,7 +13,8 @@
  * staff-portal endpoint `pages/api/my/geocode.ts`, gated on RBAC auth
  * instead of the /my session.
  *
- * Response shape is always 200 + `{ geocode: GeocodeResult | null }`:
+ * Response shape is always 200 + `{ geocode: GeocodeResult | null, cached: boolean }`
+ * (the `cached` flag mirrors the sibling `/api/my/geocode.ts`; clients may ignore it):
  *   - Resolved successfully → geocode is the structured address.
  *   - Nominatim down, rate-limited, or returned no useful data → null.
  */

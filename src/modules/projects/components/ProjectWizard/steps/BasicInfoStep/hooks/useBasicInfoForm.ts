@@ -19,6 +19,8 @@ async function fetchReverseGeocode(lat: number, lng: number): Promise<LocationDa
     const json = await res.json();
     return (json?.data?.geocode as LocationData | null) ?? null;
   } catch {
+    // Network/parse failure — the effect's caller surfaces a user-facing
+    // "Could not find location information" message, so swallow to null here.
     return null;
   }
 }
