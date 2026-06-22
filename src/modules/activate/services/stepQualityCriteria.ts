@@ -160,7 +160,9 @@ export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
  */
 export const FAIL_REASON_INSTRUCTION = `If it fails, fail_reason must be ONE short sentence (max 140 characters) written for the field technician: state what is wrong AND what to do to pass — for example "Only the top floor is in frame — step back so the roof and both building edges are visible."
 
-SPECIAL CASE: if the image appears to be a photograph of a screen, monitor, or printed photo (moiré/interference patterns, screen bezels or borders, visible pixels, glare bands), fail_reason must say that — e.g. "This looks like a photo of a screen — take the photo of the real scene on site." — instead of a framing complaint.`;
+EXPOSURE / LIGHTING: if the photo is overexposed, washed out or glare-blown (or too dark) so the scene cannot be made out, say exactly that and how to fix it — e.g. "Photo is overexposed — the scene is washed out by glare; retake with the sun behind you, out of direct sunlight." Sun glare and overexposure are a LIGHTING problem, never a screen.
+
+SCREEN (rare): only call the image a photograph of a screen, monitor or printed photo when an ACTUAL screen artefact is visible — a device bezel/border or frame, a moiré/pixel grid, or a rectangular reflected display. Do NOT call a bright, hazy or glare-washed real photo a "screen"; if it is just too bright, use the EXPOSURE guidance above.`;
 
 /**
  * Cross-step "wrong subject" instruction (opt-in via buildMessageContent's
