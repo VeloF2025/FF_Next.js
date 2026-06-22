@@ -20,6 +20,48 @@ export interface StepCriteria {
   failReason: string;
 }
 
+/**
+ * Power-meter (Step 7) reading acceptance range, per the FibreFlow QA standard
+ * (same range the activate side enforces via `vlm_power_meter_status`).
+ * dBm readings are always negative; a reading passes when -24 ≤ dBm ≤ -18.
+ * The VLM only reads the number off the display — the range comparison is done
+ * deterministically in code so the gate never depends on the VLM doing maths.
+ */
+export const POWER_METER_STEP = 7;
+export const POWER_METER_DBM_MAX = -18; // strongest acceptable (closest to 0)
+export const POWER_METER_DBM_MIN = -24; // weakest acceptable
+
+export interface PowerMeterRangeResult {
+  pass: boolean;
+  /** Technician-facing reason when rejected; null when the reading passes. */
+  reason: string | null;
+}
+
+/**
+ * Validate an extracted power-meter reading against the acceptance range.
+ *
+ * @param legible - whether the VLM confirmed the meter/reading is readable.
+ *   When false the VLM has already rejected the photo and that failure stands.
+ * @param dbm - the numeric reading the VLM read off the display, or null when
+ *   it could not be read.
+ */
+export function checkPowerMeterRange(legible: boolean, dbm: number | null): PowerMeterRangeResult {
+  if (!legible) return { pass: false, reason: null };
+  if (dbm == null || Number.isNaN(dbm)) {
+    return {
+      pass: false,
+      reason: 'Could not read the dBm value — retake so the number on the meter display is sharp and fully visible.',
+    };
+  }
+  if (dbm < POWER_METER_DBM_MIN || dbm > POWER_METER_DBM_MAX) {
+    return {
+      pass: false,
+      reason: `Reading ${dbm} dBm is outside the acceptable ${POWER_METER_DBM_MAX} to ${POWER_METER_DBM_MIN} dBm range — check the connection and splice.`,
+    };
+  }
+  return { pass: true, reason: null };
+}
+
 export const STEP_CRITERIA: Record<QualityCheckStep, StepCriteria> = {
   1: {
     label: 'House / Property Photo',
@@ -180,6 +222,21 @@ export function buildMessageContent(
   const crossStep = opts?.crossStepClassification
     ? `${buildCrossStepInstruction(step)}\n\n`
     : '';
+  // Step 7 (Power Meter) additionally extracts the numeric dBm reading so the
+  // route can range-check it (-18 to -24); the JSON shape gains a "dbm" field.
+  // SiteCam live-capture only (same opt-in as crossStep) — auto-QA's prompt is
+  // left byte-identical so its existing step-7 behaviour is unchanged.
+  const isPowerMeter = step === POWER_METER_STEP && !!opts?.crossStepClassification;
+  const dbmInstruction = isPowerMeter
+    ? `Also read the dBm value shown on the meter display and return it as a numeric "dbm" field. Power-meter readings are ALWAYS negative (e.g. -21.3, never 21.3 — always include the minus sign). If the number cannot be read clearly, set "dbm" to null.\n\n`
+    : '';
+  const jsonShape = isPowerMeter
+    ? `{"passes": true, "dbm": -21.3, "fail_reason": null}
+OR
+{"passes": false, "dbm": null, "fail_reason": "<one short sentence as instructed above>"}`
+    : `{"passes": true, "fail_reason": null}
+OR
+{"passes": false, "fail_reason": "<one short sentence as instructed above>"}`;
   const content: VlmContentPart[] = [];
   const hasGallery =
     (galleryExamples?.positiveBase64.length ?? 0) > 0 ||
@@ -265,10 +322,8 @@ ${criteria.failInstruction}
 
 ${FAIL_REASON_INSTRUCTION}
 
-Return STRICT JSON only — no other text:
-{"passes": true, "fail_reason": null}
-OR
-{"passes": false, "fail_reason": "<one short sentence as instructed above>"}`,
+${dbmInstruction}Return STRICT JSON only — no other text:
+${jsonShape}`,
     });
   } else {
     content.push({
@@ -288,10 +343,8 @@ Evaluate this photo:`,
       type: 'text',
       text: `${FAIL_REASON_INSTRUCTION}
 
-Return STRICT JSON only — no other text:
-{"passes": true, "fail_reason": null}
-OR
-{"passes": false, "fail_reason": "<one short sentence as instructed above>"}`,
+${dbmInstruction}Return STRICT JSON only — no other text:
+${jsonShape}`,
     });
   }
 
