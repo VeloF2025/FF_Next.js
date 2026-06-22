@@ -17,7 +17,10 @@ export const ACTIVATION_STEPS: readonly SiteCamStep[] = [
   { number: 5,  label: 'Wall (ONT Mount)',          hasVlm: true,  hasSerialScan: false },
   { number: 6,  label: 'ONT Back After Install',    hasVlm: false, hasSerialScan: true,  serialLabel: 'ONT Serial',  serialDevice: 'ont' },
   { number: 7,  label: 'Power Meter',               hasVlm: true,  hasSerialScan: false },
-  { number: 8,  label: 'Final Installation',        hasVlm: true,  hasSerialScan: true,  serialLabel: 'UPS Serial',  serialDevice: 'ups' },
+  // Step 8 is VLM-only: the UPS serial is NOT scanned here. Serial scanning
+  // happens once, at step 6 (ONT). Final Installation behaves like any photo
+  // step — pass advances, fail shows the reason.
+  { number: 8,  label: 'Final Installation',        hasVlm: true,  hasSerialScan: false },
   { number: 9,  label: 'Green Lights on ONT',       hasVlm: true,  hasSerialScan: false },
   { number: 10, label: 'Signature',                 hasVlm: true,  hasSerialScan: false },
   { number: 11, label: 'Dome Joint Open',           hasVlm: true,  hasSerialScan: false },

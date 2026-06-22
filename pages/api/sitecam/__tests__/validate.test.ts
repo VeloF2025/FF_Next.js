@@ -124,6 +124,7 @@ describe('POST /api/sitecam/validate', () => {
       const res = await run({ ...base });
       const data = res._getJSONData().data;
       expect(data.pass).toBe(false);
+      expect(data.reasons[0]).toMatch(/Power levels are incorrect/);
       expect(data.reasons[0]).toMatch(/-30 dBm is outside/);
       expect(data.powerMeterDbm).toBe(-30);
     });
@@ -132,7 +133,7 @@ describe('POST /api/sitecam/validate', () => {
       mockVlm('{"passes":true,"dbm":-10,"fail_reason":null}');
       const data = (await run({ ...base }))._getJSONData().data;
       expect(data.pass).toBe(false);
-      expect(data.reasons[0]).toMatch(/outside the acceptable -18 to -24/);
+      expect(data.reasons[0]).toMatch(/outside the required -18 to -24/);
     });
 
     it('fails when the reading cannot be read (dbm null)', async () => {

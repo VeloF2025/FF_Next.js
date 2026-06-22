@@ -56,7 +56,7 @@ export function checkPowerMeterRange(legible: boolean, dbm: number | null): Powe
   if (dbm < POWER_METER_DBM_MIN || dbm > POWER_METER_DBM_MAX) {
     return {
       pass: false,
-      reason: `Reading ${dbm} dBm is outside the acceptable ${POWER_METER_DBM_MAX} to ${POWER_METER_DBM_MIN} dBm range — check the connection and splice.`,
+      reason: `Power levels are incorrect — the reading of ${dbm} dBm is outside the required ${POWER_METER_DBM_MAX} to ${POWER_METER_DBM_MIN} dBm range.`,
     };
   }
   return { pass: true, reason: null };

@@ -28,13 +28,14 @@ describe('checkPowerMeterRange', () => {
   it('fails when too weak (below -24)', () => {
     const r = checkPowerMeterRange(true, -25);
     expect(r.pass).toBe(false);
-    expect(r.reason).toMatch(/-25 dBm is outside the acceptable -18 to -24/);
+    expect(r.reason).toMatch(/Power levels are incorrect/);
+    expect(r.reason).toMatch(/-25 dBm is outside the required -18 to -24/);
   });
 
   it('fails when too strong (above -18)', () => {
     const r = checkPowerMeterRange(true, -17.9);
     expect(r.pass).toBe(false);
-    expect(r.reason).toMatch(/outside the acceptable -18 to -24/);
+    expect(r.reason).toMatch(/outside the required -18 to -24/);
   });
 
   it('fails when no numeric reading was extracted', () => {
