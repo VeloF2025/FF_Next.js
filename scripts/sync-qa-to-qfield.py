@@ -2,28 +2,36 @@
 """
 Sync Construction QA decisions back to QField Civil Audit GPKG files.
 
-Updates pole attributes in QField based on FibreFlow QA review statuses:
-  - Poles with photos → Status: "Pole Verified/ Civil Complete", Pole Plant Date
-  - QA approved → Status: "(ADMIN) Q/A Complete", Q/A Date, Q/A Civil Comments
-  - QA failed/retake → Status: "Q/A Failed", Q/A Date, Q/A Civil Comments (missing steps)
-  - No photos → Status left as-is (NULL or "To be Planted")
+Updates pole attributes in QField based on FibreFlow QA review statuses.
+Status strings are PER-PROJECT and must match each QField layer's "Status"
+ValueMap exactly (see FF_TO_QF_CIVIL_AUDIT and the note further down). Only
+HUMAN QA-centre decisions are written; VLM auto 'retake_required' flags are
+never pushed as failures:
+  - workflow_status 'approved'                 → status_approved (e.g. Mohadin
+                                                  "(ADMIN) Q/A Passed")
+  - workflow_status 'rejected'/'rework_needed' → status_failed   ("Q/A Failed")
+  - planted, QField Status currently NULL      → status_planted_incomplete
+                                                  ("Pole Planted - Photos Incomplete")
+  - existing field statuses / 'retake_required'/ no photos → left as-is
+
+Pole Plant Date is gap-filled only (never overwrites a date the field captured).
 
 Process:
-  1. Download Civil Audit.gpkg from MinIO
+  1. Download the pole GPKG from MinIO
   2. Update rows via SQLite
   3. Upload back to MinIO (new version)
   4. QFieldCloud syncs to tablets on next sync
 
 Usage:
-  python3 scripts/sync-qa-to-qfield.py [--project "Thembisa POP 1"] [--dry-run] [--approved-only]
+  python3 scripts/sync-qa-to-qfield.py [--project "Mohadin"] [--dry-run] [--approved-only]
 
-  --approved-only skips writes for rework/failed poles and "planted but no QA"
-  poles. Only approved poles get "(ADMIN) Q/A Complete". Skipped poles are
-  reported in the summary so the operator can tell suppression apart from
-  "nothing to do".
+  --approved-only skips writes for reject/rework poles and the planted gap-fill;
+  only approved poles get status_approved. Skipped poles are reported in the
+  summary so the operator can tell suppression apart from "nothing to do".
 """
 
 import argparse
+import json
 import os
 import sqlite3
 import subprocess
@@ -36,7 +44,9 @@ from psycopg2.extras import RealDictCursor
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-DB_URL = os.environ.get("DATABASE_URL", "postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require")
+# DATABASE_URL must come from the environment (post-Neon-cutover this points at
+# Supabase). Never hard-code a connection string with a password in a tracked file.
+DB_URL = os.environ.get("DATABASE_URL", "")
 MINIO_BUCKET = "qfieldcloud-prod"
 
 # FibreFlow project → QFieldCloud project mapping
@@ -78,6 +88,13 @@ FF_TO_QF_CIVIL_AUDIT = {
         "label_col": "label",
         "qa_comments_col": "QA Civil Comments",
         "qa_date_col": "QA Date",
+        # Status strings below MUST match the QField "Civil Audit" ValueMap
+        # exactly — verified against MOA_Site_Audit_2026_cloud.qgs on 2026-06-22.
+        # The pole layer has NO generic "Q/A Complete"; approved poles use
+        # "(ADMIN) Q/A Passed". "Q/A Failed" is being ADDED to the ValueMap.
+        "status_approved": "(ADMIN) Q/A Passed",
+        "status_failed": "Q/A Failed",
+        "status_planted_incomplete": "Pole Planted - Photos Incomplete",
     },
     "Mamelodi": {
         "qf_project_id": "2ce80264-170c-4f05-ada1-68220d7e5885",
@@ -96,46 +113,78 @@ FF_TO_QF_CIVIL_AUDIT = {
         "label_col": "label",
         "qa_comments_col": "Q/A Civil Comments",
         "qa_date_col": "Q/A Date",
+        # Verified against ETW POP 2 Site Audit 2026_cloud.qgs ValueMap 2026-06-23 —
+        # identical vocabulary to Mohadin. Pole layer has no "Q/A Failed" option
+        # (would need adding to the .qgs, same as Mohadin) for the rework poles.
+        "status_approved": "(ADMIN) Q/A Passed",
+        "status_failed": "Q/A Failed",
+        "status_planted_incomplete": "Pole Planted - Photos Incomplete",
     },
 }
 
 # ── Status mapping ────────────────────────────────────────────────────────────
-
-QA_STATUS_MAP = {
-    "approved":         "(ADMIN) Q/A Complete",
-    "rejected":         "Q/A Failed",
-    "retake_required":  "Q/A Failed",
-    "rework_needed":    "Q/A Failed",
-}
-
-PLANTED_STATUS = "Pole Verified/ Civil Complete"
+#
+# Status vocabulary is PER-PROJECT — each QField project's "Status" ValueMap
+# differs, so writing a single hard-coded string corrupts the dropdown. The
+# previous global map ("(ADMIN) Q/A Complete" / "Pole Verified/ Civil Complete")
+# matched NO option in the live Mohadin pole layer. Values now live in
+# FF_TO_QF_CIVIL_AUDIT[project]["status_approved" | "status_failed" |
+# "status_planted_incomplete"]. A project WITHOUT those keys is treated as
+# un-audited and skipped (we refuse to write unverified Status values).
+#
+# Only HUMAN QA-centre outcomes are pushed:
+#   workflow_status == 'approved'              -> status_approved
+#   workflow_status in (rejected/rework_needed)-> status_failed
+# 'retake_required' is a VLM auto-flag (no human review) and is NEVER written
+# as a failure. Planted poles only get a NULL-gap-fill (status_planted_incomplete)
+# when their QField Status is currently blank — existing field statuses are
+# never overwritten.
 
 # ── MinIO helpers ─────────────────────────────────────────────────────────────
 
 def minio_download(qf_project_id: str, gpkg_path: str, dest: str) -> bool:
-    """Download latest GPKG version from MinIO."""
-    # List versions to get the latest
-    ls_cmd = f'docker exec qfieldcloud-minio-1 mc ls "local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/"'
-    result = subprocess.run(ls_cmd, shell=True, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"  ERROR listing GPKG versions: {result.stderr.strip()}")
+    """Download the latest GPKG version from MinIO.
+
+    Uses shell=False arg lists (no shell metachar/quoting hazard) and selects
+    the latest version by `lastModified` from `mc ls --json` — not by output
+    line ordering, which mc does not guarantee. Picking a stale version would
+    silently apply QA writes to old data and revert newer field captures, so
+    the selection is made explicit.
+    """
+    base = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/"
+    ls = subprocess.run(
+        ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", "--json", base],
+        capture_output=True, text=True,
+    )
+    if ls.returncode != 0:
+        print(f"  ERROR listing GPKG versions: {ls.stderr.strip()}")
         return False
 
-    lines = result.stdout.strip().split("\n")
-    if not lines or not lines[-1].strip():
+    versions = []
+    for line in ls.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("key") and obj.get("lastModified"):
+            versions.append(obj)
+    if not versions:
         print(f"  ERROR: No versions found for {gpkg_path}")
         return False
 
-    # Last line has the latest version
-    latest = lines[-1].strip().split()[-1]
+    latest = max(versions, key=lambda o: o["lastModified"])["key"]
     print(f"  Latest version: {latest}")
 
-    cat_cmd = f'docker exec qfieldcloud-minio-1 mc cat "local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/{latest}"'
     with open(dest, "wb") as f:
-        result = subprocess.run(cat_cmd, shell=True, stdout=f, stderr=subprocess.PIPE)
-
-    if result.returncode != 0:
-        print(f"  ERROR downloading: {result.stderr.decode().strip()}")
+        cat = subprocess.run(
+            ["docker", "exec", "qfieldcloud-minio-1", "mc", "cat", base + latest],
+            stdout=f, stderr=subprocess.PIPE,
+        )
+    if cat.returncode != 0:
+        print(f"  ERROR downloading: {cat.stderr.decode().strip()}")
         return False
 
     size = os.path.getsize(dest)
@@ -144,45 +193,72 @@ def minio_download(qf_project_id: str, gpkg_path: str, dest: str) -> bool:
 
 
 def qfieldcloud_upload(qf_project_id: str, gpkg_path: str, src: str) -> bool:
-    """Upload updated GPKG via QFieldCloud REST API.
+    """Upload the updated GPKG via the qfieldcloud_sdk (login + upload_files).
 
-    Uses curl for reliable multipart upload with SSL handling.
-    The API handles versioning, DB registration, and auto-triggers
-    a process_projectfile job for tablet sync.
+    QFieldCloud's Token-header auth is rejected for these service uploads
+    (HTTP 401); the SDK username/password login is the supported path and is
+    what the live OES sync uses. Credentials come from the environment — the
+    same values the nightly OES wrapper exports from the prod .env:
+      QFIELD_USERNAME, QFIELD_PASSWORD, QFIELD_API_URL
+    upload_files derives the remote path from the file's path relative to
+    project_path, so we stage the file under its remote name in a temp dir and
+    glob exactly that file. QFieldCloud auto-triggers process_projectfile.
     """
-    import urllib.parse
+    import shutil
+    import tempfile
 
-    token = os.environ.get("QFIELD_API_TOKEN", "")
-    if not token:
-        print("  ERROR: QFIELD_API_TOKEN not set")
+    try:
+        from qfieldcloud_sdk import sdk
+    except ImportError:
+        print("  ERROR: qfieldcloud_sdk not installed")
         return False
 
-    encoded_path = urllib.parse.quote(gpkg_path)
-    url = f"https://qfield.fibreflow.app/api/v1/files/{qf_project_id}/{encoded_path}/"
-    size = os.path.getsize(src)
-
-    result = subprocess.run([
-        "curl", "-sk", "-X", "POST", url,
-        "-H", f"Authorization: Token {token}",
-        "-F", f"file=@{src};filename={gpkg_path};type=application/octet-stream",
-        "-w", "\n%{http_code}",
-    ], capture_output=True, text=True, timeout=120)
-
-    lines = result.stdout.strip().split("\n")
-    status_code = lines[-1] if lines else "0"
-
-    if status_code in ("200", "201"):
-        print(f"  Uploaded via API (HTTP {status_code}, {size:,} bytes)")
-        return True
-    else:
-        print(f"  ERROR API upload: HTTP {status_code} | {result.stdout[:200]}")
+    api_url = os.environ.get("QFIELD_API_URL", "https://qfield.fibreflow.app/api/v1/")
+    username = os.environ.get("QFIELD_USERNAME", "admin")
+    password = os.environ.get("QFIELD_PASSWORD")
+    if not password:
+        print("  ERROR: QFIELD_PASSWORD not set in environment")
         return False
+
+    try:
+        client = sdk.Client(api_url)
+        client.login(username, password)
+    except Exception as e:
+        print(f"  ERROR: QFieldCloud login failed: {e}")
+        return False
+
+    staging = tempfile.mkdtemp()
+    dest = os.path.join(staging, gpkg_path)
+    parent = os.path.dirname(dest)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    shutil.copy(src, dest)
+
+    try:
+        results = list(client.upload_files(
+            project_id=qf_project_id,
+            upload_type=sdk.FileTransferType.PROJECT,
+            project_path=staging,
+            filter_glob=gpkg_path,
+        ))
+    except Exception as e:
+        print(f"  ERROR: GPKG upload failed: {e}")
+        return False
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+    ok = any(str(r.get("status", "")).lower().endswith("success") for r in results)
+    for r in results:
+        print(f"  upload: {r.get('name')} -> {r.get('status')}")
+    return ok
 
 
 # ── Main sync logic ───────────────────────────────────────────────────────────
 
-def sync_project(project_name: str, config: dict, dry_run: bool = False, approved_only: bool = False):
-    """Sync QA decisions for one project to its QField GPKG."""
+def sync_project(project_name: str, config: dict, dry_run: bool = False, approved_only: bool = False) -> bool:
+    """Sync QA decisions for one project to its QField GPKG. Returns True on
+    success (including an intentional un-audited skip), False on a download or
+    upload failure so the caller can set a non-zero exit code."""
     print(f"\n{'='*60}")
     print(f"Syncing: {project_name}")
     print(f"{'='*60}")
@@ -194,6 +270,16 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
     label_col = config.get("label_col", "label_1")
     qa_comments_col = config.get("qa_comments_col", "Q/A Civil Comments")
     qa_date_col = config.get("qa_date_col", "Q/A Date")
+
+    # Per-project Status ValueMap (see note above). No config → un-audited → skip.
+    status_approved = config.get("status_approved")
+    status_failed = config.get("status_failed")
+    status_planted_incomplete = config.get("status_planted_incomplete")
+    if not (status_approved and status_failed and status_planted_incomplete):
+        print("  SKIP: no audited Status ValueMap for this project — refusing "
+              "to write unverified Status values. Audit the .qgs and add "
+              "status_approved/status_failed/status_planted_incomplete first.")
+        return True
 
     # 1. Get QA review data from FibreFlow
     conn = psycopg2.connect(DB_URL)
@@ -224,11 +310,16 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
 
     print(f"  FibreFlow reviews: {len(reviews)}")
 
-    # 2. Download GPKG
-    tmp = tempfile.mktemp(suffix=".gpkg")
+    # 2. Download GPKG (mkstemp, not the deprecated/race-prone mktemp)
+    fd, tmp = tempfile.mkstemp(suffix=".gpkg")
+    os.close(fd)
     if not minio_download(qf_project_id, gpkg_path, tmp):
         print("  FAILED to download GPKG, skipping")
-        return
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return False
 
     # 3. Update GPKG
     gpkg_conn = sqlite3.connect(tmp)
@@ -253,9 +344,14 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
     print(f"  GPKG poles: {total_poles}")
 
     stats = {
-        "planted": 0, "qa_complete": 0, "qa_failed": 0, "unchanged": 0,
-        "skipped_failed": 0, "skipped_planted": 0,
+        "qa_passed": 0, "qa_failed": 0, "planted_gapfill": 0, "unchanged": 0,
+        "vlm_retake_seen": 0, "skipped_failed": 0,
     }
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Field-set statuses we must never clobber with a gap-fill.
+    PROTECTED = {"Pole Removed/Canceled"}
 
     # Get all poles from GPKG
     gpkg_cur.execute(f'SELECT fid, "{label_col}", "Status", "Pole Plant Date", "{qa_date_col}" FROM "{table_name}"')
@@ -267,78 +363,81 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
             continue
 
         review = reviews.get(label)
-
         if not review:
-            # No review = no photos taken = leave as-is or mark "To be Planted"
+            # No review = no photos taken = leave as-is.
             stats["unchanged"] += 1
             continue
 
         wf_status = review["workflow_status"]
-        earliest = review["earliest_photo"]
-        step7_date = review["step7_photo_date"]
         photo_count = review["photo_count"] or 0
+        cur_norm = (current_status or "").strip()
+        # Pole Plant Date = Step 7 (After Photo) date, fall back to earliest photo.
+        plant_src = review["step7_photo_date"] or review["earliest_photo"]
+        plant_dt = plant_src.strftime("%Y-%m-%d") if plant_src else None
 
-        # Pole Plant Date = Step 7 (After Photo) date, fall back to earliest photo
-        plant_src = step7_date or earliest
-
-        # Determine new status
-        if wf_status == "approved":
-            new_status = "(ADMIN) Q/A Complete"
-            qa_comment = review.get("qa_notes") or "PASS - automated QA"
-            qa_dt = review["qa_decision_at"].strftime("%Y-%m-%d") if review["qa_decision_at"] else datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            new_plant_date = plant_src.strftime("%Y-%m-%d") if plant_src else plant_date
-            stats["qa_complete"] += 1
-
-        elif wf_status in ("retake_required", "rejected", "rework_needed"):
-            if approved_only:
-                stats["skipped_failed"] += 1
-                continue
-            new_status = "Q/A Failed"
-            qa_comment = review.get("qa_notes") or f"QA {wf_status}"
-            qa_dt = review["qa_decision_at"].strftime("%Y-%m-%d") if review["qa_decision_at"] else datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            new_plant_date = plant_src.strftime("%Y-%m-%d") if plant_src else plant_date
-            stats["qa_failed"] += 1
-
-        elif photo_count > 0:
-            if approved_only:
-                stats["skipped_planted"] += 1
-                continue
-            # Has photos but QA not done yet → planted, awaiting QA
-            if current_status == "(ADMIN) Q/A Complete":
-                stats["unchanged"] += 1
-                continue  # Don't downgrade
-            new_status = PLANTED_STATUS
-            qa_comment = None  # Don't clear existing comments
-            qa_dt = None
-            new_plant_date = plant_src.strftime("%Y-%m-%d") if plant_src else plant_date
-            stats["planted"] += 1
-
-        else:
+        # Never touch a pole the field marked removed/cancelled.
+        if cur_norm in PROTECTED:
             stats["unchanged"] += 1
             continue
 
+        new_status = qa_comment = qa_dt = None
+        is_human = wf_status == "approved" or wf_status in ("rejected", "rework_needed")
+
+        if wf_status == "approved":
+            if cur_norm == status_approved:
+                stats["unchanged"] += 1
+                continue  # already passed; no-op
+            new_status = status_approved
+            qa_comment = review.get("qa_notes") or "PASS"
+            qa_dt = review["qa_decision_at"].strftime("%Y-%m-%d") if review["qa_decision_at"] else today
+            stats["qa_passed"] += 1
+
+        elif wf_status in ("rejected", "rework_needed"):
+            if approved_only:
+                stats["skipped_failed"] += 1
+                continue
+            new_status = status_failed
+            qa_comment = review.get("qa_notes") or f"QA {wf_status}"
+            qa_dt = review["qa_decision_at"].strftime("%Y-%m-%d") if review["qa_decision_at"] else today
+            stats["qa_failed"] += 1
+
+        else:
+            # pending / retake_required (VLM auto-flag) / unidentified — NO human
+            # decision. Never push as a failure. Only NULL-gap-fill a blank
+            # status; never overwrite the field's own marking.
+            if wf_status == "retake_required":
+                stats["vlm_retake_seen"] += 1
+            if approved_only or photo_count == 0 or cur_norm != "":
+                stats["unchanged"] += 1
+                continue
+            new_status = status_planted_incomplete
+            stats["planted_gapfill"] += 1
+
         if dry_run:
-            if stats["qa_complete"] + stats["qa_failed"] + stats["planted"] <= 5:
-                print(f"  [DRY] {label}: {current_status} → {new_status}")
+            # Always show human decisions; sample the gap-fills.
+            if is_human or stats["planted_gapfill"] <= 8:
+                tag = "PASS" if wf_status == "approved" else "FAIL" if is_human else "gap-fill"
+                print(f"  [DRY] {label}: {cur_norm or '<NULL>'} -> {new_status}  ({tag})")
             continue
 
-        # Build UPDATE
+        # Build UPDATE. Plant date is gap-filled (COALESCE existing first) so we
+        # never overwrite a date the field already captured.
         if qa_comment is not None:
             gpkg_cur.execute(f"""
                 UPDATE "{table_name}"
                 SET "Status" = ?,
-                    "Pole Plant Date" = COALESCE(?, "Pole Plant Date"),
+                    "Pole Plant Date" = COALESCE("Pole Plant Date", ?),
                     "{qa_comments_col}" = ?,
                     "{qa_date_col}" = ?
                 WHERE fid = ?
-            """, (new_status, new_plant_date, qa_comment, qa_dt, fid))
+            """, (new_status, plant_dt, qa_comment, qa_dt, fid))
         else:
             gpkg_cur.execute(f"""
                 UPDATE "{table_name}"
                 SET "Status" = ?,
-                    "Pole Plant Date" = COALESCE(?, "Pole Plant Date")
+                    "Pole Plant Date" = COALESCE("Pole Plant Date", ?)
                 WHERE fid = ?
-            """, (new_status, new_plant_date, fid))
+            """, (new_status, plant_dt, fid))
 
     # Re-create disabled spatial triggers
     for trig_name, trig_sql in disabled_triggers:
@@ -349,28 +448,29 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
 
     gpkg_conn.close()
 
-    print(f"\n  Results:")
-    print(f"    QA Complete:  {stats['qa_complete']}")
-    print(f"    QA Failed:    {stats['qa_failed']}")
-    print(f"    Planted:      {stats['planted']}")
-    print(f"    Unchanged:    {stats['unchanged']}")
+    writes = stats["qa_passed"] + stats["qa_failed"] + stats["planted_gapfill"]
+    print(f"\n  Results{' (dry-run — nothing written)' if dry_run else ''}:")
+    print(f"    Q/A Passed (human approved):       {stats['qa_passed']}  -> {status_approved!r}")
+    print(f"    Q/A Failed (human reject/rework):  {stats['qa_failed']}  -> {status_failed!r}")
+    print(f"    Planted NULL-gap-fill:             {stats['planted_gapfill']}  -> {status_planted_incomplete!r}")
+    print(f"    Unchanged:                         {stats['unchanged']}")
+    print(f"    VLM retake_required seen (NOT pushed as failed): {stats['vlm_retake_seen']}")
     if approved_only:
-        print(f"    Skipped (--approved-only): "
-              f"{stats['skipped_failed']} failed, "
-              f"{stats['skipped_planted']} planted")
+        print(f"    Skipped (--approved-only): {stats['skipped_failed']} reject/rework")
 
     # 4. Upload back to MinIO
-    if not dry_run and (stats["qa_complete"] + stats["qa_failed"] + stats["planted"]) > 0:
-        if qfieldcloud_upload(qf_project_id, gpkg_path, tmp):
-            print("  ✓ GPKG uploaded to MinIO")
-        else:
-            print("  ✗ FAILED to upload GPKG")
+    upload_ok = True
+    if not dry_run and writes > 0:
+        upload_ok = qfieldcloud_upload(qf_project_id, gpkg_path, tmp)
+        print("  ✓ GPKG uploaded to MinIO" if upload_ok else "  ✗ FAILED to upload GPKG")
 
     # Cleanup
     try:
         os.unlink(tmp)
     except OSError:
         pass
+
+    return upload_ok
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -380,8 +480,12 @@ def main():
     parser.add_argument("--project", type=str, default=None, help="Single project name")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes only")
     parser.add_argument("--approved-only", action="store_true",
-                        help="Only write '(ADMIN) Q/A Complete' for approved poles; skip rework and planted updates")
+                        help="Only write status_approved for approved poles; skip reject/rework and the planted gap-fill")
     args = parser.parse_args()
+
+    if not DB_URL:
+        print("ERROR: DATABASE_URL not set. Export it (Supabase) before running.")
+        sys.exit(1)
 
     projects = FF_TO_QF_CIVIL_AUDIT
     if args.project:
@@ -394,14 +498,20 @@ def main():
     print(f"QA → QField Sync | {len(projects)} project(s) | "
           f"dry_run={args.dry_run} | approved_only={args.approved_only}")
 
+    failures = []
     for name, config in projects.items():
         try:
-            sync_project(name, config, dry_run=args.dry_run, approved_only=args.approved_only)
+            if not sync_project(name, config, dry_run=args.dry_run, approved_only=args.approved_only):
+                failures.append(name)
         except Exception as e:
-            print(f"\n  ERROR syncing {name}: {e}")
+            print(f"\n  ERROR syncing {name}: {type(e).__name__}: {e}")
+            failures.append(name)
 
     print(f"\n{'='*60}")
     print("Done.")
+    if failures:
+        print(f"FAILED ({len(failures)}): {', '.join(failures)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
