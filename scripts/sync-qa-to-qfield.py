@@ -31,6 +31,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import sqlite3
 import subprocess
@@ -142,29 +143,48 @@ FF_TO_QF_CIVIL_AUDIT = {
 # ── MinIO helpers ─────────────────────────────────────────────────────────────
 
 def minio_download(qf_project_id: str, gpkg_path: str, dest: str) -> bool:
-    """Download latest GPKG version from MinIO."""
-    # List versions to get the latest
-    ls_cmd = f'docker exec qfieldcloud-minio-1 mc ls "local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/"'
-    result = subprocess.run(ls_cmd, shell=True, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"  ERROR listing GPKG versions: {result.stderr.strip()}")
+    """Download the latest GPKG version from MinIO.
+
+    Uses shell=False arg lists (no shell metachar/quoting hazard) and selects
+    the latest version by `lastModified` from `mc ls --json` — not by output
+    line ordering, which mc does not guarantee. Picking a stale version would
+    silently apply QA writes to old data and revert newer field captures, so
+    the selection is made explicit.
+    """
+    base = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/"
+    ls = subprocess.run(
+        ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", "--json", base],
+        capture_output=True, text=True,
+    )
+    if ls.returncode != 0:
+        print(f"  ERROR listing GPKG versions: {ls.stderr.strip()}")
         return False
 
-    lines = result.stdout.strip().split("\n")
-    if not lines or not lines[-1].strip():
+    versions = []
+    for line in ls.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("key") and obj.get("lastModified"):
+            versions.append(obj)
+    if not versions:
         print(f"  ERROR: No versions found for {gpkg_path}")
         return False
 
-    # Last line has the latest version
-    latest = lines[-1].strip().split()[-1]
+    latest = max(versions, key=lambda o: o["lastModified"])["key"]
     print(f"  Latest version: {latest}")
 
-    cat_cmd = f'docker exec qfieldcloud-minio-1 mc cat "local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/{latest}"'
     with open(dest, "wb") as f:
-        result = subprocess.run(cat_cmd, shell=True, stdout=f, stderr=subprocess.PIPE)
-
-    if result.returncode != 0:
-        print(f"  ERROR downloading: {result.stderr.decode().strip()}")
+        cat = subprocess.run(
+            ["docker", "exec", "qfieldcloud-minio-1", "mc", "cat", base + latest],
+            stdout=f, stderr=subprocess.PIPE,
+        )
+    if cat.returncode != 0:
+        print(f"  ERROR downloading: {cat.stderr.decode().strip()}")
         return False
 
     size = os.path.getsize(dest)
@@ -235,8 +255,10 @@ def qfieldcloud_upload(qf_project_id: str, gpkg_path: str, src: str) -> bool:
 
 # ── Main sync logic ───────────────────────────────────────────────────────────
 
-def sync_project(project_name: str, config: dict, dry_run: bool = False, approved_only: bool = False):
-    """Sync QA decisions for one project to its QField GPKG."""
+def sync_project(project_name: str, config: dict, dry_run: bool = False, approved_only: bool = False) -> bool:
+    """Sync QA decisions for one project to its QField GPKG. Returns True on
+    success (including an intentional un-audited skip), False on a download or
+    upload failure so the caller can set a non-zero exit code."""
     print(f"\n{'='*60}")
     print(f"Syncing: {project_name}")
     print(f"{'='*60}")
@@ -257,7 +279,7 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
         print("  SKIP: no audited Status ValueMap for this project — refusing "
               "to write unverified Status values. Audit the .qgs and add "
               "status_approved/status_failed/status_planted_incomplete first.")
-        return
+        return True
 
     # 1. Get QA review data from FibreFlow
     conn = psycopg2.connect(DB_URL)
@@ -288,11 +310,16 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
 
     print(f"  FibreFlow reviews: {len(reviews)}")
 
-    # 2. Download GPKG
-    tmp = tempfile.mktemp(suffix=".gpkg")
+    # 2. Download GPKG (mkstemp, not the deprecated/race-prone mktemp)
+    fd, tmp = tempfile.mkstemp(suffix=".gpkg")
+    os.close(fd)
     if not minio_download(qf_project_id, gpkg_path, tmp):
         print("  FAILED to download GPKG, skipping")
-        return
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return False
 
     # 3. Update GPKG
     gpkg_conn = sqlite3.connect(tmp)
@@ -432,17 +459,18 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
         print(f"    Skipped (--approved-only): {stats['skipped_failed']} reject/rework")
 
     # 4. Upload back to MinIO
+    upload_ok = True
     if not dry_run and writes > 0:
-        if qfieldcloud_upload(qf_project_id, gpkg_path, tmp):
-            print("  ✓ GPKG uploaded to MinIO")
-        else:
-            print("  ✗ FAILED to upload GPKG")
+        upload_ok = qfieldcloud_upload(qf_project_id, gpkg_path, tmp)
+        print("  ✓ GPKG uploaded to MinIO" if upload_ok else "  ✗ FAILED to upload GPKG")
 
     # Cleanup
     try:
         os.unlink(tmp)
     except OSError:
         pass
+
+    return upload_ok
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -470,14 +498,20 @@ def main():
     print(f"QA → QField Sync | {len(projects)} project(s) | "
           f"dry_run={args.dry_run} | approved_only={args.approved_only}")
 
+    failures = []
     for name, config in projects.items():
         try:
-            sync_project(name, config, dry_run=args.dry_run, approved_only=args.approved_only)
+            if not sync_project(name, config, dry_run=args.dry_run, approved_only=args.approved_only):
+                failures.append(name)
         except Exception as e:
-            print(f"\n  ERROR syncing {name}: {e}")
+            print(f"\n  ERROR syncing {name}: {type(e).__name__}: {e}")
+            failures.append(name)
 
     print(f"\n{'='*60}")
     print("Done.")
+    if failures:
+        print(f"FAILED ({len(failures)}): {', '.join(failures)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
