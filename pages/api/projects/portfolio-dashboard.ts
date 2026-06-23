@@ -175,6 +175,7 @@ async function handler(
             COUNT(*)::int as total_drops,
             COUNT(*) FILTER (WHERE status IN ('completed', 'activated', 'installed'))::int as completed_drops
           FROM drops
+          WHERE status IS DISTINCT FROM 'retired'
         `) as unknown as { total_drops: number; completed_drops: number }[]
       ).catch(() => [{
         total_drops: 0,
