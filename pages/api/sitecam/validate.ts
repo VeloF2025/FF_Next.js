@@ -21,6 +21,8 @@ import {
   STEP_CRITERIA,
   QUALITY_CHECK_STEPS,
   buildMessageContent,
+  POWER_METER_STEP,
+  checkPowerMeterRange,
   type QualityCheckStep,
 } from '@/modules/activate/services/stepQualityCriteria';
 import {
@@ -61,6 +63,8 @@ interface VlmResult {
   corrections: string[];
   /** True when pass is the result of failing open (VLM unavailable), not a real check. */
   needsManualReview: boolean;
+  /** Power-meter (Step 7) reading the VLM read off the display, when applicable. */
+  powerMeterDbm?: number | null;
 }
 
 function hashBase64(b64: string): string {
@@ -166,6 +170,7 @@ async function runVlmCheck(
         fail_reason?: string | null;
         reasons?: string[];
         corrections?: string[];
+        dbm?: number | null;
       };
       // VLM may return either "pass" or "passes" depending on prompt variant
       const passed = parsed.passes !== undefined ? parsed.passes === true : parsed.pass === true;
@@ -178,7 +183,8 @@ async function runVlmCheck(
         (typeof parsed.fail_reason === 'string' && parsed.fail_reason.trim().length > 0
           ? parsed.fail_reason.trim()
           : null) ?? (passed ? null : cannedReason);
-      return {
+
+      const result: VlmResult = {
         pass: passed,
         reasons: passed || !failReason
           ? (Array.isArray(parsed.reasons) ? parsed.reasons : [])
@@ -186,6 +192,21 @@ async function runVlmCheck(
         corrections: Array.isArray(parsed.corrections) ? parsed.corrections : [],
         needsManualReview: false,
       };
+
+      // Power Meter (Step 7, activations): a legible photo must also report a
+      // reading inside the QA-acceptable -18 to -24 dBm range. The range check
+      // is deterministic in code — the VLM only reads the number off the screen.
+      if (jobType === 'activations' && step === POWER_METER_STEP) {
+        const dbm = typeof parsed.dbm === 'number' ? parsed.dbm : null;
+        result.powerMeterDbm = dbm;
+        const ranged = checkPowerMeterRange(result.pass, dbm);
+        if (!ranged.pass) {
+          result.pass = false;
+          if (ranged.reason) result.reasons = [ranged.reason];
+        }
+      }
+
+      return result;
     }
     // No JSON in response — fail open to avoid blocking tech on parse errors,
     // but log at error level so an operator is alerted that VLM is degraded.
@@ -276,6 +297,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse, _session: Atte
     reasons: result.reasons,
     corrections: result.corrections,
     needsManualReview: result.needsManualReview,
+    powerMeterDbm: result.powerMeterDbm,
     stepLabel,
     attemptNumber,
     maxAttempts: MAX_ATTEMPTS,

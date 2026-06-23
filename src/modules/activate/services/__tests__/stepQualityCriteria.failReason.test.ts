@@ -46,6 +46,14 @@ describe('buildMessageContent fail_reason instruction', () => {
     expect(FAIL_REASON_INSTRUCTION).toContain('140');
   });
 
+  it('guides on overexposure and does not let glare be mistaken for a screen', () => {
+    // The technician must be told the real problem (too much exposure) + the fix.
+    expect(FAIL_REASON_INSTRUCTION).toMatch(/overexposed/i);
+    expect(FAIL_REASON_INSTRUCTION).toMatch(/lighting problem, never a screen/i);
+    // Screen detection must require an actual screen artefact, not just glare.
+    expect(FAIL_REASON_INSTRUCTION).toMatch(/ACTUAL screen artefact/);
+  });
+
   it('still demands the strict JSON contract', () => {
     const text = allText(buildMessageContent(1, 'base64photo').content);
     expect(text).toContain('{"passes": true, "fail_reason": null}');

@@ -55,4 +55,12 @@ describe('activation VLM coverage', () => {
     const nonVlm = ACTIVATION_STEPS.filter((s) => !s.hasVlm).map((s) => s.number);
     expect(nonVlm).toEqual([6]);
   });
+
+  it('step 6 (ONT) is the ONLY serial-scan step — step 8 Final Installation is VLM-only', () => {
+    const serialSteps = ACTIVATION_STEPS.filter((s) => s.hasSerialScan).map((s) => s.number);
+    expect(serialSteps).toEqual([6]);
+    const step8 = ACTIVATION_STEPS.find((s) => s.number === 8);
+    expect(step8?.hasSerialScan).toBe(false);
+    expect(step8?.serialDevice).toBeUndefined();
+  });
 });
