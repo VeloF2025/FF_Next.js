@@ -12,6 +12,8 @@ import { log } from '@/lib/logger';
 import { PhotoInput } from './categorizationVlmService';
 import { photoTypeToStep } from '../utils/stepMapper';
 import { looksLikeGizzuSerial } from './serialValidator';
+import { isGraphPhotoUrl } from '@/lib/graph/isGraphPhotoUrl';
+import { getGraphAccessToken } from '@/lib/graph/auth';
 
 // OneMap API host
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
@@ -338,6 +340,27 @@ export function getStatusMessage(status: PhotoFetchStatus): string {
  */
 export async function fetchPhotoAsBase64(photoUrl: string): Promise<string> {
   try {
+    // Civil QA gallery photos (vlm_visual_photo_examples, job_type='civils') are
+    // stored as Microsoft Graph API URLs that require an OAuth Bearer token —
+    // a plain fetch 401s and the example is silently dropped, so the civils VLM
+    // has run with ZERO gallery anchoring since inception. Fetch them server-side
+    // with the app's Graph token, exactly as pages/api/activate/civil-photo-gallery/photo.ts
+    // does. The isGraphPhotoUrl allowlist guarantees we only ever attach the
+    // credential to the canonical graph.microsoft.com host (SSRF / token-leak guard).
+    const graphUrl = isGraphPhotoUrl(photoUrl) ? photoUrl : null;
+    if (graphUrl) {
+      const token = await getGraphAccessToken();
+      const graphRes = await fetch(graphUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+        redirect: 'follow',
+      });
+      if (!graphRes.ok) {
+        throw new Error(`Failed to fetch Graph photo: ${graphRes.status} ${graphRes.statusText}`);
+      }
+      const arrayBuffer = await graphRes.arrayBuffer();
+      return Buffer.from(arrayBuffer).toString('base64');
+    }
+
     // Handle relative URLs by prepending the base URL
     let fullUrl = photoUrl;
     if (photoUrl.startsWith('/api/')) {
