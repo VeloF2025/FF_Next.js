@@ -316,6 +316,8 @@ def fetch_oes_data_by_project() -> Dict[str, Dict[str, List[Tuple]]]:
         WHERE NOT EXISTS (
             SELECT 1 FROM oes_activations oes WHERE oes.drop_id = d.id
         )
+          -- Exclude drops retired by a re-plan (parked, not active planning)
+          AND d.status IS DISTINCT FROM 'retired'
           AND d.latitude IS NOT NULL
           AND d.longitude IS NOT NULL
           AND d.latitude != 0

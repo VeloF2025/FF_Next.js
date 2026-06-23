@@ -223,6 +223,8 @@ def fetch_data_by_project() -> Dict[str, Dict]:
         FROM drops d
         LEFT JOIN oes_activations oa ON d.drop_number = oa.drop_number
         WHERE oa.drop_number IS NULL
+          -- Exclude drops retired by a re-plan (parked, not active planning)
+          AND d.status IS DISTINCT FROM 'retired'
           AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
           AND d.latitude::float != 0 AND d.longitude::float != 0
         ORDER BY d.project_id, d.drop_number

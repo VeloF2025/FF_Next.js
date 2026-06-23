@@ -488,6 +488,7 @@ async function handler(
         AND d.longitude != 0
         AND d.latitude BETWEEN ${SA_BOUNDS.minLat} AND ${SA_BOUNDS.maxLat}
         AND d.longitude BETWEEN ${SA_BOUNDS.minLon} AND ${SA_BOUNDS.maxLon}
+        AND d.status IS DISTINCT FROM 'retired'
         AND NOT EXISTS (
           SELECT 1 FROM oes_activations oes
           WHERE oes.drop_id = d.id
