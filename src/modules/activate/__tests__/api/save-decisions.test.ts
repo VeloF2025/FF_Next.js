@@ -148,17 +148,25 @@ describe('POST /api/activate/photo-gallery/save-decisions', () => {
     expect(correctionsCall?.[1]).toContain('reject');
   });
 
-  it('skips an already-curated photo (dedup)', async () => {
+  it('updates an already-curated photo instead of skipping (manual curation wins)', async () => {
+    // Regression: dome-joint (step 11/12) photos almost always already have a
+    // categorization correction row; the old skip-on-exist meant their gallery
+    // good/bad decisions silently never saved. They must now be UPDATEd.
     mocks.query.mockImplementation((sql: string) => {
       if (/^\s*SELECT/i.test(sql)) return Promise.resolve({ rows: [{ id: 'x' }], rowCount: 1 });
       return Promise.resolve({ rows: [], rowCount: 1 });
     });
     const { res, captured } = makeRes();
     await handler(makeReq({ decisions: [
-      { drNumber: 'DR1', filename: 'p.jpg', url: VALID_URL, stepNumber: 6, decision: 'good', confidence: 0.95 },
+      { drNumber: 'DR1', filename: 'p.jpg', url: VALID_URL, stepNumber: 11, decision: 'good', confidence: 0.95 },
     ] }), res);
-    expect(captured.body?.data).toMatchObject({ saved: 0, skipped: 1 });
-    expect(mocks.query.mock.calls.every((c) => /^\s*SELECT/i.test(String(c[0])))).toBe(true);
+    expect(captured.body?.data).toMatchObject({ saved: 1, good: 1, skipped: 0 });
+    const sqls = mocks.query.mock.calls.map((c) => String(c[0]));
+    // Existing correction row is UPDATEd, not re-inserted.
+    expect(sqls.some((s) => /UPDATE vlm_corrections/i.test(s))).toBe(true);
+    expect(sqls.some((s) => /INSERT INTO vlm_corrections/i.test(s))).toBe(false);
+    // Visual example is upserted so a flipped good/bad label persists.
+    expect(sqls.some((s) => /INSERT INTO vlm_visual_photo_examples[\s\S]*DO UPDATE/i.test(s))).toBe(true);
   });
 
   it('continues on a per-item DB error (partial success)', async () => {

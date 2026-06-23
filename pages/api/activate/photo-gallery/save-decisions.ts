@@ -11,9 +11,13 @@
  * Auth: requires `manager` role or higher — these rows change how every future
  * installation photo is evaluated by the VLM, so curation is privileged.
  *
- * Dedup: a photo_url already curated for activate/photo_categorization is a
- * silent no-op. vlm_corrections has no unique index, so we guard with a SELECT;
- * vlm_visual_photo_examples dedups via ON CONFLICT (photo_url).
+ * Re-curation: a photo_url already curated is UPDATED, not skipped — a manual
+ * gallery decision wins over a prior (often auto-categorization) row, and the
+ * good/bad label can be changed. vlm_corrections has no unique index, so we
+ * SELECT then INSERT-or-UPDATE; vlm_visual_photo_examples upserts via
+ * ON CONFLICT (photo_url) DO UPDATE so a flipped label/confidence persists.
+ * (A prior DO NOTHING / skip-on-exist is why dome-joint examples — which almost
+ * always already have a categorization row — appeared not to save.)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -87,47 +91,55 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     // it cannot be used to smuggle adversarial text into the VLM prompt.
     const stepName = STEP_LABELS[d.stepNumber] ?? `Step ${d.stepNumber}`;
 
+    // Value fields shared by the INSERT and UPDATE paths below.
+    const extractedValue = `step_${d.stepNumber}`;
+    const correctedValue = isGood ? `step_${d.stepNumber}` : 'reject';
+    const errorPattern = isGood ? null : 'poor_quality_example';
+    const notes = isGood
+      ? `Gallery: confirmed good example — step ${d.stepNumber} (${stepName})`
+      : `Gallery: bad/reject example — step ${d.stepNumber} (${stepName})`;
+    const contextJson = JSON.stringify({ drNumber: d.drNumber, filename: d.filename, stepNumber: d.stepNumber, stepName });
+    const priority = isGood ? 95 : 10;
+
     try {
-      // Duplicate guard (no unique index on vlm_corrections → guard by SELECT).
-      const existing = await pool.query(
+      // A photo may already carry a correction row — auto-categorization writes
+      // one for many photos, and dome-joint (step 11/12) photos almost always
+      // have one. Manual gallery curation MUST win, so UPDATE the existing row
+      // rather than skip it; otherwise those photos could never be saved as
+      // good/bad examples. (No unique index on vlm_corrections → guard by
+      // SELECT, then INSERT or UPDATE.)
+      const existing = await pool.query<{ id: string }>(
         `SELECT id FROM vlm_corrections
-          WHERE photo_url = $1
-            AND module = 'activate'
-            AND analysis_type = 'photo_categorization'
+          WHERE photo_url = $1 AND module = 'activate' AND analysis_type = 'photo_categorization'
           LIMIT 1`,
         [d.url],
       );
-      if ((existing.rowCount ?? 0) > 0) {
-        result.skipped++;
-        continue;
-      }
 
-      // Text few-shot pipeline. `source_id` is UUID-typed and there is no
-      // gallery source row, so it stays NULL; the gallery origin is recorded in
-      // `source_table` + `context_json`.
-      await pool.query(
-        `INSERT INTO vlm_corrections (
-          module, analysis_type, source_table, photo_url,
-          vlm_extracted_value, corrected_value, error_pattern, correction_notes,
-          context_json, is_canonical, priority
-        ) VALUES (
-          'activate', 'photo_categorization', 'gallery', $1,
-          $2, $3, $4, $5,
-          $6::jsonb, $7, $8
-        )`,
-        [
-          d.url,
-          `step_${d.stepNumber}`,
-          isGood ? `step_${d.stepNumber}` : 'reject',
-          isGood ? null : 'poor_quality_example',
-          isGood
-            ? `Gallery: confirmed good example — step ${d.stepNumber} (${stepName})`
-            : `Gallery: bad/reject example — step ${d.stepNumber} (${stepName})`,
-          JSON.stringify({ drNumber: d.drNumber, filename: d.filename, stepNumber: d.stepNumber, stepName }),
-          isGood, // is_canonical
-          isGood ? 95 : 10, // priority
-        ],
-      );
+      if ((existing.rowCount ?? 0) > 0) {
+        await pool.query(
+          `UPDATE vlm_corrections SET
+             source_table = 'gallery',
+             vlm_extracted_value = $1, corrected_value = $2, error_pattern = $3,
+             correction_notes = $4, context_json = $5::jsonb,
+             is_canonical = $6, priority = $7
+           WHERE id = $8`,
+          [extractedValue, correctedValue, errorPattern, notes, contextJson, isGood, priority, existing.rows[0].id],
+        );
+      } else {
+        // `source_id` is UUID-typed and there is no gallery source row, so it
+        // stays NULL; the gallery origin is recorded in source_table + context.
+        await pool.query(
+          `INSERT INTO vlm_corrections (
+            module, analysis_type, source_table, photo_url,
+            vlm_extracted_value, corrected_value, error_pattern, correction_notes,
+            context_json, is_canonical, priority
+          ) VALUES (
+            'activate', 'photo_categorization', 'gallery', $1,
+            $2, $3, $4, $5, $6::jsonb, $7, $8
+          )`,
+          [d.url, extractedValue, correctedValue, errorPattern, notes, contextJson, isGood, priority],
+        );
+      }
 
       // Perceptual hash for relevance-based few-shot selection (best-effort:
       // a fetch/decode failure must not block curation — the backfill script
@@ -140,12 +152,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         log.warn('[SaveDecisions] Could not compute phash (will backfill later)', { url: d.url, error: String(err) }, 'PhotoGallery');
       }
 
-      // Visual few-shot pipeline.
+      // Visual few-shot pipeline. DO UPDATE (not DO NOTHING) so re-curating a
+      // photo flips its label (good<->bad) and refreshes confidence/phash — a
+      // stale DO NOTHING is why a changed/dome-joint decision appeared not to save.
       await pool.query(
         `INSERT INTO vlm_visual_photo_examples
            (step_number, photo_url, label, dr_number, filename, confidence, phash)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (photo_url) DO NOTHING`,
+         ON CONFLICT (photo_url) DO UPDATE SET
+           step_number = EXCLUDED.step_number,
+           label = EXCLUDED.label,
+           dr_number = EXCLUDED.dr_number,
+           filename = EXCLUDED.filename,
+           confidence = EXCLUDED.confidence,
+           phash = COALESCE(EXCLUDED.phash, vlm_visual_photo_examples.phash)`,
         [d.stepNumber, d.url, isGood ? 'positive' : 'negative', d.drNumber, d.filename, d.confidence, phash],
       );
 
