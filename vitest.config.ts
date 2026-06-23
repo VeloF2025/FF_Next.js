@@ -92,6 +92,10 @@ export default defineConfig({
       // @/lib/staff/* lives at src/lib/ (hrVisibilityFilters — Slice B HR-hiding
       // filters) — explicit src-first override before the @/lib → ./lib fallback.
       { find: /^@\/lib\/staff/, replacement: path.resolve(__dirname, './src/lib/staff') },
+      // @/lib/graph/* lives at src/lib/graph/ (Microsoft Graph auth + photo-url
+      // allowlist, used by photoFetchService for civil gallery photos) — explicit
+      // src-first override before the @/lib → ./lib fallback.
+      { find: /^@\/lib\/graph/, replacement: path.resolve(__dirname, './src/lib/graph') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },
