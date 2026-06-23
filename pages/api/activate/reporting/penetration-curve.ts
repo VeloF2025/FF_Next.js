@@ -120,6 +120,7 @@ async function handler(
             FROM drops d
             JOIN projects p ON p.id = d.project_id
             WHERE p.status = 'active'
+              AND d.status IS DISTINCT FROM 'retired'
               AND COALESCE(p.project_type, 'installation') != 'internal'
               AND EXISTS (
                 SELECT 1 FROM oes_activations oes2
@@ -145,6 +146,7 @@ async function handler(
               FROM drops d
               JOIN projects p ON p.id = d.project_id
               WHERE p.status = 'active'
+                AND d.status IS DISTINCT FROM 'retired'
                 AND COALESCE(p.project_type, 'installation') != 'internal'
               GROUP BY d.project_id
             )
@@ -188,6 +190,7 @@ async function handler(
             FROM drops d
             JOIN projects p ON p.id = d.project_id
             WHERE p.status = 'active'
+              AND d.status IS DISTINCT FROM 'retired'
               AND (
                 $1::text IS NULL
                 OR ($2::boolean = true AND d.project_id = $1::uuid)
@@ -220,6 +223,7 @@ async function handler(
               FROM drops d
               JOIN projects p ON p.id = d.project_id
               WHERE p.status = 'active'
+                AND d.status IS DISTINCT FROM 'retired'
                 AND (
                   $1::text IS NULL
                   OR ($2::boolean = true AND d.project_id = $1::uuid)
@@ -233,6 +237,7 @@ async function handler(
               FROM drops d
               JOIN projects p ON p.id = d.project_id
               WHERE p.status = 'active'
+                AND d.status IS DISTINCT FROM 'retired'
                 AND (
                   $1::text IS NULL
                   OR ($2::boolean = true AND d.project_id = $1::uuid)
@@ -289,6 +294,7 @@ async function handler(
             FROM drops d
             JOIN projects p ON p.id = d.project_id
             WHERE p.status = 'active'
+              AND d.status IS DISTINCT FROM 'retired'
               AND (
                 $1::text IS NULL
                 OR ($2::boolean = true AND d.project_id = $1::uuid)
@@ -322,6 +328,7 @@ async function handler(
               FROM drops d
               JOIN projects p ON p.id = d.project_id
               WHERE p.status = 'active'
+                AND d.status IS DISTINCT FROM 'retired'
                 AND (
                   $1::text IS NULL
                   OR ($2::boolean = true AND d.project_id = $1::uuid)
@@ -335,6 +342,7 @@ async function handler(
               FROM drops d
               JOIN projects p ON p.id = d.project_id
               WHERE p.status = 'active'
+                AND d.status IS DISTINCT FROM 'retired'
                 AND (
                   $1::text IS NULL
                   OR ($2::boolean = true AND d.project_id = $1::uuid)

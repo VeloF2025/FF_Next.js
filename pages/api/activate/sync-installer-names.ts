@@ -197,6 +197,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         COUNT(*) FILTER (WHERE installed_by_name IS NULL OR installed_by_name = '') as missing_installer
       FROM drops
       WHERE drop_number IS NOT NULL
+        AND status IS DISTINCT FROM 'retired'
     `);
 
     const stats = statsResult.rows[0];
