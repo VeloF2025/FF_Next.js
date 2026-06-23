@@ -9,6 +9,7 @@ import {
   buildCivilMessageContent,
   CIVIL_STEP_CRITERIA,
   CIVIL_QUALITY_STEPS,
+  CIVIL_FAIL_REASON_INSTRUCTION,
   type CivilStep,
 } from '../civilStepCriteria';
 import type { GalleryExamples, VlmContentPart } from '@/modules/activate/services/stepQualityCriteria';
@@ -73,8 +74,28 @@ describe('buildCivilMessageContent', () => {
     expect(imageUrls(content)).toContain('data:image/jpeg;base64,NEG1');
   });
 
-  it('embeds the exact fail_reason the VLM must echo', () => {
+  it('asks for a free-text fail_reason instead of forcing the canned per-step reason', () => {
     const { content } = buildCivilMessageContent(STEP, NEW_PHOTO);
-    expect(texts(content)).toContain(CIVIL_STEP_CRITERIA[STEP].failReason);
+    const t = texts(content);
+    // The technician should get the real reason, not the canned placeholder.
+    expect(t).toContain(CIVIL_FAIL_REASON_INSTRUCTION);
+    expect(t).not.toContain('the reason must be exactly');
+    expect(t).not.toContain(`"fail_reason": "${CIVIL_STEP_CRITERIA[STEP].failReason}"`);
+  });
+
+  it('crossStepClassification: prepends the wrong-subject taxonomy of all civil steps', () => {
+    const { content } = buildCivilMessageContent(STEP, NEW_PHOTO, undefined, {
+      crossStepClassification: true,
+    });
+    const t = texts(content);
+    expect(t).toContain('WRONG-SUBJECT CHECK');
+    // Names a sibling step's subject so the model can reclassify a misfiled photo.
+    expect(t).toContain(CIVIL_STEP_CRITERIA[7].label); // 'After Photo'
+    expect(t).toContain('ONLY DESCRIBE WHAT YOU CAN SEE');
+  });
+
+  it('omits the wrong-subject check when crossStepClassification is not set', () => {
+    const { content } = buildCivilMessageContent(STEP, NEW_PHOTO);
+    expect(texts(content)).not.toContain('WRONG-SUBJECT CHECK');
   });
 });

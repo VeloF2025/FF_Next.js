@@ -125,7 +125,12 @@ async function runVlmCheck(
 
   let content: unknown[];
   if (jobType === 'civils') {
-    const { content: c } = buildCivilMessageContent(step as CivilStep, photoBase64, galleryExamples);
+    // crossStepClassification: SiteCam live-capture only. Lets the VLM fail a
+    // misfiled civil photo with a reason naming what it actually shows (e.g. an
+    // After Photo sent to "Depth Photo") instead of the canned per-step reason.
+    const { content: c } = buildCivilMessageContent(step as CivilStep, photoBase64, galleryExamples, {
+      crossStepClassification: true,
+    });
     content = c;
   } else {
     // crossStepClassification: SiteCam live-capture only. Lets the VLM fail a
