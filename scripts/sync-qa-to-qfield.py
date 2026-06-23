@@ -112,6 +112,12 @@ FF_TO_QF_CIVIL_AUDIT = {
         "label_col": "label",
         "qa_comments_col": "Q/A Civil Comments",
         "qa_date_col": "Q/A Date",
+        # Verified against ETW POP 2 Site Audit 2026_cloud.qgs ValueMap 2026-06-23 —
+        # identical vocabulary to Mohadin. Pole layer has no "Q/A Failed" option
+        # (would need adding to the .qgs, same as Mohadin) for the rework poles.
+        "status_approved": "(ADMIN) Q/A Passed",
+        "status_failed": "Q/A Failed",
+        "status_planted_incomplete": "Pole Planted - Photos Incomplete",
     },
 }
 
