@@ -89,18 +89,54 @@ export const CIVIL_STEP_CRITERIA: Record<CivilStep, CivilStepCriteria> = {
 };
 
 /**
+ * Shared fail_reason instruction. Free-text (mirrors the activation builder's
+ * FAIL_REASON_INSTRUCTION) so the technician gets the real, specific reason a
+ * photo failed instead of the canned per-step sentence — the canned
+ * CIVIL_STEP_CRITERIA[step].failReason is kept only as the fallback the
+ * validate endpoint applies when the VLM returns no reason.
+ */
+export const CIVIL_FAIL_REASON_INSTRUCTION = `If it fails, fail_reason must be ONE short sentence (max 140 characters) written for the field technician: state what is wrong AND what to do to pass — for example "The hole is already filled — retake during active digging with the hole still open."`;
+
+/**
+ * Cross-step "wrong subject" instruction (opt-in via buildCivilMessageContent's
+ * `crossStepClassification` flag — SiteCam live-capture only). Mirrors the
+ * activation builder's buildCrossStepInstruction: listing every civil step's
+ * subject lets the model recognise a misfiled photo and name what it actually
+ * shows, instead of rationalising a misleading single-step reason. Folds in an
+ * anti-hallucination guard (describe only what is visible).
+ */
+export function buildCivilCrossStepInstruction(step: CivilStep): string {
+  const expected = CIVIL_STEP_CRITERIA[step].label;
+  const taxonomy = (CIVIL_QUALITY_STEPS as readonly CivilStep[])
+    .map((s) => `- ${CIVIL_STEP_CRITERIA[s].label}`)
+    .join('\n');
+  return `WRONG-SUBJECT CHECK (do this FIRST): a civil pole-installation photo shows one of these subjects:
+${taxonomy}
+This step expects "${expected}". Decide what the photo PRIMARILY shows. If it clearly shows one of the OTHER subjects above instead of "${expected}", FAIL and your fail_reason must name the subject it actually shows and that it belongs to a different step — e.g. "This is an After Photo, not a ${expected} — retake the ${expected} shot."
+
+ONLY DESCRIBE WHAT YOU CAN SEE: do not invent a hole, measuring tape, end-plate, spirit level, label or pole that is not clearly visible. If the required subject is simply absent, say what the photo actually shows rather than guessing why a feature is "unclear".`;
+}
+
+/**
  * Build the VLM message content for a civil step quality check.
  *
  * @param step - The civil step number (1–8)
  * @param newPhotoBase64 - Base64-encoded JPEG of the photo to evaluate
  * @param galleryExamples - Optional gallery-curated positive/negative examples
+ * @param opts.crossStepClassification - When true, prepend the wrong-subject /
+ *   anti-hallucination instruction so a misfiled photo fails with a reason that
+ *   names what it actually shows. Opt-in (SiteCam live-capture).
  */
 export function buildCivilMessageContent(
   step: CivilStep,
   newPhotoBase64: string,
-  galleryExamples?: GalleryExamples
+  galleryExamples?: GalleryExamples,
+  opts?: { crossStepClassification?: boolean }
 ): { content: VlmContentPart[] } {
   const criteria = CIVIL_STEP_CRITERIA[step];
+  const crossStep = opts?.crossStepClassification
+    ? `${buildCivilCrossStepInstruction(step)}\n\n`
+    : '';
   const content: VlmContentPart[] = [];
 
   const hasGallery =
@@ -112,7 +148,7 @@ export function buildCivilMessageContent(
       type: 'text',
       text: `You are performing a quality check on a photo classified as "${criteria.label}" for a civil pole installation.
 
-I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evaluate a NEW photo.`,
+${crossStep}I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evaluate a NEW photo.`,
     });
 
     if (galleryExamples.positiveBase64.length > 0) {
@@ -154,19 +190,19 @@ I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evalu
       text: `Required criteria: ${criteria.requirements}
 ${criteria.failInstruction}
 
-If it fails, the reason must be exactly: "${criteria.failReason}"
+${CIVIL_FAIL_REASON_INSTRUCTION}
 
 Return STRICT JSON only — no other text:
 {"passes": true, "fail_reason": null}
 OR
-{"passes": false, "fail_reason": "${criteria.failReason}"}`,
+{"passes": false, "fail_reason": "<one short sentence as instructed above>"}`,
     });
   } else {
     content.push({
       type: 'text',
       text: `You are performing a quality check on a photo classified as "${criteria.label}" for a civil pole installation.
 
-Required: ${criteria.requirements}
+${crossStep}Required: ${criteria.requirements}
 ${criteria.failInstruction}
 
 Evaluate this photo:`,
@@ -177,10 +213,12 @@ Evaluate this photo:`,
     });
     content.push({
       type: 'text',
-      text: `Return STRICT JSON only — no other text:
+      text: `${CIVIL_FAIL_REASON_INSTRUCTION}
+
+Return STRICT JSON only — no other text:
 {"passes": true, "fail_reason": null}
 OR
-{"passes": false, "fail_reason": "${criteria.failReason}"}`,
+{"passes": false, "fail_reason": "<one short sentence as instructed above>"}`,
     });
   }
 
