@@ -102,6 +102,7 @@ interface ProjectResponsePreview {
   reconcile: ProjectBundleResult['reconcile'];
   parseWarnings: string[];
   fatalError: string | null;
+  autoClose: { count: number; drs: string[] };
 }
 
 interface ProjectResponseImport extends ProjectResponsePreview {
@@ -179,13 +180,36 @@ async function handler(
 
     // ── PREVIEW ───────────────────────────────────────────────────────────
     if (action === 'preview') {
-      const previewRes = results.map((r) => toPreviewResponse(r));
+      const previewRes: ProjectResponsePreview[] = [];
+      for (const r of results) {
+        const base = toPreviewResponse(r);
+        let autoClose = { count: 0, drs: [] as string[] };
+        if (r.resolution.matched && r.resolution.project && r.summary) {
+          try {
+            const currentNote2or4Drs = new Set(
+              r.deductions
+                .filter((d) => d.note === 'note2' || d.note === 'note4')
+                .map((d) => d.drNumber),
+            );
+            const dry = await processOltDropoffClosures({
+              project: r.resolution.project.name,
+              weekEnding: r.summary.weekEnding,
+              currentNote2or4Drs,
+              notesPresent: r.files.some((f) => f.kind === 'notes-xlsx'),
+              dryRun: true,
+            });
+            autoClose = { count: dry.candidates.length, drs: dry.candidates.map((c) => c.dropNumber) };
+          } catch (err) {
+            logger.warn('OLT drop-off dry-run failed (preview continues)', {
+              project: r.resolution.project.name,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        previewRes.push({ ...base, autoClose });
+      }
       cleanupFiles(bundleFiles);
-      return res.status(200).json({
-        success: true,
-        action: 'preview',
-        projects: previewRes,
-      });
+      return res.status(200).json({ success: true, action: 'preview', projects: previewRes });
     }
 
     // ── IMPORT ────────────────────────────────────────────────────────────
@@ -227,6 +251,7 @@ function toPreviewResponse(r: ProjectBundleResult): ProjectResponsePreview {
     reconcile: r.reconcile,
     parseWarnings: r.parseWarnings,
     fatalError: r.fatalError,
+    autoClose: { count: 0, drs: [] },
   };
 }
 
