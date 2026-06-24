@@ -77,6 +77,7 @@ interface ProjectBundlePreview {
   reconcile: ReconcileResult | null;
   parseWarnings: string[];
   fatalError: string | null;
+  autoClose?: { count: number; drs: string[] };
 }
 
 interface ProjectBundleImport extends ProjectBundlePreview {
@@ -538,6 +539,22 @@ function ProjectResultCard({
           {row.reconcile.uptakeInstalled}
           {row.reconcile.delta !== 0 && ` (Δ${row.reconcile.delta})`}
         </div>
+      )}
+
+      {/* OLT investigate auto-clear (note2/note4 drop-off) */}
+      {row.autoClose && row.autoClose.count > 0 && (
+        <details className="text-xs">
+          <summary className="text-teal-300 cursor-pointer hover:text-teal-200 flex items-center gap-2">
+            <CheckCircle className="w-3.5 h-3.5" />
+            {row.autoClose.count} OLT investigate record{row.autoClose.count === 1 ? '' : 's'} will be
+            auto-cleared on import
+          </summary>
+          <ul className="mt-1 space-y-0.5 pl-4">
+            {row.autoClose.drs.map((dr) => (
+              <li key={dr} className="font-mono text-[var(--ff-text-tertiary)]">{dr}</li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {/* Fatal error */}
