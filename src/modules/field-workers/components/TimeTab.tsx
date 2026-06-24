@@ -5,7 +5,7 @@
  * - Status filter: all | pending | active.
  * - Loads getFieldAttendance(), groups rows by worker.
  * - "Add entry" → ManualEntryDialog.
- * - Each entry row → WorkerTimeRow (Fix time → AdjustTimeDialog).
+ * - Each worker's entries → WorkerGroupCard → WorkerTimeRow → AdjustTimeDialog.
  * - Corrections approve/reject deferred — link to /staff/attendance/corrections.
  */
 
@@ -14,7 +14,7 @@ import { AlertTriangle, Plus, ExternalLink } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { getFieldAttendance, type FieldAttendanceRow } from '../api';
 import { getCurrentSastWeek } from '../timeHelpers';
-import { WorkerTimeRow } from './WorkerTimeRow';
+import { WorkerGroupCard, type WorkerGroup } from './WorkerGroupCard';
 import { ManualEntryDialog } from './ManualEntryDialog';
 import { log } from '@/lib/logger';
 
@@ -25,15 +25,6 @@ const STATUS_OPTIONS: readonly { key: StatusFilter; label: string }[] = [
   { key: 'pending', label: 'Pending' },
   { key: 'active',  label: 'Active' },
 ];
-
-// ── Worker group (multiple entries per person per week) ───────────────────────
-
-interface WorkerGroup {
-  staff_id:   string;
-  staff_name: string;
-  role:       string;
-  rows:       FieldAttendanceRow[];
-}
 
 function groupByWorker(rows: FieldAttendanceRow[]): WorkerGroup[] {
   const map = new Map<string, WorkerGroup>();
@@ -52,8 +43,6 @@ function groupByWorker(rows: FieldAttendanceRow[]): WorkerGroup[] {
   }
   return Array.from(map.values());
 }
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export function TimeTab() {
   const defaultWeek = getCurrentSastWeek();
@@ -91,7 +80,6 @@ export function TimeTab() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Date range */}
         <div className="flex items-center gap-2">
           <input
             type="date"
@@ -135,7 +123,6 @@ export function TimeTab() {
           })}
         </nav>
 
-        {/* Add entry */}
         <button
           type="button"
           onClick={() => setShowManual(true)}
@@ -157,7 +144,6 @@ export function TimeTab() {
         </a>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="rounded border border-red-800 bg-red-950/30 p-3 text-sm text-red-200 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -165,55 +151,22 @@ export function TimeTab() {
         </div>
       )}
 
-      {/* Loading */}
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">
           <LoadingSpinner /> Loading…
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && rows !== null && groups.length === 0 && (
         <p className="text-neutral-500 text-sm py-8 text-center">
           No clock activity in range.
         </p>
       )}
 
-      {/* Worker groups */}
       {!loading && groups.map((group) => (
-        <div key={group.staff_id} className="border border-neutral-800 rounded overflow-x-auto">
-          {/* Group header */}
-          <div className="px-3 py-2 bg-neutral-900 border-b border-neutral-800 flex items-center gap-2">
-            <span className="font-medium text-neutral-100 text-sm">{group.staff_name}</span>
-            <span className="text-xs text-neutral-500 capitalize">{group.role}</span>
-          </div>
-
-          {/* Entries table */}
-          <table className="min-w-full text-sm">
-            <thead className="bg-neutral-900/60 text-neutral-400">
-              <tr>
-                <th className="text-left px-3 py-1.5 font-medium text-xs">Date</th>
-                <th className="text-left px-3 py-1.5 font-medium text-xs">Clock in</th>
-                <th className="text-left px-3 py-1.5 font-medium text-xs">Clock out</th>
-                <th className="text-left px-3 py-1.5 font-medium text-xs">Hours</th>
-                <th className="text-left px-3 py-1.5 font-medium text-xs">Status</th>
-                <th className="px-3 py-1.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {group.rows.map((row) => (
-                <WorkerTimeRow
-                  key={row.entry_id}
-                  row={row}
-                  onAdjusted={load}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <WorkerGroupCard key={group.staff_id} group={group} onAdjusted={load} />
       ))}
 
-      {/* Manual entry dialog */}
       {showManual && (
         <ManualEntryDialog
           allRows={rows ?? []}

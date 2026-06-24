@@ -215,6 +215,7 @@ describe('adjustEntry', () => {
       adjusted_clock_out_at: '2024-01-15T15:00:00Z',
       reason: 'Left site late',
       adjustment_kind: 'clock_out_correction',
+      entry_updated_at: '2024-01-15T14:00:00Z',
     };
     await adjustEntry(payload);
     expect(fetchedUrl()).toBe('/api/field/attendance-adjust');
@@ -224,7 +225,7 @@ describe('adjustEntry', () => {
 
   it('sets Content-Type: application/json', async () => {
     mockFetch({ success: true, data: {} });
-    await adjustEntry({ entry_id: 'e-1', reason: 'test', adjustment_kind: 'kind' });
+    await adjustEntry({ entry_id: 'e-1', reason: 'test', adjustment_kind: 'kind', entry_updated_at: '2024-01-15T14:00:00Z' });
     const headers = fetchedInit().headers as Record<string, string>;
     expect(headers['Content-Type']).toBe('application/json');
   });

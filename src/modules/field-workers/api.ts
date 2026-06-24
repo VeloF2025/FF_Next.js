@@ -81,7 +81,7 @@ export interface AdjustEntryPayload {
   reason: string;
   adjustment_kind: string;
   /** Optimistic-lock guard — ISO timestamp from FieldAttendanceRow.entry_updated_at. */
-  entry_updated_at?: string;
+  entry_updated_at: string;
 }
 
 export interface AddManualEntryPayload {
