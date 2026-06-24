@@ -31,7 +31,7 @@ import { log } from '@/lib/logger';
 import {
   withAuth,
   withPermission,
-  type AuthenticatedRequest,
+  type AuthenticatedNextApiRequest,
 } from '@/lib/auth/middleware';
 import {
   insertAdjustment,
@@ -59,7 +59,9 @@ function deriveAdjustmentKind(
   return 'wrong_clock_out_time';
 }
 
-async function handler(req: AuthenticatedRequest, res: NextApiResponse): Promise<void> {
+async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+  const actor = (req as AuthenticatedNextApiRequest).user?.id;
+
   if (req.method !== 'POST') {
     apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
     return;
@@ -132,7 +134,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse): Promise
 
     const adjustment = await insertAdjustment({
       entryId,
-      requestedBy: req.user.id,
+      requestedBy: actor ?? '',
       adjustmentKind,
       adjustedClockInAt: cin,
       adjustedClockOutAt: cout,
@@ -148,7 +150,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse): Promise
 
     const result = await applyApprovedAdjustmentTxn({
       adjustmentId: adjustment.id,
-      reviewerId: req.user.id,
+      reviewerId: actor ?? '',
       reviewNote: 'Admin direct adjust (Field Workers page)',
       entryId,
       entryUpdatedAt,
