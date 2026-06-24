@@ -38,6 +38,7 @@ import { fetchBillableProjects } from '@/modules/billing/services/resolveProject
 import { reconcileBillingWeek } from '@/modules/billing/services/reconcileBillingWeek';
 import { computeVerdictsForWeek } from '@/modules/billing/services/deductionVerdictService';
 import { processExpectedRecoveries } from '@/modules/billing/services/processExpectedRecoveries';
+import { processOltDropoffClosures } from '@/modules/billing/services/processOltDropoffClosures';
 import {
   logNonInvoiceableFlagged,
   type NoteCode,
@@ -101,6 +102,7 @@ interface ProjectResponsePreview {
   reconcile: ProjectBundleResult['reconcile'];
   parseWarnings: string[];
   fatalError: string | null;
+  autoClose: { count: number; drs: string[] };
 }
 
 interface ProjectResponseImport extends ProjectResponsePreview {
@@ -178,13 +180,36 @@ async function handler(
 
     // ── PREVIEW ───────────────────────────────────────────────────────────
     if (action === 'preview') {
-      const previewRes = results.map((r) => toPreviewResponse(r));
+      const previewRes: ProjectResponsePreview[] = [];
+      for (const r of results) {
+        const base = toPreviewResponse(r);
+        let autoClose = { count: 0, drs: [] as string[] };
+        if (r.resolution.matched && r.resolution.project && r.summary) {
+          try {
+            const currentNote2or4Drs = new Set(
+              r.deductions
+                .filter((d) => d.note === 'note2' || d.note === 'note4')
+                .map((d) => d.drNumber),
+            );
+            const dry = await processOltDropoffClosures({
+              project: r.resolution.project.name,
+              weekEnding: r.summary.weekEnding,
+              currentNote2or4Drs,
+              notesPresent: r.files.some((f) => f.kind === 'notes-xlsx'),
+              dryRun: true,
+            });
+            autoClose = { count: dry.candidates.length, drs: dry.candidates.map((c) => c.dropNumber) };
+          } catch (err) {
+            logger.warn('OLT drop-off dry-run failed (preview continues)', {
+              project: r.resolution.project.name,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        previewRes.push({ ...base, autoClose });
+      }
       cleanupFiles(bundleFiles);
-      return res.status(200).json({
-        success: true,
-        action: 'preview',
-        projects: previewRes,
-      });
+      return res.status(200).json({ success: true, action: 'preview', projects: previewRes });
     }
 
     // ── IMPORT ────────────────────────────────────────────────────────────
@@ -226,6 +251,7 @@ function toPreviewResponse(r: ProjectBundleResult): ProjectResponsePreview {
     reconcile: r.reconcile,
     parseWarnings: r.parseWarnings,
     fatalError: r.fatalError,
+    autoClose: { count: 0, drs: [] },
   };
 }
 
@@ -544,6 +570,37 @@ async function importProjectResult(
       }
     } catch (err) {
       logger.warn('Expected-recovery processing failed (row still imported)', {
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // ── Auto-clear OLT investigate records for note2/note4 drop-offs ─────────
+    // When FT stops flagging a DR under note2/note4, clear it from the OLT
+    // Investigate view + close its linked NOC ticket. Best-effort — a failure
+    // here never fails the import (the row is already persisted).
+    try {
+      const currentNote2or4Drs = new Set(
+        r.deductions
+          .filter((d) => d.note === 'note2' || d.note === 'note4')
+          .map((d) => d.drNumber),
+      );
+      const dropoff = await processOltDropoffClosures({
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        currentNote2or4Drs,
+        notesPresent: notesFilename != null,
+        dryRun: false,
+      });
+      logger.info('OLT note-dropoff auto-clear complete', {
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        closedTickets: dropoff.closedTickets,
+        resolvedRecords: dropoff.resolvedRecords,
+      });
+    } catch (err) {
+      logger.warn('OLT note-dropoff auto-clear failed (row still imported)', {
         project: canonicalName,
         weekEnding: summary.weekEnding,
         error: err instanceof Error ? err.message : String(err),
