@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { isSiteCamAuthorised } from '../sitecamAuth';
 
 describe('isSiteCamAuthorised', () => {
-  // SiteCam is intentionally open to every active authenticated portal user so
-  // managers and other staff can run on-the-ground testing without a role
-  // change. Restricting it again is a revert of the commit that opened it.
+  // SiteCam is intentionally open to every authenticated portal user — including
+  // pending self-registered field technicians, who capture installation photos
+  // from their first sign-in. Restricting it again is a revert of the commits
+  // that opened it (#2042 + the pending-access follow-up).
   it('authorises field staff (technician/supervisor)', () => {
     expect(isSiteCamAuthorised('technician', null)).toBe(true);
     expect(isSiteCamAuthorised('supervisor', null)).toBe(true);
@@ -26,8 +27,8 @@ describe('isSiteCamAuthorised', () => {
     expect(isSiteCamAuthorised(undefined, undefined, 'active')).toBe(true);
   });
 
-  it('does not authorise pending portal registrations', () => {
-    expect(isSiteCamAuthorised('technician', null, 'pending')).toBe(false);
-    expect(isSiteCamAuthorised('viewer', 'system', 'pending')).toBe(false);
+  it('authorises pending portal registrations (field techs capture on first sign-in)', () => {
+    expect(isSiteCamAuthorised('technician', null, 'pending')).toBe(true);
+    expect(isSiteCamAuthorised('viewer', 'system', 'pending')).toBe(true);
   });
 });
