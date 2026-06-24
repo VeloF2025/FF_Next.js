@@ -38,6 +38,7 @@ import { fetchBillableProjects } from '@/modules/billing/services/resolveProject
 import { reconcileBillingWeek } from '@/modules/billing/services/reconcileBillingWeek';
 import { computeVerdictsForWeek } from '@/modules/billing/services/deductionVerdictService';
 import { processExpectedRecoveries } from '@/modules/billing/services/processExpectedRecoveries';
+import { processOltDropoffClosures } from '@/modules/billing/services/processOltDropoffClosures';
 import {
   logNonInvoiceableFlagged,
   type NoteCode,
@@ -544,6 +545,37 @@ async function importProjectResult(
       }
     } catch (err) {
       logger.warn('Expected-recovery processing failed (row still imported)', {
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // ── Auto-clear OLT investigate records for note2/note4 drop-offs ─────────
+    // When FT stops flagging a DR under note2/note4, clear it from the OLT
+    // Investigate view + close its linked NOC ticket. Best-effort — a failure
+    // here never fails the import (the row is already persisted).
+    try {
+      const currentNote2or4Drs = new Set(
+        r.deductions
+          .filter((d) => d.note === 'note2' || d.note === 'note4')
+          .map((d) => d.drNumber),
+      );
+      const dropoff = await processOltDropoffClosures({
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        currentNote2or4Drs,
+        notesPresent: notesFilename != null,
+        dryRun: false,
+      });
+      logger.info('OLT note-dropoff auto-clear complete', {
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        closedTickets: dropoff.closedTickets,
+        resolvedRecords: dropoff.resolvedRecords,
+      });
+    } catch (err) {
+      logger.warn('OLT note-dropoff auto-clear failed (row still imported)', {
         project: canonicalName,
         weekEnding: summary.weekEnding,
         error: err instanceof Error ? err.message : String(err),
