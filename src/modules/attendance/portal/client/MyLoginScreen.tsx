@@ -18,7 +18,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Briefcase, HardHat, ArrowRight } from 'lucide-react';
 
 import { ApiError, login } from './api';
 import { useDeviceFingerprint } from './useDeviceFingerprint';
@@ -162,15 +162,15 @@ export function MyLoginScreen() {
       </form>
 
       {/*
-        Onboarding card shown on BOTH tabs. New staff often try the email tab
-        with their main FibreFlow password, hit the unified "Invalid
-        credentials" error (no enumeration oracle, by design), and have no
-        idea credentials must be created via the PIN/OTP flow first. This
-        card is the only first-time path — the verify-otp endpoint is what
-        creates the row in attendance_credentials. The previous text-link
-        treatment was missed by Lizelle and Zander on first try, so this
-        renders as a full-width bordered call-out below a divider so it
-        reads as a separate option, not buried hint text.
+        Two distinct first-time entry points. New users were landing on the
+        wrong flow: the employee PIN-setup (/my/onboard) only sends an OTP to a
+        number ALREADY on staff, while a brand-new field worker must self-
+        register first (/my/register, which creates the staff row AND sends the
+        OTP). When both were one prominent "First time signing in?" card plus a
+        buried text link, field workers picked the employee card and waited
+        forever for a code that never came. They now render as two equal-weight,
+        colour-coded cards (employee = blue, field worker = amber) so the two
+        audiences can tell them apart at a glance.
       */}
       <div className="relative my-6" role="separator">
         <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -178,41 +178,60 @@ export function MyLoginScreen() {
         </div>
         <div className="relative flex justify-center">
           <span className="bg-neutral-950 px-3 text-xs uppercase tracking-wider text-neutral-500">
-            New staff?
+            First time on FibreFlow?
           </span>
         </div>
       </div>
 
-      <Link
-        href="/my/onboard"
-        aria-label="Set up your account for the first time"
-        className="group flex items-center gap-3 w-full px-4 py-4 rounded-xl border-2 border-blue-500/40 bg-blue-950/20 hover:bg-blue-950/40 hover:border-blue-500/70 focus-visible:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-500/40 outline-none transition-colors"
-      >
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center">
-          <Sparkles className="w-5 h-5 text-blue-300" aria-hidden="true" />
-        </div>
-        <div className="flex-1 min-w-0 text-left">
-          <div className="text-sm font-semibold text-blue-200">
-            First time signing in?
+      <div className="space-y-3">
+        {/* Employee / already on staff → set up a PIN via WhatsApp (/my/onboard). */}
+        <Link
+          href="/my/onboard"
+          aria-label="Employee or staff member — set up your PIN for the first time"
+          className="group flex items-center gap-3 w-full px-4 py-4 rounded-xl border-2 border-blue-500/40 bg-blue-950/20 hover:bg-blue-950/40 hover:border-blue-500/70 focus-visible:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-500/40 outline-none transition-colors"
+        >
+          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center">
+            <Briefcase className="w-5 h-5 text-blue-300" aria-hidden="true" />
           </div>
-          <div className="text-xs text-blue-300/80 mt-0.5">
-            {method === 'pin'
-              ? 'Set up your 6-digit PIN via WhatsApp.'
-              : "We'll send a setup code to your WhatsApp."}
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-sm font-semibold text-blue-200">
+              Employee / on staff
+            </div>
+            <div className="text-xs text-blue-300/80 mt-0.5">
+              {method === 'pin'
+                ? 'Set up your 6-digit PIN via WhatsApp.'
+                : "We'll send a setup code to your WhatsApp."}
+            </div>
           </div>
-        </div>
-        <ArrowRight
-          className="flex-shrink-0 w-5 h-5 text-blue-300 group-hover:translate-x-0.5 transition-transform"
-          aria-hidden="true"
-        />
-      </Link>
+          <ArrowRight
+            className="flex-shrink-0 w-5 h-5 text-blue-300 group-hover:translate-x-0.5 transition-transform"
+            aria-hidden="true"
+          />
+        </Link>
 
-      <Link
-        href="/my/register"
-        className="mt-3 block text-center text-sm text-blue-400 hover:text-blue-300"
-      >
-        New field worker? Register here
-      </Link>
+        {/* New field worker / contractor → self-register (creates record + sends OTP). */}
+        <Link
+          href="/my/register"
+          aria-label="New field worker — register here"
+          className="group flex items-center gap-3 w-full px-4 py-4 rounded-xl border-2 border-amber-500/40 bg-amber-950/20 hover:bg-amber-950/40 hover:border-amber-500/70 focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-500/40 outline-none transition-colors"
+        >
+          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-600/20 border border-amber-500/40 flex items-center justify-center">
+            <HardHat className="w-5 h-5 text-amber-300" aria-hidden="true" />
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-sm font-semibold text-amber-200">
+              Field worker
+            </div>
+            <div className="text-xs text-amber-300/80 mt-0.5">
+              New here? Register as a field worker.
+            </div>
+          </div>
+          <ArrowRight
+            className="flex-shrink-0 w-5 h-5 text-amber-300 group-hover:translate-x-0.5 transition-transform"
+            aria-hidden="true"
+          />
+        </Link>
+      </div>
     </MyPortalShell>
   );
 }
