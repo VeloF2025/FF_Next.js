@@ -230,37 +230,49 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
 
     if (role && accountStatus) {
       rows = await sql`
-        SELECT id, first_name, last_name, phone, email, role, account_status,
-               created_by_staff_id, created_at
-        FROM staff
-        WHERE role = ${role} AND account_status = ${accountStatus}
-        ORDER BY created_at DESC
+        SELECT s.id, s.first_name, s.last_name, s.phone, s.email, s.role, s.account_status,
+               s.created_by_staff_id, s.created_at,
+               s.source, s.declared_project_id,
+               p.project_name AS declared_project_name
+        FROM staff s
+        LEFT JOIN projects p ON p.id = s.declared_project_id
+        WHERE s.role = ${role} AND s.account_status = ${accountStatus}
+        ORDER BY s.created_at DESC
         LIMIT 200
       `;
     } else if (role) {
       rows = await sql`
-        SELECT id, first_name, last_name, phone, email, role, account_status,
-               created_by_staff_id, created_at
-        FROM staff
-        WHERE role = ${role}
-        ORDER BY created_at DESC
+        SELECT s.id, s.first_name, s.last_name, s.phone, s.email, s.role, s.account_status,
+               s.created_by_staff_id, s.created_at,
+               s.source, s.declared_project_id,
+               p.project_name AS declared_project_name
+        FROM staff s
+        LEFT JOIN projects p ON p.id = s.declared_project_id
+        WHERE s.role = ${role}
+        ORDER BY s.created_at DESC
         LIMIT 200
       `;
     } else if (accountStatus) {
       rows = await sql`
-        SELECT id, first_name, last_name, phone, email, role, account_status,
-               created_by_staff_id, created_at
-        FROM staff
-        WHERE account_status = ${accountStatus}
-        ORDER BY created_at DESC
+        SELECT s.id, s.first_name, s.last_name, s.phone, s.email, s.role, s.account_status,
+               s.created_by_staff_id, s.created_at,
+               s.source, s.declared_project_id,
+               p.project_name AS declared_project_name
+        FROM staff s
+        LEFT JOIN projects p ON p.id = s.declared_project_id
+        WHERE s.account_status = ${accountStatus}
+        ORDER BY s.created_at DESC
         LIMIT 200
       `;
     } else {
       rows = await sql`
-        SELECT id, first_name, last_name, phone, email, role, account_status,
-               created_by_staff_id, created_at
-        FROM staff
-        ORDER BY created_at DESC
+        SELECT s.id, s.first_name, s.last_name, s.phone, s.email, s.role, s.account_status,
+               s.created_by_staff_id, s.created_at,
+               s.source, s.declared_project_id,
+               p.project_name AS declared_project_name
+        FROM staff s
+        LEFT JOIN projects p ON p.id = s.declared_project_id
+        ORDER BY s.created_at DESC
         LIMIT 200
       `;
     }
