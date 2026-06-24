@@ -13,6 +13,7 @@ import {
   Activity,
   Receipt,
   FileText,
+  HardHat,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -85,6 +86,13 @@ export const staffConfig: ModuleNavigationConfig = {
       icon: Upload,
       path: '/staff/import',
       rbacKey: 'people.staff.import',
+    },
+    {
+      id: 'field-workers',
+      label: 'Field Workers',
+      icon: HardHat,
+      path: '/field',
+      rbacKey: 'people.staff.attendance.manage',
     },
   ],
 };
