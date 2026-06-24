@@ -1,0 +1,22 @@
+-- Migration 423: track per-GPKG pending (not-yet-uploaded) photo count so the GPKG
+-- extractor re-scans a GPKG whose photo binaries are still arriving.
+-- (version = max(DB 422, file 422) + 1.)
+--
+-- scripts/extract-gpkg-photos.py skips a whole GPKG when its version is unchanged since
+-- the last run (delta optimisation keyed on qfield_gpkg_sync_state). Technicians routinely
+-- sync the GPKG — which records photo *filenames* in its attribute columns — BEFORE the
+-- photo binaries finish uploading to QFieldCloud. Those binaries land after the GPKG
+-- version froze, so the delta-skip means they are never re-scanned and never ingested:
+-- the photos stay invisible in Works QA until the next GPKG re-upload. The skip path also
+-- writes no row, so recheck-pending-uploads.py (built for exactly this lag) has nothing to
+-- promote. Observed live on MOA Zone 11 PON 151 (poles D515-D518) and as 159 already-
+-- uploaded-but-uningested photos across Tonga / Mamelodi / Etwatwa.
+--
+-- pending_count stores how many photo references were skipped as not-yet-uploaded on the
+-- last run. The extractor re-scans (ignores the version delta) whenever pending_count > 0,
+-- so late-arriving binaries are picked up on the next cron run. Idempotent: the extractor
+-- dedups by photo_key, so re-scans never create duplicates. Default 0 leaves every
+-- existing row in the "already fully processed" state — a one-off `--force` run is what
+-- seeds non-zero counts (and recovers the existing backlog).
+ALTER TABLE qfield_gpkg_sync_state
+  ADD COLUMN IF NOT EXISTS pending_count integer NOT NULL DEFAULT 0;
