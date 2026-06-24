@@ -5,6 +5,13 @@ export interface SiteCamStep {
   hasSerialScan: boolean;
   serialLabel?: string;
   serialDevice?: 'ont' | 'ups';
+  /**
+   * When true, the capture screen offers a gallery "Upload Photo" button
+   * alongside "Take Photo". Reserved for photos legitimately captured outside
+   * the SiteCam camera (signature, dome-joint shots); every other step is
+   * camera-only to preserve the live-capture / anti-reuse guarantee.
+   */
+  allowUpload?: boolean;
 }
 
 export const ACTIVATION_STEPS: readonly SiteCamStep[] = [
@@ -22,9 +29,9 @@ export const ACTIVATION_STEPS: readonly SiteCamStep[] = [
   // step — pass advances, fail shows the reason.
   { number: 8,  label: 'Final Installation',        hasVlm: true,  hasSerialScan: false },
   { number: 9,  label: 'Green Lights on ONT',       hasVlm: true,  hasSerialScan: false },
-  { number: 10, label: 'Signature',                 hasVlm: true,  hasSerialScan: false },
-  { number: 11, label: 'Dome Joint Open',           hasVlm: true,  hasSerialScan: false },
-  { number: 12, label: 'Dome Joint Closed',         hasVlm: true,  hasSerialScan: false },
+  { number: 10, label: 'Signature',                 hasVlm: true,  hasSerialScan: false, allowUpload: true },
+  { number: 11, label: 'Dome Joint Open',           hasVlm: true,  hasSerialScan: false, allowUpload: true },
+  { number: 12, label: 'Dome Joint Closed',         hasVlm: true,  hasSerialScan: false, allowUpload: true },
 ];
 
 export const CIVIL_STEPS: readonly SiteCamStep[] = [

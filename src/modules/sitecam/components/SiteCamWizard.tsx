@@ -98,6 +98,11 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
           <StepCapture
             step={currentStep}
             drNumber={siteInfo.siteId}
+            // Read the upload permission from the canonical step config (not the
+            // restored draft) so it survives a mid-job deploy that changed it.
+            allowUpload={
+              steps.find((s) => s.number === currentStep.stepNumber)?.allowUpload ?? false
+            }
             onCapture={(f) => void captureAndValidate(f)}
             onSerialSaved={handleSerialSaved}
             onSkipSerial={skipSerialStep}
