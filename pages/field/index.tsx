@@ -13,6 +13,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/auth.types';
 import { ApprovalsTab } from '@/modules/field-workers/components/ApprovalsTab';
+import { TimeTab } from '@/modules/field-workers/components/TimeTab';
 
 type Tab = 'approvals' | 'time';
 
@@ -71,9 +72,7 @@ export default function FieldWorkersPage() {
 
         {activeTab === 'time' && (
           <div role="tabpanel" aria-label="Time">
-            <p className="text-neutral-500 text-sm py-6 text-center">
-              Time & attendance view — coming in Task 5.
-            </p>
+            <TimeTab />
           </div>
         )}
       </div>

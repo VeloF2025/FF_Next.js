@@ -80,6 +80,8 @@ export interface AdjustEntryPayload {
   adjusted_site_geofence_id?: string | null;
   reason: string;
   adjustment_kind: string;
+  /** Optimistic-lock guard — ISO timestamp from FieldAttendanceRow.entry_updated_at. */
+  entry_updated_at?: string;
 }
 
 export interface AddManualEntryPayload {
