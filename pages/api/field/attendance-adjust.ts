@@ -18,6 +18,7 @@
  *
  * Returns 200 { data: { adjustment } } on success.
  * Returns 400 on validation failures.
+ * Returns 401 when the request is unauthenticated.
  * Returns 404 when the entry doesn't exist.
  * Returns 409 when the week is locked, or when the optimistic lock loses a race
  *         (entry_changed / adjustment_not_pending from the txn).
@@ -46,21 +47,24 @@ import { sql } from '@/lib/db-pool';
 
 /**
  * Derives the AdjustmentKind from which timestamps are being corrected.
- * Mirrors the logic the /my portal uses for worker-initiated corrections
- * (wrong_clock_in_time / wrong_clock_out_time), with wrong_clock_in_time
- * taking precedence when both are being adjusted.
+ * When BOTH times are corrected, records 'wrong_clock_in_time' as the kind —
+ * this is a label only; the txn still applies both adjusted timestamps to the entry.
  */
 function deriveAdjustmentKind(
   cin: Date | null,
   cout: Date | null
 ): AdjustmentKind {
-  if (cin && cout) return 'wrong_clock_in_time';
   if (cin) return 'wrong_clock_in_time';
   return 'wrong_clock_out_time';
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+  // Mirrors attendance-manual-entry.ts:49–52: guard missing user before any logic.
   const actor = (req as AuthenticatedNextApiRequest).user?.id;
+  if (!actor) {
+    apiResponse.unauthorized(res);
+    return;
+  }
 
   if (req.method !== 'POST') {
     apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
@@ -71,10 +75,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const entryId = typeof b.entry_id === 'string' ? b.entry_id : '';
   const entryUpdatedAt = typeof b.entry_updated_at === 'string' ? b.entry_updated_at : '';
   const reason = typeof b.reason === 'string' ? b.reason.trim() : '';
-  const cin = b.adjusted_clock_in_at ? new Date(b.adjusted_clock_in_at as string) : null;
-  const cout = b.adjusted_clock_out_at ? new Date(b.adjusted_clock_out_at as string) : null;
 
-  // ── Input validation ────────────────────────────────────────────────────────
+  // Parse optional timestamps — validate immediately after parsing.
+  const cinRaw = b.adjusted_clock_in_at;
+  const coutRaw = b.adjusted_clock_out_at;
+  const cin = cinRaw ? new Date(cinRaw as string) : null;
+  const cout = coutRaw ? new Date(coutRaw as string) : null;
+
+  // ── Input validation ──────────────────────────────────────────────────────
 
   if (!entryId || !entryUpdatedAt) {
     apiResponse.badRequest(res, 'entry_id and entry_updated_at are required');
@@ -91,9 +99,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     );
     return;
   }
+  // Validate parsed dates — new Date('not-a-date') yields Invalid Date whose
+  // .toISOString() throws a TypeError, producing a 500 instead of a clean 400.
+  if (cin && Number.isNaN(cin.getTime())) {
+    apiResponse.badRequest(res, 'adjusted_clock_in_at must be a valid ISO timestamp');
+    return;
+  }
+  if (cout && Number.isNaN(cout.getTime())) {
+    apiResponse.badRequest(res, 'adjusted_clock_out_at must be a valid ISO timestamp');
+    return;
+  }
 
   try {
-    // ── Entry lookup ──────────────────────────────────────────────────────────
+    // ── Entry lookup ────────────────────────────────────────────────────────
 
     const rows = await sql<{
       staff_id: string;
@@ -113,7 +131,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       return;
     }
 
-    // ── Payroll-week lock check ───────────────────────────────────────────────
+    // ── Payroll-week lock check ─────────────────────────────────────────────
     // Mirrors the check in pages/api/staff/attendance-manual-entry.ts:109–116.
     // A locked week must not receive new adjustments — the payroll has already
     // been exported and any mutation would silently diverge from the export.
@@ -128,13 +146,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       return;
     }
 
-    // ── Insert adjustment (pending) ───────────────────────────────────────────
+    // ── Insert adjustment (pending) ─────────────────────────────────────────
 
     const adjustmentKind = deriveAdjustmentKind(cin, cout);
 
     const adjustment = await insertAdjustment({
       entryId,
-      requestedBy: actor ?? '',
+      requestedBy: actor,
       adjustmentKind,
       adjustedClockInAt: cin,
       adjustedClockOutAt: cout,
@@ -142,7 +160,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       reason,
     });
 
-    // ── Apply atomically through the audited transaction ──────────────────────
+    // ── Apply atomically through the audited transaction ────────────────────
     // The txn transitions the adjustment → 'approved', applies the corrected
     // timestamps to the entry using optimistic-lock on entry.updated_at, and
     // deletes the daily summary so the reconcile cron recomputes. If the
@@ -150,7 +168,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     const result = await applyApprovedAdjustmentTxn({
       adjustmentId: adjustment.id,
-      reviewerId: actor ?? '',
+      reviewerId: actor,
       reviewNote: 'Admin direct adjust (Field Workers page)',
       entryId,
       entryUpdatedAt,
