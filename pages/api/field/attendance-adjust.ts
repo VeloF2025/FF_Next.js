@@ -52,7 +52,7 @@ import { sql } from '@/lib/db-pool';
  */
 function deriveAdjustmentKind(
   cin: Date | null,
-  cout: Date | null
+  _cout: Date | null
 ): AdjustmentKind {
   if (cin) return 'wrong_clock_in_time';
   return 'wrong_clock_out_time';
