@@ -7,13 +7,24 @@
 export const SITECAM_ROLES: ReadonlyArray<string> = ['technician', 'supervisor'];
 
 /**
- * SiteCam is available to field staff (technician/supervisor) and to the
- * privileged auth roles (super_admin/system) that see every operational tile.
+ * SiteCam is currently open to every ACTIVE authenticated portal user so
+ * managers and other staff can run on-the-ground testing without a per-user
+ * role change. Pending portal registrations stay limited to Clock until an
+ * admin activates them.
+ *
+ * To restore the original field-staff gate (technician/supervisor + the
+ * privileged super_admin/system auth roles), replace the body with:
+ *
+ *   if (authRole === 'super_admin' || authRole === 'system') return true;
+ *   return SITECAM_ROLES.includes(role ?? '');
+ *
+ * and rename the params back to `role` / `authRole`.
  */
 export function isSiteCamAuthorised(
-  role: string | null | undefined,
-  authRole: string | null | undefined,
+  _role: string | null | undefined,
+  _authRole: string | null | undefined,
+  accountStatus?: string | null,
 ): boolean {
-  if (authRole === 'super_admin' || authRole === 'system') return true;
-  return SITECAM_ROLES.includes(role ?? '');
+  if (accountStatus === 'pending') return false;
+  return true;
 }

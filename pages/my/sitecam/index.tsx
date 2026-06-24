@@ -2,7 +2,7 @@
  * /my/sitecam — SiteCam entry page.
  *
  * Thin session shell: loads the portal session and role-gates to
- * technicians, supervisors, super_admin, and system accounts.
+ * active authenticated portal users.
  * Renders SiteCamEntry once authorised.
  *
  * Session is checked client-side so SSR renders a cacheable loading
@@ -51,7 +51,7 @@ const SiteCamIndexPage: NextPage & {
         }
         setProfile(res.profile);
         setState(
-          isSiteCamAuthorised(res.profile.role, res.profile.authRole)
+          isSiteCamAuthorised(res.profile.role, res.profile.authRole, res.profile.accountStatus)
             ? 'authorised'
             : 'unauthorised',
         );
@@ -111,7 +111,7 @@ const SiteCamIndexPage: NextPage & {
           <AlertCircle className="w-12 h-12 text-neutral-600" aria-hidden="true" />
           <h1 className="text-lg font-semibold text-neutral-200">Not authorised</h1>
           <p className="text-sm text-neutral-400 max-w-xs">
-            SiteCam is only available to technicians, supervisors, and administrators.
+            SiteCam is only available to active portal accounts while testing is open.
           </p>
           <button
             type="button"

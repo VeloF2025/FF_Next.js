@@ -20,10 +20,10 @@ import { useRouter } from 'next/router';
 import { History as HistoryIcon, AlertCircle } from 'lucide-react';
 
 import { getHubSummary, requestFleetHandoff } from './api';
-import type { AttendanceProfile, HubSummaryResponse, StaffRole } from './api';
+import type { AccountStatus, AttendanceProfile, HubSummaryResponse, StaffRole } from './api';
 import { MyPortalShell } from './MyPortalShell';
 import { InstallPrompt } from './InstallPrompt';
-import { isStoresAuthorised, STORES_AUTH_ROLES } from '@/modules/field-stock-pwa/lib/storesRoles';
+import { isStoresAuthorised } from '@/modules/field-stock-pwa/lib/storesRoles';
 import {
   ClockTile,
   VehicleTile,
@@ -36,17 +36,18 @@ import {
 
 type HubSummary = HubSummaryResponse;
 
-/** Staff roles whose holders capture installation photos via SiteCam. */
-const SITECAM_ROLES: ReadonlyArray<StaffRole> = ['technician', 'supervisor'];
-
 /**
- * SiteCam is visible to field staff (technician/supervisor) and to the
- * privileged auth roles that already see every operational tile
- * (super_admin/system, shared with the Stores gate).
+ * SiteCam is currently shown to every ACTIVE signed-in staff member so managers
+ * and other staff can run on-the-ground testing without a per-user role change.
+ * The matching page gate lives in sitecam/lib/sitecamAuth.isSiteCamAuthorised.
+ *
+ * To restore the original field-staff gate (technician/supervisor staff roles
+ * plus the privileged super_admin/system auth roles), revert this commit — it
+ * brings back both this function and isSiteCamAuthorised together.
  */
-function canSeeSiteCam(role: StaffRole | null, authRole: string | null): boolean {
-  if (role !== null && SITECAM_ROLES.includes(role)) return true;
-  return authRole !== null && (STORES_AUTH_ROLES as ReadonlyArray<string>).includes(authRole);
+function canSeeSiteCam(_role: StaffRole | null, _authRole: string | null, accountStatus: AccountStatus): boolean {
+  if (accountStatus === 'pending') return false;
+  return true;
 }
 
 interface MyHubProps {
@@ -150,7 +151,7 @@ export function MyHub({ profile }: MyHubProps) {
           {isStoresAuthorised(profile.role, profile.authRole) && (
             <StoresTile onClick={() => router.push('/my/stores')} />
           )}
-          {canSeeSiteCam(profile.role, profile.authRole) && (
+          {canSeeSiteCam(profile.role, profile.authRole, profile.accountStatus) && (
             <SiteCamTile onClick={() => router.push('/my/sitecam')} />
           )}
         </div>

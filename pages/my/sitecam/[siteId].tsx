@@ -53,10 +53,10 @@ const SiteCamWizardPage: NextPage & {
           setIsGuest(true);
           return;
         }
-        // Role-gate the wizard deep-link just like the entry page — an
-        // authenticated user without a SiteCam role must not reach the
-        // capture/submit flow by navigating straight to /my/sitecam/:id.
-        if (!isSiteCamAuthorised(res.profile.role, res.profile.authRole)) {
+        // Gate the wizard deep-link just like the entry page — pending accounts
+        // must not reach the capture/submit flow by navigating straight to
+        // /my/sitecam/:id.
+        if (!isSiteCamAuthorised(res.profile.role, res.profile.authRole, res.profile.accountStatus)) {
           setProfile(res.profile);
           setIsUnauthorised(true);
           return;
@@ -116,7 +116,7 @@ const SiteCamWizardPage: NextPage & {
     );
   }
 
-  // Authenticated but lacks a SiteCam role
+  // Authenticated but blocked by SiteCam account policy
   if (isUnauthorised) {
     return (
       <MyPortalShell title="SiteCam" staffName={profile?.name} showFooterNav={false}>
