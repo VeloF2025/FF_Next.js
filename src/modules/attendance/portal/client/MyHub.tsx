@@ -37,16 +37,16 @@ import {
 type HubSummary = HubSummaryResponse;
 
 /**
- * SiteCam is currently shown to every ACTIVE signed-in staff member so managers
- * and other staff can run on-the-ground testing without a per-user role change.
- * The matching page gate lives in sitecam/lib/sitecamAuth.isSiteCamAuthorised.
+ * SiteCam is shown to every signed-in portal user — including pending,
+ * self-registered field technicians, who must be able to capture installation
+ * photos in the field from their very first sign-in, before an admin activates
+ * them. The matching page gate lives in sitecam/lib/sitecamAuth.isSiteCamAuthorised.
  *
  * To restore the original field-staff gate (technician/supervisor staff roles
- * plus the privileged super_admin/system auth roles), revert this commit — it
- * brings back both this function and isSiteCamAuthorised together.
+ * plus the privileged super_admin/system auth roles), revert this commit and
+ * #2042 — together they bring back both this function and isSiteCamAuthorised.
  */
-function canSeeSiteCam(_role: StaffRole | null, _authRole: string | null, accountStatus: AccountStatus): boolean {
-  if (accountStatus === 'pending') return false;
+function canSeeSiteCam(_role: StaffRole | null, _authRole: string | null, _accountStatus: AccountStatus): boolean {
   return true;
 }
 
@@ -130,8 +130,11 @@ export function MyHub({ profile }: MyHubProps) {
       )}
 
       {isPending ? (
-        <div className="grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <ClockTile summary={summary} onClick={() => router.push('/my/attendance')} />
+          {canSeeSiteCam(profile.role, profile.authRole, profile.accountStatus) && (
+            <SiteCamTile onClick={() => router.push('/my/sitecam')} />
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
