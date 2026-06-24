@@ -187,6 +187,29 @@ def is_photo_value(val):
     return any(ext in s.lower() for ext in [".jpg", ".jpeg", ".png", ".heic"])
 
 
+# Keep re-scanning a same-version GPKG while it has pending (not-yet-uploaded) photos, but
+# stop once the GPKG is this old — photos still missing after this many days are treated as
+# never-coming. Mirrors recheck-pending-uploads.py's MISSING_THRESHOLD_DAYS so a
+# permanently-stuck GPKG doesn't force a full re-scan on every cron run forever.
+PENDING_RESCAN_MAX_AGE_DAYS = 7
+
+
+def _gpkg_version_age_days(version):
+    """Age in whole days of a QFieldCloud GPKG version like 'v20260624102601-abcd1234'.
+
+    The leading 14 digits are a YYYYMMDDHHMMSS UTC timestamp. Returns None when the
+    timestamp can't be parsed — callers then favour re-scanning (correctness over the
+    re-scan-cost optimisation)."""
+    m = re.match(r"v(\d{14})", version or "")
+    if not m:
+        return None
+    try:
+        ts = datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return (datetime.now(timezone.utc) - ts).days
+
+
 # ── PON/zone sync ─────────────────────────────────────────────────────────────
 
 def sync_pon_zone(cur, conn, ff_project_id, rows, columns, label_col):
@@ -494,10 +517,15 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
     print(f"  QField: {qf_id}")
     print(f"  GPKG:   {config['gpkg_path']}")
 
-    # Check delta — skip if GPKG version unchanged
+    # Check delta — skip if GPKG version unchanged AND nothing was left pending last run.
+    # pending_count = photos referenced by the GPKG whose binary had not yet uploaded to
+    # MinIO on the previous run. Those binaries arrive asynchronously (technicians sync the
+    # GPKG before all photos finish uploading), so a GPKG with outstanding pending photos
+    # must be re-scanned even when its version is unchanged — otherwise the late binaries
+    # are never ingested until the next GPKG re-upload. See migration 423.
     if not force:
         cur.execute(
-            "SELECT last_version FROM qfield_gpkg_sync_state WHERE qf_project_id = %s AND gpkg_path = %s",
+            "SELECT last_version, pending_count FROM qfield_gpkg_sync_state WHERE qf_project_id = %s AND gpkg_path = %s",
             (qf_id, config["gpkg_path"]),
         )
         state = cur.fetchone()
@@ -518,8 +546,22 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
 
         # Delta check
         if state and state["last_version"] == version and not force:
-            print(f"  SKIP: Already processed this version")
-            return 0, 0
+            pending = state.get("pending_count") or 0
+            # Re-scan an unchanged GPKG only while it still has pending photos AND the GPKG
+            # is recent. Photos still missing PENDING_RESCAN_MAX_AGE_DAYS after the GPKG was
+            # uploaded are treated as never-coming (mirrors recheck-pending-uploads.py's
+            # MISSING_THRESHOLD_DAYS), so a permanently-stuck GPKG stops being re-scanned
+            # every run. A fresh GPKG upload (new version) restarts the window; an operator
+            # can always --force to override.
+            version_age = _gpkg_version_age_days(version)
+            stale = version_age is not None and version_age > PENDING_RESCAN_MAX_AGE_DAYS
+            if pending == 0 or stale:
+                reason = ("Already processed this version" if pending == 0
+                          else f"{pending} still pending but GPKG is {version_age}d old "
+                               f"(>{PENDING_RESCAN_MAX_AGE_DAYS}d) — giving up")
+                print(f"  SKIP: {reason}")
+                return 0, 0
+            print(f"  RE-SCAN: same version but {pending} photo(s) were pending upload last run")
 
         # Open GPKG
         db = sqlite3.connect(tmp_path)
@@ -772,15 +814,19 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                 print(f"  PON/zone: {reviews_updated} reviews updated")
 
         if not dry_run:
-            # Update sync state
+            # Update sync state. pending_count records how many photo references were
+            # skipped this run because their binary is not yet in MinIO — so the next run
+            # re-scans this GPKG (see the delta check above) and ingests them once they
+            # finish uploading, without waiting for a GPKG re-upload.
             cur.execute("""
-                INSERT INTO qfield_gpkg_sync_state (qf_project_id, gpkg_path, last_version, last_synced_at, row_count)
-                VALUES (%s::uuid, %s, %s, NOW(), %s)
+                INSERT INTO qfield_gpkg_sync_state (qf_project_id, gpkg_path, last_version, last_synced_at, row_count, pending_count)
+                VALUES (%s::uuid, %s, %s, NOW(), %s, %s)
                 ON CONFLICT (qf_project_id, gpkg_path) DO UPDATE SET
                     last_version = EXCLUDED.last_version,
                     last_synced_at = NOW(),
-                    row_count = EXCLUDED.row_count
-            """, (qf_id, config["gpkg_path"], version, len(rows)))
+                    row_count = EXCLUDED.row_count,
+                    pending_count = EXCLUDED.pending_count
+            """, (qf_id, config["gpkg_path"], version, len(rows), photos_skipped_missing))
             conn.commit()
 
         print(f"  Photos found: {photos_found}, New upserted: {photos_upserted}, Skipped (no MinIO): {photos_skipped_missing}")
