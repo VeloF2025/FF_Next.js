@@ -79,7 +79,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     //   - no `approvedAccountPredicate`
     //   - `role IN ('technician','casual')` is the only staff filter beyond dates.
 
-    // 🟢 WORKING: SqlRow = Record<string,unknown>; we cast after the query
+    // WORKING: SqlRow = Record<string,unknown>; we cast after the query
     //   rather than using the generic parameter (which requires the target type
     //   to satisfy the index-signature constraint strictly).
     let rows: FieldAttendanceRow[];
@@ -104,7 +104,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
             ELSE ROUND(
               EXTRACT(EPOCH FROM (e.clock_out_at - e.clock_in_at)) / 3600.0,
               2
-            )
+            )::float
           END                                                             AS hours
         FROM attendance_entries e
         JOIN staff s ON s.id = e.staff_id
@@ -134,7 +134,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
             ELSE ROUND(
               EXTRACT(EPOCH FROM (e.clock_out_at - e.clock_in_at)) / 3600.0,
               2
-            )
+            )::float
           END                                                             AS hours
         FROM attendance_entries e
         JOIN staff s ON s.id = e.staff_id
@@ -165,7 +165,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
             ELSE ROUND(
               EXTRACT(EPOCH FROM (e.clock_out_at - e.clock_in_at)) / 3600.0,
               2
-            )
+            )::float
           END                                                             AS hours
         FROM attendance_entries e
         JOIN staff s ON s.id = e.staff_id

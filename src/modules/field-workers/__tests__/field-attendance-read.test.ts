@@ -177,13 +177,30 @@ describe('GET /api/field/attendance', () => {
     expect(mocks.sql).toHaveBeenCalledOnce();
     const queryText = capturedSql();
 
-    // (b) Role filter must be present
+    // (b) Role filter must be present — restricted to field-worker roles only
     expect(queryText).toMatch(/role\s+IN\s*\(\s*'technician'\s*,\s*'casual'\s*\)/i);
+
+    // Non-field roles must NOT appear as role values in the IN list
+    // (guards against accidentally widening the filter to include managers/admins)
+    expect(queryText).not.toMatch(/'manager'/i);
+    expect(queryText).not.toMatch(/'admin'/i);
 
     // Rule-P exemption: must NOT contain any form of pending-exclusion predicate
     expect(queryText).not.toMatch(/account_status\s*<>\s*'pending'/i);
     expect(queryText).not.toMatch(/account_status\s*!=\s*'pending'/i);
     expect(queryText).not.toMatch(/approvedAccountPredicate/i);
+  });
+
+  it('SQL shape: hours column uses ::float cast to ensure numeric type from pg driver', async () => {
+    mocks.sql.mockResolvedValue([]);
+    const { res } = makeRes();
+    await handler(makeReq({ from: FROM, to: TO }), res);
+
+    expect(mocks.sql).toHaveBeenCalledOnce();
+    const queryText = capturedSql();
+    // pg driver serialises Postgres `numeric` as a string; ::float forces a
+    // native float so callers receive a JS number, not '8.00'.
+    expect(queryText).toMatch(/ROUND\s*\([\s\S]*?\)::float/i);
   });
 
   it('SQL shape: status=pending branch filters to pending account_status', async () => {
