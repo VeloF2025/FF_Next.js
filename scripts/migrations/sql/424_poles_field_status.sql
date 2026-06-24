@@ -19,7 +19,9 @@
 -- behind readers and stall the deploy while its pending ACCESS EXCLUSIVE blocks
 -- new readers. lock_timeout makes the grab fail fast and retry instead of piling
 -- up; ADD COLUMN of a nullable, default-less column is otherwise instant.
-SET LOCAL lock_timeout = '3s';
+-- Plain SET (not SET LOCAL) so the timeout applies whether the runner wraps the
+-- file in psql -1 or applies it autocommit; it rolls back with the txn either way.
+SET lock_timeout = '3s';
 ALTER TABLE poles ADD COLUMN IF NOT EXISTS field_status VARCHAR(100);
 ALTER TABLE poles ADD COLUMN IF NOT EXISTS field_status_synced_at TIMESTAMPTZ;
 

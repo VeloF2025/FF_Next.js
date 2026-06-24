@@ -70,6 +70,12 @@ def minio_download(qf_project_id: str, gpkg_path: str, dest: str) -> bool:
         print(f"  ERROR: No versions found for {gpkg_path}")
         return False
     latest = max(versions, key=lambda o: o["lastModified"])["key"]
+    # Sanity-guard the version key (QFieldCloud versions look like v<ts>-<hash>).
+    # Not a security control (shell=False, trusted MinIO), just fail loud on a
+    # malformed key rather than feed garbage to `mc cat`.
+    if not latest.startswith("v") or any(c.isspace() for c in latest):
+        print(f"  ERROR: unexpected version key {latest!r}")
+        return False
     print(f"  Latest version: {latest}")
     with open(dest, "wb") as f:
         cat = subprocess.run(
@@ -112,6 +118,8 @@ def sync_project(name: str, cfg: dict, dry_run: bool = False) -> bool:
 
     # One Status per pole label (GPKG carries one row per pole).
     field = {label: status for label, status in rows}
+    if len(field) != len(rows):
+        print(f"  WARN: {len(rows) - len(field)} duplicate pole label(s) in GPKG — kept last")
     print(f"  GPKG poles: {len(field)}")
     dist = Counter((s or "<NULL>") for s in field.values())
     for s, c in dist.most_common():
@@ -121,34 +129,35 @@ def sync_project(name: str, cfg: dict, dry_run: bool = False) -> bool:
         print("  [DRY] no DB writes")
         return True
 
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
     # Bulk upsert onto EXISTING poles rows only (poles is the import target — we never
     # insert here). IS DISTINCT FROM keeps it idempotent and bumps synced_at only on
     # a real change. project_id is carried per-row so the join is project-scoped.
-    data = [(cfg["ff"], label, status) for label, status in field.items()]
-    # RETURNING + fetch=True so the count is accurate across execute_values batches
+    # RETURNING + fetch=True gives an accurate count across execute_values batches
     # (cur.rowcount would only report the final batch).
-    returned = execute_values(
-        cur,
-        """
-        UPDATE poles p
-           SET field_status = v.status,
-               field_status_synced_at = NOW()
-          FROM (VALUES %s) AS v(ff, label, status)
-         WHERE p.project_id = v.ff::uuid
-           AND p.pole_number = v.label
-           AND p.field_status IS DISTINCT FROM v.status
-        RETURNING p.pole_number
-        """,
-        data,
-        template="(%s, %s, %s)",
-        fetch=True,
-    )
-    updated = len(returned)
-    conn.commit()
-    cur.close()
-    conn.close()
+    data = [(cfg["ff"], label, status) for label, status in field.items()]
+    conn = psycopg2.connect(DB_URL)
+    try:
+        cur = conn.cursor()
+        returned = execute_values(
+            cur,
+            """
+            UPDATE poles p
+               SET field_status = v.status,
+                   field_status_synced_at = NOW()
+              FROM (VALUES %s) AS v(ff, label, status)
+             WHERE p.project_id = v.ff::uuid
+               AND p.pole_number = v.label
+               AND p.field_status IS DISTINCT FROM v.status
+            RETURNING p.pole_number
+            """,
+            data,
+            template="(%s, %s, %s)",
+            fetch=True,
+        )
+        conn.commit()
+        updated = len(returned)
+    finally:
+        conn.close()
     print(f"  poles rows updated: {updated}")
     return True
 
@@ -180,10 +189,11 @@ def main():
             print(f"\n  ERROR syncing {name}: {type(e).__name__}: {e}")
             failures.append(name)
 
-    print(f"\n{'='*60}\nDone.")
+    print(f"\n{'='*60}")
     if failures:
-        print(f"FAILED ({len(failures)}): {', '.join(failures)}")
+        print(f"Done with FAILURES ({len(failures)}): {', '.join(failures)}")
         sys.exit(1)
+    print("Done.")
 
 
 if __name__ == "__main__":
