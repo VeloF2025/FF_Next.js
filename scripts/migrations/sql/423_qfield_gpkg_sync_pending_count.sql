@@ -13,10 +13,16 @@
 -- uploaded-but-uningested photos across Tonga / Mamelodi / Etwatwa.
 --
 -- pending_count stores how many photo references were skipped as not-yet-uploaded on the
--- last run. The extractor re-scans (ignores the version delta) whenever pending_count > 0,
--- so late-arriving binaries are picked up on the next cron run. Idempotent: the extractor
--- dedups by photo_key, so re-scans never create duplicates. Default 0 leaves every
--- existing row in the "already fully processed" state — a one-off `--force` run is what
--- seeds non-zero counts (and recovers the existing backlog).
+-- last run. The extractor re-scans (ignores the version delta) whenever pending_count > 0
+-- AND the GPKG is younger than PENDING_RESCAN_MAX_AGE_DAYS (7d) — so late-arriving binaries
+-- are picked up on the next cron run, while a permanently-stuck GPKG eventually stops being
+-- re-scanned. Idempotent: the extractor dedups by photo_key, so re-scans never create
+-- duplicates. Default 0 leaves every existing row in the "already fully processed" state —
+-- a one-off `--force` run is what seeds non-zero counts (and recovers the existing backlog).
+--
+-- DEPLOY ORDER: apply this migration BEFORE the updated extract-gpkg-photos.py reaches the
+-- cron tree — the new "SELECT last_version, pending_count" errors if the column is absent.
+-- The column is additive and ignored by the old script, so applying it ahead of the merge
+-- is safe (instant metadata-only ADD COLUMN with a constant default on PG 12+).
 ALTER TABLE qfield_gpkg_sync_state
   ADD COLUMN IF NOT EXISTS pending_count integer NOT NULL DEFAULT 0;
