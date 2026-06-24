@@ -130,4 +130,17 @@ describe('processOltDropoffClosures — import', () => {
     expect(updateCall).toMatch(/UPDATE olt_mismatch_records/i);
     expect(updateCall).toMatch(/fix_status\s*=\s*'resolved'/i);
   });
+
+  it('does NOT count a record whose UPDATE matched 0 rows (already fixed/resolved)', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [{ dr_number: 'DR9', deduction_note: 'note2' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'rec9', drop_number: 'DR9', maintenance_ticket_id: null, ticket_uid: null, ticket_status: null }] })
+      .mockResolvedValue({ rows: [], rowCount: 0 }); // UPDATE matched nothing — record already terminal
+    const out = await processOltDropoffClosures({
+      project: 'Lawley', weekEnding: '2026-06-21',
+      currentNote2or4Drs: new Set(), notesPresent: true, dryRun: false,
+    });
+    expect(updateTicket).not.toHaveBeenCalled();
+    expect(out.resolvedRecords).toBe(0);
+  });
 });

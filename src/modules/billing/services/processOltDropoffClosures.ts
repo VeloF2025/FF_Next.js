@@ -187,17 +187,20 @@ export async function processOltDropoffClosures(
           },
           DR_HISTORY_ACTOR,
         );
-        outcome.closedTickets += 1;
+        // Only count a close that actually happened (updateTicket returned a ticket).
+        if (updated) outcome.closedTickets += 1;
       } else {
         // Unticketed (or ticket already terminal) → resolve the record directly.
-        await pool.query(
+        const res = await pool.query(
           `UPDATE olt_mismatch_records
               SET fix_status = 'resolved', resolution_type = $2,
                   resolution_notes = $3, resolved_by = $4::uuid, resolved_at = NOW()
             WHERE id = $1 AND fix_status NOT IN ('fixed','resolved')`,
           [t.id, RESOLUTION_TYPE, note, SYSTEM_USER_ID],
         );
-        outcome.resolvedRecords += 1;
+        // Record may have been fixed/resolved since the open-records query ran;
+        // only count a row we actually updated.
+        if ((res?.rowCount ?? 0) > 0) outcome.resolvedRecords += 1;
       }
 
       // DR history — one entry per prior note2/note4 the DR carried.
