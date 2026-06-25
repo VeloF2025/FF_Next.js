@@ -7,6 +7,9 @@ This directory contains cron job scripts that run on the production server.
 - `send-daily-reminders.ts` - Sends daily reminder emails to users with pending reminders
 - `send-morning-standup.ts` - Sends a per-user morning standup digest of outstanding
   tickets (NOC + H&S + ManCo), Mon–Fri at 08:00 SAST
+- `sync-qfield-status.sh` - Nightly wrapper for `../sync-qfield-status-to-ff.py`;
+  mirrors QField civil-audit pole `Status` into `poles.field_status` for the Works
+  QA PON-overview funnel (~00:45 SAST, on velo). See section below.
 
 ## Morning Standup Quick Reference
 
@@ -25,6 +28,54 @@ VPS cron line (08:00 SAST, Monday–Friday):
 ```cron
 0 8 * * 1-5 cd /var/www/fibreflow && /usr/bin/npx tsx scripts/cron/send-morning-standup.ts >> /var/log/morning-standup-cron.log 2>&1
 ```
+
+---
+
+# Works QA field_status sync (`sync-qfield-status.sh`)
+
+Mirrors the QField civil-audit pole **`Status`** from each project's poles GPKG
+(in QFieldCloud/MinIO) into **`poles.field_status`** (added by migration 424), so
+the Works QA PON overview can show the field-**planted** stage between *planned*
+(`sow_poles`) and *QA'd* (`pole_qa_photos`). Read-only against QFieldCloud
+(downloads the GPKG via `mc`; no upload). Idempotent — only rows whose
+`field_status` actually changes are written (`IS DISTINCT FROM`).
+
+Runs **on velo** (needs the `qfieldcloud-minio-1` container + the shared Supabase
+DB). The wrapper resolves `DATABASE_URL` from the deploy dir's `.env.local` →
+`.env.production` → `.env`, so the cron line stays quoting-free.
+
+**Projects** are configured in the `PROJECTS` dict at the top of
+`scripts/sync-qfield-status-to-ff.py` (Mohadin, Etwatwa, Lawley, Mamelodi,
+Thembisa POP1, Thembisa POP3). Each project's GPKG file / table / label column /
+status column **differ and were verified against the live GPKG before adding** —
+e.g. Thembisa's pole-label column is `label_1` and its table is lower-case. The
+`qf` id is the live `FT_<site>` QFieldCloud project the crews edit (NOT the stale
+`*_Pole_Audit` copies).
+
+**Status vocabulary:** `field_status` stores the **raw** GPKG string. The
+planted-vs-removed classification lives ONLY in `pages/api/works-qa/poles.ts`
+(`NOT_PLANTED_STATUSES` deny-list): two removal spellings (`Pole Removed/Canceled`
+and `Pole Canceled / Removed`) plus a pre-plant marker (`To be Planted`) count as
+not-planted; every other (incl. unknown) status defaults to planted.
+
+```bash
+# Manual run on velo (all projects)
+ssh velo@100.96.203.105
+/home/velo/fibreflow-dev/scripts/cron/sync-qfield-status.sh
+
+# Single project / dry-run (read + report, no DB writes)
+/home/velo/fibreflow-dev/scripts/cron/sync-qfield-status.sh --project Lawley --dry-run
+```
+
+velo crontab line (**00:45 SAST** — after the 23:15 OES→QField sync settles; velo
+cron is system-local SAST, so write the SAST hour directly):
+```cron
+# Works QA field_status sync (QField civil-audit Status → poles.field_status) — 00:45 SAST
+45 0 * * * /home/velo/fibreflow-dev/scripts/cron/sync-qfield-status.sh >> /home/velo/logs/sync-qfield-status.log 2>&1
+```
+
+Verify: `tail -50 /home/velo/logs/sync-qfield-status.log` (each project prints its
+GPKG pole count, Status distribution, and `poles rows updated`).
 
 ---
 
