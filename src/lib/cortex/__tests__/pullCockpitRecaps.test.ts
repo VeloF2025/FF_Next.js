@@ -13,16 +13,37 @@ function makeFakeSql(opts: {
   existingActionIds?: Set<string>;
   userIdByName?: Record<string, string>;
   newMeetingId?: number;
+  // existing per-owner rows for a base action id (owner-removal reconciliation):
+  existingByBase?: Record<string, { id: string; source_id: string; status: string; meeting_id?: number }[]>;
 } = {}) {
   const meetingInserts: { query: string; values: unknown[] }[] = [];
   const actionInserts: unknown[][] = [];
   const actionUpdates: unknown[][] = [];
+  const actionDeletes: unknown[] = [];
   const natKeyLookups: string[] = [];
   const threadLookups: string[] = [];
   const existing = opts.existingActionIds ?? new Set<string>();
   const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     // normalize whitespace so the multi-line SQL the lib writes matches these shape regexes
     const q = strings.join(' ? ').replace(/\s+/g, ' ');
+    // owner-removal reconciliation: the lib lists existing per-owner rows for a base id.
+    // Apply the REAL WHERE (meeting_id scope + base-equals OR prefix match) so the SQL safety
+    // — prefix-collision exclusion + meeting scoping — is actually exercised, not bypassed.
+    // Bound params (in the lib's order): [meeting_id, base, prefix.length, prefix].
+    if (/SELECT id, source_id, status FROM action_items/i.test(q)) {
+      const meetingId = values[0];
+      const base = String(values[1]);
+      const prefix = String(values[3]);
+      const rows = opts.existingByBase?.[base] ?? [];
+      return Promise.resolve(rows.filter((r) =>
+        (r.meeting_id === undefined || r.meeting_id === meetingId) &&
+        (r.source_id === base || r.source_id.startsWith(prefix)),
+      ));
+    }
+    if (/DELETE FROM action_items/i.test(q)) {
+      actionDeletes.push(values[0]);
+      return Promise.resolve([]);
+    }
     if (/SELECT id FROM meetings WHERE lower\(organizer_email\)/i.test(q)) {
       const org = String(values[0]).toLowerCase();
       natKeyLookups.push(org);
@@ -59,7 +80,7 @@ function makeFakeSql(opts: {
     }
     return Promise.resolve([]);
   }) as unknown as NeonQueryFunction<false, false>;
-  return { sql, meetingInserts, actionInserts, actionUpdates, natKeyLookups, threadLookups };
+  return { sql, meetingInserts, actionInserts, actionUpdates, actionDeletes, natKeyLookups, threadLookups };
 }
 
 function fakeFetch(feedBody: unknown, ackOk = true): typeof fetch {
@@ -96,7 +117,7 @@ describe('syncCortexCockpitRecaps', () => {
 
     const r = await syncCortexCockpitRecaps(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
 
-    expect(r).toEqual({ pulled: 1, reconciled: 0, created: 1, tasksCreated: 1, tasksUpdated: 0, delivered: 1, errors: 0 });
+    expect(r).toEqual({ pulled: 1, reconciled: 0, created: 1, tasksCreated: 1, tasksUpdated: 0, tasksRemoved: 0, delivered: 1, errors: 0 });
     // the new meeting row is source='cockpit', carries the thread id + participants
     expect(meetingInserts).toHaveLength(1);
     expect(meetingInserts[0].query).toContain("'cockpit'");       // source literal
@@ -251,6 +272,97 @@ describe('syncCortexCockpitRecaps', () => {
   it('an empty feed is a clean no-op', async () => {
     const { sql } = makeFakeSql();
     const r = await syncCortexCockpitRecaps(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch({ meetings: [] }) });
-    expect(r).toEqual({ pulled: 0, reconciled: 0, created: 0, tasksCreated: 0, tasksUpdated: 0, delivered: 0, errors: 0 });
+    expect(r).toEqual({ pulled: 0, reconciled: 0, created: 0, tasksCreated: 0, tasksUpdated: 0, tasksRemoved: 0, delivered: 0, errors: 0 });
+  });
+
+  // ── owner-removal propagation ──────────────────────────────────────────────────
+  it('deletes the FF item for an owner no longer delivered (owner removed in the cockpit)', async () => {
+    // The cockpit action used to have owners [johan, jj]; jj was removed, so the feed now
+    // delivers only act_9::johan@x. The stale act_9::jj@x row must be deleted.
+    const { sql, actionDeletes } = makeFakeSql({
+      meetingsByThread: { '0#19:meeting_X@thread.v2#0': 777 },
+      existingActionIds: new Set(['act_9::johan@x']),  // johan still there → UPDATE
+      existingByBase: {
+        'act_9': [
+          { id: 'row-johan', source_id: 'act_9::johan@x', status: 'pending' },
+          { id: 'row-jj', source_id: 'act_9::jj@x', status: 'pending' },  // removed
+        ],
+      },
+    });
+    const feed: CockpitFeedResponse = {
+      meetings: [cockpitMeeting({ items: [
+        { action_id: 'act_9::johan@x', content_key: 'cockpit-9', text: 'JJ to do',
+          owner: 'johan@x', due: null, confidence: 1.0 },
+      ] })],
+    };
+
+    const r = await syncCortexCockpitRecaps(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+
+    expect(r.tasksRemoved).toBe(1);
+    expect(actionDeletes).toEqual(['row-jj']);  // only the removed owner's row
+  });
+
+  it('does NOT delete a still-delivered owner item', async () => {
+    const { sql, actionDeletes } = makeFakeSql({
+      meetingsByThread: { '0#19:meeting_X@thread.v2#0': 777 },
+      existingByBase: {
+        'act_9': [
+          { id: 'row-johan', source_id: 'act_9::johan@x', status: 'pending' },
+          { id: 'row-jj', source_id: 'act_9::jj@x', status: 'pending' },
+        ],
+      },
+    });
+    const feed: CockpitFeedResponse = {
+      meetings: [cockpitMeeting({ items: [
+        { action_id: 'act_9::johan@x', content_key: 'c', text: 't', owner: 'johan@x', due: null, confidence: 1 },
+        { action_id: 'act_9::jj@x', content_key: 'c', text: 't', owner: 'jj@x', due: null, confidence: 1 },
+      ] })],
+    };
+    const r = await syncCortexCockpitRecaps(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+    expect(r.tasksRemoved).toBe(0);
+    expect(actionDeletes).toEqual([]);
+  });
+
+  it('never deletes a human-progressed (non-pending) stale item', async () => {
+    const { sql, actionDeletes } = makeFakeSql({
+      meetingsByThread: { '0#19:meeting_X@thread.v2#0': 777 },
+      existingByBase: {
+        'act_9': [
+          { id: 'row-jj', source_id: 'act_9::jj@x', status: 'completed' },  // someone did it
+        ],
+      },
+    });
+    const feed: CockpitFeedResponse = {
+      meetings: [cockpitMeeting({ items: [
+        { action_id: 'act_9::johan@x', content_key: 'c', text: 't', owner: 'johan@x', due: null, confidence: 1 },
+      ] })],
+    };
+    const r = await syncCortexCockpitRecaps(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+    expect(r.tasksRemoved).toBe(0);
+    expect(actionDeletes).toEqual([]);  // completed work preserved
+  });
+
+  it('prefix + meeting scope: only deletes the same-base, same-meeting, stale, pending row', async () => {
+    // ffMeetingId is 777 (via the thread map). The reconciliation for base act_9 must NOT touch:
+    //   - act_91::x  (a DIFFERENT action whose base merely shares the act_9 prefix), nor
+    //   - act_9::ghost@x in another meeting (999).
+    const { sql, actionDeletes } = makeFakeSql({
+      meetingsByThread: { '0#19:meeting_X@thread.v2#0': 777 },
+      existingByBase: {
+        act_9: [
+          { id: 'keep-91', source_id: 'act_91::x', status: 'pending', meeting_id: 777 },         // prefix collision
+          { id: 'keep-other-mtg', source_id: 'act_9::ghost@x', status: 'pending', meeting_id: 999 }, // another meeting
+          { id: 'del-jj', source_id: 'act_9::jj@x', status: 'pending', meeting_id: 777 },          // genuinely stale
+        ],
+      },
+    });
+    const feed: CockpitFeedResponse = {
+      meetings: [cockpitMeeting({ items: [
+        { action_id: 'act_9::johan@x', content_key: 'c', text: 't', owner: 'johan@x', due: null, confidence: 1 },
+      ] })],
+    };
+    const r = await syncCortexCockpitRecaps(sql, 'http://bridge:7403', 'key', { fetchFn: fakeFetch(feed) });
+    expect(actionDeletes).toEqual(['del-jj']);  // ONLY the right row
+    expect(r.tasksRemoved).toBe(1);
   });
 });

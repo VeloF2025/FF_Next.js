@@ -56,6 +56,7 @@ export interface CockpitSyncResult {
   created: number;       // landed as a NEW source='cockpit' meeting row
   tasksCreated: number;  // action_items newly created
   tasksUpdated: number;  // action_items UPDATED in place (an edit/reassignment re-synced)
+  tasksRemoved: number;  // action_items DELETED because an owner was removed in the cockpit
   delivered: number;     // meetings acked back to Cortex (leave the feed)
   errors: number;        // meetings that threw mid-process (logged, skipped, retried next pull)
 }
@@ -184,6 +185,7 @@ export async function syncCortexCockpitRecaps(
   let created = 0;
   let tasksCreated = 0;
   let tasksUpdated = 0;
+  let tasksRemoved = 0;
   let delivered = 0;
   let errors = 0;
 
@@ -255,6 +257,38 @@ export async function syncCortexCockpitRecaps(
         tasksCreated++;
       }
 
+      // Owner-removal propagation: an edit that removes an owner re-delivers the action with
+      // FEWER per-owner items (the cockpit edit re-arms the feed). For each delivered base
+      // action id, delete the FF rows whose per-owner source_id is no longer present — scoped
+      // to that base (never touches other actions or the recorded seal's AI items) and only
+      // PENDING machine rows (a human who progressed/completed the task keeps it).
+      const deliveredByBase = new Map<string, Set<string>>();
+      for (const item of m.items ?? []) {
+        if (!item.action_id) continue;
+        const base = item.action_id.split('::')[0] ?? item.action_id;
+        const set = deliveredByBase.get(base) ?? new Set<string>();
+        set.add(item.action_id);
+        deliveredByBase.set(base, set);
+      }
+      for (const [base, current] of deliveredByBase) {
+        const prefix = `${base}::`;
+        // Scoped to THIS meeting (meeting_id) so the global source_id match can never reach
+        // another meeting's row — the upsert already keeps a cockpit action under exactly this
+        // ffMeetingId, so its per-owner rows live here too.
+        const rows = (await sql`
+          SELECT id, source_id, status FROM action_items
+          WHERE source_type = 'cortex_meeting'
+            AND meeting_id = ${ffMeetingId}
+            AND (source_id = ${base} OR left(source_id, ${prefix.length}) = ${prefix})
+        `) as { id: unknown; source_id: string; status: string }[];
+        for (const row of rows) {
+          if (current.has(row.source_id)) continue;   // still delivered → keep
+          if (row.status !== 'pending') continue;       // never destroy human-progressed work
+          await sql`DELETE FROM action_items WHERE id = ${row.id} AND meeting_id = ${ffMeetingId}`;
+          tasksRemoved++;
+        }
+      }
+
       // Ack Cortex (idempotent server-side) by the meeting_key (always present + globally
       // unique; Cortex verifies its tenant prefix). Only count delivered on a 2xx so a failed
       // ack leaves the meeting in the feed and the next pull retries (find-or-create + UPSERT
@@ -275,5 +309,5 @@ export async function syncCortexCockpitRecaps(
     }
   }
 
-  return { pulled: meetings.length, reconciled, created, tasksCreated, tasksUpdated, delivered, errors };
+  return { pulled: meetings.length, reconciled, created, tasksCreated, tasksUpdated, tasksRemoved, delivered, errors };
 }
