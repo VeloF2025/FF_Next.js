@@ -1,0 +1,1 @@
+{"resource":"https://app.fibreflow.app/api/cortex-remote-mcp/mcp","authorization_servers":["https://app.fibreflow.app/api/cortex-remote-mcp"],"scopes_supported":["cortex.read"],"bearer_methods_supported":["header"]}
