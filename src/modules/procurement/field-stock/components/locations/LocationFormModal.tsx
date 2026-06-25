@@ -29,6 +29,7 @@ function toFormValue(loc: StockLocation): LocationFormValue {
     lat: loc.coordinates ? String(loc.coordinates.lat) : '',
     lng: loc.coordinates ? String(loc.coordinates.lng) : '',
     parentId: loc.parentId ?? '',
+    projectId: loc.projectId ?? '',
     assignedToName: loc.assignedToName ?? '',
     assignedToPhone: loc.assignedToPhone ?? '',
   };
@@ -60,6 +61,7 @@ export function LocationFormModal({
         const lng = parseFloat(value.lng);
         const update: UpdateLocationInput = {
           parentId: value.parentId,   // '' clears the parent, a uuid sets it
+          projectId: value.projectId, // '' clears the project, a uuid sets it
           name: value.name.trim(),
           address: value.address.trim() || undefined,
           coordinates: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined,

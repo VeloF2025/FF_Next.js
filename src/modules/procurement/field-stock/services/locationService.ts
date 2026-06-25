@@ -296,7 +296,7 @@ export async function updateLocation(
 
     if (input.projectId !== undefined) {
       setClauses.push(`project_id = $${paramIndex++}`);
-      params.push(input.projectId);
+      params.push(input.projectId || null);  // '' clears the project (uuid column rejects '')
     }
 
     if (input.isActive !== undefined) {
