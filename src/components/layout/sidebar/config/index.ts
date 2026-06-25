@@ -8,6 +8,7 @@ export { nocSection } from './nocSection';
 export { peopleSection } from './peopleSection';
 export { clientsSection } from './clientsSection';
 export { procurementSection } from './procurementSection';
+export { planningSection } from './planningSection';
 // export { accountingSection } from './accountingSection'; // DECOMMISSIONED 2026-04-01
 export { contractorsSection } from './contractorsSection';
 export { assetsSection } from './assetsSection';
