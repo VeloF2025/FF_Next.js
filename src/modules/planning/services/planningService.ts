@@ -62,9 +62,7 @@ export function buildUpdateSql(payload: UpdatePlanningItemPayload): { setSql: st
     i++;
   }
   sets.push('updated_at = NOW()');
-  if (payload.stage === 'cancelled' || payload.stage === 'on_hold') {
-    if (payload.stage === 'cancelled') sets.push('closed_at = NOW()');
-  }
+  if (payload.stage === 'cancelled') sets.push('closed_at = NOW()');
   return { setSql: sets.join(', '), values };
 }
 
@@ -90,13 +88,15 @@ export async function listPlanningItems(filters: PlanningFilters = {}): Promise<
   const pageSize = filters.pageSize && filters.pageSize > 0 ? filters.pageSize : 2500;
   const offset = (page - 1) * pageSize;
 
-  const countRow = await queryOne<{ count: string }>(
+  const countRow = await queryOne<{ count: number }>(
     `SELECT COUNT(*)::int AS count FROM planning_items p ${whereSql}`, values,
   );
   const total = countRow ? Number(countRow.count) : 0;
 
+  const limitParam = i++;
+  const offsetParam = i++;
   const rows = await query<PlanningItemWithRelations>(
-    `${SELECT_WITH_RELATIONS} ${whereSql} ORDER BY p.created_at DESC LIMIT $${i++} OFFSET $${i++}`,
+    `${SELECT_WITH_RELATIONS} ${whereSql} ORDER BY p.created_at DESC LIMIT $${limitParam} OFFSET $${offsetParam}`,
     [...values, pageSize, offset],
   );
 
@@ -186,7 +186,7 @@ export async function logPlanningActivity(params: {
   );
 }
 
-export async function listPlanningActivities(planningItemId: string) {
+export async function listPlanningActivities(planningItemId: string): Promise<Record<string, unknown>[]> {
   return query(
     `SELECT * FROM planning_activities WHERE planning_item_id = $1 ORDER BY created_at DESC`,
     [planningItemId],
