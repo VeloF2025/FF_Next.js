@@ -8,6 +8,7 @@ export interface LocationFormValue {
   lat: string;            // kept as string for controlled inputs; parsed on submit
   lng: string;
   parentId: string;       // '' = no parent
+  projectId: string;      // '' = no project
   assignedToName: string;
   assignedToPhone: string;
 }
@@ -32,6 +33,7 @@ export function toCreateInput(v: LocationFormValue): CreateLocationInput {
     address: v.address.trim() || undefined,
     coordinates,
     parentId: v.parentId || undefined,
+    projectId: v.projectId || undefined,
     assignedToName: v.assignedToName.trim() || undefined,
     assignedToPhone: v.assignedToPhone.trim() || undefined,
   };
@@ -39,5 +41,5 @@ export function toCreateInput(v: LocationFormValue): CreateLocationInput {
 
 export const EMPTY_LOCATION_FORM: LocationFormValue = {
   name: '', code: '', locationType: 'warehouse', address: '',
-  lat: '', lng: '', parentId: '', assignedToName: '', assignedToPhone: '',
+  lat: '', lng: '', parentId: '', projectId: '', assignedToName: '', assignedToPhone: '',
 };

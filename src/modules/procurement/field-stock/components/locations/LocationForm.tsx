@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useProjects } from '@/hooks/useProjects';
 import { useLocations } from '../../hooks';
 import type { LocationType, StockLocation } from '../../types';
 import { generateCode, type LocationFormValue } from './locationForm.utils';
@@ -43,6 +44,16 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
           l.id !== selfId,
       ),
     [locations, selfId],
+  );
+
+  // Project association (optional): which project this location serves.
+  const { data: projects } = useProjects();
+  const projectOptions = useMemo(
+    () =>
+      (projects ?? [])
+        .map((p) => ({ id: p.id, name: p.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [projects],
   );
 
   const set = (patch: Partial<LocationFormValue>) => onChange({ ...value, ...patch });
@@ -115,6 +126,20 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
           <option value="">— none (top-level hub) —</option>
           {parentOptions.map((l) => (
             <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className={labelCls}>Project <span className="text-xs text-[var(--ff-text-tertiary)]">(optional — the project this location serves)</span></label>
+        <select
+          value={value.projectId}
+          onChange={(e) => set({ projectId: e.target.value })}
+          className={inputCls}
+        >
+          <option value="">— none —</option>
+          {projectOptions.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
       </div>

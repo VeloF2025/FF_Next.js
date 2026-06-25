@@ -24,13 +24,14 @@ describe('toCreateInput', () => {
       ...base,
       name: '  Main WH  ', code: 'wh-main', locationType: 'warehouse',
       address: '  10 Foo St  ', lat: '-25.7896', lng: '28.2768',
-      parentId: 'parent-uuid', assignedToName: '  John  ', assignedToPhone: ' 0123 ',
+      parentId: 'parent-uuid', projectId: 'project-uuid', assignedToName: '  John  ', assignedToPhone: ' 0123 ',
     });
     expect(out.name).toBe('Main WH');
     expect(out.code).toBe('WH-MAIN');
     expect(out.address).toBe('10 Foo St');
     expect(out.coordinates).toEqual({ lat: -25.7896, lng: 28.2768 });
     expect(out.parentId).toBe('parent-uuid');
+    expect(out.projectId).toBe('project-uuid');
     expect(out.assignedToName).toBe('John');
     expect(out.assignedToPhone).toBe('0123');
   });
@@ -45,9 +46,10 @@ describe('toCreateInput', () => {
   });
 
   it('drops blank optional fields to undefined', () => {
-    const out = toCreateInput({ ...base, name: 'X', code: 'X', address: '', parentId: '', assignedToName: '', assignedToPhone: '' });
+    const out = toCreateInput({ ...base, name: 'X', code: 'X', address: '', parentId: '', projectId: '', assignedToName: '', assignedToPhone: '' });
     expect(out.address).toBeUndefined();
     expect(out.parentId).toBeUndefined();
+    expect(out.projectId).toBeUndefined();
     expect(out.assignedToName).toBeUndefined();
     expect(out.assignedToPhone).toBeUndefined();
   });
