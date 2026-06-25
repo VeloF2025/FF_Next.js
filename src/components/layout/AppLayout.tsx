@@ -234,6 +234,15 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
+    // Field Workers admin (exact /field — must precede the greedy
+    // `includes('field')` match below, which also catches /field-ops etc.)
+    if (path === '/field') {
+      return {
+        title: 'Field Workers',
+        breadcrumbs: ['Home', 'Field Workers'],
+      };
+    }
+
     // Field App
     if (path.includes('field')) {
       return {
