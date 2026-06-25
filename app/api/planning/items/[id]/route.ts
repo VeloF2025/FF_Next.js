@@ -73,6 +73,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (!UUID_RE.test(params.id)) return NextResponse.json({ success: false, error: { message: 'Invalid id' } }, { status: 400 });
   try {
     const userId = await getUserId();
+    const existing = await getPlanningItemById(params.id);
+    if (!existing) return NextResponse.json({ success: false, error: { message: 'Planning item not found' } }, { status: 404 });
     const deleted = await deletePlanningItem(params.id);
     void logPlanningActivity({ planningItemId: params.id, activityType: 'cancelled', note: 'Planning item cancelled', userId });
     return NextResponse.json({ success: true, data: deleted, message: 'Planning item cancelled', meta: { timestamp: new Date().toISOString() } });
