@@ -110,11 +110,20 @@ export interface PoleSummary {
   // Total photos uploaded on the pole, including unassigned (Johan's overview ask).
   total_photos: number;
   unassigned_count: number;
-  status: 'empty' | 'in_progress' | 'ready' | 'snagged' | 'approved';
+  // 'planted' = field-confirmed planted (QField civil-audit Status) but no QA
+  // photos yet — a row that exists in `poles` but not `pole_qa_photos`. All other
+  // states require a pole_qa_photos row (has_photos = true).
+  status: 'empty' | 'in_progress' | 'ready' | 'snagged' | 'approved' | 'planted';
   approved_at: string | null;
   outstanding_snag_count: number;
   has_open_verification_snag: boolean;
   has_verified_planted: boolean;
+  // True when this row is backed by a pole_qa_photos record (QA-able / clickable).
+  // False for planted-only rows synthesised from poles.field_status.
+  has_photos: boolean;
+  // QField civil-audit Status (poles.field_status). Drives the planted-row badge
+  // and is null for photographed rows that pre-date / lack a field_status sync.
+  field_status: string | null;
 }
 
 export interface WorksQAProjectStats {
