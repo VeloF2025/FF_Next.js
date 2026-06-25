@@ -244,7 +244,7 @@ export async function processPicking(req: NextApiRequest, res: NextApiResponse) 
           await txn.query(
             `INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
              VALUES ($1, $2, $3, NOW())
-             ON CONFLICT (stock_item_id, location_id, lot_number)
+             ON CONFLICT (stock_item_id, location_id, COALESCE(lot_number, ''))
              DO UPDATE SET quantity = stock_quants.quantity + $3,
                last_movement_date = NOW(), updated_at = NOW()`,
             [line.stock_item_id, destinationLocationId, line.planned_quantity],

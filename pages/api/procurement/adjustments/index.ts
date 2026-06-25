@@ -163,7 +163,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       await sql`
         INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
         VALUES (${data.stock_item_id}, ${data.location_id}, ${data.quantity}, NOW())
-        ON CONFLICT (stock_item_id, location_id, lot_number)
+        ON CONFLICT (stock_item_id, location_id, COALESCE(lot_number, ''))
         DO UPDATE SET
           quantity = stock_quants.quantity + ${data.quantity},
           last_movement_date = NOW(),
