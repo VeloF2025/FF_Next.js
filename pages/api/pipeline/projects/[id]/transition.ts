@@ -9,6 +9,7 @@ import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { createPlanningItem } from '@/modules/planning/services/planningService';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -184,6 +185,20 @@ export default withAuth(withErrorHandler(async (
       )
       ON CONFLICT (project_id, pipeline_project_id) DO NOTHING
     `;
+
+    // 6d. Auto-create the first Planning card (idempotent on unique index).
+    try {
+      const planningItem = await createPlanningItem({
+        project_id: project.id as string,
+        title: `${pp.project_name as string} — Planning`,
+        source: 'pipeline_auto',
+        created_by: userId,
+      });
+      await sql`UPDATE planning_items SET pipeline_project_id = ${pipelineProjectId} WHERE id = ${planningItem.id}`;
+    } catch (err) {
+      // Unique-violation = card already exists for this pipeline project; safe to ignore.
+      log.warn('Planning auto-card not created (likely already exists)', { pipelineProjectId, err }, 'PipelineTransition');
+    }
 
     // 7. Seed project requirements
     await sql`SELECT seed_project_requirements(${project.id}::uuid)`;
