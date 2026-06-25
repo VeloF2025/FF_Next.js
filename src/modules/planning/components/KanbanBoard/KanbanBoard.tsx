@@ -4,7 +4,7 @@
 
 import { useMemo, useState, useCallback } from 'react';
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
-import type { PlanningFilters, PlanningItemWithRelations, PlanningStage } from '../../types/planning';
+import type { BoardStage, PlanningFilters, PlanningItemWithRelations, PlanningStage } from '../../types/planning';
 import { BOARD_STAGES, STAGE_FLOW, PARKED_STAGES } from '../../constants/stages';
 import { usePlanningItems } from '../../hooks/usePlanningItems';
 import { useUpdatePlanningItem } from '../../hooks/usePlanningItem';
@@ -71,7 +71,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
     const currentStage = (optimisticMoves[itemId] ?? item.stage ?? 'intake') as PlanningStage;
-    const currentIndex = STAGE_FLOW.indexOf(currentStage as typeof STAGE_FLOW[number]);
+    const currentIndex = STAGE_FLOW.indexOf(currentStage as BoardStage);
     if (currentIndex === -1) return;
     const newIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
     if (newIndex < 0 || newIndex >= STAGE_FLOW.length) return;

@@ -32,8 +32,6 @@ const stageConfig: Partial<Record<PlanningStage, { color: string; bgColor: strin
   splice:         { color: 'text-amber-400',  bgColor: 'bg-amber-500/20',  borderColor: 'border-amber-500/40',  glowColor: 'ring-amber-500/30' },
   change_control: { color: 'text-orange-400', bgColor: 'bg-orange-500/20', borderColor: 'border-orange-500/40', glowColor: 'ring-orange-500/30' },
   as_built:       { color: 'text-green-400',  bgColor: 'bg-green-500/20',  borderColor: 'border-green-500/40',  glowColor: 'ring-green-500/30' },
-  on_hold:        { color: 'text-yellow-400', bgColor: 'bg-yellow-500/10', borderColor: 'border-yellow-500/30', glowColor: 'ring-yellow-500/20' },
-  cancelled:      { color: 'text-red-400',    bgColor: 'bg-red-500/10',    borderColor: 'border-red-500/30',    glowColor: 'ring-red-500/20' },
 };
 
 const defaultConfig = { color: 'text-gray-400', bgColor: 'bg-gray-500/20', borderColor: 'border-gray-500/40', glowColor: 'ring-gray-500/30' };
