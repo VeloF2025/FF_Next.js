@@ -57,7 +57,10 @@ export function WorksQAFiltersBar({ zones, zoneNo, ponNo, onChange }: WorksQAFil
           {sortedPons.map(p => {
             // textValue feeds the trigger's SelectValue; without it Radix
             // concatenates child text including the snag suffix.
-            const triggerText = `PON ${p.pon_no} — ${p.pole_count} pole${p.pole_count === 1 ? '' : 's'}`;
+            // pole_count is the SoW-planned total for the PON (sow_poles ∪ qa_photos),
+            // not the number captured in QA — label it "planned" so it doesn't read as
+            // the same "poles" the body count shows (which is photographed poles only).
+            const triggerText = `PON ${p.pon_no} — ${p.pole_count} planned`;
             return (
               <SelectItem
                 key={p.pon_no}

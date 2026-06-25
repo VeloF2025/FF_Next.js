@@ -158,7 +158,7 @@ export function WorksQAPage() {
       {/* Summary counts */}
       {!polesLoading && poles.length > 0 && (
         <div className="flex gap-5 text-xs text-zinc-500">
-          <span><span className="font-medium text-zinc-300">{poles.length}</span> poles</span>
+          <span><span className="font-medium text-zinc-300">{poles.length}</span> with photos</span>
           <span><span className="font-medium text-green-400">{approvedCount}</span> approved</span>
           <span><span className="font-medium text-teal-400">{readyCount}</span> ready</span>
           <span><span className="font-medium text-red-400">{snaggedCount}</span> snagged</span>
