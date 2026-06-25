@@ -30,10 +30,19 @@ from psycopg2.extras import execute_values
 DB_URL = os.environ.get("DATABASE_URL", "")
 MINIO_BUCKET = "qfieldcloud-prod"
 
-# Civil-audit pole GPKG coordinates per project (same GPKGs as sync-qa-to-qfield.py).
-# Inbound is read-only so it needs no Status ValueMap config. Lawley / Mamelodi /
-# Thembisa are added in the rollout phase once their GPKG table/label/Status are
-# verified the same way Mohadin + Etwatwa were (2026-06).
+# Civil-audit pole GPKG coordinates per project. `qf` = QFieldCloud project id
+# (the live FT_<site> project the field crews edit, NOT the older *_Pole_Audit
+# copies, which are stale); `ff` = FibreFlow projects.id; `gpkg`/`table`/`label`/
+# `status` = the poles layer's file, table, pole-label column, and civil-audit
+# Status column. These differ per project (e.g. Thembisa's label column is
+# `label_1`, its table is lower-case), so each was confirmed against the live GPKG
+# + a join cross-check vs poles.pole_number before being added — do NOT assume a
+# new project follows Mohadin's shape.
+#
+# NOTE on Status vocab: removal is spelled "Pole Removed/Canceled" in some GPKGs
+# and "Pole Canceled / Removed" in others, and Thembisa POP1 carries a pre-plant
+# "To be Planted". field_status mirrors the raw GPKG string; the planted/removed
+# classification (the deny-list) lives in pages/api/works-qa/poles.ts.
 PROJECTS = {
     "Mohadin": {"qf": "bec5f353-2e83-4f6b-989a-fca83ad94e16",
                 "ff": "bf9a90db-e758-4c05-b999-694cd63c451f",
@@ -41,6 +50,18 @@ PROJECTS = {
     "Etwatwa": {"qf": "47585401-1b25-4d3b-8d18-4337ea26df88",
                 "ff": "c7255076-1d2f-41ce-97bb-858b8c87ee27",
                 "gpkg": "PolesAudit.gpkg", "table": "PolesAudit", "label": "label", "status": "Status"},
+    "Lawley": {"qf": "2e988631-462b-448f-ae15-bb693a68cd55",
+               "ff": "4eb13426-b2a1-472d-9b3c-277082ae9b55",
+               "gpkg": "LAWPoles.gpkg", "table": "LAWPoles", "label": "label", "status": "Status"},
+    "Mamelodi": {"qf": "2ce80264-170c-4f05-ada1-68220d7e5885",
+                 "ff": "7003dc06-9af7-4a7c-bc6c-a177d77784f2",
+                 "gpkg": "MAMPoles.gpkg", "table": "MAMPoles", "label": "label", "status": "Status"},
+    "Thembisa POP1": {"qf": "63341eb4-bc81-4607-a3d6-580ea2a7457c",
+                      "ff": "7d8b94d6-8e5a-4dbb-9ede-69ce3884e004",
+                      "gpkg": "Poles.gpkg", "table": "Poles", "label": "label_1", "status": "Status"},
+    "Thembisa POP3": {"qf": "5f3b962a-7901-43f7-a284-1c1a9ed7f3d1",
+                      "ff": "1de088dd-fe24-43fb-b8d3-94fca61ef91d",
+                      "gpkg": "THM_3_Poles.gpkg", "table": "thm_3_poles", "label": "label_1", "status": "Status"},
 }
 
 

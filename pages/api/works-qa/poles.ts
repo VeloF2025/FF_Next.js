@@ -7,11 +7,20 @@ import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
 import { computePoleSummary, plantedOnlyPoleSummary, type PoleOverviewRow } from '@/modules/works-qa/utils/pole-overview';
 
 // Field-confirmed-planted statuses are every QField civil-audit Status except an
-// explicit removal — a planted pole physically exists in the field even if its
-// QA photos haven't been captured yet. Kept as "not removed" rather than an
-// allow-list so new Status strings default to "planted" (the safe assumption for
-// the funnel; a stray new status surfaces as a planted row rather than vanishing).
-const PLANTED_EXCLUDED_STATUS = 'Pole Removed/Canceled';
+// explicit removal/cancel or a not-yet-planted marker — a planted pole physically
+// exists in the field even if its QA photos haven't been captured yet (e.g.
+// "Q/A Failed" still means the pole is in the ground). Project GPKGs carry two
+// removal spellings ("Pole Removed/Canceled" — Mohadin/Etwatwa/Lawley; and
+// "Pole Canceled / Removed" — Mamelodi/Thembisa) plus a pre-plant marker
+// ("To be Planted" — Thembisa POP1); all are excluded here. Kept as a deny-list
+// rather than an allow-list so a new/unknown Status defaults to "planted" (the
+// safe assumption for the funnel: a stray status surfaces as a planted row rather
+// than silently vanishing).
+const NOT_PLANTED_STATUSES = [
+  'Pole Removed/Canceled',
+  'Pole Canceled / Removed',
+  'To be Planted',
+];
 
 // SLOT_META is a trusted in-code constant (no user input), so its column/key
 // names are safe to interpolate. Returning a bounded `present_slots` array (≤22
@@ -80,13 +89,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Planted poles (field_status) with no QA photos yet. NOT EXISTS against
     // pole_qa_photos keeps the two sets disjoint so the union never double-counts.
-    const plantedParams = [...params, PLANTED_EXCLUDED_STATUS];
+    const plantedParams: (string | number | string[])[] = [...params, NOT_PLANTED_STATUSES];
     const plantedQuery = pool.query(`
       SELECT pole_number, zone_no, pon_no, field_status
       FROM poles
       WHERE project_id = $1::uuid ${ponFilter}
         AND field_status IS NOT NULL
-        AND field_status <> $${plantedParams.length}
+        AND field_status <> ALL($${plantedParams.length}::text[])
         AND NOT EXISTS (
           SELECT 1 FROM pole_qa_photos q
           WHERE q.project_id = poles.project_id
