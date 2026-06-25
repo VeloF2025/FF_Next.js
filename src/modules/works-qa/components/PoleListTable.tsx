@@ -52,6 +52,7 @@ const STATUS_BADGE: Record<PoleSummary['status'], string> = {
   ready:       'bg-blue-500/20 text-blue-400',
   snagged:     'bg-red-500/20 text-red-400',
   approved:    'bg-green-500/20 text-green-400',
+  planted:     'bg-sky-500/15 text-sky-300',
 };
 
 const STATUS_LABEL: Record<PoleSummary['status'], string> = {
@@ -60,6 +61,7 @@ const STATUS_LABEL: Record<PoleSummary['status'], string> = {
   ready:       'Ready ▶',
   snagged:     'Snagged',
   approved:    '✓ Approved',
+  planted:     'Planted · no photos',
 };
 
 function VerifyFlag({ pole, onClick }: { pole: PoleSummary; onClick: (e: React.MouseEvent) => void }) {
@@ -110,10 +112,12 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole, onA
           {poles.map(pole => (
             <tr
               key={pole.id}
-              onClick={() => onSelect(pole.id)}
-              className={`border-b border-zinc-900 cursor-pointer transition-colors hover:bg-zinc-800/50 ${
-                selectedPoleId === pole.id ? 'bg-zinc-800/70' : ''
-              } ${pole.status === 'approved' ? 'bg-green-500/5' : ''} ${pole.has_open_verification_snag ? 'ring-1 ring-red-500/30' : ''}`}
+              onClick={pole.has_photos ? () => onSelect(pole.id) : undefined}
+              className={`border-b border-zinc-900 transition-colors ${
+                pole.has_photos ? 'cursor-pointer hover:bg-zinc-800/50' : 'cursor-default'
+              } ${selectedPoleId === pole.id ? 'bg-zinc-800/70' : ''} ${
+                pole.status === 'approved' ? 'bg-green-500/5' : ''
+              } ${pole.status === 'planted' ? 'opacity-60' : ''} ${pole.has_open_verification_snag ? 'ring-1 ring-red-500/30' : ''}`}
             >
               <td className="py-2 px-3 font-semibold text-zinc-100">{pole.pole_label}</td>
               <td className="py-2 px-3">
@@ -164,7 +168,11 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole, onA
                 </div>
               </td>
               <td className="py-2 px-3">
-                <VerifyFlag pole={pole} onClick={(e) => { e.stopPropagation(); onSnagPole(pole); }} />
+                {pole.has_photos ? (
+                  <VerifyFlag pole={pole} onClick={(e) => { e.stopPropagation(); onSnagPole(pole); }} />
+                ) : (
+                  <span className="text-xs text-zinc-600">—</span>
+                )}
               </td>
             </tr>
           ))}

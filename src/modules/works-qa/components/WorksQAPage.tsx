@@ -133,6 +133,29 @@ export function WorksQAPage() {
   const snaggedCount = poles.filter(p => p.status === 'snagged').length;
   const inProgressCount = poles.filter(p => p.status === 'in_progress').length;
 
+  // Build funnel: planned (SoW) → planted (field-confirmed or photographed) → QA'd.
+  // `poles` is the planted∪photographed set, so every row is a physically-existing
+  // pole; QA'd is the photographed subset and the planted→QA'd gap is the rows
+  // still awaiting photos. planned is the only number not in `poles` (it includes
+  // not-yet-built poles) — read it from the zones rollup for the current scope.
+  const plantedCount = poles.length;
+  const qadCount = poles.filter(p => p.has_photos).length;
+  const awaitingPhotosCount = plantedCount - qadCount;
+  const plannedCount: number | null = (() => {
+    if (ponNo != null) {
+      for (const z of zones) {
+        const pon = z.pons.find(p => p.pon_no === ponNo);
+        if (pon) return pon.pole_count;
+      }
+      return null;
+    }
+    if (zoneNo != null) {
+      const z = zones.find(z => z.zone_no === zoneNo);
+      return z ? z.pole_count : null;
+    }
+    return zones.length ? zones.reduce((sum, z) => sum + z.pole_count, 0) : null;
+  })();
+
   return (
     <div className="space-y-4">
       {/* Top bar: back, project name, filters, snag-report button, sync, zip */}
@@ -155,14 +178,32 @@ export function WorksQAPage() {
         }}
       />
 
-      {/* Summary counts */}
+      {/* Summary counts — planned → planted → QA'd funnel, then QA breakdown */}
       {!polesLoading && poles.length > 0 && (
-        <div className="flex gap-5 text-xs text-zinc-500">
-          <span><span className="font-medium text-zinc-300">{poles.length}</span> with photos</span>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-zinc-500">
+          <span className="flex items-center gap-2">
+            <span title="Poles planned in the SoW for this scope">
+              <span className="font-medium text-zinc-300">{plannedCount ?? '—'}</span> planned
+            </span>
+            <span className="text-zinc-700">→</span>
+            <span title="Poles physically in the field: QField civil-audit confirms planted, or QA photos exist">
+              <span className="font-medium text-sky-300">{plantedCount}</span> planted
+            </span>
+            <span className="text-zinc-700">→</span>
+            <span title="Poles with QA photos captured">
+              <span className="font-medium text-teal-300">{qadCount}</span> QA&apos;d
+            </span>
+          </span>
+          <span className="text-zinc-700">·</span>
           <span><span className="font-medium text-green-400">{approvedCount}</span> approved</span>
           <span><span className="font-medium text-teal-400">{readyCount}</span> ready</span>
           <span><span className="font-medium text-red-400">{snaggedCount}</span> snagged</span>
           <span><span className="font-medium text-yellow-400">{inProgressCount}</span> in progress</span>
+          {awaitingPhotosCount > 0 && (
+            <span title="Planted in the field but no QA photos uploaded yet">
+              <span className="font-medium text-sky-300">{awaitingPhotosCount}</span> awaiting photos
+            </span>
+          )}
         </div>
       )}
 

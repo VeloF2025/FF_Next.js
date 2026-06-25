@@ -4,7 +4,14 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
-import { computePoleSummary, type PoleOverviewRow } from '@/modules/works-qa/utils/pole-overview';
+import { computePoleSummary, plantedOnlyPoleSummary, type PoleOverviewRow } from '@/modules/works-qa/utils/pole-overview';
+
+// Field-confirmed-planted statuses are every QField civil-audit Status except an
+// explicit removal — a planted pole physically exists in the field even if its
+// QA photos haven't been captured yet. Kept as "not removed" rather than an
+// allow-list so new Status strings default to "planted" (the safe assumption for
+// the funnel; a stray new status surfaces as a planted row rather than vanishing).
+const PLANTED_EXCLUDED_STATUS = 'Pole Removed/Canceled';
 
 // SLOT_META is a trusted in-code constant (no user input), so its column/key
 // names are safe to interpolate. Returning a bounded `present_slots` array (≤22
@@ -29,7 +36,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ponFilter = `AND pon_no = $${params.length}`;
     }
 
-    const result = await pool.query(`
+    // Two row sources, unioned in JS so the per-slot derivation (computePoleSummary)
+    // stays pure and unit-tested:
+    //   1. photographed — pole_qa_photos rows (full QA dots/status). Source of truth
+    //      for "QA'd"; also covers planted poles whose field_status hasn't synced.
+    //   2. planted-only — poles.field_status confirms planted but no pole_qa_photos
+    //      row exists yet → surfaces the planted→QA'd gap (Phase 2 funnel).
+    // The union is essential: listing planted-only would drop photographed poles
+    // that lack a field_status (e.g. projects not yet ingested → empty table).
+    const photoQuery = pool.query(`
       SELECT
         id, pole_label, zone_no, pon_no, approved_at, slot_approvals,
         COALESCE(array_length(main_joint_tray_keys, 1), 0) AS tray_count,
@@ -63,7 +78,49 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ORDER BY pon_no ASC NULLS LAST, pole_label ASC
     `, params);
 
-    const summaries = result.rows.map(r => computePoleSummary(r as PoleOverviewRow));
+    // Planted poles (field_status) with no QA photos yet. NOT EXISTS against
+    // pole_qa_photos keeps the two sets disjoint so the union never double-counts.
+    const plantedParams = [...params, PLANTED_EXCLUDED_STATUS];
+    const plantedQuery = pool.query(`
+      SELECT pole_number, zone_no, pon_no, field_status
+      FROM poles
+      WHERE project_id = $1::uuid ${ponFilter}
+        AND field_status IS NOT NULL
+        AND field_status <> $${plantedParams.length}
+        AND NOT EXISTS (
+          SELECT 1 FROM pole_qa_photos q
+          WHERE q.project_id = poles.project_id
+            AND q.pole_label = poles.pole_number
+        )
+      ORDER BY pon_no ASC NULLS LAST, pole_number ASC
+    `, plantedParams);
+
+    const [photoResult, plantedResult] = await Promise.all([photoQuery, plantedQuery]);
+
+    const photographed = photoResult.rows.map(r => computePoleSummary(r as PoleOverviewRow));
+    const plantedRows = plantedResult.rows as Array<{
+      pole_number: string;
+      zone_no: number | null;
+      pon_no: number | null;
+      field_status: string | null;
+    }>;
+    const plantedOnly = plantedRows.map(r => plantedOnlyPoleSummary({
+      pole_number: r.pole_number,
+      zone_no: r.zone_no,
+      pon_no: r.pon_no,
+      field_status: r.field_status,
+    }));
+
+    // pon_no asc (NULLS LAST), then pole_label asc — matches each query's ORDER BY
+    // so photographed and planted-only rows interleave predictably.
+    const summaries = [...photographed, ...plantedOnly].sort((a, b) => {
+      if (a.pon_no !== b.pon_no) {
+        if (a.pon_no === null) return 1;
+        if (b.pon_no === null) return -1;
+        return a.pon_no - b.pon_no;
+      }
+      return a.pole_label.localeCompare(b.pole_label);
+    });
     return apiResponse.success(res, summaries);
   } catch (err) {
     log.error('works-qa/poles', { error: err instanceof Error ? err.message : String(err) });

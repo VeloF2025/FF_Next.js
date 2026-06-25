@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computePoleSummary, type PoleOverviewRow } from '../pole-overview';
+import { computePoleSummary, plantedOnlyPoleSummary, type PoleOverviewRow } from '../pole-overview';
 import { SLOT_META } from '../slot-keys';
 
 const ALL_KEYS = SLOT_META.map(s => s.key);
@@ -104,5 +104,36 @@ describe('computePoleSummary — photo count', () => {
     expect(s.total_photos).toBe(3);
     expect(s.unassigned_count).toBe(3);
     expect(s.status).toBe('empty');
+  });
+});
+
+describe('computePoleSummary — photographed flag', () => {
+  it('marks computed rows as having photos', () => {
+    expect(computePoleSummary(row()).has_photos).toBe(true);
+  });
+});
+
+describe('plantedOnlyPoleSummary — field-planted, no QA photos', () => {
+  const planted = plantedOnlyPoleSummary({
+    pole_number: 'MOA.P.F107',
+    zone_no: 15,
+    pon_no: 223,
+    field_status: 'Pole Planted/ All Photos',
+  });
+
+  it('status is planted with no photos and a synthetic, non-uuid id', () => {
+    expect(planted.status).toBe('planted');
+    expect(planted.has_photos).toBe(false);
+    expect(planted.id).toBe('planted:MOA.P.F107');
+    expect(planted.field_status).toBe('Pole Planted/ All Photos');
+  });
+
+  it('all dots empty and zero counts (nothing to QA yet)', () => {
+    expect(planted.civil_slots).toHaveLength(8);
+    expect(planted.dome_slots).toHaveLength(8);
+    expect(planted.joint_slots).toHaveLength(6);
+    expect([...planted.civil_slots, ...planted.dome_slots, ...planted.joint_slots].every(s => s === 'empty')).toBe(true);
+    expect(planted.total_photos).toBe(0);
+    expect(planted.outstanding_snag_count).toBe(0);
   });
 });

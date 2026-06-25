@@ -24,6 +24,8 @@ export interface PoleOverviewRow {
   vlm_fail_keys: string[];
   /** Per-slot human Approve/Snag decisions (migration 247); may be null. */
   slot_approvals: Record<string, SlotApproval> | null;
+  /** QField civil-audit Status (poles.field_status); optional, display-only. */
+  field_status?: string | null;
 }
 
 function deriveSlotState(
@@ -81,6 +83,51 @@ export function computePoleSummary(row: PoleOverviewRow): PoleSummary {
     outstanding_snag_count: row.outstanding_snag_count,
     has_open_verification_snag: row.has_open_verification_snag,
     has_verified_planted: row.has_verified_planted,
+    has_photos: true,
+    field_status: row.field_status ?? null,
+  };
+}
+
+/**
+ * Builds the PON-overview row for a pole that is field-confirmed planted
+ * (poles.field_status, from the QField civil-audit) but has no pole_qa_photos
+ * record yet — i.e. built in the field but not yet captured for QA. These rows
+ * carry no dots/snags/approval and are non-interactive in the table; they exist
+ * so the planted→QA'd gap is visible instead of silently dropped (Phase 2 funnel).
+ */
+export function plantedOnlyPoleSummary(input: {
+  pole_number: string;
+  zone_no: number | null;
+  pon_no: number | null;
+  field_status: string | null;
+}): PoleSummary {
+  const emptySlots = (d: Discipline): SlotState[] =>
+    SLOT_META.filter(s => s.discipline === d).map(() => 'empty' as SlotState);
+
+  return {
+    // Synthetic id (no pole_qa_photos row) — prefixed so the table can tell it
+    // apart from a real uuid and skip navigation/approve/verify.
+    id: `planted:${input.pole_number}`,
+    pole_label: input.pole_number,
+    zone_no: input.zone_no,
+    pon_no: input.pon_no,
+    civil_filled: 0,
+    dome_filled: 0,
+    joint_filled: 0,
+    tray_count: 0,
+    vlm_failures: 0,
+    civil_slots: emptySlots('civil'),
+    dome_slots: emptySlots('dome'),
+    joint_slots: emptySlots('main_joint'),
+    total_photos: 0,
+    unassigned_count: 0,
+    status: 'planted',
+    approved_at: null,
+    outstanding_snag_count: 0,
+    has_open_verification_snag: false,
+    has_verified_planted: false,
+    has_photos: false,
+    field_status: input.field_status,
   };
 }
 
