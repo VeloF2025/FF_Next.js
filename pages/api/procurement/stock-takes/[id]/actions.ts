@@ -194,7 +194,7 @@ async function handleApprove(
       await sql`
         INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
         VALUES (${itemId}, ${lineLocationId}, ${variance}, NOW())
-        ON CONFLICT (stock_item_id, location_id, lot_number)
+        ON CONFLICT (stock_item_id, location_id, COALESCE(lot_number, ''))
         DO UPDATE SET
           quantity = stock_quants.quantity + ${variance},
           last_movement_date = NOW(),
@@ -241,7 +241,7 @@ async function handleApprove(
         ${adjType}, ${expected}, ${finalCount}, ${Math.abs(variance)},
         ${unitCost}, ${Math.abs(variance) * unitCost}, 'COUNT_ERROR',
         ${'Variance from stock take ' + takeRef},
-        ${data.approved_by_name || null}, NOW(), ${data.approved_by_name || 'system'}
+        null, NOW(), ${data.approved_by_name || 'system'}
       )
     `;
 

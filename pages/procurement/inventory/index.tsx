@@ -99,11 +99,11 @@ interface StockBundle {
 interface StockTake {
   id: string;
   reference_number: string;
-  status: 'draft' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled';
+  status: 'draft' | 'in_progress' | 'pending_review' | 'approved' | 'completed' | 'cancelled';
   stock_take_type: string;
   started_at?: string;
   completed_at?: string;
-  item_count?: number;
+  line_count?: number;
   calc_variance_value?: number;
   total_variance_value?: number;
 }
@@ -112,6 +112,7 @@ const statusColors: Record<string, string> = {
   draft: 'bg-gray-500/20 text-gray-400',
   in_progress: 'bg-blue-500/20 text-blue-400',
   pending_review: 'bg-yellow-500/20 text-yellow-400',
+  approved: 'bg-green-500/20 text-green-400',
   completed: 'bg-green-500/20 text-green-400',
   cancelled: 'bg-red-500/20 text-red-300',
 };
@@ -748,12 +749,14 @@ function BundlesTabContent() {
 
 // Stock Takes Tab Content
 function StockTakesTabContent() {
+  const router = useRouter();
   const [stockTakes, setStockTakes] = useState<StockTake[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
+    name: '',
     stock_take_type: 'full',
     notes: '',
   });
@@ -778,7 +781,8 @@ function StockTakesTabContent() {
   };
 
   const openNewModal = () => {
-    setFormData({ stock_take_type: 'full', notes: '' });
+    const today = new Date().toISOString().slice(0, 10);
+    setFormData({ name: `Stock Take ${today}`, stock_take_type: 'full', notes: '' });
     setShowModal(true);
   };
 
@@ -787,6 +791,10 @@ function StockTakesTabContent() {
   };
 
   const handleCreate = async () => {
+    if (!formData.name.trim()) {
+      notificationService.error('Name is required');
+      return;
+    }
     setIsSaving(true);
     try {
       const res = await fetch('/api/procurement/stock-takes', {
@@ -799,7 +807,12 @@ function StockTakesTabContent() {
       if (data.success) {
         notificationService.success('Stock take created');
         closeModal();
-        fetchStockTakes();
+        // Jump straight into the new take so the user can initialise & count
+        if (data.data?.id) {
+          router.push(`/procurement/stock-takes/${data.data.id}`);
+        } else {
+          fetchStockTakes();
+        }
       } else {
         notificationService.error(data.error?.message || 'Failed to create stock take');
       }
@@ -891,7 +904,8 @@ function StockTakesTabContent() {
         {filtered.map((take) => (
           <div
             key={take.id}
-            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-indigo-500/50 transition-colors"
+            onClick={() => router.push(`/procurement/stock-takes/${take.id}`)}
+            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -905,7 +919,7 @@ function StockTakesTabContent() {
                 <span className={`px-2 py-1 rounded text-xs ${statusColors[take.status] || 'bg-gray-500/20 text-gray-400'}`}>
                   {take.status.replace('_', ' ')}
                 </span>
-                <span className="text-sm text-[var(--ff-text-secondary)]">{Number(take.item_count || 0)} items</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">{Number(take.line_count || 0)} items</span>
                 {take.status === 'draft' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(take); }}
@@ -940,6 +954,18 @@ function StockTakesTabContent() {
             </div>
 
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. Warehouse A full count"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                  autoFocus
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Stock Take Type</label>
                 <select
