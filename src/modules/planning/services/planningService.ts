@@ -133,7 +133,7 @@ export async function createPlanningItem(payload: CreatePlanningItemPayload): Pr
       payload.priority ?? 'normal',
       payload.source ?? 'manual',
       JSON.stringify(checklists),
-      null,
+      payload.pipeline_project_id ?? null,
       payload.created_by ?? null,
     ],
   );

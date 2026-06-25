@@ -55,6 +55,7 @@ export interface CreatePlanningItemPayload {
   assigned_to?: string | null;
   priority?: PlanningPriority;
   source?: PlanningSource;
+  pipeline_project_id?: string | null;
   created_by?: string | null;
 }
 

@@ -26,7 +26,7 @@ export function useUpdatePlanningItem() {
       return json.data;
     },
     onSuccess: (data) => {
-      qc.setQueryData(planningKeys.detail(data.id), data);
+      qc.invalidateQueries({ queryKey: planningKeys.detail(data.id) });
       qc.invalidateQueries({ queryKey: planningKeys.lists() });
     },
   });

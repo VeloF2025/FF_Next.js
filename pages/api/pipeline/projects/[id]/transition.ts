@@ -188,13 +188,13 @@ export default withAuth(withErrorHandler(async (
 
     // 6d. Auto-create the first Planning card (idempotent on unique index).
     try {
-      const planningItem = await createPlanningItem({
+      await createPlanningItem({
         project_id: project.id as string,
         title: `${pp.project_name as string} — Planning`,
         source: 'pipeline_auto',
+        pipeline_project_id: pipelineProjectId,
         created_by: userId,
       });
-      await sql`UPDATE planning_items SET pipeline_project_id = ${pipelineProjectId} WHERE id = ${planningItem.id}`;
     } catch (err) {
       // Unique-violation = card already exists for this pipeline project; safe to ignore.
       log.warn('Planning auto-card not created (likely already exists)', { pipelineProjectId, err }, 'PipelineTransition');
