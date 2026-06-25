@@ -23,7 +23,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [optimisticMoves, setOptimisticMoves] = useState<Record<string, PlanningStage>>({});
 
   const result = usePlanningItems({ ...filters, exclude_stage: DEFAULT_EXCLUDED_STAGES, pageSize: KANBAN_PAGE_SIZE });
-  const items: PlanningItemWithRelations[] = result.data?.data ?? [];
+  const items: PlanningItemWithRelations[] = useMemo(() => result.data?.data ?? [], [result.data]);
   const { isLoading, isError, refetch } = result;
   const error = result.error as Error | null;
   const updateItem = useUpdatePlanningItem();

@@ -1,22 +1,20 @@
 {
   "sessions": {
-    "357c6add-7e7b-4b0b-82ff-bd935422c407": {
-      "session_id": "357c6add-7e7b-4b0b-82ff-bd935422c407",
-      "started_at": "2026-04-20T10:17:35.445Z",
-      "total_input_tokens": 44537,
+    "64a1a0cb-6e43-4ebc-b8b8-f862ba660b71": {
+      "session_id": "64a1a0cb-6e43-4ebc-b8b8-f862ba660b71",
+      "started_at": "2026-06-25T11:31:50.857Z",
+      "total_input_tokens": 12226,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.13361099999999995,
-      "tool_calls": 231,
+      "total_cost_usd": 0.03667799999999998,
+      "tool_calls": 90,
       "tools_used": {
-        "EnterWorktree": 1,
-        "Bash": 77,
-        "Write": 15,
-        "Edit": 34,
-        "Read": 71,
-        "TaskUpdate": 1,
-        "Grep": 21,
-        "Glob": 7,
-        "Agent": 4
+        "Glob": 4,
+        "Grep": 10,
+        "Read": 30,
+        "Agent": 7,
+        "Write": 6,
+        "Bash": 23,
+        "Edit": 10
       }
     }
   }
