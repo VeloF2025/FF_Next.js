@@ -22,6 +22,15 @@ if ! curl -sf "$PROD_URL/api/health" > /dev/null 2>&1; then
   fi
 fi
 
+# Step 0: Re-fetch photos for DRs that came back empty (late 1Map-sync recovery).
+# Sends no messages — only re-triggers photo fetch + categorization.
+REFETCH_RESPONSE=$(curl -sf -X POST "${URL}/api/cron/refetch-missing-photos?limit=10" \
+  -H "Authorization: Bearer ${CRON_SECRET}" \
+  -H "Content-Type: application/json" 2>&1) || true
+
+REFETCH_SUMMARY=$(echo "$REFETCH_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin)['data']; print(f\"refetched={d['processed']} recovered={d['recovered']}\")" 2>/dev/null || echo "no refetch")
+echo "$LOG_PREFIX REFETCH: ${URL} — ${REFETCH_SUMMARY}"
+
 # Step 1: Retry failed/bad categorizations (re-trigger VLM for DRs that got Error results)
 RETRY_RESPONSE=$(curl -sf -X POST "${URL}/api/cron/retry-categorizations?limit=10" \
   -H "Authorization: Bearer ${CRON_SECRET}" \
