@@ -392,7 +392,7 @@ async function runLocalResolution(): Promise<{
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM loeks_field_mappings l
     WHERE UPPER(TRIM(l.ont_serial)) = UPPER(TRIM(pp.serial_number))
-      AND l.dr_number IS NOT NULL
+      AND l.dr_number ~ '^DR[0-9]+$'  -- real DR only; exclude placeholders ("DR NEEDED", "ACTIVATION NEEDED")
       AND pp.resolution_status = 'not_found'
   `);
 
