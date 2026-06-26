@@ -18,6 +18,11 @@ describe('validateSerialFormat — ONT', () => {
   test('normalised is uppercased', () => {
     expect(validateSerialFormat('alclb4abc123', 'ont').normalised).toBe('ALCLB4ABC123');
   });
+  test('normalised removes spaces/hyphens and scanner label noise', () => {
+    const r = validateSerialFormat('S/N: alcl b48e-9de0', 'ont');
+    expect(r.valid).toBe(true);
+    expect(r.normalised).toBe('ALCLB48E9DE0');
+  });
 });
 
 describe('validateSerialFormat — UPS', () => {

@@ -18,8 +18,9 @@ export function validateSerialFormat(
   raw: string,
   device: SerialDevice,
 ): FormatValidationResult {
-  const normalised = raw.trim().toUpperCase();
   const prefix = device === 'ont' ? ONT_SERIAL_PREFIX : UPS_SERIAL_PREFIX;
+  const compact = raw.trim().toUpperCase().replace(/[\s-]+/g, '');
+  const normalised = compact.match(new RegExp(`${prefix}[A-Z0-9]+`))?.[0] ?? compact;
 
   if (!normalised.startsWith(prefix)) {
     return {
