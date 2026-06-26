@@ -9,6 +9,7 @@ import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { createPlanningItem } from '@/modules/planning/services/planningService';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -184,6 +185,28 @@ export default withAuth(withErrorHandler(async (
       )
       ON CONFLICT (project_id, pipeline_project_id) DO NOTHING
     `;
+
+    // 6d. Auto-create the first Planning card (idempotent on unique index).
+    try {
+      await createPlanningItem({
+        project_id: project.id as string,
+        title: `${pp.project_name as string} — Planning`,
+        source: 'pipeline_auto',
+        pipeline_project_id: pipelineProjectId,
+        created_by: userId,
+      });
+    } catch (err) {
+      // Non-fatal: the planning auto-card is best-effort and must never break the
+      // pipeline transition (it also runs before migration 247 is applied — the
+      // table may not exist yet). 23505 = the Stage-0 card already exists for this
+      // pipeline project (expected on re-transition); anything else is a genuine
+      // failure that must be visible, not silently filed as "already exists".
+      if ((err as { code?: string })?.code === '23505') {
+        log.info('Planning auto-card already exists for pipeline project', { pipelineProjectId }, 'PipelineTransition');
+      } else {
+        log.error('Planning auto-card creation failed unexpectedly', { pipelineProjectId, err }, 'PipelineTransition');
+      }
+    }
 
     // 7. Seed project requirements
     await sql`SELECT seed_project_requirements(${project.id}::uuid)`;
