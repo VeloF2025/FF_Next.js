@@ -178,7 +178,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM oes_activations oa
-    WHERE pp.serial_number = oa.serial_number
+    WHERE UPPER(TRIM(oa.serial_number)) = UPPER(TRIM(pp.serial_number))
       AND pp.resolution_status = 'not_found'
   `);
 
@@ -197,7 +197,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM dr_photo_unified_reviews ur
-    WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number)
+    WHERE (UPPER(TRIM(ur.oes_serial)) = UPPER(TRIM(pp.serial_number)) OR UPPER(TRIM(ur.ont_serial_scanned)) = UPPER(TRIM(pp.serial_number)))
       AND pp.resolution_status = 'not_found'
   `);
 
@@ -210,7 +210,7 @@ async function runLocalResolution(): Promise<{
         resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM onemap_properties op
-    WHERE op.ont_barcode = pp.serial_number
+    WHERE UPPER(TRIM(op.ont_barcode)) = UPPER(TRIM(pp.serial_number))
       AND pp.resolution_status = 'not_found'
   `);
 
@@ -228,7 +228,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM drops d
-    WHERE d.ont_serial = pp.serial_number
+    WHERE UPPER(TRIM(d.ont_serial)) = UPPER(TRIM(pp.serial_number))
       AND pp.resolution_status = 'not_found'
   `);
 
@@ -244,7 +244,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM stock_serials ss
-    WHERE ss.serial_number = pp.serial_number
+    WHERE UPPER(TRIM(ss.serial_number)) = UPPER(TRIM(pp.serial_number))
       AND ss.installed_at_drop_number IS NOT NULL
       AND pp.resolution_status = 'not_found'
   `);
@@ -263,7 +263,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM foto_ai_reviews fr
-    WHERE (fr.vlm_ont_serial_step6 = pp.serial_number OR fr.vlm_ont_serial_step9 = pp.serial_number)
+    WHERE (UPPER(TRIM(fr.vlm_ont_serial_step6)) = UPPER(TRIM(pp.serial_number)) OR UPPER(TRIM(fr.vlm_ont_serial_step9)) = UPPER(TRIM(pp.serial_number)))
       AND pp.resolution_status = 'not_found'
   `);
 
@@ -282,7 +282,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM wa_photos wp
-    WHERE wp.vlm_ont_serial = pp.serial_number
+    WHERE UPPER(TRIM(wp.vlm_ont_serial)) = UPPER(TRIM(pp.serial_number))
       AND wp.drop_number IS NOT NULL
       AND pp.resolution_status = 'not_found'
   `);
@@ -303,7 +303,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM serial_change_history sch
-    WHERE (sch.new_value = pp.serial_number OR sch.old_value = pp.serial_number)
+    WHERE (UPPER(TRIM(sch.new_value)) = UPPER(TRIM(pp.serial_number)) OR UPPER(TRIM(sch.old_value)) = UPPER(TRIM(pp.serial_number)))
       AND sch.change_type = 'ont_serial'
       AND pp.resolution_status = 'not_found'
   `);
@@ -324,9 +324,9 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM offline_devices od
-    WHERE (od.serial_number = pp.serial_number
-        OR od.expected_serial = pp.serial_number
-        OR od.olt_serial = pp.serial_number)
+    WHERE (UPPER(TRIM(od.serial_number)) = UPPER(TRIM(pp.serial_number))
+        OR UPPER(TRIM(od.expected_serial)) = UPPER(TRIM(pp.serial_number))
+        OR UPPER(TRIM(od.olt_serial)) = UPPER(TRIM(pp.serial_number)))
       AND od.drop_number IS NOT NULL
       AND pp.resolution_status = 'not_found'
   `);
@@ -346,7 +346,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM olt_mismatch_records om
-    WHERE (om.olt_serial = pp.serial_number OR om.wrong_onemap_serial = pp.serial_number)
+    WHERE (UPPER(TRIM(om.olt_serial)) = UPPER(TRIM(pp.serial_number)) OR UPPER(TRIM(om.wrong_onemap_serial)) = UPPER(TRIM(pp.serial_number)))
       AND pp.resolution_status = 'not_found'
   `);
 
@@ -362,7 +362,7 @@ async function runLocalResolution(): Promise<{
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM arch_offline_devices aod
-    WHERE aod.serial_number = pp.serial_number
+    WHERE UPPER(TRIM(aod.serial_number)) = UPPER(TRIM(pp.serial_number))
       AND aod.drop_number IS NOT NULL
       AND pp.resolution_status = 'not_found'
   `);
@@ -377,8 +377,22 @@ async function runLocalResolution(): Promise<{
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM onemap_installations oi
     JOIN onemap_properties op ON op.id = oi.property_id
-    WHERE oi.ont_barcode = pp.serial_number
+    WHERE UPPER(TRIM(oi.ont_barcode)) = UPPER(TRIM(pp.serial_number))
       AND op.drop_number IS NOT NULL
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 13. loeks_field_mappings — Loeks/Mohadin field install mapping (serial → DR)
+  matchedLocal += await matchSource('loeks_field_mappings', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = l.dr_number,
+        resolved_source = 'loeks_field_mappings',
+        resolved_details = jsonb_build_object('matched_field', 'ont_serial'),
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
+    FROM loeks_field_mappings l
+    WHERE UPPER(TRIM(l.ont_serial)) = UPPER(TRIM(pp.serial_number))
+      AND l.dr_number IS NOT NULL
       AND pp.resolution_status = 'not_found'
   `);
 
