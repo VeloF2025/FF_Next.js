@@ -95,7 +95,7 @@ export interface RunReportResult {
   cohortDate: string;
   generatedDate: string;
   dryRun: boolean;
-  groups: { groupName: string; counts: GroupReportCounts; sent: boolean; url: string | null }[];
+  groups: { groupName: string; counts: GroupReportCounts; sent: boolean; url: string | null; error?: string }[];
   ops: { totalNotFound: number; sent: boolean; url: string | null };
 }
 
@@ -120,22 +120,41 @@ export async function runGroupNonActivationReport(opts: {
   const groups: RunReportResult['groups'] = [];
   for (const r of built) {
     let url: string | null = null;
+    let sent = false;
+    let error: string | undefined;
     if (!dryRun) {
-      const caption = groupCaption(r.groupName, r.project, opts.cohortDate, r.counts);
-      url = await sendGroupReport(r.groupJid, r.groupName, opts.cohortDate, r.buffer, caption);
-      log.info('Group non-activation report sent', { group: r.groupName }, 'GroupNonActivationReport');
+      // Isolate per-group failures: one bad send must not drop the rest of the run.
+      try {
+        const caption = groupCaption(r.groupName, r.project, opts.cohortDate, r.counts);
+        url = await sendGroupReport(r.groupJid, r.groupName, opts.cohortDate, r.buffer, caption);
+        sent = true;
+        log.info('Group non-activation report sent', { group: r.groupName }, 'GroupNonActivationReport');
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+        log.error('Group non-activation report send failed', { group: r.groupName, error }, 'GroupNonActivationReport');
+      }
     }
-    groups.push({ groupName: r.groupName, counts: r.counts, sent: !dryRun, url });
+    groups.push({ groupName: r.groupName, counts: r.counts, sent, url, error });
   }
 
   const opsRows = await getConsolidatedNotFound(opts.generatedDate);
   let opsUrl: string | null = null;
   let opsSent = false;
   if (!dryRun && opsRows.length > 0) {
-    const opsBuffer = await buildOpsWorkbook(opsRows, opts.generatedDate);
-    opsUrl = await sendOpsReport(opts.generatedDate, opsRows.length, opsBuffer);
-    opsSent = true;
-    log.info('Unresolved PP ops view sent', { total: opsRows.length }, 'GroupNonActivationReport');
+    try {
+      const opsBuffer = await buildOpsWorkbook(opsRows, opts.generatedDate);
+      opsUrl = await sendOpsReport(opts.generatedDate, opsRows.length, opsBuffer);
+      opsSent = true;
+      log.info('Unresolved PP ops view sent', { total: opsRows.length }, 'GroupNonActivationReport');
+    } catch (err) {
+      log.error(
+        'Unresolved PP ops view send failed',
+        { error: err instanceof Error ? err.message : String(err) },
+        'GroupNonActivationReport',
+      );
+    }
+  } else if (!dryRun) {
+    log.info('No unresolved PP serials — ops worklist skipped', {}, 'GroupNonActivationReport');
   }
 
   return {

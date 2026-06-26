@@ -30,7 +30,7 @@ interface OpsRaw {
 export async function getConsolidatedNotFound(asOfDateIso: string): Promise<OpsRow[]> {
   const { rows } = await pool.query(
     `SELECT pp.serial_number, pp.project,
-            ($1::date - pp.date_registered) AS aging_days,
+            ($1::date - pp.date_registered::date) AS aging_days,
             pp.date_registered::text AS date_registered,
             CASE
               WHEN EXISTS (SELECT 1 FROM loeks_field_mappings l
