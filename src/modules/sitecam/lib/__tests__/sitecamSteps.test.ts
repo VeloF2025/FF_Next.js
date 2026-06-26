@@ -64,3 +64,14 @@ describe('activation VLM coverage', () => {
     expect(step8?.serialDevice).toBeUndefined();
   });
 });
+
+describe('gallery upload allow-list', () => {
+  it('only Signature + Dome Joint Open/Closed allow gallery upload', () => {
+    const uploadable = ACTIVATION_STEPS.filter((s) => s.allowUpload).map((s) => s.label);
+    expect(uploadable).toEqual(['Signature', 'Dome Joint Open', 'Dome Joint Closed']);
+  });
+
+  it('no civil step allows gallery upload (camera-only)', () => {
+    expect(CIVIL_STEPS.some((s) => s.allowUpload)).toBe(false);
+  });
+});

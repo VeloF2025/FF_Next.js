@@ -78,28 +78,32 @@ describe('StepCapture photo preview', () => {
   });
 });
 
-describe('StepCapture test-only gallery upload (NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD)', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.resetModules();
-  });
-
-  it('hides the "Upload Photo (test)" button by default (flag unset)', () => {
-    // The statically-imported module was evaluated with the flag unset, so the
-    // gallery upload must be invisible — this is the production-safe default.
+describe('StepCapture gallery upload (allowUpload prop)', () => {
+  it('hides the "Upload Photo" button by default (allowUpload unset)', () => {
+    // Camera-only steps (1–9, civils) must never offer the gallery upload —
+    // it would defeat the live-capture / anti-reuse guarantee.
     render(<StepCapture step={step({ status: 'pending' })} {...baseProps} />);
     expect(screen.getByText('Take Photo')).toBeTruthy();
-    expect(screen.queryByText('Upload Photo (test)')).toBeNull();
+    expect(screen.queryByText('Upload Photo')).toBeNull();
   });
 
-  it('shows the "Upload Photo (test)" button only when the flag is "true"', async () => {
-    // The flag is read into a module-level const at import time, so the env must
-    // be stubbed before a fresh import re-evaluates it.
-    vi.resetModules();
-    vi.stubEnv('NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD', 'true');
-    const { StepCapture: FlaggedStepCapture } = await import('../StepCapture');
-    render(<FlaggedStepCapture step={step({ status: 'pending' })} {...baseProps} />);
-    expect(screen.getByText('Upload Photo (test)')).toBeTruthy();
+  it('shows the "Upload Photo" button when allowUpload is true', () => {
+    // Signature + dome-joint steps pass allowUpload — the photo is legitimately
+    // captured outside the SiteCam camera.
+    render(<StepCapture step={step({ status: 'pending' })} {...baseProps} allowUpload />);
+    expect(screen.getByText('Upload Photo')).toBeTruthy();
+  });
+
+  it('routes an uploaded file through onCapture (same pipeline as a camera photo)', () => {
+    const onCapture = vi.fn();
+    const { container } = render(
+      <StepCapture step={step({ status: 'pending' })} {...baseProps} onCapture={onCapture} allowUpload />,
+    );
+    // The gallery input is the one without a `capture` attribute.
+    const galleryInput = container.querySelector('input[type="file"]:not([capture])') as HTMLInputElement;
+    const file = new File(['x'], 'signature.jpg', { type: 'image/jpeg' });
+    fireEvent.change(galleryInput, { target: { files: [file] } });
+    expect(onCapture).toHaveBeenCalledWith(file);
   });
 });
 
