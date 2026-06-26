@@ -57,6 +57,13 @@ export async function buildGroupNonActivationReports(
     if (cohort.length === 0) continue; // a group gets a sheet only if it submitted that day
 
     const backlog = await getBacklog(group.groupJid, backlogFrom, backlogTo);
+    if (group.showPp && !group.project) {
+      log.warn(
+        'Activations group has no project_name — PP tab will be empty',
+        { group: group.groupName, groupJid: group.groupJid },
+        'GroupNonActivationReport',
+      );
+    }
     const ppList = group.showPp ? await getPpList(ppProjectFor(group.project), opts.cohortDate) : [];
 
     const { buffer, counts } = await buildGroupWorkbook({

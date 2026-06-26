@@ -60,10 +60,12 @@ function addSummary(wb: ExcelJS.Workbook, d: GroupReportData, c: GroupReportCoun
   ws.addRow([`Project: ${d.group.project ?? '—'}   |   Group type: ${d.group.groupType}`]);
   ws.addRow([`Cohort (first submissions): ${d.cohortDate}   |   Generated: ${d.generatedDate}`]);
   ws.addRow([]);
+  const ppExcluded = d.cohort.filter((r) => !r.activationDate && r.onPp).length;
   styleHeaderRow(ws.addRow(["Yesterday's submissions in this group", 'Count']));
   ws.addRow(['Activated', c.activated]);
   ws.addRow(['Not activated', c.miss]);
   ws.addRow(['  of which likely-typo DR numbers', c.typos]);
+  ws.addRow(['To pre-provision (excluded from misses)', ppExcluded]);
   ws.addRow(['TOTAL submitted', c.cohort]);
   ws.addRow(['Carried-over backlog (older, still open)', c.backlog]);
   if (d.group.showPp) {

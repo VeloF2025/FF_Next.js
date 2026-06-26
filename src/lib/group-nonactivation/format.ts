@@ -40,3 +40,15 @@ export function addDaysIso(iso: string, days: number): string {
   const ms = Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000;
   return new Date(ms).toISOString().slice(0, 10);
 }
+
+/** group.project_name → oes_pp_data.project (only the names that differ). */
+const PP_PROJECT_MAP: Record<string, string> = {
+  'Thembisa POP 1': 'TEM',
+  'Thembisa POP 3': 'TEM-3',
+};
+
+/** Map a group's project_name to the oes_pp_data.project value; '' if unknown/null. */
+export function ppProjectFor(projectName: string | null): string {
+  if (!projectName) return '';
+  return PP_PROJECT_MAP[projectName] ?? projectName;
+}

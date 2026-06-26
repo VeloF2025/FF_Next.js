@@ -8,9 +8,9 @@
  * @module lib/group-nonactivation/queries
  */
 import { pool } from '@/lib/db';
-import { DR_CANONICAL, type ResidualClass } from './format';
+import { DR_CANONICAL, ppProjectFor, type ResidualClass } from './format';
 
-export { DR_CANONICAL };
+export { DR_CANONICAL, ppProjectFor };
 export type { ResidualClass };
 
 /** Home-recon (pre_provision) groups explicitly in scope alongside all dr_submission groups. */
@@ -18,17 +18,6 @@ export const TARGET_HOME_RECON_JIDS = [
   '120363409368493163@g.us', // LAW Home Recon
   '120363426227615187@g.us', // MOA Home Recon
 ];
-
-/** group.project_name → oes_pp_data.project (only the names that differ). */
-const PP_PROJECT_MAP: Record<string, string> = {
-  'Thembisa POP 1': 'TEM',
-  'Thembisa POP 3': 'TEM-3',
-};
-
-export function ppProjectFor(projectName: string | null): string {
-  if (!projectName) return '';
-  return PP_PROJECT_MAP[projectName] ?? projectName;
-}
 
 export interface TargetGroup {
   groupJid: string;
@@ -122,17 +111,19 @@ export async function getCohort(groupJid: string, dateIso: string): Promise<Coho
             q.submitted_by AS lid,
             to_char(q.whatsapp_message_date AT TIME ZONE 'Africa/Johannesburg',
                     'YYYY-MM-DD HH24:MI') AS sub_sast,
-            (SELECT a.activation_date::text FROM oes_activations a
-              WHERE LOWER(a.drop_number) = LOWER(q.drop_number)
-                AND a.status = 'Active' LIMIT 1) AS act_date,
-            (SELECT a.serial_number FROM oes_activations a
-              WHERE LOWER(a.drop_number) = LOWER(q.drop_number)
-                AND a.status = 'Active' LIMIT 1) AS act_serial,
+            act.activation_date::text AS act_date,
+            act.serial_number AS act_serial,
             EXISTS (SELECT 1 FROM oes_pp_data p
                      WHERE LOWER(p.resolved_drop_number) = LOWER(q.drop_number)
                         OR (q.ont_serial_scanned <> ''
                             AND UPPER(TRIM(p.serial_number)) = UPPER(TRIM(q.ont_serial_scanned)))) AS on_pp
        FROM qa_photo_reviews q
+       LEFT JOIN LATERAL (
+         SELECT a.activation_date, a.serial_number
+           FROM oes_activations a
+          WHERE LOWER(a.drop_number) = LOWER(q.drop_number) AND a.status = 'Active'
+          LIMIT 1
+       ) act ON true
       WHERE q.wa_group_jid = $1
         AND (q.created_at AT TIME ZONE 'Africa/Johannesburg')::date = $2::date
       ORDER BY q.drop_number`,
