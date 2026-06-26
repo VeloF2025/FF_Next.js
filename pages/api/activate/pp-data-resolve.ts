@@ -132,7 +132,9 @@ async function logPPStatusChangeToTicket(
  * Run local resolution against ALL DB tables that might contain ONT serial data.
  * Each source is wrapped in try/catch so missing tables don't break the scan.
  */
-async function runLocalResolution(): Promise<{
+// Exported so the nightly re-resolve cron (pages/api/cron/pp-reresolve.ts) can
+// reuse the exact local-scan logic instead of duplicating it.
+export async function runLocalResolution(): Promise<{
   matched_oes: number;
   matched_unified: number;
   matched_onemap: number;

@@ -9,6 +9,8 @@
  */
 import { writeFileSync, mkdirSync } from 'fs';
 import { buildGroupNonActivationReports } from '@/services/groupNonActivationReport';
+import { getConsolidatedNotFound } from '@/lib/group-nonactivation/opsQueries';
+import { buildOpsWorkbook } from '@/lib/group-nonactivation/buildOpsWorkbook';
 
 function arg(name: string, def: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -43,7 +45,19 @@ async function main(): Promise<void> {
       writeFileSync(`${out}/${safe}_${cohortDate}.xlsx`, r.buffer);
     }
   }
-  console.log(`\n${results.length} workbooks built${out ? ` → ${out}` : ''}. Nothing sent.`);
+  // Consolidated "Unresolved Pre-Provision" ops worklist (all open not_found).
+  const opsRows = await getConsolidatedNotFound(generatedDate);
+  const byClass = opsRows.reduce<Record<string, number>>((acc, r) => {
+    acc[r.residualClass] = (acc[r.residualClass] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log(`\nOps worklist (open not_found): ${opsRows.length} — ${JSON.stringify(byClass)}`);
+  if (out && opsRows.length > 0) {
+    const opsBuffer = await buildOpsWorkbook(opsRows, generatedDate);
+    writeFileSync(`${out}/Unresolved-PreProvision-${generatedDate}.xlsx`, opsBuffer);
+  }
+
+  console.log(`\n${results.length} group workbooks + ops worklist built${out ? ` → ${out}` : ''}. Nothing sent.`);
   process.exit(0);
 }
 
