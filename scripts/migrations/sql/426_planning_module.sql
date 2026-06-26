@@ -1,6 +1,11 @@
--- Migration: 247_planning_module.sql
+-- Migration: 426_planning_module.sql
 -- Description: Planning module — NOC-style Kanban for planning work-items (6 stages)
 -- Created: 2026-06-25
+-- Note: relocated from scripts/migrations/247_planning_module.sql (parent dir) and
+-- renumbered to 426 — the canonical runner (scripts/run-pending-migrations.sh) only
+-- scans scripts/migrations/sql/*.sql, and 247 already exists there
+-- (247_rbac_update_all_modules.sql). All DDL is IF NOT EXISTS, so this is a safe
+-- no-op where the tables were already created manually (dev/shared DB).
 
 -- ============================================================================
 -- 1. ATOMIC UID SEQUENCE (mirrors maintenance_ticket_sequences)
