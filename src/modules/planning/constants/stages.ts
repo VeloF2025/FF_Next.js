@@ -1,4 +1,4 @@
-import type { BoardStage, ChecklistItem, PlanningStage, StageChecklists } from '../types/planning';
+import type { BoardStage, ChecklistItem, PlanningPriority, PlanningStage, StageChecklists } from '../types/planning';
 
 export const BOARD_STAGES: { key: BoardStage; label: string }[] = [
   { key: 'intake', label: 'Intake & Setup' },
@@ -22,6 +22,13 @@ export const STAGE_LABELS: Record<PlanningStage, string> = {
 
 // Off-board stages (hidden from the main board, shown in a sub-tab)
 export const PARKED_STAGES: PlanningStage[] = ['on_hold', 'cancelled'];
+
+// Accepted enum values for API input validation (keep in sync with the DB CHECK
+// constraints in scripts/migrations/247_planning_module.sql).
+export const PLANNING_STAGES: readonly PlanningStage[] = [
+  'intake', 'hld', 'lld', 'splice', 'change_control', 'as_built', 'on_hold', 'cancelled',
+];
+export const PLANNING_PRIORITIES: readonly PlanningPriority[] = ['low', 'normal', 'high', 'urgent'];
 
 // Ordered flow used by quick-move chevrons
 export const STAGE_FLOW: BoardStage[] = BOARD_STAGES.map(s => s.key);

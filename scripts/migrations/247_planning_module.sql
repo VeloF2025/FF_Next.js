@@ -23,10 +23,13 @@ CREATE TABLE IF NOT EXISTS planning_items (
   description TEXT,
   scope_area VARCHAR(255),
 
-  stage VARCHAR(32) NOT NULL DEFAULT 'intake',
+  stage VARCHAR(32) NOT NULL DEFAULT 'intake'
+    CHECK (stage IN ('intake','hld','lld','splice','change_control','as_built','on_hold','cancelled')),
   assigned_to UUID REFERENCES staff(id) ON DELETE SET NULL,
-  priority VARCHAR(16) NOT NULL DEFAULT 'normal',
-  source VARCHAR(32) NOT NULL DEFAULT 'manual',
+  priority VARCHAR(16) NOT NULL DEFAULT 'normal'
+    CHECK (priority IN ('low','normal','high','urgent')),
+  source VARCHAR(32) NOT NULL DEFAULT 'manual'
+    CHECK (source IN ('pipeline_auto','manual')),
 
   stage_checklists JSONB NOT NULL DEFAULT '{}'::jsonb,
 

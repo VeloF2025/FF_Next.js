@@ -9,12 +9,20 @@ import {
   deletePlanningItem,
   logPlanningActivity,
 } from '@/modules/planning/services/planningService';
+import { PLANNING_STAGES, PLANNING_PRIORITIES } from '@/modules/planning/constants/stages';
 
 export const dynamic = 'force-dynamic';
 
 const logger = createLogger('planning:api:items');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Fresh response per call — a NextResponse body can only be consumed once.
+const unauthorized = () =>
+  NextResponse.json(
+    { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
+    { status: 401 },
+  );
 
 async function getUserId(): Promise<string | undefined> {
   const cookieStore = await cookies();
@@ -39,8 +47,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   if (!UUID_RE.test(params.id)) return NextResponse.json({ success: false, error: { message: 'Invalid id' } }, { status: 400 });
   try {
-    const body = await req.json();
     const userId = await getUserId();
+    if (!userId) return unauthorized();
+    const body = await req.json();
+    if (body.stage && !PLANNING_STAGES.includes(body.stage)) return NextResponse.json({ success: false, error: { message: `Invalid stage. Must be one of: ${PLANNING_STAGES.join(', ')}` } }, { status: 400 });
+    if (body.priority && !PLANNING_PRIORITIES.includes(body.priority)) return NextResponse.json({ success: false, error: { message: `Invalid priority. Must be one of: ${PLANNING_PRIORITIES.join(', ')}` } }, { status: 400 });
     const before = await getPlanningItemById(params.id);
     if (!before) return NextResponse.json({ success: false, error: { message: 'Planning item not found' } }, { status: 404 });
 
@@ -73,6 +84,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (!UUID_RE.test(params.id)) return NextResponse.json({ success: false, error: { message: 'Invalid id' } }, { status: 400 });
   try {
     const userId = await getUserId();
+    if (!userId) return unauthorized();
     const existing = await getPlanningItemById(params.id);
     if (!existing) return NextResponse.json({ success: false, error: { message: 'Planning item not found' } }, { status: 404 });
     const deleted = await deletePlanningItem(params.id);
