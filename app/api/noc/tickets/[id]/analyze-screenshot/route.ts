@@ -56,7 +56,7 @@ export async function POST(
 
     // Ticket cross-reference context for the prompt.
     const ctxRows = await pool.query(
-      'SELECT dr_number, pole_number, pon_number, ont_serial FROM maintenance_tickets WHERE id = $1',
+      'SELECT dr_number, pole_id, pon, ont_serial FROM maintenance_tickets WHERE id = $1',
       [ticketId],
     );
     if (ctxRows.rows.length === 0) {
@@ -65,8 +65,8 @@ export async function POST(
     const r = ctxRows.rows[0];
     const ctx: TicketCrossRef = {
       dr_number: r.dr_number ?? null,
-      pole_number: r.pole_number ?? null,
-      pon_number: r.pon_number ?? null,
+      pole_number: r.pole_id ?? null,
+      pon_number: r.pon ?? null,
       ont_serial: r.ont_serial ?? null,
     };
 
