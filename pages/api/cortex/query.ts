@@ -16,37 +16,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withPermission } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { bridgeBearer } from '@/lib/cortex/bridgeAuth';
 import { getForwardableEntraIdToken } from '@/lib/cortex/entraAuth';
 import { fetchWithTimeout } from '@/lib/cortex/meetingReviewLogic';
+import { clampLimit, type Citation } from '@/lib/cortex/queryHelpers';
 
 const BRIDGE_URL = process.env.CORTEX_BRIDGE_URL ?? 'http://localhost:7403';
 
-// Mirrors the bridge envelope (apps/bridge/routes/query.py :: Citation). Fields
-// after source_id are always serialised by the bridge but can be empty.
-export interface Citation {
-  n: number;
-  source: string;
-  source_id: string;
-  channel?: string;
-  author?: string;
-  timestamp?: string;
-  score?: number;
-  snippet?: string;
-}
-
-const DEFAULT_LIMIT = 10;
-const MAX_LIMIT = 25;
 const MAX_Q_LEN = 500;
-
-/** Clamp a raw ?limit value to [1, MAX_LIMIT], defaulting on garbage. */
-export function clampLimit(raw: unknown): number {
-  const n = Number.parseInt(String(raw ?? ''), 10);
-  if (!Number.isFinite(n) || n < 1) return DEFAULT_LIMIT;
-  return Math.min(n, MAX_LIMIT);
-}
 
 async function getHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {
   const user = req.user;
@@ -72,9 +51,10 @@ async function getHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse
     },
   });
   if (!upstream.ok) {
-    // Upstream non-OK is not a proxy crash — warn with context, surface as 5xx.
+    // Upstream non-OK is not a proxy crash; log once at warn and surface as a 5xx.
+    // apiResponse.error does NOT log (unlike internalError), so this is the single record.
     log.warn('Cortex query upstream non-OK', { status: upstream.status }, 'cortex-query');
-    return apiResponse.internalError(res, new Error(`Bridge ${upstream.status}`));
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'An internal error occurred');
   }
   const data = (await upstream.json()) as { citations?: Citation[] };
   return apiResponse.success(res, {
@@ -94,10 +74,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       try {
         await getHandler(r as AuthenticatedNextApiRequest, s);
       } catch (err) {
-        // Single error log — apiResponse.internalError does NOT log, so this is
-        // the one place the failure is recorded (with context).
+        // apiResponse.error does NOT log (unlike internalError), so this explicit, tagged
+        // log is the single record of the failure; details are withheld from the response.
         log.error('cortex-query error', { error: err }, 'cortex-query');
-        apiResponse.internalError(s, err instanceof Error ? err : new Error(String(err)));
+        return apiResponse.error(s, ErrorCode.INTERNAL_ERROR, 'An internal error occurred');
       }
     },
   )(authReq, res);

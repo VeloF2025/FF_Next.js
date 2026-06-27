@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampLimit } from '../../../../pages/api/cortex/query';
+import { clampLimit } from '@/lib/cortex/queryHelpers';
 import { citationMeta } from '@/lib/cortex/citationFormat';
 
 describe('clampLimit', () => {
