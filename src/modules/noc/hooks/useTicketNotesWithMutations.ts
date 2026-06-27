@@ -169,6 +169,30 @@ async function deleteNote(
   return result.data;
 }
 
+export interface AnalyzeScreenshotPayload {
+  images: string[]; // base64 data URLs
+  visibility: 'private' | 'public';
+}
+
+async function analyzeScreenshotNote(
+  ticketId: string,
+  payload: AnalyzeScreenshotPayload,
+): Promise<TicketNote> {
+  const response = await fetch(`/api/noc/tickets/${ticketId}/analyze-screenshot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error?.message || `Analysis failed (${response.status})`);
+  }
+  const result = await response.json();
+  if (!result.success) throw new Error(result.error?.message || 'Analysis failed');
+  return result.data;
+}
+
 // ==================== Hooks ====================
 
 /**
@@ -298,6 +322,24 @@ export function useDeleteNote(ticketId: string) {
     },
     onError: (error: Error) => {
       logger.error('Failed to delete note', { ticketId, error: error.message });
+    },
+  });
+}
+
+/**
+ * Hook to analyze screenshot(s) with the VLM and auto-post the resulting note.
+ */
+export function useAnalyzeScreenshotNote(ticketId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: AnalyzeScreenshotPayload) => analyzeScreenshotNote(ticketId, payload),
+    onSuccess: (note) => {
+      queryClient.invalidateQueries({ queryKey: ticketNotesKeys.byTicket(ticketId) });
+      logger.info('AI screenshot note posted', { ticketId, noteId: note.id });
+    },
+    onError: (error: Error) => {
+      logger.error('Failed to post AI screenshot note', { ticketId, error: error.message });
     },
   });
 }
