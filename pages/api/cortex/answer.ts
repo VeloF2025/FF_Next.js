@@ -93,7 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         // apiResponse.error does NOT log (unlike internalError), so this explicit, tagged
         // log is the single record of the failure; details are withheld from the response.
         log.error('cortex-answer error', { error: err }, 'cortex-answer');
-        apiResponse.error(s, ErrorCode.INTERNAL_ERROR, 'An internal error occurred');
+        return apiResponse.error(s, ErrorCode.INTERNAL_ERROR, 'An internal error occurred');
       }
     },
   )(authReq, res);
