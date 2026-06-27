@@ -1,5 +1,3 @@
-'use client';
-
 import type { TicketNote } from '../../hooks/useTicketNotesWithMutations';
 
 interface NoteCardProps {
