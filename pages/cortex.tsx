@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PermissionGate } from '@/components/PermissionGate';
+import { CortexHero } from '@/components/cortex/CortexHero';
 import { CortexReviewPanel } from '@/components/cortex/CortexReviewPanel';
 import { CortexCitedSearch } from '@/components/cortex/CortexCitedSearch';
 import { CortexConnectPanel } from '@/components/cortex/CortexConnectPanel';
@@ -11,27 +12,24 @@ export default function CortexPage({ mcpEnabled }: { mcpEnabled: boolean }) {
       <Head>
         <title>Cortex | FibreFlow</title>
       </Head>
-      <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-[var(--ff-text-primary)]">Cortex</h1>
-          <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-            AI-enriched communications and meeting intelligence pending your review
-          </p>
-        </div>
-        {mcpEnabled && (
-          // showLoading keeps the gate CLOSED while permissions are still fetching —
-          // usePermission optimistically allows 'view' before hasFetched, which would
-          // otherwise flash this credential panel to a user who lacks cortex.review.
-          <PermissionGate permission="cortex.review" action="view" showLoading>
-            <div className="mb-6">
+      {/* Premium "Cortex landing" surface — scoped dark+gold skin (styles/cortex-premium.css).
+          Forced dark for this subtree regardless of the app's light/dark theme. */}
+      <div className="cortex-premium min-h-full px-6 py-8 sm:px-8">
+        <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8">
+          <CortexHero />
+
+          {mcpEnabled && (
+            // showLoading keeps the gate CLOSED while permissions are still fetching —
+            // usePermission optimistically allows 'view' before hasFetched, which would
+            // otherwise flash this credential panel to a user who lacks cortex.review.
+            <PermissionGate permission="cortex.review" action="view" showLoading>
               <CortexConnectPanel />
-            </div>
-          </PermissionGate>
-        )}
-        <div className="mb-6">
+            </PermissionGate>
+          )}
+
           <CortexCitedSearch />
+          <CortexReviewPanel />
         </div>
-        <CortexReviewPanel />
       </div>
     </AppLayout>
   );

@@ -1,0 +1,148 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Cortex Neural Aperture C Mark</title>
+  <desc id="desc">A refined C-shaped neural aperture mark with fine champagne ribs, concentric signal paths, and a restrained cyan intelligence point.</desc>
+  <defs>
+    <radialGradient id="softField" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(258 256) rotate(90) scale(206)">
+      <stop stop-color="#171B1C" stop-opacity="0.9"/>
+      <stop offset="0.72" stop-color="#070909" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#070909" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="118" y1="82" x2="394" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1D997"/>
+      <stop offset="0.42" stop-color="#C6A15B"/>
+      <stop offset="1" stop-color="#7E6334"/>
+    </linearGradient>
+    <linearGradient id="dimGold" x1="94" y1="92" x2="386" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E4C37B" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#6F592F" stop-opacity="0.62"/>
+    </linearGradient>
+    <radialGradient id="cyan" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(324 254) scale(78 10)">
+      <stop stop-color="#A9FFFB"/>
+      <stop offset="0.2" stop-color="#56D6D6" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#56D6D6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="goldGlow" x="54" y="54" width="404" height="404" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="1.4" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.78 0 0 0 0 0.58 0 0 0 0 0.28 0 0 0 0.36 0"/>
+      <feBlend in="SourceGraphic" mode="screen"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="transparent"/>
+  <circle cx="256" cy="256" r="210" fill="url(#softField)"/>
+
+  <g filter="url(#goldGlow)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Fine outer aperture ribs. These carry the visual language of the reference image. -->
+    <g stroke="url(#dimGold)" stroke-width="2.15" opacity="0.82">
+      <path d="M147.3 91.6L171.2 133"/>
+      <path d="M160 84.9L181.7 127.4"/>
+      <path d="M173.2 79.4L192.7 122.9"/>
+      <path d="M186.9 75.2L204.1 119.6"/>
+      <path d="M201 72.3L215.8 117.4"/>
+      <path d="M215.3 70.7L227.7 116.4"/>
+      <path d="M229.8 70.4L239.7 116.7"/>
+      <path d="M244.3 71.4L251.8 118.1"/>
+      <path d="M258.7 73.8L263.7 120.8"/>
+      <path d="M272.8 77.4L275.4 124.7"/>
+      <path d="M286.5 82.3L286.7 129.7"/>
+      <path d="M299.7 88.5L297.5 135.9"/>
+      <path d="M312.2 95.8L307.7 143"/>
+      <path d="M324 104.3L317.3 151"/>
+      <path d="M335 113.8L326 159.9"/>
+      <path d="M345 124.4L333.8 170"/>
+      <path d="M354 135.8L340.8 180.7"/>
+      <path d="M362 148.1L346.8 192.1"/>
+      <path d="M369 161.1L351.8 204.1"/>
+      <path d="M375 174.7L355.7 216.6"/>
+      <path d="M133.1 117.6L161.4 155.5"/>
+      <path d="M121.8 127.9L152.1 164.3"/>
+      <path d="M111.6 139.2L143.6 174.1"/>
+      <path d="M102.5 151.3L136 184.8"/>
+      <path d="M94.5 164.1L129.4 196"/>
+      <path d="M87.7 177.6L123.8 207.8"/>
+      <path d="M82 191.6L119.3 220"/>
+      <path d="M77.7 206.1L115.8 232.7"/>
+      <path d="M74.6 220.9L113.3 245.6"/>
+      <path d="M72.9 236L111.9 258.8"/>
+      <path d="M72.5 251.1L111.5 272"/>
+      <path d="M73.4 266.2L112.3 285.1"/>
+      <path d="M75.7 281.1L114.1 297.9"/>
+      <path d="M79.3 295.8L117.1 310.5"/>
+      <path d="M84.2 310L121.1 322.6"/>
+      <path d="M90.3 323.7L126.2 334.1"/>
+      <path d="M97.7 336.8L132.3 345"/>
+      <path d="M106.2 349.2L139.4 355.1"/>
+      <path d="M115.8 360.8L147.4 364.3"/>
+      <path d="M126.4 371.5L156.2 372.5"/>
+      <path d="M138 381.1L165.8 379.7"/>
+      <path d="M150.5 389.6L176.1 385.8"/>
+      <path d="M163.7 396.8L187 390.8"/>
+      <path d="M177.6 402.8L198.4 394.6"/>
+      <path d="M191.9 407.4L210.2 397.2"/>
+      <path d="M206.7 410.7L222.2 398.6"/>
+      <path d="M221.8 412.7L234.4 398.8"/>
+      <path d="M237 413.2L246.6 397.7"/>
+      <path d="M252.2 412.5L258.6 395.4"/>
+      <path d="M267.2 410.3L270.4 391.9"/>
+      <path d="M282 406.8L281.8 387.1"/>
+      <path d="M296.4 402L292.7 381.2"/>
+      <path d="M310.3 395.9L303.1 374.1"/>
+      <path d="M323.4 388.5L312.7 365.9"/>
+      <path d="M335.8 380L321.6 356.7"/>
+      <path d="M347.2 370.4L329.6 346.5"/>
+      <path d="M357.6 359.8L336.7 335.4"/>
+      <path d="M366.9 348.3L342.8 323.5"/>
+      <path d="M375 336L347.8 310.8"/>
+    </g>
+
+    <!-- Aperture C outline and inner rings. -->
+    <path d="M386 111.5C354.7 78.9 312.7 61 268.9 61C161.8 61 75 147.8 75 254.9C75 362 161.8 448.8 268.9 448.8C313.1 448.8 355.4 430.6 386.8 397.5" stroke="url(#gold)" stroke-width="6.2"/>
+    <path d="M358.5 139.9C335.3 117.2 303.5 104.4 269.8 104.4C186.6 104.4 119.1 171.9 119.1 255.1C119.1 338.3 186.6 405.8 269.8 405.8C303.8 405.8 335.9 392.8 359.1 369.6" stroke="#C6A15B" stroke-width="3.8" opacity="0.9"/>
+    <path d="M331.4 168C314.7 153.5 293.2 145.4 270.1 145.4C209.6 145.4 160.6 194.4 160.6 254.9C160.6 315.4 209.6 364.4 270.1 364.4C293.8 364.4 315.8 355.9 332.7 340.7" stroke="#F3EFE6" stroke-width="1.8" opacity="0.42"/>
+    <path d="M315.3 188.3C302.3 178 286.7 172.5 270.2 172.5C224.7 172.5 187.8 209.4 187.8 254.9C187.8 300.4 224.7 337.3 270.2 337.3C287.6 337.3 303.9 331.2 317.2 319.9" stroke="#C6A15B" stroke-width="1.55" opacity="0.58"/>
+    <path d="M302 207.2C292.7 201 281.8 197.7 270.4 197.7C238.9 197.7 213.3 223.3 213.3 254.8C213.3 286.3 238.9 311.9 270.4 311.9C282.7 311.9 294.3 308 303.9 300.8" stroke="#E0C482" stroke-width="1.35" opacity="0.56"/>
+
+    <!-- Inner neural traces: thin, deliberate paths, more like the reference. -->
+    <g stroke="#E0C482" stroke-width="2.1" opacity="0.94">
+      <path d="M114 207H163L184 228H235"/>
+      <path d="M102 235H179L195 250H270"/>
+      <path d="M103 276H172L193 258H270"/>
+      <path d="M116 307H160L182 287H238"/>
+      <path d="M134 176H185L208 198H267"/>
+      <path d="M138 338H189L211 317H267"/>
+      <path d="M164 148H225L247 169H294"/>
+      <path d="M166 366H226L249 344H295"/>
+    </g>
+    <g stroke="#F3EFE6" stroke-width="1.45" opacity="0.55">
+      <path d="M185 189H222L238 204H286"/>
+      <path d="M184 321H223L240 305H287"/>
+      <path d="M211 226H251"/>
+      <path d="M211 282H251"/>
+    </g>
+    <g fill="#070909" stroke="#E0C482">
+      <circle cx="184" cy="228" r="5.2" stroke-width="2"/>
+      <circle cx="193" cy="258" r="4.4" stroke-width="1.8"/>
+      <circle cx="182" cy="287" r="4.6" stroke-width="1.8"/>
+      <circle cx="247" cy="169" r="3.6" stroke-width="1.55"/>
+      <circle cx="249" cy="344" r="3.6" stroke-width="1.55"/>
+    </g>
+    <g fill="#56D6D6">
+      <circle cx="238" cy="204" r="3.2"/>
+      <circle cx="240" cy="305" r="3.2"/>
+      <circle cx="276" cy="145" r="2.8"/>
+      <circle cx="206" cy="250" r="2.8"/>
+    </g>
+
+    <!-- Central aperture and restrained intelligence signal. -->
+    <circle cx="271" cy="255" r="53" fill="#070909"/>
+    <path d="M286 254H401" stroke="#56D6D6" stroke-width="1.35" opacity="0.86"/>
+    <ellipse cx="337" cy="254" rx="71" ry="12" fill="url(#cyan)" opacity="0.58"/>
+    <circle cx="337" cy="254" r="3.1" fill="#A9FFFB"/>
+    <circle cx="401" cy="254" r="2.1" fill="#A9FFFB"/>
+  </g>
+  <circle cx="271" cy="255" r="53" fill="#070909"/>
+  <ellipse cx="337" cy="254" rx="71" ry="9" fill="url(#cyan)" opacity="0.46"/>
+  <path d="M286 254H401" stroke="#56D6D6" stroke-width="1.35" stroke-linecap="round" opacity="0.86"/>
+  <circle cx="337" cy="254" r="3.1" fill="#A9FFFB"/>
+  <circle cx="401" cy="254" r="2.1" fill="#A9FFFB"/>
+</svg>

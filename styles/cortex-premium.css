@@ -1,0 +1,239 @@
+/*
+ * cortex-premium.css — premium "Cortex landing" skin, scoped to the /cortex page.
+ *
+ * Ported from Cortex/apps/space-agent/public/landing.css (velocity.cortexhq.xyz).
+ * EVERYTHING is scoped under `.cortex-premium` so it never leaks into the rest of
+ * the FibreFlow app. Inside the scope we:
+ *   (a) override the shadcn HSL-channel design tokens, so the Cortex components'
+ *       existing bg-card / bg-primary / text-foreground / text-destructive utilities
+ *       adopt the gold-on-black palette with no markup churn; and
+ *   (b) add a few helper classes (.cx-glass, .cx-eyebrow, .cx-btn-*, hero/stat bits)
+ *       for effects a flat token cannot express (glassmorphism, gold gradients).
+ *
+ * Because CSS custom properties resolve from the nearest ancestor that sets them,
+ * the page renders premium dark REGARDLESS of FibreFlow's light/dark mode.
+ */
+
+.cortex-premium {
+  /* --- raw brand tokens --- */
+  --cx-black: #070909;
+  --cx-obsidian: #0b0d0d;
+  --cx-ivory: #f3efe6;
+  --cx-ivory-muted: #c9c1b3;
+  --cx-stone: #918a7c;
+  --cx-champagne: #c6a15b;
+  --cx-champagne-light: #e0c482;
+  --cx-emerald: #4fbf8f;
+  --cx-vermilion: #d65a45;
+  --cx-glass-bg: rgba(255, 255, 255, 0.055);
+  --cx-glass-border: rgba(255, 255, 255, 0.14);
+  --cx-radius: 8px;
+  --cx-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- shadcn token overrides (HSL channels) for this subtree only --- */
+  --background: 180 13% 3%;          /* #070909 */
+  --foreground: 42 33% 93%;          /* ivory   */
+  --card: 192 10% 7%;                /* near-black card base */
+  --card-foreground: 42 33% 93%;
+  --popover: 192 10% 7%;
+  --popover-foreground: 42 33% 93%;
+  --muted: 195 8% 15%;
+  --muted-foreground: 38 16% 72%;    /* ivory-muted */
+  --primary: 39 48% 57%;             /* champagne */
+  --primary-foreground: 192 36% 6%;  /* near-black on gold */
+  --secondary: 195 8% 15%;
+  --secondary-foreground: 42 33% 93%;
+  --accent: 39 48% 57%;
+  --accent-foreground: 192 36% 6%;
+  --destructive: 9 64% 56%;          /* vermilion */
+  --destructive-foreground: 42 33% 93%;
+  --border: 200 8% 22%;
+  --input: 200 8% 22%;
+  --ring: 39 48% 57%;                /* champagne focus ring */
+
+  /* --- premium surface --- */
+  position: relative;
+  min-height: 100%;
+  color: var(--cx-ivory);
+  font-family: "Inter", "IBM Plex Sans", system-ui, Arial, sans-serif;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(198, 161, 91, 0.08), transparent 34rem),
+    linear-gradient(180deg, #070909 0%, #0b0d0d 48%, #070909 100%);
+}
+
+/* faint cyan/gold aperture glow, anchored like the landing's hero depth */
+.cortex-premium::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 88% 4%, rgba(86, 214, 214, 0.06), transparent 22rem),
+    radial-gradient(circle at 10% 26%, rgba(198, 161, 91, 0.05), transparent 26rem);
+}
+.cortex-premium > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------------- glass surface ---------------- */
+.cx-glass {
+  border: 1px solid var(--cx-glass-border);
+  border-radius: var(--cx-radius);
+  background: var(--cx-glass-bg);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* ---------------- gold eyebrow label ---------------- */
+.cx-eyebrow {
+  display: block;
+  margin: 0 0 6px;
+  color: var(--cx-champagne-light);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ---------------- buttons ---------------- */
+.cx-btn-gold {
+  border: 1px solid rgba(224, 196, 130, 0.82);
+  border-radius: var(--cx-radius);
+  background: linear-gradient(180deg, rgba(198, 161, 91, 0.95), rgba(158, 125, 63, 0.85));
+  color: #1a1407;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(198, 161, 91, 0.10), 0 14px 40px rgba(0, 0, 0, 0.36);
+  transition: transform 180ms var(--cx-ease), filter 180ms var(--cx-ease);
+}
+.cx-btn-gold:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+.cx-btn-gold:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cx-btn-emerald {
+  border: 1px solid rgba(79, 191, 143, 0.6);
+  border-radius: var(--cx-radius);
+  background: linear-gradient(180deg, rgba(79, 191, 143, 0.95), rgba(58, 150, 112, 0.85));
+  color: #06140d;
+  font-weight: 600;
+  transition: transform 180ms var(--cx-ease), filter 180ms var(--cx-ease);
+}
+.cx-btn-emerald:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+.cx-btn-emerald:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------------- hero ---------------- */
+.cx-hero {
+  padding: 8px 0 4px;
+}
+.cx-hero-wordmark {
+  display: flex;
+  align-items: center;
+  line-height: 0.9;
+}
+.cx-hero-wordmark img {
+  flex: 0 0 auto;
+  width: auto;
+  height: clamp(54px, 7.4vw, 96px);
+  object-fit: contain;
+  filter: drop-shadow(0 0 24px rgba(198, 161, 91, 0.22));
+}
+.cx-hero-wordmark span {
+  margin-left: clamp(-20px, -1.3vw, -9px);
+  font-size: clamp(46px, 6.6vw, 86px);
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--cx-ivory);
+}
+.cx-hero-copy {
+  max-width: 640px;
+  margin: 14px 0 0;
+  color: var(--cx-ivory-muted);
+  font-size: clamp(16px, 1.5vw, 20px);
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+/* ---------------- hero stat cards ---------------- */
+.cx-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 660px;
+  margin: 26px 0 0;
+}
+.cx-stat {
+  padding: 14px 16px;
+}
+.cx-stat dt {
+  margin: 0;
+  color: var(--cx-stone);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.cx-stat dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  color: var(--cx-ivory);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cx-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.cx-dot--gold {
+  background: var(--cx-champagne-light);
+  box-shadow: 0 0 16px rgba(224, 196, 130, 0.6);
+}
+.cx-dot--green {
+  background: var(--cx-emerald);
+  box-shadow: 0 0 14px rgba(79, 191, 143, 0.5);
+}
+.cx-dot--neutral {
+  /* loading / unknown — muted, no glow; must never read as "all clear" */
+  background: var(--cx-stone);
+}
+
+@media (max-width: 640px) {
+  .cx-stats {
+    grid-template-columns: 1fr;
+  }
+  .cx-hero-wordmark span {
+    font-size: clamp(40px, 12vw, 56px);
+  }
+  .cx-hero-wordmark img {
+    height: clamp(44px, 13vw, 60px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-btn-gold,
+  .cx-btn-emerald {
+    transition: none;
+  }
+  .cx-btn-gold:hover:not(:disabled),
+  .cx-btn-emerald:hover:not(:disabled) {
+    transform: none;
+  }
+}

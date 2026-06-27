@@ -1,4 +1,6 @@
 import '../styles/globals.css';
+// Premium "Cortex landing" skin — scoped under .cortex-premium (used by /cortex only).
+import '../styles/cortex-premium.css';
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

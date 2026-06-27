@@ -117,9 +117,10 @@ export function CortexConnectPanel() {
   const snippet = useMemo(() => (token ? configSnippet(token) : ''), [token]);
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+    <div className="cx-glass flex flex-col gap-3 p-5">
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-foreground">Connect to Claude (MCP)</span>
+        <span className="cx-eyebrow">MCP Access</span>
+        <span className="text-base font-semibold text-foreground">Connect to Claude (MCP)</span>
         <span className="text-xs text-muted-foreground">
           Generate a personal token to query Cortex from Claude (or any MCP client). Results
           are narrowed to what you&apos;re allowed to see.
@@ -131,7 +132,7 @@ export function CortexConnectPanel() {
           type="button"
           onClick={() => void generate()}
           disabled={loading || revoking}
-          className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
+          className="cx-btn-gold rounded-md px-4 py-1.5 text-sm"
         >
           {loading ? 'Generating…' : token ? 'Regenerate token' : 'Generate token'}
         </button>

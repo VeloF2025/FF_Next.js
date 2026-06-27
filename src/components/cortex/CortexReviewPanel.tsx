@@ -114,7 +114,7 @@ export function CortexReviewPanel() {
         const busy = deciding.has(item.id);
         const itemError = itemErrors.get(item.id);
         return (
-          <div key={item.id} className="rounded-lg border border-border bg-card p-4 flex flex-col gap-3">
+          <div key={item.id} className="cx-glass p-4 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -137,7 +137,7 @@ export function CortexReviewPanel() {
               <button
                 disabled={busy}
                 onClick={() => void decide(item.id, 'approved')}
-                className="flex-1 rounded-md bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium py-1.5 transition-colors"
+                className="cx-btn-emerald flex-1 rounded-md text-sm py-1.5"
               >
                 {busy ? '…' : 'Approve'}
               </button>

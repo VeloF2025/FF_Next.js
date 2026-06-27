@@ -63,9 +63,10 @@ export function CortexCitedSearch() {
   );
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+    <div className="cx-glass flex flex-col gap-3 p-5">
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-foreground">Cited knowledge search</span>
+        <span className="cx-eyebrow">Grounded Retrieval</span>
+        <span className="text-base font-semibold text-foreground">Cited knowledge search</span>
         <span className="text-xs text-muted-foreground">
           Every result is backed by source-attributed citations you&apos;re authorized to see.
         </span>
@@ -83,7 +84,7 @@ export function CortexCitedSearch() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
+          className="cx-btn-gold rounded-md px-4 py-1.5 text-sm"
         >
           {loading ? '…' : 'Search'}
         </button>
