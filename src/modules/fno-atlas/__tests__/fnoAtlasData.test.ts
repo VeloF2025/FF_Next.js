@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fnoNetworks, scrapingTools } from '../data/fnoAtlasData';
+import { fnoBrandMapProfiles } from '../data/fnoBrandMapData';
 import { filterFnos, findFnosForProject, getCoverageConfidenceSummary } from '../lib/fnoAtlasUtils';
 
 describe('FNO Atlas data', () => {
@@ -46,5 +47,20 @@ describe('FNO Atlas data', () => {
     const primary = scrapingTools.find((tool) => tool.verdict === 'Recommended');
 
     expect(primary?.name).toBe('Crawlee + Playwright');
+  });
+
+  it('assigns a brand colour and map points to every FNO', () => {
+    const profileIds = new Set(fnoBrandMapProfiles.map((profile) => profile.fnoId));
+
+    expect(fnoNetworks.every((network) => profileIds.has(network.id))).toBe(true);
+    expect(fnoBrandMapProfiles.every((profile) => profile.mapPoints.length > 0)).toBe(true);
+  });
+
+  it('uses distinct brand colours for the key FNO examples', () => {
+    const colours = Object.fromEntries(fnoBrandMapProfiles.map((profile) => [profile.fnoId, profile.brandColor]));
+
+    expect(colours.vumatel).not.toBe(colours.frogfoot);
+    expect(colours.frogfoot).not.toBe(colours.fibertime);
+    expect(colours.fibertime).not.toBe(colours.net99);
   });
 });

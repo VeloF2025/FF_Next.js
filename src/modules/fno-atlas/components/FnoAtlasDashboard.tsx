@@ -1,8 +1,13 @@
 import { GitBranch, MapPin, Network, RadioTower, Search, type LucideIcon } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useMemo, useState, type ReactNode } from 'react';
 import { fnoNetworks, projectArchetypes, scrapingTools } from '../data/fnoAtlasData';
 import type { FnoNetwork } from '../data/fnoAtlasData';
 import { filterFnos, findFnosForProject, getAllRegions, getCoverageConfidenceSummary } from '../lib/fnoAtlasUtils';
+const FnoInteractiveMap = dynamic(
+  () => import('./FnoInteractiveMap').then((module) => module.FnoInteractiveMap),
+  { ssr: false, loading: () => <div className="rounded-2xl border p-6">Loading interactive map...</div> }
+);
 const cardStyle = {
   backgroundColor: 'var(--ff-surface)',
   borderColor: 'var(--ff-border-subtle)',
@@ -107,16 +112,15 @@ function ProjectFitPanel({ selectedId, onSelect }: { selectedId: string; onSelec
     </section>
   );
 }
-
 export function FnoAtlasDashboard() {
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('all');
   const [type, setType] = useState('all');
   const [selectedProject, setSelectedProject] = useState(projectArchetypes[0].id);
+  const [selectedFno, setSelectedFno] = useState(fnoNetworks[0].id);
   const regions = useMemo(() => getAllRegions(), []);
   const filtered = useMemo(() => filterFnos(query, region, type), [query, region, type]);
   const confidence = getCoverageConfidenceSummary();
-
   return (
     <div className="space-y-6 p-6">
       <header className="rounded-3xl border p-6 shadow-sm" style={cardStyle}>
@@ -140,9 +144,8 @@ export function FnoAtlasDashboard() {
           </div>
         </div>
       </header>
-
       <ProjectFitPanel selectedId={selectedProject} onSelect={setSelectedProject} />
-
+      <FnoInteractiveMap networks={filtered} selectedId={selectedFno} onSelect={setSelectedFno} />
       <section className="rounded-2xl border p-5" style={cardStyle}>
         <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
           <label className="text-sm font-medium">
@@ -174,7 +177,6 @@ export function FnoAtlasDashboard() {
           </label>
         </div>
       </section>
-
       <section className="grid gap-4 xl:grid-cols-2">
         {filtered.map((network) => <FnoCard key={network.id} network={network} />)}
       </section>

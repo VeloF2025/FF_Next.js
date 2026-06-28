@@ -1,4 +1,5 @@
 import '../styles/globals.css';
+import 'leaflet/dist/leaflet.css';
 // Premium "Cortex landing" skin — scoped under .cortex-premium (used by /cortex only).
 import '../styles/cortex-premium.css';
 import type { AppProps } from 'next/app';
