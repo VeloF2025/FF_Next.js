@@ -214,9 +214,19 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           <div className="mt-4 rounded-xl border p-3 text-sm" style={{ borderColor: selectedProfile.brandColor }}>
             <p className="font-semibold">{selected.name}</p>
             <p className="mt-1" style={{ color: 'var(--ff-text-secondary)' }}>{selectedProfile.brandColorSource}</p>
-            <a href={selected.website} target="_blank" rel="noreferrer" style={{ color: 'var(--ff-primary)' }}>
-              Open website
-            </a>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <a href={selected.website} target="_blank" rel="noreferrer" style={{ color: 'var(--ff-primary)' }}>
+                Open website
+              </a>
+              <a
+                href={`/api/fno-atlas/coverage-kml?operatorSlug=${encodeURIComponent(selected.id)}&limit=all`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: 'var(--ff-primary)' }}
+              >
+                Download KML
+              </a>
+            </div>
           </div>
         )}
       </aside>
