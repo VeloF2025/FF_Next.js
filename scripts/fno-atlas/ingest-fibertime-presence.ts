@@ -68,7 +68,7 @@ async function upsertSource(client: Client): Promise<string> {
      )
      SELECT id,
        'Fibertime public township map markers',
-       $1,
+       $1::text,
        'official_map',
        'static_fetch',
        15,
@@ -114,14 +114,13 @@ async function ingest(client: Client, townships: FibertimeTownship[]): Promise<I
            operator_id, source_id, ingestion_run_id, external_id, point_name,
            service_status, network_type, confidence, geom, raw_properties
          )
-         SELECT o.id, $2, $3, $4, $5,
+         SELECT o.id, $1, $2, $3, $4,
            'presence_marker', 'ftth', 'medium',
-           ST_SetSRID(ST_MakePoint($6::float8, $7::float8), 4326),
-           $8::jsonb
+           ST_SetSRID(ST_MakePoint($5::float8, $6::float8), 4326),
+           $7::jsonb
          FROM fno_atlas_operators o
          WHERE o.slug = 'fibertime'`,
         [
-          'fibertime',
           sourceId,
           runId,
           externalId,
