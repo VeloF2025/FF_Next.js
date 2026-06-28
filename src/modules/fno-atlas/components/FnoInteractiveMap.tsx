@@ -41,11 +41,11 @@ function polygonStyle(feature?: CoverageFeature): PathOptions {
   const color = feature?.properties.brandColor || fallbackPolygonColor;
   if (feature?.properties.featureKind === 'route') {
     return {
-      color,
+      color: '#22d3ee',
       fillOpacity: 0,
       opacity: 1,
-      weight: 3.5,
-      dashArray: '7 4',
+      weight: 4.5,
+      dashArray: '8 3',
     };
   }
   return {
