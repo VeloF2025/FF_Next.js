@@ -107,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         UNION ALL
         SELECT * FROM routes
       ) features
-      ORDER BY CASE feature_kind WHEN 'route' THEN 0 WHEN 'coverage' THEN 1 ELSE 2 END,
+      ORDER BY CASE feature_kind WHEN 'coverage' THEN 0 WHEN 'presence' THEN 1 ELSE 2 END,
         sort_area DESC,
         operator_name,
         area_name NULLS LAST

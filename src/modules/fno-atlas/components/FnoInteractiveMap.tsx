@@ -43,9 +43,9 @@ function polygonStyle(feature?: CoverageFeature): PathOptions {
     return {
       color,
       fillOpacity: 0,
-      opacity: 0.92,
-      weight: 2.4,
-      dashArray: '5 4',
+      opacity: 1,
+      weight: 3.5,
+      dashArray: '7 4',
     };
   }
   return {
