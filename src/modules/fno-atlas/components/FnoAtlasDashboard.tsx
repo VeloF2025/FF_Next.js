@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { fnoNetworks, projectArchetypes, scrapingTools } from '../data/fnoAtlasData';
 import type { FnoNetwork } from '../data/fnoAtlasData';
 import { filterFnos, findFnosForProject, getAllRegions, getCoverageConfidenceSummary } from '../lib/fnoAtlasUtils';
+import { FnoCoverageEvidencePanel } from './FnoCoverageEvidencePanel';
 const FnoInteractiveMap = dynamic(
   () => import('./FnoInteractiveMap').then((module) => module.FnoInteractiveMap),
   { ssr: false, loading: () => <div className="rounded-2xl border p-6">Loading interactive map...</div> }
@@ -13,6 +14,8 @@ const cardStyle = {
   borderColor: 'var(--ff-border-subtle)',
   color: 'var(--ff-text-primary)',
 };
+const defaultProjectId = projectArchetypes[0]?.id ?? '';
+const defaultFnoId = fnoNetworks[0]?.id ?? '';
 function Pill({ children }: { children: ReactNode }) {
   return (
     <span
@@ -79,7 +82,7 @@ function FnoCard({ network }: { network: FnoNetwork }) {
   );
 }
 function ProjectFitPanel({ selectedId, onSelect }: { selectedId: string; onSelect: (id: string) => void }) {
-  const selected = projectArchetypes.find((item) => item.id === selectedId) ?? projectArchetypes[0];
+  const selected = projectArchetypes.find((item) => item.id === selectedId) ?? projectArchetypes[0]!;
   const matches = findFnosForProject(selected.id);
   return (
     <section className="rounded-2xl border p-5" style={cardStyle}>
@@ -116,8 +119,8 @@ export function FnoAtlasDashboard() {
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('all');
   const [type, setType] = useState('all');
-  const [selectedProject, setSelectedProject] = useState(projectArchetypes[0].id);
-  const [selectedFno, setSelectedFno] = useState(fnoNetworks[0].id);
+  const [selectedProject, setSelectedProject] = useState(defaultProjectId);
+  const [selectedFno, setSelectedFno] = useState(defaultFnoId);
   const regions = useMemo(() => getAllRegions(), []);
   const filtered = useMemo(() => filterFnos(query, region, type), [query, region, type]);
   const confidence = getCoverageConfidenceSummary();
@@ -144,6 +147,7 @@ export function FnoAtlasDashboard() {
           </div>
         </div>
       </header>
+      <FnoCoverageEvidencePanel />
       <ProjectFitPanel selectedId={selectedProject} onSelect={setSelectedProject} />
       <FnoInteractiveMap networks={filtered} selectedId={selectedFno} onSelect={setSelectedFno} />
       <section className="rounded-2xl border p-5" style={cardStyle}>
