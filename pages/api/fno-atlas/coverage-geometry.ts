@@ -15,12 +15,31 @@ type CoverageGeometryRow = {
   geometry: Record<string, unknown>;
 };
 
+const DEFAULT_FEATURE_LIMIT = 5000;
+const MAX_FEATURE_LIMIT = 5000;
+
+function requestedLimit(value: string | string[] | undefined): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw || DEFAULT_FEATURE_LIMIT);
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_FEATURE_LIMIT;
+  return Math.min(Math.floor(parsed), MAX_FEATURE_LIMIT);
+}
+
+function requestedOperatorSlug(value: string | string[] | undefined): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return null;
+  const slug = raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  return slug || null;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
+    const limit = requestedLimit(req.query.limit);
+    const operatorSlug = requestedOperatorSlug(req.query.operatorSlug);
     const rows = await query<CoverageGeometryRow>(
       `SELECT ca.id::text,
         o.slug AS operator_slug,
@@ -34,11 +53,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
        FROM fno_atlas_coverage_areas ca
        JOIN fno_atlas_operators o ON o.id = ca.operator_id
        WHERE ca.retired_at IS NULL
-       ORDER BY o.name, ca.area_name NULLS LAST`,
+         AND ($1::text IS NULL OR o.slug = $1)
+       ORDER BY ST_Area(ca.geom::geography) DESC, o.name, ca.area_name NULLS LAST
+       LIMIT $2`,
+      [operatorSlug, limit],
     );
 
     return apiResponse.success(res, {
       type: 'FeatureCollection',
+      meta: {
+        featureLimit: limit,
+        operatorSlug,
+        returnedFeatures: rows.length,
+      },
       features: rows.map((row) => ({
         type: 'Feature',
         id: row.id,

@@ -74,7 +74,8 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/fno-atlas/coverage-geometry')
+    const params = new URLSearchParams({ operatorSlug: selected?.id || '', limit: '5000' });
+    fetch(`/api/fno-atlas/coverage-geometry?${params.toString()}`)
       .then((response) => {
         if (!response.ok) throw new Error(`Coverage geometry failed (${response.status})`);
         return response.json() as Promise<{ data: CoverageFeatureCollection }>;
@@ -88,7 +89,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selected?.id]);
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
