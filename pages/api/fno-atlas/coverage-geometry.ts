@@ -72,8 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           0::double precision AS sort_area
         FROM fno_atlas_presence_points pp
         JOIN fno_atlas_operators o ON o.id = pp.operator_id
-        WHERE pp.retired_at IS NULL
-          AND ($1::text IS NULL OR o.slug = $1)
+        WHERE ($1::text IS NULL OR o.slug = $1)
       )
       SELECT id,
         operator_slug,
