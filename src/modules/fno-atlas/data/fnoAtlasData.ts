@@ -59,7 +59,7 @@ export const fnoNetworks: FnoNetwork[] = [
     dataMethod: 'Official portal',
     confidence: 'High',
   },
-  {
+  { id: 'fibertime', name: 'Fibertime', types: ['FTTH'], footprint: 'Township and underserved-community fibre rollout focused on prepaid, affordable access; Nokia public material references 400,000 additional homes and a 2m-home target by 2028.', strongRegions: ['Gauteng', 'KwaZulu-Natal', 'townships', 'underserved communities'], projectFit: ['township FTTH', 'prepaid fibre', 'rural edge', 'low-LSM rollouts', 'underserved communities'], backhaulNotes: 'Critical low-LSM reference layer; validate feeder/backhaul economics and area status before route commitment.', website: 'https://fibertime.com/', coverageSource: 'https://www.nokia.com/newsroom/nokia-and-fibertime-accelerate-roll-out-of-fiber-broadband-access-to-underserved-townships-across-south-africa/', dataMethod: 'Public web page', confidence: 'Medium' },  { id: 'net99', name: 'Net Nine Nine', types: ['FTTH'], footprint: 'Affordable prepaid/home fibre operator targeting township and underserved communities; public funding reports reference large-scale township FTTH expansion.', strongRegions: ['Gauteng', 'KwaZulu-Natal', 'townships', 'underserved communities'], projectFit: ['township FTTH', 'prepaid fibre', 'low-LSM rollouts', 'affordable home fibre'], backhaulNotes: 'Add to every low-income feasibility scan; confirm exact network build areas and wholesale handoff model.', website: 'https://netninenine.co.za/', coverageSource: 'https://www.rmb.co.za/news/rmb-partners-with-net-99-to-expand-affordable-fibre-access-in-underserved-communities', dataMethod: 'Public web page', confidence: 'Medium' },  {
     id: 'dfa',
     name: 'DFA',
     types: ['Metro Backhaul', 'National Backhaul'],
@@ -239,7 +239,7 @@ export const projectArchetypes: ProjectArchetype[] = [
     bestFitFnos: ['openserve', 'herotel', 'frogfoot', 'metrofibre', 'broadband-infraco'],
     backhaulPriority: 'Validate NLD backhaul first; project economics fail without affordable upstream.',
   },
-  {
+  { id: 'rural-low-lsm', label: 'Rural / low-LSM rollout', description: 'Township, peri-urban and rural-edge builds where prepaid pricing, low ARPU, uptake density and affordable backhaul decide viability.', bestFitFnos: ['fibertime', 'net99', 'openserve', 'herotel', 'broadband-infraco'], backhaulPriority: 'Model feeder distance, power, pole/duct reuse, prepaid demand and POP/NLD cost before committing civils.' },  {
     id: 'metro-backhaul',
     label: 'Metro backhaul / route planning',
     description: 'Route feasibility for towers, aggregation nodes, POPs and long-haul interconnects.',

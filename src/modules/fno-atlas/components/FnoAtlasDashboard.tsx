@@ -82,7 +82,7 @@ function ProjectFitPanel({ selectedId, onSelect }: { selectedId: string; onSelec
         <GitBranch className="h-5 w-5" style={{ color: 'var(--ff-primary)' }} />
         <h2 className="text-xl font-semibold">Project-fit matcher</h2>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {projectArchetypes.map((item) => (
           <button
             key={item.id}
@@ -130,7 +130,7 @@ export function FnoAtlasDashboard() {
               </div>
             </div>
             <p className="mt-4 max-w-3xl text-sm leading-6" style={{ color: 'var(--ff-text-secondary)' }}>
-              Map which Fibre Network Operator suits each project type, where backhaul players like DFA and Liquid matter, and which official coverage source still needs verification.
+              Map which Fibre Network Operator suits each project type, including township, rural and low-LSM rollouts where prepaid access and backhaul cost decide viability.
             </p>
           </div>
           <div className="grid min-w-[280px] grid-cols-3 gap-3">
@@ -152,7 +152,7 @@ export function FnoAtlasDashboard() {
               onChange={(event) => setQuery(event.target.value)}
               className="mt-2 w-full rounded-xl border px-3 py-2 outline-none"
               style={{ borderColor: 'var(--ff-border-subtle)', backgroundColor: 'var(--ff-surface-alt)' }}
-              placeholder="DFA, Durban, estate, backhaul..."
+              placeholder="DFA, Fibertime, low-LSM, backhaul..."
             />
           </label>
           <label className="text-sm font-medium">

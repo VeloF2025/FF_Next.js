@@ -10,10 +10,22 @@ describe('FNO Atlas data', () => {
     expect(names).toContain('Liquid Intelligent Technologies');
   });
 
+  it('includes township and low-LSM rollout operators', () => {
+    const names = fnoNetworks.map((network) => network.name);
+
+    expect(names).toEqual(expect.arrayContaining(['Fibertime', 'Net Nine Nine']));
+  });
+
   it('recommends backhaul providers for metro route planning', () => {
     const matches = findFnosForProject('metro-backhaul').map((network) => network.id);
 
     expect(matches).toEqual(expect.arrayContaining(['dfa', 'liquid', 'seacom']));
+  });
+
+  it('recommends prepaid and rural-edge operators for low-LSM rollouts', () => {
+    const matches = findFnosForProject('rural-low-lsm').map((network) => network.id);
+
+    expect(matches).toEqual(expect.arrayContaining(['fibertime', 'net99', 'herotel']));
   });
 
   it('filters by region, type and free text', () => {
