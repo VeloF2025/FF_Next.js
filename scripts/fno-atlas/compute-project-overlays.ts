@@ -205,12 +205,53 @@ async function insertPresenceOverlays(client: Client, radiusM: number): Promise<
   );
 }
 
+async function insertRouteOverlays(client: Client, radiusM: number): Promise<void> {
+  await client.query(
+    `WITH drop_points AS (
+       SELECT project_id, ST_Centroid(ST_Collect(ST_SetSRID(ST_MakePoint(longitude::float8, latitude::float8), 4326))) AS geom,
+         COUNT(*) AS gps_drop_count
+       FROM drops
+       WHERE project_id IS NOT NULL AND latitude BETWEEN -35 AND -22 AND longitude BETWEEN 16 AND 33
+       GROUP BY project_id
+     ), project_points AS (
+       SELECT p.id, p.project_code, p.project_name,
+         COALESCE(CASE WHEN p.latitude BETWEEN -35 AND -22 AND p.longitude BETWEEN 16 AND 33
+           THEN ST_SetSRID(ST_MakePoint(p.longitude::float8, p.latitude::float8), 4326) END, dp.geom) AS geom,
+         COALESCE(dp.gps_drop_count, 0) AS gps_drop_count
+       FROM projects p LEFT JOIN drop_points dp ON dp.project_id = p.id
+     ), route_ops AS (
+       SELECT DISTINCT o.id, o.slug, o.name FROM fno_atlas_operators o JOIN fno_atlas_route_lines rl ON rl.operator_id = o.id
+     ), candidates AS (
+       SELECT pp.id AS project_id, pp.project_code, pp.project_name, pp.gps_drop_count,
+         ro.id AS operator_id, ro.slug AS operator_slug, ro.name AS operator_name,
+         nearest.route_line_id, nearest.route_name, nearest.distance_m
+       FROM project_points pp CROSS JOIN route_ops ro
+       LEFT JOIN LATERAL (
+         SELECT rl.id AS route_line_id, rl.route_name, ST_Distance(rl.geom::geography, pp.geom::geography) AS distance_m
+         FROM fno_atlas_route_lines rl WHERE rl.operator_id = ro.id ORDER BY rl.geom <-> pp.geom LIMIT 1
+       ) nearest ON TRUE
+       WHERE pp.geom IS NOT NULL
+     )
+     INSERT INTO fno_atlas_project_overlays (project_id, project_code, operator_id, route_line_id, match_type, distance_m, fit_score, evidence)
+     SELECT project_id, project_code, operator_id, route_line_id,
+       CASE WHEN distance_m <= $1 THEN 'backhaul_nearby' ELSE 'no_match' END,
+       ROUND(distance_m::numeric, 2),
+       CASE WHEN distance_m <= $1 THEN ROUND(GREATEST(0, 75 - (distance_m / $1 * 45))::numeric, 2) ELSE 0 END,
+       jsonb_build_object('projectName', project_name, 'operatorSlug', operator_slug, 'operatorName', operator_name,
+         'nearestRouteName', route_name, 'routeLineId', route_line_id, 'gpsDropCount', gps_drop_count, 'nearRadiusM', $1,
+         'basis', 'nearest source-backed fno_atlas_route_lines cable/backhaul route')
+     FROM candidates`,
+    [radiusM],
+  );
+}
+
 async function compute(client: Client, radiusM: number): Promise<OverlaySummary[]> {
   await client.query('BEGIN');
   try {
     await client.query('DELETE FROM fno_atlas_project_overlays');
     await insertPolygonOverlays(client, radiusM);
     await insertPresenceOverlays(client, radiusM);
+    await insertRouteOverlays(client, radiusM);
     const summary = await client.query<OverlaySummary>(
       `SELECT match_type, COUNT(*)::int, ROUND(AVG(fit_score), 2)::text AS avg_fit_score
        FROM fno_atlas_project_overlays
