@@ -42,6 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ROUND((COALESCE(SUM(ST_Area(geom::geography)), 0) / 1000000)::numeric, 2)::text AS coverage_km2,
           MAX(last_seen_at) AS last_seen_at
         FROM fno_atlas_coverage_areas
+        WHERE retired_at IS NULL
         GROUP BY operator_id
       ), presence AS (
         SELECT operator_id,
