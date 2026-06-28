@@ -6,6 +6,7 @@ import {
   FolderKanban,
   Building2,
   Briefcase,
+  MapPin,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -38,6 +39,14 @@ export const projectSection: NavSection = {
       shortLabel: 'Contract',
       permissions: [],
       rbacKey: 'contractors.list',
+    },
+    {
+      to: '/fno-atlas',
+      icon: MapPin,
+      label: 'FNO Atlas',
+      shortLabel: 'FNOs',
+      permissions: [],
+      rbacKey: 'projects.list',
     },
   ]
 };
