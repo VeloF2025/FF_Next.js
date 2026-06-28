@@ -61,7 +61,7 @@ function setSecurityHeaders(response: NextResponse) {
     "form-action 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.fibreflow.app https://firebasestorage.googleapis.com",
+    "img-src 'self' data: blob: https://*.fibreflow.app https://firebasestorage.googleapis.com https://*.tile.openstreetmap.org",
     "connect-src 'self' https://*.fibreflow.app https://*.neon.tech wss://*.neon.tech https://cloudflareinsights.com https://errors.isaflow.co.za",
   ].join('; '));
   if (process.env.NODE_ENV === 'production') {

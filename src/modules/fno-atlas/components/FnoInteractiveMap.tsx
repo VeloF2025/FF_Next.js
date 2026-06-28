@@ -5,6 +5,13 @@ import type { LatLngTuple } from '../data/fnoBrandMapData';
 
 const SOUTH_AFRICA_CENTER: LatLngTuple = [-29.0, 24.0];
 const cardStyle = { backgroundColor: 'var(--ff-surface)', borderColor: 'var(--ff-border-subtle)' };
+const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const tileAttribution = '&copy; OpenStreetMap contributors';
+
+type FnoLegendItem = {
+  network: FnoNetwork;
+  profile: NonNullable<ReturnType<typeof getBrandProfile>>;
+};
 
 interface FnoInteractiveMapProps {
   networks: FnoNetwork[];
@@ -16,25 +23,55 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
   const selected = networks.find((network) => network.id === selectedId) ?? networks[0];
   const selectedProfile = selected ? getBrandProfile(selected.id) : undefined;
   const visibleIds = new Set(networks.map((network) => network.id));
+  const legendItems: FnoLegendItem[] = networks
+    .map((network) => ({ network, profile: getBrandProfile(network.id) }))
+    .filter((item): item is FnoLegendItem => Boolean(item.profile));
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="overflow-hidden rounded-2xl border shadow-sm" style={cardStyle}>
-        <div className="flex items-center justify-between gap-3 border-b p-4" style={{ borderColor: 'var(--ff-border-subtle)' }}>
+        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--ff-border-subtle)' }}>
           <div>
             <h2 className="text-xl font-semibold">Interactive FNO coverage map</h2>
             <p className="text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-              Brand-coloured reference points; click a marker or legend item to isolate an FNO.
+              Brand-coloured reference points; tap a marker or colour key item to isolate an FNO.
             </p>
           </div>
-          <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: 'var(--ff-surface-alt)', color: 'var(--ff-text-secondary)' }}>
+          <span className="w-fit rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: 'var(--ff-surface-alt)', color: 'var(--ff-text-secondary)' }}>
             OpenStreetMap
           </span>
         </div>
-        <MapContainer center={SOUTH_AFRICA_CENTER} zoom={5} scrollWheelZoom className="h-[560px] w-full">
+
+        <div className="border-b p-3 xl:hidden" style={{ borderColor: 'var(--ff-border-subtle)' }}>
+          <div className="flex gap-2 overflow-x-auto pb-1" aria-label="FNO colour key">
+            {legendItems.map(({ network, profile }) => {
+              const active = selected?.id === network.id;
+              return (
+                <button
+                  key={network.id}
+                  type="button"
+                  onClick={() => onSelect(network.id)}
+                  className="flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium"
+                  style={{
+                    borderColor: active ? profile.brandColor : 'var(--ff-border-subtle)',
+                    backgroundColor: active ? 'var(--ff-surface-alt)' : 'var(--ff-surface)',
+                    color: 'var(--ff-text-primary)',
+                  }}
+                >
+                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: profile.brandColor }} />
+                  {network.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <MapContainer center={SOUTH_AFRICA_CENTER} zoom={5} scrollWheelZoom className="h-[440px] w-full sm:h-[560px]">
           <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution={tileAttribution}
+            detectRetina
+            maxZoom={18}
+            url={tileUrl}
           />
           {networks.map((network) => {
             const profile = getBrandProfile(network.id);
@@ -49,7 +86,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
                   color: profile.brandColor,
                   fillColor: profile.brandColor,
                   fillOpacity: active ? 0.82 : 0.42,
-                  opacity: visibleIds.has(network.id) ? 1 : 0.25,
+                  opacity: visibleIds.has(network.id) ? 0.95 : 0.25,
                   weight: active ? 4 : 2,
                 }}
                 eventHandlers={{ click: () => onSelect(network.id) }}
@@ -78,9 +115,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           Colours are brand-aligned from each FNO website/logo palette, then adjusted only enough to stay distinguishable on the map.
         </p>
         <div className="mt-4 max-h-[470px] space-y-2 overflow-y-auto pr-1">
-          {networks.map((network) => {
-            const profile = getBrandProfile(network.id);
-            if (!profile) return null;
+          {legendItems.map(({ network, profile }) => {
             const active = selected?.id === network.id;
             return (
               <button
