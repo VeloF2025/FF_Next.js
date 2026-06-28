@@ -2,7 +2,7 @@ import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import { circleMarker } from 'leaflet';
 import type { Layer, LatLng, PathOptions } from 'leaflet';
 import { useEffect, useMemo, useState } from 'react';
-import { CircleMarker, GeoJSON, MapContainer, Popup, TileLayer, Tooltip } from 'react-leaflet';
+import { GeoJSON, MapContainer, TileLayer } from 'react-leaflet';
 import type { FnoNetwork } from '../data/fnoAtlasData';
 import { getBrandProfile } from '../data/fnoBrandMapData';
 import type { LatLngTuple } from '../data/fnoBrandMapData';
@@ -74,7 +74,6 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
   const [coverageError, setCoverageError] = useState<string | null>(null);
   const selected = networks.find((network) => network.id === selectedId) ?? networks[0];
   const selectedProfile = selected ? getBrandProfile(selected.id) : undefined;
-  const visibleIds = new Set(networks.map((network) => network.id));
   const legendItems: FnoLegendItem[] = networks
     .map((network) => ({ network, profile: getBrandProfile(network.id) }))
     .filter((item): item is FnoLegendItem => Boolean(item.profile));
@@ -157,42 +156,11 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
               onEachFeature={bindCoveragePopup}
             />
           )}
-          {networks.map((network) => {
-            const profile = getBrandProfile(network.id);
-            if (!profile) return null;
-            if (selected?.id === network.id && selectedSourceFeatureCount > 0) return null;
-            const active = !selected || selected.id === network.id;
-            return profile.mapPoints.map((point) => (
-              <CircleMarker
-                key={`${network.id}-${point.label}`}
-                center={point.position}
-                radius={active ? 8 : 5}
-                pathOptions={{
-                  color: profile.brandColor,
-                  fillColor: profile.brandColor,
-                  fillOpacity: active ? 0.9 : 0.38,
-                  opacity: visibleIds.has(network.id) ? 0.95 : 0.25,
-                  weight: active ? 3 : 2,
-                }}
-                eventHandlers={{ click: () => onSelect(network.id) }}
-              >
-                <Tooltip direction="top" offset={[0, -8]}>
-                  {network.name} · {point.label}
-                </Tooltip>
-                <Popup>
-                  <strong>{network.name}</strong>
-                  <br />
-                  {point.label}
-                  <br />
-                  {point.note}
-                  <br />
-                  Reference/presence point, not a polygon boundary.
-                  <br />
-                  <a href={network.coverageSource} target="_blank" rel="noreferrer">Coverage source</a>
-                </Popup>
-              </CircleMarker>
-            ));
-          })}
+          {selected && selectedSourceFeatureCount === 0 && (
+            <div className="pointer-events-none absolute left-4 top-4 z-[1000] max-w-xs rounded-xl border px-3 py-2 text-xs shadow-sm" style={cardStyle}>
+              No source-backed polygons or presence points imported for {selected.name} yet.
+            </div>
+          )}
         </MapContainer>
       </div>
 
