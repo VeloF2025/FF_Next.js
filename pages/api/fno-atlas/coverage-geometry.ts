@@ -12,6 +12,7 @@ type CoverageGeometryRow = {
   rollout_status: string;
   network_type: string;
   confidence: string;
+  feature_kind: 'coverage' | 'presence';
   geometry: Record<string, unknown>;
 };
 
@@ -41,21 +42,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const limit = requestedLimit(req.query.limit);
     const operatorSlug = requestedOperatorSlug(req.query.operatorSlug);
     const rows = await query<CoverageGeometryRow>(
-      `SELECT ca.id::text,
-        o.slug AS operator_slug,
-        o.name AS operator_name,
-        o.brand_color,
-        ca.area_name,
-        ca.rollout_status,
-        ca.network_type,
-        ca.confidence,
-        ST_AsGeoJSON(ST_SimplifyPreserveTopology(ca.geom, 0.001))::json AS geometry
-       FROM fno_atlas_coverage_areas ca
-       JOIN fno_atlas_operators o ON o.id = ca.operator_id
-       WHERE ca.retired_at IS NULL
-         AND ($1::text IS NULL OR o.slug = $1)
-       ORDER BY ST_Area(ca.geom::geography) DESC, o.name, ca.area_name NULLS LAST
-       LIMIT $2`,
+      `WITH coverage AS (
+        SELECT ca.id::text,
+          o.slug AS operator_slug,
+          o.name AS operator_name,
+          o.brand_color,
+          ca.area_name,
+          ca.rollout_status,
+          ca.network_type,
+          ca.confidence,
+          'coverage'::text AS feature_kind,
+          ST_AsGeoJSON(ST_SimplifyPreserveTopology(ca.geom, 0.001))::json AS geometry,
+          ST_Area(ca.geom::geography) AS sort_area
+        FROM fno_atlas_coverage_areas ca
+        JOIN fno_atlas_operators o ON o.id = ca.operator_id
+        WHERE ca.retired_at IS NULL
+          AND ($1::text IS NULL OR o.slug = $1)
+      ), presence AS (
+        SELECT pp.id::text,
+          o.slug AS operator_slug,
+          o.name AS operator_name,
+          o.brand_color,
+          pp.point_name AS area_name,
+          pp.service_status AS rollout_status,
+          pp.network_type,
+          pp.confidence,
+          'presence'::text AS feature_kind,
+          ST_AsGeoJSON(pp.geom)::json AS geometry,
+          0::double precision AS sort_area
+        FROM fno_atlas_presence_points pp
+        JOIN fno_atlas_operators o ON o.id = pp.operator_id
+        WHERE pp.retired_at IS NULL
+          AND ($1::text IS NULL OR o.slug = $1)
+      )
+      SELECT id,
+        operator_slug,
+        operator_name,
+        brand_color,
+        area_name,
+        rollout_status,
+        network_type,
+        confidence,
+        feature_kind,
+        geometry
+      FROM (
+        SELECT * FROM coverage
+        UNION ALL
+        SELECT * FROM presence
+      ) features
+      ORDER BY sort_area DESC, operator_name, area_name NULLS LAST
+      LIMIT $2`,
       [operatorSlug, limit],
     );
 
@@ -77,6 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           rolloutStatus: row.rollout_status,
           networkType: row.network_type,
           confidence: row.confidence,
+          featureKind: row.feature_kind,
         },
         geometry: row.geometry,
       })),

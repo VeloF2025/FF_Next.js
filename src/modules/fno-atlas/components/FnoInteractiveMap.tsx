@@ -1,5 +1,6 @@
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
-import type { Layer, PathOptions } from 'leaflet';
+import { circleMarker } from 'leaflet';
+import type { Layer, LatLng, PathOptions } from 'leaflet';
 import { useEffect, useMemo, useState } from 'react';
 import { CircleMarker, GeoJSON, MapContainer, Popup, TileLayer, Tooltip } from 'react-leaflet';
 import type { FnoNetwork } from '../data/fnoAtlasData';
@@ -25,8 +26,8 @@ type CoverageProperties = {
   rolloutStatus: string;
   networkType: string;
   confidence: string;
+  featureKind: 'coverage' | 'presence';
 };
-
 type CoverageFeature = Feature<Geometry, CoverageProperties>;
 type CoverageFeatureCollection = FeatureCollection<Geometry, CoverageProperties>;
 
@@ -48,11 +49,24 @@ function polygonStyle(feature?: CoverageFeature): PathOptions {
 }
 
 function bindCoveragePopup(feature: CoverageFeature, layer: Layer): void {
-  const name = feature.properties.areaName || 'Coverage area';
+  const name = feature.properties.areaName || (feature.properties.featureKind === 'presence' ? 'Presence point' : 'Coverage area');
+  const label = feature.properties.featureKind === 'presence' ? 'Presence point' : 'Coverage polygon';
   layer.bindPopup(
-    `<strong>${feature.properties.operatorName}</strong><br/>${name}<br/>${feature.properties.rolloutStatus} · ${feature.properties.networkType}<br/>Confidence: ${feature.properties.confidence}`,
+    `<strong>${feature.properties.operatorName}</strong><br/>${name}<br/>${label}: ${feature.properties.rolloutStatus} · ${feature.properties.networkType}<br/>Confidence: ${feature.properties.confidence}`,
   );
   layer.bindTooltip(`${feature.properties.operatorName} · ${name}`, { sticky: true });
+}
+
+function coveragePointToLayer(feature: CoverageFeature, latlng: LatLng): Layer {
+  const color = feature.properties.brandColor || fallbackPolygonColor;
+  return circleMarker(latlng, {
+    color,
+    fillColor: color,
+    fillOpacity: 0.86,
+    opacity: 0.95,
+    radius: 7,
+    weight: 2.5,
+  });
 }
 
 export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInteractiveMapProps) {
@@ -71,6 +85,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
       features: coverage.features.filter((feature) => feature.properties.operatorSlug === selected.id),
     };
   }, [coverage, selected]);
+  const selectedSourceFeatureCount = visibleCoverage?.features.length ?? 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -138,12 +153,14 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
               key={`${selected?.id ?? 'all'}-${visibleCoverage.features.length}`}
               data={visibleCoverage}
               style={polygonStyle}
+              pointToLayer={coveragePointToLayer}
               onEachFeature={bindCoveragePopup}
             />
           )}
           {networks.map((network) => {
             const profile = getBrandProfile(network.id);
             if (!profile) return null;
+            if (selected?.id === network.id && selectedSourceFeatureCount > 0) return null;
             const active = !selected || selected.id === network.id;
             return profile.mapPoints.map((point) => (
               <CircleMarker
@@ -203,7 +220,9 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{network.name}</span>
                   <span className="block truncate text-xs" style={{ color: 'var(--ff-text-secondary)' }}>
-                    {profile.brandColorLabel} · {profile.mapPoints.length} reference point{profile.mapPoints.length === 1 ? '' : 's'}
+                    {selected?.id === network.id && selectedSourceFeatureCount > 0
+                      ? `${selectedSourceFeatureCount} source-backed feature${selectedSourceFeatureCount === 1 ? '' : 's'}`
+                      : `${profile.brandColorLabel} · ${profile.mapPoints.length} reference point${profile.mapPoints.length === 1 ? '' : 's'}`}
                   </span>
                 </span>
               </button>
