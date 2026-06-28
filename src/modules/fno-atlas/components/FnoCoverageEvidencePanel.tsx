@@ -6,6 +6,7 @@ type OperatorCoverageSummary = {
   brand_color: string | null;
   coverage_polygons: number;
   coverage_km2: string | null;
+  presence_points: number;
   last_seen_at: string | null;
 };
 
@@ -66,7 +67,8 @@ export function FnoCoverageEvidencePanel() {
   }, []);
 
   const polygonCount = data?.operatorCoverage.reduce((total, item) => total + item.coverage_polygons, 0) ?? 0;
-  const liveOperators = data?.operatorCoverage.filter((item) => item.coverage_polygons > 0) ?? [];
+  const presenceCount = data?.operatorCoverage.reduce((total, item) => total + item.presence_points, 0) ?? 0;
+  const liveOperators = data?.operatorCoverage.filter((item) => item.coverage_polygons > 0 || item.presence_points > 0) ?? [];
 
   return (
     <section className="rounded-2xl border p-5" style={cardStyle}>
@@ -79,7 +81,9 @@ export function FnoCoverageEvidencePanel() {
         </div>
         <div className="rounded-xl border px-4 py-2 text-right" style={{ borderColor: 'var(--ff-border-subtle)' }}>
           <p className="text-2xl font-semibold">{polygonCount}</p>
-          <p className="text-xs" style={{ color: 'var(--ff-text-secondary)' }}>coverage polygons</p>
+          <p className="text-xs" style={{ color: 'var(--ff-text-secondary)' }}>
+            polygons · {presenceCount} presence points
+          </p>
         </div>
       </div>
 
@@ -98,7 +102,7 @@ export function FnoCoverageEvidencePanel() {
                     <span>{item.operator_name}</span>
                   </div>
                   <span style={{ color: 'var(--ff-text-secondary)' }}>
-                    {item.coverage_polygons} polygons · {item.coverage_km2} km²
+                    {item.coverage_polygons} polygons · {item.presence_points} points · {item.coverage_km2} km²
                   </span>
                 </div>
               ))}

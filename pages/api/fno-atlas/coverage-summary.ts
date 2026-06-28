@@ -9,6 +9,7 @@ type OperatorCoverageSummary = {
   brand_color: string | null;
   coverage_polygons: number;
   coverage_km2: string | null;
+  presence_points: number;
   last_seen_at: string | null;
 };
 
@@ -35,16 +36,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const operatorCoverage = await query<OperatorCoverageSummary>(
-      `SELECT o.slug AS operator_slug,
+      `WITH coverage AS (
+        SELECT operator_id,
+          COUNT(*)::int AS coverage_polygons,
+          ROUND((COALESCE(SUM(ST_Area(geom::geography)), 0) / 1000000)::numeric, 2)::text AS coverage_km2,
+          MAX(last_seen_at) AS last_seen_at
+        FROM fno_atlas_coverage_areas
+        GROUP BY operator_id
+      ), presence AS (
+        SELECT operator_id,
+          COUNT(*)::int AS presence_points,
+          MAX(last_seen_at) AS last_seen_at
+        FROM fno_atlas_presence_points
+        GROUP BY operator_id
+      )
+      SELECT o.slug AS operator_slug,
         o.name AS operator_name,
         o.brand_color,
-        COUNT(ca.id)::int AS coverage_polygons,
-        ROUND((COALESCE(SUM(ST_Area(ca.geom::geography)), 0) / 1000000)::numeric, 2)::text AS coverage_km2,
-        MAX(ca.last_seen_at)::text AS last_seen_at
-       FROM fno_atlas_operators o
-       LEFT JOIN fno_atlas_coverage_areas ca ON ca.operator_id = o.id
-       GROUP BY o.id
-       ORDER BY coverage_polygons DESC, o.name`,
+        COALESCE(c.coverage_polygons, 0)::int AS coverage_polygons,
+        COALESCE(c.coverage_km2, '0.00') AS coverage_km2,
+        COALESCE(p.presence_points, 0)::int AS presence_points,
+        GREATEST(c.last_seen_at, p.last_seen_at)::text AS last_seen_at
+      FROM fno_atlas_operators o
+      LEFT JOIN coverage c ON c.operator_id = o.id
+      LEFT JOIN presence p ON p.operator_id = o.id
+      ORDER BY coverage_polygons DESC, presence_points DESC, o.name`,
     );
 
     const overlaySummary = await query<OverlaySummary>(
