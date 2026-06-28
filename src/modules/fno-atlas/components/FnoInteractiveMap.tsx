@@ -26,7 +26,7 @@ type CoverageProperties = {
   rolloutStatus: string;
   networkType: string;
   confidence: string;
-  featureKind: 'coverage' | 'presence';
+  featureKind: 'coverage' | 'presence' | 'route';
 };
 type CoverageFeature = Feature<Geometry, CoverageProperties>;
 type CoverageFeatureCollection = FeatureCollection<Geometry, CoverageProperties>;
@@ -39,6 +39,15 @@ interface FnoInteractiveMapProps {
 
 function polygonStyle(feature?: CoverageFeature): PathOptions {
   const color = feature?.properties.brandColor || fallbackPolygonColor;
+  if (feature?.properties.featureKind === 'route') {
+    return {
+      color,
+      fillOpacity: 0,
+      opacity: 0.92,
+      weight: 2.4,
+      dashArray: '5 4',
+    };
+  }
   return {
     color,
     fillColor: color,
@@ -48,9 +57,15 @@ function polygonStyle(feature?: CoverageFeature): PathOptions {
   };
 }
 
+function featureKindLabel(kind: CoverageProperties['featureKind']): string {
+  if (kind === 'presence') return 'Presence point';
+  if (kind === 'route') return 'Backhaul route';
+  return 'Coverage polygon';
+}
+
 function bindCoveragePopup(feature: CoverageFeature, layer: Layer): void {
-  const name = feature.properties.areaName || (feature.properties.featureKind === 'presence' ? 'Presence point' : 'Coverage area');
-  const label = feature.properties.featureKind === 'presence' ? 'Presence point' : 'Coverage polygon';
+  const name = feature.properties.areaName || featureKindLabel(feature.properties.featureKind);
+  const label = featureKindLabel(feature.properties.featureKind);
   layer.bindPopup(
     `<strong>${feature.properties.operatorName}</strong><br/>${name}<br/>${label}: ${feature.properties.rolloutStatus} · ${feature.properties.networkType}<br/>Confidence: ${feature.properties.confidence}`,
   );
@@ -88,7 +103,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
 
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams({ operatorSlug: selected?.id || '', limit: '5000' });
+    const params = new URLSearchParams({ operatorSlug: selected?.id || '', limit: selected?.id === 'dfa' ? '12000' : '5000' });
     fetch(`/api/fno-atlas/coverage-geometry?${params.toString()}`)
       .then((response) => {
         if (!response.ok) throw new Error(`Coverage geometry failed (${response.status})`);
@@ -112,7 +127,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           <div>
             <h2 className="text-xl font-semibold">Interactive FNO coverage map</h2>
             <p className="text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-              Source-backed polygons with reference/presence points; tap a marker or colour key item to isolate an FNO.
+              Source-backed coverage polygons, backhaul routes, and presence points; tap a colour key item to isolate an FNO.
             </p>
             {coverageError && <p className="mt-1 text-xs" style={{ color: 'var(--ff-error)' }}>{coverageError}</p>}
           </div>
@@ -158,7 +173,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           )}
           {selected && selectedSourceFeatureCount === 0 && (
             <div className="pointer-events-none absolute left-4 top-4 z-[1000] max-w-xs rounded-xl border px-3 py-2 text-xs shadow-sm" style={cardStyle}>
-              No source-backed polygons or presence points imported for {selected.name} yet.
+              No source-backed polygons, routes, or presence points imported for {selected.name} yet.
             </div>
           )}
         </MapContainer>
@@ -167,7 +182,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
       <aside className="rounded-2xl border p-4 shadow-sm" style={cardStyle}>
         <h3 className="text-lg font-semibold">FNO colour key</h3>
         <p className="mt-1 text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-          Polygons show source-backed coverage areas where imported. Circles are reference or presence points only.
+          Polygons show source-backed coverage, dashed lines show imported backhaul/routes, and circles show presence points.
         </p>
         <div className="mt-4 max-h-[470px] space-y-2 overflow-y-auto pr-1">
           {legendItems.map(({ network, profile }) => {

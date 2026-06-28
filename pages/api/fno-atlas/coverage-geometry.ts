@@ -12,12 +12,12 @@ type CoverageGeometryRow = {
   rollout_status: string;
   network_type: string;
   confidence: string;
-  feature_kind: 'coverage' | 'presence';
+  feature_kind: 'coverage' | 'presence' | 'route';
   geometry: Record<string, unknown>;
 };
 
 const DEFAULT_FEATURE_LIMIT = 5000;
-const MAX_FEATURE_LIMIT = 5000;
+const MAX_FEATURE_LIMIT = 15000;
 
 function requestedLimit(value: string | string[] | undefined): number {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -73,6 +73,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         FROM fno_atlas_presence_points pp
         JOIN fno_atlas_operators o ON o.id = pp.operator_id
         WHERE ($1::text IS NULL OR o.slug = $1)
+      ), routes AS (
+        SELECT rl.id::text,
+          o.slug AS operator_slug,
+          o.name AS operator_name,
+          o.brand_color,
+          rl.route_name AS area_name,
+          rl.route_type AS rollout_status,
+          rl.network_type,
+          rl.confidence,
+          'route'::text AS feature_kind,
+          ST_AsGeoJSON(ST_SimplifyPreserveTopology(rl.geom, 0.0005))::json AS geometry,
+          ST_Length(rl.geom::geography) AS sort_area
+        FROM fno_atlas_route_lines rl
+        JOIN fno_atlas_operators o ON o.id = rl.operator_id
+        WHERE rl.retired_at IS NULL
+          AND ($1::text IS NULL OR o.slug = $1)
       )
       SELECT id,
         operator_slug,
@@ -88,8 +104,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         SELECT * FROM coverage
         UNION ALL
         SELECT * FROM presence
+        UNION ALL
+        SELECT * FROM routes
       ) features
-      ORDER BY sort_area DESC, operator_name, area_name NULLS LAST
+      ORDER BY CASE feature_kind WHEN 'route' THEN 0 WHEN 'coverage' THEN 1 ELSE 2 END,
+        sort_area DESC,
+        operator_name,
+        area_name NULLS LAST
       LIMIT $2`,
       [operatorSlug, limit],
     );
