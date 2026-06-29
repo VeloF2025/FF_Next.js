@@ -60,4 +60,5 @@ A dashboard surface is explicitly out of scope for this change.
 
 ## Rollout
 - Migration ships *inside* the PR; applied by the migration runner at **deploy** (Hein), not run ad-hoc against the live DB.
-- No data backfill needed. Existing stuck DRs simply start accumulating attempts on the next cron tick and park after 5 — surfacing the month-old ones for the first time.
+- No data backfill needed. Going forward, any DR that fails **within the 2-day window** accumulates attempts on each cron tick and parks after 5 — surfacing it via the `auto_qa_attempts >= 5 AND auto_qa_processed = false` query.
+- The pre-existing stuck DRs (e.g. the 15 since 2026-05-30) are **older than the 2-day window**, so `findEligibleDRs` does not select them — they keep `auto_qa_attempts = 0` and are *not* auto-processed by this change. That is intended: they fall in the pre-`2026-06-09` backlog that is human-only by policy (see *Out of scope*). Clearing that backlog, if wanted, is a separate one-off operator action, not part of the rolling window.
