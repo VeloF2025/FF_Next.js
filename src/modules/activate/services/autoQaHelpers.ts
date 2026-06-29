@@ -10,10 +10,44 @@ import {
   evaluateAutoFail,
   getFailReasonDescription,
   checkStepCoverage,
+  type DrValidationData,
 } from './qaAutoFailService';
 import type { AutoQaResults } from './autoQaCommentGenerator';
-import type { QaDecision } from '../types/unified.types';
+import type { QaDecision, VlmCategorizationResult } from '../types/unified.types';
 import type { AutoQaProcessResult } from './autoQaProcessor';
+
+/** DB row shape consumed by buildValidationData (subset of dr_photo_unified_reviews). */
+interface DrValidationRow {
+  photo_count: number;
+  ont_serial_scanned: string | null;
+  ups_serial_scanned: string | null;
+  vlm_power_meter_dbm: number | null;
+  vlm_ont_serial_step6: string | null;
+  vlm_ont_serial_step9: string | null;
+  vlm_dr_number_step9: string | null;
+}
+
+/** Shape the DR row + categorizations into the validation input (Phase 1-4). */
+export function buildValidationData(
+  dropNumber: string,
+  dr: DrValidationRow,
+  categorizations: VlmCategorizationResult[],
+): DrValidationData {
+  return {
+    drNumber: dropNumber,
+    photoCount: dr.photo_count,
+    photos: categorizations.map((c) => ({
+      filename: c.photo_filename,
+      step: c.human_override_step ?? c.vlm_predicted_step ?? null,
+    })),
+    ontSerial: dr.ont_serial_scanned,
+    upsSerial: dr.ups_serial_scanned,
+    powerMeterDbm: dr.vlm_power_meter_dbm,
+    vlmOntSerialStep6: dr.vlm_ont_serial_step6,
+    vlmOntSerialStep9: dr.vlm_ont_serial_step9,
+    vlmDrNumberStep9: dr.vlm_dr_number_step9,
+  };
+}
 
 /**
  * Persist auto-QA results to the database
@@ -129,6 +163,43 @@ export async function persistAutoQaResults(
       }
     }
   }
+}
+
+/**
+ * Max auto-QA processing attempts before a DR is parked. A DR that throws in
+ * processOneDR is otherwise retried every cron tick forever and never sent
+ * (poison pill). After this many attempts findEligibleDRs stops selecting it,
+ * so it surfaces via `auto_qa_attempts >= MAX AND auto_qa_processed = false`
+ * with `auto_qa_last_error` instead of failing silently.
+ */
+export const MAX_AUTO_QA_ATTEMPTS = 5;
+
+/**
+ * Count an auto-QA attempt up-front (before processing) and clear any prior
+ * error. Done first so a DR that throws mid-way still climbs toward the cap.
+ */
+export async function recordAutoQaAttempt(dropNumber: string): Promise<void> {
+  await pool.query(
+    `UPDATE dr_photo_unified_reviews
+        SET auto_qa_attempts = COALESCE(auto_qa_attempts, 0) + 1,
+            auto_qa_last_attempt_at = NOW(),
+            auto_qa_last_error = NULL
+      WHERE drop_number = $1`,
+    [dropNumber],
+  );
+}
+
+/**
+ * Persist the failure reason on a failing/parked DR so it shows WHY it never
+ * sent. Best-effort: error-capture must never mask the original error.
+ */
+export async function recordAutoQaError(dropNumber: string, errMsg: string): Promise<void> {
+  await pool
+    .query(`UPDATE dr_photo_unified_reviews SET auto_qa_last_error = $2 WHERE drop_number = $1`, [
+      dropNumber,
+      errMsg.slice(0, 1000),
+    ])
+    .catch(() => undefined);
 }
 
 /**
