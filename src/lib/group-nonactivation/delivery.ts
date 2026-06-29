@@ -57,8 +57,11 @@ export function groupCaption(
     lines.push('❌ Not activated: 0 — all clear 🎉');
   }
   if (c.pp > 0) {
-    const nf = c.ppNotFound ? ` (${c.ppNotFound} not yet matched to a DR)` : '';
-    lines.push(`⏳ Pre-provision serials added yesterday: ${c.pp}${nf} — see the *Pre-Provision* tab (by serial)`);
+    lines.push(
+      `⏳ Pre-provision on FT list: ${c.pp} total` +
+        ` (${c.ppNew} new yesterday, ${c.ppNotFound} not yet matched to a DR)` +
+        ` — see the *Pre-Provision* tab`,
+    );
   }
   if (c.backlog > 0) {
     lines.push('', `📋 ${c.backlog} older drop(s) still not activated (carried over) — see the *Not Activated* tab.`);

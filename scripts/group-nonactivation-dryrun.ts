@@ -28,16 +28,16 @@ async function main(): Promise<void> {
 
   const results = await buildGroupNonActivationReports({ cohortDate, generatedDate });
 
-  console.log(`\n${'GROUP'.padEnd(28)}${'cohort'.padStart(6)}${'act'.padStart(5)}${'MISS'.padStart(6)}${'PP'.padStart(4)}${'PPnf'.padStart(5)}${'backlog'.padStart(8)}${'typos'.padStart(6)}`);
-  console.log('-'.repeat(74));
+  console.log(`\n${'GROUP'.padEnd(28)}${'cohort'.padStart(6)}${'act'.padStart(5)}${'MISS'.padStart(6)}${'PPtot'.padStart(6)}${'PPnew'.padStart(6)}${'PPnf'.padStart(5)}${'backlog'.padStart(8)}${'typos'.padStart(6)}`);
+  console.log('-'.repeat(80));
   for (const r of [...results].sort((a, b) => b.counts.miss - a.counts.miss)) {
     const c = r.counts;
     console.log(
       r.groupName.padEnd(28) +
         String(c.cohort).padStart(6) + String(c.activated).padStart(5) +
-        String(c.miss).padStart(6) + String(c.pp).padStart(4) +
-        String(c.ppNotFound).padStart(5) + String(c.backlog).padStart(8) +
-        String(c.typos).padStart(6),
+        String(c.miss).padStart(6) + String(c.pp).padStart(6) +
+        String(c.ppNew).padStart(6) + String(c.ppNotFound).padStart(5) +
+        String(c.backlog).padStart(8) + String(c.typos).padStart(6),
     );
     if (out) {
       mkdirSync(out, { recursive: true });

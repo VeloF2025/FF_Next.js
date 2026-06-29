@@ -27,8 +27,16 @@ export interface GroupReportCounts {
   cohort: number;
   activated: number;
   miss: number;
+  /** Total PP on the project's current FT list (latest batch) — reconciles with the FT recon. */
   pp: number;
+  /** Of the total, registered on the cohort day (new this run). */
+  ppNew: number;
+  /** Not yet matched to a DR. */
   ppNotFound: number;
+  /** Linked, awaiting activation. */
+  ppLinkedAwaiting: number;
+  /** Activated but still on FT's PP list (anomaly). */
+  ppActivated: number;
   backlog: number;
   typos: number;
 }
@@ -70,8 +78,12 @@ function addSummary(wb: ExcelJS.Workbook, d: GroupReportData, c: GroupReportCoun
   ws.addRow(['Carried-over backlog (older, still open)', c.backlog]);
   if (d.group.showPp) {
     ws.addRow([]);
-    styleHeaderRow(ws.addRow(['Pre-provision serials added yesterday', c.pp]));
-    ws.addRow(['  of which not_found (needs reconciliation)', c.ppNotFound]);
+    styleHeaderRow(ws.addRow([`Pre-provision on FT list — project ${d.group.project ?? '—'}`, 'Count']));
+    ws.addRow(['TOTAL on list', c.pp]);
+    ws.addRow(['  new yesterday', c.ppNew]);
+    ws.addRow(['  not yet matched to a DR (not_found)', c.ppNotFound]);
+    ws.addRow(['  linked, awaiting activation', c.ppLinkedAwaiting]);
+    ws.addRow(['  activated but still on FT list', c.ppActivated]);
   }
   ws.addRow([]);
   styleHeaderRow(ws.addRow(['Misses by submitter (yesterday)', 'Count']));
@@ -110,13 +122,15 @@ function addNotActivated(wb: ExcelJS.Workbook, d: GroupReportData): void {
 function addPreProvision(wb: ExcelJS.Workbook, d: GroupReportData): void {
   const ws = wb.addWorksheet('Pre-Provision');
   styleHeaderRow(
-    ws.addRow(['ONT Serial', 'Reason / status', 'Resolved/likely DR', 'Reconciliation', 'OLT', 'PON', 'Registered']),
+    ws.addRow(['ONT Serial', 'New?', 'Reason / status', 'Resolved/likely DR', 'Reconciliation', 'OLT', 'PON', 'Registered']),
   );
+  // ppList is ordered new-first by the query.
   d.ppList.forEach((r) => {
     const dr = r.resolvedDrop ?? r.hintDrop ?? '';
     const recon = r.resolutionStatus === 'not_found' ? RESIDUAL_LABEL[r.residualClass] : '';
-    const row = ws.addRow([r.serial, r.resolutionStatus, dr, recon, r.oltName ?? '', r.oltPon ?? '', r.dateRegistered]);
+    const row = ws.addRow([r.serial, r.isNew ? 'NEW' : '', r.resolutionStatus, dr, recon, r.oltName ?? '', r.oltPon ?? '', r.dateRegistered]);
     row.getCell(1).fill = DQ_FILL;
+    if (r.isNew) row.getCell(2).fill = OK_FILL;
   });
   autosize(ws);
 }
@@ -143,7 +157,12 @@ export async function buildGroupWorkbook(
     activated: d.cohort.filter((r) => r.activationDate).length,
     miss: d.cohort.filter((r) => !r.activationDate && !r.onPp).length,
     pp: d.ppList.length,
+    ppNew: d.ppList.filter((r) => r.isNew).length,
     ppNotFound: d.ppList.filter((r) => r.resolutionStatus === 'not_found').length,
+    ppLinkedAwaiting: d.ppList.filter(
+      (r) => r.resolutionStatus !== 'not_found' && r.resolutionStatus !== 'activated',
+    ).length,
+    ppActivated: d.ppList.filter((r) => r.resolutionStatus === 'activated').length,
     backlog: d.backlog.length,
     typos: d.cohort.filter((r) => !r.activationDate && !r.onPp && !isCanonicalDr(r.dropNumber)).length,
   };
