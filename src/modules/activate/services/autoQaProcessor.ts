@@ -12,7 +12,6 @@ import {
   validatePowerMeter,
   validateSerialCrossReference,
   evaluateAutoFail,
-  type DrValidationData,
 } from './qaAutoFailService';
 import {
   getStepAccuracy,
@@ -27,7 +26,7 @@ import {
   type AutoQaResults,
 } from './autoQaCommentGenerator';
 import { logActivity } from './activityLogService';
-import { persistAutoQaResults, makeResult } from './autoQaHelpers';
+import { persistAutoQaResults, makeResult, recordAutoQaAttempt, recordAutoQaError, buildValidationData, MAX_AUTO_QA_ATTEMPTS } from './autoQaHelpers';
 import {
   flagWithinDrStepDuplicates,
   flagDateMismatchDuplicates,
@@ -78,15 +77,17 @@ export async function findEligibleDRs(limit: number = 10): Promise<EligibleDR[]>
     `SELECT drop_number, auto_qa_eligible_at, photo_count
      FROM dr_photo_unified_reviews
      WHERE auto_qa_eligible_at <= NOW()
+       AND auto_qa_eligible_at >= NOW() - INTERVAL '2 days'  -- current DRs only, never the backlog
        AND auto_qa_processed = false
+       AND COALESCE(auto_qa_attempts, 0) < $2                -- park poison pills after MAX attempts
        AND photo_count > 0
        AND vlm_categorization_status IN ('categorized', 'approved')
        AND data_validation_completed = true
        AND (qa_decision IS NULL OR qa_decision_is_draft = true)
        AND (human_review_status IS NULL OR human_review_status != 'completed')
-     ORDER BY auto_qa_eligible_at DESC
+     ORDER BY auto_qa_eligible_at ASC                        -- oldest-first: no starvation
      LIMIT $1`,
-    [limit],
+    [limit, MAX_AUTO_QA_ATTEMPTS],
   );
 
   return result.rows;
@@ -101,6 +102,8 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
 
   try {
     log.info(`Processing ${dropNumber}`);
+
+    await recordAutoQaAttempt(dropNumber); // poison-pill guard: count before processing
 
     const drResult = await pool.query(
       `SELECT
@@ -134,21 +137,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
     }
 
     // --- PHASE 1: Prerequisites ---
-    const validationData: DrValidationData = {
-      drNumber: dropNumber,
-      photoCount: dr.photo_count,
-      photos: categorizations.map((c) => ({
-        filename: c.photo_filename,
-        step: c.human_override_step ?? c.vlm_predicted_step ?? null,
-      })),
-      ontSerial: dr.ont_serial_scanned,
-      upsSerial: dr.ups_serial_scanned,
-      powerMeterDbm: dr.vlm_power_meter_dbm,
-      vlmOntSerialStep6: dr.vlm_ont_serial_step6,
-      vlmOntSerialStep9: dr.vlm_ont_serial_step9,
-      vlmDrNumberStep9: dr.vlm_dr_number_step9,
-    };
-
+    const validationData = buildValidationData(dropNumber, dr, categorizations);
     const prereqs = checkPrerequisites(validationData);
 
     // --- PHASE 2: Photo Review (auto-approval tiers) ---
@@ -294,6 +283,8 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     log.error(`Error processing ${dropNumber}: ${errMsg}`);
+    // Surface WHY this DR failed (it shows up parked once it hits the cap).
+    await recordAutoQaError(dropNumber, errMsg);
     return makeResult(dropNumber, startTime, { success: false, error: errMsg });
   }
 }
