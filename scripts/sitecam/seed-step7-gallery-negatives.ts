@@ -119,7 +119,7 @@ async function main(): Promise<void> {
   const stepName = STEP_LABELS[STEP] ?? `Step ${STEP}`;
   console.log(`Seeding ${NEGATIVES.length} Step-${STEP} (${stepName}) gallery negatives${dry ? ' (dry run — no writes)' : ''}\n`);
 
-  let saved = 0, hashFail = 0;
+  let saved = 0, hashFail = 0, writeFail = 0;
   for (const p of NEGATIVES) {
     const url = photoUrl(p);
     let phash: string | null = null;
@@ -130,16 +130,24 @@ async function main(): Promise<void> {
       console.log(`  phash skipped (will backfill) ${url}: ${err instanceof Error ? err.message : String(err)}`);
     }
     if (!dry) {
-      await upsertCorrection(url, p, stepName);
-      await upsertVisual(url, p, phash);
+      // Isolate each photo's writes (mirrors save-decisions.ts per-decision try/catch):
+      // a DB error on one negative must not abort the remaining seeds.
+      try {
+        await upsertCorrection(url, p, stepName);
+        await upsertVisual(url, p, phash);
+      } catch (err) {
+        writeFail++;
+        console.error(`  WRITE FAILED ${url}: ${err instanceof Error ? err.message : String(err)}`);
+        continue;
+      }
     }
     saved++;
     console.log(`  ${dry ? 'WOULD SEED' : 'SEEDED'} [negative]${phash ? '' : ' (no phash)'} ${url}\n      ↳ ${p.reason}`);
   }
 
-  console.log(`\nDone. ${dry ? 'Would seed' : 'Seeded'}: ${saved}  phash failures: ${hashFail}`);
+  console.log(`\nDone. ${dry ? 'Would seed' : 'Seeded'}: ${saved}/${NEGATIVES.length}  phash failures: ${hashFail}  write failures: ${writeFail}`);
   await pool.end();
-  process.exit(0);
+  process.exit(writeFail > 0 ? 1 : 0);
 }
 
 main().catch((err) => {
