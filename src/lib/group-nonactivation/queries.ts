@@ -53,6 +53,8 @@ export interface PpRow {
   dateRegistered: string;
   residualClass: ResidualClass;
   hintDrop: string | null;
+  /** Registered on the cohort day (a NEW pre-provision this run). */
+  isNew: boolean;
 }
 
 interface GroupRaw {
@@ -84,6 +86,7 @@ interface PpRaw {
   date_registered: string;
   residual_class: ResidualClass;
   hint_drop: string | null;
+  is_new: boolean;
 }
 
 export async function getTargetGroups(): Promise<TargetGroup[]> {
@@ -113,6 +116,9 @@ export async function getCohort(groupJid: string, dateIso: string): Promise<Coho
                     'YYYY-MM-DD HH24:MI') AS sub_sast,
             act.activation_date::text AS act_date,
             act.serial_number AS act_serial,
+            -- on_pp deliberately matches ANY oes_pp_data row (not just the latest batch
+            -- the PP tab shows): a cohort drop is "explained by pre-provision" whichever
+            -- FT batch its serial sits in, so it drops out of Misses regardless.
             EXISTS (SELECT 1 FROM oes_pp_data p
                      WHERE LOWER(p.resolved_drop_number) = LOWER(q.drop_number)
                         OR (q.ont_serial_scanned <> ''
@@ -168,13 +174,18 @@ export async function getBacklog(
 }
 
 /**
- * PP list for a project on a date (serial-keyed). For not_found rows, classify
- * the reconciliation residual and surface a likely DR hint when one exists.
+ * Full current PP list for a project — the latest import batch (MAX import_batch_id),
+ * matching the daily FT-recon PP sheet. `isNew` flags rows registered on the cohort
+ * day. For not_found rows, classify the reconciliation residual + likely-DR hint.
  */
 export async function getPpList(ppProject: string, dateIso: string): Promise<PpRow[]> {
   const { rows } = await pool.query(
-    `SELECT pp.serial_number, pp.resolution_status, pp.resolved_drop_number,
+    `WITH lb AS (
+       SELECT MAX(import_batch_id) AS bid FROM oes_pp_data WHERE project = $1
+     )
+     SELECT pp.serial_number, pp.resolution_status, pp.resolved_drop_number,
             pp.olt_name, pp.olt_pon::text AS olt_pon, pp.date_registered::text AS date_registered,
+            COALESCE(pp.date_registered = $2::date, false) AS is_new,
             CASE
               WHEN pp.resolution_status <> 'not_found' THEN 'resolved'
               WHEN EXISTS (SELECT 1 FROM loeks_field_mappings l
@@ -200,8 +211,10 @@ export async function getPpList(ppProject: string, dateIso: string): Promise<PpR
                   AND l.dr_number ~ '^DR[0-9]+$' LIMIT 1)
             ) AS hint_drop
        FROM oes_pp_data pp
-      WHERE pp.project = $1 AND pp.date_registered = $2::date
-      ORDER BY (pp.resolution_status = 'not_found') DESC, pp.resolution_status, pp.serial_number`,
+       JOIN lb ON pp.import_batch_id = lb.bid
+      WHERE pp.project = $1
+      ORDER BY COALESCE(pp.date_registered = $2::date, false) DESC,
+               (pp.resolution_status = 'not_found') DESC, pp.resolution_status, pp.serial_number`,
     [ppProject, dateIso],
   );
   return (rows as PpRaw[]).map((r) => ({
@@ -213,5 +226,6 @@ export async function getPpList(ppProject: string, dateIso: string): Promise<PpR
     dateRegistered: r.date_registered,
     residualClass: r.residual_class,
     hintDrop: r.hint_drop,
+    isNew: r.is_new,
   }));
 }
