@@ -116,6 +116,9 @@ export async function getCohort(groupJid: string, dateIso: string): Promise<Coho
                     'YYYY-MM-DD HH24:MI') AS sub_sast,
             act.activation_date::text AS act_date,
             act.serial_number AS act_serial,
+            -- on_pp deliberately matches ANY oes_pp_data row (not just the latest batch
+            -- the PP tab shows): a cohort drop is "explained by pre-provision" whichever
+            -- FT batch its serial sits in, so it drops out of Misses regardless.
             EXISTS (SELECT 1 FROM oes_pp_data p
                      WHERE LOWER(p.resolved_drop_number) = LOWER(q.drop_number)
                         OR (q.ont_serial_scanned <> ''
@@ -182,7 +185,7 @@ export async function getPpList(ppProject: string, dateIso: string): Promise<PpR
      )
      SELECT pp.serial_number, pp.resolution_status, pp.resolved_drop_number,
             pp.olt_name, pp.olt_pon::text AS olt_pon, pp.date_registered::text AS date_registered,
-            (pp.date_registered = $2::date) AS is_new,
+            COALESCE(pp.date_registered = $2::date, false) AS is_new,
             CASE
               WHEN pp.resolution_status <> 'not_found' THEN 'resolved'
               WHEN EXISTS (SELECT 1 FROM loeks_field_mappings l
@@ -210,7 +213,7 @@ export async function getPpList(ppProject: string, dateIso: string): Promise<PpR
        FROM oes_pp_data pp
        JOIN lb ON pp.import_batch_id = lb.bid
       WHERE pp.project = $1
-      ORDER BY (pp.date_registered = $2::date) DESC,
+      ORDER BY COALESCE(pp.date_registered = $2::date, false) DESC,
                (pp.resolution_status = 'not_found') DESC, pp.resolution_status, pp.serial_number`,
     [ppProject, dateIso],
   );
