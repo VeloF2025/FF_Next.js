@@ -17,6 +17,7 @@ function toQueryString(filters?: PlanningFilters): string {
   if (!filters) return '';
   const p = new URLSearchParams();
   if (filters.project_id) p.set('project_id', filters.project_id);
+  if (filters.pipeline_project_id) p.set('pipeline_project_id', filters.pipeline_project_id);
   if (filters.stage) p.set('stage', filters.stage);
   filters.exclude_stage?.forEach(s => p.append('exclude_stage', s));
   if (filters.assigned_to) p.set('assigned_to', filters.assigned_to);

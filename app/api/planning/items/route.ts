@@ -8,6 +8,7 @@ import {
   createPlanningItem,
   logPlanningActivity,
 } from '@/modules/planning/services/planningService';
+import { resolveOrCreateProjectForPipeline } from '@/modules/planning/services/projectMaterializationService';
 import type { PlanningFilters, PlanningStage } from '@/modules/planning/types/planning';
 import { PLANNING_STAGES, PLANNING_PRIORITIES } from '@/modules/planning/constants/stages';
 
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const filters: PlanningFilters = {};
     if (searchParams.has('project_id')) filters.project_id = searchParams.get('project_id')!;
+    if (searchParams.has('pipeline_project_id')) filters.pipeline_project_id = searchParams.get('pipeline_project_id')!;
     if (searchParams.has('stage')) filters.stage = searchParams.get('stage') as PlanningStage;
     if (searchParams.has('exclude_stage')) filters.exclude_stage = searchParams.getAll('exclude_stage') as PlanningStage[];
     if (searchParams.has('assigned_to')) filters.assigned_to = searchParams.get('assigned_to')!;
@@ -45,16 +47,18 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    if (!body.project_id) return NextResponse.json({ success: false, error: { message: 'project_id is required' } }, { status: 400 });
+    if (!body.project_id && !body.pipeline_project_id) return NextResponse.json({ success: false, error: { message: 'project_id or pipeline_project_id is required' } }, { status: 400 });
     if (!body.title || !String(body.title).trim()) return NextResponse.json({ success: false, error: { message: 'title is required' } }, { status: 400 });
     if (body.stage && !PLANNING_STAGES.includes(body.stage)) return NextResponse.json({ success: false, error: { message: `Invalid stage. Must be one of: ${PLANNING_STAGES.join(', ')}` } }, { status: 400 });
     if (body.priority && !PLANNING_PRIORITIES.includes(body.priority)) return NextResponse.json({ success: false, error: { message: `Invalid priority. Must be one of: ${PLANNING_PRIORITIES.join(', ')}` } }, { status: 400 });
 
     const cookieStore = await cookies();
     const token = cookieStore.get('ff_auth_token')?.value;
+    let userName = '';
     if (token) {
       const payload = await verifyToken(token);
       if (payload?.sub) body.created_by = payload.sub;
+      userName = (payload as { name?: string } | null)?.name || payload?.sub || '';
     }
     // Require an authenticated user (matches the NOC POST gate). Unauthenticated
     // callers cannot create planning items even though middleware only rate-limits.
@@ -63,6 +67,17 @@ export async function POST(req: NextRequest) {
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' }, meta: { timestamp: new Date().toISOString() } },
         { status: 401 },
       );
+    }
+
+    // Picked a pipeline project (no real project row yet) → materialize/link one,
+    // then attach the card to it. See projectMaterializationService for the hybrid rules.
+    if (!body.project_id && body.pipeline_project_id) {
+      const { projectId } = await resolveOrCreateProjectForPipeline(body.pipeline_project_id, {
+        userId: body.created_by,
+        userName: userName || body.created_by,
+      });
+      body.project_id = projectId;
+      body.source = 'manual';
     }
 
     const item = await createPlanningItem(body);

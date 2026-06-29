@@ -47,7 +47,8 @@ export interface PlanningItemWithRelations extends PlanningItem {
 }
 
 export interface CreatePlanningItemPayload {
-  project_id: string;
+  /** Optional when `pipeline_project_id` is supplied — the API materializes/links a project. */
+  project_id?: string;
   title: string;
   description?: string | null;
   scope_area?: string | null;
@@ -71,6 +72,7 @@ export interface UpdatePlanningItemPayload {
 
 export interface PlanningFilters {
   project_id?: string;
+  pipeline_project_id?: string;
   stage?: PlanningStage;
   exclude_stage?: PlanningStage[];
   assigned_to?: string;

@@ -1,28 +1,30 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { ProjectQueryService } from '@/services/projects/core/projectQueryService';
 import { BOARD_STAGES } from '../constants/stages';
-import { log } from '@/lib/logger';
-import type { Project } from '@/types/project/base.types';
+import { PipelineProjectPicker, type PipelineProjectOption } from './PipelineProjectPicker';
 
-export interface PlanningFilterValues { project: string; stage: string; search: string }
+export interface PlanningFilterValues {
+  pipeline_project: string;
+  pipeline_project_name: string;
+  stage: string;
+  search: string;
+}
 
 interface Props {
   value: PlanningFilterValues;
   onChange: (key: keyof PlanningFilterValues, val: string) => void;
+  onSelectProject: (project: PipelineProjectOption | null) => void;
   onClear: () => void;
 }
 
-export function PlanningFilterBar({ value, onChange, onClear }: Props) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  useEffect(() => {
-    ProjectQueryService.getActiveProjects()
-      .then(setProjects)
-      .catch((error) => log.error('Failed to load projects', { data: error }, 'PlanningFilterBar'));
-  }, []);
-
+export function PlanningFilterBar({ value, onChange, onSelectProject, onClear }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2 mb-4">
+      <PipelineProjectPicker
+        className="min-w-[240px]"
+        value={value.pipeline_project ? { id: value.pipeline_project, label: value.pipeline_project_name || 'Selected project' } : null}
+        onSelect={onSelectProject}
+        placeholder="Search all projects…"
+      />
       <input
         type="text"
         placeholder="Search planning items…"
@@ -30,12 +32,6 @@ export function PlanningFilterBar({ value, onChange, onClear }: Props) {
         onChange={(e) => onChange('search', e.target.value)}
         className="px-3 py-2 border rounded-md text-sm"
       />
-      <select value={value.project} onChange={(e) => onChange('project', e.target.value)} className="px-3 py-2 border rounded-md text-sm">
-        <option value="">All Projects</option>
-        {projects.map((p) => (
-          <option key={p.id} value={p.id}>{p.project_name ?? p.name} {p.project_code ?? (p.code ? `(${p.code})` : '')}</option>
-        ))}
-      </select>
       <select value={value.stage} onChange={(e) => onChange('stage', e.target.value)} className="px-3 py-2 border rounded-md text-sm">
         <option value="">All Stages</option>
         {BOARD_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
