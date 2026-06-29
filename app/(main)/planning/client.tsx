@@ -4,16 +4,22 @@ import { useMemo } from 'react';
 import { useUrlFilters } from '@/hooks/useUrlFilters';
 import { KanbanBoard } from '@/modules/planning/components/KanbanBoard';
 import { PlanningFilterBar } from '@/modules/planning/components/PlanningFilterBar';
+import type { PipelineProjectOption } from '@/modules/planning/components/PipelineProjectPicker';
 import type { PlanningFilters, PlanningStage } from '@/modules/planning/types/planning';
 
 export default function PlanningPageClient() {
-  const { filters, setFilter, clearAll } = useUrlFilters({ project: '', stage: '', search: '' });
+  const { filters, setFilter, setMultiple, clearAll } = useUrlFilters({
+    pipeline_project: '',
+    pipeline_project_name: '',
+    stage: '',
+    search: '',
+  });
 
   const boardFilters: PlanningFilters = useMemo(() => ({
-    project_id: filters.project || undefined,
+    pipeline_project_id: filters.pipeline_project || undefined,
     stage: (filters.stage || undefined) as PlanningStage | undefined,
     search: filters.search || undefined,
-  }), [filters.project, filters.stage, filters.search]);
+  }), [filters.pipeline_project, filters.stage, filters.search]);
 
   return (
     <div className="p-6">
@@ -24,6 +30,9 @@ export default function PlanningPageClient() {
       <PlanningFilterBar
         value={filters}
         onChange={(k, v) => setFilter(k, v)}
+        onSelectProject={(p: PipelineProjectOption | null) =>
+          setMultiple({ pipeline_project: p?.id ?? '', pipeline_project_name: p?.project_name ?? '' })
+        }
         onClear={clearAll}
       />
       <KanbanBoard filters={boardFilters} />

@@ -71,6 +71,7 @@ export async function listPlanningItems(filters: PlanningFilters = {}): Promise<
   const values: unknown[] = [];
   let i = 1;
   if (filters.project_id) { where.push(`p.project_id = $${i++}`); values.push(filters.project_id); }
+  if (filters.pipeline_project_id) { where.push(`p.pipeline_project_id = $${i++}`); values.push(filters.pipeline_project_id); }
   if (filters.stage) { where.push(`p.stage = $${i++}`); values.push(filters.stage); }
   if (filters.exclude_stage?.length) {
     where.push(`p.stage <> ALL($${i++}::text[])`); values.push(filters.exclude_stage);
