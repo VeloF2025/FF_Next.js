@@ -102,6 +102,7 @@ function coveragePointToLayer(feature: CoverageFeature, latlng: LatLng): Layer {
 export function FnoInteractiveMap({ networks, selectedIds, onToggle }: FnoInteractiveMapProps) {
   const [coverage, setCoverage] = useState<CoverageFeatureCollection | null>(null);
   const [coverageError, setCoverageError] = useState<string | null>(null);
+  const [includeDfaRoutes, setIncludeDfaRoutes] = useState(false);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedNetworks = useMemo(
     () => networks.filter((network) => selectedIdSet.has(network.id)),
@@ -136,11 +137,13 @@ export function FnoInteractiveMap({ networks, selectedIds, onToggle }: FnoIntera
         cancelled = true;
       };
     }
+    const abortController = new AbortController();
     Promise.all(
       selectedIds.map(async (id) => {
-        const params = new URLSearchParams({ operatorSlug: id, limit: id === 'dfa' ? '12000' : '5000' });
+        const params = new URLSearchParams({ operatorSlug: id, limit: id === 'dfa' && includeDfaRoutes ? '12000' : '5000' });
         if (id === 'fibertime') params.set('featureKinds', 'project_aoi');
-        const response = await fetch(`/api/fno-atlas/coverage-geometry?${params.toString()}`);
+        if (id === 'dfa' && !includeDfaRoutes) params.set('featureKinds', 'coverage');
+        const response = await fetch(`/api/fno-atlas/coverage-geometry?${params.toString()}`, { signal: abortController.signal });
         if (!response.ok) throw new Error(`Coverage geometry failed for ${id} (${response.status})`);
         return response.json() as Promise<{ data: CoverageFeatureCollection }>;
       }),
@@ -155,12 +158,14 @@ export function FnoInteractiveMap({ networks, selectedIds, onToggle }: FnoIntera
         }
       })
       .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         if (!cancelled) setCoverageError(error instanceof Error ? error.message : 'Coverage geometry failed');
       });
     return () => {
       cancelled = true;
+      abortController.abort();
     };
-  }, [selectedIds]);
+  }, [selectedIds, includeDfaRoutes]);
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -226,6 +231,19 @@ export function FnoInteractiveMap({ networks, selectedIds, onToggle }: FnoIntera
         <p className="mt-1 text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
           Polygons show official/source-backed FNO coverage, amber dashed fills show Velocity AOI areas, cyan dashed lines show routes, and circles show official presence markers. Click FNOs to add/remove overlays.
         </p>
+        {selectedIdSet.has('dfa') && (
+          <label className="mt-3 flex items-start gap-2 rounded-xl border p-3 text-xs" style={{ borderColor: 'var(--ff-border-subtle)', color: 'var(--ff-text-secondary)' }}>
+            <input
+              type="checkbox"
+              checked={includeDfaRoutes}
+              onChange={(event) => setIncludeDfaRoutes(event.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Show DFA route lines. This loads about 9,225 extra route features and can slow the browser on phones.
+            </span>
+          </label>
+        )}
         <p className="mt-2 text-xs" style={{ color: 'var(--ff-text-secondary)' }}>
           {selectedNetworks.length} selected · {selectedSourceFeatureCount} visible source-backed features
         </p>
