@@ -18,11 +18,10 @@ type AoiSummaryRow = {
   confidence: string;
 };
 
-const SOURCE_NAME = 'Velocity 1Map area AOIs';
+const SOURCE_NAME = 'Velocity internal area AOIs';
 const SOURCE_URL = 'fibreflow://onemap_properties';
 const DRY_RUN = process.argv.includes('--dry-run');
 const MIN_POINTS = 30;
-const CLUSTER_EPS_METRES = 900;
 const BUFFER_METRES = 50;
 const HULL_RATIO = 0.85;
 
@@ -58,7 +57,7 @@ async function ensureSource(client: Client, operatorId: string): Promise<string>
       [
         existing.rows[0].id,
         SOURCE_NAME,
-        'Internal Velocity/1Map GPS-derived AOI polygons. Area-only layer; does not expose demand points and is not official FNO-published coverage.',
+        'Internal Velocity GPS-derived AOI polygons. Area-only layer; does not expose demand points and is not official FNO-published coverage.',
       ],
     );
     return existing.rows[0].id;
@@ -74,7 +73,7 @@ async function ensureSource(client: Client, operatorId: string): Promise<string>
       operatorId,
       SOURCE_NAME,
       SOURCE_URL,
-      'Internal Velocity/1Map GPS-derived AOI polygons. Area-only layer; does not expose demand points and is not official FNO-published coverage.',
+      'Internal Velocity GPS-derived AOI polygons. Area-only layer; does not expose demand points and is not official FNO-published coverage.',
     ],
   );
   return result.rows[0].id;
@@ -90,12 +89,12 @@ async function createRun(client: Client, sourceId: string): Promise<string> {
       JSON.stringify({
         source: SOURCE_URL,
         minPoints: MIN_POINTS,
-        clusterEpsMetres: CLUSTER_EPS_METRES,
         hullRatio: HULL_RATIO,
         bufferMetres: BUFFER_METRES,
         granularity: 'site_only',
         exposesDemandPoints: false,
         overwritesProjects: false,
+        method: 'site_all_coordinates_concave_hull',
       }),
     ],
   );
@@ -114,25 +113,16 @@ async function preview(client: Client): Promise<AoiSummaryRow[]> {
           AND longitude IS NOT NULL
           AND latitude BETWEEN -35.5 AND -21.5
           AND longitude BETWEEN 16.0 AND 33.5
-     ), clustered AS (
-       SELECT site_code, geom_3857,
-              ST_ClusterDBSCAN(geom_3857, eps := $1, minpoints := 25) OVER (PARTITION BY site_code) AS cluster_id
-         FROM valid_points
      ), grouped AS (
        SELECT site_code,
-              cluster_id,
               COUNT(*)::int AS point_count,
-              ST_Multi(ST_Transform(ST_Buffer(ST_ConcaveHull(ST_Collect(geom_3857), $2, true), $3), 4326)) AS geom
-         FROM clustered
-        WHERE cluster_id IS NOT NULL
-        GROUP BY site_code, cluster_id
-       HAVING COUNT(*) >= $4
+              ST_Multi(ST_Transform(ST_Buffer(ST_ConcaveHull(ST_Collect(geom_3857), $1, true), $2), 4326)) AS geom
+         FROM valid_points
+        GROUP BY site_code
+       HAVING COUNT(*) >= $3
      )
      SELECT site_code,
-            CASE WHEN COUNT(*) OVER (PARTITION BY site_code) = 1
-              THEN site_code
-              ELSE site_code || ' AOI ' || (ROW_NUMBER() OVER (PARTITION BY site_code ORDER BY point_count DESC))::text
-            END AS area_name,
+            site_code AS area_name,
             point_count,
             ROUND((ST_Area(geom::geography) / 1000000)::numeric, 2)::text AS km2,
             CASE
@@ -145,17 +135,24 @@ async function preview(client: Client): Promise<AoiSummaryRow[]> {
         AND NOT ST_IsEmpty(geom)
       ORDER BY point_count DESC, site_code
       LIMIT 200`,
-    [CLUSTER_EPS_METRES, HULL_RATIO, BUFFER_METRES, MIN_POINTS],
+    [HULL_RATIO, BUFFER_METRES, MIN_POINTS],
   );
   return result.rows;
 }
 
 async function importAois(client: Client, operatorId: string, sourceId: string, runId: string): Promise<number> {
+  await client.query(
+    `UPDATE fno_atlas_project_aois
+        SET retired_at = NOW(), updated_at = NOW()
+      WHERE source_id = $1
+        AND retired_at IS NULL`,
+    [sourceId],
+  );
+
   const result = await client.query<{ inserted: number }>(
     `WITH valid_points AS (
        SELECT site AS site_code,
               status,
-              flow_name_groups,
               ST_Transform(ST_SetSRID(ST_MakePoint(longitude::double precision, latitude::double precision), 4326), 3857) AS geom_3857
          FROM onemap_properties
         WHERE site IS NOT NULL
@@ -164,30 +161,26 @@ async function importAois(client: Client, operatorId: string, sourceId: string, 
           AND longitude IS NOT NULL
           AND latitude BETWEEN -35.5 AND -21.5
           AND longitude BETWEEN 16.0 AND 33.5
-     ), clustered AS (
-       SELECT site_code, status, flow_name_groups, geom_3857,
-              ST_ClusterDBSCAN(geom_3857, eps := $1, minpoints := 25) OVER (PARTITION BY site_code) AS cluster_id
-         FROM valid_points
+     ), status_counts AS (
+       SELECT site_code,
+              jsonb_object_agg(status, status_count) FILTER (WHERE status IS NOT NULL) AS status_counts
+         FROM (
+           SELECT site_code, status, COUNT(*)::int AS status_count
+             FROM valid_points
+            WHERE status IS NOT NULL
+            GROUP BY site_code, status
+         ) counts
+        GROUP BY site_code
      ), grouped AS (
        SELECT site_code,
-              cluster_id,
               COUNT(*)::int AS point_count,
-              jsonb_object_agg(status, status_count) FILTER (WHERE status IS NOT NULL) AS status_counts,
-              ST_Multi(ST_Transform(ST_Buffer(ST_ConcaveHull(ST_Collect(geom_3857), $2, true), $3), 4326)) AS geom
-         FROM (
-           SELECT site_code, cluster_id, status, geom_3857,
-                  COUNT(*) OVER (PARTITION BY site_code, cluster_id, status)::int AS status_count
-             FROM clustered
-            WHERE cluster_id IS NOT NULL
-         ) ranked
-        GROUP BY site_code, cluster_id
-       HAVING COUNT(*) >= $4
+              ST_Multi(ST_Transform(ST_Buffer(ST_ConcaveHull(ST_Collect(geom_3857), $1, true), $2), 4326)) AS geom
+         FROM valid_points
+        GROUP BY site_code
+       HAVING COUNT(*) >= $3
      ), named AS (
        SELECT site_code,
-              CASE WHEN COUNT(*) OVER (PARTITION BY site_code) = 1
-                THEN site_code
-                ELSE site_code || ' AOI ' || (ROW_NUMBER() OVER (PARTITION BY site_code ORDER BY point_count DESC))::text
-              END AS area_name,
+              site_code AS area_name,
               point_count,
               CASE
                 WHEN point_count >= 1000 THEN 'high'
@@ -196,38 +189,33 @@ async function importAois(client: Client, operatorId: string, sourceId: string, 
               END AS confidence,
               geom,
               jsonb_build_object(
-                'sourceTable', 'onemap_properties',
+                'sourceTable', 'internal_gps_properties',
                 'granularity', 'site_only',
                 'exposesDemandPoints', false,
                 'overwritesProjects', false,
-                'clusterEpsMetres', $1,
-                'hullRatio', $2,
-                'bufferMetres', $3,
+                'method', 'site_all_coordinates_concave_hull',
+                'hullRatio', $1,
+                'bufferMetres', $2,
                 'pointCount', point_count,
                 'statusCounts', COALESCE(status_counts, '{}'::jsonb),
-                'label', 'Velocity 1Map AOI - not official FNO-published coverage'
+                'label', 'Velocity AOI - not official FNO-published coverage'
               ) AS raw_properties
          FROM grouped
+         LEFT JOIN status_counts USING (site_code)
         WHERE ST_IsValid(geom)
           AND NOT ST_IsEmpty(geom)
-     ), retired AS (
-       UPDATE fno_atlas_project_aois
-          SET retired_at = NOW(), updated_at = NOW()
-        WHERE source_id = $5
-          AND retired_at IS NULL
-       RETURNING id
      ), inserted AS (
        INSERT INTO fno_atlas_project_aois (
          operator_id, source_id, ingestion_run_id, site_code, area_name, area_kind,
          point_count, confidence, geom, raw_properties, first_seen_at, last_seen_at
        )
-       SELECT $6, $5, $7, site_code, area_name, 'onemap_site_aoi', point_count,
+       SELECT $5, $4, $6, site_code, area_name, 'velocity_site_aoi', point_count,
               confidence, geom, raw_properties, NOW(), NOW()
          FROM named
        RETURNING id
      )
      SELECT COUNT(*)::int AS inserted FROM inserted`,
-    [CLUSTER_EPS_METRES, HULL_RATIO, BUFFER_METRES, MIN_POINTS, sourceId, operatorId, runId],
+    [HULL_RATIO, BUFFER_METRES, MIN_POINTS, sourceId, operatorId, runId],
   );
   return result.rows[0].inserted;
 }
@@ -242,7 +230,7 @@ async function main() {
     const operatorId = operator.rows[0].id;
 
     const rows = await preview(client);
-    console.log(`1Map AOI preview: ${rows.length} area polygons would be generated`);
+    console.log(`Velocity AOI preview: ${rows.length} area polygons would be generated`);
     console.table(rows.slice(0, 25));
     if (DRY_RUN) return;
 
@@ -257,7 +245,7 @@ async function main() {
       [runId, inserted],
     );
     await client.query('COMMIT');
-    console.log(`Inserted ${inserted} Velocity 1Map AOI area polygons`);
+    console.log(`Inserted ${inserted} Velocity AOI area polygons`);
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;
