@@ -15,7 +15,7 @@ const cardStyle = {
   color: 'var(--ff-text-primary)',
 };
 const defaultProjectId = projectArchetypes[0]?.id ?? '';
-const defaultFnoId = fnoNetworks[0]?.id ?? '';
+const defaultFnoId = fnoNetworks.find((network) => network.id === 'fibertime')?.id ?? fnoNetworks[0]?.id ?? '';
 function Pill({ children }: { children: ReactNode }) {
   return (
     <span
