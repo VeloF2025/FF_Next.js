@@ -206,7 +206,7 @@ export function FnoInteractiveMap({ networks, selectedIds, onToggle }: FnoIntera
           <TileLayer attribution={tileAttribution} detectRetina maxZoom={18} url={tileUrl} />
           {visibleCoverage && (
             <GeoJSON
-              key={`${selected?.id ?? 'all'}-${visibleCoverage.features.length}`}
+              key={`${selectedIds.join('|') || 'none'}-${visibleCoverage.features.length}`}
               data={visibleCoverage}
               style={polygonStyle}
               pointToLayer={coveragePointToLayer}
