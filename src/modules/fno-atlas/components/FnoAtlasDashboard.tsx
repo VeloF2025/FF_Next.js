@@ -1,6 +1,6 @@
 import { GitBranch, MapPin, Network, RadioTower, Search, type LucideIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { fnoNetworks, projectArchetypes, scrapingTools } from '../data/fnoAtlasData';
 import type { FnoNetwork } from '../data/fnoAtlasData';
 import { filterFnos, findFnosForProject, getAllRegions, getCoverageConfidenceSummary } from '../lib/fnoAtlasUtils';
@@ -120,10 +120,26 @@ export function FnoAtlasDashboard() {
   const [region, setRegion] = useState('all');
   const [type, setType] = useState('all');
   const [selectedProject, setSelectedProject] = useState(defaultProjectId);
-  const [selectedFno, setSelectedFno] = useState(defaultFnoId);
+  const [selectedFnos, setSelectedFnos] = useState<string[]>(defaultFnoId ? [defaultFnoId] : []);
   const regions = useMemo(() => getAllRegions(), []);
   const filtered = useMemo(() => filterFnos(query, region, type), [query, region, type]);
   const confidence = getCoverageConfidenceSummary();
+  useEffect(() => {
+    setSelectedFnos((current) => {
+      const filteredIds = new Set(filtered.map((network) => network.id));
+      const stillVisible = current.filter((id) => filteredIds.has(id));
+      if (stillVisible.length > 0) return stillVisible;
+      return filtered[0]?.id ? [filtered[0].id] : [];
+    });
+  }, [filtered]);
+  const toggleSelectedFno = (id: string) => {
+    setSelectedFnos((current) => {
+      if (current.includes(id)) {
+        return current.length > 1 ? current.filter((item) => item !== id) : current;
+      }
+      return [...current, id];
+    });
+  };
   return (
     <div className="space-y-6 p-6">
       <header className="rounded-3xl border p-6 shadow-sm" style={cardStyle}>
@@ -149,7 +165,7 @@ export function FnoAtlasDashboard() {
       </header>
       <FnoCoverageEvidencePanel />
       <ProjectFitPanel selectedId={selectedProject} onSelect={setSelectedProject} />
-      <FnoInteractiveMap networks={filtered} selectedId={selectedFno} onSelect={setSelectedFno} />
+      <FnoInteractiveMap networks={filtered} selectedIds={selectedFnos} onToggle={toggleSelectedFno} />
       <section className="rounded-2xl border p-5" style={cardStyle}>
         <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
           <label className="text-sm font-medium">
