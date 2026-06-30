@@ -117,12 +117,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           o.name AS operator_name,
           o.brand_color,
           aoi.area_name,
-          '1map_aoi'::text AS rollout_status,
+          'velocity_aoi'::text AS rollout_status,
           'project_aoi'::text AS network_type,
           aoi.confidence,
           'project_aoi'::text AS feature_kind,
           aoi.point_count,
-          'Velocity 1Map AOI - not official FNO coverage'::text AS source_label,
+          'Velocity AOI - not official FNO coverage'::text AS source_label,
           ST_AsGeoJSON(ST_SimplifyPreserveTopology(aoi.geom, 0.0002))::json AS geometry,
           ST_Area(aoi.geom::geography) AS sort_area
         FROM fno_atlas_project_aois aoi

@@ -72,7 +72,7 @@ function polygonStyle(feature?: CoverageFeature): PathOptions {
 function featureKindLabel(kind: CoverageProperties['featureKind']): string {
   if (kind === 'presence') return 'Presence point';
   if (kind === 'route') return 'Backhaul route';
-  if (kind === 'project_aoi') return 'Velocity 1Map AOI';
+  if (kind === 'project_aoi') return 'Velocity AOI';
   return 'Coverage polygon';
 }
 
@@ -80,7 +80,7 @@ function bindCoveragePopup(feature: CoverageFeature, layer: Layer): void {
   const name = feature.properties.areaName || featureKindLabel(feature.properties.featureKind);
   const label = featureKindLabel(feature.properties.featureKind);
   const sourceLabel = feature.properties.sourceLabel ? `<br/>${feature.properties.sourceLabel}` : '';
-  const pointCount = feature.properties.pointCount ? `<br/>1Map GPS records used: ${feature.properties.pointCount}` : '';
+  const pointCount = feature.properties.pointCount ? `<br/>GPS records used: ${feature.properties.pointCount}` : '';
   layer.bindPopup(
     `<strong>${feature.properties.operatorName}</strong><br/>${name}<br/>${label}: ${feature.properties.rolloutStatus} · ${feature.properties.networkType}<br/>Confidence: ${feature.properties.confidence}${pointCount}${sourceLabel}`,
   );
@@ -143,7 +143,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           <div>
             <h2 className="text-xl font-semibold">Interactive FNO coverage map</h2>
             <p className="text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-              Source-backed coverage polygons, Velocity 1Map AOI areas, backhaul routes, and presence markers; Fibertime defaults to Velocity 1Map AOI areas only.
+              Source-backed coverage polygons, Velocity AOI areas, backhaul routes, and presence markers; Fibertime defaults to Velocity AOI areas only.
             </p>
             {coverageError && <p className="mt-1 text-xs" style={{ color: 'var(--ff-error)' }}>{coverageError}</p>}
           </div>
@@ -198,7 +198,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
       <aside className="rounded-2xl border p-4 shadow-sm" style={cardStyle}>
         <h3 className="text-lg font-semibold">FNO colour key</h3>
         <p className="mt-1 text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-          Polygons show official/source-backed FNO coverage, amber dashed fills show Velocity 1Map AOI areas, cyan dashed lines show routes, and circles show official presence markers. Fibertime shows AOI areas only by default.
+          Polygons show official/source-backed FNO coverage, amber dashed fills show Velocity AOI areas, cyan dashed lines show routes, and circles show official presence markers. Fibertime shows AOI areas only by default.
         </p>
         <div className="mt-4 max-h-[470px] space-y-2 overflow-y-auto pr-1">
           {legendItems.map(({ network, profile }) => {
