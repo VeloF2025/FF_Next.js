@@ -119,6 +119,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
   useEffect(() => {
     let cancelled = false;
     const params = new URLSearchParams({ operatorSlug: selected?.id || '', limit: selected?.id === 'dfa' ? '12000' : '5000' });
+    if (selected?.id === 'fibertime') params.set('featureKinds', 'project_aoi');
     fetch(`/api/fno-atlas/coverage-geometry?${params.toString()}`)
       .then((response) => {
         if (!response.ok) throw new Error(`Coverage geometry failed (${response.status})`);
@@ -142,7 +143,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           <div>
             <h2 className="text-xl font-semibold">Interactive FNO coverage map</h2>
             <p className="text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-              Source-backed coverage polygons, Velocity 1Map AOI areas, backhaul routes, and presence markers; tap a colour key item to isolate an FNO.
+              Source-backed coverage polygons, Velocity 1Map AOI areas, backhaul routes, and presence markers; Fibertime defaults to Velocity 1Map AOI areas only.
             </p>
             {coverageError && <p className="mt-1 text-xs" style={{ color: 'var(--ff-error)' }}>{coverageError}</p>}
           </div>
@@ -197,7 +198,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
       <aside className="rounded-2xl border p-4 shadow-sm" style={cardStyle}>
         <h3 className="text-lg font-semibold">FNO colour key</h3>
         <p className="mt-1 text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-          Polygons show official/source-backed FNO coverage, amber dashed fills show Velocity 1Map AOI areas, cyan dashed lines show routes, and circles show official presence markers.
+          Polygons show official/source-backed FNO coverage, amber dashed fills show Velocity 1Map AOI areas, cyan dashed lines show routes, and circles show official presence markers. Fibertime shows AOI areas only by default.
         </p>
         <div className="mt-4 max-h-[470px] space-y-2 overflow-y-auto pr-1">
           {legendItems.map(({ network, profile }) => {

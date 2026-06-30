@@ -18,6 +18,9 @@ type CoverageGeometryRow = {
   geometry: Record<string, unknown>;
 };
 
+const FEATURE_KINDS = ['coverage', 'presence', 'route', 'project_aoi'] as const;
+type FeatureKind = (typeof FEATURE_KINDS)[number];
+
 const DEFAULT_FEATURE_LIMIT = 5000;
 const MAX_FEATURE_LIMIT = 15000;
 
@@ -35,6 +38,16 @@ function requestedOperatorSlug(value: string | string[] | undefined): string | n
   return slug || null;
 }
 
+function requestedFeatureKinds(value: string | string[] | undefined): FeatureKind[] | null {
+  const raw = Array.isArray(value) ? value.join(',') : value;
+  if (!raw) return null;
+  const requested = raw
+    .split(',')
+    .map((kind) => kind.trim())
+    .filter((kind): kind is FeatureKind => FEATURE_KINDS.includes(kind as FeatureKind));
+  return requested.length > 0 ? requested : null;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
@@ -43,6 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const limit = requestedLimit(req.query.limit);
     const operatorSlug = requestedOperatorSlug(req.query.operatorSlug);
+    const featureKinds = requestedFeatureKinds(req.query.featureKinds);
     const rows = await query<CoverageGeometryRow>(
       `WITH coverage AS (
         SELECT ca.id::text,
@@ -137,12 +151,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         UNION ALL
         SELECT * FROM project_aois
       ) features
+      WHERE ($3::text[] IS NULL OR feature_kind = ANY($3::text[]))
       ORDER BY CASE feature_kind WHEN 'coverage' THEN 0 WHEN 'project_aoi' THEN 1 WHEN 'route' THEN 2 WHEN 'presence' THEN 3 ELSE 4 END,
         sort_area DESC,
         operator_name,
         area_name NULLS LAST
       LIMIT $2`,
-      [operatorSlug, limit],
+      [operatorSlug, limit, featureKinds],
     );
 
     return apiResponse.success(res, {
@@ -150,6 +165,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       meta: {
         featureLimit: limit,
         operatorSlug,
+        featureKinds,
         returnedFeatures: rows.length,
       },
       features: rows.map((row) => ({
