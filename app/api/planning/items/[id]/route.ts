@@ -1,7 +1,6 @@
 // app/api/planning/items/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/jwt';
+import { requirePermission } from '@/lib/auth/app-router';
 import { createLogger } from '@/lib/logger';
 import {
   getPlanningItemById,
@@ -17,22 +16,9 @@ const logger = createLogger('planning:api:items');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Fresh response per call — a NextResponse body can only be consumed once.
-const unauthorized = () =>
-  NextResponse.json(
-    { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
-    { status: 401 },
-  );
-
-async function getUserId(): Promise<string | undefined> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('ff_auth_token')?.value;
-  if (!token) return undefined;
-  const payload = await verifyToken(token);
-  return payload?.sub;
-}
-
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const [, deny] = await requirePermission(req, 'planning.main', 'view');
+  if (deny) return deny;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ success: false, error: { message: 'Invalid id' } }, { status: 400 });
   try {
     const item = await getPlanningItemById(params.id);
@@ -45,10 +31,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const [user, deny] = await requirePermission(req, 'planning.main', 'edit');
+  if (deny) return deny;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ success: false, error: { message: 'Invalid id' } }, { status: 400 });
   try {
-    const userId = await getUserId();
-    if (!userId) return unauthorized();
     const body = await req.json();
     if (body.stage && !PLANNING_STAGES.includes(body.stage)) return NextResponse.json({ success: false, error: { message: `Invalid stage. Must be one of: ${PLANNING_STAGES.join(', ')}` } }, { status: 400 });
     if (body.priority && !PLANNING_PRIORITIES.includes(body.priority)) return NextResponse.json({ success: false, error: { message: `Invalid priority. Must be one of: ${PLANNING_PRIORITIES.join(', ')}` } }, { status: 400 });
@@ -60,17 +46,17 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (body.stage && body.stage !== before.stage) {
       void logPlanningActivity({
         planningItemId: params.id, activityType: 'stage_change',
-        fieldChanged: 'stage', oldValue: before.stage, newValue: body.stage, userId,
+        fieldChanged: 'stage', oldValue: before.stage, newValue: body.stage, userId: user.id,
       });
     }
     if (body.assigned_to !== undefined && body.assigned_to !== before.assigned_to) {
       void logPlanningActivity({
         planningItemId: params.id, activityType: 'assignment',
-        fieldChanged: 'assigned_to', oldValue: before.assigned_to, newValue: body.assigned_to ?? null, userId,
+        fieldChanged: 'assigned_to', oldValue: before.assigned_to, newValue: body.assigned_to ?? null, userId: user.id,
       });
     }
     if (body.stage_checklists) {
-      void logPlanningActivity({ planningItemId: params.id, activityType: 'checklist', userId });
+      void logPlanningActivity({ planningItemId: params.id, activityType: 'checklist', userId: user.id });
     }
 
     return NextResponse.json({ success: true, data: updated, message: 'Planning item updated', meta: { timestamp: new Date().toISOString() } });
@@ -80,15 +66,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const [user, deny] = await requirePermission(req, 'planning.main', 'delete');
+  if (deny) return deny;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ success: false, error: { message: 'Invalid id' } }, { status: 400 });
   try {
-    const userId = await getUserId();
-    if (!userId) return unauthorized();
     const existing = await getPlanningItemById(params.id);
     if (!existing) return NextResponse.json({ success: false, error: { message: 'Planning item not found' } }, { status: 404 });
     const deleted = await deletePlanningItem(params.id);
-    void logPlanningActivity({ planningItemId: params.id, activityType: 'cancelled', note: 'Planning item cancelled', userId });
+    void logPlanningActivity({ planningItemId: params.id, activityType: 'cancelled', note: 'Planning item cancelled', userId: user.id });
     return NextResponse.json({ success: true, data: deleted, message: 'Planning item cancelled', meta: { timestamp: new Date().toISOString() } });
   } catch (error) {
     logger.error('Failed to delete planning item', { error, id: params.id });

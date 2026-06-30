@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useUrlFilters } from '@/hooks/useUrlFilters';
+import { ProtectedPage, PermissionGate } from '@/components/PermissionGate';
 import { KanbanBoard } from '@/modules/planning/components/KanbanBoard';
 import { PlanningFilterBar } from '@/modules/planning/components/PlanningFilterBar';
 import type { PipelineProjectOption } from '@/modules/planning/components/PipelineProjectPicker';
@@ -22,20 +23,24 @@ export default function PlanningPageClient() {
   }), [filters.pipeline_project, filters.stage, filters.search]);
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold">Planning</h1>
-        <Link href="/planning/new" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm">New Planning Item</Link>
+    <ProtectedPage permission="planning.main" action="view">
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-semibold">Planning</h1>
+          <PermissionGate permission="planning.main" action="create">
+            <Link href="/planning/new" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm">New Planning Item</Link>
+          </PermissionGate>
+        </div>
+        <PlanningFilterBar
+          value={filters}
+          onChange={(k, v) => setFilter(k, v)}
+          onSelectProject={(p: PipelineProjectOption | null) =>
+            setMultiple({ pipeline_project: p?.id ?? '', pipeline_project_name: p?.project_name ?? '' })
+          }
+          onClear={clearAll}
+        />
+        <KanbanBoard filters={boardFilters} />
       </div>
-      <PlanningFilterBar
-        value={filters}
-        onChange={(k, v) => setFilter(k, v)}
-        onSelectProject={(p: PipelineProjectOption | null) =>
-          setMultiple({ pipeline_project: p?.id ?? '', pipeline_project_name: p?.project_name ?? '' })
-        }
-        onClear={clearAll}
-      />
-      <KanbanBoard filters={boardFilters} />
-    </div>
+    </ProtectedPage>
   );
 }

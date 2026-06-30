@@ -1,7 +1,6 @@
 // app/api/planning/items/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/jwt';
+import { requirePermission } from '@/lib/auth/app-router';
 import { createLogger } from '@/lib/logger';
 import {
   listPlanningItems,
@@ -17,6 +16,8 @@ export const dynamic = 'force-dynamic';
 const logger = createLogger('planning:api:items');
 
 export async function GET(req: NextRequest) {
+  const [, deny] = await requirePermission(req, 'planning.main', 'view');
+  if (deny) return deny;
   try {
     const { searchParams } = new URL(req.url);
     const filters: PlanningFilters = {};
@@ -45,6 +46,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const [user, deny] = await requirePermission(req, 'planning.main', 'create');
+  if (deny) return deny;
   try {
     const body = await req.json();
     if (!body.project_id && !body.pipeline_project_id) return NextResponse.json({ success: false, error: { message: 'project_id or pipeline_project_id is required' } }, { status: 400 });
@@ -52,29 +55,15 @@ export async function POST(req: NextRequest) {
     if (body.stage && !PLANNING_STAGES.includes(body.stage)) return NextResponse.json({ success: false, error: { message: `Invalid stage. Must be one of: ${PLANNING_STAGES.join(', ')}` } }, { status: 400 });
     if (body.priority && !PLANNING_PRIORITIES.includes(body.priority)) return NextResponse.json({ success: false, error: { message: `Invalid priority. Must be one of: ${PLANNING_PRIORITIES.join(', ')}` } }, { status: 400 });
 
-    const cookieStore = await cookies();
-    const token = cookieStore.get('ff_auth_token')?.value;
-    let userName = '';
-    if (token) {
-      const payload = await verifyToken(token);
-      if (payload?.sub) body.created_by = payload.sub;
-      userName = (payload as { name?: string } | null)?.name || payload?.sub || '';
-    }
-    // Require an authenticated user (matches the NOC POST gate). Unauthenticated
-    // callers cannot create planning items even though middleware only rate-limits.
-    if (!body.created_by) {
-      return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' }, meta: { timestamp: new Date().toISOString() } },
-        { status: 401 },
-      );
-    }
+    body.created_by = user.id;
+    const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || user.id;
 
     // Picked a pipeline project (no real project row yet) → materialize/link one,
     // then attach the card to it. See projectMaterializationService for the hybrid rules.
     if (!body.project_id && body.pipeline_project_id) {
       const { projectId } = await resolveOrCreateProjectForPipeline(body.pipeline_project_id, {
-        userId: body.created_by,
-        userName: userName || body.created_by,
+        userId: user.id,
+        userName,
       });
       body.project_id = projectId;
       body.source = 'manual';
@@ -85,7 +74,7 @@ export async function POST(req: NextRequest) {
       planningItemId: item.id,
       activityType: 'created',
       note: `Planning item created: ${item.item_uid}`,
-      userId: body.created_by,
+      userId: user.id,
     });
 
     return NextResponse.json(

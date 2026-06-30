@@ -5,11 +5,13 @@ import { usePlanningItem, useUpdatePlanningItem } from '../hooks/usePlanningItem
 import { BOARD_STAGES, STAGE_FLOW, STAGE_LABELS } from '../constants/stages';
 import type { BoardStage, ChecklistItem, PlanningStage, StageChecklists } from '../types/planning';
 import { log } from '@/lib/logger';
+import { useCanDo } from '@/hooks/usePermission';
 
 export function PlanningItemDetail({ itemId }: { itemId: string }) {
   const { data: item, isLoading } = usePlanningItem(itemId);
   const update = useUpdatePlanningItem();
   const [openStage, setOpenStage] = useState<BoardStage | null>(null);
+  const canEdit = useCanDo('planning.main', 'edit');
 
   if (isLoading) return <div>Loading…</div>;
   if (!item) return <div>Planning item not found. <Link href="/planning" className="text-blue-600">Back to board</Link></div>;
@@ -44,12 +46,12 @@ export function PlanningItemDetail({ itemId }: { itemId: string }) {
 
       <div className="flex gap-2 my-4">
         <button
-          disabled={currentIndex <= 0}
+          disabled={currentIndex <= 0 || !canEdit}
           onClick={() => { const s = STAGE_FLOW[currentIndex - 1]; if (s) moveStage(s); }}
           className="px-3 py-2 border rounded-md text-sm disabled:opacity-40"
         >← Previous stage</button>
         <button
-          disabled={currentIndex < 0 || currentIndex >= STAGE_FLOW.length - 1}
+          disabled={currentIndex < 0 || currentIndex >= STAGE_FLOW.length - 1 || !canEdit}
           onClick={() => { const s = STAGE_FLOW[currentIndex + 1]; if (s) moveStage(s); }}
           className="px-3 py-2 border rounded-md text-sm disabled:opacity-40"
         >Next stage →</button>
@@ -70,7 +72,7 @@ export function PlanningItemDetail({ itemId }: { itemId: string }) {
                 <ul className="px-4 pb-3 space-y-1">
                   {items.map((c) => (
                     <li key={c.id} className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={c.done} onChange={() => toggleChecklist(key, c.id)} />
+                      <input type="checkbox" checked={c.done} disabled={!canEdit} onChange={() => toggleChecklist(key, c.id)} />
                       <span className={c.kind === 'gate' ? 'font-semibold' : ''}>{c.label}</span>
                     </li>
                   ))}
