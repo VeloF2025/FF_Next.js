@@ -35,8 +35,8 @@ type CoverageFeatureCollection = FeatureCollection<Geometry, CoverageProperties>
 
 interface FnoInteractiveMapProps {
   networks: FnoNetwork[];
-  selectedId: string;
-  onSelect: (id: string) => void;
+  selectedIds: string[];
+  onToggle: (id: string) => void;
 }
 
 function polygonStyle(feature?: CoverageFeature): PathOptions {
@@ -99,34 +99,60 @@ function coveragePointToLayer(feature: CoverageFeature, latlng: LatLng): Layer {
   });
 }
 
-export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInteractiveMapProps) {
+export function FnoInteractiveMap({ networks, selectedIds, onToggle }: FnoInteractiveMapProps) {
   const [coverage, setCoverage] = useState<CoverageFeatureCollection | null>(null);
   const [coverageError, setCoverageError] = useState<string | null>(null);
-  const selected = networks.find((network) => network.id === selectedId) ?? networks[0];
-  const selectedProfile = selected ? getBrandProfile(selected.id) : undefined;
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedNetworks = useMemo(
+    () => networks.filter((network) => selectedIdSet.has(network.id)),
+    [networks, selectedIdSet],
+  );
+  const primarySelected = selectedNetworks[0];
+  const primarySelectedProfile = primarySelected ? getBrandProfile(primarySelected.id) : undefined;
   const legendItems: FnoLegendItem[] = networks
     .map((network) => ({ network, profile: getBrandProfile(network.id) }))
     .filter((item): item is FnoLegendItem => Boolean(item.profile));
   const visibleCoverage = useMemo<CoverageFeatureCollection | null>(() => {
-    if (!coverage || !selected) return coverage;
+    if (!coverage || selectedIdSet.size === 0) return coverage;
     return {
       type: 'FeatureCollection',
-      features: coverage.features.filter((feature) => feature.properties.operatorSlug === selected.id),
+      features: coverage.features.filter((feature) => selectedIdSet.has(feature.properties.operatorSlug)),
     };
-  }, [coverage, selected]);
+  }, [coverage, selectedIdSet]);
   const selectedSourceFeatureCount = visibleCoverage?.features.length ?? 0;
+  const featureCountsByOperator = useMemo(() => {
+    const counts = new Map<string, number>();
+    coverage?.features.forEach((feature) => {
+      counts.set(feature.properties.operatorSlug, (counts.get(feature.properties.operatorSlug) ?? 0) + 1);
+    });
+    return counts;
+  }, [coverage]);
 
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams({ operatorSlug: selected?.id || '', limit: selected?.id === 'dfa' ? '12000' : '5000' });
-    if (selected?.id === 'fibertime') params.set('featureKinds', 'project_aoi');
-    fetch(`/api/fno-atlas/coverage-geometry?${params.toString()}`)
-      .then((response) => {
-        if (!response.ok) throw new Error(`Coverage geometry failed (${response.status})`);
+    if (selectedIds.length === 0) {
+      setCoverage({ type: 'FeatureCollection', features: [] });
+      return () => {
+        cancelled = true;
+      };
+    }
+    Promise.all(
+      selectedIds.map(async (id) => {
+        const params = new URLSearchParams({ operatorSlug: id, limit: id === 'dfa' ? '12000' : '5000' });
+        if (id === 'fibertime') params.set('featureKinds', 'project_aoi');
+        const response = await fetch(`/api/fno-atlas/coverage-geometry?${params.toString()}`);
+        if (!response.ok) throw new Error(`Coverage geometry failed for ${id} (${response.status})`);
         return response.json() as Promise<{ data: CoverageFeatureCollection }>;
-      })
-      .then((payload) => {
-        if (!cancelled) setCoverage(payload.data);
+      }),
+    )
+      .then((payloads) => {
+        if (!cancelled) {
+          setCoverage({
+            type: 'FeatureCollection',
+            features: payloads.flatMap((payload) => payload.data.features),
+          });
+          setCoverageError(null);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) setCoverageError(error instanceof Error ? error.message : 'Coverage geometry failed');
@@ -134,7 +160,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
     return () => {
       cancelled = true;
     };
-  }, [selected?.id]);
+  }, [selectedIds]);
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -143,7 +169,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           <div>
             <h2 className="text-xl font-semibold">Interactive FNO coverage map</h2>
             <p className="text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-              Source-backed coverage polygons, Velocity AOI areas, backhaul routes, and presence markers; Fibertime defaults to Velocity AOI areas only.
+              Select one or more FNOs to overlay source-backed coverage polygons, Velocity AOI areas, backhaul routes, and presence markers.
             </p>
             {coverageError && <p className="mt-1 text-xs" style={{ color: 'var(--ff-error)' }}>{coverageError}</p>}
           </div>
@@ -155,12 +181,12 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
         <div className="border-b p-3 xl:hidden" style={{ borderColor: 'var(--ff-border-subtle)' }}>
           <div className="flex gap-2 overflow-x-auto pb-1" aria-label="FNO colour key">
             {legendItems.map(({ network, profile }) => {
-              const active = selected?.id === network.id;
+              const active = selectedIdSet.has(network.id);
               return (
                 <button
                   key={network.id}
                   type="button"
-                  onClick={() => onSelect(network.id)}
+                  onClick={() => onToggle(network.id)}
                   className="flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium"
                   style={{
                     borderColor: active ? profile.brandColor : 'var(--ff-border-subtle)',
@@ -187,9 +213,9 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
               onEachFeature={bindCoveragePopup}
             />
           )}
-          {selected && selectedSourceFeatureCount === 0 && (
+          {selectedNetworks.length > 0 && selectedSourceFeatureCount === 0 && (
             <div className="pointer-events-none absolute left-4 top-4 z-[1000] max-w-xs rounded-xl border px-3 py-2 text-xs shadow-sm" style={cardStyle}>
-              No source-backed polygons, AOI areas, routes, or presence markers imported for {selected.name} yet.
+              No source-backed polygons, AOI areas, routes, or presence markers imported for the selected FNOs yet.
             </div>
           )}
         </MapContainer>
@@ -198,16 +224,20 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
       <aside className="rounded-2xl border p-4 shadow-sm" style={cardStyle}>
         <h3 className="text-lg font-semibold">FNO colour key</h3>
         <p className="mt-1 text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-          Polygons show official/source-backed FNO coverage, amber dashed fills show Velocity AOI areas, cyan dashed lines show routes, and circles show official presence markers. Fibertime shows AOI areas only by default.
+          Polygons show official/source-backed FNO coverage, amber dashed fills show Velocity AOI areas, cyan dashed lines show routes, and circles show official presence markers. Click FNOs to add/remove overlays.
+        </p>
+        <p className="mt-2 text-xs" style={{ color: 'var(--ff-text-secondary)' }}>
+          {selectedNetworks.length} selected · {selectedSourceFeatureCount} visible source-backed features
         </p>
         <div className="mt-4 max-h-[470px] space-y-2 overflow-y-auto pr-1">
           {legendItems.map(({ network, profile }) => {
-            const active = selected?.id === network.id;
+            const active = selectedIdSet.has(network.id);
+            const featureCount = featureCountsByOperator.get(network.id) ?? 0;
             return (
               <button
                 key={network.id}
                 type="button"
-                onClick={() => onSelect(network.id)}
+                onClick={() => onToggle(network.id)}
                 className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:shadow-sm"
                 style={{
                   borderColor: active ? profile.brandColor : 'var(--ff-border-subtle)',
@@ -219,8 +249,8 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{network.name}</span>
                   <span className="block truncate text-xs" style={{ color: 'var(--ff-text-secondary)' }}>
-                    {selected?.id === network.id && selectedSourceFeatureCount > 0
-                      ? `${selectedSourceFeatureCount} source-backed feature${selectedSourceFeatureCount === 1 ? '' : 's'}`
+                    {active && featureCount > 0
+                      ? `${featureCount} visible feature${featureCount === 1 ? '' : 's'}`
                       : `${profile.brandColorLabel} · ${profile.mapPoints.length} reference point${profile.mapPoints.length === 1 ? '' : 's'}`}
                   </span>
                 </span>
@@ -228,22 +258,26 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
             );
           })}
         </div>
-        {selected && selectedProfile && (
-          <div className="mt-4 rounded-xl border p-3 text-sm" style={{ borderColor: selectedProfile.brandColor }}>
-            <p className="font-semibold">{selected.name}</p>
-            <p className="mt-1" style={{ color: 'var(--ff-text-secondary)' }}>{selectedProfile.brandColorSource}</p>
+        {primarySelected && primarySelectedProfile && (
+          <div className="mt-4 rounded-xl border p-3 text-sm" style={{ borderColor: primarySelectedProfile.brandColor }}>
+            <p className="font-semibold">
+              {selectedNetworks.length === 1 ? primarySelected.name : `${selectedNetworks.length} FNO overlays selected`}
+            </p>
+            <p className="mt-1" style={{ color: 'var(--ff-text-secondary)' }}>{primarySelectedProfile.brandColorSource}</p>
             <div className="mt-2 flex flex-wrap gap-3">
-              <a href={selected.website} target="_blank" rel="noreferrer" style={{ color: 'var(--ff-primary)' }}>
+              <a href={primarySelected.website} target="_blank" rel="noreferrer" style={{ color: 'var(--ff-primary)' }}>
                 Open website
               </a>
-              <a
-                href={`/api/fno-atlas/coverage-kml?operatorSlug=${encodeURIComponent(selected.id)}&limit=all`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: 'var(--ff-primary)' }}
-              >
-                Download KML
-              </a>
+              {selectedNetworks.length === 1 && (
+                <a
+                  href={`/api/fno-atlas/coverage-kml?operatorSlug=${encodeURIComponent(primarySelected.id)}&limit=all`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: 'var(--ff-primary)' }}
+                >
+                  Download KML
+                </a>
+              )}
             </div>
           </div>
         )}
