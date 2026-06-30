@@ -12,7 +12,9 @@ type CoverageGeometryRow = {
   rollout_status: string;
   network_type: string;
   confidence: string;
-  feature_kind: 'coverage' | 'presence' | 'route';
+  feature_kind: 'coverage' | 'presence' | 'route' | 'project_aoi';
+  point_count: number | null;
+  source_label: string | null;
   geometry: Record<string, unknown>;
 };
 
@@ -52,6 +54,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ca.network_type,
           ca.confidence,
           'coverage'::text AS feature_kind,
+          NULL::integer AS point_count,
+          'Official FNO coverage polygon'::text AS source_label,
           ST_AsGeoJSON(ST_SimplifyPreserveTopology(ca.geom, 0.001))::json AS geometry,
           ST_Area(ca.geom::geography) AS sort_area
         FROM fno_atlas_coverage_areas ca
@@ -68,6 +72,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           pp.network_type,
           pp.confidence,
           'presence'::text AS feature_kind,
+          NULL::integer AS point_count,
+          'Official FNO presence marker'::text AS source_label,
           ST_AsGeoJSON(pp.geom)::json AS geometry,
           0::double precision AS sort_area
         FROM fno_atlas_presence_points pp
@@ -83,11 +89,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           rl.network_type,
           rl.confidence,
           'route'::text AS feature_kind,
+          NULL::integer AS point_count,
+          'Imported FNO route/backhaul line'::text AS source_label,
           ST_AsGeoJSON(ST_SimplifyPreserveTopology(rl.geom, 0.0005))::json AS geometry,
           ST_Length(rl.geom::geography) AS sort_area
         FROM fno_atlas_route_lines rl
         JOIN fno_atlas_operators o ON o.id = rl.operator_id
         WHERE rl.retired_at IS NULL
+          AND ($1::text IS NULL OR o.slug = $1)
+      ), project_aois AS (
+        SELECT aoi.id::text,
+          o.slug AS operator_slug,
+          o.name AS operator_name,
+          o.brand_color,
+          aoi.area_name,
+          '1map_aoi'::text AS rollout_status,
+          'project_aoi'::text AS network_type,
+          aoi.confidence,
+          'project_aoi'::text AS feature_kind,
+          aoi.point_count,
+          'Velocity 1Map AOI - not official FNO coverage'::text AS source_label,
+          ST_AsGeoJSON(ST_SimplifyPreserveTopology(aoi.geom, 0.0002))::json AS geometry,
+          ST_Area(aoi.geom::geography) AS sort_area
+        FROM fno_atlas_project_aois aoi
+        LEFT JOIN fno_atlas_operators o ON o.id = aoi.operator_id
+        WHERE aoi.retired_at IS NULL
           AND ($1::text IS NULL OR o.slug = $1)
       )
       SELECT id,
@@ -99,6 +125,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         network_type,
         confidence,
         feature_kind,
+        point_count,
+        source_label,
         geometry
       FROM (
         SELECT * FROM coverage
@@ -106,8 +134,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         SELECT * FROM presence
         UNION ALL
         SELECT * FROM routes
+        UNION ALL
+        SELECT * FROM project_aois
       ) features
-      ORDER BY CASE feature_kind WHEN 'coverage' THEN 0 WHEN 'presence' THEN 1 ELSE 2 END,
+      ORDER BY CASE feature_kind WHEN 'coverage' THEN 0 WHEN 'project_aoi' THEN 1 WHEN 'route' THEN 2 WHEN 'presence' THEN 3 ELSE 4 END,
         sort_area DESC,
         operator_name,
         area_name NULLS LAST
@@ -134,6 +164,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           networkType: row.network_type,
           confidence: row.confidence,
           featureKind: row.feature_kind,
+          pointCount: row.point_count,
+          sourceLabel: row.source_label,
         },
         geometry: row.geometry,
       })),

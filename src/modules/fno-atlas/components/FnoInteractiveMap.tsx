@@ -26,7 +26,9 @@ type CoverageProperties = {
   rolloutStatus: string;
   networkType: string;
   confidence: string;
-  featureKind: 'coverage' | 'presence' | 'route';
+  featureKind: 'coverage' | 'presence' | 'route' | 'project_aoi';
+  pointCount: number | null;
+  sourceLabel: string | null;
 };
 type CoverageFeature = Feature<Geometry, CoverageProperties>;
 type CoverageFeatureCollection = FeatureCollection<Geometry, CoverageProperties>;
@@ -48,6 +50,16 @@ function polygonStyle(feature?: CoverageFeature): PathOptions {
       dashArray: '8 3',
     };
   }
+  if (feature?.properties.featureKind === 'project_aoi') {
+    return {
+      color: '#f59e0b',
+      fillColor: '#f59e0b',
+      fillOpacity: 0.24,
+      opacity: 0.95,
+      weight: 2.4,
+      dashArray: '10 4',
+    };
+  }
   return {
     color,
     fillColor: color,
@@ -60,14 +72,17 @@ function polygonStyle(feature?: CoverageFeature): PathOptions {
 function featureKindLabel(kind: CoverageProperties['featureKind']): string {
   if (kind === 'presence') return 'Presence point';
   if (kind === 'route') return 'Backhaul route';
+  if (kind === 'project_aoi') return 'Velocity 1Map AOI';
   return 'Coverage polygon';
 }
 
 function bindCoveragePopup(feature: CoverageFeature, layer: Layer): void {
   const name = feature.properties.areaName || featureKindLabel(feature.properties.featureKind);
   const label = featureKindLabel(feature.properties.featureKind);
+  const sourceLabel = feature.properties.sourceLabel ? `<br/>${feature.properties.sourceLabel}` : '';
+  const pointCount = feature.properties.pointCount ? `<br/>1Map GPS records used: ${feature.properties.pointCount}` : '';
   layer.bindPopup(
-    `<strong>${feature.properties.operatorName}</strong><br/>${name}<br/>${label}: ${feature.properties.rolloutStatus} · ${feature.properties.networkType}<br/>Confidence: ${feature.properties.confidence}`,
+    `<strong>${feature.properties.operatorName}</strong><br/>${name}<br/>${label}: ${feature.properties.rolloutStatus} · ${feature.properties.networkType}<br/>Confidence: ${feature.properties.confidence}${pointCount}${sourceLabel}`,
   );
   layer.bindTooltip(`${feature.properties.operatorName} · ${name}`, { sticky: true });
 }
@@ -127,7 +142,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           <div>
             <h2 className="text-xl font-semibold">Interactive FNO coverage map</h2>
             <p className="text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-              Source-backed coverage polygons, backhaul routes, and presence points; tap a colour key item to isolate an FNO.
+              Source-backed coverage polygons, Velocity 1Map AOI areas, backhaul routes, and presence markers; tap a colour key item to isolate an FNO.
             </p>
             {coverageError && <p className="mt-1 text-xs" style={{ color: 'var(--ff-error)' }}>{coverageError}</p>}
           </div>
@@ -173,7 +188,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
           )}
           {selected && selectedSourceFeatureCount === 0 && (
             <div className="pointer-events-none absolute left-4 top-4 z-[1000] max-w-xs rounded-xl border px-3 py-2 text-xs shadow-sm" style={cardStyle}>
-              No source-backed polygons, routes, or presence points imported for {selected.name} yet.
+              No source-backed polygons, AOI areas, routes, or presence markers imported for {selected.name} yet.
             </div>
           )}
         </MapContainer>
@@ -182,7 +197,7 @@ export function FnoInteractiveMap({ networks, selectedId, onSelect }: FnoInterac
       <aside className="rounded-2xl border p-4 shadow-sm" style={cardStyle}>
         <h3 className="text-lg font-semibold">FNO colour key</h3>
         <p className="mt-1 text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
-          Polygons show source-backed coverage, dashed lines show imported backhaul/routes, and circles show presence points.
+          Polygons show official/source-backed FNO coverage, amber dashed fills show Velocity 1Map AOI areas, cyan dashed lines show routes, and circles show official presence markers.
         </p>
         <div className="mt-4 max-h-[470px] space-y-2 overflow-y-auto pr-1">
           {legendItems.map(({ network, profile }) => {
