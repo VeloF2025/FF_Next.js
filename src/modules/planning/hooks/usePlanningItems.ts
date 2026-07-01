@@ -37,8 +37,12 @@ async function fetchPlanningItems(filters?: PlanningFilters): Promise<PlanningLi
   return { data: json.data, pagination: json.pagination };
 }
 
-export function usePlanningItems(filters?: PlanningFilters) {
-  return useQuery({ queryKey: planningKeys.list(filters), queryFn: () => fetchPlanningItems(filters) });
+export function usePlanningItems(filters?: PlanningFilters, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: planningKeys.list(filters),
+    queryFn: () => fetchPlanningItems(filters),
+    enabled: options?.enabled ?? true,
+  });
 }
 
 export function useCreatePlanningItem() {
