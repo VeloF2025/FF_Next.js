@@ -7,6 +7,19 @@ import type { BoardStage, ChecklistItem, PlanningStage, StageChecklists } from '
 import { log } from '@/lib/logger';
 import { useCanDo } from '@/hooks/usePermission';
 
+// Stage badge colors — mirror the board's KanbanColumn stageConfig so the pill
+// stays readable in the dark theme (plain bg-gray-100 rendered white-on-white).
+const STAGE_BADGE: Partial<Record<PlanningStage, string>> = {
+  intake:         'bg-gray-500/20 text-gray-400',
+  hld:            'bg-blue-500/20 text-blue-400',
+  lld:            'bg-indigo-500/20 text-indigo-400',
+  splice:         'bg-amber-500/20 text-amber-400',
+  change_control: 'bg-orange-500/20 text-orange-400',
+  as_built:       'bg-green-500/20 text-green-400',
+  on_hold:        'bg-gray-500/20 text-gray-400',
+  cancelled:      'bg-red-500/20 text-red-400',
+};
+
 export function PlanningItemDetail({ itemId }: { itemId: string }) {
   const { data: item, isLoading } = usePlanningItem(itemId);
   const update = useUpdatePlanningItem();
@@ -41,7 +54,7 @@ export function PlanningItemDetail({ itemId }: { itemId: string }) {
           <h1 className="text-xl font-semibold">{item.title}</h1>
           <p className="text-sm text-gray-500">{item.item_uid} · {item.project_name} · {item.scope_area}</p>
         </div>
-        <span className="px-3 py-1 rounded-full bg-gray-100 text-sm">{STAGE_LABELS[item.stage]}</span>
+        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${STAGE_BADGE[item.stage] ?? 'bg-gray-500/20 text-gray-400'}`}>{STAGE_LABELS[item.stage]}</span>
       </div>
 
       <div className="flex gap-2 my-4">
