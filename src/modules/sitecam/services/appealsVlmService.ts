@@ -26,6 +26,7 @@ import type { VlmContentPart } from '@/modules/activate/services/stepQualityCrit
 import { QUALITY_CHECK_STEPS } from '@/modules/activate/services/stepQualityCriteria';
 import { CIVIL_QUALITY_STEPS } from '@/modules/sitecam/lib/civilStepCriteria';
 import { buildAppealPhotoContent } from '@/modules/sitecam/lib/appealStepCriteria';
+import { extractOntSerialEnhanced } from '@/modules/activate/services/enhancedBarcodeService';
 
 const MODULE = 'AppealsVlm';
 /** Bump whenever the appeal prompt changes — recorded in `model` for audit. */
@@ -182,11 +183,87 @@ async function evaluatePhotoAppeal(input: AppealInput): Promise<AppealEvaluation
   };
 }
 
-// Placeholder — real serial-appeal logic lands in Task 4 (which renames the
-// param to `input` and uses it). Underscore avoids an unused-param lint error
-// in this intermediate commit.
-async function evaluateSerialAppeal(_input: AppealInput): Promise<AppealEvaluation> {
-  return uncertain('Serial-appeal mode not yet implemented', 'unreadable_image', null);
+interface RawSerialJson {
+  serial?: unknown;
+}
+
+/** VLM OCR fallback: read a serial off the photo when the barcode scan fails. */
+async function ocrSerialViaVlm(photoBase64: string): Promise<string | null> {
+  const optimized = await optimizeForVlm(photoBase64, {
+    maxWidth: VLM_MAX_IMAGE_WIDTH,
+    maxHeight: VLM_MAX_IMAGE_HEIGHT,
+  });
+  const content: VlmContentPart[] = [
+    {
+      type: 'text',
+      text: 'Read the ONT/device serial number printed or barcoded in this photo. Respond with ONLY this JSON: {"serial":"<value>"} or {"serial":null} if you cannot read it clearly.',
+    },
+    { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${optimized}` } },
+  ];
+  const raw = await callVlm(content);
+  if (raw === null) return null;
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]) as RawSerialJson;
+    return typeof parsed.serial === 'string' && parsed.serial.trim().length > 0 ? parsed.serial.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function evaluateSerialAppeal(input: AppealInput): Promise<AppealEvaluation> {
+  const scanned = (input.serialScanned ?? '').trim().toUpperCase();
+  const expected = (input.serialExpected ?? '').trim().toUpperCase();
+
+  // 1. Barcode-first (Data Matrix / Code128) — highest confidence. A thrown
+  //    scanner error is treated as a failed read, not a crash.
+  const barcode = await extractOntSerialEnhanced(input.photoBase64).catch((err: unknown) => {
+    log.error('Barcode scan threw during serial appeal', { error: String(err) }, MODULE);
+    return null;
+  });
+  let serialRead: string | null = barcode?.success ? barcode.serial : null;
+  const viaBarcode = serialRead !== null;
+
+  // 2. VLM OCR fallback.
+  if (!serialRead) serialRead = await ocrSerialViaVlm(input.photoBase64);
+
+  if (!serialRead) {
+    return uncertain('Serial not legible in the appealed photo (barcode + OCR both failed)', 'unreadable_image', null);
+  }
+
+  const readNorm = serialRead.trim().toUpperCase();
+  const checks: AppealCheck[] = [
+    {
+      name: 'photo_matches_scanned',
+      verdict: readNorm === scanned ? 'pass' : 'fail',
+      evidence: `photo serial ${readNorm} vs scanned ${scanned || '(none)'}`,
+    },
+    {
+      name: 'photo_matches_expected',
+      verdict: readNorm === expected ? 'pass' : 'fail',
+      evidence: `photo serial ${readNorm} vs expected ${expected || '(none)'}`,
+    },
+  ];
+
+  // Approve when the photo legibly shows the serial the tech scanned — the
+  // mismatch is then against the EXPECTED/SOW value (an upstream data issue,
+  // not a tech error). Deny when the photo shows a different serial.
+  const recommendation: AppealRecommendation = readNorm === scanned ? 'approve' : 'deny';
+  const reasoning =
+    recommendation === 'approve'
+      ? `Photo serial ${readNorm} matches the scanned value; mismatch is against the expected/SOW serial ${expected || '(none)'}.`
+      : `Photo serial ${readNorm} does not match the scanned value ${scanned || '(none)'}.`;
+
+  return {
+    recommendation,
+    confidence: viaBarcode ? 0.95 : 0.7,
+    reasoning,
+    checks,
+    serialRead: readNorm,
+    model: MODEL_TAG,
+    skipReason: null,
+  };
 }
 
 /** Entry point: dispatch to serial mode when the appeal carries serial fields, else photo mode. */
