@@ -868,6 +868,7 @@ Then **stop** — await Hein's review/merge and coordinate the migration apply o
 - How the Phase 2 cron derives `jobType` for a `sitecam_appeals` row (the table has `step_number`/`dr_number` but no `job_type`; serial appeals are activations, photo appeals need the DR's discipline). **This is a P2 concern** — the P1 service takes `jobType` explicitly.
 - [OPEN 6a] target agreement rate + minimum sample size before trusting go-live.
 - [OPEN 7a] cron interval + batch size (P2).
+- **P5 rollback foot-gun (from final review):** once go-live starts writing `decided_via = 'vlm'`, the P5 migration's rollback cannot simply restore the narrow `CHECK (decided_via IN ('whatsapp','in_app'))` — it will throw on existing `'vlm'` rows. The go-live rollback must remap/handle those rows before the constraint swap. Harmless in P1 (nothing writes `'vlm'` in shadow mode).
 
 ## Execution Handoff
 
