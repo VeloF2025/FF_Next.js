@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-03
 **Branch:** `feat/main-app-pwa`
-**Status:** Draft — awaiting Hein's review
+**Status:** Approved (Hein, 2026-07-03) — pilot = Snags; Layer B = hand-rolled `sw-app.js`
 **Author:** Claude (brainstorming session with Hein)
 
 ---
@@ -311,15 +311,15 @@ and keep Layer C hand-rolled either way.
 
 ---
 
-## 7. Open Questions for Review
+## 7. Decisions (resolved — Hein, 2026-07-03)
 
-1. **Pilot workflow** — Snags (recommended, §3.4) vs the original Works QA pick vs
-   Activations/DR. Confirms which consumer Phase 0 wires up.
-2. **Approach** — hand-rolled `sw-app.js` (recommended, §5) vs Serwist/next-pwa for Layer B.
-3. **GET API read-cache allowlist** — which (if any) GET endpoints should render offline in
-   Phase 0? Safe default: none beyond the shell; grow deliberately per workflow.
-4. **Install affordance** — custom `InstallPrompt` UI (recommended) vs rely solely on the
-   browser's native install button.
+1. **Pilot workflow** — ✅ **Snags create/resolve** (§3.4). Truest "capture offline in the
+   field, sync later" shape.
+2. **Approach** — ✅ **Hand-rolled `sw-app.js`** for Layer B (§5). No new build-system dep;
+   the write-queue needs no toolkit.
+3. **GET API read-cache allowlist** — ✅ Safe default: **none beyond the shell** in Phase 0;
+   grow deliberately per workflow in later phases.
+4. **Install affordance** — ✅ Custom `InstallPrompt` UI component (not native-only).
 
 ---
 
