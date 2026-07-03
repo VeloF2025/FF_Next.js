@@ -225,10 +225,11 @@ export async function scrapeOneDriveRecordings(
           const recordingDate = parsed.date || itemDate;
 
           // Match window: recording start time (createdDateTime/filename, UTC) vs meeting start (UTC).
-          // 60min absorbs the skew between a meeting's scheduled start and when recording began.
-          // (Previously 4h — a stale workaround for a since-fixed SAST/UTC parsing bug; that wide
-          // window is what let a recording match a meeting up to 4h away.)
-          const windowMs = 60 * 60 * 1000;
+          // 2h absorbs skew between a meeting's scheduled start and when recording began — including
+          // the itemDate fallback used when the filename carries no timestamp. (Previously 4h — a
+          // stale workaround for a since-fixed SAST/UTC parsing bug; that width let a recording match
+          // a meeting hours away. The ownership filter below, not the window, is the real guard.)
+          const windowMs = 2 * 60 * 60 * 1000;
           const dateStart = new Date(recordingDate.getTime() - windowMs).toISOString();
           const dateEnd = new Date(recordingDate.getTime() + windowMs).toISOString();
 
@@ -239,7 +240,11 @@ export async function scrapeOneDriveRecordings(
           // even an unrelated concurrent meeting owned by someone else. Incident 2026-07-02: a
           // board-meeting recording in Lew's OneDrive was stolen by a different organizer's meeting
           // because the real meeting row had not been created by the webhook yet.
-          const owner = user.mail.toLowerCase();
+          // Match the participant email EXACTLY against each JSONB array element — a substring LIKE
+          // over participants::text would false-match a longer address (e.g. owner "a@x" inside
+          // "za@x") and an empty owner would collapse to LIKE '%%' (match everything).
+          const owner = (user.mail || '').toLowerCase();
+          if (!owner) continue; // defensive: internal users always have mail; skip if somehow absent rather than run an unowned match
           const matchRows = await sql`
             SELECT id, title, recording_path
             FROM meetings
@@ -250,7 +255,13 @@ export async function scrapeOneDriveRecordings(
               AND onedrive_item_id IS NULL
               AND (
                 lower(organizer_email) = ${owner}
-                OR lower(participants::text) LIKE ${'%' + owner + '%'}
+                OR (
+                  jsonb_typeof(participants) = 'array'
+                  AND EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(participants) AS p
+                    WHERE lower(p->>'email') = ${owner}
+                  )
+                )
               )
             ORDER BY ABS(EXTRACT(EPOCH FROM (meeting_date - ${recordingDate.toISOString()}::timestamptz)))
             LIMIT 1
