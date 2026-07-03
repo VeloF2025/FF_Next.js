@@ -122,6 +122,7 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
               log.info('Appeal submitted', { appealId }, 'SiteCamWizard');
             }}
             drNumber={siteInfo.siteId}
+            jobType={siteInfo.jobType}
             stepNumber={currentStep.stepNumber}
             stepLabel={currentStep.label}
             photoUrl={currentStep.photoBase64}
