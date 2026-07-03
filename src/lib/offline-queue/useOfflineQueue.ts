@@ -43,6 +43,12 @@ function newId(): string {
   return `q-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** Module-scope stable fallback. If it were allocated inside the hook
+ *  (`config.classify ?? ((err) => defaultClassify(err))`) a new closure would
+ *  be created every render, churning syncNow's identity and re-firing the
+ *  online/poll effects on every render — an unbounded idle render loop. */
+const defaultClassifyFn = (err: unknown) => defaultClassify(err);
+
 export function useOfflineQueue<TPayload>(
   config: OfflineQueueConfig<TPayload>
 ): UseOfflineQueueResult<TPayload> {
@@ -59,7 +65,12 @@ export function useOfflineQueue<TPayload>(
     () => new OfflineQueueStore<TPayload>(config.queueName, config.maxQueueSize ?? 50),
     [config.queueName, config.maxQueueSize]
   );
-  const classify = config.classify ?? ((err: unknown) => defaultClassify(err));
+  // Read the primitives syncNow depends on as plain identifiers so its
+  // useCallback deps are stable-by-value — depending on the whole `config`
+  // object (a fresh literal each render for inline callers) would churn
+  // syncNow's identity and re-fire the online/poll effects every render.
+  const { submit, queueName } = config;
+  const classify = config.classify ?? defaultClassifyFn;
   const maxAttempts = config.maxAttemptsBeforeDrain;
 
   const refresh = useCallback(async () => {
@@ -110,7 +121,7 @@ export function useOfflineQueue<TPayload>(
           items,
           async (item) => {
             try {
-              await config.submit(item.payload);
+              await submit(item.payload);
               return { drain: true };
             } catch (err) {
               return classify(err, item.payload);
@@ -132,16 +143,19 @@ export function useOfflineQueue<TPayload>(
         setLastReport(report);
       } while (pendingReflush.current);
     } catch (err) {
-      log.error('[offline-queue] sync failed', { queue: config.queueName, err });
+      log.error('[offline-queue] sync failed', { queue: queueName, err });
       setQueueUnavailable(true);
     } finally {
       await refresh();
       setSyncing(false);
       inFlight.current = false;
     }
-    // config.submit/classify are stable per render for typical callers; the
-    // queueName-keyed store memo bounds re-creation.
-  }, [store, refresh, config, classify, maxAttempts]);
+    // Depend on the destructured submit/queueName primitives (not the whole
+    // config object) so syncNow stays stable for inline-literal callers —
+    // mirroring how refresh scopes its deps. Depending on the whole `config`
+    // would churn syncNow's identity every render and re-fire the online/poll
+    // effects — the idle render loop this fix closes.
+  }, [store, refresh, submit, queueName, classify, maxAttempts]);
 
   const acknowledgeDropped = useCallback(
     async (id: string) => {

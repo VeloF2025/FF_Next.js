@@ -37,4 +37,13 @@ describe('useOfflineQueue', () => {
     await act(async () => { await result.current.syncNow(); });
     await waitFor(() => expect(result.current.pendingCount).toBe(1));
   });
+
+  it('keeps syncNow stable across renders for inline-literal callers (no churn loop)', () => {
+    const submit = vi.fn(async (_p: P) => {});
+    const qn = `Q${(globalThis as { __q?: number }).__q}stable`;
+    const { result, rerender } = renderHook(() => useOfflineQueue<P>({ queueName: qn, submit }));
+    const first = result.current.syncNow;
+    rerender();
+    expect(result.current.syncNow).toBe(first);
+  });
 });
