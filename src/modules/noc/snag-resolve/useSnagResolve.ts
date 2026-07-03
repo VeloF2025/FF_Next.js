@@ -7,8 +7,10 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import type { IdentityFormState, ResolveAction, SessionActor, SharedData } from './types';
+import { useOfflineQueue } from '@/lib/offline-queue';
+import type { IdentityFormState, QueuedCompleteStep, ResolveAction, SessionActor, SharedData } from './types';
 import { getOrCreateFingerprint, loadStoredActor, persistActor } from './session';
+import { submitCompleteStep } from './offlineComplete';
 
 export interface UseSnagResolveResult {
   data: SharedData | null;
@@ -19,6 +21,7 @@ export interface UseSnagResolveResult {
   identityForm: IdentityFormState;
   actionLoading: boolean;
   uploadingStep: string | null;
+  pendingCompleteCount: number;
   setShowIdentityModal: (show: boolean) => void;
   setIdentityForm: (form: IdentityFormState) => void;
   performAction: (action: ResolveAction, extra?: Record<string, string>) => Promise<void>;
@@ -37,6 +40,12 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
   const [actor, setActor] = useState<SessionActor | null>(null);
   const [showIdentityModal, setShowIdentityModal] = useState(false);
   const [identityForm, setIdentityForm] = useState<IdentityFormState>({ name: '', phone: '', company: '' });
+
+  const completeQueue = useOfflineQueue<QueuedCompleteStep>({
+    // One DB per token keeps a device that resolves several snags from mixing queues.
+    queueName: tokenStr ? `SnagCompleteDB:${tokenStr}` : 'SnagCompleteDB:none',
+    submit: submitCompleteStep,
+  });
 
   useEffect(() => {
     if (!tokenStr) return;
@@ -165,9 +174,22 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     if (data?.canStartWork) await performAction('start_work');
   }, [registerActor, data?.canStartWork, performAction]);
 
-  const handleMarkComplete = useCallback((stepId: string) => {
-    void performAction('complete_step', { stepId });
-  }, [performAction]);
+  const handleMarkComplete = useCallback(
+    (stepId: string) => {
+      if (!tokenStr) return;
+      const payload: QueuedCompleteStep = { token: tokenStr, stepId, actorId: actor?.id };
+      if (!completeQueue.online) {
+        void completeQueue.enqueue(payload);
+        return;
+      }
+      // Online: keep the existing optimistic server call; on network error the
+      // queue is the safety net.
+      void performAction('complete_step', { stepId }).catch(() => {
+        void completeQueue.enqueue(payload);
+      });
+    },
+    [tokenStr, actor?.id, completeQueue, performAction]
+  );
 
   return {
     data,
@@ -178,6 +200,7 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     identityForm,
     actionLoading,
     uploadingStep,
+    pendingCompleteCount: completeQueue.pendingCount,
     setShowIdentityModal,
     setIdentityForm,
     performAction,
