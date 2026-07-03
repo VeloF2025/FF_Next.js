@@ -1714,3 +1714,23 @@ git push -u origin feat/main-app-pwa
 **Type consistency:** `QueuedItem`/`DroppedItem`/`SubmitResult`/`FlushReport`/`FlushHooks`/`OfflineQueueConfig` defined in Task 1 and consumed unchanged in Tasks 2-4; `flushQueue` signature `(items, submit, hooks, maxAttempts?)` is identical in Task 3 definition and Task 4 usage; `useOfflineQueue` result fields (`enqueue/pendingCount/online/syncNow/...`) match between Task 4 and Task 13 usage; `submitCompleteStep(payload: QueuedCompleteStep)` matches `OfflineQueueConfig.submit` shape.
 
 **Risk note carried forward:** SW scope arbitration is the highest-risk property — covered by the `isReserved` unit test (Task 7) and the untouched-files regression check (Task 14 Step 2).
+
+---
+
+## Post-Implementation Changes (review-driven — code is source of truth)
+
+Executed via subagent-driven development; per-task and final reviews drove these corrections
+(the inline code blocks above were updated to match, except where noted):
+
+- **Task 2 test** — unique IndexedDB name per test (per-instance store connection would deadlock `deleteDatabase`).
+- **Task 4 hook** — `syncNow` identity stabilized: module-scope `defaultClassifyFn` + destructured `submit`/`queueName` deps (fixed an unbounded idle render loop). Regression test added.
+- **Task 7 SW** — single-source scope guard `public/sw-app-guard.js` loaded via `importScripts` (no duplication); test eslint rule is `no-var-requires`.
+- **Task 8 icons** — generated with `rsvg-convert` (ImageMagick 6.9 SVG delegate ships dimensionally-correct BLANK icons); verify color count, not just dimensions.
+- **Task 11 test** — `beforeinstallprompt` dispatch wrapped in `act()` (React 18 batching).
+- **Task 13 pilot** — removed unreachable `.catch(enqueue)` (performAction never rejects).
+
+### Final whole-branch review fixes (commits `2ec54b49`, `f05a54dc`)
+1. **Offline-queue success semantics** — a successful sync (`{drain:true}`, no `errorMessage`) was routed through `onDrain → store.drop`, polluting the `dropped` store (meant for permanent failures). Added an `onSuccess` hook + `succeeded` counter; success now `deletePending`, permanent failure (`drain`+`errorMessage`) `drop`s. **NOTE: the source attendance queue has the same latent bug — out of Phase 0 scope, flagged separately.**
+2. **Root SW** — removed `self.skipWaiting()` from `install` so updates WAIT and the UpdatePrompt "Reload" (message-driven `SKIP_WAITING`) actually works. (Existing `sw-my.js` shares the original pattern — flagged separately.)
+3. **Snag pilot** — `enqueue` failures (`QueueFullError` / IDB-unavailable) now surface via `setError` instead of silent loss; `handleMarkComplete` deps destructured to stable primitives.
+4. Added `defaultClassify` 400/409/5xx/plain-error tests; added a regression test asserting `dropped` stays empty on success.
