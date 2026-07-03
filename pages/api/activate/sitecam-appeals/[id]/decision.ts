@@ -29,7 +29,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
            decided_by = $2,
            decided_via = 'in_app',
            decided_at = now(),
-           denial_reason = $3
+           denial_reason = $3,
+           human_agreed_with_vlm = CASE
+             WHEN vlm_recommendation IS NULL OR vlm_recommendation = 'uncertain' THEN NULL
+             WHEN vlm_recommendation = 'approve' AND $1 = 'approved' THEN true
+             WHEN vlm_recommendation = 'deny'    AND $1 = 'denied'   THEN true
+             ELSE false
+           END
        WHERE id = $4
        RETURNING dr_number, step_number`,
       [decision, decidedBy, denialReason ?? null, id],
