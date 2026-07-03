@@ -12,9 +12,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     return apiResponse.badRequest(res, 'status must be pending, approved or denied');
 
   const { rows } = await pool.query(
-    `SELECT a.id, a.dr_number, a.step_number, a.appeal_text, a.photo_url,
+    `SELECT a.id, a.dr_number, a.step_number, a.job_type, a.appeal_text, a.photo_url,
             a.serial_scanned, a.serial_expected, a.attempt_number,
             a.status, a.decided_via, a.decided_at, a.denial_reason, a.created_at,
+            a.vlm_recommendation, a.vlm_confidence, a.vlm_reasoning, a.vlm_checks,
+            a.vlm_serial_read, a.vlm_skip_reason, a.vlm_evaluated_at, a.human_agreed_with_vlm,
             s.first_name || ' ' || s.last_name AS tech_name
      FROM sitecam_appeals a
      LEFT JOIN staff s ON s.id = a.technician_id
