@@ -224,11 +224,22 @@ export async function scrapeOneDriveRecordings(
           const parsed = parseRecordingFilename(item.name);
           const recordingDate = parsed.date || itemDate;
 
-          // Match window: 4h covers SAST→UTC offset (2h) plus scheduling buffer
-          const windowMs = 4 * 60 * 60 * 1000;
+          // Match window: recording start time (createdDateTime/filename, UTC) vs meeting start (UTC).
+          // 60min absorbs the skew between a meeting's scheduled start and when recording began.
+          // (Previously 4h — a stale workaround for a since-fixed SAST/UTC parsing bug; that wide
+          // window is what let a recording match a meeting up to 4h away.)
+          const windowMs = 60 * 60 * 1000;
           const dateStart = new Date(recordingDate.getTime() - windowMs).toISOString();
           const dateEnd = new Date(recordingDate.getTime() + windowMs).toISOString();
 
+          // Only attach to a meeting the recording's OneDrive owner actually took part in
+          // (organizer or listed participant). Teams saves a recording to the recorder's OneDrive,
+          // so the owner is always in the meeting. Without this guard the scraper attached a
+          // recording to whichever recording-less teams row happened to be closest in time —
+          // even an unrelated concurrent meeting owned by someone else. Incident 2026-07-02: a
+          // board-meeting recording in Lew's OneDrive was stolen by a different organizer's meeting
+          // because the real meeting row had not been created by the webhook yet.
+          const owner = user.mail.toLowerCase();
           const matchRows = await sql`
             SELECT id, title, recording_path
             FROM meetings
@@ -237,6 +248,10 @@ export async function scrapeOneDriveRecordings(
               AND meeting_date <= ${dateEnd}
               AND recording_path IS NULL
               AND onedrive_item_id IS NULL
+              AND (
+                lower(organizer_email) = ${owner}
+                OR lower(participants::text) LIKE ${'%' + owner + '%'}
+              )
             ORDER BY ABS(EXTRACT(EPOCH FROM (meeting_date - ${recordingDate.toISOString()}::timestamptz)))
             LIMIT 1
           ` as MeetingMatchRow[];
