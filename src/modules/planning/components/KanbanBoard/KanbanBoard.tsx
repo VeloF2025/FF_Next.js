@@ -22,7 +22,14 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [optimisticMoves, setOptimisticMoves] = useState<Record<string, PlanningStage>>({});
 
-  const result = usePlanningItems({ ...filters, exclude_stage: DEFAULT_EXCLUDED_STAGES, pageSize: KANBAN_PAGE_SIZE });
+  // The board is project-scoped: items only load once a pipeline project is
+  // selected in the picker. Without this gate, an unfiltered fetch would show
+  // every project's items on a fresh load.
+  const projectSelected = Boolean(filters?.pipeline_project_id);
+  const result = usePlanningItems(
+    { ...filters, exclude_stage: DEFAULT_EXCLUDED_STAGES, pageSize: KANBAN_PAGE_SIZE },
+    { enabled: projectSelected },
+  );
   const items: PlanningItemWithRelations[] = useMemo(() => result.data?.data ?? [], [result.data]);
   const { isLoading, isError, refetch } = result;
   const error = result.error as Error | null;
@@ -79,6 +86,22 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     if (!nextStage) return;
     await moveItem(itemId, nextStage);
   }, [items, optimisticMoves, moveItem]);
+
+  if (!projectSelected) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3 text-center max-w-md">
+          <svg className="w-10 h-10 text-[var(--ff-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
+          </svg>
+          <p className="text-[var(--ff-text-primary)] font-medium">Select a project to view its planning board</p>
+          <p className="text-sm text-[var(--ff-text-secondary)]">
+            Use “Search all projects…” above to find and select a project. Its planning items appear here once selected.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) return <LoadingSpinner className="h-96" size="lg" label="Loading planning items..." />;
 
