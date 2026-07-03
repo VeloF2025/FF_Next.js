@@ -1328,7 +1328,7 @@ git commit -m "feat(pwa): link manifest + apple PWA meta in document head"
 
 ```tsx
 // src/components/pwa/__tests__/InstallPrompt.test.tsx
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { InstallPrompt } from '../InstallPrompt';
 
@@ -1336,7 +1336,10 @@ function fireBeforeInstall() {
   const e = new Event('beforeinstallprompt') as Event & { prompt?: () => Promise<void>; userChoice?: Promise<{ outcome: string }> };
   e.prompt = async () => {};
   e.userChoice = Promise.resolve({ outcome: 'accepted' });
-  window.dispatchEvent(e);
+  // Wrap in act(): the handler's setState runs outside React's synthetic event
+  // system (native dispatchEvent), so React 18 batches the flush to a microtask
+  // — without act() the assertion runs before the re-render commits.
+  act(() => { window.dispatchEvent(e); });
 }
 
 describe('InstallPrompt', () => {
