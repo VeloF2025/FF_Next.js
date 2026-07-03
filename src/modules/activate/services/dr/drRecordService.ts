@@ -21,6 +21,7 @@ const log = createLogger('DrRecordService');
 import type { ContactData, RecordResolutionResult } from './drProcessTypes';
 import { createSubmissionSnapshot, flattenContact } from './drRecordHelpers';
 import { insertFromQARecord, insertNewRecord } from './drRecordInserts';
+import { resetReviewCycleForResubmission } from './reviewCycleReset';
 import type { QARow, UnifiedRow, WaContext } from './drRecordInternalTypes';
 
 // Re-export types used by callers
@@ -227,6 +228,10 @@ async function handleExistingUnified(p: {
     await updateUnifiedRecordNonDestructive(
       dropNumber, submittedDateStr, project ?? expectedProject ?? null, senderPhone, wa, contact
     );
+    // A prior (e.g. OneMap) cycle may have left feedback_sent/qa_decision set; the
+    // new WA photos start a fresh cycle, so clear the stale review markers (else a
+    // stale "Human ✓" sticks — and a 0-photo submission never gets auto-QA'd to fix it).
+    await resetReviewCycleForResubmission(dropNumber);
     return { isResubmission: false, submissionCount: record.submission_count ?? 1, previousSubmission: null };
   }
 
@@ -279,6 +284,11 @@ async function handleExistingUnified(p: {
     previousPhotoCount: previousSubmission.photo_count,
     hadFeedback: previousSubmission.feedback_sent,
   });
+
+  // The prior cycle is now archived in submission_history; clear its live review
+  // markers so the resubmitted photos start a clean cycle (no stale "Human ✓",
+  // re-eligible for auto-QA).
+  await resetReviewCycleForResubmission(dropNumber);
 
   return { isResubmission: true, submissionCount, previousSubmission };
 }
