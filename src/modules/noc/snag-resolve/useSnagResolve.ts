@@ -46,6 +46,9 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     queueName: tokenStr ? `SnagCompleteDB:${tokenStr}` : 'SnagCompleteDB:none',
     submit: submitCompleteStep,
   });
+  // Destructure the stable primitives so handleMarkComplete's deps are plain
+  // identifiers (satisfies react-hooks/exhaustive-deps and keeps a stable identity).
+  const { online: completeOnline, enqueue: enqueueComplete } = completeQueue;
 
   useEffect(() => {
     if (!tokenStr) return;
@@ -179,11 +182,11 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
       if (!tokenStr) return;
       // Offline: queue for background sync on reconnect (the pilot's core).
       // Online: performAction does the POST and surfaces its own errors.
-      if (!completeQueue.online) {
+      if (!completeOnline) {
         const payload: QueuedCompleteStep = { token: tokenStr, stepId, actorId: actor?.id };
         // NEVER let an offline completion vanish silently — surface a queue-full
         // or IndexedDB-unavailable failure so the user knows it was NOT saved.
-        completeQueue.enqueue(payload).catch((err) => {
+        enqueueComplete(payload).catch((err) => {
           setError(
             err instanceof QueueFullError
               ? err.message
@@ -194,7 +197,7 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
       }
       void performAction('complete_step', { stepId });
     },
-    [tokenStr, actor?.id, completeQueue.online, completeQueue.enqueue, performAction]
+    [tokenStr, actor?.id, completeOnline, enqueueComplete, performAction]
   );
 
   return {
