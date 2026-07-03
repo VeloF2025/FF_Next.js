@@ -194,11 +194,15 @@ function item(id: string, attempts = 0): QueuedItem<P> {
 
 describe('OfflineQueueStore', () => {
   let store: OfflineQueueStore<P>;
+  let dbN = 0;
 
-  beforeEach(async () => {
-    store = new OfflineQueueStore<P>('TestQueueDB', 3);
-    await store.__resetForTests();
-    store = new OfflineQueueStore<P>('TestQueueDB', 3);
+  beforeEach(() => {
+    // Unique DB name per test → hermetic isolation. We deliberately avoid
+    // deleteDatabase()/__resetForTests here: the store holds a PER-INSTANCE
+    // connection (not a module singleton like the attendance original), so a
+    // prior test's still-open connection would block deleteDatabase on a
+    // shared name. A fresh name per test sidesteps that entirely.
+    store = new OfflineQueueStore<P>(`TestQueueDB-${dbN++}`, 3);
   });
 
   it('enqueues and lists pending in queuedAt order', async () => {
