@@ -177,16 +177,20 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
   const handleMarkComplete = useCallback(
     (stepId: string) => {
       if (!tokenStr) return;
-      const payload: QueuedCompleteStep = { token: tokenStr, stepId, actorId: actor?.id };
+      // Offline: queue the step-completion for background sync on reconnect —
+      // this is the pilot's core (capture offline → flush on the online edge).
+      // Online: performAction does the POST and surfaces its own errors via
+      // setError. NOTE: performAction never rejects (it swallows errors
+      // internally), so an online-time network failure is shown to the user,
+      // NOT queued. Routing online-time failures through the queue is a
+      // deliberate Phase-0 follow-up, intentionally not wired here — so we do
+      // NOT attach a `.catch(enqueue)` that could never fire (dead code).
       if (!completeQueue.online) {
+        const payload: QueuedCompleteStep = { token: tokenStr, stepId, actorId: actor?.id };
         void completeQueue.enqueue(payload);
         return;
       }
-      // Online: keep the existing optimistic server call; on network error the
-      // queue is the safety net.
-      void performAction('complete_step', { stepId }).catch(() => {
-        void completeQueue.enqueue(payload);
-      });
+      void performAction('complete_step', { stepId });
     },
     [tokenStr, actor?.id, completeQueue, performAction]
   );
