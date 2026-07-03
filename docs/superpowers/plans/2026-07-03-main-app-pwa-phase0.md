@@ -1193,20 +1193,33 @@ If `rsvg-convert` or ImageMagick `convert` is available, render `any` icons at 1
 
 ```bash
 mkdir -p public/icons
-# 'any' purpose — full-bleed
-convert -background none -resize 192x192 public/favicon.svg public/icons/icon-192.png
-convert -background none -resize 512x512 public/favicon.svg public/icons/icon-512.png
-# 'maskable' purpose — logo centred in an 80% safe area on the theme colour
-convert -background '#5B8DEF' -resize 154x154 public/favicon.svg -gravity center -extent 192x192 public/icons/icon-192-maskable.png
-convert -background '#5B8DEF' -resize 410x410 public/favicon.svg -gravity center -extent 512x512 public/icons/icon-512-maskable.png
+# IMPORTANT: do NOT use `convert -resize file.svg`. This system's ImageMagick 6.9
+# SVG delegate ignores the resize geometry — it rasterizes the SVG at its 32x32
+# intrinsic size (dropping the gradient) and upsamples, silently shipping a
+# dimensionally-correct but visually BLANK icon. Rasterize with rsvg-convert
+# directly; use `convert` only to composite the maskable background.
+
+# 'any' purpose — full-bleed, transparent bg
+rsvg-convert -w 192 -h 192 public/favicon.svg -o public/icons/icon-192.png
+rsvg-convert -w 512 -h 512 public/favicon.svg -o public/icons/icon-512.png
+
+# 'maskable' purpose — logo centred at ~80% in a #5B8DEF safe area
+tmp=$(mktemp -d)
+rsvg-convert -w 154 -h 154 public/favicon.svg -o "$tmp/logo-154.png"
+convert -size 192x192 xc:'#5B8DEF' "$tmp/logo-154.png" -gravity center -composite public/icons/icon-192-maskable.png
+rsvg-convert -w 410 -h 410 public/favicon.svg -o "$tmp/logo-410.png"
+convert -size 512x512 xc:'#5B8DEF' "$tmp/logo-410.png" -gravity center -composite public/icons/icon-512-maskable.png
+rm -rf "$tmp"
 ```
 
 If no SVG rasteriser is installed, STOP and ask the human to supply the four PNGs (do not ship a stretched favicon as a 512 icon — Android installers reject low-res icons and the install prompt won't appear).
 
-- [ ] **Step 3: Verify dimensions**
+- [ ] **Step 3: Verify dimensions AND that the icons are not blank**
 
-Run: `file public/icons/*.png`
-Expected: reports `192 x 192` and `512 x 512` PNGs.
+Run: `file public/icons/*.png` — expected `192 x 192` and `512 x 512` PNGs.
+Then run: `identify -format '%f: %k colors\n' public/icons/*.png` — each icon must
+report **many** colors (hundreds — the blue→pink gradient), NOT `1 colors`. A
+`1 colors` result means the blank-icon failure above; do not commit it.
 
 - [ ] **Step 4: Commit**
 
