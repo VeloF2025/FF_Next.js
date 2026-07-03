@@ -21,7 +21,7 @@ export async function flushQueue<TPayload>(
   hooks: FlushHooks,
   maxAttempts: number = MAX_ATTEMPTS_BEFORE_DRAIN
 ): Promise<FlushReport> {
-  const report: FlushReport = { attempted: 0, drained: 0, kept: 0, failures: [] };
+  const report: FlushReport = { attempted: 0, succeeded: 0, drained: 0, kept: 0, failures: [] };
 
   for (const item of items) {
     report.attempted++;
@@ -39,9 +39,17 @@ export async function flushQueue<TPayload>(
     try {
       const result = await submit(item);
       if (result.drain) {
-        await hooks.onDrain(item.id, result.errorMessage ?? 'Dropped by server response');
-        report.drained++;
-        if (result.errorMessage) report.failures.push({ id: item.id, message: result.errorMessage });
+        if (result.errorMessage) {
+          // Permanent failure the user can't fix by retrying — retain a record
+          // in the dropped store for visibility/dispute.
+          await hooks.onDrain(item.id, result.errorMessage);
+          report.drained++;
+          report.failures.push({ id: item.id, message: result.errorMessage });
+        } else {
+          // Success — remove from the queue entirely (NOT the dropped store).
+          await hooks.onSuccess(item.id);
+          report.succeeded++;
+        }
       } else {
         const message = result.errorMessage ?? 'Transient failure';
         await hooks.onTransient(item.id, message);

@@ -26,6 +26,7 @@ describe('useOfflineQueue', () => {
     await act(async () => { await result.current.syncNow(); });
     await waitFor(() => expect(result.current.pendingCount).toBe(0));
     expect(submit).toHaveBeenCalledWith({ note: 'a' });
+    expect(result.current.dropped).toHaveLength(0);
   });
 
   it('keeps the item when submit throws a transient error', async () => {

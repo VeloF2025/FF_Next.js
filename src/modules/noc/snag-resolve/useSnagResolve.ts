@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { useOfflineQueue } from '@/lib/offline-queue';
+import { useOfflineQueue, QueueFullError } from '@/lib/offline-queue';
 import type { IdentityFormState, QueuedCompleteStep, ResolveAction, SessionActor, SharedData } from './types';
 import { getOrCreateFingerprint, loadStoredActor, persistActor } from './session';
 import { submitCompleteStep } from './offlineComplete';
@@ -177,22 +177,24 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
   const handleMarkComplete = useCallback(
     (stepId: string) => {
       if (!tokenStr) return;
-      // Offline: queue the step-completion for background sync on reconnect —
-      // this is the pilot's core (capture offline → flush on the online edge).
-      // Online: performAction does the POST and surfaces its own errors via
-      // setError. NOTE: performAction never rejects (it swallows errors
-      // internally), so an online-time network failure is shown to the user,
-      // NOT queued. Routing online-time failures through the queue is a
-      // deliberate Phase-0 follow-up, intentionally not wired here — so we do
-      // NOT attach a `.catch(enqueue)` that could never fire (dead code).
+      // Offline: queue for background sync on reconnect (the pilot's core).
+      // Online: performAction does the POST and surfaces its own errors.
       if (!completeQueue.online) {
         const payload: QueuedCompleteStep = { token: tokenStr, stepId, actorId: actor?.id };
-        void completeQueue.enqueue(payload);
+        // NEVER let an offline completion vanish silently — surface a queue-full
+        // or IndexedDB-unavailable failure so the user knows it was NOT saved.
+        completeQueue.enqueue(payload).catch((err) => {
+          setError(
+            err instanceof QueueFullError
+              ? err.message
+              : 'Could not save this step offline. Reconnect and try again, or contact support.'
+          );
+        });
         return;
       }
       void performAction('complete_step', { stepId });
     },
-    [tokenStr, actor?.id, completeQueue, performAction]
+    [tokenStr, actor?.id, completeQueue.online, completeQueue.enqueue, performAction]
   );
 
   return {

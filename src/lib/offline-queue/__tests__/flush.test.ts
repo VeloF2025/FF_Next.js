@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { flushQueue, MAX_ATTEMPTS_BEFORE_DRAIN } from '../flush';
+import { defaultClassify, flushQueue, MAX_ATTEMPTS_BEFORE_DRAIN } from '../flush';
 import type { QueuedItem, FlushHooks } from '../types';
 
 function item(id: string, attempts = 0): QueuedItem<{ n: string }> {
@@ -9,6 +9,7 @@ function hooks(): FlushHooks & { calls: string[] } {
   const calls: string[] = [];
   return {
     calls,
+    onSuccess: async (id) => { calls.push(`success:${id}`); },
     onDrain: async (id) => { calls.push(`drain:${id}`); },
     onTransient: async (id) => { calls.push(`transient:${id}`); },
     onAbandon: async (id) => { calls.push(`abandon:${id}`); },
@@ -16,9 +17,21 @@ function hooks(): FlushHooks & { calls: string[] } {
 }
 
 describe('flushQueue', () => {
-  it('drains a successful item', async () => {
+  it('deletes (succeeds) a successful item', async () => {
     const h = hooks();
     const report = await flushQueue([item('1')], async () => ({ drain: true }), h);
+    expect(report.succeeded).toBe(1);
+    expect(report.drained).toBe(0);
+    expect(h.calls).toEqual(['success:1']);
+  });
+
+  it('drains a permanently-failed item into the dropped store', async () => {
+    const h = hooks();
+    const report = await flushQueue(
+      [item('1')],
+      async () => ({ drain: true, errorMessage: 'perm' }),
+      h
+    );
     expect(report.drained).toBe(1);
     expect(h.calls).toEqual(['drain:1']);
   });
@@ -46,5 +59,23 @@ describe('flushQueue', () => {
     const report = await flushQueue([item('1')], async () => { throw new Error('net'); }, h);
     expect(report.kept).toBe(1);
     expect(h.calls).toEqual(['transient:1']);
+  });
+});
+
+describe('defaultClassify', () => {
+  it('drains a 409 status', () => {
+    expect(defaultClassify({ status: 409 }).drain).toBe(true);
+  });
+
+  it('drains a 400 status', () => {
+    expect(defaultClassify({ status: 400 }).drain).toBe(true);
+  });
+
+  it('keeps a 500 status', () => {
+    expect(defaultClassify({ status: 500 }).drain).toBe(false);
+  });
+
+  it('keeps a plain Error', () => {
+    expect(defaultClassify(new Error('x')).drain).toBe(false);
   });
 });

@@ -114,7 +114,7 @@ export function useOfflineQueue<TPayload>(
         pendingReflush.current = false;
         const items = await store.listPending();
         if (items.length === 0) {
-          setLastReport({ attempted: 0, drained: 0, kept: 0, failures: [] });
+          setLastReport({ attempted: 0, succeeded: 0, drained: 0, kept: 0, failures: [] });
           break;
         }
         const report = await flushQueue(
@@ -128,6 +128,7 @@ export function useOfflineQueue<TPayload>(
             }
           },
           {
+            onSuccess: (id) => store.deletePending(id),
             onDrain: (id, reason) => {
               const it = items.find((i) => i.id === id);
               return it ? store.drop(it, reason) : store.deletePending(id);

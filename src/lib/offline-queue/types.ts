@@ -21,7 +21,15 @@ export interface DroppedItem<TPayload> extends QueuedItem<TPayload> {
   dropReason: string;
 }
 
-/** Result of trying to submit one item. */
+/**
+ * Result of trying to submit one item.
+ *
+ * Contract: `drain: true` with NO `errorMessage` = success — the item is
+ * removed from the queue entirely (NOT the dropped store). `drain: true`
+ * WITH an `errorMessage` = permanent failure — the item is moved to the
+ * dropped store for user visibility/dispute. `drain: false` = transient —
+ * the item is kept and retried.
+ */
 export interface SubmitResult {
   /** True → remove from pending (success OR permanent failure). */
   drain: boolean;
@@ -31,12 +39,14 @@ export interface SubmitResult {
 
 export interface FlushReport {
   attempted: number;
+  succeeded: number;
   drained: number;
   kept: number;
   failures: Array<{ id: string; message: string }>;
 }
 
 export interface FlushHooks {
+  onSuccess: (id: string) => Promise<void>;
   onDrain: (id: string, reason: string) => Promise<void>;
   onTransient: (id: string, message: string) => Promise<void>;
   onAbandon: (id: string, reason: string) => Promise<void>;

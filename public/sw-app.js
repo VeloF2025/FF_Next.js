@@ -23,7 +23,6 @@ const SHELL_ASSETS = ['/offline.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((c) => c.addAll(SHELL_ASSETS)));
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
