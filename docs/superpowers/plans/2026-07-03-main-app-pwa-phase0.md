@@ -1140,7 +1140,7 @@ if (typeof module !== 'undefined' && module.exports) {
 ```js
 // src/lib/offline-queue/__tests__/sw-app-guard.test.ts
 import { describe, expect, it } from 'vitest';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { isReserved } = require('../../../../public/sw-app-guard.js');
 
 describe('sw-app isReserved (scope arbitration)', () => {
