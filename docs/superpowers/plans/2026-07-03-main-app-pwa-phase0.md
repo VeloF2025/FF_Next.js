@@ -1028,21 +1028,18 @@ Create `public/sw-app.js` with the guard also exported for test via a tiny sibli
  * non-GET request (mutations go to the network or the app's offline queue).
  */
 
+// Scope-arbitration guard `isReserved` lives in ONE place
+// (public/sw-app-guard.js), shared with its unit test. importScripts loads it
+// into this SW's global scope so `isReserved(pathname)` is callable in the fetch
+// handler below. Service workers can't `import` from src/, so a shared public/
+// script that works in both a SW global and a CommonJS require is the DRY way
+// to keep a single source of truth (no duplicated prefix lists).
+importScripts('/sw-app-guard.js');
+
 const SHELL_CACHE = 'app-shell-v1';
 const RUNTIME_CACHE = 'app-runtime-v1';
 
 const SHELL_ASSETS = ['/offline.html', '/manifest.json'];
-
-// Requests under these prefixes belong to another SW or must never be cached.
-const RESERVED_PREFIXES = ['/my', '/stock', '/field-stock', '/fleet'];
-const RESERVED_ASSETS = ['/sw-my.js', '/sw-stock.js', '/sw-fleet.js', '/manifest-my.json'];
-
-function isReserved(pathname) {
-  if (RESERVED_ASSETS.includes(pathname)) return true;
-  return RESERVED_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p + '/')
-  );
-}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((c) => c.addAll(SHELL_ASSETS)));
@@ -1115,20 +1112,30 @@ self.addEventListener('message', (event) => {
 });
 ```
 
-Create the extracted guard + its test so the reserved-scope logic is unit-covered:
+Create the shared guard (the single source of truth for `isReserved`, loaded by
+`sw-app.js` via `importScripts` and by the test via `require`) plus its test:
 
 ```js
-// public/sw-app-guard.js  (CommonJS, imported only by the test)
+// public/sw-app-guard.js
+// Single source of truth for scope arbitration. Loaded two ways:
+//  - sw-app.js: importScripts('/sw-app-guard.js') runs this in the SW global
+//    scope, making `isReserved` a global the fetch handler can call.
+//  - the unit test: require()s it as a CommonJS module via module.exports.
+// Kept as a plain public/ script (not an ES/TS module) because service workers
+// cannot `import` from src/ and importScripts needs a classic script.
 function isReserved(pathname) {
   const RESERVED_PREFIXES = ['/my', '/stock', '/field-stock', '/fleet'];
   const RESERVED_ASSETS = ['/sw-my.js', '/sw-stock.js', '/sw-fleet.js', '/manifest-my.json'];
   if (RESERVED_ASSETS.includes(pathname)) return true;
   return RESERVED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));
 }
-module.exports = { isReserved };
+// `typeof module` guard: `module` is undefined in the SW scope (a bare
+// reference would throw ReferenceError); this exports for the CommonJS test
+// without breaking the importScripts path.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { isReserved };
+}
 ```
-
-> Keep `isReserved` identical in both files. If this duplication is objectionable at review, the guard file can be the source of truth and `sw-app.js` can inline a copy with a `// keep in sync with sw-app-guard.js` comment — SWs cannot `import` from `src/`.
 
 ```js
 // src/lib/offline-queue/__tests__/sw-app-guard.test.ts
