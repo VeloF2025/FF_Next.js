@@ -16,9 +16,15 @@ export async function uploadToVfStorage(filename: string, base64: string): Promi
   const buffer = Buffer.from(base64, 'base64');
   const formData = new FormData();
   formData.append('file', new Blob([buffer], { type: 'image/jpeg' }), filename);
-  const resp = await fetch(`${VF_STORAGE_URL}/upload`, { method: 'POST', body: formData });
+
+  // VF Storage only exposes typed upload routes: /upload/:type/:category.
+  // Bare /upload returns 404, causing SiteCam to fail the final submission after
+  // every step has already passed. Keep SiteCam photos grouped and return the
+  // app-safe same-origin /storage proxy path used by the rest of FibreFlow.
+  const resp = await fetch(`${VF_STORAGE_URL}/upload/sitecam/photos`, { method: 'POST', body: formData });
   if (!resp.ok) throw new Error(`VF Storage upload failed: HTTP ${resp.status}`);
-  const json = await resp.json() as { url?: string };
-  if (!json.url) throw new Error('VF Storage returned no url');
-  return json.url;
+  const json = await resp.json() as { path?: string; url?: string };
+  if (json.path) return `/storage/${json.path}`;
+  if (json.url) return json.url;
+  throw new Error('VF Storage returned no path or url');
 }

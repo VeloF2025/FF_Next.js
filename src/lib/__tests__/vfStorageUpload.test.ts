@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { safeFilename } from '../vfStorageUpload';
 
 describe('safeFilename', () => {
@@ -36,5 +36,33 @@ describe('safeFilename', () => {
     expect(safeFilename(undefined)).toMatch(/^photo_\d+\.jpg$/);
     expect(safeFilename(42)).toMatch(/^photo_\d+\.jpg$/);
     expect(safeFilename({ name: 'x' })).toMatch(/^photo_\d+\.jpg$/);
+  });
+});
+
+describe('uploadToVfStorage', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv('VF_STORAGE_URL', 'http://storage.test');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('uploads SiteCam photos to the typed VF Storage route and returns the /storage proxy path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ path: 'sitecam/photos/photo-123.jpg' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { uploadToVfStorage } = await import('../vfStorageUpload');
+    const url = await uploadToVfStorage('photo.jpg', 'aW1hZ2U=');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://storage.test/upload/sitecam/photos');
+    expect(url).toBe('/storage/sitecam/photos/photo-123.jpg');
   });
 });
