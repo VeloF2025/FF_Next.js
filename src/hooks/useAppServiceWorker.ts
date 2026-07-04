@@ -63,10 +63,15 @@ export function useAppServiceWorker() {
   }, []);
 
   const updateServiceWorker = useCallback(() => {
-    if (state.registration?.waiting) {
-      state.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      window.location.reload();
-    }
+    if (!state.registration?.waiting) return;
+    // Reload only after the new worker takes control, so we don't reload under
+    // the old worker (which would still serve stale assets).
+    navigator.serviceWorker.addEventListener(
+      'controllerchange',
+      () => window.location.reload(),
+      { once: true }
+    );
+    state.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
   }, [state.registration]);
 
   return { ...state, updateServiceWorker };

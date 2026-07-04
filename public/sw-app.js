@@ -1,11 +1,12 @@
 /**
  * Root service worker for the main FibreFlow app (scope '/').
  *
- * Provides: installable offline shell + runtime read-cache (stale-while-
- * revalidate for navigations, cache-first for static assets). Deliberately
- * NEVER touches the sub-scopes that already own a service worker
- * (/my → sw-my.js, field-stock → sw-stock.js, fleet → sw-fleet.js) nor any
- * non-GET request (mutations go to the network or the app's offline queue).
+ * Provides: an installable offline shell + a runtime cache — navigations are
+ * network-first with an offline-page fallback; a strict allowlist of
+ * build/static assets is cache-first. Deliberately NEVER touches the
+ * sub-scopes that already own a service worker (/my → sw-my.js,
+ * field-stock → sw-stock.js, fleet → sw-fleet.js) nor any non-GET request
+ * (mutations go to the network or the app's offline queue).
  */
 
 // Scope-arbitration guard `isReserved` lives in ONE place
@@ -21,22 +22,33 @@ const RUNTIME_CACHE = 'app-runtime-v1';
 
 const SHELL_ASSETS = ['/offline.html', '/manifest.json'];
 
+// Cache-first ONLY for build assets and an explicit public-asset allowlist —
+// never per-user or storage-proxied content (e.g. /storage/*), which must not
+// be served stale from a shared cache.
+const CACHEABLE_PREFIXES = ['/_next/static/', '/icons/', '/assets/'];
+const CACHEABLE_PATHS = [
+  '/manifest.json', '/offline.html', '/favicon.ico', '/favicon.svg',
+  '/favicon-16x16.png', '/apple-touch-icon.png', '/icon.png',
+];
+
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((c) => c.addAll(SHELL_ASSETS)));
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((names) =>
-      Promise.all(
-        names
-          .filter((n) => (n.startsWith('app-shell-') || n.startsWith('app-runtime-')) &&
-            n !== SHELL_CACHE && n !== RUNTIME_CACHE)
-          .map((n) => caches.delete(n))
-      )
-    )
+    Promise.all([
+      caches.keys().then((names) =>
+        Promise.all(
+          names
+            .filter((n) => (n.startsWith('app-shell-') || n.startsWith('app-runtime-')) &&
+              n !== SHELL_CACHE && n !== RUNTIME_CACHE)
+            .map((n) => caches.delete(n))
+        )
+      ),
+      self.clients.claim(),
+    ])
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -63,10 +75,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static build assets + images: cache-first with background refresh.
+  // Build assets + allowlisted public assets: cache-first.
   if (
-    url.pathname.startsWith('/_next/static/') ||
-    url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|webp|woff|woff2)$/)
+    CACHEABLE_PREFIXES.some((p) => url.pathname.startsWith(p)) ||
+    CACHEABLE_PATHS.includes(url.pathname)
   ) {
     event.respondWith(
       caches.match(request).then(
@@ -88,4 +100,9 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'CLEAR_RUNTIME_CACHE') {
+    // Called on logout so a shared/kiosk device can't serve the previous
+    // session's cached navigations offline.
+    event.waitUntil(caches.delete(RUNTIME_CACHE));
+  }
 });

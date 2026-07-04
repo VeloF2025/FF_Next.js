@@ -8,7 +8,7 @@
 import type { QueuedCompleteStep } from './types';
 
 export async function submitCompleteStep(payload: QueuedCompleteStep): Promise<void> {
-  const res = await fetch(`/api/snags/shared/${payload.token}`, {
+  const res = await fetch(`/api/snags/shared/${encodeURIComponent(payload.token)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'complete_step', stepId: payload.stepId, actorId: payload.actorId }),

@@ -29,6 +29,12 @@ export interface DroppedItem<TPayload> extends QueuedItem<TPayload> {
  * WITH an `errorMessage` = permanent failure — the item is moved to the
  * dropped store for user visibility/dispute. `drain: false` = transient —
  * the item is kept and retried.
+ *
+ * This is load-bearing: a permanent-failure result MUST set a non-empty
+ * `errorMessage`. The flush engine treats `drain: true` with an
+ * empty/absent `errorMessage` as SUCCESS (item deleted), and `drain: true`
+ * with a non-empty `errorMessage` as a permanent failure (item moved to the
+ * dropped store).
  */
 export interface SubmitResult {
   /** True → remove from pending (success OR permanent failure). */
