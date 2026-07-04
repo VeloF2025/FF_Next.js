@@ -15,6 +15,8 @@ import { reportWebVitals } from '@/lib/performance';
 import { initErrorTracking } from '@/lib/errorTracking';
 import { VersionChecker } from '@/components/VersionChecker';
 import { DemoModeBanner } from '@/components/DemoModeBanner';
+import { InstallPrompt } from '@/components/pwa/InstallPrompt';
+import { UpdatePrompt } from '@/components/pwa/UpdatePrompt';
 // Install global 401 interceptor early - this import sets up the fetch interceptor
 import '@/lib/authErrorHandler';
 
@@ -49,6 +51,8 @@ function MyApp({ Component, pageProps }: AppProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <VersionChecker />
+      <InstallPrompt />
+      <UpdatePrompt />
       <DemoModeBanner />
       <AuthProvider>
         <ThemeProvider enableSystemTheme={false}>

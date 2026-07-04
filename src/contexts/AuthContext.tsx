@@ -223,6 +223,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setCurrentUser(null);
       setIsAuthenticated(false);
+      // Clear the PWA runtime cache so a shared/kiosk device can't serve this
+      // session's cached pages offline after logout.
+      if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_RUNTIME_CACHE' });
+      }
       // Redirect to sign-in page
       if (typeof window !== 'undefined') {
         window.location.href = '/sign-in';

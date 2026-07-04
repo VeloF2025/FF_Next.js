@@ -63,3 +63,10 @@ export interface IdentityFormState {
 
 /** Server-side action values accepted by /api/snags/shared/[token]. */
 export type ResolveAction = 'start_work' | 'complete_step' | 'submit_for_qa';
+
+/** Payload queued by the offline-write queue for a 'complete_step' action. */
+export interface QueuedCompleteStep {
+  token: string;
+  stepId: string;
+  actorId?: string;
+}

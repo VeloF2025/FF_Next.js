@@ -7,8 +7,10 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import type { IdentityFormState, ResolveAction, SessionActor, SharedData } from './types';
+import { useOfflineQueue, QueueFullError } from '@/lib/offline-queue';
+import type { IdentityFormState, QueuedCompleteStep, ResolveAction, SessionActor, SharedData } from './types';
 import { getOrCreateFingerprint, loadStoredActor, persistActor } from './session';
+import { submitCompleteStep } from './offlineComplete';
 
 export interface UseSnagResolveResult {
   data: SharedData | null;
@@ -19,6 +21,7 @@ export interface UseSnagResolveResult {
   identityForm: IdentityFormState;
   actionLoading: boolean;
   uploadingStep: string | null;
+  pendingCompleteCount: number;
   setShowIdentityModal: (show: boolean) => void;
   setIdentityForm: (form: IdentityFormState) => void;
   performAction: (action: ResolveAction, extra?: Record<string, string>) => Promise<void>;
@@ -37,6 +40,15 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
   const [actor, setActor] = useState<SessionActor | null>(null);
   const [showIdentityModal, setShowIdentityModal] = useState(false);
   const [identityForm, setIdentityForm] = useState<IdentityFormState>({ name: '', phone: '', company: '' });
+
+  const completeQueue = useOfflineQueue<QueuedCompleteStep>({
+    // One DB per token keeps a device that resolves several snags from mixing queues.
+    queueName: tokenStr ? `SnagCompleteDB:${tokenStr}` : 'SnagCompleteDB:none',
+    submit: submitCompleteStep,
+  });
+  // Destructure the stable primitives so handleMarkComplete's deps are plain
+  // identifiers (satisfies react-hooks/exhaustive-deps and keeps a stable identity).
+  const { online: completeOnline, enqueue: enqueueComplete } = completeQueue;
 
   useEffect(() => {
     if (!tokenStr) return;
@@ -165,9 +177,28 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     if (data?.canStartWork) await performAction('start_work');
   }, [registerActor, data?.canStartWork, performAction]);
 
-  const handleMarkComplete = useCallback((stepId: string) => {
-    void performAction('complete_step', { stepId });
-  }, [performAction]);
+  const handleMarkComplete = useCallback(
+    (stepId: string) => {
+      if (!tokenStr) return;
+      // Offline: queue for background sync on reconnect (the pilot's core).
+      // Online: performAction does the POST and surfaces its own errors.
+      if (!completeOnline) {
+        const payload: QueuedCompleteStep = { token: tokenStr, stepId, actorId: actor?.id };
+        // NEVER let an offline completion vanish silently — surface a queue-full
+        // or IndexedDB-unavailable failure so the user knows it was NOT saved.
+        enqueueComplete(payload).catch((err) => {
+          setError(
+            err instanceof QueueFullError
+              ? err.message
+              : 'Could not save this step offline. Reconnect and try again, or contact support.'
+          );
+        });
+        return;
+      }
+      void performAction('complete_step', { stepId });
+    },
+    [tokenStr, actor?.id, completeOnline, enqueueComplete, performAction]
+  );
 
   return {
     data,
@@ -178,6 +209,7 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     identityForm,
     actionLoading,
     uploadingStep,
+    pendingCompleteCount: completeQueue.pendingCount,
     setShowIdentityModal,
     setIdentityForm,
     performAction,
