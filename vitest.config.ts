@@ -66,6 +66,10 @@ export default defineConfig({
       { find: '@/lib/vfStoragePhotoUrl', replacement: path.resolve(__dirname, './src/lib/vfStoragePhotoUrl') },
       { find: '@/lib/vfStorageUpload', replacement: path.resolve(__dirname, './src/lib/vfStorageUpload') },
       { find: '@/lib/vlm', replacement: path.resolve(__dirname, './src/lib/vlm') },
+      // @/lib/offline-queue lives at src/lib/offline-queue/ (generic offline-write
+      // queue used by the snag-resolve PWA pilot) — explicit src-first override
+      // before the @/lib → ./lib fallback.
+      { find: '@/lib/offline-queue', replacement: path.resolve(__dirname, './src/lib/offline-queue') },
       { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
       { find: '@/lib/email', replacement: path.resolve(__dirname, './src/lib/email') },
       { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
