@@ -1,6 +1,6 @@
 # Main App PWA — Phase 1: Offline Photo / Large-Blob Capture
 
-**Status:** DRAFT — awaiting Hein's review (surface decision + open questions in §5/§8 are unresolved).
+**Status:** ✅ APPROVED (Hein, 2026-07-05). O1 surface = **Snags photo**; O2–O4 accepted per recommendation (§8). Ready for implementation — start with PR-1 (lib). Implementation deferred to a fresh session by Hein's request.
 **Author:** Claude (Opus), 2026-07-05. Produced via brainstorming → grill-me → spec.
 **Predecessor:** Phase 0 (PR #2115, merged 2026-07-04) — installable shell + app-wide offline read + reusable offline-write queue `src/lib/offline-queue/` + Snags `complete_step` (JSON) pilot. Phase-0 polish (neutral offline page) shipped as PR #2121 (2026-07-05).
 
@@ -92,9 +92,9 @@ The feared dependency between the Phase-0 `complete_step` queue and this photo q
 
 ---
 
-## 5. Approach Decision — Surface (NEEDS HEIN'S SIGN-OFF) 🚩
+## 5. Approach Decision — Surface (✅ RESOLVED: Option B, Hein 2026-07-05)
 
-The one decision that changes the shape of everything downstream. Raised via AskUserQuestion 2026-07-05; **Hein was away — this spec provisionally assumes Option B and must be confirmed at the review gate.**
+The one decision that changes the shape of everything downstream. **Hein confirmed Option B (Snags photo).** Original framing kept below for the record.
 
 - **Option B — Extend the Snags pilot (RECOMMENDED).** Add offline photo upload to the snag-resolve page Phase 0 already made offline-capable. Smallest new surface, so the work concentrates on the genuinely new mechanic (blob + quota + downscale + idempotent replay). De-risks that mechanic on a proven surface before the large Activations/DR surface. Lower blast radius; faster to ship. Activations/DR becomes Phase 2 with the pattern battle-tested.
 - **Option A — Activations/DR (the originally-agreed decomposition).** Higher user value (activation photo capture is the core field workflow) but introduces the new blob mechanic **and** a large, complex surface (5-phase QA wizard, VLM categorisation, multi-photo DR) simultaneously — bigger scope, higher risk for a first offline-photo implementation.
@@ -125,12 +125,12 @@ The one decision that changes the shape of everything downstream. Raised via Ask
 
 ---
 
-## 8. Open Questions for Hein (review gate) 🚩
+## 8. Decisions (✅ RESOLVED — Hein accepted the recommendations, 2026-07-05)
 
-- **O1 — Surface:** confirm B (Snags photo) vs A (Activations/DR). §5. *This is the gating decision.*
-- **O2 — Quota budget value:** propose `maxQueueBytes ≈ 40 MB` and `maxQueueSize` staying at 50 for the photo queue (≈ 50 × ~500 KB downscaled, with headroom). Comfortable for a day's snag work; low enough to stay well under mobile IDB quotas. Confirm or set a target.
-- **O3 — Idempotency migration in scope?** Recommended IN (§3.5). If Hein wants Phase 1 code-only with the migration as a fast-follow, the queue must ship *disabled* until the migration lands, else it banks the duplicate-attachment regression. Recommend shipping them together.
-- **O4 — Legacy single-photo steps:** the non-slot path (`maintenance_verification_steps.photo_url`, handler line ~149) also duplicates attachments on retry. Cover it in Phase 1 (same `clientUploadId` fix, small extra) or scope Phase 1 to slot-aware steps only? Recommend covering both — the fix is shared.
+- **O1 — Surface:** ✅ **B (Snags photo).** §5.
+- **O2 — Quota budget:** ✅ `maxQueueBytes = 40 MB`, `maxQueueSize` stays 50 (≈ 50 × ~500 KB downscaled, with headroom). Tunable at impl time if real-device testing warrants — treat 40 MB as the default, not a contract.
+- **O3 — Idempotency migration:** ✅ **IN scope** (§3.5) — ship the `client_upload_id` migration + guarded handler together with the queue (PR-2 before PR-3), so the offline queue never lands ahead of its retry-safety.
+- **O4 — Legacy single-photo steps:** ✅ **Cover both** — the `clientUploadId` fix is shared, so the non-slot path (`maintenance_verification_steps.photo_url`) gets the same idempotency guard.
 
 ---
 

@@ -1,7 +1,7 @@
 # Main App PWA — Phase 1 Implementation Plan (Offline Photo Capture)
 
 **Spec:** `docs/superpowers/specs/2026-07-05-main-app-pwa-phase1-design.md`
-**Status:** DRAFT — do NOT start implementation until Hein confirms the surface decision (spec §5 / O1) and open questions O2–O4. This plan assumes **Option B (Snags photo)**; if Hein picks A, Tasks 1–6 stand unchanged (shared lib + downscale + idempotency principle) and Tasks 7–10 are rewritten against the Activations endpoints.
+**Status:** ✅ APPROVED (Hein, 2026-07-05) — O1 = **Snags photo**; O2 budget 40 MB (tunable); O3 idempotency migration IN scope; O4 cover both photo paths. Implementation deferred to a fresh session by Hein's request. Start with **PR-1 (Tasks 1–4, pure lib)** off a fresh worktree from `origin/master`.
 
 ---
 
