@@ -107,21 +107,28 @@ describe('classifyApiError', () => {
 describe('flushQueue', () => {
   function hooks() {
     return {
+      onSuccess: vi.fn().mockResolvedValue(undefined),
       onDrain: vi.fn().mockResolvedValue(undefined),
       onTransient: vi.fn().mockResolvedValue(undefined),
       onAbandon: vi.fn().mockResolvedValue(undefined),
     };
   }
 
-  it('drains everything the server accepts, reports counts', async () => {
+  it('removes everything the server accepts via onSuccess (NOT onDrain), reports counts', async () => {
+    // A successful sync returns { drain: true } with NO errorMessage. It must
+    // be deleted from pending via onSuccess — never routed to the dropped store,
+    // which would make a synced shift look "Dropped by server response".
     const events = [event('1'), event('2'), event('3')];
     const submit: SubmitClockEvent = vi.fn().mockResolvedValue({ drain: true });
     const h = hooks();
     const report = await flushQueue(events, submit, h);
     expect(report.attempted).toBe(3);
-    expect(report.drained).toBe(3);
+    expect(report.succeeded).toBe(3);
+    expect(report.drained).toBe(0);
     expect(report.kept).toBe(0);
-    expect(h.onDrain).toHaveBeenCalledTimes(3);
+    expect(report.failures).toEqual([]);
+    expect(h.onSuccess).toHaveBeenCalledTimes(3);
+    expect(h.onDrain).not.toHaveBeenCalled();
     expect(h.onTransient).not.toHaveBeenCalled();
     expect(h.onAbandon).not.toHaveBeenCalled();
   });
@@ -135,10 +142,12 @@ describe('flushQueue', () => {
       .mockResolvedValue({ drain: true });
     const h = hooks();
     const report = await flushQueue(events, submit, h);
-    expect(report.drained).toBe(1);
+    expect(report.succeeded).toBe(1);
+    expect(report.drained).toBe(0);
     expect(report.kept).toBe(1);
     expect(submit).toHaveBeenCalledTimes(2);
-    expect(h.onDrain).toHaveBeenCalledWith('1', expect.any(String));
+    expect(h.onSuccess).toHaveBeenCalledWith('1');
+    expect(h.onDrain).not.toHaveBeenCalled();
     expect(h.onTransient).toHaveBeenCalledWith('2', 'down');
   });
 
@@ -184,16 +193,18 @@ describe('flushQueue', () => {
     const h = hooks();
     const report = await flushQueue(events, submit, h);
     expect(report.attempted).toBe(2);
-    expect(report.drained).toBe(2);
+    expect(report.drained).toBe(1); // the abandoned event
+    expect(report.succeeded).toBe(1); // the accepted event
     expect(h.onAbandon).toHaveBeenCalledTimes(1);
-    expect(h.onDrain).toHaveBeenCalledTimes(1);
+    expect(h.onSuccess).toHaveBeenCalledTimes(1);
+    expect(h.onDrain).not.toHaveBeenCalled();
     expect(submit).toHaveBeenCalledTimes(1);
   });
 
   it('handles an empty queue cleanly', async () => {
     const submit = vi.fn();
     const report = await flushQueue([], submit as unknown as SubmitClockEvent, hooks());
-    expect(report).toEqual({ attempted: 0, drained: 0, kept: 0, failures: [] });
+    expect(report).toEqual({ attempted: 0, succeeded: 0, drained: 0, kept: 0, failures: [] });
     expect(submit).not.toHaveBeenCalled();
   });
 });

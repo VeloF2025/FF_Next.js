@@ -32,13 +32,18 @@ export type SubmitClockEvent = (event: PendingClockEvent) => Promise<SubmitResul
 
 export interface FlushReport {
   attempted: number;
+  succeeded: number;
   drained: number;
   kept: number;
   failures: Array<{ id: string; message: string }>;
 }
 
 export interface FlushHooks {
-  /** Drop an event from pending and persist a dropped-row with `reason`. */
+  /** Successful sync — remove the event from pending entirely (NOT the
+   *  dropped store). The event reached the server; there is nothing to keep. */
+  onSuccess: (id: string) => Promise<void>;
+  /** Permanent failure the user can't fix by retrying — drop from pending and
+   *  persist a dropped-row with `reason` for visibility/dispute. */
   onDrain: (id: string, reason: string) => Promise<void>;
   /** Increment the attempts counter + store the last error message. */
   onTransient: (id: string, message: string) => Promise<void>;
@@ -52,7 +57,7 @@ export async function flushQueue(
   submit: SubmitClockEvent,
   hooks: FlushHooks
 ): Promise<FlushReport> {
-  const report: FlushReport = { attempted: 0, drained: 0, kept: 0, failures: [] };
+  const report: FlushReport = { attempted: 0, succeeded: 0, drained: 0, kept: 0, failures: [] };
 
   for (const event of events) {
     report.attempted++;
@@ -72,10 +77,18 @@ export async function flushQueue(
     try {
       const result = await submit(event);
       if (result.drain) {
-        await hooks.onDrain(event.id, result.errorMessage ?? 'Dropped by server response');
-        report.drained++;
         if (result.errorMessage) {
+          // Permanent failure the user can't fix by retrying — retain a record
+          // in the dropped store for visibility/dispute.
+          await hooks.onDrain(event.id, result.errorMessage);
+          report.drained++;
           report.failures.push({ id: event.id, message: result.errorMessage });
+        } else {
+          // Success — the event reached the server. Remove it from the queue
+          // entirely; it must NOT land in the dropped store (which would make a
+          // synced shift look "Dropped by server response" to the worker).
+          await hooks.onSuccess(event.id);
+          report.succeeded++;
         }
       } else {
         const message = result.errorMessage ?? 'Transient failure';
