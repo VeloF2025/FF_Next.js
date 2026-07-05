@@ -7,7 +7,11 @@
  * and continues to handle background submission of clock events.
  */
 
-const CACHE_NAME = 'my-portal-v1';
+// Bump CACHE_NAME on any change to a precached STATIC_ASSET (e.g. the shared
+// /offline.html) so an already-installed SW reinstalls and the activate handler
+// purges the stale copy — otherwise /my keeps serving the old cached shell.
+// (Update lands via the /my UpdatePrompt "Reload" — this SW deliberately waits.)
+const CACHE_NAME = 'my-portal-v2';
 const OFFLINE_CACHE = 'my-offline-v1';
 
 const STATIC_ASSETS = [
