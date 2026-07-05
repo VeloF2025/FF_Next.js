@@ -109,10 +109,13 @@ export function useAttendanceSync(): UseAttendanceSyncResult {
         pendingReflush.current = false;
         const events = await listPendingClockEvents();
         if (events.length === 0) {
-          setLastReport({ attempted: 0, drained: 0, kept: 0, failures: [] });
+          setLastReport({ attempted: 0, succeeded: 0, drained: 0, kept: 0, failures: [] });
           break;
         }
         const report = await flushQueue(events, submitEvent, {
+          // Successful sync — delete from pending; never route through the
+          // dropped store (that mislabels a synced shift as "dropped").
+          onSuccess: (id) => deletePendingClockEvent(id),
           onDrain: (id, reason) => {
             const ev = events.find((e) => e.id === id);
             return ev
