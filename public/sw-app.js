@@ -17,8 +17,11 @@
 // to keep a single source of truth (no duplicated prefix lists).
 importScripts('/sw-app-guard.js');
 
-const SHELL_CACHE = 'app-shell-v1';
-const RUNTIME_CACHE = 'app-runtime-v1';
+// Bump these on any change to a precached shell asset (e.g. offline.html) so an
+// already-installed SW reinstalls and the `activate` handler purges the stale
+// copy — otherwise existing clients keep serving the old cached shell.
+const SHELL_CACHE = 'app-shell-v2';
+const RUNTIME_CACHE = 'app-runtime-v2';
 
 const SHELL_ASSETS = ['/offline.html', '/manifest.json'];
 
