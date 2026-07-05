@@ -5,8 +5,7 @@
  * device is offline and flushes them on reconnect (see useSnagResolve +
  * useOfflineQueue). Without any UI, a subcontractor who taps "Mark Complete"
  * offline gets no feedback that the action was saved. This badge surfaces the
- * pending count so they know the work is stored and will sync — mirroring the
- * "items pending sync" affordance on public/offline.html.
+ * pending count so they know the work is stored and will sync.
  *
  * Renders nothing when there is nothing queued.
  */
