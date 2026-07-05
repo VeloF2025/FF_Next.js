@@ -26,7 +26,13 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  self.skipWaiting();
+  // NOTE: deliberately NO self.skipWaiting() here. An updated SW must WAIT so
+  // the /my UpdatePrompt can offer "Reload" — its click posts SKIP_WAITING
+  // (handled below) to activate the new worker on the user's terms. Calling
+  // skipWaiting() in install would auto-activate the update immediately,
+  // making that prompt's Reload a no-op. First install still activates fine:
+  // with no controller to replace there is no waiting phase, and the activate
+  // handler's self.clients.claim() takes control of the open /my tab.
 });
 
 self.addEventListener('activate', (event) => {
