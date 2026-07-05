@@ -16,6 +16,7 @@ import { TicketStatus } from '@/modules/noc/types/ticket';
 import { PageShell, DescriptionWithGPS } from '@/modules/noc/snag-resolve/PageShell';
 import { IdentityModal } from '@/modules/noc/snag-resolve/IdentityModal';
 import { VerificationStepList } from '@/modules/noc/snag-resolve/VerificationStepList';
+import { PendingSyncIndicator } from '@/modules/noc/snag-resolve/PendingSyncIndicator';
 import { STATUS_LABELS, STATUS_COLORS, STATUS_COLOR_FALLBACK } from '@/modules/noc/snag-resolve/session';
 import { useSnagResolve } from '@/modules/noc/snag-resolve/useSnagResolve';
 
@@ -26,7 +27,7 @@ export default function SnagResolvePage() {
 
   const {
     data, loading, error, actor, showIdentityModal, identityForm,
-    actionLoading, uploadingStep,
+    actionLoading, uploadingStep, pendingCompleteCount,
     setShowIdentityModal, setIdentityForm,
     performAction, handlePhotoUpload, handleStartWork, handleIdentitySubmit, handleMarkComplete,
   } = useSnagResolve(tokenStr);
@@ -87,6 +88,8 @@ export default function SnagResolvePage() {
           {error}
         </div>
       )}
+
+      <PendingSyncIndicator count={pendingCompleteCount} />
 
       {!canInteract && (
         <div className="mb-6 rounded-lg bg-zinc-800 border border-zinc-700 p-4 flex items-center gap-3">
