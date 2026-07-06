@@ -47,7 +47,7 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
     retrySubmit,
     onAppealSubmitted,
     appealPending,
-  } = useSiteCamCapture(steps, siteInfo, entryGeofence);
+  } = useSiteCamCapture(steps, profile.staffId, siteInfo, entryGeofence);
 
   const total = stepStates.length;
   const doneCount = stepStates.filter(

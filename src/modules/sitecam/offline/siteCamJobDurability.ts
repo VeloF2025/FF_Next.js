@@ -10,7 +10,7 @@ import { log } from '@/lib/logger';
 import { QuotaExceededError } from '@/lib/offline-queue';
 import type { SiteCamJobMeta, SiteCamPhotoStore, StoredStepPhoto } from './photoStore';
 import { blobToBase64 } from './submitSiteCamJob';
-import type { SiteInfo, StepState } from '../hooks/useSiteCamCapture';
+import type { SiteInfo, StepState } from '../lib/sitecamTypes';
 
 const MODULE = 'siteCamJobDurability';
 

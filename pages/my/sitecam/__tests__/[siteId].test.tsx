@@ -18,7 +18,7 @@ vi.mock('@/modules/attendance/portal/client/api', () => ({
 
 const findRestorableSiteCamJobMock = vi.fn();
 vi.mock('@/modules/sitecam/offline/findRestorableSiteCamJob', () => ({
-  findRestorableSiteCamJob: (siteId: string) => findRestorableSiteCamJobMock(siteId),
+  findRestorableSiteCamJob: (staffId: string, siteId: string) => findRestorableSiteCamJobMock(staffId, siteId),
 }));
 
 vi.mock('@/modules/sitecam/components/SiteCamWizard', () => ({
@@ -67,6 +67,9 @@ describe('SiteCamWizardPage warm-start restore (Task 7)', () => {
 
     await waitFor(() => expect(screen.getByTestId('wizard')).toBeTruthy());
     expect(screen.getByTestId('wizard').textContent).toBe('wizard:DR-WARM-1:Jane Tech');
+    // Scoped to the CURRENT staff member's session (shared-device fix) — not
+    // a bare siteId lookup that any signed-in tech could restore.
+    expect(findRestorableSiteCamJobMock).toHaveBeenCalledWith('s1', 'DR-WARM-1');
   });
 
   it('falls back to the "Site not found" error when the site fetch fails and no IDB job exists', async () => {

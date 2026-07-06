@@ -9,7 +9,7 @@ import {
 } from '../siteCamJobDurability';
 import { SiteCamPhotoStore, type StoredStepPhoto } from '../photoStore';
 import { QuotaExceededError } from '@/lib/offline-queue';
-import type { SiteInfo, StepState } from '../../hooks/useSiteCamCapture';
+import type { SiteInfo, StepState } from '../../lib/sitecamTypes';
 
 vi.mock('@/lib/logger', () => ({
   log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
@@ -17,7 +17,7 @@ vi.mock('@/lib/logger', () => ({
 
 let dbN = 0;
 function freshStore(): SiteCamPhotoStore {
-  return new SiteCamPhotoStore('activations', `DUR-${dbN++}`);
+  return new SiteCamPhotoStore('staff-1', 'activations', `DUR-${dbN++}`);
 }
 
 const SITE_INFO: SiteInfo = {

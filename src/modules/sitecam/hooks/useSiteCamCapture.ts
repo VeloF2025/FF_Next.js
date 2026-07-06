@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { log } from '@/lib/logger';
-import type { SiteCamStep, SiteCamJobType } from '../lib/sitecamSteps';
+import type { SiteCamStep } from '../lib/sitecamSteps';
 import type { GeofenceReading } from '../lib/geofence';
 import { prepareCapturePhotos } from '../lib/watermarkPhoto';
 import { loadDraft, saveDraft, clearDraft, type SiteCamDraft } from '../lib/sitecamDraft';
+import type { StepStatus, StepState, SiteInfo } from '../lib/sitecamTypes';
 import { SiteCamPhotoStore } from '../offline/photoStore';
 import {
   ensureSiteCamJobMeta,
@@ -19,48 +20,10 @@ const MODULE = 'useSiteCamCapture';
 /** Poll cadence for an appeal awaiting a supervisor decision. */
 const APPEAL_POLL_MS = 8000;
 
-export type StepStatus =
-  | 'pending'
-  | 'validating'
-  | 'pass'
-  | 'fail'
-  | 'escalated'
-  | 'serial_scan'     // photo passed, waiting for barcode scan
-  | 'serial_pending'; // barcode scanned + format valid, saved as pending (cross-ref async)
-
-export interface StepState {
-  stepNumber: number;
-  label: string;
-  hasVlm: boolean;
-  hasSerialScan: boolean;
-  serialLabel: string;
-  serialDevice: 'ont' | 'ups' | null;
-  serialAttempts: number;
-  serialScanned: string | null;
-  status: StepStatus;
-  photoBase64: string | null;
-  attemptNumber: number;
-  failReasons: string[];
-  corrections: string[];
-  /**
-   * True when the photo auto-passed only because the VLM was unavailable
-   * (server or client fail-open). Such photos are uploaded but flagged for
-   * manual QA review rather than treated as verified passes.
-   */
-  needsManualReview: boolean;
-}
-
-export interface SiteInfo {
-  jobType: SiteCamJobType;
-  siteId: string;
-  customerName: string | null;
-  address: string | null;
-  projectName: string | null;
-  plannedLat: number | null;
-  plannedLon: number | null;
-  pon: number | null;
-  zone: number | null;
-}
+// Re-exported for existing consumers (components/pages) that import these
+// types from this module — the canonical definitions now live in
+// `../lib/sitecamTypes` (see that file's header for why).
+export type { StepStatus, StepState, SiteInfo };
 
 function initStepStates(
   steps: readonly SiteCamStep[],
@@ -85,6 +48,15 @@ function initStepStates(
 
 export function useSiteCamCapture(
   steps: readonly SiteCamStep[],
+  /**
+   * The current staff member's identifier — scopes the durable offline store
+   * so a shared/reissued field device never mixes or auto-flushes another
+   * technician's queued job under this session (blind-review MEDIUM fix,
+   * PR-3). Must be the SAME identity the server attributes uploads to
+   * (`session.staffId` in `pages/api/sitecam/upload.ts`) — callers pass the
+   * portal session's `profile.staffId`.
+   */
+  staffId: string,
   siteInfo: SiteInfo,
   entryGeofence: GeofenceReading | null = null,
 ) {
@@ -121,11 +93,13 @@ export function useSiteCamCapture(
   // screen. Restored from durable meta on mount if a prior tap already queued it.
   const [queued, setQueued] = useState(false);
 
-  // One durable IndexedDB job store per (jobType, siteId) — recreated only
-  // when the job itself changes (a genuinely different job), never per render.
+  // One durable IndexedDB job store per (staffId, jobType, siteId) — recreated
+  // only when the job itself (or the signed-in staff member) changes, never
+  // per render. Staff-scoped so a shared/reissued device can't cross-attribute
+  // or auto-flush another technician's queued job.
   const store = useMemo(
-    () => new SiteCamPhotoStore(siteInfo.jobType, siteInfo.siteId),
-    [siteInfo.jobType, siteInfo.siteId],
+    () => new SiteCamPhotoStore(staffId, siteInfo.jobType, siteInfo.siteId),
+    [staffId, siteInfo.jobType, siteInfo.siteId],
   );
 
   // Mirror progress into localStorage so a refresh / PWA reload restores it.

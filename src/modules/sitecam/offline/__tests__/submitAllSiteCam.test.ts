@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { attemptSiteCamSubmit } from '../submitAllSiteCam';
 import { SiteCamPhotoStore } from '../photoStore';
-import type { SiteInfo } from '../../hooks/useSiteCamCapture';
+import type { SiteInfo } from '../../lib/sitecamTypes';
 import { buildReading } from '../../lib/geofence';
 
 vi.mock('@/lib/logger', () => ({
@@ -29,7 +29,7 @@ class MockFileReader {
 
 let dbN = 0;
 function freshStore(): SiteCamPhotoStore {
-  return new SiteCamPhotoStore('activations', `SUB-${dbN++}`);
+  return new SiteCamPhotoStore('staff-1', 'activations', `SUB-${dbN++}`);
 }
 
 const SITE_INFO: SiteInfo = {
@@ -169,5 +169,83 @@ describe('attemptSiteCamSubmit', () => {
     await attemptSiteCamSubmit(store, null, { online: true, fetchImpl });
 
     expect(posted.geofence).toBeNull();
+  });
+});
+
+describe('attemptSiteCamSubmit — unclassified failures surface visibly (blind-review MEDIUM fix)', () => {
+  it('a store.getMeta() rejection resolves to a visible "error", never a silent throw', async () => {
+    const store = freshStore();
+    await seedCapturingJob(store);
+    vi.spyOn(SiteCamPhotoStore.prototype, 'getMeta').mockRejectedValue(new Error('IDB unavailable'));
+
+    const result = await attemptSiteCamSubmit(store, null, { online: true });
+
+    expect(result).toEqual({
+      outcome: 'error',
+      message: "Couldn't prepare your photos to submit — try again.",
+    });
+  });
+
+  it('a store.listStepPhotos() rejection resolves to a visible "error", never a silent throw', async () => {
+    const store = freshStore();
+    await seedCapturingJob(store);
+    vi.spyOn(SiteCamPhotoStore.prototype, 'listStepPhotos').mockRejectedValue(new Error('IDB cursor failed'));
+
+    const result = await attemptSiteCamSubmit(store, null, { online: false });
+
+    expect(result).toEqual({
+      outcome: 'error',
+      message: "Couldn't prepare your photos to submit — try again.",
+    });
+  });
+
+  it('never rejects the returned promise — the caller can always safely await it', async () => {
+    const store = freshStore();
+    await seedCapturingJob(store);
+    vi.spyOn(SiteCamPhotoStore.prototype, 'getMeta').mockRejectedValue(new Error('boom'));
+
+    await expect(attemptSiteCamSubmit(store, null, { online: true })).resolves.toMatchObject({
+      outcome: 'error',
+    });
+  });
+});
+
+describe('attemptSiteCamSubmit — submit geofence persistence (blind-review LOW fix)', () => {
+  it('persists the at-tap geofence on the job meta when queuing offline', async () => {
+    const store = freshStore();
+    await seedCapturingJob(store);
+    const entryReading = buildReading({
+      plannedLat: -26.1, plannedLon: 27.5, deviceLat: -26.101, deviceLon: 27.5, accuracyM: 5,
+    });
+    const readLocation = vi.fn(async () => ({ lat: -26.2, lon: 27.6, accuracy: 9 }));
+
+    await attemptSiteCamSubmit(store, entryReading, { online: false, readLocation });
+
+    const meta = await store.getMeta();
+    expect(meta?.submitGeofence).toMatchObject({ submitLat: -26.2, submitLon: 27.6 });
+  });
+
+  it('a later retry reuses the persisted geofence instead of resampling the device location', async () => {
+    const store = freshStore();
+    await seedCapturingJob(store);
+    const entryReading = buildReading({
+      plannedLat: -26.1, plannedLon: 27.5, deviceLat: -26.101, deviceLon: 27.5, accuracyM: 5,
+    });
+    const firstReadLocation = vi.fn(async () => ({ lat: -26.2, lon: 27.6, accuracy: 9 }));
+    await attemptSiteCamSubmit(store, entryReading, { online: false, readLocation: firstReadLocation });
+
+    // Retry later — e.g. back at the depot, a very different location. If the
+    // fix works, this second sample is never even taken for the payload.
+    const secondReadLocation = vi.fn(async () => ({ lat: -25.0, lon: 28.0, accuracy: 5 }));
+    let posted: Record<string, unknown> = {};
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      posted = JSON.parse(init?.body as string);
+      return jsonResponse({ data: { uploadedCount: 1 } });
+    });
+
+    await attemptSiteCamSubmit(store, entryReading, { online: true, fetchImpl, readLocation: secondReadLocation });
+
+    expect(secondReadLocation).not.toHaveBeenCalled();
+    expect(posted.geofence).toMatchObject({ submitLat: -26.2, submitLon: 27.6 });
   });
 });

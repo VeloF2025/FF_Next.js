@@ -120,12 +120,16 @@ const SiteCamWizardPage: NextPage & {
   }, [sessionReady, siteId]);
 
   // Warm-start restore: once the site fetch has failed, check IndexedDB for a
-  // job already opened earlier in this session (no network needed).
+  // job already opened earlier in this session (no network needed). Scoped to
+  // the CURRENT staff member (`profile.staffId`) — by the time `siteError` is
+  // set, the session-load effect has already resolved successfully (that's
+  // the only path to `sessionReady`/site-fetch even starting), so `profile`
+  // is guaranteed non-null here; the `!profile` guard is defensive typing only.
   useEffect(() => {
-    if (!siteError || typeof siteId !== 'string') return;
+    if (!siteError || typeof siteId !== 'string' || !profile) return;
 
     let cancelled = false;
-    findRestorableSiteCamJob(siteId)
+    findRestorableSiteCamJob(profile.staffId, siteId)
       .then((found) => {
         if (!cancelled) setRestoredSiteInfo(found?.siteInfo ?? null);
       })
@@ -142,7 +146,7 @@ const SiteCamWizardPage: NextPage & {
     return () => {
       cancelled = true;
     };
-  }, [siteError, siteId]);
+  }, [siteError, siteId, profile]);
 
   // Guest redirect
   if (isGuest) {

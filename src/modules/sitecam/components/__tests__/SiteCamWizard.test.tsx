@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { SiteCamWizard } from '../SiteCamWizard';
 import type { SiteInfo, StepState } from '../../hooks/useSiteCamCapture';
 
@@ -19,7 +19,7 @@ vi.mock('../../hooks/useSiteCamCapture', async () => {
   return { ...actual, useSiteCamCapture: (...args: unknown[]) => useSiteCamCaptureMock(...args) };
 });
 
-const profile = { name: 'Tech', profilePhotoUrl: null } as never;
+const profile = { staffId: 'staff-1', name: 'Tech', profilePhotoUrl: null } as never;
 const SITE_INFO: SiteInfo = {
   jobType: 'civils', siteId: 'POLE-1', customerName: null, address: null,
   projectName: null, plannedLat: null, plannedLon: null, pon: null, zone: null,
@@ -115,5 +115,17 @@ describe('SiteCamWizard offline states (Task 7)', () => {
     expect(screen.queryByText('Saved offline')).toBeNull();
     expect(screen.queryByText('Photo not saved on this device')).toBeNull();
     expect(screen.queryByText("Couldn't submit")).toBeNull();
+  });
+});
+
+describe('SiteCamWizard — SiteCamSubmitPanel extraction wiring', () => {
+  it('clicking "Submit All Photos" calls the hook\'s submitAll (extraction preserved the wiring)', () => {
+    const submitAll = vi.fn();
+    useSiteCamCaptureMock.mockReturnValue(baseHookReturn({ submitAll }));
+    render(<SiteCamWizard profile={profile} siteInfo={SITE_INFO} />);
+
+    fireEvent.click(screen.getByText('Submit All Photos'));
+
+    expect(submitAll).toHaveBeenCalledTimes(1);
   });
 });

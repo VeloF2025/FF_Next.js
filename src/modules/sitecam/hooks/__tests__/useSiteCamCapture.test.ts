@@ -58,6 +58,7 @@ class MockFileReader {
 }
 
 const STEPS: readonly SiteCamStep[] = [{ number: 1, label: 'Before Photo', hasVlm: true }];
+const STAFF_ID = 'staff-1';
 const SITE_INFO: SiteInfo = {
   jobType: 'civils',
   siteId: 'POLE-1',
@@ -74,22 +75,6 @@ function file(): File {
   return new File(['x'], 'p.jpg', { type: 'image/jpeg' });
 }
 
-/**
- * Start a capture, then drain fake-indexeddb's zero-delay `setTimeout`
- * scheduling (the durability write Task 5 added to `captureAndValidate`)
- * before awaiting the settled result. `vi.useFakeTimers()` is active for
- * every test in this file (to skip the 1500ms auto-advance delay) — without
- * this explicit drain, the IDB transaction's `oncomplete` callback (which
- * fake-indexeddb schedules via a REAL `setTimeout(fn, 0)`, see
- * node_modules/fake-indexeddb/build/cjs/lib/scheduling.js) never fires,
- * deadlocking a plain `await result.current.captureAndValidate(...)`.
- * `runAllTimersAsync` (not a single `advanceTimersByTimeAsync(0)`) is
- * required because one `putStepPhoto` call chains SEVERAL such zero-delay
- * hops (open → transaction → cursor → put → commit), each only scheduled
- * once the previous one's microtask resolves — a single-pass advance won't
- * see the later hops. Safe here: no interval (appeal poll / flush poll) is
- * active yet at capture time in any of these tests.
- */
 /**
  * Flush chained zero-delay `setTimeout` hops (fake-indexeddb's scheduling)
  * WITHOUT touching a real timer — unlike `vi.runAllTimersAsync()`, which
@@ -178,7 +163,7 @@ describe('useSiteCamCapture', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, SITE_INFO));
 
     await act(async () => {
       await capture(result);
@@ -202,7 +187,7 @@ describe('useSiteCamCapture', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, SITE_INFO));
 
     for (let i = 0; i < 3; i++) {
       await act(async () => {
@@ -226,7 +211,7 @@ describe('useSiteCamCapture', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, SITE_INFO));
 
     await act(async () => {
       await capture(result);
@@ -244,7 +229,7 @@ describe('useSiteCamCapture', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, SITE_INFO));
     await act(async () => {
       await capture(result);
     });
@@ -261,7 +246,7 @@ describe('useSiteCamCapture', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, SITE_INFO));
     await act(async () => {
       await capture(result);
     });
@@ -272,7 +257,7 @@ describe('useSiteCamCapture', () => {
 
   it('auto-passes a non-VLM step without calling the validate API', async () => {
     const noVlmSteps: readonly SiteCamStep[] = [{ number: 3, label: 'Entry Outside', hasVlm: false }];
-    const { result } = renderHook(() => useSiteCamCapture(noVlmSteps, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(noVlmSteps, STAFF_ID, SITE_INFO));
 
     await act(async () => {
       await capture(result);
@@ -311,7 +296,7 @@ describe('useSiteCamCapture geofence payload', () => {
       plannedLat: -26.1, plannedLon: 27.5, deviceLat: -26.101, deviceLon: 27.5, accuracyM: 5,
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, SITE_INFO, entryReading));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, SITE_INFO, entryReading));
     await act(async () => { await capture(result); });
     await act(async () => { await vi.runAllTimersAsync(); });
     // submitAll also reads/clears the durable store (Task 6) — same
@@ -341,7 +326,7 @@ describe('useSiteCamCapture draft persistence', () => {
       null,
     );
 
-    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, STAFF_ID, SITE_INFO));
 
     expect(result.current.currentStepIndex).toBe(1);
     expect(result.current.stepStates[0].status).toBe('pass');
@@ -361,7 +346,7 @@ describe('useSiteCamCapture appeal resolution', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, STAFF_ID, SITE_INFO));
 
     await act(async () => { await capture(result); });
     expect(result.current.stepStates[0].status).toBe('fail');
@@ -386,7 +371,7 @@ describe('useSiteCamCapture appeal resolution', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, SITE_INFO));
+    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, STAFF_ID, SITE_INFO));
 
     await act(async () => { await capture(result); });
     await act(async () => { result.current.onAppealSubmitted(); });
@@ -418,10 +403,10 @@ describe('useSiteCamCapture durability (Task 5)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(result); });
 
-    const store = new SiteCamPhotoStore('civils', siteInfo.siteId);
+    const store = new SiteCamPhotoStore(STAFF_ID, 'civils', siteInfo.siteId);
     const photos = await drain(store.listStepPhotos());
     expect(photos).toHaveLength(1);
     expect(photos[0].stepNumber).toBe(1);
@@ -438,12 +423,34 @@ describe('useSiteCamCapture durability (Task 5)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(result); });
 
     expect(result.current.photoNotSaved).toBe(true);
     expect(result.current.stepStates[0].status).toBe('pending');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('clears photoNotSaved on a subsequent successful capture (retry after freeing space)', async () => {
+    const siteInfo: SiteInfo = { ...SITE_INFO, siteId: 'POLE-DUR-2B' };
+    // Rejects only the FIRST call — the retry falls through to the real
+    // (successful) implementation, simulating the tech freeing up space.
+    vi.spyOn(SiteCamPhotoStore.prototype, 'putStepPhoto').mockRejectedValueOnce(
+      new QuotaExceededError(100, 50, 100, 'queue'),
+    );
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') return jsonOk({ data: { pass: true, reasons: [], corrections: [], maxAttempts: 3 } });
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
+    await act(async () => { await capture(result); });
+    expect(result.current.photoNotSaved).toBe(true);
+
+    await act(async () => { await capture(result); });
+
+    expect(result.current.photoNotSaved).toBe(false);
+    expect(result.current.stepStates[0].status).toBe('pass');
   });
 
   it('mints a clientSubmissionId once and reuses it across every subsequent capture', async () => {
@@ -453,11 +460,11 @@ describe('useSiteCamCapture durability (Task 5)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, siteInfo));
+    const { result } = renderHook(() => useSiteCamCapture(TWO_STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(result); });
     await act(async () => { await vi.runAllTimersAsync(); }); // settle the 1500ms auto-advance to step 2
 
-    const store = new SiteCamPhotoStore('civils', siteInfo.siteId);
+    const store = new SiteCamPhotoStore(STAFF_ID, 'civils', siteInfo.siteId);
     const firstId = (await drain(store.getMeta()))?.clientSubmissionId;
     expect(firstId).toBeTruthy();
 
@@ -476,7 +483,7 @@ describe('useSiteCamCapture restore-on-mount (Task 5)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const first = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const first = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(first.result); });
     expect(first.result.current.stepStates[0].status).toBe('pass');
     first.unmount();
@@ -487,7 +494,7 @@ describe('useSiteCamCapture restore-on-mount (Task 5)', () => {
       { ...first.result.current.stepStates[0], photoBase64: null },
     ], 0, null);
 
-    const second = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const second = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     expect(second.result.current.stepStates[0].photoBase64).toBeNull(); // stripped, pre-restore
 
     await act(async () => { await vi.runAllTimersAsync(); });
@@ -510,7 +517,7 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(result); });
 
     await act(async () => {
@@ -533,7 +540,7 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(result); });
 
     await act(async () => {
@@ -545,7 +552,7 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
     expect(result.current.uploadResult).toEqual({ uploadedCount: 1 });
     expect(result.current.queued).toBe(false);
 
-    const store = new SiteCamPhotoStore('civils', siteInfo.siteId);
+    const store = new SiteCamPhotoStore(STAFF_ID, 'civils', siteInfo.siteId);
     expect(await drain(store.getMeta())).toBeNull();
     expect(await drain(store.listStepPhotos())).toHaveLength(0);
   });
@@ -559,7 +566,7 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(result); });
     await act(async () => {
       const pending = result.current.submitAll();
@@ -594,7 +601,7 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(result); });
     await act(async () => {
       const pending = result.current.submitAll();
@@ -619,7 +626,7 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
     expect(result.current.queued).toBe(true);
     expect(result.current.uploadResult).toBeNull();
 
-    const store = new SiteCamPhotoStore('civils', siteInfo.siteId);
+    const store = new SiteCamPhotoStore(STAFF_ID, 'civils', siteInfo.siteId);
     expect(await drain(store.listStepPhotos())).toHaveLength(1);
   });
 
@@ -632,7 +639,7 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
-    const { result } = renderHook(() => useSiteCamCapture(STEPS, siteInfo));
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
     await act(async () => { await capture(result); });
     await act(async () => {
       const pending = result.current.submitAll();
@@ -655,6 +662,68 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
     });
 
     expect(result.current.uploadError).toBe('Site not found');
+    expect(result.current.uploadResult).toBeNull();
+  });
+
+  it('tapping Submit surfaces a visible error (not a silent no-op) when the store read fails (blind-review MEDIUM fix)', async () => {
+    const siteInfo: SiteInfo = { ...SITE_INFO, siteId: 'POLE-FLUSH-4' };
+    vi.stubGlobal('navigator', onlineNavigator());
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') return jsonOk({ data: { pass: true, reasons: [], corrections: [], maxAttempts: 3 } });
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
+    await act(async () => { await capture(result); });
+
+    // Simulate the store erroring on read (e.g. IDB genuinely unreachable) —
+    // previously this rejection propagated uncaught past `submitAll`'s
+    // `onClick={() => void submitAll()}`, leaving the tap a silent no-op.
+    vi.spyOn(SiteCamPhotoStore.prototype, 'getMeta').mockRejectedValue(new Error('IDB unavailable'));
+
+    await act(async () => {
+      const pending = result.current.submitAll();
+      await flushZeroDelayChain();
+      await pending;
+    });
+
+    expect(result.current.uploadError).toBe("Couldn't prepare your photos to submit — try again.");
+    expect(result.current.uploadResult).toBeNull();
+    expect(result.current.queued).toBe(false);
+  });
+
+  it('a queued flush that hits a persistent store-read failure surfaces uploadError and stops auto-retrying', async () => {
+    const siteInfo: SiteInfo = { ...SITE_INFO, siteId: 'POLE-FLUSH-5' };
+    vi.stubGlobal('navigator', onlineNavigator({ onLine: false }));
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/sitecam/validate') return jsonOk({ data: { pass: true, reasons: [], corrections: [], maxAttempts: 3 } });
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+
+    const { result } = renderHook(() => useSiteCamCapture(STEPS, STAFF_ID, siteInfo));
+    await act(async () => { await capture(result); });
+    await act(async () => {
+      const pending = result.current.submitAll();
+      await flushZeroDelayChain();
+      await pending;
+    });
+    expect(result.current.queued).toBe(true);
+
+    // The retry attempt (triggered by reconnect) hits a broken store read.
+    vi.spyOn(SiteCamPhotoStore.prototype, 'listStepPhotos').mockRejectedValue(new Error('IDB cursor failed'));
+
+    (globalThis.navigator as unknown as { onLine: boolean }).onLine = true;
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await act(async () => {
+      await flushZeroDelayChain();
+    });
+
+    // Visible, not a silent stall — and the job is NOT lost (still queued,
+    // ready for a manual retry once the store recovers).
+    expect(result.current.uploadError).toBe("Couldn't prepare your photos to submit — try again.");
+    expect(result.current.queued).toBe(true);
     expect(result.current.uploadResult).toBeNull();
   });
 });
