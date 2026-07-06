@@ -7,6 +7,9 @@ vi.mock('@/modules/sitecam/services/appealsVlmStore', () => ({
 vi.mock('@/modules/sitecam/services/appealsVlmService', () => ({
   evaluateAppeal: vi.fn(),
 }));
+// A dedicated pooled client holds the run-serialising advisory lock.
+const dbClient = { query: vi.fn(), release: vi.fn() };
+vi.mock('@/lib/db', () => ({ default: { connect: vi.fn(() => Promise.resolve(dbClient)) } }));
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMocks } from 'node-mocks-http';
@@ -48,6 +51,12 @@ describe('POST /api/cron/appeals-vlm', () => {
     process.env.CRON_SECRET = SECRET;
     mockFind.mockResolvedValue([]);
     mockRetry.mockResolvedValue({ attempts: 1, parked: false });
+    // Default: this run acquires the advisory lock.
+    dbClient.query.mockImplementation((sql: string) =>
+      sql.includes('pg_try_advisory_lock')
+        ? Promise.resolve({ rows: [{ locked: true }] })
+        : Promise.resolve({ rows: [] }),
+    );
   });
 
   it('rejects non-GET/POST with 405', async () => {
@@ -119,5 +128,28 @@ describe('POST /api/cron/appeals-vlm', () => {
     const res = await run(AUTH);
     expect(mockRecord).toHaveBeenCalledWith('a2', approve);
     expect(res._getJSONData().data).toMatchObject({ processed: 2, scored: 1 });
+  });
+
+  it('skips the tick when another run holds the advisory lock (prevents double-processing)', async () => {
+    dbClient.query.mockImplementation((sql: string) =>
+      sql.includes('pg_try_advisory_lock')
+        ? Promise.resolve({ rows: [{ locked: false }] })
+        : Promise.resolve({ rows: [] }),
+    );
+    mockFind.mockResolvedValue([pendingPhoto] as never); // work is available…
+    const res = await run(AUTH);
+    // …but the tick bails before selecting or scoring anything.
+    expect(mockFind).not.toHaveBeenCalled();
+    expect(mockEval).not.toHaveBeenCalled();
+    expect(res._getJSONData().data).toMatchObject({ processed: 0, scored: 0, retried: 0, skipped: true });
+  });
+
+  it('releases the advisory lock and the connection after a run', async () => {
+    mockFind.mockResolvedValue([pendingPhoto] as never);
+    mockEval.mockResolvedValue(approve as never);
+    await run(AUTH);
+    const unlocked = dbClient.query.mock.calls.some((c) => (c[0] as string).includes('pg_advisory_unlock'));
+    expect(unlocked).toBe(true);
+    expect(dbClient.release).toHaveBeenCalled();
   });
 });
