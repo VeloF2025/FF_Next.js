@@ -14,4 +14,5 @@ export type {
   FlushReport,
   FlushHooks,
   OfflineQueueConfig,
+  QuotaExceededKind,
 } from './types';

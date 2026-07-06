@@ -141,4 +141,31 @@ describe('OfflineQueueStore byte budget', () => {
     await s.enqueue(item('1', 0, 500)); // under byte budget → allowed despite no estimate
     expect(await s.countPending()).toBe(1);
   });
+
+  it('tags the storage-estimate rejection with kind "device"', async () => {
+    stubStorageEstimate({ usage: 900, quota: 1000 }); // over the 0.8 fraction
+    const s = new OfflineQueueStore<P>(`ByteDB-${dbN++}`, 50, 10_000_000);
+    await expect(s.enqueue(item('1', 0, 500))).rejects.toMatchObject({
+      name: 'QuotaExceededError',
+      kind: 'device',
+    });
+  });
+
+  it('tags the queue-budget rejection with kind "queue"', async () => {
+    const s = new OfflineQueueStore<P>(`ByteDB-${dbN++}`, 50, 1000);
+    await s.enqueue(item('1', 0, 700));
+    await expect(s.enqueue(item('2', 0, 400))).rejects.toMatchObject({
+      name: 'QuotaExceededError',
+      kind: 'queue',
+    });
+  });
+
+  it('sumPendingBytes reports the derived running total', async () => {
+    const s = new OfflineQueueStore<P>(`ByteDB-${dbN++}`, 50, 10_000);
+    await s.enqueue(item('1', 0, 300));
+    await s.enqueue(item('2', 0, 250));
+    expect(await s.sumPendingBytes()).toBe(550);
+    await s.deletePending('1');
+    expect(await s.sumPendingBytes()).toBe(250);
+  });
 });

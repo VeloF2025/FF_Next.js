@@ -94,6 +94,30 @@ describe('downscaleImage', () => {
     expect(lo.size).toBeLessThan(hi.size);
   });
 
+  it('honors a custom maxEdge override', async () => {
+    installStubs({ width: 4000, height: 3000 });
+    await downscaleImage(fakeFile(), { maxEdge: 800 });
+    expect(Math.max(lastToBlob!.width, lastToBlob!.height)).toBe(800);
+    expect(lastToBlob!.width).toBe(800);
+    expect(lastToBlob!.height).toBe(600);
+  });
+
+  it('honors a custom mimeType override', async () => {
+    installStubs({ width: 1000, height: 1000 });
+    const blob = await downscaleImage(fakeFile(), { mimeType: 'image/webp' });
+    expect(blob.type).toBe('image/webp');
+    expect(lastToBlob!.type).toBe('image/webp');
+  });
+
+  it('rejects with ImageDecodeError when the canvas yields no blob', async () => {
+    installStubs({ width: 1000, height: 1000 });
+    // Re-stub toBlob to hand back null (the encoder failing / unsupported type).
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (cb: BlobCallback) {
+      cb(null);
+    });
+    await expect(downscaleImage(fakeFile())).rejects.toBeInstanceOf(ImageDecodeError);
+  });
+
   it('rejects with ImageDecodeError when the browser cannot decode the file', async () => {
     vi.stubGlobal('createImageBitmap', vi.fn(async () => { throw new Error('bad image'); }));
     await expect(downscaleImage(fakeFile())).rejects.toBeInstanceOf(ImageDecodeError);

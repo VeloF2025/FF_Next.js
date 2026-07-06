@@ -28,4 +28,17 @@ describe('QuotaExceededError', () => {
     expect(err.addBytes).toBe(500_000);
     expect(err.budgetBytes).toBe(40_000_000);
   });
+
+  it("defaults to kind 'queue' with a queue-budget message", () => {
+    const err = new QuotaExceededError(1000, 500, 1200);
+    expect(err.kind).toBe('queue');
+    expect(err.message).toContain('queue byte budget');
+  });
+
+  it("carries kind 'device' with a distinct device-quota message when the storage estimate trips", () => {
+    const err = new QuotaExceededError(9_000_000, 500_000, 10_000_000, 'device');
+    expect(err.kind).toBe('device');
+    expect(err.message).toContain('device');
+    expect(err.message).not.toContain('queue byte budget');
+  });
 });

@@ -32,6 +32,26 @@ async function estimateStorage(): Promise<{ usage: number; quota: number } | nul
   return null;
 }
 
+/** Sum `byteSize` across a store via a cursor, chaining raw IndexedDB requests
+ *  (no `await`) so it can run inside a live readwrite transaction without the
+ *  transaction auto-committing between operations. Resolves with the total. */
+function cursorSumBytes(store: IDBObjectStore): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let total = 0;
+    const cursorReq = store.openCursor();
+    cursorReq.onsuccess = () => {
+      const cursor = cursorReq.result;
+      if (cursor) {
+        total += (cursor.value as { byteSize?: number }).byteSize ?? 0;
+        cursor.continue();
+      } else {
+        resolve(total);
+      }
+    };
+    cursorReq.onerror = () => reject(cursorReq.error ?? new Error('IDB cursor failed'));
+  });
+}
+
 export class OfflineQueueStore<TPayload> {
   private dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -93,50 +113,73 @@ export class OfflineQueueStore<TPayload> {
   }
 
   async enqueue(item: QueuedItem<TPayload>): Promise<void> {
-    const count = await this.countPending();
-    if (count >= this.maxQueueSize) throw new QueueFullError(count);
-    if (this.maxQueueBytes !== undefined) {
-      await this.assertByteBudget(item.byteSize ?? 0);
-    }
-    await this.tx(PENDING, 'readwrite', (s) => this.req(s.add(item)));
-  }
+    const addBytes = item.byteSize ?? 0;
 
-  /** Sum `byteSize` across all pending rows via a cursor. Derived accounting —
-   *  never a persisted counter that could drift from the actual rows. */
-  async sumPendingBytes(): Promise<number> {
-    return this.tx(
+    // Best-effort device-pressure guard, run BEFORE the atomic write. It calls
+    // the Storage API (not IndexedDB), so it cannot live inside the transaction
+    // below — awaiting a non-IDB promise there would let the transaction
+    // auto-commit. This check is advisory/approximate; a tiny race on it is
+    // acceptable because the hard caps (count + byte budget) are enforced
+    // atomically in the transaction that follows.
+    if (this.maxQueueBytes !== undefined) {
+      const est = await estimateStorage();
+      if (est && est.quota > 0 && (est.usage + addBytes) / est.quota > STORAGE_SAFETY_FRACTION) {
+        throw new QuotaExceededError(est.usage, addBytes, est.quota, 'device');
+      }
+    }
+
+    // Count cap + byte budget + insert in ONE readwrite transaction. IndexedDB
+    // serialises transactions with overlapping scope, so a concurrent enqueue's
+    // count/sum reads see this one's committed write — closing the
+    // check-then-write TOCTOU that would otherwise let parallel large-photo
+    // captures blow past the caps. All steps chain raw IDB requests (no await)
+    // to keep the transaction alive across them.
+    await this.tx(
       PENDING,
-      'readonly',
+      'readwrite',
       (s) =>
-        new Promise<number>((resolve, reject) => {
-          let total = 0;
-          const cursorReq = s.openCursor();
-          cursorReq.onsuccess = () => {
-            const cursor = cursorReq.result;
-            if (cursor) {
-              total += (cursor.value as QueuedItem<TPayload>).byteSize ?? 0;
-              cursor.continue();
-            } else {
-              resolve(total);
-            }
+        new Promise<void>((resolve, reject) => {
+          const add = () => {
+            const addReq = s.add(item);
+            addReq.onsuccess = () => resolve();
+            addReq.onerror = () => reject(addReq.error ?? new Error('IDB add failed'));
           };
-          cursorReq.onerror = () => reject(cursorReq.error ?? new Error('IDB cursor failed'));
+          const countReq = s.count();
+          countReq.onerror = () => reject(countReq.error ?? new Error('IDB count failed'));
+          countReq.onsuccess = () => {
+            if (countReq.result >= this.maxQueueSize) {
+              reject(new QueueFullError(countReq.result));
+              return;
+            }
+            if (this.maxQueueBytes === undefined) {
+              add();
+              return;
+            }
+            let total = 0;
+            const cursorReq = s.openCursor();
+            cursorReq.onerror = () => reject(cursorReq.error ?? new Error('IDB cursor failed'));
+            cursorReq.onsuccess = () => {
+              const cursor = cursorReq.result;
+              if (cursor) {
+                total += (cursor.value as { byteSize?: number }).byteSize ?? 0;
+                cursor.continue();
+                return;
+              }
+              if (total + addBytes > (this.maxQueueBytes as number)) {
+                reject(new QuotaExceededError(total, addBytes, this.maxQueueBytes as number, 'queue'));
+                return;
+              }
+              add();
+            };
+          };
         })
     );
   }
 
-  /** Throw QuotaExceededError if adding `addBytes` would breach the byte budget
-   *  OR push projected browser storage past the safety fraction. */
-  private async assertByteBudget(addBytes: number): Promise<void> {
-    const budget = this.maxQueueBytes as number;
-    const current = await this.sumPendingBytes();
-    if (current + addBytes > budget) {
-      throw new QuotaExceededError(current, addBytes, budget);
-    }
-    const est = await estimateStorage();
-    if (est && est.quota > 0 && (est.usage + addBytes) / est.quota > STORAGE_SAFETY_FRACTION) {
-      throw new QuotaExceededError(est.usage, addBytes, est.quota);
-    }
+  /** Sum `byteSize` across all pending rows. Derived accounting for UI/telemetry
+   *  — never a persisted counter that could drift from the actual rows. */
+  async sumPendingBytes(): Promise<number> {
+    return this.tx(PENDING, 'readonly', (s) => cursorSumBytes(s));
   }
 
   async listPending(): Promise<QueuedItem<TPayload>[]> {

@@ -18,6 +18,8 @@ export interface QueuedItem<TPayload> {
    * (see `maxQueueBytes`). Written at enqueue from `OfflineQueueConfig.sizeOf`
    * (0 when the workflow declares no size — e.g. small-JSON queues). The store
    * sums this over pending rows; it is derived accounting, never authoritative.
+   * Required going forward, but IndexedDB is schemaless: rows written before
+   * this field existed may lack it, so read sites coalesce a missing value to 0.
    */
   byteSize: number;
 }
@@ -101,24 +103,42 @@ export class QueueFullError extends Error {
   }
 }
 
+/** Which limit an enqueue tripped. `queue` = this queue's own byte budget
+ *  (currentBytes/budgetBytes are queue-scoped). `device` = the browser's
+ *  origin-wide storage estimate (currentBytes/budgetBytes are the device
+ *  usage/quota, which may be far larger). The UI/logs must not conflate them. */
+export type QuotaExceededKind = 'queue' | 'device';
+
 /**
  * Thrown when an enqueue would exceed the per-queue byte budget (`maxQueueBytes`)
  * or the browser's projected storage estimate. Distinct from `QueueFullError`
  * (a count cap) so the UI can render photo-specific "not saved, sync to free
- * space" copy. Carries the raw byte figures for logging and UI messaging.
+ * space" copy. Carries the raw byte figures for logging and UI messaging, and a
+ * `kind` discriminant so a consumer can tell the queue-budget case (its own
+ * bytes) apart from the device-storage case (origin-wide usage vs quota).
  */
 export class QuotaExceededError extends Error {
   readonly currentBytes: number;
   readonly addBytes: number;
   readonly budgetBytes: number;
-  constructor(currentBytes: number, addBytes: number, budgetBytes: number) {
-    super(
-      `Offline queue byte budget exceeded: ${currentBytes} stored + ${addBytes} incoming ` +
-        `exceeds the ${budgetBytes} byte budget. Reconnect to sync before capturing more.`
-    );
+  readonly kind: QuotaExceededKind;
+  constructor(
+    currentBytes: number,
+    addBytes: number,
+    budgetBytes: number,
+    kind: QuotaExceededKind = 'queue'
+  ) {
+    const detail =
+      kind === 'device'
+        ? `device storage nearly full: ${currentBytes} used + ${addBytes} incoming ` +
+          `approaches the ${budgetBytes} byte device quota`
+        : `offline queue byte budget exceeded: ${currentBytes} stored + ${addBytes} incoming ` +
+          `exceeds the ${budgetBytes} byte budget`;
+    super(`${detail}. Reconnect to sync before capturing more.`);
     this.name = 'QuotaExceededError';
     this.currentBytes = currentBytes;
     this.addBytes = addBytes;
     this.budgetBytes = budgetBytes;
+    this.kind = kind;
   }
 }
