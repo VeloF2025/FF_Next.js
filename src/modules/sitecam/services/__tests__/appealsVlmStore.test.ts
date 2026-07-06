@@ -27,6 +27,13 @@ describe('appealsVlmStore', () => {
     expect(sql).toContain('job_type');
   });
 
+  it('findPendingAppeals binds [maxAttempts, limit] in that order (a swap breaks the attempt cap)', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as never);
+    await findPendingAppeals(10, 3); // limit=10, maxAttempts=3
+    // $1 = maxAttempts (compared to vlm_attempts), $2 = limit (LIMIT clause)
+    expect(mockQuery.mock.calls[0][1]).toEqual([3, 10]);
+  });
+
   it('recordEvaluation writes vlm_* incl. evaluated_at and NEVER touches status', async () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as never);
     await recordEvaluation('appeal-1', evaluation);
@@ -62,5 +69,15 @@ describe('appealsVlmStore', () => {
       3,
     );
     expect(out).toEqual({ attempts: 1, parked: false });
+  });
+
+  it('recordTransientFailure degrades to attempts:0 when RETURNING is empty (stale/deleted id)', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as never);
+    const out = await recordTransientFailure(
+      'gone',
+      { ...evaluation, recommendation: 'uncertain', skipReason: 'vlm_unavailable' },
+      3,
+    );
+    expect(out).toEqual({ attempts: 0, parked: false });
   });
 });

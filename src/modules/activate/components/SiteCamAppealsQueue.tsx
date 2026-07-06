@@ -2,10 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { SiteCamFailedQueue } from './SiteCamFailedQueue';
+import { AiBadge, VlmRecommendationPanel, type VlmAdvisory } from './AppealVlmPanel';
 
-interface AppealCheck { name: string; verdict: 'pass' | 'fail' | 'uncertain'; evidence: string }
-
-interface Appeal {
+interface Appeal extends VlmAdvisory {
   id: string;
   dr_number: string;
   step_number: number;
@@ -18,31 +17,7 @@ interface Appeal {
   created_at: string;
   tech_name: string | null;
   denial_reason: string | null;
-  vlm_recommendation: 'approve' | 'deny' | 'uncertain' | null;
-  vlm_confidence: number | null;
-  vlm_reasoning: string | null;
-  vlm_checks: AppealCheck[] | null;
-  vlm_serial_read: string | null;
-  vlm_skip_reason: string | null;
   human_agreed_with_vlm: boolean | null;
-}
-
-const REC_STYLES: Record<'approve' | 'deny' | 'uncertain', string> = {
-  approve: 'bg-green-100 text-green-700',
-  deny: 'bg-red-100 text-red-700',
-  uncertain: 'bg-neutral-100 text-neutral-500',
-};
-
-function AiBadge({ appeal }: { appeal: Appeal }) {
-  const rec = appeal.vlm_recommendation;
-  if (!rec) return null;
-  const pct = appeal.vlm_confidence != null ? ` ${Math.round(appeal.vlm_confidence * 100)}%` : '';
-  const label = rec === 'uncertain' ? 'AI: Uncertain' : `AI: ${rec === 'approve' ? 'Approve' : 'Deny'}${pct}`;
-  return (
-    <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${REC_STYLES[rec]}`}>
-      {label}
-    </span>
-  );
 }
 
 const STEP_LABELS: Record<number, string> = {
@@ -151,7 +126,7 @@ export function SiteCamAppealsQueue() {
                     </span>
                     <span className="mx-2 text-neutral-400">·</span>
                     <span className="text-xs text-neutral-500">{a.tech_name ?? 'Unknown'}</span>
-                    <AiBadge appeal={a} />
+                    <AiBadge advisory={a} />
                     {a.status !== 'pending' && a.human_agreed_with_vlm !== null && (
                       <span className={`ml-2 text-xs ${a.human_agreed_with_vlm ? 'text-green-600' : 'text-amber-600'}`}>
                         {a.human_agreed_with_vlm ? '✓ agreed' : '✗ disagreed'}
@@ -166,31 +141,7 @@ export function SiteCamAppealsQueue() {
                 {expanded === a.id && (
                   <div className="border-t border-neutral-100 px-4 py-4 space-y-4">
                     <p className="text-sm text-neutral-700">{a.appeal_text}</p>
-                    {a.vlm_recommendation && (
-                      <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 space-y-2">
-                        <div className="flex items-center gap-2 text-xs font-medium text-neutral-600">
-                          <span>VLM recommendation</span>
-                          <AiBadge appeal={a} />
-                          {a.vlm_skip_reason && <span className="text-neutral-400">({a.vlm_skip_reason})</span>}
-                        </div>
-                        {a.vlm_reasoning && <p className="text-sm text-neutral-700">{a.vlm_reasoning}</p>}
-                        {a.vlm_serial_read && (
-                          <p className="text-xs text-neutral-500">Serial read: <span className="font-mono">{a.vlm_serial_read}</span></p>
-                        )}
-                        {a.vlm_checks && a.vlm_checks.length > 0 && (
-                          <ul className="space-y-1">
-                            {a.vlm_checks.map((c, i) => (
-                              <li key={i} className="text-xs text-neutral-500">
-                                <span className={c.verdict === 'pass' ? 'text-green-600' : c.verdict === 'fail' ? 'text-red-600' : 'text-neutral-400'}>
-                                  {c.verdict}
-                                </span>{' '}
-                                <span className="font-medium">{c.name}</span> — {c.evidence}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
+                    <VlmRecommendationPanel advisory={a} />
                     {a.serial_scanned && (
                       <div className="text-xs text-neutral-500 space-y-1">
                         <p>Serial scanned: <span className="font-mono">{a.serial_scanned}</span></p>

@@ -18,7 +18,7 @@ interface AppealBody {
   serialScanned?: string;
   serialExpected?: string;
   attemptNumber: number;
-  jobType: SiteCamJobType;
+  jobType?: SiteCamJobType;
 }
 
 async function handler(
@@ -43,7 +43,10 @@ async function handler(
     return apiResponse.badRequest(res, 'photoUrl must be a data:image/ URI');
 
   // job_type drives which step criteria/gallery the appeals VLM cron uses (Phase 2).
-  if (jobType !== 'activations' && jobType !== 'civils')
+  // Tolerate a missing value — a stale/cached SiteCam PWA predates this field, and the
+  // column is nullable (the scoring cron treats NULL as 'activations'). Reject only an
+  // explicit out-of-enum value so a technician's appeal is never hard-blocked by a cache.
+  if (jobType != null && jobType !== 'activations' && jobType !== 'civils')
     return apiResponse.badRequest(res, 'jobType must be "activations" or "civils"');
 
   const { rows: staffRows } = await pool.query<{ first_name: string; last_name: string }>(
@@ -61,7 +64,7 @@ async function handler(
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      RETURNING id`,
     [drNumber, stepNumber, session.staffId, appealText, photoUrl,
-     serialScanned ?? null, serialExpected ?? null, attemptNumber, jobType],
+     serialScanned ?? null, serialExpected ?? null, attemptNumber, jobType ?? null],
   );
   const appealId = rows[0]!.id;
 

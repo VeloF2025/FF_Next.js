@@ -88,6 +88,14 @@ describe('POST /api/cron/appeals-vlm', () => {
     expect(mockEval).toHaveBeenCalledWith(expect.objectContaining({ jobType: 'activations' }));
   });
 
+  it('degrades a NULL photo_url to an empty base64 string without throwing', async () => {
+    mockFind.mockResolvedValue([{ ...pendingPhoto, photo_url: null }] as never);
+    mockEval.mockResolvedValue(approve as never);
+    const res = await run(AUTH);
+    expect(mockEval).toHaveBeenCalledWith(expect.objectContaining({ photoBase64: '' }));
+    expect(res._getJSONData().data).toMatchObject({ processed: 1, scored: 1 });
+  });
+
   it('routes a transient VLM outage to recordTransientFailure (retry), not a terminal write', async () => {
     mockFind.mockResolvedValue([pendingPhoto] as never);
     mockEval.mockResolvedValue({ ...approve, recommendation: 'uncertain', skipReason: 'vlm_unavailable' } as never);

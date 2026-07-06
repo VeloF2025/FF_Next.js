@@ -44,8 +44,23 @@ describe('POST /api/my/sitecam/appeal', () => {
     expect(insertCall?.[1]).toContain('activations');
   });
 
-  it('rejects an invalid job_type with 400', async () => {
+  it('persists a civils job_type', async () => {
+    const res = await run({ ...baseBody, jobType: 'civils' });
+    expect(res._getStatusCode()).toBe(200);
+    const insertCall = mockQuery.mock.calls.find((c) => (c[0] as string).includes('INSERT INTO sitecam_appeals'));
+    expect(insertCall?.[1]).toContain('civils');
+  });
+
+  it('rejects an explicit invalid job_type with 400', async () => {
     const res = await run({ ...baseBody, jobType: 'plumbing' });
     expect(res._getStatusCode()).toBe(400);
+  });
+
+  it('tolerates a missing job_type (stale PWA) — stores NULL rather than rejecting', async () => {
+    const { jobType: _omit, ...noJobType } = baseBody;
+    const res = await run(noJobType);
+    expect(res._getStatusCode()).toBe(200);
+    const insertCall = mockQuery.mock.calls.find((c) => (c[0] as string).includes('INSERT INTO sitecam_appeals'));
+    expect(insertCall?.[1]?.[8]).toBeNull();
   });
 });
