@@ -14,9 +14,10 @@ const fetcher = async (url: string): Promise<PoleSummary[]> => {
   return body.data ?? [];
 };
 
-export function usePoleList(projectId: string | null, ponNo: number | null) {
+export function usePoleList(projectId: string | null, zoneNo: number | null, ponNo: number | null) {
   const params = new URLSearchParams();
   if (projectId) params.set('project_id', projectId);
+  if (zoneNo != null) params.set('zone_no', String(zoneNo));
   if (ponNo != null) params.set('pon_no', String(ponNo));
 
   const { data, error, mutate, isLoading } = useSWR<PoleSummary[]>(
