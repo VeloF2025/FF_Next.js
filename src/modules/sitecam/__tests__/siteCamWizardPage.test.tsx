@@ -34,7 +34,10 @@ vi.mock('next/router', () => ({
   useRouter: () => ({ query: routerQuery, push: vi.fn(), replace: vi.fn() }),
 }));
 
-import SiteCamWizardPage from '../[siteId]';
+// This page lives under pages/ (Next routes every .tsx there), so the test
+// cannot live under pages/ or `next build` tries to render it and crashes on the
+// vitest import. It sits in the module __tests__ and imports the page by path.
+import SiteCamWizardPage from '../../../../pages/my/sitecam/[siteId]';
 
 const PROFILE = {
   staffId: 's1', name: 'Tech', phone: null, email: null, homeSiteId: null,
