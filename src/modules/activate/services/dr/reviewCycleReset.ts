@@ -41,6 +41,14 @@ export async function resetReviewCycleForResubmission(dropNumber: string): Promi
          feedback_sent = false,
          feedback_sent_at = NULL,
          feedback_message = NULL,
+         -- Reset the human-review gate back to "fresh". A prior cycle's
+         -- 'completed' independently (a) keeps the row out of auto-QA
+         -- (autoQaProcessor: human_review_status != 'completed'), (b) blocks the
+         -- auto-feedback cron (WHERE human_review_status = 'pending_hitl'), and
+         -- (c) still labels the drop 'human_reviewed' in the QA Centre filter.
+         -- NULL is the fresh state (mirrors retry-categorizations' post-QA reset)
+         -- so auto-QA re-runs and re-arms 'pending_hitl' naturally.
+         human_review_status = NULL,
          -- Clear auto-QA markers so the new submission is re-evaluated
          auto_qa_processed = false,
          auto_qa_processed_at = NULL,
@@ -49,7 +57,8 @@ export async function resetReviewCycleForResubmission(dropNumber: string): Promi
          auto_feedback_skip_reason = NULL,
          updated_at = NOW()
        WHERE drop_number = $1
-         AND (feedback_sent = true OR qa_decision IS NOT NULL OR auto_qa_processed = true)`,
+         AND (feedback_sent = true OR qa_decision IS NOT NULL
+              OR auto_qa_processed = true OR human_review_status = 'completed')`,
       [dropNumber],
     );
 
