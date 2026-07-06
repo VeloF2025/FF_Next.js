@@ -10,7 +10,8 @@
 
 import { QuotaExceededError, estimateStorage, STORAGE_SAFETY_FRACTION } from '@/lib/offline-queue';
 import type { SiteCamJobType } from '../lib/sitecamSteps';
-import type { SiteInfo } from '../hooks/useSiteCamCapture';
+import type { SiteInfo } from '../lib/sitecamTypes';
+import type { GeofencePayload } from '../lib/geofence';
 
 const PHOTOS = 'photos';
 const META = 'meta';
@@ -23,11 +24,18 @@ const DB_VERSION = 1;
  *  headroom over that before an over-budget capture is refused. Tunable. */
 export const SITECAM_JOB_MAX_BYTES = 20 * 1024 * 1024;
 
-/** Per-job IndexedDB database name — namespaced by job type + site so
- *  activations vs civils of the same site cannot collide, mirroring the
- *  existing draft key `sitecam:draft:v1:<jobType>:<siteId>`. */
-export function sitecamJobDbName(jobType: SiteCamJobType, siteId: string): string {
-  return `SiteCamJobDB:${jobType}:${siteId}`;
+/**
+ * Per-job IndexedDB database name — namespaced by STAFF + job type + site.
+ * The staff scoping (blind-review MEDIUM fix, PR-3) prevents a shared/reissued
+ * field device from mixing technicians: without it, Tech B opening the same
+ * site would inherit and auto-flush Tech A's queued photos under Tech B's
+ * session (wrong `pwa_tech_id` server-side), and a same-site capture by two
+ * staff could collide in one store. Job type + site alone still disambiguate
+ * activations vs civils of the same site, mirroring the existing draft key
+ * `sitecam:draft:v1:<jobType>:<siteId>`.
+ */
+export function sitecamJobDbName(staffId: string, jobType: SiteCamJobType, siteId: string): string {
+  return `SiteCamJobDB:${staffId}:${jobType}:${siteId}`;
 }
 
 /** One captured step photo, persisted as a native Blob (IndexedDB structured
@@ -50,14 +58,22 @@ export interface SiteCamJobMeta {
   clientSubmissionId: string;
   submitState: 'capturing' | 'queued';
   queuedAt?: string;
+  /**
+   * The geofence payload computed at the FIRST submit tap that resulted in a
+   * queued (offline/failed) submission — persisted so a LATER automatic flush
+   * retry reuses the technician's at-tap location rather than resampling GPS
+   * wherever the device happens to be when the retry fires (e.g. back at the
+   * depot). `undefined` until the job has been queued at least once.
+   */
+  submitGeofence?: GeofencePayload | null;
 }
 
 export class SiteCamPhotoStore {
   private readonly dbName: string;
   private dbPromise: Promise<IDBDatabase> | null = null;
 
-  constructor(jobType: SiteCamJobType, siteId: string) {
-    this.dbName = sitecamJobDbName(jobType, siteId);
+  constructor(staffId: string, jobType: SiteCamJobType, siteId: string) {
+    this.dbName = sitecamJobDbName(staffId, jobType, siteId);
   }
 
   private openDb(): Promise<IDBDatabase> {

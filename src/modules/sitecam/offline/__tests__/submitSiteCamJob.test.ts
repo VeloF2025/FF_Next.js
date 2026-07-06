@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { QueueFullError, QuotaExceededError } from '@/lib/offline-queue';
 import { blobToBase64, buildUploadPayload, classifySubmit } from '../submitSiteCamJob';
 import type { SiteCamJobMeta, StoredStepPhoto } from '../photoStore';
-import type { SiteInfo } from '../../hooks/useSiteCamCapture';
+import type { SiteInfo } from '../../lib/sitecamTypes';
 import type { GeofencePayload } from '../../lib/geofence';
 
 const SITE_INFO: SiteInfo = {

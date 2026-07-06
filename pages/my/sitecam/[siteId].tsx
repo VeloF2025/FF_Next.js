@@ -7,6 +7,13 @@
  *
  * Session is checked client-side so SSR renders a cacheable loading
  * shell without leaking auth state into cached HTML.
+ *
+ * Warm-start offline restore (Task 7): if the site-info fetch fails (e.g. no
+ * connectivity) but a durable job already exists in IndexedDB for this
+ * siteId (opened online earlier in this same warm session), the wizard
+ * renders from the restored SiteInfo instead of the "Site not found" error —
+ * no network fetch required. Cold-start (first-ever open with zero prior
+ * connectivity) is out of scope (spec §2 non-goal).
  */
 
 import { useState, useEffect } from 'react';
@@ -22,6 +29,10 @@ import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { isSiteCamAuthorised } from '@/modules/sitecam/lib/sitecamAuth';
 import type { SiteInfo } from '@/modules/sitecam/hooks/useSiteCamCapture';
 import { decodeGeofenceParam } from '@/modules/sitecam/lib/geofence';
+import { findRestorableSiteCamJob } from '@/modules/sitecam/offline/findRestorableSiteCamJob';
+import { log } from '@/lib/logger';
+
+const MODULE = 'SiteCamWizardPage';
 
 // =============================================================================
 // Page
@@ -41,6 +52,10 @@ const SiteCamWizardPage: NextPage & {
 
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [siteError, setSiteError] = useState<string | null>(null);
+
+  // Warm-start restore: only consulted once the site-info fetch has failed.
+  const [restoredSiteInfo, setRestoredSiteInfo] = useState<SiteInfo | null>(null);
+  const [restoreChecked, setRestoreChecked] = useState(false);
 
   // Load session once on mount
   useEffect(() => {
@@ -104,6 +119,35 @@ const SiteCamWizardPage: NextPage & {
     };
   }, [sessionReady, siteId]);
 
+  // Warm-start restore: once the site fetch has failed, check IndexedDB for a
+  // job already opened earlier in this session (no network needed). Scoped to
+  // the CURRENT staff member (`profile.staffId`) — by the time `siteError` is
+  // set, the session-load effect has already resolved successfully (that's
+  // the only path to `sessionReady`/site-fetch even starting), so `profile`
+  // is guaranteed non-null here; the `!profile` guard is defensive typing only.
+  useEffect(() => {
+    if (!siteError || typeof siteId !== 'string' || !profile) return;
+
+    let cancelled = false;
+    findRestorableSiteCamJob(profile.staffId, siteId)
+      .then((found) => {
+        if (!cancelled) setRestoredSiteInfo(found?.siteInfo ?? null);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          log.warn('SiteCam warm-start restore lookup failed', { siteId, err: String(err) }, MODULE);
+          setRestoredSiteInfo(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRestoreChecked(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [siteError, siteId, profile]);
+
   // Guest redirect
   if (isGuest) {
     if (typeof window !== 'undefined') void router.replace('/my');
@@ -151,10 +195,27 @@ const SiteCamWizardPage: NextPage & {
     );
   }
 
+  const entryGeofence = decodeGeofenceParam(router.query.gf);
+
   // Loading — waiting for session or site info
   if (!sessionReady || !siteInfo) {
-    // Show site fetch error if present
+    // Site fetch failed — try the warm-start IDB restore before giving up.
     if (siteError) {
+      if (!restoreChecked) {
+        return (
+          <MyPortalShell title="SiteCam" showFooterNav={false}>
+            <div className="flex items-center justify-center pt-24 gap-2 text-sm text-neutral-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading…
+            </div>
+          </MyPortalShell>
+        );
+      }
+
+      if (restoredSiteInfo) {
+        return <SiteCamWizard profile={profile!} siteInfo={restoredSiteInfo} entryGeofence={entryGeofence} />;
+      }
+
       return (
         <MyPortalShell title="SiteCam" staffName={profile?.name} showFooterNav={false}>
           <div className="flex flex-col items-center gap-4 pt-16 text-center">
@@ -184,7 +245,6 @@ const SiteCamWizardPage: NextPage & {
     );
   }
 
-  const entryGeofence = decodeGeofenceParam(router.query.gf);
   return <SiteCamWizard profile={profile!} siteInfo={siteInfo} entryGeofence={entryGeofence} />;
 };
 

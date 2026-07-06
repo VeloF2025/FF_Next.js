@@ -2,14 +2,15 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SiteCamPhotoStore, sitecamJobDbName, SITECAM_JOB_MAX_BYTES, type SiteCamJobMeta, type StoredStepPhoto } from '../photoStore';
 import { QuotaExceededError } from '@/lib/offline-queue';
-import type { SiteInfo } from '../../hooks/useSiteCamCapture';
+import type { SiteInfo } from '../../lib/sitecamTypes';
 
 let dbN = 0;
+const STAFF_ID = 'staff-1';
 
 /** Fresh store per test — a unique siteId keeps IndexedDB databases isolated
  *  (mirrors src/lib/offline-queue/__tests__/store.test.ts). */
-function freshStore(): SiteCamPhotoStore {
-  return new SiteCamPhotoStore('activations', `SITE-${dbN++}`);
+function freshStore(staffId: string = STAFF_ID): SiteCamPhotoStore {
+  return new SiteCamPhotoStore(staffId, 'activations', `SITE-${dbN++}`);
 }
 
 function photo(stepNumber: number, byteSize: number, over: Partial<StoredStepPhoto> = {}): StoredStepPhoto {
@@ -58,9 +59,38 @@ afterEach(() => {
 });
 
 describe('sitecamJobDbName', () => {
-  it('namespaces by job type + site id', () => {
-    expect(sitecamJobDbName('activations', 'DR1866766')).toBe('SiteCamJobDB:activations:DR1866766');
-    expect(sitecamJobDbName('civils', 'POLE-1')).toBe('SiteCamJobDB:civils:POLE-1');
+  it('namespaces by staff id + job type + site id', () => {
+    expect(sitecamJobDbName('staff-1', 'activations', 'DR1866766')).toBe('SiteCamJobDB:staff-1:activations:DR1866766');
+    expect(sitecamJobDbName('staff-2', 'civils', 'POLE-1')).toBe('SiteCamJobDB:staff-2:civils:POLE-1');
+  });
+
+  it('gives two different staff ids distinct database names for the SAME job type + site', () => {
+    expect(sitecamJobDbName('staff-a', 'activations', 'DR1'))
+      .not.toBe(sitecamJobDbName('staff-b', 'activations', 'DR1'));
+  });
+});
+
+describe('SiteCamPhotoStore — staff isolation (shared-device attribution fix)', () => {
+  it('a photo written under one staff id is invisible to another staff id at the same site', async () => {
+    const siteId = 'SHARED-DEVICE-SITE-1';
+    const storeA = new SiteCamPhotoStore('staff-a', 'activations', siteId);
+    const storeB = new SiteCamPhotoStore('staff-b', 'activations', siteId);
+
+    await storeA.putStepPhoto(photo(1, 100));
+
+    expect(await storeA.listStepPhotos()).toHaveLength(1);
+    expect(await storeB.listStepPhotos()).toHaveLength(0);
+  });
+
+  it('meta (including a queued submission) written under one staff id is invisible to another', async () => {
+    const siteId = 'SHARED-DEVICE-SITE-2';
+    const storeA = new SiteCamPhotoStore('staff-a', 'activations', siteId);
+    const storeB = new SiteCamPhotoStore('staff-b', 'activations', siteId);
+
+    await storeA.putMeta(meta({ submitState: 'queued', clientSubmissionId: 'uuid-staff-a' }));
+
+    expect((await storeA.getMeta())?.clientSubmissionId).toBe('uuid-staff-a');
+    expect(await storeB.getMeta()).toBeNull();
   });
 });
 
