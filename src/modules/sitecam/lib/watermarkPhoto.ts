@@ -7,6 +7,7 @@
 
 import { log } from '@/lib/logger';
 import { readFileAsBase64 } from './fileToBase64';
+import { base64ToBlob } from './savePhotoToDevice';
 
 const MODULE = 'watermarkPhoto';
 
@@ -39,6 +40,18 @@ function toRawJpeg(canvas: HTMLCanvasElement, fallback: string): string {
   return canvas.toDataURL('image/jpeg', 0.85).split(',')[1] ?? fallback;
 }
 
+/**
+ * Encode a canvas as a JPEG Blob for durable (IndexedDB) storage. Falls back
+ * to decoding `fallbackBase64` when `toBlob` hands back null (encoder failure
+ * / unsupported type) — a failed Blob encode must never throw and block a
+ * technician mid-install.
+ */
+function canvasToJpegBlob(canvas: HTMLCanvasElement, fallbackBase64: string): Promise<Blob> {
+  return new Promise((resolve) => {
+    canvas.toBlob((b) => resolve(b ?? base64ToBlob(fallbackBase64)), 'image/jpeg', 0.85);
+  });
+}
+
 export interface CapturePhotos {
   /**
    * Downscaled JPEG (raw base64) with NO watermark — for VLM grading, so the
@@ -50,6 +63,12 @@ export interface CapturePhotos {
    * — the copy that is stored, uploaded and escalated.
    */
   watermarked: string;
+  /**
+   * The same watermarked JPEG as a native Blob, encoded from the canvas AFTER
+   * the banner is drawn — for durable offline storage (IndexedDB structured
+   * clone handles Blobs natively, −33% vs base64 at rest).
+   */
+  watermarkedBlob: Blob;
 }
 
 /**
@@ -74,7 +93,7 @@ export async function prepareCapturePhotos(
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return { clean: rawBase64, watermarked: rawBase64 };
+    if (!ctx) return { clean: rawBase64, watermarked: rawBase64, watermarkedBlob: base64ToBlob(rawBase64) };
 
     // Downscale once; capture the clean copy BEFORE the banner is drawn.
     ctx.drawImage(img, 0, 0, width, height);
@@ -99,10 +118,11 @@ export async function prepareCapturePhotos(
     );
 
     const watermarked = toRawJpeg(canvas, rawBase64);
-    return { clean, watermarked };
+    const watermarkedBlob = await canvasToJpegBlob(canvas, watermarked);
+    return { clean, watermarked, watermarkedBlob };
   } catch (err) {
     log.warn('Watermark/downscale failed — using original photo', { err: String(err) }, MODULE);
-    return { clean: rawBase64, watermarked: rawBase64 };
+    return { clean: rawBase64, watermarked: rawBase64, watermarkedBlob: base64ToBlob(rawBase64) };
   }
 }
 

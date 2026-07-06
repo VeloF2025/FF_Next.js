@@ -1,4 +1,4 @@
-export { OfflineQueueStore } from './store';
+export { OfflineQueueStore, estimateStorage, STORAGE_SAFETY_FRACTION } from './store';
 export { flushQueue, defaultClassify, MAX_ATTEMPTS_BEFORE_DRAIN } from './flush';
 export { useOfflineQueue } from './useOfflineQueue';
 export type { UseOfflineQueueResult } from './useOfflineQueue';

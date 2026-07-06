@@ -1,5 +1,7 @@
-/** Read a File as raw base64 (strips the data:...;base64, prefix). */
-export function readFileAsBase64(file: File): Promise<string> {
+/** Read a File/Blob as raw base64 (strips the data:...;base64, prefix). Takes
+ *  a `Blob` (File extends Blob) so it also serves as the Blob-at-rest →
+ *  base64-on-the-wire conversion for durable IndexedDB-stored photos. */
+export function readFileAsBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -8,6 +10,6 @@ export function readFileAsBase64(file: File): Promise<string> {
       resolve(base64);
     };
     reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 }
