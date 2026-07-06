@@ -6,6 +6,7 @@ import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import { sendWhatsAppGroup } from '@/modules/notifications/services/whatsappDelivery';
 import { log } from '@/lib/logger';
 import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
+import { scoreAppealNow } from '@/modules/sitecam/services/appealsVlmRunner';
 
 const MODULE = 'sitecam-appeal';
 const APPEAL_GROUP_JID = process.env.SITECAM_APPEAL_GROUP_JID ?? '';
@@ -88,6 +89,12 @@ async function handler(
       log.warn('Appeal WA send failed (non-fatal)', { appealId, err: String(err) }, MODULE);
     });
   }
+
+  // Fast path: kick off VLM scoring immediately so the appeal is checked (and, if
+  // auto-decide is on, decided) in seconds instead of waiting up to a full cron
+  // cycle. Fire-and-forget — best-effort, never blocks or fails the submit; the
+  // batch cron is the safety net if this doesn't land.
+  void scoreAppealNow(appealId);
 
   log.info('Appeal submitted', { appealId, drNumber, stepNumber }, MODULE);
   return apiResponse.success(res, { appealId });

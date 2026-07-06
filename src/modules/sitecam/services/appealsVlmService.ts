@@ -54,6 +54,14 @@ export interface AppealEvaluation {
   serialRead?: string | null; // serial mode only
   model: string;
   skipReason: AppealSkipReason | null;
+  /**
+   * Photo mode only: how many gallery reference examples (approved + rejected)
+   * were cross-referenced against the appealed photo before this recommendation.
+   * `undefined` for serial mode (barcode/OCR, no gallery). Auto-decide requires
+   * this to be > 0 for a photo appeal — a photo is never auto-decided without
+   * having been judged against the step's curated gallery.
+   */
+  galleryExamplesUsed?: number;
 }
 
 export interface AppealInput {
@@ -157,6 +165,8 @@ async function evaluatePhotoAppeal(input: AppealInput): Promise<AppealEvaluation
   // Rank gallery examples by visual similarity to the appealed photo, then give
   // the judged photo the larger budget (small edge-case features must survive).
   const gallery = await loadGalleryExamples(input.stepNumber, toGalleryJobType(input.jobType), input.photoBase64);
+  const galleryExamplesUsed =
+    (gallery?.positiveBase64.length ?? 0) + (gallery?.negativeBase64.length ?? 0);
   const optimized = await optimizeForVlm(input.photoBase64, {
     maxWidth: VLM_MAX_IMAGE_WIDTH,
     maxHeight: VLM_MAX_IMAGE_HEIGHT,
@@ -180,6 +190,7 @@ async function evaluatePhotoAppeal(input: AppealInput): Promise<AppealEvaluation
     serialRead: null,
     model: MODEL_TAG,
     skipReason: null,
+    galleryExamplesUsed,
   };
 }
 

@@ -71,7 +71,9 @@ export function SiteCamFailedQueue() {
             type="button"
             onClick={() => setFilter(f)}
             className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${
-              filter === f ? 'bg-sky-100 text-sky-700' : 'bg-neutral-100 text-neutral-500 hover:text-neutral-700'
+              filter === f
+                ? 'bg-[var(--ff-primary)] text-white'
+                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]'
             }`}
           >
             {f}
@@ -83,17 +85,17 @@ export function SiteCamFailedQueue() {
 
       {loading && (
         <div className="flex justify-center py-10">
-          <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--ff-text-tertiary)]" />
         </div>
       )}
 
       {!loading && items.length === 0 && (
-        <p className="py-10 text-center text-sm text-neutral-400">No {filter} failed submissions</p>
+        <p className="py-10 text-center text-sm text-[var(--ff-text-tertiary)]">No {filter} failed submissions</p>
       )}
 
       <div className="space-y-2">
         {items.map((e) => (
-          <div key={e.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+          <div key={e.id} className="rounded-xl border border-[var(--ff-border-light)] bg-[var(--ff-bg-card)] shadow-sm">
             <div className="flex w-full items-center justify-between px-4 py-3">
               <div>
                 <button
@@ -104,16 +106,16 @@ export function SiteCamFailedQueue() {
                     if (next !== expanded) setNote('');
                     setExpanded(next);
                   }}
-                  className="font-medium text-sky-700 underline-offset-2 hover:underline"
+                  className="font-medium text-[var(--ff-primary)] underline-offset-2 hover:underline"
                 >
                   {e.site_id}
                 </button>
-                <span className="mx-2 text-neutral-400">·</span>
-                <span className="text-sm text-neutral-600">
+                <span className="mx-2 text-[var(--ff-text-tertiary)]">·</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">
                   Step {e.step_number}: {STEP_LABELS[e.step_number] ?? ''}
                 </span>
-                <span className="mx-2 text-neutral-400">·</span>
-                <span className="text-xs text-neutral-500">{e.tech_name ?? 'Unknown'}</span>
+                <span className="mx-2 text-[var(--ff-text-tertiary)]">·</span>
+                <span className="text-xs text-[var(--ff-text-tertiary)]">{e.tech_name ?? 'Unknown'}</span>
               </div>
               <span className={`text-xs font-medium capitalize ${
                 e.status === 'pending' ? 'text-amber-600'

@@ -44,9 +44,9 @@ export function SiteCamFailedCard({
   onResolve,
 }: SiteCamFailedCardProps) {
   return (
-    <div className="border-t border-neutral-100 px-4 py-4 space-y-4">
+    <div className="border-t border-[var(--ff-border-light)] px-4 py-4 space-y-4">
       {e.fail_reasons.length > 0 && (
-        <p className="text-sm text-neutral-700">{e.fail_reasons.join('; ')}</p>
+        <p className="text-sm text-[var(--ff-text-primary)]">{e.fail_reasons.join('; ')}</p>
       )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {e.attempt_photos.map((p) => (
@@ -54,9 +54,9 @@ export function SiteCamFailedCard({
             <img
               src={p.url}
               alt={`Attempt ${p.attempt}`}
-              className="h-40 w-full rounded-lg object-contain border border-neutral-200 bg-neutral-50"
+              className="h-40 w-full rounded-lg object-contain border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]"
             />
-            <figcaption className="text-xs text-neutral-500">
+            <figcaption className="text-xs text-[var(--ff-text-tertiary)]">
               Attempt {p.attempt}: {p.reasons.join(', ')}
             </figcaption>
           </figure>
@@ -70,7 +70,7 @@ export function SiteCamFailedCard({
             onChange={(ev) => onNoteChange(ev.target.value)}
             placeholder="Note (required if rejecting)…"
             rows={2}
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:border-sky-400"
+            className="w-full rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-3 py-2 text-sm text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:border-[var(--ff-primary)]"
           />
           <div className="flex gap-3">
             <button
@@ -92,7 +92,7 @@ export function SiteCamFailedCard({
           </div>
         </div>
       ) : (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-[var(--ff-text-tertiary)]">
           {e.status === 'approved' ? 'Approved' : 'Rejected'} by {e.resolved_by_name ?? 'unknown'}
           {e.resolution_note ? ` — ${e.resolution_note}` : ''}
         </p>
