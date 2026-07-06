@@ -42,9 +42,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Zone → PON scope filters, applied identically to both row sources below.
     // zone_no and pon_no are columns on both pole_qa_photos and poles.
     if (zone_no && typeof zone_no === 'string') {
-      const zoneNum = parseInt(zone_no, 10);
-      if (isNaN(zoneNum)) return apiResponse.badRequest(res, 'zone_no must be a number');
-      params.push(zoneNum);
+      if (!/^\d+$/.test(zone_no)) return apiResponse.badRequest(res, 'zone_no must be a number');
+      params.push(parseInt(zone_no, 10));
       filters.push(`zone_no = $${params.length}`);
     }
     if (pon_no && typeof pon_no === 'string') {

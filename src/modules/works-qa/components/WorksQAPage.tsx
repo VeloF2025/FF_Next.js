@@ -18,8 +18,11 @@ export function WorksQAPage() {
   const router = useRouter();
   const { project_id, zone_no, pon_no } = router.query;
   const projectId = typeof project_id === 'string' ? project_id : null;
-  const zoneNo = typeof zone_no === 'string' ? Number(zone_no) : null;
-  const ponNo = typeof pon_no === 'string' ? Number(pon_no) : null;
+  // Guard the empty-string case: Number('') is 0, which would wrongly filter to
+  // zone/PON 0 instead of clearing. (pushQuery deletes cleared keys, so this only
+  // bites a hand-crafted `?zone_no=` URL — but keep the parse total.)
+  const zoneNo = typeof zone_no === 'string' && zone_no !== '' ? Number(zone_no) : null;
+  const ponNo = typeof pon_no === 'string' && pon_no !== '' ? Number(pon_no) : null;
 
   // Always fetch dashboard — Level 2 uses it to resolve project_name.
   const { data: dashboard, isLoading: dashboardLoading } = useSWR<WorksQADashboardResponse>('/api/works-qa/project-dashboard', fetcher);
