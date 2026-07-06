@@ -117,10 +117,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       RETURNING id, ticket_id, filename, file_url, is_evidence, uploaded_at
     `)[0];
 
-    // Update attachments_count on ticket
+    // Touch the ticket so it surfaces the upload activity. attachments_count is
+    // maintained by the AFTER INSERT/DELETE trigger `increment_attachments_count`
+    // (migration 233), so we must NOT bump it here — the previous explicit
+    // `attachments_count + 1` double-counted on top of the trigger (+2 per
+    // upload). Mirrors the same fix applied to pages/api/snags/shared/[token].ts.
     await sql`
       UPDATE maintenance_tickets
-      SET attachments_count = attachments_count + 1, updated_at = NOW()
+      SET updated_at = NOW()
       WHERE id = ${ticketId}
     `;
 
