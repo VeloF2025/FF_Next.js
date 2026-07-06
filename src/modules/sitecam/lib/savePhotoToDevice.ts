@@ -11,7 +11,10 @@ export function stepPhotoFilename(siteId: string, stepNumber: number, when: Date
   return `${safeSite}_step${stepNumber}_${date}.jpg`;
 }
 
-function base64ToBlob(base64: string): Blob {
+/** Decode raw base64 (no `data:` prefix) into a JPEG Blob. Exported so other
+ *  sitecam lib modules (e.g. the watermark pipeline's Blob fallback) can reuse
+ *  the decode instead of duplicating it. */
+export function base64ToBlob(base64: string): Blob {
   const bytes = atob(base64);
   const arr = new Uint8Array(bytes.length);
   for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
