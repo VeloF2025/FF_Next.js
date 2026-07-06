@@ -19,6 +19,11 @@ export function snagPhotoQueueName(token: string): string {
   return `SnagPhotoDB:${token}`;
 }
 
+/** Byte-size accessor for the queue's `sizeOf`. Module-scoped so its identity is
+ *  stable across renders (an inline closure would churn the hook's enqueue/
+ *  handler identities — mirrors the offline-queue lib's own `defaultClassifyFn`). */
+export const sizeOfSnagPhoto = (p: PendingSnagPhoto): number => p.byteSize;
+
 /** One queued snag photo awaiting upload. `photoBlob` is stored natively. */
 export interface PendingSnagPhoto {
   token: string;

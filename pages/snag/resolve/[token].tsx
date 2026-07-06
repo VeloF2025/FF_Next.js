@@ -11,13 +11,14 @@
 
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { AlertTriangle, CheckCircle, ArrowRight, Lock, Upload, User } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ArrowRight, Lock, Upload } from 'lucide-react';
 import { TicketStatus } from '@/modules/noc/types/ticket';
 import { PageShell, DescriptionWithGPS } from '@/modules/noc/snag-resolve/PageShell';
 import { IdentityModal } from '@/modules/noc/snag-resolve/IdentityModal';
 import { VerificationStepList } from '@/modules/noc/snag-resolve/VerificationStepList';
 import { PendingSyncIndicator } from '@/modules/noc/snag-resolve/PendingSyncIndicator';
-import { STATUS_LABELS, STATUS_COLORS, STATUS_COLOR_FALLBACK } from '@/modules/noc/snag-resolve/session';
+import { PhotoFailureBanners } from '@/modules/noc/snag-resolve/PhotoFailureBanners';
+import { ResolveTicketHeader } from '@/modules/noc/snag-resolve/ResolveTicketHeader';
 import { useSnagResolve } from '@/modules/noc/snag-resolve/useSnagResolve';
 
 export default function SnagResolvePage() {
@@ -28,7 +29,7 @@ export default function SnagResolvePage() {
   const {
     data, loading, error, actor, showIdentityModal, identityForm,
     actionLoading, uploadingStep, pendingCompleteCount, pendingPhotoCount,
-    photoNotSaved, clearPhotoNotSaved,
+    photoNotSaved, clearPhotoNotSaved, droppedPhotos, acknowledgeDroppedPhoto,
     setShowIdentityModal, setIdentityForm,
     performAction, handlePhotoUpload, handleStartWork, handleIdentitySubmit, handleMarkComplete,
   } = useSnagResolve(tokenStr);
@@ -65,24 +66,7 @@ export default function SnagResolvePage() {
         <title>{ticket.ticket_uid} — Ticket Resolution | FibreFlow</title>
       </Head>
 
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold text-zinc-100">{ticket.ticket_uid}</h1>
-          <span className={`text-xs px-2 py-1 rounded border font-medium ${STATUS_COLORS[ticket.status] ?? STATUS_COLOR_FALLBACK}`}>
-            {STATUS_LABELS[ticket.status] ?? ticket.status}
-          </span>
-        </div>
-        <h2 className="text-sm text-zinc-300 mb-1">{ticket.title}</h2>
-        {ticket.project_name && (
-          <p className="text-xs text-zinc-500">Project: {ticket.project_name}</p>
-        )}
-        {actor && (
-          <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-zinc-400 bg-zinc-800/60 border border-zinc-700 rounded px-2 py-1">
-            <User className="w-3 h-3" />
-            <span>Logged in as <span className="text-zinc-200">{actor.name}</span>{actor.company ? ` · ${actor.company}` : ''}</span>
-          </div>
-        )}
-      </div>
+      <ResolveTicketHeader ticket={ticket} actor={actor} />
 
       {error && (
         <div className="mb-4 rounded-md bg-red-900/20 border border-red-700/40 px-4 py-3 text-xs text-red-300">
@@ -90,28 +74,12 @@ export default function SnagResolvePage() {
         </div>
       )}
 
-      {photoNotSaved && (
-        <div
-          role="alert"
-          className="mb-4 rounded-md bg-red-950/60 border-2 border-red-600 px-4 py-3 text-xs text-red-200"
-        >
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-400" aria-hidden="true" />
-            <div className="flex-1">
-              <p className="font-semibold text-red-100">Photo NOT saved</p>
-              <p className="mt-0.5">{photoNotSaved}</p>
-            </div>
-            <button
-              type="button"
-              onClick={clearPhotoNotSaved}
-              className="text-red-400 hover:text-red-200 font-medium"
-              aria-label="Dismiss"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
+      <PhotoFailureBanners
+        notSaved={photoNotSaved}
+        onClearNotSaved={clearPhotoNotSaved}
+        dropped={droppedPhotos}
+        onAcknowledgeDropped={(id) => { void acknowledgeDroppedPhoto(id); }}
+      />
 
       <PendingSyncIndicator count={pendingCompleteCount} photoCount={pendingPhotoCount} />
 

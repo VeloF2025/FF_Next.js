@@ -19,6 +19,7 @@
 
 import { QuotaExceededError, QueueFullError } from '@/lib/offline-queue';
 import { downscaleImage } from '@/lib/images/downscaleImage';
+import { log } from '@/lib/logger';
 import { submitSnagPhoto } from './submitSnagPhoto';
 import type { PendingSnagPhoto } from './photoQueue';
 
@@ -83,9 +84,10 @@ async function downscaleAndEnqueue(
   let blob: Blob;
   try {
     blob = await downscale(capture.file);
-  } catch {
+  } catch (err) {
     // The image couldn't be decoded/processed on this device — not a queue
     // problem. Tell the tech to retake rather than silently dropping it.
+    log.error('[snag-resolve] photo downscale failed', { err, stepId: capture.stepId, slotKey: capture.slotKey });
     return {
       kind: 'not_saved',
       message: 'This photo could not be processed on your device — please retake it.',
@@ -95,6 +97,7 @@ async function downscaleAndEnqueue(
     await enqueue(buildPayload(capture, blob, clientUploadId));
     return { kind: 'queued' };
   } catch (err) {
+    log.error('[snag-resolve] photo enqueue failed', { err, stepId: capture.stepId, slotKey: capture.slotKey });
     if (err instanceof QuotaExceededError || err instanceof QueueFullError) {
       return {
         kind: 'not_saved',

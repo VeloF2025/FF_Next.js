@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { useOfflineQueue, QueueFullError } from '@/lib/offline-queue';
+import { useOfflineQueue, QueueFullError, type DroppedItem } from '@/lib/offline-queue';
 import type { IdentityFormState, QueuedCompleteStep, ResolveAction, SessionActor, SharedData } from './types';
 import { getOrCreateFingerprint, loadStoredActor, persistActor } from './session';
 import { submitCompleteStep } from './offlineComplete';
@@ -15,6 +15,7 @@ import {
   SNAG_PHOTO_MAX_QUEUE_BYTES,
   SNAG_PHOTO_MAX_QUEUE_SIZE,
   snagPhotoQueueName,
+  sizeOfSnagPhoto,
   type PendingSnagPhoto,
 } from './offline/photoQueue';
 import { submitSnagPhoto } from './offline/submitSnagPhoto';
@@ -35,6 +36,11 @@ export interface UseSnagResolveResult {
    *  Non-null ⇒ the UI must render a hard failure, never a queued/green state. */
   photoNotSaved: string | null;
   clearPhotoNotSaved: () => void;
+  /** Photos the server permanently rejected on flush (e.g. step already
+   *  complete). Retained on-device + surfaced so the tech knows they weren't
+   *  stored — never a silent drop (spec R5). */
+  droppedPhotos: DroppedItem<PendingSnagPhoto>[];
+  acknowledgeDroppedPhoto: (id: string) => Promise<void>;
   setShowIdentityModal: (show: boolean) => void;
   setIdentityForm: (form: IdentityFormState) => void;
   performAction: (action: ResolveAction, extra?: Record<string, string>) => Promise<void>;
@@ -71,9 +77,9 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     submit: submitSnagPhoto,
     maxQueueBytes: SNAG_PHOTO_MAX_QUEUE_BYTES,
     maxQueueSize: SNAG_PHOTO_MAX_QUEUE_SIZE,
-    sizeOf: (p) => p.byteSize,
+    sizeOf: sizeOfSnagPhoto,
   });
-  const { online: photoOnline, enqueue: enqueuePhoto } = photoQueue;
+  const { online: photoOnline, enqueue: enqueuePhoto, lastReport: photoLastReport } = photoQueue;
   const clearPhotoNotSaved = useCallback(() => setPhotoNotSaved(null), []);
 
   useEffect(() => {
@@ -101,6 +107,16 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
   }, [tokenStr]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
+
+  // When a background photo flush actually uploads (succeeded) or permanently
+  // drops (drained) an item, refresh the tiles so a synced photo turns green and
+  // a rejected one is reflected. Empty/no-op flushes (succeeded=drained=0) don't
+  // refetch. fetchData is stable per token, so this can't loop.
+  useEffect(() => {
+    if (photoLastReport && (photoLastReport.succeeded > 0 || photoLastReport.drained > 0)) {
+      void fetchData();
+    }
+  }, [photoLastReport, fetchData]);
 
   const performAction = useCallback(async (action: ResolveAction, extra?: Record<string, string>) => {
     if (!tokenStr) return;
@@ -243,6 +259,8 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     pendingPhotoCount: photoQueue.pendingCount,
     photoNotSaved,
     clearPhotoNotSaved,
+    droppedPhotos: photoQueue.dropped,
+    acknowledgeDroppedPhoto: photoQueue.acknowledgeDropped,
     setShowIdentityModal,
     setIdentityForm,
     performAction,

@@ -212,4 +212,32 @@ describe('useSnagResolve — photo upload branch', () => {
     expect(result.current.showIdentityModal).toBe(true);
     expect(multipartPosted(fetchMock)).toBe(false);
   });
+
+  it('online HTTP error: surfaces error, does not queue', async () => {
+    const token = `tok-photo-err-${(globalThis as { __t?: number }).__t}`;
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.body instanceof FormData
+        ? ({ ok: false, status: 400 } as Response)
+        : jsonResponse({ data: mockSharedData })
+    );
+    const { result } = seedActorAndRender(token);
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.actor).not.toBeNull();
+    });
+
+    await act(async () => { await result.current.handlePhotoUpload('step-1', photoFile(), 'front'); });
+
+    await waitFor(() => expect(result.current.error).toBeTruthy());
+    expect(result.current.pendingPhotoCount).toBe(0);
+    expect(result.current.photoNotSaved).toBeNull();
+  });
+
+  // NOTE: the background-flush → refetch integration (a queued photo turning
+  // green after reconnect) is driven by useOfflineQueue's online-edge/poll flush,
+  // whose timing is not deterministic under testing-library + fake-indexeddb (the
+  // lib suite likewise triggers syncNow directly). The hook effect that wires it
+  // (`fetchData` when `photoLastReport.succeeded > 0`) is trivial and the flush
+  // mechanics are lib-tested; the full offline→reconnect→green-tile flow is
+  // browser-verified in Task 11 (playwriter, dispatched offline/online events).
 });
