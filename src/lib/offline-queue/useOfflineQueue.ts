@@ -62,14 +62,19 @@ export function useOfflineQueue<TPayload>(
   const pendingReflush = useRef(false);
 
   const store = useMemo(
-    () => new OfflineQueueStore<TPayload>(config.queueName, config.maxQueueSize ?? 50),
-    [config.queueName, config.maxQueueSize]
+    () =>
+      new OfflineQueueStore<TPayload>(
+        config.queueName,
+        config.maxQueueSize ?? 50,
+        config.maxQueueBytes
+      ),
+    [config.queueName, config.maxQueueSize, config.maxQueueBytes]
   );
   // Read the primitives syncNow depends on as plain identifiers so its
   // useCallback deps are stable-by-value — depending on the whole `config`
   // object (a fresh literal each render for inline callers) would churn
   // syncNow's identity and re-fire the online/poll effects every render.
-  const { submit, queueName } = config;
+  const { submit, queueName, sizeOf } = config;
   const classify = config.classify ?? defaultClassifyFn;
   const maxAttempts = config.maxAttemptsBeforeDrain;
 
@@ -95,11 +100,15 @@ export function useOfflineQueue<TPayload>(
         payload,
         queuedAt: new Date().toISOString(),
         attempts: 0,
+        byteSize: sizeOf ? sizeOf(payload) : 0,
       };
+      // If the store rejects (count OR byte budget), the throw propagates to the
+      // caller and refresh() is skipped — nothing was written, so pendingCount
+      // must not move. The consumer's fallback maps this to `not_saved`.
       await store.enqueue(item);
       await refresh();
     },
-    [store, refresh]
+    [store, refresh, sizeOf]
   );
 
   const syncNow = useCallback(async () => {

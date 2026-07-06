@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOfflineQueue } from '../useOfflineQueue';
 import { OfflineQueueStore } from '../store';
+import { QuotaExceededError } from '../types';
 
 // Mutable flag so individual tests can flip online/offline deterministically.
 let mockOnline = true;
@@ -84,6 +85,51 @@ describe('useOfflineQueue', () => {
     await waitFor(() => expect(result.current.pendingCount).toBe(0));
     expect(result.current.dropped).toHaveLength(1);
     expect(result.current.dropped[0].payload).toEqual({ note: 'c' });
+  });
+
+  it('threads sizeOf → stores byteSize and allows an under-budget enqueue', async () => {
+    const submit = vi.fn(async (_p: P) => {});
+    const { result } = renderHook(() =>
+      useOfflineQueue<P>({
+        queueName: `Q${(globalThis as { __q?: number }).__q}under`,
+        submit,
+        maxQueueBytes: 10_000,
+        sizeOf: () => 500,
+      })
+    );
+    await act(async () => { await result.current.enqueue({ note: 'ok' }); });
+    await waitFor(() => expect(result.current.pendingCount).toBe(1));
+  });
+
+  it('rejects an enqueue over the byte budget and leaves pendingCount at 0', async () => {
+    const submit = vi.fn(async (_p: P) => {});
+    const { result } = renderHook(() =>
+      useOfflineQueue<P>({
+        queueName: `Q${(globalThis as { __q?: number }).__q}over`,
+        submit,
+        maxQueueBytes: 1000,
+        sizeOf: () => 1500, // a single item already exceeds the budget
+      })
+    );
+    let caught: unknown;
+    await act(async () => {
+      try { await result.current.enqueue({ note: 'big' }); }
+      catch (e) { caught = e; }
+    });
+    expect(caught).toBeInstanceOf(QuotaExceededError);
+    expect(result.current.pendingCount).toBe(0);
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('keeps syncNow stable across renders when a byte budget is configured', () => {
+    const submit = vi.fn(async (_p: P) => {});
+    const qn = `Q${(globalThis as { __q?: number }).__q}bytestable`;
+    const { result, rerender } = renderHook(() =>
+      useOfflineQueue<P>({ queueName: qn, submit, maxQueueBytes: 40_000_000, sizeOf: () => 1 })
+    );
+    const first = result.current.syncNow;
+    rerender();
+    expect(result.current.syncNow).toBe(first);
   });
 
   it('flips queueUnavailable to true when the store is unreachable', async () => {

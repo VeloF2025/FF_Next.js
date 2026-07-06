@@ -100,6 +100,10 @@ export default defineConfig({
       // allowlist, used by photoFetchService for civil gallery photos) — explicit
       // src-first override before the @/lib → ./lib fallback.
       { find: /^@\/lib\/graph/, replacement: path.resolve(__dirname, './src/lib/graph') },
+      // @/lib/images/* lives at src/lib/images/ (shared browser image-downscale
+      // util for the offline-photo PWA queue) — explicit src-first override
+      // before the generic @/lib → ./lib fallback.
+      { find: /^@\/lib\/images/, replacement: path.resolve(__dirname, './src/lib/images') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },

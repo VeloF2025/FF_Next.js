@@ -6,18 +6,41 @@
  * same safety caps, made generic over the payload type.
  */
 
-import { QueueFullError, type DroppedItem, type QueuedItem } from './types';
+import { QueueFullError, QuotaExceededError, type DroppedItem, type QueuedItem } from './types';
 
 const PENDING = 'pending';
 const DROPPED = 'dropped';
 const DB_VERSION = 1;
+
+/** Reject an enqueue once the browser's projected storage usage would cross
+ *  this fraction of its quota — a soft guard *before* IndexedDB throws its own
+ *  QuotaExceededError under real pressure. */
+const STORAGE_SAFETY_FRACTION = 0.8;
+
+/** Best-effort read of the browser's storage estimate. Returns null when the
+ *  API is absent or throws — the caller treats that as "pass the byte-budget
+ *  check only", never as a hard block that would strand a legitimate item. */
+async function estimateStorage(): Promise<{ usage: number; quota: number } | null> {
+  try {
+    const storage = typeof navigator !== 'undefined' ? navigator.storage : undefined;
+    if (!storage?.estimate) return null;
+    const { usage, quota } = await storage.estimate();
+    if (typeof usage === 'number' && typeof quota === 'number') return { usage, quota };
+  } catch {
+    // API unavailable / rejected — fall through to "unavailable".
+  }
+  return null;
+}
 
 export class OfflineQueueStore<TPayload> {
   private dbPromise: Promise<IDBDatabase> | null = null;
 
   constructor(
     private readonly dbName: string,
-    private readonly maxQueueSize = 50
+    private readonly maxQueueSize = 50,
+    /** When set, total pending `byteSize` may not exceed this. Undefined = no
+     *  byte cap (count cap only). */
+    private readonly maxQueueBytes?: number
   ) {}
 
   private openDb(): Promise<IDBDatabase> {
@@ -72,7 +95,48 @@ export class OfflineQueueStore<TPayload> {
   async enqueue(item: QueuedItem<TPayload>): Promise<void> {
     const count = await this.countPending();
     if (count >= this.maxQueueSize) throw new QueueFullError(count);
+    if (this.maxQueueBytes !== undefined) {
+      await this.assertByteBudget(item.byteSize ?? 0);
+    }
     await this.tx(PENDING, 'readwrite', (s) => this.req(s.add(item)));
+  }
+
+  /** Sum `byteSize` across all pending rows via a cursor. Derived accounting —
+   *  never a persisted counter that could drift from the actual rows. */
+  async sumPendingBytes(): Promise<number> {
+    return this.tx(
+      PENDING,
+      'readonly',
+      (s) =>
+        new Promise<number>((resolve, reject) => {
+          let total = 0;
+          const cursorReq = s.openCursor();
+          cursorReq.onsuccess = () => {
+            const cursor = cursorReq.result;
+            if (cursor) {
+              total += (cursor.value as QueuedItem<TPayload>).byteSize ?? 0;
+              cursor.continue();
+            } else {
+              resolve(total);
+            }
+          };
+          cursorReq.onerror = () => reject(cursorReq.error ?? new Error('IDB cursor failed'));
+        })
+    );
+  }
+
+  /** Throw QuotaExceededError if adding `addBytes` would breach the byte budget
+   *  OR push projected browser storage past the safety fraction. */
+  private async assertByteBudget(addBytes: number): Promise<void> {
+    const budget = this.maxQueueBytes as number;
+    const current = await this.sumPendingBytes();
+    if (current + addBytes > budget) {
+      throw new QuotaExceededError(current, addBytes, budget);
+    }
+    const est = await estimateStorage();
+    if (est && est.quota > 0 && (est.usage + addBytes) / est.quota > STORAGE_SAFETY_FRACTION) {
+      throw new QuotaExceededError(est.usage, addBytes, est.quota);
+    }
   }
 
   async listPending(): Promise<QueuedItem<TPayload>[]> {
