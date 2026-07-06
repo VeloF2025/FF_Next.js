@@ -98,6 +98,27 @@ export function WorksQAPageHeader(p: Props) {
             </a>
           </>
         )}
+        {p.zoneNo !== null && p.ponNo === null && (
+          <>
+            <a
+              href={`/api/works-qa/zone-zip?project_id=${encodeURIComponent(p.projectId)}&zone_no=${p.zoneNo}`}
+              className="inline-flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs px-3 py-2 rounded-md font-medium transition-colors"
+              title="Download all approved poles in this zone as one ZIP (Zone → PON → Pole). Large zones can be several GB — keep this tab open until it finishes."
+              aria-label={`Download ZIP of approved poles in zone ${p.zoneNo}`}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Zone ZIP
+            </a>
+            <a
+              href={`/api/works-qa/zone-zip?project_id=${encodeURIComponent(p.projectId)}&zone_no=${p.zoneNo}&include_unapproved=true`}
+              className="text-xs text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
+              title="Download every pole in this zone (including in-progress) plus unassigned photos"
+              aria-label={`Download ZIP of all poles in zone ${p.zoneNo} including in-progress`}
+            >
+              + in-progress
+            </a>
+          </>
+        )}
         {p.rightExtra}
       </div>
     </div>
