@@ -158,4 +158,21 @@ describe('SiteCamPhotoStore — clear', () => {
     expect(await store.listStepPhotos()).toHaveLength(0);
     expect(await store.getMeta()).toBeNull();
   });
+
+  // clear() runs both object-store clears in a SINGLE IndexedDB transaction
+  // (not two sequential ones) so a crash/tab-close mid-clear can never leave
+  // `photos` emptied with a stale `meta` (e.g. submitState:'queued' surviving
+  // with no photos behind it, which restore-on-mount would misread).
+  it('clear empties multiple step photos and meta together (single-transaction discipline)', async () => {
+    const store = freshStore();
+    await store.putStepPhoto(photo(1, 100));
+    await store.putStepPhoto(photo(2, 100));
+    await store.putStepPhoto(photo(3, 100));
+    await store.putMeta(meta({ submitState: 'queued', queuedAt: '2026-07-06T10:05:00.000Z' }));
+
+    await store.clear();
+
+    expect(await store.listStepPhotos()).toEqual([]);
+    expect(await store.getMeta()).toBeNull();
+  });
 });

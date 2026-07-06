@@ -192,9 +192,23 @@ export class SiteCamPhotoStore {
     });
   }
 
-  /** Empties both object stores — called once a submission has flushed. */
+  /**
+   * Empties both object stores in ONE transaction — called once a submission
+   * has flushed. Single-transaction so an interruption (tab close/crash)
+   * between the two clears can't leave `photos` emptied but `meta` stale
+   * (e.g. a `submitState:'queued'` record surviving even though the photos
+   * it referenced are already gone, which the restore-on-mount logic would
+   * then misread as a queued job with no photos).
+   */
   async clear(): Promise<void> {
-    await this.tx(PHOTOS, 'readwrite', (store) => this.req(store.clear()));
-    await this.tx(META, 'readwrite', (store) => this.req(store.clear()));
+    const db = await this.openDb();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction([PHOTOS, META], 'readwrite');
+      transaction.objectStore(PHOTOS).clear();
+      transaction.objectStore(META).clear();
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error('IDB tx failed'));
+      transaction.onabort = () => reject(transaction.error ?? new Error('IDB tx aborted'));
+    });
   }
 }
