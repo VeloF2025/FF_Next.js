@@ -129,7 +129,16 @@ export function SiteCamAppealsQueue() {
                 <button
                   type="button"
                   className="flex w-full items-center justify-between px-4 py-3 text-left"
-                  onClick={() => setExpanded(expanded === a.id ? null : a.id)}
+                  onClick={() => {
+                    const next = expanded === a.id ? null : a.id;
+                    setExpanded(next);
+                    setError(null);
+                    // Pre-fill the denial box with the VLM's reasoning so the
+                    // technician always gets the "why it fails" explanation. The
+                    // reviewer can edit/append before denying; whatever is in the
+                    // box is what gets sent.
+                    if (next && a.status === 'pending') setDenialText(a.vlm_reasoning ?? '');
+                  }}
                 >
                   <div>
                     <span className="font-medium text-[var(--ff-primary)] underline-offset-2 hover:underline">{a.dr_number}</span>
@@ -171,7 +180,7 @@ export function SiteCamAppealsQueue() {
                         <textarea
                           value={denialText}
                           onChange={(e) => { setDenialText(e.target.value); if (error) setError(null); }}
-                          placeholder="Denial reason (required if denying)…"
+                          placeholder="Reason sent to the technician (pre-filled from the VLM — edit as needed)…"
                           rows={2}
                           className="w-full rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-3 py-2 text-sm text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:border-[var(--ff-primary)]"
                         />
