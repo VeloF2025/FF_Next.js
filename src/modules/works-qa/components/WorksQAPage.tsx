@@ -30,7 +30,7 @@ export function WorksQAPage() {
     projectId ? `/api/works-qa/zones?project_id=${encodeURIComponent(projectId)}` : null, fetcher,
   );
 
-  const { poles, isLoading: polesLoading, mutate: mutatePoles } = usePoleList(projectId, ponNo);
+  const { poles, isLoading: polesLoading, mutate: mutatePoles } = usePoleList(projectId, zoneNo, ponNo);
   const [selectedPoleId, setSelectedPoleId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [snagPole, setSnagPole] = useState<{ id: string; pole_label: string } | null>(null);

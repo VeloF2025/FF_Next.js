@@ -32,18 +32,28 @@ const PRESENT_SLOTS_EXPR = `ARRAY_REMOVE(ARRAY[
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
-  const { project_id, pon_no } = req.query;
+  const { project_id, zone_no, pon_no } = req.query;
   if (!project_id || typeof project_id !== 'string') return apiResponse.badRequest(res, 'project_id required');
 
   try {
     const params: (string | number)[] = [project_id];
-    let ponFilter = '';
+    const filters: string[] = [];
+
+    // Zone → PON scope filters, applied identically to both row sources below.
+    // zone_no and pon_no are columns on both pole_qa_photos and poles.
+    if (zone_no && typeof zone_no === 'string') {
+      const zoneNum = parseInt(zone_no, 10);
+      if (isNaN(zoneNum)) return apiResponse.badRequest(res, 'zone_no must be a number');
+      params.push(zoneNum);
+      filters.push(`zone_no = $${params.length}`);
+    }
     if (pon_no && typeof pon_no === 'string') {
       const ponNum = parseInt(pon_no, 10);
       if (isNaN(ponNum)) return apiResponse.badRequest(res, 'pon_no must be a number');
       params.push(ponNum);
-      ponFilter = `AND pon_no = $${params.length}`;
+      filters.push(`pon_no = $${params.length}`);
     }
+    const scopeFilter = filters.map(f => `AND ${f}`).join(' ');
 
     // Two row sources, unioned in JS so the per-slot derivation (computePoleSummary)
     // stays pure and unit-tested:
@@ -83,7 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             AND s.status = 'verified'
         ) AS has_verified_planted
       FROM pole_qa_photos
-      WHERE project_id = $1::uuid ${ponFilter}
+      WHERE project_id = $1::uuid ${scopeFilter}
       ORDER BY pon_no ASC NULLS LAST, pole_label ASC
     `, params);
 
@@ -93,7 +103,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const plantedQuery = pool.query(`
       SELECT pole_number, zone_no, pon_no, field_status
       FROM poles
-      WHERE project_id = $1::uuid ${ponFilter}
+      WHERE project_id = $1::uuid ${scopeFilter}
         AND field_status IS NOT NULL
         AND field_status <> ALL($${plantedParams.length}::text[])
         AND NOT EXISTS (
