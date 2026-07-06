@@ -58,7 +58,12 @@ function blobBytes(blob: Blob): Promise<number[]> {
  * encoded (via `toBlob`) strictly AFTER the banner — i.e. from the SAME
  * canvas, post-banner, while the clean copy stays banner-free.
  */
-function installCanvasStubs(callLog: string[]): void {
+function installCanvasStubs(
+  callLog: string[],
+  /** The Blob `canvas.toBlob` hands back — pass `null` to exercise the
+   *  encoder-failure fallback (`base64ToBlob(watermarked)`). */
+  toBlobResult: Blob | null = new Blob([new Uint8Array([9, 9, 9])], { type: 'image/jpeg' }),
+): void {
   vi.stubGlobal('Image', MockImage as unknown as typeof Image);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     drawImage: vi.fn(),
@@ -77,7 +82,7 @@ function installCanvasStubs(callLog: string[]): void {
   });
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (cb: BlobCallback) {
     callLog.push('toBlob');
-    cb(new Blob([new Uint8Array([9, 9, 9])], { type: 'image/jpeg' }));
+    cb(toBlobResult);
   });
 }
 
@@ -103,6 +108,24 @@ describe('prepareCapturePhotos', () => {
     // The clean copy's toDataURL happens BEFORE the banner (fillRect/fillText)
     // is ever drawn; the Blob is encoded from the canvas strictly AFTER.
     expect(callLog).toEqual(['toDataURL', 'fillRect', 'fillText', 'toDataURL', 'toBlob']);
+  });
+
+  it('falls back to base64ToBlob(watermarked) when canvas.toBlob yields null — never throws', async () => {
+    const callLog: string[] = [];
+    installCanvasStubs(callLog, null);
+
+    const result = await prepareCapturePhotos(fakeFile(), 'DR1866766', new Date(2026, 5, 12));
+
+    // The base64 paths are unaffected — only the Blob encode failed.
+    expect(result.clean).toBe('Q0xFQU4=');
+    expect(result.watermarked).toBe('V0FURVJNQVJLRUQ=');
+    expect(result.watermarkedBlob).toBeInstanceOf(Blob);
+    expect(result.watermarkedBlob.type).toBe('image/jpeg');
+    // Decoded from the fallback base64 ('V0FURVJNQVJLRUQ=') via base64ToBlob,
+    // not the (absent) native toBlob output.
+    expect(await blobBytes(result.watermarkedBlob)).toEqual(
+      Array.from(atob('V0FURVJNQVJLRUQ='), (c) => c.charCodeAt(0)),
+    );
   });
 
   it('falls back to the original photo (base64 + Blob) when canvas 2D context is unavailable — never throws', async () => {

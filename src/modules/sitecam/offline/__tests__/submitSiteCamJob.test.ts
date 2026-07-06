@@ -91,7 +91,7 @@ describe('buildUploadPayload', () => {
 });
 
 describe('classifySubmit', () => {
-  it('offline → queued regardless of error', () => {
+  it('offline with no quota error → queued', () => {
     expect(classifySubmit(false, undefined)).toBe('queued');
     expect(classifySubmit(false, new Error('anything'))).toBe('queued');
   });
@@ -106,6 +106,11 @@ describe('classifySubmit', () => {
 
   it('QueueFullError → not_saved', () => {
     expect(classifySubmit(true, new QueueFullError(50))).toBe('not_saved');
+  });
+
+  it('a hard storage failure wins over connectivity: offline + QuotaExceededError → not_saved, not queued', () => {
+    expect(classifySubmit(false, new QuotaExceededError(100, 50, 100, 'queue'))).toBe('not_saved');
+    expect(classifySubmit(false, new QueueFullError(50))).toBe('not_saved');
   });
 
   it('a definitive 4xx → error', () => {

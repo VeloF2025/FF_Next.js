@@ -14,13 +14,16 @@ const DB_VERSION = 1;
 
 /** Reject an enqueue once the browser's projected storage usage would cross
  *  this fraction of its quota — a soft guard *before* IndexedDB throws its own
- *  QuotaExceededError under real pressure. */
-const STORAGE_SAFETY_FRACTION = 0.8;
+ *  QuotaExceededError under real pressure. Exported so other on-device stores
+ *  (e.g. the SiteCam job store) can apply the same device-pressure guard
+ *  without duplicating the threshold. */
+export const STORAGE_SAFETY_FRACTION = 0.8;
 
 /** Best-effort read of the browser's storage estimate. Returns null when the
  *  API is absent or throws — the caller treats that as "pass the byte-budget
- *  check only", never as a hard block that would strand a legitimate item. */
-async function estimateStorage(): Promise<{ usage: number; quota: number } | null> {
+ *  check only", never as a hard block that would strand a legitimate item.
+ *  Exported for reuse by other on-device stores (see `STORAGE_SAFETY_FRACTION`). */
+export async function estimateStorage(): Promise<{ usage: number; quota: number } | null> {
   try {
     const storage = typeof navigator !== 'undefined' ? navigator.storage : undefined;
     if (!storage?.estimate) return null;

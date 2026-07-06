@@ -8,7 +8,7 @@
  * (derived byte-sum via cursor, never a persisted counter).
  */
 
-import { QuotaExceededError } from '@/lib/offline-queue';
+import { QuotaExceededError, estimateStorage, STORAGE_SAFETY_FRACTION } from '@/lib/offline-queue';
 import type { SiteCamJobType } from '../lib/sitecamSteps';
 import type { SiteInfo } from '../hooks/useSiteCamCapture';
 
@@ -22,11 +22,6 @@ const DB_VERSION = 1;
 /** One job ≈ 3.6–7.5 MB of watermarked JPEG Blobs (8–12 steps); generous
  *  headroom over that before an over-budget capture is refused. Tunable. */
 export const SITECAM_JOB_MAX_BYTES = 20 * 1024 * 1024;
-
-/** Reject a write once the browser's projected storage usage would cross this
- *  fraction of its quota — mirrors `src/lib/offline-queue/store.ts`'s soft
- *  guard, applied here per-write since a job store has no enqueue-time cap. */
-const STORAGE_SAFETY_FRACTION = 0.8;
 
 /** Per-job IndexedDB database name — namespaced by job type + site so
  *  activations vs civils of the same site cannot collide, mirroring the
@@ -55,21 +50,6 @@ export interface SiteCamJobMeta {
   clientSubmissionId: string;
   submitState: 'capturing' | 'queued';
   queuedAt?: string;
-}
-
-/** Best-effort read of the browser's storage estimate. Returns null when the
- *  API is absent or throws — the caller treats that as "byte-budget check
- *  only", never as a hard block that would strand a legitimate photo. */
-async function estimateStorage(): Promise<{ usage: number; quota: number } | null> {
-  try {
-    const storage = typeof navigator !== 'undefined' ? navigator.storage : undefined;
-    if (!storage?.estimate) return null;
-    const { usage, quota } = await storage.estimate();
-    if (typeof usage === 'number' && typeof quota === 'number') return { usage, quota };
-  } catch {
-    // API unavailable / rejected — fall through to "unavailable".
-  }
-  return null;
 }
 
 export class SiteCamPhotoStore {

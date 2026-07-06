@@ -6,6 +6,7 @@
  */
 
 import { QueueFullError, QuotaExceededError } from '@/lib/offline-queue';
+import { readFileAsBase64 } from '../lib/fileToBase64';
 import { getStepsForJobType, type SiteCamJobType } from '../lib/sitecamSteps';
 import type { GeofencePayload } from '../lib/geofence';
 import type { SiteCamJobMeta, StoredStepPhoto } from './photoStore';
@@ -31,19 +32,10 @@ export interface SiteCamUploadPayload {
 
 export type SubmitOutcome = 'submitted' | 'queued' | 'not_saved' | 'error';
 
-/** Read a Blob as raw base64 (no `data:` prefix) — mirrors `readFileAsBase64`,
- *  for the Blob-at-rest → base64-on-the-wire conversion at flush time. */
-export function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(',')[1] ?? result);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
+/** Read a Blob as raw base64 (no `data:` prefix) — the Blob-at-rest →
+ *  base64-on-the-wire conversion at flush time. Delegates to the shared
+ *  `readFileAsBase64` (DRY — same FileReader/data-URL-stripping logic). */
+export const blobToBase64 = readFileAsBase64;
 
 function stepLabelFor(jobType: SiteCamJobType, stepNumber: number): string {
   const step = getStepsForJobType(jobType).find((s) => s.number === stepNumber);
@@ -85,16 +77,18 @@ export async function buildUploadPayload(
  * where the job now stands. The caller handles the 2xx ('submitted') case
  * directly — this only classifies a throw or an offline short-circuit.
  *
- * Precedence: offline → always `queued` (never attempted the network); a
- * byte/count quota error → `not_saved` (capture-time, not a submit retry
- * candidate); a definitive 4xx (`.status` 400–499) → `error` (won't resolve
- * on retry, surface it); anything else while online (5xx, network throw,
- * unknown) → `queued` for the flush loop to retry.
+ * Precedence: a byte/count quota error → `not_saved` FIRST, regardless of
+ * connectivity — a hard storage failure is not a connectivity problem and
+ * must win even if the device also happens to be offline; offline (with no
+ * quota error) → `queued` (never attempted the network); a definitive 4xx
+ * (`.status` 400–499) → `error` (won't resolve on retry, surface it);
+ * anything else while online (5xx, network throw, unknown) → `queued` for
+ * the flush loop to retry.
  */
 export function classifySubmit(online: boolean, err: unknown): SubmitOutcome {
-  if (!online) return 'queued';
-
   if (err instanceof QuotaExceededError || err instanceof QueueFullError) return 'not_saved';
+
+  if (!online) return 'queued';
 
   const status = (err as { status?: number } | null | undefined)?.status;
   if (typeof status === 'number' && status >= 400 && status <= 499) return 'error';
