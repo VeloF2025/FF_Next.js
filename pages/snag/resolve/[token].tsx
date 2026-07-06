@@ -27,7 +27,8 @@ export default function SnagResolvePage() {
 
   const {
     data, loading, error, actor, showIdentityModal, identityForm,
-    actionLoading, uploadingStep, pendingCompleteCount,
+    actionLoading, uploadingStep, pendingCompleteCount, pendingPhotoCount,
+    photoNotSaved, clearPhotoNotSaved,
     setShowIdentityModal, setIdentityForm,
     performAction, handlePhotoUpload, handleStartWork, handleIdentitySubmit, handleMarkComplete,
   } = useSnagResolve(tokenStr);
@@ -89,7 +90,30 @@ export default function SnagResolvePage() {
         </div>
       )}
 
-      <PendingSyncIndicator count={pendingCompleteCount} />
+      {photoNotSaved && (
+        <div
+          role="alert"
+          className="mb-4 rounded-md bg-red-950/60 border-2 border-red-600 px-4 py-3 text-xs text-red-200"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-400" aria-hidden="true" />
+            <div className="flex-1">
+              <p className="font-semibold text-red-100">Photo NOT saved</p>
+              <p className="mt-0.5">{photoNotSaved}</p>
+            </div>
+            <button
+              type="button"
+              onClick={clearPhotoNotSaved}
+              className="text-red-400 hover:text-red-200 font-medium"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      <PendingSyncIndicator count={pendingCompleteCount} photoCount={pendingPhotoCount} />
 
       {!canInteract && (
         <div className="mb-6 rounded-lg bg-zinc-800 border border-zinc-700 p-4 flex items-center gap-3">

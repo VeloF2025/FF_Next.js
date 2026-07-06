@@ -11,6 +11,14 @@ import { useOfflineQueue, QueueFullError } from '@/lib/offline-queue';
 import type { IdentityFormState, QueuedCompleteStep, ResolveAction, SessionActor, SharedData } from './types';
 import { getOrCreateFingerprint, loadStoredActor, persistActor } from './session';
 import { submitCompleteStep } from './offlineComplete';
+import {
+  SNAG_PHOTO_MAX_QUEUE_BYTES,
+  SNAG_PHOTO_MAX_QUEUE_SIZE,
+  snagPhotoQueueName,
+  type PendingSnagPhoto,
+} from './offline/photoQueue';
+import { submitSnagPhoto } from './offline/submitSnagPhoto';
+import { submitPhotoWithOfflineFallback } from './offline/submitPhotoWithOfflineFallback';
 
 export interface UseSnagResolveResult {
   data: SharedData | null;
@@ -22,6 +30,11 @@ export interface UseSnagResolveResult {
   actionLoading: boolean;
   uploadingStep: string | null;
   pendingCompleteCount: number;
+  pendingPhotoCount: number;
+  /** Emphatic "photo NOT saved" copy (quota/queue full or undecodable image).
+   *  Non-null ⇒ the UI must render a hard failure, never a queued/green state. */
+  photoNotSaved: string | null;
+  clearPhotoNotSaved: () => void;
   setShowIdentityModal: (show: boolean) => void;
   setIdentityForm: (form: IdentityFormState) => void;
   performAction: (action: ResolveAction, extra?: Record<string, string>) => Promise<void>;
@@ -41,6 +54,8 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
   const [showIdentityModal, setShowIdentityModal] = useState(false);
   const [identityForm, setIdentityForm] = useState<IdentityFormState>({ name: '', phone: '', company: '' });
 
+  const [photoNotSaved, setPhotoNotSaved] = useState<string | null>(null);
+
   const completeQueue = useOfflineQueue<QueuedCompleteStep>({
     // One DB per token keeps a device that resolves several snags from mixing queues.
     queueName: tokenStr ? `SnagCompleteDB:${tokenStr}` : 'SnagCompleteDB:none',
@@ -49,6 +64,17 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
   // Destructure the stable primitives so handleMarkComplete's deps are plain
   // identifiers (satisfies react-hooks/exhaustive-deps and keeps a stable identity).
   const { online: completeOnline, enqueue: enqueueComplete } = completeQueue;
+
+  // Photo queue: byte-aware (photos are large — the count cap alone is unsafe).
+  const photoQueue = useOfflineQueue<PendingSnagPhoto>({
+    queueName: tokenStr ? snagPhotoQueueName(tokenStr) : snagPhotoQueueName('none'),
+    submit: submitSnagPhoto,
+    maxQueueBytes: SNAG_PHOTO_MAX_QUEUE_BYTES,
+    maxQueueSize: SNAG_PHOTO_MAX_QUEUE_SIZE,
+    sizeOf: (p) => p.byteSize,
+  });
+  const { online: photoOnline, enqueue: enqueuePhoto } = photoQueue;
+  const clearPhotoNotSaved = useCallback(() => setPhotoNotSaved(null), []);
 
   useEffect(() => {
     if (!tokenStr) return;
@@ -104,26 +130,30 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     // uploads run in parallel without clobbering each other's spinners.
     const uploadKey = slotKey ? `${stepId}:${slotKey}` : stepId;
     setUploadingStep(uploadKey);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('action', 'upload_photo');
-      formData.append('stepId', stepId);
-      if (slotKey) formData.append('slotKey', slotKey);
-      // Keep the conditional from the original page — guards against a server
-      // contract drift that yields a falsy actor.id (empty string posts as
-      // 'actorId=' rather than the field being absent, which the API handler
-      // treats differently downstream).
-      if (actor.id) formData.append('actorId', actor.id);
-      const res = await fetch(`/api/snags/shared/${tokenStr}`, { method: 'POST', body: formData });
-      if (!res.ok) throw new Error('Upload failed');
-      await fetchData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploadingStep(null);
+    setPhotoNotSaved(null);
+    // `actor.id` guarded to undefined so a falsy id isn't sent as 'actorId='.
+    const result = await submitPhotoWithOfflineFallback(
+      { token: tokenStr, stepId, slotKey, actorId: actor.id || undefined, file },
+      { online: photoOnline, enqueue: enqueuePhoto }
+    );
+    setUploadingStep(null);
+    switch (result.kind) {
+      case 'submitted':
+        // Only a server-confirmed upload refreshes the tiles — a queued photo
+        // must NOT show as uploaded (no green tile for un-synced work).
+        await fetchData();
+        return;
+      case 'queued':
+        // pendingPhotoCount surfaces it; the tile stays in its pre-upload state.
+        return;
+      case 'not_saved':
+        setPhotoNotSaved(result.message);
+        return;
+      case 'error':
+        setError(result.message);
+        return;
     }
-  }, [tokenStr, data, actor, fetchData]);
+  }, [tokenStr, data, actor, photoOnline, enqueuePhoto, fetchData]);
 
   const registerActor = useCallback(async (): Promise<SessionActor | null> => {
     if (!tokenStr) return null;
@@ -210,6 +240,9 @@ export function useSnagResolve(tokenStr: string | null): UseSnagResolveResult {
     actionLoading,
     uploadingStep,
     pendingCompleteCount: completeQueue.pendingCount,
+    pendingPhotoCount: photoQueue.pendingCount,
+    photoNotSaved,
+    clearPhotoNotSaved,
     setShowIdentityModal,
     setIdentityForm,
     performAction,
