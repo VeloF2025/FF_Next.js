@@ -48,11 +48,54 @@ describe('resetPriorQaCycleForResubmission', () => {
     // Guarded so brand-new drops (no prior cycle) are untouched
     expect(sql).toContain('feedback_sent = true OR qa_decision IS NOT NULL OR auto_qa_processed = true');
 
-    expect(params).toEqual(['DR1855395']);
+    expect(params).toEqual(['DR1855395', null]);
   });
 
   it('swallows DB errors so a failed reset never loses the photo submission', async () => {
     mockQuery.mockRejectedValueOnce(new Error('db down'));
     await expect(resetPriorQaCycleForResubmission('DR1855362')).resolves.toBeUndefined();
+  });
+
+  // PWA Phase 2 PR-2: idempotency guard against a lost-ack retry from the
+  // offline queue (PR-3). See resubmissionReset.ts docblock for the guard's
+  // negative-jsonb-index / replay semantics.
+  describe('idempotency (clientSubmissionId replay guard)', () => {
+    it('tags the archived snapshot with client_submission_id and binds it as $2', async () => {
+      await resetPriorQaCycleForResubmission('DR1', 'uuid-A');
+
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+
+      expect(sql).toContain('client_submission_id');
+      expect(sql).toContain(
+        "$2 IS NULL OR COALESCE(submission_history -> -1 ->> 'client_submission_id'",
+      );
+      expect(params).toEqual(['DR1', 'uuid-A']);
+    });
+
+    it('legacy call (no clientSubmissionId) binds null for $2', async () => {
+      await resetPriorQaCycleForResubmission('DR1');
+
+      const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual(['DR1', null]);
+    });
+
+    // Review HIGH finding: an empty string must not silently defeat the reset.
+    // COALESCE(..., '') <> '' is false for every row with no prior
+    // client_submission_id, so an unnormalized '' would make the guard block
+    // every resubmission for that drop (reintroducing the stale "Human ✓" bug).
+    it('empty string clientSubmissionId normalizes to null for $2', async () => {
+      await resetPriorQaCycleForResubmission('DR1', '');
+
+      const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual(['DR1', null]);
+    });
+
+    it('whitespace-only clientSubmissionId normalizes to null for $2', async () => {
+      await resetPriorQaCycleForResubmission('DR1', '   ');
+
+      const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual(['DR1', null]);
+    });
   });
 });

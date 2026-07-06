@@ -50,18 +50,25 @@ interface UploadBody {
   siteId: string;
   photos: PhotoRecord[];
   geofence?: GeofencePayload | null;
+  clientSubmissionId?: string;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse, session: AttendanceSession): Promise<void> {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
 
-  const { jobType, siteId, photos, geofence } = (req.body ?? {}) as Partial<UploadBody>;
+  const { jobType, siteId, photos, geofence, clientSubmissionId } = (req.body ?? {}) as Partial<UploadBody>;
   if (!jobType || !siteId || !Array.isArray(photos) || photos.length === 0) {
     return apiResponse.badRequest(res, 'jobType, siteId, and photos (non-empty array) required');
   }
   if (photos.length > MAX_PHOTOS) {
     return apiResponse.badRequest(res, `Too many photos (max ${MAX_PHOTOS})`);
   }
+  // Coerce to a clean value at the handler boundary — only forward a
+  // non-empty string, else undefined (the legacy/unguarded path).
+  const cleanClientSubmissionId =
+    typeof clientSubmissionId === 'string' && clientSubmissionId.trim().length > 0
+      ? clientSubmissionId.trim()
+      : undefined;
 
   const techId = session.staffId ?? null;
   const uploadedUrls: Record<number, string> = {};
@@ -98,7 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse, session: Atten
     // feedback markers left from a prior review (e.g. an earlier activation that
     // is being re-photographed) so the QA Centre does not show a false
     // "Human ✓" badge and the auto-feedback cron re-evaluates the new photos.
-    await resetPriorQaCycleForResubmission(drNum);
+    await resetPriorQaCycleForResubmission(drNum, cleanClientSubmissionId);
     await pool.query(
       `UPDATE dr_photo_unified_reviews
        SET pwa_submission_at        = NOW(),
