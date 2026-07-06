@@ -5,6 +5,7 @@ export type { UseOfflineQueueResult } from './useOfflineQueue';
 export type { SubmitOne } from './flush';
 export {
   QueueFullError,
+  QuotaExceededError,
 } from './types';
 export type {
   QueuedItem,
@@ -13,4 +14,5 @@ export type {
   FlushReport,
   FlushHooks,
   OfflineQueueConfig,
+  QuotaExceededKind,
 } from './types';

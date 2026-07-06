@@ -13,6 +13,15 @@ export interface QueuedItem<TPayload> {
   queuedAt: string;
   attempts: number;
   lastError?: string;
+  /**
+   * On-device size of this item in bytes, used by the byte-aware quota
+   * (see `maxQueueBytes`). Written at enqueue from `OfflineQueueConfig.sizeOf`
+   * (0 when the workflow declares no size — e.g. small-JSON queues). The store
+   * sums this over pending rows; it is derived accounting, never authoritative.
+   * Required going forward, but IndexedDB is schemaless: rows written before
+   * this field existed may lack it, so read sites coalesce a missing value to 0.
+   */
+  byteSize: number;
 }
 
 /** A permanently-dropped item, retained on-device for user visibility/dispute. */
@@ -64,6 +73,20 @@ export interface OfflineQueueConfig<TPayload> {
   queueName: string;
   /** Upper bound on pending depth. Default 50. */
   maxQueueSize?: number;
+  /**
+   * Upper bound on total on-device bytes across pending items. When set, an
+   * enqueue that would push `sum(byteSize) + incoming > maxQueueBytes` throws
+   * `QuotaExceededError`. Undefined (the default, e.g. small-JSON queues) means
+   * no byte cap — only the count cap applies. Coexists with `maxQueueSize`;
+   * whichever trips first wins.
+   */
+  maxQueueBytes?: number;
+  /**
+   * Compute the on-device byte size of a payload, written to the queued item
+   * so the byte budget can be enforced without decoding the payload again.
+   * Omit for count-only queues (byteSize defaults to 0).
+   */
+  sizeOf?: (payload: TPayload) => number;
   /** Attempts before an item is abandoned to the dropped store. Default 10. */
   maxAttemptsBeforeDrain?: number;
   /** The network call. Return normally on success; throw on failure. */
@@ -77,5 +100,45 @@ export class QueueFullError extends Error {
   constructor(size: number) {
     super(`Offline queue is full (${size} items). Reconnect to sync before adding more.`);
     this.name = 'QueueFullError';
+  }
+}
+
+/** Which limit an enqueue tripped. `queue` = this queue's own byte budget
+ *  (currentBytes/budgetBytes are queue-scoped). `device` = the browser's
+ *  origin-wide storage estimate (currentBytes/budgetBytes are the device
+ *  usage/quota, which may be far larger). The UI/logs must not conflate them. */
+export type QuotaExceededKind = 'queue' | 'device';
+
+/**
+ * Thrown when an enqueue would exceed the per-queue byte budget (`maxQueueBytes`)
+ * or the browser's projected storage estimate. Distinct from `QueueFullError`
+ * (a count cap) so the UI can render photo-specific "not saved, sync to free
+ * space" copy. Carries the raw byte figures for logging and UI messaging, and a
+ * `kind` discriminant so a consumer can tell the queue-budget case (its own
+ * bytes) apart from the device-storage case (origin-wide usage vs quota).
+ */
+export class QuotaExceededError extends Error {
+  readonly currentBytes: number;
+  readonly addBytes: number;
+  readonly budgetBytes: number;
+  readonly kind: QuotaExceededKind;
+  constructor(
+    currentBytes: number,
+    addBytes: number,
+    budgetBytes: number,
+    kind: QuotaExceededKind = 'queue'
+  ) {
+    const detail =
+      kind === 'device'
+        ? `device storage nearly full: ${currentBytes} used + ${addBytes} incoming ` +
+          `approaches the ${budgetBytes} byte device quota`
+        : `offline queue byte budget exceeded: ${currentBytes} stored + ${addBytes} incoming ` +
+          `exceeds the ${budgetBytes} byte budget`;
+    super(`${detail}. Reconnect to sync before capturing more.`);
+    this.name = 'QuotaExceededError';
+    this.currentBytes = currentBytes;
+    this.addBytes = addBytes;
+    this.budgetBytes = budgetBytes;
+    this.kind = kind;
   }
 }
