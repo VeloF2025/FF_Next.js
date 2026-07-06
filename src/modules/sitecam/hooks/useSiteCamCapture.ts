@@ -1,9 +1,18 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { log } from '@/lib/logger';
 import type { SiteCamStep, SiteCamJobType } from '../lib/sitecamSteps';
-import { readDeviceLocation, type GeofenceReading, type GeofencePayload } from '../lib/geofence';
+import type { GeofenceReading } from '../lib/geofence';
 import { prepareCapturePhotos } from '../lib/watermarkPhoto';
 import { loadDraft, saveDraft, clearDraft, type SiteCamDraft } from '../lib/sitecamDraft';
+import { SiteCamPhotoStore } from '../offline/photoStore';
+import {
+  ensureSiteCamJobMeta,
+  persistCapturedPhoto,
+  decodeStoredPhotos,
+  mergeHydratedPhotos,
+} from '../offline/siteCamJobDurability';
+import { attemptSiteCamSubmit, type SiteCamSubmitOutcome } from '../offline/submitAllSiteCam';
+import { useSiteCamFlush } from '../offline/useSiteCamFlush';
 
 const MODULE = 'useSiteCamCapture';
 
@@ -103,6 +112,21 @@ export function useSiteCamCapture(
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<{ uploadedCount: number } | null>(null);
+  // True only when a byte-quota rejection blocked the LAST capture from being
+  // durably saved — the step must stay un-captured (never green) until a
+  // retry succeeds (Task 5).
+  const [photoNotSaved, setPhotoNotSaved] = useState(false);
+  // True once a submission has been queued for offline/background flush
+  // (Task 6) — drives the "Saved offline" UI instead of the green success
+  // screen. Restored from durable meta on mount if a prior tap already queued it.
+  const [queued, setQueued] = useState(false);
+
+  // One durable IndexedDB job store per (jobType, siteId) — recreated only
+  // when the job itself changes (a genuinely different job), never per render.
+  const store = useMemo(
+    () => new SiteCamPhotoStore(siteInfo.jobType, siteInfo.siteId),
+    [siteInfo.jobType, siteInfo.siteId],
+  );
 
   // Mirror progress into localStorage so a refresh / PWA reload restores it.
   useEffect(() => {
@@ -113,6 +137,38 @@ export function useSiteCamCapture(
   useEffect(() => {
     if (uploadResult) clearDraft(siteInfo.jobType, siteInfo.siteId);
   }, [uploadResult, siteInfo.jobType, siteInfo.siteId]);
+
+  // Restore-on-mount (Task 5): mint/reuse the job's durable meta (stable
+  // clientSubmissionId across every capture + resubmit), surface a
+  // previously-queued submission, and hydrate any captured step whose photo
+  // was stripped from the localStorage draft (its "lite" quota fallback —
+  // now the intended path, since the durable copy lives in IDB). Uses a
+  // functional `setStepStates` update so a live capture completing while
+  // this async restore is in flight can never be stomped by stale data.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const meta = await ensureSiteCamJobMeta(store, siteInfo);
+      if (cancelled) return;
+      setQueued(meta.submitState === 'queued');
+
+      const photos = await store.listStepPhotos();
+      if (photos.length === 0 || cancelled) return;
+
+      const decoded = await decodeStoredPhotos(photos);
+      if (cancelled) return;
+      setStepStates((prev) => mergeHydratedPhotos(prev, decoded));
+    })().catch((err) => {
+      log.warn('SiteCam job restore failed (continuing without durability)', { err: String(err) }, MODULE);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // One-time restore per job — keyed on `store` identity (which only
+    // changes when jobType/siteId change, i.e. a genuinely different job),
+    // not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store]);
 
   // Poll for a supervisor's appeal decision. An approved appeal marks the step
   // passed and advances (if it is still the current step); a denied appeal
@@ -272,16 +328,30 @@ export function useSiteCamCapture(
       const step = steps[idx];
       if (!step) return;
 
+      setPhotoNotSaved(false);
+
       let clean: string;
       let watermarked: string;
+      let watermarkedBlob: Blob;
       try {
-        // Downscale once and produce two copies: a CLEAN image for the VLM (so
-        // the banner is never burned into the pixels it grades for quality) and
-        // a WATERMARKED image — site id + capture time in the pixels — for
-        // storage/upload so the photo cannot be reused on another DR.
-        ({ clean, watermarked } = await prepareCapturePhotos(file, siteInfo.siteId));
+        // Downscale once and produce three copies: a CLEAN image for the VLM (so
+        // the banner is never burned into the pixels it grades for quality), a
+        // WATERMARKED image — site id + capture time in the pixels — for
+        // storage/upload so the photo cannot be reused on another DR, and the
+        // same watermarked JPEG as a Blob for durable offline storage.
+        ({ clean, watermarked, watermarkedBlob } = await prepareCapturePhotos(file, siteInfo.siteId));
       } catch (err) {
         log.error('Failed to read file as base64', { err: String(err) }, MODULE);
+        return;
+      }
+
+      // Persist durably BEFORE any status transition (Task 5) — a byte-quota
+      // rejection must block the step from ever going "green". Any OTHER store
+      // failure fails OPEN (logged, non-fatal): durability is best-effort and
+      // must never block a technician mid-install.
+      const persisted = await persistCapturedPhoto(store, step.number, watermarkedBlob, false);
+      if (persisted === 'quota_exceeded') {
+        setPhotoNotSaved(true);
         return;
       }
 
@@ -332,6 +402,10 @@ export function useSiteCamCapture(
         if (!res.ok) {
           // HTTP error — fail-open, but flag the photo for manual QA review.
           log.error('Validate returned non-OK status (fail-open)', { status: res.status }, MODULE);
+          // Best-effort patch of the already-persisted photo's flag — the
+          // initial write above already succeeded, so a failure here is
+          // logged and never blocks the tech.
+          void persistCapturedPhoto(store, step.number, watermarkedBlob, true);
           setStepStates((prev) =>
             prev.map((s, i) => (i === idx ? { ...s, status: 'pass', needsManualReview: true } : s)),
           );
@@ -353,6 +427,9 @@ export function useSiteCamCapture(
 
         if (pass) {
           const flagged = needsManualReview === true;
+          // Server-side fail-open on an otherwise-genuine pass — patch the
+          // already-persisted photo's flag (best-effort, non-blocking).
+          if (flagged) void persistCapturedPhoto(store, step.number, watermarkedBlob, true);
           if (step.hasSerialScan && siteInfo.jobType === 'activations') {
             setStepStates((prev) =>
               prev.map((s, i) =>
@@ -388,71 +465,73 @@ export function useSiteCamCapture(
       } catch (err) {
         // Network error — fail-open, but flag the photo for manual QA review.
         log.error('Validate network error (fail-open)', { err: String(err) }, MODULE);
+        void persistCapturedPhoto(store, step.number, watermarkedBlob, true);
         setStepStates((prev) =>
           prev.map((s, i) => (i === idx ? { ...s, status: 'pass', needsManualReview: true } : s)),
         );
         advanceStep(1500);
       }
     },
-    [currentStepIndex, steps, siteInfo, stepStates, advanceStep, escalateStep],
+    [currentStepIndex, steps, siteInfo, stepStates, advanceStep, escalateStep, store],
   );
 
-  const submitAll = useCallback(async (): Promise<void> => {
-    const photos = stepStates
-      .filter((s) => (s.status === 'pass' || s.status === 'escalated' || s.status === 'serial_pending') && s.photoBase64 !== null)
-      .map((s) => ({
-        stepNumber: s.stepNumber,
-        stepLabel: s.label,
-        filename: `step-${s.stepNumber}.jpg`,
-        base64: s.photoBase64 as string,
-        needsManualReview: s.needsManualReview,
-      }));
-
-    let geofence: GeofencePayload | null = null;
-    if (entryGeofence) {
-      const submitPos = await readDeviceLocation(10_000);
-      geofence = {
-        ...entryGeofence,
-        submitLat: submitPos?.lat ?? null,
-        submitLon: submitPos?.lon ?? null,
-      };
+  // Centralises what happens to every submit outcome — shared by the initial
+  // Submit tap AND the page-context flush retry (Task 6) so there is exactly
+  // one place that decides what "submitting this job" means. `queued` stays
+  // untouched on 'error': a fresh online failure was never queued (matches
+  // today's plain retry-on-this-screen behaviour); a flush-retry failure was
+  // already queued and the photos remain safely stored either way — only the
+  // message surfaces, never a silent drop (mirrors useOfflineQueue's
+  // dropped-item contract).
+  const handleSubmitOutcome = useCallback((result: SiteCamSubmitOutcome) => {
+    switch (result.outcome) {
+      case 'submitted':
+        setUploadResult({ uploadedCount: result.uploadedCount });
+        setQueued(false);
+        setUploadError(null);
+        log.info('Upload complete', { uploadedCount: result.uploadedCount }, MODULE);
+        break;
+      case 'queued':
+        setQueued(true);
+        setUploadError(null);
+        break;
+      case 'error':
+        setUploadError(result.message);
+        log.error('SiteCam submit failed', { message: result.message }, MODULE);
+        break;
+      case 'not_saved':
+        setUploadError(result.message);
+        break;
+      case 'idle':
+        setUploadError('Nothing to submit — please recapture your photos.');
+        break;
     }
+  }, []);
 
+  // The one function that actually attempts a submit — offline-aware (builds
+  // from the durable store, POSTs with clientSubmissionId, queues on
+  // offline/network/5xx, clears the store on 2xx). Reused by both the Submit
+  // tap (`submitAll`, below) and the background flush loop (`useSiteCamFlush`).
+  const attemptFlush = useCallback(async (): Promise<void> => {
+    const result = await attemptSiteCamSubmit(store, entryGeofence);
+    handleSubmitOutcome(result);
+  }, [store, entryGeofence, handleSubmitOutcome]);
+
+  // Page-context retry cadence (online edge + mount + 60s poll + manual) for
+  // a job already queued. Auto-retry pauses while `uploadError` is showing —
+  // the technician must retry manually via `retrySubmit` (Task 6).
+  const { flushing, syncNow: retrySubmit } = useSiteCamFlush(queued, uploadError !== null, attemptFlush);
+
+  const submitAll = useCallback(async (): Promise<void> => {
     setUploading(true);
     setUploadError(null);
     setUploadResult(null);
-
     try {
-      const res = await fetch('/api/sitecam/upload', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobType: siteInfo.jobType,
-          siteId: siteInfo.siteId,
-          photos,
-          geofence,
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => `HTTP ${res.status}`);
-        setUploadError(text || `HTTP ${res.status}`);
-        log.error('Upload failed', { status: res.status }, MODULE);
-        return;
-      }
-
-      const json = (await res.json()) as { data: { uploadedCount: number } };
-      setUploadResult({ uploadedCount: json.data.uploadedCount });
-      log.info('Upload complete', { uploadedCount: json.data.uploadedCount }, MODULE);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setUploadError(msg);
-      log.error('Upload network error', { err: msg }, MODULE);
+      await attemptFlush();
     } finally {
       setUploading(false);
     }
-  }, [stepStates, siteInfo, entryGeofence]);
+  }, [attemptFlush]);
 
   const currentStep: StepState | null = stepStates[currentStepIndex] ?? null;
 
@@ -475,6 +554,10 @@ export function useSiteCamCapture(
     uploading,
     uploadError,
     uploadResult,
+    photoNotSaved,
+    queued,
+    flushing,
+    retrySubmit,
     escalateStep,
     onAppealSubmitted,
     appealPending,
