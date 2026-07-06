@@ -22,6 +22,7 @@ import {
   getStepsForCategoryAndDiscipline,
   type PhotoSlot,
 } from '@/modules/noc/constants/verificationSteps';
+import { normalizeClientUploadId } from '@/modules/noc/snag-resolve/clientUploadId';
 
 export const config = {
   api: { bodyParser: false },
@@ -279,6 +280,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const slotKeyRaw = fields.slotKey?.[0] ?? null;
         const slotKeyField = slotKeyRaw?.trim() || null;
         const actorIdField = fields.actorId?.[0] ?? null;
+        // Client-generated idempotency key (offline queue retries reuse it).
+        // Malformed/absent → null (no guard; legacy/online behaviour).
+        const clientUploadId = normalizeClientUploadId(fields.clientUploadId?.[0]);
         if (!file) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'file is required');
         if (!actorIdField) {
           return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'actorId is required — refresh and identify yourself before uploading');
@@ -341,11 +345,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Insert attachment, stamping the actor who uploaded it (NULL if no
         // actor session was established yet — backwards compat).
+        //
+        // Idempotent under offline-queue retry: a lost-ack replay re-POSTs the
+        // same clientUploadId. ON CONFLICT DO NOTHING dedupes the row via the
+        // partial unique index on client_upload_id (migration 438). A NULL key
+        // (legacy/online uploads) is unconstrained by that partial index, so
+        // those always insert — unchanged behaviour.
+        //
+        // attachments_count is maintained by the AFTER INSERT/DELETE trigger
+        // `increment_attachments_count`, so a deduped retry (no row inserted →
+        // no trigger fire) does not bump the counter. We therefore do NOT
+        // increment attachments_count here — a previous explicit `+1` was a
+        // latent double-count on top of the trigger. We still touch updated_at
+        // so the ticket surfaces the upload activity.
+        //
+        // Accepted tradeoff on a deduped retry: the VF-Storage upload above ran
+        // again and produced a NEW fileUrl, but this INSERT keeps the FIRST
+        // attempt's file_url (DO NOTHING) while the slot upsert / legacy step
+        // update below write the new fileUrl. The attachment-ledger row and the
+        // step's photo_url can thus reference two storage objects. This is
+        // benign: an offline-queue retry re-sends the identical downscaled
+        // bytes, so both objects are the same image — no data loss, no wrong
+        // photo. The slot/step writes are deliberately NOT gated on "was the
+        // attachment freshly inserted", because a first attempt that inserted
+        // the attachment but died before the slot write must still complete the
+        // slot on retry.
         await sql`
-          INSERT INTO maintenance_attachments (ticket_id, filename, file_url, file_type, file_size, uploaded_by, description, mime_type, storage_url, is_evidence, uploaded_by_actor_id)
-          VALUES (${ticketId}, ${filename}, ${fileUrl}, 'photo', ${file.size}, ${ticketId}, 'Uploaded by field technician', ${file.mimetype ?? 'image/jpeg'}, ${fileUrl}, true, ${actorIdField})
+          INSERT INTO maintenance_attachments (ticket_id, filename, file_url, file_type, file_size, uploaded_by, description, mime_type, storage_url, is_evidence, uploaded_by_actor_id, client_upload_id)
+          VALUES (${ticketId}, ${filename}, ${fileUrl}, 'photo', ${file.size}, ${ticketId}, 'Uploaded by field technician', ${file.mimetype ?? 'image/jpeg'}, ${fileUrl}, true, ${actorIdField}, ${clientUploadId})
+          ON CONFLICT (client_upload_id) WHERE client_upload_id IS NOT NULL DO NOTHING
         `;
-        await sql`UPDATE maintenance_tickets SET attachments_count = attachments_count + 1, updated_at = NOW() WHERE id = ${ticketId}`;
+        await sql`UPDATE maintenance_tickets SET updated_at = NOW() WHERE id = ${ticketId}`;
 
         // Slot-aware path: when slotKey is provided AND template declares it.
         if (stepIdField && slotKeyField && resolvedSlot) {
@@ -399,7 +429,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         fs.unlinkSync(file.filepath);
-        log.info('Shared ticket: photo uploaded', { ticketId, filename, stepId: stepIdField, slotKey: slotKeyField, actorId: actorIdField });
+        log.info('Shared ticket: photo uploaded', { ticketId, filename, stepId: stepIdField, slotKey: slotKeyField, actorId: actorIdField, clientUploadId });
         return apiResponse.success(res, { uploaded: true, url: fileUrl, slotKey: slotKeyField });
       } catch (err) {
         log.error('Shared ticket: photo upload failed', { ticketId, error: err instanceof Error ? err.message : 'Unknown' });
