@@ -4,7 +4,7 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { poleToZipEntries } from '@/modules/works-qa/utils/zip-entries';
+import { poleToZipEntries, safeSegment } from '@/modules/works-qa/utils/zip-entries';
 import type { PoleQaPhoto } from '@/modules/works-qa/types/works-qa.types';
 
 // Streamed response: disable Next's ~4 MB response cap and its "API resolved
@@ -79,7 +79,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const cookie = req.headers.cookie ?? '';
   const entries = rows.flatMap(pole =>
-    poleToZipEntries(pole, `Zone_${zoneNum}/PON_${pole.pon_no ?? 'unknown'}`),
+    // zoneNum is a validated int; pon_no is an int column — safeSegment is
+    // defence-in-depth so the prefix can't traverse even if the schema changes.
+    poleToZipEntries(pole, `Zone_${zoneNum}/PON_${safeSegment(String(pole.pon_no ?? 'unknown'))}`),
   );
 
   // --- stream the archive (headers before the first byte) ---
