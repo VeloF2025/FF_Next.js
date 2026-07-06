@@ -33,10 +33,20 @@ const MODULE = 'SiteCamResubmissionReset';
  * (`feedback_sent = true` OR `qa_decision IS NOT NULL` OR
  * `auto_qa_processed = true`). Non-fatal: a failure here must not lose the
  * technician's photo submission, so errors are logged and swallowed.
+ *
+ * Idempotency (PWA Phase 2 PR-2): `clientSubmissionId`, when supplied, is
+ * tagged onto the archived snapshot as `client_submission_id`. A lost-ack
+ * retry from the offline queue (PR-3) replays the same id, so the WHERE
+ * clause's replay guard compares it against the most recent snapshot
+ * (`submission_history -> -1`) and no-ops on a match — the reset fires at
+ * most once per submission. Legacy/online callers that omit the id keep
+ * today's unguarded behaviour.
  */
 export async function resetPriorQaCycleForResubmission(
   dropNumber: string,
+  clientSubmissionId?: string,
 ): Promise<void> {
+  const cid = clientSubmissionId ?? null;
   try {
     const { rowCount } = await pool.query(
       `UPDATE dr_photo_unified_reviews
@@ -52,7 +62,8 @@ export async function resetPriorQaCycleForResubmission(
            'feedback_sent', feedback_sent,
            'feedback_sent_at', feedback_sent_at,
            'feedback_message', feedback_message,
-           'qa_phase', qa_phase
+           'qa_phase', qa_phase,
+           'client_submission_id', $2
          ),
          submission_count = COALESCE(submission_count, 1) + 1,
          -- Clear the QA decision so the badge no longer reads a stale human/auto review
@@ -72,8 +83,9 @@ export async function resetPriorQaCycleForResubmission(
          auto_feedback_skip_reason = NULL,
          updated_at = NOW()
        WHERE drop_number = $1
-         AND (feedback_sent = true OR qa_decision IS NOT NULL OR auto_qa_processed = true)`,
-      [dropNumber],
+         AND (feedback_sent = true OR qa_decision IS NOT NULL OR auto_qa_processed = true)
+         AND ($2 IS NULL OR COALESCE(submission_history -> -1 ->> 'client_submission_id', '') <> $2)`,
+      [dropNumber, cid],
     );
 
     if (rowCount && rowCount > 0) {

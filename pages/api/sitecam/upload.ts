@@ -50,12 +50,13 @@ interface UploadBody {
   siteId: string;
   photos: PhotoRecord[];
   geofence?: GeofencePayload | null;
+  clientSubmissionId?: string;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse, session: AttendanceSession): Promise<void> {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
 
-  const { jobType, siteId, photos, geofence } = (req.body ?? {}) as Partial<UploadBody>;
+  const { jobType, siteId, photos, geofence, clientSubmissionId } = (req.body ?? {}) as Partial<UploadBody>;
   if (!jobType || !siteId || !Array.isArray(photos) || photos.length === 0) {
     return apiResponse.badRequest(res, 'jobType, siteId, and photos (non-empty array) required');
   }
@@ -98,7 +99,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse, session: Atten
     // feedback markers left from a prior review (e.g. an earlier activation that
     // is being re-photographed) so the QA Centre does not show a false
     // "Human ✓" badge and the auto-feedback cron re-evaluates the new photos.
-    await resetPriorQaCycleForResubmission(drNum);
+    await resetPriorQaCycleForResubmission(drNum, clientSubmissionId);
     await pool.query(
       `UPDATE dr_photo_unified_reviews
        SET pwa_submission_at        = NOW(),
