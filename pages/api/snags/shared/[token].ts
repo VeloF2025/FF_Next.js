@@ -358,6 +358,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // increment attachments_count here — a previous explicit `+1` was a
         // latent double-count on top of the trigger. We still touch updated_at
         // so the ticket surfaces the upload activity.
+        //
+        // Accepted tradeoff on a deduped retry: the VF-Storage upload above ran
+        // again and produced a NEW fileUrl, but this INSERT keeps the FIRST
+        // attempt's file_url (DO NOTHING) while the slot upsert / legacy step
+        // update below write the new fileUrl. The attachment-ledger row and the
+        // step's photo_url can thus reference two storage objects. This is
+        // benign: an offline-queue retry re-sends the identical downscaled
+        // bytes, so both objects are the same image — no data loss, no wrong
+        // photo. The slot/step writes are deliberately NOT gated on "was the
+        // attachment freshly inserted", because a first attempt that inserted
+        // the attachment but died before the slot write must still complete the
+        // slot on retry.
         await sql`
           INSERT INTO maintenance_attachments (ticket_id, filename, file_url, file_type, file_size, uploaded_by, description, mime_type, storage_url, is_evidence, uploaded_by_actor_id, client_upload_id)
           VALUES (${ticketId}, ${filename}, ${fileUrl}, 'photo', ${file.size}, ${ticketId}, 'Uploaded by field technician', ${file.mimetype ?? 'image/jpeg'}, ${fileUrl}, true, ${actorIdField}, ${clientUploadId})
