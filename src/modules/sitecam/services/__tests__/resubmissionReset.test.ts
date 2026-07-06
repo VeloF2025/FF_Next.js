@@ -79,5 +79,23 @@ describe('resetPriorQaCycleForResubmission', () => {
       const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
       expect(params).toEqual(['DR1', null]);
     });
+
+    // Review HIGH finding: an empty string must not silently defeat the reset.
+    // COALESCE(..., '') <> '' is false for every row with no prior
+    // client_submission_id, so an unnormalized '' would make the guard block
+    // every resubmission for that drop (reintroducing the stale "Human ✓" bug).
+    it('empty string clientSubmissionId normalizes to null for $2', async () => {
+      await resetPriorQaCycleForResubmission('DR1', '');
+
+      const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual(['DR1', null]);
+    });
+
+    it('whitespace-only clientSubmissionId normalizes to null for $2', async () => {
+      await resetPriorQaCycleForResubmission('DR1', '   ');
+
+      const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual(['DR1', null]);
+    });
   });
 });

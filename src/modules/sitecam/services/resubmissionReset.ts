@@ -46,7 +46,15 @@ export async function resetPriorQaCycleForResubmission(
   dropNumber: string,
   clientSubmissionId?: string,
 ): Promise<void> {
-  const cid = clientSubmissionId ?? null;
+  // Normalize: empty/whitespace/non-string all collapse to null so they take
+  // the legacy `$2 IS NULL` path instead of silently defeating the reset
+  // (an empty string would otherwise never match a snapshot's absent
+  // client_submission_id, so the guard's `<>` comparison would block every
+  // resubmission for that drop — see PR-2 review HIGH finding).
+  const cid =
+    typeof clientSubmissionId === 'string' && clientSubmissionId.trim().length > 0
+      ? clientSubmissionId.trim()
+      : null;
   try {
     const { rowCount } = await pool.query(
       `UPDATE dr_photo_unified_reviews

@@ -63,6 +63,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse, session: Atten
   if (photos.length > MAX_PHOTOS) {
     return apiResponse.badRequest(res, `Too many photos (max ${MAX_PHOTOS})`);
   }
+  // Coerce to a clean value at the handler boundary — only forward a
+  // non-empty string, else undefined (the legacy/unguarded path).
+  const cleanClientSubmissionId =
+    typeof clientSubmissionId === 'string' && clientSubmissionId.trim().length > 0
+      ? clientSubmissionId.trim()
+      : undefined;
 
   const techId = session.staffId ?? null;
   const uploadedUrls: Record<number, string> = {};
@@ -99,7 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse, session: Atten
     // feedback markers left from a prior review (e.g. an earlier activation that
     // is being re-photographed) so the QA Centre does not show a false
     // "Human ✓" badge and the auto-feedback cron re-evaluates the new photos.
-    await resetPriorQaCycleForResubmission(drNum, clientSubmissionId);
+    await resetPriorQaCycleForResubmission(drNum, cleanClientSubmissionId);
     await pool.query(
       `UPDATE dr_photo_unified_reviews
        SET pwa_submission_at        = NOW(),
