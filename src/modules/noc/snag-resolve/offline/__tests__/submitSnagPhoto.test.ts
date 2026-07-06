@@ -64,6 +64,17 @@ describe('submitSnagPhoto', () => {
     await expect(submitSnagPhoto(payload())).rejects.toMatchObject({ status: 409 });
   });
 
+  it('surfaces the server error message from the JSON body in the thrown error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { message: 'step is already complete — uploads are locked' } }),
+    } as unknown as Response)));
+    const err = await submitSnagPhoto(payload()).catch((e) => e as Error);
+    expect(err.message).toContain('step is already complete');
+    expect((err as { status?: number }).status).toBe(400);
+  });
+
   it('throws with .status on a 5xx so the queue keeps and retries it', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503 } as Response)));
     await expect(submitSnagPhoto(payload())).rejects.toMatchObject({ status: 503 });

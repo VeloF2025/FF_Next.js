@@ -24,7 +24,13 @@ export async function submitSnagPhoto(payload: PendingSnagPhoto): Promise<void> 
     body: form,
   });
   if (!res.ok) {
-    const err = new Error(`upload_photo failed (${res.status})`) as Error & { status?: number };
+    // Pull the server's reason out of the JSON body when present so a
+    // permanently-dropped photo surfaces WHY (e.g. "step is already complete")
+    // in the dropped-photo banner, not just a bare status code.
+    const body = typeof res.json === 'function' ? await res.json().catch(() => null) : null;
+    const reason = (body as { error?: { message?: string } } | null)?.error?.message;
+    const detail = typeof reason === 'string' && reason ? `: ${reason}` : '';
+    const err = new Error(`upload_photo failed (${res.status})${detail}`) as Error & { status?: number };
     err.status = res.status;
     throw err;
   }
