@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { CheckCircle, Download } from 'lucide-react';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { useSiteCamCapture, type SiteInfo } from '../hooks/useSiteCamCapture';
@@ -8,6 +7,9 @@ import type { GeofenceReading } from '../lib/geofence';
 import { StepCapture } from './StepCapture';
 import { saveAllPhotosToDevice, stepPhotoFilename } from '../lib/savePhotoToDevice';
 import { SiteCamSuccess } from './SiteCamSuccess';
+import { SiteCamOfflineStatus } from './SiteCamOfflineStatus';
+import { SiteCamSubmitPanel } from './SiteCamSubmitPanel';
+import { PhotoNotSavedBanner } from './PhotoNotSavedBanner';
 import { AppealModal } from './AppealModal';
 import { log } from '@/lib/logger';
 
@@ -39,6 +41,10 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
     uploading,
     uploadError,
     uploadResult,
+    photoNotSaved,
+    queued,
+    flushing,
+    retrySubmit,
     onAppealSubmitted,
     appealPending,
   } = useSiteCamCapture(steps, siteInfo, entryGeofence);
@@ -51,10 +57,27 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
   const escalatedCount = stepStates.filter((s) => s.status === 'escalated').length;
   const progressPct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
+  // A real "Submitted ✓" only ever follows a confirmed 2xx — checked first so
+  // it always wins once it lands.
   if (uploadResult) {
     return (
       <MyPortalShell title="SiteCam" staffName={profile.name} showFooterNav={false}>
         <SiteCamSuccess uploadedCount={uploadResult.uploadedCount} />
+      </MyPortalShell>
+    );
+  }
+
+  // A queued-but-not-yet-confirmed submission renders its own screen —
+  // NEVER the green success screen (D6 — never green until flushed).
+  if (queued) {
+    return (
+      <MyPortalShell title="SiteCam" staffName={profile.name} showFooterNav={false}>
+        <SiteCamOfflineStatus
+          photoCount={doneCount}
+          uploadError={uploadError}
+          flushing={flushing}
+          onRetry={() => void retrySubmit()}
+        />
       </MyPortalShell>
     );
   }
@@ -92,6 +115,8 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
             />
           ))}
         </div>
+
+        <PhotoNotSavedBanner show={photoNotSaved} />
 
         {/* Current step */}
         {!allDone && currentStep && (
@@ -136,51 +161,26 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
         )}
 
         {/* All done — submit */}
-        {allDone && !uploadResult && (
-          <div className="rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-6 space-y-4">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <CheckCircle className="h-10 w-10 text-green-400" />
-              <h2 className="text-lg font-semibold text-neutral-100">All steps complete</h2>
-              <p className="text-sm text-neutral-400">
-                {passedCount} passed · {escalatedCount} escalated
-              </p>
-            </div>
-
-            {uploadError && (
-              <div className="rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-sm text-red-300">
-                {uploadError}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void submitAll()}
-              disabled={uploading}
-              className="w-full rounded-lg bg-sky-600 py-3 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50 active:bg-sky-700"
-            >
-              {uploading ? 'Uploading…' : 'Submit All Photos'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                void saveAllPhotosToDevice(
-                  stepStates
-                    .filter((s) => s.photoBase64 !== null)
-                    .map((s) => ({
-                      base64: s.photoBase64 as string,
-                      filename: stepPhotoFilename(siteInfo.siteId, s.stepNumber),
-                    })),
-                ).catch((err: unknown) => {
-                  log.warn('Save all photos failed', { err: String(err) }, 'SiteCamWizard');
-                });
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-600 py-3 text-sm font-medium text-neutral-300 hover:bg-neutral-800 transition-colors"
-            >
-              <Download className="h-4 w-4" />
-              Save Photos to Device (for 1Map)
-            </button>
-          </div>
+        {allDone && (
+          <SiteCamSubmitPanel
+            passedCount={passedCount}
+            escalatedCount={escalatedCount}
+            uploadError={uploadError}
+            uploading={uploading}
+            onSubmit={() => void submitAll()}
+            onSaveAll={() => {
+              void saveAllPhotosToDevice(
+                stepStates
+                  .filter((s) => s.photoBase64 !== null)
+                  .map((s) => ({
+                    base64: s.photoBase64 as string,
+                    filename: stepPhotoFilename(siteInfo.siteId, s.stepNumber),
+                  })),
+              ).catch((err: unknown) => {
+                log.warn('Save all photos failed', { err: String(err) }, 'SiteCamWizard');
+              });
+            }}
+          />
         )}
       </div>
     </MyPortalShell>
