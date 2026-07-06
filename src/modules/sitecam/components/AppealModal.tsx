@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Send } from 'lucide-react';
 import { log } from '@/lib/logger';
+import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 
 const MODULE = 'AppealModal';
 
@@ -15,12 +16,13 @@ interface Props {
   serialScanned?: string;
   serialExpected?: string;
   attemptNumber: number;
+  jobType: SiteCamJobType;
 }
 
 export function AppealModal({
   isOpen, onClose, onSubmitted,
   drNumber, stepNumber, stepLabel,
-  photoUrl, serialScanned, serialExpected, attemptNumber,
+  photoUrl, serialScanned, serialExpected, attemptNumber, jobType,
 }: Props) {
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -46,6 +48,7 @@ export function AppealModal({
           serialScanned,
           serialExpected,
           attemptNumber,
+          jobType,
         }),
       });
       const json = (await res.json()) as { data?: { appealId: string }; error?: string };

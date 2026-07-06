@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { SiteCamFailedQueue } from './SiteCamFailedQueue';
+import { AiBadge, VlmRecommendationPanel, type VlmAdvisory } from './AppealVlmPanel';
 
-interface Appeal {
+interface Appeal extends VlmAdvisory {
   id: string;
   dr_number: string;
   step_number: number;
@@ -16,6 +17,7 @@ interface Appeal {
   created_at: string;
   tech_name: string | null;
   denial_reason: string | null;
+  human_agreed_with_vlm: boolean | null;
 }
 
 const STEP_LABELS: Record<number, string> = {
@@ -124,6 +126,12 @@ export function SiteCamAppealsQueue() {
                     </span>
                     <span className="mx-2 text-neutral-400">·</span>
                     <span className="text-xs text-neutral-500">{a.tech_name ?? 'Unknown'}</span>
+                    <AiBadge advisory={a} />
+                    {a.status !== 'pending' && a.human_agreed_with_vlm !== null && (
+                      <span className={`ml-2 text-xs ${a.human_agreed_with_vlm ? 'text-green-600' : 'text-amber-600'}`}>
+                        {a.human_agreed_with_vlm ? '✓ agreed' : '✗ disagreed'}
+                      </span>
+                    )}
                   </div>
                   {expanded === a.id
                     ? <ChevronUp className="h-4 w-4 text-neutral-400" />
@@ -133,6 +141,7 @@ export function SiteCamAppealsQueue() {
                 {expanded === a.id && (
                   <div className="border-t border-neutral-100 px-4 py-4 space-y-4">
                     <p className="text-sm text-neutral-700">{a.appeal_text}</p>
+                    <VlmRecommendationPanel advisory={a} />
                     {a.serial_scanned && (
                       <div className="text-xs text-neutral-500 space-y-1">
                         <p>Serial scanned: <span className="font-mono">{a.serial_scanned}</span></p>

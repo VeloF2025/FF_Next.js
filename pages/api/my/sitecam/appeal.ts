@@ -5,6 +5,7 @@ import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import { sendWhatsAppGroup } from '@/modules/notifications/services/whatsappDelivery';
 import { log } from '@/lib/logger';
+import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 
 const MODULE = 'sitecam-appeal';
 const APPEAL_GROUP_JID = process.env.SITECAM_APPEAL_GROUP_JID ?? '';
@@ -17,6 +18,7 @@ interface AppealBody {
   serialScanned?: string;
   serialExpected?: string;
   attemptNumber: number;
+  jobType?: SiteCamJobType;
 }
 
 async function handler(
@@ -29,7 +31,7 @@ async function handler(
 
   const {
     drNumber, stepNumber, appealText, photoUrl,
-    serialScanned, serialExpected, attemptNumber,
+    serialScanned, serialExpected, attemptNumber, jobType,
   } = req.body as AppealBody;
 
   if (!drNumber || !stepNumber || !appealText || !photoUrl || !attemptNumber)
@@ -39,6 +41,13 @@ async function handler(
   // self-contained (no external fetch) and prevents a crafted URL being relayed to the WA bridge.
   if (!photoUrl.startsWith('data:image/'))
     return apiResponse.badRequest(res, 'photoUrl must be a data:image/ URI');
+
+  // job_type drives which step criteria/gallery the appeals VLM cron uses (Phase 2).
+  // Tolerate a missing value — a stale/cached SiteCam PWA predates this field, and the
+  // column is nullable (the scoring cron treats NULL as 'activations'). Reject only an
+  // explicit out-of-enum value so a technician's appeal is never hard-blocked by a cache.
+  if (jobType != null && jobType !== 'activations' && jobType !== 'civils')
+    return apiResponse.badRequest(res, 'jobType must be "activations" or "civils"');
 
   const { rows: staffRows } = await pool.query<{ first_name: string; last_name: string }>(
     `SELECT first_name, last_name FROM staff WHERE id = $1 LIMIT 1`,
@@ -51,11 +60,11 @@ async function handler(
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO sitecam_appeals
        (dr_number, step_number, technician_id, appeal_text, photo_url,
-        serial_scanned, serial_expected, attempt_number)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        serial_scanned, serial_expected, attempt_number, job_type)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      RETURNING id`,
     [drNumber, stepNumber, session.staffId, appealText, photoUrl,
-     serialScanned ?? null, serialExpected ?? null, attemptNumber],
+     serialScanned ?? null, serialExpected ?? null, attemptNumber, jobType ?? null],
   );
   const appealId = rows[0]!.id;
 
