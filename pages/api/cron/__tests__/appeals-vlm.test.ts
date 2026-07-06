@@ -9,7 +9,10 @@ vi.mock('@/modules/sitecam/services/appealsVlmService', () => ({
 }));
 // A dedicated pooled client holds the run-serialising advisory lock.
 const dbClient = { query: vi.fn(), release: vi.fn() };
-vi.mock('@/lib/db', () => ({ default: { connect: vi.fn(() => Promise.resolve(dbClient)) } }));
+const mockConnect = vi.fn(() => Promise.resolve(dbClient));
+// `connect` forwards to mockConnect lazily so tests can override it (e.g. reject to
+// simulate a connect failure); a direct reference would hit the vi.mock-hoist TDZ.
+vi.mock('@/lib/db', () => ({ default: { connect: () => mockConnect() } }));
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMocks } from 'node-mocks-http';
@@ -51,7 +54,8 @@ describe('POST /api/cron/appeals-vlm', () => {
     process.env.CRON_SECRET = SECRET;
     mockFind.mockResolvedValue([]);
     mockRetry.mockResolvedValue({ attempts: 1, parked: false });
-    // Default: this run acquires the advisory lock.
+    // Default: a healthy connection that acquires the advisory lock.
+    mockConnect.mockImplementation(() => Promise.resolve(dbClient));
     dbClient.query.mockImplementation((sql: string) =>
       sql.includes('pg_try_advisory_lock')
         ? Promise.resolve({ rows: [{ locked: true }] })
@@ -144,12 +148,39 @@ describe('POST /api/cron/appeals-vlm', () => {
     expect(res._getJSONData().data).toMatchObject({ processed: 0, scored: 0, retried: 0, skipped: true });
   });
 
-  it('releases the advisory lock and the connection after a run', async () => {
+  it('releases the advisory lock and returns the connection (not destroyed) after a run', async () => {
     mockFind.mockResolvedValue([pendingPhoto] as never);
     mockEval.mockResolvedValue(approve as never);
     await run(AUTH);
     const unlocked = dbClient.query.mock.calls.some((c) => (c[0] as string).includes('pg_advisory_unlock'));
     expect(unlocked).toBe(true);
+    expect(dbClient.release).toHaveBeenCalledTimes(1);
+    expect(dbClient.release).not.toHaveBeenCalledWith(true); // returned to the pool, not destroyed
+  });
+
+  it('destroys the connection when unlocking fails (frees the otherwise-leaked lock)', async () => {
+    dbClient.query.mockImplementation((sql: string) => {
+      if (sql.includes('pg_try_advisory_lock')) return Promise.resolve({ rows: [{ locked: true }] });
+      if (sql.includes('pg_advisory_unlock')) return Promise.reject(new Error('connection lost'));
+      return Promise.resolve({ rows: [] });
+    });
+    await run(AUTH); // clean body (0 pending), but the unlock throws
+    expect(dbClient.release).toHaveBeenCalledWith(true);
+  });
+
+  it('still unlocks + releases when the run body throws', async () => {
+    mockFind.mockRejectedValue(new Error('db down'));
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(500);
+    const unlocked = dbClient.query.mock.calls.some((c) => (c[0] as string).includes('pg_advisory_unlock'));
+    expect(unlocked).toBe(true);
     expect(dbClient.release).toHaveBeenCalled();
+  });
+
+  it('returns a clean, logged 500 when acquiring a DB connection fails', async () => {
+    mockConnect.mockRejectedValueOnce(new Error('pool exhausted'));
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(500);
+    expect(dbClient.release).not.toHaveBeenCalled(); // no client acquired → nothing to release
   });
 });
