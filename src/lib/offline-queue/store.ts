@@ -34,7 +34,11 @@ async function estimateStorage(): Promise<{ usage: number; quota: number } | nul
 
 /** Sum `byteSize` across a store via a cursor, chaining raw IndexedDB requests
  *  (no `await`) so it can run inside a live readwrite transaction without the
- *  transaction auto-committing between operations. Resolves with the total. */
+ *  transaction auto-committing between operations. Resolves with the total.
+ *  CAUTION: do NOT chain a write (`s.add`/`s.put`) off this via `.then` — the
+ *  microtask hop after the returned promise settles can let the transaction
+ *  auto-commit first. `enqueue` inlines its cursor loop and calls `add()`
+ *  directly in the terminal `onsuccess` for exactly this reason. */
 function cursorSumBytes(store: IDBObjectStore): Promise<number> {
   return new Promise((resolve, reject) => {
     let total = 0;
