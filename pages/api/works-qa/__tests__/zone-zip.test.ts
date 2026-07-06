@@ -88,4 +88,32 @@ describe('zone-zip', () => {
     await handler(req, res);
     expect(res._getStatusCode()).toBe(400);
   });
+
+  it('400s when zone_no is not a clean number', async () => {
+    const { req, res } = createMocks({ method: 'GET', query: { project_id: 'proj-1', zone_no: '5abc' } });
+    // @ts-expect-error
+    await handler(req, res);
+    expect(res._getStatusCode()).toBe(400);
+  });
+
+  it('never fetches or archives a storage key containing ".." (Zip Slip guard)', async () => {
+    const EVIL = {
+      ...(POLE as Record<string, unknown>),
+      civil_step_07_key: 'works-qa/proj-1/../secret.jpg',
+    } as unknown;
+    poolMock.query.mockResolvedValue({ rows: [EVIL] });
+    const { req, res } = createMocks({
+      method: 'GET',
+      query: { project_id: 'proj-1', zone_no: '5', include_unapproved: 'true' },
+    });
+    // @ts-expect-error
+    await handler(req, res);
+    // the traversal key is skipped (not fetched) → no civil entry, and it is listed in the manifest
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0])).not.toContain('..');
+    }
+    const paths = await zipPaths(res);
+    expect(paths.some(p => p.includes('/civil/'))).toBe(false);
+    expect(paths).toContain('_manifest.txt');
+  });
 });

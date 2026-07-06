@@ -1,4 +1,4 @@
-import { poleToZipEntries, slotFilename } from '../zip-entries';
+import { poleToZipEntries, slotFilename, safeSegment } from '../zip-entries';
 import type { PoleQaPhoto } from '../../types/works-qa.types';
 
 const BASE: PoleQaPhoto = {
@@ -19,6 +19,16 @@ const BASE: PoleQaPhoto = {
 describe('slotFilename', () => {
   it('zero-pads the step and slugifies the label', () => {
     expect(slotFilename(7, 'After Photo')).toBe('07_after_photo.jpg');
+  });
+});
+
+describe('safeSegment', () => {
+  it('preserves ordinary pole labels', () => {
+    expect(safeSegment('LAW.P.A001')).toBe('LAW.P.A001');
+  });
+  it('neutralises path separators and traversal', () => {
+    expect(safeSegment('../../etc/passwd')).not.toMatch(/\.\.|[/\\]/);
+    expect(safeSegment('a/b\\c')).toBe('a_b_c');
   });
 });
 
@@ -46,5 +56,13 @@ describe('poleToZipEntries', () => {
   it('emits no unassigned entries when the pole has none', () => {
     const paths = poleToZipEntries(BASE, 'Zone_5/PON_999').map(e => e.path);
     expect(paths.some(p => p.includes('/unassigned/'))).toBe(false);
+  });
+
+  it('never emits a traversal path from a hostile pole_label (Zip Slip)', () => {
+    const pole: PoleQaPhoto = { ...BASE, pole_label: '../../evil' };
+    for (const { path } of poleToZipEntries(pole, 'Zone_5/PON_999')) {
+      expect(path.startsWith('Zone_5/PON_999/')).toBe(true);
+      expect(path.split('/').includes('..')).toBe(false);
+    }
   });
 });

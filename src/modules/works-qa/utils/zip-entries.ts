@@ -17,13 +17,22 @@ export function slotFilename(stepNumber: number, label: string): string {
 }
 
 /**
+ * Strip path separators and traversal so a field-sourced value (e.g. a
+ * pole_label from a QField/SOW import) can never escape its folder when the
+ * ZIP is extracted (Zip Slip). Single dots are preserved ("LAW.P.A001").
+ */
+export function safeSegment(value: string): string {
+  return value.replace(/[/\\]+/g, '_').replace(/\.{2,}/g, '_').trim() || '_';
+}
+
+/**
  * Map one pole row to its ZIP entries under `prefix`. Layout matches the
  * per-PON download (pon-zip.ts): {prefix}/{pole}/civil|optical|unassigned/...
  * Only photos with a non-null key produce an entry, so empty folders are never
  * emitted.
  */
 export function poleToZipEntries(pole: PoleQaPhoto, prefix: string): ZipEntry[] {
-  const base = `${prefix}/${pole.pole_label}`;
+  const base = `${prefix}/${safeSegment(pole.pole_label)}`;
   const entries: ZipEntry[] = [];
 
   for (const slot of CIVIL_SLOTS) {
