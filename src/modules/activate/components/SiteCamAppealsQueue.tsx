@@ -36,9 +36,11 @@ export function SiteCamAppealsQueue() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
   const [denialText, setDenialText] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (status: 'pending' | 'approved' | 'denied') => {
     setLoading(true);
+    setError(null);
     try {
       const r = await fetch(`/api/activate/sitecam-appeals?status=${status}`, { credentials: 'include' });
       const j = (await r.json()) as { data: { appeals: Appeal[] } };
@@ -55,6 +57,13 @@ export function SiteCamAppealsQueue() {
   }, [tab, load]);
 
   async function decide(id: string, decision: 'approved' | 'denied') {
+    // A denial must carry a reason (the technician sees it). Surface this instead
+    // of a silently-disabled button that reads as "Deny doesn't work".
+    if (decision === 'denied' && !denialText.trim()) {
+      setError('Enter a denial reason before denying.');
+      return;
+    }
+    setError(null);
     setDeciding(id);
     try {
       const res = await fetch(`/api/activate/sitecam-appeals/${id}/decision`, {
@@ -65,6 +74,7 @@ export function SiteCamAppealsQueue() {
       });
       if (!res.ok) {
         log.error('Decision rejected', { id, status: res.status }, MODULE);
+        setError(`Could not ${decision === 'denied' ? 'deny' : 'approve'} this appeal (error ${res.status}). Please try again.`);
         return;
       }
       setDenialText('');
@@ -72,6 +82,7 @@ export function SiteCamAppealsQueue() {
       await load(tab === 'failed' ? 'pending' : tab);
     } catch (err) {
       log.error('Decision failed', { err: String(err) }, MODULE);
+      setError('Could not submit the decision — check your connection and try again.');
     } finally {
       setDeciding(null);
     }
@@ -159,11 +170,12 @@ export function SiteCamAppealsQueue() {
                       <div className="space-y-3">
                         <textarea
                           value={denialText}
-                          onChange={(e) => setDenialText(e.target.value)}
+                          onChange={(e) => { setDenialText(e.target.value); if (error) setError(null); }}
                           placeholder="Denial reason (required if denying)…"
                           rows={2}
                           className="w-full rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-3 py-2 text-sm text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:border-[var(--ff-primary)]"
                         />
+                        {error && <p className="text-sm text-red-500">{error}</p>}
                         <div className="flex gap-3">
                           <button
                             type="button"
@@ -175,7 +187,7 @@ export function SiteCamAppealsQueue() {
                           </button>
                           <button
                             type="button"
-                            disabled={deciding === a.id || !denialText.trim()}
+                            disabled={deciding === a.id}
                             onClick={() => void decide(a.id, 'denied')}
                             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
                           >
