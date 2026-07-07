@@ -261,8 +261,28 @@ export function withPermission(requiredPermission: string, action: 'view' | 'cre
         return handler(req, res);
       }
 
-      const { userHasPermission } = await import('@/lib/permissions');
-      const allowed = await userHasPermission(authReq.user.id, requiredPermission, action);
+      let allowed: boolean;
+      try {
+        const { userHasPermission } = await import('@/lib/permissions');
+        allowed = await userHasPermission(authReq.user.id, requiredPermission, action);
+      } catch (error) {
+        // withAuth's outer catch cannot intercept this rejection (it returns the
+        // handler promise without awaiting), so fail closed with structured JSON
+        // instead of leaking a generic Next.js 500.
+        log.error('Permission check failed', {
+          userId: authReq.user.id,
+          permission: requiredPermission,
+          action,
+          error: error instanceof Error ? error.message : error,
+        }, 'withPermission');
+        return res.status(500).json({
+          success: false,
+          error: {
+            code: 'PERMISSION_CHECK_ERROR',
+            message: 'Permission check failed',
+          },
+        });
+      }
 
       if (!allowed) {
         log.warn('Permission denied', {
