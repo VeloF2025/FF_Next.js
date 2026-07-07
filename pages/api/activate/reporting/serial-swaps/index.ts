@@ -18,7 +18,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import ExcelJS from 'exceljs';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, withRole } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
 import { gpsCoordinates, applyTicketRowLinks } from '@/lib/excel/ticketLinkCells';
@@ -312,4 +312,4 @@ async function handler(
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'view')(handler));

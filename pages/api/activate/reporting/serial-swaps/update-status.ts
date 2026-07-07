@@ -14,7 +14,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, withRole } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import type { SwapStatus } from '@/modules/activate/types/reporting.types';
 
@@ -102,4 +102,4 @@ async function handler(
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'edit')(handler));

@@ -26,7 +26,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-import { withAuth, withRole } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import type {
   PenetrationCurveResponse,
@@ -480,4 +480,4 @@ async function handler(
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'view')(handler));

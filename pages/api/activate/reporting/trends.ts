@@ -16,7 +16,7 @@ import { getTrendAnalysisReport } from '@/modules/activate/services/reportingSer
 import type { TrendGroupBy } from '@/modules/activate/types/reporting.types';
 import { log } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withPermission, AuthenticatedNextApiRequest } from '@/lib/auth';
 
 async function handler(
   req: NextApiRequest,
@@ -71,4 +71,4 @@ async function handler(
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'view')(handler));

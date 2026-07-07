@@ -23,7 +23,7 @@ import { getOfflineDevicesReport } from '@/modules/activate/services/reportingSe
 import type { OfflineMatchStatus } from '@/modules/activate/types/reporting.types';
 import { log } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth, withRole } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { gpsCoordinates, applyTicketRowLinks } from '@/lib/excel/ticketLinkCells';
 
 async function handler(
@@ -181,4 +181,4 @@ async function handler(
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'view')(handler));

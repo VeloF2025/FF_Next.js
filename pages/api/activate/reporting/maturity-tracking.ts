@@ -16,7 +16,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-import { withAuth, withRole } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { cachedQuery } from '@/lib/queryCache';
 import type {
@@ -718,4 +718,4 @@ function calculateAvgDaysToMilestone(hierarchy: ProjectMaturityNode[], targetPer
   return Math.round(daysValues.reduce((sum, d) => sum + d, 0) / daysValues.length);
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'view')(handler));
