@@ -19,9 +19,9 @@ export interface VlmAdvisory {
 }
 
 const REC_STYLES: Record<'approve' | 'deny' | 'uncertain', string> = {
-  approve: 'bg-green-100 text-green-700',
-  deny: 'bg-red-100 text-red-700',
-  uncertain: 'bg-neutral-100 text-neutral-500',
+  approve: 'bg-[var(--ff-success)]/20 text-[var(--ff-success)]',
+  deny: 'bg-[var(--ff-danger)]/20 text-[var(--ff-danger)]',
+  uncertain: 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]',
 };
 
 export function AiBadge({ advisory }: { advisory: VlmAdvisory }) {
@@ -39,21 +39,21 @@ export function AiBadge({ advisory }: { advisory: VlmAdvisory }) {
 export function VlmRecommendationPanel({ advisory }: { advisory: VlmAdvisory }) {
   if (!advisory.vlm_recommendation) return null;
   return (
-    <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 space-y-2">
-      <div className="flex items-center gap-2 text-xs font-medium text-neutral-600">
+    <div className="rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-3 py-2 space-y-2">
+      <div className="flex items-center gap-2 text-xs font-medium text-[var(--ff-text-secondary)]">
         <span>VLM recommendation</span>
         <AiBadge advisory={advisory} />
-        {advisory.vlm_skip_reason && <span className="text-neutral-400">({advisory.vlm_skip_reason})</span>}
+        {advisory.vlm_skip_reason && <span className="text-[var(--ff-text-tertiary)]">({advisory.vlm_skip_reason})</span>}
       </div>
-      {advisory.vlm_reasoning && <p className="text-sm text-neutral-700">{advisory.vlm_reasoning}</p>}
+      {advisory.vlm_reasoning && <p className="text-sm text-[var(--ff-text-primary)]">{advisory.vlm_reasoning}</p>}
       {advisory.vlm_serial_read && (
-        <p className="text-xs text-neutral-500">Serial read: <span className="font-mono">{advisory.vlm_serial_read}</span></p>
+        <p className="text-xs text-[var(--ff-text-tertiary)]">Serial read: <span className="font-mono">{advisory.vlm_serial_read}</span></p>
       )}
       {advisory.vlm_checks && advisory.vlm_checks.length > 0 && (
         <ul className="space-y-1">
           {advisory.vlm_checks.map((c) => (
-            <li key={c.name} className="text-xs text-neutral-500">
-              <span className={c.verdict === 'pass' ? 'text-green-600' : c.verdict === 'fail' ? 'text-red-600' : 'text-neutral-400'}>
+            <li key={c.name} className="text-xs text-[var(--ff-text-tertiary)]">
+              <span className={c.verdict === 'pass' ? 'text-[var(--ff-success)]' : c.verdict === 'fail' ? 'text-[var(--ff-danger)]' : 'text-[var(--ff-text-tertiary)]'}>
                 {c.verdict}
               </span>{' '}
               <span className="font-medium">{c.name}</span> — {c.evidence}

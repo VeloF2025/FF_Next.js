@@ -3,14 +3,8 @@ import type { PoolClient } from 'pg';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
-import { evaluateAppeal, type AppealInput } from '@/modules/sitecam/services/appealsVlmService';
-import {
-  findPendingAppeals,
-  recordEvaluation,
-  recordTransientFailure,
-  type PendingAppeal,
-} from '@/modules/sitecam/services/appealsVlmStore';
+import { findPendingAppeals, isAutoDecideEnabled } from '@/modules/sitecam/services/appealsVlmStore';
+import { processAppeal } from '@/modules/sitecam/services/appealsVlmRunner';
 
 const MODULE = 'AppealsVlmCron';
 const BATCH_LIMIT = 10;
@@ -22,22 +16,6 @@ const MAX_ATTEMPTS = 3;
 // skips the tick when another run holds it — non-blocking, and not an xact lock, so
 // we never pin a connection in an open transaction across the slow VLM calls.
 const CRON_LOCK_NAME = 'sitecam-appeals-vlm-cron';
-
-/** Strip the `data:image/…;base64,` prefix — the evaluator expects raw base64. */
-function toRawBase64(dataUri: string | null): string {
-  return (dataUri ?? '').replace(/^data:image\/[^;]+;base64,/, '');
-}
-
-function toAppealInput(a: PendingAppeal): AppealInput {
-  return {
-    jobType: (a.job_type ?? 'activations') as SiteCamJobType,
-    stepNumber: a.step_number,
-    photoBase64: toRawBase64(a.photo_url),
-    appealText: a.appeal_text,
-    serialScanned: a.serial_scanned,
-    serialExpected: a.serial_expected,
-  };
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -67,37 +45,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.success(res, { processed: 0, scored: 0, retried: 0, skipped: true });
     }
 
+    // Resolved once per tick: OFF/absent → advisory shadow mode; ON → auto-decide
+    // clear approve/deny above the confidence + gallery-cross-reference bar.
+    const autoDecide = await isAutoDecideEnabled();
     const appeals = await findPendingAppeals(BATCH_LIMIT, MAX_ATTEMPTS);
-    log.info(`Appeals VLM: ${appeals.length} pending`, undefined, MODULE);
+    log.info(`Appeals VLM: ${appeals.length} pending (autoDecide=${autoDecide})`, undefined, MODULE);
 
     let scored = 0;
     let retried = 0;
+    let autoDecided = 0;
 
     for (const appeal of appeals) {
       try {
-        const evaluation = await evaluateAppeal(toAppealInput(appeal));
-        // Only a transient VLM outage is retryable; every other outcome — a real
-        // approve/deny or a terminal uncertain (no_photo/unsupported_step/
-        // unreadable_image) — is written once and never re-scored.
-        if (evaluation.skipReason === 'vlm_unavailable') {
-          const { attempts, parked } = await recordTransientFailure(appeal.id, evaluation, MAX_ATTEMPTS);
-          retried++;
-          if (parked) {
-            log.error(`Appeal ${appeal.id} parked after ${attempts} VLM outages`, undefined, MODULE);
-          } else {
-            log.warn(`Appeal ${appeal.id} VLM unavailable — attempt ${attempts}/${MAX_ATTEMPTS}, will retry`, undefined, MODULE);
-          }
-        } else {
-          await recordEvaluation(appeal.id, evaluation);
-          scored++;
-          log.info(`Appeal ${appeal.id} scored: ${evaluation.recommendation} (${evaluation.confidence})`, undefined, MODULE);
-        }
+        const outcome = await processAppeal(appeal, autoDecide);
+        if (outcome === 'auto_decided') autoDecided++;
+        else if (outcome === 'scored') scored++;
+        else if (outcome === 'retried') retried++;
       } catch (err) {
         log.error(`Unexpected error scoring appeal ${appeal.id}`, { err: String(err) }, MODULE);
       }
     }
 
-    return apiResponse.success(res, { processed: appeals.length, scored, retried, skipped: false });
+    return apiResponse.success(res, {
+      processed: appeals.length,
+      scored,
+      autoDecided,
+      retried,
+      skipped: false,
+    });
   } catch (err) {
     log.error('Appeals VLM cron failed', { err: String(err) }, MODULE);
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Appeals VLM cron failed');

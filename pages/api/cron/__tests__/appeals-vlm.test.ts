@@ -1,11 +1,13 @@
 vi.mock('@/lib/logger', () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
+// The handler is now thin wiring: it resolves the auto-decide flag, selects the
+// batch, and delegates each appeal to processAppeal (unit-tested in the runner
+// suite). Mock that surface here and assert the wiring/lock/response shape only.
 vi.mock('@/modules/sitecam/services/appealsVlmStore', () => ({
   findPendingAppeals: vi.fn(),
-  recordEvaluation: vi.fn(),
-  recordTransientFailure: vi.fn(),
+  isAutoDecideEnabled: vi.fn(),
 }));
-vi.mock('@/modules/sitecam/services/appealsVlmService', () => ({
-  evaluateAppeal: vi.fn(),
+vi.mock('@/modules/sitecam/services/appealsVlmRunner', () => ({
+  processAppeal: vi.fn(),
 }));
 // A dedicated pooled client holds the run-serialising advisory lock.
 const dbClient = { query: vi.fn(), release: vi.fn() };
@@ -18,17 +20,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMocks } from 'node-mocks-http';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import handler from '../appeals-vlm';
-import {
-  findPendingAppeals,
-  recordEvaluation,
-  recordTransientFailure,
-} from '@/modules/sitecam/services/appealsVlmStore';
-import { evaluateAppeal } from '@/modules/sitecam/services/appealsVlmService';
+import { findPendingAppeals, isAutoDecideEnabled } from '@/modules/sitecam/services/appealsVlmStore';
+import { processAppeal } from '@/modules/sitecam/services/appealsVlmRunner';
 
 const mockFind = vi.mocked(findPendingAppeals);
-const mockRecord = vi.mocked(recordEvaluation);
-const mockRetry = vi.mocked(recordTransientFailure);
-const mockEval = vi.mocked(evaluateAppeal);
+const mockAutoDecideEnabled = vi.mocked(isAutoDecideEnabled);
+const mockProcess = vi.mocked(processAppeal);
 
 const SECRET = 'test-cron-secret';
 const AUTH = { authorization: `Bearer ${SECRET}` };
@@ -38,22 +35,19 @@ function run(headers: Record<string, string>, method: 'GET' | 'POST' | 'PUT' = '
   return handler(req, res).then(() => res);
 }
 
-const pendingPhoto = {
-  id: 'a1', dr_number: 'DR001', step_number: 6, job_type: 'activations' as const,
+const pending = (id: string) => ({
+  id, dr_number: 'DR001', step_number: 6, job_type: 'activations' as const,
   photo_url: 'data:image/jpeg;base64,AAAA', appeal_text: 'green cable visible',
   serial_scanned: null, serial_expected: null,
-};
-const approve = {
-  recommendation: 'approve' as const, confidence: 0.9, reasoning: 'ok',
-  checks: [], serialRead: null, model: 'm', skipReason: null,
-};
+});
 
 describe('POST /api/cron/appeals-vlm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.CRON_SECRET = SECRET;
     mockFind.mockResolvedValue([]);
-    mockRetry.mockResolvedValue({ attempts: 1, parked: false });
+    mockAutoDecideEnabled.mockResolvedValue(false);
+    mockProcess.mockResolvedValue('scored');
     // Default: a healthy connection that acquires the advisory lock.
     mockConnect.mockImplementation(() => Promise.resolve(dbClient));
     dbClient.query.mockImplementation((sql: string) =>
@@ -77,60 +71,41 @@ describe('POST /api/cron/appeals-vlm', () => {
     expect((await run({ authorization: 'Bearer nope' }))._getStatusCode()).toBe(401);
   });
 
-  it('processed:0 when nothing is pending', async () => {
+  it('processed:0 (and does not call processAppeal) when nothing is pending', async () => {
     const res = await run(AUTH);
-    expect(res._getJSONData().data).toMatchObject({ processed: 0, scored: 0, retried: 0 });
+    expect(mockProcess).not.toHaveBeenCalled();
+    expect(res._getJSONData().data).toMatchObject({ processed: 0, scored: 0, autoDecided: 0, retried: 0, skipped: false });
   });
 
-  it('scores a photo appeal: strips the data URI, passes job_type, records terminal', async () => {
-    mockFind.mockResolvedValue([pendingPhoto] as never);
-    mockEval.mockResolvedValue(approve as never);
-    const res = await run(AUTH);
-    expect(mockEval).toHaveBeenCalledWith(expect.objectContaining({
-      jobType: 'activations', stepNumber: 6, photoBase64: 'AAAA', appealText: 'green cable visible',
-    }));
-    expect(mockRecord).toHaveBeenCalledWith('a1', approve);
-    expect(mockRetry).not.toHaveBeenCalled();
-    expect(res._getJSONData().data).toMatchObject({ processed: 1, scored: 1, retried: 0 });
-  });
-
-  it('defaults a NULL job_type to activations', async () => {
-    mockFind.mockResolvedValue([{ ...pendingPhoto, job_type: null }] as never);
-    mockEval.mockResolvedValue(approve as never);
+  it('resolves the auto-decide flag once and passes it to every processAppeal call', async () => {
+    mockAutoDecideEnabled.mockResolvedValue(true);
+    mockFind.mockResolvedValue([pending('a1'), pending('a2')] as never);
+    mockProcess.mockResolvedValue('auto_decided');
     await run(AUTH);
-    expect(mockEval).toHaveBeenCalledWith(expect.objectContaining({ jobType: 'activations' }));
+    expect(mockAutoDecideEnabled).toHaveBeenCalledOnce();
+    expect(mockProcess).toHaveBeenCalledTimes(2);
+    expect(mockProcess).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }), true);
+    expect(mockProcess).toHaveBeenCalledWith(expect.objectContaining({ id: 'a2' }), true);
   });
 
-  it('degrades a NULL photo_url to an empty base64 string without throwing', async () => {
-    mockFind.mockResolvedValue([{ ...pendingPhoto, photo_url: null }] as never);
-    mockEval.mockResolvedValue(approve as never);
+  it('tallies each processAppeal outcome into the response counters', async () => {
+    mockFind.mockResolvedValue([pending('a1'), pending('a2'), pending('a3'), pending('a4')] as never);
+    mockProcess
+      .mockResolvedValueOnce('auto_decided')
+      .mockResolvedValueOnce('scored')
+      .mockResolvedValueOnce('retried')
+      .mockResolvedValueOnce('noop');
     const res = await run(AUTH);
-    expect(mockEval).toHaveBeenCalledWith(expect.objectContaining({ photoBase64: '' }));
-    expect(res._getJSONData().data).toMatchObject({ processed: 1, scored: 1 });
+    expect(res._getJSONData().data).toMatchObject({
+      processed: 4, autoDecided: 1, scored: 1, retried: 1, skipped: false,
+    });
   });
 
-  it('routes a transient VLM outage to recordTransientFailure (retry), not a terminal write', async () => {
-    mockFind.mockResolvedValue([pendingPhoto] as never);
-    mockEval.mockResolvedValue({ ...approve, recommendation: 'uncertain', skipReason: 'vlm_unavailable' } as never);
+  it('isolates a thrown processAppeal error without aborting the rest of the batch', async () => {
+    mockFind.mockResolvedValue([pending('a1'), pending('a2')] as never);
+    mockProcess.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce('scored');
     const res = await run(AUTH);
-    expect(mockRetry).toHaveBeenCalledWith('a1', expect.objectContaining({ skipReason: 'vlm_unavailable' }), 3);
-    expect(mockRecord).not.toHaveBeenCalled();
-    expect(res._getJSONData().data).toMatchObject({ processed: 1, scored: 0, retried: 1 });
-  });
-
-  it('records a terminal uncertain (unsupported_step) rather than retrying', async () => {
-    mockFind.mockResolvedValue([pendingPhoto] as never);
-    mockEval.mockResolvedValue({ ...approve, recommendation: 'uncertain', skipReason: 'unsupported_step' } as never);
-    await run(AUTH);
-    expect(mockRecord).toHaveBeenCalledOnce();
-    expect(mockRetry).not.toHaveBeenCalled();
-  });
-
-  it('a thrown evaluator error skips that appeal without aborting the batch', async () => {
-    mockFind.mockResolvedValue([pendingPhoto, { ...pendingPhoto, id: 'a2' }] as never);
-    mockEval.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(approve as never);
-    const res = await run(AUTH);
-    expect(mockRecord).toHaveBeenCalledWith('a2', approve);
+    expect(mockProcess).toHaveBeenCalledTimes(2);
     expect(res._getJSONData().data).toMatchObject({ processed: 2, scored: 1 });
   });
 
@@ -140,17 +115,16 @@ describe('POST /api/cron/appeals-vlm', () => {
         ? Promise.resolve({ rows: [{ locked: false }] })
         : Promise.resolve({ rows: [] }),
     );
-    mockFind.mockResolvedValue([pendingPhoto] as never); // work is available…
+    mockFind.mockResolvedValue([pending('a1')] as never); // work is available…
     const res = await run(AUTH);
     // …but the tick bails before selecting or scoring anything.
     expect(mockFind).not.toHaveBeenCalled();
-    expect(mockEval).not.toHaveBeenCalled();
+    expect(mockProcess).not.toHaveBeenCalled();
     expect(res._getJSONData().data).toMatchObject({ processed: 0, scored: 0, retried: 0, skipped: true });
   });
 
   it('releases the advisory lock and returns the connection (not destroyed) after a run', async () => {
-    mockFind.mockResolvedValue([pendingPhoto] as never);
-    mockEval.mockResolvedValue(approve as never);
+    mockFind.mockResolvedValue([pending('a1')] as never);
     await run(AUTH);
     const unlocked = dbClient.query.mock.calls.some((c) => (c[0] as string).includes('pg_advisory_unlock'));
     expect(unlocked).toBe(true);

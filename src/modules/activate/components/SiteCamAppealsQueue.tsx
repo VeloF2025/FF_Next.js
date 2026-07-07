@@ -36,9 +36,11 @@ export function SiteCamAppealsQueue() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
   const [denialText, setDenialText] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (status: 'pending' | 'approved' | 'denied') => {
     setLoading(true);
+    setError(null);
     try {
       const r = await fetch(`/api/activate/sitecam-appeals?status=${status}`, { credentials: 'include' });
       const j = (await r.json()) as { data: { appeals: Appeal[] } };
@@ -55,6 +57,13 @@ export function SiteCamAppealsQueue() {
   }, [tab, load]);
 
   async function decide(id: string, decision: 'approved' | 'denied') {
+    // A denial must carry a reason (the technician sees it). Surface this instead
+    // of a silently-disabled button that reads as "Deny doesn't work".
+    if (decision === 'denied' && !denialText.trim()) {
+      setError('Enter a denial reason before denying.');
+      return;
+    }
+    setError(null);
     setDeciding(id);
     try {
       const res = await fetch(`/api/activate/sitecam-appeals/${id}/decision`, {
@@ -65,6 +74,7 @@ export function SiteCamAppealsQueue() {
       });
       if (!res.ok) {
         log.error('Decision rejected', { id, status: res.status }, MODULE);
+        setError(`Could not ${decision === 'denied' ? 'deny' : 'approve'} this appeal (error ${res.status}). Please try again.`);
         return;
       }
       setDenialText('');
@@ -72,6 +82,7 @@ export function SiteCamAppealsQueue() {
       await load(tab === 'failed' ? 'pending' : tab);
     } catch (err) {
       log.error('Decision failed', { err: String(err) }, MODULE);
+      setError('Could not submit the decision — check your connection and try again.');
     } finally {
       setDeciding(null);
     }
@@ -81,14 +92,16 @@ export function SiteCamAppealsQueue() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 border-b border-neutral-200 pb-2">
+      <div className="flex gap-2 border-b border-[var(--ff-border-light)] pb-2">
         {tabs.map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium capitalize rounded-t ${
-              tab === t ? 'border-b-2 border-sky-600 text-sky-700' : 'text-neutral-500 hover:text-neutral-700'
+              tab === t
+                ? 'border-b-2 border-[var(--ff-primary)] text-[var(--ff-primary)]'
+                : 'text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]'
             }`}
           >
             {t}
@@ -102,30 +115,39 @@ export function SiteCamAppealsQueue() {
         <>
           {loading && (
             <div className="flex justify-center py-10">
-              <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-[var(--ff-text-tertiary)]" />
             </div>
           )}
 
           {!loading && appeals.length === 0 && (
-            <p className="py-10 text-center text-sm text-neutral-400">No {tab} appeals</p>
+            <p className="py-10 text-center text-sm text-[var(--ff-text-tertiary)]">No {tab} appeals</p>
           )}
 
           <div className="space-y-2">
             {appeals.map((a) => (
-              <div key={a.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+              <div key={a.id} className="rounded-xl border border-[var(--ff-border-light)] bg-[var(--ff-bg-card)] shadow-sm">
                 <button
                   type="button"
                   className="flex w-full items-center justify-between px-4 py-3 text-left"
-                  onClick={() => setExpanded(expanded === a.id ? null : a.id)}
+                  onClick={() => {
+                    const next = expanded === a.id ? null : a.id;
+                    setExpanded(next);
+                    setError(null);
+                    // Pre-fill the denial box with the VLM's reasoning so the
+                    // technician always gets the "why it fails" explanation. The
+                    // reviewer can edit/append before denying; whatever is in the
+                    // box is what gets sent.
+                    if (next && a.status === 'pending') setDenialText(a.vlm_reasoning ?? '');
+                  }}
                 >
                   <div>
-                    <span className="font-medium text-sky-700 underline-offset-2 hover:underline">{a.dr_number}</span>
-                    <span className="mx-2 text-neutral-400">·</span>
-                    <span className="text-sm text-neutral-600">
+                    <span className="font-medium text-[var(--ff-primary)] underline-offset-2 hover:underline">{a.dr_number}</span>
+                    <span className="mx-2 text-[var(--ff-text-tertiary)]">·</span>
+                    <span className="text-sm text-[var(--ff-text-secondary)]">
                       Step {a.step_number}: {STEP_LABELS[a.step_number] ?? ''}
                     </span>
-                    <span className="mx-2 text-neutral-400">·</span>
-                    <span className="text-xs text-neutral-500">{a.tech_name ?? 'Unknown'}</span>
+                    <span className="mx-2 text-[var(--ff-text-tertiary)]">·</span>
+                    <span className="text-xs text-[var(--ff-text-tertiary)]">{a.tech_name ?? 'Unknown'}</span>
                     <AiBadge advisory={a} />
                     {a.status !== 'pending' && a.human_agreed_with_vlm !== null && (
                       <span className={`ml-2 text-xs ${a.human_agreed_with_vlm ? 'text-green-600' : 'text-amber-600'}`}>
@@ -134,16 +156,16 @@ export function SiteCamAppealsQueue() {
                     )}
                   </div>
                   {expanded === a.id
-                    ? <ChevronUp className="h-4 w-4 text-neutral-400" />
-                    : <ChevronDown className="h-4 w-4 text-neutral-400" />}
+                    ? <ChevronUp className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+                    : <ChevronDown className="h-4 w-4 text-[var(--ff-text-tertiary)]" />}
                 </button>
 
                 {expanded === a.id && (
-                  <div className="border-t border-neutral-100 px-4 py-4 space-y-4">
-                    <p className="text-sm text-neutral-700">{a.appeal_text}</p>
+                  <div className="border-t border-[var(--ff-border-light)] px-4 py-4 space-y-4">
+                    <p className="text-sm text-[var(--ff-text-primary)]">{a.appeal_text}</p>
                     <VlmRecommendationPanel advisory={a} />
                     {a.serial_scanned && (
-                      <div className="text-xs text-neutral-500 space-y-1">
+                      <div className="text-xs text-[var(--ff-text-tertiary)] space-y-1">
                         <p>Serial scanned: <span className="font-mono">{a.serial_scanned}</span></p>
                         <p>Expected: <span className="font-mono">{a.serial_expected ?? 'unknown'}</span></p>
                       </div>
@@ -151,17 +173,18 @@ export function SiteCamAppealsQueue() {
                     <img
                       src={a.photo_url}
                       alt="Appeal photo"
-                      className="h-48 w-full rounded-lg object-contain border border-neutral-200 bg-neutral-50"
+                      className="h-48 w-full rounded-lg object-contain border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]"
                     />
                     {tab === 'pending' && (
                       <div className="space-y-3">
                         <textarea
                           value={denialText}
-                          onChange={(e) => setDenialText(e.target.value)}
-                          placeholder="Denial reason (required if denying)…"
+                          onChange={(e) => { setDenialText(e.target.value); if (error) setError(null); }}
+                          placeholder="Reason sent to the technician (pre-filled from the VLM — edit as needed)…"
                           rows={2}
-                          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:border-sky-400"
+                          className="w-full rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-3 py-2 text-sm text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:border-[var(--ff-primary)]"
                         />
+                        {error && <p className="text-sm text-red-500">{error}</p>}
                         <div className="flex gap-3">
                           <button
                             type="button"
@@ -173,7 +196,7 @@ export function SiteCamAppealsQueue() {
                           </button>
                           <button
                             type="button"
-                            disabled={deciding === a.id || !denialText.trim()}
+                            disabled={deciding === a.id}
                             onClick={() => void decide(a.id, 'denied')}
                             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
                           >

@@ -3,7 +3,14 @@ vi.mock('@/lib/logger', () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import pool from '@/lib/db';
-import { findPendingAppeals, recordEvaluation, recordTransientFailure } from '../appealsVlmStore';
+import {
+  findPendingAppeals,
+  findEligibleAppealById,
+  isAutoDecideEnabled,
+  recordEvaluation,
+  recordAutoDecision,
+  recordTransientFailure,
+} from '../appealsVlmStore';
 import type { AppealEvaluation } from '../appealsVlmService';
 
 const mockQuery = vi.mocked(pool.query);
@@ -79,5 +86,59 @@ describe('appealsVlmStore', () => {
       3,
     );
     expect(out).toEqual({ attempts: 0, parked: false });
+  });
+
+  it('recordEvaluation is claim-once: returns false when the guarded UPDATE matched no row', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as never);
+    const applied = await recordEvaluation('already-scored', evaluation);
+    expect(applied).toBe(false);
+    // guard prevents a second writer from overwriting a recorded evaluation
+    expect(mockQuery.mock.calls[0][0] as string).toContain('vlm_evaluated_at IS NULL');
+  });
+
+  it('isAutoDecideEnabled is true only for the exact string "true"', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ value: 'true' }], rowCount: 1 } as never);
+    expect(await isAutoDecideEnabled()).toBe(true);
+    mockQuery.mockResolvedValueOnce({ rows: [{ value: 'false' }], rowCount: 1 } as never);
+    expect(await isAutoDecideEnabled()).toBe(false);
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never); // flag absent → OFF
+    expect(await isAutoDecideEnabled()).toBe(false);
+    expect(mockQuery.mock.calls[0][0] as string).toContain('appeals_vlm_autodecide');
+  });
+
+  it('findEligibleAppealById guards on pending + unscored and returns null when nothing matches', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as never);
+    const out = await findEligibleAppealById('x');
+    expect(out).toBeNull();
+    const sql = mockQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("status = 'pending'");
+    expect(sql).toContain('vlm_evaluated_at IS NULL');
+  });
+
+  it('recordAutoDecision applies the decision + decided_via=vlm and is guarded against overriding a human', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as never);
+    const applied = await recordAutoDecision('appeal-1', evaluation, 'approved');
+    expect(applied).toBe(true);
+    const sql = mockQuery.mock.calls[0][0] as string;
+    expect(sql).toMatch(/status\s*=\s*\$9/);
+    expect(sql).toContain("decided_via        = 'vlm'");
+    expect(sql).toContain('decided_by         = NULL');
+    // never clobber a decision a human already made, never re-decide a scored row
+    expect(sql).toContain("status = 'pending'");
+    expect(sql).toContain('vlm_evaluated_at IS NULL');
+    expect(mockQuery.mock.calls[0][1] as unknown[]).toContain('approved');
+  });
+
+  it('recordAutoDecision copies the VLM reasoning into denial_reason only on a deny', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as never);
+    await recordAutoDecision('appeal-1', { ...evaluation, recommendation: 'deny', reasoning: 'no cable entry visible' }, 'denied');
+    const sql = mockQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("denial_reason      = CASE WHEN $9 = 'denied' THEN $4 ELSE denial_reason END");
+  });
+
+  it('recordAutoDecision returns false when the guard blocks the write (row no longer pending/unscored)', async () => {
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as never);
+    const applied = await recordAutoDecision('appeal-1', evaluation, 'denied');
+    expect(applied).toBe(false);
   });
 });
