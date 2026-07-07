@@ -19,7 +19,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-import { withAuth, withRole } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import type {
   ActivationProgressResponse,
@@ -428,4 +428,4 @@ function formatDateLabel(dateStr: string): string {
   return date.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' });
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'view')(handler));

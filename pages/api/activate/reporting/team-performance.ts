@@ -14,7 +14,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getTeamPerformanceReport } from '@/modules/activate/services/reportingService';
 import { log } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withPermission, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { cachedQuery } from '@/lib/queryCache';
 
 /** Cache TTL: 5 minutes — team performance data is aggregated and expensive to compute */
@@ -75,4 +75,4 @@ async function handler(
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'view')(handler));

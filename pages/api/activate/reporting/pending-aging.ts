@@ -13,7 +13,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
-import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withPermission, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -159,4 +159,4 @@ async function handler(
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('activate.reports', 'view')(handler));
