@@ -93,8 +93,12 @@ async function handler(
   // Fast path: kick off VLM scoring immediately so the appeal is checked (and, if
   // auto-decide is on, decided) in seconds instead of waiting up to a full cron
   // cycle. Fire-and-forget — best-effort, never blocks or fails the submit; the
-  // batch cron is the safety net if this doesn't land.
-  void scoreAppealNow(appealId);
+  // batch cron is the safety net if this doesn't land. scoreAppealNow already
+  // swallows its own errors; the .catch is a belt-and-suspenders guard so a future
+  // refactor that lets it reject can never surface an unhandled rejection here.
+  scoreAppealNow(appealId).catch((err: unknown) => {
+    log.warn('On-submit appeal scoring rejected unexpectedly', { appealId, err: String(err) }, MODULE);
+  });
 
   log.info('Appeal submitted', { appealId, drNumber, stepNumber }, MODULE);
   return apiResponse.success(res, { appealId });

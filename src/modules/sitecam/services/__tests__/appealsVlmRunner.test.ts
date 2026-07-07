@@ -10,11 +10,25 @@ vi.mock('../appealsVlmStore', () => ({
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { evaluateAppeal, type AppealEvaluation } from '../appealsVlmService';
-import { recordAutoDecision, recordEvaluation, recordTransientFailure } from '../appealsVlmStore';
-import { processAppeal, qualifiesForAutoDecision } from '../appealsVlmRunner';
+import {
+  findEligibleAppealById,
+  isAutoDecideEnabled,
+  recordAutoDecision,
+  recordEvaluation,
+  recordTransientFailure,
+} from '../appealsVlmStore';
+import {
+  processAppeal,
+  qualifiesForAutoDecision,
+  scoreAppealNow,
+  toAppealInput,
+  toRawBase64,
+} from '../appealsVlmRunner';
 import type { PendingAppeal } from '../appealsVlmStore';
 
 const mockEvaluate = vi.mocked(evaluateAppeal);
+const mockFindById = vi.mocked(findEligibleAppealById);
+const mockAutoDecideEnabled = vi.mocked(isAutoDecideEnabled);
 const mockAutoDecision = vi.mocked(recordAutoDecision);
 const mockRecordEval = vi.mocked(recordEvaluation);
 const mockTransient = vi.mocked(recordTransientFailure);
@@ -37,6 +51,10 @@ describe('qualifiesForAutoDecision', () => {
     expect(qualifiesForAutoDecision({ ...base, recommendation: 'approve' })).toBe(true);
   });
 
+  it('accepts exactly the 0.80 confidence threshold (boundary)', () => {
+    expect(qualifiesForAutoDecision({ ...base, confidence: 0.8 })).toBe(true);
+  });
+
   it('rejects uncertain', () => {
     expect(qualifiesForAutoDecision({ ...base, recommendation: 'uncertain' })).toBe(false);
   });
@@ -49,22 +67,34 @@ describe('qualifiesForAutoDecision', () => {
     expect(qualifiesForAutoDecision({ ...base, galleryExamplesUsed: 0 })).toBe(false);
   });
 
-  it('allows a SERIAL appeal (no gallery) on confidence alone', () => {
+  it('NEVER auto-decides a SERIAL appeal (no gallery anchor), even at barcode-level confidence', () => {
+    // Serial mode leaves galleryExamplesUsed undefined. Both sides of a serial match are
+    // requester-controlled (submitted scan value + submitted photo), so an auto-approve
+    // could be fabricated — it must always fall to a human until validated server-side.
     const serial = { ...base, galleryExamplesUsed: undefined };
-    expect(qualifiesForAutoDecision(serial)).toBe(true);
+    expect(qualifiesForAutoDecision(serial)).toBe(false);
+    expect(qualifiesForAutoDecision({ ...serial, recommendation: 'approve' })).toBe(false);
   });
 });
 
 describe('processAppeal', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('auto-decides when the flag is ON and the evaluation qualifies', async () => {
+  it('auto-decides when the flag is ON and the evaluation qualifies (deny → "denied")', async () => {
     mockEvaluate.mockResolvedValue(base);
     mockAutoDecision.mockResolvedValue(true);
     const outcome = await processAppeal(appeal, true);
     expect(outcome).toBe('auto_decided');
     expect(mockAutoDecision).toHaveBeenCalledWith('a1', base, 'denied');
     expect(mockRecordEval).not.toHaveBeenCalled();
+  });
+
+  it('maps an approve recommendation to the "approved" decision', async () => {
+    mockEvaluate.mockResolvedValue({ ...base, recommendation: 'approve' });
+    mockAutoDecision.mockResolvedValue(true);
+    const outcome = await processAppeal(appeal, true);
+    expect(outcome).toBe('auto_decided');
+    expect(mockAutoDecision).toHaveBeenCalledWith('a1', expect.objectContaining({ recommendation: 'approve' }), 'approved');
   });
 
   it('stays advisory (never auto-decides) when the flag is OFF, even for a confident result', async () => {
@@ -93,10 +123,71 @@ describe('processAppeal', () => {
     expect(mockRecordEval).not.toHaveBeenCalled();
   });
 
-  it('reports noop when it loses the claim-once race', async () => {
+  it('reports noop when it loses the claim-once race on an auto-decision', async () => {
     mockEvaluate.mockResolvedValue(base);
     mockAutoDecision.mockResolvedValue(false);
     const outcome = await processAppeal(appeal, true);
     expect(outcome).toBe('noop');
+  });
+
+  it('reports noop when it loses the claim-once race on an advisory write', async () => {
+    mockEvaluate.mockResolvedValue(base);
+    mockRecordEval.mockResolvedValue(false);
+    const outcome = await processAppeal(appeal, false);
+    expect(outcome).toBe('noop');
+  });
+});
+
+describe('scoreAppealNow (on-submit fast path)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('no-ops (never evaluates) when the appeal is no longer eligible', async () => {
+    mockFindById.mockResolvedValue(null);
+    await scoreAppealNow('a1');
+    expect(mockEvaluate).not.toHaveBeenCalled();
+    expect(mockAutoDecideEnabled).not.toHaveBeenCalled();
+  });
+
+  it('scores an eligible appeal, threading the resolved auto-decide flag through', async () => {
+    mockFindById.mockResolvedValue(appeal);
+    mockAutoDecideEnabled.mockResolvedValue(true);
+    mockEvaluate.mockResolvedValue(base); // deny, gallery 6, conf 0.95 → qualifies
+    mockAutoDecision.mockResolvedValue(true);
+    await scoreAppealNow('a1');
+    expect(mockAutoDecideEnabled).toHaveBeenCalledOnce();
+    expect(mockAutoDecision).toHaveBeenCalledWith('a1', base, 'denied');
+  });
+
+  it('swallows an unexpected error and resolves (the submit request must never fail)', async () => {
+    mockFindById.mockRejectedValue(new Error('db down'));
+    await expect(scoreAppealNow('a1')).resolves.toBeUndefined();
+    expect(mockEvaluate).not.toHaveBeenCalled();
+  });
+});
+
+describe('toRawBase64', () => {
+  it('strips a data-URI prefix, leaving raw base64', () => {
+    expect(toRawBase64('data:image/jpeg;base64,AAAA')).toBe('AAAA');
+    expect(toRawBase64('data:image/png;base64,ZZZZ')).toBe('ZZZZ');
+  });
+  it('degrades a null photo to an empty string', () => {
+    expect(toRawBase64(null)).toBe('');
+  });
+  it('leaves an already-raw base64 string untouched', () => {
+    expect(toRawBase64('AAAA')).toBe('AAAA');
+  });
+});
+
+describe('toAppealInput', () => {
+  it('maps a pending row to the evaluator input, stripping the data URI', () => {
+    expect(toAppealInput(appeal)).toMatchObject({
+      jobType: 'activations', stepNumber: 3, photoBase64: 'xxx', appealText: 'outside photo',
+    });
+  });
+  it('defaults a NULL job_type to activations', () => {
+    expect(toAppealInput({ ...appeal, job_type: null }).jobType).toBe('activations');
+  });
+  it('degrades a NULL photo_url to an empty base64 string', () => {
+    expect(toAppealInput({ ...appeal, photo_url: null }).photoBase64).toBe('');
   });
 });

@@ -7,10 +7,14 @@
  * Decision policy (go-live, when the flag is on):
  *   - Only a clear `approve`/`deny` at confidence >= AUTO_DECIDE_MIN_CONFIDENCE
  *     is auto-applied. `uncertain` / low confidence stay pending for a human.
- *   - A PHOTO appeal is auto-decided ONLY if it was cross-referenced against the
- *     step's gallery (galleryExamplesUsed > 0). No gallery reference → no auto
- *     decision, it falls back to the human queue. Serial appeals (barcode/OCR,
- *     no gallery) are gated on confidence alone.
+ *   - ONLY a PHOTO appeal can be auto-decided, and only if it was cross-referenced
+ *     against the step's gallery (galleryExamplesUsed > 0). No gallery reference →
+ *     no auto decision, it falls back to the human queue.
+ *   - SERIAL appeals are NEVER auto-decided: the match compares the photo's
+ *     OCR/barcode read against the technician-submitted scanned/expected values,
+ *     both requester-controlled with no server-trusted anchor, so an auto-approve
+ *     could be fabricated. They always go to a human until serial values are
+ *     validated server-side against the original failed attempt.
  *   - A transient VLM outage is retried; every other outcome is written once.
  */
 import { log } from '@/lib/logger';
@@ -56,10 +60,15 @@ export function qualifiesForAutoDecision(evaluation: AppealEvaluation): boolean 
   const rec = evaluation.recommendation;
   if (rec !== 'approve' && rec !== 'deny') return false;
   if (evaluation.confidence < AUTO_DECIDE_MIN_CONFIDENCE) return false;
-  // Photo mode carries a gallery count; serial mode leaves it undefined. Require a
-  // photo to have actually been cross-referenced against the gallery before deciding.
+  // Auto-decision requires the gallery cross-reference, which ONLY photo appeals
+  // carry (galleryExamplesUsed is set). A serial appeal (galleryExamplesUsed
+  // undefined) matches the photo's OCR/barcode read against the technician-supplied
+  // scanned/expected values — both requester-controlled — so it can never be
+  // auto-decided; it falls to a human. Re-enabling needs server-side serial
+  // validation against the original failed attempt.
   const isPhotoMode = evaluation.galleryExamplesUsed !== undefined;
-  if (isPhotoMode && (evaluation.galleryExamplesUsed ?? 0) <= 0) return false;
+  if (!isPhotoMode) return false;
+  if ((evaluation.galleryExamplesUsed ?? 0) <= 0) return false;
   return true;
 }
 

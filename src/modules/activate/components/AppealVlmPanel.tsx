@@ -19,9 +19,9 @@ export interface VlmAdvisory {
 }
 
 const REC_STYLES: Record<'approve' | 'deny' | 'uncertain', string> = {
-  approve: 'bg-green-100 text-green-700',
-  deny: 'bg-red-100 text-red-700',
-  uncertain: 'bg-neutral-100 text-[var(--ff-text-tertiary)]',
+  approve: 'bg-[var(--ff-success)]/20 text-[var(--ff-success)]',
+  deny: 'bg-[var(--ff-danger)]/20 text-[var(--ff-danger)]',
+  uncertain: 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]',
 };
 
 export function AiBadge({ advisory }: { advisory: VlmAdvisory }) {
@@ -53,7 +53,7 @@ export function VlmRecommendationPanel({ advisory }: { advisory: VlmAdvisory }) 
         <ul className="space-y-1">
           {advisory.vlm_checks.map((c) => (
             <li key={c.name} className="text-xs text-[var(--ff-text-tertiary)]">
-              <span className={c.verdict === 'pass' ? 'text-green-600' : c.verdict === 'fail' ? 'text-red-600' : 'text-[var(--ff-text-tertiary)]'}>
+              <span className={c.verdict === 'pass' ? 'text-[var(--ff-success)]' : c.verdict === 'fail' ? 'text-[var(--ff-danger)]' : 'text-[var(--ff-text-tertiary)]'}>
                 {c.verdict}
               </span>{' '}
               <span className="font-medium">{c.name}</span> — {c.evidence}
