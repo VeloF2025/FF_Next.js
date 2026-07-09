@@ -1,18 +1,20 @@
 // src/modules/billing/services/processOltDropoffClosures.ts
 /**
- * Auto-clear OLT Investigate records when a previously note2/note4-flagged DR
- * drops off FiberTime's weekly notes.
+ * Auto-clear OLT Investigate records when FibreTime's weekly notes show that a
+ * previously flagged DR no longer needs investigation.
  *
  * Called best-effort from the weekly billing bundle import (and as a read-only
  * dry-run on preview). For one project + week it:
- *   1. finds DRs flagged note2/note4 in PRIOR weeks (priorFlagged),
- *   2. subtracts this week's note2/note4 DRs (currentFlagged) → droppedOff,
- *   3. intersects droppedOff with currently-OPEN olt_mismatch_records,
- *   4. closes the linked NOC ticket (cascade removes the record) or resolves
- *      the unticketed record directly, and writes the DR-history audit.
+ *   1. keeps the existing note2/note4 rule: if a DR was note2/note4 before and
+ *      is not note2/note4 this week, close it;
+ *   2. adds the conservative all-notes rule: if a DR was note1/note3/note5
+ *      before and is absent from ALL current notes, close it;
+ *   3. intersects candidates with currently-OPEN olt_mismatch_records;
+ *   4. closes the linked NOC ticket (cascade resolves the record) or resolves
+ *      the unticketed record directly, and writes DR-history audit rows.
  *
- * Trust model: FT dropping the note is treated as authoritative (decided
- * 2026-06-24). Self-healing: a later re-deduction is re-detected by the OLT
+ * Trust model: FT dropping the relevant note/sheet entry is treated as
+ * authoritative. Self-healing: a later re-deduction is re-detected by the OLT
  * report import and flagged not_returned by processExpectedRecoveries.
  */
 
@@ -25,19 +27,29 @@ export interface OpenMismatchRecord {
 }
 
 /**
- * Pure drop-off filter: open records whose DR was flagged note2/note4 before
- * (`priorFlaggedDrs`) and is NOT flagged note2/note4 this week
- * (`currentFlaggedDrs`). The prior gate ensures we never touch records that are
- * open purely from auto-detection (never FT-flagged).
+ * Pure drop-off filter.
+ *
+ * Rules:
+ * - note2/note4 preserve the original behaviour: prior note2/4 and no current
+ *   note2/4 means close.
+ * - other notes only close when the DR is absent from ALL current notes. This
+ *   avoids closing a DR that merely moved from note5 to note2, etc.
+ *
+ * The prior gates ensure we never touch records open purely from auto-detection
+ * and never FT-flagged.
  */
 export function computeDropOffClosures(
-  priorFlaggedDrs: Set<string>,
-  currentFlaggedDrs: Set<string>,
+  priorNote2or4Drs: Set<string>,
+  currentNote2or4Drs: Set<string>,
   openRecords: OpenMismatchRecord[],
+  priorOtherNoteDrs: Set<string> = new Set(),
+  currentAnyNoteDrs: Set<string> = currentNote2or4Drs,
 ): OpenMismatchRecord[] {
-  return openRecords.filter(
-    (r) => priorFlaggedDrs.has(r.dropNumber) && !currentFlaggedDrs.has(r.dropNumber),
-  );
+  return openRecords.filter((r) => {
+    const note2or4Dropoff = priorNote2or4Drs.has(r.dropNumber) && !currentNote2or4Drs.has(r.dropNumber);
+    const otherNoteAllNotesDropoff = priorOtherNoteDrs.has(r.dropNumber) && !currentAnyNoteDrs.has(r.dropNumber);
+    return note2or4Dropoff || otherNoteAllNotesDropoff;
+  });
 }
 
 import { createLogger } from '@/lib/logger';
@@ -69,6 +81,7 @@ export interface OltDropoffInput {
   project: string;
   weekEnding: string; // 'YYYY-MM-DD'
   currentNote2or4Drs: Set<string>;
+  currentAnyNoteDrs: Set<string>;
   notesPresent: boolean;
   dryRun: boolean;
 }
@@ -83,7 +96,7 @@ export interface OltDropoffOutcome {
 function auditMessage(project: string, weekEnding: string): string {
   return (
     `Auto-cleared: FibreFlow weekly notes for ${project} WE${weekEnding} no longer list ` +
-    `this DR under note2/note4 — FiberTime considers the issue resolved. ` +
+    `this DR under the applicable FT note rule — FiberTime considers the issue resolved. ` +
     `Cleared automatically on notes import.`
   );
 }
@@ -91,31 +104,39 @@ function auditMessage(project: string, weekEnding: string): string {
 export async function processOltDropoffClosures(
   input: OltDropoffInput,
 ): Promise<OltDropoffOutcome> {
-  const { project, weekEnding, currentNote2or4Drs, notesPresent, dryRun } = input;
+  const { project, weekEnding, currentNote2or4Drs, currentAnyNoteDrs, notesPresent, dryRun } = input;
   const empty: OltDropoffOutcome = { evaluated: false, candidates: [], closedTickets: 0, resolvedRecords: 0 };
 
   // Safety invariant: no authority to declare drop-offs without a notes XLSX.
   if (!notesPresent) return empty;
 
-  // 1. DRs flagged note2/note4 in PRIOR weeks for this project (+ which notes).
+  // 1. DRs flagged in PRIOR weeks for this project (+ which notes). Split the
+  // current note2/note4 behaviour from the new conservative all-notes rule.
   const priorRes = await pool.query<{ dr_number: string; deduction_note: NoteCode }>(
     `SELECT DISTINCT dr_number, deduction_note
        FROM ft_billing_deductions
       WHERE project = $1
-        AND deduction_note IN ('note2','note4')
+        AND deduction_note IN ('note1','note2','note3','note4','note5')
         AND week_ending < $2::date`,
     [project, weekEnding],
   );
-  const priorDrs = new Set<string>();
+  const priorNote2or4Drs = new Set<string>();
+  const priorOtherNoteDrs = new Set<string>();
   const priorNotesByDr = new Map<string, NoteCode[]>();
   for (const row of priorRes.rows) {
-    priorDrs.add(row.dr_number);
+    if (row.deduction_note === 'note2' || row.deduction_note === 'note4') {
+      priorNote2or4Drs.add(row.dr_number);
+    } else {
+      priorOtherNoteDrs.add(row.dr_number);
+    }
     const notes = priorNotesByDr.get(row.dr_number) ?? [];
     if (!notes.includes(row.deduction_note)) notes.push(row.deduction_note);
     priorNotesByDr.set(row.dr_number, notes);
   }
 
-  const droppedOff = [...priorDrs].filter((dr) => !currentNote2or4Drs.has(dr));
+  const note2or4DroppedOff = [...priorNote2or4Drs].filter((dr) => !currentNote2or4Drs.has(dr));
+  const otherNotesDroppedOffAllNotes = [...priorOtherNoteDrs].filter((dr) => !currentAnyNoteDrs.has(dr));
+  const droppedOff = [...new Set([...note2or4DroppedOff, ...otherNotesDroppedOffAllNotes])];
   if (droppedOff.length === 0) return { ...empty, evaluated: true };
 
   // 2. Currently-OPEN mismatch records among the dropped-off DRs.
@@ -139,7 +160,13 @@ export async function processOltDropoffClosures(
     ticketStatus: row.ticket_status,
   }));
 
-  const targets = computeDropOffClosures(priorDrs, currentNote2or4Drs, openRecords);
+  const targets = computeDropOffClosures(
+    priorNote2or4Drs,
+    currentNote2or4Drs,
+    openRecords,
+    priorOtherNoteDrs,
+    currentAnyNoteDrs,
+  );
 
   const outcome: OltDropoffOutcome = {
     evaluated: true,
@@ -183,7 +210,7 @@ export async function processOltDropoffClosures(
             ticketId: updated.id,
             ticketUid: updated.ticket_uid ?? t.ticketUid ?? '',
             triggeringEvent: 'ft_note_dropoff',
-            ruleName: 'note2note4_dropoff_autoclose',
+            ruleName: 'weekly_notes_dropoff_autoclose',
           },
           DR_HISTORY_ACTOR,
         );

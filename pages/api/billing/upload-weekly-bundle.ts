@@ -191,10 +191,12 @@ async function handler(
                 .filter((d) => d.note === 'note2' || d.note === 'note4')
                 .map((d) => d.drNumber),
             );
+            const currentAnyNoteDrs = new Set(r.deductions.map((d) => d.drNumber));
             const dry = await processOltDropoffClosures({
               project: r.resolution.project.name,
               weekEnding: r.summary.weekEnding,
               currentNote2or4Drs,
+              currentAnyNoteDrs,
               notesPresent: r.files.some((f) => f.kind === 'notes-xlsx'),
               dryRun: true,
             });
@@ -586,10 +588,12 @@ async function importProjectResult(
           .filter((d) => d.note === 'note2' || d.note === 'note4')
           .map((d) => d.drNumber),
       );
+      const currentAnyNoteDrs = new Set(r.deductions.map((d) => d.drNumber));
       const dropoff = await processOltDropoffClosures({
         project: canonicalName,
         weekEnding: summary.weekEnding,
         currentNote2or4Drs,
+        currentAnyNoteDrs,
         notesPresent: notesFilename != null,
         dryRun: false,
       });

@@ -35,6 +35,32 @@ describe('computeDropOffClosures', () => {
   it('no prior flags → nothing dropped off', () => {
     expect(computeDropOffClosures(new Set(), new Set(['DR1']), [rec('DR1')])).toEqual([]);
   });
+
+  it('closes prior note1/3/5 records only when the DR is absent from all current notes', () => {
+    const priorNote2or4 = new Set<string>();
+    const currentNote2or4 = new Set<string>();
+    const priorOtherNotes = new Set(['DR_NOTE1_GONE', 'DR_NOTE5_MOVED']);
+    const currentAnyNotes = new Set(['DR_NOTE5_MOVED']);
+    const out = computeDropOffClosures(
+      priorNote2or4,
+      currentNote2or4,
+      [rec('DR_NOTE1_GONE'), rec('DR_NOTE5_MOVED')],
+      priorOtherNotes,
+      currentAnyNotes,
+    );
+    expect(out.map((r) => r.dropNumber)).toEqual(['DR_NOTE1_GONE']);
+  });
+
+  it('still preserves note2/note4 drop-off behaviour independently of all-notes movement', () => {
+    const out = computeDropOffClosures(
+      new Set(['DR_NOTE2_MOVED']),
+      new Set<string>(),
+      [rec('DR_NOTE2_MOVED')],
+      new Set<string>(),
+      new Set(['DR_NOTE2_MOVED']),
+    );
+    expect(out.map((r) => r.dropNumber)).toEqual(['DR_NOTE2_MOVED']);
+  });
 });
 
 import { vi, beforeEach } from 'vitest';
@@ -72,7 +98,7 @@ describe('processOltDropoffClosures — guards', () => {
   it('is a no-op when notesPresent is false', async () => {
     const out = await processOltDropoffClosures({
       project: 'Lawley', weekEnding: '2026-06-21',
-      currentNote2or4Drs: new Set(), notesPresent: false, dryRun: false,
+      currentNote2or4Drs: new Set(), currentAnyNoteDrs: new Set(), notesPresent: false, dryRun: false,
     });
     expect(out.evaluated).toBe(false);
     expect(query).not.toHaveBeenCalled();
@@ -86,11 +112,23 @@ describe('processOltDropoffClosures — dryRun', () => {
       .mockResolvedValueOnce({ rows: [{ id: 'rec1', drop_number: 'DR1', maintenance_ticket_id: null, ticket_uid: null, ticket_status: null }] }); // open
     const out = await processOltDropoffClosures({
       project: 'Lawley', weekEnding: '2026-06-21',
-      currentNote2or4Drs: new Set(), notesPresent: true, dryRun: true,
+      currentNote2or4Drs: new Set(), currentAnyNoteDrs: new Set(), notesPresent: true, dryRun: true,
     });
     expect(out.candidates.map((c) => c.dropNumber)).toEqual(['DR1']);
     expect(updateTicket).not.toHaveBeenCalled();
     expect(query).toHaveBeenCalledTimes(2); // prior + open only, no UPDATE
+  });
+
+  it('returns prior note5 candidates only when absent from all current notes', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [{ dr_number: 'DR5', deduction_note: 'note5' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'rec5', drop_number: 'DR5', maintenance_ticket_id: 'tk5', ticket_uid: 'NOC-5', ticket_status: 'assigned' }] });
+    const out = await processOltDropoffClosures({
+      project: 'Etwatwa', weekEnding: '2026-07-05',
+      currentNote2or4Drs: new Set(), currentAnyNoteDrs: new Set(), notesPresent: true, dryRun: true,
+    });
+    expect(out.candidates).toEqual([{ dropNumber: 'DR5', ticketUid: 'NOC-5' }]);
+    expect(updateTicket).not.toHaveBeenCalled();
   });
 });
 
@@ -104,7 +142,7 @@ describe('processOltDropoffClosures — import', () => {
 
     const out = await processOltDropoffClosures({
       project: 'Lawley', weekEnding: '2026-06-21',
-      currentNote2or4Drs: new Set(), notesPresent: true, dryRun: false,
+      currentNote2or4Drs: new Set(), currentAnyNoteDrs: new Set(), notesPresent: true, dryRun: false,
     });
 
     expect(updateTicket).toHaveBeenCalledWith('tk1', expect.objectContaining({ status: 'resolved' }));
@@ -121,7 +159,7 @@ describe('processOltDropoffClosures — import', () => {
       .mockResolvedValue({ rows: [], rowCount: 1 }); // the direct UPDATE
     const out = await processOltDropoffClosures({
       project: 'Lawley', weekEnding: '2026-06-21',
-      currentNote2or4Drs: new Set(), notesPresent: true, dryRun: false,
+      currentNote2or4Drs: new Set(), currentAnyNoteDrs: new Set(), notesPresent: true, dryRun: false,
     });
     expect(updateTicket).not.toHaveBeenCalled();
     expect(out.resolvedRecords).toBe(1);
@@ -138,7 +176,7 @@ describe('processOltDropoffClosures — import', () => {
       .mockResolvedValue({ rows: [], rowCount: 0 }); // UPDATE matched nothing — record already terminal
     const out = await processOltDropoffClosures({
       project: 'Lawley', weekEnding: '2026-06-21',
-      currentNote2or4Drs: new Set(), notesPresent: true, dryRun: false,
+      currentNote2or4Drs: new Set(), currentAnyNoteDrs: new Set(), notesPresent: true, dryRun: false,
     });
     expect(updateTicket).not.toHaveBeenCalled();
     expect(out.resolvedRecords).toBe(0);
