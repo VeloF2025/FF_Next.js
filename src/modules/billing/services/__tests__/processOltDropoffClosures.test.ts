@@ -36,30 +36,24 @@ describe('computeDropOffClosures', () => {
     expect(computeDropOffClosures(new Set(), new Set(['DR1']), [rec('DR1')])).toEqual([]);
   });
 
-  it('closes prior note1/3/5 records only when the DR is absent from all current notes', () => {
-    const priorNote2or4 = new Set<string>();
-    const currentNote2or4 = new Set<string>();
-    const priorOtherNotes = new Set(['DR_NOTE1_GONE', 'DR_NOTE5_MOVED']);
+  it('closes any prior weekly-note record only when the DR is absent from all current notes', () => {
+    const priorNotes = new Set(['DR_NOTE1_GONE', 'DR_NOTE5_MOVED']);
     const currentAnyNotes = new Set(['DR_NOTE5_MOVED']);
     const out = computeDropOffClosures(
-      priorNote2or4,
-      currentNote2or4,
-      [rec('DR_NOTE1_GONE'), rec('DR_NOTE5_MOVED')],
-      priorOtherNotes,
+      priorNotes,
       currentAnyNotes,
+      [rec('DR_NOTE1_GONE'), rec('DR_NOTE5_MOVED')],
     );
     expect(out.map((r) => r.dropNumber)).toEqual(['DR_NOTE1_GONE']);
   });
 
-  it('still preserves note2/note4 drop-off behaviour independently of all-notes movement', () => {
+  it('does not close a prior note2/note4 DR that merely moved to another current note', () => {
     const out = computeDropOffClosures(
       new Set(['DR_NOTE2_MOVED']),
-      new Set<string>(),
-      [rec('DR_NOTE2_MOVED')],
-      new Set<string>(),
       new Set(['DR_NOTE2_MOVED']),
+      [rec('DR_NOTE2_MOVED')],
     );
-    expect(out.map((r) => r.dropNumber)).toEqual(['DR_NOTE2_MOVED']);
+    expect(out).toEqual([]);
   });
 });
 
@@ -106,23 +100,31 @@ describe('processOltDropoffClosures — guards', () => {
 });
 
 describe('processOltDropoffClosures — dryRun', () => {
-  it('returns candidates and mutates nothing', async () => {
+  it('returns all open ticket candidates by DR and mutates nothing', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ dr_number: 'DR1', deduction_note: 'note4' }] }) // prior
-      .mockResolvedValueOnce({ rows: [{ id: 'rec1', drop_number: 'DR1', maintenance_ticket_id: null, ticket_uid: null, ticket_status: null }] }); // open
+      .mockResolvedValueOnce({ rows: [
+        { maintenance_ticket_id: 'tk1', drop_number: 'DR1', ticket_uid: 'NOC-1', ticket_status: 'open' },
+        { maintenance_ticket_id: 'tk2', drop_number: 'DR1', ticket_uid: 'NOC-2', ticket_status: 'assigned' },
+      ] }) // open maintenance tickets by DR
+      .mockResolvedValueOnce({ rows: [] }); // unticketed OLT records
     const out = await processOltDropoffClosures({
       project: 'Lawley', weekEnding: '2026-06-21',
       currentNote2or4Drs: new Set(), currentAnyNoteDrs: new Set(), notesPresent: true, dryRun: true,
     });
-    expect(out.candidates.map((c) => c.dropNumber)).toEqual(['DR1']);
+    expect(out.candidates).toEqual([
+      { dropNumber: 'DR1', ticketUid: 'NOC-1' },
+      { dropNumber: 'DR1', ticketUid: 'NOC-2' },
+    ]);
     expect(updateTicket).not.toHaveBeenCalled();
-    expect(query).toHaveBeenCalledTimes(2); // prior + open only, no UPDATE
+    expect(query).toHaveBeenCalledTimes(3); // prior + tickets + unticketed records, no UPDATE
   });
 
-  it('returns prior note5 candidates only when absent from all current notes', async () => {
+  it('returns prior note5 ticket candidates only when absent from all current notes', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ dr_number: 'DR5', deduction_note: 'note5' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'rec5', drop_number: 'DR5', maintenance_ticket_id: 'tk5', ticket_uid: 'NOC-5', ticket_status: 'assigned' }] });
+      .mockResolvedValueOnce({ rows: [{ maintenance_ticket_id: 'tk5', drop_number: 'DR5', ticket_uid: 'NOC-5', ticket_status: 'assigned' }] })
+      .mockResolvedValueOnce({ rows: [] });
     const out = await processOltDropoffClosures({
       project: 'Etwatwa', weekEnding: '2026-07-05',
       currentNote2or4Drs: new Set(), currentAnyNoteDrs: new Set(), notesPresent: true, dryRun: true,
@@ -136,7 +138,8 @@ describe('processOltDropoffClosures — import', () => {
   it('closes the ticket via cascade for a ticketed record', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ dr_number: 'DR1', deduction_note: 'note4' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'rec1', drop_number: 'DR1', maintenance_ticket_id: 'tk1', ticket_uid: 'NOC-1', ticket_status: 'open' }] })
+      .mockResolvedValueOnce({ rows: [{ maintenance_ticket_id: 'tk1', drop_number: 'DR1', ticket_uid: 'NOC-1', ticket_status: 'open' }] })
+      .mockResolvedValueOnce({ rows: [] }) // unticketed OLT records
       .mockResolvedValue({ rows: [], rowCount: 1 }); // any follow-up UPDATE
     updateTicket.mockResolvedValue({ id: 'tk1', ticket_uid: 'NOC-1', status: 'resolved', dr_number: 'DR1' });
 
@@ -155,7 +158,8 @@ describe('processOltDropoffClosures — import', () => {
   it('resolves an unticketed record directly', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ dr_number: 'DR9', deduction_note: 'note2' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'rec9', drop_number: 'DR9', maintenance_ticket_id: null, ticket_uid: null, ticket_status: null }] })
+      .mockResolvedValueOnce({ rows: [] }) // no open maintenance tickets
+      .mockResolvedValueOnce({ rows: [{ id: 'rec9', drop_number: 'DR9' }] })
       .mockResolvedValue({ rows: [], rowCount: 1 }); // the direct UPDATE
     const out = await processOltDropoffClosures({
       project: 'Lawley', weekEnding: '2026-06-21',
@@ -163,8 +167,8 @@ describe('processOltDropoffClosures — import', () => {
     });
     expect(updateTicket).not.toHaveBeenCalled();
     expect(out.resolvedRecords).toBe(1);
-    // Third query is the resolving UPDATE on olt_mismatch_records.
-    const updateCall = query.mock.calls[2]?.[0] as string;
+    // Fourth query is the resolving UPDATE on olt_mismatch_records.
+    const updateCall = query.mock.calls[3]?.[0] as string;
     expect(updateCall).toMatch(/UPDATE olt_mismatch_records/i);
     expect(updateCall).toMatch(/fix_status\s*=\s*'resolved'/i);
   });
@@ -172,7 +176,8 @@ describe('processOltDropoffClosures — import', () => {
   it('does NOT count a record whose UPDATE matched 0 rows (already fixed/resolved)', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ dr_number: 'DR9', deduction_note: 'note2' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'rec9', drop_number: 'DR9', maintenance_ticket_id: null, ticket_uid: null, ticket_status: null }] })
+      .mockResolvedValueOnce({ rows: [] }) // no open maintenance tickets
+      .mockResolvedValueOnce({ rows: [{ id: 'rec9', drop_number: 'DR9' }] })
       .mockResolvedValue({ rows: [], rowCount: 0 }); // UPDATE matched nothing — record already terminal
     const out = await processOltDropoffClosures({
       project: 'Lawley', weekEnding: '2026-06-21',
