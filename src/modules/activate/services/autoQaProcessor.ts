@@ -204,7 +204,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       : [];
     const urlByFilename = new Map(photosMetadataForCable.map((p) => [p.filename, p.url]));
     await applyOntBackCableCheck(dropNumber, photoResults, urlByFilename, discardedPhotos);
-    await applyStepQualityCheck(dropNumber, photoResults, urlByFilename);
+    const qualityCheck = await applyStepQualityCheck(dropNumber, photoResults, urlByFilename);
 
     // --- PHASE 3: Data Validation ---
     const stepCoverage = checkStepCoverage(validationData.photos);
@@ -246,7 +246,15 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       feedbackMessage,
     };
 
-    await persistAutoQaResults(dropNumber, decision, autoFailResult, autoQaResults, stepCoverage, discardedPhotos);
+    // If any visual quality check could not complete (VLM error after retries),
+    // hold the DR for human review: keep it in the HITL queue but suppress the
+    // auto-feedback cron so no unverified "approved" goes to the technician.
+    const holdForHumanReason = qualityCheck.checkIncomplete ? 'quality_check_incomplete' : null;
+    if (holdForHumanReason) {
+      log.warn(`${dropNumber}: quality check incomplete — auto-feedback held for human review`);
+    }
+
+    await persistAutoQaResults(dropNumber, decision, autoFailResult, autoQaResults, stepCoverage, discardedPhotos, holdForHumanReason);
 
     await logActivity(
       dropNumber,

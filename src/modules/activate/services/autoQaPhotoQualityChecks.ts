@@ -63,18 +63,31 @@ export async function applyOntBackCableCheck(
   return noCableCount;
 }
 
+export interface StepQualityCheckSummary {
+  /** Photos demoted from PASS to FAIL because they failed the visual criteria. */
+  demoted: number;
+  /**
+   * True when at least one photo's quality check could not complete (VLM error
+   * after every retry). The DR must then be held for human review rather than
+   * silently keeping its categorization PASS — see autoQaProcessor.
+   */
+  checkIncomplete: boolean;
+}
+
 /**
  * Run a per-step visual quality check for every currently-PASS photo whose
  * step is in QUALITY_CHECK_STEPS (step 6 is excluded — covered by the cable
- * check above). On VLM/network failure for a photo, leave its verdict intact.
+ * check above).
  *
- * Returns the number of photos that were demoted from PASS to FAIL.
+ * A photo that fails the criteria is demoted PASS→FAIL. A photo whose check
+ * could not complete (VLM error after retries) keeps its verdict but flips
+ * `checkIncomplete` so the DR is held for human review — never silently passed.
  */
 export async function applyStepQualityCheck(
   dropNumber: string,
   photoResults: AutoQaPhotoResult[],
   urlByFilename: Map<string, string>,
-): Promise<number> {
+): Promise<StepQualityCheckSummary> {
   const qualityCheckStepsSet = new Set<number>(QUALITY_CHECK_STEPS);
   const photosForQualityCheck: Array<{ filename: string; url: string; step: number }> = [];
 
@@ -85,15 +98,21 @@ export async function applyStepQualityCheck(
     photosForQualityCheck.push({ filename: p.filename, url, step: p.step });
   }
 
-  if (photosForQualityCheck.length === 0) return 0;
+  if (photosForQualityCheck.length === 0) return { demoted: 0, checkIncomplete: false };
 
   const qualityResults = await validateStepQuality(dropNumber, photosForQualityCheck);
   let qualityFailCount = 0;
+  let checkIncomplete = false;
 
   for (const photo of photoResults) {
     if (!qualityCheckStepsSet.has(photo.step)) continue;
     const result = qualityResults.get(photo.filename);
-    if (!result || result.checkFailed) continue; // preserve original on VLM/network error
+    if (!result) continue;
+    if (result.checkFailed) {
+      // Inconclusive — do NOT keep an unverified PASS; hold the DR for a human.
+      checkIncomplete = true;
+      continue;
+    }
     if (!result.passes && result.failReason) {
       photo.decision = 'FAIL';
       photo.comment = result.failReason;
@@ -104,5 +123,8 @@ export async function applyStepQualityCheck(
   if (qualityFailCount > 0) {
     log.info(`Step quality check failed ${qualityFailCount} photo(s) for ${dropNumber}`);
   }
-  return qualityFailCount;
+  if (checkIncomplete) {
+    log.warn(`Step quality check incomplete for ${dropNumber} — holding for human review (auto-feedback suppressed)`);
+  }
+  return { demoted: qualityFailCount, checkIncomplete };
 }

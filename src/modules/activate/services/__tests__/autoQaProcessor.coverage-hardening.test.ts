@@ -50,7 +50,7 @@ vi.mock('../autoQaDuplicateDetector', () => ({
 }));
 vi.mock('../autoQaPhotoQualityChecks', () => ({
   applyOntBackCableCheck: vi.fn(async () => 0),
-  applyStepQualityCheck: vi.fn(async () => 0),
+  applyStepQualityCheck: vi.fn(async () => ({ demoted: 0, checkIncomplete: false })),
 }));
 
 import { findEligibleDRs } from '../autoQaProcessor';

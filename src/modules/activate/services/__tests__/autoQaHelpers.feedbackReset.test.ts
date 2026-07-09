@@ -38,13 +38,41 @@ describe('persistAutoQaResults feedback-cycle reset', () => {
       coverage,
     );
 
-    const updateSql = mockQuery.mock.calls
-      .map((c) => c[0] as string)
-      .find((sql) => sql.includes("human_review_status = 'pending_hitl'"));
-    expect(updateSql).toBeDefined();
+    const updateCall = mockQuery.mock.calls.find(
+      (c) => typeof c[0] === 'string' && (c[0] as string).includes("human_review_status = 'pending_hitl'"),
+    );
+    expect(updateCall).toBeDefined();
+    const updateSql = updateCall![0] as string;
+    const params = updateCall![1] as unknown[];
     expect(updateSql).toContain('feedback_sent = false');
     expect(updateSql).toContain('auto_feedback_sent_at = NULL');
     expect(updateSql).toContain('auto_feedback_attempts = 0');
-    expect(updateSql).toContain('auto_feedback_skip_reason = NULL');
+    // Skip reason is now parameterised ($17) so it can hold a DR for human review.
+    expect(updateSql).toContain('auto_feedback_skip_reason = $17');
+    // No hold reason passed → param is null → normal auto-feedback flow.
+    expect(params[16]).toBeNull();
+  });
+
+  it('holds the DR (sets auto_feedback_skip_reason) when a hold reason is passed', async () => {
+    const autoFail = { autoFail: false, reasons: [] } as unknown as ReturnType<typeof evaluateAutoFail>;
+    const coverage = { covered: [1, 2], missing: [] } as unknown as ReturnType<typeof checkStepCoverage>;
+
+    await persistAutoQaResults(
+      'DR_HOLD',
+      'PASS',
+      autoFail,
+      { summary: { decision: 'pass' }, photos: [], validations: [] } as never,
+      coverage,
+      undefined,
+      'quality_check_incomplete',
+    );
+
+    const updateCall = mockQuery.mock.calls.find(
+      (c) => typeof c[0] === 'string' && (c[0] as string).includes("human_review_status = 'pending_hitl'"),
+    );
+    expect(updateCall).toBeDefined();
+    const params = updateCall![1] as unknown[];
+    // $17 carries the hold reason → auto-feedback cron skips this DR.
+    expect(params[16]).toBe('quality_check_incomplete');
   });
 });
