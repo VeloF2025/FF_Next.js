@@ -1,0 +1,16 @@
+-- scripts/migrations/sql/440_fibreflow_user_idle_session_timeout.sql
+-- Backstop for connection-slot exhaustion (2026-07-10 production outage).
+-- Leaked idle connections from `next build` jest-workers accumulated (146 zombie
+-- `ff-pg-app` connections) until they hit max_connections=200 and locked the live
+-- app out. The code fix (src/lib/db.ts build-phase guard, same PR) stops the leak
+-- at the source; this is defense-in-depth: Postgres will terminate any
+-- fibreflow_user session left idle (NOT in a transaction) for 30 minutes, so a
+-- future leak of this class self-heals instead of piling up over days.
+--
+-- 30min sits well above the app pool's own 30s idle eviction (src/lib/db.ts) and
+-- above any legitimate short-lived cron connection, so it only reaps genuine
+-- zombies. Applies to NEW sessions only; the existing leaked sessions from the
+-- 2026-07-10 incident are cleared out-of-band by killing the orphaned workers.
+-- idle_session_timeout is a USERSET parameter, so fibreflow_user may set it on
+-- itself (no superuser required). Requires PostgreSQL 14+ (Supabase is 15+).
+ALTER ROLE fibreflow_user SET idle_session_timeout = '30min';

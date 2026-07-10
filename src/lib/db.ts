@@ -48,22 +48,48 @@ const useSSL = process.env.DATABASE_URL?.includes('sslmode=require') ?? false;
 // raising max_connections (host RAM is ample); these pools are already minimal.
 // `application_name` is set so the NEXT saturation is diagnosable per env/pool
 // (PORT 3000 = prod, 3005 = dev) instead of an anonymous block of idle connections.
+// Build-phase guard (added 2026-07-10 after a production outage). During
+// `next build`, Next spawns ~30 jest-worker children for static generation and
+// each imports this module. With `min: 1` plus the eager warm-up below, every
+// worker permanently holds one connection — idle eviction never drops below
+// `min`, and the open socket keeps the (later orphaned) worker alive after the
+// build finishes. Each build therefore leaks ~30 idle `fibreflow_user`
+// connections; after a few builds they exhaust Postgres max_connections and lock
+// the live app out (that was the 2026-07-10 outage: 146 zombie `ff-pg-app`
+// connections == 146 orphaned build workers). In build phase we keep no
+// connection floor (min:0) and skip the warm-up, and tag any residual build-time
+// query with a distinct application_name so it is instantly diagnosable.
+export function resolvePoolConfig(env: NodeJS.ProcessEnv = process.env) {
+  const isBuildPhase = env.NEXT_PHASE === 'phase-production-build';
+  return {
+    isBuildPhase,
+    applicationName: `ff-pg-${env.PORT || (isBuildPhase ? 'build' : 'app')}`,
+    min: isBuildPhase ? 0 : 1,
+  };
+}
+
+const { isBuildPhase, applicationName, min } = resolvePoolConfig();
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: useSSL ? { rejectUnauthorized: false } : false,
-  application_name: `ff-pg-${process.env.PORT || 'app'}`,
+  application_name: applicationName,
   max: 10,
-  min: 1,
+  min,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
 });
 
-// Warm up pool on startup so first user request doesn't hit a cold Neon connection
-pool.connect()
-  .then(client => { client.release(); log.info('[db] pool warmed up'); })
-  .catch(err => log.warn('[db] pool warm-up failed, will retry on first query:', err.message));
+// Warm up pool on startup so first user request doesn't hit a cold connection.
+// Skipped during `next build` (see build-phase guard above): a warm-up connection
+// there would keep a jest-worker alive and leak once the build orphans it.
+if (!isBuildPhase) {
+  pool.connect()
+    .then(client => { client.release(); log.info('[db] pool warmed up'); })
+    .catch(err => log.warn('[db] pool warm-up failed, will retry on first query:', err.message));
+}
 
 export default pool;
 export { pool };
