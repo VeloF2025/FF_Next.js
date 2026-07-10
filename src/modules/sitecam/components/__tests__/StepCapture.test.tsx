@@ -130,4 +130,15 @@ describe('StepCapture test-only serial-scan skip (NEXT_PUBLIC_SITECAM_ALLOW_UPLO
     fireEvent.click(skip);
     expect(onSkipSerial).toHaveBeenCalledTimes(1);
   });
+
+  // TEMPORARY (dev testing): the flag also opens gallery upload on every step so
+  // other-site photos can exercise camera-only steps. Remove with the feature.
+  it('shows "Upload Photo (test)" on a camera-only step when the flag is "true"', async () => {
+    vi.resetModules();
+    vi.stubEnv('NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD', 'true');
+    const { StepCapture: FlaggedStepCapture } = await import('../StepCapture');
+    // step 1 is camera-only (no allowUpload prop) — normally no gallery button.
+    render(<FlaggedStepCapture step={step({ status: 'pending' })} {...baseProps} />);
+    expect(screen.getByText('Upload Photo (test)')).toBeTruthy();
+  });
 });

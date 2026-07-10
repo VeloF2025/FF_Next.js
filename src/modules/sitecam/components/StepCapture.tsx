@@ -6,12 +6,16 @@ import type { StepState } from '../hooks/useSiteCamCapture';
 import { SerialScanStep } from './SerialScanStep';
 import { savePhotoToDevice, stepPhotoFilename } from '../lib/savePhotoToDevice';
 
-// ─── TEMPORARY: dev-only serial-scan skip ────────────────────────────────────
-// Gated to dev via the build-time flag; NEVER enabled in production. Lets a
-// tester advance past the step-6 serial scan when no physical ONT/UPS barcode is
-// on hand, so downstream steps can be exercised. (This flag previously also gated
-// a test gallery-upload on every step; that was replaced by the per-step
-// `allowUpload` button — a permanent production feature — see Props.allowUpload.)
+// ─── TEMPORARY: dev-only test affordances ────────────────────────────────────
+// Gated to dev via the build-time flag; NEVER enabled in production. When true it:
+//   1. shows a "Skip serial scan (test)" button so a tester can advance past the
+//      step-6 serial scan with no physical ONT/UPS barcode on hand, and
+//   2. shows the gallery "Upload Photo (test)" button on EVERY step (see
+//      `showUpload` below) so other-site photos can be fed into steps that are
+//      normally camera-only — for full end-to-end test coverage.
+// The per-step `allowUpload` prop (steps 10–12) is a SEPARATE, PERMANENT
+// production feature and is unaffected by this flag — see Props.allowUpload.
+// To revert (2) later: drop the `|| ALLOW_TEST_UPLOAD` in `showUpload` below.
 const ALLOW_TEST_UPLOAD = process.env.NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD === 'true';
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -59,6 +63,12 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSe
   const showCamera = step.status === 'pending' || step.status === 'fail';
   const showSerialScan = step.status === 'serial_scan';
   const remaining = Math.max(0, 3 - step.attemptNumber);
+  // Show the gallery upload when the step legitimately allows it (permanent —
+  // steps 10–12) OR when the dev test flag is on (TEMPORARY — every step, so a
+  // tester can feed other-site photos into camera-only steps). Remove the
+  // `|| ALLOW_TEST_UPLOAD` to revert to production behaviour.
+  const showUpload = allowUpload || ALLOW_TEST_UPLOAD;
+  const isTestUpload = !allowUpload && ALLOW_TEST_UPLOAD;
   const showAppeal =
     !appealPending &&
     ((step.status === 'fail' && step.attemptNumber > 0) || step.status === 'escalated');
@@ -185,7 +195,7 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSe
               No `capture` attribute → on a phone this opens the gallery/file
               picker. The chosen file flows through the exact same onCapture →
               watermark → validate pipeline as a camera photo. */}
-          {allowUpload && (
+          {showUpload && (
             <>
               <button
                 type="button"
@@ -193,7 +203,7 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSe
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-600 bg-neutral-900 py-3 text-sm font-medium text-neutral-300 hover:border-sky-500 hover:bg-neutral-800 transition-colors"
               >
                 <Upload className="h-5 w-5" />
-                Upload Photo
+                {isTestUpload ? 'Upload Photo (test)' : 'Upload Photo'}
               </button>
               <input
                 ref={uploadInputRef}
