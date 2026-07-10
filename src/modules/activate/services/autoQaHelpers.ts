@@ -58,7 +58,14 @@ export async function persistAutoQaResults(
   autoFailResult: ReturnType<typeof evaluateAutoFail>,
   autoQaResults: AutoQaResults,
   stepCoverage: ReturnType<typeof checkStepCoverage>,
-  discardedPhotos?: Array<{ filename: string; originalStep: number; reason: string }>
+  discardedPhotos?: Array<{ filename: string; originalStep: number; reason: string }>,
+  /**
+   * When set, holds the DR for human review by pre-populating
+   * auto_feedback_skip_reason (the auto-feedback cron only sends when it is
+   * NULL). Used when a visual quality check could not complete, so an
+   * unverified PASS is never auto-sent to the technician. Null = normal flow.
+   */
+  holdForHumanReason: string | null = null,
 ): Promise<void> {
   const reasons = decision === 'PASS' ? [] : autoFailResult.reasons;
   const reasonDescriptions = reasons.map((r) => ({ check: r, status: 'fail', message: getFailReasonDescription(r) }));
@@ -88,7 +95,9 @@ export async function persistAutoQaResults(
        feedback_sent = false,
        auto_feedback_sent_at = NULL,
        auto_feedback_attempts = 0,
-       auto_feedback_skip_reason = NULL,
+       -- Held for human review when the visual quality check was inconclusive;
+       -- NULL otherwise so a clean re-run resumes normal auto-feedback.
+       auto_feedback_skip_reason = $17,
        step_01_house_photo = $5,
        step_02_cable_from_pole = $6,
        step_03_entry_outside = $7,
@@ -111,6 +120,7 @@ export async function persistAutoQaResults(
       stepBooleans[0], stepBooleans[1], stepBooleans[2], stepBooleans[3], stepBooleans[4],
       stepBooleans[5], stepBooleans[6], stepBooleans[7], stepBooleans[8], stepBooleans[9],
       stepBooleans[10], stepBooleans[11],
+      holdForHumanReason,
     ]
   );
 
