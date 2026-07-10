@@ -130,4 +130,36 @@ describe('StepCapture test-only serial-scan skip (NEXT_PUBLIC_SITECAM_ALLOW_UPLO
     fireEvent.click(skip);
     expect(onSkipSerial).toHaveBeenCalledTimes(1);
   });
+
+  // TEMPORARY (dev testing): the flag also opens gallery upload on every step so
+  // other-site photos can exercise camera-only steps. Remove with the feature.
+  it('shows "Upload Photo (test)" on a camera-only step when the flag is "true"', async () => {
+    vi.resetModules();
+    vi.stubEnv('NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD', 'true');
+    const { StepCapture: FlaggedStepCapture } = await import('../StepCapture');
+    // step 1 is camera-only (no allowUpload prop) — normally no gallery button.
+    render(<FlaggedStepCapture step={step({ status: 'pending' })} {...baseProps} />);
+    expect(screen.getByText('Upload Photo (test)')).toBeTruthy();
+  });
+
+  it('keeps a camera-only step gallery-free when the flag is explicitly "false"', async () => {
+    // Fail-closed: an explicit "false" (not just unset) must not open the upload.
+    vi.resetModules();
+    vi.stubEnv('NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD', 'false');
+    const { StepCapture: FlaggedStepCapture } = await import('../StepCapture');
+    render(<FlaggedStepCapture step={step({ status: 'pending' })} {...baseProps} />);
+    expect(screen.queryByText('Upload Photo')).toBeNull();
+    expect(screen.queryByText('Upload Photo (test)')).toBeNull();
+  });
+
+  it('labels the permanent allowUpload button plainly (not "(test)") even with the flag on', async () => {
+    // Steps 10–12 pass allowUpload; the dev flag must not relabel their
+    // permanent, production button as a test affordance.
+    vi.resetModules();
+    vi.stubEnv('NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD', 'true');
+    const { StepCapture: FlaggedStepCapture } = await import('../StepCapture');
+    render(<FlaggedStepCapture step={step({ status: 'pending' })} {...baseProps} allowUpload />);
+    expect(screen.getByText('Upload Photo')).toBeTruthy();
+    expect(screen.queryByText('Upload Photo (test)')).toBeNull();
+  });
 });
