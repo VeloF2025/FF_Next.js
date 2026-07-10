@@ -157,6 +157,14 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
                 No tech JID
               </span>
             )}
+            {review.auto_feedback_skip_reason === 'quality_check_incomplete' && (
+              <span
+                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200"
+                title="A visual quality check could not complete — auto-feedback was held. Double-check photo quality before approving."
+              >
+                ⚠ Quality check held
+              </span>
+            )}
           </div>
         </div>
       </div>

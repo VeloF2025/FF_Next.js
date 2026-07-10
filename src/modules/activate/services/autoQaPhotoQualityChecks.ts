@@ -7,8 +7,10 @@
  *  1. ONT-back green-cable — Step 6 photos must show a green fiber cable
  *     plugged into the fiber port; otherwise reclassify to Step 0.
  *  2. Step quality — for steps in QUALITY_CHECK_STEPS (excl. step 6) that
- *     are currently PASS, run a per-step visual VLM check; fail-open on
- *     network/VLM errors to preserve the original verdict.
+ *     are currently PASS, run a per-step visual VLM check. The check is
+ *     retried; if it still can't complete, the DR is HELD for human review
+ *     (checkIncomplete) rather than keeping an unverified PASS — never a
+ *     silent fail-open (see applyStepQualityCheck).
  *
  * Both mutate `photoResults` in place and append to `discardedPhotos`.
  */

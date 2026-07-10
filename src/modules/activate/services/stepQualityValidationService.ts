@@ -8,8 +8,11 @@
  * Step 6 is excluded — handled by validateOntBackCables.
  * Criteria + prompt builder live in ./stepQualityCriteria.
  *
- * On any VLM/network error the original decision is preserved (checkFailed=true),
- * so transient failures never cause false discards.
+ * Each VLM call is retried (see QUALITY_CHECK_MAX_ATTEMPTS). Only when every
+ * attempt fails does the check report `checkFailed=true` — which means
+ * INCONCLUSIVE, not "pass": the caller holds the DR for human review rather
+ * than keeping an unverified PASS. A transient VLM outage therefore never
+ * silently auto-approves a photo.
  */
 
 import { log } from '@/lib/logger';
