@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 
 /**
  * Guards the 2026-07-10 production outage fix: during `next build` the pool must
@@ -8,17 +8,23 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
  * max_connections and locked the live app out).
  */
 
-type ResolvePoolConfig = typeof import('@/lib/db')['resolvePoolConfig'];
-let resolvePoolConfig: ResolvePoolConfig;
+type DbModule = typeof import('@/lib/db');
+let dbModule: DbModule;
+let resolvePoolConfig: DbModule['resolvePoolConfig'];
 
 beforeAll(async () => {
-  // Set build phase BEFORE loading the module so its load-time warm-up
+  // Stub build phase BEFORE loading the module so its load-time warm-up
   // (pool.connect) is skipped and the test never opens a real DB connection.
-  // vi.importActual bypasses the global @/lib/db mock in vitest.setup.ts so we
-  // exercise the real resolvePoolConfig.
-  process.env.NEXT_PHASE = 'phase-production-build';
-  const actual = await vi.importActual<typeof import('@/lib/db')>('@/lib/db');
-  resolvePoolConfig = actual.resolvePoolConfig;
+  // vi.stubEnv is auto-reverted by unstubAllEnvs() below, so NEXT_PHASE can't
+  // leak into other test files. vi.importActual bypasses the global @/lib/db
+  // mock in vitest.setup.ts so we exercise the real module.
+  vi.stubEnv('NEXT_PHASE', 'phase-production-build');
+  dbModule = await vi.importActual<DbModule>('@/lib/db');
+  resolvePoolConfig = dbModule.resolvePoolConfig;
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('resolvePoolConfig — build-phase connection-leak guard', () => {
@@ -46,5 +52,20 @@ describe('resolvePoolConfig — build-phase connection-leak guard', () => {
     expect(cfg.isBuildPhase).toBe(true);
     expect(cfg.min).toBe(0);
     expect(cfg.applicationName).toBe('ff-pg-3000');
+  });
+});
+
+describe('exported Pool wiring (regression guard for the outage fix)', () => {
+  // The module was imported under NEXT_PHASE=phase-production-build in beforeAll,
+  // so the real Pool must have been constructed FROM resolvePoolConfig — i.e. with
+  // min:0 and the build app_name. This fails if a future edit re-hardcodes min:1
+  // or unwires resolvePoolConfig from `new Pool(...)`: the exact regressions that
+  // would reintroduce the leak while leaving the pure-function tests green.
+  it('constructs the Pool with the resolved build-phase config', () => {
+    const options = (dbModule.pool as unknown as {
+      options: { min?: number; application_name?: string };
+    }).options;
+    expect(options.min).toBe(0);
+    expect(options.application_name).toBe('ff-pg-build');
   });
 });

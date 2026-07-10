@@ -3,14 +3,24 @@
 -- Leaked idle connections from `next build` jest-workers accumulated (146 zombie
 -- `ff-pg-app` connections) until they hit max_connections=200 and locked the live
 -- app out. The code fix (src/lib/db.ts build-phase guard, same PR) stops the leak
--- at the source; this is defense-in-depth: Postgres will terminate any
--- fibreflow_user session left idle (NOT in a transaction) for 30 minutes, so a
--- future leak of this class self-heals instead of piling up over days.
+-- at the source; this is defense-in-depth: Postgres terminates any fibreflow_user
+-- session left idle for 1 hour, so a future leak of this class self-heals instead
+-- of piling up over days.
 --
--- 30min sits well above the app pool's own 30s idle eviction (src/lib/db.ts) and
--- above any legitimate short-lived cron connection, so it only reaps genuine
--- zombies. Applies to NEW sessions only; the existing leaked sessions from the
--- 2026-07-10 incident are cleared out-of-band by killing the orphaned workers.
+-- Blast radius (shared dev+prod DB): this is role-scoped, so it also applies to the
+-- always-on runtime pools (:3000 / :3005), which hold one warm `min:1` connection.
+-- It is safe by construction:
+--   * idle_session_timeout ONLY terminates sessions that are idle AND NOT inside a
+--     transaction — it never interrupts an in-flight query or an open transaction.
+--   * When Postgres closes an idle pooled connection, node-postgres (pg-pool)
+--     discards that client and opens a fresh one on the next query, so the runtime
+--     pools self-heal with at most one extra reconnect. Verified against pg-pool's
+--     idle-client error handling; the app pool's own idleTimeoutMillis is 30s.
+--   * 1h sits ~120x above that 30s eviction and far above any legitimate idle
+--     runtime connection, so in practice it only ever reaps genuine zombies.
+-- Applies to NEW sessions only; existing 2026-07-10 zombies are cleared out-of-band
+-- by killing the orphaned workers (see docs/incidents/2026-07-10-...md). Merging
+-- this PR does NOT run the migration — it is applied deliberately via the runner.
 -- idle_session_timeout is a USERSET parameter, so fibreflow_user may set it on
 -- itself (no superuser required). Requires PostgreSQL 14+ (Supabase is 15+).
-ALTER ROLE fibreflow_user SET idle_session_timeout = '30min';
+ALTER ROLE fibreflow_user SET idle_session_timeout = '1h';

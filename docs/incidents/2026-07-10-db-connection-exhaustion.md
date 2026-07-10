@@ -40,8 +40,10 @@ rebuilds.
    Any residual build-time query is tagged `ff-pg-build` for instant diagnosis.
    Covered by `src/lib/__tests__/db.test.ts`.
 2. **Migration 440 — `idle_session_timeout` backstop.** `ALTER ROLE fibreflow_user
-   SET idle_session_timeout = '30min'` so any future leak of this class self-heals
-   instead of piling up over days.
+   SET idle_session_timeout = '1h'` so any future leak of this class self-heals
+   instead of piling up over days. Role-scoped but safe: `idle_session_timeout`
+   never interrupts an in-flight query or open transaction, and pg-pool reconnects
+   idle clients Postgres closes. Applied via the migration runner, not on merge.
 
 ## Required server-side follow-ups (NOT in this repo)
 `/home/velo/scripts/fibreflow-health-check-v2.sh` is not version-controlled. Apply

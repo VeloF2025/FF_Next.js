@@ -59,6 +59,11 @@ const useSSL = process.env.DATABASE_URL?.includes('sslmode=require') ?? false;
 // connections == 146 orphaned build workers). In build phase we keep no
 // connection floor (min:0) and skip the warm-up, and tag any residual build-time
 // query with a distinct application_name so it is instantly diagnosable.
+// This removes the *guaranteed* leak (every worker held a min:1 floor). A build
+// worker that still issues a real query opens a connection under min:0; if that
+// worker is orphaned before the 30s idle eviction fires, the connection is
+// bounded by the migration-440 `idle_session_timeout` backstop, not leaked
+// indefinitely — bounded, not fully eliminated.
 export function resolvePoolConfig(env: NodeJS.ProcessEnv = process.env) {
   const isBuildPhase = env.NEXT_PHASE === 'phase-production-build';
   return {
