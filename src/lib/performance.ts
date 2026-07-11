@@ -52,34 +52,13 @@ function getRating(
 }
 
 /**
- * Send metrics to analytics endpoint
+ * Record the metric. Dev-only logging: there is no server-side vitals sink —
+ * the old `/api/analytics/web-vitals` beacon 401'd for every portal/field
+ * session and discarded the payload even when authorised, so it was removed.
  */
-async function sendToAnalytics(metric: WebVitalsMetric): Promise<void> {
-  // Only send in production
+function sendToAnalytics(metric: WebVitalsMetric): void {
   if (process.env.NODE_ENV !== 'production') {
     log.debug('performance', { action: 'web-vitals-metric', metric });
-    return;
-  }
-
-  try {
-    // Send to Vercel Analytics (if available)
-    if (typeof window !== 'undefined' && 'va' in window) {
-      (window as unknown as { va?: (event: string, name: string, data: WebVitalsMetric) => void }).va?.('track', 'web-vitals', metric);
-    }
-
-    // Send to custom analytics endpoint
-    await fetch('/api/analytics/web-vitals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(metric),
-      // Don't wait for response
-      keepalive: true,
-    }).catch(() => {
-      // Silently fail - don't impact user experience
-    });
-  } catch (error) {
-    // Silently fail - performance tracking shouldn't break the app
-    log.error('performance', { action: 'send-metric-failed', error });
   }
 }
 
