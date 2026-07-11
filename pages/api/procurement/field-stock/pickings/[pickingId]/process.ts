@@ -10,7 +10,6 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { transaction, query } from '@/lib/db-pool';
-import type { TxnClient } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
@@ -22,6 +21,8 @@ import {
   getOrCreateContractorHolder,
 } from '@/modules/procurement/field-stock/services/stockHolderService';
 import { promotePickingSerials } from '@/modules/procurement/field-stock/services/pickingSerialPromotion';
+import { validateStockAvailability } from './_availability';
+import type { PickingLine } from './_availability';
 import {
   assertHolderNotBlocked,
   assertHolderAutoBlock,
@@ -29,19 +30,6 @@ import {
   HolderBlockedError,
   HolderAutoBlockedError,
 } from '@/modules/procurement/field-stock/services/holderBlockGuard';
-
-interface PickingLine {
-  id: string;
-  stock_item_id: string;
-  planned_quantity: number;
-  serial_ids?: string[];
-  lot_number?: string | null;
-  unit_cost?: number | null;
-}
-
-interface StockQuantRow extends Record<string, unknown> {
-  quantity: number;
-}
 
 interface Picking {
   id: string;
@@ -57,32 +45,6 @@ interface Picking {
   contractor_name: string | null;
   signed_by: string | null;
   lines: PickingLine[];
-}
-
-/** Verify every picking line has sufficient stock at source (runs inside txn with FOR UPDATE). */
-async function validateStockAvailability(
-  txn: TxnClient,
-  lines: PickingLine[],
-  sourceLocationId: string,
-): Promise<{ valid: true } | { valid: false; errors: Record<string, string> }> {
-  const errors: Record<string, string> = {};
-  for (const line of lines) {
-    if (!line || !line.stock_item_id) continue;
-    const quants = await txn.query<StockQuantRow>(
-      `SELECT quantity FROM stock_quants WHERE stock_item_id = $1 AND location_id = $2 FOR UPDATE`,
-      [line.stock_item_id, sourceLocationId],
-    );
-    if (quants.length === 0) {
-      errors[line.stock_item_id] = `No stock record for item ${line.stock_item_id} at source ${sourceLocationId}`;
-      continue;
-    }
-    const available = Number(quants[0]!.quantity);
-    if (available < line.planned_quantity) {
-      errors[line.stock_item_id] =
-        `Insufficient stock for ${line.stock_item_id}: required ${line.planned_quantity}, available ${available}`;
-    }
-  }
-  return Object.keys(errors).length > 0 ? { valid: false, errors } : { valid: true };
 }
 
 export async function processPicking(req: NextApiRequest, res: NextApiResponse) {

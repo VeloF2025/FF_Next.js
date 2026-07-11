@@ -62,6 +62,9 @@ interface SerialRow {
   status: string;
   /** Present only when the serial service was called via getSerials (with joins). */
   itemName?: string;
+  currentLocationId?: string | null;
+  /** Joined by the /my/stores serial route; absent from other serial endpoints. */
+  currentLocationName?: string | null;
 }
 
 // =============================================================================
@@ -84,6 +87,8 @@ export async function validateSerial(serialNumber: string): Promise<{
   valid: boolean;
   stockItemId?: string;
   stockItemName?: string;
+  currentLocationId?: string | null;
+  currentLocationName?: string | null;
   errorMessage?: string;
 }> {
   try {
@@ -96,6 +101,8 @@ export async function validateSerial(serialNumber: string): Promise<{
         valid: false,
         stockItemId: serial.stockItemId,
         stockItemName: serial.itemName,
+        currentLocationId: serial.currentLocationId,
+        currentLocationName: serial.currentLocationName,
         errorMessage: `Serial is not available (status: ${serial.status})`,
       };
     }
@@ -104,6 +111,8 @@ export async function validateSerial(serialNumber: string): Promise<{
       valid: true,
       stockItemId: serial.stockItemId,
       stockItemName: serial.itemName,
+      currentLocationId: serial.currentLocationId,
+      currentLocationName: serial.currentLocationName,
     };
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
