@@ -129,3 +129,27 @@ describe('SiteCamWizard — SiteCamSubmitPanel extraction wiring', () => {
     expect(submitAll).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('SiteCamWizard — completion summary counts', () => {
+  it('counts a serial_pending step as passed so the summary matches the photo count', () => {
+    const stepStates = [
+      ...Array.from({ length: 11 }, (_, i) => passedStep({ stepNumber: i + 1 })),
+      passedStep({ stepNumber: 12, status: 'serial_pending', serialScanned: 'ALCL12345678' }),
+    ];
+    useSiteCamCaptureMock.mockReturnValue(baseHookReturn({ stepStates }));
+    render(<SiteCamWizard profile={profile} siteInfo={SITE_INFO} />);
+
+    expect(screen.getByText('12 passed · 0 escalated')).toBeTruthy();
+  });
+
+  it('still reports escalated steps separately', () => {
+    const stepStates = [
+      passedStep({ stepNumber: 1 }),
+      passedStep({ stepNumber: 2, status: 'escalated' }),
+    ];
+    useSiteCamCaptureMock.mockReturnValue(baseHookReturn({ stepStates }));
+    render(<SiteCamWizard profile={profile} siteInfo={SITE_INFO} />);
+
+    expect(screen.getByText('1 passed · 1 escalated')).toBeTruthy();
+  });
+});

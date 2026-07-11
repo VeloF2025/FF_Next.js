@@ -6,6 +6,7 @@ import {
   buildReading,
   encodeGeofenceParam,
   decodeGeofenceParam,
+  formatGeofenceDistance,
   readDeviceLocation,
   GEOFENCE_THRESHOLD_M,
 } from '../geofence';
@@ -63,9 +64,42 @@ describe('encode/decode round-trip', () => {
     expect(decoded).toEqual(reading);
   });
 
+  it('encodes as plain JSON (router handles percent-encoding)', () => {
+    const reading = buildReading({ plannedLat: -26.1, plannedLon: 27.5, deviceLat: -26.101, deviceLon: 27.5, accuracyM: 5 });
+    expect(encodeGeofenceParam(reading).startsWith('{')).toBe(true);
+  });
+
+  it('still decodes the pre-fix double-encoded form', () => {
+    const reading = buildReading({ plannedLat: -26.1, plannedLon: 27.5, deviceLat: -26.101, deviceLon: 27.5, accuracyM: 5 });
+    const legacy = encodeURIComponent(JSON.stringify(reading));
+    expect(decodeGeofenceParam(legacy)).toEqual(reading);
+  });
+
   it('returns null for malformed param', () => {
     expect(decodeGeofenceParam('not-json')).toBeNull();
     expect(decodeGeofenceParam(undefined)).toBeNull();
+  });
+});
+
+describe('formatGeofenceDistance', () => {
+  it('shows metres below 1 km', () => {
+    expect(formatGeofenceDistance(0)).toBe('0 m');
+    expect(formatGeofenceDistance(26.7)).toBe('27 m');
+    expect(formatGeofenceDistance(999.4)).toBe('999 m');
+  });
+
+  it('shows km with one decimal below 10 km', () => {
+    expect(formatGeofenceDistance(1000)).toBe('1.0 km');
+    expect(formatGeofenceDistance(4321)).toBe('4.3 km');
+  });
+
+  it('never shows "1000 m" — values that round to 1000 flip to km', () => {
+    expect(formatGeofenceDistance(999.6)).toBe('1.0 km');
+  });
+
+  it('shows whole km from 10 km up', () => {
+    expect(formatGeofenceDistance(10_000)).toBe('10 km');
+    expect(formatGeofenceDistance(1_278_345.88)).toBe('1278 km');
   });
 });
 

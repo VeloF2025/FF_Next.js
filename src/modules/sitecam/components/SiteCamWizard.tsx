@@ -53,7 +53,11 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
   const doneCount = stepStates.filter(
     (s) => s.status === 'pass' || s.status === 'escalated' || s.status === 'serial_pending',
   ).length;
-  const passedCount = stepStates.filter((s) => s.status === 'pass').length;
+  // serial_pending is a completed step (photo taken + serial saved) — count it
+  // as passed so the summary matches the uploaded photo count.
+  const passedCount = stepStates.filter(
+    (s) => s.status === 'pass' || s.status === 'serial_pending',
+  ).length;
   const escalatedCount = stepStates.filter((s) => s.status === 'escalated').length;
   const progressPct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 

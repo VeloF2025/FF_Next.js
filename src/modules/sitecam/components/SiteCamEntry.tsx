@@ -6,6 +6,7 @@ import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { log } from '@/lib/logger';
 import type { SiteInfo } from '../hooks/useSiteCamCapture';
 import { useStartCaptureGeofence } from '../hooks/useStartCaptureGeofence';
+import { formatGeofenceDistance } from '../lib/geofence';
 import { SiteMetaGrid } from './SiteMetaGrid';
 
 const MODULE = 'SiteCamEntry';
@@ -154,7 +155,7 @@ export function SiteCamEntry({ profile }: Props) {
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>
                       {pendingWarning.status === 'out_of_range'
-                        ? `You appear to be about ${Math.round(pendingWarning.distanceM ?? 0)} m from the planned location. You can continue — this visit will be flagged for QA review.`
+                        ? `You appear to be about ${formatGeofenceDistance(pendingWarning.distanceM ?? 0)} from the planned location. You can continue — this visit will be flagged for QA review.`
                         : `Location access is off, so your visit can't be GPS-verified. You can continue — this visit will be flagged for QA review.`}
                     </span>
                   </div>

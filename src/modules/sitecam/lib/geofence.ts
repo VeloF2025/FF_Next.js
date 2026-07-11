@@ -77,9 +77,12 @@ export function buildReading(input: GeofenceInput): GeofenceReading {
   return { ...input, ...classifyGeofence(input) };
 }
 
-/** Encode a reading for a URL query param. */
+/**
+ * Encode a reading for a URL query param. Plain JSON — the Next.js router
+ * percent-encodes query values itself, so encoding here double-encodes.
+ */
 export function encodeGeofenceParam(reading: GeofenceReading): string {
-  return encodeURIComponent(JSON.stringify(reading));
+  return JSON.stringify(reading);
 }
 
 /** Decode the query param back into a reading; null when absent/malformed. */
@@ -88,10 +91,23 @@ export function decodeGeofenceParam(
 ): GeofenceReading | null {
   if (typeof raw !== 'string' || raw.length === 0) return null;
   try {
-    return JSON.parse(decodeURIComponent(raw)) as GeofenceReading;
+    return JSON.parse(raw) as GeofenceReading;
   } catch {
-    return null;
+    // Tolerate the pre-fix double-encoded form (in-flight URLs at deploy time).
+    try {
+      return JSON.parse(decodeURIComponent(raw)) as GeofenceReading;
+    } catch {
+      return null;
+    }
   }
+}
+
+/** Human-readable distance for geofence warnings: metres below 1 km, else km. */
+export function formatGeofenceDistance(distanceM: number): string {
+  const rounded = Math.round(distanceM);
+  if (rounded < 1000) return `${rounded} m`;
+  const km = distanceM / 1000;
+  return `${km.toFixed(km < 10 ? 1 : 0)} km`;
 }
 
 /**
