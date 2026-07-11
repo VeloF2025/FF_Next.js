@@ -141,6 +141,16 @@ export async function bridgeBearer(
   return token;
 }
 
+/** Thrown when a super-admin requests a lifetime beyond the 90-day cap. A distinct
+ *  class so the route can map it to a 400 (the UI offers `1y` to everyone, so this is
+ *  a normal user action, not a server fault) while every other mint failure stays 500. */
+export class McpLifetimeCapError extends Error {
+  constructor() {
+    super('Super-admin tokens are capped at 90 days — choose 30 or 90 days.');
+    this.name = 'McpLifetimeCapError';
+  }
+}
+
 /** A minted MCP bearer token plus its expiry, for display in the connect UI. */
 export interface McpToken {
   /** The HS256 JWT to paste into an MCP client config as CORTEX_USER_TOKEN. */
@@ -166,15 +176,15 @@ export interface McpToken {
  *   Super-admin emails (`CORTEX_SUPER_ADMIN_EMAILS`) are capped at `90d` — their
  *   tokens see the whole tenant, so `1y`/`never` are rejected to bound blast radius.
  * @throws if `BRIDGE_JWT_SECRET` is unset — fail LOUD rather than silently issuing a
- *   broad service credential or an empty bearer. Also throws when a super-admin
- *   requests a lifetime beyond the 90-day cap.
+ *   broad service credential or an empty bearer. Throws `McpLifetimeCapError` when a
+ *   super-admin requests a lifetime beyond the 90-day cap.
  */
 export async function mintMcpToken(
   userEmail: string,
   lifetime: Lifetime = '30d',
 ): Promise<McpToken> {
   if (isSuperAdmin(userEmail) && (lifetime === '1y' || lifetime === 'never')) {
-    throw new Error('mintMcpToken: super-admin tokens are capped at 90 days');
+    throw new McpLifetimeCapError();
   }
   const instanceId = process.env.CORTEX_INSTANCE_ID ?? 'velocity-fibre';
   const days = LIFETIME_DAYS[lifetime];

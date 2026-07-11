@@ -27,7 +27,8 @@ import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withPermission } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { bridgeBearer, mintMcpToken } from '@/lib/cortex/bridgeAuth';
+import { log } from '@/lib/logger';
+import { McpLifetimeCapError, bridgeBearer, mintMcpToken } from '@/lib/cortex/bridgeAuth';
 import type { Lifetime } from '@/lib/cortex/bridgeAuth';
 import { fetchWithTimeout } from '@/lib/cortex/meetingReviewLogic';
 
@@ -40,16 +41,32 @@ function mcpTokenUiEnabled(): boolean {
 // PHASE GATE: `never` is fully supported at the mintMcpToken/LIFETIME_DAYS level
 // (unit-tested), but not offered here yet — a later phase adds it once the admin
 // safety-net (revocation UI, audit trail) exists. Keep in sync with the dropdown.
-const ALLOWED_LIFETIMES = ['30d', '90d', '1y'] as const;
+const ALLOWED_LIFETIMES = ['30d', '90d', '1y'] as const satisfies ReadonlyArray<
+  Exclude<Lifetime, 'never'>
+>;
+
+function isAllowedLifetime(v: unknown): v is (typeof ALLOWED_LIFETIMES)[number] {
+  return typeof v === 'string' && (ALLOWED_LIFETIMES as readonly string[]).includes(v);
+}
 
 async function postHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {
-  const raw = (req.body?.lifetime ?? '30d') as string;
-  if (!ALLOWED_LIFETIMES.includes(raw as (typeof ALLOWED_LIFETIMES)[number])) {
+  const raw: unknown = req.body?.lifetime ?? '30d';
+  if (!isAllowedLifetime(raw)) {
     return apiResponse.badRequest(res, `lifetime must be one of ${ALLOWED_LIFETIMES.join(', ')}`);
   }
-  const { token, expiresAt } = await mintMcpToken(req.user.email, raw as Lifetime);
-  // The token is shown once to the user; never logged.
-  return apiResponse.success(res, { token, expiresAt });
+  try {
+    const { token, expiresAt } = await mintMcpToken(req.user.email, raw);
+    // The token is shown once to the user; never logged.
+    return apiResponse.success(res, { token, expiresAt });
+  } catch (err) {
+    // The dropdown offers `1y` to everyone, so a capped super-admin picking it is a
+    // normal user action — answer with a clear 400, not the generic 500 below.
+    if (err instanceof McpLifetimeCapError) {
+      log.warn('MCP token mint rejected: super-admin lifetime cap', { lifetime: raw }, 'cortex-mcp-token');
+      return apiResponse.badRequest(res, err.message);
+    }
+    throw err;
+  }
 }
 
 async function deleteHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {

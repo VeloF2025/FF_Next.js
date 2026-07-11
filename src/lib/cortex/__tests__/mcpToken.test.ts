@@ -9,7 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { decodeProtectedHeader, decodeJwt, jwtVerify } from 'jose';
-import { LIFETIME_DAYS, mintMcpToken } from '@/lib/cortex/bridgeAuth';
+import { LIFETIME_DAYS, McpLifetimeCapError, mintMcpToken } from '@/lib/cortex/bridgeAuth';
 
 const SECRET = 'test-bridge-secret-value-0123456789';
 const USER = 'bob@velocityfibre.co.za';
@@ -161,8 +161,9 @@ describe('mintMcpToken — super-admin cap', () => {
     else process.env.CORTEX_SUPER_ADMIN_EMAILS = savedAdmins;
   });
 
-  it('rejects "1y" for a super-admin email', async () => {
+  it('rejects "1y" for a super-admin email with the typed cap error (route maps it to 400)', async () => {
     await expect(mintMcpToken(ADMIN, '1y')).rejects.toThrow(/capped at 90 days/);
+    await expect(mintMcpToken(ADMIN, '1y')).rejects.toBeInstanceOf(McpLifetimeCapError);
   });
 
   it('rejects "never" for a super-admin email', async () => {

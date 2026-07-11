@@ -127,6 +127,23 @@ describe('CortexConnectPanel', () => {
     expect(screen.queryByLabelText(/cortex mcp token/i)).toBeNull();
   });
 
+  it("surfaces the server's error message on a 400 (e.g. the super-admin 90-day cap)", async () => {
+    mockFetchOnce(() => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: 'Super-admin tokens are capped at 90 days — choose 30 or 90 days.' },
+      }),
+    }));
+    render(<CortexConnectPanel />);
+    fireEvent.change(screen.getByLabelText(/token lifetime/i), { target: { value: '1y' } });
+    fireEvent.click(screen.getByRole('button', { name: /generate token/i }));
+
+    await waitFor(() => expect(screen.getByText(/capped at 90 days/i)).toBeTruthy());
+    expect(screen.queryByLabelText(/cortex mcp token/i)).toBeNull();
+  });
+
   it('revokes via DELETE, clears the shown token, and confirms', async () => {
     // First mint, then revoke — two fetch calls.
     const fetchMock = vi.fn();
