@@ -44,12 +44,45 @@ describe('CortexConnectPanel', () => {
 
     const input = (await screen.findByLabelText(/cortex mcp token/i)) as HTMLInputElement;
     expect(input.value).toBe(TOKEN);
-    expect(global.fetch).toHaveBeenCalledWith('/api/cortex/mcp-token', { method: 'POST' });
+    // Default lifetime (90d) is sent as the JSON body.
+    expect(global.fetch).toHaveBeenCalledWith('/api/cortex/mcp-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lifetime: '90d' }),
+    });
     // Expiry rendered and the config snippet carries the token.
     expect(screen.getByText(/^Expires /)).toBeTruthy();
     expect(screen.getByText(/CORTEX_USER_TOKEN/)).toBeTruthy();
     // After a successful mint the button offers regeneration.
     expect(screen.getByRole('button', { name: /regenerate token/i })).toBeTruthy();
+  });
+
+  it('renders the lifetime dropdown, defaulted to 90 days', () => {
+    render(<CortexConnectPanel />);
+    const select = screen.getByLabelText(/token lifetime/i) as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    expect(select.value).toBe('90d');
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toEqual(['30d', '90d', '1y']);
+  });
+
+  it('sends the currently-selected lifetime in the POST body', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ data: { token: TOKEN, expiresAt: '2027-07-11T00:00:00.000Z' } }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<CortexConnectPanel />);
+    fireEvent.change(screen.getByLabelText(/token lifetime/i), { target: { value: '1y' } });
+    fireEvent.click(screen.getByRole('button', { name: /generate token/i }));
+
+    await screen.findByLabelText(/cortex mcp token/i);
+    expect(fetchMock).toHaveBeenCalledWith('/api/cortex/mcp-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lifetime: '1y' }),
+    });
   });
 
   it('copies the token to the clipboard', async () => {
@@ -91,6 +124,23 @@ describe('CortexConnectPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /generate token/i }));
 
     await waitFor(() => expect(screen.getByText(/could not generate a token/i)).toBeTruthy());
+    expect(screen.queryByLabelText(/cortex mcp token/i)).toBeNull();
+  });
+
+  it("surfaces the server's error message on a 400 (e.g. the super-admin 90-day cap)", async () => {
+    mockFetchOnce(() => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: 'Super-admin tokens are capped at 90 days — choose 30 or 90 days.' },
+      }),
+    }));
+    render(<CortexConnectPanel />);
+    fireEvent.change(screen.getByLabelText(/token lifetime/i), { target: { value: '1y' } });
+    fireEvent.click(screen.getByRole('button', { name: /generate token/i }));
+
+    await waitFor(() => expect(screen.getByText(/capped at 90 days/i)).toBeTruthy());
     expect(screen.queryByLabelText(/cortex mcp token/i)).toBeNull();
   });
 

@@ -45,13 +45,16 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 // ── Signer seam: assert identity binding without real crypto ─────────────────────
-const mintMcpToken = vi.fn(async (email: string) => ({
+const mintMcpToken = vi.fn(async (email: string, _lifetime?: string) => ({
   token: `tok-for-${email}`,
   expiresAt: '2026-07-14T00:00:00.000Z',
 }));
 const bridgeBearer = vi.fn(async (_email: string) => 'self-auth-bearer');
-vi.mock('@/lib/cortex/bridgeAuth', () => ({
-  mintMcpToken: (email: string) => mintMcpToken(email),
+// Spread the real module so McpLifetimeCapError stays the SAME class the route
+// imports — the handler's `instanceof` mapping to 400 is exercised for real.
+vi.mock('@/lib/cortex/bridgeAuth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/cortex/bridgeAuth')>()),
+  mintMcpToken: (email: string, lifetime?: string) => mintMcpToken(email, lifetime),
   bridgeBearer: (email: string) => bridgeBearer(email),
 }));
 
@@ -65,6 +68,7 @@ vi.mock('@/lib/cortex/meetingReviewLogic', () => ({
 
 // Import AFTER mocks are registered.
 import handler from '../mcp-token';
+import { McpLifetimeCapError } from '@/lib/cortex/bridgeAuth';
 
 let saved: string | undefined;
 let savedSecret: string | undefined;
@@ -88,8 +92,8 @@ afterEach(() => {
   else process.env.BRIDGE_JWT_SECRET = savedSecret;
 });
 
-function run(method: 'GET' | 'POST' | 'DELETE') {
-  const { req, res } = createMocks<NextApiRequest, NextApiResponse>({ method });
+function run(method: 'GET' | 'POST' | 'DELETE', body?: Record<string, unknown>) {
+  const { req, res } = createMocks<NextApiRequest, NextApiResponse>({ method, body });
   return { req, res, done: handler(req, res) };
 }
 
@@ -131,7 +135,7 @@ describe('POST /api/cortex/mcp-token — auth + permission (flag on)', () => {
     expect(mintMcpToken).not.toHaveBeenCalled();
   });
 
-  it('200s and returns the token minted for the VERIFIED session email', async () => {
+  it('200s and returns the token minted for the VERIFIED session email, defaulting lifetime to 30d', async () => {
     principal.email = 'alice@velocityfibre.co.za';
     const { res, done } = run('POST');
     await done;
@@ -140,9 +144,60 @@ describe('POST /api/cortex/mcp-token — auth + permission (flag on)', () => {
     expect(body.success).toBe(true);
     expect(body.data.token).toBe('tok-for-alice@velocityfibre.co.za');
     expect(body.data.expiresAt).toBe('2026-07-14T00:00:00.000Z');
-    // Identity binding: minted for the session email, exactly once.
+    // Identity binding: minted for the session email, exactly once, default lifetime.
     expect(mintMcpToken).toHaveBeenCalledTimes(1);
-    expect(mintMcpToken).toHaveBeenCalledWith('alice@velocityfibre.co.za');
+    expect(mintMcpToken).toHaveBeenCalledWith('alice@velocityfibre.co.za', '30d');
+  });
+
+  it.each(['30d', '90d', '1y'] as const)(
+    '200s and passes lifetime %s through to mintMcpToken',
+    async (lifetime) => {
+      principal.email = 'alice@velocityfibre.co.za';
+      const { res, done } = run('POST', { lifetime });
+      await done;
+      expect(res._getStatusCode()).toBe(200);
+      expect(mintMcpToken).toHaveBeenCalledWith('alice@velocityfibre.co.za', lifetime);
+    },
+  );
+
+  it('400s on an invalid lifetime value, and never mints', async () => {
+    const { res, done } = run('POST', { lifetime: 'forever' });
+    await done;
+    expect(res._getStatusCode()).toBe(400);
+    expect(mintMcpToken).not.toHaveBeenCalled();
+  });
+
+  it('400s on "never" — not offered at the endpoint yet (phase gate), and never mints', async () => {
+    const { res, done } = run('POST', { lifetime: 'never' });
+    await done;
+    expect(res._getStatusCode()).toBe(400);
+    expect(mintMcpToken).not.toHaveBeenCalled();
+  });
+
+  it('400s on a non-string lifetime, and never mints', async () => {
+    const { res, done } = run('POST', { lifetime: 365 });
+    await done;
+    expect(res._getStatusCode()).toBe(400);
+    expect(mintMcpToken).not.toHaveBeenCalled();
+  });
+
+  it('400s with the cap message (not a 500) when a super-admin requests "1y"', async () => {
+    // The UI offers "1 year" to everyone; mintMcpToken enforces the 90-day cap for
+    // super-admins by throwing McpLifetimeCapError. The route must answer 400.
+    mintMcpToken.mockRejectedValueOnce(new McpLifetimeCapError());
+    const { res, done } = run('POST', { lifetime: '1y' });
+    await done;
+    expect(res._getStatusCode()).toBe(400);
+    const body = res._getJSONData();
+    expect(body.success).toBe(false);
+    expect(body.error.message).toMatch(/capped at 90 days/);
+  });
+
+  it('500s (generic) when the mint fails for any other reason', async () => {
+    mintMcpToken.mockRejectedValueOnce(new Error('BRIDGE_JWT_SECRET is not set'));
+    const { res, done } = run('POST', { lifetime: '30d' });
+    await done;
+    expect(res._getStatusCode()).toBe(500);
   });
 });
 

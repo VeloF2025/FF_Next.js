@@ -1,11 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Lifetime } from '@/lib/cortex/bridgeAuth';
+import { McpTokenReveal, type CopyTarget } from './McpTokenReveal';
 
 /**
- * "Connect to Claude (MCP)" — self-serve panel that mints a 30-day Cortex MCP
- * bearer token for the signed-in user (POST /api/cortex/mcp-token) and shows the
- * MCP client config to paste it into.
+ * "Connect to Claude (MCP)" — self-serve panel that mints a user-selectable-lifetime
+ * (30 days / 90 days / 1 year, default 90 days) Cortex MCP bearer token for the
+ * signed-in user (POST /api/cortex/mcp-token) and shows the MCP client config to
+ * paste it into.
  *
  * The token is a bearer credential (anyone holding it queries Cortex AS this user
  * until it expires), so it is shown ONCE, never persisted client-side, and never
@@ -13,8 +16,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
  * supplies no email. To revoke, use the Revoke control (Phase 7 PR-D).
  */
 
+/** The endpoint's phase gate (ALLOWED_LIFETIMES in pages/api/cortex/mcp-token.ts)
+ *  excludes `never`, so the UI derives its narrower union from the lib's type. */
+type UiLifetime = Exclude<Lifetime, 'never'>;
+
+const LIFETIME_OPTIONS: ReadonlyArray<{ value: UiLifetime; label: string }> = [
+  { value: '30d', label: '30 days' },
+  { value: '90d', label: '90 days' },
+  { value: '1y', label: '1 year' },
+];
+
 interface MintResponse {
-  data?: { token?: string; expiresAt?: string };
+  data?: { token?: string; expiresAt?: string | null };
+  error?: { message?: string };
 }
 
 const BRIDGE_URL = ['https:', '', 'app.fibreflow.app', 'api', 'cortex-bridge'].join('/');
@@ -39,21 +53,19 @@ function configSnippet(token: string): string {
 function formatExpiry(iso: string): string {
   if (!iso) return '';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function CortexConnectPanel() {
   const [token, setToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string>('');
+  const [lifetime, setLifetime] = useState<UiLifetime>('90d');
   const [loading, setLoading] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [copied, setCopied] = useState<'token' | 'config' | null>(null);
+  const [copied, setCopied] = useState<CopyTarget | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear the "Copied!" timer on unmount so we never setState on an unmounted node.
@@ -67,20 +79,27 @@ export function CortexConnectPanel() {
     setNotice(null);
     setCopied(null);
     try {
-      const res = await fetch('/api/cortex/mcp-token', { method: 'POST' });
-      if (!res.ok) throw new Error(`${res.status}`);
-      const json = (await res.json()) as MintResponse;
-      const t = json.data?.token;
+      const res = await fetch('/api/cortex/mcp-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lifetime }),
+      });
+      const json = (await res.json().catch(() => null)) as MintResponse | null;
+      if (!res.ok) {
+        // Surface the server's reason (e.g. the super-admin 90-day cap) when given.
+        throw new Error(json?.error?.message ?? `request failed (${res.status})`);
+      }
+      const t = json?.data?.token;
       if (!t) throw new Error('no token returned');
       setToken(t);
-      setExpiresAt(json.data?.expiresAt ?? '');
+      setExpiresAt(json?.data?.expiresAt ?? '');
     } catch (e) {
       setToken(null);
       setError(`Could not generate a token: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [lifetime]);
 
   const revoke = useCallback(async () => {
     setRevoking(true);
@@ -100,7 +119,7 @@ export function CortexConnectPanel() {
     }
   }, []);
 
-  const copy = useCallback(async (text: string, which: 'token' | 'config') => {
+  const copy = useCallback(async (text: string, which: CopyTarget) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(which);
@@ -128,6 +147,21 @@ export function CortexConnectPanel() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Token lifetime</span>
+          <select
+            value={lifetime}
+            onChange={(e) => setLifetime(e.target.value as UiLifetime)}
+            disabled={loading || revoking}
+            className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+          >
+            {LIFETIME_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           onClick={() => void generate()}
@@ -150,60 +184,13 @@ export function CortexConnectPanel() {
       {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
 
       {token && (
-        <div className="flex flex-col gap-3">
-          <div className="rounded-md border border-border border-l-2 border-l-warning-500 bg-background p-3 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">Copy this token now</span> — it&apos;s shown
-            only once and acts as a password (anyone holding it can query Cortex as you until it
-            expires). Don&apos;t commit it or paste it in chat/tickets.
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-foreground">Your token</span>
-              {expiry && (
-                <span className="text-[11px] text-muted-foreground">Expires {expiry}</span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                autoComplete="off"
-                readOnly
-                value={token}
-                aria-label="Cortex MCP token"
-                onFocus={(e) => e.currentTarget.select()}
-                className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <button
-                type="button"
-                onClick={() => void copy(token, 'token')}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                {copied === 'token' ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-foreground">MCP client config</span>
-              <button
-                type="button"
-                onClick={() => void copy(snippet, 'config')}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                {copied === 'config' ? 'Copied!' : 'Copy config'}
-              </button>
-            </div>
-            <pre className="overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
-              {snippet}
-            </pre>
-            <span className="text-[11px] text-muted-foreground">
-              Paste into your Claude Desktop / Claude Code MCP settings. See the
-              <span className="font-mono"> docs/cortex-mcp-connect.md</span> guide for details.
-            </span>
-          </div>
-        </div>
+        <McpTokenReveal
+          token={token}
+          expiry={expiry}
+          snippet={snippet}
+          copied={copied}
+          onCopy={(text, which) => void copy(text, which)}
+        />
       )}
     </div>
   );
