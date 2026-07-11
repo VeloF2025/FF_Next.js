@@ -32,6 +32,19 @@ describe('formatSubmitError', () => {
     expect(msg).toContain('Second problem');
   });
 
+  it('surfaces string-array detail values (apiResponse allows string | string[])', () => {
+    const err = new ApiError(422, 'VALIDATION_ERROR', 'Validation failed', {
+      a: ['First problem', 'Second problem'],
+      b: 'Third problem',
+    });
+
+    const msg = formatSubmitError(err);
+
+    expect(msg).toContain('First problem');
+    expect(msg).toContain('Second problem');
+    expect(msg).toContain('Third problem');
+  });
+
   it('ignores non-string detail values', () => {
     const err = new ApiError(422, 'VALIDATION_ERROR', 'Validation failed', {
       a: { nested: true },

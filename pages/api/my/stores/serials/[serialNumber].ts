@@ -46,9 +46,9 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
     // currentLocationId.
     let currentLocationName: string | null = null;
     if (serial.currentLocationId) {
-      const rows = (await sql`
+      const rows = await sql<{ name: string | null }>`
         SELECT name FROM stock_locations WHERE id = ${serial.currentLocationId}
-      `) as { name: string | null }[];
+      `;
       currentLocationName = rows[0]?.name ?? null;
     }
 

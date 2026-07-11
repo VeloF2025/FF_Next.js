@@ -13,9 +13,12 @@ const FALLBACK_MESSAGE = 'An unexpected error occurred. Please try again.';
 
 export function formatSubmitError(err: unknown): string {
   if (err instanceof ApiError && err.code === 'VALIDATION_ERROR' && err.details) {
-    const detailMessages = Object.values(err.details).filter(
-      (v): v is string => typeof v === 'string'
-    );
+    // apiResponse.validationError allows string | string[] per field.
+    const detailMessages = Object.values(err.details).flatMap((v) => {
+      if (typeof v === 'string') return [v];
+      if (Array.isArray(v)) return v.filter((s): s is string => typeof s === 'string');
+      return [];
+    });
     if (detailMessages.length > 0) return detailMessages.join(' ');
   }
   return err instanceof Error ? err.message : FALLBACK_MESSAGE;
