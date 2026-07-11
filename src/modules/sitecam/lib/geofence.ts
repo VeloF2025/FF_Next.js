@@ -104,7 +104,8 @@ export function decodeGeofenceParam(
 
 /** Human-readable distance for geofence warnings: metres below 1 km, else km. */
 export function formatGeofenceDistance(distanceM: number): string {
-  if (distanceM < 1000) return `${Math.round(distanceM)} m`;
+  const rounded = Math.round(distanceM);
+  if (rounded < 1000) return `${rounded} m`;
   const km = distanceM / 1000;
   return `${km.toFixed(km < 10 ? 1 : 0)} km`;
 }

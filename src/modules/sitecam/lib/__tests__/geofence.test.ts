@@ -93,6 +93,10 @@ describe('formatGeofenceDistance', () => {
     expect(formatGeofenceDistance(4321)).toBe('4.3 km');
   });
 
+  it('never shows "1000 m" — values that round to 1000 flip to km', () => {
+    expect(formatGeofenceDistance(999.6)).toBe('1.0 km');
+  });
+
   it('shows whole km from 10 km up', () => {
     expect(formatGeofenceDistance(10_000)).toBe('10 km');
     expect(formatGeofenceDistance(1_278_345.88)).toBe('1278 km');

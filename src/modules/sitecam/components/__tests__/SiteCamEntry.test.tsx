@@ -55,4 +55,28 @@ describe('SiteCamEntry meta grid + geofence warning', () => {
     await waitFor(() => expect(screen.getByText(/location/i)).toBeTruthy());
     expect(screen.getByText(/Continue anyway/i)).toBeTruthy();
   });
+
+  it('formats a large out-of-range distance in km in the warning banner', async () => {
+    // Device ~1278 km from the planned coords (Etwatwa plan vs Western Cape device).
+    vi.stubGlobal('navigator', {
+      geolocation: {
+        getCurrentPosition: (ok: PositionCallback) =>
+          ok({
+            coords: { latitude: -34.0692166, longitude: 18.8444319, accuracy: 26 },
+          } as GeolocationPosition),
+      },
+    });
+    mockSiteFetch({
+      jobType: 'activations', siteId: 'DR2', customerName: null, address: null,
+      projectName: null, plannedLat: -26.13224, plannedLon: 28.476216, pon: 1, zone: 1,
+    });
+    render(<SiteCamEntry profile={profile} />);
+    fireEvent.change(screen.getByLabelText(/DR \/ Pole Number/i), { target: { value: 'DR2' } });
+    fireEvent.click(screen.getByText('Find'));
+    await waitFor(() => screen.getByText('Start Capture'));
+    fireEvent.click(screen.getByText('Start Capture'));
+    await waitFor(() =>
+      expect(screen.getByText(/about 1278 km from the planned location/i)).toBeTruthy(),
+    );
+  });
 });
