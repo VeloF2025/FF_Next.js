@@ -3,15 +3,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
- * "Connect to Claude (MCP)" — self-serve panel that mints a 30-day Cortex MCP
- * bearer token for the signed-in user (POST /api/cortex/mcp-token) and shows the
- * MCP client config to paste it into.
+ * "Connect to Claude (MCP)" — self-serve panel that mints a user-selectable-lifetime
+ * (30 days / 90 days / 1 year, default 90 days) Cortex MCP bearer token for the
+ * signed-in user (POST /api/cortex/mcp-token) and shows the MCP client config to
+ * paste it into.
  *
  * The token is a bearer credential (anyone holding it queries Cortex AS this user
  * until it expires), so it is shown ONCE, never persisted client-side, and never
  * logged. The server reads the identity from the verified session — this component
  * supplies no email. To revoke, use the Revoke control (Phase 7 PR-D).
  */
+
+/** Kept in sync with ALLOWED_LIFETIMES in pages/api/cortex/mcp-token.ts. */
+type Lifetime = '30d' | '90d' | '1y';
+
+const LIFETIME_OPTIONS: ReadonlyArray<{ value: Lifetime; label: string }> = [
+  { value: '30d', label: '30 days' },
+  { value: '90d', label: '90 days' },
+  { value: '1y', label: '1 year' },
+];
 
 interface MintResponse {
   data?: { token?: string; expiresAt?: string };
@@ -49,6 +59,7 @@ function formatExpiry(iso: string): string {
 export function CortexConnectPanel() {
   const [token, setToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string>('');
+  const [lifetime, setLifetime] = useState<Lifetime>('90d');
   const [loading, setLoading] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +78,11 @@ export function CortexConnectPanel() {
     setNotice(null);
     setCopied(null);
     try {
-      const res = await fetch('/api/cortex/mcp-token', { method: 'POST' });
+      const res = await fetch('/api/cortex/mcp-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lifetime }),
+      });
       if (!res.ok) throw new Error(`${res.status}`);
       const json = (await res.json()) as MintResponse;
       const t = json.data?.token;
@@ -80,7 +95,7 @@ export function CortexConnectPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [lifetime]);
 
   const revoke = useCallback(async () => {
     setRevoking(true);
@@ -128,6 +143,21 @@ export function CortexConnectPanel() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Token lifetime</span>
+          <select
+            value={lifetime}
+            onChange={(e) => setLifetime(e.target.value as Lifetime)}
+            disabled={loading || revoking}
+            className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+          >
+            {LIFETIME_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           onClick={() => void generate()}

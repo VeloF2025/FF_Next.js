@@ -44,12 +44,45 @@ describe('CortexConnectPanel', () => {
 
     const input = (await screen.findByLabelText(/cortex mcp token/i)) as HTMLInputElement;
     expect(input.value).toBe(TOKEN);
-    expect(global.fetch).toHaveBeenCalledWith('/api/cortex/mcp-token', { method: 'POST' });
+    // Default lifetime (90d) is sent as the JSON body.
+    expect(global.fetch).toHaveBeenCalledWith('/api/cortex/mcp-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lifetime: '90d' }),
+    });
     // Expiry rendered and the config snippet carries the token.
     expect(screen.getByText(/^Expires /)).toBeTruthy();
     expect(screen.getByText(/CORTEX_USER_TOKEN/)).toBeTruthy();
     // After a successful mint the button offers regeneration.
     expect(screen.getByRole('button', { name: /regenerate token/i })).toBeTruthy();
+  });
+
+  it('renders the lifetime dropdown, defaulted to 90 days', () => {
+    render(<CortexConnectPanel />);
+    const select = screen.getByLabelText(/token lifetime/i) as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    expect(select.value).toBe('90d');
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toEqual(['30d', '90d', '1y']);
+  });
+
+  it('sends the currently-selected lifetime in the POST body', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ data: { token: TOKEN, expiresAt: '2027-07-11T00:00:00.000Z' } }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<CortexConnectPanel />);
+    fireEvent.change(screen.getByLabelText(/token lifetime/i), { target: { value: '1y' } });
+    fireEvent.click(screen.getByRole('button', { name: /generate token/i }));
+
+    await screen.findByLabelText(/cortex mcp token/i);
+    expect(fetchMock).toHaveBeenCalledWith('/api/cortex/mcp-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lifetime: '1y' }),
+    });
   });
 
   it('copies the token to the clipboard', async () => {
