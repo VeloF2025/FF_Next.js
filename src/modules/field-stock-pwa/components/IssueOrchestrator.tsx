@@ -122,6 +122,7 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
       )}
       {flow.step === 'scan-serials' && flow.stockItem && (
         <ScanSerialsStep stockItem={flow.stockItem} scanned={flow.scanned}
+          sourceLocation={flow.sourceLocation}
           onChange={(next) => setFlow((s) => ({ ...s, scanned: next }))}
           onDone={() => setFlow((s) => ({ ...s, step: 'sign-submit' }))} />
       )}

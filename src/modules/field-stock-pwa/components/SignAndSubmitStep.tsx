@@ -15,6 +15,7 @@ import { PickProjectField } from './PickProjectField';
 import { submitIssue, uploadIssueProof } from '@/modules/field-stock-pwa/api';
 import { enqueueIssue } from '@/modules/field-stock-pwa/offline/queueIssue';
 import { checkPendingValueCap } from '@/modules/field-stock-pwa/lib/stockValueGuard';
+import { formatSubmitError } from '@/modules/field-stock-pwa/lib/submitError';
 import type { StockItem } from './PickItemStep';
 import type { PwaTechSummary, PwaScannedSerial, PwaIssueDraft, PwaPickingResult } from '@/modules/field-stock-pwa/types';
 
@@ -88,7 +89,7 @@ export function SignAndSubmitStep({
         onSubmitted({ pickingId: 'queued-' + queueId, pickingNumber: 'QUEUED', status: 'pending' });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
+      setError(formatSubmitError(err));
     } finally {
       setSubmitting(false);
     }

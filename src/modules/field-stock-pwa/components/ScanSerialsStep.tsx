@@ -30,6 +30,8 @@ export interface ScanSerialsStepProps {
   scanned: PwaScannedSerial[];
   onChange: (next: PwaScannedSerial[]) => void;
   onDone: () => void;
+  /** Selected source warehouse — serials registered elsewhere are rejected at scan time. */
+  sourceLocation?: { id: string; name: string } | null;
 }
 
 export function ScanSerialsStep({
@@ -37,13 +39,14 @@ export function ScanSerialsStep({
   scanned,
   onChange,
   onDone,
+  sourceLocation,
 }: ScanSerialsStepProps) {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [fallbackHint, setFallbackHint] = useState<string | null>(null);
 
-  const { handleRawSerial, handleRemove } = useScanSerial({ stockItem, scanned, onChange });
+  const { handleRawSerial, handleRemove } = useScanSerial({ stockItem, scanned, onChange, sourceLocation });
 
   const validCount = scanned.filter((s) => s.state === 'valid').length;
   const hasPending = scanned.some((s) => s.state === 'pending-validation');

@@ -20,9 +20,17 @@ interface UseScanSerialOptions {
   stockItem: { id: string; name: string };
   scanned: PwaScannedSerial[];
   onChange: (next: PwaScannedSerial[]) => void;
+  /**
+   * Selected source warehouse. When set, a serial registered at a different
+   * location is rejected at scan time — otherwise the mismatch only surfaces
+   * as a process-step failure after the technician has already signed.
+   * A serial with no recorded location is allowed (missing data is not a
+   * contradiction; the process-step stock check still guards quantities).
+   */
+  sourceLocation?: { id: string; name: string } | null;
 }
 
-export function useScanSerial({ stockItem, scanned, onChange }: UseScanSerialOptions) {
+export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: UseScanSerialOptions) {
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -77,6 +85,18 @@ export function useScanSerial({ stockItem, scanned, onChange }: UseScanSerialOpt
           state: 'invalid',
           errorMessage: `Wrong stock item — scanned ${result.stockItemName ?? result.stockItemId}, expected ${stockItem.name}`,
         };
+      } else if (
+        sourceLocation &&
+        result.currentLocationId &&
+        result.currentLocationId !== sourceLocation.id
+      ) {
+        resolved = {
+          ...optimistic,
+          stockItemId: result.stockItemId ?? stockItem.id,
+          stockItemName: result.stockItemName ?? stockItem.name,
+          state: 'invalid',
+          errorMessage: `Serial is at ${result.currentLocationName ?? 'another warehouse'}, not ${sourceLocation.name}`,
+        };
       } else {
         resolved = {
           ...optimistic,
@@ -92,7 +112,7 @@ export function useScanSerial({ stockItem, scanned, onChange }: UseScanSerialOpt
           .concat(resolved)
       );
     },
-    [scanned, scannedSet, stockItem, onChange]
+    [scanned, scannedSet, stockItem, onChange, sourceLocation]
   );
 
   const handleRemove = useCallback(

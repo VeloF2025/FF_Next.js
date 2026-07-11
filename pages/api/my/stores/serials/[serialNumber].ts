@@ -9,6 +9,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { sql } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withMySession } from '@/modules/attendance/portal/authMiddleware';
@@ -40,12 +41,23 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
       return apiResponse.notFound(res, 'Serial', serialNumber);
     }
 
-    if (req.query.includeHistory === 'true' && serial.id) {
-      const history = await getSerialHistory(serial.id);
-      return apiResponse.success(res, { ...serial, history });
+    // The scan step cross-checks the serial's warehouse against the selected
+    // source and needs a display name — the shared serialService returns only
+    // currentLocationId.
+    let currentLocationName: string | null = null;
+    if (serial.currentLocationId) {
+      const rows = (await sql`
+        SELECT name FROM stock_locations WHERE id = ${serial.currentLocationId}
+      `) as { name: string | null }[];
+      currentLocationName = rows[0]?.name ?? null;
     }
 
-    return apiResponse.success(res, serial);
+    if (req.query.includeHistory === 'true' && serial.id) {
+      const history = await getSerialHistory(serial.id);
+      return apiResponse.success(res, { ...serial, currentLocationName, history });
+    }
+
+    return apiResponse.success(res, { ...serial, currentLocationName });
   } catch (error) {
     log.error('my-stores serial API error', { error }, 'my/stores/serials/[number]');
     return apiResponse.internalError(res, error);
