@@ -2,13 +2,14 @@
 //
 // jose's signing primitives require the Node/WebCrypto build (see bridgeAuth.test.ts).
 /**
- * Tests for mintMcpToken — the self-serve, long-lived (30-day) Cortex MCP bearer
- * token. It must mirror scripts/mint_user_token.py's claim shape EXACTLY (the bridge
- * verifies it) plus the token_use="mcp" revocation marker.
+ * Tests for mintMcpToken — the self-serve Cortex MCP bearer token, default 30-day
+ * lifetime but user-selectable up to `never`. It must mirror
+ * scripts/mint_user_token.py's claim shape EXACTLY (the bridge verifies it) plus the
+ * token_use="mcp" revocation marker and a unique `jti`.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { decodeProtectedHeader, jwtVerify } from 'jose';
-import { mintMcpToken } from '@/lib/cortex/bridgeAuth';
+import { decodeProtectedHeader, decodeJwt, jwtVerify } from 'jose';
+import { LIFETIME_DAYS, mintMcpToken } from '@/lib/cortex/bridgeAuth';
 
 const SECRET = 'test-bridge-secret-value-0123456789';
 const USER = 'bob@velocityfibre.co.za';
@@ -100,5 +101,87 @@ describe('mintMcpToken — identity binding', () => {
 describe('mintMcpToken — fail loud (no silent downgrade)', () => {
   it('throws when BRIDGE_JWT_SECRET is unset (never returns an empty/api-key bearer)', async () => {
     await expect(mintMcpToken(USER)).rejects.toThrow(/BRIDGE_JWT_SECRET is not set/);
+  });
+});
+
+describe('LIFETIME_DAYS', () => {
+  it('maps every lifetime to the right day count', () => {
+    expect(LIFETIME_DAYS).toEqual({ '30d': 30, '90d': 90, '1y': 365, never: null });
+  });
+});
+
+describe('mintMcpToken — jti claim', () => {
+  it('stamps a unique jti on every mint', async () => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const first = await mintMcpToken(USER);
+    const second = await mintMcpToken(USER);
+    const firstJti = decodeJwt(first.token).jti;
+    const secondJti = decodeJwt(second.token).jti;
+    expect(typeof firstJti).toBe('string');
+    expect(firstJti).toBeTruthy();
+    expect(firstJti).not.toBe(secondJti);
+  });
+});
+
+describe('mintMcpToken — user-selectable lifetime', () => {
+  it.each([
+    ['30d', 30],
+    ['90d', 90],
+    ['1y', 365],
+  ] as const)('mints an exp %s days after iat for lifetime %s', async (lifetime, days) => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const { token } = await mintMcpToken(USER, lifetime);
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
+    expect(payload.exp! - payload.iat!).toBe(days * 24 * 60 * 60);
+  });
+
+  it('omits exp entirely for "never" and returns expiresAt: null', async () => {
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+    const { token, expiresAt } = await mintMcpToken(USER, 'never');
+    const payload = decodeJwt(token);
+    expect(payload.exp).toBeUndefined();
+    expect(expiresAt).toBeNull();
+    // Still a valid, verifiable signature — just no expiry claim.
+    await expect(jwtVerify(token, new TextEncoder().encode(SECRET))).resolves.toBeDefined();
+  });
+});
+
+describe('mintMcpToken — super-admin cap', () => {
+  const ADMIN = 'admin@velocityfibre.co.za';
+  let savedAdmins: string | undefined;
+
+  beforeEach(() => {
+    savedAdmins = process.env.CORTEX_SUPER_ADMIN_EMAILS;
+    process.env.CORTEX_SUPER_ADMIN_EMAILS = `${ADMIN}, other-admin@velocityfibre.co.za`;
+    process.env.BRIDGE_JWT_SECRET = SECRET;
+  });
+
+  afterEach(() => {
+    if (savedAdmins === undefined) delete process.env.CORTEX_SUPER_ADMIN_EMAILS;
+    else process.env.CORTEX_SUPER_ADMIN_EMAILS = savedAdmins;
+  });
+
+  it('rejects "1y" for a super-admin email', async () => {
+    await expect(mintMcpToken(ADMIN, '1y')).rejects.toThrow(/capped at 90 days/);
+  });
+
+  it('rejects "never" for a super-admin email', async () => {
+    await expect(mintMcpToken(ADMIN, 'never')).rejects.toThrow(/capped at 90 days/);
+  });
+
+  it('allows "90d" for a super-admin email', async () => {
+    const { token } = await mintMcpToken(ADMIN, '90d');
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
+    expect(payload.exp! - payload.iat!).toBe(90 * 24 * 60 * 60);
+  });
+
+  it('is case-insensitive on the super-admin match', async () => {
+    await expect(mintMcpToken(ADMIN.toUpperCase(), '1y')).rejects.toThrow(/capped at 90 days/);
+  });
+
+  it('does not cap a non-super-admin email', async () => {
+    const { token } = await mintMcpToken('regular@velocityfibre.co.za', '1y');
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
+    expect(payload.exp! - payload.iat!).toBe(365 * 24 * 60 * 60);
   });
 });
