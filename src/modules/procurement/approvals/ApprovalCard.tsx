@@ -73,6 +73,7 @@ function getDocLink(type: WorkflowType, docId: string) {
 
 interface Props {
   item: ApprovalItem;
+  onOpen?: (id: string) => void;
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
   onPark?: (id: string) => void;
@@ -80,7 +81,7 @@ interface Props {
   actioningId: string | null;
 }
 
-export function ApprovalCard({ item, onApprove, onReject, onPark, onResume, actioningId }: Props) {
+export function ApprovalCard({ item, onOpen, onApprove, onReject, onPark, onResume, actioningId }: Props) {
   const router = useRouter();
   const tc = typeConfig[item.documentType] || { label: item.documentType, color: 'bg-gray-500/20 text-gray-400', icon: FileText };
   const sb = (statusBadge[item.status] || statusBadge.pending)!;
@@ -95,10 +96,25 @@ export function ApprovalCard({ item, onApprove, onReject, onPark, onResume, acti
           <div className={`p-2 rounded-lg ${tc.color.split(' ')[0]}`}>
             <TypeIcon className={`h-5 w-5 ${tc.color.split(' ')[1]}`} />
           </div>
-          <div className="flex-1 min-w-0">
+          <div
+            role={onOpen ? 'button' : undefined}
+            tabIndex={onOpen ? 0 : undefined}
+            onClick={() => onOpen?.(item.id)}
+            onKeyDown={(e) => {
+              if (!onOpen) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpen(item.id);
+              }
+            }}
+            className={`flex-1 min-w-0 ${onOpen ? 'cursor-pointer' : ''}`}
+          >
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <button
-                onClick={() => router.push(getDocLink(item.documentType, item.documentId))}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(getDocLink(item.documentType, item.documentId));
+                }}
                 className="font-medium text-[var(--ff-text-primary)] hover:text-amber-400 transition-colors"
               >
                 {item.documentNumber || `#${item.documentId.slice(0, 8)}`}
