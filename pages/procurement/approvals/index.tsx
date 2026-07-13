@@ -1,5 +1,6 @@
 // WORKING: Approvals page — all statuses with filtering
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
 import Link from 'next/link';
 import {
@@ -22,6 +23,7 @@ const statusTabs: { key: StatusTab; label: string; Icon: typeof Clock; countKey:
 ];
 
 export default function ApprovalsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<ApprovalItem[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -158,12 +160,12 @@ export default function ApprovalsPage() {
         {/* Header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="p-2 rounded-lg bg-amber-500/20">
                   <ClipboardCheck className="h-6 w-6 text-amber-400" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h1 className="text-xl font-semibold text-[var(--ff-text-primary)]">Approvals</h1>
                   <p className="text-sm text-[var(--ff-text-secondary)]">Review and manage procurement approvals</p>
                 </div>
@@ -188,7 +190,7 @@ export default function ApprovalsPage() {
 
         <div className="p-6">
           {/* Status Tabs */}
-          <div className="mb-6 flex items-center gap-1 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-1 w-fit">
+          <div className="mb-6 flex items-center gap-1 overflow-x-auto whitespace-nowrap bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-1 w-fit">
             {statusTabs.map((tab) => {
               const count = counts[tab.countKey] || 0;
               const isActive = activeTab === tab.key;
@@ -196,7 +198,7 @@ export default function ApprovalsPage() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium shrink-0 transition-colors ${
                     isActive
                       ? 'bg-amber-500/20 text-amber-400'
                       : 'text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
@@ -270,6 +272,7 @@ export default function ApprovalsPage() {
                 <ApprovalCard
                   key={item.id}
                   item={item}
+                  onOpen={(id) => router.push(`/procurement/approvals/${id}`)}
                   onApprove={handleApprove}
                   onReject={(id) => setShowRejectModal(id)}
                   onPark={(id) => setShowParkModal(id)}
