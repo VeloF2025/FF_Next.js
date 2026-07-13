@@ -5,6 +5,7 @@ import type { GeofenceReading } from '../lib/geofence';
 import { prepareCapturePhotos } from '../lib/watermarkPhoto';
 import { loadDraft, saveDraft, clearDraft, type SiteCamDraft } from '../lib/sitecamDraft';
 import type { StepStatus, StepState, SiteInfo } from '../lib/sitecamTypes';
+import { resumeStepIndex } from '../lib/resumeStepIndex';
 import { SiteCamPhotoStore } from '../offline/photoStore';
 import {
   ensureSiteCamJobMeta,
@@ -74,9 +75,15 @@ export function useSiteCamCapture(
   const [stepStates, setStepStates] = useState<StepState[]>(
     () => initialDraft()?.stepStates ?? initStepStates(steps),
   );
-  const [currentStepIndex, setCurrentStepIndex] = useState(
-    () => initialDraft()?.currentStepIndex ?? 0,
-  );
+  const [currentStepIndex, setCurrentStepIndex] = useState(() => {
+    const draft = initialDraft();
+    if (!draft) return 0;
+    // A restored draft can point at a step the tech already completed (its
+    // advance timer was lost to a PWA reload/backgrounding). Skip forward to
+    // the first unfinished step so they are never stranded on a "Step
+    // complete" card with no way to continue.
+    return resumeStepIndex(draft.stepStates, draft.currentStepIndex);
+  });
   // Index of a step whose appeal is awaiting a supervisor decision, if any.
   const [appealedIndex, setAppealedIndex] = useState<number | null>(
     () => initialDraft()?.appealedIndex ?? null,
