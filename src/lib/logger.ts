@@ -148,22 +148,30 @@ class Logger {
       // always go to stderr; info/debug go to stdout only when LOG_STDOUT=true, to
       // avoid flooding by default. process.std*.write (not console.*) preserves
       // the zero-console-tolerance rule.
-      let dataStr = '';
-      if (data !== undefined) {
-        try {
-          dataStr = ` ${JSON.stringify(data)}`;
-        } catch {
-          dataStr = ' [unserializable data]';
+      // Only build the line when it will actually be emitted (warn/error always;
+      // info/debug only under LOG_STDOUT) — avoids serializing `data` for the
+      // common info/debug case.
+      // NOTE: `data` is now persisted (via stderr → systemd/journald), so callers
+      // must never put secrets in it — same discipline as CLAUDE.md rule 11.
+      const toStderr = level === 'warn' || level === 'error';
+      if (toStderr || process.env.LOG_STDOUT === 'true') {
+        let dataStr = '';
+        if (data !== undefined) {
+          try {
+            dataStr = ` ${JSON.stringify(data)}`;
+          } catch {
+            dataStr = ' [unserializable data]';
+          }
         }
-      }
-      // Collapse embedded CR/LF so a caller-supplied string (e.g. a logged email
-      // or IP from an unauthenticated request) can't forge extra journald lines
-      // (CWE-117 log injection). dataStr is JSON-encoded so already newline-safe.
-      const line = `${logMessage}${dataStr}`.replace(/[\r\n]+/g, ' ') + '\n';
-      if (level === 'warn' || level === 'error') {
-        process.stderr.write(line);
-      } else if (process.env.LOG_STDOUT === 'true') {
-        process.stdout.write(line);
+        // Collapse embedded CR/LF so a caller-supplied string (e.g. a logged email
+        // or IP from an unauthenticated request) can't forge extra journald lines
+        // (CWE-117 log injection). dataStr is JSON-encoded so already newline-safe.
+        const line = `${logMessage}${dataStr}`.replace(/[\r\n]+/g, ' ') + '\n';
+        if (toStderr) {
+          process.stderr.write(line);
+        } else {
+          process.stdout.write(line);
+        }
       }
     }
   }
