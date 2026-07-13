@@ -247,19 +247,12 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       feedbackMessage,
     };
 
-    // Hold a DR for human review only when the visual quality check was
-    // inconclusive AND the verdict is a PASS — see
-    // shouldHoldForIncompleteQualityCheck for why FAIL/REWORK must still flow.
-    // A checkIncomplete is always worth surfacing (it means the VLM QA is failing).
+    // Hold auto-feedback for human review only when the visual quality check was
+    // inconclusive AND the verdict is PASS — a FAIL/REWORK verdict is provably
+    // unaffected, so its feedback must still flow (see shouldHoldForIncompleteQualityCheck).
+    const holdForHumanReason = shouldHoldForIncompleteQualityCheck(qualityCheck.checkIncomplete, decision) ? 'quality_check_incomplete' : null;
     if (qualityCheck.checkIncomplete) {
-      log.warn(`${dropNumber}: visual quality check could not complete (VLM error after retries) — decision=${decision}`);
-    }
-    const holdForHumanReason =
-      shouldHoldForIncompleteQualityCheck(qualityCheck.checkIncomplete, decision)
-        ? 'quality_check_incomplete'
-        : null;
-    if (holdForHumanReason) {
-      log.warn(`${dropNumber}: PASS verdict held for human review — visual quality check unverified`);
+      log.warn(`${dropNumber}: visual quality check could not complete (VLM error after retries) — decision=${decision}, feedbackHeld=${!!holdForHumanReason}`);
     }
 
     await persistAutoQaResults(dropNumber, decision, autoFailResult, autoQaResults, stepCoverage, discardedPhotos, holdForHumanReason);
