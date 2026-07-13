@@ -170,7 +170,7 @@ export default function ApprovalsPage() {
                   <p className="text-sm text-[var(--ff-text-secondary)]">Review and manage procurement approvals</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 {(counts.pending || 0) > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 rounded-lg">
                     <Clock className="h-4 w-4 text-amber-400" />
