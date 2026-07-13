@@ -84,6 +84,7 @@ export default withAuth(withErrorHandler(async (
       assignedTo: request.assigned_to ?? null,
     });
     if (!eligible && !isAssignee && !hasProcurementEdit) {
+      log.warn('Ineligible park attempt', { requestId: id, userId }, 'procurement-park');
       return apiResponse.forbidden(res, 'You are not authorised to park this approval request');
     }
 

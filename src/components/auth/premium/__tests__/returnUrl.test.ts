@@ -11,6 +11,9 @@ describe('safeReturnUrl', () => {
   it('rejects protocol-relative URLs', () => {
     expect(safeReturnUrl('//evil.com')).toBe('/');
   });
+  it('rejects backslash tricks', () => {
+    expect(safeReturnUrl('/\\evil.com')).toBe('/');
+  });
   it('rejects non-string / array / empty', () => {
     expect(safeReturnUrl(undefined)).toBe('/');
     expect(safeReturnUrl(['/a', '/b'])).toBe('/');

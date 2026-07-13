@@ -23,4 +23,7 @@ describe('isEligibleApprover', () => {
   it('assigned_to match overrides type → eligible', () => {
     expect(isEligibleApprover({ ...base, userRole: 'field_technician', approverRole: 'project_manager', assignedTo: 'u1' })).toBe(true);
   });
+  it('unmodelled approver type with no assignment → not eligible (default-deny)', () => {
+    expect(isEligibleApprover({ ...base, userRole: 'field_technician', approverType: 'department_head', approverRole: null, approverUserId: null })).toBe(false);
+  });
 });
