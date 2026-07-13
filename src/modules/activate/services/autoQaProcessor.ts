@@ -36,6 +36,7 @@ import {
   applyOntBackCableCheck,
   applyStepQualityCheck,
 } from './autoQaPhotoQualityChecks';
+import { shouldHoldForIncompleteQualityCheck } from './autoQaHoldPolicy';
 import type { VlmCategorizationResult, QaDecision } from '../types/unified.types';
 
 // Re-export so existing imports (incl. tests) keep working after the split.
@@ -246,12 +247,19 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       feedbackMessage,
     };
 
-    // If any visual quality check could not complete (VLM error after retries),
-    // hold the DR for human review: keep it in the HITL queue but suppress the
-    // auto-feedback cron so no unverified "approved" goes to the technician.
-    const holdForHumanReason = qualityCheck.checkIncomplete ? 'quality_check_incomplete' : null;
+    // Hold a DR for human review only when the visual quality check was
+    // inconclusive AND the verdict is a PASS — see
+    // shouldHoldForIncompleteQualityCheck for why FAIL/REWORK must still flow.
+    // A checkIncomplete is always worth surfacing (it means the VLM QA is failing).
+    if (qualityCheck.checkIncomplete) {
+      log.warn(`${dropNumber}: visual quality check could not complete (VLM error after retries) — decision=${decision}`);
+    }
+    const holdForHumanReason =
+      shouldHoldForIncompleteQualityCheck(qualityCheck.checkIncomplete, decision)
+        ? 'quality_check_incomplete'
+        : null;
     if (holdForHumanReason) {
-      log.warn(`${dropNumber}: quality check incomplete — auto-feedback held for human review`);
+      log.warn(`${dropNumber}: PASS verdict held for human review — visual quality check unverified`);
     }
 
     await persistAutoQaResults(dropNumber, decision, autoFailResult, autoQaResults, stepCoverage, discardedPhotos, holdForHumanReason);
