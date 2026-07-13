@@ -26,14 +26,14 @@ export function ApprovalSummaryHeader({ record }: { record: ApprovalRequestRecor
         )}
       </div>
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] truncate">{record.documentNumber || '—'}</h2>
+        <h2 className="min-w-0 text-lg font-semibold text-[var(--ff-text-primary)] truncate">{record.documentNumber || '—'}</h2>
         <span className="text-lg font-semibold text-[var(--ff-text-primary)] shrink-0">{money(record.documentAmount)}</span>
       </div>
       <dl className="mt-3 space-y-1 text-sm">
-        <div className="flex justify-between gap-3"><dt className="text-[var(--ff-text-tertiary)]">Requested by</dt>
-          <dd className="text-[var(--ff-text-secondary)] truncate">{record.requestedByName || '—'}</dd></div>
-        <div className="flex justify-between gap-3"><dt className="text-[var(--ff-text-tertiary)]">Level</dt>
-          <dd className="text-[var(--ff-text-secondary)] truncate">{record.levelName || `Level ${record.levelNumber ?? ''}`}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="shrink-0 text-[var(--ff-text-tertiary)]">Requested by</dt>
+          <dd className="min-w-0 text-right text-[var(--ff-text-secondary)] truncate">{record.requestedByName || '—'}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="shrink-0 text-[var(--ff-text-tertiary)]">Level</dt>
+          <dd className="min-w-0 text-right text-[var(--ff-text-secondary)] truncate">{record.levelName || `Level ${record.levelNumber ?? ''}`}</dd></div>
         {record.requestNotes && (
           <div className="pt-1 text-[var(--ff-text-secondary)] flex items-start gap-1.5">
             <Clock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[var(--ff-text-tertiary)]" />

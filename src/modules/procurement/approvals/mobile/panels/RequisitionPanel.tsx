@@ -27,9 +27,9 @@ export function RequisitionPanel({ record }: { record: ApprovalRequestRecord }) 
         {req.items.map((it, i) => (
           <li key={i} className="p-3">
             <p className="text-sm text-[var(--ff-text-primary)]">{it.itemDescription}</p>
-            <div className="mt-1 flex justify-between text-xs text-[var(--ff-text-secondary)]">
-              <span>{it.quantity} {it.uom ?? ''}</span>
-              {it.suggestedSupplierName && <span className="truncate">{it.suggestedSupplierName}</span>}
+            <div className="mt-1 flex justify-between gap-3 text-xs text-[var(--ff-text-secondary)]">
+              <span className="shrink-0">{it.quantity} {it.uom ?? ''}</span>
+              {it.suggestedSupplierName && <span className="min-w-0 truncate">{it.suggestedSupplierName}</span>}
             </div>
           </li>
         ))}

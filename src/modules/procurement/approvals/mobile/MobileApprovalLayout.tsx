@@ -11,7 +11,7 @@ export function MobileApprovalLayout({ title, children }: { title: string; child
           className="p-2 -ml-2 rounded-lg hover:bg-[var(--ff-bg-hover)] shrink-0">
           <ArrowLeft className="h-5 w-5 text-[var(--ff-text-secondary)]" />
         </button>
-        <h1 className="text-base font-semibold text-[var(--ff-text-primary)] truncate">{title}</h1>
+        <h1 className="flex-1 min-w-0 text-base font-semibold text-[var(--ff-text-primary)] truncate">{title}</h1>
       </header>
       <main className="flex-1 overflow-y-auto pb-28">{children}</main>
     </div>

@@ -4,6 +4,32 @@ import { log } from '@/lib/logger';
 import { ReasonBottomSheet } from './ReasonBottomSheet';
 import type { ApprovalRequestRecord, ApprovalActionType } from './types';
 
+const STATUS_LABELS: Record<string, string> = {
+  waiting: 'awaiting an earlier level', on_hold: 'on hold',
+  approved: 'approved', rejected: 'rejected', cancelled: 'cancelled',
+};
+
+/**
+ * Prefer a meaningful error string. apiResponse.validationError sends the generic
+ * message "Validation failed" and puts the real reason in `details` (field → message),
+ * so fall back to the first detail value when the message is generic or absent.
+ */
+function extractErrorMessage(error: unknown, fallback: string): string {
+  const e = (error ?? {}) as { message?: unknown; details?: unknown };
+  const message = typeof e.message === 'string' ? e.message : '';
+  const generic = message === '' || message.toLowerCase() === 'validation failed';
+  if (!generic) return message;
+  const details = e.details;
+  if (typeof details === 'string' && details.length > 0) return details;
+  if (details && typeof details === 'object') {
+    for (const v of Object.values(details as Record<string, unknown>)) {
+      if (typeof v === 'string' && v.length > 0) return v;
+      if (Array.isArray(v) && typeof v[0] === 'string' && v[0].length > 0) return v[0];
+    }
+  }
+  return message || fallback;
+}
+
 export function ApprovalActionBar({ record, onActioned }: { record: ApprovalRequestRecord; onActioned: () => void }) {
   const [busy, setBusy] = useState(false);
   const [sheet, setSheet] = useState<null | 'reject' | 'park'>(null);
@@ -11,7 +37,7 @@ export function ApprovalActionBar({ record, onActioned }: { record: ApprovalRequ
 
   if (!record.canAct) {
     return <div className="fixed bottom-0 inset-x-0 p-4 border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-center text-sm text-[var(--ff-text-secondary)]">
-      {record.status === 'pending' ? 'You are not an approver for this request.' : `This request is already ${record.status}.`}
+      {record.status === 'pending' ? 'You are not an approver for this request.' : `This request is already ${STATUS_LABELS[record.status] ?? record.status}.`}
     </div>;
   }
 
@@ -25,7 +51,7 @@ export function ApprovalActionBar({ record, onActioned }: { record: ApprovalRequ
       });
       const data = await res.json();
       if (data.success) { setSheet(null); onActioned(); }
-      else setErr(data.error?.message || `Failed to ${action}`);
+      else setErr(extractErrorMessage(data.error, `Failed to ${action}`));
     } catch (e) { log.error(`Approval ${action} failed`, { error: e }, 'procurement'); setErr(`Failed to ${action}`); }
     finally { setBusy(false); }
   };
