@@ -6,6 +6,7 @@ import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { notify } from '@/modules/notifications/services';
 import { completeApprovalActionItem } from '@/lib/action-items/procurementActions';
+import { isEligibleApprover } from '@/modules/procurement/approvals/eligibility';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -30,9 +31,11 @@ export default withAuth(withErrorHandler(async (
   try {
     // Check if approval request exists and is pending
     const existing = await sql`
-      SELECT ar.*, aw.workflow_type
+      SELECT ar.*, aw.workflow_type,
+             al.approver_type, al.approver_user_id, al.approver_role
       FROM approval_requests ar
       JOIN approval_workflows aw ON ar.workflow_id = aw.id
+      JOIN approval_levels al ON ar.level_id = al.id
       WHERE ar.id = ${id}
     `;
 
@@ -46,6 +49,19 @@ export default withAuth(withErrorHandler(async (
       return apiResponse.validationError(res, {
         status: `Cannot approve a request that is already ${request.status}`,
       });
+    }
+
+    const eligible = isEligibleApprover({
+      userId: authReq.user.id,
+      userRole: authReq.user.role,
+      approverType: request.approver_type,
+      approverUserId: request.approver_user_id,
+      approverRole: request.approver_role,
+      assignedTo: request.assigned_to ?? null,
+    });
+    if (!eligible) {
+      log.warn('Ineligible approval attempt', { requestId: id, userId: authReq.user.id }, 'procurement');
+      return apiResponse.forbidden(res, 'You are not an approver for this request.');
     }
 
     // Update the approval request

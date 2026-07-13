@@ -17,6 +17,7 @@ import { VelocityInput } from '@/components/ui/VelocityInput';
 import { VelocityButton } from '@/components/ui/VelocityButton';
 import { getRandomQuote, MotivationalQuote } from '@/data/motivational-quotes';
 import { useAuth } from '@/contexts/AuthContext';
+import { safeReturnUrl } from './safeReturnUrl';
 
 type AuthStep = 'email' | 'password' | 'setup-password';
 type EmailStatus = 'STAFF_NOT_FOUND' | 'FIRST_TIME_USER' | 'PASSWORD_REQUIRED' | 'PASSWORD_SETUP_REQUIRED' | 'USER_DISABLED';
@@ -136,7 +137,7 @@ export function PremiumLoginPage() {
       await signInWithEmail(email, actualPassword);
 
       // Redirect to dashboard on success (AuthContext is now updated)
-      const returnUrl = (router.query.returnUrl as string) || '/';
+      const returnUrl = safeReturnUrl(router.query.returnUrl);
       router.push(returnUrl);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed';
@@ -176,7 +177,7 @@ export function PremiumLoginPage() {
       await refreshUser();
 
       // Redirect to dashboard on success (AuthContext is now updated)
-      const returnUrl = (router.query.returnUrl as string) || '/';
+      const returnUrl = safeReturnUrl(router.query.returnUrl);
       router.push(returnUrl);
     } catch {
       setError('Network error. Please try again.');

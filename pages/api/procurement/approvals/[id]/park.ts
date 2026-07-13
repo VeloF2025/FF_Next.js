@@ -14,6 +14,7 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { userHasPermission } from '@/lib/permissions';
 import { notify } from '@/modules/notifications/services';
 import { completeApprovalActionItem } from '@/lib/action-items/procurementActions';
+import { isEligibleApprover } from '@/modules/procurement/approvals/eligibility';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -45,9 +46,13 @@ export default withAuth(withErrorHandler(async (
 
   try {
     const existing = await sql`
-      SELECT id, status, assigned_to, document_type, document_id, document_number, requested_by
-      FROM approval_requests
-      WHERE id = ${id}
+      SELECT ar.id, ar.status, ar.assigned_to, ar.document_type, ar.document_id,
+             ar.document_number, ar.requested_by,
+             al.approver_type, al.approver_user_id, al.approver_role
+      FROM approval_requests ar
+      JOIN approval_workflows aw ON ar.workflow_id = aw.id
+      JOIN approval_levels al ON ar.level_id = al.id
+      WHERE ar.id = ${id}
     `;
 
     if (existing.length === 0) {
@@ -56,12 +61,13 @@ export default withAuth(withErrorHandler(async (
 
     const request = existing[0]!;
 
-    // Authz: caller must be the assigned approver, super_admin, or hold the
-    // procurement.sourcing edit permission. The asymmetry vs resume.ts —
-    // resume also accepts the original parker — is intentional: parking is
-    // an active gate, so only the approver-side may decide to hold; resuming
-    // includes the parker so they can undo their own pause without needing
-    // to be the approver themselves.
+    // Authz: caller must be the level's eligible approver, the assigned
+    // approver, super_admin, or hold the procurement.sourcing edit
+    // permission. The asymmetry vs resume.ts — resume also accepts the
+    // original parker — is intentional: parking is an active gate, so only
+    // the approver-side may decide to hold; resuming includes the parker so
+    // they can undo their own pause without needing to be the approver
+    // themselves.
     // Requesters cannot park their own request: that would be a workflow-
     // bypass (silently stalling the chain).
     const isAssignee = request.assigned_to && String(request.assigned_to) === String(userId);
@@ -69,7 +75,16 @@ export default withAuth(withErrorHandler(async (
     const hasProcurementEdit = isSuperAdmin
       ? true
       : await userHasPermission(userId, 'procurement.sourcing', 'edit');
-    if (!isAssignee && !hasProcurementEdit) {
+    const eligible = isEligibleApprover({
+      userId,
+      userRole: authReq.user.role,
+      approverType: request.approver_type,
+      approverUserId: request.approver_user_id,
+      approverRole: request.approver_role,
+      assignedTo: request.assigned_to ?? null,
+    });
+    if (!eligible && !isAssignee && !hasProcurementEdit) {
+      log.warn('Ineligible park attempt', { requestId: id, userId }, 'procurement-park');
       return apiResponse.forbidden(res, 'You are not authorised to park this approval request');
     }
 
