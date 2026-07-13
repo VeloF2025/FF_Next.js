@@ -32,8 +32,6 @@ export interface LogEntry {
 }
 
 export interface LoggerOptions {
-  enableConsole?: boolean;
-  enableFile?: boolean;
   level?: 'debug' | 'info' | 'warn' | 'error';
 }
 
@@ -43,8 +41,6 @@ export interface LoggerOptions {
  */
 class Logger {
   private options: LoggerOptions = {
-    enableConsole: process.env.NODE_ENV === 'development',
-    enableFile: false,
     level: 'info',
   };
 
