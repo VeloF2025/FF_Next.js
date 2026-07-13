@@ -156,7 +156,10 @@ class Logger {
           dataStr = ' [unserializable data]';
         }
       }
-      const line = `${logMessage}${dataStr}\n`;
+      // Collapse embedded CR/LF so a caller-supplied string (e.g. a logged email
+      // or IP from an unauthenticated request) can't forge extra journald lines
+      // (CWE-117 log injection). dataStr is JSON-encoded so already newline-safe.
+      const line = `${logMessage}${dataStr}`.replace(/[\r\n]+/g, ' ') + '\n';
       if (level === 'warn' || level === 'error') {
         process.stderr.write(line);
       } else if (process.env.LOG_STDOUT === 'true') {
