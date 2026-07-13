@@ -132,22 +132,47 @@ class Logger {
         window.__appLogs.shift();
       }
     } else {
-      // Node.js environment - could write to file or send to logging service
-      // For now, just store in process (could be extended)
+      // Node.js: keep the in-memory ring buffer (used by getLogs()/exportLogs())…
       if (!process.__appLogs) process.__appLogs = [];
       process.__appLogs.push(logEntry);
-      
+
       // Limit log storage
       if (process.__appLogs.length > 1000) {
         process.__appLogs.shift();
       }
-    }
 
-    // In development, could optionally write to stderr/stdout
-    // But we avoid console.* statements entirely for zero-tolerance compliance
-    if (this.options.enableFile && process.env.NODE_ENV === 'development') {
-      // Could implement file logging here if needed
-      // fs.appendFile('app.log', logMessage + '\n', () => {})
+      // …AND emit to the process streams so systemd/journald (and any log
+      // aggregator) actually capture them. Previously prod logs were kept ONLY in
+      // the in-memory buffer and written nowhere — which is why the 2026-07-10
+      // auto-QA quality-check outage stayed invisible for 3 days. warn/error
+      // always go to stderr; info/debug go to stdout only when LOG_STDOUT=true, to
+      // avoid flooding by default. process.std*.write (not console.*) preserves
+      // the zero-console-tolerance rule.
+      // Only build the line when it will actually be emitted (warn/error always;
+      // info/debug only under LOG_STDOUT) — avoids serializing `data` for the
+      // common info/debug case.
+      // NOTE: `data` is now persisted (via stderr → systemd/journald), so callers
+      // must never put secrets in it — same discipline as CLAUDE.md rule 11.
+      const toStderr = level === 'warn' || level === 'error';
+      if (toStderr || process.env.LOG_STDOUT === 'true') {
+        let dataStr = '';
+        if (data !== undefined) {
+          try {
+            dataStr = ` ${JSON.stringify(data)}`;
+          } catch {
+            dataStr = ' [unserializable data]';
+          }
+        }
+        // Collapse embedded CR/LF so a caller-supplied string (e.g. a logged email
+        // or IP from an unauthenticated request) can't forge extra journald lines
+        // (CWE-117 log injection). dataStr is JSON-encoded so already newline-safe.
+        const line = `${logMessage}${dataStr}`.replace(/[\r\n]+/g, ' ') + '\n';
+        if (toStderr) {
+          process.stderr.write(line);
+        } else {
+          process.stdout.write(line);
+        }
+      }
     }
   }
 
