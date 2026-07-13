@@ -330,7 +330,7 @@ export default function PurchaseOrderDetailPage() {
     const status = purchaseOrder.status;
 
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {!isEditing && (
           <button
             onClick={startEditing}
@@ -553,20 +553,20 @@ export default function PurchaseOrderDetailPage() {
         {/* Header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4 min-w-0">
                 <button
                   onClick={() => router.push('/procurement/purchase-orders')}
-                  className="p-2 hover:bg-[var(--ff-bg-hover)] rounded-lg transition-colors"
+                  className="p-2 hover:bg-[var(--ff-bg-hover)] rounded-lg transition-colors shrink-0"
                 >
                   <ArrowLeft className="h-5 w-5 text-[var(--ff-text-secondary)]" />
                 </button>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-500/20">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-blue-500/20 shrink-0">
                     <ShoppingCart className="h-6 w-6 text-blue-400" />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <h1 className="text-xl font-semibold text-[var(--ff-text-primary)]">
                         {purchaseOrder.poNumber}
                       </h1>
@@ -575,7 +575,7 @@ export default function PurchaseOrderDetailPage() {
                         {statusInfo.label}
                       </span>
                     </div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">
+                    <p className="text-sm text-[var(--ff-text-secondary)] truncate">
                       {purchaseOrder.supplierName}
                       {purchaseOrder.projectName && ` • ${purchaseOrder.projectName}`}
                     </p>
