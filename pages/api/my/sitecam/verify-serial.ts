@@ -4,7 +4,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import { validateSerialFormat, type SerialDevice } from '@/modules/sitecam/lib/verifySerial';
-import { crossReferenceSerial } from '@/modules/sitecam/lib/serialCrossRef';
+import { crossReferenceSerial, crossRefStatusToColumn } from '@/modules/sitecam/lib/serialCrossRef';
 import { log } from '@/lib/logger';
 
 const MODULE = 'verify-serial';
@@ -55,6 +55,12 @@ async function handler(
   const statusCol   = isOnt ? 'ont_serial_status'   : 'ups_serial_status';
   const scannedCol  = isOnt ? 'ont_serial_scanned'  : 'ups_serial_scanned';
 
+  // Persist the mapped column value, NOT the raw crossRef.status: the column's
+  // CHECK constraint forbids 'verified'/'mismatch', so writing those 500s the
+  // save and strands the tech on step 6. The raw status still flows to the UI
+  // via the response below.
+  const persistedStatus = crossRefStatusToColumn(crossRef.status);
+
   await pool.query(
     `INSERT INTO dr_photo_unified_reviews (drop_number, ${attemptsCol}, ${statusCol}, ${scannedCol})
      VALUES ($1, $2, $4, $3)
@@ -63,7 +69,7 @@ async function handler(
        ${attemptsCol} = $2,
        ${statusCol}   = $4,
        ${scannedCol}  = $3`,
-    [drNumber, attemptNumber, validation.normalised, crossRef.status],
+    [drNumber, attemptNumber, validation.normalised, persistedStatus],
   );
 
   log.info('Serial scan saved', {

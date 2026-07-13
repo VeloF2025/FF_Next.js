@@ -4,7 +4,27 @@ vi.mock('@/lib/logger', () => ({
   log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-import { decideCrossRefStatus, crossReferenceSerial } from '../serialCrossRef';
+import { decideCrossRefStatus, crossReferenceSerial, crossRefStatusToColumn } from '../serialCrossRef';
+
+describe('crossRefStatusToColumn', () => {
+  // The ont/ups_serial_status CHECK constraint only allows pending/pass/fail/locked.
+  // verify-serial must map the cross-ref result before persisting or the write 500s.
+  it('maps verified → pass', () => {
+    expect(crossRefStatusToColumn('verified')).toBe('pass');
+  });
+  it('maps mismatch → fail', () => {
+    expect(crossRefStatusToColumn('mismatch')).toBe('fail');
+  });
+  it('keeps pending → pending', () => {
+    expect(crossRefStatusToColumn('pending')).toBe('pending');
+  });
+  it('never emits a value the CHECK constraint forbids', () => {
+    const allowed = new Set(['pending', 'pass', 'fail', 'locked']);
+    for (const s of ['verified', 'mismatch', 'pending'] as const) {
+      expect(allowed.has(crossRefStatusToColumn(s))).toBe(true);
+    }
+  });
+});
 
 describe('decideCrossRefStatus', () => {
   it('stays pending when no reference serial exists', () => {

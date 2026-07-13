@@ -20,6 +20,29 @@ export interface CrossRefResult {
   expectedSerial: string | null;
 }
 
+/** Values permitted by the dr_photo_unified_reviews.{ont,ups}_serial_status CHECK constraint. */
+export type SerialStatusColumn = 'pending' | 'pass' | 'fail';
+
+/**
+ * Map a cross-reference status to the value persisted in the
+ * `dr_photo_unified_reviews.{ont,ups}_serial_status` column. That column's
+ * CHECK constraint only permits {'pending','pass','fail','locked'} — writing
+ * the raw CrossRefStatus ('verified'/'mismatch') violates it and 500s the
+ * serial save, stranding the technician on step 6. The raw CrossRefStatus is
+ * still returned to the client (see verify-serial) for its UI messaging; only
+ * the persisted value must be mapped.
+ */
+export function crossRefStatusToColumn(status: CrossRefStatus): SerialStatusColumn {
+  switch (status) {
+    case 'verified':
+      return 'pass';
+    case 'mismatch':
+      return 'fail';
+    case 'pending':
+      return 'pending';
+  }
+}
+
 /**
  * Pure decision: compare a scanned serial to the reference value. EXACT match
  * (case- and whitespace-normalised) — for authority-grade ONT/UPS asset
