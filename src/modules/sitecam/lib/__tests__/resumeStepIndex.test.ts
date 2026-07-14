@@ -8,6 +8,8 @@ function step(status: StepStatus, stepNumber: number): StepState {
     label: `Step ${stepNumber}`,
     hasVlm: true,
     hasSerialScan: false,
+    serials: [],
+    serialIndex: 0,
     serialLabel: '',
     serialDevice: null,
     serialAttempts: 0,

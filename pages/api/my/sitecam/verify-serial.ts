@@ -11,7 +11,14 @@ const MODULE = 'verify-serial';
 
 interface VerifySerialBody {
   drNumber: string;
-  step: number;           // 6 = ONT, 8 = UPS
+  step: number;
+  /**
+   * Which serial this is. Explicit because step 6 now carries BOTH the ONT
+   * serial (6a) and the Gizzu UPS serial (6b) — the step number alone can no
+   * longer distinguish them. Optional for back-compat with older clients
+   * (falls back to the legacy step-number inference: 6→ONT, 8→UPS).
+   */
+  device?: 'ont' | 'ups';
   scannedSerial: string;
   attemptNumber: number;  // counts invalid-format retries
 }
@@ -24,18 +31,22 @@ async function handler(
   if (req.method !== 'POST')
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
 
-  const { drNumber, step, scannedSerial, attemptNumber } = req.body as VerifySerialBody;
+  const { drNumber, step, device: reqDevice, scannedSerial, attemptNumber } = req.body as VerifySerialBody;
 
   // attemptNumber is 1-based (caller sends serialAttempts + 1, min 1), so null/undefined check only
   if (!drNumber || !step || !scannedSerial || attemptNumber == null)
     return apiResponse.badRequest(res, 'drNumber, step, scannedSerial, attemptNumber required');
 
-  const isOnt = step === 6;
-  const isUps = step === 8;
-  if (!isOnt && !isUps)
-    return apiResponse.badRequest(res, 'step must be 6 (ONT) or 8 (UPS)');
+  // Resolve the device: prefer the explicit body field (step 6 carries both
+  // ONT and UPS); fall back to the legacy step-number inference (6→ONT, 8→UPS).
+  const device: SerialDevice | null =
+    reqDevice === 'ont' || reqDevice === 'ups'
+      ? reqDevice
+      : step === 6 ? 'ont' : step === 8 ? 'ups' : null;
+  if (!device)
+    return apiResponse.badRequest(res, 'device must be "ont" or "ups" (or step 6/8)');
 
-  const device: SerialDevice = isOnt ? 'ont' : 'ups';
+  const isOnt = device === 'ont';
   const validation = validateSerialFormat(scannedSerial, device);
 
   if (!validation.valid) {

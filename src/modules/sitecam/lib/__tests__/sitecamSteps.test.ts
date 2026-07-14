@@ -61,7 +61,13 @@ describe('activation VLM coverage', () => {
     expect(serialSteps).toEqual([6]);
     const step8 = ACTIVATION_STEPS.find((s) => s.number === 8);
     expect(step8?.hasSerialScan).toBe(false);
-    expect(step8?.serialDevice).toBeUndefined();
+    expect(step8?.serials).toBeUndefined();
+  });
+
+  it('step 6 scans the ONT then the Gizzu UPS serial (6a, 6b)', () => {
+    const step6 = ACTIVATION_STEPS.find((s) => s.number === 6);
+    expect(step6?.serials?.map((x) => x.device)).toEqual(['ont', 'ups']);
+    expect(step6?.serials?.map((x) => x.label)).toEqual(['ONT Serial', 'Gizzu UPS Serial']);
   });
 });
 

@@ -28,6 +28,7 @@ const SITE_INFO: SiteInfo = {
 function passedStep(over: Partial<StepState> = {}): StepState {
   return {
     stepNumber: 1, label: 'Before Photo', hasVlm: true, hasSerialScan: false,
+    serials: [], serialIndex: 0,
     serialLabel: '', serialDevice: null, serialAttempts: 0, serialScanned: null,
     status: 'pass', photoBase64: 'QUJD', attemptNumber: 1, failReasons: [],
     corrections: [], needsManualReview: false, ...over,

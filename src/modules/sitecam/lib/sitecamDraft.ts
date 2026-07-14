@@ -17,8 +17,14 @@
  */
 
 import { log } from '@/lib/logger';
-import type { SiteCamJobType } from './sitecamSteps';
+import type { SiteCamJobType, SiteCamStep, SerialSpec } from './sitecamSteps';
 import type { StepState } from '../hooks/useSiteCamCapture';
+import { nextSerialPatch } from './serialSequence';
+
+/** Serials configured for a step, in order (empty for non-serial steps). */
+function stepSerials(step: SiteCamStep | undefined): SerialSpec[] {
+  return step?.serials ? step.serials.map((s) => ({ ...s })) : [];
+}
 
 const MODULE = 'sitecamDraft';
 const KEY_PREFIX = 'sitecam:draft:v1:';
@@ -87,7 +93,7 @@ export function saveDraft(
 export function loadDraft(
   jobType: SiteCamJobType,
   siteId: string,
-  steps: readonly { number: number }[],
+  steps: readonly SiteCamStep[],
 ): SiteCamDraft | null {
   const store = storage();
   if (!store) return null;
@@ -103,12 +109,41 @@ export function loadDraft(
     const sameShape = states.every((s, i) => s && s.stepNumber === steps[i]?.number);
     if (!sameShape) return null;
 
-    const idx =
+    // Backfill the serial-sequence fields so a draft written before step 6
+    // gained its two-serial flow (a mid-job deploy) can't strand the wizard
+    // with an undefined `serials`/`serialIndex`.
+    let earliestReopened = -1;
+    const restored = states.map((s, i) => {
+      const serials = Array.isArray(s.serials) && s.serials.length > 0 ? s.serials : stepSerials(steps[i]);
+      const maxIndex = Math.max(serials.length, 1);
+      const serialIndex =
+        typeof s.serialIndex === 'number' && s.serialIndex >= 0 && s.serialIndex < maxIndex ? s.serialIndex : 0;
+      const base = { ...s, serials, serialIndex };
+
+      // A serial step marked complete (`serial_pending`) under an OLDER
+      // single-serial flow, but which now has more serials to collect (e.g. the
+      // Gizzu UPS added at 6b), is reopened at the next unscanned serial so the
+      // remaining serial is still captured — "both serials mandatory" must hold
+      // for a job in flight across the deploy.
+      if (base.hasSerialScan && base.status === 'serial_pending' && serialIndex < serials.length - 1) {
+        if (earliestReopened === -1) earliestReopened = i;
+        return { ...base, status: 'serial_scan' as const, ...nextSerialPatch(base) };
+      }
+      return base;
+    });
+
+    const persistedIdx =
       typeof parsed.currentStepIndex === 'number' &&
       parsed.currentStepIndex >= 0 &&
       parsed.currentStepIndex < steps.length
         ? parsed.currentStepIndex
         : 0;
+    // If a completed step was reopened for a newly-required serial, route the
+    // technician's position BACK to it. The old flow left `currentStepIndex`
+    // PAST step 6, and `resumeStepIndex` only scans forward — so without this the
+    // reopened serial is never shown, and a fully-finished job deadlocks (its
+    // `serial_scan` step is neither "done" nor submit-able).
+    const idx = earliestReopened >= 0 ? Math.min(persistedIdx, earliestReopened) : persistedIdx;
 
     // Validate the appealed-step index the same way: a stale draft (e.g. written
     // before the step list changed) could carry an index past the current range,
@@ -122,7 +157,7 @@ export function loadDraft(
         : null;
 
     return {
-      stepStates: states,
+      stepStates: restored,
       currentStepIndex: idx,
       appealedIndex,
     };

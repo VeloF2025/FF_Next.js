@@ -35,6 +35,7 @@ const SITE_INFO: SiteInfo = {
 function stepFixture(num: number, over: Partial<StepState> = {}): StepState {
   return {
     stepNumber: num, label: `Step ${num}`, hasVlm: true, hasSerialScan: false,
+    serials: [], serialIndex: 0,
     serialLabel: '', serialDevice: null, serialAttempts: 0, serialScanned: null,
     status: 'pending', photoBase64: null, attemptNumber: 0, failReasons: [],
     corrections: [], needsManualReview: false, ...over,

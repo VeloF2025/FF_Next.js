@@ -157,12 +157,15 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSe
       {showSerialScan && step.serialDevice && (
         <>
           <SerialScanStep
+            // Remount on each serial (6a → 6b) so the scan UI resets cleanly.
+            key={step.serialIndex}
             stepNumber={step.stepNumber}
             serialLabel={step.serialLabel}
             serialDevice={step.serialDevice}
             serialAttempts={step.serialAttempts}
             drNumber={drNumber}
             onScanSaved={onSerialSaved}
+            serialPosition={{ index: step.serialIndex, total: step.serials.length }}
           />
 
           {/* ─── TEMPORARY: test-only skip (remove with ALLOW_TEST_UPLOAD) ───
