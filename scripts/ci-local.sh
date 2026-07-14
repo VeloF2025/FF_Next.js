@@ -109,6 +109,23 @@ else
   echo "$DIVERGENCE_OUTPUT" | grep -B1 "no-neon-shim-sql-divergence" | tail -20 | sed 's/^/    /'
 fi
 
+# ─── Gate 2d: QField step-detection (pure-logic regression) ──────────────────
+# Guards the GPKG photo-column → checklist-step mapping (qfield_step_detection.py)
+# that feeds Works-QA ingestion — a silent regression here drops field photos from
+# the dashboard. Pure/dependency-free (no DB) so it runs in every mode.
+echo -e "\n${CYAN}── Gate 2d: QField step detection ──${NC}\n"
+
+if command -v python3 >/dev/null 2>&1; then
+  if python3 scripts/test_extract_gpkg_step_detection.py > /tmp/ci-qfield-stepdetect.txt 2>&1; then
+    pass "QField step detection: all checks pass"
+  else
+    fail "QField step detection: regression detected"
+    tail -20 /tmp/ci-qfield-stepdetect.txt | sed 's/^/    /'
+  fi
+else
+  skip "QField step detection: python3 not available"
+fi
+
 # ─── Gate 3: TypeScript ──────────────────────────────────────────────────────
 echo -e "\n${CYAN}── Gate 3: TypeScript ──${NC}\n"
 
