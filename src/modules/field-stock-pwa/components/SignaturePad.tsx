@@ -47,6 +47,10 @@ export function SignaturePad({
 }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
+  // Whether the current gesture actually drew a stroke (pointer moved). A
+  // zero-movement tap leaves no visible ink, so it must NOT count as a
+  // signature — important now that this pad backs a customer legal sign-off.
+  const moved = useRef(false);
 
   // Initialise canvas background on mount. We do NOT re-init on `value` changes
   // because the parent controls the data URL; the canvas itself is the source of
@@ -90,6 +94,7 @@ export function SignaturePad({
       ctx.beginPath();
       ctx.moveTo(coords.x, coords.y);
       drawing.current = true;
+      moved.current = false;
     },
     [toCanvasCoords],
   );
@@ -103,6 +108,7 @@ export function SignaturePad({
       if (!ctx) return;
       ctx.lineTo(coords.x, coords.y);
       ctx.stroke();
+      moved.current = true;
     },
     [toCanvasCoords],
   );
@@ -111,6 +117,9 @@ export function SignaturePad({
     (_e: React.PointerEvent<HTMLCanvasElement>) => {
       if (!drawing.current) return;
       drawing.current = false;
+      // A tap with no movement drew no ink — ignore it so a blank canvas can
+      // never be emitted as a "signature".
+      if (!moved.current) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       onChange(canvas.toDataURL('image/png'));
@@ -129,6 +138,7 @@ export function SignaturePad({
     ctx.lineWidth = LINE_WIDTH;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    moved.current = false;
     onChange(null);
   }, [onChange]);
 
