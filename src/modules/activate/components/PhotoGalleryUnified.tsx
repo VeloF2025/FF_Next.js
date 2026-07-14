@@ -342,6 +342,7 @@ function PhotoSourceBadge({ source }: PhotoSourceBadgeProps) {
     onemap: { label: 'OneMap GIS', color: 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200' },
     boss: { label: 'BOSS API', color: 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200' },
     local: { label: 'Local Cache', color: 'bg-secondary text-foreground' },
+    sitecam: { label: 'SiteCam App', color: 'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200' },
   };
 
   const fallback = { label: source || 'Unknown', color: 'bg-secondary text-foreground' };

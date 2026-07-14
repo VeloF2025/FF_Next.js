@@ -32,7 +32,7 @@ import { SerialRecheckPanel } from './SerialRecheckPanel';
 import { QaWizardContainer } from './wizard/QaWizardContainer';
 import { DrSummaryPage } from './DrSummaryPage';
 import { MaintenanceTab } from '@/modules/noc/components/MaintenanceTab';
-import { ChevronDown, ChevronRight, RefreshCw, MapPin, MessageCircle, Wrench } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw, MapPin, MessageCircle, Wrench, Smartphone } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,8 @@ interface UnifiedReviewCardProps {
 }
 
 import { PwaComparisonTab } from './PwaComparisonTab';
+import { useSiteCamPhotos } from '../hooks/useSiteCamPhotos';
+import { SiteCamPhotosContent } from './SiteCamPhotosSection';
 
 type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'maintenance' | 'qa' | 'categorization' | 'pwa';
 
@@ -420,8 +422,11 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
 
   // Expanded sections state - all expanded by default
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['installation', 'group', 'maintenance'])
+    new Set(['installation', 'sitecam', 'group', 'maintenance'])
   );
+
+  // SiteCam PWA photos (dr_photo_unified_reviews.pwa_photo_urls)
+  const siteCam = useSiteCamPhotos(review.drop_number);
 
   // WA Group photos state
   const [waPhotos, setWaPhotos] = useState<WAPhoto[]>([]);
@@ -523,7 +528,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
   };
 
   // Section configurations
-  type SectionColor = 'green' | 'blue' | 'orange';
+  type SectionColor = 'green' | 'blue' | 'orange' | 'purple';
   const sections: Array<{
     id: string;
     label: string;
@@ -539,6 +544,14 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
       color: 'green',
       count: installationPhotos.length,
       loading: false,
+    },
+    {
+      id: 'sitecam',
+      label: 'SiteCam',
+      icon: Smartphone,
+      color: 'purple',
+      count: siteCam.count,
+      loading: siteCam.loading,
     },
     {
       id: 'group',
@@ -573,6 +586,11 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
       bg: 'bg-orange-100 dark:bg-orange-900/30',
       text: 'text-orange-800 dark:text-orange-200',
       border: 'border-orange-200 dark:border-orange-800',
+    },
+    purple: {
+      bg: 'bg-purple-100 dark:bg-purple-900/30',
+      text: 'text-purple-800 dark:text-purple-200',
+      border: 'border-purple-200 dark:border-purple-800',
     },
   };
 
@@ -712,6 +730,8 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                       />
                     </>
                   )}
+
+                  {section.id === 'sitecam' && <SiteCamPhotosContent data={siteCam} />}
 
                   {section.id === 'group' && (
                     <>

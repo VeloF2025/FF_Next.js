@@ -17,7 +17,7 @@
 /**
  * Photo source types
  */
-export type PhotoSource = 'onemap' | 'boss' | 'local';
+export type PhotoSource = 'onemap' | 'boss' | 'local' | 'sitecam';
 
 /**
  * AI evaluation status
