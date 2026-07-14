@@ -24,6 +24,11 @@ from datetime import datetime, timezone
 import psycopg2
 import psycopg2.extras
 
+# Pure photo-column detection (no DB deps) — unit-tested/CI-gated by
+# scripts/test_extract_gpkg_step_detection.py. scripts/ is sys.path[0] when this
+# file is run as `python3 scripts/extract-gpkg-photos.py` (the only invocation).
+from qfield_step_detection import detect_step_columns, is_photo_value
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
 DB_URL = os.environ.get("DATABASE_URL")
@@ -130,98 +135,9 @@ OPTICAL_GPKGS = {
 
 
 # ── Step column detection ─────────────────────────────────────────────────────
-
-# Match GPKG column names to civil checklist steps by the LEADING WORD after the
-# column's number, e.g. "1. Before Photo…", "3. Depth Photo…", "8. Clear Photo of
-# Pole Label". Each step's first word is unique (Before/During/Depth/End/Compact/
-# Level/After/Clear), so we key on that.
-#
-# Why leading-word and NOT `^<n>[.\s].*<keyword>` (the old form):
-#   1. Number-agnostic. The HT_ civil-audit form prefixes a "1. Permission Slip
-#      Photo" column, shifting every real step +1 ("2. Before…" = step 1 …
-#      "9. Clear…" = step 8). The step *text* is identical to FT, so anchoring the
-#      word (not the number) maps FT (1-8) and HT (2-9) identically.
-#   2. Avoids deep-keyword contamination. The verbose descriptions repeat other
-#      steps' words — "3. Depth Photo … mark our poles … before planting" contains
-#      "mark"/"before". A `.*(before|mark)` pattern would mis-file it as step 1.
-#      Anchoring the keyword right after the number (`^\d+[.\s]*before`) means only
-#      the column that actually STARTS with "Before" is step 1.
-#   3. Excludes non-step numbered columns. Mohadin's "9. SJC Label" and HT's
-#      "1. Permission Slip Photo" have no step leading-word → correctly unmatched
-#      (there is no Works-QA slot for either).
-# The un-numbered optical columns ("PhotoJoint"/"PhotoLabel"/"PhotoSlack") lack a
-# leading digit, so they never match here — they fall through to EXTRA_PHOTO_PATTERNS.
-STEP_PATTERNS = [
-    (re.compile(r"^\d+[\.\s]*before", re.IGNORECASE), 1, "Before Photo"),
-    (re.compile(r"^\d+[\.\s]*during", re.IGNORECASE), 2, "During Photo"),
-    (re.compile(r"^\d+[\.\s]*depth", re.IGNORECASE), 3, "Depth Photo"),
-    (re.compile(r"^\d+[\.\s]*end", re.IGNORECASE), 4, "End Plates"),
-    (re.compile(r"^\d+[\.\s]*compact", re.IGNORECASE), 5, "Compaction"),
-    (re.compile(r"^\d+[\.\s]*level", re.IGNORECASE), 6, "Level Check"),
-    (re.compile(r"^\d+[\.\s]*after", re.IGNORECASE), 7, "After Photo"),
-    (re.compile(r"^\d+[\.\s]*clear", re.IGNORECASE), 8, "Pole Label"),
-]
-
-# Extra photo columns (optical / misc) — no step assignment
-EXTRA_PHOTO_PATTERNS = [
-    re.compile(r"^Photo.*Joint", re.IGNORECASE),
-    re.compile(r"^Photo.*Label", re.IGNORECASE),
-    re.compile(r"^Photo.*Slack", re.IGNORECASE),
-    re.compile(r"^Photo.*Pole", re.IGNORECASE),
-    re.compile(r"^Photo.*Sla", re.IGNORECASE),
-    re.compile(r"^Pole.*Photo$", re.IGNORECASE),
-    re.compile(r"^Joint.*Photo$", re.IGNORECASE),
-    re.compile(r"^Lable.*Photo$", re.IGNORECASE),
-    re.compile(r"^Slack.*Photo$", re.IGNORECASE),
-]
-
-# Optical dome step columns
-OPTICAL_STEP_PATTERNS = [
-    (re.compile(r"^1[\.\s].*dome.*pole", re.IGNORECASE), 1, "Dome on Pole"),
-    (re.compile(r"^2[\.\s].*dome.*label", re.IGNORECASE), 2, "Dome Label"),
-    (re.compile(r"^3[\.\s].*open.*dome", re.IGNORECASE), 3, "Open Dome"),
-    (re.compile(r"^4[\.\s].*splice.*protect", re.IGNORECASE), 4, "Splice Protectors"),
-    (re.compile(r"^5[\.\s].*slack.*manage", re.IGNORECASE), 5, "Slack Management"),
-    (re.compile(r"^6[\.\s].*strength.*member", re.IGNORECASE), 6, "Strength Members"),
-    (re.compile(r"^7[\.\s].*seal.*dust", re.IGNORECASE), 7, "Seals & Dust Caps"),
-    (re.compile(r"^8[\.\s].*pole.*id", re.IGNORECASE), 8, "Pole ID"),
-]
-
-
-def detect_step_columns(columns):
-    """Detect which columns contain photo references and their step numbers."""
-    step_cols = {}  # col_name -> (step, label, discipline)
-    extra_cols = []  # col_name (no step)
-
-    for col in columns:
-        col_clean = col.strip()
-        # Check civil step patterns (leading-word, number-agnostic)
-        for pattern, step, label in STEP_PATTERNS:
-            if pattern.match(col_clean):
-                step_cols[col] = (step, label, "civil")
-                break
-        else:
-            # Check optical step patterns
-            for pattern, step, label in OPTICAL_STEP_PATTERNS:
-                if pattern.match(col_clean):
-                    step_cols[col] = (step, label, "optical")
-                    break
-            else:
-                # Check extra photo columns
-                for pattern in EXTRA_PHOTO_PATTERNS:
-                    if pattern.match(col_clean):
-                        extra_cols.append(col)
-                        break
-
-    return step_cols, extra_cols
-
-
-def is_photo_value(val):
-    """Check if a column value looks like a photo reference."""
-    if not val or not str(val).strip():
-        return False
-    s = str(val).strip()
-    return any(ext in s.lower() for ext in [".jpg", ".jpeg", ".png", ".heic"])
+# STEP_PATTERNS / OPTICAL_STEP_PATTERNS / EXTRA_PHOTO_PATTERNS / detect_step_columns
+# / is_photo_value now live in qfield_step_detection.py (imported at the top) so the
+# detection logic is pure and CI-gated by test_extract_gpkg_step_detection.py.
 
 
 # Keep re-scanning a same-version GPKG while it has pending (not-yet-uploaded) photos, but

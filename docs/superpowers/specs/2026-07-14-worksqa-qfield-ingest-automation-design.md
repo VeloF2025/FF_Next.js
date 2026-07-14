@@ -131,3 +131,34 @@ coverage-check (D3) flags it. No action now.
 - The immediate Mahikeng/Ben Farm backfill is a data op run from the branch against the
   shared prod DB (dry-run evidence first, then live). It is independent of the code
   deploy and can run once the extractor change is reviewed.
+
+## As-built notes (deltas from the design above)
+
+The implementation refined several points during build + blind review (PR #2162):
+
+- **§A step detection — leading-word, not keyword-anywhere.** Matching keys on the
+  *leading word right after the number* (`^\d+[.\s]*before`), not a keyword appearing
+  anywhere (`^\d+.*before`). Keyword-anywhere mis-fires on the verbose descriptions
+  ("3. Depth Photo … mark our poles … before planting" contains "mark"/"before").
+  Step 8's keyword is **`clear`** (not `label` — the column is "Clear Photo of Pole
+  Label", and a leading-word `label` anchor wouldn't match it). Each step also accepts
+  the old synonym leading words (mark/digging/measuring/plate/backfill/spirit/picture)
+  for forward-robustness. The pattern tables + `detect_step_columns` live in a pure,
+  dependency-free `scripts/qfield_step_detection.py` so the test can gate CI without a
+  DB (wired into `scripts/ci-local.sh` Gate 2d).
+- **Verified no regression.** `extract-gpkg-photos.py --all --dry-run` was diffed
+  old-vs-new across all 8 registered projects: every photo-bearing column detects
+  identically. The only change is Themb'elihle's optical `8. Final SJC photo…` moving
+  from a civil misclassification to the correct optical step 8 (and it holds 0 photos).
+- **§B Ben Farm NOT registered.** Its civil audit is split across three team GPKGs
+  (`Civil Audit (BF|LLK|MT).gpkg`) with inconsistent table names and only ~7 photos;
+  left to the coverage-check to flag when it crosses the threshold.
+- **§E — CLI, not a `CRON_SECRET` HTTP endpoint.** The sync core is invoked directly by
+  `scripts/works-qa-sync.ts` (a headless tsx CLI, `--all-active` / `--project`), which
+  the cron runs. No `pages/api/cron/works-qa-sync.ts` was built — the CLI needs no HTTP
+  surface (velo has DB access), which is simpler and lower-risk. Per-project errors are
+  isolated so one bad project doesn't starve the batch.
+- **§D3 coverage-check covers BOTH halves.** It flags an **extract gap** (QFieldCloud
+  DCIM ≥ threshold but 0 in `qfield_photo_validations`) AND a **sync gap** (extracted
+  but `pole_qa_photos` empty — the aliased-project failure mode). Threshold default 20
+  (noise suppression); self-checks that the `DCIM/%` query returns rows.

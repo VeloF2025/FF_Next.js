@@ -51,7 +51,7 @@ const OPTICAL_STEP_MAP: Record<number, string> = {
 // Optical work types — anything dome/joint/optical/activation-related
 const OPTICAL_WORK_TYPES = new Set(['dome_joint', 'optical', 'activation', 'joint']);
 
-function resolveSlotKey(checklist_step: number | null, work_type: string | null): string | null {
+export function resolveSlotKey(checklist_step: number | null, work_type: string | null): string | null {
   if (checklist_step === null || checklist_step === undefined) return null;
   const isOptical = work_type ? OPTICAL_WORK_TYPES.has(work_type) : false;
   const slotKey = isOptical
@@ -65,7 +65,7 @@ function resolveSlotKey(checklist_step: number | null, work_type: string | null)
 // dome label back to its pole so the optical photos attach to the right pole row.
 // Returns null when the label isn't a recognised dome label.
 const DOME_LABEL_RE = /^(\w+)\.STS\..*?\.DM\.P\.([A-Za-z0-9]+)/;
-function domeLabelToPole(label: string | null): string | null {
+export function domeLabelToPole(label: string | null): string | null {
   if (!label) return null;
   const m = DOME_LABEL_RE.exec(label);
   return m ? `${m[1]}.P.${m[2]}` : null;
@@ -100,22 +100,13 @@ export async function syncQfieldForProject(
   projectId: string,
   poleLabel?: string | null,
 ): Promise<SyncQfieldResult> {
-  // NOTE on pole_label filtering: civil rows are keyed by pole label, but optical
-  // ('joint') rows are keyed by the dome label — so a SQL `feature_id = pole_label`
-  // filter would silently drop ALL optical photos for the requested pole. We
-  // therefore fetch every pole/joint row for the project and filter by the
-  // resolved pole label in-process (see the loop below) so both types honour it.
+  // poleLabel filter is applied in-process (loop below), not in SQL: optical
+  // ('joint') rows are keyed by dome label, so a SQL `feature_id = poleLabel` would
+  // drop ALL optical photos for the pole. Two-hop join translates the EXTERNAL
+  // QField UUID (q.project_id) → qfield_projects.id → the FF project, which handles
+  // both id==qfield_project_id rows and aliased rows (Etwatwa/Tonga/HT_ audits/…);
+  // without it those projects' photos are invisible to this sync (migration 376).
   const params: (string | null)[] = [projectId];
-
-  // project_id from the client is a FibreFlow project ID. qfield_photo_validations.project_id
-  // stores the EXTERNAL QField project UUID. Translate it through
-  // qfield_projects.qfield_project_id to qfield_projects.id, then join
-  // qfield_project_links by qfield_projects.id. The two-hop translation handles both
-  // "id == qfield_project_id" rows (most projects) AND aliased rows where
-  // qfield_projects.id was historically aliased to the FF project UUID
-  // (FT_Etwatwa_POP_2, VT_Tonga, MAM Pole Audit (Offline), Grabouw QA, Grabouw
-  // Drill Survey, and the HT_ audit projects). Without the translation those
-  // projects' photos are invisible to this sync — see migration 376.
   const qResult = await pool.query<QFieldRow>(
     `
       SELECT q.feature_id, q.feature_type, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback

@@ -48,7 +48,8 @@ async function main() {
         SELECT DISTINCT p.id, p.project_name
         FROM projects p
         JOIN qfield_project_links l ON l.fibreflow_project_id = p.id
-        WHERE p.status != 'archived'
+        -- IS DISTINCT FROM (not !=) so a NULL-status project is still included.
+        WHERE p.status IS DISTINCT FROM 'archived'
         ORDER BY p.project_name
       `);
       targets = rows.map((r) => r.id);
@@ -58,16 +59,33 @@ async function main() {
     }
 
     const totals: SyncQfieldResult = { synced: 0, skipped: 0, unassigned: 0, unmappedDomeLabels: 0 };
+    const failures: Array<{ projectId: string; error: string }> = [];
     for (const projectId of targets) {
-      const r = await syncQfieldForProject(pool, projectId, pole);
-      totals.synced += r.synced;
-      totals.skipped += r.skipped;
-      totals.unassigned += r.unassigned;
-      totals.unmappedDomeLabels += r.unmappedDomeLabels;
-      console.log(`  ${projectId}: synced=${r.synced} unassigned=${r.unassigned} skipped=${r.skipped}`);
+      // Per-project isolation: one project failing must NOT starve the rest of the
+      // batch (the cron syncs all active projects; a single bad/locked project
+      // shouldn't leave every alphabetically-later one un-synced until next run).
+      try {
+        const r = await syncQfieldForProject(pool, projectId, pole);
+        totals.synced += r.synced;
+        totals.skipped += r.skipped;
+        totals.unassigned += r.unassigned;
+        totals.unmappedDomeLabels += r.unmappedDomeLabels;
+        // Surface unmapped dome labels per-project: syncQfieldCore's log.warn goes to
+        // @/lib/logger's in-memory buffer, which is invisible from a tsx CLI/cron.
+        const unmapped = r.unmappedDomeLabels > 0 ? ` unmappedDomeLabels=${r.unmappedDomeLabels}` : '';
+        console.log(`  ${projectId}: synced=${r.synced} unassigned=${r.unassigned} skipped=${r.skipped}${unmapped}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        failures.push({ projectId, error: msg });
+        console.error(`  ${projectId}: FAILED — ${msg}`);
+      }
     }
 
     console.log(`TOTAL: synced=${totals.synced} unassigned=${totals.unassigned} skipped=${totals.skipped} unmappedDomeLabels=${totals.unmappedDomeLabels}`);
+    if (failures.length > 0) {
+      console.error(`FAILED ${failures.length}/${targets.length} project(s): ${failures.map((f) => f.projectId).join(', ')}`);
+      process.exitCode = 1; // non-zero so the cron logs a WARNING with a record of failures
+    }
   } finally {
     await pool.end();
   }

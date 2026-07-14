@@ -66,7 +66,8 @@ def qfc_dcim_counts():
 
 def linked_active_qfield_projects(conn):
     """Rows for QField projects linked to an active (non-archived) FF project,
-    with their FF project name and ingested (qfield_photo_validations) count."""
+    with their FF project name and ingested (qfield_photo_validations) count.
+    IS DISTINCT FROM (not <>) so a NULL-status project is still included."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
             SELECT qp.qfield_project_id AS qf_uuid,
@@ -77,9 +78,38 @@ def linked_active_qfield_projects(conn):
             FROM qfield_projects qp
             JOIN qfield_project_links l ON l.qfield_project_id = qp.id
             JOIN projects p ON p.id = l.fibreflow_project_id
-            WHERE p.status <> 'archived'
+            WHERE p.status IS DISTINCT FROM 'archived'
         """)
         return cur.fetchall()
+
+
+def stuck_sync_projects(conn, threshold):
+    """Active FF projects whose photos were EXTRACTED (qfield_photo_validations) but
+    never SYNCED (pole_qa_photos is empty) — so they still don't reach the dashboard.
+
+    Extract success ≠ dashboard visibility: aliased QField projects only appear once
+    works-qa-sync populates pole_qa_photos. Checking only qfield_photo_validations
+    (linked_active_qfield_projects) would miss a stuck/half-run sync, so we check the
+    sync output here. Returns [(ff_name, ingested, threshold_used)]."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("""
+            SELECT p.project_name AS ff_name,
+                   (SELECT COUNT(*) FROM qfield_photo_validations q
+                      JOIN qfield_projects qp ON qp.qfield_project_id = q.project_id::text
+                      JOIN qfield_project_links l ON l.qfield_project_id = qp.id
+                     WHERE l.fibreflow_project_id = p.id
+                       AND q.feature_type IN ('pole', 'joint')) AS ingested,
+                   (SELECT COUNT(*) FROM pole_qa_photos pq WHERE pq.project_id = p.id) AS synced
+            FROM projects p
+            WHERE p.status IS DISTINCT FROM 'archived'
+              AND EXISTS (SELECT 1 FROM qfield_project_links l WHERE l.fibreflow_project_id = p.id)
+        """)
+        out = []
+        for r in cur.fetchall():
+            if int(r["ingested"]) >= threshold and int(r["synced"]) == 0:
+                out.append((r["ff_name"], int(r["ingested"])))
+        out.sort(key=lambda x: x[1], reverse=True)
+        return out
 
 
 def post_wa(message):
@@ -106,31 +136,42 @@ def main():
         sys.exit(1)
 
     dcim = qfc_dcim_counts()
+    # Self-check the source-of-truth query: if the `DCIM/%` filter ever stops matching
+    # (schema/path change in QFieldCloud), it returns nothing and the extract-gap check
+    # below would silently report all-clear forever. Fail loud instead.
+    if not dcim:
+        print("WARN: QFieldCloud returned 0 projects with DCIM photos — the "
+              "`filestorage_file.name LIKE 'DCIM/%'` assumption may be broken; "
+              "the extract-gap check cannot function.", file=sys.stderr)
+
     conn = psycopg2.connect(db_url)
     try:
         rows = linked_active_qfield_projects(conn)
+        stuck = stuck_sync_projects(conn, args.threshold)
     finally:
         conn.close()
 
-    flagged = []
+    # Extract gap: upstream photos in QFieldCloud but nothing in qfield_photo_validations.
+    extract_gap = []
     for r in rows:
         src = dcim.get(r["qf_uuid"], 0)
         if src >= args.threshold and int(r["ingested"]) == 0:
-            flagged.append((r["ff_name"], r["qf_name"], r["qf_uuid"], src))
-
-    flagged.sort(key=lambda x: x[3], reverse=True)
+            extract_gap.append((r["ff_name"], r["qf_name"], src))
+    extract_gap.sort(key=lambda x: x[2], reverse=True)
 
     print(f"Coverage check: {len(rows)} linked/active QField project(s) examined, "
-          f"threshold={args.threshold}, {len(flagged)} flagged.")
-    for ff_name, qf_name, qf_uuid, src in flagged:
-        print(f"  FLAG: {ff_name} ← {qf_name} ({qf_uuid}): {src} photos upstream, 0 ingested")
+          f"threshold={args.threshold}. extract-gap={len(extract_gap)}, sync-gap={len(stuck)}.")
+    for ff_name, qf_name, src in extract_gap:
+        print(f"  EXTRACT-GAP: {ff_name} ← {qf_name}: {src} photos upstream, 0 extracted")
+    for ff_name, ingested in stuck:
+        print(f"  SYNC-GAP: {ff_name}: {ingested} photos extracted, 0 on the dashboard (pole_qa_photos empty)")
 
-    if flagged and not args.no_wa:
-        lines = ["⚠️ Works-QA: QField photos not reaching FibreFlow", ""]
-        for ff_name, qf_name, _uuid, src in flagged:
-            lines.append(f"• {ff_name} ({qf_name}): {src} photos upstream, 0 ingested")
-        lines.append("")
-        lines.append("Register in extract-gpkg-photos.py PROJECTS to ingest.")
+    if (extract_gap or stuck) and not args.no_wa:
+        lines = ["⚠️ Works-QA: QField photos not reaching the dashboard", ""]
+        for ff_name, qf_name, src in extract_gap:
+            lines.append(f"• {ff_name} ({qf_name}): {src} photos upstream, not extracted — register in extract-gpkg-photos.py")
+        for ff_name, ingested in stuck:
+            lines.append(f"• {ff_name}: {ingested} photos extracted but sync produced 0 pole rows — check works-qa-sync")
         post_wa("\n".join(lines))
 
     # Exit 0 always — this is a monitor, not a gate; the cron continues.
