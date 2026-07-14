@@ -88,6 +88,24 @@ PROJECTS = {
         "table_name": "civil_audit",
         "label_col": "Pole Label",
     },
+    # HT_ civil-audit projects (VeloPlan/OSP handover). Same civil-audit form as FT
+    # but with a "1. Permission Slip Photo" prefix that shifts step numbers by +1 —
+    # handled by STEP_PATTERNS (leading-word, number-agnostic). Pole label lives in
+    # the "Name" column (e.g. HT_MFKGP4_D2964PL); "Lable"/"Pole_ID" are empty/junk.
+    # GPKG file is "Civil audit.gpkg" (lower-case "audit"); table match is case-insensitive.
+    "Mahikeng": {
+        "qf_project_id": "e801cd43-7efe-4f7a-bed5-ee0410f3dfd6",
+        "ff_project_id": "7794d0ba-95c9-491b-8cb5-7f300c61aa23",
+        "gpkg_path": "Civil audit.gpkg",
+        "table_name": "civil_audit",
+        "label_col": "Name",
+    },
+    # NOTE: "Phalaborwa - Ben Farm" (qf ef0b7147…, ff 67df5c8d…) is NOT registered
+    # yet. Its civil audit is split across three team GPKGs — "Civil Audit (BF|LLK|
+    # MT).gpkg" — with inconsistent QField relation-table names, and only ~7 photos
+    # captured so far. It will be onboarded (with the correct per-GPKG table names)
+    # once field QA ramps; until then the coverage-check (worksqa-qfield-ingest.sh)
+    # flags it if its upstream photo count crosses the alert threshold.
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)
@@ -113,16 +131,35 @@ OPTICAL_GPKGS = {
 
 # ── Step column detection ─────────────────────────────────────────────────────
 
-# Match GPKG column names to checklist steps using the leading number
+# Match GPKG column names to civil checklist steps by the LEADING WORD after the
+# column's number, e.g. "1. Before Photo…", "3. Depth Photo…", "8. Clear Photo of
+# Pole Label". Each step's first word is unique (Before/During/Depth/End/Compact/
+# Level/After/Clear), so we key on that.
+#
+# Why leading-word and NOT `^<n>[.\s].*<keyword>` (the old form):
+#   1. Number-agnostic. The HT_ civil-audit form prefixes a "1. Permission Slip
+#      Photo" column, shifting every real step +1 ("2. Before…" = step 1 …
+#      "9. Clear…" = step 8). The step *text* is identical to FT, so anchoring the
+#      word (not the number) maps FT (1-8) and HT (2-9) identically.
+#   2. Avoids deep-keyword contamination. The verbose descriptions repeat other
+#      steps' words — "3. Depth Photo … mark our poles … before planting" contains
+#      "mark"/"before". A `.*(before|mark)` pattern would mis-file it as step 1.
+#      Anchoring the keyword right after the number (`^\d+[.\s]*before`) means only
+#      the column that actually STARTS with "Before" is step 1.
+#   3. Excludes non-step numbered columns. Mohadin's "9. SJC Label" and HT's
+#      "1. Permission Slip Photo" have no step leading-word → correctly unmatched
+#      (there is no Works-QA slot for either).
+# The un-numbered optical columns ("PhotoJoint"/"PhotoLabel"/"PhotoSlack") lack a
+# leading digit, so they never match here — they fall through to EXTRA_PHOTO_PATTERNS.
 STEP_PATTERNS = [
-    (re.compile(r"^1[\.\s].*(?:before|mark)", re.IGNORECASE), 1, "Before Photo"),
-    (re.compile(r"^2[\.\s].*(?:during|digging)", re.IGNORECASE), 2, "During Photo"),
-    (re.compile(r"^3[\.\s].*(?:depth|measuring)", re.IGNORECASE), 3, "Depth Photo"),
-    (re.compile(r"^4[\.\s].*(?:end.?plate|visible)", re.IGNORECASE), 4, "End Plates"),
-    (re.compile(r"^5[\.\s].*(?:compact|backfill)", re.IGNORECASE), 5, "Compaction"),
-    (re.compile(r"^6[\.\s].*(?:level|spirit)", re.IGNORECASE), 6, "Level Check"),
-    (re.compile(r"^7[\.\s].*(?:after|picture)", re.IGNORECASE), 7, "After Photo"),
-    (re.compile(r"^8[\.\s].*(?:label|foto|photo)", re.IGNORECASE), 8, "Pole Label"),
+    (re.compile(r"^\d+[\.\s]*before", re.IGNORECASE), 1, "Before Photo"),
+    (re.compile(r"^\d+[\.\s]*during", re.IGNORECASE), 2, "During Photo"),
+    (re.compile(r"^\d+[\.\s]*depth", re.IGNORECASE), 3, "Depth Photo"),
+    (re.compile(r"^\d+[\.\s]*end", re.IGNORECASE), 4, "End Plates"),
+    (re.compile(r"^\d+[\.\s]*compact", re.IGNORECASE), 5, "Compaction"),
+    (re.compile(r"^\d+[\.\s]*level", re.IGNORECASE), 6, "Level Check"),
+    (re.compile(r"^\d+[\.\s]*after", re.IGNORECASE), 7, "After Photo"),
+    (re.compile(r"^\d+[\.\s]*clear", re.IGNORECASE), 8, "Pole Label"),
 ]
 
 # Extra photo columns (optical / misc) — no step assignment
@@ -158,7 +195,7 @@ def detect_step_columns(columns):
 
     for col in columns:
         col_clean = col.strip()
-        # Check civil step patterns
+        # Check civil step patterns (leading-word, number-agnostic)
         for pattern, step, label in STEP_PATTERNS:
             if pattern.match(col_clean):
                 step_cols[col] = (step, label, "civil")
