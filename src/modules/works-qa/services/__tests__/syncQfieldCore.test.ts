@@ -44,12 +44,28 @@ describe('domeLabelToPole', () => {
     expect(domeLabelToPole('LAW.STS.03.DIS.DM.P.B100-X')).toBe('LAW.P.B100');
   });
 
+  it('accepts non-STS discipline segments (AGG / FTS)', () => {
+    expect(domeLabelToPole('ETW.AGG.DM.P.H275')).toBe('ETW.P.H275');
+    expect(domeLabelToPole('ETW.FTS.16.AGG.DM.P.H328-O')).toBe('ETW.P.H328');
+  });
+
+  it('passes a bare pole label straight through (Lawley/Mohadin key optical by pole)', () => {
+    expect(domeLabelToPole('LAW.P.B078')).toBe('LAW.P.B078');
+    expect(domeLabelToPole('MOA.P.A032')).toBe('MOA.P.A032');
+    expect(domeLabelToPole('MAM.P.A352')).toBe('MAM.P.A352');
+  });
+
+  it('returns null for a dome-on-manhole label (.DM.MH. — not pole-attached)', () => {
+    expect(domeLabelToPole('TEM.FTS.8.AGG.DM.MH.A058-OLT.02.C4P16')).toBeNull();
+  });
+
   it('returns null for a null label', () => {
     expect(domeLabelToPole(null)).toBeNull();
   });
 
-  it('returns null for a label that is not a recognised dome label', () => {
-    expect(domeLabelToPole('MAM.P.A352')).toBeNull(); // already a pole label, no .STS…DM.P.
+  it('returns null for corrupt / placeholder labels', () => {
+    expect(domeLabelToPole('New pole')).toBeNull();
+    expect(domeLabelToPole('LAW.S.A133')).toBeNull(); // .S. splice, not a pole
     expect(domeLabelToPole('random-string')).toBeNull();
   });
 });

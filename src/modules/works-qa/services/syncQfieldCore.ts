@@ -60,15 +60,24 @@ export function resolveSlotKey(checklist_step: number | null, work_type: string 
   return slotKey;
 }
 
-// Optical/dome validations are keyed by the dome/splice label, not the pole label
-// (e.g. "MAM.STS.16.DIS.DM.P.A352-C2P11.L5" belongs to pole "MAM.P.A352"). Map the
-// dome label back to its pole so the optical photos attach to the right pole row.
-// Returns null when the label isn't a recognised dome label.
-const DOME_LABEL_RE = /^(\w+)\.STS\..*?\.DM\.P\.([A-Za-z0-9]+)/;
+// Resolve the pole label an optical ('joint') validation belongs to. Optical rows
+// are keyed one of two ways depending on the project:
+//   1. Dome/splice label — "MAM.STS.16.DIS.DM.P.A352-C2P11.L5" belongs to pole
+//      "MAM.P.A352". The discipline segment varies (STS distribution / AGG
+//      aggregation / FTS feeder), so we match ".DM.P.<pole>" generically rather
+//      than hard-coding ".STS.". Dome-on-manhole labels ".DM.MH.<x>" have no pole
+//      and stay null (Works QA is pole-centric).
+//   2. Pole label directly — Lawley/Mohadin key optical rows by "LAW.P.B078" with
+//      no dome wrapper; pass those straight through.
+// Returns null when neither shape matches (corrupt / placeholder labels).
+const DOME_LABEL_RE = /^(\w+)\..*?\.DM\.P\.([A-Za-z0-9]+)/;
+const POLE_LABEL_RE = /^(\w+\.P\.[A-Za-z0-9]+)/;
 export function domeLabelToPole(label: string | null): string | null {
   if (!label) return null;
   const m = DOME_LABEL_RE.exec(label);
-  return m ? `${m[1]}.P.${m[2]}` : null;
+  if (m) return `${m[1]}.P.${m[2]}`;
+  const p = POLE_LABEL_RE.exec(label);
+  return p ? p[1]! : null;
 }
 
 interface QFieldRow {
