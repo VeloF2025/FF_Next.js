@@ -91,8 +91,8 @@ export function ApprovalCard({ item, onOpen, onApprove, onReject, onPark, onResu
 
   return (
     <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-[var(--ff-border-light)] transition-colors">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3 flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="flex items-start gap-3 min-w-0 sm:flex-1">
           <div className={`p-2 rounded-lg ${tc.color.split(' ')[0]}`}>
             <TypeIcon className={`h-5 w-5 ${tc.color.split(' ')[1]}`} />
           </div>
@@ -165,15 +165,15 @@ export function ApprovalCard({ item, onOpen, onApprove, onReject, onPark, onResu
           </div>
         </div>
 
-        {/* Right: Amount + Actions */}
-        <div className="flex items-center gap-4">
+        {/* Right: Amount + Actions — full-width wrapping row on mobile so buttons never clip */}
+        <div className="flex items-center gap-3 flex-wrap justify-between sm:justify-end sm:gap-4">
           {item.documentAmount != null && (
             <div className="text-right">
               <div className="text-lg font-semibold text-[var(--ff-text-primary)]">{fmtZAR(item.documentAmount)}</div>
               <div className="text-xs text-[var(--ff-text-tertiary)]">incl. VAT</div>
             </div>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {isPending && onApprove && (
               <button
                 onClick={() => onApprove(item.id)}
