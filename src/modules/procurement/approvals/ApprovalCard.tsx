@@ -166,7 +166,7 @@ export function ApprovalCard({ item, onOpen, onApprove, onReject, onPark, onResu
         </div>
 
         {/* Right: Amount + Actions — full-width wrapping row on mobile so buttons never clip */}
-        <div className="flex items-center gap-3 flex-wrap justify-between sm:justify-end sm:gap-4">
+        <div className="flex items-center gap-3 flex-wrap justify-end sm:gap-4">
           {item.documentAmount != null && (
             <div className="text-right">
               <div className="text-lg font-semibold text-[var(--ff-text-primary)]">{fmtZAR(item.documentAmount)}</div>
