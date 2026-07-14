@@ -28,6 +28,10 @@ export interface SignaturePadProps {
   value: string | null;
   /** Called after each completed stroke or on clear. */
   onChange: (dataUrl: string | null) => void;
+  /** Label above the pad. Defaults to the technician-facing wording. */
+  label?: string;
+  /** Hint shown while the pad is empty. */
+  hint?: string;
 }
 
 // Dark background and stroke colours matching the /my portal dark theme.
@@ -35,7 +39,12 @@ const BG_COLOUR = '#171717'; // neutral-900
 const STROKE_COLOUR = '#ffffff';
 const LINE_WIDTH = 2.5;
 
-export function SignaturePad({ value, onChange }: SignaturePadProps) {
+export function SignaturePad({
+  value,
+  onChange,
+  label = 'Technician signature',
+  hint = 'Sign above to confirm receipt',
+}: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
 
@@ -129,7 +138,7 @@ export function SignaturePad({ value, onChange }: SignaturePadProps) {
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-neutral-300 flex items-center gap-1.5">
           <PenTool className="w-4 h-4 text-neutral-500" />
-          Technician signature
+          {label}
         </span>
         <button
           type="button"
@@ -159,7 +168,7 @@ export function SignaturePad({ value, onChange }: SignaturePadProps) {
       {!value && (
         <p className="text-xs text-neutral-500 flex items-center gap-1">
           <PenTool className="w-3 h-3" />
-          Sign above to confirm receipt
+          {hint}
         </p>
       )}
     </div>

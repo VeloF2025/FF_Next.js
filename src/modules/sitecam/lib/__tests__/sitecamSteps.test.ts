@@ -51,9 +51,9 @@ describe('activation VLM coverage', () => {
     expect(ACTIVATION_STEPS.find((s) => s.number === 4)?.hasVlm).toBe(true);
   });
 
-  it('only step 6 (serial-scan) skips the VLM among activation steps', () => {
+  it('skips the VLM for step 6 (serial-scan) and step 10 (customer sign-off)', () => {
     const nonVlm = ACTIVATION_STEPS.filter((s) => !s.hasVlm).map((s) => s.number);
-    expect(nonVlm).toEqual([6]);
+    expect(nonVlm).toEqual([6, 10]);
   });
 
   it('step 6 (ONT) is the ONLY serial-scan step — step 8 Final Installation is VLM-only', () => {
@@ -66,12 +66,31 @@ describe('activation VLM coverage', () => {
 });
 
 describe('gallery upload allow-list', () => {
-  it('only Signature + Dome Joint Open/Closed allow gallery upload', () => {
+  it('only the Dome Joint shots allow gallery upload', () => {
     const uploadable = ACTIVATION_STEPS.filter((s) => s.allowUpload).map((s) => s.label);
-    expect(uploadable).toEqual(['Signature', 'Dome Joint Open', 'Dome Joint Closed']);
+    expect(uploadable).toEqual(['Dome Joint Open', 'Dome Joint Closed']);
   });
 
   it('no civil step allows gallery upload (camera-only)', () => {
     expect(CIVIL_STEPS.some((s) => s.allowUpload)).toBe(false);
+  });
+});
+
+describe('customer sign-off step', () => {
+  const signature = ACTIVATION_STEPS.find((s) => s.number === 10);
+
+  it('step 10 (Signature) is a sign-off step, not a photo/upload step', () => {
+    expect(signature?.label).toBe('Signature');
+    expect(signature?.signature).toBe(true);
+    expect(signature?.allowUpload).toBeFalsy();
+  });
+
+  it('is not VLM-graded (a drawn signature is not a gradeable photo)', () => {
+    expect(signature?.hasVlm).toBe(false);
+  });
+
+  it('is the only signature step, and only for activations', () => {
+    expect(ACTIVATION_STEPS.filter((s) => s.signature)).toHaveLength(1);
+    expect(CIVIL_STEPS.some((s) => s.signature)).toBe(false);
   });
 });
