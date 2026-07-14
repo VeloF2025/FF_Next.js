@@ -44,7 +44,7 @@ interface UnifiedReviewCardProps {
 
 import { PwaComparisonTab } from './PwaComparisonTab';
 import { useSiteCamPhotos } from '../hooks/useSiteCamPhotos';
-import { SiteCamPhotosContent } from './SiteCamPhotosSection';
+import { SiteCamPhotosSection } from './SiteCamPhotosSection';
 
 type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'maintenance' | 'qa' | 'categorization' | 'pwa';
 
@@ -110,7 +110,7 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
     { key: 'maintenance' as const, label: 'Maintenance', icon: '🔧' },
     { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
     { key: 'qa' as const, label: 'Manual QA', icon: '✅' },
-    { key: 'pwa' as const, label: 'SiteCam', icon: '📱' },
+    { key: 'pwa' as const, label: 'SiteCam Compare', icon: '📱' },
   ];
 
   const handleBackToList = () => {
@@ -731,7 +731,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                     </>
                   )}
 
-                  {section.id === 'sitecam' && <SiteCamPhotosContent data={siteCam} />}
+                  {section.id === 'sitecam' && <SiteCamPhotosSection data={siteCam} />}
 
                   {section.id === 'group' && (
                     <>

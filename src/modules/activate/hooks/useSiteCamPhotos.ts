@@ -67,8 +67,16 @@ export function useSiteCamPhotos(drNumber: string): SiteCamData {
       .then((r) => r.json() as Promise<SubmissionResponse>)
       .then((d) => {
         if (cancelled) return;
-        const submission = d.success ? d.data?.submission ?? null : null;
+        // A `success: false` body means the request itself failed (auth, 4xx/5xx
+        // via apiResponse) — surface it as an error, not as "no photos".
+        if (!d.success) {
+          log.warn('SiteCam submission request failed', { drNumber }, 'useSiteCamPhotos');
+          setData({ ...EMPTY, error: 'Failed to load SiteCam photos' });
+          return;
+        }
+        const submission = d.data?.submission ?? null;
         if (!submission) {
+          // Genuine "no SiteCam submission for this DR" — empty state, not an error.
           setData(EMPTY);
           return;
         }

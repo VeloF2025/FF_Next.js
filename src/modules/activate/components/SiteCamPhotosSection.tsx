@@ -17,7 +17,7 @@ import type { SiteCamData } from '../hooks/useSiteCamPhotos';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 /** Body content for the SiteCam bucket: header + step-grouped gallery, or an empty state. */
-export function SiteCamPhotosContent({ data }: { data: SiteCamData }) {
+export function SiteCamPhotosSection({ data }: { data: SiteCamData }) {
   const { photos, submittedAt, techName, loading, error } = data;
 
   if (loading) {
