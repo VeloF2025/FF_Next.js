@@ -132,6 +132,9 @@ export function SiteCamWizard({ profile, siteInfo, entryGeofence = null }: Props
             allowUpload={
               steps.find((s) => s.number === currentStep.stepNumber)?.allowUpload ?? false
             }
+            isSignature={
+              steps.find((s) => s.number === currentStep.stepNumber)?.signature ?? false
+            }
             onCapture={(f) => void captureAndValidate(f)}
             onSerialSaved={handleSerialSaved}
             onSkipSerial={skipSerialStep}

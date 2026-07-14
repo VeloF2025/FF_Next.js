@@ -12,6 +12,14 @@ export interface SiteCamStep {
    * camera-only to preserve the live-capture / anti-reuse guarantee.
    */
   allowUpload?: boolean;
+  /**
+   * When true, this step captures a customer sign-off on-screen (printed name +
+   * consent + drawn signature) instead of a photo. It is composited into a
+   * single image that flows through the normal upload pipeline as this step's
+   * photo. Signature steps are not VLM-graded (a drawn signature isn't a photo
+   * the model can assess), so they should also set `hasVlm: false`.
+   */
+  signature?: boolean;
 }
 
 export const ACTIVATION_STEPS: readonly SiteCamStep[] = [
@@ -29,7 +37,10 @@ export const ACTIVATION_STEPS: readonly SiteCamStep[] = [
   // step — pass advances, fail shows the reason.
   { number: 8,  label: 'Final Installation',        hasVlm: true,  hasSerialScan: false },
   { number: 9,  label: 'Green Lights on ONT',       hasVlm: true,  hasSerialScan: false },
-  { number: 10, label: 'Signature',                 hasVlm: true,  hasSerialScan: false, allowUpload: true },
+  // Step 10 is the customer sign-off: the customer types their name, ticks the
+  // consent box, and signs on-screen. Composited to one image (see
+  // SiteCamSignatureStep) — not VLM-graded, not a gallery upload.
+  { number: 10, label: 'Signature',                 hasVlm: false, hasSerialScan: false, signature: true },
   { number: 11, label: 'Dome Joint Open',           hasVlm: true,  hasSerialScan: false, allowUpload: true },
   { number: 12, label: 'Dome Joint Closed',         hasVlm: true,  hasSerialScan: false, allowUpload: true },
 ];

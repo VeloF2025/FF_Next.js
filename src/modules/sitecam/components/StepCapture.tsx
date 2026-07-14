@@ -4,6 +4,7 @@ import { AlertTriangle, Camera, CheckCircle, Download, Loader2, SkipForward, Upl
 import { log } from '@/lib/logger';
 import type { StepState } from '../hooks/useSiteCamCapture';
 import { SerialScanStep } from './SerialScanStep';
+import { SiteCamSignatureStep } from './SiteCamSignatureStep';
 import { savePhotoToDevice, stepPhotoFilename } from '../lib/savePhotoToDevice';
 
 // ─── TEMPORARY: dev-only test affordances ────────────────────────────────────
@@ -35,9 +36,15 @@ interface Props {
    * camera (signature, dome-joint shots); all other steps are camera-only.
    */
   allowUpload?: boolean;
+  /**
+   * When true, this step captures a customer sign-off (name + consent +
+   * signature) instead of a photo. Renders SiteCamSignatureStep in place of the
+   * camera; the composited image flows through the same onCapture pipeline.
+   */
+  isSignature?: boolean;
 }
 
-export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSerial, onAppeal, appealPending = false, allowUpload = false }: Props) {
+export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSerial, onAppeal, appealPending = false, allowUpload = false, isSignature = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null); // gallery picker for allowUpload steps
   const [saved, setSaved] = useState(false);
@@ -60,7 +67,10 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSe
     }
   };
 
-  const showCamera = step.status === 'pending' || step.status === 'fail';
+  const needsCapture = step.status === 'pending' || step.status === 'fail';
+  // A signature step captures a customer sign-off in place of the camera.
+  const showSignature = isSignature && needsCapture;
+  const showCamera = needsCapture && !isSignature;
   const showSerialScan = step.status === 'serial_scan';
   const remaining = Math.max(0, 3 - step.attemptNumber);
   // Show the gallery upload when the step legitimately allows it (permanent —
@@ -141,6 +151,8 @@ export function StepCapture({ step, drNumber, onCapture, onSerialSaved, onSkipSe
           </p>
         </div>
       )}
+
+      {showSignature && <SiteCamSignatureStep onSigned={onCapture} />}
 
       {showSerialScan && step.serialDevice && (
         <>
