@@ -1,10 +1,21 @@
+/** One serial the technician scans within a serial-scan step. */
+export interface SerialSpec {
+  device: 'ont' | 'ups';
+  label: string;
+}
+
 export interface SiteCamStep {
   number: number;
   label: string;
   hasVlm: boolean;
   hasSerialScan: boolean;
-  serialLabel?: string;
-  serialDevice?: 'ont' | 'ups';
+  /**
+   * The serials scanned at this step, in order. A serial-scan step captures
+   * these one after another (each with its own confirm gate) before advancing;
+   * step 6 scans the ONT serial then the Gizzu UPS serial. Only meaningful when
+   * `hasSerialScan` is true.
+   */
+  serials?: readonly SerialSpec[];
   /**
    * When true, the capture screen offers a gallery "Upload Photo" button
    * alongside "Take Photo". Reserved for photos legitimately captured outside
@@ -30,11 +41,18 @@ export const ACTIVATION_STEPS: readonly SiteCamStep[] = [
   { number: 3,  label: 'Entry Outside',             hasVlm: true,  hasSerialScan: false },
   { number: 4,  label: 'Entry Inside',              hasVlm: true,  hasSerialScan: false },
   { number: 5,  label: 'Wall (ONT Mount)',          hasVlm: true,  hasSerialScan: false },
-  { number: 6,  label: 'ONT Back After Install',    hasVlm: false, hasSerialScan: true,  serialLabel: 'ONT Serial',  serialDevice: 'ont' },
+  // Step 6 scans TWO serials in order, each with a confirm gate: 6a = ONT
+  // (ALCL…), 6b = Gizzu UPS (GU18W…). Both are mandatory before the step
+  // advances. It keeps its single ONT-back photo and step number.
+  { number: 6,  label: 'ONT Back After Install',    hasVlm: false, hasSerialScan: true,
+    serials: [
+      { device: 'ont', label: 'ONT Serial' },
+      { device: 'ups', label: 'Gizzu UPS Serial' },
+    ] },
   { number: 7,  label: 'Power Meter',               hasVlm: true,  hasSerialScan: false },
-  // Step 8 is VLM-only: the UPS serial is NOT scanned here. Serial scanning
-  // happens once, at step 6 (ONT). Final Installation behaves like any photo
-  // step — pass advances, fail shows the reason.
+  // Step 8 is VLM-only: the UPS serial is scanned at step 6 (6b), not here.
+  // Final Installation behaves like any photo step — pass advances, fail shows
+  // the reason.
   { number: 8,  label: 'Final Installation',        hasVlm: true,  hasSerialScan: false },
   { number: 9,  label: 'Green Lights on ONT',       hasVlm: true,  hasSerialScan: false },
   // Step 10 is the customer sign-off: the customer types their name, ticks the

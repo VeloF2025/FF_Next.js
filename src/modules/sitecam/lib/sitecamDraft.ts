@@ -17,8 +17,13 @@
  */
 
 import { log } from '@/lib/logger';
-import type { SiteCamJobType } from './sitecamSteps';
+import type { SiteCamJobType, SiteCamStep, SerialSpec } from './sitecamSteps';
 import type { StepState } from '../hooks/useSiteCamCapture';
+
+/** Serials configured for a step, in order (empty for non-serial steps). */
+function stepSerials(step: SiteCamStep | undefined): SerialSpec[] {
+  return step?.serials ? step.serials.map((s) => ({ ...s })) : [];
+}
 
 const MODULE = 'sitecamDraft';
 const KEY_PREFIX = 'sitecam:draft:v1:';
@@ -87,7 +92,7 @@ export function saveDraft(
 export function loadDraft(
   jobType: SiteCamJobType,
   siteId: string,
-  steps: readonly { number: number }[],
+  steps: readonly SiteCamStep[],
 ): SiteCamDraft | null {
   const store = storage();
   if (!store) return null;
@@ -102,6 +107,17 @@ export function loadDraft(
     // Guard against a step-definition change since the draft was written.
     const sameShape = states.every((s, i) => s && s.stepNumber === steps[i]?.number);
     if (!sameShape) return null;
+
+    // Backfill the serial-sequence fields so a draft written before step 6
+    // gained its two-serial flow (a mid-job deploy) can't strand the wizard
+    // with an undefined `serials`/`serialIndex`.
+    const restored = states.map((s, i) => {
+      const serials = Array.isArray(s.serials) && s.serials.length > 0 ? s.serials : stepSerials(steps[i]);
+      const maxIndex = Math.max(serials.length, 1);
+      const serialIndex =
+        typeof s.serialIndex === 'number' && s.serialIndex >= 0 && s.serialIndex < maxIndex ? s.serialIndex : 0;
+      return { ...s, serials, serialIndex };
+    });
 
     const idx =
       typeof parsed.currentStepIndex === 'number' &&
@@ -122,7 +138,7 @@ export function loadDraft(
         : null;
 
     return {
-      stepStates: states,
+      stepStates: restored,
       currentStepIndex: idx,
       appealedIndex,
     };

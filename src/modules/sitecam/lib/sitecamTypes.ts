@@ -10,7 +10,7 @@
  * consumers (components/pages) so their import paths are unaffected.
  */
 
-import type { SiteCamJobType } from './sitecamSteps';
+import type { SiteCamJobType, SerialSpec } from './sitecamSteps';
 
 export type StepStatus =
   | 'pending'
@@ -26,8 +26,18 @@ export interface StepState {
   label: string;
   hasVlm: boolean;
   hasSerialScan: boolean;
+  /**
+   * The serials to scan at this step, in order (empty for non-serial steps).
+   * Step 6 carries [ONT, Gizzu UPS]; the wizard walks them via `serialIndex`.
+   */
+  serials: SerialSpec[];
+  /** Index into `serials` of the serial currently being scanned (0-based). */
+  serialIndex: number;
+  /** Label of the CURRENT serial (`serials[serialIndex]`) — mirrored for the UI. */
   serialLabel: string;
+  /** Device of the CURRENT serial (`serials[serialIndex]`) — mirrored for the UI. */
   serialDevice: 'ont' | 'ups' | null;
+  /** Attempt count for the CURRENT serial (resets when advancing to the next). */
   serialAttempts: number;
   serialScanned: string | null;
   status: StepStatus;

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { log } from '@/lib/logger';
-import type { SiteCamStep } from '../lib/sitecamSteps';
+import type { SiteCamStep, SerialSpec } from '../lib/sitecamSteps';
 import type { GeofenceReading } from '../lib/geofence';
 import { prepareCapturePhotos } from '../lib/watermarkPhoto';
 import { loadDraft, saveDraft, clearDraft, type SiteCamDraft } from '../lib/sitecamDraft';
@@ -29,22 +29,28 @@ export type { StepStatus, StepState, SiteInfo };
 function initStepStates(
   steps: readonly SiteCamStep[],
 ): StepState[] {
-  return steps.map((s) => ({
-    stepNumber: s.number,
-    label: s.label,
-    hasVlm: s.hasVlm,
-    hasSerialScan: s.hasSerialScan,
-    serialLabel: s.serialLabel ?? '',
-    serialDevice: s.serialDevice ?? null,
-    serialAttempts: 0,
-    serialScanned: null,
-    status: 'pending',
-    photoBase64: null,
-    attemptNumber: 0,
-    failReasons: [],
-    corrections: [],
-    needsManualReview: false,
-  }));
+  return steps.map((s) => {
+    const serials: SerialSpec[] = s.serials ? s.serials.map((x) => ({ ...x })) : [];
+    const first = serials[0] ?? null;
+    return {
+      stepNumber: s.number,
+      label: s.label,
+      hasVlm: s.hasVlm,
+      hasSerialScan: s.hasSerialScan,
+      serials,
+      serialIndex: 0,
+      serialLabel: first?.label ?? '',
+      serialDevice: first?.device ?? null,
+      serialAttempts: 0,
+      serialScanned: null,
+      status: 'pending',
+      photoBase64: null,
+      attemptNumber: 0,
+      failReasons: [],
+      corrections: [],
+      needsManualReview: false,
+    };
+  });
 }
 
 export function useSiteCamCapture(
@@ -268,20 +274,45 @@ export function useSiteCamCapture(
 
   const handleSerialSaved = useCallback(
     (idx: number, serial: string) => {
+      // Decide from the current snapshot whether this was the LAST serial of the
+      // step (step 6 scans two: ONT then Gizzu UPS). Reading here — not inside the
+      // updater — keeps `advanceStep` a single, side-effect-free call.
+      const step = stepStates[idx];
+      const total = step?.serials.length ?? 0;
+      const isLastSerial = (step?.serialIndex ?? 0) + 1 >= Math.max(total, 1);
+
       setStepStates((prev) =>
         prev.map((s, i) => {
           if (i !== idx) return s;
+          if (isLastSerial) {
+            return {
+              ...s,
+              status: 'serial_pending',
+              serialScanned: serial,
+              serialAttempts: s.serialAttempts + 1,
+            };
+          }
+          // More serials to scan — advance to the next one and re-enter the scan
+          // UI (the SerialScanStep remounts on serialIndex). Reset the per-serial
+          // attempt counter and mirror the next serial's device/label. The STEP
+          // does not advance until the last serial is saved.
+          const nextIndex = s.serialIndex + 1;
+          const next = s.serials[nextIndex] ?? null;
           return {
             ...s,
-            status: 'serial_pending',
-            serialScanned: serial,
-            serialAttempts: s.serialAttempts + 1,
+            status: 'serial_scan',
+            serialIndex: nextIndex,
+            serialLabel: next?.label ?? '',
+            serialDevice: next?.device ?? null,
+            serialAttempts: 0,
+            serialScanned: null,
           };
         }),
       );
-      advanceStep(1500);
+
+      if (isLastSerial) advanceStep(1500);
     },
-    [advanceStep],
+    [stepStates, advanceStep],
   );
 
   // Dev/testing only — gated in the UI by NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD (off

@@ -727,3 +727,54 @@ describe('useSiteCamCapture offline submit + flush (Task 6)', () => {
     expect(result.current.uploadResult).toBeNull();
   });
 });
+
+describe('useSiteCamCapture — step 6 dual serial (6a ONT → 6b Gizzu UPS)', () => {
+  // An activation step that scans two serials, plus a following photo step so
+  // there is somewhere to advance to once both serials are saved.
+  const DUAL_SERIAL_STEPS: readonly SiteCamStep[] = [
+    {
+      number: 1, label: 'ONT Back After Install', hasVlm: false, hasSerialScan: true,
+      serials: [
+        { device: 'ont', label: 'ONT Serial' },
+        { device: 'ups', label: 'Gizzu UPS Serial' },
+      ],
+    },
+    { number: 2, label: 'Power Meter', hasVlm: true, hasSerialScan: false },
+  ];
+  const ACT_SITE: SiteInfo = { ...SITE_INFO, jobType: 'activations', siteId: 'DR2600734' };
+
+  it('scans ONT first, then re-enters serial scan for the Gizzu UPS without advancing', async () => {
+    const { result } = renderHook(() => useSiteCamCapture(DUAL_SERIAL_STEPS, STAFF_ID, ACT_SITE));
+
+    // Take the ONT-back photo → enters the serial-scan stage on the ONT serial.
+    await act(async () => { await capture(result); });
+    expect(result.current.stepStates[0].status).toBe('serial_scan');
+    expect(result.current.stepStates[0].serialIndex).toBe(0);
+    expect(result.current.stepStates[0].serialDevice).toBe('ont');
+
+    // 6a saved → still serial_scan, advanced to the UPS serial, attempts reset,
+    // and the STEP has NOT advanced.
+    await act(async () => { result.current.handleSerialSaved('ALCLB48CC3CA'); });
+    expect(result.current.stepStates[0].status).toBe('serial_scan');
+    expect(result.current.stepStates[0].serialIndex).toBe(1);
+    expect(result.current.stepStates[0].serialDevice).toBe('ups');
+    expect(result.current.stepStates[0].serialLabel).toBe('Gizzu UPS Serial');
+    expect(result.current.stepStates[0].serialAttempts).toBe(0);
+    expect(result.current.currentStepIndex).toBe(0);
+  });
+
+  it('completes step 6 and advances only after the Gizzu UPS serial is saved', async () => {
+    const { result } = renderHook(() => useSiteCamCapture(DUAL_SERIAL_STEPS, STAFF_ID, ACT_SITE));
+    await act(async () => { await capture(result); });
+    await act(async () => { result.current.handleSerialSaved('ALCLB48CC3CA'); });
+
+    // 6b saved → step complete and advance to step 7 after the delay.
+    await act(async () => {
+      result.current.handleSerialSaved('GU18W12V2508057584');
+      await vi.advanceTimersByTimeAsync(1600);
+    });
+    expect(result.current.stepStates[0].status).toBe('serial_pending');
+    expect(result.current.stepStates[0].serialScanned).toBe('GU18W12V2508057584');
+    expect(result.current.currentStepIndex).toBe(1);
+  });
+});
