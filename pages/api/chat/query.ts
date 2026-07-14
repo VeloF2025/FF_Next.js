@@ -111,7 +111,7 @@ const QUERIES: QueryDef[] = [
     id: 'qa_by_project',
     name: 'QA by Project',
     description: 'QA pass/fail counts grouped by project',
-    sql: `SELECT p.name as project, qa_decision, COUNT(*) as count FROM dr_photo_unified_reviews dr JOIN projects p ON dr.project_id = p.id WHERE qa_decision IS NOT NULL GROUP BY p.name, qa_decision ORDER BY p.name, count DESC`,
+    sql: `SELECT project, qa_decision, COUNT(*) as count FROM dr_photo_unified_reviews WHERE qa_decision IS NOT NULL GROUP BY project, qa_decision ORDER BY project, count DESC`,
     format: 'table',
   },
 
