@@ -19,6 +19,7 @@
 import { log } from '@/lib/logger';
 import type { SiteCamJobType, SiteCamStep, SerialSpec } from './sitecamSteps';
 import type { StepState } from '../hooks/useSiteCamCapture';
+import { nextSerialPatch } from './serialSequence';
 
 /** Serials configured for a step, in order (empty for non-serial steps). */
 function stepSerials(step: SiteCamStep | undefined): SerialSpec[] {
@@ -116,7 +117,17 @@ export function loadDraft(
       const maxIndex = Math.max(serials.length, 1);
       const serialIndex =
         typeof s.serialIndex === 'number' && s.serialIndex >= 0 && s.serialIndex < maxIndex ? s.serialIndex : 0;
-      return { ...s, serials, serialIndex };
+      const base = { ...s, serials, serialIndex };
+
+      // A serial step marked complete (`serial_pending`) under an OLDER
+      // single-serial flow, but which now has more serials to collect (e.g. the
+      // Gizzu UPS added at 6b), is reopened at the next unscanned serial so the
+      // remaining serial is still captured — "both serials mandatory" must hold
+      // for a job in flight across the deploy.
+      if (base.hasSerialScan && base.status === 'serial_pending' && serialIndex < serials.length - 1) {
+        return { ...base, status: 'serial_scan' as const, ...nextSerialPatch(base) };
+      }
+      return base;
     });
 
     const idx =

@@ -40,6 +40,7 @@ const TWO_STEPS: readonly SiteCamStep[] = [
 function stepFixture(num: number, over: Partial<StepState> = {}): StepState {
   return {
     stepNumber: num, label: `Step ${num}`, hasVlm: true, hasSerialScan: false,
+    serials: [], serialIndex: 0,
     serialLabel: '', serialDevice: null, serialAttempts: 0, serialScanned: null,
     status: 'pending', photoBase64: null, attemptNumber: 0, failReasons: [],
     corrections: [], needsManualReview: false, ...over,
@@ -776,5 +777,15 @@ describe('useSiteCamCapture — step 6 dual serial (6a ONT → 6b Gizzu UPS)', (
     expect(result.current.stepStates[0].status).toBe('serial_pending');
     expect(result.current.stepStates[0].serialScanned).toBe('GU18W12V2508057584');
     expect(result.current.currentStepIndex).toBe(1);
+  });
+
+  it('dev skip advances 6a → 6b (skips the current serial only, no step advance)', async () => {
+    const { result } = renderHook(() => useSiteCamCapture(DUAL_SERIAL_STEPS, STAFF_ID, ACT_SITE));
+    await act(async () => { await capture(result); });
+    await act(async () => { result.current.skipSerialStep(); });
+    expect(result.current.stepStates[0].status).toBe('serial_scan');
+    expect(result.current.stepStates[0].serialIndex).toBe(1);
+    expect(result.current.stepStates[0].serialDevice).toBe('ups');
+    expect(result.current.currentStepIndex).toBe(0);
   });
 });

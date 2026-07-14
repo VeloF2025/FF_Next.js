@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { log } from '@/lib/logger';
 import type { SiteCamStep, SerialSpec } from '../lib/sitecamSteps';
+import { isLastSerial, nextSerialPatch } from '../lib/serialSequence';
 import type { GeofenceReading } from '../lib/geofence';
 import { prepareCapturePhotos } from '../lib/watermarkPhoto';
 import { loadDraft, saveDraft, clearDraft, type SiteCamDraft } from '../lib/sitecamDraft';
@@ -278,60 +279,48 @@ export function useSiteCamCapture(
       // step (step 6 scans two: ONT then Gizzu UPS). Reading here — not inside the
       // updater — keeps `advanceStep` a single, side-effect-free call.
       const step = stepStates[idx];
-      const total = step?.serials.length ?? 0;
-      const isLastSerial = (step?.serialIndex ?? 0) + 1 >= Math.max(total, 1);
+      const last = step ? isLastSerial(step) : true;
 
       setStepStates((prev) =>
         prev.map((s, i) => {
           if (i !== idx) return s;
-          if (isLastSerial) {
-            return {
-              ...s,
-              status: 'serial_pending',
-              serialScanned: serial,
-              serialAttempts: s.serialAttempts + 1,
-            };
+          if (last) {
+            return { ...s, status: 'serial_pending', serialScanned: serial, serialAttempts: s.serialAttempts + 1 };
           }
           // More serials to scan — advance to the next one and re-enter the scan
-          // UI (the SerialScanStep remounts on serialIndex). Reset the per-serial
-          // attempt counter and mirror the next serial's device/label. The STEP
-          // does not advance until the last serial is saved.
-          const nextIndex = s.serialIndex + 1;
-          const next = s.serials[nextIndex] ?? null;
-          return {
-            ...s,
-            status: 'serial_scan',
-            serialIndex: nextIndex,
-            serialLabel: next?.label ?? '',
-            serialDevice: next?.device ?? null,
-            serialAttempts: 0,
-            serialScanned: null,
-          };
+          // UI (SerialScanStep remounts on serialIndex). The STEP does not
+          // advance until the last serial is saved.
+          return { ...s, status: 'serial_scan', ...nextSerialPatch(s) };
         }),
       );
 
-      if (isLastSerial) advanceStep(1500);
+      if (last) advanceStep(1500);
     },
     [stepStates, advanceStep],
   );
 
   // Dev/testing only — gated in the UI by NEXT_PUBLIC_SITECAM_ALLOW_UPLOAD (off
-  // in production). Lets a tester advance past a serial-scan step without a
-  // physical ONT/UPS barcode in front of the lens, so the rest of the wizard can
-  // be exercised end-to-end. Marks the step done (advances + still uploads the
-  // photo) but records no serial and flags it for manual review.
+  // in production). Lets a tester advance past a serial without a physical
+  // ONT/UPS barcode in front of the lens. Skips the CURRENT serial only —
+  // advances to the next one if any remain (so 6b can be reached), else marks
+  // the step done. Records no serial and flags it for manual review.
   const skipSerialStep = useCallback(
     (idx: number) => {
+      const step = stepStates[idx];
+      const last = step ? isLastSerial(step) : true;
+
       setStepStates((prev) =>
-        prev.map((s, i) =>
-          i === idx
+        prev.map((s, i) => {
+          if (i !== idx) return s;
+          return last
             ? { ...s, status: 'serial_pending', serialScanned: null, needsManualReview: true }
-            : s,
-        ),
+            : { ...s, status: 'serial_scan', ...nextSerialPatch(s), needsManualReview: true };
+        }),
       );
-      advanceStep(600);
+
+      if (last) advanceStep(600);
     },
-    [advanceStep],
+    [stepStates, advanceStep],
   );
 
   const captureAndValidate = useCallback(
