@@ -29,7 +29,7 @@ export default withAuth(withErrorHandler(async (
   try {
     // Check if project exists
     const project = await sql`
-      SELECT id, name, status FROM projects WHERE id = ${projectId}
+      SELECT id FROM projects WHERE id = ${projectId}
     `;
 
     if (project.length === 0) {
