@@ -187,7 +187,7 @@ const QUERIES: QueryDef[] = [
     id: 'projects_active',
     name: 'Active Projects',
     description: 'List of active projects with key info',
-    sql: `SELECT name, status, created_at FROM projects WHERE LOWER(status) = 'active' ORDER BY created_at DESC LIMIT 20`,
+    sql: `SELECT project_name AS name, status, created_at FROM projects WHERE LOWER(status) = 'active' ORDER BY created_at DESC LIMIT 20`,
     format: 'table',
   },
 
