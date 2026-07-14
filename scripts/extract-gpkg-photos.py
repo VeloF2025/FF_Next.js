@@ -131,6 +131,11 @@ OPTICAL_GPKGS = {
     "Thembisa POP 1": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optical_audit_", "label_col": "label"},
     "Thembisa POP 3": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optical_audit", "label_col": "label"},
     "Themb'elihle": {"gpkg_path": "Optical Audit.gpkg", "table_name": "optica_audit", "label_col": "label"},
+    # Lawley's dome audit is "LAWJoints.gpkg" / table "LAWJoints" (8 dome-step cols),
+    # label = dome label e.g. "LAW.STS.8.DIS.DM.P.D832-C#P#.L#". Previously unregistered,
+    # so Lawley's dome photos never ingested with steps; only ~25 captured so far but
+    # this wires the path so future dome audits auto-slot (like the other projects).
+    "Lawley": {"gpkg_path": "LAWJoints.gpkg", "table_name": "LAWJoints", "label_col": "label"},
 }
 
 
