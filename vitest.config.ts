@@ -104,6 +104,9 @@ export default defineConfig({
       // util for the offline-photo PWA queue) — explicit src-first override
       // before the generic @/lib → ./lib fallback.
       { find: /^@\/lib\/images/, replacement: path.resolve(__dirname, './src/lib/images') },
+      // @/lib/sharepoint/* lives at src/lib/sharepoint/ (Fibertime SharePoint
+      // REST client) — explicit src-first override before the generic fallback.
+      { find: /^@\/lib\/sharepoint/, replacement: path.resolve(__dirname, './src/lib/sharepoint') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },
