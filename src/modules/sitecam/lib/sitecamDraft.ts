@@ -112,6 +112,7 @@ export function loadDraft(
     // Backfill the serial-sequence fields so a draft written before step 6
     // gained its two-serial flow (a mid-job deploy) can't strand the wizard
     // with an undefined `serials`/`serialIndex`.
+    let earliestReopened = -1;
     const restored = states.map((s, i) => {
       const serials = Array.isArray(s.serials) && s.serials.length > 0 ? s.serials : stepSerials(steps[i]);
       const maxIndex = Math.max(serials.length, 1);
@@ -125,17 +126,24 @@ export function loadDraft(
       // remaining serial is still captured — "both serials mandatory" must hold
       // for a job in flight across the deploy.
       if (base.hasSerialScan && base.status === 'serial_pending' && serialIndex < serials.length - 1) {
+        if (earliestReopened === -1) earliestReopened = i;
         return { ...base, status: 'serial_scan' as const, ...nextSerialPatch(base) };
       }
       return base;
     });
 
-    const idx =
+    const persistedIdx =
       typeof parsed.currentStepIndex === 'number' &&
       parsed.currentStepIndex >= 0 &&
       parsed.currentStepIndex < steps.length
         ? parsed.currentStepIndex
         : 0;
+    // If a completed step was reopened for a newly-required serial, route the
+    // technician's position BACK to it. The old flow left `currentStepIndex`
+    // PAST step 6, and `resumeStepIndex` only scans forward — so without this the
+    // reopened serial is never shown, and a fully-finished job deadlocks (its
+    // `serial_scan` step is neither "done" nor submit-able).
+    const idx = earliestReopened >= 0 ? Math.min(persistedIdx, earliestReopened) : persistedIdx;
 
     // Validate the appealed-step index the same way: a stale draft (e.g. written
     // before the step list changed) could carry an index past the current range,

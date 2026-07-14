@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { saveDraft, loadDraft, clearDraft } from '../sitecamDraft';
+import { resumeStepIndex } from '../resumeStepIndex';
 import type { StepState } from '../../hooks/useSiteCamCapture';
 import type { SiteCamStep } from '../sitecamSteps';
 
@@ -153,5 +154,42 @@ describe('sitecamDraft', () => {
     expect(s.serialIndex).toBe(1);
     expect(s.serialDevice).toBe('ups');
     expect(s.serialLabel).toBe('Gizzu UPS Serial');
+  });
+
+  it('routes the technician BACK to the reopened step even after they advanced past it', () => {
+    // A 7-step activation where step 6 (index 5) now scans two serials.
+    const STEPS7: readonly SiteCamStep[] = [1, 2, 3, 4, 5, 6, 7].map((n) =>
+      n === 6
+        ? {
+            number: 6, label: 'ONT Back After Install', hasVlm: false, hasSerialScan: true,
+            serials: [{ device: 'ont', label: 'ONT Serial' }, { device: 'ups', label: 'Gizzu UPS Serial' }],
+          }
+        : { number: n, label: `Step ${n}`, hasVlm: true, hasSerialScan: false },
+    );
+    // Old draft: steps 1-5 passed, step 6 finished the ONT-only flow
+    // (serial_pending, pre-change shape), tech advanced to step 7 (index 6).
+    const legacy6 = {
+      stepNumber: 6, label: 'ONT Back After Install', hasVlm: false, hasSerialScan: true,
+      serialLabel: 'ONT Serial', serialDevice: 'ont', serialAttempts: 1, serialScanned: 'ALCLB48CC3CA',
+      status: 'serial_pending', photoBase64: null, attemptNumber: 1, failReasons: [], corrections: [],
+      needsManualReview: false,
+    };
+    const legacyStates = [
+      step(1, { status: 'pass' }), step(2, { status: 'pass' }), step(3, { status: 'pass' }),
+      step(4, { status: 'pass' }), step(5, { status: 'pass' }), legacy6, step(7),
+    ];
+    window.localStorage.setItem(
+      'sitecam:draft:v1:activations:DR-ADVANCED',
+      JSON.stringify({ stepStates: legacyStates, currentStepIndex: 6, appealedIndex: null }),
+    );
+
+    const loaded = loadDraft('activations', 'DR-ADVANCED', STEPS7);
+    expect(loaded).not.toBeNull();
+    // Position routed back from step 7 (index 6) to the reopened step 6 (index 5)…
+    expect(loaded!.currentStepIndex).toBe(5);
+    // …and resumeStepIndex keeps it there (the reopened serial step is not "done").
+    expect(resumeStepIndex(loaded!.stepStates, loaded!.currentStepIndex)).toBe(5);
+    expect(loaded!.stepStates[5].status).toBe('serial_scan');
+    expect(loaded!.stepStates[5].serialDevice).toBe('ups');
   });
 });
