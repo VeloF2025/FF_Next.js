@@ -134,9 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await parseJsonResponse<LoginApiResponse>(res);
         // API returns { success, data: { user } } structure
         const userData = data.data?.user || data.user;
+        if (!userData) {
+          throw new ApiResponseError('Session response carried no user');
+        }
+
         const { user: mappedUser, authUser } = mapApiUser(userData);
         setUser(authUser);
         setCurrentUser(mappedUser);

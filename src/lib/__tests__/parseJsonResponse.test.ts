@@ -52,13 +52,17 @@ describe('parseJsonResponse', () => {
   });
 
   it('never surfaces the raw parser text to the user', async () => {
-    const res = makeResponse(NEXT_HTML_ERROR_PAGE, 'text/html; charset=utf-8', 500);
+    // A fresh Response per assertion: a body stream can only be read once, so
+    // reusing one would pass here only as long as the content-type check keeps
+    // throwing before the body is touched.
+    await expect(
+      parseJsonResponse(makeResponse(NEXT_HTML_ERROR_PAGE, 'text/html; charset=utf-8', 500))
+    ).rejects.toThrow('The server is temporarily unavailable. Please try again in a moment.');
 
     // The exact string Llewelyn saw on screen — it must not survive.
-    await expect(parseJsonResponse(res)).rejects.toThrow(
-      'The server is temporarily unavailable. Please try again in a moment.'
-    );
-    await expect(parseJsonResponse(res)).rejects.not.toThrow(/Unexpected token|DOCTYPE|valid JSON/);
+    await expect(
+      parseJsonResponse(makeResponse(NEXT_HTML_ERROR_PAGE, 'text/html; charset=utf-8', 500))
+    ).rejects.not.toThrow(/Unexpected token|DOCTYPE|valid JSON/);
   });
 
   it('rejects an HTML body even when the status is 200', async () => {
