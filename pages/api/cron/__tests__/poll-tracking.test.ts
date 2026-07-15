@@ -43,13 +43,18 @@ function makeFakeClient({ lockAcquired = true } = {}) {
   return { query, release };
 }
 
-/** Default sql() stub: no existing watermark, upserts no-op. */
+/**
+ * Default sql() stub: no existing watermark, upserts no-op, and one active
+ * tracker so the window-budget clamp has a fleet size to work from.
+ */
 function stubSql({
   watermarkRow = null as { last_event_ts: string | null } | null,
+  activeTrackers = 1,
 } = {}) {
   sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
     const text = strings.join('');
     if (text.includes('SELECT last_event_ts')) return watermarkRow ? [watermarkRow] : [];
+    if (text.includes('FROM fleet_vehicle_trackers')) return [{ n: activeTrackers }];
     return [];
   });
 }
@@ -57,11 +62,14 @@ function stubSql({
 function makeFakeProvider(overrides: Partial<{
   key: string;
   accountRef: string;
+  maxEventsPerFetch: number;
   fetchPositions: ReturnType<typeof vi.fn>;
 }> = {}) {
   return {
     key: overrides.key ?? 'cartrack',
     accountRef: overrides.accountRef ?? 'default',
+    // Cartrack's real budget: MAX_PAGES(20) * PAGE_SIZE(1000).
+    maxEventsPerFetch: overrides.maxEventsPerFetch ?? 20_000,
     fetchPositions: overrides.fetchPositions ?? vi.fn().mockResolvedValue([]),
   };
 }
@@ -194,13 +202,75 @@ describe('GET/POST /api/cron/poll-tracking', () => {
     // the watermark has already moved on past them. Anything older than this
     // window when it lands is never fetched again, so shrinking this value
     // silently drops those fixes — pin it.
-    const lastEventTs = '2026-07-15T07:00:00.000Z';
-    stubSql({ watermarkRow: { last_event_ts: lastEventTs } });
-    const fetchPositions = vi.fn().mockResolvedValue([]);
-    cartrackProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions }));
-    await run(AUTH);
-    const [from] = fetchPositions.mock.calls[0] as [Date, Date];
-    expect(from.getTime()).toBe(new Date(lastEventTs).getTime() - 30 * 60 * 1000);
+    //
+    // Pin the clock too: `from` is now also floored by the window-budget
+    // clamp, which is measured back from now(). Against the real wall clock a
+    // hard-coded watermark drifts ever further into the past until the clamp
+    // — correctly — takes over, and this test would fail for a reason that has
+    // nothing to do with the overlap it exists to check.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-15T07:05:00.000Z'));
+      const lastEventTs = '2026-07-15T07:00:00.000Z';
+      stubSql({ watermarkRow: { last_event_ts: lastEventTs } });
+      const fetchPositions = vi.fn().mockResolvedValue([]);
+      cartrackProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions }));
+      await run(AUTH);
+      const [from] = fetchPositions.mock.calls[0] as [Date, Date];
+      expect(from.getTime()).toBe(new Date(lastEventTs).getTime() - 30 * 60 * 1000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clamps the window to the event budget when the fleet makes it unaffordable', async () => {
+    // The regression: a 6h cold start costs ~26k events at 22 vehicles against
+    // a 20k budget, so fetchPositions throws. A throw leaves the watermark
+    // unset, so the next tick cold-starts and throws again — the poller never
+    // starts. Verified against the live account 2026-07-15 (~200 ev/h/vehicle).
+    vi.useFakeTimers();
+    try {
+      const now = new Date('2026-07-15T12:00:00.000Z');
+      vi.setSystemTime(now);
+      stubSql({ watermarkRow: null, activeTrackers: 22 }); // cold start, big fleet
+      const fetchPositions = vi.fn().mockResolvedValue([]);
+      cartrackProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions }));
+      await run(AUTH);
+
+      const [from] = fetchPositions.mock.calls[0] as [Date, Date];
+      const windowHours = (now.getTime() - from.getTime()) / 3_600_000;
+      expect(windowHours).toBeLessThan(6); // clamped below COLD_START_MS
+      // and the request it produces must fit the budget at 200 ev/h/vehicle
+      expect(windowHours * 200 * 22).toBeLessThanOrEqual(20_000);
+
+      expect(logMock.warn).toHaveBeenCalledWith(
+        expect.stringContaining('window clamped'),
+        expect.objectContaining({ activeTrackers: 22 })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not clamp — or warn — when the fleet is small enough to afford the cold start', async () => {
+    vi.useFakeTimers();
+    try {
+      const now = new Date('2026-07-15T12:00:00.000Z');
+      vi.setSystemTime(now);
+      stubSql({ watermarkRow: null, activeTrackers: 7 }); // today's tracked fleet
+      const fetchPositions = vi.fn().mockResolvedValue([]);
+      cartrackProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions }));
+      await run(AUTH);
+
+      const [from] = fetchPositions.mock.calls[0] as [Date, Date];
+      expect(now.getTime() - from.getTime()).toBe(6 * 60 * 60 * 1000); // full cold start
+      expect(logMock.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('window clamped'),
+        expect.anything()
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('threads provider.key AND provider.accountRef through to ingestPositions — not external_id-only lookup', async () => {

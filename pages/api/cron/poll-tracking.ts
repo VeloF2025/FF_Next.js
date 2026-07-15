@@ -15,29 +15,9 @@ import { log } from '@/lib/logger';
 import { sql, pool } from '@/lib/db-pool';
 import { cartrackProvider } from '@/services/tracking/cartrack/provider';
 import { ingestPositions } from '@/services/tracking/ingest';
+import { resolveWindow } from '@/services/tracking/windowBudget';
 import type { ProviderKey, TrackingProvider } from '@/services/tracking/types';
 
-/**
- * Re-poll this far back before the watermark; dedup absorbs the overlap.
- *
- * Sized for buffering, not for clock skew. The watermark is one scalar per
- * account (max event_ts), but a vehicle that loses GSM coverage keeps
- * recording and uploads those fixes late, stamped with the event time they
- * happened at. Meanwhile the other vehicles hold the watermark near now — so
- * anything older than this overlap when it lands is never fetched again, and
- * Cartrack's 24h cap makes it unrecoverable the next day. 30 minutes covers
- * an ordinary dropout (parking basement, rural stretch); a longer outage
- * still loses fixes, which a per-tracker watermark would fix properly.
- *
- * Cheap to widen: ingest dedups on ON CONFLICT DO NOTHING, so replaying a
- * window costs bandwidth, not correctness. At ~22 vehicles this is roughly
- * 660 events per tick against a 5000-event pagination cap that throws rather
- * than truncating — so a fleet large enough to outgrow this window fails
- * loudly instead of silently dropping the tail.
- */
-const OVERLAP_MS = 30 * 60 * 1000;
-/** First run with no watermark: how far back to backfill. */
-const COLD_START_MS = 6 * 60 * 60 * 1000;
 /** Advisory lock key so a slow run is not re-entered by the next tick. */
 const LOCK_KEY = 4417301;
 
@@ -49,6 +29,15 @@ type PollResult =
       skippedUnmapped: number;
       windowFrom: string;
       windowTo: string;
+      /**
+       * Minutes of history the event budget forced this tick to skip, present
+       * only when that happened. It rides in the response because the cron
+       * appends this body to /home/velo/logs/poll-tracking.log — log.warn goes
+       * to journald, which is not where anyone looks when a day of telemetry is
+       * missing. A clamp is not an error, so it must not raise
+       * consecutive_failures; but it must not be invisible either.
+       */
+      clampedMinutes?: number;
     }
   | { provider: ProviderKey; accountRef: string; error: string; authFailure: boolean };
 
@@ -127,9 +116,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `;
         const now = new Date();
         const last = wm[0]?.last_event_ts ? new Date(wm[0].last_event_ts) : null;
-        const from = last
-          ? new Date(last.getTime() - OVERLAP_MS)
-          : new Date(now.getTime() - COLD_START_MS);
+
+        // The window has to fit what this provider will actually serve. The
+        // feed is account-wide, so its event count scales with the active
+        // fleet: a 6h cold start costs ~8k events at 7 vehicles but ~26k at
+        // 22, past the 20k budget. Unclamped, that throws — and since a throw
+        // leaves the watermark unset, the next tick cold-starts and throws
+        // again. The poller would never start at all, and the logs would show
+        // only a pagination error with no hint that fleet size caused it.
+        const trackerRows = await sql<{ n: number }>`
+          SELECT count(*)::int AS n FROM fleet_vehicle_trackers
+          WHERE provider = ${provider.key}
+            AND account_ref = ${provider.accountRef}
+            AND is_active
+        `;
+        const activeTrackers = trackerRows[0]?.n ?? 0;
+        const { from, clampedMs, maxWindowMs: maxWindow } = resolveWindow({
+          last, now, maxEventsPerFetch: provider.maxEventsPerFetch, activeTrackers,
+        });
+
+        if (clampedMs > 0) {
+          // Never let this be silent: the window was narrowed, so some history
+          // is not fetched on this tick and — past the provider's retention —
+          // never will be. Also reported in the response below, since that is
+          // what reaches the cron's log file.
+          log.warn('[poll-tracking] window clamped to the provider event budget', {
+            provider: provider.key,
+            accountRef: provider.accountRef,
+            activeTrackers,
+            skippedMinutes: Math.round(clampedMs / 60_000),
+            maxWindowMinutes: Math.round(maxWindow / 60_000),
+            clampedFrom: from.toISOString(),
+          });
+        }
 
         const positions = await provider.fetchPositions(from, now);
         // accountRef is threaded through (not just provider.key) because
@@ -168,7 +187,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         results.push({
           provider: provider.key, accountRef: provider.accountRef,
           inserted, skippedUnmapped,
-          windowFrom: from.toISOString(), windowTo: now.toISOString() });
+          windowFrom: from.toISOString(), windowTo: now.toISOString(),
+          // Omitted entirely on a normal tick, so its presence in the cron log
+          // is the signal — no scanning past a "clampedMinutes: 0" on every line.
+          ...(clampedMs > 0 ? { clampedMinutes: Math.round(clampedMs / 60_000) } : {}) });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         const authFailure = isAuthFailure(message);
