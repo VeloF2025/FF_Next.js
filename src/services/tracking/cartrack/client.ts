@@ -138,7 +138,9 @@ class HttpCartrackClient implements CartrackClient {
     // in-memory by vehicle_id. The endpoint caps the window at 24h, which
     // comfortably exceeds our default ±5 min tolerance.
     //
-    // Date format per docs: `YYYY-MM-DD hh:mm:ss` (no timezone, assumed UTC).
+    // Cartrack reads these timestamps as South African local time, NOT UTC —
+    // verified against the live API 2026-07-15 (sending UTC returns events 2h
+    // stale). The published docs say UTC and are wrong. See cartrackTsFormat.
     const from = cartrackTsFormat(new Date(at.getTime() - toleranceMs));
     const to = cartrackTsFormat(new Date(at.getTime() + toleranceMs));
     const buildUrl = (page: number) =>
