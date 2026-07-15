@@ -47,17 +47,37 @@ Copied verbatim from CLAUDE.md and the design. Every task inherits these.
 
 ---
 
-## Task 1: Fix the Cartrack timezone bug
+## Task 1: Fix the Cartrack timezone bug — both directions
 
 Ships first and alone. It is a live-system correctness bug independent of everything else here.
 
+**There are two defects, one on each side of the wire.** Both must be fixed together: fixing only
+the request side leaves `fetchPositionAt` still returning `no_data` for every call, which is worse
+than not fixing it — it would look fixed.
+
+| Side | Defect | Effect |
+|---|---|---|
+| **Request** | `cartrackTsFormat` sends UTC; Cartrack reads SAST | Window is 2h in the past |
+| **Response** | `toSample` cannot parse Cartrack's `+02` offset | **Every sample dropped** |
+
+The response defect is the nastier one, verified on the live wire (`'2026-07-15 12:30:03+02'`):
+1. `TZ_SUFFIX_RE = /(?:[Zz]|[+-]\d{2}:?\d{2})$/` requires a **four-digit** offset, so it does not
+   match `+02`. The code concludes there is no timezone and appends `Z`.
+2. That yields `'2026-07-15T12:30:03+02Z'` → `new Date(...)` → **Invalid Date** → `toSample`
+   returns `null` → the sample is silently discarded.
+
+And even with the regex fixed, `new Date('2026-07-15T12:30:03+02')` is *still* Invalid Date — V8
+will not parse a bare two-digit offset. It must be expanded to `+02:00`.
+
 **Files:**
-- Modify: `src/services/tracking/cartrack/client.ts` (`cartrackTsFormat`, ~line 383)
+- Modify: `src/services/tracking/cartrack/client.ts` (`cartrackTsFormat` ~line 383; `TZ_SUFFIX_RE` and `toSample` ~line 396-417)
 - Test: `src/services/tracking/cartrack/__tests__/client.test.ts`
 
 **Interfaces:**
 - Consumes: nothing
-- Produces: `cartrackTsFormat(d: Date): string` — now returns SAST wall-clock, e.g. `'2026-07-15 10:00:00'` for `2026-07-15T08:00:00Z`
+- Produces:
+  - `cartrackTsFormat(d: Date): string` — SAST wall-clock, e.g. `'2026-07-15 10:00:00'` for `2026-07-15T08:00:00Z`
+  - `toSample` — now parses `+02`, `+02:00`, `+0200`, `Z`, and bare (assumed UTC)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -121,22 +141,133 @@ Note: we shift the instant then read it with `getUTC*`. Reading with local gette
 Run: `npx vitest run src/services/tracking/cartrack/__tests__/client.test.ts -t cartrackTsFormat`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Run the whole cartrack suite for regressions**
+- [ ] **Step 5: Write the failing test for the RESPONSE side**
+
+Add to the same test file. The `event_ts` values below are the **real wire format**, copied from a
+live response on 2026-07-15 — do not "tidy" them into `+02:00`.
+
+```ts
+describe('toSample timestamp parsing', () => {
+  // Live wire format is a TWO-digit offset: '2026-07-15 12:30:03+02'.
+  // The old TZ_SUFFIX_RE wanted four digits, missed it, appended 'Z', and
+  // produced Invalid Date — silently dropping every sample.
+  it('parses Cartrack real two-digit offset', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03+02')?.toISOString())
+      .toBe('2026-07-15T10:30:03.000Z');
+  });
+
+  it('parses a colon offset', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03+02:00')?.toISOString())
+      .toBe('2026-07-15T10:30:03.000Z');
+  });
+
+  it('parses a compact four-digit offset', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03+0200')?.toISOString())
+      .toBe('2026-07-15T10:30:03.000Z');
+  });
+
+  it('parses explicit Z', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03Z')?.toISOString())
+      .toBe('2026-07-15T12:30:03.000Z');
+  });
+
+  it('treats a bare timestamp as UTC', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03')?.toISOString())
+      .toBe('2026-07-15T12:30:03.000Z');
+  });
+
+  it('parses a negative bare offset', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03-05')?.toISOString())
+      .toBe('2026-07-15T17:30:03.000Z');
+  });
+
+  it('returns null for junk rather than an Invalid Date', () => {
+    expect(parseSampleTs('not a timestamp')).toBeNull();
+  });
+});
+```
+
+Export a small pure `parseSampleTs(raw: string): Date | null` from `client.ts` and have `toSample`
+call it — the parsing is what needs testing, not the whole sample builder.
+
+- [ ] **Step 6: Run it to verify it fails**
+
+Run: `npx vitest run src/services/tracking/cartrack/__tests__/client.test.ts -t "toSample timestamp"`
+Expected: FAIL — `parseSampleTs` is not exported/defined.
+
+- [ ] **Step 7: Implement the response-side fix**
+
+In `src/services/tracking/cartrack/client.ts`, replace `TZ_SUFFIX_RE` and the parsing inside
+`toSample`:
+
+```ts
+/**
+ * Detects an explicit timezone suffix. Cartrack's SA tenant emits a
+ * TWO-digit offset (`+02`), so the minutes group must be optional — a
+ * `\d{2}:?\d{2}` pattern misses it entirely and the caller then wrongly
+ * appends 'Z'.
+ */
+const TZ_SUFFIX_RE = /(?:[Zz]|[+-]\d{2}(?::?\d{2})?)$/;
+/** Matches a bare hour-only offset like `+02` / `-05` at the very end. */
+const BARE_HOUR_OFFSET_RE = /([+-]\d{2})$/;
+
+/**
+ * Parse a Cartrack timestamp to a Date, or null if unparseable.
+ *
+ * Verified against the live wire format 2026-07-15: `'2026-07-15 12:30:03+02'`.
+ * V8 cannot parse a bare two-digit offset — `new Date('...T12:30:03+02')` is
+ * Invalid Date — so it is expanded to `+02:00` first.
+ */
+export function parseSampleTs(raw: string): Date | null {
+  if (!raw) return null;
+  let iso = raw.replace(' ', 'T');
+  if (!TZ_SUFFIX_RE.test(iso)) {
+    iso += 'Z'; // no zone stated — documented as UTC
+  } else {
+    iso = iso.replace(BARE_HOUR_OFFSET_RE, '$1:00');
+  }
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+```
+
+Then in `toSample`, replace the inline normalisation with:
+
+```ts
+  const ts = parseSampleTs(raw.event_ts);
+  if (!ts) return null;
+```
+
+Keep the existing guard that returns null when `latitude`/`longitude` are null.
+
+- [ ] **Step 8: Run the response-side tests**
+
+Run: `npx vitest run src/services/tracking/cartrack/__tests__/client.test.ts -t "toSample timestamp"`
+Expected: PASS (7 tests).
+
+- [ ] **Step 9: Run the whole cartrack suite for regressions**
 
 Run: `npx vitest run src/services/tracking/cartrack/`
 Expected: PASS. If a test asserted the old UTC behaviour, it encoded the bug — update it and note why in the commit.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add src/services/tracking/cartrack/client.ts src/services/tracking/cartrack/__tests__/client.test.ts
-git commit -m "fix(tracking): Cartrack query windows are SAST, not UTC
+git commit -m "fix(tracking): Cartrack timezone handling, both directions
 
-Verified live against the account: sending UTC returns events 2h stale;
-sending SAST returns current events. The docs say UTC and are wrong.
+Two defects, one on each side of the wire. Either alone makes
+fetchPositionAt return no_data for every call.
 
-Without this, every fetchPositionAt asks for the wrong two hours, finds
-nothing within its 5-minute tolerance, and returns no_data."
+Request side: cartrackTsFormat sent UTC; Cartrack reads South African
+local time. Verified live — sending UTC returns events 2h stale, sending
+SAST returns current ones. The published docs say UTC and are wrong.
+
+Response side: the SA tenant emits a TWO-digit offset ('...12:30:03+02').
+TZ_SUFFIX_RE required four digits, so it read the offset as absent and
+appended 'Z', yielding '...12:30:03+02Z' -> Invalid Date -> every sample
+silently discarded. V8 also cannot parse a bare '+02' at all, so the
+offset is now expanded to '+02:00' before parsing."
 ```
 
 ---
@@ -652,11 +783,27 @@ function bool(v: unknown): boolean | null {
   return null;
 }
 
-/** Cartrack returns `YYYY-MM-DD hh:mm:ss+02`. Honour the offset if present. */
-const TZ_SUFFIX_RE = /(?:[Zz]|[+-]\d{2}:?\d{2})$/;
+/**
+ * Cartrack returns `YYYY-MM-DD hh:mm:ss+02` — a **two-digit** offset.
+ *
+ * Two traps here, both verified against the live wire format 2026-07-15:
+ *   1. A `[+-]\d{2}:?\d{2}` regex does NOT match `+02` (it wants four
+ *      digits), so the offset reads as absent and a `Z` gets appended.
+ *   2. `new Date('2026-07-15T12:30:03+02')` is **Invalid Date** — V8 will
+ *      not parse a bare two-digit offset. It must be expanded to `+02:00`.
+ * Either trap alone silently drops every sample.
+ */
+const TZ_SUFFIX_RE = /(?:[Zz]|[+-]\d{2}(?::?\d{2})?)$/;
+const BARE_HOUR_OFFSET_RE = /([+-]\d{2})$/;
+
 function parseTs(raw: unknown): Date | null {
   if (typeof raw !== 'string' || !raw) return null;
-  const iso = raw.replace(' ', 'T') + (TZ_SUFFIX_RE.test(raw) ? '' : 'Z');
+  let iso = raw.replace(' ', 'T');
+  if (!TZ_SUFFIX_RE.test(iso)) {
+    iso += 'Z'; // no zone stated — the docs say UTC
+  } else {
+    iso = iso.replace(BARE_HOUR_OFFSET_RE, '$1:00');
+  }
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
 }
