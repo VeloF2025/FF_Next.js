@@ -82,11 +82,17 @@ CREATE TABLE IF NOT EXISTS fleet_tracking_watermarks (
   PRIMARY KEY (provider, account_ref)
 );
 
--- fleet_gps_trips.vehicle_id: live trips have no upload job, AND
--- driverScoreService.calculateAuthorizationScore already queries this
--- column, which never existed — the query throws and is swallowed.
+-- fleet_gps_trips.vehicle_id: driverScoreService.calculateAuthorizationScore
+-- already queries this column, which never existed — the query throws and is
+-- swallowed.
+--
+-- job_id keeps its NOT NULL. Live trips will need it dropped, but nothing in
+-- this release writes fleet_gps_trips, and the rollback cannot restore the
+-- constraint once rows with a NULL job_id exist. Until there is a writer, the
+-- drop only means the existing investigation-upload inserter stops failing
+-- loudly on a missing job_id and starts writing orphan rows silently. It
+-- belongs in the change that adds live trips.
 ALTER TABLE fleet_gps_trips ADD COLUMN IF NOT EXISTS vehicle_id UUID REFERENCES fleet_vehicles(id);
-ALTER TABLE fleet_gps_trips ALTER COLUMN job_id DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_fleet_gps_trips_vehicle ON fleet_gps_trips (vehicle_id);
 
 COMMIT;

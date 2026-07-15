@@ -16,7 +16,7 @@
  */
 import { log } from '@/lib/logger';
 import { cartrackTsFormat, parseSampleTs } from './client';
-import type { ProviderPosition, ProviderVehicle, TrackingProvider } from '../types';
+import type { ProviderPosition, TrackingProvider } from '../types';
 
 const TIMEOUT_MS = 20_000;
 const MAX_PAGES = 20;
@@ -66,20 +66,6 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
   return {
     key: 'cartrack',
     accountRef: opts.accountRef,
-
-    async listVehicles(): Promise<ProviderVehicle[]> {
-      const body = await getJson(`${base}/vehicles?limit=500&page=1`);
-      const rows = (body.data ?? []) as Array<Record<string, unknown>>;
-      // In the SA tenant `registration` is an internal placeholder
-      // (e.g. TEMP-2084956); the real plate is in `vehicle_name`.
-      return rows
-        .map((v) => ({
-          externalId: String(v.vehicle_id ?? ''),
-          registration: (v.vehicle_name as string) ?? null,
-          description: [v.manufacturer, v.model].filter(Boolean).join(' ').trim() || null,
-        }))
-        .filter((v) => v.externalId.length > 0);
-    },
 
     async fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]> {
       const out: ProviderPosition[] = [];

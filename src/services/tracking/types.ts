@@ -8,12 +8,6 @@
  */
 export type ProviderKey = 'cartrack' | 'netstar' | 'ituran';
 
-export interface ProviderVehicle {
-  externalId: string;
-  registration: string | null;
-  description: string | null;
-}
-
 export interface ProviderPosition {
   externalId: string;
   providerEventId: string | null;
@@ -35,6 +29,5 @@ export interface ProviderPosition {
 export interface TrackingProvider {
   readonly key: ProviderKey;
   readonly accountRef: string;
-  listVehicles(): Promise<ProviderVehicle[]>;
   fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]>;
 }

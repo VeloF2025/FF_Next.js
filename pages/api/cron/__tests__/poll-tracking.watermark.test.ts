@@ -73,7 +73,6 @@ function makeFakeProvider(fetchPositions: () => Promise<ProviderPosition[]>) {
   return {
     key: 'cartrack' as const,
     accountRef: 'default',
-    listVehicles: vi.fn().mockResolvedValue([]),
     fetchPositions: vi.fn(fetchPositions),
   };
 }

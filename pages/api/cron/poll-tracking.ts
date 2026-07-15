@@ -178,6 +178,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     return apiResponse.success(res, { results });
   } finally {
+    let unlockFailed = false;
     if (lockHeld) {
       try {
         await client.query('SELECT pg_advisory_unlock($1)', [LOCK_KEY]);
@@ -185,10 +186,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Must not throw here: the response may already be sent, and an
         // unhandled rejection at this point would surface as exactly that
         // rather than as a clean 5xx.
+        unlockFailed = true;
         log.error('[poll-tracking] advisory unlock failed', {
           error: err instanceof Error ? err.message : String(err) });
       }
     }
-    client.release();
+    // The lock is session-scoped, so a connection whose unlock failed still
+    // holds it. Returning that to the pool (min: 1, so it is never evicted)
+    // strands the lock for the life of the process and every later tick then
+    // skips with a 200 — tracking stops dead and looks healthy. Destroying the
+    // connection ends its session, which is what makes Postgres drop the lock.
+    client.release(unlockFailed);
   }
 }

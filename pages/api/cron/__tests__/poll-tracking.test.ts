@@ -62,7 +62,6 @@ function makeFakeProvider(overrides: Partial<{
   return {
     key: overrides.key ?? 'cartrack',
     accountRef: overrides.accountRef ?? 'default',
-    listVehicles: vi.fn().mockResolvedValue([]),
     fetchPositions: overrides.fetchPositions ?? vi.fn().mockResolvedValue([]),
   };
 }
@@ -160,7 +159,23 @@ describe('GET/POST /api/cron/poll-tracking', () => {
       expect.stringContaining('advisory unlock failed'),
       expect.objectContaining({ error: expect.stringContaining('connection reset') })
     );
+    // ...and destroys the connection rather than handing it back. The lock is
+    // session-scoped, so this connection still holds it; the pool keeps min: 1
+    // and would never evict it, stranding the lock for the life of the process.
+    // Every later tick would then skip with a 200 — tracking dead, looking fine.
+    // Ending the session is what makes Postgres drop the lock.
     expect(client.release).toHaveBeenCalledTimes(1);
+    expect(client.release).toHaveBeenCalledWith(true);
+  });
+
+  it('returns the connection to the pool (does NOT destroy it) when the unlock succeeds', async () => {
+    // The counterpart to the test above: destroying on every tick would churn
+    // a fresh connection every 2 minutes for no reason.
+    const client = makeFakeClient();
+    poolConnectMock.mockImplementation(async () => client);
+    await run(AUTH);
+    expect(client.release).toHaveBeenCalledTimes(1);
+    expect(client.release).not.toHaveBeenCalledWith(true);
   });
 
   it('cold start with no watermark backfills from 6 hours ago', async () => {
