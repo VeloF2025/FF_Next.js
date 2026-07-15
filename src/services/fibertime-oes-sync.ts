@@ -48,6 +48,21 @@ const logger = createLogger('services:fibertime-oes-sync');
 export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3', 'ETW-1', 'ETW-2'] as const;
 export type Site = (typeof ACTIVE_SITES)[number];
 
+// Retry tuning. Fibertime sometimes publishes the per-site OES files a few
+// minutes AFTER our cron fires (files land ~22:35–22:41 SAST — the 2026-07-14
+// timing race). Re-check any site still `not_available` a couple of times before
+// giving up, so a late upload imports within the same run. A hard wall-clock
+// budget keeps the whole run under the cron's `curl -m 300`: retries stop early
+// rather than sleep past DEFAULT_MAX_TOTAL_MS (2 passes × 90s ≈ 3 min of waiting,
+// leaving headroom for the actual SharePoint fetch + import work).
+const DEFAULT_MAX_RETRY_PASSES = 2;
+const DEFAULT_RETRY_DELAY_MS = 90_000;
+const DEFAULT_MAX_TOTAL_MS = 240_000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -64,10 +79,34 @@ export interface SiteResult {
   error?: string;
 }
 
+export interface SyncSummary {
+  imported: number;
+  skipped: number;
+  notAvailable: number;
+  errors: number;
+  /** Number of extra re-check passes that ran (0 = every site resolved on pass 1). */
+  retryPasses: number;
+}
+
 export interface SyncReport {
   date: string;
   sites: SiteResult[];
   durationMs: number;
+  summary: SyncSummary;
+}
+
+export interface RunOesSyncOptions {
+  /** Extra re-check passes for sites still `not_available` (late SharePoint upload). Default 2. */
+  maxRetryPasses?: number;
+  /** Delay between retry passes in ms. Default 90_000; pass 0 in tests. */
+  retryDelayMs?: number;
+  /** Hard wall-clock budget in ms; retries stop rather than sleep past it. Default 240_000. */
+  maxTotalMs?: number;
+  /**
+   * Per-site sync fn — injectable so the retry/detection orchestration can be
+   * unit-tested without the SharePoint/DB stack. Defaults to the real syncSite.
+   */
+  syncOne?: (site: Site, date: string) => Promise<SiteResult>;
 }
 
 // ============================================================================
@@ -253,10 +292,55 @@ export async function syncSite(site: Site, date: string): Promise<SiteResult> {
 // ============================================================================
 
 /**
- * Run the nightly OES sync for every site in ACTIVE_SITES.
- * @param date - YYYYMMDD (defaults to today SAST / UTC+2)
+ * Sync one set of sites a single time. Handles the auth-expiry abort rule:
+ * listFolderFiles is the FIRST SharePoint call in syncSite, so a fulfilled
+ * outcome (imported / skipped / not_available) proves the session is valid. A
+ * real expiry 403s on EVERY folder, so no site can be fulfilled — abort only
+ * when we saw an auth rejection AND not a single site listed successfully. A 403
+ * on one folder while others succeed (e.g. a forbidden ETW POP) is a per-site
+ * permission gap, recorded per-site rather than aborting the run.
  */
-export async function runOesSync(date?: string): Promise<SyncReport> {
+async function syncSitesOnce(
+  sites: readonly Site[],
+  date: string,
+  syncOne: (site: Site, date: string) => Promise<SiteResult>
+): Promise<SiteResult[]> {
+  const outcomes = await Promise.allSettled(sites.map(site => syncOne(site, date)));
+
+  const sessionLikelyValid = outcomes.some(o => o.status === 'fulfilled');
+  const authRejection = outcomes.find(
+    (o): o is PromiseRejectedResult =>
+      o.status === 'rejected' && o.reason instanceof FibertimeAuthExpiredError
+  );
+  if (authRejection && !sessionLikelyValid) {
+    throw authRejection.reason;
+  }
+
+  return outcomes.map((outcome, idx) => {
+    if (outcome.status === 'fulfilled') return outcome.value;
+    const site = sites[idx] as Site;
+    const errMsg =
+      outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+    logger.error('Unexpected site sync rejection', { site, error: errMsg });
+    return { site, status: 'error' as const, error: errMsg };
+  });
+}
+
+/**
+ * Run the nightly OES sync for every site in ACTIVE_SITES.
+ *
+ * Sites that come back `not_available` are re-checked a bounded number of times
+ * (see {@link RunOesSyncOptions}) to self-heal a late SharePoint upload. If the
+ * run still ingests nothing, a WARN is emitted so the silent-failure class that
+ * hid the 2026-07-14 timing race can be alerted on.
+ *
+ * @param date    - YYYYMMDD (defaults to today SAST / UTC+2)
+ * @param options - retry tuning + injectable per-site sync (for tests)
+ */
+export async function runOesSync(
+  date?: string,
+  options: RunOesSyncOptions = {}
+): Promise<SyncReport> {
   // Default to today in SAST (UTC+2)
   const reportDate =
     date ??
@@ -265,53 +349,103 @@ export async function runOesSync(date?: string): Promise<SyncReport> {
       .slice(0, 10)
       .replace(/-/g, '');
 
+  const maxRetryPasses = options.maxRetryPasses ?? DEFAULT_MAX_RETRY_PASSES;
+  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  const maxTotalMs = options.maxTotalMs ?? DEFAULT_MAX_TOTAL_MS;
+  const syncOne = options.syncOne ?? syncSite;
+
   logger.info('Starting Fibertime OES sync', { date: reportDate, sites: ACTIVE_SITES });
-
   const startMs = Date.now();
-  const sites = await Promise.allSettled(
-    ACTIVE_SITES.map(site => syncSite(site, reportDate))
-  );
 
-  // Distinguish a genuine cookie expiry from a per-folder permission gap.
-  // listFolderFiles is the FIRST SharePoint call in syncSite, so a fulfilled
-  // outcome (imported / skipped / not_available) proves that listing returned
-  // 200 — i.e. the session is valid. A real expiry 403s on EVERY folder, so no
-  // site can be fulfilled. Therefore: abort only when we saw an auth rejection
-  // AND not a single site listed successfully. A 403 on one folder while others
-  // succeed (e.g. a forbidden ETW POP) is a permission gap — recorded per-site.
-  const sessionLikelyValid = sites.some(o => o.status === 'fulfilled');
-  const authRejection = sites.find(
-    (o): o is PromiseRejectedResult =>
-      o.status === 'rejected' && o.reason instanceof FibertimeAuthExpiredError
-  );
-  if (authRejection && !sessionLikelyValid) {
-    throw authRejection.reason;
+  // Pass 1 — every site.
+  const resultBySite = new Map<Site, SiteResult>();
+  for (const r of await syncSitesOnce(ACTIVE_SITES, reportDate, syncOne)) {
+    resultBySite.set(r.site, r);
   }
 
-  const results: SiteResult[] = sites.map((outcome, idx) => {
-    if (outcome.status === 'fulfilled') return outcome.value;
-    const site = ACTIVE_SITES[idx] as Site;
-    const errMsg =
-      outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
-    logger.error('Unexpected site sync rejection', { site, error: errMsg });
-    return { site, status: 'error' as const, error: errMsg };
-  });
+  // Retry passes — re-check only sites still `not_available`. Fibertime sometimes
+  // uploads the day's file a few minutes after our cron fires; a bounded wait lets
+  // that late upload import within the same run instead of failing silently.
+  let retryPasses = 0;
+  for (let pass = 1; pass <= maxRetryPasses; pass++) {
+    const pending = ACTIVE_SITES.filter(s => resultBySite.get(s)?.status === 'not_available');
+    if (pending.length === 0) break;
+
+    // Deadline guard: never sleep past the run budget (the cron wraps this in
+    // `curl -m 300`). Stopping early keeps the report + completion/detection logs;
+    // getting killed mid-run would lose them — the silent failure we're fixing.
+    const elapsedMs = Date.now() - startMs;
+    if (retryDelayMs > 0 && elapsedMs + retryDelayMs > maxTotalMs) {
+      logger.warn('OES sync: retry budget exhausted — stopping re-checks early', {
+        pass,
+        pending,
+        elapsedMs,
+        maxTotalMs,
+      });
+      break;
+    }
+
+    retryPasses = pass;
+    logger.info('OES sync: sites still not_available — waiting to re-check (late upload?)', {
+      pass,
+      pending,
+      retryDelayMs,
+    });
+    if (retryDelayMs > 0) await delay(retryDelayMs);
+
+    try {
+      for (const r of await syncSitesOnce(pending, reportDate, syncOne)) {
+        resultBySite.set(r.site, r);
+      }
+    } catch (err) {
+      // A session that expires mid-run (only reachable once retries stretch the
+      // wall-clock) must NOT discard the sites that already imported on pass 1:
+      // keep the accumulated results and stop retrying. Pass 1 still hard-aborts
+      // a session that was invalid from the very start (see syncSitesOnce).
+      if (err instanceof FibertimeAuthExpiredError) {
+        logger.warn('OES sync: session expired during retry — keeping earlier results', {
+          pass,
+          pending,
+        });
+        break;
+      }
+      throw err;
+    }
+  }
+
+  const results: SiteResult[] = ACTIVE_SITES.map(
+    s => resultBySite.get(s) ?? { site: s, status: 'error' as const, error: 'no result' }
+  );
+
+  const summary: SyncSummary = {
+    imported: results.filter(r => r.status === 'imported').length,
+    skipped: results.filter(r => r.status === 'skipped').length,
+    notAvailable: results.filter(r => r.status === 'not_available').length,
+    errors: results.filter(r => r.status === 'error').length,
+    retryPasses,
+  };
 
   const report: SyncReport = {
     date: reportDate,
     sites: results,
     durationMs: Date.now() - startMs,
+    summary,
   };
 
-  const imported = results.filter(r => r.status === 'imported').length;
-  const skipped = results.filter(r => r.status === 'skipped').length;
-  const errors = results.filter(r => r.status === 'error').length;
+  // Detection: a run that ingested NOTHING new and has no evidence the day's data
+  // was already imported earlier (skipped) is a silent-failure signal — the class
+  // that hid the 2026-07-14 timing race for a week. Surface it loudly so drift can
+  // be alerted on instead of passing as a green `success:true`.
+  if (summary.imported === 0 && summary.skipped === 0) {
+    logger.warn(
+      'OES sync imported 0 sites — no OES data ingested. Check Fibertime SharePoint upload timing vs the cron schedule.',
+      { date: reportDate, ...summary, sites: results.map(r => ({ site: r.site, status: r.status })) }
+    );
+  }
 
   logger.info('Fibertime OES sync complete', {
     date: reportDate,
-    imported,
-    skipped,
-    errors,
+    ...summary,
     durationMs: report.durationMs,
   });
 
