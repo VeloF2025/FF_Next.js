@@ -20,7 +20,7 @@ Copied verbatim from CLAUDE.md and the design. Every task inherits these.
 - **Never commit credentials.** Real values live only in `.claude/credentials.local.md` (gitignored).
 - **Database:** use `pg.Pool` via `@/lib/db-pool` (`sql` tagged template, `query`, `queryOne`, `transaction`). **Never** `lib/db/pool.js` / the Neon shim — conditional SQL through it is broken.
 - **Migrations must live in `scripts/migrations/sql/`.** The runner scans nowhere else. Every migration needs a matching `rollback_<n>_*.sql`.
-- **API responses:** `import { apiResponse } from '@/lib/apiResponse'` → `apiResponse.success(res, data)`, `.badRequest()`, `.unauthorized()`, `.methodNotAllowed()`, `.internalError()`.
+- **API responses:** `import { apiResponse } from '@/lib/apiResponse'` → `apiResponse.success(res, data)`, `.badRequest()`, `.unauthorized()`, `.methodNotAllowed(res, method, allowedMethods)` — **three** args — `.internalError()`.
 - **Timezone:** South Africa is UTC+02:00 year-round, no DST. **Cartrack query timestamps are SAST, not UTC.**
 - **DGTS:** no tautological tests, no mocks pretending to be implementations.
 - **Run `npm run ci:quick` before every PR.** Never `--no-verify`.
@@ -1152,9 +1152,10 @@ Create `pages/api/cron/poll-tracking.ts`:
 /**
  * Polls every configured tracking provider and stores new positions.
  *
- * Cron (Velocity crontab — Vercel crons do not fire for this systemd-hosted app):
- *   */2 * * * * curl -fsS -H "x-cron-secret: $CRON_SECRET" \
- *     http://localhost:3005/api/cron/poll-tracking >> /home/velo/logs/poll-tracking.log 2>&1
+ * Cron: a curl line in the Velocity crontab (Vercel crons do not fire for this
+ * systemd-hosted app). The schedule is deliberately NOT written inside this
+ * JSDoc block: a cron expression contains the sequence that closes a block
+ * comment, which silently breaks the build. See Task 9 for the crontab line.
  *
  * Devices report every 1-4 min; polling faster than they transmit gains
  * nothing. Cartrack returns all vehicles in one call, so cost is one
@@ -1191,7 +1192,7 @@ function configuredProviders(): TrackingProvider[] {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
   }
 
   const expected = process.env.CRON_SECRET;
@@ -1329,7 +1330,7 @@ interface Row extends Record<string, unknown> {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, ['GET']);
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
   const rows = await sql<Row>`
     SELECT
