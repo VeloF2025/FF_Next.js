@@ -9,6 +9,7 @@ import type {
   ProgressStatus,
 } from './fnoReportTypes';
 import { buildFnoHierarchySql, buildProjectWhere, FNO_NAMES } from './fnoQfieldSql';
+import { getHerotelQfieldSnapshot } from './herotelQfieldSnapshot';
 
 interface RawHierarchyRow extends Record<string, unknown> {
   project_id: string;
@@ -72,13 +73,17 @@ export async function getFnoProjects(fnoKey: FnoKey): Promise<ProjectOption[]> {
   return rows.map((row) => ({ projectId: row.project_id, projectName: row.project_name }));
 }
 
+function isUuid(value: string | undefined): boolean {
+  return !!value && /^[0-9a-f-]{36}$/i.test(value);
+}
+
 export async function getFnoScopeActualReport(
   fnoKey: FnoKey,
   projectId?: string,
 ): Promise<ScopeActualResponse> {
-  const { where, params } = buildProjectWhere(fnoKey, projectId);
+  const dbProjectId = isUuid(projectId) ? projectId : undefined;
+  const { where, params } = buildProjectWhere(fnoKey, dbProjectId);
   const rows = await query<RawHierarchyRow>(buildFnoHierarchySql(where), params);
-  const projects = await getFnoProjects(fnoKey);
   const summary: ScopeActualSummary = {
     poleScope: 0,
     poleActual: 0,
@@ -93,6 +98,19 @@ export async function getFnoScopeActualReport(
   };
 
   const hierarchy = rows.map((row) => mapHierarchyRow(row, summary));
+
+  if (fnoKey === 'herotel' && hierarchy.length === 0) {
+    const snapshot = getHerotelQfieldSnapshot(projectId);
+    return {
+      fnoKey,
+      fnoName: FNO_NAMES[fnoKey],
+      projects: snapshot.projects,
+      summary: snapshot.summary,
+      hierarchy: snapshot.rows,
+    };
+  }
+
+  const projects = await getFnoProjects(fnoKey);
 
   return {
     fnoKey,

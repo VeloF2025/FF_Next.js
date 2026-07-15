@@ -18,10 +18,9 @@ import {
   normalizeFnoKey,
 } from '@/modules/construction-qa/services/fnoQfieldReportService';
 
-function validProjectId(input: string | string[] | undefined): string | undefined {
+function selectedProjectId(input: string | string[] | undefined): string | undefined {
   const value = Array.isArray(input) ? input[0] : input;
-  if (!value) return undefined;
-  return /^[0-9a-f-]{36}$/i.test(value) ? value : undefined;
+  return value || undefined;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -38,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     const fnoKey = normalizeFnoKey(req.query.fno);
-    const projectId = validProjectId(req.query.projectId);
+    const projectId = selectedProjectId(req.query.projectId);
     const report = await getFnoScopeActualReport(fnoKey, projectId);
     return apiResponse.success(res, report);
   } catch (error) {
