@@ -32,7 +32,7 @@ export default function FleetMapPage() {
     let cancelled = false;
     async function load() {
       try {
-        const res = await fetch('/api/fleet/positions/live');
+        const res = await fetch('/api/fleet/positions/live', { credentials: 'include' });
         if (!res.ok) throw new Error(`Failed to load positions (${res.status})`);
         const body = (await res.json()) as LivePositionsResponse;
         if (!cancelled) {

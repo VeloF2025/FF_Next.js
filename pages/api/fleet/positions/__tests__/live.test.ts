@@ -8,6 +8,11 @@ vi.mock('@/lib/db-pool', () => ({
   sql: (...a: unknown[]) => sqlMock(...a),
 }));
 
+// Passthrough so these tests exercise the handler's own behaviour. That the real
+// route is auth-wrapped is pinned separately in live.auth.test.ts — a passthrough
+// here would otherwise let the wrapper be deleted with every test still green.
+vi.mock('@/lib/auth', () => ({ withAuth: (h: unknown) => h }));
+
 import handler from '../live';
 
 /** Fixed "now" so ageSeconds/isStale assertions are exact, not approximate. */

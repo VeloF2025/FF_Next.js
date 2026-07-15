@@ -13,6 +13,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
+import { withAuth } from '@/lib/auth';
 
 /** A fix older than this is not "live" and must not be drawn as if it were. */
 const STALE_AFTER_SECONDS = 15 * 60;
@@ -49,7 +50,7 @@ export interface LiveVehicle {
   trackingState: TrackingState;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
   try {
@@ -108,3 +109,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.databaseError(res, error);
   }
 }
+
+export default withAuth(handler);

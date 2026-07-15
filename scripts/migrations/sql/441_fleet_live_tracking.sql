@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_positions (
   tracker_id        UUID REFERENCES fleet_vehicle_trackers(id) ON DELETE SET NULL,
   provider          VARCHAR(20) NOT NULL CHECK (provider IN ('cartrack','netstar','ituran')),
   account_ref       VARCHAR(50) NOT NULL,
-  provider_event_id VARCHAR(64),
+  provider_event_id VARCHAR(160),
   recorded_at       TIMESTAMPTZ NOT NULL,
   received_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   lat               NUMERIC(10,7) NOT NULL,
@@ -56,6 +56,8 @@ COMMENT ON COLUMN fleet_vehicle_positions.road_speed_kph IS 'Legal limit of the 
 COMMENT ON COLUMN fleet_vehicle_positions.odometer_km IS 'Cartrack reports metres; divided by 1000 at ingest.';
 COMMENT ON COLUMN fleet_vehicle_positions.account_ref IS
   'Which tenant/account on the provider (denormalised from fleet_vehicle_trackers) so a row is self-describing without a join, and so the dedup index below can be scoped per account.';
+COMMENT ON COLUMN fleet_vehicle_positions.provider_event_id IS
+  'Provider''s own event id where it supplies one. Providers that do not get a synthetic "syn:<account_ref>:<external_id>:<iso8601>" id from ingest, which at the column widths above reaches 144 chars — hence 160, not 64.';
 
 -- Scoped by account_ref, not just provider: two accounts on the same
 -- provider (Velocity and Urent, both Cartrack) can legitimately report the

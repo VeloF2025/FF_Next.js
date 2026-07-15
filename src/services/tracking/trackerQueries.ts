@@ -1,7 +1,10 @@
 /**
  * Read/write access to fleet_vehicle_trackers — the single source of truth
- * for which tracker reports for which vehicle. Replaces the old
- * fleet_vehicles.cartrack_vehicle_id column (dropped in migration 442).
+ * for which tracker reports for which vehicle. Supersedes the old
+ * fleet_vehicles.cartrack_vehicle_id column, which nothing reads once this
+ * ships but is dropped by a later migration: dev and prod share one database
+ * and the deploy applies migrations before the new code is serving, so
+ * dropping it in this release would break prod's still-running old code.
  */
 import { transaction } from '@/lib/db-pool';
 
