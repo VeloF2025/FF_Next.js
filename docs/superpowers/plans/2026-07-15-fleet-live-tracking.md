@@ -433,7 +433,15 @@ Task 2 drops `cartrack_vehicle_id`. Seven files read it. They move here, in one 
 - Consumes: `fleet_vehicle_trackers` (Task 2)
 - Produces:
   - `setVehicleTracker(args: { vehicleId: string; provider: string; accountRef: string; externalId: string | null }): Promise<void>`
-  - `listVehicleTrackers(provider: string): Promise<Array<{ vehicleId: string; registration: string; externalId: string | null }>>`
+    — **must run both statements in one `transaction()`**. Run as separate autocommit
+    statements, a failing INSERT (e.g. an over-length `external_id` against `VARCHAR(64)`)
+    commits the deactivate and leaves the vehicle **silently unmapped**.
+
+> **Do not add a `listVehicleTrackers` reader here.** An earlier draft of this plan specified one
+> and it was dead on arrival: the mapping API's GET cannot use it (its shape drops `description`,
+> renames `id`, and filters `status='active'`, silently breaking the UI contract), Task 5's ingest
+> needs `{external_id, vehicle_id, tracker_id}` with no `fleet_vehicles` join, and Task 7 needs a
+> LATERAL join plus driver name. Each reader is written against its real caller.
 
 - [ ] **Step 1: Write the failing test for `setVehicleTracker`**
 
@@ -442,28 +450,49 @@ Create `src/services/tracking/__tests__/trackerQueries.test.ts`:
 ```ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const sqlMock = vi.fn();
-vi.mock('@/lib/db-pool', () => ({ sql: (...a: unknown[]) => sqlMock(...a) }));
+// Record the statements the transaction actually issues, in order.
+// TxnClient.query is POSITIONAL — query(text, params) — not a tagged
+// template. Do not mock it as `txn.sql`.
+const stmts: string[] = [];
+const transactionMock = vi.fn(async (cb: (txn: unknown) => Promise<unknown>) =>
+  cb({
+    query: async (text: string) => { stmts.push(text); return []; },
+    queryOne: async () => null,
+  })
+);
+vi.mock('@/lib/db-pool', () => ({
+  sql: vi.fn(async () => []),
+  transaction: (cb: (txn: unknown) => Promise<unknown>) => transactionMock(cb),
+}));
 
 import { setVehicleTracker } from '../trackerQueries';
 
 describe('setVehicleTracker', () => {
-  beforeEach(() => { sqlMock.mockReset(); sqlMock.mockResolvedValue([]); });
+  beforeEach(() => { stmts.length = 0; });
 
-  it('deactivates the existing tracker before inserting a new one', async () => {
+  // Assert the STATEMENTS AND THEIR ORDER, not the call count. A count
+  // assertion passes even when the INSERT runs first — which is the exact
+  // violation of the partial unique index `(vehicle_id) WHERE is_active`
+  // that the ordering exists to prevent. It would also pass if both
+  // statements were `SELECT 1`.
+  it('deactivates the existing tracker before inserting the new one, in one transaction', async () => {
     await setVehicleTracker({
       vehicleId: 'v-1', provider: 'cartrack', accountRef: 'acct', externalId: 'ct-9',
     });
-    // Two statements: deactivate, then upsert. The partial unique index
-    // (one active tracker per vehicle) makes ordering load-bearing.
-    expect(sqlMock).toHaveBeenCalledTimes(2);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(stmts).toHaveLength(2);
+    expect(stmts[0]).toMatch(/UPDATE fleet_vehicle_trackers[\s\S]*is_active = false/i);
+    // No DB trigger on updated_at — the statement must set it itself.
+    expect(stmts[0]).toMatch(/updated_at = now\(\)/i);
+    expect(stmts[1]).toMatch(/INSERT INTO fleet_vehicle_trackers/i);
   });
 
   it('only deactivates when externalId is null (unmapping)', async () => {
     await setVehicleTracker({
       vehicleId: 'v-1', provider: 'cartrack', accountRef: 'acct', externalId: null,
     });
-    expect(sqlMock).toHaveBeenCalledTimes(1);
+    expect(stmts).toHaveLength(1);
+    expect(stmts[0]).toMatch(/UPDATE fleet_vehicle_trackers[\s\S]*is_active = false/i);
   });
 });
 ```
@@ -473,7 +502,7 @@ describe('setVehicleTracker', () => {
 Run: `npx vitest run src/services/tracking/__tests__/trackerQueries.test.ts`
 Expected: FAIL — cannot resolve `../trackerQueries`.
 
-- [ ] **Step 3: Implement `trackerQueries.ts`**
+- [ ] **Step 3: Implement `trackerQueries.ts`** (use `transaction()` from `@/lib/db-pool`; `TxnClient.query` is positional `query(text, params)`, so use `$1` placeholders — it is NOT a tagged template)
 
 Create `src/services/tracking/trackerQueries.ts`:
 
