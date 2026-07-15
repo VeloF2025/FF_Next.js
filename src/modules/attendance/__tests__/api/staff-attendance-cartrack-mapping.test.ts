@@ -11,6 +11,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   sql: vi.fn(),
+  txnQuery: vi.fn(async () => []),
+  transaction: vi.fn(),
   userHasPermission: vi.fn(async () => true),
   cartrackClientFromEnv: vi.fn(() => ({
     listVehicles: vi.fn(async () => [
@@ -19,11 +21,19 @@ const mocks = vi.hoisted(() => ({
     fetchPositionAt: vi.fn(),
   })),
 }));
+// setVehicleTracker runs its writes inside a single `transaction()` call
+// (see trackerQueries.ts) — the fake txn's `query` delegates to
+// `mocks.txnQuery` so tests can assert on the deactivate/insert statements
+// separately from the plain `sql` calls the rest of the handler makes.
+mocks.transaction.mockImplementation(async (callback: (txn: unknown) => Promise<unknown>) => {
+  const txn = { query: mocks.txnQuery, queryOne: vi.fn(async () => null) };
+  return callback(txn);
+});
 
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
+vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql, transaction: mocks.transaction }));
 vi.mock('@/lib/auth/middleware', () => ({
   withAuth: (h: unknown) => h,
   withPermission: () => (h: unknown) => h,
@@ -174,7 +184,8 @@ describe('POST /api/staff/attendance-cartrack-mapping', () => {
   });
 
   it('happy path — sets cartrack_vehicle_id and returns updated row', async () => {
-    // Call 1: existence check. Calls 2+3: setVehicleTracker's deactivate + insert.
+    // Existence check goes through `sql`. setVehicleTracker's deactivate +
+    // insert go through the single `transaction()` call.
     mocks.sql.mockResolvedValueOnce([
       { id: 'fv-1', registration: 'CA12345', description: null },
     ]);
@@ -191,11 +202,12 @@ describe('POST /api/staff/attendance-cartrack-mapping', () => {
       description: null,
       cartrack_vehicle_id: 'ct-1',
     });
-    // Existence check + setVehicleTracker's deactivate + insert.
-    expect(mocks.sql).toHaveBeenCalledTimes(3);
-    const insertCall = mocks.sql.mock.calls[2] as [readonly string[], ...unknown[]];
-    expect(insertCall.slice(1)).toContain('ct-1');
-    expect(insertCall.slice(1)).toContain('fv-1');
+    expect(mocks.sql).toHaveBeenCalledTimes(1);
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.txnQuery).toHaveBeenCalledTimes(2);
+    const insertCall = mocks.txnQuery.mock.calls[1] as [string, unknown[]];
+    expect(insertCall[1]).toContain('ct-1');
+    expect(insertCall[1]).toContain('fv-1');
   });
 
   it('can clear the mapping with cartrack_vehicle_id=null', async () => {
@@ -210,8 +222,11 @@ describe('POST /api/staff/attendance-cartrack-mapping', () => {
     expect(captured.statusCode).toBe(200);
     const body = captured.body as { data: { vehicle: FleetVehicleRow } };
     expect(body.data.vehicle.cartrack_vehicle_id).toBeNull();
-    // Existence check + setVehicleTracker's deactivate only (externalId=null skips the insert).
-    expect(mocks.sql).toHaveBeenCalledTimes(2);
+    // Existence check via `sql`; setVehicleTracker's deactivate-only via
+    // `transaction` (externalId=null skips the insert).
+    expect(mocks.sql).toHaveBeenCalledTimes(1);
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.txnQuery).toHaveBeenCalledTimes(1);
   });
 
   it.each<[string, unknown]>([
