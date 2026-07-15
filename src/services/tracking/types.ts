@@ -29,5 +29,14 @@ export interface ProviderPosition {
 export interface TrackingProvider {
   readonly key: ProviderKey;
   readonly accountRef: string;
+  /**
+   * Most events one fetchPositions call can return before it gives up.
+   *
+   * The caller needs this to size its query window: these feeds are
+   * account-wide, so events scale with fleet size, and a window wide enough to
+   * blow the budget throws rather than returning a truncated page. Exposed per
+   * provider because it is a fact about that provider's API, not about us.
+   */
+  readonly maxEventsPerFetch: number;
   fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]>;
 }

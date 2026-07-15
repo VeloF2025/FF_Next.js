@@ -27,17 +27,38 @@ import type { ProviderKey, TrackingProvider } from '@/services/tracking/types';
  * anything older than this overlap when it lands is never fetched again, and
  * Cartrack's 24h cap makes it unrecoverable the next day. 30 minutes covers
  * an ordinary dropout (parking basement, rural stretch); a longer outage
- * still loses fixes, which a per-tracker watermark would fix properly.
+ * still loses fixes, which a per-tracker watermark would fix properly (#2169).
  *
  * Cheap to widen: ingest dedups on ON CONFLICT DO NOTHING, so replaying a
- * window costs bandwidth, not correctness. At ~22 vehicles this is roughly
- * 660 events per tick against a 5000-event pagination cap that throws rather
- * than truncating — so a fleet large enough to outgrow this window fails
- * loudly instead of silently dropping the tail.
+ * window costs bandwidth, not correctness — but only up to the provider's
+ * event budget, which is what clampWindowStart below enforces.
  */
 const OVERLAP_MS = 30 * 60 * 1000;
-/** First run with no watermark: how far back to backfill. */
+/** First run with no watermark: how far back to backfill, budget permitting. */
 const COLD_START_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Assumed events per hour per tracked vehicle, for sizing the query window.
+ *
+ * Measured against the live Velocity account on 2026-07-15: ~200/hour/vehicle,
+ * consistent across 10min/30min/1h/6h probes. 300 carries ~50% headroom, since
+ * guessing high costs a narrower window while guessing low throws.
+ */
+const EVENTS_PER_HOUR_PER_VEHICLE = 300;
+
+/**
+ * Fraction of the provider's event budget a single window may plan to use.
+ * The rate above is an average; leaving room means a burst of hard-braking
+ * events doesn't tip an otherwise-legal window over the edge.
+ */
+const BUDGET_UTILISATION = 0.8;
+
+/**
+ * Never plan a window narrower than this. Below it the fleet has outgrown a
+ * single account-wide poll and no window keeps up — losing data either way, so
+ * fail visibly rather than silently shrinking to nothing.
+ */
+const MIN_WINDOW_MS = 5 * 60 * 1000;
 /** Advisory lock key so a slow run is not re-entered by the next tick. */
 const LOCK_KEY = 4417301;
 
@@ -51,6 +72,39 @@ type PollResult =
       windowTo: string;
     }
   | { provider: ProviderKey; accountRef: string; error: string; authFailure: boolean };
+
+/**
+ * Widest window this provider can be asked for without blowing its event
+ * budget, given how many vehicles are currently feeding it.
+ *
+ * These feeds are account-wide: events scale with the number of active
+ * trackers, so the safe window shrinks as the fleet grows. Exported for tests.
+ */
+export function maxWindowMsFor(maxEventsPerFetch: number, activeTrackers: number): number {
+  // No trackers means no events to page through, so nothing to clamp against.
+  if (activeTrackers <= 0) return COLD_START_MS;
+  const hours =
+    (maxEventsPerFetch * BUDGET_UTILISATION) / (EVENTS_PER_HOUR_PER_VEHICLE * activeTrackers);
+  return Math.max(hours * 60 * 60 * 1000, MIN_WINDOW_MS);
+}
+
+/**
+ * Pull `from` forward if the window it implies is wider than the budget allows.
+ *
+ * Returns the clamped start plus what was given up, so the caller can say so
+ * out loud. Losing history here is a real cost — it is only ever the better of
+ * two bad options, because the unclamped alternative throws and ingests
+ * nothing at all, forever.
+ */
+export function clampWindowStart(
+  desiredFrom: Date,
+  now: Date,
+  maxWindowMs: number
+): { from: Date; clampedMs: number } {
+  const floor = new Date(now.getTime() - maxWindowMs);
+  if (desiredFrom.getTime() >= floor.getTime()) return { from: desiredFrom, clampedMs: 0 };
+  return { from: floor, clampedMs: floor.getTime() - desiredFrom.getTime() };
+}
 
 function configuredProviders(): TrackingProvider[] {
   const out: TrackingProvider[] = [];
@@ -127,9 +181,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `;
         const now = new Date();
         const last = wm[0]?.last_event_ts ? new Date(wm[0].last_event_ts) : null;
-        const from = last
+        const desiredFrom = last
           ? new Date(last.getTime() - OVERLAP_MS)
           : new Date(now.getTime() - COLD_START_MS);
+
+        // How wide a window this account can afford right now. The feed is
+        // account-wide, so its event count scales with the active fleet: a
+        // 6h cold start costs ~8k events at 7 vehicles but ~26k at 22, past
+        // the 20k budget. Unclamped, that throws — and since a throw leaves
+        // the watermark unset, the next tick cold-starts and throws again.
+        // The poller would never start at all, and the logs would show only
+        // a pagination error with no hint that the fleet size caused it.
+        const trackerRows = await sql<{ n: number }>`
+          SELECT count(*)::int AS n FROM fleet_vehicle_trackers
+          WHERE provider = ${provider.key}
+            AND account_ref = ${provider.accountRef}
+            AND is_active
+        `;
+        const activeTrackers = trackerRows[0]?.n ?? 0;
+        const maxWindow = maxWindowMsFor(provider.maxEventsPerFetch, activeTrackers);
+        const { from, clampedMs } = clampWindowStart(desiredFrom, now, maxWindow);
+
+        if (clampedMs > 0) {
+          // Never let this be silent: the window was narrowed, so some history
+          // will not be fetched on this tick and — past the provider's
+          // retention — may never be.
+          log.warn('[poll-tracking] window clamped to the provider event budget', {
+            provider: provider.key,
+            accountRef: provider.accountRef,
+            activeTrackers,
+            skippedMinutes: Math.round(clampedMs / 60_000),
+            maxWindowMinutes: Math.round(maxWindow / 60_000),
+            requestedFrom: desiredFrom.toISOString(),
+            clampedFrom: from.toISOString(),
+          });
+        }
 
         const positions = await provider.fetchPositions(from, now);
         // accountRef is threaded through (not just provider.key) because

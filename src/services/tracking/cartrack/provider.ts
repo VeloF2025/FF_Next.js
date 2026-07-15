@@ -22,6 +22,13 @@ const TIMEOUT_MS = 20_000;
 const MAX_PAGES = 20;
 const PAGE_SIZE = 1000;
 
+/**
+ * Ceiling on one fetchPositions call. Past this the pagination loop throws
+ * instead of returning a truncated page — silently dropping the tail of a
+ * window would look identical to "those fixes never happened".
+ */
+export const CARTRACK_MAX_EVENTS_PER_FETCH = MAX_PAGES * PAGE_SIZE;
+
 export interface CartrackProviderOptions {
   baseUrl: string;
   username: string;
@@ -66,6 +73,7 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
   return {
     key: 'cartrack',
     accountRef: opts.accountRef,
+    maxEventsPerFetch: CARTRACK_MAX_EVENTS_PER_FETCH,
 
     async fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]> {
       const out: ProviderPosition[] = [];
