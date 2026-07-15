@@ -972,7 +972,19 @@ Absent telemetry is null, never zero."
 
 **Interfaces:**
 - Consumes: `ProviderPosition` (Task 4), `fleet_vehicle_positions` + `fleet_tracking_watermarks` (Task 2)
-- Produces: `ingestPositions(provider, positions): Promise<{ inserted: number; skippedUnmapped: number }>`
+- Produces: `ingestPositions(provider, accountRef, positions): Promise<{ inserted: number; skippedUnmapped: number }>`
+
+> **`accountRef` is not optional.** Migration 441 makes `external_id` unique only per
+> `(provider, account_ref)`, and watermarks are keyed the same way — multiple accounts per provider
+> is explicitly modelled, and **Urent is a second Cartrack account** we are actively trying to
+> onboard. A tracker lookup keyed on `external_id` alone would silently attribute Urent's positions
+> to a Velocity vehicle sharing that id. Filter the lookup by `account_ref`, and include it in the
+> synthetic event id.
+
+> **`inserted` must be counted from `RETURNING id`, never from rows submitted.** `ON CONFLICT DO
+> NOTHING` drops duplicates silently, and the poller overlaps by 2 minutes *by design* — so an
+> incremented-per-row count reports roughly double the truth, and a healthy nonzero on a tick that
+> wrote nothing at all.
 
 - [ ] **Step 1: Write the failing test**
 
