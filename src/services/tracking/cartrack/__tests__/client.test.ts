@@ -22,6 +22,7 @@ import {
   cartrackClientFromEnv,
   CartrackError,
   pickNearestSample,
+  cartrackTsFormat,
   DEFAULT_TOLERANCE_MS,
 } from '../client';
 import type { CartrackPositionSample } from '../types';
@@ -221,7 +222,7 @@ describe('HttpCartrackClient.fetchPositionAt — /vehicles/events', () => {
     ).rejects.toThrow(/data\[\]|malformed/);
   });
 
-  it('encodes start_timestamp/end_timestamp as Cartrack `YYYY-MM-DD hh:mm:ss` UTC (not ISO-8601)', async () => {
+  it('encodes start_timestamp/end_timestamp as Cartrack `YYYY-MM-DD hh:mm:ss` SAST (not ISO-8601, not UTC)', async () => {
     let capturedUrl = '';
     const fetchImpl = (async (url: string) => {
       capturedUrl = url;
@@ -236,8 +237,11 @@ describe('HttpCartrackClient.fetchPositionAt — /vehicles/events', () => {
     const to = params.get('end_timestamp')!;
     expect(from).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     expect(to).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
-    expect(from).toBe('2026-04-20 05:57:00');
-    expect(to).toBe('2026-04-20 06:03:00');
+    // ±3 min around 06:00:00Z is 05:57–06:03 UTC, which Cartrack must be
+    // asked for as 07:57–08:03 SAST. The previous expectation of
+    // '2026-04-20 05:57:00' encoded the UTC bug — see cartrackTsFormat.
+    expect(from).toBe('2026-04-20 07:57:00');
+    expect(to).toBe('2026-04-20 08:03:00');
   });
 
   it('default tolerance window is 5 minutes', () => {
@@ -591,6 +595,22 @@ describe('listVehicles — pagination + shape + fallback (P0/P1 hardening)', () 
     expect(vehicles[0]!.registration).toBe(null);
     // Row is still present so a mapping admin can manually claim it.
     expect(vehicles[0]!.description).toBe('Foton Tunland');
+  });
+});
+
+describe('cartrackTsFormat', () => {
+  // Verified live 2026-07-15: sending UTC returned events 2h stale; sending
+  // SAST returned current events. Cartrack reads these as South African time.
+  it('formats as SAST wall-clock, not UTC', () => {
+    expect(cartrackTsFormat(new Date('2026-07-15T08:00:00Z'))).toBe('2026-07-15 10:00:00');
+  });
+
+  it('rolls the date over when SAST crosses midnight', () => {
+    expect(cartrackTsFormat(new Date('2026-07-15T22:30:00Z'))).toBe('2026-07-16 00:30:00');
+  });
+
+  it('pads single digits', () => {
+    expect(cartrackTsFormat(new Date('2026-01-05T01:02:03Z'))).toBe('2026-01-05 03:02:03');
   });
 });
 

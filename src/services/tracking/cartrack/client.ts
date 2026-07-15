@@ -377,14 +377,24 @@ export function pickNearestSample(
 }
 
 /**
- * Cartrack expects timestamps in `YYYY-MM-DD hh:mm:ss` (no TZ suffix,
- * interpreted as UTC per the docs' examples). Not ISO-8601.
+ * Cartrack expects `YYYY-MM-DD hh:mm:ss` in **South African local time**.
+ *
+ * Verified live 2026-07-15 by querying both ways against the same account:
+ *   - sent UTC numbers  → returned events 2h stale
+ *   - sent SAST numbers → returned current events
+ * The published docs describe these as UTC. They are wrong.
+ *
+ * SA has no DST, so the offset is a constant +02:00 and a fixed shift is
+ * correct year-round. Do not "simplify" this back to getUTC*.
  */
-function cartrackTsFormat(d: Date): string {
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+
+export function cartrackTsFormat(d: Date): string {
+  const sast = new Date(d.getTime() + SAST_OFFSET_MS);
   const pad = (n: number) => String(n).padStart(2, '0');
   return (
-    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
-    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+    `${sast.getUTCFullYear()}-${pad(sast.getUTCMonth() + 1)}-${pad(sast.getUTCDate())} ` +
+    `${pad(sast.getUTCHours())}:${pad(sast.getUTCMinutes())}:${pad(sast.getUTCSeconds())}`
   );
 }
 
