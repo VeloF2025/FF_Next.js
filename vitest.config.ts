@@ -75,6 +75,8 @@ export default defineConfig({
       { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
       { find: '@/lib/geo', replacement: path.resolve(__dirname, './src/lib/geo') },
       { find: '@/lib/apiResponse', replacement: path.resolve(__dirname, './src/lib/apiResponse') },
+      { find: '@/lib/handleApiResponse', replacement: path.resolve(__dirname, './src/lib/handleApiResponse') },
+      { find: '@/lib/authErrorHandler', replacement: path.resolve(__dirname, './src/lib/authErrorHandler') },
       // @/lib/auth-mock lives at root ./lib/ — the generic @/lib fallback
       // below doesn't get the chance because `@/lib/auth` (more specific)
       // matches first. Needs an explicit entry above the auth alias.
