@@ -16,9 +16,15 @@
  * again: the poller never starts. These tests pin the clamp that prevents it.
  */
 import { describe, it, expect } from 'vitest';
-import { maxWindowMsFor, clampWindowStart } from '../poll-tracking';
+import { maxWindowMsFor, clampWindowStart, resolveWindow, COLD_START_MS } from '../windowBudget';
+import { CARTRACK_MAX_EVENTS_PER_FETCH } from '../cartrack/provider';
 
-const BUDGET = 20_000; // Cartrack: MAX_PAGES(20) * PAGE_SIZE(1000)
+/**
+ * Imported, not hardcoded: if MAX_PAGES or PAGE_SIZE ever change, these tests
+ * must re-evaluate against the new budget rather than keep passing against a
+ * stale 20,000 that no longer describes the provider.
+ */
+const BUDGET = CARTRACK_MAX_EVENTS_PER_FETCH;
 const HOUR = 60 * 60 * 1000;
 const NOW = new Date('2026-07-15T12:00:00.000Z');
 
@@ -56,7 +62,71 @@ describe('maxWindowMsFor', () => {
 
   it('falls back to the cold-start width when no trackers are active', () => {
     // Nothing is reporting, so there are no events to page through.
-    expect(maxWindowMsFor(BUDGET, 0)).toBe(6 * HOUR);
+    expect(maxWindowMsFor(BUDGET, 0)).toBe(COLD_START_MS);
+  });
+
+  it.each([
+    ['budget NaN', NaN, 10],
+    ['budget zero', 0, 10],
+    ['budget negative', -1, 10],
+    ['trackers NaN', 20_000, NaN],
+    ['trackers negative', 20_000, -5],
+  ])('never returns a non-finite window (%s)', (_label, budget, trackers) => {
+    // Math.max(NaN, x) is NaN, and a NaN window would sail through the clamp as
+    // an Invalid Date, reach fetchPositions as a corrupt request, and — since
+    // clampedMs would also be NaN — skip the "we clamped" warning entirely.
+    // Unreachable via cartrackProvider today; the guard is for the next one.
+    const w = maxWindowMsFor(budget, trackers);
+    expect(Number.isFinite(w)).toBe(true);
+    expect(w).toBeGreaterThan(0);
+  });
+});
+
+describe('resolveWindow', () => {
+  it('warm start: overlaps back from the watermark when affordable', () => {
+    const last = new Date(NOW.getTime() - 5 * 60 * 1000);
+    const { from, clampedMs } = resolveWindow({
+      last, now: NOW, maxEventsPerFetch: BUDGET, activeTrackers: 7,
+    });
+    expect(from).toEqual(new Date(last.getTime() - 30 * 60 * 1000)); // OVERLAP_MS
+    expect(clampedMs).toBe(0);
+  });
+
+  it('cold start: backfills the full window at a small fleet', () => {
+    const { from, clampedMs } = resolveWindow({
+      last: null, now: NOW, maxEventsPerFetch: BUDGET, activeTrackers: 7,
+    });
+    expect(NOW.getTime() - from.getTime()).toBe(COLD_START_MS);
+    expect(clampedMs).toBe(0);
+  });
+
+  it('cold start: clamps at a fleet that cannot afford it', () => {
+    const { from, clampedMs, maxWindowMs } = resolveWindow({
+      last: null, now: NOW, maxEventsPerFetch: BUDGET, activeTrackers: 22,
+    });
+    expect(clampedMs).toBeGreaterThan(0);
+    expect(NOW.getTime() - from.getTime()).toBe(maxWindowMs);
+    expect(estimatedEvents(NOW.getTime() - from.getTime(), 22)).toBeLessThanOrEqual(BUDGET);
+  });
+
+  it('never produces an inverted window (from after now)', () => {
+    for (const trackers of [0, 1, 7, 22, 37, 100_000]) {
+      const { from } = resolveWindow({
+        last: null, now: NOW, maxEventsPerFetch: BUDGET, activeTrackers: trackers,
+      });
+      expect(from.getTime()).toBeLessThan(NOW.getTime());
+    }
+  });
+
+  it('a stale watermark cannot drag the window past the budget', () => {
+    // The watermark is days old (poller was down). Without the clamp this asks
+    // for days of events at once and throws — the exact self-sustaining failure.
+    const last = new Date(NOW.getTime() - 5 * 24 * 60 * 60 * 1000);
+    const { from, clampedMs } = resolveWindow({
+      last, now: NOW, maxEventsPerFetch: BUDGET, activeTrackers: 22,
+    });
+    expect(clampedMs).toBeGreaterThan(0);
+    expect(estimatedEvents(NOW.getTime() - from.getTime(), 22)).toBeLessThanOrEqual(BUDGET);
   });
 });
 
