@@ -60,6 +60,46 @@ export interface HandleApiResponseResult<T = unknown> {
 }
 
 /**
+ * Thrown when a response body could not be read as JSON. The `message` is
+ * always safe to show in the UI — callers can surface it directly, and can
+ * use `instanceof` to tell it apart from a genuine network failure (where
+ * `fetch` itself rejects with a TypeError).
+ */
+export class ApiResponseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ApiResponseError';
+  }
+}
+
+/**
+ * Read a fetch Response as JSON, tolerating non-JSON error pages.
+ *
+ * An API route that fails at module load — a missing dependency, say — crashes
+ * before its handler's try/catch can return JSON, so Next serves an HTML error
+ * page instead. `res.json()` on that HTML throws `Unexpected token '<'`, which
+ * reached a user verbatim on 2026-07-15 (see #2175). Anything that isn't JSON
+ * is a server-side fault, so report it as one.
+ */
+export async function parseJsonResponse<T = unknown>(res: Response): Promise<T> {
+  const contentType = res.headers.get('content-type') ?? '';
+
+  if (!contentType.includes('application/json')) {
+    throw new ApiResponseError(
+      'The server is temporarily unavailable. Please try again in a moment.'
+    );
+  }
+
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new ApiResponseError(
+      'The server sent a response we could not read. Please try again.'
+    );
+  }
+}
+
+/**
  * Normalise any FibreFlow API response (old or new format) into a
  * consistent `{ data, error }` shape for frontend consumption.
  */

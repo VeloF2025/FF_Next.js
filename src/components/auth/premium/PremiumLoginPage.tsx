@@ -18,6 +18,7 @@ import { VelocityButton } from '@/components/ui/VelocityButton';
 import { getRandomQuote, MotivationalQuote } from '@/data/motivational-quotes';
 import { useAuth } from '@/contexts/AuthContext';
 import { safeReturnUrl } from './safeReturnUrl';
+import { ApiResponseError, parseJsonResponse } from '@/lib/handleApiResponse';
 
 type AuthStep = 'email' | 'password' | 'setup-password';
 type EmailStatus = 'STAFF_NOT_FOUND' | 'FIRST_TIME_USER' | 'PASSWORD_REQUIRED' | 'PASSWORD_SETUP_REQUIRED' | 'USER_DISABLED';
@@ -28,6 +29,19 @@ interface StaffInfo {
   lastName: string;
   position?: string;
   department?: string;
+}
+
+/** Body of POST /api/auth/check-email. */
+interface CheckEmailApiResponse {
+  success?: boolean;
+  data?: { status: EmailStatus; message: string; staff?: StaffInfo };
+  error?: { code?: string; message?: string };
+}
+
+/** Body of POST /api/auth/setup-password. */
+interface SetupPasswordApiResponse {
+  success?: boolean;
+  error?: { code?: string; message?: string };
 }
 
 export function PremiumLoginPage() {
@@ -73,9 +87,9 @@ export function PremiumLoginPage() {
         body: JSON.stringify({ email: actualEmail }),
       });
 
-      const data = await res.json();
+      const data = await parseJsonResponse<CheckEmailApiResponse>(res);
 
-      if (!data.success) {
+      if (!data.success || !data.data) {
         setError(data.error?.message || 'An error occurred');
         return;
       }
@@ -101,8 +115,8 @@ export function PremiumLoginPage() {
         default:
           setError('Unknown status. Please try again.');
       }
-    } catch {
-      setError('Network error. Please try again.');
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : 'Network error. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -166,7 +180,7 @@ export function PremiumLoginPage() {
         credentials: 'include',
       });
 
-      const data = await res.json();
+      const data = await parseJsonResponse<SetupPasswordApiResponse>(res);
 
       if (!res.ok) {
         setError(data.error?.message || 'Password setup failed');
@@ -179,8 +193,8 @@ export function PremiumLoginPage() {
       // Redirect to dashboard on success (AuthContext is now updated)
       const returnUrl = safeReturnUrl(router.query.returnUrl);
       router.push(returnUrl);
-    } catch {
-      setError('Network error. Please try again.');
+    } catch (err) {
+      setError(err instanceof ApiResponseError ? err.message : 'Network error. Please try again.');
     } finally {
       setLoading(false);
     }

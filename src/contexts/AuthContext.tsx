@@ -11,6 +11,7 @@ import {
   ROLE_PERMISSIONS,
 } from '@/types/auth.types';
 import { resetAuthErrorHandler } from '@/lib/authErrorHandler';
+import { ApiResponseError, parseJsonResponse } from '@/lib/handleApiResponse';
 
 interface AuthContextType {
   // Legacy properties for backward compatibility
@@ -107,6 +108,17 @@ function mapApiUser(apiUser: {
   return { user, authUser };
 }
 
+type ApiUser = Parameters<typeof mapApiUser>[0];
+
+/** Body of POST /api/auth/login — success and error shapes both optional. */
+interface LoginApiResponse {
+  success?: boolean;
+  data?: { user?: ApiUser };
+  user?: ApiUser;
+  message?: string;
+  error?: { code?: string; message?: string };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: 'include',
       });
 
-      const data = await res.json();
+      const data = await parseJsonResponse<LoginApiResponse>(res);
 
       if (!res.ok) {
         throw new Error(data.error?.message || data.message || 'Login failed');
@@ -171,6 +183,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // API returns { success, data: { user } } structure
       const userData = data.data?.user || data.user;
+      if (!userData) {
+        throw new ApiResponseError('The server sent an incomplete sign-in response. Please try again.');
+      }
+
       const { user: mappedUser, authUser } = mapApiUser(userData);
       setUser(authUser);
       setCurrentUser(mappedUser);
