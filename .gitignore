@@ -2,7 +2,13 @@
 .superpowers/
 
 # Dependencies
+# Both spellings on purpose: the trailing slash matches a real directory, the
+# bare name also matches a symlink named node_modules. Developers here link it
+# between the main tree and their worktrees, and a symlink is not a directory —
+# so `node_modules/` alone lets one through, which is how it came to be tracked
+# in the first place.
 node_modules/
+node_modules
 /.pnp
 .pnp.js
 

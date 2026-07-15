@@ -149,12 +149,14 @@ CURRENT_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
 # Reset files a prior local `npm ci`/build regenerates that would otherwise block
 # the pull with a dirty working tree:
 #   - package-lock.json (npm install rewrites it)
-#   - node_modules — committed as a symlink to the workspace; a real dir left by a
-#     previous npm ci shows as a deletion and blocks `git pull` (observed on prod
-#     2026-05-26). `git checkout --` cleanly restores the symlink; npm ci rebuilds
-#     node_modules after the pull.
+#
+# The node_modules restore that used to live here is gone: node_modules is no
+# longer tracked, so there is no symlink for git to restore and nothing at that
+# path for a pull to conflict with. It exists as a real directory (or a
+# developer's symlink), gitignored, and npm ci owns it. A deploy dir that still
+# has it in its index from before this change needs a one-off
+# `git rm --cached node_modules` — index only, leaving the real directory alone.
 sudo -u velo bash -c "cd $DIR && git checkout -- package-lock.json 2>/dev/null || true"
-sudo -u velo bash -c "cd $DIR && git checkout -- node_modules 2>/dev/null || true"
 sudo -u velo bash -c "cd $DIR && git fetch origin && git checkout $BRANCH && git pull origin $BRANCH" \
   || error "git pull failed for $DIR (dirty tree or network) — aborting before any build/restart"
 NEW_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
