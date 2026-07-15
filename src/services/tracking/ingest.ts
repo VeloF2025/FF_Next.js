@@ -1,8 +1,13 @@
 /**
  * Writes normalised positions into fleet_vehicle_positions.
  *
- * Idempotent by (provider, provider_event_id): polling windows overlap on
- * purpose, so re-ingesting the same event must be a no-op, not a duplicate.
+ * Idempotent by (provider, account_ref, provider_event_id): polling windows
+ * overlap on purpose, so re-ingesting the same event must be a no-op, not a
+ * duplicate. account_ref is part of the dedup key (not just provider)
+ * because two accounts on the same provider (e.g. Velocity and Urent on
+ * Cartrack) can legitimately report the same real provider_event_id —
+ * without it, the second account's insert would be silently dropped by
+ * ON CONFLICT DO NOTHING and misattributed to the first account's history.
  *
  * Inserts are batched (not per-row) because the first run is a 6-hour
  * cold-start backfill — roughly 1,600 positions in one call. Each chunk
@@ -29,11 +34,11 @@ import type { ProviderKey, ProviderPosition } from './types';
 /** Reject fixes dated further ahead than this — device clock skew. */
 const MAX_FUTURE_MS = 5 * 60 * 1000;
 
-/** Rows per INSERT: 500 * 17 columns = 8,500 params, well under Postgres's 65,535 limit. */
+/** Rows per INSERT: 500 * 18 columns = 9,000 params, well under Postgres's 65,535 limit. */
 const CHUNK_SIZE = 500;
 
 const COLUMNS = [
-  'vehicle_id', 'tracker_id', 'provider', 'provider_event_id', 'recorded_at',
+  'vehicle_id', 'tracker_id', 'provider', 'account_ref', 'provider_event_id', 'recorded_at',
   'lat', 'lon', 'speed_kph', 'road_speed_kph', 'is_speeding', 'ignition',
   'odometer_km', 'linear_g', 'lateral_g', 'bearing', 'altitude_m', 'gps_fix_type',
 ] as const;
@@ -77,8 +82,8 @@ export async function ingestPositions(
   provider: ProviderKey,
   accountRef: string,
   positions: ProviderPosition[]
-): Promise<{ inserted: number; skippedUnmapped: number }> {
-  if (positions.length === 0) return { inserted: 0, skippedUnmapped: 0 };
+): Promise<{ inserted: number; skippedUnmapped: number; maxIngestedAt: Date | null }> {
+  if (positions.length === 0) return { inserted: 0, skippedUnmapped: 0, maxIngestedAt: null };
 
   const trackers = await sql<TrackerRow>`
     SELECT external_id, vehicle_id, id AS tracker_id
@@ -91,11 +96,19 @@ export async function ingestPositions(
   let skippedUnmapped = 0;
   let skippedFuture = 0;
   const rows: InsertRow[] = [];
+  // Only ever advanced by a position that is actually a candidate for
+  // storage (mapped to a tracker, not future-dated). This is what the
+  // watermark advances from — never from raw fetched positions — so a
+  // future-dated fix or an all-unmapped batch can never push it past what
+  // was (or will be) stored. See poll-tracking.ts for how this is used.
+  let maxIngestedAt: Date | null = null;
 
   for (const p of positions) {
     const t = byExternalId.get(p.externalId);
     if (!t) { skippedUnmapped++; continue; }
     if (p.recordedAt.getTime() > cutoff) { skippedFuture++; continue; }
+
+    if (!maxIngestedAt || p.recordedAt > maxIngestedAt) maxIngestedAt = p.recordedAt;
 
     // The Cartrack adapter (and possibly others) can omit the provider's
     // event id. The dedup index is partial — WHERE provider_event_id IS
@@ -108,7 +121,7 @@ export async function ingestPositions(
     const eventId = p.providerEventId ?? `syn:${accountRef}:${p.externalId}:${p.recordedAt.toISOString()}`;
 
     rows.push([
-      t.vehicle_id, t.tracker_id, provider, eventId, p.recordedAt,
+      t.vehicle_id, t.tracker_id, provider, accountRef, eventId, p.recordedAt,
       p.lat, p.lon, p.speedKph, p.roadSpeedKph, p.isSpeeding, p.ignition,
       p.odometerKm, p.linearG, p.lateralG, p.bearing, p.altitudeM, p.gpsFixType,
     ]);
@@ -137,5 +150,5 @@ export async function ingestPositions(
       log.info('[tracking-ingest] positions for unmapped trackers', payload);
     }
   }
-  return { inserted, skippedUnmapped };
+  return { inserted, skippedUnmapped, maxIngestedAt };
 }

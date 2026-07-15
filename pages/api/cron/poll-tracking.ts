@@ -12,7 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { sql } from '@/lib/db-pool';
+import { sql, pool } from '@/lib/db-pool';
 import { cartrackProvider } from '@/services/tracking/cartrack/provider';
 import { ingestPositions } from '@/services/tracking/ingest';
 import type { ProviderKey, TrackingProvider } from '@/services/tracking/types';
@@ -76,13 +76,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.unauthorized(res, 'Invalid cron secret');
   }
 
-  const locked = await sql<{ locked: boolean }>`SELECT pg_try_advisory_lock(${LOCK_KEY}) AS locked`;
-  if (!locked[0]?.locked) {
-    log.info('[poll-tracking] previous run still in progress — skipping tick');
-    return apiResponse.success(res, { skipped: 'already-running' });
-  }
-
+  // pg_try_advisory_lock/pg_advisory_unlock are SESSION-scoped: the acquire
+  // and release must run on the same physical connection or the unlock
+  // silently no-ops (a WARNING, not a thrown error) on a session that never
+  // held the lock — leaking the lock on whichever session did acquire it
+  // forever, since the pool's `min: 1` floor (src/lib/db.ts) never evicts
+  // it. `sql`/pool.query() each check out an arbitrary connection, so they
+  // cannot be used here. A pinned client guarantees same-session acquire and
+  // release. It also preserves the crash-safety we rely on: if this process
+  // dies mid-run, the dropped TCP connection releases the lock for free —
+  // no cleanup step required. (Deliberately not transaction() +
+  // pg_try_advisory_xact_lock: that would wrap the multi-second poll in a
+  // transaction, contradicting the "chunks are NOT wrapped in a
+  // transaction" decision in ingest.ts.)
+  const client = await pool.connect();
+  let lockHeld = false;
   try {
+    const { rows } = await client.query<{ locked: boolean }>(
+      'SELECT pg_try_advisory_lock($1) AS locked', [LOCK_KEY]);
+    lockHeld = rows[0]?.locked ?? false;
+    if (!lockHeld) {
+      log.info('[poll-tracking] previous run still in progress — skipping tick');
+      return apiResponse.success(res, { skipped: 'already-running' });
+    }
+
     const results: PollResult[] = [];
     for (const provider of configuredProviders()) {
       // One provider failing must never block the others.
@@ -104,15 +121,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Cartrack account being onboarded alongside Velocity's; dropping
         // accountRef here would let a shared external_id silently
         // attribute positions to the wrong vehicle.
-        const { inserted, skippedUnmapped } = await ingestPositions(
+        const { inserted, skippedUnmapped, maxIngestedAt } = await ingestPositions(
           provider.key, provider.accountRef, positions);
 
-        const maxTs = positions.reduce<Date | null>(
-          (acc, p) => (!acc || p.recordedAt > acc ? p.recordedAt : acc), null);
-
+        // The watermark advances from maxIngestedAt — the max recordedAt
+        // among positions ingestPositions actually accepted as insert
+        // candidates — NEVER from the raw fetched positions. That is what
+        // makes the watermark reflect only stored (or storable) data:
+        //   - A future-dated fix (device clock skew) is rejected inside
+        //     ingestPositions before it can touch maxIngestedAt, so it can
+        //     never push the window past real data and strand polling on
+        //     an inverted from/to window forever.
+        //   - An all-unmapped batch (e.g. migration 441 applied but
+        //     trackers not mapped yet) yields maxIngestedAt = null here, so
+        //     `maxIngestedAt ?? last` reinserts the existing watermark
+        //     unchanged — the cold-start backfill window survives until
+        //     mapping lands, instead of being burned early.
         await sql`
           INSERT INTO fleet_tracking_watermarks (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures)
-          VALUES (${provider.key}, ${provider.accountRef}, ${maxTs ?? last}, now(), NULL, 0)
+          VALUES (${provider.key}, ${provider.accountRef}, ${maxIngestedAt ?? last}, now(), NULL, 0)
           ON CONFLICT (provider, account_ref) DO UPDATE
             SET last_event_ts = COALESCE(EXCLUDED.last_event_ts, fleet_tracking_watermarks.last_event_ts),
                 last_run_at = now(), last_error = NULL, consecutive_failures = 0
@@ -151,6 +178,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     return apiResponse.success(res, { results });
   } finally {
-    await sql`SELECT pg_advisory_unlock(${LOCK_KEY})`;
+    if (lockHeld) {
+      try {
+        await client.query('SELECT pg_advisory_unlock($1)', [LOCK_KEY]);
+      } catch (err) {
+        // Must not throw here: the response may already be sent, and an
+        // unhandled rejection at this point would surface as exactly that
+        // rather than as a clean 5xx.
+        log.error('[poll-tracking] advisory unlock failed', {
+          error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    client.release();
   }
 }

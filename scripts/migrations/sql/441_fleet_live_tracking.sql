@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_positions (
   vehicle_id        UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
   tracker_id        UUID REFERENCES fleet_vehicle_trackers(id) ON DELETE SET NULL,
   provider          VARCHAR(20) NOT NULL CHECK (provider IN ('cartrack','netstar','ituran')),
+  account_ref       VARCHAR(50) NOT NULL,
   provider_event_id VARCHAR(64),
   recorded_at       TIMESTAMPTZ NOT NULL,
   received_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -47,9 +48,15 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_positions (
 );
 COMMENT ON COLUMN fleet_vehicle_positions.road_speed_kph IS 'Legal limit of the road, as reported by the provider.';
 COMMENT ON COLUMN fleet_vehicle_positions.odometer_km IS 'Cartrack reports metres; divided by 1000 at ingest.';
+COMMENT ON COLUMN fleet_vehicle_positions.account_ref IS
+  'Which tenant/account on the provider (denormalised from fleet_vehicle_trackers) so a row is self-describing without a join, and so the dedup index below can be scoped per account.';
 
+-- Scoped by account_ref, not just provider: two accounts on the same
+-- provider (Velocity and Urent, both Cartrack) can legitimately report the
+-- same real provider_event_id. Without account_ref in the key, the second
+-- account's row would be silently dropped by ON CONFLICT DO NOTHING.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_fleet_positions_provider_event
-  ON fleet_vehicle_positions (provider, provider_event_id) WHERE provider_event_id IS NOT NULL;
+  ON fleet_vehicle_positions (provider, account_ref, provider_event_id) WHERE provider_event_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_fleet_positions_vehicle_time
   ON fleet_vehicle_positions (vehicle_id, recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_fleet_positions_time

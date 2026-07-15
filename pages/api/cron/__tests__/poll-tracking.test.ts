@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMocks } from 'node-mocks-http';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const { sqlMock, cartrackProviderMock, ingestPositionsMock, logMock } = vi.hoisted(() => ({
+const { sqlMock, poolConnectMock, cartrackProviderMock, ingestPositionsMock, logMock } = vi.hoisted(() => ({
   sqlMock: vi.fn(),
+  poolConnectMock: vi.fn(),
   cartrackProviderMock: vi.fn(),
   ingestPositionsMock: vi.fn(),
   logMock: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
@@ -11,6 +12,7 @@ const { sqlMock, cartrackProviderMock, ingestPositionsMock, logMock } = vi.hoist
 
 vi.mock('@/lib/db-pool', () => ({
   sql: (...a: unknown[]) => sqlMock(...a),
+  pool: { connect: (...a: unknown[]) => poolConnectMock(...a) },
 }));
 vi.mock('@/lib/logger', () => ({ log: logMock }));
 vi.mock('@/services/tracking/cartrack/provider', () => ({
@@ -25,14 +27,28 @@ import handler from '../poll-tracking';
 const SECRET = 'test-cron-secret';
 const AUTH = { 'x-cron-secret': SECRET };
 
-/** Default sql() stub: lock acquires, no existing watermark, upserts no-op. */
+/**
+ * The advisory lock is now acquired/released on a single pinned client
+ * (pool.connect()), not via sql``/pool.query() — that's the whole point of
+ * the Critical-1 fix, since pg_try_advisory_lock/pg_advisory_unlock are
+ * session-scoped. This fake client stands in for that pinned connection.
+ */
+function makeFakeClient({ lockAcquired = true } = {}) {
+  const query = vi.fn(async (text: string) => {
+    if (text.includes('pg_try_advisory_lock')) return { rows: [{ locked: lockAcquired }] };
+    if (text.includes('pg_advisory_unlock')) return { rows: [{}] };
+    return { rows: [] };
+  });
+  const release = vi.fn();
+  return { query, release };
+}
+
+/** Default sql() stub: no existing watermark, upserts no-op. */
 function stubSql({
-  lockAcquired = true,
   watermarkRow = null as { last_event_ts: string | null } | null,
 } = {}) {
   sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
     const text = strings.join('');
-    if (text.includes('pg_try_advisory_lock')) return [{ locked: lockAcquired }];
     if (text.includes('SELECT last_event_ts')) return watermarkRow ? [watermarkRow] : [];
     return [];
   });
@@ -65,8 +81,9 @@ describe('GET/POST /api/cron/poll-tracking', () => {
     process.env.CARTRACK_API_PASS = 'pass';
     process.env.CARTRACK_ACCOUNT_REF = 'velocity';
     stubSql();
+    poolConnectMock.mockImplementation(async () => makeFakeClient());
     cartrackProviderMock.mockReturnValue(makeFakeProvider());
-    ingestPositionsMock.mockResolvedValue({ inserted: 0, skippedUnmapped: 0 });
+    ingestPositionsMock.mockResolvedValue({ inserted: 0, skippedUnmapped: 0, maxIngestedAt: null });
   });
 
   it('rejects non-GET/POST methods with 405', async () => {
@@ -92,20 +109,58 @@ describe('GET/POST /api/cron/poll-tracking', () => {
   });
 
   it('skips the tick without polling when the advisory lock is already held', async () => {
-    stubSql({ lockAcquired: false });
+    const client = makeFakeClient({ lockAcquired: false });
+    poolConnectMock.mockImplementation(async () => client);
     const res = await run(AUTH);
     expect(res._getStatusCode()).toBe(200);
     expect(res._getJSONData().data).toMatchObject({ skipped: 'already-running' });
     expect(cartrackProviderMock().fetchPositions).not.toHaveBeenCalled();
+    // Never held the lock, so must never attempt to unlock it — but the
+    // pinned connection itself must still be released back to the pool.
+    expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('pg_advisory_unlock'), expect.anything());
+    expect(client.release).toHaveBeenCalledTimes(1);
   });
 
-  it('always releases the advisory lock, even when a provider throws', async () => {
+  it('acquires and releases the advisory lock on the SAME pinned connection — not sql``/pool.query()', async () => {
+    // The whole point of the Critical-1 fix: pg_try_advisory_lock and
+    // pg_advisory_unlock are session-scoped. If either call went through
+    // sql`` (an arbitrary connection from the pool) instead of the pinned
+    // client, this would either not compile against this test's mocks or
+    // the lock/unlock pair would silently run on different sessions.
+    const client = makeFakeClient();
+    poolConnectMock.mockImplementation(async () => client);
+    await run(AUTH);
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining('pg_try_advisory_lock'), [4417301]);
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_unlock'), [4417301]);
+    expect(sqlMock.mock.calls.some((c) => (c[0] as TemplateStringsArray).join('').includes('advisory'))).toBe(false);
+  });
+
+  it('always releases the pinned connection back to the pool, even when a provider throws', async () => {
+    const client = makeFakeClient();
+    poolConnectMock.mockImplementation(async () => client);
     cartrackProviderMock.mockReturnValue(
       makeFakeProvider({ fetchPositions: vi.fn().mockRejectedValue(new Error('boom')) })
     );
     await run(AUTH);
-    const unlockCall = sqlMock.mock.calls.find((c) => (c[0] as TemplateStringsArray).join('').includes('pg_advisory_unlock'));
-    expect(unlockCall).toBeDefined();
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_unlock'), expect.anything());
+    expect(client.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when the unlock query itself fails — logs instead, and still releases the connection', async () => {
+    const client = makeFakeClient();
+    client.query.mockImplementation(async (text: string) => {
+      if (text.includes('pg_try_advisory_lock')) return { rows: [{ locked: true }] };
+      if (text.includes('pg_advisory_unlock')) throw new Error('connection reset');
+      return { rows: [] };
+    });
+    poolConnectMock.mockImplementation(async () => client);
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(200); // response already sent; unlock failure must not surface as a crash
+    expect(logMock.error).toHaveBeenCalledWith(
+      expect.stringContaining('advisory unlock failed'),
+      expect.objectContaining({ error: expect.stringContaining('connection reset') })
+    );
+    expect(client.release).toHaveBeenCalledTimes(1);
   });
 
   it('cold start with no watermark backfills from 6 hours ago', async () => {
@@ -142,7 +197,7 @@ describe('GET/POST /api/cron/poll-tracking', () => {
   });
 
   it('reports inserted/skippedUnmapped per provider on success', async () => {
-    ingestPositionsMock.mockResolvedValue({ inserted: 5, skippedUnmapped: 2 });
+    ingestPositionsMock.mockResolvedValue({ inserted: 5, skippedUnmapped: 2, maxIngestedAt: null });
     const res = await run(AUTH);
     expect(res._getJSONData().data.results).toEqual([
       expect.objectContaining({ provider: 'cartrack', accountRef: 'default', inserted: 5, skippedUnmapped: 2 }),
@@ -190,5 +245,59 @@ describe('GET/POST /api/cron/poll-tracking', () => {
     delete process.env.CARTRACK_BASE_URL;
     const res = await run(AUTH);
     expect(res._getJSONData().data.results).toEqual([]);
+  });
+
+  describe('watermark write: pins the value written to last_event_ts', () => {
+    // ingestPositions is mocked here (unit-isolated) — its own maxIngestedAt
+    // computation, including the future-date and all-unmapped guards, is
+    // covered against real ProviderPosition data in ingest.test.ts and in
+    // poll-tracking.watermark.test.ts. These tests pin the trivial-looking
+    // but previously-untested wiring in poll-tracking.ts itself: whatever
+    // ingestPositions.maxIngestedAt comes back as is exactly what gets
+    // written, falling back to the prior watermark on null.
+    function successUpsertValue(): unknown {
+      const call = sqlMock.mock.calls.find((c) => {
+        const text = (c[0] as TemplateStringsArray).join('');
+        return text.includes('INSERT INTO fleet_tracking_watermarks') && text.includes('last_event_ts');
+      });
+      if (!call) throw new Error('no success-path watermark upsert found');
+      return call[3]; // ${provider.key}, ${accountRef}, ${last_event_ts value} — 3rd interpolated value
+    }
+
+    it('advances last_event_ts to the max ingested timestamp on a normal batch', async () => {
+      const maxIngestedAt = new Date('2026-07-15T08:05:00.000Z');
+      ingestPositionsMock.mockResolvedValue({ inserted: 2, skippedUnmapped: 0, maxIngestedAt });
+      await run(AUTH);
+      expect(successUpsertValue()).toEqual(maxIngestedAt);
+    });
+
+    it('holds the existing watermark on an empty batch (maxIngestedAt null)', async () => {
+      const lastEventTs = '2026-07-15T07:00:00.000Z';
+      stubSql({ watermarkRow: { last_event_ts: lastEventTs } });
+      ingestPositionsMock.mockResolvedValue({ inserted: 0, skippedUnmapped: 0, maxIngestedAt: null });
+      await run(AUTH);
+      expect(successUpsertValue()).toEqual(new Date(lastEventTs));
+    });
+
+    it('holds the existing watermark on an all-unmapped batch (maxIngestedAt null despite fetched positions)', async () => {
+      const lastEventTs = '2026-07-15T07:00:00.000Z';
+      stubSql({ watermarkRow: { last_event_ts: lastEventTs } });
+      cartrackProviderMock.mockReturnValue(
+        makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([{ externalId: 'unmapped-1' }]) })
+      );
+      ingestPositionsMock.mockResolvedValue({ inserted: 0, skippedUnmapped: 1, maxIngestedAt: null });
+      await run(AUTH);
+      expect(successUpsertValue()).toEqual(new Date(lastEventTs));
+    });
+
+    it('stays null on a cold-start all-unmapped batch — does not fabricate a watermark', async () => {
+      // No prior watermark row at all (cold start) AND nothing ingested:
+      // last is null, maxIngestedAt is null, so the written value must be
+      // null too — never a stray Date — or the next tick's cold-start
+      // backfill window is lost.
+      ingestPositionsMock.mockResolvedValue({ inserted: 0, skippedUnmapped: 1, maxIngestedAt: null });
+      await run(AUTH);
+      expect(successUpsertValue()).toBeNull();
+    });
   });
 });
