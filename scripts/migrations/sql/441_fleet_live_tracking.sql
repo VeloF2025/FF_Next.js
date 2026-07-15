@@ -1,5 +1,11 @@
 -- 441: Fleet live tracking — provider-blind position store.
 -- Design: docs/superpowers/specs/2026-07-15-fleet-live-tracking-design.md
+--
+-- Purely additive — safe to apply any time, including before the code
+-- deploy. Dev and production share one Postgres instance, so a migration
+-- that dropped a column still read by prod's running code would break
+-- prod immediately. See 442_drop_cartrack_vehicle_id.sql for that drop,
+-- which must only run after the new code is deployed everywhere.
 
 BEGIN;
 
@@ -80,8 +86,5 @@ CREATE TABLE IF NOT EXISTS fleet_tracking_watermarks (
 ALTER TABLE fleet_gps_trips ADD COLUMN IF NOT EXISTS vehicle_id UUID REFERENCES fleet_vehicles(id);
 ALTER TABLE fleet_gps_trips ALTER COLUMN job_id DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_fleet_gps_trips_vehicle ON fleet_gps_trips (vehicle_id);
-
--- Superseded by fleet_vehicle_trackers. 0 rows — nothing to migrate.
-ALTER TABLE fleet_vehicles DROP COLUMN IF EXISTS cartrack_vehicle_id;
 
 COMMIT;
