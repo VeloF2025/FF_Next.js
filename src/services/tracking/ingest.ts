@@ -17,6 +17,15 @@ import { sql, query } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import type { ProviderKey, ProviderPosition } from './types';
 
+/**
+ * Second Cartrack account onboarding (Urent, alongside Velocity) is why
+ * every lookup below is scoped by (provider, account_ref), not provider
+ * alone: migration 441 makes external_id unique only per account, so two
+ * accounts on the same provider can legitimately share an external_id.
+ * Keying on external_id alone would silently attribute positions to the
+ * wrong vehicle the moment that happens.
+ */
+
 /** Reject fixes dated further ahead than this — device clock skew. */
 const MAX_FUTURE_MS = 5 * 60 * 1000;
 
@@ -66,6 +75,7 @@ function buildInsertQuery(rows: InsertRow[]): { text: string; params: unknown[] 
 
 export async function ingestPositions(
   provider: ProviderKey,
+  accountRef: string,
   positions: ProviderPosition[]
 ): Promise<{ inserted: number; skippedUnmapped: number }> {
   if (positions.length === 0) return { inserted: 0, skippedUnmapped: 0 };
@@ -73,7 +83,7 @@ export async function ingestPositions(
   const trackers = await sql<TrackerRow>`
     SELECT external_id, vehicle_id, id AS tracker_id
     FROM fleet_vehicle_trackers
-    WHERE provider = ${provider} AND is_active
+    WHERE provider = ${provider} AND account_ref = ${accountRef} AND is_active
   `;
   const byExternalId = new Map(trackers.map((t) => [t.external_id, t]));
 
@@ -93,8 +103,9 @@ export async function ingestPositions(
     // every overlapping poll, forever. Synthesise a deterministic id from
     // stable fields so the same event always maps to the same synthetic
     // id, keeping it dedupable via the existing (provider, provider_event_id)
-    // index without touching migration 441.
-    const eventId = p.providerEventId ?? `syn:${p.externalId}:${p.recordedAt.toISOString()}`;
+    // index without touching migration 441. accountRef is included so two
+    // accounts on the same provider can never collide on this synthetic id.
+    const eventId = p.providerEventId ?? `syn:${accountRef}:${p.externalId}:${p.recordedAt.toISOString()}`;
 
     rows.push([
       t.vehicle_id, t.tracker_id, provider, eventId, p.recordedAt,
@@ -111,10 +122,10 @@ export async function ingestPositions(
   }
 
   if (skippedFuture > 0) {
-    log.warn('[tracking-ingest] rejected positions dated in the future', { provider, skippedFuture });
+    log.warn('[tracking-ingest] rejected positions dated in the future', { provider, accountRef, skippedFuture });
   }
   if (skippedUnmapped > 0) {
-    const payload = { provider, skippedUnmapped, total: positions.length };
+    const payload = { provider, accountRef, skippedUnmapped, total: positions.length };
     if (skippedUnmapped === positions.length) {
       // Every position in this batch was unmapped — e.g. 441 not applied
       // yet, or fleet_vehicle_trackers is empty/all-inactive. That's a

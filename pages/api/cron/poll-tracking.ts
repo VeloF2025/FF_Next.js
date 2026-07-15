@@ -1,0 +1,156 @@
+/**
+ * Polls every configured tracking provider and stores new positions.
+ *
+ * Cron (Velocity crontab — Vercel crons do not fire for this systemd-hosted app):
+ *   *\/2 * * * * curl -fsS -H "x-cron-secret: $CRON_SECRET" \
+ *     http://localhost:3005/api/cron/poll-tracking >> /home/velo/logs/poll-tracking.log 2>&1
+ *
+ * Devices report every 1-4 min; polling faster than they transmit gains
+ * nothing. Cartrack returns all vehicles in one call, so cost is one
+ * request per tick regardless of fleet size.
+ */
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
+import { sql } from '@/lib/db-pool';
+import { cartrackProvider } from '@/services/tracking/cartrack/provider';
+import { ingestPositions } from '@/services/tracking/ingest';
+import type { ProviderKey, TrackingProvider } from '@/services/tracking/types';
+
+/** Re-poll slightly before the watermark; dedup absorbs the overlap. */
+const OVERLAP_MS = 2 * 60 * 1000;
+/** First run with no watermark: how far back to backfill. */
+const COLD_START_MS = 6 * 60 * 60 * 1000;
+/** Advisory lock key so a slow run is not re-entered by the next tick. */
+const LOCK_KEY = 4417301;
+
+type PollResult =
+  | {
+      provider: ProviderKey;
+      accountRef: string;
+      inserted: number;
+      skippedUnmapped: number;
+      windowFrom: string;
+      windowTo: string;
+    }
+  | { provider: ProviderKey; accountRef: string; error: string; authFailure: boolean };
+
+function configuredProviders(): TrackingProvider[] {
+  const out: TrackingProvider[] = [];
+  const { CARTRACK_BASE_URL, CARTRACK_API_USER, CARTRACK_API_PASS } = process.env;
+  if (CARTRACK_BASE_URL && CARTRACK_API_USER && CARTRACK_API_PASS) {
+    out.push(cartrackProvider({
+      baseUrl: CARTRACK_BASE_URL,
+      username: CARTRACK_API_USER,
+      password: CARTRACK_API_PASS,
+      accountRef: process.env.CARTRACK_ACCOUNT_REF ?? 'default',
+    }));
+  }
+  return out;
+}
+
+/**
+ * A 401 means credentials or entitlement — not a transient blip — and
+ * retrying on the next tick will never fix it (live reality: Urent's
+ * Cartrack account returns 401 today because its API entitlement isn't
+ * switched on). It must read differently in the logs than a 500 so nobody
+ * waits for it to self-heal.
+ */
+function isAuthFailure(message: string): boolean {
+  return /HTTP 401\b/.test(message);
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
+  }
+
+  // Mirrors pages/api/cron/fleet-check-reminders.ts — the canonical
+  // cron-auth pattern in this repo: fail closed when the secret is unset.
+  const expected = process.env.CRON_SECRET;
+  if (!expected) {
+    log.error('[poll-tracking] CRON_SECRET not configured — rejecting');
+    return apiResponse.error(res, ErrorCode.SERVICE_UNAVAILABLE, 'Cron endpoint misconfigured');
+  }
+  if (req.headers['x-cron-secret'] !== expected) {
+    return apiResponse.unauthorized(res, 'Invalid cron secret');
+  }
+
+  const locked = await sql<{ locked: boolean }>`SELECT pg_try_advisory_lock(${LOCK_KEY}) AS locked`;
+  if (!locked[0]?.locked) {
+    log.info('[poll-tracking] previous run still in progress — skipping tick');
+    return apiResponse.success(res, { skipped: 'already-running' });
+  }
+
+  try {
+    const results: PollResult[] = [];
+    for (const provider of configuredProviders()) {
+      // One provider failing must never block the others.
+      try {
+        const wm = await sql<{ last_event_ts: Date | null }>`
+          SELECT last_event_ts FROM fleet_tracking_watermarks
+          WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+        `;
+        const now = new Date();
+        const last = wm[0]?.last_event_ts ? new Date(wm[0].last_event_ts) : null;
+        const from = last
+          ? new Date(last.getTime() - OVERLAP_MS)
+          : new Date(now.getTime() - COLD_START_MS);
+
+        const positions = await provider.fetchPositions(from, now);
+        // accountRef is threaded through (not just provider.key) because
+        // migration 441 keys tracker uniqueness — and the ingest lookup —
+        // on (provider, account_ref, external_id). Urent is a second
+        // Cartrack account being onboarded alongside Velocity's; dropping
+        // accountRef here would let a shared external_id silently
+        // attribute positions to the wrong vehicle.
+        const { inserted, skippedUnmapped } = await ingestPositions(
+          provider.key, provider.accountRef, positions);
+
+        const maxTs = positions.reduce<Date | null>(
+          (acc, p) => (!acc || p.recordedAt > acc ? p.recordedAt : acc), null);
+
+        await sql`
+          INSERT INTO fleet_tracking_watermarks (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures)
+          VALUES (${provider.key}, ${provider.accountRef}, ${maxTs ?? last}, now(), NULL, 0)
+          ON CONFLICT (provider, account_ref) DO UPDATE
+            SET last_event_ts = COALESCE(EXCLUDED.last_event_ts, fleet_tracking_watermarks.last_event_ts),
+                last_run_at = now(), last_error = NULL, consecutive_failures = 0
+        `;
+
+        log.info('[poll-tracking] polled', {
+          provider: provider.key, accountRef: provider.accountRef,
+          fetched: positions.length, inserted, skippedUnmapped });
+        results.push({
+          provider: provider.key, accountRef: provider.accountRef,
+          inserted, skippedUnmapped,
+          windowFrom: from.toISOString(), windowTo: now.toISOString() });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const authFailure = isAuthFailure(message);
+        // Watermark deliberately untouched — the next tick retries the same
+        // window, so a transient outage loses no data. Note this INSERT
+        // omits last_event_ts entirely, so ON CONFLICT never overwrites it.
+        await sql`
+          INSERT INTO fleet_tracking_watermarks (provider, account_ref, last_run_at, last_error, consecutive_failures)
+          VALUES (${provider.key}, ${provider.accountRef}, now(), ${message}, 1)
+          ON CONFLICT (provider, account_ref) DO UPDATE
+            SET last_run_at = now(), last_error = ${message},
+                consecutive_failures = fleet_tracking_watermarks.consecutive_failures + 1
+        `;
+        if (authFailure) {
+          log.error('[poll-tracking] provider auth failure — credentials/entitlement, will not self-heal', {
+            provider: provider.key, accountRef: provider.accountRef, error: message });
+        } else {
+          log.error('[poll-tracking] provider failed', {
+            provider: provider.key, accountRef: provider.accountRef, error: message });
+        }
+        results.push({
+          provider: provider.key, accountRef: provider.accountRef, error: message, authFailure });
+      }
+    }
+    return apiResponse.success(res, { results });
+  } finally {
+    await sql`SELECT pg_advisory_unlock(${LOCK_KEY})`;
+  }
+}

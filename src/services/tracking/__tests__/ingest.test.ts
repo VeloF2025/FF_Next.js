@@ -14,6 +14,8 @@ vi.mock('@/lib/logger', () => ({ log: logMock }));
 import { ingestPositions } from '../ingest';
 import type { ProviderPosition } from '../types';
 
+const ACCOUNT = 'default';
+
 function pos(
   externalId: string,
   iso: string,
@@ -42,7 +44,7 @@ describe('ingestPositions', () => {
 
   it('skips positions whose tracker is not mapped to a vehicle', async () => {
     sqlMock.mockResolvedValueOnce([]); // no tracker rows
-    const r = await ingestPositions('cartrack', [pos('unknown-1', '2026-07-15T08:00:00Z')]);
+    const r = await ingestPositions('cartrack', ACCOUNT, [pos('unknown-1', '2026-07-15T08:00:00Z')]);
     expect(r.inserted).toBe(0);
     expect(r.skippedUnmapped).toBe(1);
     expect(queryMock).not.toHaveBeenCalled();
@@ -60,29 +62,67 @@ describe('ingestPositions', () => {
       pos('ct-2', '2026-07-15T08:00:00Z'),
       pos('ct-3', '2026-07-15T08:00:00Z'),
     ];
-    const r = await ingestPositions('cartrack', positions);
+    const r = await ingestPositions('cartrack', ACCOUNT, positions);
 
     expect(r.inserted).toBe(2);
     expect(r.skippedUnmapped).toBe(0);
   });
 
-  it('synthesises a deterministic event id when providerEventId is null, stable across repeats', async () => {
+  it('scopes the tracker lookup by provider AND account_ref, not provider alone', async () => {
+    sqlMock.mockResolvedValueOnce([trackerRow('ct-1')]);
+    queryMock.mockResolvedValueOnce([{ id: 'a' }]);
+    await ingestPositions('cartrack', 'urent', [pos('ct-1', '2026-07-15T08:00:00Z')]);
+
+    const sqlCallArgs = sqlMock.mock.calls[0];
+    expect(sqlCallArgs).toContain('cartrack');
+    expect(sqlCallArgs).toContain('urent');
+  });
+
+  it('keeps two accounts on the same provider isolated: identical external_id maps to different vehicles', async () => {
+    // Migration 441 scopes tracker uniqueness to (provider, account_ref,
+    // external_id) precisely because Urent is a second Cartrack account
+    // being onboarded alongside Velocity's. If the lookup were keyed on
+    // external_id alone, one account's positions could land on the other
+    // account's vehicle — silent wrong-vehicle attribution.
+    sqlMock.mockResolvedValueOnce([trackerRow('v1', 'vehicle-velocity', 'tracker-velocity')]);
+    queryMock.mockResolvedValueOnce([{ id: 'a' }]);
+    const r1 = await ingestPositions('cartrack', 'velocity', [pos('v1', '2026-07-15T08:00:00Z', null)]);
+    expect(r1.inserted).toBe(1);
+    const velocityParams = queryMock.mock.calls[0][1] as unknown[];
+    expect(velocityParams[0]).toBe('vehicle-velocity'); // vehicle_id is the 1st insert column
+    expect(velocityParams[3]).toBe('syn:velocity:v1:2026-07-15T08:00:00.000Z'); // provider_event_id is the 4th
+
+    queryMock.mockClear();
+    sqlMock.mockResolvedValueOnce([trackerRow('v1', 'vehicle-urent', 'tracker-urent')]);
+    queryMock.mockResolvedValueOnce([{ id: 'b' }]);
+    const r2 = await ingestPositions('cartrack', 'urent', [pos('v1', '2026-07-15T08:00:00Z', null)]);
+    expect(r2.inserted).toBe(1);
+    const urentParams = queryMock.mock.calls[0][1] as unknown[];
+    expect(urentParams[0]).toBe('vehicle-urent');
+    expect(urentParams[3]).toBe('syn:urent:v1:2026-07-15T08:00:00.000Z');
+
+    // The tracker lookup itself must have been scoped per account.
+    expect(sqlMock.mock.calls[0]).toContain('velocity');
+    expect(sqlMock.mock.calls[1]).toContain('urent');
+  });
+
+  it('synthesises a deterministic event id (scoped by account) when providerEventId is null, stable across repeats', async () => {
     sqlMock.mockResolvedValue([trackerRow('ct-1')]);
     queryMock.mockResolvedValue([{ id: 'x' }]);
     const iso = '2026-07-15T08:00:00.000Z';
     const p = pos('ct-1', iso, null);
 
-    await ingestPositions('cartrack', [p]);
+    await ingestPositions('cartrack', ACCOUNT, [p]);
     const firstParams = queryMock.mock.calls[0][1] as unknown[];
     const firstEventId = firstParams[3]; // provider_event_id is the 4th insert column
 
     queryMock.mockClear();
-    await ingestPositions('cartrack', [p]);
+    await ingestPositions('cartrack', ACCOUNT, [p]);
     const secondParams = queryMock.mock.calls[0][1] as unknown[];
     const secondEventId = secondParams[3];
 
     expect(firstEventId).not.toBeNull();
-    expect(firstEventId).toBe(`syn:ct-1:${iso}`);
+    expect(firstEventId).toBe(`syn:${ACCOUNT}:ct-1:${iso}`);
     expect(firstEventId).toBe(secondEventId);
   });
 
@@ -90,7 +130,7 @@ describe('ingestPositions', () => {
     sqlMock.mockResolvedValueOnce([]); // fleet_vehicle_trackers empty/all-inactive
     const positions = [pos('ct-1', '2026-07-15T08:00:00Z'), pos('ct-2', '2026-07-15T08:00:00Z')];
 
-    await ingestPositions('cartrack', positions);
+    await ingestPositions('cartrack', ACCOUNT, positions);
 
     expect(logMock.warn).toHaveBeenCalledWith(
       expect.stringContaining('entire batch skipped'),
@@ -104,7 +144,7 @@ describe('ingestPositions', () => {
     queryMock.mockResolvedValueOnce([{ id: 'a' }]);
     const positions = [pos('ct-1', '2026-07-15T08:00:00Z'), pos('ct-unmapped', '2026-07-15T08:00:00Z')];
 
-    await ingestPositions('cartrack', positions);
+    await ingestPositions('cartrack', ACCOUNT, positions);
 
     expect(logMock.info).toHaveBeenCalledWith(
       expect.stringContaining('unmapped'),
@@ -122,7 +162,7 @@ describe('ingestPositions', () => {
       .mockResolvedValueOnce([{ id: 'b0' }]);
 
     const positions = Array.from({ length: count }, (_, i) => pos(`ct-${i}`, '2026-07-15T08:00:00Z'));
-    const r = await ingestPositions('cartrack', positions);
+    const r = await ingestPositions('cartrack', ACCOUNT, positions);
 
     expect(queryMock).toHaveBeenCalledTimes(2);
     expect(r.inserted).toBe(501);
@@ -131,7 +171,7 @@ describe('ingestPositions', () => {
   it('rejects timestamps more than 5 minutes in the future', async () => {
     sqlMock.mockResolvedValueOnce([trackerRow('ct-1')]);
     const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    const r = await ingestPositions('cartrack', [pos('ct-1', future)]);
+    const r = await ingestPositions('cartrack', ACCOUNT, [pos('ct-1', future)]);
     expect(r.inserted).toBe(0);
     expect(queryMock).not.toHaveBeenCalled();
   });
@@ -146,11 +186,11 @@ describe('ingestPositions', () => {
 
       sqlMock.mockResolvedValueOnce([trackerRow('ct-1')]);
       queryMock.mockResolvedValueOnce([{ id: 'a' }]);
-      const r1 = await ingestPositions('cartrack', [pos('ct-1', atBoundary.toISOString())]);
+      const r1 = await ingestPositions('cartrack', ACCOUNT, [pos('ct-1', atBoundary.toISOString())]);
       expect(r1.inserted).toBe(1);
 
       sqlMock.mockResolvedValueOnce([trackerRow('ct-1')]);
-      const r2 = await ingestPositions('cartrack', [pos('ct-1', beyondBoundary.toISOString())]);
+      const r2 = await ingestPositions('cartrack', ACCOUNT, [pos('ct-1', beyondBoundary.toISOString())]);
       expect(r2.inserted).toBe(0);
     } finally {
       vi.useRealTimers();
