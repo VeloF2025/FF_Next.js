@@ -105,13 +105,36 @@ returns `'2026-07-15 10:00:00'`, not `'2026-07-15 08:00:00'`.
 `fleet_vehicles.cartrack_vehicle_id` is a single column hardcoded to one vendor. There is nowhere
 to record *"this vehicle is on Netstar, ID 12345"*.
 
-Replace with `fleet_vehicle_trackers`. **This becomes the single source of truth** — attendance's
-`cartrackReconcile` must be updated to read it in the same change. We are not creating a second
-copy of the same fact; that is precisely the split-brain bug this module already suffers from
-between `vehicle_assignments` and `fleet_vehicles.assigned_driver_id`.
+Replace with `fleet_vehicle_trackers`. **This becomes the single source of truth.** We are not
+creating a second copy of the same fact — that is precisely the split-brain bug this module already
+suffers from between `vehicle_assignments` and `fleet_vehicles.assigned_driver_id`, which has
+already drifted (29 pointers vs 22 active assignments).
 
-`fleet_vehicles.cartrack_vehicle_id` is dropped in the same migration. It holds 0 rows, so there
-is no data to migrate and no reason to keep a deprecated shadow column.
+`fleet_vehicles.cartrack_vehicle_id` is dropped in the same migration. It holds 0 rows, so there is
+nothing to migrate and no reason to keep a deprecated shadow column.
+
+**Blast radius — larger than it first appears.** Seven source files read that column and all must
+move in the same change:
+
+| File | Role |
+|---|---|
+| `src/services/attendance/cartrackReconcileQueries.ts:39` | Reconcile query — joins the column |
+| `src/services/attendance/cartrackReconcile.ts` | Consumes the query result |
+| `pages/api/staff/attendance-cartrack-mapping.ts` | Mapping API (the only writer) |
+| `pages/staff/attendance/cartrack-mapping.tsx` | Mapping UI |
+| `src/components/attendance/CartrackVehicleRow.tsx` | Mapping row component |
+| `src/services/tracking/cartrack/types.ts` | Type definition |
+| `src/services/tracking/cartrack/client.ts` | Doc comment reference |
+
+Plus `src/modules/attendance/__tests__/api/staff-attendance-cartrack-mapping.test.ts`.
+
+**Rejected alternative:** dual-writing both the column and the new table during a transition. With
+0 rows there is nothing to transition, and dual-writing would deliberately create the exact
+split-brain this table exists to eliminate. Do it once, properly.
+
+**Noted oddity:** the only tracker-mapping UI lives under `/staff/attendance`, not `/fleet`. It is
+a fleet concern. Moving it is *not* in this scope — mentioned, not fixed — but it is why the
+mapping API is touched here at all.
 
 ### 6.3 Position store — migration 441
 
