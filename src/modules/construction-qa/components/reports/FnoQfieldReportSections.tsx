@@ -72,6 +72,9 @@ export function DataQualityPanel({ data }: { data: ScopeActualResponse }) {
           <p className="mt-1 text-[var(--ff-text-secondary)]">
             CWC/ATP fields are not mapped yet. Sampled QField files expose generic fields like Status, LSTATUS and WSTATUS, so the report deliberately avoids inventing CWC/ATP completion.
           </p>
+          <p className="mt-2 text-[var(--ff-warning)]">
+            Rows with both Zone and PON unknown are treated as unmapped aggregate rows and excluded from headline/project quantity totals until planner mapping confirms what those counts represent.
+          </p>
         </div>
       </div>
     </div>
@@ -94,6 +97,11 @@ export function ProjectCards({ rollups }: { rollups: ProjectRollup[] }) {
           <div className="mt-3 text-xs text-[var(--ff-text-secondary)]">
             {project.issues > 0 ? `${project.issues} rows with data-quality issues` : 'No row-level issues flagged'}
           </div>
+          {project.excludedRows.length > 0 && (
+            <div className="mt-2 rounded-md border border-[var(--ff-warning)] bg-[var(--ff-surface-alt)] px-2 py-1 text-xs text-[var(--ff-warning)]">
+              Excluded unmapped: {formatNumber(project.excludedPoleActual)} poles · {formatKm(project.excludedCableActualMeters)} cable
+            </div>
+          )}
         </a>
       ))}
     </div>

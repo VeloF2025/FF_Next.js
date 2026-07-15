@@ -12,7 +12,7 @@ import {
   ProjectCards,
   SourceBanner,
 } from './FnoQfieldReportSections';
-import { buildProjectRollups, formatKm, formatNumber, statusLabel } from './FnoQfieldReportUtils';
+import { buildProjectRollups, buildTrustedSummary, formatKm, formatNumber, isUnmappedAggregateRow, statusLabel } from './FnoQfieldReportUtils';
 
 const FNO_OPTIONS: { key: FnoKey; label: string }[] = [
   { key: 'herotel', label: 'Herotel' },
@@ -64,18 +64,20 @@ export function FnoQfieldReportsPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const rollups = useMemo(() => buildProjectRollups(data), [data]);
+  const trustedSummary = useMemo(() => buildTrustedSummary(rollups), [rollups]);
   const summary = data?.summary;
 
   const exportRows = useCallback(() => {
     if (!data) return;
     downloadCsv('fno-qfield-report.csv', [
-      ['Project', 'Zone', 'PON', 'QField poles', 'QField cable meters', 'CWC', 'ATP', 'Issues'],
+      ['Project', 'Zone', 'PON', 'QField poles', 'QField cable meters', 'Rollup status', 'CWC', 'ATP', 'Issues'],
       ...data.hierarchy.map((row) => [
         row.projectName,
         row.zoneNo?.toString() ?? 'Unknown',
         row.ponNo?.toString() ?? 'Unknown',
         row.poleActual.toString(),
         row.cableActualMeters.toFixed(2),
+        isUnmappedAggregateRow(row) ? 'Excluded from totals: unmapped aggregate row' : 'Included in trusted totals',
         statusLabel(row.cwcStatus),
         statusLabel(row.atpStatus),
         row.issues.join('; '),
@@ -134,8 +136,8 @@ export function FnoQfieldReportsPage() {
       {!loading && summary && data && (
         <>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="QField poles extracted" value={formatNumber(summary.poleActual)} sub={`Scope field currently mirrors extracted QField count: ${formatNumber(summary.poleScope)}`} />
-            <MetricCard label="QField cable extracted" value={formatKm(summary.cableActualMeters)} sub={`Scope field currently mirrors extracted QField length: ${formatKm(summary.cableScopeMeters)}`} />
+            <MetricCard label="Trusted QField poles" value={formatNumber(trustedSummary.poleActual)} sub={`${formatNumber(trustedSummary.excludedPoleActual)} unmapped poles excluded pending planner mapping`} />
+            <MetricCard label="Trusted QField cable" value={formatKm(trustedSummary.cableActualMeters)} sub={`${formatKm(trustedSummary.excludedCableActualMeters)} unmapped cable excluded pending planner mapping`} />
             <MetricCard label="CWC mapping" value="Not configured" sub="Planner must confirm status field/value mapping" />
             <MetricCard label="ATP mapping" value="Not configured" sub="Generic Status/LSTATUS/WSTATUS seen only" />
           </div>
