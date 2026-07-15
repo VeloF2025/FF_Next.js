@@ -879,6 +879,9 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
     async fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]> {
       const out: ProviderPosition[] = [];
       let noFix = 0;
+      let unparseableTs = 0;
+      let totalEvents = 0;
+      let exampleBadTs: string | null = null;
       for (let page = 1; page <= MAX_PAGES; page++) {
         const url =
           `${base}/vehicles/events` +
@@ -910,10 +913,29 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
             gpsFixType: num(r.gps_fix_type),
           });
         }
-        if (page >= (body.meta?.last_page ?? 1)) break;
+        const lastPage = body.meta?.last_page ?? 1;
+        if (page >= lastPage) break;
+        // Fail loud rather than truncate. The poller leaves its watermark
+        // untouched on error and retries the same window, so a throw loses
+        // nothing — a silent cap loses data with no signal at all.
+        if (page === MAX_PAGES) {
+          throw new Error(
+            `Cartrack events: pagination exceeded MAX_PAGES=${MAX_PAGES} ` +
+            `(fetched through page ${page} of ${lastPage}; shrink the window)`
+          );
+        }
       }
+      // Split deliberately. A null lat/lon is routine (tunnel, cold start).
+      // An unparseable timestamp is a contract breach — and is the exact shape
+      // of the +02 two-digit-offset bug this project shipped twice. Counted
+      // together, a parser regression returns [] and looks like an ordinary day.
       if (noFix > 0) {
-        log.warn('[cartrack-provider] events skipped for missing fix or timestamp', { noFix });
+        log.warn('[cartrack-provider] events skipped — no GPS fix', { noFix, totalEvents });
+      }
+      if (unparseableTs > 0) {
+        log.error('[cartrack-provider] events skipped — UNPARSEABLE timestamp', {
+          unparseableTs, totalEvents, exampleRaw: exampleBadTs,
+        });
       }
       return out;
     },
