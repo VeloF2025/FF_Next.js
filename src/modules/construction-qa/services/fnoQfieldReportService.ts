@@ -61,6 +61,10 @@ export function normalizeFnoKey(input: string | string[] | undefined): FnoKey {
 }
 
 export async function getFnoProjects(fnoKey: FnoKey): Promise<ProjectOption[]> {
+  if (fnoKey === 'herotel') {
+    return getHerotelQfieldSnapshot().projects;
+  }
+
   const { where, params } = buildProjectWhere(fnoKey);
   const rows = await query<RawProjectRow>(`
     SELECT p.id::text AS project_id, p.project_name
@@ -81,6 +85,17 @@ export async function getFnoScopeActualReport(
   fnoKey: FnoKey,
   projectId?: string,
 ): Promise<ScopeActualResponse> {
+  if (fnoKey === 'herotel') {
+    const snapshot = getHerotelQfieldSnapshot(projectId);
+    return {
+      fnoKey,
+      fnoName: FNO_NAMES[fnoKey],
+      projects: snapshot.projects,
+      summary: snapshot.summary,
+      hierarchy: snapshot.rows,
+    };
+  }
+
   const dbProjectId = isUuid(projectId) ? projectId : undefined;
   const { where, params } = buildProjectWhere(fnoKey, dbProjectId);
   const rows = await query<RawHierarchyRow>(buildFnoHierarchySql(where), params);
@@ -98,17 +113,6 @@ export async function getFnoScopeActualReport(
   };
 
   const hierarchy = rows.map((row) => mapHierarchyRow(row, summary));
-
-  if (fnoKey === 'herotel' && hierarchy.length === 0) {
-    const snapshot = getHerotelQfieldSnapshot(projectId);
-    return {
-      fnoKey,
-      fnoName: FNO_NAMES[fnoKey],
-      projects: snapshot.projects,
-      summary: snapshot.summary,
-      hierarchy: snapshot.rows,
-    };
-  }
 
   const projects = await getFnoProjects(fnoKey);
 

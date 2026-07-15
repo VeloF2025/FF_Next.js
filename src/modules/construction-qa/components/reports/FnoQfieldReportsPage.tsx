@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BarChart3, GitBranch, RefreshCw } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { FnoKey, ScopeActualResponse } from '../../services/fnoReportTypes';
+import { buildClientFallbackReport } from './fnoQfieldClientFallback';
 
 const FNO_OPTIONS: { key: FnoKey; label: string }[] = [
   { key: 'herotel', label: 'Herotel' },
@@ -30,8 +31,8 @@ function statusLabel(status: string): string {
 export function FnoQfieldReportsPage() {
   const [fno, setFno] = useState<FnoKey>('herotel');
   const [projectId, setProjectId] = useState('');
-  const [data, setData] = useState<ScopeActualResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ScopeActualResponse | null>(() => buildClientFallbackReport());
+  const [loading, setLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -41,8 +42,10 @@ export function FnoQfieldReportsPage() {
       const response = await fetch(`/api/construction-qa/fno-reports?${params}`, { credentials: 'include' });
       if (!response.ok) throw new Error(`API ${response.status}`);
       const json = await response.json();
+      if (!json?.data?.summary || !Array.isArray(json.data.hierarchy)) throw new Error('Invalid report payload');
       setData(json.data);
     } catch (error) {
+      setData(fno === 'herotel' ? buildClientFallbackReport(projectId) : null);
       log.error('Failed to load FNO QField report', { error: (error as Error).message }, 'FnoQfieldReportsPage');
     } finally {
       setLoading(false);
