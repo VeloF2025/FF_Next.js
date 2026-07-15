@@ -23,7 +23,7 @@
  */
 
 export interface CartrackPositionSample {
-  /** Cartrack's opaque vehicle identifier (stored in fleet_vehicles.cartrack_vehicle_id). */
+  /** Cartrack's opaque vehicle identifier (stored in fleet_vehicle_trackers.external_id). */
   vehicleId: string;
   lat: number;
   lon: number;

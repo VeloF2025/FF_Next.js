@@ -3,6 +3,7 @@
  *
  * Fleet routes covered:
  *   /fleet                              → Dashboard
+ *   /fleet/map                          → Map
  *   /fleet/vehicles                     → Vehicles → List
  *   /fleet/vehicles/[id]                → Vehicles (detail)
  *   /fleet/vehicles/[id]/check-in-history → Vehicles (detail sub-page)
@@ -27,6 +28,7 @@ import type { Tab } from '../accounting/accountingNavConfig';
 
 export const TABS: Tab[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/fleet' },
+  { id: 'map', label: 'Map', href: '/fleet/map' },
 
   {
     id: 'vehicles',
@@ -116,6 +118,9 @@ export function getActiveTabId(
 ): string {
   // Exact match for Dashboard — avoids catching /fleet/* prefixes
   if (pathname === '/fleet') return 'dashboard';
+
+  // Map — live vehicle tracking
+  if (pathname.startsWith('/fleet/map')) return 'map';
 
   // Analytics
   if (pathname.startsWith('/fleet/analytics')) return 'analytics';

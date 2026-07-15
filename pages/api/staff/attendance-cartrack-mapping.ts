@@ -24,6 +24,7 @@ import {
 } from '@/lib/auth/middleware';
 import { userHasPermission } from '@/lib/permissions';
 import { cartrackClientFromEnv, CartrackError } from '@/services/tracking/cartrack/client';
+import { setVehicleTracker } from '@/services/tracking/trackerQueries';
 
 interface FleetVehicleRow extends Record<string, unknown> {
   id: string;
@@ -32,14 +33,29 @@ interface FleetVehicleRow extends Record<string, unknown> {
   cartrack_vehicle_id: string | null;
 }
 
+interface FleetVehicleExistenceRow extends Record<string, unknown> {
+  id: string;
+  registration: string | null;
+  description: string | null;
+}
+
+/** Which Cartrack tenant/account this deployment maps against (see migration 441). */
+const CARTRACK_ACCOUNT_REF = process.env.CARTRACK_ACCOUNT_REF ?? 'default';
+
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   const includeCandidates = req.query.include_candidates === 'true';
 
+  // Joins the active Cartrack tracker (if any) onto each vehicle. A vehicle
+  // can have at most one active tracker (partial unique index on
+  // fleet_vehicle_trackers(vehicle_id) WHERE is_active), so this LEFT JOIN
+  // cannot fan out rows even before the provider filter narrows it further.
   const rows = await sql<FleetVehicleRow>`
-    SELECT id, registration, description, cartrack_vehicle_id
-    FROM fleet_vehicles
-    WHERE status IN ('active', 'maintenance')
-    ORDER BY registration ASC NULLS LAST
+    SELECT fv.id, fv.registration, fv.description, t.external_id AS cartrack_vehicle_id
+    FROM fleet_vehicles fv
+    LEFT JOIN fleet_vehicle_trackers t
+      ON t.vehicle_id = fv.id AND t.is_active AND t.provider = 'cartrack'
+    WHERE fv.status IN ('active', 'maintenance')
+    ORDER BY fv.registration ASC NULLS LAST
   `;
 
   let candidates: Array<{
@@ -143,18 +159,29 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     // `status IN ('active','maintenance')` matches the GET filter — the UI
     // won't offer retired vehicles, and a direct POST against a retired
     // row is almost certainly a bug. Defence-in-depth against stale IDs.
-    const updated = await sql<FleetVehicleRow>`
-      UPDATE fleet_vehicles
-      SET cartrack_vehicle_id = ${cartrackVehicleId}, updated_at = NOW()
+    // fleet_vehicle_trackers has no status column of its own (it FKs to
+    // fleet_vehicles), so this existence check is what enforces the filter
+    // before setVehicleTracker writes.
+    const existing = await sql<FleetVehicleExistenceRow>`
+      SELECT id, registration, description
+      FROM fleet_vehicles
       WHERE id = ${fleetVehicleId}
         AND status IN ('active', 'maintenance')
-      RETURNING id, registration, description, cartrack_vehicle_id
     `;
-    if (updated.length === 0) {
+    if (existing.length === 0) {
       apiResponse.notFound(res, 'FleetVehicle', fleetVehicleId);
       return;
     }
-    apiResponse.success(res, { vehicle: updated[0] });
+
+    await setVehicleTracker({
+      vehicleId: fleetVehicleId,
+      provider: 'cartrack',
+      accountRef: CARTRACK_ACCOUNT_REF,
+      externalId: cartrackVehicleId,
+    });
+
+    const vehicle: FleetVehicleRow = { ...existing[0], cartrack_vehicle_id: cartrackVehicleId };
+    apiResponse.success(res, { vehicle });
   } catch (err) {
     log.error('[cartrack-mapping] update failed', {
       fleetVehicleId,

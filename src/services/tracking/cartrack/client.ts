@@ -10,7 +10,7 @@
  *     access. Production callers go through `cartrackClientFromEnv()`.
  *   - Every non-2xx except 404 throws — the reconcile job treats 404 as
  *     "vehicle not mapped" (an expected steady-state outcome for a
- *     fleet_vehicles row with a stale cartrack_vehicle_id), and anything
+ *     fleet_vehicle_trackers row with a stale external_id), and anything
  *     else is a transient problem to surface loud so ops can retry.
  *   - Nearest-sample picker is pure: tests can feed in a hand-rolled
  *     sample array without hitting fetch.
@@ -138,7 +138,9 @@ class HttpCartrackClient implements CartrackClient {
     // in-memory by vehicle_id. The endpoint caps the window at 24h, which
     // comfortably exceeds our default ±5 min tolerance.
     //
-    // Date format per docs: `YYYY-MM-DD hh:mm:ss` (no timezone, assumed UTC).
+    // Cartrack reads these timestamps as South African local time, NOT UTC —
+    // verified against the live API 2026-07-15 (sending UTC returns events 2h
+    // stale). The published docs say UTC and are wrong. See cartrackTsFormat.
     const from = cartrackTsFormat(new Date(at.getTime() - toleranceMs));
     const to = cartrackTsFormat(new Date(at.getTime() + toleranceMs));
     const buildUrl = (page: number) =>
@@ -377,23 +379,55 @@ export function pickNearestSample(
 }
 
 /**
- * Cartrack expects timestamps in `YYYY-MM-DD hh:mm:ss` (no TZ suffix,
- * interpreted as UTC per the docs' examples). Not ISO-8601.
+ * Cartrack expects `YYYY-MM-DD hh:mm:ss` in **South African local time**.
+ *
+ * Verified live 2026-07-15 by querying both ways against the same account:
+ *   - sent UTC numbers  → returned events 2h stale
+ *   - sent SAST numbers → returned current events
+ * The published docs describe these as UTC. They are wrong.
+ *
+ * SA has no DST, so the offset is a constant +02:00 and a fixed shift is
+ * correct year-round. Do not "simplify" this back to getUTC*.
  */
-function cartrackTsFormat(d: Date): string {
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+
+export function cartrackTsFormat(d: Date): string {
+  const sast = new Date(d.getTime() + SAST_OFFSET_MS);
   const pad = (n: number) => String(n).padStart(2, '0');
   return (
-    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
-    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+    `${sast.getUTCFullYear()}-${pad(sast.getUTCMonth() + 1)}-${pad(sast.getUTCDate())} ` +
+    `${pad(sast.getUTCHours())}:${pad(sast.getUTCMinutes())}:${pad(sast.getUTCSeconds())}`
   );
 }
 
 /**
- * Detects an explicit timezone suffix on a possibly-ISO string.
- * Matches: `Z` or `z` at end; `+02:00`, `-0530`, `+02` — anything Date
- * would treat as TZ-anchored.
+ * Detects an explicit timezone suffix. Cartrack's SA tenant emits a
+ * TWO-digit offset (`+02`), so the minutes group must be optional — a
+ * `\d{2}:?\d{2}` pattern misses it entirely and the caller then wrongly
+ * appends 'Z'.
  */
-const TZ_SUFFIX_RE = /(?:[Zz]|[+-]\d{2}:?\d{2})$/;
+const TZ_SUFFIX_RE = /(?:[Zz]|[+-]\d{2}(?::?\d{2})?)$/;
+/** Matches a bare hour-only offset like `+02` / `-05` at the very end. */
+const BARE_HOUR_OFFSET_RE = /([+-]\d{2})$/;
+
+/**
+ * Parse a Cartrack timestamp to a Date, or null if unparseable.
+ *
+ * Verified against the live wire format 2026-07-15: `'2026-07-15 12:30:03+02'`.
+ * V8 cannot parse a bare two-digit offset — `new Date('...T12:30:03+02')` is
+ * Invalid Date — so it is expanded to `+02:00` first.
+ */
+export function parseSampleTs(raw: string): Date | null {
+  if (!raw) return null;
+  let iso = raw.replace(' ', 'T');
+  if (!TZ_SUFFIX_RE.test(iso)) {
+    iso += 'Z'; // no zone stated — documented as UTC
+  } else {
+    iso = iso.replace(BARE_HOUR_OFFSET_RE, '$1:00');
+  }
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 function toSample(
   vehicleId: string,
@@ -404,15 +438,8 @@ function toSample(
   }
 ): CartrackPositionSample | null {
   if (!raw.event_ts || raw.latitude == null || raw.longitude == null) return null;
-  // Cartrack event_ts is documented as `YYYY-MM-DD hh:mm:ss` in UTC.
-  // Always check for a TZ suffix (covers: space-separated no-TZ,
-  // ISO-8601 with Z, ISO-8601 with offset, AND the failure mode where
-  // Cartrack ever returns `YYYY-MM-DDTHH:MM:SS` without a Z — which
-  // `new Date()` would otherwise parse as LOCAL time).
-  const hasTz = TZ_SUFFIX_RE.test(raw.event_ts);
-  const normalised = raw.event_ts.replace(' ', 'T') + (hasTz ? '' : 'Z');
-  const ts = new Date(normalised);
-  if (Number.isNaN(ts.getTime())) return null;
+  const ts = parseSampleTs(raw.event_ts);
+  if (!ts) return null;
   return { vehicleId, lat: raw.latitude, lon: raw.longitude, ts };
 }
 

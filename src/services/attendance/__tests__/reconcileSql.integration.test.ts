@@ -232,7 +232,7 @@ const TEMPLATES: Template[] = [
         e.clock_in_lon::text,
         e.clock_out_lat::text,
         e.clock_out_lon::text,
-        fv.cartrack_vehicle_id,
+        ct.external_id AS cartrack_vehicle_id,
         EXISTS (
           SELECT 1 FROM attendance_gps_verifications v
           WHERE v.entry_id = e.id AND v.check_type = 'in'
@@ -244,6 +244,8 @@ const TEMPLATES: Template[] = [
       FROM attendance_entries e
       JOIN vehicle_assignments va ON va.id = e.vehicle_assignment_id
       JOIN fleet_vehicles fv ON fv.id = va.fleet_vehicle_id
+      LEFT JOIN fleet_vehicle_trackers ct
+        ON ct.vehicle_id = fv.id AND ct.is_active AND ct.provider = 'cartrack'
       WHERE e.status IN ('closed', 'auto_closed', 'manual')
         AND e.vehicle_assignment_id IS NOT NULL
         AND e.work_date >= $1::date

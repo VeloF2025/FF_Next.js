@@ -2,14 +2,15 @@
  * Nightly Cartrack GPS cross-check.
  *
  * For each recently-closed attendance_entry with a vehicle_assignment,
- * resolve the linked fleet_vehicle's cartrack_vehicle_id, fetch the
- * Cartrack position sample closest to clock_in_at and clock_out_at, and
- * upsert `attendance_gps_verifications` with the verdict:
+ * resolve the linked fleet_vehicle's active Cartrack tracker (via
+ * fleet_vehicle_trackers), fetch the Cartrack position sample closest to
+ * clock_in_at and clock_out_at, and upsert `attendance_gps_verifications`
+ * with the verdict:
  *
  *   match              — distance ≤ threshold_m
  *   mismatch           — distance > threshold_m (raises vehicle_gps_mismatch exception)
  *   no_data            — Cartrack returned no sample in ±5 min window
- *   vehicle_not_mapped — fleet_vehicles.cartrack_vehicle_id IS NULL or 404
+ *   vehicle_not_mapped — no active fleet_vehicle_trackers row (provider='cartrack') or 404
  *   device_gps_off     — clock_in/out had no device lat/lon (phone GPS off);
  *                        Cartrack not called because corroboration is
  *                        impossible without a device side to compare to
