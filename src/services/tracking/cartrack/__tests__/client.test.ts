@@ -23,6 +23,7 @@ import {
   CartrackError,
   pickNearestSample,
   cartrackTsFormat,
+  parseSampleTs,
   DEFAULT_TOLERANCE_MS,
 } from '../client';
 import type { CartrackPositionSample } from '../types';
@@ -518,9 +519,13 @@ describe('fetchPositionAt — event_ts format variants + GPS-fix-less warn', () 
       '1',
       new Date('2026-04-20T06:00:00Z')
     );
-    // Date('2026-04-20Z') is actually valid (midnight UTC) — but that's
-    // outside the ±5min window from 06:00, so `no_data`. The toSample
-    // function itself returns a sample; picker discards it.
+    // `no_data`, but note the mechanism changed with the +02 parsing fix:
+    // TZ_SUFFIX_RE now reads the trailing '-20' of a date-only string as an
+    // hour-only offset, so parseSampleTs expands it to '2026-04-20:00' ->
+    // Invalid Date -> null, and toSample drops the row. (Previously it
+    // parsed as valid midnight UTC and the picker discarded it for being
+    // outside the ±5min window.) Either way the row never yields a position,
+    // and the title now describes what actually happens.
     expect(result.status).toBe('no_data');
   });
 });
@@ -611,6 +616,45 @@ describe('cartrackTsFormat', () => {
 
   it('pads single digits', () => {
     expect(cartrackTsFormat(new Date('2026-01-05T01:02:03Z'))).toBe('2026-01-05 03:02:03');
+  });
+});
+
+describe('toSample timestamp parsing', () => {
+  // Live wire format is a TWO-digit offset: '2026-07-15 12:30:03+02'.
+  // The old TZ_SUFFIX_RE wanted four digits, missed it, appended 'Z', and
+  // produced Invalid Date — silently dropping every sample.
+  it('parses Cartrack real two-digit offset', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03+02')?.toISOString())
+      .toBe('2026-07-15T10:30:03.000Z');
+  });
+
+  it('parses a colon offset', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03+02:00')?.toISOString())
+      .toBe('2026-07-15T10:30:03.000Z');
+  });
+
+  it('parses a compact four-digit offset', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03+0200')?.toISOString())
+      .toBe('2026-07-15T10:30:03.000Z');
+  });
+
+  it('parses explicit Z', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03Z')?.toISOString())
+      .toBe('2026-07-15T12:30:03.000Z');
+  });
+
+  it('treats a bare timestamp as UTC', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03')?.toISOString())
+      .toBe('2026-07-15T12:30:03.000Z');
+  });
+
+  it('parses a negative bare offset', () => {
+    expect(parseSampleTs('2026-07-15 12:30:03-05')?.toISOString())
+      .toBe('2026-07-15T17:30:03.000Z');
+  });
+
+  it('returns null for junk rather than an Invalid Date', () => {
+    expect(parseSampleTs('not a timestamp')).toBeNull();
   });
 });
 

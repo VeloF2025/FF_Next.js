@@ -399,11 +399,33 @@ export function cartrackTsFormat(d: Date): string {
 }
 
 /**
- * Detects an explicit timezone suffix on a possibly-ISO string.
- * Matches: `Z` or `z` at end; `+02:00`, `-0530`, `+02` — anything Date
- * would treat as TZ-anchored.
+ * Detects an explicit timezone suffix. Cartrack's SA tenant emits a
+ * TWO-digit offset (`+02`), so the minutes group must be optional — a
+ * `\d{2}:?\d{2}` pattern misses it entirely and the caller then wrongly
+ * appends 'Z'.
  */
-const TZ_SUFFIX_RE = /(?:[Zz]|[+-]\d{2}:?\d{2})$/;
+const TZ_SUFFIX_RE = /(?:[Zz]|[+-]\d{2}(?::?\d{2})?)$/;
+/** Matches a bare hour-only offset like `+02` / `-05` at the very end. */
+const BARE_HOUR_OFFSET_RE = /([+-]\d{2})$/;
+
+/**
+ * Parse a Cartrack timestamp to a Date, or null if unparseable.
+ *
+ * Verified against the live wire format 2026-07-15: `'2026-07-15 12:30:03+02'`.
+ * V8 cannot parse a bare two-digit offset — `new Date('...T12:30:03+02')` is
+ * Invalid Date — so it is expanded to `+02:00` first.
+ */
+export function parseSampleTs(raw: string): Date | null {
+  if (!raw) return null;
+  let iso = raw.replace(' ', 'T');
+  if (!TZ_SUFFIX_RE.test(iso)) {
+    iso += 'Z'; // no zone stated — documented as UTC
+  } else {
+    iso = iso.replace(BARE_HOUR_OFFSET_RE, '$1:00');
+  }
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 function toSample(
   vehicleId: string,
@@ -414,15 +436,8 @@ function toSample(
   }
 ): CartrackPositionSample | null {
   if (!raw.event_ts || raw.latitude == null || raw.longitude == null) return null;
-  // Cartrack event_ts is documented as `YYYY-MM-DD hh:mm:ss` in UTC.
-  // Always check for a TZ suffix (covers: space-separated no-TZ,
-  // ISO-8601 with Z, ISO-8601 with offset, AND the failure mode where
-  // Cartrack ever returns `YYYY-MM-DDTHH:MM:SS` without a Z — which
-  // `new Date()` would otherwise parse as LOCAL time).
-  const hasTz = TZ_SUFFIX_RE.test(raw.event_ts);
-  const normalised = raw.event_ts.replace(' ', 'T') + (hasTz ? '' : 'Z');
-  const ts = new Date(normalised);
-  if (Number.isNaN(ts.getTime())) return null;
+  const ts = parseSampleTs(raw.event_ts);
+  if (!ts) return null;
   return { vehicleId, lat: raw.latitude, lon: raw.longitude, ts };
 }
 
