@@ -84,6 +84,9 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
     async fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]> {
       const out: ProviderPosition[] = [];
       let noFix = 0;
+      let unparseableTs = 0;
+      let unparseableTsExample: string | null = null;
+      let totalEvents = 0;
       for (let page = 1; page <= MAX_PAGES; page++) {
         const url =
           `${base}/vehicles/events` +
@@ -92,11 +95,19 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
           `&limit=${PAGE_SIZE}&page=${page}`;
         const body = await getJson(url);
         const rows = (body.data ?? []) as Array<Record<string, unknown>>;
+        totalEvents += rows.length;
         for (const r of rows) {
           const ts = typeof r.event_ts === 'string' ? parseSampleTs(r.event_ts) : null;
+          if (!ts) {
+            unparseableTs++;
+            if (unparseableTsExample === null) {
+              unparseableTsExample = typeof r.event_ts === 'string' ? r.event_ts : String(r.event_ts);
+            }
+            continue;
+          }
           const lat = num(r.latitude);
           const lon = num(r.longitude);
-          if (!ts || lat === null || lon === null) { noFix++; continue; }
+          if (lat === null || lon === null) { noFix++; continue; }
           const odoM = num(r.odometer);
           out.push({
             externalId: String(r.vehicle_id ?? ''),
@@ -115,10 +126,27 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
             gpsFixType: num(r.gps_fix_type),
           });
         }
-        if (page >= (body.meta?.last_page ?? 1)) break;
+        const lastPage = body.meta?.last_page ?? 1;
+        if (page >= lastPage) break;
+        if (page === MAX_PAGES) {
+          throw new Error(
+            `Cartrack events: pagination exceeded MAX_PAGES=${MAX_PAGES} ` +
+              `(fetched through page ${page} of ${lastPage}; shrink the window)`
+          );
+        }
       }
       if (noFix > 0) {
-        log.warn('[cartrack-provider] events skipped for missing fix or timestamp', { noFix });
+        log.warn('[cartrack-provider] events skipped for missing GPS fix', {
+          noFix,
+          totalEvents,
+        });
+      }
+      if (unparseableTs > 0) {
+        log.error('[cartrack-provider] events skipped for unparseable timestamp', {
+          unparseableTs,
+          totalEvents,
+          exampleEventTs: unparseableTsExample,
+        });
       }
       return out;
     },

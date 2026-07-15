@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cartrackProvider } from '../provider';
+import { log } from '@/lib/logger';
 
 const REAL_EVENT = {
   event_id: 918273645,
@@ -30,6 +31,10 @@ function providerWithEvents(events: unknown[]) {
 }
 
 describe('cartrackProvider.fetchPositions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('normalises a real event, converting odometer metres to km', async () => {
     const out = await providerWithEvents([REAL_EVENT]).fetchPositions(
       new Date('2026-07-15T08:00:00Z'), new Date('2026-07-15T09:00:00Z'),
@@ -66,5 +71,46 @@ describe('cartrackProvider.fetchPositions', () => {
     expect(out[0].speedKph).toBeNull();
     expect(out[0].lateralG).toBeNull();
     expect(out[0].odometerKm).toBeNull();
+  });
+
+  it('throws when meta.last_page exceeds MAX_PAGES instead of silently truncating', async () => {
+    const fetchImpl = async () =>
+      new Response(
+        JSON.stringify({ data: [REAL_EVENT], meta: { last_page: 999 } }),
+        { status: 200 }
+      );
+    const provider = cartrackProvider({
+      baseUrl: 'https://example.test/rest',
+      username: 'u', password: 'p', accountRef: 'acct',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    await expect(
+      provider.fetchPositions(new Date('2026-07-15T08:00:00Z'), new Date('2026-07-15T09:00:00Z'))
+    ).rejects.toThrow(/MAX_PAGES=20/);
+  });
+
+  it('drops an unparseable timestamp row, keeps good rows, and logs at error level with the raw value', async () => {
+    const bad = { ...REAL_EVENT, event_id: 1, event_ts: 'not-a-timestamp' };
+    const good = { ...REAL_EVENT, event_id: 2 };
+    const out = await providerWithEvents([bad, good]).fetchPositions(new Date(), new Date());
+
+    expect(out).toHaveLength(1);
+    expect(out[0].providerEventId).toBe('2');
+    expect(vi.mocked(log.error)).toHaveBeenCalledWith(
+      expect.stringContaining('unparseable timestamp'),
+      expect.objectContaining({ unparseableTs: 1, exampleEventTs: 'not-a-timestamp' })
+    );
+    expect(vi.mocked(log.warn)).not.toHaveBeenCalled();
+  });
+
+  it('logs a null-lat/lon row at warn, not error', async () => {
+    const noFix = { ...REAL_EVENT, latitude: null, longitude: null };
+    await providerWithEvents([noFix]).fetchPositions(new Date(), new Date());
+
+    expect(vi.mocked(log.warn)).toHaveBeenCalledWith(
+      expect.stringContaining('missing GPS fix'),
+      expect.objectContaining({ noFix: 1 })
+    );
+    expect(vi.mocked(log.error)).not.toHaveBeenCalled();
   });
 });
