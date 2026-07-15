@@ -16,7 +16,9 @@
  * again: the poller never starts. These tests pin the clamp that prevents it.
  */
 import { describe, it, expect } from 'vitest';
-import { maxWindowMsFor, clampWindowStart, resolveWindow, COLD_START_MS } from '../windowBudget';
+import {
+  maxWindowMsFor, clampWindowStart, resolveWindow, COLD_START_MS, MIN_WINDOW_MS,
+} from '../windowBudget';
 import { CARTRACK_MAX_EVENTS_PER_FETCH } from '../cartrack/provider';
 
 /**
@@ -79,6 +81,27 @@ describe('maxWindowMsFor', () => {
     const w = maxWindowMsFor(budget, trackers);
     expect(Number.isFinite(w)).toBe(true);
     expect(w).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['NaN', NaN],
+    ['zero', 0],
+    ['negative', -1],
+  ])('falls back to the NARROWEST window when the budget is unknown (%s)', (_label, budget) => {
+    // Direction matters, and the finite-and-positive assertion above passes
+    // either way. A provider that has not stated its budget has told us nothing
+    // about what it will serve: handing it the full cold start would reproduce
+    // the throw-forever failure this module exists to prevent, silently and for
+    // that provider alone. Guessing small costs history; guessing large costs
+    // the integration.
+    expect(maxWindowMsFor(budget, 10)).toBe(MIN_WINDOW_MS);
+  });
+
+  it('still backfills a cold start when no trackers are active despite a valid budget', () => {
+    // The counterpart: zero trackers is a domain fact (nothing reporting, so no
+    // window costs anything), not an unknown — so it must NOT collapse to the
+    // narrow fallback, or a fleet mapped later loses its backfill.
+    expect(maxWindowMsFor(20_000, 0)).toBe(COLD_START_MS);
   });
 });
 

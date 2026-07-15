@@ -56,11 +56,18 @@ export const MIN_WINDOW_MS = 5 * 60 * 1000;
  * budget, given how many vehicles are currently feeding it.
  */
 export function maxWindowMsFor(maxEventsPerFetch: number, activeTrackers: number): number {
-  // A provider that cannot state its budget gets the default window rather
-  // than a NaN one: Math.max(NaN, x) is NaN, which would sail through the
-  // clamp as an Invalid Date and reach fetchPositions as a corrupt request.
-  if (!Number.isFinite(maxEventsPerFetch) || maxEventsPerFetch <= 0) return COLD_START_MS;
-  // No trackers means no events to page through, so nothing to clamp against.
+  // Unknown budget → the NARROWEST window, not the widest. A provider whose
+  // maxEventsPerFetch is unset, zero or NaN has told us nothing about what it
+  // will serve, and handing it the full cold start would reintroduce exactly
+  // the throw-forever failure this module exists to prevent — silently, for
+  // that provider only. Guessing small merely costs history; guessing large
+  // costs the whole integration. (Also stops NaN reaching Math.max, which
+  // returns NaN and would sail through the clamp as an Invalid Date.)
+  if (!Number.isFinite(maxEventsPerFetch) || maxEventsPerFetch <= 0) return MIN_WINDOW_MS;
+  // Zero trackers is different in kind: not an unknown, but the domain fact
+  // that nothing is reporting, so no window width can cost anything. The
+  // default backfill is right here, and it means a fleet mapped later still
+  // gets its cold start.
   if (!Number.isFinite(activeTrackers) || activeTrackers <= 0) return COLD_START_MS;
   const hours =
     (maxEventsPerFetch * BUDGET_UTILISATION) / (EVENTS_PER_HOUR_PER_VEHICLE * activeTrackers);
