@@ -36,7 +36,7 @@ export async function loadCandidateEntries(
       e.clock_in_lon::text,
       e.clock_out_lat::text,
       e.clock_out_lon::text,
-      fv.cartrack_vehicle_id,
+      ct.external_id AS cartrack_vehicle_id,
       EXISTS (
         SELECT 1 FROM attendance_gps_verifications v
         WHERE v.entry_id = e.id AND v.check_type = 'in'
@@ -48,6 +48,8 @@ export async function loadCandidateEntries(
     FROM attendance_entries e
     JOIN vehicle_assignments va ON va.id = e.vehicle_assignment_id
     JOIN fleet_vehicles fv ON fv.id = va.fleet_vehicle_id
+    LEFT JOIN fleet_vehicle_trackers ct
+      ON ct.vehicle_id = fv.id AND ct.is_active AND ct.provider = 'cartrack'
     WHERE e.status IN ('closed', 'auto_closed', 'manual')
       AND e.vehicle_assignment_id IS NOT NULL
       AND e.work_date >= ${fromDate}::date
@@ -61,7 +63,7 @@ export async function loadCandidateEntries(
  *   match              — device within threshold of vehicle at clock time
  *   mismatch           — device > threshold (raises supervisor exception)
  *   no_data            — Cartrack returned no samples in window
- *   vehicle_not_mapped — admin-level: fleet_vehicle has no cartrack_vehicle_id
+ *   vehicle_not_mapped — admin-level: fleet_vehicle has no active fleet_vehicle_trackers row
  *   device_gps_off     — driver-level: clock_in/out lat+lon were null or
  *                        non-finite, so corroboration is impossible
  *                        regardless of what Cartrack did. Distinct from

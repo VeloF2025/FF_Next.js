@@ -10,7 +10,7 @@
  *     access. Production callers go through `cartrackClientFromEnv()`.
  *   - Every non-2xx except 404 throws — the reconcile job treats 404 as
  *     "vehicle not mapped" (an expected steady-state outcome for a
- *     fleet_vehicles row with a stale cartrack_vehicle_id), and anything
+ *     fleet_vehicle_trackers row with a stale external_id), and anything
  *     else is a transient problem to surface loud so ops can retry.
  *   - Nearest-sample picker is pure: tests can feed in a hand-rolled
  *     sample array without hitting fetch.

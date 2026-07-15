@@ -38,6 +38,13 @@ vi.mock('@/services/tracking/cartrack/client', () => ({
 
 import handler from '../../../../../pages/api/staff/attendance-cartrack-mapping';
 
+interface FleetVehicleRow {
+  id: string;
+  registration: string | null;
+  description: string | null;
+  cartrack_vehicle_id: string | null;
+}
+
 function makeReq(
   opts: {
     method?: string;
@@ -155,18 +162,21 @@ describe('POST /api/staff/attendance-cartrack-mapping', () => {
   });
 
   it('404 when fleet vehicle does not exist', async () => {
-    mocks.sql.mockResolvedValueOnce([]); // UPDATE RETURNING produces no rows
+    mocks.sql.mockResolvedValueOnce([]); // existence-check SELECT produces no rows
     const { res, captured } = makeRes();
     await handler(
       makeReq({ method: 'POST', body: { fleet_vehicle_id: 'ghost', cartrack_vehicle_id: 'ct-1' } }),
       res
     );
     expect(captured.statusCode).toBe(404);
+    // Must NOT have reached setVehicleTracker's writes.
+    expect(mocks.sql).toHaveBeenCalledTimes(1);
   });
 
   it('happy path — sets cartrack_vehicle_id and returns updated row', async () => {
+    // Call 1: existence check. Calls 2+3: setVehicleTracker's deactivate + insert.
     mocks.sql.mockResolvedValueOnce([
-      { id: 'fv-1', registration: 'CA12345', description: null, cartrack_vehicle_id: 'ct-1' },
+      { id: 'fv-1', registration: 'CA12345', description: null },
     ]);
     const { res, captured } = makeRes();
     await handler(
@@ -174,14 +184,23 @@ describe('POST /api/staff/attendance-cartrack-mapping', () => {
       res
     );
     expect(captured.statusCode).toBe(200);
-    const call = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
-    expect(call.slice(1)).toContain('ct-1');
-    expect(call.slice(1)).toContain('fv-1');
+    const body = captured.body as { data: { vehicle: FleetVehicleRow } };
+    expect(body.data.vehicle).toEqual({
+      id: 'fv-1',
+      registration: 'CA12345',
+      description: null,
+      cartrack_vehicle_id: 'ct-1',
+    });
+    // Existence check + setVehicleTracker's deactivate + insert.
+    expect(mocks.sql).toHaveBeenCalledTimes(3);
+    const insertCall = mocks.sql.mock.calls[2] as [readonly string[], ...unknown[]];
+    expect(insertCall.slice(1)).toContain('ct-1');
+    expect(insertCall.slice(1)).toContain('fv-1');
   });
 
   it('can clear the mapping with cartrack_vehicle_id=null', async () => {
     mocks.sql.mockResolvedValueOnce([
-      { id: 'fv-1', registration: 'CA12345', description: null, cartrack_vehicle_id: null },
+      { id: 'fv-1', registration: 'CA12345', description: null },
     ]);
     const { res, captured } = makeRes();
     await handler(
@@ -189,8 +208,10 @@ describe('POST /api/staff/attendance-cartrack-mapping', () => {
       res
     );
     expect(captured.statusCode).toBe(200);
-    const call = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
-    expect(call.slice(1)).toContain(null);
+    const body = captured.body as { data: { vehicle: FleetVehicleRow } };
+    expect(body.data.vehicle.cartrack_vehicle_id).toBeNull();
+    // Existence check + setVehicleTracker's deactivate only (externalId=null skips the insert).
+    expect(mocks.sql).toHaveBeenCalledTimes(2);
   });
 
   it.each<[string, unknown]>([
@@ -200,15 +221,15 @@ describe('POST /api/staff/attendance-cartrack-mapping', () => {
     ['missing key', undefined],
   ])('POST normalises cartrack_vehicle_id=%s to null', async (_label, input) => {
     mocks.sql.mockResolvedValueOnce([
-      { id: 'fv-1', registration: 'CA12345', description: null, cartrack_vehicle_id: null },
+      { id: 'fv-1', registration: 'CA12345', description: null },
     ]);
     const { res, captured } = makeRes();
     const body: Record<string, unknown> = { fleet_vehicle_id: 'fv-1' };
     if (input !== undefined) body.cartrack_vehicle_id = input;
     await handler(makeReq({ method: 'POST', body }), res);
     expect(captured.statusCode).toBe(200);
-    const call = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
-    expect(call.slice(1)).toContain(null);
+    const respBody = captured.body as { data: { vehicle: FleetVehicleRow } };
+    expect(respBody.data.vehicle.cartrack_vehicle_id).toBeNull();
   });
 
   it('rejects a cartrack_vehicle_id that is not in the Cartrack fleet (400)', async () => {
