@@ -144,4 +144,43 @@ describe('GET /api/fleet/positions/live', () => {
 
     expect(vehicle.ageSeconds).toBe(90);
   });
+
+  it('returns a JSON error response when the query throws', async () => {
+    const error = new Error('Connection pool exhausted');
+    sqlMock.mockRejectedValue(error);
+
+    const res = await run();
+    expect(res._getStatusCode()).toBe(500);
+
+    const body = res._getJSONData();
+    expect(body.success).toBe(false);
+    expect(body.error).toBeDefined();
+    expect(body.error.code).toBe('DATABASE_ERROR');
+    expect(body.error.message).toBe('A database error occurred');
+  });
+
+  it('a vehicle with no active tracker but leftover position rows returns "untracked" with the leftover position', async () => {
+    const leftoverRecordedAt = new Date(NOW.getTime() - 30 * 60 * 1000); // 30 min ago
+    sqlMock.mockResolvedValue([
+      makeRow({
+        vehicle_id: 'veh-deactivated',
+        has_tracker: false,
+        recorded_at: leftoverRecordedAt,
+        lat: '-25.7479000',
+        lon: '28.2293000',
+        speed_kph: '30.00',
+      }),
+    ]);
+
+    const res = await run();
+    const vehicle = res._getJSONData().data.vehicles[0];
+
+    expect(vehicle.vehicleId).toBe('veh-deactivated');
+    expect(vehicle.trackingState).toBe('untracked');
+    expect(vehicle.lat).toBe(-25.7479);
+    expect(vehicle.lon).toBe(28.2293);
+    expect(vehicle.speedKph).toBe(30);
+    expect(vehicle.recordedAt).toBe(leftoverRecordedAt.toISOString());
+    expect(vehicle.ageSeconds).toBe(1800); // 30 min in seconds
+  });
 });

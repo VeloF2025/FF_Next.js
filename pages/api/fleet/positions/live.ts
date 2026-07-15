@@ -11,6 +11,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 
 /** A fix older than this is not "live" and must not be drawn as if it were. */
@@ -51,54 +52,59 @@ export interface LiveVehicle {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
-  const rows = await sql<Row>`
-    SELECT
-      v.id AS vehicle_id,
-      v.registration,
-      NULLIF(TRIM(CONCAT(s.first_name, ' ', s.last_name)), '') AS driver_name,
-      p.provider,
-      p.lat::text, p.lon::text, p.speed_kph::text,
-      p.ignition, p.is_speeding, p.recorded_at,
-      (t.id IS NOT NULL) AS has_tracker
-    FROM fleet_vehicles v
-    LEFT JOIN staff s ON s.id = v.assigned_driver_id
-    LEFT JOIN fleet_vehicle_trackers t ON t.vehicle_id = v.id AND t.is_active
-    LEFT JOIN LATERAL (
-      SELECT DISTINCT ON (fp.vehicle_id)
-             fp.provider, fp.lat, fp.lon, fp.speed_kph, fp.ignition, fp.is_speeding, fp.recorded_at
-      FROM fleet_vehicle_positions fp
-      WHERE fp.vehicle_id = v.id
-      ORDER BY fp.vehicle_id, fp.recorded_at DESC
-    ) p ON true
-    WHERE v.status = 'active'
-    ORDER BY v.registration
-  `;
+  try {
+    const rows = await sql<Row>`
+      SELECT
+        v.id AS vehicle_id,
+        v.registration,
+        NULLIF(TRIM(CONCAT(s.first_name, ' ', s.last_name)), '') AS driver_name,
+        p.provider,
+        p.lat::text, p.lon::text, p.speed_kph::text,
+        p.ignition, p.is_speeding, p.recorded_at,
+        (t.id IS NOT NULL) AS has_tracker
+      FROM fleet_vehicles v
+      LEFT JOIN staff s ON s.id = v.assigned_driver_id
+      LEFT JOIN fleet_vehicle_trackers t ON t.vehicle_id = v.id AND t.is_active
+      LEFT JOIN LATERAL (
+        SELECT DISTINCT ON (fp.vehicle_id)
+               fp.provider, fp.lat, fp.lon, fp.speed_kph, fp.ignition, fp.is_speeding, fp.recorded_at
+        FROM fleet_vehicle_positions fp
+        WHERE fp.vehicle_id = v.id
+        ORDER BY fp.vehicle_id, fp.recorded_at DESC
+      ) p ON true
+      WHERE v.status = 'active'
+      ORDER BY v.registration
+    `;
 
-  const now = Date.now();
-  const vehicles: LiveVehicle[] = rows.map((r) => {
-    const recordedAt = r.recorded_at ? new Date(r.recorded_at) : null;
-    const ageSeconds = recordedAt ? Math.round((now - recordedAt.getTime()) / 1000) : null;
-    const trackingState: TrackingState = !r.has_tracker
-      ? 'untracked'
-      : recordedAt === null
-        ? 'awaiting_data'
-        : 'tracked';
-    return {
-      vehicleId: r.vehicle_id,
-      registration: r.registration,
-      driverName: r.driver_name,
-      provider: r.provider,
-      lat: r.lat === null ? null : Number(r.lat),
-      lon: r.lon === null ? null : Number(r.lon),
-      speedKph: r.speed_kph === null ? null : Number(r.speed_kph),
-      ignition: r.ignition,
-      isSpeeding: r.is_speeding,
-      recordedAt: recordedAt?.toISOString() ?? null,
-      ageSeconds,
-      isStale: ageSeconds !== null && ageSeconds > STALE_AFTER_SECONDS,
-      trackingState,
-    };
-  });
+    const now = Date.now();
+    const vehicles: LiveVehicle[] = rows.map((r) => {
+      const recordedAt = r.recorded_at ? new Date(r.recorded_at) : null;
+      const ageSeconds = recordedAt ? Math.round((now - recordedAt.getTime()) / 1000) : null;
+      const trackingState: TrackingState = !r.has_tracker
+        ? 'untracked'
+        : recordedAt === null
+          ? 'awaiting_data'
+          : 'tracked';
+      return {
+        vehicleId: r.vehicle_id,
+        registration: r.registration,
+        driverName: r.driver_name,
+        provider: r.provider,
+        lat: r.lat === null ? null : Number(r.lat),
+        lon: r.lon === null ? null : Number(r.lon),
+        speedKph: r.speed_kph === null ? null : Number(r.speed_kph),
+        ignition: r.ignition,
+        isSpeeding: r.is_speeding,
+        recordedAt: recordedAt?.toISOString() ?? null,
+        ageSeconds,
+        isStale: ageSeconds !== null && ageSeconds > STALE_AFTER_SECONDS,
+        trackingState,
+      };
+    });
 
-  return apiResponse.success(res, { vehicles, staleAfterSeconds: STALE_AFTER_SECONDS });
+    return apiResponse.success(res, { vehicles, staleAfterSeconds: STALE_AFTER_SECONDS });
+  } catch (error) {
+    log.error('[fleet/positions/live] query failed', { error });
+    return apiResponse.databaseError(res, error);
+  }
 }
