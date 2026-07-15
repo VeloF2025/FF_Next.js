@@ -180,7 +180,7 @@ describe('POST /api/staff/attendance-cartrack-mapping', () => {
     );
     expect(captured.statusCode).toBe(404);
     // Must NOT have reached setVehicleTracker's writes.
-    expect(mocks.sql).toHaveBeenCalledTimes(1);
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it('happy path — sets cartrack_vehicle_id and returns updated row', async () => {

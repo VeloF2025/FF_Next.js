@@ -47,6 +47,8 @@ describe('setVehicleTracker', () => {
     expect(calls[0].text).toMatch(/UPDATE fleet_vehicle_trackers[\s\S]*is_active = false/i);
     expect(calls[0].text).toMatch(/updated_at = now\(\)/i);
     expect(calls[1].text).toMatch(/INSERT INTO fleet_vehicle_trackers/i);
+    expect(calls[1].text).toMatch(/ON CONFLICT \(provider, account_ref, external_id\)/i);
+    expect(calls[1].text).toMatch(/updated_at = now\(\)/i);
   });
 
   it('only deactivates when externalId is null (unmapping)', async () => {
