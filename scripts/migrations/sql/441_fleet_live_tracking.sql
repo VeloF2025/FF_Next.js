@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_positions (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   vehicle_id        UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
   tracker_id        UUID REFERENCES fleet_vehicle_trackers(id) ON DELETE SET NULL,
-  provider          VARCHAR(20) NOT NULL,
+  provider          VARCHAR(20) NOT NULL CHECK (provider IN ('cartrack','netstar','ituran')),
   provider_event_id VARCHAR(64),
   recorded_at       TIMESTAMPTZ NOT NULL,
   received_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
