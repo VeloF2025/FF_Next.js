@@ -51,10 +51,13 @@ export type Site = (typeof ACTIVE_SITES)[number];
 // Retry tuning. Fibertime sometimes publishes the per-site OES files a few
 // minutes AFTER our cron fires (files land ~22:35–22:41 SAST — the 2026-07-14
 // timing race). Re-check any site still `not_available` a couple of times before
-// giving up, so a late upload imports within the same run. Kept under the cron's
-// `curl -m 300` budget: 2 passes × 90s ≈ 3 min.
+// giving up, so a late upload imports within the same run. A hard wall-clock
+// budget keeps the whole run under the cron's `curl -m 300`: retries stop early
+// rather than sleep past DEFAULT_MAX_TOTAL_MS (2 passes × 90s ≈ 3 min of waiting,
+// leaving headroom for the actual SharePoint fetch + import work).
 const DEFAULT_MAX_RETRY_PASSES = 2;
 const DEFAULT_RETRY_DELAY_MS = 90_000;
+const DEFAULT_MAX_TOTAL_MS = 240_000;
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -97,6 +100,8 @@ export interface RunOesSyncOptions {
   maxRetryPasses?: number;
   /** Delay between retry passes in ms. Default 90_000; pass 0 in tests. */
   retryDelayMs?: number;
+  /** Hard wall-clock budget in ms; retries stop rather than sleep past it. Default 240_000. */
+  maxTotalMs?: number;
   /**
    * Per-site sync fn — injectable so the retry/detection orchestration can be
    * unit-tested without the SharePoint/DB stack. Defaults to the real syncSite.
@@ -346,6 +351,7 @@ export async function runOesSync(
 
   const maxRetryPasses = options.maxRetryPasses ?? DEFAULT_MAX_RETRY_PASSES;
   const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  const maxTotalMs = options.maxTotalMs ?? DEFAULT_MAX_TOTAL_MS;
   const syncOne = options.syncOne ?? syncSite;
 
   logger.info('Starting Fibertime OES sync', { date: reportDate, sites: ACTIVE_SITES });
@@ -364,6 +370,21 @@ export async function runOesSync(
   for (let pass = 1; pass <= maxRetryPasses; pass++) {
     const pending = ACTIVE_SITES.filter(s => resultBySite.get(s)?.status === 'not_available');
     if (pending.length === 0) break;
+
+    // Deadline guard: never sleep past the run budget (the cron wraps this in
+    // `curl -m 300`). Stopping early keeps the report + completion/detection logs;
+    // getting killed mid-run would lose them — the silent failure we're fixing.
+    const elapsedMs = Date.now() - startMs;
+    if (retryDelayMs > 0 && elapsedMs + retryDelayMs > maxTotalMs) {
+      logger.warn('OES sync: retry budget exhausted — stopping re-checks early', {
+        pass,
+        pending,
+        elapsedMs,
+        maxTotalMs,
+      });
+      break;
+    }
+
     retryPasses = pass;
     logger.info('OES sync: sites still not_available — waiting to re-check (late upload?)', {
       pass,
@@ -371,8 +392,24 @@ export async function runOesSync(
       retryDelayMs,
     });
     if (retryDelayMs > 0) await delay(retryDelayMs);
-    for (const r of await syncSitesOnce(pending, reportDate, syncOne)) {
-      resultBySite.set(r.site, r);
+
+    try {
+      for (const r of await syncSitesOnce(pending, reportDate, syncOne)) {
+        resultBySite.set(r.site, r);
+      }
+    } catch (err) {
+      // A session that expires mid-run (only reachable once retries stretch the
+      // wall-clock) must NOT discard the sites that already imported on pass 1:
+      // keep the accumulated results and stop retrying. Pass 1 still hard-aborts
+      // a session that was invalid from the very start (see syncSitesOnce).
+      if (err instanceof FibertimeAuthExpiredError) {
+        logger.warn('OES sync: session expired during retry — keeping earlier results', {
+          pass,
+          pending,
+        });
+        break;
+      }
+      throw err;
     }
   }
 

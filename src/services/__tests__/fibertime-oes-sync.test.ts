@@ -101,6 +101,22 @@ describe('runOesSync — retry self-heal', () => {
     expect(s.calls()['LAW']).toBe(3); // 1 initial + 2 retries
     expect(warn).not.toHaveBeenCalled(); // other sites imported → not a 0-import night
   });
+
+  it('stops retrying without sleeping past the wall-clock budget', async () => {
+    const s = scriptedSyncOne({ LAW: ['not_available'] }, 'imported'); // LAW never arrives
+    // Huge per-pass delay + tiny budget → the deadline guard must skip the retry
+    // (and its sleep) entirely rather than blow the cron's curl -m 300 timeout.
+    const report = await runOesSync(DATE, {
+      syncOne: s.fn,
+      retryDelayMs: 100_000,
+      maxTotalMs: 1,
+      maxRetryPasses: 2,
+    });
+
+    expect(report.summary.retryPasses).toBe(0); // no retry pass ran
+    expect(s.calls()['LAW']).toBe(1); // checked once on pass 1, never re-checked
+    expect(report.sites.find(r => r.site === 'LAW')?.status).toBe('not_available');
+  });
 });
 
 describe('runOesSync — 0-import detection', () => {
@@ -143,5 +159,22 @@ describe('runOesSync — auth-expiry abort rule', () => {
 
     expect(report.sites.find(r => r.site === 'ETW-1')?.status).toBe('error');
     expect(report.summary.imported).toBe(ACTIVE_SITES.length - 1);
+  });
+
+  it('keeps pass-1 results when the session expires during a retry pass', async () => {
+    let lawCalls = 0;
+    const fn = vi.fn(async (site: Site): Promise<SiteResult> => {
+      if (site === 'LAW') {
+        lawCalls += 1;
+        if (lawCalls === 1) return { site, status: 'not_available' };
+        throw new FibertimeAuthExpiredError(); // session dies before LAW's file lands
+      }
+      return { site, status: 'imported' };
+    });
+    // Must NOT throw: the 6 pass-1 imports survive; LAW keeps its pass-1 status.
+    const report = await runOesSync(DATE, { syncOne: fn, retryDelayMs: 0, maxRetryPasses: 2 });
+
+    expect(report.summary.imported).toBe(ACTIVE_SITES.length - 1);
+    expect(report.sites.find(r => r.site === 'LAW')?.status).toBe('not_available');
   });
 });
