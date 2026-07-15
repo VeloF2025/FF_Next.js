@@ -188,14 +188,19 @@ describe('GET/POST /api/cron/poll-tracking', () => {
     expect(to.getTime() - from.getTime()).toBeCloseTo(6 * 60 * 60 * 1000, -3);
   });
 
-  it('warm start re-polls from the watermark minus a 2-minute overlap', async () => {
+  it('warm start re-polls from the watermark minus a 30-minute overlap', async () => {
+    // The overlap is what catches a vehicle that buffered fixes while out of
+    // GSM coverage: its events arrive late stamped with an old event_ts, and
+    // the watermark has already moved on past them. Anything older than this
+    // window when it lands is never fetched again, so shrinking this value
+    // silently drops those fixes — pin it.
     const lastEventTs = '2026-07-15T07:00:00.000Z';
     stubSql({ watermarkRow: { last_event_ts: lastEventTs } });
     const fetchPositions = vi.fn().mockResolvedValue([]);
     cartrackProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions }));
     await run(AUTH);
     const [from] = fetchPositions.mock.calls[0] as [Date, Date];
-    expect(from.getTime()).toBe(new Date(lastEventTs).getTime() - 2 * 60 * 1000);
+    expect(from.getTime()).toBe(new Date(lastEventTs).getTime() - 30 * 60 * 1000);
   });
 
   it('threads provider.key AND provider.accountRef through to ingestPositions — not external_id-only lookup', async () => {

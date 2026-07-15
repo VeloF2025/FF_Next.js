@@ -17,8 +17,25 @@ import { cartrackProvider } from '@/services/tracking/cartrack/provider';
 import { ingestPositions } from '@/services/tracking/ingest';
 import type { ProviderKey, TrackingProvider } from '@/services/tracking/types';
 
-/** Re-poll slightly before the watermark; dedup absorbs the overlap. */
-const OVERLAP_MS = 2 * 60 * 1000;
+/**
+ * Re-poll this far back before the watermark; dedup absorbs the overlap.
+ *
+ * Sized for buffering, not for clock skew. The watermark is one scalar per
+ * account (max event_ts), but a vehicle that loses GSM coverage keeps
+ * recording and uploads those fixes late, stamped with the event time they
+ * happened at. Meanwhile the other vehicles hold the watermark near now — so
+ * anything older than this overlap when it lands is never fetched again, and
+ * Cartrack's 24h cap makes it unrecoverable the next day. 30 minutes covers
+ * an ordinary dropout (parking basement, rural stretch); a longer outage
+ * still loses fixes, which a per-tracker watermark would fix properly.
+ *
+ * Cheap to widen: ingest dedups on ON CONFLICT DO NOTHING, so replaying a
+ * window costs bandwidth, not correctness. At ~22 vehicles this is roughly
+ * 660 events per tick against a 5000-event pagination cap that throws rather
+ * than truncating — so a fleet large enough to outgrow this window fails
+ * loudly instead of silently dropping the tail.
+ */
+const OVERLAP_MS = 30 * 60 * 1000;
 /** First run with no watermark: how far back to backfill. */
 const COLD_START_MS = 6 * 60 * 60 * 1000;
 /** Advisory lock key so a slow run is not re-entered by the next tick. */
