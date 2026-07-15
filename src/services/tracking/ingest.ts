@@ -60,6 +60,13 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
+/**
+ * Builds an INSERT query with an explicitly-named conflict target.
+ * Names the ON CONFLICT target to make the watermark's dedup assumption self-defending:
+ * maxIngestedAt depends on dropped rows being dropped by THIS constraint, so only
+ * the dedup index may swallow a row. A future unrelated unique constraint will error
+ * loudly instead of silently advancing the watermark past data that was never stored.
+ */
 function buildInsertQuery(rows: InsertRow[]): { text: string; params: unknown[] } {
   const params: unknown[] = [];
   const tuples = rows.map((row) => {
@@ -72,7 +79,7 @@ function buildInsertQuery(rows: InsertRow[]): { text: string; params: unknown[] 
   const text = `
     INSERT INTO fleet_vehicle_positions (${COLUMNS.join(', ')})
     VALUES ${tuples.join(', ')}
-    ON CONFLICT DO NOTHING
+    ON CONFLICT (provider, account_ref, provider_event_id) WHERE provider_event_id IS NOT NULL DO NOTHING
     RETURNING id
   `;
   return { text, params };
