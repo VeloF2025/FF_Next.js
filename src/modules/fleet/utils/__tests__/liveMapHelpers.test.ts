@@ -6,7 +6,7 @@
  * "how old is this fix" label, and which vehicles are safe to plot at all.
  */
 import { describe, expect, it } from 'vitest';
-import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
+import type { LiveVehicle, TrackingState } from '@/pages/api/fleet/positions/live';
 import { ageLabel, colourFor, notPlottedReason, partitionVehicles } from '../liveMapHelpers';
 
 function vehicle(overrides: Partial<LiveVehicle> = {}): LiveVehicle {
@@ -131,7 +131,10 @@ describe('notPlottedReason', () => {
   });
 
   it('returns "no position data" for unknown tracking state', () => {
-    const v = vehicle({ trackingState: 'unknown_state' as any });
+    // Deliberately force a state outside the union: this pins the fallback
+    // branch against a future TrackingState gaining a member that nobody
+    // teaches this function about. Cast through `unknown`, not `any`.
+    const v = vehicle({ trackingState: 'unknown_state' as unknown as TrackingState });
     expect(notPlottedReason(v)).toBe('no position data');
   });
 });
