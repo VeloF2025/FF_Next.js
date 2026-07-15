@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
-import { ageLabel, colourFor, partitionVehicles } from '../liveMapHelpers';
+import { ageLabel, colourFor, notPlottedReason, partitionVehicles } from '../liveMapHelpers';
 
 function vehicle(overrides: Partial<LiveVehicle> = {}): LiveVehicle {
   return {
@@ -111,5 +111,27 @@ describe('partitionVehicles', () => {
     const { plotted, notPlotted } = partitionVehicles([tracked, awaiting, untracked]);
     expect(plotted.map((v) => v.vehicleId)).toEqual(['v1']);
     expect(notPlotted.map((v) => v.vehicleId)).toEqual(['v2', 'v3']);
+  });
+});
+
+describe('notPlottedReason', () => {
+  it('returns "no tracker" for an untracked vehicle', () => {
+    const v = vehicle({ trackingState: 'untracked' });
+    expect(notPlottedReason(v)).toBe('no tracker');
+  });
+
+  it('returns "awaiting data" for a vehicle awaiting first position', () => {
+    const v = vehicle({ trackingState: 'awaiting_data' });
+    expect(notPlottedReason(v)).toBe('awaiting data');
+  });
+
+  it('returns "no position data" as fallback for any other tracking state', () => {
+    const v = vehicle({ trackingState: 'tracked' });
+    expect(notPlottedReason(v)).toBe('no position data');
+  });
+
+  it('returns "no position data" for unknown tracking state', () => {
+    const v = vehicle({ trackingState: 'unknown_state' as any });
+    expect(notPlottedReason(v)).toBe('no position data');
   });
 });
