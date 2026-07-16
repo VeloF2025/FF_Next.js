@@ -39,20 +39,41 @@ fi
 # start of every prestart so they don't accumulate on disk.
 su - velo -c "find '$APP_DIR' -maxdepth 1 -name 'node_modules.prestart-bak.*' -mtime +0 -exec rm -rf {} + 2>/dev/null || true" 2>/dev/null || true
 
-# --- Guard 1: ensure node_modules/.bin/next is usable -------------------------
+# --- Guard 1: ensure node_modules is COMPLETE, not merely present -------------
 # Historical context: previous recovery did `rm -rf node_modules && npm ci`,
 # but if npm ci failed (OOM, network blip, parallel deploy contention) the dir
 # stayed empty and the service started serving 500s on every cookie-touching
 # request because next/dist/compiled/cookie was missing. The `|| true` on the
 # npm ci call swallowed the failure silently.
 #
+# `.bin/next` alone is a single-binary probe, and a half-installed tree passes
+# it: on 2026-07-15 dev started with `next` present but `cookie` absent, so
+# /api/auth/login died at module load and served an HTML 500 to users for 45
+# minutes (#2176). Ask npm what it actually resolves instead.
+#
+# `npm ls --omit=dev --depth=0` exits non-zero iff a top-level dep is missing or
+# invalid; an `extraneous` package still exits 0 (measured on the live trees).
+# These trees are only ever built by `npm ci`, so a non-zero exit means a real
+# gap. ~0.3s. Test the exit code via `if`, NOT `npm ls | grep`: under
+# `set -o pipefail` a pipeline takes npm ls's non-zero exit and masks a grep
+# match, so the check would fail OPEN — report a broken tree as healthy, the
+# exact failure this guards against (caught in blind review of the first cut).
+#
 # Atomic recovery: mv the broken node_modules aside, run npm ci into a fresh
 # dir, swap on success. On failure, restore the backup so the service still
 # has whatever node_modules it had before — we don't make it worse. If
 # nothing works, exit non-zero so systemd doesn't start the service into a
 # 500-storm.
-if ! su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null; then
-    log "WARNING: node_modules/.bin/next not accessible — atomic npm ci recovery..."
+node_modules_incomplete() {
+    su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null || return 0
+    if su - velo -c "cd '$APP_DIR' && npm ls --omit=dev --depth=0 >/dev/null 2>&1" 2>/dev/null; then
+        return 1  # all top-level deps resolve → complete
+    fi
+    return 0  # missing/invalid dep → incomplete
+}
+
+if node_modules_incomplete; then
+    log "WARNING: node_modules incomplete (.bin/next missing, or a top-level dep unresolved) — atomic npm ci recovery..."
     BACKUP_PATH=""
     if su - velo -c "test -e '$APP_DIR/node_modules'" 2>/dev/null; then
         BACKUP_PATH="$APP_DIR/node_modules.prestart-bak.$$"
@@ -63,8 +84,8 @@ if ! su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null; then
     NPM_CI_RC=0
     su - velo -c "cd $APP_DIR && npm ci --legacy-peer-deps" >> "$LOG_FILE" 2>&1 || NPM_CI_RC=$?
 
-    if [ "$NPM_CI_RC" -eq 0 ] && su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null; then
-        log "node_modules restored OK via npm ci."
+    if [ "$NPM_CI_RC" -eq 0 ] && ! node_modules_incomplete; then
+        log "node_modules restored OK via npm ci (all top-level deps resolve)."
         if [ -n "$BACKUP_PATH" ] && [ -d "$BACKUP_PATH" ]; then
             # Close fd 9 (flock) in the subshell so a slow rm doesn't extend the lock
             ( 9>&-; su - velo -c "rm -rf '$BACKUP_PATH'" ) &
