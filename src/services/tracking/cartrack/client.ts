@@ -246,7 +246,7 @@ class HttpCartrackClient implements CartrackClient {
   ): Promise<{ data: T[]; pages: number }> {
     const all: T[] = [];
     let page = 1;
-    while (true) {
+    for (;;) {
       let res: Response;
       try {
         res = await this.doFetch(buildUrl(page));
