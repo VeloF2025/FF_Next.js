@@ -72,6 +72,15 @@ describe('resolveUnifiedRecord — resetReviewCycleForResubmission wiring', () =
     expect(res.submissionCount).toBe(1);
   });
 
+  it('does NOT treat a reprocess (no WA context) of a record that ALREADY has WA history as a resubmission', async () => {
+    // A categorisation retry of a real WA drop must not bump submission_count or reset the review cycle.
+    const res = await resolveWithUnified({ created_at: OLD, submission_count: 2, wa_message_id: 'wa1', wa_received_at: OLD, submission_history: [] }, {});
+    expect(mockReset).not.toHaveBeenCalled();
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(res.isResubmission).toBe(false);
+    expect(res.submissionCount).toBe(2);
+  });
+
   it('resets on a genuine resubmission (record already carries WA context)', async () => {
     const res = await resolveWithUnified({ created_at: OLD, submission_count: 2, wa_message_id: 'wa1', wa_received_at: OLD, submission_history: [] }, WA_CONTEXT);
     expect(mockReset).toHaveBeenCalledWith('DR1863256');

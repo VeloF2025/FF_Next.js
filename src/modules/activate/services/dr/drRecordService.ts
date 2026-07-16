@@ -207,6 +207,28 @@ async function handleExistingUnified(p: {
   const { dropNumber, submittedDateStr, project, expectedProject, senderPhone, wa, contact, record } = p;
   const ageSeconds = (Date.now() - new Date(record.created_at).getTime()) / 1000;
 
+  // Internal reprocess guard — MUST stay first, ahead of every submission branch.
+  //
+  // process-new-dr is re-invoked WITHOUT any WhatsApp context by the internal
+  // reprocess callers — retry-categorizations, refetch-missing-photos and
+  // admin/retry-failed — purely to re-fetch photos + re-run VLM categorisation.
+  // A call carrying no WhatsApp message id is not a submission event, so it must
+  // never touch submission metadata. Every branch below otherwise treats the
+  // call as a submission: it defaults a missing submitted_date to today, flips
+  // is_oes_only=FALSE and/or resets the review cycle — which silently re-dates
+  // historic OES-only activations into the current day's "Installed (From
+  // WhatsApp)" count and wipes review state. A genuine WhatsApp submission
+  // (first-time, <60s duplicate, or resubmission) always carries wa.waMessageId;
+  // the photo fetch + categorisation this reprocess call exists for happen
+  // elsewhere in process-new-dr.
+  if (!wa.waMessageId) {
+    log.info(`Reprocess (no WhatsApp context) for ${dropNumber} — preserving submission metadata`, {
+      ageSeconds: ageSeconds.toFixed(1),
+      submissionCount: record.submission_count,
+    });
+    return { isResubmission: false, submissionCount: record.submission_count ?? 1, previousSubmission: null };
+  }
+
   // Idempotency guard: < 60 s → not a real resubmission
   if (ageSeconds < 60) {
     log.info(`Idempotency guard: ${dropNumber} unified record is only ${ageSeconds.toFixed(1)}s old`, {
@@ -219,25 +241,8 @@ async function handleExistingUnified(p: {
   }
 
   // First real WA submission on a pre-existing (OES/ack-created) record.
-  //
-  // Guard on real WhatsApp context (wa.waMessageId). process-new-dr is also
-  // re-invoked WITHOUT any WA context by the internal reprocess callers
-  // (retry-categorizations, refetch-missing-photos, admin/retry-failed) purely
-  // to re-fetch photos + re-run VLM categorisation. Those calls are NOT new
-  // submissions: treating them as such stamps a fabricated submitted_date
-  // (process-new-dr defaults a missing date to today) and flips is_oes_only to
-  // FALSE, which silently re-dates historic OES-only activations into the
-  // current day's "Installed (From WhatsApp)" count. A reprocess must leave all
-  // submission metadata untouched.
-  if (!record.wa_message_id && !record.wa_received_at && !wa.waMessageId) {
-    log.info(`Reprocess of pre-existing non-WA record ${dropNumber} — preserving submission metadata`, {
-      ageSeconds: ageSeconds.toFixed(1),
-      submissionCount: record.submission_count,
-    });
-    return { isResubmission: false, submissionCount: record.submission_count ?? 1, previousSubmission: null };
-  }
-
-  // First real WA submission on a pre-existing (OES/ack-created) record
+  // Reaching here means wa.waMessageId is present (guarded above), so this is a
+  // genuine WhatsApp submission arriving on an OES/ack-created shell record.
   if (!record.wa_message_id && !record.wa_received_at) {
     log.info(`First WA submission for pre-existing record ${dropNumber}`, {
       ageSeconds: ageSeconds.toFixed(1),

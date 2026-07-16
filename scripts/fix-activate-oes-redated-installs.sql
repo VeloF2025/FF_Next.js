@@ -27,6 +27,17 @@
 --   oes_activations, and whose submitted_date was fabricated well after the row
 --   was created (> 7 days). Correct end state: is_oes_only = TRUE (so they count
 --   as Activated, never Installed) and submitted_date = NULL (drop the fake date).
+--
+--   Two deliberate guards keep this from touching GENUINE installs:
+--     * `submitted_date - created_at > 7` — the bug stamps *today* onto months-old
+--       rows, so the gap is large. Rows with a small gap are overwhelmingly
+--       genuine WhatsApp installs synced from qa_photo_reviews (submitted_date ≈
+--       created_at, no wa_message_id populated by that sync path). Measured on
+--       prod: of the small-gap rows 320/413 are in qa_photo_reviews; of the
+--       large-gap bug rows only 4/242 are. Dropping this filter would wrongly
+--       reclassify ~413 real installs as OES-only.
+--     * `NOT IN qa_photo_reviews` — belt-and-braces: never reclassify a drop that
+--       has WhatsApp QA history, even in the large-gap bucket.
 -- ============================================================================
 
 \set ON_ERROR_STOP on
@@ -46,7 +57,8 @@ WHERE (is_oes_only = FALSE OR is_oes_only IS NULL)
   AND whatsapp_submitted_at IS NULL
   AND submitted_date IS NOT NULL
   AND submitted_date - created_at::date > 7
-  AND drop_number IN (SELECT drop_number FROM oes_activations);
+  AND drop_number IN (SELECT drop_number FROM oes_activations)
+  AND drop_number NOT IN (SELECT drop_number FROM qa_photo_reviews);
 
 \echo '=== BEFORE: "Installed" per day for the affected window ==='
 SELECT COALESCE(submitted_date, created_at::date) AS day, COUNT(*) AS installed
@@ -69,7 +81,8 @@ WHERE (is_oes_only = FALSE OR is_oes_only IS NULL)
   AND whatsapp_submitted_at IS NULL
   AND submitted_date IS NOT NULL
   AND submitted_date - created_at::date > 7
-  AND drop_number IN (SELECT drop_number FROM oes_activations);
+  AND drop_number IN (SELECT drop_number FROM oes_activations)
+  AND drop_number NOT IN (SELECT drop_number FROM qa_photo_reviews);
 
 \echo '=== AFTER (in-transaction): "Installed" per day for the affected window ==='
 SELECT COALESCE(submitted_date, created_at::date) AS day, COUNT(*) AS installed
