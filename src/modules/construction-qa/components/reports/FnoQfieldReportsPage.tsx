@@ -38,6 +38,7 @@ export function FnoQfieldReportsPage() {
   const [loading, setLoading] = useState(false);
   const [sourceMode, setSourceMode] = useState<SourceMode>('snapshot');
   const [loadError, setLoadError] = useState<string | null>('Live API not checked yet');
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -66,6 +67,15 @@ export function FnoQfieldReportsPage() {
   const rollups = useMemo(() => buildProjectRollups(data), [data]);
   const trustedSummary = useMemo(() => buildTrustedSummary(rollups), [rollups]);
   const summary = data?.summary;
+
+  const toggleProject = useCallback((projectName: string) => {
+    setExpandedProjects((current) => {
+      const next = new Set(current);
+      if (next.has(projectName)) next.delete(projectName);
+      else next.add(projectName);
+      return next;
+    });
+  }, []);
 
   const exportRows = useCallback(() => {
     if (!data) return;
@@ -143,18 +153,28 @@ export function FnoQfieldReportsPage() {
           </div>
 
           <DataQualityPanel data={data} />
-          <ProjectCards rollups={rollups} />
-          <DetailSections rollups={rollups} />
+          <ProjectCards rollups={rollups} expandedProjects={expandedProjects} onToggleProject={toggleProject} />
+          <DetailSections rollups={rollups} expandedProjects={expandedProjects} />
         </>
       )}
     </div>
   );
 }
 
-function DetailSections({ rollups }: { rollups: ReturnType<typeof buildProjectRollups> }) {
+function DetailSections({ rollups, expandedProjects }: { rollups: ReturnType<typeof buildProjectRollups>; expandedProjects: Set<string> }) {
+  const expandedRollups = rollups.filter((project) => expandedProjects.has(project.projectName));
+
+  if (expandedRollups.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-[var(--ff-border)] bg-[var(--ff-surface)] p-4 text-sm text-[var(--ff-text-secondary)]">
+        Select a project card above to expand its Zone/PON detail. Select it again to collapse.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {rollups.map((project) => (
+      {expandedRollups.map((project) => (
         <div id={`project-${project.projectName}`} key={project.projectName} className="overflow-hidden rounded-lg border border-[var(--ff-border)] bg-[var(--ff-surface)]">
           <div className="border-b border-[var(--ff-border)] px-4 py-3 font-medium text-[var(--ff-text-primary)]">{project.projectName} detail</div>
           <div className="space-y-3 p-3 md:hidden">
