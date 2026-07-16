@@ -21,6 +21,7 @@ const log = createLogger('DrRecordService');
 import type { ContactData, RecordResolutionResult } from './drProcessTypes';
 import { createSubmissionSnapshot, flattenContact } from './drRecordHelpers';
 import { insertFromQARecord, insertNewRecord } from './drRecordInserts';
+import { updateUnifiedRecordNonDestructive } from './drRecordUpdates';
 import { resetReviewCycleForResubmission } from './reviewCycleReset';
 import type { QARow, UnifiedRow, WaContext } from './drRecordInternalTypes';
 
@@ -96,54 +97,6 @@ export async function resolveSenderPhone(
   }
 
   return null;
-}
-
-// ---------------------------------------------------------------------------
-// Non-destructive COALESCE update (idempotency + first-WA paths)
-// ---------------------------------------------------------------------------
-
-export async function updateUnifiedRecordNonDestructive(
-  dropNumber: string,
-  submittedDateStr: string,
-  project: string | null,
-  senderPhone: string | null,
-  wa: WaContext,
-  contact: ContactData
-): Promise<void> {
-  const c = flattenContact(contact);
-  await pool.query(
-    `UPDATE dr_photo_unified_reviews
-     SET
-       submitted_date = COALESCE(submitted_date, $2::DATE),
-       project = COALESCE($3, project),
-       wa_message_id = COALESCE($4, wa_message_id),
-       wa_sender_jid = COALESCE($5, wa_sender_jid),
-       wa_original_text = COALESCE($6, wa_original_text),
-       wa_group_jid = COALESCE($7, wa_group_jid),
-       wa_received_at = CASE WHEN $4 IS NOT NULL THEN NOW() ELSE wa_received_at END,
-       sender_phone = COALESCE($8, sender_phone),
-       is_oes_only = FALSE,
-       subscriber_name = COALESCE($9, subscriber_name),
-       subscriber_phone = COALESCE($10, subscriber_phone),
-       subscriber_email = COALESCE($11, subscriber_email),
-       subscriber_language = COALESCE($12, subscriber_language),
-       signup_agent = COALESCE($13, signup_agent),
-       installer_name = COALESCE($14, installer_name),
-       qcontact_name = COALESCE($15, qcontact_name),
-       qcontact_phone = COALESCE($16, qcontact_phone),
-       qcontact_email = COALESCE($17, qcontact_email),
-       updated_at = NOW()
-     WHERE drop_number = $1`,
-    [
-      dropNumber, submittedDateStr, project,
-      wa.waMessageId ?? null, wa.waSenderJid ?? null,
-      wa.waOriginalText ?? null, wa.waGroupJid ?? null,
-      senderPhone,
-      c.subscriber_name, c.subscriber_phone, c.subscriber_email,
-      c.subscriber_language, c.signup_agent, c.installer_name,
-      c.qcontact_name, c.qcontact_phone, c.qcontact_email,
-    ]
-  );
 }
 
 // ---------------------------------------------------------------------------
