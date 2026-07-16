@@ -16,6 +16,8 @@ import type { SiteCamJobType } from '@/modules/sitecam/lib/sitecamSteps';
 import type { GeofencePayload } from '@/modules/sitecam/lib/geofence';
 import { resetPriorQaCycleForResubmission } from '@/modules/sitecam/services/resubmissionReset';
 import { uploadToVfStorage, safeFilename } from '@/lib/vfStorageUpload';
+import { extractStep6Serials } from '@/modules/activate/services/step6SerialExtraction';
+import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
 
 const MODULE = 'PwaUpload';
 // 12 activation steps + tolerance — guards against an oversized upload payload.
@@ -126,6 +128,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse, session: Atten
        WHERE drop_number = $5`,
       [techId, Object.keys(uploadedUrls).length, JSON.stringify(uploadedUrls), vlmUnavailableSteps, drNum, ...gf]
     );
+
+    // Fire-and-forget: read the step-6 photo's serials with the VLM and recompute
+    // the 4-way serial verification. This must never block or fail the
+    // technician's upload response — a VLM/verification error is swallowed here.
+    const step6Url = uploadedUrls[6];
+    if (step6Url) {
+      void (async () => {
+        try {
+          await extractStep6Serials(drNum, step6Url);
+          await computeAndPersistVerification(drNum);
+        } catch (err) {
+          log.error('Step-6 serial verification trigger failed', { drNum, error: String(err) }, MODULE);
+        }
+      })();
+    }
   } else {
     await pool.query(
       `UPDATE pole_install_sessions
