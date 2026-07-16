@@ -185,6 +185,19 @@ log "Release SHA: $GIT_SHA"
 # On failure, restore the backup so node_modules is at least no WORSE than
 # before. The build step that follows will fail loudly if recovery doesn't
 # produce a usable .bin/next.
+# True only when every top-level runtime dependency actually resolves — not just
+# .bin/next. Matches the "missing:" line rather than npm ls's exit code, which is
+# also non-zero for benign states (this repo's healthy tree reports one
+# `extraneous` package). ~0.3s. Mirrors node_modules_incomplete() in
+# scripts/fibreflow-prestart.sh; keep the two in step.
+node_modules_complete() {
+  sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'" || return 1
+  if sudo -u velo bash -c "cd '$DIR' && npm ls --omit=dev --depth=0 2>&1" | grep -q "missing:"; then
+    return 1
+  fi
+  return 0
+}
+
 atomic_npm_ci() {
   local reason="$1"
   local backup=""
@@ -197,8 +210,8 @@ atomic_npm_ci() {
   local rc=0
   sudo -u velo bash -c "cd $DIR && npm ci --legacy-peer-deps" || rc=$?
 
-  if [[ "$rc" -eq 0 ]] && sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
-    log "npm ci succeeded ($reason) — node_modules ready."
+  if [[ "$rc" -eq 0 ]] && node_modules_complete; then
+    log "npm ci succeeded ($reason) — node_modules ready (all top-level deps resolve)."
     if [[ -n "$backup" ]] && sudo -u velo bash -c "test -d '$backup'"; then
       (sudo -u velo bash -c "rm -rf '$backup'" &) # async cleanup
     fi
@@ -235,12 +248,17 @@ if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>
   atomic_npm_ci "package.json changed"
 fi
 
-# --- Step 3 (guard): Validate node_modules is usable (catches dangling symlink) ---
-# node_modules may be a symlink to the workspace; if that target was wiped the build silently
-# fails with "next: not found" (exit 127). Detect this before touching .next.
-if ! sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
-  log "WARNING: node_modules/.bin/next not accessible — atomic npm ci recovery..."
-  atomic_npm_ci "node_modules/.bin/next missing"
+# --- Step 3 (guard): Validate node_modules is COMPLETE, not merely present ---
+# A missing .bin/next makes the build fail loudly ("next: not found", exit 127), but a
+# tree where next is present and some other dependency is not builds fine and dies at
+# runtime: on 2026-07-15 dev served an HTML 500 from /api/auth/login for 45 minutes
+# because `cookie` was absent while `next` was not (#2176). Ask npm what it resolves.
+# See node_modules_incomplete() in scripts/fibreflow-prestart.sh — same check, same
+# reasoning for matching "missing:" rather than npm ls's exit code (a healthy tree here
+# exits non-zero over one `extraneous` package).
+if ! node_modules_complete; then
+  log "WARNING: node_modules incomplete (.bin/next missing, or npm ls reports missing deps) — atomic npm ci recovery..."
+  atomic_npm_ci "node_modules incomplete"
   log "node_modules restored OK."
 fi
 
