@@ -10,6 +10,7 @@ import { TrayBucket } from './TrayBucket';
 import { ApproveDisciplineButton } from './ApprovePoleButton';
 import { DisciplineComments } from './DisciplineComments';
 import { UnassignedBucket } from './UnassignedBucket';
+import { DeletedBucket } from './DeletedBucket';
 import { PoleSnagsTab } from './PoleSnagsTab';
 import { SlotPhotoPicker } from './SlotPhotoPicker';
 import { getLinkCandidates } from '../utils/link-candidates';
@@ -26,7 +27,7 @@ import {
 } from '../utils/pole-detail-helpers';
 import {
   assignPhoto, overrideSlot, movePhoto, uploadTrayPhotos,
-  approvePhotoApi, snagPhotoApi, linkPhoto,
+  approvePhotoApi, snagPhotoApi, linkPhoto, binPhoto,
 } from '../utils/pole-detail-api';
 import type { Discipline } from '../utils/approval-gates';
 import { log } from '@/lib/logger';
@@ -328,7 +329,21 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                   suggestions={pole.unassigned_suggestions}
                   onView={i => { const idx = unassignedIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
                   onUploaded={async () => { await mutate(); }}
+                  onDelete={key => {
+                    binPhoto(pole.id, key, 'delete')
+                      .then(() => mutate())
+                      .catch((e: unknown) => setMoveError(e instanceof Error ? e.message : String(e)));
+                  }}
                   disabled={!!pole.approved_at}
+                />
+
+                <DeletedBucket
+                  photoKeys={pole.deleted_photo_keys ?? []}
+                  onRestore={key => {
+                    binPhoto(pole.id, key, 'restore')
+                      .then(() => mutate())
+                      .catch((e: unknown) => setMoveError(e instanceof Error ? e.message : String(e)));
+                  }}
                 />
               </div>
             </DragDropContext>
