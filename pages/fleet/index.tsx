@@ -169,7 +169,7 @@ export default function FleetDashboardPage() {
   if (loading) {
     return (
       <AppLayout>
-        <ModulePage config={fleetConfig} headerActions={headerActions} isLoading>
+        <ModulePage config={fleetConfig} headerActions={headerActions} isLoading hideTabs>
           <FleetDashboardSkeleton />
         </ModulePage>
       </AppLayout>
@@ -179,7 +179,7 @@ export default function FleetDashboardPage() {
   if (error) {
     return (
       <AppLayout>
-        <ModulePage config={fleetConfig} headerActions={headerActions}>
+        <ModulePage config={fleetConfig} headerActions={headerActions} hideTabs>
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
@@ -193,7 +193,7 @@ export default function FleetDashboardPage() {
 
   return (
     <AppLayout>
-      <ModulePage config={fleetConfig} headerActions={headerActions}>
+      <ModulePage config={fleetConfig} headerActions={headerActions} hideTabs>
         <div className="space-y-6">
           {/* Stats Grid */}
           <StatsGrid

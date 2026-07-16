@@ -86,7 +86,7 @@ export default function FleetImportPage() {
 
   return (
     <AppLayout>
-      <ModulePage config={fleetConfig}>
+      <ModulePage config={fleetConfig} hideTabs>
         <div className="p-6 space-y-6 max-w-4xl">
           {/* Header */}
           <div>

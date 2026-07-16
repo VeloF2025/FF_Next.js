@@ -142,7 +142,7 @@ export default function FleetDriversPage() {
 
   return (
     <AppLayout>
-        <ModulePage config={fleetConfig}>
+        <ModulePage config={fleetConfig} hideTabs>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div>
