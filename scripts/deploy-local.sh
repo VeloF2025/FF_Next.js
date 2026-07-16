@@ -186,16 +186,23 @@ log "Release SHA: $GIT_SHA"
 # before. The build step that follows will fail loudly if recovery doesn't
 # produce a usable .bin/next.
 # True only when every top-level runtime dependency actually resolves — not just
-# .bin/next. Matches the "missing:" line rather than npm ls's exit code, which is
-# also non-zero for benign states (this repo's healthy tree reports one
-# `extraneous` package). ~0.3s. Mirrors node_modules_incomplete() in
-# scripts/fibreflow-prestart.sh; keep the two in step.
+# .bin/next. `npm ls --omit=dev --depth=0` exits non-zero iff a top-level dep is
+# missing or the installed version is invalid; a merely `extraneous` package
+# still exits 0 (measured on the live prod + dev trees). Since these trees are
+# only ever built by `npm ci` from the lockfile, a non-zero exit means a real
+# gap. ~0.3s.
+#
+# Test the exit code via `if`, NOT `npm ls | grep`: under `set -o pipefail` a
+# pipeline takes npm ls's non-zero exit, which masks the grep match and makes
+# the check fail OPEN — reporting a broken tree as healthy, the exact bug this
+# guards against (caught in blind review of the first cut). Mirrors
+# node_modules_incomplete() in scripts/fibreflow-prestart.sh; keep the two in step.
 node_modules_complete() {
   sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'" || return 1
-  if sudo -u velo bash -c "cd '$DIR' && npm ls --omit=dev --depth=0 2>&1" | grep -q "missing:"; then
-    return 1
+  if sudo -u velo bash -c "cd '$DIR' && npm ls --omit=dev --depth=0 >/dev/null 2>&1"; then
+    return 0
   fi
-  return 0
+  return 1
 }
 
 atomic_npm_ci() {

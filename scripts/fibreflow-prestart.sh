@@ -51,12 +51,13 @@ su - velo -c "find '$APP_DIR' -maxdepth 1 -name 'node_modules.prestart-bak.*' -m
 # /api/auth/login died at module load and served an HTML 500 to users for 45
 # minutes (#2176). Ask npm what it actually resolves instead.
 #
-# Trigger on the literal "missing:" line rather than npm ls's exit code: the
-# code is also non-zero for benign states (a healthy tree here reports one
-# `extraneous` package), and a false positive would npm ci on every boot and
-# then refuse to start the service — turning a cosmetic quirk into an outage.
-# A healthy tree emits no "missing:" line; a tree with a dependency removed
-# emits one per dependency. ~0.3s.
+# `npm ls --omit=dev --depth=0` exits non-zero iff a top-level dep is missing or
+# invalid; an `extraneous` package still exits 0 (measured on the live trees).
+# These trees are only ever built by `npm ci`, so a non-zero exit means a real
+# gap. ~0.3s. Test the exit code via `if`, NOT `npm ls | grep`: under
+# `set -o pipefail` a pipeline takes npm ls's non-zero exit and masks a grep
+# match, so the check would fail OPEN — report a broken tree as healthy, the
+# exact failure this guards against (caught in blind review of the first cut).
 #
 # Atomic recovery: mv the broken node_modules aside, run npm ci into a fresh
 # dir, swap on success. On failure, restore the backup so the service still
@@ -65,9 +66,10 @@ su - velo -c "find '$APP_DIR' -maxdepth 1 -name 'node_modules.prestart-bak.*' -m
 # 500-storm.
 node_modules_incomplete() {
     su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null || return 0
-    su - velo -c "cd '$APP_DIR' && npm ls --omit=dev --depth=0 2>&1" 2>/dev/null \
-        | grep -q "missing:" && return 0
-    return 1
+    if su - velo -c "cd '$APP_DIR' && npm ls --omit=dev --depth=0 >/dev/null 2>&1" 2>/dev/null; then
+        return 1  # all top-level deps resolve → complete
+    fi
+    return 0  # missing/invalid dep → incomplete
 }
 
 if node_modules_incomplete; then
