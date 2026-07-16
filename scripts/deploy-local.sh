@@ -168,6 +168,35 @@ if [[ "$NEW_SHA" != "$EXPECTED_SHA" ]]; then
 fi
 log "Commit: $CURRENT_COMMIT -> $NEW_COMMIT"
 
+# --- Keep the systemd ExecStartPre guard in sync with the repo (#2183) ---
+# /usr/local/bin/fibreflow-prestart is a root-owned COPY of scripts/fibreflow-prestart.sh.
+# It runs as root (ExecStartPre=+…), so it must stay a root-owned copy — never a symlink
+# into a velo-writable deploy dir, which would let a non-root user rewrite a script that
+# runs as root. Re-install from the just-pulled tree when it differs, so a merged guard
+# change reaches the running services on the next deploy instead of waiting for a manual
+# copy (the drift that let #2176 ship inert). Runs before the restart below, so THIS
+# deploy's start already uses the updated guard. Only writes on a real change, and never
+# installs a guard that doesn't parse.
+sync_prestart_guard() {
+  local repo_copy="$DIR/scripts/fibreflow-prestart.sh"
+  local installed="/usr/local/bin/fibreflow-prestart"
+  if ! sudo test -f "$repo_copy"; then
+    warn "prestart guard missing from repo ($repo_copy) — leaving $installed untouched"
+    return 0
+  fi
+  if sudo cmp -s "$repo_copy" "$installed"; then
+    return 0  # already in sync — nothing to do
+  fi
+  if ! sudo bash -n "$repo_copy"; then
+    warn "repo prestart guard has a syntax error — NOT installing (keeping current $installed)"
+    return 0
+  fi
+  log "prestart guard changed — installing $repo_copy -> $installed"
+  sudo install -m 755 -o root -g root "$repo_copy" "$installed" \
+    || warn "failed to install prestart guard — continuing with the previous version"
+}
+sync_prestart_guard
+
 # --- Release tagging for Sentry/Bugsink (BL-54) ---
 GIT_SHA="$NEW_COMMIT"
 export GIT_SHA

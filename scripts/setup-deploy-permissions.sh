@@ -6,9 +6,11 @@
 #
 # Creates:
 #   /usr/local/bin/fibreflow-fix-next  — ownership fixer script
+#   /usr/local/bin/fibreflow-prestart  — systemd ExecStartPre guard (from the repo)
 #   /etc/sudoers.d/fibreflow-deploy    — passwordless sudoers rules
 #
-# After this, deploy-local.sh works without password prompts.
+# After this, deploy-local.sh works without password prompts, and keeps the
+# prestart guard in sync from then on (see sync_prestart_guard there).
 # =============================================================================
 
 set -euo pipefail
@@ -76,6 +78,25 @@ SCRIPT
 
 chmod 755 /usr/local/bin/fibreflow-fix-next
 echo "  Created /usr/local/bin/fibreflow-fix-next"
+
+# --- 1b. Install the ExecStartPre guard from the repo ---
+# fibreflow-prestart validates node_modules + .next before a service starts. It
+# runs as root, so keep it a root-owned copy here — not a symlink into a
+# velo-writable dir. deploy-local.sh re-syncs it on every deploy; this seeds a
+# fresh host (and repairs it if it was ever removed). Copied from the repo rather
+# than inlined so the guard has a single source of truth.
+SETUP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SETUP_SCRIPT_DIR/fibreflow-prestart.sh" ]]; then
+  if bash -n "$SETUP_SCRIPT_DIR/fibreflow-prestart.sh"; then
+    install -m 755 -o root -g root "$SETUP_SCRIPT_DIR/fibreflow-prestart.sh" /usr/local/bin/fibreflow-prestart
+    echo "  Installed /usr/local/bin/fibreflow-prestart"
+  else
+    echo "  ERROR: $SETUP_SCRIPT_DIR/fibreflow-prestart.sh has a syntax error — NOT installed"
+    exit 1
+  fi
+else
+  echo "  WARNING: $SETUP_SCRIPT_DIR/fibreflow-prestart.sh not found — prestart guard NOT installed"
+fi
 
 # --- 2. Create sudoers drop-in ---
 cat > /etc/sudoers.d/fibreflow-deploy << 'SUDOERS'
