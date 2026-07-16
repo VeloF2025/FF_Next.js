@@ -178,6 +178,14 @@ log "Commit: $CURRENT_COMMIT -> $NEW_COMMIT"
 # deploy's start already uses the updated guard. Only writes on a real change, and never
 # installs a guard that doesn't parse.
 sync_prestart_guard() {
+  # Only ever publish master's (reviewed) guard to the shared root path. The
+  # installed file is used by BOTH dev and prod, so a dev deploy on a feature
+  # branch (deploy dev --branch X) must not push an experimental guard there —
+  # it would break the OTHER env on its next (possibly unattended) restart.
+  if [[ "$BRANCH" != "master" ]]; then
+    log "prestart guard sync skipped (branch '$BRANCH' != master)"
+    return 0
+  fi
   local repo_copy="$DIR/scripts/fibreflow-prestart.sh"
   local installed="/usr/local/bin/fibreflow-prestart"
   if ! sudo test -f "$repo_copy"; then
