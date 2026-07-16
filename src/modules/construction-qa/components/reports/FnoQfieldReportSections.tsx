@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, BarChart3, Database, Download, GitBranch, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, BarChart3, ChevronDown, ChevronRight, Database, Download, GitBranch, ShieldAlert } from 'lucide-react';
 import type { ScopeActualResponse } from '../../services/fnoReportTypes';
 import type { ProjectRollup } from './FnoQfieldReportUtils';
 import { formatKm, formatNumber } from './FnoQfieldReportUtils';
@@ -81,13 +81,34 @@ export function DataQualityPanel({ data }: { data: ScopeActualResponse }) {
   );
 }
 
-export function ProjectCards({ rollups }: { rollups: ProjectRollup[] }) {
+export function ProjectCards({
+  rollups,
+  expandedProjects,
+  onToggleProject,
+}: {
+  rollups: ProjectRollup[];
+  expandedProjects: Set<string>;
+  onToggleProject: (projectName: string) => void;
+}) {
   return (
     <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-      {rollups.map((project) => (
-        <a key={project.projectName} href={`#project-${project.projectName}`} className="rounded-lg border border-[var(--ff-border)] bg-[var(--ff-surface)] p-4 hover:bg-[var(--ff-surface-alt)]">
-          <div className="flex items-center gap-2 font-medium text-[var(--ff-text-primary)]">
-            <GitBranch className="h-4 w-4 text-[var(--ff-primary)]" /> {project.projectName}
+      {rollups.map((project) => {
+        const isExpanded = expandedProjects.has(project.projectName);
+        return (
+        <button
+          key={project.projectName}
+          type="button"
+          aria-expanded={isExpanded}
+          aria-controls={`project-${project.projectName}`}
+          onClick={() => onToggleProject(project.projectName)}
+          className="rounded-lg border border-[var(--ff-border)] bg-[var(--ff-surface)] p-4 text-left hover:bg-[var(--ff-surface-alt)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+        >
+          <div className="flex items-center justify-between gap-2 font-medium text-[var(--ff-text-primary)]">
+            <span className="flex min-w-0 items-center gap-2">
+              <GitBranch className="h-4 w-4 shrink-0 text-[var(--ff-primary)]" />
+              <span className="truncate">{project.projectName}</span>
+            </span>
+            {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
           </div>
           <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
             <Stat label="Rows" value={formatNumber(project.rows.length)} />
@@ -102,8 +123,12 @@ export function ProjectCards({ rollups }: { rollups: ProjectRollup[] }) {
               Excluded unmapped: {formatNumber(project.excludedPoleActual)} poles · {formatKm(project.excludedCableActualMeters)} cable
             </div>
           )}
-        </a>
-      ))}
+          <div className="mt-3 text-xs font-medium text-[var(--ff-primary)]">
+            {isExpanded ? 'Hide project detail' : 'Show project detail'}
+          </div>
+        </button>
+        );
+      })}
     </div>
   );
 }
