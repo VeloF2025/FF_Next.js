@@ -51,6 +51,36 @@ export async function movePhoto(poleId: string, photoKey: string, from: string, 
   }
 }
 
+/**
+ * Soft-delete bin: move a photo between the unassigned and deleted buckets.
+ *   action='delete'  → unassigned → deleted
+ *   action='restore' → deleted → unassigned
+ */
+export async function binPhoto(poleId: string, photoKey: string, action: 'delete' | 'restore'): Promise<void> {
+  const res = await fetch('/api/works-qa/photo-bin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pole_id: poleId, photo_key: photoKey, action }),
+  });
+  if (!res.ok) {
+    const body = await safeJson<{ error?: { message?: string } }>(res);
+    throw new Error(body?.error?.message ?? `${action === 'delete' ? 'Delete' : 'Restore'} failed (${res.status})`);
+  }
+}
+
+/** Re-open a previously-approved discipline so its photos can be edited again. */
+export async function reopenDiscipline(poleId: string, discipline: 'civil' | 'dome' | 'main_joint'): Promise<void> {
+  const res = await fetch('/api/works-qa/pole-reopen', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pole_id: poleId, discipline }),
+  });
+  if (!res.ok) {
+    const body = await safeJson<{ error?: { message?: string } }>(res);
+    throw new Error(body?.error?.message ?? `Re-open failed (${res.status})`);
+  }
+}
+
 export async function linkPhoto(poleId: string, sourceSlot: string, targetSlot: string, reason?: string): Promise<void> {
   const res = await fetch('/api/works-qa/link-photo', {
     method: 'POST',

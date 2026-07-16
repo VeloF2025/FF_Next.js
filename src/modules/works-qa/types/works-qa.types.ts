@@ -48,6 +48,10 @@ export interface PoleQaPhoto {
 
   main_joint_tray_keys: string[];
   unassigned_photo_keys: string[];
+  // Soft-delete bin (migration 442). Photos removed from the Unassigned bucket
+  // land here instead of being dropped, so a mis-delete is recoverable. Restore
+  // moves a key back to unassigned_photo_keys.
+  deleted_photo_keys: string[];
   unassigned_suggestions?: Record<string, { suggested_slot: string; confidence: number; generated_at?: string }>;
   vlm_results: Record<string, VlmSlotResult>;
   // Per-slot Approve / Snag decisions (migration 247). Keyed by SLOT_META.key.

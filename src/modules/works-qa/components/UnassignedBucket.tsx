@@ -1,5 +1,5 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd';
-import { GripVertical, Sparkles } from 'lucide-react';
+import { GripVertical, Sparkles, Trash2 } from 'lucide-react';
 import { useBulkUpload, BulkUploadButton, UploadChipList } from './BulkUnassignedUpload';
 import { useAutoSort } from '../hooks/useAutoSort';
 import { UnassignedThumb } from './UnassignedThumb';
@@ -14,6 +14,10 @@ interface UnassignedBucketProps {
   suggestions?: Record<string, UnassignedSuggestion>;
   onView?: (index: number) => void;
   onUploaded: () => void | Promise<void>;
+  // Soft-delete: send a photo to the recycle bin (deleted_photo_keys). Allowed
+  // even on approved poles — binning a stray unassigned photo is a cleanup
+  // action and never touches an approved slot.
+  onDelete?: (photoKey: string) => void;
   disabled?: boolean;
 }
 
@@ -28,7 +32,7 @@ interface UnassignedBucketProps {
  * confidence or filled slots → suggestion badge with [Accept].
  */
 export function UnassignedBucket({
-  poleId, photoKeys, suggestions, onView, onUploaded, disabled,
+  poleId, photoKeys, suggestions, onView, onUploaded, onDelete, disabled,
 }: UnassignedBucketProps) {
   const { chips, running: uploading, handleFiles, handleDrop } = useBulkUpload({ poleId, onUploaded });
   const { running: sorting, summary, error: sortError, sort } = useAutoSort({ poleId, onSorted: onUploaded });
@@ -123,6 +127,18 @@ export function UnassignedBucket({
                           >
                             <GripVertical className="w-3 h-3" aria-hidden="true" />
                           </div>
+
+                          {onDelete && (
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); onDelete(key); }}
+                              aria-label="Delete photo (move to Deleted Photos)"
+                              title="Delete — moves to Deleted Photos (recoverable)"
+                              className="absolute top-1 right-1 z-10 p-0.5 rounded bg-black/60 text-zinc-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 className="w-3 h-3" aria-hidden="true" />
+                            </button>
+                          )}
 
                           <UnassignedThumb photoKey={key} index={i} onView={onView} />
 

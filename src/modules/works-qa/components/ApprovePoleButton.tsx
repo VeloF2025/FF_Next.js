@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { disciplineGatesPass, type Discipline } from '../utils/approval-gates';
 import type { PoleQaPhoto } from '../types/works-qa.types';
+import { ReopenDisciplineButton } from './ReopenDisciplineButton';
 
 interface ApproveDisciplineButtonProps {
   pole: PoleQaPhoto;
@@ -32,16 +33,24 @@ export function ApproveDisciplineButton({ pole, discipline, onApproved }: Approv
 
   if (alreadyApproved) {
     return (
-      <div className="flex items-center gap-2 text-green-400 text-xs font-medium">
-        <span>✓ {label} approved</span>
-        {pole.overridden_by && (
-          <span
-            className="text-amber-400 text-[10px]"
-            title={pole.override_reason ?? 'Approved with override'}
-          >
-            (override)
-          </span>
-        )}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 text-green-400 text-xs font-medium">
+          <span>✓ {label} approved</span>
+          {pole.overridden_by && (
+            <span
+              className="text-amber-400 text-[10px]"
+              title={pole.override_reason ?? 'Approved with override'}
+            >
+              (override)
+            </span>
+          )}
+        </div>
+        <ReopenDisciplineButton
+          poleId={pole.id}
+          discipline={discipline}
+          label={label}
+          onReopened={onApproved}
+        />
       </div>
     );
   }
