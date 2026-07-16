@@ -260,11 +260,10 @@ fi
 # tree where next is present and some other dependency is not builds fine and dies at
 # runtime: on 2026-07-15 dev served an HTML 500 from /api/auth/login for 45 minutes
 # because `cookie` was absent while `next` was not (#2176). Ask npm what it resolves.
-# See node_modules_incomplete() in scripts/fibreflow-prestart.sh — same check, same
-# reasoning for matching "missing:" rather than npm ls's exit code (a healthy tree here
-# exits non-zero over one `extraneous` package).
+# node_modules_complete() (defined above) tests npm ls's exit code, not a piped grep —
+# see its comment for why. Mirrors node_modules_incomplete() in fibreflow-prestart.sh.
 if ! node_modules_complete; then
-  log "WARNING: node_modules incomplete (.bin/next missing, or npm ls reports missing deps) — atomic npm ci recovery..."
+  log "WARNING: node_modules incomplete (.bin/next missing, or a top-level dep unresolved) — atomic npm ci recovery..."
   atomic_npm_ci "node_modules incomplete"
   log "node_modules restored OK."
 fi

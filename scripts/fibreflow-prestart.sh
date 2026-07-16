@@ -73,7 +73,7 @@ node_modules_incomplete() {
 }
 
 if node_modules_incomplete; then
-    log "WARNING: node_modules incomplete (.bin/next missing, or npm ls reports missing deps) — atomic npm ci recovery..."
+    log "WARNING: node_modules incomplete (.bin/next missing, or a top-level dep unresolved) — atomic npm ci recovery..."
     BACKUP_PATH=""
     if su - velo -c "test -e '$APP_DIR/node_modules'" 2>/dev/null; then
         BACKUP_PATH="$APP_DIR/node_modules.prestart-bak.$$"
