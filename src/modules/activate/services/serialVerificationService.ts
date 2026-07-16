@@ -95,7 +95,7 @@ function normalizeSerial(serial: string | null): string | null {
   return serial.trim().toUpperCase();
 }
 
-function calculateVerification(serials: (string | null)[]): VerificationDetail {
+export function calculateVerification(serials: (string | null)[]): VerificationDetail {
   const normalized = serials.map(normalizeSerial);
   const nonNull = normalized.filter(Boolean) as string[];
   const unique = [...new Set(nonNull)];
@@ -153,6 +153,7 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
     onemap_data AS (
       SELECT ont_serial_scanned as ont, ups_serial_scanned as ups,
              vlm_dr_number_step9 as ph_bl_dr, vlm_ont_serial_step9 as ph_bl_ont,
+             vlm_ont_serial_step6 as step6_ont, vlm_ups_serial_step6 as step6_ups,
              oes_serial as row_oes_serial
       FROM dr_photo_unified_reviews
       WHERE drop_number = ${dropNumber}
@@ -166,18 +167,27 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
         AND vlm_processed = true
       ORDER BY vlm_confidence DESC NULLS LAST, message_timestamp DESC
       LIMIT 1
+    ),
+    drops_data AS (
+      SELECT mini_ups_serial as ups
+      FROM drops
+      WHERE drop_number = ${dropNumber}
+      LIMIT 1
     )
     SELECT
       (SELECT ont FROM oes_data) as oes_ont,
       (SELECT ont FROM offline_data) as offline_ont,
       (SELECT ont FROM onemap_data) as onemap_ont,
       (SELECT ups FROM onemap_data) as onemap_ups,
+      (SELECT step6_ont FROM onemap_data) as step6_ont,
+      (SELECT step6_ups FROM onemap_data) as step6_ups,
       (SELECT ph_bl_dr FROM onemap_data) as ph_bl_dr,
       (SELECT ph_bl_ont FROM onemap_data) as ph_bl_ont,
       (SELECT row_oes_serial FROM onemap_data) as row_oes_serial,
       (SELECT ont FROM wa_photo_data) as wa_ont,
       (SELECT ups FROM wa_photo_data) as wa_ups,
-      (SELECT vlm_confidence FROM wa_photo_data) as wa_confidence
+      (SELECT vlm_confidence FROM wa_photo_data) as wa_confidence,
+      (SELECT ups FROM drops_data) as drops_ups
   `;
 
   const row = result[0] || {};
@@ -187,6 +197,7 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
     row.offline_ont as string | null,
     row.onemap_ont as string | null,
     row.wa_ont as string | null,
+    row.step6_ont as string | null,   // SiteCam step-6 photo (VLM ONT read)
   ];
 
   const upsSerials = [
@@ -194,6 +205,8 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
     null, // No offline UPS tracking
     row.onemap_ups as string | null,
     row.wa_ups as string | null,
+    row.step6_ups as string | null,   // SiteCam step-6 photo (VLM UPS read)
+    row.drops_ups as string | null,   // drops / SOW record (UPS)
   ];
 
   const ontVerification = calculateVerification(ontSerials);
