@@ -85,8 +85,10 @@ npx tsx scripts/fno-atlas/ingest-letaba-presence.ts --dry-run
 ALLOW_FNO_ATLAS_DB_WRITE=1 npx tsx scripts/fno-atlas/ingest-letaba-presence.ts
 ```
 
-Env knobs: `LETABA_MIN_POPULATION` (default 2000), `LETABA_PROBE_DELAY_MS`
-(default 1000 — politeness against a third party; do not lower).
+Env knobs: `LETABA_MIN_POPULATION` (default 2000, min 0), `LETABA_PROBE_DELAY_MS`
+(default 1000, min 250 — politeness against a third party; do not lower). Both
+throw on a non-finite/below-min value rather than silently disabling the filter
+or the rate limit.
 
 Footprint bbox = Vhembe/Mopani/Ehlanzeni (lat −25.2..−22.1, lng 29.5..31.6).
 Probing the edges (Polokwane, Nelspruit) returns nothing, so the bbox is not
@@ -95,15 +97,22 @@ clipping real coverage.
 **Towns returning `[]` are not stored** — one centroid miss is not evidence the
 town is uncovered.
 
-`network_type` is derived: `trufibre` = FTTH, `skyfibre`/`wireless` =
-fixed-wireless → `mixed` if both, else `ftth` / `fixed_wireless`.
+`network_type` uses the **mig 427 vocabulary** — `ftth` | `wireless` | `mixed` |
+`unknown`. Do not invent new terms here: `fno_atlas_coverage_areas` has a CHECK
+constraining that enum, while `fno_atlas_presence_points` does **not**, so a new
+term drifts silently. Mapping: `trufibre` → fibre, `skyfibre`/`wireless` →
+wireless; both → `mixed`. A provider we do not recognise is never absorbed into
+`wireless` — alone it yields `unknown`, alongside known products `mixed`, and the
+run prints a `WARNING: unclassified Letaba providers […]` line so new product
+lines get noticed.
+
 One point per town (not per provider) — per-provider points would stack
 duplicate markers on the same coordinate. Full service list, pricing and
 provenance live in `raw_properties`.
 
 ## Result (2026-07-17)
 
-119 towns probed, **107 covered** (98 `fixed_wireless`, 9 `mixed`, 0 fibre-only —
+119 towns probed, **107 covered** (98 `wireless`, 9 `mixed`, 0 fibre-only —
 Letaba is wireless-first). No `ftth`-only town exists.
 
 ## Gotchas

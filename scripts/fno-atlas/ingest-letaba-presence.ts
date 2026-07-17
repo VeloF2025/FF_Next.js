@@ -1,22 +1,14 @@
 #!/usr/bin/env tsx
 
 /**
- * Letaba Networks presence ingestion.
+ * Letaba Networks presence ingestion. See .claude/modules/fno-atlas-betterportal.md
  *
- * Letaba publishes no coverage map, GeoJSON, KML, WMS or WFS layer — their site
- * is a 7-page WordPress install whose only coverage tool is a BetterPortal
- * widget that answers "is this pin covered?" one point at a time. There is no
- * footprint to download, so coverage is established by probing that public API
- * at real town coordinates.
- *
- * Provenance is split so that neither half is hand-authored:
- *   - WHERE we probe  -> GeoNames ZA populated places (CC-BY 4.0), a licensed gazetteer.
- *   - WHETHER covered -> Letaba's own coverage API answers for that exact point.
- *
- * Results are presence points (mig 428), never coverage polygons (mig 427): one
- * probe at a town centroid is evidence of presence in that town, not a boundary.
- * Towns answering "no coverage" are not stored — absence of a hit at one
- * centroid is not evidence the town is uncovered.
+ * Letaba publishes no coverage layer, only a per-point coverage-check API, so
+ * provenance is split so neither half is hand-authored: GeoNames ZA (CC-BY 4.0)
+ * decides WHERE we probe, Letaba's own API decides WHETHER it is covered.
+ * Presence points (mig 428), never polygons (mig 427): a centroid hit evidences
+ * presence in a town, not a boundary. Towns answering "no coverage" are not
+ * stored — one centroid miss is not evidence the town is uncovered.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -40,9 +32,25 @@ const USER_AGENT = 'FibreFlow FNO Atlas Letaba presence ingestion/1.0';
 
 /** Vhembe + Mopani + Ehlanzeni districts: Musina (north) to Lydenburg (south). */
 const FOOTPRINT = { minLat: -25.2, maxLat: -22.1, minLng: 29.5, maxLng: 31.6 };
-const MIN_POPULATION = Number(process.env.LETABA_MIN_POPULATION || 2000);
+
+/** Letaba product names -> the fno_atlas network_type vocabulary (mig 427). */
+const FIBRE_PROVIDERS = new Set(['trufibre']);
+const WIRELESS_PROVIDERS = new Set(['wireless', 'skyfibre']);
+
+/** A bad env value must fail loudly, never silently disable a filter or rate limit. */
+function numericEnv(name: string, fallback: number, min: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < min) {
+    throw new Error(`${name} must be a finite number >= ${min}, got ${JSON.stringify(raw)}`);
+  }
+  return parsed;
+}
+
+const MIN_POPULATION = numericEnv('LETABA_MIN_POPULATION', 2000, 0);
 /** Politeness: one probe per second against a third party's public endpoint. */
-const PROBE_DELAY_MS = Number(process.env.LETABA_PROBE_DELAY_MS || 1000);
+const PROBE_DELAY_MS = numericEnv('LETABA_PROBE_DELAY_MS', 1000, 250);
 
 function writeLine(value: unknown): void {
   process.stdout.write(`${typeof value === 'string' ? value : util.inspect(value, { depth: 4 })}\n`);
@@ -77,7 +85,8 @@ function fetchFootprintTowns(): Town[] {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'letaba-geonames-'));
   const zip = path.join(dir, 'ZA.zip');
   try {
-    execFileSync('curl', ['-sS', '-L', '-A', USER_AGENT, '--max-time', '120', '-o', zip, GEONAMES_URL], { stdio: ['ignore', 'ignore', 'pipe'] });
+    // -f so an HTTP error page fails here with a clear status, not later as a confusing unzip error.
+    execFileSync('curl', ['-fsS', '-L', '-A', USER_AGENT, '--max-time', '120', '-o', zip, GEONAMES_URL], { stdio: ['ignore', 'ignore', 'pipe'] });
     const raw = execFileSync('unzip', ['-p', zip, 'ZA.txt'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     const towns: Town[] = [];
     for (const line of raw.split('\n')) {
@@ -87,7 +96,8 @@ function fetchFootprintTowns(): Town[] {
       const lat = Number(c[4]);
       const lng = Number(c[5]);
       const population = Number(c[14] || 0);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      // NaN must be dropped explicitly: `NaN < MIN_POPULATION` is false, so it would pass the gate below.
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(population)) continue;
       if (lat < FOOTPRINT.minLat || lat > FOOTPRINT.maxLat) continue;
       if (lng < FOOTPRINT.minLng || lng > FOOTPRINT.maxLng) continue;
       if (population < MIN_POPULATION) continue;
@@ -134,14 +144,25 @@ async function probeAll(towns: Town[], onProgress: (done: number, hits: number) 
   return covered;
 }
 
-/** trufibre is Letaba's FTTH product; skyfibre/wireless are fixed-wireless. */
+/**
+ * Map Letaba's products onto the mig 427 vocabulary ('ftth'|'wireless'|'mixed'|'unknown').
+ * An unseen provider must NOT be absorbed into 'wireless' — Letaba could add
+ * satellite/LTE and we would misreport it. Alone => 'unknown'; with known => 'mixed'.
+ */
 function deriveNetworkType(services: Service[]): string {
-  const providers = new Set(services.map((s) => s.provider));
-  const hasFibre = providers.has('trufibre');
-  const hasWireless = providers.has('wireless') || providers.has('skyfibre');
-  if (hasFibre && hasWireless) return 'mixed';
-  if (hasFibre) return 'ftth';
-  return 'fixed_wireless';
+  const providers = [...new Set(services.map((s) => s.provider))];
+  const hasFibre = providers.some((p) => FIBRE_PROVIDERS.has(p));
+  const hasWireless = providers.some((p) => WIRELESS_PROVIDERS.has(p));
+  const hasUnknown = providers.some((p) => !FIBRE_PROVIDERS.has(p) && !WIRELESS_PROVIDERS.has(p));
+  if (hasUnknown && !hasFibre && !hasWireless) return 'unknown';
+  if (hasUnknown || (hasFibre && hasWireless)) return 'mixed';
+  return hasFibre ? 'ftth' : 'wireless';
+}
+
+/** Surface provider names we do not classify, so new Letaba products get noticed. */
+function unclassifiedProviders(covered: CoveredTown[]): string[] {
+  const all = covered.flatMap((t) => t.services.map((s) => s.provider));
+  return [...new Set(all.filter((p) => !FIBRE_PROVIDERS.has(p) && !WIRELESS_PROVIDERS.has(p)))];
 }
 
 async function upsertSource(client: Client): Promise<string> {
@@ -252,6 +273,11 @@ async function main(): Promise<void> {
     if (done % 20 === 0 || done === towns.length) writeLine(`  probed ${done}/${towns.length}, covered ${hits}`);
   });
   writeLine(`covered towns: ${covered.length}/${towns.length}`);
+
+  const unclassified = unclassifiedProviders(covered);
+  if (unclassified.length > 0) {
+    writeLine(`WARNING: unclassified Letaba providers ${JSON.stringify(unclassified)} — classified as 'unknown'/'mixed'. Update FIBRE_PROVIDERS/WIRELESS_PROVIDERS.`);
+  }
 
   if (!write) {
     writeLine(covered.slice(0, 12).map((t) => ({ name: t.name, lat: t.lat, lng: t.lng, pop: t.population, net: deriveNetworkType(t.services), providers: t.services.map((s) => s.provider) })));
