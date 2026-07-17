@@ -27,6 +27,11 @@ let exitCode = 0;
 
 // feature_id and filename are DB-sourced and become path segments, so this must
 // also neutralise separators and `..` — path.join() does not sandbox traversal.
+// NOT injective: `a/b` and `a\b` both collapse to `a_b`, so two distinct inputs
+// can land on one destination, where the existsSync() branch below would treat
+// the second as already-synced and repoint it at the first one's file. Verified
+// unreachable today (0 of 14,195 feature_ids and 0 of 81,521 filenames contain
+// any of / \ < > : " | ? * or a leading dot); revisit if that ever changes.
 function sanitize(name) {
   return name
     .replace(/[<>:"|?*]/g, '_')

@@ -37,8 +37,14 @@ if [[ "${1:-}" == "--dry-run" ]]; then
   DRY_RUN="--dry-run"
 fi
 
+# Best-effort logging, same as check-root-disk.sh: `| tee -a` under pipefail dies
+# the moment LOG_FILE is unwritable, which would abort a backup for a logging
+# problem. Braces because `echo … 2>/dev/null` cannot silence a failing
+# redirection — bash reports that itself, before the command runs.
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+  local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+  echo "$msg"
+  { echo "$msg" >> "$LOG_FILE"; } 2>/dev/null || true
 }
 
 if [[ ! -d "$SRC" ]]; then
@@ -46,7 +52,10 @@ if [[ ! -d "$SRC" ]]; then
   exit 1
 fi
 
-mkdir -p "$DEST" "$(dirname "$LOG_FILE")"
+mkdir -p "$DEST"
+# Log dir is best-effort: no destination means no backup, but an unwritable log
+# must not stop one.
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
 
 # Refuse to back up onto the same physical disk — that is not a backup.
 # Compare the underlying DISK (lsblk PKNAME), not just the mount source: two
@@ -66,7 +75,10 @@ if [[ -n "$src_disk" && -n "$dest_disk" && "$src_disk" == "$dest_disk" ]]; then
   exit 1
 fi
 if [[ -z "$src_disk" || -z "$dest_disk" ]]; then
-  log "WARNING: could not resolve a physical disk for ${src_dev} and/or ${dest_dev}; fell back to mount-source comparison only."
+  # Fails OPEN on purpose: PKNAME is empty for whole-disk (unpartitioned) and
+  # non-block-backed filesystems, and an unverified backup still beats no backup.
+  # Loud, because in that state the same-disk protection below is NOT in force.
+  log "WARNING: could not resolve a physical disk for ${src_dev} and/or ${dest_dev} — same-disk protection is NOT active for this run; mount-source comparison only."
 fi
 
 # 10#: df can emit zero-padded values, which bash would read as octal.
@@ -81,7 +93,15 @@ log "Starting QA photo backup: $SRC ($src_dev) -> $DEST ($dest_dev) ${DRY_RUN}"
 # NOTE: intentionally NO --delete. This is evidence, not a mirror: a bad
 # delete on the source must never propagate and destroy the only other copy.
 # The backup is additive; prune deliberately if it ever needs reclaiming.
-rsync -a --stats $DRY_RUN "$SRC/" "$DEST/" >>"$LOG_FILE" 2>&1
+# rsync's own status still gates the run — but capture its output rather than
+# redirecting to LOG_FILE directly, so an unwritable log can't be the thing that
+# fails an otherwise-good backup. --stats output is a few lines; buffering is fine.
+if ! rsync_out=$(rsync -a --stats $DRY_RUN "$SRC/" "$DEST/" 2>&1); then
+  log "FATAL: rsync failed:"
+  log "$rsync_out"
+  exit 1
+fi
+{ echo "$rsync_out" >> "$LOG_FILE"; } 2>/dev/null || true
 
 # `|| true` on every pipeline below: SRC is the LIVE photo directory, so find can
 # exit non-zero merely because a file vanished mid-scan. Under `set -euo pipefail`
