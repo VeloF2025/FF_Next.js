@@ -1,0 +1,30 @@
+[Unit]
+Description=FibreFlow Next.js Application (Dev)
+After=network.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=velo
+Group=velo
+WorkingDirectory=/home/velo/fibreflow-dev
+
+# Pre-start guard: verify .next/BUILD_ID exists, rebuild if missing
+ExecStartPre=+/usr/local/bin/fibreflow-prestart /home/velo/fibreflow-dev
+
+ExecStart=/usr/bin/npm start -- -p 3005
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+Environment=NODE_ENV=production
+Environment=PORT=3005
+
+StandardOutput=append:/var/log/fibreflow-dev.log
+StandardError=append:/var/log/fibreflow-dev.error.log
+
+[Install]
+WantedBy=multi-user.target
