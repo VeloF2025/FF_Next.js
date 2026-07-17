@@ -18,8 +18,10 @@ set -euo pipefail
 
 THRESHOLD="${ROOT_DISK_THRESHOLD:-80}"
 MOUNT="${ROOT_DISK_MOUNT:-/}"
-LOG_FILE="${ROOT_DISK_LOG:-/tmp/check-root-disk.log}"
-STATE_FILE="${ROOT_DISK_STATE:-/tmp/.check-root-disk.state}"
+# Not /tmp: systemd-tmpfiles would periodically wipe the cooldown state (silently
+# re-arming alerts), and predictable /tmp names are a symlink-race surface.
+LOG_FILE="${ROOT_DISK_LOG:-/srv/data/backups/check-root-disk.log}"
+STATE_FILE="${ROOT_DISK_STATE:-/srv/data/backups/.check-root-disk.state}"
 COOLDOWN_SECONDS="${ROOT_DISK_COOLDOWN:-21600}" # 6h — don't spam an hourly cron
 
 WA_BRIDGE="${WA_BRIDGE_URL:-http://72.61.197.178:8083/send-message}"
@@ -28,13 +30,25 @@ WA_GROUP_JID="${WA_ALERT_GROUP_JID:-120363421664266245@g.us}"
 FORCE=""
 [[ "${1:-}" == "--force" ]] && FORCE=1
 
+mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$STATE_FILE")"
+
+# Single-instance: an hourly cron must never overlap itself and race STATE_FILE.
+# -n = fail immediately rather than queue up behind a stuck run.
+LOCK_FILE="${ROOT_DISK_LOCK:-/var/lock/check-root-disk.lock}"
+if [[ -z "${_ROOT_DISK_LOCKED:-}" ]]; then
+  export _ROOT_DISK_LOCKED=1
+  exec flock -n "$LOCK_FILE" "$0" "$@" || { echo "another check-root-disk run holds the lock; skipping"; exit 0; }
+fi
+
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
 send_wa_alert() {
   local message="$1"
-  curl -s -X POST "$WA_BRIDGE" \
+  # Timeouts are mandatory: this runs hourly, and a black-holed bridge (packets
+  # dropped rather than refused) would otherwise hang curl past the next run.
+  curl -s --connect-timeout 5 --max-time 10 -X POST "$WA_BRIDGE" \
     -H "Content-Type: application/json" \
     -d "{\"group_jid\":\"${WA_GROUP_JID}\",\"message\":\"${message}\"}" \
     >/dev/null 2>&1 || log "WARNING: could not reach WA bridge at ${WA_BRIDGE}"

@@ -23,8 +23,15 @@ const args = process.argv.slice(2);
 const limitIdx = args.indexOf('--limit');
 const LIMIT = limitIdx >= 0 ? parseInt(args[limitIdx + 1]) : 6000;
 
+let exitCode = 0;
+
+// feature_id and filename are DB-sourced and become path segments, so this must
+// also neutralise separators and `..` — path.join() does not sandbox traversal.
 function sanitize(name) {
-  return name.replace(/[<>:"|?*]/g, '_');
+  return name
+    .replace(/[<>:"|?*]/g, '_')
+    .replace(/[/\\]/g, '_')
+    .replace(/^\.+/, '_');
 }
 
 async function main() {
@@ -60,12 +67,17 @@ async function main() {
 
     if (fs.existsSync(destPath)) {
       // File already on disk, just update DB
-      await pool.query(
+      const res = await pool.query(
         `UPDATE construction_qa_photos
          SET source = 'local', storage_key = $1, updated_at = NOW()
          WHERE id = $2::uuid AND source = 'qfield'`,
         [relPath, row.id]
       );
+      if (res.rowCount === 0) {
+        stats.fail++;
+        failures.push({ key: row.storage_key, reason: 'row no longer source=qfield at UPDATE time' });
+        continue;
+      }
       stats.skip++;
       continue;
     }
@@ -90,12 +102,21 @@ async function main() {
       fs.mkdirSync(path.dirname(destPath), { recursive: true });
       fs.writeFileSync(destPath, buffer);
 
-      await pool.query(
+      // `AND source='qfield'` matches the skip-path guard above: it makes the write
+      // idempotent, so a re-run can never rewrite storage_key on a row another run
+      // already moved to 'local'. rowCount is checked because a guarded UPDATE that
+      // matches nothing must not be reported as a successful sync.
+      const res = await pool.query(
         `UPDATE construction_qa_photos
          SET source = 'local', storage_key = $1, updated_at = NOW()
          WHERE id = $2::uuid AND source = 'qfield'`,
         [relPath, row.id]
       );
+      if (res.rowCount === 0) {
+        stats.fail++;
+        failures.push({ key: row.storage_key, reason: 'row no longer source=qfield at UPDATE time' });
+        continue;
+      }
       stats.ok++;
     } catch (err) {
       stats.fail++;
@@ -111,6 +132,7 @@ async function main() {
 
   // Never drop failures silently — they are unsynced field evidence.
   if (failures.length > 0) {
+    exitCode = 1;
     console.error(`\n${failures.length} failure(s):`);
     for (const f of failures.slice(0, 50)) {
       console.error(`  ${f.key} -> ${f.reason}`);
@@ -122,7 +144,10 @@ async function main() {
 main()
   .then(async () => {
     await pool.end();
-    process.exit(0);
+    // Exit non-zero if any photo failed to sync. Printing failures is not enough:
+    // this runs from cron, where $? is the only thing a wrapper can key off, and a
+    // fully-failed run (e.g. MinIO down) would otherwise look like success.
+    process.exit(exitCode);
   })
   .catch(async (e) => {
     console.error('Fatal:', e);

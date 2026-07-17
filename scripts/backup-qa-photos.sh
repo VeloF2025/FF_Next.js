@@ -45,15 +45,29 @@ fi
 mkdir -p "$DEST" "$(dirname "$LOG_FILE")"
 
 # Refuse to back up onto the same physical disk — that is not a backup.
+# Compare the underlying DISK (lsblk PKNAME), not just the mount source: two
+# different LVs/partitions can sit on one NVMe, which would pass a mount-source
+# check while giving zero redundancy against that drive failing.
 src_dev=$(df --output=source "$SRC" | tail -1)
 dest_dev=$(df --output=source "$DEST" | tail -1)
+src_disk=$(lsblk -no PKNAME "$src_dev" 2>/dev/null | head -1 || true)
+dest_disk=$(lsblk -no PKNAME "$dest_dev" 2>/dev/null | head -1 || true)
+
 if [[ "$src_dev" == "$dest_dev" ]]; then
   log "FATAL: source and destination are on the same device ($src_dev). Refusing — this would not be a backup."
   exit 1
 fi
+if [[ -n "$src_disk" && -n "$dest_disk" && "$src_disk" == "$dest_disk" ]]; then
+  log "FATAL: source and destination are both on physical disk ${src_disk} (${src_dev} vs ${dest_dev}). Refusing — this would not survive that disk failing."
+  exit 1
+fi
+if [[ -z "$src_disk" || -z "$dest_disk" ]]; then
+  log "WARNING: could not resolve a physical disk for ${src_dev} and/or ${dest_dev}; fell back to mount-source comparison only."
+fi
 
+# 10#: df can emit zero-padded values, which bash would read as octal.
 free_gb=$(df -BG --output=avail "$DEST" | tail -1 | tr -dc '0-9')
-if (( free_gb < MIN_FREE_GB )); then
+if (( 10#${free_gb:-0} < 10#$MIN_FREE_GB )); then
   log "FATAL: only ${free_gb}G free on $DEST (need ${MIN_FREE_GB}G)."
   exit 1
 fi
@@ -65,14 +79,18 @@ log "Starting QA photo backup: $SRC ($src_dev) -> $DEST ($dest_dev) ${DRY_RUN}"
 # The backup is additive; prune deliberately if it ever needs reclaiming.
 rsync -a --stats $DRY_RUN "$SRC/" "$DEST/" >>"$LOG_FILE" 2>&1
 
-src_files=$(find "$SRC" -type f | wc -l)
-dest_files=$(find "$DEST" -type f | wc -l)
-src_size=$(du -sh "$SRC" | cut -f1)
-dest_size=$(du -sh "$DEST" | cut -f1)
+# `|| true` on every pipeline below: SRC is the LIVE photo directory, so find can
+# exit non-zero merely because a file vanished mid-scan. Under `set -euo pipefail`
+# that would kill the script here — after rsync already succeeded — with no log
+# line saying why. A count is not worth losing the diagnostic trail over.
+src_files=$(find "$SRC" -type f 2>/dev/null | wc -l || true)
+dest_files=$(find "$DEST" -type f 2>/dev/null | wc -l || true)
+src_size=$(du -sh "$SRC" 2>/dev/null | cut -f1 || true)
+dest_size=$(du -sh "$DEST" 2>/dev/null | cut -f1 || true)
 
 log "Source: ${src_files} files (${src_size}) | Backup: ${dest_files} files (${dest_size})"
 
-if [[ -z "$DRY_RUN" ]] && (( dest_files < src_files )); then
+if [[ -z "$DRY_RUN" ]] && (( 10#${dest_files:-0} < 10#${src_files:-0} )); then
   log "WARNING: backup has fewer files than source (${dest_files} < ${src_files})."
   exit 1
 fi
