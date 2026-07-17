@@ -10,12 +10,16 @@
 # rows flip source='qfield' -> source='local', /srv/storage holds the ONLY
 # copy of that evidence.
 #
-# DISK TOPOLOGY (this is the whole point — verify before changing paths):
-#   /srv/storage -> nvme2n1   (source: qa-photos live here)
-#   /srv/data    -> nvme1n1   (destination: a DIFFERENT physical disk)
-#   /            -> nvme0n1   (91% full — never a backup target)
-# Backing up to the same physical disk protects nothing. Keep SRC and DEST
-# on different NVMe devices; `lsblk -o NAME,SIZE,MOUNTPOINT` confirms.
+# DISK TOPOLOGY (this is the whole point — verify before changing paths).
+# Mount source -> physical disk (`df --output=source` then `lsblk -no PKNAME`):
+#   /srv/storage  /dev/nvme2n1p1 -> nvme2n1   (source: qa-photos live here)
+#   /srv/data     /dev/nvme1n1p1 -> nvme1n1   (destination: a DIFFERENT disk)
+#   /             /dev/mapper/ubuntu--vg-ubuntu--lv -> nvme0n1  (91% full — never a target)
+# Backing up to the same physical disk protects nothing, so the run below
+# compares PKNAME and refuses if SRC and DEST share a drive. Note /srv/data and
+# /srv/ml are DIFFERENT mount sources on the SAME disk (nvme1n1) — that pair is
+# exactly what the PKNAME check exists to reject, and a mount-source comparison
+# alone would wave it through.
 #
 # Cron (SAST): 30 1 * * *  /home/velo/fibreflow-production/scripts/backup-qa-photos.sh
 # Usage: bash scripts/backup-qa-photos.sh [--dry-run]
@@ -89,6 +93,14 @@ src_size=$(du -sh "$SRC" 2>/dev/null | cut -f1 || true)
 dest_size=$(du -sh "$DEST" 2>/dev/null | cut -f1 || true)
 
 log "Source: ${src_files} files (${src_size}) | Backup: ${dest_files} files (${dest_size})"
+
+# A zero source count means the enumeration itself failed (the live directory is
+# never empty). Say so — otherwise the dest>=src check below trivially passes and
+# a broken scan reads as a clean backup.
+if (( 10#${src_files:-0} == 0 )); then
+  log "WARNING: enumerated 0 source files — scan failed; integrity check skipped."
+  exit 1
+fi
 
 if [[ -z "$DRY_RUN" ]] && (( 10#${dest_files:-0} < 10#${src_files:-0} )); then
   log "WARNING: backup has fewer files than source (${dest_files} < ${src_files})."

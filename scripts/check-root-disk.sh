@@ -33,11 +33,13 @@ FORCE=""
 mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$STATE_FILE")" 2>/dev/null || true
 
 # NO LOCK, deliberately. A review suggested flock to stop an hourly run racing
-# STATE_FILE, but overlap needs a run lasting >1h and the only unbounded step was
-# the WA curl, which now has --max-time 10; everything else is a df. Meanwhile
-# every flock failure mode (missing binary, unopenable lock file, lock held)
-# ends with this script NOT RUNNING — i.e. a full disk goes unreported. For a
-# monitor, silently not running is worse than a duplicated alert.
+# STATE_FILE, but overlap needs a run lasting >1h: the only unbounded step was
+# the WA curl, now capped by --max-time 10, and the rest is df against a LOCAL
+# NVMe (df can block forever on a hung network mount — if ROOT_DISK_MOUNT is
+# ever pointed at one, revisit this). Meanwhile every flock failure mode
+# (missing binary, unopenable lock file, lock held) ends with this script NOT
+# RUNNING — a full disk goes unreported. For a monitor, silently not running is
+# worse than a duplicated alert.
 
 # Logging is best-effort: an unwritable LOG_FILE must never stop a disk alert.
 # (`| tee -a` under pipefail would kill the script the moment tee failed.)
