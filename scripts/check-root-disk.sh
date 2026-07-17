@@ -30,18 +30,23 @@ WA_GROUP_JID="${WA_ALERT_GROUP_JID:-120363421664266245@g.us}"
 FORCE=""
 [[ "${1:-}" == "--force" ]] && FORCE=1
 
-mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$STATE_FILE")"
+mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$STATE_FILE")" 2>/dev/null || true
 
-# Single-instance: an hourly cron must never overlap itself and race STATE_FILE.
-# -n = fail immediately rather than queue up behind a stuck run.
-LOCK_FILE="${ROOT_DISK_LOCK:-/var/lock/check-root-disk.lock}"
-if [[ -z "${_ROOT_DISK_LOCKED:-}" ]]; then
-  export _ROOT_DISK_LOCKED=1
-  exec flock -n "$LOCK_FILE" "$0" "$@" || { echo "another check-root-disk run holds the lock; skipping"; exit 0; }
-fi
+# NO LOCK, deliberately. A review suggested flock to stop an hourly run racing
+# STATE_FILE, but overlap needs a run lasting >1h and the only unbounded step was
+# the WA curl, which now has --max-time 10; everything else is a df. Meanwhile
+# every flock failure mode (missing binary, unopenable lock file, lock held)
+# ends with this script NOT RUNNING — i.e. a full disk goes unreported. For a
+# monitor, silently not running is worse than a duplicated alert.
 
+# Logging is best-effort: an unwritable LOG_FILE must never stop a disk alert.
+# (`| tee -a` under pipefail would kill the script the moment tee failed.)
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+  local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+  echo "$msg"
+  # Braces + `|| true`: a failing REDIRECTION is reported by bash itself before
+  # the command runs, so `echo ... 2>/dev/null` would not silence it.
+  { echo "$msg" >> "$LOG_FILE"; } 2>/dev/null || true
 }
 
 send_wa_alert() {
@@ -66,7 +71,7 @@ fi
 # Force base-10: df can return zero-padded values ("08") which bash reads as octal.
 if (( 10#$USED_PCT < 10#$THRESHOLD )); then
   log "OK: ${MOUNT} at ${USED_PCT}% (threshold ${THRESHOLD}%, ${AVAIL} free)"
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" 2>/dev/null || true
   exit 0
 fi
 
@@ -83,4 +88,6 @@ fi
 
 log "ALERT: ${MOUNT} at ${USED_PCT}% (threshold ${THRESHOLD}%, only ${AVAIL} free)"
 send_wa_alert "🔴 DISK ALERT: root ${MOUNT} on $(hostname) is ${USED_PCT}% full (only ${AVAIL} free, threshold ${THRESHOLD}%). Top offender is usually QFieldCloud MinIO under /var/lib/docker."
-echo "${now} ${USED_PCT}" > "$STATE_FILE"
+# Best-effort, like the log: failing to persist cooldown state costs a duplicate
+# alert next hour — it must not make an otherwise-successful run report failure.
+{ echo "${now} ${USED_PCT}" > "$STATE_FILE"; } 2>/dev/null || log "WARNING: could not write state file ${STATE_FILE}; cooldown will not apply."
