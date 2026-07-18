@@ -1,0 +1,190 @@
+# Prometheus Alerting Rules for BOSS
+# Purpose: Define alerting conditions for critical system events
+# Reference: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+
+groups:
+  - name: boss_critical_alerts
+    interval: 1m
+    rules:
+      # Event Queue Alerts
+      - alert: HighEventQueueDepth
+        expr: boss_event_queue_depth > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: event_bus
+        annotations:
+          summary: "High event queue depth detected"
+          description: "Event queue {{$labels.stream}} has {{$value}} events (threshold: 100). Possible processing bottleneck."
+
+      - alert: CriticalEventQueueDepth
+        expr: boss_event_queue_depth > 500
+        for: 2m
+        labels:
+          severity: critical
+          component: event_bus
+        annotations:
+          summary: "CRITICAL: Event queue depth exceeded"
+          description: "Event queue {{$labels.stream}} has {{$value}} events (threshold: 500). System may be overwhelmed."
+
+      # Hook Execution Alerts
+      - alert: HighHookFailureRate
+        expr: |
+          (
+            sum(rate(boss_hook_executions_total{status="failed"}[5m])) by (hook_name)
+            /
+            sum(rate(boss_hook_executions_total[5m])) by (hook_name)
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: hooks
+        annotations:
+          summary: "High hook failure rate"
+          description: "Hook {{$labels.hook_name}} has {{$value | humanizePercentage}} failure rate (threshold: 10%)."
+
+      - alert: HookExecutionLatencyHigh
+        expr: |
+          histogram_quantile(0.95, rate(boss_hook_duration_seconds_bucket[5m])) > 5.0
+        for: 5m
+        labels:
+          severity: warning
+          component: hooks
+        annotations:
+          summary: "Hook execution latency is high"
+          description: "Hook {{$labels.hook_name}} p95 latency is {{$value}}s (threshold: 5s)."
+
+      # Dead Letter Queue Alerts
+      - alert: DeadLetterQueueGrowing
+        expr: sum(boss_dlq_events_total) > 50
+        for: 10m
+        labels:
+          severity: warning
+          component: dlq
+        annotations:
+          summary: "Dead letter queue is growing"
+          description: "DLQ has {{$value}} failed events (threshold: 50). Manual intervention may be required."
+
+      - alert: DeadLetterQueueCritical
+        expr: sum(boss_dlq_events_total) > 200
+        for: 5m
+        labels:
+          severity: critical
+          component: dlq
+        annotations:
+          summary: "CRITICAL: Dead letter queue size exceeded"
+          description: "DLQ has {{$value}} failed events (threshold: 200). System health compromised."
+
+      # Cost Alerts
+      - alert: MonthlyBudgetWarning
+        expr: boss_monthly_cost_usd{category="total"} > 500
+        for: 5m
+        labels:
+          severity: warning
+          component: cost
+        annotations:
+          summary: "Monthly cost approaching budget limit"
+          description: "Current monthly cost is ${{$value}} (budget: $600). Consider optimizing API usage."
+
+      - alert: MonthlyBudgetExceeded
+        expr: boss_monthly_cost_usd{category="total"} > 600
+        for: 2m
+        labels:
+          severity: critical
+          component: cost
+        annotations:
+          summary: "CRITICAL: Monthly budget exceeded"
+          description: "Current monthly cost is ${{$value}} (budget: $600). Immediate action required."
+
+      # Resource Alerts
+      - alert: HighMemoryUsage
+        expr: boss_memory_usage_bytes{type="rss"} > 2147483648  # 2GB
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{$value | humanize1024}}B (threshold: 2GB)."
+
+      - alert: HighCPUUsage
+        expr: boss_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{$value}}% (threshold: 80%)."
+
+      # Agent Health Alerts
+      - alert: AgentOperationFailures
+        expr: |
+          (
+            sum(rate(boss_agent_operations_total{status="failed"}[5m])) by (agent_name)
+            /
+            sum(rate(boss_agent_operations_total[5m])) by (agent_name)
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: agents
+        annotations:
+          summary: "Agent experiencing high failure rate"
+          description: "Agent {{$labels.agent_name}} has {{$value | humanizePercentage}} failure rate (threshold: 20%)."
+
+      # System Health Alerts
+      - alert: BOSSMetricsExporterDown
+        expr: up{job="boss"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "CRITICAL: BOSS metrics exporter is down"
+          description: "Cannot scrape BOSS metrics. System monitoring offline."
+
+      - alert: DatabaseConnectionLost
+        expr: boss_database_connections_active{database="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "CRITICAL: PostgreSQL connection lost"
+          description: "Event store is unavailable. System may continue without persistence."
+
+      - alert: EventBusConnectionLost
+        expr: boss_database_connections_active{database="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: event_bus
+        annotations:
+          summary: "CRITICAL: Redis connection lost"
+          description: "Event bus is unavailable. System cannot process events."
+
+  - name: boss_performance_alerts
+    interval: 5m
+    rules:
+      # Performance SLA Violations
+      - alert: EventProcessingLatencySLAViolation
+        expr: |
+          histogram_quantile(0.95, rate(boss_event_processing_duration_seconds_bucket[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "Event processing latency SLA violation"
+          description: "p95 event processing latency is {{$value}}s (SLA: 200ms)."
+
+      - alert: LowEventThroughput
+        expr: rate(boss_events_consumed_total[5m]) < 1
+        for: 15m
+        labels:
+          severity: info
+          component: performance
+        annotations:
+          summary: "Low event throughput detected"
+          description: "Event consumption rate is {{$value}} events/sec. System may be idle or underutilized."

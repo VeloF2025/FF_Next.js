@@ -1,0 +1,510 @@
+{
+  "dashboard": {
+    "title": "BOSS Production Dashboard",
+    "description": "Comprehensive monitoring dashboard for BOSS (Business Operating System Solution)",
+    "tags": ["boss", "events", "hooks", "agents", "production"],
+    "timezone": "browser",
+    "editable": true,
+    "graphTooltip": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Event Throughput",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "rate(boss_events_published_total[5m])",
+            "legendFormat": "{{event_type}} published",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(boss_events_consumed_total[5m])",
+            "legendFormat": "{{event_type}} consumed",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Events/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Event Queue Depth",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "boss_event_queue_depth",
+            "legendFormat": "{{stream}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Queue Depth",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "High Event Queue Depth",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [100],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "message": "Event queue depth exceeded 100 events - possible processing bottleneck",
+          "noDataState": "no_data"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Hook Execution Rate",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(boss_hook_executions_total{status=\"success\"}[5m])",
+            "legendFormat": "{{hook_name}} success",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(boss_hook_executions_total{status=\"failed\"}[5m])",
+            "legendFormat": "{{hook_name}} failed",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Executions/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Hook Execution Latency (p95)",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(boss_hook_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{hook_name}} p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(boss_hook_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{hook_name}} p50",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Latency (seconds)",
+            "format": "s"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Hook Success Rate",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(boss_hook_executions_total{status=\"success\"}[5m])) / sum(rate(boss_hook_executions_total[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "textMode": "value",
+          "colorMode": "value",
+          "unit": "percent",
+          "decimals": 2
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "value": null,
+              "color": "red"
+            },
+            {
+              "value": 95,
+              "color": "yellow"
+            },
+            {
+              "value": 99,
+              "color": "green"
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Dead Letter Queue Size",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "sum(boss_dlq_events_total)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "textMode": "value",
+          "colorMode": "value"
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "value": null,
+              "color": "green"
+            },
+            {
+              "value": 10,
+              "color": "yellow"
+            },
+            {
+              "value": 50,
+              "color": "red"
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "Monthly Cost (USD)",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "boss_monthly_cost_usd{category=\"total\"}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "textMode": "value",
+          "colorMode": "value",
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "value": null,
+              "color": "green"
+            },
+            {
+              "value": 500,
+              "color": "yellow"
+            },
+            {
+              "value": 600,
+              "color": "red"
+            }
+          ]
+        },
+        "alert": {
+          "name": "High Monthly Cost",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [500],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "message": "Monthly cost exceeded $500 - approaching budget limit of $600",
+          "noDataState": "no_data"
+        }
+      },
+      {
+        "id": 8,
+        "title": "Budget Remaining (USD)",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "boss_cost_budget_remaining_usd",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "textMode": "value",
+          "colorMode": "value",
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "value": null,
+              "color": "red"
+            },
+            {
+              "value": 100,
+              "color": "yellow"
+            },
+            {
+              "value": 200,
+              "color": "green"
+            }
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "title": "OCR Cost Optimization",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 20
+        },
+        "targets": [
+          {
+            "expr": "boss_ocr_tier_usage_total",
+            "legendFormat": "{{tier}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "right"
+          },
+          "pieType": "pie",
+          "tooltip": {
+            "mode": "single"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Agent Operations",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 20
+        },
+        "targets": [
+          {
+            "expr": "rate(boss_agent_operations_total{status=\"success\"}[5m])",
+            "legendFormat": "{{agent_name}}/{{operation}} success",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(boss_agent_operations_total{status=\"failed\"}[5m])",
+            "legendFormat": "{{agent_name}}/{{operation}} failed",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Operations/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "System Resources - Memory",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 28
+        },
+        "targets": [
+          {
+            "expr": "boss_memory_usage_bytes{type=\"rss\"}",
+            "legendFormat": "RSS (Resident Set Size)",
+            "refId": "A"
+          },
+          {
+            "expr": "boss_memory_usage_bytes{type=\"vms\"}",
+            "legendFormat": "VMS (Virtual Memory Size)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Memory Usage",
+            "format": "bytes"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "System Resources - CPU",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 28
+        },
+        "targets": [
+          {
+            "expr": "boss_cpu_usage_percent",
+            "legendFormat": "CPU Usage",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "CPU %",
+            "format": "percent",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Event Processing Duration (Heatmap)",
+        "type": "heatmap",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 36
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(boss_event_processing_duration_seconds_bucket[5m])) by (le)",
+            "format": "heatmap",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "calculate": false,
+          "cellGap": 2,
+          "color": {
+            "exponent": 0.5,
+            "fill": "dark-orange",
+            "mode": "scheme",
+            "reverse": false,
+            "scale": "exponential",
+            "scheme": "Spectral",
+            "steps": 128
+          },
+          "exemplars": {
+            "color": "rgba(255,0,255,0.7)"
+          },
+          "filterValues": {
+            "le": 1e-9
+          },
+          "legend": {
+            "show": true
+          },
+          "rowsFrame": {
+            "layout": "auto"
+          },
+          "tooltip": {
+            "show": true,
+            "yHistogram": false
+          },
+          "yAxis": {
+            "axisPlacement": "left",
+            "reverse": false,
+            "unit": "s"
+          }
+        }
+      }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 38,
+    "version": 1
+  }
+}

@@ -1,0 +1,1658 @@
+"""
+Email Intelligence API Routes
+
+Provides endpoints for:
+- Email classification (3-tier cascade: rule→heuristic→Claude)
+- Email draft generation (Claude + RAG context)
+- Email sending (MS Graph)
+- Outlook category management
+
+Enhanced for n8n integration on Hostinger VPS.
+
+Author: BOSS Development Team
+Created: 2025-11-17
+Updated: 2025-11-30 (n8n integration)
+"""
+
+import os
+import json
+import logging
+import asyncio
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+from pathlib import Path
+from fastapi import APIRouter, HTTPException, Depends, status, Request, BackgroundTasks
+from pydantic import BaseModel, Field
+
+from api.auth import verify_api_key
+from api.rate_limiting import limiter
+
+# Import EmailClassifier (3-tier cascade)
+from lib.email.email_classifier import EmailClassifier, EmailCategory, Classification
+
+# Import DraftGenerator
+from agents.communication.draft_generator import DraftGenerator
+
+# Import MS Graph client
+from lib.msgraph.client import MSGraphClient
+from lib.msgraph.models import Email, EmailDraft, EmailImportance
+
+# Import IMAP client
+from lib.imap.client import IMAPClient
+
+logger = logging.getLogger(__name__)
+
+# Data directory for config files
+DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
+
+router = APIRouter(prefix="/email", tags=["Email Intelligence"])
+
+# Initialize components lazily to avoid startup issues
+_email_classifier: Optional[EmailClassifier] = None
+_draft_generator: Optional[DraftGenerator] = None
+_msgraph_clients: Dict[str, MSGraphClient] = {}
+_imap_clients: Dict[str, IMAPClient] = {}
+
+
+def load_msgraph_accounts() -> List[Dict[str, Any]]:
+    """
+    Load MS Graph accounts from config file.
+
+    Returns:
+        List of account configurations with credentials
+    """
+    config_file = DATA_DIR / "msgraph_accounts.json"
+
+    if config_file.exists():
+        try:
+            with open(config_file, "r") as f:
+                data = json.load(f)
+            accounts = data.get("accounts", [])
+            enabled = [a for a in accounts if a.get("enabled", True)]
+            logger.info(f"Loaded {len(enabled)} enabled MS Graph accounts from config")
+            return enabled
+        except Exception as e:
+            logger.error(f"Error loading MS Graph accounts: {e}")
+
+    # Fallback to environment variables
+    if all([os.getenv("MS_GRAPH_CLIENT_ID"),
+            os.getenv("MS_GRAPH_CLIENT_SECRET"),
+            os.getenv("MS_GRAPH_TENANT_ID")]):
+        logger.info("Using MS Graph credentials from environment variables")
+        return [{
+            "account_id": "default",
+            "client_id": os.getenv("MS_GRAPH_CLIENT_ID"),
+            "client_secret": os.getenv("MS_GRAPH_CLIENT_SECRET"),
+            "tenant_id": os.getenv("MS_GRAPH_TENANT_ID"),
+            "user_email": os.getenv("MS_GRAPH_USER_EMAIL"),
+            "display_name": "Default MS Graph Account",
+            "enabled": True
+        }]
+
+    logger.warning("No MS Graph accounts configured")
+    return []
+
+
+def load_imap_accounts() -> List[Dict[str, Any]]:
+    """
+    Load IMAP accounts from config file.
+
+    Returns:
+        List of account configurations with credentials
+    """
+    config_file = DATA_DIR / "imap_accounts.json"
+
+    if config_file.exists():
+        try:
+            with open(config_file, "r") as f:
+                data = json.load(f)
+            accounts = data.get("accounts", [])
+            enabled = [a for a in accounts if a.get("enabled", True)]
+            logger.info(f"Loaded {len(enabled)} enabled IMAP accounts from config")
+            return enabled
+        except Exception as e:
+            logger.error(f"Error loading IMAP accounts: {e}")
+
+    logger.warning("No IMAP accounts configured")
+    return []
+
+
+async def get_imap_client(account: Dict[str, Any]) -> IMAPClient:
+    """
+    Get or create IMAPClient instance for specified account.
+
+    Args:
+        account: Account configuration dict with host, port, username, password
+
+    Returns:
+        IMAPClient instance
+    """
+    global _imap_clients
+
+    account_id = account.get("account_id", "default")
+
+    # Check cache
+    if account_id in _imap_clients:
+        return _imap_clients[account_id]
+
+    # Create new client
+    client = IMAPClient(
+        imap_server=account.get("host"),
+        imap_port=account.get("port", 993),
+        smtp_server=account.get("smtp_host"),
+        smtp_port=account.get("smtp_port", 587),
+        username=account.get("username"),
+        password=account.get("password"),
+        use_ssl=True
+    )
+    await client.connect()
+    _imap_clients[account_id] = client
+    logger.info(f"IMAPClient connected for account: {account.get('display_name', account_id)}")
+
+    return client
+
+
+def get_email_classifier() -> EmailClassifier:
+    """Get or create EmailClassifier instance."""
+    global _email_classifier
+    if _email_classifier is None:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        _email_classifier = EmailClassifier(anthropic_api_key=api_key)
+        logger.info("EmailClassifier initialized (3-tier cascade)")
+    return _email_classifier
+
+
+def get_draft_generator() -> DraftGenerator:
+    """Get or create DraftGenerator instance."""
+    global _draft_generator
+    if _draft_generator is None:
+        _draft_generator = DraftGenerator()
+        logger.info("DraftGenerator initialized")
+    return _draft_generator
+
+
+async def get_msgraph_client(account_id: Optional[str] = None) -> MSGraphClient:
+    """
+    Get or create MSGraphClient instance for specified account.
+
+    Args:
+        account_id: Specific account ID to use, or None for first available
+
+    Returns:
+        MSGraphClient instance
+
+    Raises:
+        HTTPException: If no MS Graph accounts are configured
+    """
+    global _msgraph_clients
+
+    # Load accounts from config
+    accounts = load_msgraph_accounts()
+
+    if not accounts:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No MS Graph accounts configured. Add accounts to data/msgraph_accounts.json or set MS_GRAPH_* environment variables."
+        )
+
+    # Find the requested account or use first available
+    account = None
+    if account_id:
+        account = next((a for a in accounts if a.get("account_id") == account_id), None)
+        if not account:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"MS Graph account '{account_id}' not found"
+            )
+    else:
+        account = accounts[0]
+
+    cache_key = account.get("account_id", "default")
+
+    # Check cache
+    if cache_key in _msgraph_clients:
+        return _msgraph_clients[cache_key]
+
+    # Create new client
+    client = MSGraphClient(
+        client_id=account.get("client_id"),
+        client_secret=account.get("client_secret"),
+        tenant_id=account.get("tenant_id"),
+        user_email=account.get("user_email")
+    )
+    await client.connect()
+    _msgraph_clients[cache_key] = client
+    logger.info(f"MSGraphClient connected for account: {account.get('display_name', cache_key)}")
+
+    return client
+
+
+async def get_all_msgraph_clients() -> List[tuple[str, MSGraphClient]]:
+    """
+    Get all configured MS Graph clients.
+
+    Returns:
+        List of (account_id, client) tuples
+    """
+    accounts = load_msgraph_accounts()
+    clients = []
+
+    for account in accounts:
+        account_id = account.get("account_id", "default")
+        try:
+            client = await get_msgraph_client(account_id)
+            clients.append((account_id, client))
+        except Exception as e:
+            logger.error(f"Failed to connect account {account_id}: {e}")
+
+    return clients
+
+
+# ============================================================================
+# REQUEST/RESPONSE MODELS
+# ============================================================================
+
+class EmailMessage(BaseModel):
+    """Email message for classification/processing"""
+    from_address: str = Field(..., description="Sender email address")
+    to_addresses: List[str] = Field(..., description="Recipient email addresses")
+    subject: str = Field(..., description="Email subject")
+    body: str = Field(..., description="Email body text")
+    cc_addresses: Optional[List[str]] = Field(default=None, description="CC addresses")
+    received_time: Optional[str] = Field(default=None, description="Email received timestamp")
+
+
+class ClassifyEmailRequest(BaseModel):
+    """Request model for email classification"""
+    email: EmailMessage = Field(..., description="Email to classify")
+
+
+class ClassifyEmailResponse(BaseModel):
+    """Response model for email classification"""
+    urgency: str = Field(..., description="Urgency level: high|medium|low")
+    category: str = Field(..., description="Email category")
+    intent: str = Field(..., description="Sender's intent")
+    priority_score: float = Field(ge=0.0, le=1.0, description="Priority score 0-1")
+    requires_response: bool = Field(..., description="Whether response is required")
+    estimated_response_time: str = Field(..., description="Recommended response timeframe")
+    keywords: List[str] = Field(default=[], description="Key terms identified")
+    confidence: float = Field(ge=0.0, le=1.0, description="Classification confidence")
+
+
+class DraftEmailRequest(BaseModel):
+    """Request model for email draft generation"""
+    email: EmailMessage = Field(..., description="Email to respond to")
+    context: Optional[Dict[str, Any]] = Field(default=None, description="Additional context from enrichment")
+    tone: str = Field(default="professional", description="Tone: professional|friendly|formal")
+    instructions: Optional[str] = Field(default=None, description="Special instructions for draft")
+
+
+class DraftEmailResponse(BaseModel):
+    """Response model for email draft"""
+    draft_id: str = Field(..., description="Unique draft identifier")
+    to: List[str] = Field(..., description="Recipients")
+    subject: str = Field(..., description="Draft subject")
+    body: str = Field(..., description="Draft body")
+    tone: str = Field(..., description="Tone used")
+    confidence: float = Field(ge=0.0, le=1.0, description="Draft quality confidence")
+    created_at: str = Field(..., description="Draft creation timestamp")
+
+
+class SendEmailRequest(BaseModel):
+    """Request model for sending email"""
+    draft_id: Optional[str] = Field(default=None, description="Draft ID to send")
+    to: List[str] = Field(..., description="Recipients")
+    subject: str = Field(..., description="Email subject")
+    body: str = Field(..., description="Email body")
+    cc: Optional[List[str]] = Field(default=None, description="CC recipients")
+    attachments: Optional[List[str]] = Field(default=None, description="Attachment file paths")
+
+
+class SendEmailResponse(BaseModel):
+    """Response model for sent email"""
+    message_id: str = Field(..., description="MS Graph message ID")
+    status: str = Field(..., description="Send status")
+    timestamp: str = Field(..., description="Send timestamp")
+    recipients: List[str] = Field(..., description="Recipients")
+
+
+class CategorizeEmailRequest(BaseModel):
+    """Request model for email categorization (Outlook categories)"""
+    message_id: str = Field(..., description="MS Graph message ID")
+    category: str = Field(..., description="Category name to apply")
+    add_category: bool = Field(default=True, description="Add (True) or replace (False) categories")
+
+
+class CategorizeEmailResponse(BaseModel):
+    """Response model for email categorization"""
+    message_id: str = Field(..., description="MS Graph message ID")
+    categories: List[str] = Field(..., description="Applied categories")
+    status: str = Field(..., description="Operation status")
+
+
+class SendApprovedRequest(BaseModel):
+    """Request model for sending approved draft"""
+    draft_id: str = Field(..., description="Draft ID from draft endpoint")
+    to: List[str] = Field(..., description="Recipients")
+    subject: str = Field(..., description="Email subject")
+    body: str = Field(..., description="Email body (HTML)")
+    cc: Optional[List[str]] = Field(default=None, description="CC recipients")
+    in_reply_to: Optional[str] = Field(default=None, description="Original message ID if reply")
+
+
+class SendApprovedResponse(BaseModel):
+    """Response model for sent approved email"""
+    message_id: str = Field(..., description="MS Graph message ID")
+    status: str = Field(..., description="Send status: sent|failed")
+    timestamp: str = Field(..., description="Send timestamp")
+    recipients: List[str] = Field(..., description="Recipients")
+    draft_id: str = Field(..., description="Original draft ID")
+
+
+class CallbackRequest(BaseModel):
+    """Request from n8n to trigger BOSS callback"""
+    email_id: str = Field(..., description="Original email ID")
+    classification: Dict[str, Any] = Field(..., description="Classification result")
+    draft: Optional[Dict[str, Any]] = Field(default=None, description="Generated draft")
+    callback_url: str = Field(..., description="n8n webhook URL for callback")
+
+
+class CallbackResponse(BaseModel):
+    """Response for callback registration"""
+    callback_id: str = Field(..., description="Callback tracking ID")
+    status: str = Field(..., description="Registration status")
+
+
+# ============================================================================
+# CLASSIFICATION LOGIC
+# ============================================================================
+
+def classify_urgency(email: EmailMessage) -> tuple[str, float]:
+    """
+    Classify email urgency based on keywords and patterns.
+
+    Returns:
+        (urgency_level, confidence_score)
+    """
+    subject_lower = email.subject.lower()
+    body_lower = email.body.lower()
+
+    # High urgency keywords
+    high_urgency_keywords = [
+        "urgent", "asap", "immediately", "critical", "emergency",
+        "deadline", "today", "now", "press release", "media"
+    ]
+
+    # Medium urgency keywords
+    medium_urgency_keywords = [
+        "soon", "this week", "important", "please review",
+        "follow up", "reminder", "update required"
+    ]
+
+    # Check for high urgency
+    high_matches = sum(1 for kw in high_urgency_keywords if kw in subject_lower or kw in body_lower)
+    if high_matches >= 2:
+        return "high", 0.9
+    elif high_matches == 1:
+        return "high", 0.7
+
+    # Check for medium urgency
+    medium_matches = sum(1 for kw in medium_urgency_keywords if kw in subject_lower or kw in body_lower)
+    if medium_matches >= 2:
+        return "medium", 0.8
+    elif medium_matches == 1:
+        return "medium", 0.6
+
+    # Default to low urgency
+    return "low", 0.7
+
+
+def classify_category(email: EmailMessage) -> tuple[str, List[str]]:
+    """
+    Classify email category based on content.
+
+    Returns:
+        (category, keywords)
+    """
+    subject_lower = email.subject.lower()
+    body_lower = email.body.lower()
+    text = f"{subject_lower} {body_lower}"
+
+    categories = {
+        "financial": ["invoice", "payment", "financial", "budget", "cost", "quote", "billing"],
+        "meeting": ["meeting", "call", "schedule", "calendar", "appointment", "zoom", "teams"],
+        "question": ["question", "clarify", "wondering", "help", "how to", "can you", "?"],
+        "update": ["update", "status", "progress", "report", "fyi", "sharing"],
+        "action_required": ["please", "need", "required", "must", "should", "action"],
+        "legal": ["contract", "agreement", "legal", "terms", "compliance", "regulation"],
+        "technical": ["bug", "error", "technical", "issue", "system", "code", "deployment"]
+    }
+
+    scores = {}
+    for category, keywords in categories.items():
+        matches = [kw for kw in keywords if kw in text]
+        if matches:
+            scores[category] = len(matches)
+
+    if not scores:
+        return "general", []
+
+    # Get category with most matches
+    best_category = max(scores.items(), key=lambda x: x[1])[0]
+    keywords = [kw for kw in categories[best_category] if kw in text]
+
+    return best_category, keywords
+
+
+def classify_intent(email: EmailMessage) -> str:
+    """
+    Classify sender's intent.
+
+    Returns:
+        Intent classification
+    """
+    subject_lower = email.subject.lower()
+    body_lower = email.body.lower()
+    text = f"{subject_lower} {body_lower}"
+
+    # Order matters - check action-requiring intents first
+    intents = {
+        "request_action": ["please provide", "could you", "need you to", "action required", "kindly"],
+        "request_info": ["question", "wondering", "can you provide", "need information", "?"],
+        "approve": ["approve", "approval", "sign off", "review and approve"],
+        "complain": ["issue", "problem", "concern", "complaint", "not working"],
+        "schedule": ["meeting", "call", "schedule", "available", "calendar"],
+        "thank": ["thank", "appreciate", "grateful", "thanks"],
+        "provide_update": ["update", "fyi", "sharing", "wanted to let you know"]
+    }
+
+    for intent, keywords in intents.items():
+        if any(kw in text for kw in keywords):
+            return intent
+
+    return "inform"
+
+
+def calculate_priority_score(urgency: str, category: str, requires_response: bool) -> float:
+    """Calculate overall priority score."""
+    urgency_scores = {"high": 1.0, "medium": 0.6, "low": 0.3}
+    category_weights = {
+        "financial": 0.9,
+        "legal": 0.95,
+        "action_required": 0.85,
+        "meeting": 0.7,
+        "question": 0.6,
+        "update": 0.4,
+        "general": 0.3,
+        "technical": 0.8
+    }
+
+    base_score = urgency_scores.get(urgency, 0.5)
+    category_weight = category_weights.get(category, 0.5)
+    response_bonus = 0.1 if requires_response else 0
+
+    score = (base_score * 0.6) + (category_weight * 0.3) + response_bonus
+    return min(score, 1.0)
+
+
+def estimate_response_time(urgency: str, category: str) -> str:
+    """Estimate recommended response timeframe."""
+    if urgency == "high":
+        if category in ["legal", "financial", "action_required"]:
+            return "< 2 hours"
+        return "< 4 hours"
+    elif urgency == "medium":
+        if category in ["question", "meeting"]:
+            return "< 24 hours"
+        return "< 2 days"
+    else:
+        if category == "update":
+            return "No response needed"
+        return "< 1 week"
+
+
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
+
+@router.post("/classify", response_model=ClassifyEmailResponse, dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def classify_email(request: Request, classify_request: ClassifyEmailRequest) -> ClassifyEmailResponse:
+    """
+    Classify email using 3-tier cascade (rule→heuristic→Claude).
+
+    This endpoint analyzes an email and provides:
+    - Urgency level (high/medium/low)
+    - Category classification (Urgent, Client Inquiry, Financial, etc.)
+    - Sender's intent
+    - Priority score
+    - Response requirements
+    - Classification method used (rule-based, heuristic, ai)
+
+    **Cost Optimization:**
+    - Tier 1 (rule-based): FREE, ~70% of emails
+    - Tier 2 (heuristic): FREE, ~20% more
+    - Tier 3 (Claude AI): PAID (~$0.002), only ~10% complex cases
+
+    **Example Request:**
+    ```json
+    {
+        "email": {
+            "from_address": "john@blitz.com",
+            "to_addresses": ["boss@example.com"],
+            "subject": "URGENT: Q4 Financial Review Required",
+            "body": "Please review and approve the attached Q4 financials ASAP..."
+        }
+    }
+    ```
+    """
+    logger.info(f"Classifying email from: {classify_request.email.from_address}")
+
+    try:
+        # Get classifier instance
+        classifier = get_email_classifier()
+
+        # Convert request to classifier format
+        email_data = {
+            "subject": classify_request.email.subject,
+            "body": classify_request.email.body,
+            "sender": classify_request.email.from_address,
+            "recipients": classify_request.email.to_addresses,
+            "cc_recipients": classify_request.email.cc_addresses or [],
+            "has_attachments": False,  # Not available in request
+            "importance": "normal"
+        }
+
+        # Run 3-tier classification
+        classification = await classifier.classify(email_data)
+
+        # Map EmailCategory to urgency
+        urgency_map = {
+            EmailCategory.URGENT: "high",
+            EmailCategory.ACTION_REQUIRED: "medium",
+            EmailCategory.FINANCIAL: "medium",
+            EmailCategory.CLIENT_INQUIRY: "medium",
+            EmailCategory.INTERNAL: "low",
+            EmailCategory.FYI: "low",
+            EmailCategory.SPAM: "low"
+        }
+        urgency = urgency_map.get(classification.category, "medium")
+
+        # Determine if response required
+        requires_response = classifier.should_generate_draft(classification.category)
+
+        # Calculate priority score based on category and confidence
+        priority_map = {
+            EmailCategory.URGENT: 0.95,
+            EmailCategory.FINANCIAL: 0.85,
+            EmailCategory.ACTION_REQUIRED: 0.80,
+            EmailCategory.CLIENT_INQUIRY: 0.75,
+            EmailCategory.INTERNAL: 0.50,
+            EmailCategory.FYI: 0.30,
+            EmailCategory.SPAM: 0.10
+        }
+        priority_score = priority_map.get(classification.category, 0.50) * classification.confidence
+
+        # Also run legacy analysis for intent and keywords
+        intent = classify_intent(classify_request.email)
+        _, keywords = classify_category(classify_request.email)
+        estimated_response_time = estimate_response_time(urgency, classification.category.value)
+
+        response = ClassifyEmailResponse(
+            urgency=urgency,
+            category=classification.category.value,
+            intent=intent,
+            priority_score=round(priority_score, 2),
+            requires_response=requires_response,
+            estimated_response_time=estimated_response_time,
+            keywords=keywords,
+            confidence=classification.confidence
+        )
+
+        logger.info(
+            f"✅ Email classified via {classification.method}: "
+            f"{classification.category.value} (confidence: {classification.confidence:.2f})"
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Email classification failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email classification failed: {str(e)}"
+        )
+
+
+@router.post("/draft", response_model=DraftEmailResponse, dependencies=[Depends(verify_api_key)])
+@limiter.limit("10/minute")
+async def draft_email(request: Request, draft_request: DraftEmailRequest) -> DraftEmailResponse:
+    """
+    Generate email draft using Claude with RAG context.
+
+    Uses DraftGenerator which:
+    - Integrates Claude API for intelligent drafting
+    - Supports personality profiles from learning history
+    - Uses RAG context for relevant document references
+    - Auto-detects complexity for cost optimization
+
+    **Effort Optimization (Claude Opus 4.5):**
+    - routine: 76%+ token savings (simple acknowledgments)
+    - standard: Best cost/quality balance (default)
+    - complex: Thorough analysis (financial/legal)
+
+    **Example Request:**
+    ```json
+    {
+        "email": {
+            "from_address": "john@blitz.com",
+            "to_addresses": ["boss@example.com"],
+            "subject": "Q4 Financial Review",
+            "body": "Please review the attached Q4 financials..."
+        },
+        "context": {
+            "sender_info": {"name": "John Smith", "company": "Blitz"},
+            "relevant_docs": [{"title": "Q4 Report", "summary": "..."}]
+        },
+        "tone": "professional"
+    }
+    ```
+    """
+    logger.info(f"Generating draft for email from: {draft_request.email.from_address}")
+
+    try:
+        # Get draft generator
+        generator = get_draft_generator()
+
+        # Convert request email to internal Email model
+        email = Email(
+            message_id=f"incoming_{datetime.utcnow().timestamp()}",
+            subject=draft_request.email.subject,
+            body=draft_request.email.body,
+            sender=draft_request.email.from_address,
+            sender_name=draft_request.email.from_address.split("@")[0].replace(".", " ").title(),
+            to_recipients=draft_request.email.to_addresses,
+            cc_recipients=draft_request.email.cc_addresses or [],
+            received_at=datetime.utcnow() if not draft_request.email.received_time else datetime.fromisoformat(draft_request.email.received_time),
+            is_read=True,
+            has_attachments=False
+        )
+
+        # Prepare context
+        context = draft_request.context or {}
+
+        # Auto-detect complexity from context/classification
+        complexity = DraftGenerator.detect_complexity(context)
+        logger.info(f"Auto-detected complexity: {complexity}")
+
+        # Generate draft using Claude
+        draft = await generator.generate_draft(
+            email=email,
+            context=context,
+            tone=draft_request.tone,
+            user_name="Hein van Vuuren",  # TODO: Make configurable
+            complexity=complexity
+        )
+
+        # Create response
+        draft_id = f"draft_{datetime.utcnow().timestamp()}"
+
+        response = DraftEmailResponse(
+            draft_id=draft_id,
+            to=draft.to_recipients,
+            subject=draft.subject,
+            body=draft.body,
+            tone=draft_request.tone,
+            confidence=draft.confidence,
+            created_at=draft.generated_at.isoformat() if draft.generated_at else datetime.utcnow().isoformat()
+        )
+
+        logger.info(f"✅ Draft generated: {draft_id} (complexity={complexity}, confidence={draft.confidence:.2f})")
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Email draft generation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email draft generation failed: {str(e)}"
+        )
+
+
+@router.post("/send", response_model=SendEmailResponse, dependencies=[Depends(verify_api_key)])
+@limiter.limit("5/minute")
+async def send_email(request: Request, send_request: SendEmailRequest) -> SendEmailResponse:
+    """
+    Send email via MS Graph (direct send, no approval).
+
+    Use /send-approved for approved drafts from n8n workflow.
+    """
+    logger.info(f"Sending email to: {send_request.to}")
+
+    try:
+        # Get MS Graph client
+        client = await get_msgraph_client()
+
+        # Send via MS Graph
+        await client.send_email(
+            to=send_request.to,
+            subject=send_request.subject,
+            body=send_request.body,
+            cc=send_request.cc,
+            is_html=True
+        )
+
+        message_id = f"sent_{datetime.utcnow().timestamp()}"
+
+        response = SendEmailResponse(
+            message_id=message_id,
+            status="sent",
+            timestamp=datetime.utcnow().isoformat(),
+            recipients=send_request.to
+        )
+
+        logger.info(f"✅ Email sent via MS Graph: {message_id}")
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Email sending failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email sending failed: {str(e)}"
+        )
+
+
+# ============================================================================
+# NEW ENDPOINTS FOR N8N INTEGRATION
+# ============================================================================
+
+@router.post("/categorize", response_model=CategorizeEmailResponse, dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def categorize_email(request: Request, categorize_request: CategorizeEmailRequest) -> CategorizeEmailResponse:
+    """
+    Apply Outlook category to email via MS Graph.
+
+    Categories are color-coded labels visible in Outlook:
+    - Urgent (Red)
+    - Client Inquiry (Blue)
+    - Internal (Green)
+    - Financial (Orange)
+    - Action Required (Yellow)
+    - FYI (Gray)
+    - Spam/Marketing (Purple)
+
+    **Example Request:**
+    ```json
+    {
+        "message_id": "AAMkAGI...",
+        "category": "Financial",
+        "add_category": true
+    }
+    ```
+    """
+    logger.info(f"Categorizing email {categorize_request.message_id}: {categorize_request.category}")
+
+    try:
+        # Get MS Graph client
+        client = await get_msgraph_client()
+
+        if categorize_request.add_category:
+            # Add category (preserve existing)
+            await client.add_message_category(
+                categorize_request.message_id,
+                categorize_request.category
+            )
+        else:
+            # Replace all categories
+            await client.update_message_categories(
+                categorize_request.message_id,
+                [categorize_request.category]
+            )
+
+        # Fetch updated email to get final categories
+        email = await client.get_email(categorize_request.message_id)
+        final_categories = email.categories or [categorize_request.category]
+
+        response = CategorizeEmailResponse(
+            message_id=categorize_request.message_id,
+            categories=final_categories,
+            status="success"
+        )
+
+        logger.info(f"✅ Email categorized: {final_categories}")
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Email categorization failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email categorization failed: {str(e)}"
+        )
+
+
+@router.post("/send-approved", response_model=SendApprovedResponse, dependencies=[Depends(verify_api_key)])
+@limiter.limit("10/minute")
+async def send_approved_email(request: Request, send_request: SendApprovedRequest) -> SendApprovedResponse:
+    """
+    Send user-approved email draft via MS Graph.
+
+    This endpoint is called by n8n after user approves a draft via Telegram.
+
+    **Workflow:**
+    1. n8n receives email → calls /classify
+    2. BOSS classifies → returns classification + draft
+    3. n8n shows Telegram approval buttons
+    4. User approves → n8n calls /send-approved
+    5. BOSS sends via MS Graph
+
+    **Example Request:**
+    ```json
+    {
+        "draft_id": "draft_1732940000.123",
+        "to": ["john@blitz.com"],
+        "subject": "Re: Q4 Financial Review",
+        "body": "<p>Hi John...</p>",
+        "in_reply_to": "AAMkAGI..."
+    }
+    ```
+    """
+    logger.info(f"Sending approved draft {send_request.draft_id} to: {send_request.to}")
+
+    try:
+        # Get MS Graph client
+        client = await get_msgraph_client()
+
+        # Send email via MS Graph
+        await client.send_email(
+            to=send_request.to,
+            subject=send_request.subject,
+            body=send_request.body,
+            cc=send_request.cc,
+            is_html=True,
+            in_reply_to=send_request.in_reply_to
+        )
+
+        message_id = f"approved_{datetime.utcnow().timestamp()}"
+
+        response = SendApprovedResponse(
+            message_id=message_id,
+            status="sent",
+            timestamp=datetime.utcnow().isoformat(),
+            recipients=send_request.to,
+            draft_id=send_request.draft_id
+        )
+
+        logger.info(f"✅ Approved email sent via MS Graph: {message_id}")
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Approved email sending failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Approved email sending failed: {str(e)}"
+        )
+
+
+@router.post("/sync-categories", dependencies=[Depends(verify_api_key)])
+@limiter.limit("5/minute")
+async def sync_outlook_categories(request: Request) -> Dict[str, Any]:
+    """
+    Sync BOSS email categories to Outlook.
+
+    Creates all required categories in Outlook if they don't exist.
+    Should be called once during setup.
+
+    **Categories Created:**
+    - Urgent (Red)
+    - Client Inquiry (Blue)
+    - Internal (Green)
+    - Financial (Orange)
+    - Action Required (Yellow)
+    - FYI (Gray)
+    - Spam/Marketing (Purple)
+    """
+    logger.info("Syncing BOSS categories to Outlook...")
+
+    try:
+        # Get MS Graph client
+        client = await get_msgraph_client()
+
+        # Define BOSS categories with Outlook colors
+        boss_categories = {
+            "Urgent": "preset0",         # Red
+            "Client Inquiry": "preset1",  # Blue
+            "Internal": "preset2",        # Green
+            "Financial": "preset3",       # Orange
+            "Action Required": "preset4", # Yellow
+            "FYI": "preset5",            # Gray
+            "Spam/Marketing": "preset6"   # Purple
+        }
+
+        # Sync categories
+        await client.sync_categories(boss_categories)
+
+        logger.info(f"✅ Synced {len(boss_categories)} categories to Outlook")
+
+        return {
+            "status": "success",
+            "categories_synced": list(boss_categories.keys()),
+            "message": "Categories synced to Outlook"
+        }
+
+    except Exception as e:
+        logger.error(f"Category sync failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Category sync failed: {str(e)}"
+        )
+
+
+@router.get("/health", dependencies=[Depends(verify_api_key)])
+async def email_health_check(request: Request) -> Dict[str, Any]:
+    """
+    Health check for email API components.
+
+    Returns status of:
+    - EmailClassifier (3-tier cascade)
+    - DraftGenerator (Claude + RAG)
+    - MSGraphClient (Office 365)
+    """
+    health = {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "components": {}
+    }
+
+    # Check EmailClassifier
+    try:
+        classifier = get_email_classifier()
+        health["components"]["email_classifier"] = {
+            "status": "healthy",
+            "tiers": ["rule-based", "heuristic", "ai"]
+        }
+    except Exception as e:
+        health["components"]["email_classifier"] = {"status": "error", "error": str(e)}
+        health["status"] = "degraded"
+
+    # Check DraftGenerator
+    try:
+        generator = get_draft_generator()
+        health["components"]["draft_generator"] = {
+            "status": "healthy",
+            "claude_available": generator.client is not None,
+            "gemini_fallback": generator.gemini_model is not None
+        }
+    except Exception as e:
+        health["components"]["draft_generator"] = {"status": "error", "error": str(e)}
+        health["status"] = "degraded"
+
+    # Check MS Graph (if configured)
+    try:
+        if os.getenv("MS_GRAPH_CLIENT_ID"):
+            client = await get_msgraph_client()
+            health["components"]["msgraph_client"] = {
+                "status": "healthy",
+                "user": client.user_email
+            }
+        else:
+            health["components"]["msgraph_client"] = {"status": "not_configured"}
+    except Exception as e:
+        health["components"]["msgraph_client"] = {"status": "error", "error": str(e)}
+        health["status"] = "degraded"
+
+    return health
+
+
+# ============================================================================
+# N8N INTEGRATION - CLASSIFY AND DRAFT (Combined endpoint)
+# ============================================================================
+
+class ClassifyAndDraftRequest(BaseModel):
+    """Request model for combined classify-and-draft (n8n integration)"""
+    type: str = Field(default="draft_request", description="Request type")
+    email: Dict[str, Any] = Field(..., description="Email data from n8n classification")
+    classification: Dict[str, Any] = Field(..., description="Classification from n8n")
+    options: Optional[Dict[str, Any]] = Field(default=None, description="Draft options")
+
+
+class ClassifyAndDraftResponse(BaseModel):
+    """Response model for combined classify-and-draft"""
+    draft_id: str = Field(..., description="Unique draft identifier")
+    email: Dict[str, Any] = Field(..., description="Original email data")
+    classification: Dict[str, Any] = Field(..., description="Classification data")
+    draft: Dict[str, Any] = Field(..., description="Generated draft")
+    approval_id: str = Field(..., description="Approval queue ID")
+    created_at: str = Field(..., description="Timestamp")
+
+
+@router.post("/classify-and-draft", response_model=ClassifyAndDraftResponse)
+async def classify_and_draft(request: Request, data: ClassifyAndDraftRequest) -> ClassifyAndDraftResponse:
+    """
+    Combined endpoint for n8n integration.
+
+    Receives pre-classified email from n8n and generates draft for approval.
+    This endpoint is called by the n8n workflow when an email needs a draft response.
+
+    **Flow:**
+    1. n8n classifies email (rule-based, FREE)
+    2. n8n calls this endpoint for emails needing drafts
+    3. BOSS generates draft using Claude + RAG context
+    4. Draft is queued for Telegram approval
+
+    **Options:**
+    - tone: 'match_sender' | 'professional' | 'friendly' | 'formal'
+    - include_context: bool - Include RAG context
+    - max_length: int - Max draft length (default: 500)
+    """
+    logger.info(f"[n8n] Classify-and-draft request for: {data.email.get('subject', 'Unknown')}")
+
+    try:
+        # Extract email data (from n8n classification format)
+        email_data = data.email
+        classification = data.classification
+        options = data.options or {}
+
+        # Get draft generator
+        generator = get_draft_generator()
+
+        # Convert to internal Email model
+        email = Email(
+            message_id=email_data.get("message_id", f"n8n_{datetime.utcnow().timestamp()}"),
+            subject=email_data.get("subject", ""),
+            body=email_data.get("body_full") or email_data.get("body_preview", ""),
+            sender=email_data.get("from", ""),
+            sender_name=email_data.get("from_name", ""),
+            to_recipients=email_data.get("to", []),
+            cc_recipients=email_data.get("cc", []),
+            received_at=datetime.fromisoformat(email_data.get("received_at", datetime.utcnow().isoformat()).replace("Z", "+00:00")) if email_data.get("received_at") else datetime.utcnow(),
+            is_read=True,
+            has_attachments=email_data.get("has_attachments", False)
+        )
+
+        # Determine tone
+        tone = options.get("tone", "professional")
+        if tone == "match_sender":
+            # Analyze sender's tone from email body
+            tone = await analyze_sender_tone(email_data.get("body_full") or email_data.get("body_preview", ""))
+
+        # Build context from classification
+        context = {
+            "classification": classification,
+            "priority": classification.get("priority", 5),
+            "category": classification.get("category", "ROUTINE"),
+            "confidence": classification.get("confidence", 0.5),
+            "sender_info": {
+                "name": email_data.get("from_name", ""),
+                "email": email_data.get("from", ""),
+            }
+        }
+
+        # Include RAG context if requested
+        if options.get("include_context", True):
+            # TODO: Query RAG for relevant documents
+            context["rag_context"] = []
+
+        # Determine complexity for effort parameter
+        category = classification.get("category", "ROUTINE")
+        if category in ["URGENT", "FINANCIAL"]:
+            complexity = "complex"
+        elif category in ["ACTION_REQUIRED", "CLIENT_INQUIRY"]:
+            complexity = "standard"
+        else:
+            complexity = "routine"
+
+        # Generate draft
+        draft = await generator.generate_draft(
+            email=email,
+            context=context,
+            tone=tone,
+            user_name="Hein van Vuuren",  # TODO: Make configurable
+            complexity=complexity
+        )
+
+        # Create draft ID and approval ID
+        timestamp = datetime.utcnow()
+        draft_id = f"draft_{int(timestamp.timestamp() * 1000)}"
+        approval_id = f"approval_{int(timestamp.timestamp() * 1000)}"
+
+        # Build response
+        response = ClassifyAndDraftResponse(
+            draft_id=draft_id,
+            email=email_data,
+            classification=classification,
+            draft={
+                "to": draft.to_recipients,
+                "subject": draft.subject,
+                "body": draft.body,
+                "tone": tone,
+                "confidence": draft.confidence,
+            },
+            approval_id=approval_id,
+            created_at=timestamp.isoformat()
+        )
+
+        logger.info(f"[n8n] ✅ Draft generated: {draft_id} (category={category}, tone={tone})")
+
+        return response
+
+    except Exception as e:
+        logger.error(f"[n8n] Classify-and-draft failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Draft generation failed: {str(e)}"
+        )
+
+
+async def analyze_sender_tone(body: str) -> str:
+    """
+    Analyze sender's communication tone from email body.
+
+    Returns: 'professional' | 'friendly' | 'formal' | 'casual'
+    """
+    if not body:
+        return "professional"
+
+    body_lower = body.lower()
+
+    # Friendly indicators
+    friendly_patterns = [
+        "hi ", "hey ", "hello!", "thanks!", "cheers", "best,", "regards,",
+        "hope you're well", "hope this finds you", ":)", "!"
+    ]
+
+    # Formal indicators
+    formal_patterns = [
+        "dear ", "sincerely,", "yours faithfully", "kind regards",
+        "please be advised", "hereby", "pursuant to", "as per"
+    ]
+
+    # Casual indicators
+    casual_patterns = [
+        "quick", "just a", "fyi", "heads up", "btw", "asap",
+        "checking in", "touching base"
+    ]
+
+    friendly_score = sum(1 for p in friendly_patterns if p in body_lower)
+    formal_score = sum(1 for p in formal_patterns if p in body_lower)
+    casual_score = sum(1 for p in casual_patterns if p in body_lower)
+
+    if formal_score > friendly_score and formal_score > casual_score:
+        return "formal"
+    elif friendly_score > formal_score and friendly_score > casual_score:
+        return "friendly"
+    elif casual_score > formal_score and casual_score > friendly_score:
+        return "friendly"  # Treat casual as friendly
+    else:
+        return "professional"
+
+
+# ============================================================================
+# RAG INGESTION HELPER
+# ============================================================================
+
+async def ingest_email_to_rag(email: Email, account_id: str) -> bool:
+    """
+    Ingest an email into the RAG knowledge base (Qdrant).
+
+    This embeds the email content and stores it in the 'conversations'
+    collection for semantic search later.
+
+    Args:
+        email: The Email object to ingest
+        account_id: The MS Graph account ID
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        import hashlib
+        from qdrant_client.models import PointStruct
+
+        # Get or create embedding service and qdrant manager
+        from lib.rag.embedding_service import get_embedding_service
+        from lib.rag.qdrant_manager import get_qdrant_manager
+
+        embedding_service = get_embedding_service()
+        qdrant = get_qdrant_manager()
+
+        # Prepare text for embedding (combine subject and body)
+        email_text = f"Subject: {email.subject}\n\nFrom: {email.sender}\n\n{email.body[:4000] if email.body else ''}"
+
+        # Generate embedding
+        embedding = embedding_service.generate_embedding(email_text)
+
+        if not embedding:
+            logger.warning(f"Failed to generate embedding for email: {email.message_id}")
+            return False
+
+        # Create unique point ID from message_id
+        point_id = hashlib.md5(email.message_id.encode()).hexdigest()
+
+        # Create point with metadata
+        point = PointStruct(
+            id=point_id,
+            vector=embedding,
+            payload={
+                "type": "email",
+                "message_id": email.message_id,
+                "subject": email.subject[:500] if email.subject else "",
+                "sender": email.sender,
+                "sender_name": email.sender_name or "",
+                "to_recipients": email.recipients[:5] if email.recipients else [],
+                "cc_recipients": (email.cc_recipients or [])[:5],
+                "received_at": str(email.received_at) if email.received_at else None,
+                "account_id": account_id,
+                "body_preview": email.body[:500] if email.body else "",
+                "has_attachments": email.has_attachments,
+                "indexed_at": datetime.utcnow().isoformat()
+            }
+        )
+
+        # Upsert to Qdrant conversations collection
+        result = qdrant.upsert_vectors(
+            collection_name="conversations",
+            points=[point]
+        )
+
+        if result.get("status") == "success":
+            logger.info(f"✅ Ingested email to RAG: {email.subject[:50]}...")
+            return True
+        else:
+            logger.warning(f"RAG upsert returned: {result}")
+            return False
+
+    except Exception as e:
+        logger.error(f"Error ingesting email to RAG: {e}", exc_info=True)
+        return False
+
+
+# ============================================================================
+# EMAIL POLLING ENDPOINT
+# ============================================================================
+
+class PollEmailsRequest(BaseModel):
+    """Request model for email polling."""
+    folder: str = Field(default="inbox", description="Folder to poll")
+    limit: int = Field(default=10, ge=1, le=50, description="Max emails to fetch")
+    unread_only: bool = Field(default=True, description="Only fetch unread emails")
+    account_id: Optional[str] = Field(default=None, description="Specific account ID to poll, or None for all accounts")
+
+
+class PollEmailsResponse(BaseModel):
+    """Response model for email polling."""
+    status: str = Field(..., description="Status: success, failed, or no_emails")
+    emails_found: int = Field(..., description="Number of emails found")
+    events_published: int = Field(..., description="Number of EMAIL_RECEIVED events published")
+    emails: List[Dict[str, Any]] = Field(default=[], description="List of email summaries")
+    message: str = Field(default="", description="Status message")
+
+
+@router.post("/poll", response_model=PollEmailsResponse, dependencies=[Depends(verify_api_key)])
+@limiter.limit("10/minute")
+async def poll_emails(request: Request, poll_request: PollEmailsRequest) -> PollEmailsResponse:
+    """
+    Poll inbox for new emails and trigger EMAIL_RECEIVED events.
+
+    This endpoint enables the full email processing pipeline:
+    1. Polls the specified folder for unread emails (MS Graph + IMAP accounts)
+    2. Publishes EMAIL_RECEIVED events for each email found
+    3. The on_email_received hook then processes each email:
+       - Classifies urgency/category
+       - Generates draft response if needed
+       - Queues draft for approval
+
+    **Supported Account Types:**
+    - MS Graph (Office 365): Blitz, Velocity accounts
+    - IMAP: H10, Vortex, and other standard email servers
+
+    **Use cases:**
+    - Manual trigger from Open WebUI ("check my emails")
+    - Scheduled polling via cron or n8n
+    - Testing the email processing flow
+
+    **Example Request:**
+    ```json
+    {
+        "folder": "inbox",
+        "limit": 10,
+        "unread_only": true,
+        "account_id": "hein_blitz"
+    }
+    ```
+    """
+    logger.info(
+        f"Polling emails: folder={poll_request.folder}, "
+        f"limit={poll_request.limit}, unread_only={poll_request.unread_only}, "
+        f"account_id={poll_request.account_id}"
+    )
+
+    all_emails = []
+    all_summaries = []
+    errors = []
+    total_accounts = 0
+
+    try:
+        # ============================================================
+        # POLL MS GRAPH ACCOUNTS (Office 365)
+        # ============================================================
+        msgraph_accounts = load_msgraph_accounts()
+
+        if poll_request.account_id:
+            # Filter to specific account if requested
+            msgraph_accounts = [a for a in msgraph_accounts if a.get("account_id") == poll_request.account_id]
+
+        for account in msgraph_accounts:
+            account_id = account.get("account_id", "default")
+            display_name = account.get("display_name", account_id)
+            total_accounts += 1
+
+            try:
+                client = await get_msgraph_client(account_id)
+
+                # Get emails from this account
+                emails = await client.get_emails(
+                    folder=poll_request.folder,
+                    limit=poll_request.limit,
+                    unread_only=poll_request.unread_only
+                )
+
+                logger.info(f"[MS Graph] Found {len(emails)} emails in {display_name}")
+
+                for email in emails:
+                    all_emails.append(email)
+                    all_summaries.append({
+                        "from": email.sender,
+                        "subject": email.subject[:100] + ("..." if len(email.subject) > 100 else ""),
+                        "received_at": str(email.received_at) if email.received_at else "Unknown",
+                        "message_id": email.message_id,
+                        "account_id": account_id,
+                        "account_type": "msgraph"
+                    })
+
+                    # Publish EMAIL_RECEIVED event for processing
+                    try:
+                        from lib.events.redis_event_bus import RedisEventBus
+                        from lib.events.event_schema import Event, EventType
+
+                        event_bus = RedisEventBus()
+                        event = Event(
+                            event_type=EventType.EMAIL_RECEIVED,
+                            source="email_poll_api",
+                            data={
+                                "message_id": email.message_id,
+                                "sender": email.sender,
+                                "subject": email.subject,
+                                "body": email.body[:5000] if email.body else "",
+                                "received_at": str(email.received_at) if email.received_at else None,
+                                "account_id": account_id,
+                                "account_type": "msgraph",
+                                "folder": poll_request.folder
+                            }
+                        )
+                        redis_msg_id = event_bus.publish(event)
+                        logger.debug(f"Published EMAIL_RECEIVED event: {redis_msg_id}")
+                    except Exception as event_err:
+                        logger.warning(f"Failed to publish EMAIL_RECEIVED event: {event_err}")
+
+                    # Ingest email into RAG knowledge base
+                    try:
+                        await ingest_email_to_rag(email, account_id)
+                    except Exception as rag_err:
+                        logger.warning(f"Failed to ingest email to RAG: {rag_err}")
+
+            except Exception as account_err:
+                error_msg = f"MS Graph {display_name}: {str(account_err)}"
+                logger.error(f"Error polling MS Graph {account_id}: {account_err}")
+                errors.append(error_msg)
+
+        # ============================================================
+        # POLL IMAP ACCOUNTS (Standard email servers)
+        # ============================================================
+        imap_accounts = load_imap_accounts()
+
+        if poll_request.account_id:
+            # Filter to specific account if requested
+            imap_accounts = [a for a in imap_accounts if a.get("account_id") == poll_request.account_id]
+
+        for account in imap_accounts:
+            account_id = account.get("account_id", "default")
+            display_name = account.get("display_name", account_id)
+            total_accounts += 1
+
+            try:
+                client = await get_imap_client(account)
+
+                # Map folder name for IMAP (inbox -> INBOX)
+                imap_folder = poll_request.folder.upper() if poll_request.folder.lower() == "inbox" else poll_request.folder
+
+                # Check if account specifies folders to sync
+                folders_to_sync = account.get("folders_to_sync", [imap_folder])
+                if imap_folder not in folders_to_sync and "INBOX" in folders_to_sync:
+                    imap_folder = "INBOX"
+
+                # Get emails from this IMAP account
+                emails = await client.get_emails(
+                    folder=imap_folder,
+                    limit=poll_request.limit,
+                    unread_only=poll_request.unread_only
+                )
+
+                logger.info(f"[IMAP] Found {len(emails)} emails in {display_name}")
+
+                for email in emails:
+                    all_emails.append(email)
+                    all_summaries.append({
+                        "from": email.sender,
+                        "subject": email.subject[:100] + ("..." if len(email.subject) > 100 else ""),
+                        "received_at": str(email.received_at) if email.received_at else "Unknown",
+                        "message_id": email.message_id,
+                        "account_id": account_id,
+                        "account_type": "imap"
+                    })
+
+                    # Publish EMAIL_RECEIVED event for processing
+                    try:
+                        from lib.events.redis_event_bus import RedisEventBus
+                        from lib.events.event_schema import Event, EventType
+
+                        event_bus = RedisEventBus()
+                        event = Event(
+                            event_type=EventType.EMAIL_RECEIVED,
+                            source="email_poll_api",
+                            data={
+                                "message_id": email.message_id,
+                                "sender": email.sender,
+                                "subject": email.subject,
+                                "body": email.body[:5000] if email.body else "",
+                                "received_at": str(email.received_at) if email.received_at else None,
+                                "account_id": account_id,
+                                "account_type": "imap",
+                                "folder": imap_folder
+                            }
+                        )
+                        redis_msg_id = event_bus.publish(event)
+                        logger.debug(f"Published EMAIL_RECEIVED event: {redis_msg_id}")
+                    except Exception as event_err:
+                        logger.warning(f"Failed to publish EMAIL_RECEIVED event: {event_err}")
+
+                    # Ingest email into RAG knowledge base
+                    try:
+                        await ingest_email_to_rag(email, account_id)
+                    except Exception as rag_err:
+                        logger.warning(f"Failed to ingest email to RAG: {rag_err}")
+
+            except Exception as account_err:
+                error_msg = f"IMAP {display_name}: {str(account_err)}"
+                logger.error(f"Error polling IMAP {account_id}: {account_err}")
+                errors.append(error_msg)
+
+        # ============================================================
+        # BUILD RESPONSE
+        # ============================================================
+        if total_accounts == 0:
+            return PollEmailsResponse(
+                status="failed",
+                emails_found=0,
+                events_published=0,
+                emails=[],
+                message="No email accounts configured. Add accounts to data/msgraph_accounts.json or data/imap_accounts.json."
+            )
+
+        if not all_emails and not errors:
+            return PollEmailsResponse(
+                status="no_emails",
+                emails_found=0,
+                events_published=0,
+                emails=[],
+                message="No new emails found. All caught up!"
+            )
+
+        if errors and not all_emails:
+            return PollEmailsResponse(
+                status="failed",
+                emails_found=0,
+                events_published=0,
+                emails=[],
+                message=f"Polling failed: {'; '.join(errors)}"
+            )
+
+        return PollEmailsResponse(
+            status="success",
+            emails_found=len(all_emails),
+            events_published=len(all_emails),
+            emails=all_summaries,
+            message=f"Found {len(all_emails)} emails across {total_accounts} account(s). Processing started."
+            + (f" Errors: {'; '.join(errors)}" if errors else "")
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"Email polling failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email polling failed: {str(e)}"
+        )
+
+
+# ============================================================================
+# RAG SEARCH ENDPOINT
+# ============================================================================
+
+class RAGSearchRequest(BaseModel):
+    """Request model for RAG knowledge base search."""
+    query: str = Field(..., description="Search query text")
+    limit: int = Field(default=10, ge=1, le=50, description="Max results to return")
+    collection: str = Field(default="conversations", description="Collection to search (conversations, documents, entities)")
+    score_threshold: Optional[float] = Field(default=0.5, ge=0, le=1.0, description="Minimum similarity score")
+
+
+class RAGSearchResult(BaseModel):
+    """Single search result."""
+    id: str
+    score: float
+    type: str
+    subject: Optional[str] = None
+    sender: Optional[str] = None
+    body_preview: Optional[str] = None
+    received_at: Optional[str] = None
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class RAGSearchResponse(BaseModel):
+    """Response model for RAG search."""
+    status: str
+    query: str
+    results_count: int
+    results: List[RAGSearchResult]
+    collection: str
+
+
+@router.post("/search", response_model=RAGSearchResponse, dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def search_knowledge_base(request: Request, search_request: RAGSearchRequest) -> RAGSearchResponse:
+    """
+    Search the RAG knowledge base for relevant emails/documents.
+
+    This endpoint performs semantic search across ingested emails
+    to find relevant content based on the query.
+
+    **Collections:**
+    - conversations: Emails and chat messages
+    - documents: Ingested documents (PDFs, Word, etc.)
+    - entities: Extracted entities (people, companies, projects)
+
+    **Example Request:**
+    ```json
+    {
+        "query": "Q4 financial reports from Blitz",
+        "limit": 10,
+        "collection": "conversations",
+        "score_threshold": 0.5
+    }
+    ```
+    """
+    logger.info(f"RAG search: query='{search_request.query[:50]}...', collection={search_request.collection}")
+
+    try:
+        from lib.rag.embedding_service import get_embedding_service
+        from lib.rag.qdrant_manager import get_qdrant_manager
+
+        embedding_service = get_embedding_service()
+        qdrant = get_qdrant_manager()
+
+        # Generate query embedding
+        query_embedding = embedding_service.generate_embedding(search_request.query)
+
+        if not query_embedding:
+            return RAGSearchResponse(
+                status="error",
+                query=search_request.query,
+                results_count=0,
+                results=[],
+                collection=search_request.collection
+            )
+
+        # Search Qdrant
+        raw_results = qdrant.search(
+            collection_name=search_request.collection,
+            query_vector=query_embedding,
+            limit=search_request.limit,
+            score_threshold=search_request.score_threshold
+        )
+
+        # Convert to response model
+        results = []
+        for hit in raw_results:
+            payload = hit.get("payload", {})
+            results.append(RAGSearchResult(
+                id=str(hit.get("id", "")),
+                score=hit.get("score", 0.0),
+                type=payload.get("type", "unknown"),
+                subject=payload.get("subject"),
+                sender=payload.get("sender"),
+                body_preview=payload.get("body_preview"),
+                received_at=payload.get("received_at"),
+                payload=payload
+            ))
+
+        logger.info(f"RAG search found {len(results)} results for '{search_request.query[:30]}...'")
+
+        return RAGSearchResponse(
+            status="success",
+            query=search_request.query,
+            results_count=len(results),
+            results=results,
+            collection=search_request.collection
+        )
+
+    except Exception as e:
+        logger.error(f"RAG search failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"RAG search failed: {str(e)}"
+        )

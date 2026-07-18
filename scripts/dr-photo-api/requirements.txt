@@ -1,0 +1,26 @@
+# Requirements for DR Photo Verification API Service
+# FastAPI server with 1Map integration
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# HTTP client for 1Map API
+httpx>=0.25.0
+
+# Data validation
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# File handling
+aiofiles>=23.0.0
+python-multipart>=0.0.6
+
+# Image processing (EXIF extraction)
+Pillow>=10.0.0
+
+# Database (optional - for metadata persistence)
+asyncpg>=0.29.0
