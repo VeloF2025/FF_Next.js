@@ -69,7 +69,10 @@ REDIRECT = re.compile(r">>?\s*(?!/dev/null\b|&\s*[0-9])\S")
 
 
 def _unquoted(cmd: str) -> str:
-    return re.sub(r"'[^']*'|\"[^\"]*\"", " ", cmd)
+    # Single-quoted spans are inert in bash — strip them fully. Double-quoted spans
+    # are only inert if they contain no `$` or backtick; a `"$(… > file)"` still
+    # runs the redirect live, so such spans are kept for the redirect check to see.
+    return re.sub(r"'[^']*'|\"[^\"$`]*\"", " ", cmd)
 
 
 def deny(reason: str) -> None:
