@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
-"""Jarvis relay — hands WhatsApp mentions to a headless Claude Code agent.
+"""Jarvis relay — hands WhatsApp mentions to a headless Claude Code agent, and
+executes fixes that Hein approves from his authenticated DM.
 
-Runs on Hein's workstation. Polls the WA bridge's sqlite store (over SSH) for
-messages that @-tag the Velocity number in the allowlisted internal groups.
-For each one it launches `claude -p` (full Claude Code, with the workstation's
-real tools/SSH/DB access) to actually diagnose the issue, then posts the reply
-back through the bridge as a threaded message. State-changing fixes are never
-run by the agent — they come back as an approval_request that DMs Hein.
+Runs on Hein's workstation (velo-server). Polls the WA bridge's sqlite store
+(over SSH) for messages that @-tag the Velocity number in the allowlisted
+groups, or any message in Hein's DM. Each is handed to `claude -p` (full Claude
+Code, real tools/SSH/DB access) which diagnoses read-only and replies.
+
+State-changing fixes are NEVER run by the agent (a guard hook blocks them).
+Instead the agent returns an approval_request with an exact command; the relay
+stores it under a short token and DMs Hein. When Hein approves that token from
+his DM, the relay itself runs the pre-vetted command (as Hein) and reports back.
 """
 import base64
 import json
 import logging
 import os
+import re
+import secrets
 import subprocess
 import sys
 import time
@@ -25,25 +31,29 @@ REPO_DIR = os.getenv("JARVIS_REPO", "/home/hein/Workspace/FF_Next.js")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SYSTEM_PROMPT_FILE = os.getenv("JARVIS_SYSTEM", os.path.join(BASE_DIR, "system-prompt.md"))
 SETTINGS_FILE = os.getenv("JARVIS_SETTINGS", "/home/hein/.jarvis-agent/settings.json")
+EXEC_SYSTEM_FILE = os.getenv("JARVIS_EXEC_SYSTEM", os.path.join(BASE_DIR, "system-prompt-exec.md"))
+EXEC_SETTINGS = os.getenv("JARVIS_EXEC_SETTINGS", "/home/hein/.jarvis-agent/settings-exec.json")
 STATE_FILE = os.getenv("STATE_FILE", "/home/hein/.jarvis-agent/state.json")
-# WhatsApp renders an @-mention of the bridge account as its LID
-# (188674373324992), not the phone number — match either.
+PENDING_FILE = os.getenv("PENDING_FILE", "/home/hein/.jarvis-agent/pending.json")
 JARVIS_MENTIONS = [t.strip() for t in os.getenv(
     "JARVIS_MENTIONS", "188674373324992,27638412276",
 ).split(",") if t.strip()]
-HEIN_JID = os.getenv("HEIN_JID", "")  # set in jarvis-agent.env (personal number, not in git)
+HEIN_JID = os.getenv("HEIN_JID", "")  # where approval requests are SENT (personal number, not in git)
+HEIN_DM_JID = os.getenv("HEIN_DM_JID", "")  # the DM chat approvals must COME FROM (authenticated Hein)
 ALLOWED_GROUPS = [g.strip() for g in os.getenv(
-    "ALLOWED_GROUPS",
-    "120363425013095777@g.us,120363423864087150@g.us",
+    "ALLOWED_GROUPS", "120363425013095777@g.us,120363423864087150@g.us",
 ).split(",") if g.strip()]
-# Direct-message chats where ANY inbound message is a question for Jarvis
-# (no @-tag needed — a DM is inherently directed at Jarvis).
 DM_CHATS = [c.strip() for c in os.getenv("DM_CHATS", "").split(",") if c.strip()]
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "15"))
 MAX_REPLIES_PER_HOUR = int(os.getenv("MAX_REPLIES_PER_HOUR", "10"))
 CONTEXT_MESSAGES = int(os.getenv("CONTEXT_MESSAGES", "20"))
 AGENT_TIMEOUT = int(os.getenv("AGENT_TIMEOUT", "420"))
+EXEC_TIMEOUT = int(os.getenv("EXEC_TIMEOUT", "240"))
+APPROVAL_TTL = int(os.getenv("APPROVAL_TTL", "1800"))
 MODEL = os.getenv("JARVIS_MODEL", "opus")
+
+APPROVE_RE = re.compile(r"\b(yes|ja|approve|approved|goedgekeur|keur goed|do it|doen dit|ok|okay|go|gaan voort|goed|maak so)\b", re.I)
+DECLINE_RE = re.compile(r"\b(no|nee|cancel|kanselleer|stop|moenie|los dit|nie)\b", re.I)
 
 log = logging.getLogger("jarvis-relay")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -61,7 +71,6 @@ def ssh(remote_cmd: str, timeout: int = 30) -> str:
 
 
 def sql_json(query: str) -> list:
-    """Run a query on the bridge sqlite and return rows as dicts (via json_object)."""
     out = ssh(f'sqlite3 "{BRIDGE_DB}" {json.dumps(query)}')
     rows = []
     for line in out.splitlines():
@@ -72,6 +81,21 @@ def sql_json(query: str) -> list:
             except json.JSONDecodeError:
                 pass
     return rows
+
+
+def _json_load(path: str) -> dict:
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _json_save(path: str, obj: dict) -> None:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(obj, f)
+    os.replace(tmp, path)
 
 
 def new_mentions(cursor_ts: str) -> list:
@@ -95,16 +119,12 @@ def new_mentions(cursor_ts: str) -> list:
 
 
 def chat_context(chat_jid: str) -> tuple:
-    q = (
+    rows = list(reversed(sql_json(
         "SELECT json_object('sender',sender,'content',content,'me',is_from_me) "
         f"FROM messages WHERE chat_jid='{chat_jid}' AND content!='' "
         f"ORDER BY timestamp DESC LIMIT {CONTEXT_MESSAGES}"
-    )
-    rows = list(reversed(sql_json(q)))
-    name_rows = sql_json(
-        "SELECT json_object('n',name) FROM chats WHERE jid="
-        f"'{chat_jid}'"
-    )
+    )))
+    name_rows = sql_json(f"SELECT json_object('n',name) FROM chats WHERE jid='{chat_jid}'")
     group_name = name_rows[0]["n"] if name_rows else chat_jid
     lines = []
     for r in rows:
@@ -125,10 +145,8 @@ def run_agent(group_name: str, sender: str, message: str, context: str) -> dict:
     )
     cmd = [
         "claude", "-p", user_prompt,
-        "--output-format", "json",
-        "--model", MODEL,
-        "--append-system-prompt", system_prompt,
-        "--settings", SETTINGS_FILE,
+        "--output-format", "json", "--model", MODEL,
+        "--append-system-prompt", system_prompt, "--settings", SETTINGS_FILE,
     ]
     r = subprocess.run(cmd, cwd=REPO_DIR, capture_output=True, text=True, timeout=AGENT_TIMEOUT)
     if r.returncode != 0:
@@ -172,38 +190,125 @@ def bridge_post(path: str, payload: dict) -> bool:
 
 def send_group_reply(msg: dict, reply: str) -> bool:
     return bridge_post("/api/send", {
-        "recipient": msg["chat"],
-        "message": reply,
-        "replyToId": msg["id"],
-        "replyToSender": msg["sender"],
+        "recipient": msg["chat"], "message": reply,
+        "replyToId": msg["id"], "replyToSender": msg["sender"],
         "quotedContent": (msg.get("content") or "")[:120],
     })
 
 
 def send_ack(msg: dict) -> None:
-    """Instant 'working on it' so a multi-minute investigation doesn't look dead."""
     bridge_post("/api/send", {
         "recipient": msg["chat"],
         "message": "🔍 Besig om die stelsel te kyk… / Checking the live system, one moment…",
-        "replyToId": msg["id"],
-        "replyToSender": msg["sender"],
+        "replyToId": msg["id"], "replyToSender": msg["sender"],
         "quotedContent": (msg.get("content") or "")[:120],
     })
 
 
-def dm_hein(group_name: str, sender: str, ar: dict) -> None:
-    if not HEIN_JID:
-        log.warning("HEIN_JID unset; cannot send approval DM for: %s", ar.get("summary", ""))
-        return
-    text = (
-        "🔐 Jarvis needs approval before acting.\n\n"
-        f"From: {sender.split('@')[0]} in \"{group_name}\"\n"
-        f"Action: {ar.get('summary', '')}\n"
-        f"Proposed: {ar.get('proposed', '')}\n"
-        f"Host: {ar.get('host', '')}  |  Risk: {ar.get('risk', '')}\n\n"
-        "Reply here to approve/decline. Jarvis has NOT run it."
+def dm(text: str) -> None:
+    if HEIN_JID:
+        bridge_post("/send-message", {"group_jid": HEIN_JID, "message": text})
+
+
+def request_approval(origin_chat: str, group_name: str, sender: str, ar: dict) -> None:
+    token = secrets.token_hex(2)
+    pend = load_pending()
+    pend[token] = {
+        "command": ar.get("proposed", ""), "host": ar.get("host", "velo"),
+        "summary": ar.get("summary", ""), "chat": origin_chat,
+        "requester": sender, "ts": time.time(),
+    }
+    _json_save(PENDING_FILE, pend)
+    log.info("stored pending %s host=%s cmd=%s", token, pend[token]["host"], pend[token]["command"][:200])
+    dm(
+        "🔐 Jarvis wil 'n aksie uitvoer — jou goedkeuring nodig.\n\n"
+        f"Van: {sender.split('@')[0]} in \"{group_name}\"\n"
+        f"Aksie: {ar.get('summary', '')}\n"
+        f"Opdrag: {ar.get('proposed', '')}\n"
+        f"Host: {ar.get('host', '')}  |  Risiko: {ar.get('risk', '')}\n\n"
+        f"Antwoord *JARVIS OK {token}* (of net 'ja') om goed te keur, of 'nee' om te kanselleer."
     )
-    bridge_post("/send-message", {"group_jid": HEIN_JID, "message": text})
+
+
+def load_pending() -> dict:
+    pend = _json_load(PENDING_FILE)
+    now = time.time()
+    fresh = {t: a for t, a in pend.items() if now - a.get("ts", 0) < APPROVAL_TTL}
+    if len(fresh) != len(pend):
+        _json_save(PENDING_FILE, fresh)
+    return fresh
+
+
+def match_pending(content: str) -> tuple:
+    pend = load_pending()
+    if not pend:
+        return None, None
+    for t in pend:
+        if t.lower() in content.lower():
+            return t, ("decline" if DECLINE_RE.search(content) else "approve")
+    if len(pend) == 1:
+        t = next(iter(pend))
+        if DECLINE_RE.search(content):
+            return t, "decline"
+        if APPROVE_RE.search(content):
+            return t, "approve"
+    return None, None
+
+
+def execute_via_agent(action: dict) -> str:
+    """Spin up a second Claude Code agent in execute mode to carry out the
+    Hein-approved action and verify it — runs on velo (local) with write access
+    and a catastrophic-only guard."""
+    with open(EXEC_SYSTEM_FILE) as f:
+        system_prompt = f.read()
+    prompt = (
+        "Hein approved this action from his authenticated WhatsApp DM. Carry it out now, then verify it worked.\n\n"
+        f"Action: {action.get('summary', '')}\n"
+        f"Host: {action.get('host', 'velo')} (this box IS velo-server; for host=vps use ssh root@72.61.197.178)\n"
+        f"Approved command/steps:\n{action.get('command', '')}\n\n"
+        "Do EXACTLY this and nothing more, verify the result, then output ONLY a short plain-text report."
+    )
+    cmd = [
+        "claude", "-p", prompt, "--output-format", "json", "--model", MODEL,
+        "--append-system-prompt", system_prompt, "--settings", EXEC_SETTINGS,
+    ]
+    try:
+        r = subprocess.run(cmd, cwd=REPO_DIR, capture_output=True, text=True, timeout=AGENT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return f"(execute agent timed out after {AGENT_TIMEOUT}s — check manually)"
+    if r.returncode != 0:
+        log.error("execute agent rc=%s err=%s", r.returncode, r.stderr.strip()[:300])
+        return f"(execute agent failed rc={r.returncode})"
+    try:
+        return json.loads(r.stdout)["result"].strip()
+    except (json.JSONDecodeError, KeyError):
+        return r.stdout.strip()[:900]
+
+
+def handle_approval(token: str, verb: str) -> bool:
+    pend = load_pending()
+    action = pend.get(token)
+    if not action:
+        return False
+    del pend[token]
+    _json_save(PENDING_FILE, pend)
+    origin = action.get("chat")
+    if verb == "decline":
+        dm(f"❌ OK, ek los dit — {action['summary']}")
+        if origin and origin != HEIN_DM_JID:
+            bridge_post("/send-message", {"group_jid": origin, "message": "Hein het die regstelling gekanselleer."})
+        return True
+    log.info("EXECUTING approved %s on %s: %s", token, action["host"], action["command"][:200])
+    dm(f"⚙️ Goedgekeur — ek voer nou uit: {action['summary']}")
+    out = execute_via_agent(action)
+    log.info("exec result: %s", out[:300])
+    dm(f"✅ Uitgevoer: {action['summary']}\n\n{out[:900]}")
+    if origin and origin != HEIN_DM_JID:
+        bridge_post("/send-message", {
+            "group_jid": origin,
+            "message": f"✅ Hein het goedgekeur en dit is gedoen: {action['summary']}",
+        })
+    return True
 
 
 def rate_limited() -> bool:
@@ -214,18 +319,11 @@ def rate_limited() -> bool:
 
 
 def load_state() -> dict:
-    try:
-        with open(STATE_FILE) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+    return _json_load(STATE_FILE)
 
 
 def save_state(state: dict) -> None:
-    tmp = STATE_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(state, f)
-    os.replace(tmp, STATE_FILE)
+    _json_save(STATE_FILE, state)
 
 
 def process_once(state: dict) -> None:
@@ -234,6 +332,16 @@ def process_once(state: dict) -> None:
         state["cursor"] = max(state["cursor"], msg["ts"])
         if msg["id"] in replied:
             continue
+        # Approval path — only from Hein's authenticated DM chat.
+        if HEIN_DM_JID and msg["chat"] == HEIN_DM_JID:
+            token, verb = match_pending(msg["content"])
+            if token:
+                log.info("approval from Hein DM: token=%s verb=%s", token, verb)
+                if handle_approval(token, verb):
+                    replied.append(msg["id"])
+                    del replied[:-200]
+                    save_state(state)
+                    continue
         if rate_limited():
             log.warning("rate limit hit (%d/h); skipping %s", MAX_REPLIES_PER_HOUR, msg["id"])
             continue
@@ -255,21 +363,22 @@ def process_once(state: dict) -> None:
             reply_times.append(time.time())
             replied.append(msg["id"])
             del replied[:-200]
-            if ar:
-                dm_hein(group_name, msg["sender"], ar)
+            if ar and ar.get("proposed"):
+                request_approval(msg["chat"], group_name, msg["sender"], ar)
         save_state(state)
 
 
 def main() -> None:
-    if not ALLOWED_GROUPS:
-        log.error("ALLOWED_GROUPS empty; refusing to start")
+    if not ALLOWED_GROUPS and not DM_CHATS:
+        log.error("no ALLOWED_GROUPS or DM_CHATS; refusing to start")
         sys.exit(1)
     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
     state = load_state()
     if "cursor" not in state:
         state["cursor"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00:00")
         save_state(state)
-    log.info("jarvis-relay up: groups=%d model=%s cursor=%s", len(ALLOWED_GROUPS), MODEL, state["cursor"])
+    log.info("jarvis-relay up: groups=%d dms=%d model=%s cursor=%s",
+             len(ALLOWED_GROUPS), len(DM_CHATS), MODEL, state["cursor"])
     while True:
         try:
             process_once(state)

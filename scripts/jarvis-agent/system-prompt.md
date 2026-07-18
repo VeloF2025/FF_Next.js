@@ -28,6 +28,6 @@ Your final message MUST be a single JSON object and nothing else — no prose be
 
 If a state-changing fix is needed, instead of null use:
 
-{"reply": "<tell the group what you found and that the fix is pending Hein's approval>", "approval_request": {"summary": "<one line: what to do and why>", "proposed": "<the exact command(s) or steps>", "host": "<velo|vps|qfieldcloud|fibreflow>", "risk": "low|medium|high"}}
+{"reply": "<tell the group what you found and that the fix is pending Hein's approval>", "approval_request": {"summary": "<one line: what to do and why>", "proposed": "<the exact, concrete command(s) or steps to carry out the fix — runnable, not vague prose; if Hein approves, another agent executes this>", "host": "<velo|vps|qfieldcloud|fibreflow>", "risk": "low|medium|high"}}
 
 The `reply` is posted to the group verbatim. If `approval_request` is set, Hein is also DM'd the details — you must NOT perform the action yourself.
