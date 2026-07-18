@@ -37,7 +37,10 @@ const UPSERT_LEGACY = (valuePlaceholders: string) => `
   ON CONFLICT (serial_number, project) DO UPDATE SET
     date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
     import_batch_id = EXCLUDED.import_batch_id,
-    -- Sheet GPS fills blanks only: resolution-derived coords (drops) stay authoritative.
+    -- Fill-blank GPS: whichever coordinate is captured first wins — this sheet
+    -- import or pp-data-resolve's backfillGpsCoordinates (drops/OES/onemap,
+    -- also WHERE latitude IS NULL). Later sheet values never overwrite; a bad
+    -- first geocode needs a manual correction.
     latitude = COALESCE(oes_pp_data.latitude, EXCLUDED.latitude),
     longitude = COALESCE(oes_pp_data.longitude, EXCLUDED.longitude),
     -- Re-entry: an activated serial reappears in PP DATA → reset for fresh
@@ -101,7 +104,7 @@ const UPSERT_V2 = (valuePlaceholders: string) => `
   ON CONFLICT (serial_number, project) DO UPDATE SET
     date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
     import_batch_id = EXCLUDED.import_batch_id,
-    -- Sheet GPS fills blanks only: resolution-derived coords (drops) stay authoritative.
+    -- Fill-blank GPS: first captured coordinate wins (see UPSERT_LEGACY note).
     latitude = COALESCE(oes_pp_data.latitude, EXCLUDED.latitude),
     longitude = COALESCE(oes_pp_data.longitude, EXCLUDED.longitude),
     -- ONT_LIFECYCLE_V2: never demote activated rows. Status is immutable

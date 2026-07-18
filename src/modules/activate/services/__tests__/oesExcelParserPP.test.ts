@@ -107,7 +107,7 @@ describe('parsePPDataSheet GPS', () => {
 describe('parseOESExcel file round-trip', () => {
   const tmpFile = path.join(os.tmpdir(), `oes-pp-gps-test-${process.pid}.xlsx`);
   afterAll(() => {
-    try { fs.unlinkSync(tmpFile); } catch { /* already gone */ }
+    fs.rmSync(tmpFile, { force: true });
   });
 
   it('surfaces PP GPS through the full file read (formula-only cells survive)', () => {

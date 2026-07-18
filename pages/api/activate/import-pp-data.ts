@@ -373,8 +373,11 @@ async function handler(
               d.zone_no,
               d.pon_no,
               d.pole_number,
-              d.latitude,
-              d.longitude,
+              -- GPS: DR-resolved drops coords first, then the PP row's own
+              -- coordinates (Fibertime sheet / resolve backfill) — same
+              -- precedence as PP ticket creation, so not_found rows export GPS.
+              COALESCE(d.latitude, pp.latitude) AS latitude,
+              COALESCE(d.longitude, pp.longitude) AS longitude,
               mt.id AS ticket_id,
               mt.ticket_uid
        FROM oes_pp_data pp

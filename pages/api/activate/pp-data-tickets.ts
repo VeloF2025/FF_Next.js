@@ -16,7 +16,7 @@ import { log } from '@/lib/logger';
 
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
-import { normalizePPTicketBatches } from '@/modules/activate/services/ticketBatchService';
+import { normalizePPTicketBatches, resolvePpTicketGps } from '@/modules/activate/services/ticketBatchService';
 import { createTicket } from '@/modules/noc/services/ticketService';
 import { findDuplicateTickets, linkSourceToTicket } from '@/modules/noc/services/duplicateTicketService';
 import { classifyResolutionPath } from '@/modules/noc/services/resolutionPathClassifier';
@@ -252,11 +252,10 @@ async function handleCreate(
           ? await getEnrichmentForDR(dr, project)
           : await getProjectId(project);
 
-        // GPS: prefer DR enrichment (drops/1Map); fall back to the PP row's own
-        // coordinates (Fibertime sheet Address link / resolution backfill) — the
-        // only location we have for not_found serials.
-        const gpsLat = enrichment.lat || (record.latitude != null ? String(record.latitude) : undefined);
-        const gpsLng = enrichment.lng || (record.longitude != null ? String(record.longitude) : undefined);
+        // GPS: DR enrichment first; falls back to the PP row's own coordinates
+        // (Fibertime sheet Address link / resolve backfill) — the only location
+        // we have for not_found serials.
+        const gps = resolvePpTicketGps(enrichment.lat, enrichment.lng, record.latitude, record.longitude);
 
         // Build enriched title
         const locationParts: string[] = [];
@@ -276,7 +275,7 @@ async function handleCreate(
 
         if (locationParts.length > 0) descParts.push(`Location: ${locationParts.join(', ')}`);
         if (enrichment.address) descParts.push(`Address: ${enrichment.address}`);
-        if (gpsLat && gpsLng) descParts.push(`GPS: ${gpsLat},${gpsLng} — https://maps.google.com/?q=${gpsLat},${gpsLng}`);
+        if (gps) descParts.push(`GPS: ${gps.lat},${gps.lng} — https://maps.google.com/?q=${gps.lat},${gps.lng}`);
         if (enrichment.client_name) descParts.push(`End User: ${enrichment.client_name}`);
         if (enrichment.client_contact) descParts.push(`Contact: ${enrichment.client_contact}`);
         if (enrichment.installer_name) descParts.push(`Installer: ${enrichment.installer_name}`);
@@ -395,10 +394,10 @@ async function handleCreate(
         }
 
         // Set GPS coordinates directly (createTicket doesn't handle text GPS format)
-        if (gpsLat && gpsLng) {
+        if (gps) {
           await pool.query(
             `UPDATE maintenance_tickets SET gps_coordinates = $1 WHERE id = $2`,
-            [`${gpsLat},${gpsLng}`, ticket.id]
+            [`${gps.lat},${gps.lng}`, ticket.id]
           );
         }
 
@@ -522,11 +521,10 @@ async function handleBackfill(
       upsertField('client_email', enrichment.client_email, ticket.client_email);
 
       // GPS: DR enrichment first, then the PP row's own coordinates
-      const gpsLat = enrichment.lat || (ticket.pp_lat != null ? String(ticket.pp_lat) : undefined);
-      const gpsLng = enrichment.lng || (ticket.pp_lng != null ? String(ticket.pp_lng) : undefined);
-      if (gpsLat && gpsLng && !ticket.gps_coordinates) {
+      const gps = resolvePpTicketGps(enrichment.lat, enrichment.lng, ticket.pp_lat, ticket.pp_lng);
+      if (gps && !ticket.gps_coordinates) {
         updates.push(`gps_coordinates = $${paramIdx}`);
-        values.push(`${gpsLat},${gpsLng}`);
+        values.push(`${gps.lat},${gps.lng}`);
         paramIdx++;
       }
 
@@ -537,7 +535,7 @@ async function handleBackfill(
       if (enrichment.zone) descParts.push(`Zone ${enrichment.zone}`);
       if (enrichment.pon) descParts.push(`PON ${enrichment.pon}`);
       if (enrichment.address) descParts.push(`Address: ${enrichment.address}`);
-      if (gpsLat && gpsLng) descParts.push(`GPS: ${gpsLat},${gpsLng} — https://maps.google.com/?q=${gpsLat},${gpsLng}`);
+      if (gps) descParts.push(`GPS: ${gps.lat},${gps.lng} — https://maps.google.com/?q=${gps.lat},${gps.lng}`);
       if (enrichment.client_name) descParts.push(`End User: ${enrichment.client_name}`);
       if (enrichment.client_contact) descParts.push(`Contact: ${enrichment.client_contact}`);
       if (enrichment.installer_name) descParts.push(`Installer: ${enrichment.installer_name}`);
