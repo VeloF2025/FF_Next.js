@@ -15,6 +15,10 @@ import json
 import re
 import sys
 
+# Inline-code and INDIRECTION forms. Because this guard checks the exact approved
+# command as a literal string, any indirection (substitution, a variable holding
+# the interpreter, base64) would hide the real action — so auto-execution refuses
+# them outright; Hein runs anything that genuinely needs them by hand.
 CODE_EXEC = [
     (r"\bpython[0-9.]*\s+-c\b", "inline python"),
     (r"\bperl\s+-e\b", "inline perl"),
@@ -22,7 +26,19 @@ CODE_EXEC = [
     (r"\bnode\s+-e\b|\bnode\s+--eval\b", "inline node"),
     (r"\bbash\s+-c\b|\bsh\s+-c\b|\bzsh\s+-c\b", "inline shell -c"),
     (r"\beval\b", "eval"),
-    (r"\bbase64\s+-d\b[^\n|]*\|\s*(ba|z)?sh\b", "base64-decode piped to shell"),
+    (r"\$\(", "command substitution $() (too indirect to auto-run)"),
+    (r"`[^`]*`", "backtick substitution (too indirect to auto-run)"),
+    (r"<<<", "here-string (too indirect to auto-run)"),
+    (r"\bbase64\b[^\n]*(--decode|-d)\b", "base64 decode (too indirect to auto-run)"),
+    (r"=\s*['\"]?\$?(\w*/)?(python[0-9.]*|bash|zsh|sh|perl|ruby|node)\b", "interpreter stored in a variable"),
+]
+
+# Reading secrets / dumping the environment (the approved command must not do this).
+SECRET_READ = [
+    (r"\b(cat|less|more|head|tail|grep|egrep|awk|sed|xxd|od|strings|cp|scp|rsync|nl|tac|dd)\b[^\n]*"
+     r"(credentials\.local\.md|\.env(\.|\b)|id_rsa|id_ed25519|id_ecdsa|\.pem\b|\.key\b|authorized_keys|/\.ssh/|\.pgpass)",
+     "reading a secret/credential file"),
+    (r"\b(env|printenv)\b\s*$|\bprintenv\b\s+\w", "dumping environment variables"),
 ]
 
 # Writes/edits to security-sensitive targets — blocked even when approved,
@@ -61,7 +77,7 @@ CATASTROPHIC = [
     (r"docker\s+(system\s+prune|volume\s+rm|volume\s+prune)", "docker volume/system prune"),
 ]
 
-ALL = CODE_EXEC + SENSITIVE_WRITE + CATASTROPHIC
+ALL = CODE_EXEC + SECRET_READ + SENSITIVE_WRITE + CATASTROPHIC
 
 
 def deny(reason: str) -> None:

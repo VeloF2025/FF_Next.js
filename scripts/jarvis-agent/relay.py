@@ -31,8 +31,7 @@ REPO_DIR = os.getenv("JARVIS_REPO", "/home/hein/Workspace/FF_Next.js")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SYSTEM_PROMPT_FILE = os.getenv("JARVIS_SYSTEM", os.path.join(BASE_DIR, "system-prompt.md"))
 SETTINGS_FILE = os.getenv("JARVIS_SETTINGS", "/home/hein/.jarvis-agent/settings.json")
-EXEC_SYSTEM_FILE = os.getenv("JARVIS_EXEC_SYSTEM", os.path.join(BASE_DIR, "system-prompt-exec.md"))
-EXEC_SETTINGS = os.getenv("JARVIS_EXEC_SETTINGS", "/home/hein/.jarvis-agent/settings-exec.json")
+GUARD_EXEC_FILE = os.getenv("JARVIS_GUARD_EXEC", "/home/hein/.jarvis-agent/guard-exec.py")
 STATE_FILE = os.getenv("STATE_FILE", "/home/hein/.jarvis-agent/state.json")
 PENDING_FILE = os.getenv("PENDING_FILE", "/home/hein/.jarvis-agent/pending.json")
 JARVIS_MENTIONS = [t.strip() for t in os.getenv(
@@ -73,7 +72,34 @@ SECRET_PATTERNS = [
 ]
 
 
+def _env_secret_values() -> list:
+    """Exact secret values from the environment (DB URLs, tokens, passwords) so any
+    that appear in output are scrubbed regardless of format — the reliable backstop
+    behind blocking secret-file reads."""
+    vals = set()
+    for k, v in os.environ.items():
+        if len(v) < 6:
+            continue
+        if re.search(r"(PASS|PASSWORD|TOKEN|SECRET|_KEY|APIKEY|DATABASE|PGPASSWORD|CREDENTIAL|CONN|DSN)", k, re.I):
+            vals.add(v)
+        # pull the password out of ANY connection-string value (regardless of the
+        # env var's name) so it's scrubbed even when it appears bare in output.
+        m = re.search(r"://[^:/@\s]+:([^@/\s]{4,})@", v)
+        if m:
+            vals.add(m.group(1))
+            vals.add(v)
+    return sorted(vals, key=len, reverse=True)
+
+
+_ENV_SECRETS = _env_secret_values()
+
+
 def redact(text: str) -> str:
+    if not text:
+        return text
+    for v in _ENV_SECRETS:
+        if v in text:
+            text = text.replace(v, "«redacted»")
     for p in SECRET_PATTERNS:
         text = p.sub("«redacted»", text)
     return text
@@ -301,34 +327,62 @@ def match_pending(content: str) -> tuple:
     return None, None
 
 
-def execute_via_agent(action: dict) -> str:
-    """Spin up a second Claude Code agent in execute mode to carry out the
-    Hein-approved action and verify it — runs on velo (local) with write access
-    and a catastrophic-only guard."""
-    with open(EXEC_SYSTEM_FILE) as f:
+def command_blocked(cmd: str) -> str:
+    """Deterministic safety check on the EXACT approved command, reusing the
+    guard-exec ruleset (catastrophic / sensitive-path / obfuscation). Returns a
+    reason string if the command must not be auto-executed, else "". Fails closed."""
+    try:
+        r = subprocess.run(
+            ["python3", GUARD_EXEC_FILE],
+            input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
+            capture_output=True, text=True, timeout=10,
+        )
+    except Exception as e:  # noqa: BLE001 - fail closed on any check failure
+        return f"safety check could not run ({e})"
+    if '"deny"' in r.stdout:
+        try:
+            return json.loads(r.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+        except Exception:
+            return "blocked by the safety guard"
+    return ""
+
+
+def run_command(cmd: str, host: str) -> str:
+    """Run the exact approved command deterministically (no LLM). velo/local runs
+    here (this box is velo); host=vps runs over SSH."""
+    try:
+        if host == "vps":
+            return ssh(cmd, timeout=EXEC_TIMEOUT)
+        r = subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True, timeout=EXEC_TIMEOUT)
+        return (r.stdout or "") + (("\n" + r.stderr) if r.stderr else "")
+    except subprocess.TimeoutExpired:
+        return f"(timed out after {EXEC_TIMEOUT}s — check manually)"
+    except Exception as e:  # noqa: BLE001 - surface any run failure to Hein
+        return f"(execution error: {e})"
+
+
+def verify_via_agent(action: dict, output: str) -> str:
+    """Read-only agent re-checks that the fix actually worked. Uses the read-only
+    settings/guard — it cannot change anything."""
+    with open(SYSTEM_PROMPT_FILE) as f:
         system_prompt = f.read()
     prompt = (
-        "Hein approved this action from his authenticated WhatsApp DM. Carry it out now, then verify it worked.\n\n"
-        f"Action: {action.get('summary', '')}\n"
-        f"Host: {action.get('host', 'velo')} (this box IS velo-server; for host=vps use ssh root@72.61.197.178)\n"
-        f"Approved command/steps:\n{action.get('command', '')}\n\n"
-        "Do EXACTLY this and nothing more, verify the result, then output ONLY a short plain-text report."
+        "An approved fix was just executed by the operator relay (NOT by you).\n"
+        f"Fix: {action.get('summary', '')}\n"
+        f"Command output:\n{output[:2000]}\n\n"
+        "Verify READ-ONLY whether it actually worked — re-check the relevant live status "
+        "(job finished, package fresh, service active, row updated). Change nothing. "
+        "Output ONLY a 1-2 sentence plain-text verification in Afrikaans."
     )
     cmd = [
         "claude", "-p", prompt, "--output-format", "json", "--model", MODEL,
-        "--append-system-prompt", system_prompt, "--settings", EXEC_SETTINGS,
+        "--append-system-prompt", system_prompt, "--settings", SETTINGS_FILE,
     ]
     try:
         r = subprocess.run(cmd, cwd=REPO_DIR, capture_output=True, text=True, timeout=AGENT_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return f"(execute agent timed out after {AGENT_TIMEOUT}s — check manually)"
-    if r.returncode != 0:
-        log.error("execute agent rc=%s err=%s", r.returncode, r.stderr.strip()[:300])
-        return f"(execute agent failed rc={r.returncode})"
-    try:
         return json.loads(r.stdout)["result"].strip()
-    except (json.JSONDecodeError, KeyError):
-        return r.stdout.strip()[:900]
+    except Exception:  # noqa: BLE001 - verification is best-effort
+        return "(kon nie outomaties verifieer nie — kyk asseblief self)"
 
 
 def handle_approval(token: str, verb: str) -> bool:
@@ -344,15 +398,25 @@ def handle_approval(token: str, verb: str) -> bool:
         if origin and origin != HEIN_DM_JID:
             bridge_post("/send-message", {"group_jid": origin, "message": "Hein het die regstelling gekanselleer."})
         return True
-    log.info("EXECUTING approved %s on %s: %s", token, action["host"], action["command"][:200])
+    cmd, host = action["command"], action.get("host", "velo")
+    reason = command_blocked(cmd)
+    if reason:
+        log.warning("refused to auto-execute %s: %s", token, reason)
+        dm(f"⛔ Ek voer dit NIE outomaties uit nie: {reason}\nDoen dit self as jy seker is.")
+        if origin and origin != HEIN_DM_JID:
+            bridge_post("/send-message", {"group_jid": origin,
+                        "message": "Kon nie die regstelling outomaties uitvoer nie — Hein moet dit self doen."})
+        return True
+    log.info("EXECUTING approved %s on %s: %s", token, host, cmd[:200])
     dm(f"⚙️ Goedgekeur — ek voer nou uit: {sanitize_display(action['summary'], 200)}")
-    out = redact(execute_via_agent(action))
-    log.info("exec result: %s", out[:300])
-    dm(f"✅ Uitgevoer: {sanitize_display(action['summary'], 200)}\n\n{out[:900]}")
+    out = redact(run_command(cmd, host))
+    log.info("exec output: %s", out[:300])
+    verify = redact(verify_via_agent(action, out))
+    dm(f"✅ Uitgevoer: {sanitize_display(action['summary'], 200)}\n\nUitset:\n{out[:500]}\n\nVerifikasie: {verify[:300]}")
     if origin and origin != HEIN_DM_JID:
         bridge_post("/send-message", {
             "group_jid": origin,
-            "message": f"✅ Hein het goedgekeur en dit is gedoen: {action['summary']}",
+            "message": f"✅ Hein het goedgekeur en dit is gedoen: {sanitize_display(action['summary'], 200)}",
         })
     return True
 
@@ -418,10 +482,10 @@ def main() -> None:
     if not ALLOWED_GROUPS and not DM_CHATS:
         log.error("no ALLOWED_GROUPS or DM_CHATS; refusing to start")
         sys.exit(1)
-    # The approval channel must be Hein's DM, never a group — otherwise a group
-    # member could approve execution.
-    if HEIN_DM_JID and HEIN_DM_JID in ALLOWED_GROUPS:
-        log.error("HEIN_DM_JID overlaps ALLOWED_GROUPS — refusing to start (approval channel must not be a group)")
+    # The approval channel must be Hein's 1:1 DM, never a group (a group JID ends
+    # in @g.us) — otherwise a group member could approve execution.
+    if HEIN_DM_JID and (HEIN_DM_JID in ALLOWED_GROUPS or HEIN_DM_JID.endswith("@g.us")):
+        log.error("HEIN_DM_JID must be Hein's 1:1 DM, not a group — refusing to start")
         sys.exit(1)
     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
     state = load_state()

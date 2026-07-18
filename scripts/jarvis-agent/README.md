@@ -21,12 +21,11 @@ advice-only `scripts/jarvis-responder/` bot (disabled).
 | File | Role |
 |---|---|
 | `relay.py` | Poll loop, agent invocation, reply, approval routing + execution |
-| `system-prompt.md` | Diagnosis agent persona (read-only) |
-| `settings.json` | Diagnosis perms: deny Write/Edit; `guard.py` blocks state-changing Bash |
-| `guard.py` | PreToolUse hook — blocks all state-changing shell for the diagnosis agent |
-| `system-prompt-exec.md` | Execute-mode agent persona (write-enabled) |
-| `settings-exec.json` | Execute perms: allow Write/Edit/Bash; `guard-exec.py` catastrophic-only |
-| `guard-exec.py` | PreToolUse hook — blocks only catastrophic commands in execute mode |
+| `system-prompt.md` | Diagnosis / verify agent persona (read-only) |
+| `settings.json` | Read-only perms: deny Write/Edit/Task + secret-file Reads; `guard.py` (Bash) + `guard-read.py` (Read/Grep/Glob) hooks |
+| `guard.py` | PreToolUse Bash hook — blocks state-changing shell, secret reads, code-exec wrappers |
+| `guard-read.py` | PreToolUse Read/Grep/Glob hook — blocks reading credential/secret files |
+| `guard-exec.py` | Deterministic ruleset the relay runs against the EXACT approved command before executing it (catastrophic / sensitive-write / obfuscation / secret-read) |
 | `jarvis-agent.service` | systemd --user unit |
 
 Runtime copies live in `~/.jarvis-agent/`; secrets/config in
@@ -34,14 +33,26 @@ Runtime copies live in `~/.jarvis-agent/`; secrets/config in
 
 ## Approval → execute (Hein-authenticated)
 
-The diagnosis agent is **read-only**. For a fix that changes state it returns an
-`approval_request` with an exact command; the relay stores it under a short token
-and DMs Hein. When Hein replies from his DM (`HEIN_DM_JID`) with
-`JARVIS OK <token>` — or just "ja" when one is pending — the relay spins up a
-**second Claude Code agent in execute mode** (write-enabled; `guard-exec.py`
-blocks only catastrophic commands) that carries out the approved action, verifies
-it, and reports back. Tokens expire after `APPROVAL_TTL` (30 min). Approvals are
-only honoured from Hein's authenticated DM JID — never from a group.
+The diagnosis agent is **read-only** (no write tools; guards block state changes
+and secret reads). For a fix that changes state it returns an `approval_request`
+with an exact command; the relay stores it under a short token and DMs Hein. When
+Hein replies from his DM (`HEIN_DM_JID`) with `JARVIS OK <token>` — or an exact
+"ja"/"nee" when one is pending — the relay:
+
+1. runs the exact approved command through `guard-exec.py` (deterministic check);
+   if it's catastrophic / touches a sensitive path / uses obfuscation, it refuses
+   and tells Hein to do it by hand;
+2. otherwise **the relay itself executes the command verbatim** (no LLM latitude
+   — it runs exactly what Hein saw and approved), locally on velo or over SSH for
+   `host: vps`;
+3. spins up a **read-only** agent to verify the fix actually worked and reports
+   output + verification back (secret-scanned).
+
+There is deliberately **no write-capable agent** — a regex guard cannot safely
+constrain an LLM with a shell, so execution is deterministic and bound to the
+approved command. Tokens expire after `APPROVAL_TTL` (30 min). Approvals are only
+honoured from Hein's authenticated 1:1 DM — never a group (startup refuses if
+`HEIN_DM_JID` is a group JID).
 
 ## Config (`~/.jarvis-agent/jarvis-agent.env`)
 

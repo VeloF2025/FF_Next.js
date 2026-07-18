@@ -42,7 +42,10 @@ DENY = [
     (r"\brm\b", "file deletion"),
     (r"\bmv\s|\bcp\s", "file move/copy"),
     (r"\bsed\s+-i\b|\btee\b", "in-place file write"),
-    (r">>?\s*(?!/dev/null\b|&\s*[0-9])\S", "output redirection to a file"),
+    # Redirect to a real path (absolute/home/relative). Deliberately does NOT match
+    # `WHERE ts > 5000` or `col > 'x'` inside a SQL string — the diagnosis agent's
+    # core job is SELECT queries.
+    (r">>?\s*['\"]?(?!/dev/null\b)(/|~|\./|\.\./)", "output redirection to a file path"),
     (r"\bsystemctl\b[^\n]*\b(restart|stop|start|enable|disable|reload|kill|mask|unmask)\b", "service state change"),
     (r"\bservice\s+\S+\s+(restart|stop|start|reload)\b", "service state change"),
     (r"\b(pkill|killall|kill)\b|\bfuser\s+-k\b", "process kill"),

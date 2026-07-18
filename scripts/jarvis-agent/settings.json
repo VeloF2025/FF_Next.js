@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": ["Bash", "Read", "Grep", "Glob", "WebFetch", "Skill"],
-    "deny": ["Write", "Edit", "NotebookEdit", "Task"]
+    "deny": [
+      "Write", "Edit", "NotebookEdit", "Task",
+      "Read(**/.claude/credentials.local.md)", "Read(**/credentials.local.md)",
+      "Read(**/.env)", "Read(**/.env.*)", "Read(**/*.pem)", "Read(**/*.key)",
+      "Read(**/id_rsa)", "Read(**/id_ed25519)", "Read(**/authorized_keys)", "Read(**/.pgpass)"
+    ]
   },
   "hooks": {
     "PreToolUse": [
@@ -9,6 +14,12 @@
         "matcher": "Bash",
         "hooks": [
           { "type": "command", "command": "python3 /home/hein/.jarvis-agent/guard.py" }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          { "type": "command", "command": "python3 /home/hein/.jarvis-agent/guard-read.py" }
         ]
       }
     ]
