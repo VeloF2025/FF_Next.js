@@ -53,7 +53,7 @@ export function extractOntSerial(barcodeData: string | null): string | null {
  * Read-only query — does NOT trigger photo downloads.
  * Uses an 8-second abort timeout to avoid blocking the acknowledgment response.
  * 8s (not 5s) gives headroom for non-Etwatwa projects, which the BOSS API resolves
- * via a fresh per-request 1Map web login (~3-5s) rather than the ~0.5s Etwatwa path.
+ * via a 1Map web login on cache miss (~3-5s cold) rather than the ~0.5s Etwatwa path.
  */
 export async function fetchOneMapRecord(dropNumber: string): Promise<OneMapLookupResult> {
   const empty: OneMapLookupResult = { found: false, photoCount: 0, ontSerial: null, upsSerial: null };
