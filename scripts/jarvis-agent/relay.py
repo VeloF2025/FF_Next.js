@@ -36,6 +36,9 @@ ALLOWED_GROUPS = [g.strip() for g in os.getenv(
     "ALLOWED_GROUPS",
     "120363425013095777@g.us,120363423864087150@g.us",
 ).split(",") if g.strip()]
+# Direct-message chats where ANY inbound message is a question for Jarvis
+# (no @-tag needed — a DM is inherently directed at Jarvis).
+DM_CHATS = [c.strip() for c in os.getenv("DM_CHATS", "").split(",") if c.strip()]
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "15"))
 MAX_REPLIES_PER_HOUR = int(os.getenv("MAX_REPLIES_PER_HOUR", "10"))
 CONTEXT_MESSAGES = int(os.getenv("CONTEXT_MESSAGES", "20"))
@@ -72,13 +75,21 @@ def sql_json(query: str) -> list:
 
 
 def new_mentions(cursor_ts: str) -> list:
-    groups = ",".join(f"'{g}'" for g in ALLOWED_GROUPS)
-    mention = " OR ".join(f"content LIKE '%{t}%'" for t in JARVIS_MENTIONS)
+    clauses = []
+    if ALLOWED_GROUPS:
+        groups = ",".join(f"'{g}'" for g in ALLOWED_GROUPS)
+        mention = " OR ".join(f"content LIKE '%{t}%'" for t in JARVIS_MENTIONS)
+        clauses.append(f"(chat_jid IN ({groups}) AND ({mention}))")
+    if DM_CHATS:
+        dms = ",".join(f"'{c}'" for c in DM_CHATS)
+        clauses.append(f"chat_jid IN ({dms})")
+    if not clauses:
+        return []
     q = (
         "SELECT json_object('id',id,'chat',chat_jid,'sender',sender,"
         "'content',content,'ts',timestamp) "
         f"FROM messages WHERE is_from_me=0 AND timestamp > '{cursor_ts}' "
-        f"AND chat_jid IN ({groups}) AND ({mention}) ORDER BY timestamp"
+        f"AND ({' OR '.join(clauses)}) ORDER BY timestamp"
     )
     return sql_json(q)
 
@@ -106,7 +117,7 @@ def run_agent(group_name: str, sender: str, message: str, context: str) -> dict:
     with open(SYSTEM_PROMPT_FILE) as f:
         system_prompt = f.read()
     user_prompt = (
-        f'You (Jarvis) were tagged in the Velocity WhatsApp group "{group_name}".\n\n'
+        f'A message was sent to you (Jarvis) on WhatsApp in "{group_name}".\n\n'
         f"Recent conversation (oldest first):\n{context}\n\n"
         f"The message you must answer, from {sender.split('@')[0]}:\n{message}\n\n"
         "Investigate with your tools and produce the reply. "
