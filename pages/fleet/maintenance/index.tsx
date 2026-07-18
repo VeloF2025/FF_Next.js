@@ -408,7 +408,7 @@ export default function FleetMaintenancePage() {
   if (loading) {
     return (
       <AppLayout>
-        <ModulePage config={fleetConfig}>
+        <ModulePage config={fleetConfig} hideTabs>
         <div className="p-6">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Fleet Maintenance</h1>
@@ -424,7 +424,7 @@ export default function FleetMaintenancePage() {
   if (error) {
     return (
       <AppLayout>
-        <ModulePage config={fleetConfig}>
+        <ModulePage config={fleetConfig} hideTabs>
         <div className="p-6">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Fleet Maintenance</h1>
@@ -451,7 +451,7 @@ export default function FleetMaintenancePage() {
 
   return (
     <AppLayout>
-        <ModulePage config={fleetConfig}>
+        <ModulePage config={fleetConfig} hideTabs>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

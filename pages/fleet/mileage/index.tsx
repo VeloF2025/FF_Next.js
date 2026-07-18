@@ -144,7 +144,7 @@ export default function FleetMileagePage() {
 
   return (
     <AppLayout>
-      <ModulePage config={fleetConfig}>
+      <ModulePage config={fleetConfig} hideTabs>
         <div className="p-6 space-y-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

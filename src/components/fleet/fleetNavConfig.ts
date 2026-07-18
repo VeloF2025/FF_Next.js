@@ -8,8 +8,10 @@
  *   /fleet/vehicles/[id]                → Vehicles (detail)
  *   /fleet/vehicles/[id]/check-in-history → Vehicles (detail sub-page)
  *   /fleet/portal                       → Vehicles → Portal
+ *   /fleet/import                       → Vehicles → Import
  *   /fleet/drivers                      → Operations → Drivers
  *   /fleet/fuel                         → Operations → Fuel
+ *   /fleet/mileage                      → Operations → Mileage
  *   /fleet/maintenance                  → Operations → Maintenance
  *   /fleet/check-in                     → Check-Ins → Check In Now
  *   /fleet/check-in/history             → Check-Ins → History
@@ -42,6 +44,7 @@ export const TABS: Tab[] = [
         items: [
           { label: 'Vehicle List', href: '/fleet/vehicles' },
           { label: 'Vehicle Portal', href: '/fleet/portal' },
+          { label: 'Import', href: '/fleet/import' },
         ],
       },
     ],
@@ -61,6 +64,7 @@ export const TABS: Tab[] = [
         section: 'Costs',
         items: [
           { label: 'Fuel', href: '/fleet/fuel' },
+          { label: 'Mileage', href: '/fleet/mileage' },
         ],
       },
       {
@@ -125,15 +129,17 @@ export function getActiveTabId(
   // Analytics
   if (pathname.startsWith('/fleet/analytics')) return 'analytics';
 
-  // Vehicles — list, detail pages, and vehicle portal
+  // Vehicles — list, detail pages, vehicle portal, and bulk import
   if (pathname.startsWith('/fleet/vehicles') ||
-      pathname.startsWith('/fleet/portal')) {
+      pathname.startsWith('/fleet/portal') ||
+      pathname.startsWith('/fleet/import')) {
     return 'vehicles';
   }
 
-  // Operations — drivers, fuel, maintenance
+  // Operations — drivers, fuel, mileage, maintenance
   if (pathname.startsWith('/fleet/drivers') ||
       pathname.startsWith('/fleet/fuel') ||
+      pathname.startsWith('/fleet/mileage') ||
       pathname.startsWith('/fleet/maintenance')) {
     return 'operations';
   }
