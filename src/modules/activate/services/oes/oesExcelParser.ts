@@ -224,6 +224,7 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
   const sheetStartCol = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).s.c : 0;
 
   const rows: PPRow[] = [];
+  let gpsParseFailures = 0;
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (!row || !row[0] || !row[1]) continue;
@@ -242,6 +243,11 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
       const cell = sheet[cellRef] as XLSX.CellObject | undefined;
       const gps = extractGpsFromFormula(cell?.f);
       if (gps) ({ latitude, longitude } = gps);
+      // A non-empty Address-link formula that yields no coordinates means the
+      // Fibertime URL template drifted from the one MAPS_LINK_COORDS matches.
+      // This parser is the only PP GPS source, so make the drift observable
+      // instead of silently capturing zero GPS.
+      else if (cell?.f) gpsParseFailures++;
     }
 
     let dateRegistered: string | null = null;
@@ -262,6 +268,13 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
       longitude,
       drop_number: dropNumberCol >= 0 ? normalizeSheetDropNumber(row[dropNumberCol]) : null,
     });
+  }
+
+  if (addressLinkCol >= 0 && gpsParseFailures > 0) {
+    logger.warn(
+      `GPS: ${gpsParseFailures}/${rows.length} PP rows had an Address-link formula that did not yield coordinates — ` +
+        `the Fibertime URL template may have changed (expected maps.google.com/?q=lat,lng)`,
+    );
   }
 
   return rows.length > 0 ? rows : null;
