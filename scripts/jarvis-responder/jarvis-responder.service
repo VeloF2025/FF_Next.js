@@ -1,0 +1,17 @@
+[Unit]
+Description=Jarvis WhatsApp mention responder (polls bridge sqlite, replies via Claude)
+After=network-online.target whatsapp-bridge.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/jarvis-responder
+EnvironmentFile=/etc/jarvis-responder.env
+ExecStart=/opt/jarvis-responder/venv/bin/python /opt/jarvis-responder/poll.py
+Restart=always
+RestartSec=15
+# Never allowed to touch the bridge; read-only DB access enforced in code (mode=ro)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
