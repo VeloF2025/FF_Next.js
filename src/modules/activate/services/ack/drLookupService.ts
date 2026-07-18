@@ -24,6 +24,11 @@ const logger = createLogger('activate/ack/drLookupService');
 // BOSS API - Docker container on Velocity that caches 1Map photo data
 const BOSS_API_HOST = process.env.BOSS_API_HOST || 'http://100.96.203.105:8003';
 
+// 8s (not 5s): non-Etwatwa projects resolve via a 1Map web login on cache miss
+// (~3-5s cold) vs the ~0.5s Etwatwa path. Bounded well under the ack handler's
+// 30s maxDuration (see dr-acknowledgment.ts).
+const ONE_MAP_LOOKUP_TIMEOUT_MS = 8000;
+
 /**
  * Extract ONT serial from barcode scan data.
  *
@@ -51,14 +56,14 @@ export function extractOntSerial(barcodeData: string | null): string | null {
  * Fetch DR record from OneMap via BOSS API.
  *
  * Read-only query — does NOT trigger photo downloads.
- * Uses a 5-second abort timeout to avoid blocking the acknowledgment response.
+ * Aborts after ONE_MAP_LOOKUP_TIMEOUT_MS to avoid blocking the acknowledgment response.
  */
 export async function fetchOneMapRecord(dropNumber: string): Promise<OneMapLookupResult> {
   const empty: OneMapLookupResult = { found: false, photoCount: 0, ontSerial: null, upsSerial: null };
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), ONE_MAP_LOOKUP_TIMEOUT_MS);
 
     const response = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
       signal: controller.signal,

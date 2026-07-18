@@ -90,7 +90,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       });
     }
 
-    // Fetch DR from OneMap via BOSS API (read-only, 5s timeout)
+    // Fetch DR from OneMap via BOSS API (read-only, 8s timeout)
     const { found, photoCount, ontSerial, upsSerial } = await fetchOneMapRecord(dropNumber);
 
     // Start duplicate serial check in parallel with WA photo polling (adds 0ms wall-clock time)
