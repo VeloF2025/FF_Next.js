@@ -69,10 +69,17 @@ REDIRECT = re.compile(r">>?\s*(?!/dev/null\b|&\s*[0-9])\S")
 
 
 def _unquoted(cmd: str) -> str:
-    # Single-quoted spans are inert in bash — strip them fully. Double-quoted spans
-    # are only inert if they contain no `$` or backtick; a `"$(… > file)"` still
-    # runs the redirect live, so such spans are kept for the redirect check to see.
-    return re.sub(r"'[^']*'|\"[^\"$`]*\"", " ", cmd)
+    # Strip inert quoted spans so a `>`/`<` used as a SQL comparison operator inside
+    # a query string isn't mistaken for a redirect. Single-quoted spans are always
+    # inert. A double-quoted span is inert UNLESS it contains live evaluation —
+    # `$(…)` command substitution or a backtick — which can carry a real redirect
+    # (`"$(… > file)"`). Keying on `$(` specifically (not any `$`) avoids
+    # false-positiving on `$1` params, `$$` dollar-quoting, or a literal `$` in data.
+    def strip_dq(m: "re.Match") -> str:
+        s = m.group(0)
+        return s if ("$(" in s or "`" in s) else " "
+    cmd = re.sub(r'"[^"]*"', strip_dq, cmd)
+    return re.sub(r"'[^']*'", " ", cmd)
 
 
 def deny(reason: str) -> None:
