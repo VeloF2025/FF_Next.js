@@ -26,7 +26,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SYSTEM_PROMPT_FILE = os.getenv("JARVIS_SYSTEM", os.path.join(BASE_DIR, "system-prompt.md"))
 SETTINGS_FILE = os.getenv("JARVIS_SETTINGS", "/home/hein/.jarvis-agent/settings.json")
 STATE_FILE = os.getenv("STATE_FILE", "/home/hein/.jarvis-agent/state.json")
-TAG = os.getenv("JARVIS_TAG", "27638412276")
+# WhatsApp renders an @-mention of the bridge account as its LID
+# (188674373324992), not the phone number — match either.
+JARVIS_MENTIONS = [t.strip() for t in os.getenv(
+    "JARVIS_MENTIONS", "188674373324992,27638412276",
+).split(",") if t.strip()]
 HEIN_JID = os.getenv("HEIN_JID", "27665881287@s.whatsapp.net")
 ALLOWED_GROUPS = [g.strip() for g in os.getenv(
     "ALLOWED_GROUPS",
@@ -69,11 +73,12 @@ def sql_json(query: str) -> list:
 
 def new_mentions(cursor_ts: str) -> list:
     groups = ",".join(f"'{g}'" for g in ALLOWED_GROUPS)
+    mention = " OR ".join(f"content LIKE '%{t}%'" for t in JARVIS_MENTIONS)
     q = (
         "SELECT json_object('id',id,'chat',chat_jid,'sender',sender,"
         "'content',content,'ts',timestamp) "
         f"FROM messages WHERE is_from_me=0 AND timestamp > '{cursor_ts}' "
-        f"AND chat_jid IN ({groups}) AND content LIKE '%{TAG}%' ORDER BY timestamp"
+        f"AND chat_jid IN ({groups}) AND ({mention}) ORDER BY timestamp"
     )
     return sql_json(q)
 
@@ -216,12 +221,16 @@ def process_once(state: dict) -> None:
             result = {"reply": "Ek kry nie betyds klaar met die kontrole nie — Hein sal moet kyk.",
                       "approval_request": None}
         reply = result.get("reply")
+        ar = result.get("approval_request")
+        log.info("agent reply: %s", (reply or "<none>")[:300])
+        if ar:
+            log.info("agent approval_request: %s | %s", ar.get("summary", ""), ar.get("proposed", "")[:200])
         if reply and send_group_reply(msg, reply):
             reply_times.append(time.time())
             replied.append(msg["id"])
             del replied[:-200]
-            if result.get("approval_request"):
-                dm_hein(group_name, msg["sender"], result["approval_request"])
+            if ar:
+                dm_hein(group_name, msg["sender"], ar)
         save_state(state)
 
 
