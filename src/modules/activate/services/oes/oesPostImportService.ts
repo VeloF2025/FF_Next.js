@@ -272,7 +272,7 @@ export function triggerPpActivationCheck(): void {
             updated_at = NOW()
         FROM oa1
         WHERE oa1.drop_number = pp.resolved_drop_number
-          AND pp.resolution_status IN ('located_1map', 'located_local', 'located_unified')
+          AND pp.resolution_status IN ('located_1map', 'located_local', 'located_unified', 'located_fibertime')
           AND NOT (
             pp.serial_number IS NOT NULL AND TRIM(pp.serial_number) NOT IN ('', '-')
             AND oa1.serial_number IS NOT NULL AND TRIM(oa1.serial_number) NOT IN ('', '-')

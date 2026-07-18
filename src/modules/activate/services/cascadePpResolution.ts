@@ -57,7 +57,7 @@ export async function cascadePpResolution(
              pp.resolved_details
       FROM oes_pp_data pp
       WHERE pp.resolved_at >= $1
-        AND pp.resolution_status IN ('located_local','located_unified','located_oes','located_onemap','located_1map','activated')
+        AND pp.resolution_status IN ('located_local','located_unified','located_oes','located_onemap','located_1map','located_fibertime','activated')
         AND pp.resolved_drop_number IS NOT NULL
       `,
       [cutoffTime.toISOString()],

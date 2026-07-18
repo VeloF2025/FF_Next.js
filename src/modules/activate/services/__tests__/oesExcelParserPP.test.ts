@@ -9,10 +9,13 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import {
+  collectSheetDrTriples,
   extractGpsFromFormula,
+  normalizeSheetDropNumber,
   parsePPDataSheet,
   parseOESExcel,
   EXPECTED_HEADERS,
+  type PPRow,
 } from '../oes/oesExcelParser';
 
 const MAPS_FORMULA = 'HYPERLINK("https://maps.google.com/?q=-26.72364496494768,27.01957903906529","View Map")';
@@ -49,19 +52,21 @@ function buildPPSheet(): XLSX.WorkSheet {
     E1: { t: 's', v: 'ACS Last Seen Online' },
     F1: { t: 's', v: 'Drop Number' },
     G1: { t: 's', v: 'Address link' },
-    // Row 2: has GPS formula (no cached value — matches the real files)
+    // Row 2: has GPS formula (no cached value — matches the real files) + a DR
     A2: { t: 's', v: 'MOA' },
     B2: { t: 's', v: 'ALCLB477AAAA' },
     C2: { t: 's', v: '2025-09-09 11:21:39' },
+    F2: { t: 's', v: 'dr1853481' },
     G2: { t: 's', f: MAPS_FORMULA },
-    // Row 3: no Address link at all
+    // Row 3: no Address link, no Drop Number
     A3: { t: 's', v: 'MOA' },
     B3: { t: 's', v: 'ALCLB477BBBB' },
     C3: { t: 's', v: '2025-09-09 14:15:18' },
-    // Row 4: non-maps link
+    // Row 4: non-maps link + unallocated drop text
     A4: { t: 's', v: 'LAW' },
     B4: { t: 's', v: 'ALCLB477CCCC' },
     C4: { t: 's', v: '2025-09-10 08:00:00' },
+    F4: { t: 's', v: 'no drop allocated' },
     G4: { t: 's', f: 'HYPERLINK("https://example.com/x","View Map")' },
   };
   return sheet;
@@ -80,9 +85,10 @@ describe('parsePPDataSheet GPS', () => {
       serial_number: 'ALCLB477AAAA',
       latitude: -26.72364496494768,
       longitude: 27.01957903906529,
+      drop_number: 'DR1853481',
     });
-    expect(rows?.[1]).toMatchObject({ serial_number: 'ALCLB477BBBB', latitude: null, longitude: null });
-    expect(rows?.[2]).toMatchObject({ project: 'Lawley', latitude: null, longitude: null });
+    expect(rows?.[1]).toMatchObject({ serial_number: 'ALCLB477BBBB', latitude: null, longitude: null, drop_number: null });
+    expect(rows?.[2]).toMatchObject({ project: 'Lawley', latitude: null, longitude: null, drop_number: null });
   });
 
   it('handles sheets without an Address link column (pre-Jul-2026 format)', () => {
@@ -100,7 +106,45 @@ describe('parsePPDataSheet GPS', () => {
 
     const rows = parsePPDataSheet(wb);
     expect(rows).toHaveLength(1);
-    expect(rows?.[0]).toMatchObject({ serial_number: 'ALCLB477DDDD', latitude: null, longitude: null });
+    expect(rows?.[0]).toMatchObject({ serial_number: 'ALCLB477DDDD', latitude: null, longitude: null, drop_number: null });
+  });
+});
+
+describe('collectSheetDrTriples', () => {
+  const row = (serial: string, project: string, dr: string | null): PPRow => ({
+    project, serial_number: serial, date_registered: null, latitude: null, longitude: null, drop_number: dr,
+  });
+
+  it('keeps only DR-bearing rows, deduped by serial+project, first occurrence wins', () => {
+    const rows = [
+      row('S1', 'Mohadin', 'DR1'),
+      row('S1', 'Mohadin', 'DR2'),      // duplicate pair, conflicting DR — dropped
+      row('S1', 'Lawley', 'DR3'),       // same serial, different project — kept
+      row('S2', 'Mohadin', null),       // no DR — dropped
+    ];
+    expect(collectSheetDrTriples(rows)).toEqual([
+      expect.objectContaining({ serial_number: 'S1', project: 'Mohadin', drop_number: 'DR1' }),
+      expect.objectContaining({ serial_number: 'S1', project: 'Lawley', drop_number: 'DR3' }),
+    ]);
+  });
+
+  it('returns empty for rows without DRs', () => {
+    expect(collectSheetDrTriples([row('S1', 'Mohadin', null)])).toEqual([]);
+  });
+});
+
+describe('normalizeSheetDropNumber', () => {
+  it('accepts DR numbers case-insensitively', () => {
+    expect(normalizeSheetDropNumber('DR1853481')).toBe('DR1853481');
+    expect(normalizeSheetDropNumber(' dr1853481 ')).toBe('DR1853481');
+  });
+
+  it('rejects blanks, placeholders, and junk', () => {
+    expect(normalizeSheetDropNumber(undefined)).toBeNull();
+    expect(normalizeSheetDropNumber('')).toBeNull();
+    expect(normalizeSheetDropNumber('no drop allocated')).toBeNull();
+    expect(normalizeSheetDropNumber('DR')).toBeNull();
+    expect(normalizeSheetDropNumber('1853481')).toBeNull();
   });
 });
 

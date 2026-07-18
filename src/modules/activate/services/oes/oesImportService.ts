@@ -11,7 +11,7 @@
 import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
 import { isOntLifecycleV2Enabled } from '@/lib/featureFlags';
-import type { OESRow, PPRow } from './oesExcelParser';
+import { collectSheetDrTriples, type OESRow, type PPRow } from './oesExcelParser';
 
 // ============================================================================
 // PP DATA UPSERT TEMPLATES (module-level constants)
@@ -470,9 +470,37 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
       });
     }
 
+    // Fibertime sheet DR — the per-site PP sheets carry a "Drop Number"
+    // column (added ~Jul 2026). Deliberately LAST in the chain: our own
+    // serial-keyed evidence (OES/unified/onemap) wins, and rows already
+    // located_* are never overwritten — the sheet disagrees with our
+    // resolution ~15% of the time, so it only claims rows still not_found.
+    let sheetDrMatches = 0;
+    let sheetDrRows: ResolvedRow[] = [];
+    const drTriples = collectSheetDrTriples(ppRows);
+    if (drTriples.length > 0) {
+      const sheetDrMatch = await pool.query<ResolvedRow>(`
+        UPDATE oes_pp_data pp SET resolution_status = 'located_fibertime',
+          resolved_drop_number = s.dr, resolved_source = 'fibertime_sheet',
+          resolved_details = jsonb_build_object('sheet_file', $4::text),
+          resolved_at = NOW(), updated_at = NOW()
+        FROM unnest($1::text[], $2::text[], $3::text[]) AS s(serial, project, dr)
+        WHERE pp.serial_number = s.serial AND pp.project = s.project
+          AND pp.resolution_status = 'not_found'
+        RETURNING s.dr AS drop_number, pp.serial_number, pp.project
+      `, [
+        drTriples.map(r => r.serial_number),
+        drTriples.map(r => r.project),
+        drTriples.map(r => r.drop_number),
+        filename,
+      ]);
+      sheetDrMatches = sheetDrMatch.rowCount ?? 0;
+      sheetDrRows = sheetDrMatch.rows;
+    }
+
     // Action Centre timeline: emit pre_prov_added for every drop a PP row
     // was resolved to in this batch. Best-effort — never fail the import.
-    const resolvedRows: ResolvedRow[] = [...oesMatch.rows, ...unifiedMatch.rows, ...onemapRows];
+    const resolvedRows: ResolvedRow[] = [...oesMatch.rows, ...unifiedMatch.rows, ...onemapRows, ...sheetDrRows];
     if (resolvedRows.length > 0) {
       const { logPreProvAdded } = await import(
         '@/modules/activate/services/activity-log/eventLoggers'
@@ -485,7 +513,8 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
       );
     }
 
-    const totalResolved = (oesMatch.rowCount ?? 0) + (unifiedMatch.rowCount ?? 0) + onemapMatches;
+    const totalResolved =
+      (oesMatch.rowCount ?? 0) + (unifiedMatch.rowCount ?? 0) + onemapMatches + sheetDrMatches;
 
     await pool.query(
       `UPDATE oes_pp_import_batches SET located_count = $1, unlocated_count = $2 WHERE id = $3`,
@@ -498,6 +527,7 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
       oes: oesMatch.rowCount ?? 0,
       unified: unifiedMatch.rowCount ?? 0,
       onemap: onemapMatches,
+      fibertimeSheet: sheetDrMatches,
     });
   } catch (err) {
     logger.error('PP DATA import failed (non-blocking)', { error: err instanceof Error ? err.message : String(err) });
