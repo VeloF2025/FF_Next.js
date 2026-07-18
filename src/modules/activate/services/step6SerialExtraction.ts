@@ -22,10 +22,22 @@ export async function extractStep6Serials(
 ): Promise<{ ont: string | null; ups: string | null }> {
   const extract = deps.extract ?? extractSerialsFromWaPhoto;
   const query = deps.query ?? ((sql: string, params: unknown[]) => pool.query(sql, params));
+
+  let ont: string | null = null;
+  let ups: string | null = null;
   try {
     const r = await extract(photoUrl);
-    const ont = r.ontSerial ?? null;
-    const ups = r.upsSerial ?? null;
+    ont = r.ontSerial ?? null;
+    ups = r.upsSerial ?? null;
+  } catch (err) {
+    log.error('Step-6 serial VLM extraction failed', { dropNumber, error: String(err) }, MODULE);
+    return { ont: null, ups: null };
+  }
+
+  // Persist separately: a DB write failure must not discard a serial the VLM just
+  // read — return it anyway so a later recompute can still use it, and log the two
+  // failure modes distinctly (VLM read vs. persist) rather than as one message.
+  try {
     // COALESCE so a null read never clobbers a serial an earlier pass captured.
     await query(
       `UPDATE dr_photo_unified_reviews
@@ -35,9 +47,8 @@ export async function extractStep6Serials(
       [dropNumber, ont, ups],
     );
     log.info('Step-6 photo serials extracted', { dropNumber, ont, ups }, MODULE);
-    return { ont, ups };
   } catch (err) {
-    log.error('Step-6 serial extraction failed', { dropNumber, error: String(err) }, MODULE);
-    return { ont: null, ups: null };
+    log.error('Step-6 serial persist failed (read succeeded)', { dropNumber, ont, ups, error: String(err) }, MODULE);
   }
+  return { ont, ups };
 }

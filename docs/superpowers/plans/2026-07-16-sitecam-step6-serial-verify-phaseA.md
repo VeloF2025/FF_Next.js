@@ -22,15 +22,15 @@
 ### Task 1: Migration — add `vlm_ups_serial_step6`
 
 **Files:**
-- Create: `scripts/migrations/sql/443_sitecam_step6_ups_vlm_serial.sql`
-- Create: `scripts/migrations/sql/rollback_443_sitecam_step6_ups_vlm_serial.sql`
+- Create: `scripts/migrations/sql/444_sitecam_step6_ups_vlm_serial.sql`
+- Create: `scripts/migrations/sql/rollback_444_sitecam_step6_ups_vlm_serial.sql`
 
 **Interfaces:**
 - Produces: column `dr_photo_unified_reviews.vlm_ups_serial_step6 TEXT` (nullable). `vlm_ont_serial_step6` already exists.
 
 - [ ] **Step 1: Write the migration**
 
-`scripts/migrations/sql/443_sitecam_step6_ups_vlm_serial.sql`:
+`scripts/migrations/sql/444_sitecam_step6_ups_vlm_serial.sql`:
 ```sql
 -- 443: SiteCam step-6 photo VLM UPS serial read.
 -- vlm_ont_serial_step6 already exists (dormant); this adds the UPS counterpart so
@@ -44,7 +44,7 @@ COMMENT ON COLUMN dr_photo_unified_reviews.vlm_ups_serial_step6 IS
 COMMIT;
 ```
 
-`scripts/migrations/sql/rollback_443_sitecam_step6_ups_vlm_serial.sql`:
+`scripts/migrations/sql/rollback_444_sitecam_step6_ups_vlm_serial.sql`:
 ```sql
 BEGIN;
 ALTER TABLE dr_photo_unified_reviews DROP COLUMN IF EXISTS vlm_ups_serial_step6;
@@ -53,7 +53,7 @@ COMMIT;
 
 - [ ] **Step 2: Commit**
 ```bash
-git add scripts/migrations/sql/443_sitecam_step6_ups_vlm_serial.sql scripts/migrations/sql/rollback_443_sitecam_step6_ups_vlm_serial.sql
+git add scripts/migrations/sql/444_sitecam_step6_ups_vlm_serial.sql scripts/migrations/sql/rollback_444_sitecam_step6_ups_vlm_serial.sql
 git commit -m "feat(sitecam): migration 443 — step-6 photo VLM UPS serial column"
 ```
 

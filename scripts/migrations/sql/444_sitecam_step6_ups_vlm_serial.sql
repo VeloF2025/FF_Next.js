@@ -1,4 +1,4 @@
--- 443: SiteCam step-6 photo VLM UPS serial read.
+-- 444: SiteCam step-6 photo VLM UPS serial read.
 -- vlm_ont_serial_step6 already exists (dormant); this adds the UPS counterpart so
 -- the step-6 photo can contribute BOTH serials to the 4-way verification engine.
 -- Purely additive, nullable — safe to apply any time.
