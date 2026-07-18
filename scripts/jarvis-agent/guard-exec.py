@@ -28,8 +28,10 @@ CODE_EXEC = [
     (r"\beval\b", "eval"),
     (r"\$\(", "command substitution $() (too indirect to auto-run)"),
     (r"`[^`]*`", "backtick substitution (too indirect to auto-run)"),
+    (r"<\(", "process substitution <() (too indirect to auto-run)"),
     (r"<<<", "here-string (too indirect to auto-run)"),
     (r"\bbase64\b[^\n]*(--decode|-d)\b", "base64 decode (too indirect to auto-run)"),
+    (r"\|\s*xargs\b", "piped into xargs (target hidden from the check)"),
     (r"=\s*['\"]?\$?(\w*/)?(python[0-9.]*|bash|zsh|sh|perl|ruby|node)\b", "interpreter stored in a variable"),
 ]
 

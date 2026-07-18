@@ -42,10 +42,6 @@ DENY = [
     (r"\brm\b", "file deletion"),
     (r"\bmv\s|\bcp\s", "file move/copy"),
     (r"\bsed\s+-i\b|\btee\b", "in-place file write"),
-    # Redirect to a real path (absolute/home/relative). Deliberately does NOT match
-    # `WHERE ts > 5000` or `col > 'x'` inside a SQL string — the diagnosis agent's
-    # core job is SELECT queries.
-    (r">>?\s*['\"]?(?!/dev/null\b)(/|~|\./|\.\./)", "output redirection to a file path"),
     (r"\bsystemctl\b[^\n]*\b(restart|stop|start|enable|disable|reload|kill|mask|unmask)\b", "service state change"),
     (r"\bservice\s+\S+\s+(restart|stop|start|reload)\b", "service state change"),
     (r"\b(pkill|killall|kill)\b|\bfuser\s+-k\b", "process kill"),
@@ -64,6 +60,17 @@ DENY = [
 
 ALL = CODE_EXEC + SECRET_READ + DENY
 
+# A shell redirect that writes a file. Checked against the command with quoted
+# spans removed, so a `>`/`<` used as a SQL comparison operator *inside* a quoted
+# query string (`… WHERE ts > 5000`) is never mistaken for a redirect, while a
+# real `> file` / `>> file` (outside quotes, any target incl. a bare relative
+# name) is caught. `2>/dev/null` and `2>&1` are exempted.
+REDIRECT = re.compile(r">>?\s*(?!/dev/null\b|&\s*[0-9])\S")
+
+
+def _unquoted(cmd: str) -> str:
+    return re.sub(r"'[^']*'|\"[^\"]*\"", " ", cmd)
+
 
 def deny(reason: str) -> None:
     print(json.dumps({"hookSpecificOutput": {
@@ -81,6 +88,11 @@ def main() -> None:
     if data.get("tool_name") != "Bash":
         sys.exit(0)
     cmd = (data.get("tool_input") or {}).get("command", "")
+    if REDIRECT.search(_unquoted(cmd)):
+        deny(
+            "BLOCKED: this command redirects output to a file. The diagnosis agent is "
+            "read-only — it must not write files. Put any fix in \"approval_request\"."
+        )
     for pattern, label in ALL:
         if re.search(pattern, cmd, re.IGNORECASE):
             deny(

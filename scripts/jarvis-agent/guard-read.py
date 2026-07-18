@@ -12,8 +12,14 @@ import re
 import sys
 
 SECRET_PATH = re.compile(
-    r"(credentials\.local\.md|(^|/)\.env(\.[\w.-]+)?$|(^|/)\.env\b|id_rsa|id_ed25519|id_ecdsa"
-    r"|\.pem($|['\"\s])|\.key($|['\"\s])|authorized_keys|/\.ssh/|\.pgpass|\.npmrc"
+    r"(credentials\.local\.md"
+    r"|(^|/)[^/\s'\"]*\.env(\.[\w.-]+)?($|['\"\s])"   # any *.env / *.env.* basename (incl. jarvis-agent.env)
+    r"|jarvis-agent\.env"
+    r"|\bid_rsa\b|\bid_ed25519\b|\bid_ecdsa\b"
+    r"|\.pem($|['\"\s])|\.key($|['\"\s])|authorized_keys|\.pgpass|\.npmrc"
+    r"|/\.ssh(/|$|['\"\s])|(^|/)\.ssh(/|$)"            # ssh dir
+    r"|/\.jarvis-agent(/|$|['\"\s])"                  # relay runtime (holds secrets)
+    r"|/root/\."                                       # dotfiles under /root
     r"|secrets?\.(ya?ml|json|env|txt)|credentials(\.|_))",
     re.IGNORECASE,
 )

@@ -88,6 +88,11 @@ def _env_secret_values() -> list:
         if m:
             vals.add(m.group(1))
             vals.add(v)
+    # also scrub the approval-channel JIDs — leaking which JID the gate trusts is recon.
+    for name in ("HEIN_JID", "HEIN_DM_JID"):
+        v = os.environ.get(name, "")
+        if len(v) >= 6:
+            vals.add(v)
     return sorted(vals, key=len, reverse=True)
 
 
