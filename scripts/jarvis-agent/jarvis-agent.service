@@ -1,0 +1,18 @@
+[Unit]
+Description=Jarvis relay — routes WhatsApp mentions to a headless Claude Code agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Runtime lives in ~/.jarvis-agent (guard.py, settings.json, state.json); source
+# of truth is scripts/jarvis-agent/ in the FF_Next.js repo.
+WorkingDirectory=%h/.jarvis-agent
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=%h/.jarvis-agent/jarvis-agent.env
+ExecStart=/usr/bin/python3 %h/.jarvis-agent/relay.py
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=default.target
