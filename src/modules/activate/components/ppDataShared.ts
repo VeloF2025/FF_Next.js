@@ -30,6 +30,9 @@ export interface PPRecord {
   olt_lt: number | null;
   olt_pon: number | null;
   olt_ont_pos: number | null;
+  /** pg numeric serializes as string over JSON */
+  latitude: string | number | null;
+  longitude: string | number | null;
 }
 
 export type PPCardCategory = 'total' | 'activated' | 'located' | 'not_found' | 'ticketed';

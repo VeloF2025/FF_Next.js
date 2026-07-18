@@ -32,11 +32,17 @@ import type { OESRow, PPRow } from './oesExcelParser';
  * Preserved verbatim so flag-off is byte-identical to pre-PR master.
  */
 const UPSERT_LEGACY = (valuePlaceholders: string) => `
-  INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
+  INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id, latitude, longitude)
   VALUES ${valuePlaceholders}
   ON CONFLICT (serial_number, project) DO UPDATE SET
     date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
     import_batch_id = EXCLUDED.import_batch_id,
+    -- Fill-blank GPS: whichever coordinate is captured first wins — this sheet
+    -- import or pp-data-resolve's backfillGpsCoordinates (drops/OES/onemap,
+    -- also WHERE latitude IS NULL). Later sheet values never overwrite; a bad
+    -- first geocode needs a manual correction.
+    latitude = COALESCE(oes_pp_data.latitude, EXCLUDED.latitude),
+    longitude = COALESCE(oes_pp_data.longitude, EXCLUDED.longitude),
     -- Re-entry: an activated serial reappears in PP DATA → reset for fresh
     -- ticket lifecycle, but only clear maintenance_ticket_id when the
     -- linked ticket is actually closed. Clearing it while the prior
@@ -93,11 +99,14 @@ const UPSERT_LEGACY = (valuePlaceholders: string) => `
  * maintenance_ticket_id) is preserved as the record of fact.
  */
 const UPSERT_V2 = (valuePlaceholders: string) => `
-  INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
+  INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id, latitude, longitude)
   VALUES ${valuePlaceholders}
   ON CONFLICT (serial_number, project) DO UPDATE SET
     date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
     import_batch_id = EXCLUDED.import_batch_id,
+    -- Fill-blank GPS: first captured coordinate wins (see UPSERT_LEGACY note).
+    latitude = COALESCE(oes_pp_data.latitude, EXCLUDED.latitude),
+    longitude = COALESCE(oes_pp_data.longitude, EXCLUDED.longitude),
     -- ONT_LIFECYCLE_V2: never demote activated rows. Status is immutable
     -- once activated; only decommissioned_at can move it to terminal state.
     resolution_status = oes_pp_data.resolution_status,
@@ -355,9 +364,14 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
       const placeholders: string[] = [];
 
       chunk.forEach((row, idx) => {
-        const offset = idx * 4;
-        placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}::date, $${offset + 4})`);
-        values.push(row.serial_number, row.project, row.date_registered, batchId);
+        const offset = idx * 6;
+        placeholders.push(
+          `($${offset + 1}, $${offset + 2}, $${offset + 3}::date, $${offset + 4}, $${offset + 5}, $${offset + 6})`
+        );
+        values.push(
+          row.serial_number, row.project, row.date_registered, batchId,
+          row.latitude, row.longitude
+        );
       });
 
       // Look up which (serial, project) pairs in this chunk already exist as

@@ -61,3 +61,19 @@ export function resolveTeamForProject(
   if (!match) return null;
   return { team_id: match.team_id, team_name: match.team_name || match.team_id };
 }
+
+/**
+ * GPS for a PP ticket: DR enrichment (drops/1Map, already ::text strings)
+ * wins; falls back to the PP row's own coordinates (pg numeric — arrives as
+ * string). Returns null unless both axes resolve.
+ */
+export function resolvePpTicketGps(
+  enrichLat: string | undefined,
+  enrichLng: string | undefined,
+  ppLat: string | number | null | undefined,
+  ppLng: string | number | null | undefined
+): { lat: string; lng: string } | null {
+  const lat = enrichLat || (ppLat != null ? String(ppLat) : undefined);
+  const lng = enrichLng || (ppLng != null ? String(ppLng) : undefined);
+  return lat && lng ? { lat, lng } : null;
+}
