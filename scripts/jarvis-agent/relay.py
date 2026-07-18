@@ -31,7 +31,7 @@ STATE_FILE = os.getenv("STATE_FILE", "/home/hein/.jarvis-agent/state.json")
 JARVIS_MENTIONS = [t.strip() for t in os.getenv(
     "JARVIS_MENTIONS", "188674373324992,27638412276",
 ).split(",") if t.strip()]
-HEIN_JID = os.getenv("HEIN_JID", "27665881287@s.whatsapp.net")
+HEIN_JID = os.getenv("HEIN_JID", "")  # set in jarvis-agent.env (personal number, not in git)
 ALLOWED_GROUPS = [g.strip() for g in os.getenv(
     "ALLOWED_GROUPS",
     "120363425013095777@g.us,120363423864087150@g.us",
@@ -170,6 +170,9 @@ def send_group_reply(msg: dict, reply: str) -> bool:
 
 
 def dm_hein(group_name: str, sender: str, ar: dict) -> None:
+    if not HEIN_JID:
+        log.warning("HEIN_JID unset; cannot send approval DM for: %s", ar.get("summary", ""))
+        return
     text = (
         "🔐 Jarvis needs approval before acting.\n\n"
         f"From: {sender.split('@')[0]} in \"{group_name}\"\n"
