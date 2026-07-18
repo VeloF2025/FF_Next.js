@@ -180,6 +180,17 @@ def send_group_reply(msg: dict, reply: str) -> bool:
     })
 
 
+def send_ack(msg: dict) -> None:
+    """Instant 'working on it' so a multi-minute investigation doesn't look dead."""
+    bridge_post("/api/send", {
+        "recipient": msg["chat"],
+        "message": "🔍 Besig om die stelsel te kyk… / Checking the live system, one moment…",
+        "replyToId": msg["id"],
+        "replyToSender": msg["sender"],
+        "quotedContent": (msg.get("content") or "")[:120],
+    })
+
+
 def dm_hein(group_name: str, sender: str, ar: dict) -> None:
     if not HEIN_JID:
         log.warning("HEIN_JID unset; cannot send approval DM for: %s", ar.get("summary", ""))
@@ -227,6 +238,7 @@ def process_once(state: dict) -> None:
             log.warning("rate limit hit (%d/h); skipping %s", MAX_REPLIES_PER_HOUR, msg["id"])
             continue
         log.info("mention in %s from %s: %s", msg["chat"], msg["sender"], msg["content"][:120])
+        send_ack(msg)
         group_name, context = chat_context(msg["chat"])
         try:
             result = run_agent(group_name, msg["sender"], msg["content"], context)
