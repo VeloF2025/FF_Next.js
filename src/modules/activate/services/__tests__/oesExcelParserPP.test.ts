@@ -9,11 +9,13 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import {
+  collectSheetDrTriples,
   extractGpsFromFormula,
   normalizeSheetDropNumber,
   parsePPDataSheet,
   parseOESExcel,
   EXPECTED_HEADERS,
+  type PPRow,
 } from '../oes/oesExcelParser';
 
 const MAPS_FORMULA = 'HYPERLINK("https://maps.google.com/?q=-26.72364496494768,27.01957903906529","View Map")';
@@ -105,6 +107,29 @@ describe('parsePPDataSheet GPS', () => {
     const rows = parsePPDataSheet(wb);
     expect(rows).toHaveLength(1);
     expect(rows?.[0]).toMatchObject({ serial_number: 'ALCLB477DDDD', latitude: null, longitude: null, drop_number: null });
+  });
+});
+
+describe('collectSheetDrTriples', () => {
+  const row = (serial: string, project: string, dr: string | null): PPRow => ({
+    project, serial_number: serial, date_registered: null, latitude: null, longitude: null, drop_number: dr,
+  });
+
+  it('keeps only DR-bearing rows, deduped by serial+project, first occurrence wins', () => {
+    const rows = [
+      row('S1', 'Mohadin', 'DR1'),
+      row('S1', 'Mohadin', 'DR2'),      // duplicate pair, conflicting DR — dropped
+      row('S1', 'Lawley', 'DR3'),       // same serial, different project — kept
+      row('S2', 'Mohadin', null),       // no DR — dropped
+    ];
+    expect(collectSheetDrTriples(rows)).toEqual([
+      expect.objectContaining({ serial_number: 'S1', project: 'Mohadin', drop_number: 'DR1' }),
+      expect.objectContaining({ serial_number: 'S1', project: 'Lawley', drop_number: 'DR3' }),
+    ]);
+  });
+
+  it('returns empty for rows without DRs', () => {
+    expect(collectSheetDrTriples([row('S1', 'Mohadin', null)])).toEqual([]);
   });
 });
 

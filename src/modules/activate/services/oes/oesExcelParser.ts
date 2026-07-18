@@ -176,6 +176,22 @@ export function normalizeSheetDropNumber(value: unknown): string | null {
   return /^DR\d+$/.test(s) ? s : null;
 }
 
+/**
+ * DR-bearing PP rows deduplicated by (serial_number, project) — first
+ * occurrence wins, deterministically. oes_pp_data is unique on that pair, so
+ * duplicate sheet rows fed into an `UPDATE ... FROM unnest(...)` would hit the
+ * same target row with an unspecified winner and inflate RETURNING counts.
+ */
+export function collectSheetDrTriples(rows: PPRow[]): Array<PPRow & { drop_number: string }> {
+  const seen = new Map<string, PPRow & { drop_number: string }>();
+  for (const r of rows) {
+    if (r.drop_number == null) continue;
+    const key = `${r.serial_number}|${r.project}`;
+    if (!seen.has(key)) seen.set(key, r as PPRow & { drop_number: string });
+  }
+  return [...seen.values()];
+}
+
 /** Parse PP DATA sheet from an already-loaded workbook. Returns null if not found.
  *
  * GPS: the sheet's "Address link" column holds HYPERLINK() cells whose cached

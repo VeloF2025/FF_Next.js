@@ -11,7 +11,7 @@
 import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
 import { isOntLifecycleV2Enabled } from '@/lib/featureFlags';
-import type { OESRow, PPRow } from './oesExcelParser';
+import { collectSheetDrTriples, type OESRow, type PPRow } from './oesExcelParser';
 
 // ============================================================================
 // PP DATA UPSERT TEMPLATES (module-level constants)
@@ -477,9 +477,7 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
     // resolution ~15% of the time, so it only claims rows still not_found.
     let sheetDrMatches = 0;
     let sheetDrRows: ResolvedRow[] = [];
-    const drTriples = ppRows.filter(
-      (r): r is PPRow & { drop_number: string } => r.drop_number != null
-    );
+    const drTriples = collectSheetDrTriples(ppRows);
     if (drTriples.length > 0) {
       const sheetDrMatch = await pool.query<ResolvedRow>(`
         UPDATE oes_pp_data pp SET resolution_status = 'located_fibertime',
