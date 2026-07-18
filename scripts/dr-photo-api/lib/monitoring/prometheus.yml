@@ -1,0 +1,55 @@
+# Prometheus Configuration for BOSS
+# Purpose: Configure Prometheus to scrape BOSS metrics
+# Usage: docker run -p 9091:9090 -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+
+global:
+  scrape_interval: 15s      # How often to scrape targets
+  evaluation_interval: 15s  # How often to evaluate rules
+  external_labels:
+    monitor: 'boss-production'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'localhost:9093'  # Alertmanager address
+
+# Load alerting rules
+rule_files:
+  - 'alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # BOSS Metrics Exporter
+  - job_name: 'boss'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'boss-core'
+          component: 'metrics-exporter'
+
+  # PostgreSQL Exporter (optional - if you add postgres_exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['localhost:9187']
+        labels:
+          service: 'boss-database'
+          component: 'postgresql'
+
+  # Redis Exporter (optional - if you add redis_exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['localhost:9121']
+        labels:
+          service: 'boss-eventbus'
+          component: 'redis'
+
+  # Node Exporter (optional - for system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+        labels:
+          service: 'boss-system'
+          component: 'node-exporter'
