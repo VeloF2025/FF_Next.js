@@ -36,6 +36,8 @@ export interface PPRow {
   project: string;
   serial_number: string;
   date_registered: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface ParseResult {
@@ -147,7 +149,31 @@ const PP_PROJECT_CODE_MAP: Record<string, string> = {
   'ETW-3': 'Etwatwa',
 };
 
-/** Parse PP DATA sheet from an already-loaded workbook. Returns null if not found. */
+// Coordinates inside the PP sheet's "Address link" HYPERLINK formula, e.g.
+//   HYPERLINK("https://maps.google.com/?q=-26.7236,27.0195","View Map")
+const MAPS_LINK_COORDS = /maps\.google\.com\/\?q=(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/;
+
+/** Extract lat/lng from an Address-link HYPERLINK formula string. */
+export function extractGpsFromFormula(
+  formula: string | undefined
+): { latitude: number; longitude: number } | null {
+  if (!formula) return null;
+  const m = formula.match(MAPS_LINK_COORDS);
+  if (!m) return null;
+  const latitude = parseFloat(m[1] as string);
+  const longitude = parseFloat(m[2] as string);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  if (latitude === 0 && longitude === 0) return null;
+  return { latitude, longitude };
+}
+
+/** Parse PP DATA sheet from an already-loaded workbook. Returns null if not found.
+ *
+ * GPS: the sheet's "Address link" column holds HYPERLINK() cells whose cached
+ * value is empty, so they only surface when the workbook was read with
+ * `{ cellFormula: true, sheetStubs: true }` — a default read drops them.
+ */
 export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
   const ppSheetName = workbook.SheetNames.find(name => {
     const u = name.toUpperCase();
@@ -162,6 +188,14 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
   if (data.length < 2) return null;
 
+  // Column index of "Address link" (varies per format revision; absent pre-Jul 2026).
+  const headerRow = (data[0] ?? []) as unknown[];
+  const addressLinkCol = headerRow.findIndex(
+    h => typeof h === 'string' && /address\s*link/i.test(h)
+  );
+  const sheetStartRow = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).s.r : 0;
+  const sheetStartCol = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).s.c : 0;
+
   const rows: PPRow[] = [];
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
@@ -170,6 +204,18 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
     const rawProject = String(row[0]).trim().toUpperCase();
     const serialNumber = String(row[1]).trim();
     if (!serialNumber) continue;
+
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+    if (addressLinkCol >= 0) {
+      const cellRef = XLSX.utils.encode_cell({
+        r: sheetStartRow + i,
+        c: sheetStartCol + addressLinkCol,
+      });
+      const cell = sheet[cellRef] as XLSX.CellObject | undefined;
+      const gps = extractGpsFromFormula(cell?.f);
+      if (gps) ({ latitude, longitude } = gps);
+    }
 
     let dateRegistered: string | null = null;
     if (row[2] !== undefined && row[2] !== null && row[2] !== '') {
@@ -185,6 +231,8 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
       project: PP_PROJECT_CODE_MAP[rawProject] || rawProject,
       serial_number: serialNumber,
       date_registered: dateRegistered,
+      latitude,
+      longitude,
     });
   }
 
@@ -195,7 +243,11 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
 export function parseOESExcel(filePath: string): ParseResult {
   const workbook = XLSX.readFile(filePath);
 
-  const ppRows = parsePPDataSheet(workbook);
+  // Separate formula-aware read for PP DATA only: the Address-link HYPERLINK
+  // cells have an empty cached value and vanish from a default (stub-less)
+  // read. The OLT sheet keeps the default read so its parsing is untouched.
+  const ppWorkbook = XLSX.readFile(filePath, { cellFormula: true, sheetStubs: true });
+  const ppRows = parsePPDataSheet(ppWorkbook);
   if (ppRows) {
     logger.info(`Found PP DATA sheet with ${ppRows.length} rows`);
   }

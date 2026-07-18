@@ -7,7 +7,7 @@
 'use client';
 
 import { memo } from 'react';
-import { ExternalLink, Ticket, CheckSquare, Square } from 'lucide-react';
+import { ExternalLink, MapPin, Ticket, CheckSquare, Square } from 'lucide-react';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { type PPRecord, STATUS_COLORS, daysAgo, ageBadgeStyle, isSelectable } from './ppDataShared';
 
@@ -84,6 +84,9 @@ export const PPDataRow = memo(function PPDataRow({ record, isSelected, onToggleS
       {/* Actions: ExternalLink to DR + Ticket select icon */}
       <td className="py-3 px-4 text-right">
         <div className="flex items-center justify-end gap-1">
+          {record.latitude != null && record.longitude != null
+            ? <a href={`https://maps.google.com/?q=${record.latitude},${record.longitude}`} target="_blank" rel="noopener noreferrer" className="p-1.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)] transition-colors" title="View location on map"><MapPin className="w-4 h-4" /></a>
+            : <span className="inline-block w-7 h-7" />}
           {record.resolved_drop_number
             ? <a href={`/activate/${record.resolved_drop_number}`} target="_blank" rel="noopener noreferrer" className="p-1.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)] transition-colors" title="View DR in Activate"><ExternalLink className="w-4 h-4" /></a>
             : <span className="inline-block w-7 h-7" />}
