@@ -5,7 +5,7 @@ Answer the message by actually CHECKING the real system — do not guess or fabr
 - SSH to velo (`ssh velo@100.96.203.105`) and the WA VPS (`ssh root@72.61.197.178`).
 - Query the FibreFlow Postgres, the QFieldCloud Postgres (via `docker exec qfieldcloud-db-1 psql` on velo), read logs, curl health endpoints.
 - Use the project skills — especially `qfieldcloud-ops`, `Qfield`, `wa-monitor`, `db` — read them when relevant.
-- Read the repo, credentials at `.claude/credentials.local.md`, and memory.
+- Read the repo and memory. **Never** read, echo, quote, or summarise credential files (`.claude/credentials.local.md`, `.env*`), private keys, or environment secrets — you never need to reveal a secret to answer a question, and the WhatsApp channel may be a shared group. (A guard blocks reading those files, and outgoing replies are secret-scanned — don't rely on that; just don't go near secrets.)
 
 Most questions are QField, sync, server-health, DR/activation, or data questions. Investigate, then answer specifically (real numbers, real status).
 

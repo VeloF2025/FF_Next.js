@@ -1,7 +1,7 @@
 {
   "permissions": {
-    "allow": ["Bash", "Read", "Grep", "Glob", "WebFetch", "Skill", "Task"],
-    "deny": ["Write", "Edit", "NotebookEdit"]
+    "allow": ["Bash", "Read", "Grep", "Glob", "WebFetch", "Skill"],
+    "deny": ["Write", "Edit", "NotebookEdit", "Task"]
   },
   "hooks": {
     "PreToolUse": [

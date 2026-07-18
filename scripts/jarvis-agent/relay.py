@@ -52,8 +52,42 @@ EXEC_TIMEOUT = int(os.getenv("EXEC_TIMEOUT", "240"))
 APPROVAL_TTL = int(os.getenv("APPROVAL_TTL", "1800"))
 MODEL = os.getenv("JARVIS_MODEL", "opus")
 
-APPROVE_RE = re.compile(r"\b(yes|ja|approve|approved|goedgekeur|keur goed|do it|doen dit|ok|okay|go|gaan voort|goed|maak so)\b", re.I)
-DECLINE_RE = re.compile(r"\b(no|nee|cancel|kanselleer|stop|moenie|los dit|nie)\b", re.I)
+# Bare-word approvals are accepted ONLY when the whole message equals one of these
+# exactly (avoids "ek weet nie" / "ok cool" misfiring on a pending action). The
+# safe path is always an explicit "JARVIS OK <token>".
+APPROVE_WORDS = {"ja", "yes", "approve", "approved", "goedgekeur", "ok", "okay",
+                 "do it", "doen dit", "gaan voort", "maak so", "reg so"}
+DECLINE_WORDS = {"nee", "no", "cancel", "kanselleer", "stop", "moenie", "los dit", "laat staan"}
+
+# Outgoing replies are scanned for secrets before they leave — the diagnosis agent
+# can read credential files/env, so this is the enforced control against a
+# prompt-injected exfiltration to a (semi-trusted) group.
+SECRET_PATTERNS = [
+    re.compile(r"\w+://[^\s:@/]+:[^\s:@/]+@\S+"),                       # user:pass@host URLs (incl. postgres://)
+    re.compile(r"sk-ant-[A-Za-z0-9_\-]{8,}"),
+    re.compile(r"npg_[A-Za-z0-9]{8,}"),
+    re.compile(r"eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.?[A-Za-z0-9_\-]*"),  # JWT
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),                               # AWS access key id
+    re.compile(r"(?i)\b(password|passwd|pgpassword|secret|api[_-]?key|auth[_-]?token|access[_-]?token|bearer)\b\s*[:=]\s*\S+"),
+]
+
+
+def redact(text: str) -> str:
+    for p in SECRET_PATTERNS:
+        text = p.sub("«redacted»", text)
+    return text
+
+
+def sanitize_display(s: str, cap: int = 600) -> str:
+    """Strip control/bidi chars and cap length so the human approval gate can't be
+    fooled by a proposal whose destructive tail is hidden off-screen or reversed."""
+    s = re.sub(r"[‪-‮⁦-⁩\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", s or "")
+    return s if len(s) <= cap else s[:cap] + " …(afgekap/truncated)"
+
+
+def _sq(s: str) -> str:
+    return str(s).replace("'", "''")
 
 log = logging.getLogger("jarvis-relay")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -101,18 +135,20 @@ def _json_save(path: str, obj: dict) -> None:
 def new_mentions(cursor_ts: str) -> list:
     clauses = []
     if ALLOWED_GROUPS:
-        groups = ",".join(f"'{g}'" for g in ALLOWED_GROUPS)
-        mention = " OR ".join(f"content LIKE '%{t}%'" for t in JARVIS_MENTIONS)
+        groups = ",".join(f"'{_sq(g)}'" for g in ALLOWED_GROUPS)
+        mention = " OR ".join(f"content LIKE '%{_sq(t)}%'" for t in JARVIS_MENTIONS)
         clauses.append(f"(chat_jid IN ({groups}) AND ({mention}))")
     if DM_CHATS:
-        dms = ",".join(f"'{c}'" for c in DM_CHATS)
+        dms = ",".join(f"'{_sq(c)}'" for c in DM_CHATS)
         clauses.append(f"chat_jid IN ({dms})")
     if not clauses:
         return []
+    # >= (not >) so a message sharing the last-seen second isn't skipped; the
+    # replied-id dedup below prevents reprocessing.
     q = (
         "SELECT json_object('id',id,'chat',chat_jid,'sender',sender,"
         "'content',content,'ts',timestamp) "
-        f"FROM messages WHERE is_from_me=0 AND timestamp > '{cursor_ts}' "
+        f"FROM messages WHERE is_from_me=0 AND timestamp >= '{_sq(cursor_ts)}' "
         f"AND ({' OR '.join(clauses)}) ORDER BY timestamp"
     )
     return sql_json(q)
@@ -121,10 +157,10 @@ def new_mentions(cursor_ts: str) -> list:
 def chat_context(chat_jid: str) -> tuple:
     rows = list(reversed(sql_json(
         "SELECT json_object('sender',sender,'content',content,'me',is_from_me) "
-        f"FROM messages WHERE chat_jid='{chat_jid}' AND content!='' "
+        f"FROM messages WHERE chat_jid='{_sq(chat_jid)}' AND content!='' "
         f"ORDER BY timestamp DESC LIMIT {CONTEXT_MESSAGES}"
     )))
-    name_rows = sql_json(f"SELECT json_object('n',name) FROM chats WHERE jid='{chat_jid}'")
+    name_rows = sql_json(f"SELECT json_object('n',name) FROM chats WHERE jid='{_sq(chat_jid)}'")
     group_name = name_rows[0]["n"] if name_rows else chat_jid
     lines = []
     for r in rows:
@@ -190,7 +226,7 @@ def bridge_post(path: str, payload: dict) -> bool:
 
 def send_group_reply(msg: dict, reply: str) -> bool:
     return bridge_post("/api/send", {
-        "recipient": msg["chat"], "message": reply,
+        "recipient": msg["chat"], "message": redact(reply),
         "replyToId": msg["id"], "replyToSender": msg["sender"],
         "quotedContent": (msg.get("content") or "")[:120],
     })
@@ -211,7 +247,11 @@ def dm(text: str) -> None:
 
 
 def request_approval(origin_chat: str, group_name: str, sender: str, ar: dict) -> None:
-    token = secrets.token_hex(2)
+    if not HEIN_JID:
+        log.error("HEIN_JID unset — cannot request approval; dropping proposed action: %s",
+                  ar.get("summary", ""))
+        return
+    token = secrets.token_hex(3)
     pend = load_pending()
     pend[token] = {
         "command": ar.get("proposed", ""), "host": ar.get("host", "velo"),
@@ -222,11 +262,11 @@ def request_approval(origin_chat: str, group_name: str, sender: str, ar: dict) -
     log.info("stored pending %s host=%s cmd=%s", token, pend[token]["host"], pend[token]["command"][:200])
     dm(
         "🔐 Jarvis wil 'n aksie uitvoer — jou goedkeuring nodig.\n\n"
-        f"Van: {sender.split('@')[0]} in \"{group_name}\"\n"
-        f"Aksie: {ar.get('summary', '')}\n"
-        f"Opdrag: {ar.get('proposed', '')}\n"
-        f"Host: {ar.get('host', '')}  |  Risiko: {ar.get('risk', '')}\n\n"
-        f"Antwoord *JARVIS OK {token}* (of net 'ja') om goed te keur, of 'nee' om te kanselleer."
+        f"Van: {sender.split('@')[0]} in \"{sanitize_display(group_name, 80)}\"\n"
+        f"Aksie: {sanitize_display(ar.get('summary', ''), 200)}\n"
+        f"Opdrag: {sanitize_display(ar.get('proposed', ''))}\n"
+        f"Host: {sanitize_display(ar.get('host', ''), 20)}  |  Risiko: {sanitize_display(ar.get('risk', ''), 10)}\n\n"
+        f"Antwoord *JARVIS OK {token}* om goed te keur, of 'nee' om te kanselleer."
     )
 
 
@@ -243,14 +283,20 @@ def match_pending(content: str) -> tuple:
     pend = load_pending()
     if not pend:
         return None, None
+    text = (content or "").strip().lower()
+    words = set(text.split())
+    # Explicit token (hex, matched on a non-hex boundary so it can't be a fragment
+    # of a longer string) — the safe path; works with any number pending.
     for t in pend:
-        if t.lower() in content.lower():
-            return t, ("decline" if DECLINE_RE.search(content) else "approve")
+        if re.search(rf"(?<![0-9a-f]){re.escape(t.lower())}(?![0-9a-f])", text):
+            return t, ("decline" if (words & DECLINE_WORDS) else "approve")
+    # Bare word: ONLY when the entire message equals one affirmative/negative and
+    # exactly one action is pending (so "ek weet nie" / "ok cool" never fire).
     if len(pend) == 1:
         t = next(iter(pend))
-        if DECLINE_RE.search(content):
+        if text in DECLINE_WORDS:
             return t, "decline"
-        if APPROVE_RE.search(content):
+        if text in APPROVE_WORDS:
             return t, "approve"
     return None, None
 
@@ -299,10 +345,10 @@ def handle_approval(token: str, verb: str) -> bool:
             bridge_post("/send-message", {"group_jid": origin, "message": "Hein het die regstelling gekanselleer."})
         return True
     log.info("EXECUTING approved %s on %s: %s", token, action["host"], action["command"][:200])
-    dm(f"⚙️ Goedgekeur — ek voer nou uit: {action['summary']}")
-    out = execute_via_agent(action)
+    dm(f"⚙️ Goedgekeur — ek voer nou uit: {sanitize_display(action['summary'], 200)}")
+    out = redact(execute_via_agent(action))
     log.info("exec result: %s", out[:300])
-    dm(f"✅ Uitgevoer: {action['summary']}\n\n{out[:900]}")
+    dm(f"✅ Uitgevoer: {sanitize_display(action['summary'], 200)}\n\n{out[:900]}")
     if origin and origin != HEIN_DM_JID:
         bridge_post("/send-message", {
             "group_jid": origin,
@@ -371,6 +417,11 @@ def process_once(state: dict) -> None:
 def main() -> None:
     if not ALLOWED_GROUPS and not DM_CHATS:
         log.error("no ALLOWED_GROUPS or DM_CHATS; refusing to start")
+        sys.exit(1)
+    # The approval channel must be Hein's DM, never a group — otherwise a group
+    # member could approve execution.
+    if HEIN_DM_JID and HEIN_DM_JID in ALLOWED_GROUPS:
+        log.error("HEIN_DM_JID overlaps ALLOWED_GROUPS — refusing to start (approval channel must not be a group)")
         sys.exit(1)
     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
     state = load_state()
