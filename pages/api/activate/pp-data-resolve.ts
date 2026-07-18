@@ -47,6 +47,7 @@ const STATUS_LABELS: Record<string, string> = {
   located_onemap: 'Found (OneMap)',
   located_1map: 'Found (1Map)',
   located_local: 'Found (Local)',
+  located_fibertime: 'Found (Fibertime)',
   activated: 'Activated',
   not_found: 'Not Found',
 };

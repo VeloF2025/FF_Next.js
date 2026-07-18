@@ -38,6 +38,8 @@ export interface PPRow {
   date_registered: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** DR from the sheet's "Drop Number" column (added ~Jul 2026); null when blank or "no drop allocated". */
+  drop_number: string | null;
 }
 
 export interface ParseResult {
@@ -168,6 +170,12 @@ export function extractGpsFromFormula(
   return { latitude, longitude };
 }
 
+/** Normalize the PP sheet's Drop Number cell: `DR1853481` → uppercase; anything else (blank, "no drop allocated") → null. */
+export function normalizeSheetDropNumber(value: unknown): string | null {
+  const s = String(value ?? '').trim().toUpperCase();
+  return /^DR\d+$/.test(s) ? s : null;
+}
+
 /** Parse PP DATA sheet from an already-loaded workbook. Returns null if not found.
  *
  * GPS: the sheet's "Address link" column holds HYPERLINK() cells whose cached
@@ -192,6 +200,9 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
   const headerRow = (data[0] ?? []) as unknown[];
   const addressLinkCol = headerRow.findIndex(
     h => typeof h === 'string' && /address\s*link/i.test(h)
+  );
+  const dropNumberCol = headerRow.findIndex(
+    h => typeof h === 'string' && /drop\s*number/i.test(h)
   );
   const sheetStartRow = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).s.r : 0;
   const sheetStartCol = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).s.c : 0;
@@ -233,6 +244,7 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
       date_registered: dateRegistered,
       latitude,
       longitude,
+      drop_number: dropNumberCol >= 0 ? normalizeSheetDropNumber(row[dropNumberCol]) : null,
     });
   }
 

@@ -125,8 +125,9 @@ export async function loadPpLinkedAwaitingRows(): Promise<LinkedAwaitingRow[]> {
       ON p.project = lb.project AND p.import_batch_id = lb.bid
     WHERE (
       -- Actual oes_pp_data status values are located_1map / located_local /
-      -- located_unified. (located_oes / located_onemap kept for forward-compat.)
-      p.resolution_status IN ('located_1map', 'located_local', 'located_unified', 'located_oes', 'located_onemap')
+      -- located_unified / located_fibertime (sheet DR, mig 445).
+      -- (located_oes / located_onemap kept for forward-compat.)
+      p.resolution_status IN ('located_1map', 'located_local', 'located_unified', 'located_oes', 'located_onemap', 'located_fibertime')
       OR cardinality(p.linked_via) > 0
     )
       -- Exclude not_found (own tab) and activated (own highlighted set) so the

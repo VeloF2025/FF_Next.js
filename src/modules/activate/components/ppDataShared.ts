@@ -48,6 +48,7 @@ export const STATUS_COLORS: Record<string, { bg: string; text: string; label: st
   located_onemap:  { bg: 'bg-purple-500/20', text: 'text-purple-400', label: 'Found (OneMap)' },
   located_1map:    { bg: 'bg-teal-500/20',   text: 'text-teal-400',   label: 'Found (1Map)' },
   located_local:   { bg: 'bg-cyan-500/20',   text: 'text-cyan-400',   label: 'Found (Local)' },
+  located_fibertime: { bg: 'bg-indigo-500/20', text: 'text-indigo-400', label: 'Found (Fibertime)' },
   activated:       { bg: 'bg-green-500/20',  text: 'text-green-400',  label: 'Activated' },
 };
 

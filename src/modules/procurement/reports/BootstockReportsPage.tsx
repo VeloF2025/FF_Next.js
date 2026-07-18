@@ -186,6 +186,7 @@ export function BootstockReportsPage() {
             <option value="located_1map">Found (1Map)</option>
             <option value="located_unified">Found (Unified)</option>
             <option value="located_local">Found (Local)</option>
+            <option value="located_fibertime">Found (Fibertime)</option>
             <option value="located_oes">Found (OES)</option>
           </select>
         )}
@@ -326,6 +327,7 @@ function PpBadge({ status }: { status: string }) {
     located_1map: { bg: 'bg-blue-500/10', text: 'text-blue-400', label: 'Found (1Map)' },
     located_unified: { bg: 'bg-purple-500/10', text: 'text-purple-400', label: 'Found (Unified)' },
     located_local: { bg: 'bg-teal-500/10', text: 'text-teal-400', label: 'Found (Local)' },
+    located_fibertime: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', label: 'Found (Fibertime)' },
     located_oes: { bg: 'bg-green-500/10', text: 'text-green-400', label: 'Found (OES)' },
   };
   const c = config[status] || { bg: 'bg-gray-500/10', text: 'text-gray-400', label: status };
