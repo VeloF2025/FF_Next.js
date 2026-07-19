@@ -516,8 +516,11 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
     const totalResolved =
       (oesMatch.rowCount ?? 0) + (unifiedMatch.rowCount ?? 0) + onemapMatches + sheetDrMatches;
 
+    // Live column is not_found_count — writing "unlocated_count" made this
+    // UPDATE throw into the outer catch on every import (stats-only loss;
+    // the upserts/promotions above had already committed).
     await pool.query(
-      `UPDATE oes_pp_import_batches SET located_count = $1, unlocated_count = $2 WHERE id = $3`,
+      `UPDATE oes_pp_import_batches SET located_count = $1, not_found_count = $2 WHERE id = $3`,
       [totalResolved, ppRows.length - totalResolved, batchId]
     );
 
