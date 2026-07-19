@@ -279,7 +279,14 @@ class PhotoDatabase:
 
         try:
             self.pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
-            logger.info(f"Database connected: {DATABASE_URL[:30]}...")
+            # Log only the host, never a raw prefix of DATABASE_URL: slicing the
+            # full connection string can include leading characters of the
+            # password (e.g. "postgresql://user:XX..." at a short-enough slice
+            # length) — this was dormant while DATABASE_URL pointed at a dead
+            # host with rejected auth, but leaks real password characters once
+            # pointed at a live, valid credential.
+            db_host = DATABASE_URL.split("@")[-1].split("/")[0] if "@" in DATABASE_URL else "unknown"
+            logger.info(f"Database connected: {db_host}")
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
             self._enabled = False
