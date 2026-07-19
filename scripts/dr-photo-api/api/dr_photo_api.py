@@ -29,6 +29,7 @@ import io
 import json
 import logging
 import os
+import re
 import time
 import uuid
 import zipfile
@@ -63,12 +64,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 1Map's auth API takes credentials as GET query params (their API contract, not
-# ours — see onemap_specialist_agent.py _authenticate/_web_session). httpx logs
-# the full request URL at INFO, which would leak ONEMAP_PASSWORD into container
-# logs on every login. Silence httpx/httpcore's own request-line logging; this
-# does not affect our own logger.info()/logger.warning() calls above.
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
+# ours — see onemap_specialist_agent.py _authenticate). httpx logs the full
+# request URL at INFO by default, which would leak ONEMAP_PASSWORD into
+# container logs on every login. Redact credential-like query params from
+# httpx/httpcore's own log records rather than silencing the logger outright —
+# this closes the leak without losing request/response visibility for other
+# (non-credential-bearing) outgoing calls. Does not affect logs emitted by our
+# own `logger` (a separate, unfiltered logger).
+_CREDENTIAL_QUERY_PARAM_RE = re.compile(
+    r"(?i)([?&](?:password|passwd|token|secret|key|api[_-]?key|access[_-]?key)=)[^&\s'\"]+"
+)
+
+
+class _RedactCredentialsFilter(logging.Filter):
+    """Redact password/token/secret/api_key query-param values from log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = _CREDENTIAL_QUERY_PARAM_RE.sub(r"\1***REDACTED***", record.msg)
+        if record.args:
+            record.args = tuple(
+                _CREDENTIAL_QUERY_PARAM_RE.sub(r"\1***REDACTED***", arg)
+                if isinstance(arg, str) else arg
+                for arg in record.args
+            )
+        return True
+
+
+_redact_filter = _RedactCredentialsFilter()
+logging.getLogger("httpx").addFilter(_redact_filter)
+logging.getLogger("httpcore").addFilter(_redact_filter)
 
 # Import 1Map agent
 from agents.integrations.onemap_specialist_agent import (
@@ -806,7 +831,14 @@ class CascadeVisionEvaluator:
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(url, json=payload)
-                response.raise_for_status()
+                # NOT response.raise_for_status(): its HTTPStatusError embeds the
+                # full request URL, which here contains GEMINI_API_KEY as a query
+                # param (Gemini's API contract) — that message would leak the key
+                # into logs via the `except Exception as e` below. Raise a
+                # credential-free message instead (mirrors OneMapSpecialistAgent
+                # ._authenticate()'s status check for the same reason).
+                if response.status_code >= 400:
+                    raise Exception(f"Gemini API error: {response.status_code}")
                 result = response.json()
 
             text_response = result["candidates"][0]["content"]["parts"][0]["text"]
