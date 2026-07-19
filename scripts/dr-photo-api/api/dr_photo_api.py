@@ -62,6 +62,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 1Map's auth API takes credentials as GET query params (their API contract, not
+# ours — see onemap_specialist_agent.py _authenticate/_web_session). httpx logs
+# the full request URL at INFO, which would leak ONEMAP_PASSWORD into container
+# logs on every login. Silence httpx/httpcore's own request-line logging; this
+# does not affect our own logger.info()/logger.warning() calls above.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 # Import 1Map agent
 from agents.integrations.onemap_specialist_agent import (
     OneMapSpecialistAgent,
