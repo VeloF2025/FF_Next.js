@@ -66,11 +66,13 @@ logger = logging.getLogger(__name__)
 # 1Map's auth API takes credentials as GET query params (their API contract, not
 # ours — see onemap_specialist_agent.py _authenticate). httpx logs the full
 # request URL at INFO by default, which would leak ONEMAP_PASSWORD into
-# container logs on every login. Redact credential-like query params from
-# httpx/httpcore's own log records rather than silencing the logger outright —
-# this closes the leak without losing request/response visibility for other
-# (non-credential-bearing) outgoing calls. Does not affect logs emitted by our
-# own `logger` (a separate, unfiltered logger).
+# container logs on every login. Redact credential-like query params from log
+# records rather than silencing the logger outright — this closes the leak
+# without losing request/response visibility for other (non-credential-bearing)
+# calls. Attached at the root handler (below), so it runs on every record that
+# reaches it — httpx, httpcore's children, and our own logger. Note it only
+# redacts URL query-param form (`?password=` / `&token=`); a secret logged some
+# other way (e.g. inside a dict repr) must be redacted at its own call site.
 _CREDENTIAL_QUERY_PARAM_RE = re.compile(
     r"(?i)([?&](?:password|passwd|token|secret|key|api[_-]?key|access[_-]?key)=)[^&\s'\"]+"
 )
@@ -104,8 +106,18 @@ class _RedactCredentialsFilter(logging.Filter):
 
 
 _redact_filter = _RedactCredentialsFilter()
-logging.getLogger("httpx").addFilter(_redact_filter)
-logging.getLogger("httpcore").addFilter(_redact_filter)
+# Attach at the ROOT HANDLER, not on individual loggers. A logging.Filter only
+# runs for records that ORIGINATE on the logger it is attached to — it does NOT
+# fire for records propagating up from child loggers (only ancestor *handlers*
+# fire on propagation, not ancestor *filters*). httpcore logs through per-module
+# child loggers (httpcore.http11 / .connection / .http2 / .proxy / .socks), so
+# getLogger("httpcore").addFilter(...) is dead code — dormant at INFO, but it
+# would silently leak the credential-bearing URL the moment anyone enables DEBUG
+# to troubleshoot a 1Map request. A handler-level filter runs for every record
+# that reaches the handler, covering httpx and all httpcore children at once.
+# basicConfig() above guarantees the root has a handler by this point.
+for _handler in logging.getLogger().handlers:
+    _handler.addFilter(_redact_filter)
 
 # Import 1Map agent
 from agents.integrations.onemap_specialist_agent import (
