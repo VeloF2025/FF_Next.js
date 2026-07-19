@@ -755,7 +755,11 @@ class OneMapSpecialistAgent:
             # Try primary upload endpoint
             upload_url = f"{self.BASE_URL.replace('/v1', '')}/apps/app/attachments/upload"
 
-            logger.debug(f"POST {upload_url} with params: {params}")
+            # Never log the bearer token in cleartext: for its ~2h validity it is
+            # a full session credential, and this debug line reaches handlers the
+            # moment anyone enables DEBUG to chase an upload issue.
+            _log_params = {**params, "token": "***REDACTED***"} if "token" in params else params
+            logger.debug(f"POST {upload_url} with params: {_log_params}")
 
             response = await self._client.post(
                 upload_url,
