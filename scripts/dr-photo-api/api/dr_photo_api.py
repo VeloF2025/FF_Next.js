@@ -77,17 +77,29 @@ _CREDENTIAL_QUERY_PARAM_RE = re.compile(
 
 
 class _RedactCredentialsFilter(logging.Filter):
-    """Redact password/token/secret/api_key query-param values from log records."""
+    """Redact password/token/secret/api_key query-param values from log records.
+
+    httpx's own request logging (`logger.info('HTTP Request: %s %s "%s %d %s"',
+    request.method, request.url, ...)`) passes `request.url` as an `httpx.URL`
+    OBJECT in `record.args`, not a str — %-formatting stringifies it only at
+    emit time, after any filter has run. Coerce every arg to str() before
+    matching (and substitute the coerced string back, since %s would call
+    str() on it anyway) — an isinstance(arg, str) guard here would silently
+    skip exactly the object that carries the credential and defeat the filter.
+    """
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.msg, str):
             record.msg = _CREDENTIAL_QUERY_PARAM_RE.sub(r"\1***REDACTED***", record.msg)
         if record.args:
-            record.args = tuple(
-                _CREDENTIAL_QUERY_PARAM_RE.sub(r"\1***REDACTED***", arg)
-                if isinstance(arg, str) else arg
-                for arg in record.args
-            )
+            new_args = []
+            for arg in record.args:
+                arg_str = str(arg)
+                if _CREDENTIAL_QUERY_PARAM_RE.search(arg_str):
+                    new_args.append(_CREDENTIAL_QUERY_PARAM_RE.sub(r"\1***REDACTED***", arg_str))
+                else:
+                    new_args.append(arg)
+            record.args = tuple(new_args)
         return True
 
 
