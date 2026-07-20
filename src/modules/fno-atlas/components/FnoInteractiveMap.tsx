@@ -99,6 +99,21 @@ function coveragePointToLayer(feature: CoverageFeature, latlng: LatLng): Layer {
   });
 }
 
+/**
+ * Operators surfaced for their fibre footprint only — their wireless-only presence
+ * points are hidden from the map. Letaba is wireless-first with a TruFibre line, so
+ * only its fibre-capable towns (network_type 'ftth' | 'mixed') are relevant here.
+ */
+const FIBRE_ONLY_OPERATOR_SLUGS = new Set<string>(['letaba']);
+
+function isWirelessOnlyPresenceHidden(feature: CoverageFeature): boolean {
+  return (
+    FIBRE_ONLY_OPERATOR_SLUGS.has(feature.properties.operatorSlug) &&
+    feature.properties.featureKind === 'presence' &&
+    feature.properties.networkType === 'wireless'
+  );
+}
+
 export function FnoInteractiveMap({ networks, selectedIds, onToggle }: FnoInteractiveMapProps) {
   const [coverage, setCoverage] = useState<CoverageFeatureCollection | null>(null);
   const [coverageError, setCoverageError] = useState<string | null>(null);
@@ -152,7 +167,9 @@ export function FnoInteractiveMap({ networks, selectedIds, onToggle }: FnoIntera
         if (!cancelled) {
           setCoverage({
             type: 'FeatureCollection',
-            features: payloads.flatMap((payload) => payload.data.features),
+            features: payloads
+              .flatMap((payload) => payload.data.features)
+              .filter((feature) => !isWirelessOnlyPresenceHidden(feature)),
           });
           setCoverageError(null);
         }
