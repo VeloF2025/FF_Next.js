@@ -1,4 +1,4 @@
-export type FnoType = 'FTTH' | 'FTTB' | 'Metro Backhaul' | 'National Backhaul' | 'Wholesale Aggregator';
+export type FnoType = 'FTTH' | 'FTTB' | 'Metro Backhaul' | 'National Backhaul' | 'Wholesale Aggregator' | 'Fixed Wireless';
 export type DataMethod = 'Official portal' | 'Public web page' | 'PDF/map extraction' | 'Aggregator API' | 'Manual verification';
 
 export interface FnoNetwork {
@@ -218,14 +218,14 @@ export const fnoNetworks: FnoNetwork[] = [
   {
     id: 'letaba',
     name: 'Letaba Networks',
-    types: ['FTTH'],
-    footprint: 'Wireless-first regional ISP across Limpopo and Mpumalanga (Vhembe, Mopani and Ehlanzeni districts, Musina to Lydenburg), plus TruFibre/SkyFibre. Publishes no coverage map — presence points are point-probed from their public coverage-check API.',
+    types: ['Fixed Wireless', 'FTTH'],
+    footprint: 'Wireless-first regional ISP across Limpopo and Mpumalanga (Vhembe, Mopani and Ehlanzeni districts, Musina to Lydenburg); fixed-wireless plus a TruFibre FTTH line. Publishes no coverage map — presence points are point-probed from their public coverage-check API.',
     strongRegions: ['Limpopo', 'Mpumalanga', 'Vhembe', 'Mopani', 'Ehlanzeni'],
     projectFit: ['regional wireless', 'rural edge', 'secondary towns', 'Limpopo/Mpumalanga coverage'],
-    backhaulNotes: 'Wireless-first footprint useful where metro FNOs are absent in Limpopo/Mpumalanga. Coverage is point-probed, not a published layer.',
+    backhaulNotes: 'Validate fixed-wireless vs TruFibre availability per town; useful reference where metro FNOs are absent in Limpopo/Mpumalanga.',
     website: 'https://letaba.net/',
-    coverageSource: 'https://letaba.net/',
-    dataMethod: 'Official portal',
+    coverageSource: 'https://letaba.net/apply/',
+    dataMethod: 'Aggregator API',
     confidence: 'Medium',
   },
 ];
