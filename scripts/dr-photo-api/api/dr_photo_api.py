@@ -258,7 +258,8 @@ PHOTOS_BASE_PATH.mkdir(parents=True, exist_ok=True)
 # DRs; a cold lookup costs 4-10s of sequential 1Map calls. Positive results
 # only — a 404 is NEVER cached, so a tech completing a sign-up and resubmitting
 # sees it immediately. Short TTL keeps photo_count honest for quick resubmits.
-# /api/download invalidates its DR (local_photos changes on disk).
+# Both photo-writing endpoints (/api/download and /api/dr/process) invalidate
+# their DR AFTER download_all_photos completes (local_photos changed on disk).
 _RECORD_CACHE: Dict[str, tuple] = {}  # DR -> (cached_monotonic, response_dict)
 _RECORD_CACHE_TTL = 180.0
 _RECORD_CACHE_MAX = 4096
@@ -2196,8 +2197,6 @@ async def download_dr_photos(dr_number: str):
 
     Phase 2.4: Enhanced with GPS extraction and validation.
     """
-    # Local photos are about to change on disk — drop the cached record.
-    _RECORD_CACHE.pop(dr_number.strip().upper(), None)
     try:
         async with OneMapSpecialistAgent() as agent:
             record = await agent.get_dr(dr_number)
@@ -2207,6 +2206,11 @@ async def download_dr_photos(dr_number: str):
 
             output_dir = PHOTOS_BASE_PATH / dr_number
             photos = await agent.download_all_photos(record, str(output_dir))
+
+            # local_photos just changed on disk — drop the cached record AFTER
+            # the mutation (popping before it would let a concurrent /api/record
+            # re-cache the pre-download state for a full TTL).
+            _RECORD_CACHE.pop(dr_number.strip().upper(), None)
 
             # Get DR site coordinates for GPS validation
             site_coords = None
@@ -3562,6 +3566,9 @@ async def process_dr(
             async with OneMapSpecialistAgent() as agent:
                 output_dir = PHOTOS_BASE_PATH / dr_number
                 photos = await agent.download_all_photos(onemap_record, str(output_dir))
+
+                # Same post-mutation invalidation as /api/download.
+                _RECORD_CACHE.pop(dr_number.strip().upper(), None)
 
                 local_photos = list(output_dir.glob("*.jpg"))
 

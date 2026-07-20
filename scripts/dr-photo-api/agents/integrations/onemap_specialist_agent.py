@@ -277,8 +277,12 @@ class OneMapSpecialistAgent:
     async def _authenticate(self, force: bool = False) -> None:
         """Authenticate and obtain API token (process-wide TTL cache).
 
-        `force=True` bypasses and replaces the cached token — used by
-        _request()'s retry when 1Map rejects a cached token early.
+        `force=True` marks the CALLER's current token as rejected — used by
+        the 401/403 retries. Under the lock, a real login only happens if the
+        cache still holds that same rejected token (or is empty/expired);
+        when a concurrent request already refreshed it, the new token is
+        adopted instead — otherwise a burst of simultaneous 401s would each
+        re-login and recreate the login-flood 413 failure mode.
         """
         global _V1_TOKEN
 
@@ -288,11 +292,15 @@ class OneMapSpecialistAgent:
                 self._token = cached[1]
                 return
 
+        rejected_token = self._token if force else None
+
         async with _V1_LOCK:
             cached = _V1_TOKEN  # re-check under lock
-            if not force and cached is not None and (time.monotonic() - cached[0]) < _V1_TOKEN_TTL:
-                self._token = cached[1]
-                return
+            if cached is not None and (time.monotonic() - cached[0]) < _V1_TOKEN_TTL:
+                if not force or cached[1] != rejected_token:
+                    # Fresh (or peer-refreshed) token — adopt, don't re-login.
+                    self._token = cached[1]
+                    return
 
             response = await self._client.get(
                 "/auth/login",
@@ -350,6 +358,14 @@ class OneMapSpecialistAgent:
         params["token"] = self._token
 
         response = await self._client.get(endpoint, params=params)
+
+        if response.status_code in (401, 403):
+            # Same early-invalidation recovery as _request(): one forced
+            # refresh (adopts a peer's fresh token when available), one retry.
+            logger.warning(f"1Map v1 auth rejected on binary request ({response.status_code}) — refreshing token")
+            await self._authenticate(force=True)
+            params["token"] = self._token
+            response = await self._client.get(endpoint, params=params)
 
         if response.status_code != 200:
             raise Exception(f"Binary request failed: {response.status_code}")
