@@ -77,6 +77,10 @@ export const fnoBrandMapProfiles: FnoBrandMapProfile[] = [
     { label: 'Coastal / international capacity', position: [-33.85, 18.55], note: 'Subsea, IP transit and carrier path option' },
     { label: 'National enterprise', position: [-26.1, 28.12], note: 'Carrier-grade transit and enterprise services' },
   ] },
+  { fnoId: 'letaba', brandColor: '#004A8F', brandColorLabel: 'Letaba blue', brandColorSource: 'Letaba Networks website/logo palette', mapPoints: [
+    { label: 'Limpopo (Tzaneen / Mopani)', position: [-23.83, 30.16], note: 'Wireless-first Limpopo footprint' },
+    { label: 'Mpumalanga (Lydenburg)', position: [-25.1, 30.45], note: 'Southern extent of the probed footprint' },
+  ] },
 ];
 
 export function getBrandProfile(fnoId: string): FnoBrandMapProfile | undefined {
