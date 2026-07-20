@@ -143,6 +143,15 @@ export async function triggerOltAutoDetect(batchId: string): Promise<boolean> {
         if (result.apiLookupsQueued > 0) {
           await processLookupQueue(result.runId);
         }
+
+        // After the new batch is classified, sweep the OLD open mismatches:
+        // 1Map often catches up days later, and ticketed/needs_investigation
+        // rows are excluded from the queue processor's auto-resolve.
+        const { reconcileConfirmedMatches } = await import(
+          '@/modules/data-sync/services/oltMatchReconciliationService'
+        );
+        const recon = await reconcileConfirmedMatches();
+        logger.info('OLT match reconciliation completed', { data: recon });
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : 'Unknown error';
