@@ -14,6 +14,7 @@ import { photoTypeToStep } from '../utils/stepMapper';
 import { looksLikeGizzuSerial } from './serialValidator';
 import { isGraphPhotoUrl } from '@/lib/graph/isGraphPhotoUrl';
 import { getGraphAccessToken } from '@/lib/graph/auth';
+import { resolveInternalPhotoUrl } from '@/lib/internalPhotoUrl';
 
 // OneMap API host
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
@@ -361,12 +362,17 @@ export async function fetchPhotoAsBase64(photoUrl: string): Promise<string> {
       return Buffer.from(arrayBuffer).toString('base64');
     }
 
-    // Handle relative URLs by prepending the base URL
-    let fullUrl = photoUrl;
-    if (photoUrl.startsWith('/api/')) {
-      // For server-side calls, use the internal API URL
+    // Photo-proxy paths must be rewritten to the backend photo server, NOT
+    // prefixed with our own base URL: /api/activate/photo is withAuth-protected,
+    // so a credential-less server-side fetch 401s. That silently broke every
+    // auto-QA consumer of this helper (step quality check, ONT-back cable check,
+    // EXIF date validation) from the moment withAuth was applied to the route —
+    // the same 401 vlmGallery already hit, so reuse its resolver.
+    let fullUrl = resolveInternalPhotoUrl(photoUrl);
+    if (fullUrl.startsWith('/api/')) {
+      // Some other relative API path — fall back to the app's own base URL.
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
-      fullUrl = `${baseUrl}${photoUrl}`;
+      fullUrl = `${baseUrl}${fullUrl}`;
     }
 
     log.debug(`Fetching photo as base64: ${fullUrl.substring(0, 80)}...`, undefined, 'PhotoFetchService');
