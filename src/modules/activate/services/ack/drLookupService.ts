@@ -53,10 +53,37 @@ export function extractOntSerial(barcodeData: string | null): string | null {
 }
 
 /**
+ * Availability-failure fallback: consult our nightly-synced onemap_properties
+ * mirror so a slow/down BOSS or 1Map never gets reported to the tech as
+ * "home sign-up not completed". The mirror can't see photos or serial
+ * barcodes, so the caller sends a neutral ack rather than the found-path
+ * message — this only answers "does the sign-up exist at all?".
+ */
+async function checkOneMapMirror(dropNumber: string): Promise<OneMapLookupResult> {
+  const failed: OneMapLookupResult = {
+    found: false, photoCount: 0, ontSerial: null, upsSerial: null, lookupFailed: true,
+  };
+  try {
+    const result = await pool.query(
+      `SELECT 1 FROM onemap_properties WHERE drop_number = $1 LIMIT 1`,
+      [dropNumber]
+    );
+    const mirrorFound = (result.rowCount ?? 0) > 0;
+    logger.warn(`OneMap live lookup unavailable for ${dropNumber} — mirror says ${mirrorFound ? 'FOUND' : 'not found'}`);
+    return { ...failed, mirrorFound };
+  } catch (error) {
+    logger.warn(`OneMap mirror fallback failed for ${dropNumber}`, { error });
+    return failed;
+  }
+}
+
+/**
  * Fetch DR record from OneMap via BOSS API.
  *
  * Read-only query — does NOT trigger photo downloads.
  * Aborts after ONE_MAP_LOOKUP_TIMEOUT_MS to avoid blocking the acknowledgment response.
+ * Availability failures (5xx / timeout / network) fall back to the local mirror
+ * via checkOneMapMirror; only a BOSS 404/422 is a genuine "not in 1Map".
  */
 export async function fetchOneMapRecord(dropNumber: string): Promise<OneMapLookupResult> {
   const empty: OneMapLookupResult = { found: false, photoCount: 0, ontSerial: null, upsSerial: null };
@@ -88,19 +115,19 @@ export async function fetchOneMapRecord(dropNumber: string): Promise<OneMapLooku
 
     if (response.status === 404 || response.status === 422) {
       logger.info(`DR ${dropNumber} not found in OneMap`);
-    } else {
-      logger.warn(`OneMap returned ${response.status} for ${dropNumber}`);
+      return empty;
     }
 
-    return empty;
+    logger.warn(`OneMap returned ${response.status} for ${dropNumber}`);
+    return checkOneMapMirror(dropNumber);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       logger.warn(`OneMap timeout for ${dropNumber}`);
     } else {
       logger.warn(`OneMap query failed for ${dropNumber}`, { error });
     }
-    // Continue with found=false — don't fail the acknowledgment
-    return empty;
+    // Don't fail the acknowledgment — answer from the local mirror instead
+    return checkOneMapMirror(dropNumber);
   }
 }
 

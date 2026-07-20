@@ -67,4 +67,8 @@ export interface OneMapLookupResult {
   photoCount: number;
   ontSerial: string | null;
   upsSerial: string | null;
+  /** Live BOSS/1Map lookup errored or timed out — `found:false` is NOT evidence the sign-up is missing. */
+  lookupFailed?: boolean;
+  /** Set alongside lookupFailed: the DR exists in our synced onemap_properties mirror. */
+  mirrorFound?: boolean;
 }

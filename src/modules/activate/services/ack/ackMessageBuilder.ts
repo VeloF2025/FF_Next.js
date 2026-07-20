@@ -304,6 +304,31 @@ export function generateResubmissionAckMessage(
 }
 
 /**
+ * Neutral acknowledgment when the live 1Map lookup is unavailable (BOSS
+ * slow/down or 1Map erroring). We must NOT claim the home sign-up is missing —
+ * we simply couldn't check. If our synced mirror has the DR, say so.
+ */
+export function generateLookupUnavailableMessage(
+  dropNumber: string,
+  mirrorFound: boolean
+): AckResult {
+  const lines: string[] = [];
+
+  lines.push(`📥 *${dropNumber} Received*`);
+  lines.push('');
+  lines.push('1Map verification is temporarily unavailable — your submission is logged and will be verified automatically.');
+  lines.push('No action needed from your side.');
+  lines.push('');
+  if (mirrorFound) {
+    lines.push("✅ Home sign-up found in FibreFlow's synced 1Map records.");
+    lines.push('');
+  }
+  lines.push('⚠️ Marked for QA review.');
+
+  return { message: lines.join('\n'), swapped: false, swapDetails: null };
+}
+
+/**
  * Generate warning acknowledgment for DRs in drops table but NOT in 1Map.
  *
  * Warns that home sign-up hasn't been completed.
