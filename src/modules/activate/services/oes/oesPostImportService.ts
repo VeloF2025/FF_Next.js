@@ -140,18 +140,30 @@ export async function triggerOltAutoDetect(batchId: string): Promise<boolean> {
       .then(async (result) => {
         logger.info('OLT auto-detect completed', { data: result });
 
-        if (result.apiLookupsQueued > 0) {
-          await processLookupQueue(result.runId);
+        try {
+          if (result.apiLookupsQueued > 0) {
+            await processLookupQueue(result.runId);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          logger.error('OLT lookup-queue processing failed (non-blocking)', { message: msg });
         }
 
         // After the new batch is classified, sweep the OLD open mismatches:
         // 1Map often catches up days later, and ticketed/needs_investigation
-        // rows are excluded from the queue processor's auto-resolve.
-        const { reconcileConfirmedMatches } = await import(
-          '@/modules/data-sync/services/oltMatchReconciliationService'
-        );
-        const recon = await reconcileConfirmedMatches();
-        logger.info('OLT match reconciliation completed', { data: recon });
+        // rows are excluded from the queue processor's auto-resolve. Own
+        // try/catch: a queue failure above must not skip the sweep, and a
+        // sweep failure must not be mislabeled as an auto-detect failure.
+        try {
+          const { reconcileConfirmedMatches } = await import(
+            '@/modules/data-sync/services/oltMatchReconciliationService'
+          );
+          const recon = await reconcileConfirmedMatches();
+          logger.info('OLT match reconciliation completed', { data: recon });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          logger.error('OLT match reconciliation failed (non-blocking)', { message: msg });
+        }
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : 'Unknown error';

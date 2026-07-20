@@ -95,6 +95,8 @@ async function getSystemUser(): Promise<SystemUser | null> {
   return rows.length > 0 ? (rows[0] as SystemUser) : null;
 }
 
+type TicketCloseOutcome = 'closed' | 'already_terminal' | 'failed';
+
 /**
  * Close a linked NOC ticket through the same cascade the manual OLT resolve
  * uses (#1909): status flip + change log + note/activity/data-sync/AI-summary
@@ -105,7 +107,7 @@ async function closeLinkedTicket(
   ticketId: string,
   note: string,
   systemUser: SystemUser | null,
-): Promise<boolean> {
+): Promise<TicketCloseOutcome> {
   try {
     const { getTicketById, updateTicket, logTicketChanges } = await import(
       '@/modules/noc/services/ticketService'
@@ -115,9 +117,9 @@ async function closeLinkedTicket(
     );
     const { TicketStatus } = await import('@/modules/noc/types/ticket');
 
+    // getTicketById throws on a missing/invalid ticket — handled by the catch.
     const oldTicket = await getTicketById(ticketId);
-    if (!oldTicket) return false;
-    if (TERMINAL_TICKET_STATUSES.includes(oldTicket.status)) return true;
+    if (TERMINAL_TICKET_STATUSES.includes(oldTicket.status)) return 'already_terminal';
 
     const updatedTicket = await updateTicket(ticketId, {
       status: TicketStatus.RESOLVED,
@@ -137,13 +139,13 @@ async function closeLinkedTicket(
       note,
       noteVisibility: 'public',
     });
-    return true;
+    return 'closed';
   } catch (err) {
     log.warn('Linked ticket close failed (non-blocking)', {
       ticketId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return false;
+    return 'failed';
   }
 }
 
@@ -239,8 +241,8 @@ export async function reconcileConfirmedMatches(): Promise<ReconcileResult> {
     result.recordsResolved++;
 
     if (row.maintenance_ticket_id) {
-      const closed = await closeLinkedTicket(row.maintenance_ticket_id, note, systemUser);
-      if (closed) result.ticketsClosed++;
+      const outcome = await closeLinkedTicket(row.maintenance_ticket_id, note, systemUser);
+      if (outcome === 'closed') result.ticketsClosed++;
     }
   }
 
