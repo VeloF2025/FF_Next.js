@@ -17,6 +17,7 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { createLogger } from '@/lib/logger';
 import {
   generateAckMessage,
+  generateLookupUnavailableMessage,
   generateNotOnOneMapMessage,
   generateResubmissionAckMessage,
   normalizeForCompare,
@@ -91,7 +92,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     }
 
     // Fetch DR from OneMap via BOSS API (read-only, 8s timeout)
-    const { found, photoCount, ontSerial, upsSerial } = await fetchOneMapRecord(dropNumber);
+    const { found, photoCount, ontSerial, upsSerial, lookupFailed, mirrorFound } =
+      await fetchOneMapRecord(dropNumber);
 
     // Start duplicate serial check in parallel with WA photo polling (adds 0ms wall-clock time)
     const duplicateCheckPromise: Promise<DuplicateSerialResult> =
@@ -176,6 +178,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       );
       await markForRework(dropNumber, photoCount);
       await updateOneMapStatus(dropNumber, 'found', ontSerial, upsSerial);
+    } else if (!found && lookupFailed) {
+      // Live 1Map/BOSS lookup errored or timed out — we could NOT check, so
+      // never tell the tech the sign-up is missing. Neutral ack; no
+      // not_found stamp. If our synced mirror has the DR, record it as found.
+      ackResult = generateLookupUnavailableMessage(dropNumber, mirrorFound ?? false);
+      logger.warn(`DR ${dropNumber} 1Map lookup unavailable — neutral ack sent`, {
+        mirrorFound: mirrorFound ?? false,
+      });
+      if (mirrorFound) {
+        await updateOneMapStatus(dropNumber, 'found');
+      }
     } else if (!found) {
       const dropsRecord = await checkDropsTable(dropNumber);
 
@@ -237,7 +250,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     const duration = Date.now() - startTime;
 
-    if (!found && !notOnOneMap) {
+    if (!found && lookupFailed) {
+      logger.info(`DR ${dropNumber} lookup unavailable - neutral ack sent in ${duration}ms`);
+    } else if (!found && !notOnOneMap) {
       logger.info(`DR ${dropNumber} not found anywhere - sending "not found" notification`);
     } else if (notOnOneMap) {
       logger.info(`DR ${dropNumber} NOT ON 1MAP - warning ack sent in ${duration}ms`);
