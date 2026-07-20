@@ -253,6 +253,38 @@ from lib.image.gps_validator import GPSValidator, GPSValidationStatus
 PHOTOS_BASE_PATH = Path(os.getenv("DR_PHOTOS_PATH", "data/dr_photos"))
 PHOTOS_BASE_PATH.mkdir(parents=True, exist_ok=True)
 
+# --- /api/record TTL cache (2026-07-20) --------------------------------------
+# FibreFlow's WA ack (8s abort) and the hourly catch-up sweep re-hit the same
+# DRs; a cold lookup costs 4-10s of sequential 1Map calls. Positive results
+# only — a 404 is NEVER cached, so a tech completing a sign-up and resubmitting
+# sees it immediately. Short TTL keeps photo_count honest for quick resubmits.
+# Both photo-writing endpoints (/api/download and /api/dr/process) invalidate
+# their DR AFTER download_all_photos completes (local_photos changed on disk).
+_RECORD_CACHE: Dict[str, tuple] = {}  # DR -> (cached_monotonic, response_dict)
+_RECORD_CACHE_TTL = 180.0
+_RECORD_CACHE_MAX = 4096
+
+
+def _record_cache_get(dr_number: str) -> Optional[Dict[str, Any]]:
+    entry = _RECORD_CACHE.get(dr_number)
+    if entry is None:
+        return None
+    if (time.monotonic() - entry[0]) >= _RECORD_CACHE_TTL:
+        _RECORD_CACHE.pop(dr_number, None)
+        return None
+    return entry[1]
+
+
+def _record_cache_put(dr_number: str, response: Dict[str, Any]) -> None:
+    if len(_RECORD_CACHE) >= _RECORD_CACHE_MAX:
+        # Bounded: drop expired first, then oldest — O(n) but n is small.
+        now = time.monotonic()
+        for key in [k for k, v in _RECORD_CACHE.items() if (now - v[0]) >= _RECORD_CACHE_TTL]:
+            _RECORD_CACHE.pop(key, None)
+        while len(_RECORD_CACHE) >= _RECORD_CACHE_MAX:
+            _RECORD_CACHE.pop(next(iter(_RECORD_CACHE)), None)
+    _RECORD_CACHE[dr_number] = (time.monotonic(), response)
+
 # Database URL (optional - enables persistence)
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
@@ -2045,7 +2077,12 @@ async def health_check():
 
 @app.get("/api/record/{dr_number}", response_model=DRRecordResponse)
 async def get_dr_record(dr_number: str):
-    """Get DR record details from 1Map."""
+    """Get DR record details from 1Map (found results TTL-cached)."""
+    dr_number = dr_number.strip().upper()
+    cached = _record_cache_get(dr_number)
+    if cached is not None:
+        return cached
+
     try:
         async with OneMapSpecialistAgent() as agent:
             record = await agent.get_dr(dr_number)
@@ -2121,7 +2158,7 @@ async def get_dr_record(dr_number: str):
             if not signup_agent:
                 signup_agent = main_raw_data.get('fieldnme2')
 
-            return {
+            response = {
                 "dr_number": record.dr_number,
                 "site": record.site,
                 "site_name": agent.get_site_name(record.site),
@@ -2141,6 +2178,8 @@ async def get_dr_record(dr_number: str):
                 "email_address": email_address,
                 "language": language
             }
+            _record_cache_put(dr_number, response)
+            return response
 
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
@@ -2167,6 +2206,11 @@ async def download_dr_photos(dr_number: str):
 
             output_dir = PHOTOS_BASE_PATH / dr_number
             photos = await agent.download_all_photos(record, str(output_dir))
+
+            # local_photos just changed on disk — drop the cached record AFTER
+            # the mutation (popping before it would let a concurrent /api/record
+            # re-cache the pre-download state for a full TTL).
+            _RECORD_CACHE.pop(dr_number.strip().upper(), None)
 
             # Get DR site coordinates for GPS validation
             site_coords = None
@@ -3522,6 +3566,9 @@ async def process_dr(
             async with OneMapSpecialistAgent() as agent:
                 output_dir = PHOTOS_BASE_PATH / dr_number
                 photos = await agent.download_all_photos(onemap_record, str(output_dir))
+
+                # Same post-mutation invalidation as /api/download.
+                _RECORD_CACHE.pop(dr_number.strip().upper(), None)
 
                 local_photos = list(output_dir.glob("*.jpg"))
 

@@ -65,6 +65,17 @@ _WEB_SESSION_TTL = 1200.0  # seconds (20 min); << 1Map's ~2-day silent cookie ex
 _WEB_SESSIONS: Dict[str, Tuple[float, httpx.AsyncClient]] = {}
 _WEB_LOCKS: Dict[str, asyncio.Lock] = {}
 
+# --- v1 token cache (2026-07-20) ---------------------------------------------
+# The v1 path previously logged in on EVERY request (each API call does
+# `async with OneMapSpecialistAgent()` → connect() → _authenticate()), adding
+# ~1-2s per lookup and carrying the same login-flood 413 risk as failure
+# mode 2 above. 1Map v1 tokens live ~2h; the web-session TTL refreshes well
+# inside that. _request() retries once with a forced re-login on an
+# auth-shaped rejection, covering early server-side invalidation.
+_V1_TOKEN_TTL = 1200.0
+_V1_TOKEN: Optional[Tuple[float, str]] = None  # (obtained_monotonic, token)
+_V1_LOCK = asyncio.Lock()
+
 
 class PhotoType(Enum):
     """Standard photo types in Fibertime installations."""
@@ -263,27 +274,51 @@ class OneMapSpecialistAgent:
     async def __aexit__(self, *args):
         await self.disconnect()
 
-    async def _authenticate(self) -> None:
-        """Authenticate and obtain API token."""
-        response = await self._client.get(
-            "/auth/login",
-            params={"email": self.email, "password": self.password}
-        )
+    async def _authenticate(self, force: bool = False) -> None:
+        """Authenticate and obtain API token (process-wide TTL cache).
 
-        if response.status_code != 200:
-            raise Exception(f"Authentication failed: {response.status_code}")
+        `force=True` marks the CALLER's current token as rejected — used by
+        the 401/403 retries. Under the lock, a real login only happens if the
+        cache still holds that same rejected token (or is empty/expired);
+        when a concurrent request already refreshed it, the new token is
+        adopted instead — otherwise a burst of simultaneous 401s would each
+        re-login and recreate the login-flood 413 failure mode.
+        """
+        global _V1_TOKEN
 
-        data = response.json()
-        api_token = data.get("apiToken", {})
-        self._token = api_token.get("token") if isinstance(api_token, dict) else None
+        if not force:
+            cached = _V1_TOKEN
+            if cached is not None and (time.monotonic() - cached[0]) < _V1_TOKEN_TTL:
+                self._token = cached[1]
+                return
 
-        if not self._token:
-            raise Exception("No token received from authentication")
+        rejected_token = self._token if force else None
 
-        # Token is valid for 2 hours
-        self._token_expires = datetime.now()
+        async with _V1_LOCK:
+            cached = _V1_TOKEN  # re-check under lock
+            if cached is not None and (time.monotonic() - cached[0]) < _V1_TOKEN_TTL:
+                if not force or cached[1] != rejected_token:
+                    # Fresh (or peer-refreshed) token — adopt, don't re-login.
+                    self._token = cached[1]
+                    return
 
-        logger.debug("Successfully authenticated with 1Map")
+            response = await self._client.get(
+                "/auth/login",
+                params={"email": self.email, "password": self.password}
+            )
+
+            if response.status_code != 200:
+                raise Exception(f"Authentication failed: {response.status_code}")
+
+            data = response.json()
+            api_token = data.get("apiToken", {})
+            self._token = api_token.get("token") if isinstance(api_token, dict) else None
+
+            if not self._token:
+                raise Exception("No token received from authentication")
+
+            _V1_TOKEN = (time.monotonic(), self._token)
+            logger.debug("Successfully authenticated with 1Map (token cached)")
 
     async def _request(
         self,
@@ -298,6 +333,14 @@ class OneMapSpecialistAgent:
         params["token"] = self._token
 
         response = await self._client.request(method, endpoint, params=params, **kwargs)
+
+        if response.status_code in (401, 403):
+            # Cached token invalidated server-side before its TTL — one forced
+            # re-login, then retry the request once.
+            logger.warning(f"1Map v1 auth rejected ({response.status_code}) — refreshing token")
+            await self._authenticate(force=True)
+            params["token"] = self._token
+            response = await self._client.request(method, endpoint, params=params, **kwargs)
 
         if response.status_code != 200:
             raise Exception(f"API request failed: {response.status_code} - {response.text[:200]}")
@@ -315,6 +358,14 @@ class OneMapSpecialistAgent:
         params["token"] = self._token
 
         response = await self._client.get(endpoint, params=params)
+
+        if response.status_code in (401, 403):
+            # Same early-invalidation recovery as _request(): one forced
+            # refresh (adopts a peer's fresh token when available), one retry.
+            logger.warning(f"1Map v1 auth rejected on binary request ({response.status_code}) — refreshing token")
+            await self._authenticate(force=True)
+            params["token"] = self._token
+            response = await self._client.get(endpoint, params=params)
 
         if response.status_code != 200:
             raise Exception(f"Binary request failed: {response.status_code}")
