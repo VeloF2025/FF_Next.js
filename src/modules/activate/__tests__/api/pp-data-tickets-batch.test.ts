@@ -79,16 +79,17 @@ describe('resolvePpTicketGps', () => {
       .toEqual({ lat: '-26.7236', lng: '27.0195' });
   });
 
-  it('returns null when either axis is missing everywhere', () => {
+  it('returns null when no source has a complete pair', () => {
     expect(resolvePpTicketGps(undefined, undefined, null, null)).toBeNull();
     expect(resolvePpTicketGps('-26.1', undefined, null, null)).toBeNull();
     expect(resolvePpTicketGps(undefined, undefined, '-26.7', null)).toBeNull();
+    expect(resolvePpTicketGps(undefined, '27.9', '-26.7', null)).toBeNull();
   });
 
-  it('resolves each axis independently across sources', () => {
+  it('never mixes axes across sources — falls through to the complete pair', () => {
     expect(resolvePpTicketGps('-26.1', undefined, '-26.7', '27.0'))
-      .toEqual({ lat: '-26.1', lng: '27.0' });
-    expect(resolvePpTicketGps(undefined, '27.9', '-26.7', null))
-      .toEqual({ lat: '-26.7', lng: '27.9' });
+      .toEqual({ lat: '-26.7', lng: '27.0' });
+    expect(resolvePpTicketGps(undefined, '27.9', '-26.7', '27.0'))
+      .toEqual({ lat: '-26.7', lng: '27.0' });
   });
 });
