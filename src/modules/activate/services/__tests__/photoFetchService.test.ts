@@ -59,6 +59,42 @@ describe('fetchPhotoAsBase64 — Microsoft Graph gallery photos', () => {
     expect(init).toBeUndefined();
   });
 
+  it('resolves a relative photo-proxy path to the internal OneMap URL, not the withAuth-protected proxy', async () => {
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      arrayBuffer: async () => PNG_BYTES.buffer,
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await fetchPhotoAsBase64('/api/activate/photo/DR1729653/DR1729653_ph_outs_1.jpg');
+
+    const [calledUrl] = fetchSpy.mock.calls[0] ?? [];
+    // Must go straight to the internal photo server. Routing it back through
+    // /api/activate/photo (withAuth) 401s on a credential-less server-side
+    // fetch, which silently broke every VLM quality check.
+    expect(calledUrl).toBe(
+      'http://100.96.203.105:8003/api/photo/DR1729653/DR1729653_ph_outs_1.jpg'
+    );
+    expect(String(calledUrl)).not.toContain('/api/activate/photo/');
+  });
+
+  it('routes a WhatsApp photo to the VPS photo server, not the 1Map server', async () => {
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      arrayBuffer: async () => PNG_BYTES.buffer,
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await fetchPhotoAsBase64('/api/activate/photo/DR1729653/wa_12345.jpg');
+
+    const [calledUrl] = fetchSpy.mock.calls[0] ?? [];
+    expect(calledUrl).toBe('http://72.61.197.178:8866/photos/DR1729653/wa_12345.jpg');
+  });
+
   it('throws when Graph returns a non-OK status (so the example is reported, not silently hashed)', async () => {
     const fetchSpy = vi.fn(async () => ({
       ok: false,
