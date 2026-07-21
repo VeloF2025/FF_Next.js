@@ -4,6 +4,11 @@ export interface VlmSlotResult {
   feedback: string;
   overridden_by?: string;
   override_reason?: string;
+  // True once the VLM has actually scored this slot. A pending (never-scored)
+  // slot is written as `{ scored: false }` with no `valid` field, so the UI can
+  // show "Awaiting AI" instead of a red failure. Scored-detection elsewhere keys
+  // on the presence of a boolean `valid`, not on this flag.
+  scored?: boolean;
   // Set when a single photo is reused to satisfy a second step (e.g. a depth
   // shot that also shows the end-plates). Distinct from a normal override so it
   // can be excluded from VLM training — see pages/api/works-qa/link-photo.ts.
@@ -92,10 +97,11 @@ export interface PoleQaComment {
 
 // Per-slot review state shown as a dot on the PON overview (Works QA).
 //  - 'approved' → a person approved this photo (slot_approvals.decision)   → strong green
-//  - 'pass'     → has a photo, VLM-valid (or overridden), not yet approved → faint green
+//  - 'pass'     → has a photo, VLM-scored valid (or overridden)            → faint green
 //  - 'fail'     → snagged by a person OR an un-overridden VLM failure      → red
+//  - 'pending'  → has a photo but the VLM has not scored it yet            → neutral grey
 //  - 'empty'    → no photo in this slot                                    → grey
-export type SlotState = 'empty' | 'approved' | 'pass' | 'fail';
+export type SlotState = 'empty' | 'approved' | 'pass' | 'fail' | 'pending';
 
 export interface PoleSummary {
   id: string;

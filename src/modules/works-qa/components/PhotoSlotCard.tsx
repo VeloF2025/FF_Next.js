@@ -4,6 +4,7 @@ import { X, GripVertical } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { VlmSlotResult, SlotApproval } from '../types/works-qa.types';
 import { photoUrl } from '../utils/photo-url';
+import { deriveSlotCardStatus } from '../utils/slot-card-status';
 import { SnagInlineForm, type SnagSubmitInput, type SnagSubmitResult } from './SnagInlineForm';
 import type { AssignableUser } from '../hooks/useAssignableUsers';
 
@@ -56,23 +57,20 @@ export function PhotoSlotCard({
     }
   }
 
-  const status: 'empty' | 'pass' | 'fail' | 'overridden' =
-    !photoKey ? 'empty'
-    : vlm?.overridden_by ? 'overridden'
-    : vlm?.valid ? 'pass'
-    : vlm ? 'fail'
-    : 'empty';
+  const status = deriveSlotCardStatus(photoKey, vlm);
 
   const borderColor =
     status === 'pass' ? 'border-green-500/40' :
     status === 'overridden' ? 'border-amber-500/40' :
     status === 'fail' ? 'border-red-500/40' :
+    status === 'pending' ? 'border-sky-500/30' :
     'border-zinc-700 border-dashed';
 
   const bgColor =
     status === 'pass' ? 'bg-green-500/5' :
     status === 'overridden' ? 'bg-amber-500/5' :
     status === 'fail' ? 'bg-red-500/5' :
+    status === 'pending' ? 'bg-sky-500/5' :
     'bg-zinc-900';
 
   // Slot Droppable: only `!!photoKey` gates drop (slot already filled).
@@ -114,6 +112,7 @@ export function PhotoSlotCard({
               {status === 'pass' && <span className="text-xs text-green-400">✓ VLM pass</span>}
               {status === 'overridden' && <span className="text-xs text-amber-400">✓ Overridden</span>}
               {status === 'fail' && <span className="text-xs text-red-400">⚠ VLM fail</span>}
+              {status === 'pending' && <span className="text-xs text-sky-400">⏳ Awaiting AI</span>}
               {photoKey && onUnassign && !disabled && (
                 <button
                   type="button"

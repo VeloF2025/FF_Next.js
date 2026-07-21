@@ -17,11 +17,23 @@ interface VlmValidateParams {
   vlmCheck: string;
 }
 
-const FALLBACK_RESULT: VlmSlotResult = {
+export const FALLBACK_RESULT: VlmSlotResult = {
   valid: false,
   confidence: 0,
   feedback: 'VLM validation failed — manual review required',
 };
+
+/**
+ * True when a result is the fetch/parse fallback — i.e. the VLM produced no
+ * real verdict (service down, timeout, unparseable response). Callers MUST NOT
+ * persist a fallback as a real score (`{valid:false, scored:true}`): that would
+ * stick an unscored photo as a permanent red "VLM fail". Persist a pending
+ * marker (`{scored:false}`) instead so it is re-scored on a later run. This is
+ * the single source of truth for the sentinel — never re-type the string.
+ */
+export function isVlmFallback(result: VlmSlotResult): boolean {
+  return result.confidence === 0 && result.feedback === FALLBACK_RESULT.feedback;
+}
 
 export async function validatePhotoWithVlm(
   params: VlmValidateParams,

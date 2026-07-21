@@ -22,6 +22,8 @@ export interface PoleOverviewRow {
   present_slots: string[];
   /** Slot keys with an un-overridden VLM failure. */
   vlm_fail_keys: string[];
+  /** Slot keys whose vlm_results entry has a boolean `valid` (i.e. VLM-scored). */
+  scored_slots: string[];
   /** Per-slot human Approve/Snag decisions (migration 247); may be null. */
   slot_approvals: Record<string, SlotApproval> | null;
   /** QField civil-audit Status (poles.field_status); optional, display-only. */
@@ -33,12 +35,14 @@ function deriveSlotState(
   present: Set<string>,
   vlmFails: Set<string>,
   approvals: Record<string, SlotApproval>,
+  scored: Set<string>,
 ): SlotState {
   if (!present.has(slotKey)) return 'empty';
   const decision = approvals[slotKey]?.decision;
   if (decision === 'approved') return 'approved';
   if (decision === 'snagged') return 'fail';
   if (vlmFails.has(slotKey)) return 'fail';
+  if (!scored.has(slotKey)) return 'pending';
   return 'pass';
 }
 
@@ -46,10 +50,11 @@ export function computePoleSummary(row: PoleOverviewRow): PoleSummary {
   const present = new Set(row.present_slots ?? []);
   const vlmFails = new Set(row.vlm_fail_keys ?? []);
   const approvals = row.slot_approvals ?? {};
+  const scored = new Set(row.scored_slots ?? []);
 
   const statesFor = (d: Discipline): SlotState[] =>
     SLOT_META.filter(s => s.discipline === d).map(s =>
-      deriveSlotState(s.key, present, vlmFails, approvals),
+      deriveSlotState(s.key, present, vlmFails, approvals, scored),
     );
 
   const civil_slots = statesFor('civil');
@@ -62,6 +67,7 @@ export function computePoleSummary(row: PoleOverviewRow): PoleSummary {
 
   const vlm_failures = vlmFails.size;
   const total_photos = civil_filled + dome_filled + joint_filled + row.tray_count + row.unassigned_count;
+  const hasPending = SLOT_META.some(s => present.has(s.key) && !scored.has(s.key));
 
   return {
     id: row.id,
@@ -78,7 +84,7 @@ export function computePoleSummary(row: PoleOverviewRow): PoleSummary {
     joint_slots,
     total_photos,
     unassigned_count: row.unassigned_count,
-    status: deriveStatus(row, present, vlm_failures),
+    status: deriveStatus(row, present, vlm_failures, hasPending),
     approved_at: row.approved_at,
     outstanding_snag_count: row.outstanding_snag_count,
     has_open_verification_snag: row.has_open_verification_snag,
@@ -137,12 +143,13 @@ function deriveStatus(
   row: PoleOverviewRow,
   present: Set<string>,
   vlmFailures: number,
+  hasPending: boolean,
 ): PoleSummary['status'] {
   if (row.approved_at) return 'approved';
   if (row.outstanding_snag_count > 0) return 'snagged';
 
   const allSlotsFilled = SLOT_META.every(s => present.has(s.key));
-  if (allSlotsFilled && row.tray_count >= 1 && vlmFailures === 0) return 'ready';
+  if (allSlotsFilled && row.tray_count >= 1 && vlmFailures === 0 && !hasPending) return 'ready';
 
   const anyContent = present.size > 0 || row.tray_count >= 1;
   return anyContent ? 'in_progress' : 'empty';

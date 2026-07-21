@@ -72,6 +72,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SELECT e.key FROM jsonb_each(COALESCE(vlm_results, '{}'::jsonb)) AS e(key, value)
            WHERE (e.value->>'valid')::boolean = false AND e.value->>'overridden_by' IS NULL
         ), '{}'::text[]) AS vlm_fail_keys,
+        COALESCE(ARRAY(
+          SELECT e.key FROM jsonb_each(COALESCE(vlm_results, '{}'::jsonb)) AS e(key, value)
+           WHERE jsonb_exists(e.value, 'valid')
+        ), '{}'::text[]) AS scored_slots,
         COALESCE((
           SELECT COUNT(*)::int
             FROM snags s

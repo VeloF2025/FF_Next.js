@@ -23,3 +23,22 @@ export function photoUrl(key: string): string {
               :                                 'local';
   return `/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}`;
 }
+
+/**
+ * Absolute variant of photoUrl() for server-side consumers that hand the URL to
+ * the VLM (which runs on the velo host and cannot resolve a relative path). The
+ * proxy path carries `&vlm=true` — photo-proxy.ts allows that from localhost so
+ * the VLM can fetch without a session (same path construction-qa's VLM uses).
+ */
+export function absolutePhotoUrl(
+  key: string,
+  appBase: string = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fibreflow.app',
+): string {
+  if (!key) return '';
+  const base = appBase.replace(/\/$/, '');
+  if (key.startsWith('works-qa/')) return `${base}/storage/${key}`;
+  const source = key.startsWith('projects/')   ? 'qfield'
+              : key.startsWith('sharepoint:') ? 'sharepoint'
+              :                                 'local';
+  return `${base}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}&vlm=true`;
+}
