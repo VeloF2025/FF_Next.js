@@ -19,6 +19,8 @@ vi.mock('@/modules/works-qa/services/worksQaVlmService', () => ({
   validatePhotoWithVlm: vi.fn(async () => ({
     valid: true, confidence: 0.9, feedback: 'ok',
   })),
+  isVlmFallback: vi.fn(() => false),
+  FALLBACK_RESULT: { valid: false, confidence: 0, feedback: 'VLM validation failed — manual review required' },
 }));
 
 // Replace formidable to feed canned fields/files

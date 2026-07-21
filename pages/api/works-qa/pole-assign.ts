@@ -20,7 +20,7 @@ import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
-import { validatePhotoWithVlm } from '@/modules/works-qa/services/worksQaVlmService';
+import { validatePhotoWithVlm, isVlmFallback, FALLBACK_RESULT } from '@/modules/works-qa/services/worksQaVlmService';
 import type { VlmSlotResult } from '@/modules/works-qa/types/works-qa.types';
 
 export const config = {
@@ -153,8 +153,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         poleId,
         slot,
       });
-      vlmResult = { valid: false, confidence: 0, feedback: 'VLM validation unavailable — manual review required' };
+      vlmResult = FALLBACK_RESULT;
     }
+
+    // A VLM fallback (service down/timeout/unparseable) is NOT a real verdict —
+    // persist a pending marker so the slot shows "Awaiting AI" and the
+    // works-qa-vlm-score step re-scores it, instead of sticking it as a red fail.
+    // Same contract as syncQfieldCore.ts. A real result is stamped scored:true.
+    const vlmEntry: VlmSlotResult | { scored: false } =
+      isVlmFallback(vlmResult) ? { scored: false } : { ...vlmResult, scored: true };
 
     // 8. Persist to DB
     if (isTray) {
@@ -165,7 +172,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              vlm_results = vlm_results || jsonb_build_object($2::text, $3::jsonb),
              updated_at = NOW()
          WHERE id = $4::uuid`,
-        [photoKey, vlmKey, JSON.stringify(vlmResult), poleId]
+        [photoKey, vlmKey, JSON.stringify(vlmEntry), poleId]
       );
     } else if (isUnassigned) {
       const vlmKey = `unassigned_${crypto.randomUUID()}`;
@@ -175,7 +182,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              vlm_results = vlm_results || jsonb_build_object($2::text, $3::jsonb),
              updated_at = NOW()
          WHERE id = $4::uuid`,
-        [photoKey, vlmKey, JSON.stringify(vlmResult), poleId]
+        [photoKey, vlmKey, JSON.stringify(vlmEntry), poleId]
       );
     } else {
       // Standard slot: update the fixed column + append VLM result
@@ -186,12 +193,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              vlm_results = vlm_results || jsonb_build_object($2::text, $3::jsonb),
              updated_at = NOW()
          WHERE id = $4::uuid`,
-        [photoKey, slot, JSON.stringify(vlmResult), poleId]
+        [photoKey, slot, JSON.stringify(vlmEntry), poleId]
       );
     }
 
     // 9. Cleanup temp file (done in finally below)
-    return apiResponse.success(res, { photo_key: photoKey, vlm: vlmResult });
+    return apiResponse.success(res, { photo_key: photoKey, vlm: vlmEntry });
   } catch (err) {
     log.error('works-qa/pole-assign error', {
       error: err instanceof Error ? err.message : String(err),

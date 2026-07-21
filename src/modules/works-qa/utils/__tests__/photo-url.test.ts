@@ -23,4 +23,8 @@ describe('absolutePhotoUrl', () => {
   it('returns empty string for empty key', () => {
     expect(absolutePhotoUrl('', BASE)).toBe('');
   });
+  it('strips a trailing slash from appBase (no double slash)', () => {
+    expect(absolutePhotoUrl('works-qa/p/pole/civil/x.jpg', `${BASE}/`)).toBe(`${BASE}/storage/works-qa/p/pole/civil/x.jpg`);
+    expect(absolutePhotoUrl('projects/abc/files/y.jpg', `${BASE}/`)).toContain(`${BASE}/api/construction-qa/photo-proxy?`);
+  });
 });

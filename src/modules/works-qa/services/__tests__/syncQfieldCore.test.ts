@@ -155,4 +155,21 @@ describe('syncQfieldForProject — vlm_results entry', () => {
     expect(entry.civil_01.confidence).toBe(0.82);
     expect(entry.civil_01.scored).toBe(true);
   });
+
+  // Boundary: confidence 0 is a REAL zero-confidence verdict (NOT NULL), so it
+  // must be written as scored (valid:false, scored:true), never as pending.
+  // Guards the `!== null` branch against a truthy-check regression.
+  it('writes a scored result (not pending) when upstream confidence is 0', async () => {
+    const captured = await runSyncCapturingVlmEntry({
+      vlm_confidence: 0,
+      checklist_step: 1,
+      work_type: 'pole_installation',
+      feature_type: 'pole',
+      feature_id: 'HT_X_F0001PL',
+    });
+    const entry = JSON.parse(captured.vlmEntryJson);
+    expect(entry.civil_01.scored).toBe(true);
+    expect(entry.civil_01.valid).toBe(false);
+    expect(entry.civil_01.confidence).toBe(0);
+  });
 });

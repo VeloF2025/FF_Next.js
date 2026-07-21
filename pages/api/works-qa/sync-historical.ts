@@ -105,13 +105,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (!slot) continue;
       if (!ALLOWED_PHOTO_COLUMNS.has(slot.dbColumn)) continue;
 
-      const vlmEntry = JSON.stringify({
-        [slot.slotKey]: {
-          valid: row.vlm_valid ?? false,
-          confidence: row.vlm_confidence !== null ? Number(row.vlm_confidence) : 0,
-          feedback: row.vlm_feedback ?? `Historical photo (${row.source})`,
-        },
-      });
+      // A source photo whose construction-qa VLM verdict is NULL was never
+      // actually scored — write a pending marker ({scored:false}) so the UI
+      // shows "Awaiting AI" and works-qa-vlm-score re-scores it, instead of
+      // coalescing NULL to a real valid:false red fail. Mirrors syncQfieldCore.ts.
+      const vlmEntry = row.vlm_valid !== null && row.vlm_valid !== undefined
+        ? JSON.stringify({
+            [slot.slotKey]: {
+              valid: row.vlm_valid,
+              confidence: row.vlm_confidence !== null ? Number(row.vlm_confidence) : 0,
+              feedback: row.vlm_feedback ?? `Historical photo (${row.source})`,
+              scored: true,
+            },
+          })
+        : JSON.stringify({ [slot.slotKey]: { scored: false } });
 
       // Insert if missing (zone/PON from review or sow_poles fallback)
       await pool.query(`

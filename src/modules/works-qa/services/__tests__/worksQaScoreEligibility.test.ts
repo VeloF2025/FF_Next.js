@@ -24,6 +24,10 @@ describe('eligibleSlotsForRow', () => {
   it('excludes a slot without a photo', () => {
     expect(eligibleSlotsForRow(row({}))).toEqual([]);
   });
+  it('does not throw when vlm_results is null (fresh, never-touched row)', () => {
+    const r = row({ civil_step_01_key: 'k1', vlm_results: null });
+    expect(eligibleSlotsForRow(r)).toEqual([{ slotKey: 'civil_01', photoKey: 'k1' }]);
+  });
   it('excludes an already-scored slot (entry has boolean valid)', () => {
     const r = row({ civil_step_01_key: 'k1', vlm_results: { civil_01: { valid: true, confidence: 0.9, feedback: '' } } });
     expect(eligibleSlotsForRow(r)).toEqual([]);

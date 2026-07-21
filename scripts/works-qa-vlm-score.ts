@@ -13,7 +13,7 @@
  *   DATABASE_URL=… tsx scripts/works-qa-vlm-score.ts [--limit 500] [--concurrency 4] [--fresh-hours 3] [--project <uuid>]
  */
 import { Pool } from 'pg';
-import { validatePhotoWithVlm } from '@/modules/works-qa/services/worksQaVlmService';
+import { validatePhotoWithVlm, isVlmFallback } from '@/modules/works-qa/services/worksQaVlmService';
 import { eligibleSlotsForRow, type ScorableRow } from '@/modules/works-qa/services/worksQaScoreEligibility';
 import { absolutePhotoUrl } from '@/modules/works-qa/utils/photo-url';
 import { getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
@@ -22,11 +22,6 @@ function argVal(flag: string): string | undefined {
   const i = process.argv.indexOf(flag);
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
-
-// The pending marker feedback returned by worksQaVlmService on any VLM error.
-// A fallback must NOT be persisted as a real score — leave the slot unscored so
-// it retries next run instead of sticking as a red fail.
-const FALLBACK_FEEDBACK = 'VLM validation failed — manual review required';
 
 const SCORABLE_COLUMNS = `
   id,
@@ -61,8 +56,9 @@ async function scoreOne(pool: Pool, task: ScoreTask): Promise<'scored' | 'skippe
       stepLabel: meta.label,
       vlmCheck: meta.vlmCheck,
     });
-    // Fallback sentinel → leave unscored (retry next run).
-    if (result.confidence === 0 && result.feedback === FALLBACK_FEEDBACK) {
+    // VLM produced no real verdict → leave unscored (retry next run), never
+    // persist a fallback as a real score. Sentinel lives in worksQaVlmService.
+    if (isVlmFallback(result)) {
       return 'errored';
     }
     const entry = JSON.stringify({ [task.slotKey]: { ...result, scored: true } });
