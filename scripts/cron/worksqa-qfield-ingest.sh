@@ -56,13 +56,17 @@ run_tsx() {
 cd "$ROOT"
 echo "===== worksqa-qfield-ingest $(date '+%F %T %Z') (root=$ROOT) ====="
 
-echo "[1/3] extract-gpkg-photos.py --all"
+echo "[1/4] extract-gpkg-photos.py --all"
 "$PYTHON" scripts/extract-gpkg-photos.py --all || echo "  WARNING: extract step failed (continuing)"
 
-echo "[2/3] works-qa-sync.ts --all-active"
+echo "[2/4] works-qa-sync.ts --all-active"
 run_tsx scripts/works-qa-sync.ts --all-active || echo "  WARNING: works-qa sync step failed (continuing)"
 
-echo "[3/3] works-qa-coverage-check.py"
+echo "[3/4] works-qa-vlm-score.ts (fresh + up to 500 backlog)"
+run_tsx scripts/works-qa-vlm-score.ts --limit 500 --concurrency 4 --fresh-hours 3 \
+  || echo "  WARNING: vlm-score step failed (continuing)"
+
+echo "[4/4] works-qa-coverage-check.py"
 "$PYTHON" scripts/works-qa-coverage-check.py "$@" || echo "  WARNING: coverage check failed (continuing)"
 
 echo "===== worksqa-qfield-ingest complete $(date '+%F %T %Z') ====="
