@@ -122,14 +122,19 @@ async function syncProject(pool, projectId) {
     }
 
     const slotKey = SLOT_KEY_BY_COLUMN[colName];
-    const conf = r.vlm_confidence !== null ? Number(r.vlm_confidence) : 0;
-    const vlmEntry = JSON.stringify({
-      [slotKey]: {
-        valid: conf >= 0.6,
-        confidence: conf,
-        feedback: r.vlm_feedback ?? 'Synced from QField',
-      },
-    });
+    // NULL upstream confidence = never scored → write a pending marker so the UI
+    // shows "Awaiting AI" (not a red fail) and the works-qa-vlm-score step picks
+    // it up. Mirrors src/modules/works-qa/services/syncQfieldCore.ts.
+    const vlmEntry = r.vlm_confidence !== null
+      ? JSON.stringify({
+          [slotKey]: {
+            valid: Number(r.vlm_confidence) >= 0.6,
+            confidence: Number(r.vlm_confidence),
+            feedback: r.vlm_feedback ?? 'Synced from QField',
+            scored: true,
+          },
+        })
+      : JSON.stringify({ [slotKey]: { scored: false } });
 
     // Try to fill if empty
     const filled = await pool.query(
