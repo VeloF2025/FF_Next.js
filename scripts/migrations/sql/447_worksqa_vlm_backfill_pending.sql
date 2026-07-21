@@ -17,7 +17,9 @@
 -- the string set below.
 --
 -- Idempotent: converted entries lose their `valid`/`feedback` keys, so a re-run
--- matches nothing. Verified via dry-run: 22,208 entries across 6,379 rows.
+-- matches nothing. Dynamic count (~22k entries / ~6.4k rows at authoring); it
+-- sweeps whatever placeholder entries exist at apply time, so the exact number
+-- drifts up with the live pipeline until this runs.
 
 UPDATE pole_qa_photos p
 SET vlm_results = (
