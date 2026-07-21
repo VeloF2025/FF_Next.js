@@ -19,15 +19,16 @@ function row(overrides: Partial<PoleOverviewRow> = {}): PoleOverviewRow {
     has_verified_planted: false,
     present_slots: [],
     vlm_fail_keys: [],
+    scored_slots: [],
     slot_approvals: null,
     ...overrides,
   };
 }
 
 describe('computePoleSummary — per-slot dot states', () => {
-  it('empty slot → empty; filled VLM-clean slot → pass (faint green)', () => {
-    const s = computePoleSummary(row({ present_slots: ['civil_01'] }));
-    expect(s.civil_slots[0]).toBe('pass');   // civil_01 present, no fail/approval
+  it('empty slot → empty; filled VLM-clean scored slot → pass (faint green)', () => {
+    const s = computePoleSummary(row({ present_slots: ['civil_01'], scored_slots: ['civil_01'] }));
+    expect(s.civil_slots[0]).toBe('pass');   // civil_01 present, scored, no fail/approval
     expect(s.civil_slots[1]).toBe('empty');  // civil_02 absent
   });
 
@@ -53,6 +54,34 @@ describe('computePoleSummary — per-slot dot states', () => {
     const idx = SLOT_META.filter(x => x.discipline === 'dome').findIndex(x => x.key === 'dome_03');
     expect(s.dome_slots[idx]).toBe('fail');
   });
+
+  it('marks a present-but-unscored slot as pending, not pass', () => {
+    expect(computePoleSummary(row({ present_slots: ['civil_01'] })).civil_slots[0]).toBe('pending');
+  });
+
+  it('marks a scored-valid slot as pass', () => {
+    expect(computePoleSummary(row({ present_slots: ['civil_01'], scored_slots: ['civil_01'] })).civil_slots[0]).toBe('pass');
+  });
+
+  it('marks a scored-invalid slot as fail', () => {
+    expect(computePoleSummary(row({ present_slots: ['civil_01'], vlm_fail_keys: ['civil_01'], scored_slots: ['civil_01'] })).civil_slots[0]).toBe('fail');
+  });
+
+  it('human approval/snag still wins over pending', () => {
+    const approved = row({ present_slots: ['civil_01'], slot_approvals: { civil_01: { decision: 'approved', by: 'x', at: 't' } } });
+    expect(computePoleSummary(approved).civil_slots[0]).toBe('approved');
+    const snagged = row({ present_slots: ['civil_01'], slot_approvals: { civil_01: { decision: 'snagged', by: 'x', at: 't' } } });
+    expect(computePoleSummary(snagged).civil_slots[0]).toBe('fail');
+  });
+
+  it('pending slots are not counted as vlm_failures', () => {
+    expect(computePoleSummary(row({ present_slots: ['civil_01', 'civil_02'] })).vlm_failures).toBe(0);
+  });
+
+  it('a fully-photographed pole is NOT ready while any slot is still unscored', () => {
+    // ALL_KEYS present + tray but scored_slots empty → pending, so not "ready".
+    expect(computePoleSummary(row({ present_slots: ALL_KEYS, tray_count: 2 })).status).toBe('in_progress');
+  });
 });
 
 describe('computePoleSummary — status', () => {
@@ -65,7 +94,7 @@ describe('computePoleSummary — status', () => {
   });
 
   it('all slots + tray + zero VLM failures → ready', () => {
-    expect(computePoleSummary(row({ present_slots: ALL_KEYS, tray_count: 2 })).status).toBe('ready');
+    expect(computePoleSummary(row({ present_slots: ALL_KEYS, tray_count: 2, scored_slots: ALL_KEYS })).status).toBe('ready');
   });
 
   it('all slots filled but a VLM failure remains → in_progress (not ready)', () => {

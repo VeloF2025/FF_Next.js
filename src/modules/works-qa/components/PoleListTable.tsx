@@ -14,6 +14,7 @@ const SLOT_COLOR: Record<SlotState, string> = {
   approved: 'bg-green-500',       // strong green — a person approved this photo
   pass:     'bg-green-500/30',    // faint green  — VLM-passed, not yet approved
   fail:     'bg-red-500/60',      // red          — snagged or un-overridden VLM fail
+  pending:  'bg-zinc-500',        // neutral grey — has a photo, not yet VLM-scored
   empty:    'bg-zinc-800',        // grey         — no photo
 };
 
@@ -32,6 +33,7 @@ function DotLegend() {
     ['approved', 'Approved'],
     ['pass', 'VLM-passed'],
     ['fail', 'Snag / VLM fail'],
+    ['pending', 'Awaiting VLM'],
     ['empty', 'No photo'],
   ];
   return (

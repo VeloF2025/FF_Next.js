@@ -97,10 +97,11 @@ export interface PoleQaComment {
 
 // Per-slot review state shown as a dot on the PON overview (Works QA).
 //  - 'approved' → a person approved this photo (slot_approvals.decision)   → strong green
-//  - 'pass'     → has a photo, VLM-valid (or overridden), not yet approved → faint green
+//  - 'pass'     → has a photo, VLM-scored valid (or overridden)            → faint green
 //  - 'fail'     → snagged by a person OR an un-overridden VLM failure      → red
+//  - 'pending'  → has a photo but the VLM has not scored it yet            → neutral grey
 //  - 'empty'    → no photo in this slot                                    → grey
-export type SlotState = 'empty' | 'approved' | 'pass' | 'fail';
+export type SlotState = 'empty' | 'approved' | 'pass' | 'fail' | 'pending';
 
 export interface PoleSummary {
   id: string;
