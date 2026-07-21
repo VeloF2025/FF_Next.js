@@ -5,13 +5,15 @@
 # only when someone runs the extractor by hand — see the design spec
 # docs/superpowers/specs/2026-07-14-worksqa-qfield-ingest-automation-design.md.
 #
-# Three steps (each non-fatal so one failure doesn't skip the rest):
+# Four steps (each non-fatal so one failure doesn't skip the rest):
 #   1. extract-gpkg-photos.py --all  — GPKG photos → qfield_photo_validations
 #      (registered PROJECTS; existing dedup makes it idempotent + clears backlogs).
 #   2. works-qa-sync.ts --all-active — qfield_photo_validations → pole_qa_photos
 #      (REQUIRED for aliased QField projects, which the dashboard's direct-join
 #      branch cannot surface from qfield_photo_validations alone).
-#   3. works-qa-coverage-check.py    — WARN + WhatsApp when a linked/active project
+#   3. works-qa-vlm-score.ts          — Run VLM on unscored, humanly-undecided pole photos
+#      (scores fresh synced photos + backlog; non-fatal so coverage-check still runs).
+#   4. works-qa-coverage-check.py    — WARN + WhatsApp when a linked/active project
 #      has upstream photos but 0 ingested (the "never silently miss" guarantee).
 #
 # Suggested crontab (aligns with cron-classify-photos.sh, 4×/day SAST):
