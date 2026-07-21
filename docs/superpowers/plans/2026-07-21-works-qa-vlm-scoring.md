@@ -898,6 +898,173 @@ Then open the PR with `gh pr create` summarising: root cause (Works-QA never sco
 
 ---
 
+### Task 8: Fix the second QField→Works-QA producer (`backfill-works-qa-from-qfield.js`)
+
+The final review found a second producer that still writes the old NULL→`valid:false` marker. If it runs, it re-creates red-fail markers that the scorer then permanently skips. Converge it to the pending-marker logic from Task 1.
+
+**Files:**
+- Modify: `scripts/backfill-works-qa-from-qfield.js:124-132`
+
+**Interfaces:**
+- Consumes: same marker contract as `syncQfieldCore.ts` — pending `{scored:false}`; scored `{valid, confidence, feedback, scored:true}`.
+
+- [ ] **Step 1: Read the current marker construction**
+
+Run: `sed -n '118,145p' scripts/backfill-works-qa-from-qfield.js`
+Expected: you see `const conf = r.vlm_confidence !== null ? Number(r.vlm_confidence) : 0;` then a `vlmEntry` with `valid: conf >= 0.6`.
+
+- [ ] **Step 2: Replace the marker construction to match `syncQfieldCore`**
+
+Replace lines 125-132 (the `const conf = …` line through the `vlmEntry` object) with:
+
+```javascript
+    const slotKey = SLOT_KEY_BY_COLUMN[colName];
+    // NULL upstream confidence = never scored → write a pending marker so the UI
+    // shows "Awaiting AI" (not a red fail) and the works-qa-vlm-score step picks
+    // it up. Mirrors src/modules/works-qa/services/syncQfieldCore.ts.
+    const vlmEntry = r.vlm_confidence !== null
+      ? JSON.stringify({
+          [slotKey]: {
+            valid: Number(r.vlm_confidence) >= 0.6,
+            confidence: Number(r.vlm_confidence),
+            feedback: r.vlm_feedback ?? 'Synced from QField',
+            scored: true,
+          },
+        })
+      : JSON.stringify({ [slotKey]: { scored: false } });
+```
+
+Note: `const slotKey = SLOT_KEY_BY_COLUMN[colName];` already exists at line 124 — do not duplicate it; the replacement block above starts from that line so keep exactly one copy.
+
+- [ ] **Step 3: Node syntax-check**
+
+Run: `node --check scripts/backfill-works-qa-from-qfield.js && echo "node OK"`
+Expected: `node OK`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd /home/hein/Workspace/FF_Next.js-vlm-scoring && git add scripts/backfill-works-qa-from-qfield.js && git commit -m "fix(works-qa): converge backfill producer to pending marker for unscored photos"
+```
+
+---
+
+### Task 9: One-time backfill migration — placeholder markers → pending
+
+Convert the ~22,208 existing never-scored placeholder markers (identified by their exact fallback feedback strings) into `{scored:false}` pending markers, so existing photos stop rendering red "VLM fail" and become eligible for the scorer to fill. Verified via dry-run: 22,208 entries across 6,379 rows; the single genuine conf-0 verdict ("This image is not related…") is excluded by exact-string matching.
+
+**Files:**
+- Create: `scripts/migrations/sql/447_worksqa_vlm_backfill_pending.sql`
+- Create: `scripts/migrations/sql/rollback_447_worksqa_vlm_backfill_pending.sql`
+
+Conventions (verified): migrations live in `scripts/migrations/sql/`, numbered `NNN_name.sql` (highest existing is 446 → this is **447**); the runner (`scripts/run-pending-migrations.sh`) applies files not yet in `schema_migrations`, wraps each in a transaction, and **skips `rollback_*`** files. Match the header/comment style of `442_worksqa_deleted_photo_keys.sql`.
+
+- [ ] **Step 1: Write the forward migration**
+
+Create `scripts/migrations/sql/447_worksqa_vlm_backfill_pending.sql` with EXACTLY this content (the em-dash `—` characters in the feedback strings are U+2014 and must be preserved byte-for-byte):
+
+```sql
+-- scripts/migrations/sql/447_worksqa_vlm_backfill_pending.sql
+-- Works QA: normalise never-scored placeholder VLM markers to pending.
+--
+-- Before the works-qa VLM scoring step existed, the QField sync stamped every
+-- unscored photo with {valid:false, confidence:0, feedback:'Synced from QField'}
+-- (plus a handful of sibling fallbacks). The Works-QA UI renders valid:false as a
+-- red "VLM fail", so ~22k genuinely-unscored photos looked failed. The new scorer
+-- treats "has a boolean valid" as "already scored" and would otherwise skip them
+-- forever.
+--
+-- This one-time backfill rewrites those placeholder entries (matched by their
+-- exact fallback feedback strings) to the pending marker {scored:false}. The UI
+-- then shows a neutral "Awaiting AI", and works-qa-vlm-score picks them up (no
+-- boolean `valid` → eligible) and fills real scores over subsequent cron runs.
+-- Genuine VLM verdicts (descriptive feedback) are left untouched — e.g. the
+-- "This image is not related to any civil construction step…" verdict is not in
+-- the string set below.
+--
+-- Idempotent: converted entries lose their `valid`/`feedback` keys, so a re-run
+-- matches nothing. Verified via dry-run: 22,208 entries across 6,379 rows.
+
+UPDATE pole_qa_photos p
+SET vlm_results = (
+  SELECT jsonb_object_agg(
+    e.key,
+    CASE
+      WHEN NOT (e.value ? 'scored')
+       AND e.value->>'valid' = 'false'
+       AND e.value->>'feedback' IN (
+         'Synced from QField',
+         'Synced from QField (optical)',
+         'Historical photo',
+         'Historical photo (qfield)',
+         'Historical photo (local)',
+         'AI validation unavailable — manual review required',
+         'VLM validation failed — manual review required'
+       )
+      THEN '{"scored": false}'::jsonb
+      ELSE e.value
+    END
+  )
+  FROM jsonb_each(p.vlm_results) AS e(key, value)
+)
+WHERE p.vlm_results IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM jsonb_each(p.vlm_results) AS e(key, value)
+    WHERE NOT (e.value ? 'scored')
+      AND e.value->>'valid' = 'false'
+      AND e.value->>'feedback' IN (
+        'Synced from QField',
+        'Synced from QField (optical)',
+        'Historical photo',
+        'Historical photo (qfield)',
+        'Historical photo (local)',
+        'AI validation unavailable — manual review required',
+        'VLM validation failed — manual review required'
+      )
+  );
+```
+
+- [ ] **Step 2: Write the rollback (documented no-op)**
+
+Create `scripts/migrations/sql/rollback_447_worksqa_vlm_backfill_pending.sql`:
+
+```sql
+-- Rollback for 447_worksqa_vlm_backfill_pending.sql
+--
+-- Intentionally a NO-OP. The forward migration normalises never-scored
+-- placeholder markers to the canonical pending marker {scored:false}, which is
+-- the CORRECT state (the photos were never VLM-scored). Reverting would:
+--   1. re-introduce the false-negative "VLM fail" rendering the migration fixed,
+--      and
+--   2. be ambiguous — a {scored:false} entry produced by this backfill is
+--      indistinguishable from one written by the (now-fixed) QField sync for a
+--      genuinely new unscored photo, so a blanket revert would corrupt
+--      legitimately-pending new markers.
+-- If a revert is ever truly required, restore pole_qa_photos.vlm_results from a
+-- backup taken before the migration ran. No automatic downgrade is provided.
+
+SELECT 1;  -- no-op
+```
+
+- [ ] **Step 3: Validate the SQL parses (against the live DB, read-only wrapper)**
+
+Confirm the file's SQL is syntactically valid without mutating data by running it inside a rolled-back transaction (uses the DB connection string from `.claude/credentials.local.md` — never inline the password in a tracked file):
+
+```bash
+cd /home/hein/Workspace/FF_Next.js-vlm-scoring && PGPASSWORD="$WORKSQA_PW" psql -h 100.96.203.105 -p 5437 -U fibreflow_user -d fibreflow -v ON_ERROR_STOP=1 -c "BEGIN;" -f scripts/migrations/sql/447_worksqa_vlm_backfill_pending.sql -c "ROLLBACK;" && echo "SQL parses + runs (rolled back, no data changed)"
+```
+Expected: `UPDATE 6379` then `ROLLBACK`, ending with the success echo. (6379 is the row count; it is rolled back, so nothing persists.)
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd /home/hein/Workspace/FF_Next.js-vlm-scoring && git add scripts/migrations/sql/447_worksqa_vlm_backfill_pending.sql scripts/migrations/sql/rollback_447_worksqa_vlm_backfill_pending.sql && git commit -m "feat(works-qa): backfill never-scored placeholder markers to pending (447)"
+```
+
+Note: this migration is auto-applied by `scripts/run-pending-migrations.sh` on the next `bash scripts/deploy-local.sh` — it is NOT run manually here. The dev deploy applies it; production applies it on the after-hours promote with Hein's approval.
+
+---
+
 ## Notes / follow-ups (out of scope here)
 
 - Prod cron wiring for the whole ingest pipeline is still pending per `project_worksqa_qfield_ingest_automation` — the new step ships with the code but prod's crontab must be wired separately.
