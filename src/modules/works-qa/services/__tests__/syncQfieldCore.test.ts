@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { resolveSlotKey, domeLabelToPole } from '@/modules/works-qa/services/syncQfieldCore';
+import { describe, it, expect, vi } from 'vitest';
+import type { Pool } from 'pg';
+import {
+  resolveSlotKey,
+  domeLabelToPole,
+  syncQfieldForProject,
+} from '@/modules/works-qa/services/syncQfieldCore';
 
 // Pure mapping functions in the sync core. These now run on the unattended cron
 // path (scripts/works-qa-sync.ts --all-active), where a silent mapping regression
@@ -67,5 +72,87 @@ describe('domeLabelToPole', () => {
     expect(domeLabelToPole('New pole')).toBeNull();
     expect(domeLabelToPole('LAW.S.A133')).toBeNull(); // .S. splice, not a pole
     expect(domeLabelToPole('random-string')).toBeNull();
+  });
+});
+
+// syncQfieldForProject takes an injected `pg.Pool`, so a plain object with a
+// routed `query` mock is enough — no vi.mock('@/lib/db') needed. Each query the
+// sync issues is routed by a distinguishing SQL substring:
+//   - the qfield_photo_validations SELECT (the one QField row under test)
+//   - the `AS col_val` slot-column SELECT (empty, so the upsert path runs)
+//   - the `vlm_results = vlm_results ||` UPDATE, whose 2nd bind param (the
+//     vlm_results JSON) is captured for assertions
+// Anything else (the pole_qa_photos upsert INSERT) gets an empty-rows default.
+interface FakeQfieldRow {
+  vlm_confidence: number | null;
+  checklist_step: number;
+  work_type: string;
+  feature_type: 'pole' | 'joint';
+  feature_id: string;
+}
+
+async function runSyncCapturingVlmEntry(row: FakeQfieldRow): Promise<{ vlmEntryJson: string }> {
+  let vlmEntryJson: string | undefined;
+
+  const query = vi.fn(async (sql: string, params?: unknown[]) => {
+    if (sql.includes('FROM qfield_photo_validations')) {
+      return {
+        rows: [
+          {
+            feature_id: row.feature_id,
+            feature_type: row.feature_type,
+            photo_key: 'HT_X/files/test-photo.jpg',
+            checklist_step: row.checklist_step,
+            work_type: row.work_type,
+            vlm_confidence: row.vlm_confidence,
+            vlm_feedback: null,
+          },
+        ],
+      };
+    }
+    if (sql.includes('AS col_val')) {
+      return { rows: [{ col_val: null }] };
+    }
+    if (sql.includes('vlm_results = vlm_results ||')) {
+      vlmEntryJson = params?.[1] as string;
+      return { rows: [], rowCount: 1 };
+    }
+    // pole_qa_photos upsert INSERT (and anything else) — no rows needed.
+    return { rows: [], rowCount: 0 };
+  });
+
+  await syncQfieldForProject({ query } as unknown as Pool, 'proj-1');
+
+  if (vlmEntryJson === undefined) {
+    throw new Error('vlm_results UPDATE was never issued — check the mock query routing');
+  }
+  return { vlmEntryJson };
+}
+
+describe('syncQfieldForProject — vlm_results entry', () => {
+  it('writes a pending marker (scored:false, no valid) when upstream confidence is NULL', async () => {
+    const captured = await runSyncCapturingVlmEntry({
+      vlm_confidence: null,
+      checklist_step: 1,
+      work_type: 'pole_installation',
+      feature_type: 'pole',
+      feature_id: 'HT_X_F0001PL',
+    });
+    const entry = JSON.parse(captured.vlmEntryJson);
+    expect(entry.civil_01).toEqual({ scored: false });
+  });
+
+  it('writes a scored result (valid + scored:true) when upstream confidence is present', async () => {
+    const captured = await runSyncCapturingVlmEntry({
+      vlm_confidence: 0.82,
+      checklist_step: 1,
+      work_type: 'pole_installation',
+      feature_type: 'pole',
+      feature_id: 'HT_X_F0001PL',
+    });
+    const entry = JSON.parse(captured.vlmEntryJson);
+    expect(entry.civil_01.valid).toBe(true);
+    expect(entry.civil_01.confidence).toBe(0.82);
+    expect(entry.civil_01.scored).toBe(true);
   });
 });

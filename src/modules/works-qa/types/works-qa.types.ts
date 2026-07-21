@@ -4,6 +4,11 @@ export interface VlmSlotResult {
   feedback: string;
   overridden_by?: string;
   override_reason?: string;
+  // True once the VLM has actually scored this slot. A pending (never-scored)
+  // slot is written as `{ scored: false }` with no `valid` field, so the UI can
+  // show "Awaiting AI" instead of a red failure. Scored-detection elsewhere keys
+  // on the presence of a boolean `valid`, not on this flag.
+  scored?: boolean;
   // Set when a single photo is reused to satisfy a second step (e.g. a depth
   // shot that also shows the end-plates). Distinct from a normal override so it
   // can be excluded from VLM training — see pages/api/works-qa/link-photo.ts.

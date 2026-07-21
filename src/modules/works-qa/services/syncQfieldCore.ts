@@ -266,15 +266,21 @@ export async function syncQfieldForProject(
       continue;
     }
 
-    // Build VLM result entry
-    const confidence = row.vlm_confidence !== null ? Number(row.vlm_confidence) : 0;
-    const vlmEntry = JSON.stringify({
-      [slotKey]: {
-        valid: confidence >= 0.6,
-        confidence,
-        feedback: row.vlm_feedback ?? 'Synced from QField',
-      },
-    });
+    // Build VLM result entry. A row with no upstream confidence has never been
+    // scored — write a pending marker (scored:false, no `valid`) so the UI shows
+    // "Awaiting AI", NOT a red fail. The new works-qa-vlm-score step fills these
+    // in on a later run. A row that DOES carry a confidence (legacy pre-2026-03
+    // data) keeps its real pass/fail.
+    const vlmEntry = row.vlm_confidence !== null
+      ? JSON.stringify({
+          [slotKey]: {
+            valid: Number(row.vlm_confidence) >= 0.6,
+            confidence: Number(row.vlm_confidence),
+            feedback: row.vlm_feedback ?? 'Synced from QField',
+            scored: true,
+          },
+        })
+      : JSON.stringify({ [slotKey]: { scored: false } });
 
     await pool.query(
       `
