@@ -109,9 +109,15 @@ async function getEnrichmentForDR(drNumber: string, projectName?: string): Promi
   // Pole from drops (1Map pole often null)
   enrichment.pole_number = r.pole_number || r.omap_pole || undefined;
 
-  // GPS: prefer drops (usually present), fallback 1Map
-  enrichment.lat = r.drop_lat || r.omap_lat || undefined;
-  enrichment.lng = r.drop_lng || r.omap_lng || undefined;
+  // GPS: prefer drops (usually present), fallback 1Map — PAIR-WISE, a pair
+  // always comes from one source (mixed axes = plausible but wrong point)
+  if (r.drop_lat && r.drop_lng) {
+    enrichment.lat = r.drop_lat;
+    enrichment.lng = r.drop_lng;
+  } else if (r.omap_lat && r.omap_lng) {
+    enrichment.lat = r.omap_lat;
+    enrichment.lng = r.omap_lng;
+  }
 
   // Client info from 1Map
   const clientName = (r.client_name || '').trim();

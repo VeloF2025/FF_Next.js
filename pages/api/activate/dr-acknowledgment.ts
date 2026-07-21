@@ -284,7 +284,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     return apiResponse.success(res, {
       dropNumber,
-      found: found || notOnOneMap,
+      // mirrorFound: the live lookup failed but our synced 1Map mirror has the
+      // DR — the WA message says "found", so the JSON must agree.
+      found: found || notOnOneMap || Boolean(mirrorFound),
+      lookupFailed: Boolean(lookupFailed),
       photoCount,
       ontSerial,
       upsSerial,

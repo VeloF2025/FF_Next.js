@@ -524,6 +524,37 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
       [totalResolved, ppRows.length - totalResolved, batchId]
     );
 
+    // Backfill GPS onto open PP tickets that predate GPS capture or whose
+    // coordinates only just arrived (sheet GPS / DR resolution above).
+    // PAIR-WISE: drops pair first, else the PP row's own pair — never mixed
+    // axes. Idempotent and cheap; runs once per imported PP sheet.
+    try {
+      const gpsBackfill = await pool.query(`
+        UPDATE maintenance_tickets mt
+        SET gps_coordinates = CASE
+              WHEN d.latitude IS NOT NULL AND d.longitude IS NOT NULL
+                THEN d.latitude::text || ',' || d.longitude::text
+              ELSE pp.latitude::text || ',' || pp.longitude::text
+            END,
+            updated_at = NOW()
+        FROM oes_pp_data pp
+        LEFT JOIN drops d ON d.drop_number = pp.resolved_drop_number
+        WHERE pp.maintenance_ticket_id = mt.id
+          AND mt.source = 'pp_data'
+          AND (mt.gps_coordinates IS NULL OR mt.gps_coordinates = '')
+          AND mt.status NOT IN ('resolved','closed','cancelled')
+          AND ((d.latitude IS NOT NULL AND d.longitude IS NOT NULL)
+               OR (pp.latitude IS NOT NULL AND pp.longitude IS NOT NULL))
+      `);
+      if ((gpsBackfill.rowCount ?? 0) > 0) {
+        logger.info('PP ticket GPS backfill', { updated: gpsBackfill.rowCount });
+      }
+    } catch (err) {
+      logger.warn('PP ticket GPS backfill failed (non-blocking)', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     logger.info('PP DATA import complete', {
       total: ppRows.length,
       resolved: totalResolved,

@@ -65,7 +65,9 @@ export function resolveTeamForProject(
 /**
  * GPS for a PP ticket: DR enrichment (drops/1Map, already ::text strings)
  * wins; falls back to the PP row's own coordinates (pg numeric — arrives as
- * string). Returns null unless both axes resolve.
+ * string). PAIR-WISE: a coordinate pair always comes from ONE source —
+ * mixing a latitude from drops with a longitude from the PP sheet would
+ * produce a plausible-looking but geographically wrong point.
  */
 export function resolvePpTicketGps(
   enrichLat: string | undefined,
@@ -73,7 +75,7 @@ export function resolvePpTicketGps(
   ppLat: string | number | null | undefined,
   ppLng: string | number | null | undefined
 ): { lat: string; lng: string } | null {
-  const lat = enrichLat || (ppLat != null ? String(ppLat) : undefined);
-  const lng = enrichLng || (ppLng != null ? String(ppLng) : undefined);
-  return lat && lng ? { lat, lng } : null;
+  if (enrichLat && enrichLng) return { lat: enrichLat, lng: enrichLng };
+  if (ppLat != null && ppLng != null) return { lat: String(ppLat), lng: String(ppLng) };
+  return null;
 }
