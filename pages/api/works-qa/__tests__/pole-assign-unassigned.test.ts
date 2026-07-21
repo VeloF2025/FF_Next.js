@@ -39,7 +39,9 @@ vi.mock('formidable', () => {
 });
 
 import handler from '../pole-assign';
+import { isVlmFallback } from '@/modules/works-qa/services/worksQaVlmService';
 import { createMocks } from 'node-mocks-http';
+import type { Mock } from 'vitest';
 
 describe('pole-assign — slot=unassigned', () => {
   beforeEach(() => {
@@ -62,6 +64,22 @@ describe('pole-assign — slot=unassigned', () => {
     expect(updateSql).toMatch(/unassigned_photo_keys = array_append/);
     expect(updateSql).not.toMatch(/main_joint_tray_keys = array_append/);
 
+    expect(res._getStatusCode()).toBe(200);
+  });
+
+  it('persists a pending marker {scored:false} when the VLM result is a fallback', async () => {
+    // Force the fallback branch: a VLM-down result must NOT be persisted as a
+    // red valid:false; it becomes pending so the scorer re-scores it later.
+    (isVlmFallback as unknown as Mock).mockReturnValueOnce(true);
+
+    const { req, res } = createMocks({ method: 'POST' });
+    // @ts-expect-error createMocks res not fully typed
+    await handler(req, res);
+
+    // 2nd query is the UPDATE; its $3 param is JSON.stringify(vlmEntry). The SQL
+    // wraps it under the vlm key via jsonb_build_object, so $3 is the raw entry.
+    const updateParams = poolMock.query.mock.calls[1]![1] as unknown[];
+    expect(JSON.parse(updateParams[2] as string)).toEqual({ scored: false });
     expect(res._getStatusCode()).toBe(200);
   });
 });
