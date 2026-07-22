@@ -67,7 +67,12 @@ export function computePoleSummary(row: PoleOverviewRow): PoleSummary {
 
   const vlm_failures = vlmFails.size;
   const total_photos = civil_filled + dome_filled + joint_filled + row.tray_count + row.unassigned_count;
-  const hasPending = SLOT_META.some(s => present.has(s.key) && !scored.has(s.key));
+  // A human-approved slot is "resolved" even if the VLM never scored it, so it
+  // must not keep the pole out of 'ready'. (A snagged slot blocks 'ready' via
+  // outstanding_snag_count, separately.)
+  const hasPending = SLOT_META.some(
+    s => present.has(s.key) && !scored.has(s.key) && approvals[s.key]?.decision !== 'approved',
+  );
 
   return {
     id: row.id,

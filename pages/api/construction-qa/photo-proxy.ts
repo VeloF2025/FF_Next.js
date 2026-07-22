@@ -15,7 +15,7 @@ import { withAuth, withPermission } from '@/lib/auth/middleware';
 import path from 'path';
 import fs from 'fs';
 import { apiResponse } from '@/lib/apiResponse';
-import { isVlmProxyAuthorized } from '@/lib/vlm/photoProxyAuth';
+import { isVlmProxyAuthorized, secretsMatch } from '@/lib/vlm/photoProxyAuth';
 
 const execAsync = promisify(exec);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
@@ -72,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 function authWrapper(req: NextApiRequest, res: NextApiResponse) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
   const expectedSecret = process.env.CRON_SECRET;
-  if (expectedSecret && cronSecret === expectedSecret) {
+  if (expectedSecret && typeof cronSecret === 'string' && secretsMatch(cronSecret, expectedSecret)) {
     return handler(req, res);
   }
 

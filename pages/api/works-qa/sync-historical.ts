@@ -24,6 +24,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
+import { buildHistoricalVlmEntry } from '@/modules/works-qa/services/syncHistoricalEntry';
 
 const ALLOWED_PHOTO_COLUMNS = new Set(SLOT_META.map(s => s.dbColumn));
 
@@ -105,20 +106,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (!slot) continue;
       if (!ALLOWED_PHOTO_COLUMNS.has(slot.dbColumn)) continue;
 
-      // A source photo whose construction-qa VLM verdict is NULL was never
-      // actually scored — write a pending marker ({scored:false}) so the UI
-      // shows "Awaiting AI" and works-qa-vlm-score re-scores it, instead of
-      // coalescing NULL to a real valid:false red fail. Mirrors syncQfieldCore.ts.
-      const vlmEntry = row.vlm_valid !== null && row.vlm_valid !== undefined
-        ? JSON.stringify({
-            [slot.slotKey]: {
-              valid: row.vlm_valid,
-              confidence: row.vlm_confidence !== null ? Number(row.vlm_confidence) : 0,
-              feedback: row.vlm_feedback ?? `Historical photo (${row.source})`,
-              scored: true,
-            },
-          })
-        : JSON.stringify({ [slot.slotKey]: { scored: false } });
+      const vlmEntry = buildHistoricalVlmEntry({
+        slotKey: slot.slotKey,
+        vlmValid: row.vlm_valid,
+        vlmConfidence: row.vlm_confidence,
+        vlmFeedback: row.vlm_feedback,
+        source: row.source,
+      });
 
       // Insert if missing (zone/PON from review or sow_poles fallback)
       await pool.query(`

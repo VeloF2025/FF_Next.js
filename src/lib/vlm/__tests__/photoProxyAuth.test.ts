@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { isVlmProxyAuthorized, vlmProxyKeyParam } from '../photoProxyAuth';
+import { isVlmProxyAuthorized, vlmProxyKeyParam, secretsMatch } from '../photoProxyAuth';
 
 const ORIG = process.env.VLM_PROXY_SECRET;
 afterEach(() => {
@@ -33,6 +33,14 @@ describe('isVlmProxyAuthorized', () => {
     process.env.VLM_PROXY_SECRET = 's3cr3t-value';
     expect(isVlmProxyAuthorized({ vlm: 'true' })).toBe(false);
     expect(isVlmProxyAuthorized({ vlm: 'true', vlmkey: ['s3cr3t-value'] })).toBe(false);
+  });
+});
+
+describe('secretsMatch (timing-safe compare, also used for CRON_SECRET)', () => {
+  it('true only for equal strings; false for different value or length', () => {
+    expect(secretsMatch('abc123', 'abc123')).toBe(true);
+    expect(secretsMatch('abc123', 'abc124')).toBe(false);
+    expect(secretsMatch('abc', 'abcd')).toBe(false);
   });
 });
 
