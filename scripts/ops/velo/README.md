@@ -29,6 +29,12 @@ The health-check script degrades rather than dying if its env file is missing:
 DB logging and sudo-based recovery become no-ops. That is deliberate — a monitor
 that aborts on a missing secret is worse than one that keeps probing.
 
+This only holds because every `sudo`/`systemctl` and build invocation is
+explicitly guarded (`|| true`, or `|| BUILD_SUCCESS=$?`). Under `set -euo
+pipefail` a *bare* pipeline that fails aborts the whole script, which would skip
+every remaining service check with no log line explaining why. If you add a new
+sudo call here, guard it.
+
 ## Deploying a change
 
 There is no automated sync. To change either file:

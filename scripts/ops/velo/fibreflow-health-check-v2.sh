@@ -1,7 +1,7 @@
 #!/bin/bash
 # FibreFlow Health Monitor v2.0 - Comprehensive Auto-Recovery
 # Checks all FibreFlow services, Docker containers, and logs to database
-# Runs every 5 minutes via cron
+# Runs every 15 minutes via cron
 
 set -euo pipefail
 
@@ -23,7 +23,8 @@ VELO_SUDO_PASSWORD="${VELO_SUDO_PASSWORD:-}"
 
 # Lock file — prevent concurrent runs (build takes 6-8min, cron now runs every 15min)
 LOCK_FILE="/tmp/fibreflow-health-check.lock"
-LOCK_TIMEOUT=300  # 5 minutes - hard limit to prevent stale locks
+LOCK_TIMEOUT=900  # 15 min - must exceed worst-case rebuild (6-8min) or a
+                  # still-running build is treated as stale and raced
 if [ -f "$LOCK_FILE" ]; then
     LOCK_AGE=$(( $(date +%s) - $(stat -c %Y "$LOCK_FILE") ))
     if [ "$LOCK_AGE" -lt "$LOCK_TIMEOUT" ]; then
@@ -65,7 +66,6 @@ TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 ISO_TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 # Database connection (Neon Production)
-DB_URL="postgresql://fibreflow_user:${FIBREFLOW_DB_PASSWORD}@localhost:5437/fibreflow"
 
 # WhatsApp alerting (via wa-feedback service)
 WA_FEEDBACK_URL="http://localhost:8092/send"
@@ -132,7 +132,9 @@ check_systemd_service() {
             fi
         fi
         log "WARNING: $SERVICE_NAME returned HTTP $HTTP_CODE - Restarting $SYSTEMD_SERVICE"
-        echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl restart "$SYSTEMD_SERVICE" 2>/dev/null
+        # `|| true`: an unguarded failure here aborts the whole script under
+        # `set -e`, silently skipping every remaining service check.
+        echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl restart "$SYSTEMD_SERVICE" 2>/dev/null || true
         sleep 5
         
         # Verify restart worked
@@ -269,7 +271,9 @@ check_systemd_status() {
     
     if [ "$SERVICE_STATUS" != "active" ]; then
         log "WARNING: $SERVICE_NAME is $SERVICE_STATUS - Restarting $SYSTEMD_SERVICE"
-        echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl restart "$SYSTEMD_SERVICE" 2>/dev/null
+        # `|| true`: an unguarded failure here aborts the whole script under
+        # `set -e`, silently skipping every remaining service check.
+        echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl restart "$SYSTEMD_SERVICE" 2>/dev/null || true
         sleep 5
         
         SERVICE_STATUS_AFTER=$(echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl is-active "$SYSTEMD_SERVICE" 2>/dev/null) || true
@@ -380,8 +384,12 @@ check_build_manifest() {
         ln -sf "$APP_DIR/node_modules" "$TEMP_BUILD_DIR/node_modules" 2>/dev/null || true
 
         # Build
-        echo "$VELO_SUDO_PASSWORD" | sudo -S -u velo bash -c "cd $TEMP_BUILD_DIR && NODE_OPTIONS='--max-old-space-size=4096' npm run build" 2>/dev/null
-        BUILD_SUCCESS=$?
+        # Capture the exit code WITHOUT letting `set -e` abort: a bare pipeline
+        # here would kill the script before BUILD_SUCCESS is assigned, making the
+        # restore-backup branch below unreachable and leaving the service stopped
+        # with no .next directory.
+        BUILD_SUCCESS=0
+        echo "$VELO_SUDO_PASSWORD" | sudo -S -u velo bash -c "cd $TEMP_BUILD_DIR && NODE_OPTIONS='--max-old-space-size=4096' npm run build" 2>/dev/null || BUILD_SUCCESS=$?
 
         # --- STEP 4: Atomic swap or restore backup ---
         if [ $BUILD_SUCCESS -eq 0 ] && [ -f "$TEMP_BUILD_DIR/.next/BUILD_ID" ]; then
@@ -404,7 +412,7 @@ check_build_manifest() {
 
         # --- STEP 5: Restart service (always — it was stopped) ---
         log "Starting $SYSTEMD_SERVICE..."
-        echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl start "$SYSTEMD_SERVICE" 2>/dev/null
+        echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl start "$SYSTEMD_SERVICE" 2>/dev/null || true
         sleep 5
 
         # --- STEP 6: Verify ---
