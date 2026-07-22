@@ -4,6 +4,7 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { vlmProxyKeyParam } from '@/lib/vlm/photoProxyAuth';
 import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
 import type { PoleQaPhoto } from '@/modules/works-qa/types/works-qa.types';
 
@@ -19,7 +20,7 @@ function photoUrl(key: string): string {
   const source = key.startsWith('projects/')   ? 'qfield'
               : key.startsWith('sharepoint:') ? 'sharepoint'
               :                                 'local';
-  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}&vlm=true`;
+  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}${vlmProxyKeyParam()}`;
 }
 
 function slotFilename(stepNumber: number, label: string): string {

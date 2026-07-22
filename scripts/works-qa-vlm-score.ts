@@ -16,6 +16,7 @@ import { Pool } from 'pg';
 import { validatePhotoWithVlm, isVlmFallback } from '@/modules/works-qa/services/worksQaVlmService';
 import { eligibleSlotsForRow, type ScorableRow } from '@/modules/works-qa/services/worksQaScoreEligibility';
 import { absolutePhotoUrl } from '@/modules/works-qa/utils/photo-url';
+import { vlmProxyKeyParam } from '@/lib/vlm/photoProxyAuth';
 import { getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
 
 function argVal(flag: string): string | undefined {
@@ -51,7 +52,7 @@ async function scoreOne(pool: Pool, task: ScoreTask): Promise<'scored' | 'skippe
   if (!meta) return 'skipped';
   try {
     const result = await validatePhotoWithVlm({
-      photoUrl: absolutePhotoUrl(task.photoKey),
+      photoUrl: absolutePhotoUrl(task.photoKey, undefined, vlmProxyKeyParam()),
       slotKey: task.slotKey,
       stepLabel: meta.label,
       vlmCheck: meta.vlmCheck,

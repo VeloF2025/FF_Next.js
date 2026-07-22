@@ -18,6 +18,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { SLOT_META, getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
+import { vlmProxyKeyParam } from '@/lib/vlm/photoProxyAuth';
 import { classifyPhotoToSlot } from '@/modules/works-qa/services/worksQaVlmService';
 
 const AUTO_PLACE_THRESHOLD = 0.95;
@@ -34,7 +35,7 @@ function photoUrl(key: string): string {
   const source = key.startsWith('projects/')   ? 'qfield'
               : key.startsWith('sharepoint:') ? 'sharepoint'
               :                                 'local';
-  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}&vlm=true`;
+  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}${vlmProxyKeyParam()}`;
 }
 
 interface AutoSortBody { pole_id?: string }
