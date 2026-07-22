@@ -75,6 +75,17 @@ def test_safe_join_blocks_symlink_escape(tmp_root):
     assert _rejects(tmp_root, "escape", "secret.jpg")
 
 
+def test_blocks_json_body_filename_write(tmp_root):
+    """Regression: POST /lawley/process takes `file_name` from the JSON body.
+
+    Body fields are not constrained by FastAPI path-param routing, so a raw
+    "../../x" needs no encoding trick to escape the target directory.
+    """
+    for payload in ["../../PWNED.txt", "../escape.xlsx", "/etc/cron.d/backdoor",
+                    "sub/dir/file.xlsx"]:
+        assert _rejects(tmp_root, payload), f"{payload!r} should be rejected"
+
+
 def test_safe_photo_path_enforces_extension(tmp_root):
     assert safe_photo_path(tmp_root, "DR123", "a.jpg").name == "a.jpg"
     assert safe_photo_path(tmp_root, "DR123", "a.PNG").name == "a.PNG"

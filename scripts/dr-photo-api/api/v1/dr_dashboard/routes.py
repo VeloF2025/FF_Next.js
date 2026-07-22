@@ -435,7 +435,7 @@ def load_session_detail(dr_number: str, project: str) -> Optional[Dict]:
         if not user_dir.is_dir():
             continue
 
-        session_file = user_dir / f"{dr_number}_session.json"
+        session_file = safe_join(user_dir, f"{dr_number}_session.json")
         if session_file.exists():
             try:
                 with open(session_file, "r") as f:
@@ -469,7 +469,9 @@ def get_photos_for_dr(dr_number: str, project: str = None) -> List[Dict]:
         # Check all project subfolders for this DR (VPS structure)
         for project_dir in DR_PHOTOS_DIR.iterdir():
             if project_dir.is_dir() and not project_dir.name.startswith("."):
-                potential_dr_dir = project_dir / dr_number
+                # safe_join above already rejects an unsafe dr_number, but
+                # contain here too so this loop does not depend on that.
+                potential_dr_dir = safe_join(project_dir, dr_number)
                 if potential_dr_dir.exists():
                     dr_photo_dir = potential_dr_dir
                     if not project:

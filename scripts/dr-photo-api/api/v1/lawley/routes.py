@@ -21,6 +21,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 
+from api.safe_paths import safe_join
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -70,14 +72,19 @@ async def process_lawley_file(request: LawleyProcessRequest):
     import time
     start_time = time.time()
 
+    # `file_name` is a JSON body field, so FastAPI's path-param routing never
+    # constrains it -- it can contain "/" and ".." literally. Contain it before
+    # any filesystem work, and above the try: the broad `except Exception`
+    # below would otherwise turn the 400 into a 500.
+    docs_dir = project_root / "docs"
+    archive_path = safe_join(docs_dir, request.file_name)
+
     try:
         # Decode base64 file content
         file_content = base64.b64decode(request.file_content_base64)
 
         # Save to docs folder for processing
-        docs_dir = project_root / "docs"
         docs_dir.mkdir(exist_ok=True)
-        archive_path = docs_dir / request.file_name
         archive_path.write_bytes(file_content)
         logger.info(f"Saved performance file to: {archive_path}")
 
@@ -592,7 +599,7 @@ async def list_reports():
 async def get_report(date: str):
     """Get a specific Lawley report by date (YYYY-MM-DD format)."""
     report_dir = project_root / "data" / "lawley" / "daily_reports"
-    report_path = report_dir / f"lawley_daily_report_{date}.md"
+    report_path = safe_join(report_dir, f"lawley_daily_report_{date}.md")
 
     if not report_path.exists():
         raise HTTPException(status_code=404, detail=f"Report not found for {date}")

@@ -3481,7 +3481,9 @@ async def process_dr(
     if not local_photos:
         for proj_dir in PHOTOS_BASE_PATH.iterdir():
             if proj_dir.is_dir() and not proj_dir.name.startswith("DR"):
-                potential_path = proj_dir / dr_number
+                # safe_join above already rejects an unsafe dr_number, but
+                # contain here too so this loop does not depend on that.
+                potential_path = safe_join(proj_dir, dr_number)
                 if potential_path.exists():
                     dr_path = potential_path
                     project = proj_dir.name
