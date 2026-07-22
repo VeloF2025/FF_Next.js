@@ -41,7 +41,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from dotenv import load_dotenv
 from fastapi import WebSocket, WebSocketDisconnect, BackgroundTasks, FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
+from api.cors_config import configure_cors
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -1747,14 +1747,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware — secure, env-driven policy shared with api.main so the two
+# app configs can't diverge (see api/cors_config.py).
+configure_cors(app)
 
 
 # =============================================================================

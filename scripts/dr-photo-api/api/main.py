@@ -25,7 +25,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Depends, status
-from fastapi.middleware.cors import CORSMiddleware
+from api.cors_config import configure_cors
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 import uvicorn
@@ -122,14 +122,11 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
-# CORS middleware (allow n8n to call API)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict to n8n container IP
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware — secure, env-driven policy shared with api.dr_photo_api
+# (see api/cors_config.py). Set DR_PHOTO_API_CORS_ORIGINS to allow n8n/browser
+# origins; default is no cross-origin access (server-to-server callers are
+# unaffected — they send no Origin header).
+configure_cors(app)
 
 # Register API routers
 if HAS_CONTEXT and context_router:
