@@ -26,7 +26,8 @@ const SUGGEST_THRESHOLD = 0.6;
 const ALLOWED_PHOTO_COLUMNS = new Set(SLOT_META.map(s => s.dbColumn));
 
 // Loopback so the server-to-server VLM URL lands on the local Next.js process;
-// photo-proxy's localhost-bypass accepts it without a session cookie.
+// photo-proxy authorises the ?vlm=true path via the shared VLM_PROXY_SECRET
+// (vlmProxyKeyParam), not the peer IP, so no session cookie is needed.
 const LOOPBACK_PORT = process.env.PORT ?? '3000';
 const LOOPBACK_BASE = `http://127.0.0.1:${LOOPBACK_PORT}`;
 

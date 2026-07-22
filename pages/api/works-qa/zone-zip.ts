@@ -19,8 +19,9 @@ const MAX_PENDING = 24;          // soft cap on appended-but-unwritten entries (
 const FETCH_TIMEOUT_MS = 30_000; // per-photo loopback fetch timeout
 
 // Same prefix dispatch as pon-zip.ts / photo-url.ts: works-qa keys hit VF
-// Storage via nginx; everything else goes through the photo-proxy with a
-// localhost bypass (?vlm=true) so this server-to-server call needs no session.
+// Storage via nginx; everything else goes through the photo-proxy, whose
+// ?vlm=true path is authorised by the shared VLM_PROXY_SECRET (vlmProxyKeyParam),
+// so this server-to-server call needs no session.
 function photoUrl(key: string): string {
   if (key.startsWith('works-qa/')) return `${LOOPBACK_BASE}/storage/${key}`;
   const source = key.startsWith('projects/') ? 'qfield'
