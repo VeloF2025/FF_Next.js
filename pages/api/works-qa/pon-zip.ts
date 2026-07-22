@@ -4,12 +4,13 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { vlmProxyKeyParam } from '@/lib/vlm/photoProxyAuth';
 import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
 import type { PoleQaPhoto } from '@/modules/works-qa/types/works-qa.types';
 
-// Loopback so the server-to-server call lands on the local Next.js process and the
-// photo-proxy's localhost-bypass (`?vlm=true`) accepts it without a session cookie.
-// Falls back to the user's cookie for non-loopback paths if PORT is unknown.
+// Loopback so the server-to-server call lands on the local Next.js process. The
+// photo-proxy authorises the `?vlm=true` path via the shared VLM_PROXY_SECRET
+// (vlmProxyKeyParam), not the peer IP — so no session cookie is needed.
 const LOOPBACK_PORT = process.env.PORT ?? '3000';
 const LOOPBACK_BASE = `http://127.0.0.1:${LOOPBACK_PORT}`;
 
@@ -19,23 +20,28 @@ function photoUrl(key: string): string {
   const source = key.startsWith('projects/')   ? 'qfield'
               : key.startsWith('sharepoint:') ? 'sharepoint'
               :                                 'local';
-  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}&vlm=true`;
+  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}${vlmProxyKeyParam()}`;
 }
 
 function slotFilename(stepNumber: number, label: string): string {
   return `${String(stepNumber).padStart(2, '0')}_${label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.jpg`;
 }
 
+// Redact the vlmkey secret before logging — the proxy URL carries it and a 404
+// (photo awaiting sync) is a routine response, so an un-redacted log would write
+// the shared secret to the app log on a common path.
+const redactUrl = (url: string): string => url.replace(/([?&]vlmkey=)[^&]*/i, '$1REDACTED');
+
 async function fetchPhoto(url: string, cookie: string): Promise<Buffer | null> {
   try {
     const resp = await fetch(url, { headers: cookie ? { cookie } : {} });
     if (!resp.ok) {
-      log.warn('pon-zip: fetchPhoto non-OK', { url, status: resp.status });
+      log.warn('pon-zip: fetchPhoto non-OK', { url: redactUrl(url), status: resp.status });
       return null;
     }
     return Buffer.from(await resp.arrayBuffer());
   } catch (err) {
-    log.error('pon-zip: fetchPhoto failed', { url, error: err instanceof Error ? err.message : String(err) });
+    log.error('pon-zip: fetchPhoto failed', { url: redactUrl(url), error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }

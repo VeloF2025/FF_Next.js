@@ -18,6 +18,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { SLOT_META, getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
+import { vlmProxyKeyParam } from '@/lib/vlm/photoProxyAuth';
 import { classifyPhotoToSlot } from '@/modules/works-qa/services/worksQaVlmService';
 
 const AUTO_PLACE_THRESHOLD = 0.95;
@@ -25,7 +26,8 @@ const SUGGEST_THRESHOLD = 0.6;
 const ALLOWED_PHOTO_COLUMNS = new Set(SLOT_META.map(s => s.dbColumn));
 
 // Loopback so the server-to-server VLM URL lands on the local Next.js process;
-// photo-proxy's localhost-bypass accepts it without a session cookie.
+// photo-proxy authorises the ?vlm=true path via the shared VLM_PROXY_SECRET
+// (vlmProxyKeyParam), not the peer IP, so no session cookie is needed.
 const LOOPBACK_PORT = process.env.PORT ?? '3000';
 const LOOPBACK_BASE = `http://127.0.0.1:${LOOPBACK_PORT}`;
 
@@ -34,7 +36,7 @@ function photoUrl(key: string): string {
   const source = key.startsWith('projects/')   ? 'qfield'
               : key.startsWith('sharepoint:') ? 'sharepoint'
               :                                 'local';
-  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}&vlm=true`;
+  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}${vlmProxyKeyParam()}`;
 }
 
 interface AutoSortBody { pole_id?: string }

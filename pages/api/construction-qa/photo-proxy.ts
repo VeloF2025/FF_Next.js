@@ -15,6 +15,7 @@ import { withAuth, withPermission } from '@/lib/auth/middleware';
 import path from 'path';
 import fs from 'fs';
 import { apiResponse } from '@/lib/apiResponse';
+import { isVlmProxyAuthorized } from '@/lib/vlm/photoProxyAuth';
 
 const execAsync = promisify(exec);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
@@ -75,11 +76,16 @@ function authWrapper(req: NextApiRequest, res: NextApiResponse) {
     return handler(req, res);
   }
 
-  // Allow localhost requests (VLM server fetching photos on same machine)
-  const remoteAddr = req.socket?.remoteAddress || '';
-  const isLocalhost = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
-  if (isLocalhost && req.query.vlm === 'true') {
+  // Internal VLM / loopback photo fetch: authorised by a shared secret in the
+  // query string (vLLM does a plain GET and can't send a header). The old
+  // peer-IP "localhost" check is gone — nginx reverse-proxies to Node over
+  // loopback, so every request's remoteAddress is 127.0.0.1 and the check was
+  // no boundary at all (see project_photo_proxy_vlm_auth_bypass).
+  if (isVlmProxyAuthorized(req.query as { vlm?: string | string[]; vlmkey?: string | string[] })) {
     return handler(req, res);
+  }
+  if (req.query.vlm === 'true' && !process.env.VLM_PROXY_SECRET) {
+    log.warn('photo-proxy: vlm=true request but VLM_PROXY_SECRET is not configured — denying and falling back to session auth', { module: 'cqa-photo-proxy' });
   }
 
   return withAuth(withPermission('construction-qa.qa-centre')(handler))(req, res);

@@ -13,6 +13,7 @@ import { getChecklist } from '../types/construction.types';
 import type { Discipline, VlmStepResult, VlmOverallResult } from '../types';
 import { recordCorrectExtraction, getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
 import { VLM_API_URL, VLM_MODEL, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
+import { vlmProxyKeyParam } from '@/lib/vlm/photoProxyAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 const MODULE = 'cqa-vlm';
@@ -447,8 +448,10 @@ ${fewShotSection ? `\n${fewShotSection}\n` : ''}${classificationBlock}${validati
  * Build a URL for the VLM to access the photo.
  */
 function buildPhotoUrl(storageKey: string, source: string): string {
-  // VLM runs on Velocity, so we use the local API to proxy the photo
+  // VLM runs on Velocity, so we use the local API to proxy the photo. The
+  // ?vlm=true path is authorised by a shared secret in the query string
+  // (vlmProxyKeyParam), not the peer IP — see project_photo_proxy_vlm_auth_bypass.
   const port = process.env.PORT || '3000';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:${port}`;
-  return `${baseUrl}/api/construction-qa/photo-proxy?key=${encodeURIComponent(storageKey)}&source=${source}&vlm=true`;
+  return `${baseUrl}/api/construction-qa/photo-proxy?key=${encodeURIComponent(storageKey)}&source=${source}${vlmProxyKeyParam()}`;
 }

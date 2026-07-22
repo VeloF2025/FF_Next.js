@@ -26,13 +26,19 @@ export function photoUrl(key: string): string {
 
 /**
  * Absolute variant of photoUrl() for server-side consumers that hand the URL to
- * the VLM (which runs on the velo host and cannot resolve a relative path). The
- * proxy path carries `&vlm=true` — photo-proxy.ts allows that from localhost so
- * the VLM can fetch without a session (same path construction-qa's VLM uses).
+ * the VLM (which runs on the velo host and cannot resolve a relative path).
+ *
+ * `vlmKeyParam` is the auth fragment the proxy requires for the `vlm=true` path
+ * (`&vlm=true&vlmkey=<secret>` from `@/lib/vlm/photoProxyAuth`.vlmProxyKeyParam()).
+ * It is passed IN — not read here — because this module is imported by client
+ * components (photoUrl), and the secret/`crypto` helper must never enter the
+ * client bundle. Server callers MUST pass it; omitting it yields a session-auth
+ * URL (no `vlm=true`), which the VLM can't use.
  */
 export function absolutePhotoUrl(
   key: string,
   appBase: string = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fibreflow.app',
+  vlmKeyParam = '',
 ): string {
   if (!key) return '';
   const base = appBase.replace(/\/$/, '');
@@ -40,5 +46,5 @@ export function absolutePhotoUrl(
   const source = key.startsWith('projects/')   ? 'qfield'
               : key.startsWith('sharepoint:') ? 'sharepoint'
               :                                 'local';
-  return `${base}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}&vlm=true`;
+  return `${base}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}${vlmKeyParam}`;
 }
