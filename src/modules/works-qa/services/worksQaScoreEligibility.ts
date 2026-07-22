@@ -39,7 +39,7 @@ export function eligibleSlotsForRow(row: ScorableRow): Array<{ slotKey: string; 
   const out: Array<{ slotKey: string; photoKey: string }> = [];
 
   for (const meta of SLOT_META) {
-    const photoKey = (row as unknown as Record<string, string | null>)[meta.dbColumn];
+    const photoKey = row[meta.dbColumn as keyof ScorableRow] as string | null;
     if (!photoKey) continue;                                   // no photo
     if (typeof vlm[meta.key]?.valid === 'boolean') continue;   // already scored
     if (approvals[meta.key]) continue;                         // per-slot human decision

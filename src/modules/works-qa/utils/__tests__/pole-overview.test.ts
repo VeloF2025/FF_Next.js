@@ -97,6 +97,16 @@ describe('computePoleSummary — status', () => {
     expect(computePoleSummary(row({ present_slots: ALL_KEYS, tray_count: 2, scored_slots: ALL_KEYS })).status).toBe('ready');
   });
 
+  it('an approved-but-unscored slot does not block ready (human approval resolves it)', () => {
+    const s = computePoleSummary(row({
+      present_slots: ALL_KEYS,
+      tray_count: 2,
+      scored_slots: ALL_KEYS.filter(k => k !== 'civil_01'), // civil_01 present but never scored
+      slot_approvals: { civil_01: { decision: 'approved', by: 'x', at: 't' } },
+    }));
+    expect(s.status).toBe('ready');
+  });
+
   it('all slots filled but a VLM failure remains → in_progress (not ready)', () => {
     const s = computePoleSummary(row({ present_slots: ALL_KEYS, tray_count: 1, vlm_fail_keys: ['civil_05'] }));
     expect(s.status).toBe('in_progress');

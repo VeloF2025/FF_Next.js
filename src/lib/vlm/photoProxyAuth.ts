@@ -17,7 +17,7 @@
  */
 import { timingSafeEqual } from 'crypto';
 
-function secretsMatch(provided: string, expected: string): boolean {
+export function secretsMatch(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
   // timingSafeEqual throws on length mismatch — guard first (length is not secret).
