@@ -45,6 +45,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
+from api.safe_paths import safe_join, safe_photo_path
+
 # Database support (optional)
 try:
     import asyncpg
@@ -2092,7 +2094,7 @@ async def get_dr_record(dr_number: str):
 
             # Check for local photos
             local_photos = []
-            dr_path = PHOTOS_BASE_PATH / dr_number
+            dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
             if dr_path.exists():
                 for photo_file in sorted(dr_path.glob("*.jpg")):
                     parts = photo_file.stem.split("_")
@@ -2204,7 +2206,7 @@ async def download_dr_photos(dr_number: str):
             if not record:
                 raise HTTPException(status_code=404, detail=f"DR {dr_number} not found")
 
-            output_dir = PHOTOS_BASE_PATH / dr_number
+            output_dir = safe_join(PHOTOS_BASE_PATH, dr_number)
             photos = await agent.download_all_photos(record, str(output_dir))
 
             # local_photos just changed on disk — drop the cached record AFTER
@@ -2333,21 +2335,21 @@ async def serve_photo(
     import re
     from fastapi.responses import Response
 
-    photo_path = PHOTOS_BASE_PATH / dr_number / filename
+    photo_path = safe_photo_path(PHOTOS_BASE_PATH, dr_number, filename)
 
     # If file exists on disk and is a valid image (>1KB), serve it
-    if photo_path.exists() and photo_path.stat().st_size > 0:
+    if photo_path.is_file() and photo_path.stat().st_size > 0:
         if download:
             return FileResponse(
                 photo_path,
                 media_type="image/jpeg",
-                filename=filename,
-                headers={"Content-Disposition": f"attachment; filename={filename}"}
+                filename=photo_path.name,
+                headers={"Content-Disposition": f"attachment; filename={photo_path.name}"}
             )
         return FileResponse(
             photo_path,
             media_type="image/jpeg",
-            filename=filename
+            filename=photo_path.name
         )
 
     # Try to extract photo_type and attachment_id from filename
@@ -2359,7 +2361,7 @@ async def serve_photo(
 
         # First try to get primary_id from session file
         primary_id = None
-        session_file = DR_SESSIONS_DIR / project / f"session_{dr_number}.json"
+        session_file = safe_join(DR_SESSIONS_DIR, project, f"session_{dr_number}.json")
         if session_file.exists():
             try:
                 with open(session_file, 'r') as f:
@@ -2416,7 +2418,7 @@ async def serve_photo(
 @app.get("/api/download-zip/{dr_number}")
 async def download_photos_zip(dr_number: str):
     """Download all photos for a DR as a ZIP file to user's local PC."""
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
 
     if not dr_path.exists():
         raise HTTPException(status_code=404, detail=f"No photos found for {dr_number}. Please download from 1Map first.")
@@ -2575,7 +2577,7 @@ async def list_dr_photos(dr_number: str):
     Returns detailed information about each photo including
     file metadata and photo type classification.
     """
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
 
     if not dr_path.exists():
         raise HTTPException(
@@ -2642,7 +2644,7 @@ async def evaluate_dr_photos_endpoint(
             detail="AI evaluation not available. GEMINI_API_KEY not configured."
         )
 
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
 
     if not dr_path.exists():
         raise HTTPException(
@@ -2681,7 +2683,7 @@ async def get_evaluation_status(dr_number: str):
     Returns whether the DR has been evaluated and basic status info.
     For full results, use GET /api/evaluations/{dr_number}.
     """
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
 
     if not dr_path.exists():
         return {
@@ -2731,7 +2733,7 @@ async def save_evaluation_results(dr_number: str):
             detail="AI evaluation not available. GEMINI_API_KEY not configured."
         )
 
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
 
     if not dr_path.exists():
         raise HTTPException(
@@ -2768,7 +2770,7 @@ async def get_evaluation_results(dr_number: str):
     Returns the full evaluation results if they exist.
     Use POST /api/evaluate/{dr_number}/save to generate and save results first.
     """
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
     eval_file = dr_path / "evaluation_results.json"
 
     if not eval_file.exists():
@@ -2829,7 +2831,7 @@ async def delete_evaluation_results(dr_number: str):
 
     This allows re-evaluation of photos if needed.
     """
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
     eval_file = dr_path / "evaluation_results.json"
 
     if not eval_file.exists():
@@ -2887,10 +2889,10 @@ async def trigger_qa_evaluation(
         )
 
     # Check if photos exist
-    dr_path = PHOTOS_BASE_PATH / project / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, project, dr_number)
     if not dr_path.exists():
         # Try without project prefix (old structure)
-        dr_path = PHOTOS_BASE_PATH / dr_number
+        dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
 
     if not dr_path.exists():
         raise HTTPException(
@@ -3240,9 +3242,9 @@ async def get_qa_status(
             }
 
     # Check for saved file
-    dr_path = PHOTOS_BASE_PATH / project / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, project, dr_number)
     if not dr_path.exists():
-        dr_path = PHOTOS_BASE_PATH / dr_number
+        dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
 
     qa_file = dr_path / "qa_results.json" if dr_path.exists() else None
     if qa_file and qa_file.exists():
@@ -3300,7 +3302,7 @@ async def get_qa_summary(
 
     search_paths = [PHOTOS_BASE_PATH]
     if project:
-        project_path = PHOTOS_BASE_PATH / project
+        project_path = safe_join(PHOTOS_BASE_PATH, project)
         if project_path.exists():
             search_paths = [project_path]
 
@@ -3368,9 +3370,9 @@ async def sync_to_sharepoint(
     Also uploads qa_results.json if available.
     """
     # Check if photos exist
-    dr_path = PHOTOS_BASE_PATH / project / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, project, dr_number)
     if not dr_path.exists():
-        dr_path = PHOTOS_BASE_PATH / dr_number
+        dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
 
     if not dr_path.exists():
         raise HTTPException(
@@ -3469,7 +3471,7 @@ async def process_dr(
     # Step 1: Check local database for existing results
     local_qa_results = None
     local_photos = []
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
     project = "Unknown"
 
     if dr_path.exists():
@@ -3479,7 +3481,9 @@ async def process_dr(
     if not local_photos:
         for proj_dir in PHOTOS_BASE_PATH.iterdir():
             if proj_dir.is_dir() and not proj_dir.name.startswith("DR"):
-                potential_path = proj_dir / dr_number
+                # safe_join above already rejects an unsafe dr_number, but
+                # contain here too so this loop does not depend on that.
+                potential_path = safe_join(proj_dir, dr_number)
                 if potential_path.exists():
                     dr_path = potential_path
                     project = proj_dir.name
@@ -3564,7 +3568,7 @@ async def process_dr(
     if not local_photos and onemap_record and auto_download:
         try:
             async with OneMapSpecialistAgent() as agent:
-                output_dir = PHOTOS_BASE_PATH / dr_number
+                output_dir = safe_join(PHOTOS_BASE_PATH, dr_number)
                 photos = await agent.download_all_photos(onemap_record, str(output_dir))
 
                 # Same post-mutation invalidation as /api/download.
@@ -3790,7 +3794,7 @@ async def get_dashboard_sessions(
     # Try to load from session files
     search_dir = DR_SESSIONS_DIR
     if project:
-        project_dir = DR_SESSIONS_DIR / project
+        project_dir = safe_join(DR_SESSIONS_DIR, project)
         if project_dir.exists():
             search_dir = project_dir
 
@@ -3834,9 +3838,9 @@ async def get_dashboard_session(
     project: str = Query("LAW")
 ):
     """Get detailed session info for a specific DR."""
-    session_file = DR_SESSIONS_DIR / project / f"session_{dr_number}.json"
+    session_file = safe_join(DR_SESSIONS_DIR, project, f"session_{dr_number}.json")
     if not session_file.exists():
-        session_file = DR_SESSIONS_DIR / f"session_{dr_number}.json"
+        session_file = safe_join(DR_SESSIONS_DIR, f"session_{dr_number}.json")
 
     if not session_file.exists():
         raise HTTPException(status_code=404, detail=f"Session not found for {dr_number}")
@@ -3878,9 +3882,11 @@ async def create_dashboard_session(
     if not dr_number.startswith("DR"):
         raise HTTPException(status_code=400, detail="Invalid DR number format. Must start with 'DR'")
 
-    # Check for existing active session
-    project_dir = DR_SESSIONS_DIR / project
-    session_file = project_dir / f"session_{dr_number}.json"
+    # Check for existing active session.
+    # Note: the startswith("DR") check above does not prevent traversal --
+    # "DR/../.." also starts with "DR" -- so the join must still be contained.
+    project_dir = safe_join(DR_SESSIONS_DIR, project)
+    session_file = safe_join(DR_SESSIONS_DIR, project, f"session_{dr_number}.json")
 
     if session_file.exists():
         with open(session_file, 'r') as f:
@@ -3892,7 +3898,7 @@ async def create_dashboard_session(
             )
 
     # Check if DR has photos
-    dr_path = PHOTOS_BASE_PATH / dr_number
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
     photos = []
     
     logger.info(f"Checking for photos for {dr_number}")
@@ -3979,7 +3985,7 @@ async def update_session_step(
     project: str = Query("LAW")
 ):
     """Update a specific step's status in a session."""
-    session_file = DR_SESSIONS_DIR / project / f"session_{dr_number}.json"
+    session_file = safe_join(DR_SESSIONS_DIR, project, f"session_{dr_number}.json")
 
     if not session_file.exists():
         raise HTTPException(status_code=404, detail=f"Session not found for {dr_number}")
@@ -4054,7 +4060,7 @@ async def get_dashboard_stats(
 
     search_dir = DR_SESSIONS_DIR
     if project:
-        project_dir = DR_SESSIONS_DIR / project
+        project_dir = safe_join(DR_SESSIONS_DIR, project)
         if project_dir.exists():
             search_dir = project_dir
 

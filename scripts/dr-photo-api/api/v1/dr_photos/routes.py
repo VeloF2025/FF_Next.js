@@ -23,6 +23,7 @@ from agents.integrations.onemap_specialist_agent import (
     DRRecord,
     PhotoType,
 )
+from api.safe_paths import safe_join, safe_photo_path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dr-photos", tags=["DR Photos"])
@@ -290,6 +291,10 @@ async def get_dr_record(dr_number: str):
     Returns:
         DR record with photos info and local photo list
     """
+    # Validate before the try block: the broad `except Exception` below would
+    # otherwise turn a 400 into a 500.
+    dr_path = safe_join(PHOTOS_BASE_PATH, dr_number)
+
     try:
         async with OneMapSpecialistAgent() as agent:
             record = await agent.get_dr(dr_number)
@@ -299,7 +304,6 @@ async def get_dr_record(dr_number: str):
 
             # Check for local photos
             local_photos = []
-            dr_path = PHOTOS_BASE_PATH / dr_number
             if dr_path.exists():
                 for photo_file in dr_path.glob("*.jpg"):
                     # Parse photo type from filename
@@ -341,6 +345,10 @@ async def download_dr_photos(dr_number: str):
     Returns:
         Download result with file list
     """
+    # Validate before the try block: the broad `except Exception` below would
+    # otherwise turn a 400 into a 500.
+    output_dir = safe_join(PHOTOS_BASE_PATH, dr_number)
+
     try:
         async with OneMapSpecialistAgent() as agent:
             record = await agent.get_dr(dr_number)
@@ -348,7 +356,6 @@ async def download_dr_photos(dr_number: str):
             if not record:
                 raise HTTPException(status_code=404, detail=f"DR {dr_number} not found")
 
-            output_dir = PHOTOS_BASE_PATH / dr_number
             photos = await agent.download_all_photos(record, str(output_dir))
 
             files = [f"{record.dr_number}_{p.photo_type}_{p.attachment_id}.jpg" for p in photos]
@@ -379,15 +386,15 @@ async def serve_photo(dr_number: str, filename: str):
     Returns:
         Photo file
     """
-    photo_path = PHOTOS_BASE_PATH / dr_number / filename
+    photo_path = safe_photo_path(PHOTOS_BASE_PATH, dr_number, filename)
 
-    if not photo_path.exists():
+    if not photo_path.is_file():
         raise HTTPException(status_code=404, detail="Photo not found")
 
     return FileResponse(
         photo_path,
         media_type="image/jpeg",
-        filename=filename
+        filename=photo_path.name
     )
 
 
