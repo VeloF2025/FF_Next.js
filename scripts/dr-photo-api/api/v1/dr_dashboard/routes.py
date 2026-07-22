@@ -25,6 +25,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from loguru import logger
 
+from api.safe_paths import safe_join, safe_photo_path
+
 # Database
 try:
     import asyncpg
@@ -460,8 +462,9 @@ def get_photos_for_dr(dr_number: str, project: str = None) -> List[Dict]:
     dr_photo_dir = None
 
     # Check data/dr_photos/{dr_number}/ (direct structure, local dev)
-    if (DR_PHOTOS_DIR / dr_number).exists():
-        dr_photo_dir = DR_PHOTOS_DIR / dr_number
+    direct_dr_dir = safe_join(DR_PHOTOS_DIR, dr_number)
+    if direct_dr_dir.exists():
+        dr_photo_dir = direct_dr_dir
     else:
         # Check all project subfolders for this DR (VPS structure)
         for project_dir in DR_PHOTOS_DIR.iterdir():
@@ -821,23 +824,23 @@ async def get_photo(
     Photos are stored directly under data/dr_photos/{dr_number}/
     """
     # Try direct path first (no project subfolder)
-    photo_path = DR_PHOTOS_DIR / dr_number / filename
+    photo_path = safe_photo_path(DR_PHOTOS_DIR, dr_number, filename)
 
-    if not photo_path.exists():
+    if not photo_path.is_file():
         # Try with common project subfolders
         for project in ["lawley", "mohadin", "mamelodi"]:
-            alt_path = DR_PHOTOS_DIR / project / dr_number / filename
-            if alt_path.exists():
+            alt_path = safe_photo_path(DR_PHOTOS_DIR, project, dr_number, filename)
+            if alt_path.is_file():
                 photo_path = alt_path
                 break
 
-    if not photo_path.exists():
+    if not photo_path.is_file():
         raise HTTPException(status_code=404, detail="Photo not found")
 
     return FileResponse(
         photo_path,
         media_type="image/jpeg",
-        filename=filename,
+        filename=photo_path.name,
     )
 
 
@@ -849,19 +852,19 @@ async def get_photo_with_project(
 ):
     """Serve a photo file (with project path for compatibility)."""
     # Try with project subfolder (keep original case)
-    photo_path = DR_PHOTOS_DIR / project / dr_number / filename
+    photo_path = safe_photo_path(DR_PHOTOS_DIR, project, dr_number, filename)
 
-    if not photo_path.exists():
+    if not photo_path.is_file():
         # Fall back to direct path
-        photo_path = DR_PHOTOS_DIR / dr_number / filename
+        photo_path = safe_photo_path(DR_PHOTOS_DIR, dr_number, filename)
 
-    if not photo_path.exists():
+    if not photo_path.is_file():
         raise HTTPException(status_code=404, detail="Photo not found")
 
     return FileResponse(
         photo_path,
         media_type="image/jpeg",
-        filename=filename,
+        filename=photo_path.name,
     )
 
 
