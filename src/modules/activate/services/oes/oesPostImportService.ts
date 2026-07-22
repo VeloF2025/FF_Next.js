@@ -149,6 +149,21 @@ export async function triggerOltAutoDetect(batchId: string): Promise<boolean> {
           logger.error('OLT lookup-queue processing failed (non-blocking)', { message: msg });
         }
 
+        // FT's daily eligibility verdict clears records first: any open
+        // mismatch whose DR the fresh OES file marks Eligible/PAID has no
+        // billing hold (FT-authoritative, like the weekly dropoff closure).
+        // Pure SQL, so it runs before the 1Map sweep and shrinks its load.
+        try {
+          const { processEligibilityClosures } = await import(
+            '@/modules/data-sync/services/oltEligibilityClosureService'
+          );
+          const elig = await processEligibilityClosures();
+          logger.info('OLT eligibility closure completed', { data: elig });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          logger.error('OLT eligibility closure failed (non-blocking)', { message: msg });
+        }
+
         // After the new batch is classified, sweep the OLD open mismatches:
         // 1Map often catches up days later, and ticketed/needs_investigation
         // rows are excluded from the queue processor's auto-resolve. Own

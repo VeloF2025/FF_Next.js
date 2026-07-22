@@ -192,23 +192,25 @@ export async function upsertActivations(
   for (let i = 0; i < oesRows.length; i += BATCH_SIZE) {
     const chunk = oesRows.slice(i, i + BATCH_SIZE);
 
-    // 16 columns per row (Stack Ref removed Jan 2027)
+    // 18 columns per row (Payment Eligibility + Not Eligible Reason added Jul 2026)
     const values: (string | number | null)[] = [];
     const placeholders: string[] = [];
 
     chunk.forEach((row, idx) => {
       const dropId = dropsMap.get(row.drop_number) ?? null;
-      const offset = idx * 16;
+      const offset = idx * 18;
       placeholders.push(
         `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, ` +
         `$${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, ` +
-        `$${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16})`
+        `$${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, ` +
+        `$${offset + 16}, $${offset + 17}, $${offset + 18})`
       );
       values.push(
         row.drop_number, dropId, row.serial_number, row.activation_date,
         row.activation_datetime, row.olt_address, row.ont_rx_sig_dbm,
         row.link_budget_ont_olt_db, row.olt_rx_sig_dbm, row.link_budget_olt_ont_db,
-        row.status, row.latitude, row.longitude, row.current_ont_rx, row.team, batchId
+        row.status, row.latitude, row.longitude, row.current_ont_rx, row.team, batchId,
+        row.payment_eligibility, row.not_eligible_reason
       );
     });
 
@@ -217,7 +219,8 @@ export async function upsertActivations(
         `INSERT INTO oes_activations (
            drop_number, drop_id, serial_number, activation_date, activation_datetime, olt_address,
            ont_rx_sig_dbm, link_budget_ont_olt_db, olt_rx_sig_dbm, link_budget_olt_ont_db,
-           status, latitude, longitude, current_ont_rx, team, import_batch_id
+           status, latitude, longitude, current_ont_rx, team, import_batch_id,
+           payment_eligibility, not_eligible_reason
          ) VALUES ${placeholders.join(', ')}
          ON CONFLICT (drop_number) DO UPDATE SET
            drop_id = COALESCE(EXCLUDED.drop_id, oes_activations.drop_id),
@@ -235,6 +238,10 @@ export async function upsertActivations(
            current_ont_rx = EXCLUDED.current_ont_rx,
            team = EXCLUDED.team,
            import_batch_id = EXCLUDED.import_batch_id,
+           payment_eligibility = COALESCE(EXCLUDED.payment_eligibility, oes_activations.payment_eligibility),
+           not_eligible_reason = CASE WHEN EXCLUDED.payment_eligibility IS NULL
+                                      THEN oes_activations.not_eligible_reason
+                                      ELSE EXCLUDED.not_eligible_reason END,
            updated_at = NOW()`,
         values
       );

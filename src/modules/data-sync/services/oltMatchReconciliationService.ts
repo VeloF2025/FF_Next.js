@@ -60,7 +60,7 @@ interface CandidateRow {
   oes_serial: string | null;
 }
 
-interface SystemUser {
+export interface SystemUser {
   id: string;
   email: string;
 }
@@ -88,22 +88,22 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** Never hardcode the system user UUID — resolve it live (see memory: maint system actor). */
-async function getSystemUser(): Promise<SystemUser | null> {
+export async function getSystemUser(): Promise<SystemUser | null> {
   const { rows } = await pool.query(
     `SELECT id, email FROM users WHERE email = 'system@fibreflow.app' LIMIT 1`,
   );
   return rows.length > 0 ? (rows[0] as SystemUser) : null;
 }
 
-type TicketCloseOutcome = 'closed' | 'already_terminal' | 'failed';
+export type TicketCloseOutcome = 'closed' | 'already_terminal' | 'failed';
 
 /**
  * Close a linked NOC ticket through the same cascade the manual OLT resolve
  * uses (#1909): status flip + change log + note/activity/data-sync/AI-summary
  * side-effects. Best-effort — the record is already resolved; a ticket-close
- * failure is logged, never thrown.
+ * failure is logged, never thrown. Shared with the eligibility closure sweep.
  */
-async function closeLinkedTicket(
+export async function closeLinkedTicket(
   ticketId: string,
   note: string,
   systemUser: SystemUser | null,

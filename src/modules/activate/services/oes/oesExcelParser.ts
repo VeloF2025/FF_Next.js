@@ -30,6 +30,10 @@ export interface OESRow {
   longitude: number | null;
   current_ont_rx: number | null;
   team: string;
+  /** FT col 14 (added ~Jul 2026): 'Eligible' | 'Not Eligible' | 'PAID - Invoiced on <date>'. Null when absent. */
+  payment_eligibility: string | null;
+  /** FT col 15: semicolon-joined FT note reasons; null unless Not Eligible. */
+  not_eligible_reason: string | null;
 }
 
 export interface PPRow {
@@ -64,12 +68,14 @@ export function excelDateTimeToISO(serial: number): string {
   return date.toISOString();
 }
 
-// Expected headers (Jan 2027 format - 13 columns, Stack Ref removed)
+// Expected headers. Jul 2026 format = 15 columns (Payment Eligibility +
+// Not Eligible Reason appended); the prior 13-column format is still accepted
+// because per-site files gain the new columns at FT's pace.
 export const EXPECTED_HEADERS = [
   'Drop Number', 'Serial Number', 'Timestamp', 'OLT Address',
   'ONT Rx SIG (dBm)', 'Link Budget ONT->OLT (dB)', 'OLT Rx SIG (dBm)',
   'Link Budget OLT->ONT (dB)', 'Status', 'Latitude', 'Longitude',
-  'Current ONT RX', 'Team',
+  'Current ONT RX', 'Team', 'Payment Eligibility', 'Not Eligible Reason',
 ];
 
 /** Validate Excel headers match expected format. */
@@ -77,9 +83,9 @@ export function validateHeaders(headers: unknown[]): { valid: boolean; warnings:
   const warnings: string[] = [];
 
   if (headers.length < 13) {
-    warnings.push(`Column count mismatch: expected 13, got ${headers.length}. Format may have changed.`);
-  } else if (headers.length > 13) {
-    warnings.push(`Extra columns detected: expected 13, got ${headers.length}. New columns may have been added.`);
+    warnings.push(`Column count mismatch: expected 13 or 15, got ${headers.length}. Format may have changed.`);
+  } else if (headers.length > 13 && headers.length !== 15) {
+    warnings.push(`Extra columns detected: expected 13 or 15, got ${headers.length}. New columns may have been added.`);
   }
 
   // Check key headers are in expected positions (Jan 2027 format - no Stack Ref)
@@ -331,10 +337,11 @@ export function parseOESExcel(filePath: string): ParseResult {
       activationDate = String(row[2] ?? '');
     }
 
-    // Column mapping (Jan 2027 format - Stack Ref removed):
+    // Column mapping:
     // A=0:Drop, B=1:Serial, C=2:Timestamp, D=3:OLT Address,
     // E=4:ONT Rx, F=5:Link ONT->OLT, G=6:OLT Rx, H=7:Link OLT->ONT,
-    // I=8:Status, J=9:Lat, K=10:Lon, L=11:Current ONT RX, M=12:Team
+    // I=8:Status, J=9:Lat, K=10:Lon, L=11:Current ONT RX, M=12:Team,
+    // N=13:Payment Eligibility (Jul 2026+), O=14:Not Eligible Reason (Jul 2026+)
     rows.push({
       drop_number: dropNumber,
       serial_number: String(row[1] ?? '').trim(),
@@ -350,6 +357,8 @@ export function parseOESExcel(filePath: string): ParseResult {
       longitude: row[10] !== undefined ? parseFloat(row[10]) : null,
       current_ont_rx: row[11] !== undefined ? parseFloat(row[11]) : null,
       team: String(row[12] ?? '').trim(),
+      payment_eligibility: String(row[13] ?? '').trim() || null,
+      not_eligible_reason: String(row[14] ?? '').trim() || null,
     });
   }
 
