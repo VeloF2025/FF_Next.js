@@ -52,7 +52,9 @@ const SCORABLE_COLUMNS = `
 // slot filled AND not every discipline human-approved. Excludes empty and
 // fully-approved (dormant) rows so they can't crowd the oldest-first backlog
 // scan forever (final per-slot eligibility is still enforced by
-// eligibleSlotsForRow). Boolean approval columns are NOT NULL DEFAULT false.
+// eligibleSlotsForRow). The approval columns are nullable (DEFAULT false), so
+// COALESCE guards against a NULL turning the whole AND into SQL NULL and
+// silently dropping a row that still has eligible slots.
 const HAS_CANDIDATE_SLOT = `
   num_nonnulls(
     civil_step_01_key, civil_step_02_key, civil_step_03_key, civil_step_04_key,
@@ -62,7 +64,7 @@ const HAS_CANDIDATE_SLOT = `
     main_joint_11_key, main_joint_12_key, main_joint_13_key,
     main_joint_14_key, main_joint_15_key, main_joint_16_key
   ) > 0
-  AND NOT (civil_approved AND dome_approved AND joint_approved)
+  AND NOT (COALESCE(civil_approved, false) AND COALESCE(dome_approved, false) AND COALESCE(joint_approved, false))
 `;
 
 interface ScoreTask { rowId: string; slotKey: string; photoKey: string; }
