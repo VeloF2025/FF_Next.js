@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  dr-photo-api:
+    image: boss-vps-dr-photo-api:latest
+    container_name: dr-photo-api
+    restart: unless-stopped
+    ports:
+      - "8003:8001"
+    environment:
+      # Database - Neon PostgreSQL (cloud)
+      DATABASE_URL: "${DATABASE_URL}"
+
+      # 1Map GIS Credentials
+      ONEMAP_EMAIL: "${ONEMAP_EMAIL}"
+      ONEMAP_PASSWORD: "${ONEMAP_PASSWORD}"
+
+      # AI/ML Services (local vLLM instead of external APIs)
+      VLLM_URL: "http://192.168.1.150:8100"
+
+      # API Keys (optional fallbacks)
+      GEMINI_API_KEY: "${GEMINI_API_KEY}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+
+      # Application Config
+      DR_PHOTOS_PATH: "/app/data/dr_photos"
+      LOG_LEVEL: "INFO"
+      PYTHONUNBUFFERED: "1"
+
+    volumes:
+      # Mount DR photos and sessions from /srv/data/boss/
+      - /srv/data/boss/dr_photos:/app/data/dr_photos
+      - /srv/data/boss/dr_sessions:/app/data/dr_sessions
+
+    networks:
+      - boss-network
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health',timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  boss-network:
+    external: true
