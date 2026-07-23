@@ -87,8 +87,18 @@ export function buildCandidateQuery(mode: string): string {
  * Note this is a go-live boundary, NOT "old rows have null verified_at".
  * Fresh DRs land with a null verified_at every day — ~160/day, spread evenly
  * across the lookback window — so age alone cannot separate the two.
+ *
+ * Set to the day the cron actually starts running, and err EARLY when unsure.
+ * Too early costs a little noise — rows flagged that the cron never had a fair
+ * chance at. Too late silently drops a whole day's cohort a week after the
+ * fact, which is the bug this metric exists to prevent. Production deploys are
+ * after-hours here, so the go-live is the evening of the merge date, not the
+ * morning after.
+ *
+ * Explicit +02:00 (SAST): the DB session runs in UTC, so a bare DATE literal
+ * would land the boundary at 02:00 SAST rather than midnight.
  */
-export const IN_SCOPE_FROM = '2026-07-24';
+export const IN_SCOPE_FROM = '2026-07-23 00:00:00+02:00';
 
 /**
  * DRs that are unresolved and can no longer be reached, because they fell out
@@ -115,7 +125,7 @@ export function buildAgedOutQuery(): string {
         photo_count_mismatch = TRUE
         OR (
           photo_count_verified_at IS NULL
-          AND created_at >= DATE '${IN_SCOPE_FROM}'
+          AND created_at >= TIMESTAMPTZ '${IN_SCOPE_FROM}'
         )
       )
   `;

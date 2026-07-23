@@ -107,11 +107,22 @@ describe('buildAgedOutQuery', () => {
   });
 
   it('excludes pre-go-live rows, whose null verified_at is an artifact not a backlog', () => {
-    expect(q).toContain(`DATE '${IN_SCOPE_FROM}'`);
-    // The go-live guard must bind ONLY to the never-verified arm — a confirmed
-    // shortfall is worth reporting regardless of vintage.
-    const neverVerifiedArm = q.slice(q.indexOf('photo_count_verified_at IS NULL'));
-    expect(neverVerifiedArm).toContain(`DATE '${IN_SCOPE_FROM}'`);
+    expect(q).toContain(`TIMESTAMPTZ '${IN_SCOPE_FROM}'`);
+  });
+
+  it('binds the go-live guard to the never-verified arm ONLY', () => {
+    // A confirmed shortfall is worth reporting at any vintage, so the cutoff
+    // must not gate arm 1. Proven by exclusion, not just by position: nothing
+    // before the never-verified arm may mention the cutoff.
+    const armStart = q.indexOf('photo_count_verified_at IS NULL');
+    expect(armStart).toBeGreaterThan(-1);
+    expect(q.slice(0, armStart)).not.toContain(IN_SCOPE_FROM);
+    expect(q.slice(armStart)).toContain(`TIMESTAMPTZ '${IN_SCOPE_FROM}'`);
+  });
+
+  it('pins the cutoff to SAST midnight — the DB session runs in UTC', () => {
+    expect(IN_SCOPE_FROM).toMatch(/\+02:00$/);
+    expect(q).toContain('TIMESTAMPTZ');
   });
 
   it('only looks outside the lookback window — in-window rows are still retryable', () => {
