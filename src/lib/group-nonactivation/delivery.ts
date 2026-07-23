@@ -69,6 +69,15 @@ export function groupCaption(
   if (c.miss > 0 || c.backlog > 0) {
     lines.push('', 'Please open the *Not Activated* tab and action / correct these DRs. Fix any wrong DR numbers and resubmit.');
   }
+  if (c.olt > 0) {
+    lines.push(
+      '',
+      `🔧 1Map data issues: ${c.olt} still open${c.oltNew ? ` (${c.oltNew} raised yesterday)` : ''} — see the *OLT Mismatches* tab`,
+    );
+    if (c.oltNote2 > 0) lines.push(`   • Note 2 — no entry on 1Map: ${c.oltNote2}`);
+    if (c.oltNote4 > 0) lines.push(`   • Note 4 — Drop# / ONT serial mismatch: ${c.oltNote4}`);
+    lines.push('These are Fibertime deduction risks — please correct the 1Map entry. The tab lists the NOC ticket per row.');
+  }
   lines.push('', '— Jarvis 🤖');
   return lines.join('\n');
 }

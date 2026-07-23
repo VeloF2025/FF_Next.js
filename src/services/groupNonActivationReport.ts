@@ -15,6 +15,7 @@ import {
   getPpList,
   ppProjectFor,
 } from '@/lib/group-nonactivation/queries';
+import { getOltWorklist } from '@/lib/group-nonactivation/oltQueries';
 import { buildGroupWorkbook, type GroupReportCounts } from '@/lib/group-nonactivation/buildWorkbook';
 import { addDaysIso } from '@/lib/group-nonactivation/format';
 import { groupCaption, sendGroupReport, sendOpsReport } from '@/lib/group-nonactivation/delivery';
@@ -68,12 +69,15 @@ export async function buildGroupNonActivationReports(
       );
     }
     const ppList = group.showPp ? await getPpList(ppProjectFor(group.project), opts.cohortDate) : [];
+    // OLT recon is project-level, same as PP → activations groups only.
+    const oltList = group.showPp ? await getOltWorklist(group.project, opts.cohortDate) : [];
 
     const { buffer, counts } = await buildGroupWorkbook({
       group,
       cohort,
       backlog,
       ppList,
+      oltList,
       cohortDate: opts.cohortDate,
       generatedDate: opts.generatedDate,
     });
