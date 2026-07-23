@@ -26,7 +26,10 @@ if [ -z "${LIVE_DATABASE_URL:-}" ]; then
   exit 1
 fi
 
-cleanup() { docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; }
+cleanup() {
+  docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  rm -f /tmp/hs-schema-scratch.txt /tmp/hs-schema-live.txt /tmp/hs-schema-diff.txt
+}
 trap cleanup EXIT
 
 echo "[1/5] Starting scratch Postgres 15 on :${SCRATCH_PORT}..."

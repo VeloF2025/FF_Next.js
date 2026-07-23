@@ -50,7 +50,7 @@ export interface HSContractorDocument {
   id: string;
   contractor_id: string;
   document_type: HSDocumentType;
-  document_name: string; // display name (file_name in DB)
+  file_name: string | null;
   file_url: string | null;
   file_size: number | null;
   issue_date: string | null;
@@ -70,7 +70,7 @@ export interface HSContractorDocument {
 export interface HSContractorDocumentInput {
   contractor_id: string;
   document_type: HSDocumentType;
-  document_name: string; // display name (file_name in DB)
+  file_name?: string;
   file_url?: string;
   file_size?: number;
   issue_date?: string;

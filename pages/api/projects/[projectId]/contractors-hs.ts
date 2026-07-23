@@ -56,8 +56,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Get all contractors assigned to this project with their H&S status
-    // Note: contractor_projects.contractor_id is UUID, hs_contractor_compliance.contractor_id is INTEGER
-    // We need to handle this by joining through contractors table
+    // (contractor ids are uuid everywhere: contractor_projects, contractors,
+    //  and hs_contractor_compliance)
     const contractorsResult = await sql`
       SELECT
         cp.contractor_id,

@@ -1,6 +1,13 @@
 -- Migration: 113_health_safety_module.sql
 -- Description: Health & Safety module - checklists, audits, contractor compliance, ticket integration
 -- Date: 2026-01-22
+--
+-- ⚠️ DO NOT RUN AGAINST THE LIVE DATABASE. This file exists for fresh scratch
+-- rebuilds only (scripts/hs-scratch-rebuild-proof.sh) and is deliberately NOT
+-- in the auto-runner's sql/ directory. Against live, its DDL would no-op but
+-- the unguarded seed INSERTs at the bottom would duplicate all 8 templates
+-- (new uuids — the (template_id, item_text) unique key would not collide).
+-- The idempotent live seed is scripts/migrations/sql/450_hs_checklist_seed_44.sql.
 -- REGENERATED 2026-07-23 (H&S E2E remediation, goal D6): the live hs_* schema
 -- was created out-of-band in Jan 2026 from DDL that never matched this file,
 -- so a fresh rebuild produced tables the code (and migration 236) could not

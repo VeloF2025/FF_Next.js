@@ -6,8 +6,13 @@
 
 BEGIN;
 
+-- Scoped to the default templates the seed targeted — an operator-created
+-- item with identical text under a custom template is never touched.
 DELETE FROM hs_checklist_items i
-WHERE i.item_text IN (
+USING hs_checklist_templates t
+WHERE i.template_id = t.id
+AND t.is_default = true
+AND i.item_text IN (
   'Fall protection plan available and communicated to workers',
   'Full body harnesses inspected and in good condition',
   'Anchor points certified and load-tested',

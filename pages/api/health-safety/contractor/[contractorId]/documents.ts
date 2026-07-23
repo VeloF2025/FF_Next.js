@@ -195,8 +195,8 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
     return apiResponse.notFound(res, 'Contractor', contractorId);
   }
 
-  // Determine initial status
-  let status = 'pending_review';
+  // Determine initial status (must be a value from the table's status CHECK)
+  let status = 'pending';
   if (expiry_date && new Date(expiry_date) < new Date()) {
     status = 'expired';
   }
