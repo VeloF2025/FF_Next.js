@@ -201,8 +201,16 @@ export async function backfillDr(dropNumber: string): Promise<BackfillResult> {
     const upsSerial = data.ups_serial || null;
     const decision = decidePhotoWrite(existingCount, photos.length, cloudPhotoCount);
 
+    let wrotePhotos = false;
+
     if (decision.writePhotos) {
-      await pool.query(
+      // `existingCount` was read before a fetch that can take minutes, so the
+      // in-memory decision alone is only as fresh as that snapshot. The
+      // `photo_count <= $1` predicate re-checks the floor inside the write
+      // itself, so a concurrent writer (a QA reviewer running ensure-data on
+      // this same DR) cannot be clobbered by our stale view. rowCount 0 means
+      // the row moved under us — fall through to the stamp-only path.
+      const write = await pool.query(
         `UPDATE dr_photo_unified_reviews
          SET
            photo_source = 'onemap',
@@ -213,13 +221,22 @@ export async function backfillDr(dropNumber: string): Promise<BackfillResult> {
            photo_count_verified_at = NOW(),
            photo_count_mismatch = $5,
            updated_at = NOW()
-         WHERE drop_number = $6`,
+         WHERE drop_number = $6
+           AND COALESCE(photo_count, 0) <= $1`,
         [photos.length, JSON.stringify(photos), ontSerial, upsSerial, decision.mismatch, dropNumber]
       );
-      result.photoCount = photos.length;
+      wrotePhotos = (write.rowCount ?? 0) > 0;
+      if (wrotePhotos) {
+        result.photoCount = photos.length;
+      } else {
+        log.warn(`Photo count moved during fetch for ${dropNumber} — keeping the newer set`);
+      }
     } else {
-      // Serials are still worth taking — only the photo set is held back.
       log.warn(`Refusing to shrink photo set for ${dropNumber}`, { reason: decision.reason });
+    }
+
+    if (!wrotePhotos) {
+      // Serials are still worth taking — only the photo set is held back.
       await pool.query(
         `UPDATE dr_photo_unified_reviews
          SET

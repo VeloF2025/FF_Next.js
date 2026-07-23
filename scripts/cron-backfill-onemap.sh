@@ -25,7 +25,10 @@ LIMIT="${LIMIT:-20}"
 # 15-min slot, and it is also when a health probe against a hung-but-listening
 # port can block — so probing before locking would let ticks pile up behind the
 # probe, unprotected by the lock that exists to prevent that.
-LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/.ff-backfill-onemap.lock"
+# $HOME, not XDG_RUNTIME_DIR: classic cron sets only HOME/LOGNAME/PATH/LANG/
+# SHELL/PWD, so an XDG_RUNTIME_DIR fallback would silently land back in
+# world-writable /tmp under the scheduler this actually runs under.
+LOCK_FILE="${HOME:-/tmp}/.ff-backfill-onemap.lock"
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   echo "$LOG_PREFIX SKIP: previous run still in progress"
@@ -54,9 +57,11 @@ if [[ ! -r "$ENV_FILE" ]]; then
 fi
 # Tolerates `CRON_SECRET=x`, `export CRON_SECRET=x`, quoting, and a trailing
 # inline comment; anything else yields empty and is caught below.
+# The comment strip requires whitespace before the '#' — a secret is not
+# guaranteed to stay plain hex, and `abc#123` must not be truncated to `abc`.
 CRON_SECRET="$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?CRON_SECRET=//p' "$ENV_FILE" \
   | head -1 \
-  | sed 's/[[:space:]]*#.*$//' \
+  | sed 's/[[:space:]]\{1,\}#.*$//' \
   | tr -d '"'"'"' ' \
   )"
 if [[ -z "$CRON_SECRET" ]]; then
