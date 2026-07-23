@@ -81,6 +81,13 @@ describe('buildCandidateQuery', () => {
     expect(q).not.toContain('DROP TABLE');
   });
 
+  it('unverified mode still picks up never-verified rows inside the window', () => {
+    // The selection query and the aged-out metric deliberately differ: a null
+    // verified_at means "not yet in scope" (selectable), not "unresolved"
+    // (alertable). Pinning both so they cannot be quietly conflated again.
+    expect(buildCandidateQuery('unverified')).toContain('photo_count_verified_at IS NULL');
+  });
+
   it('preserves the pre-existing zero-photo modes', () => {
     expect(buildCandidateQuery('missing_photos')).toContain('photo_count = 0');
     expect(buildCandidateQuery('missing_serials')).toContain('ont_serial_scanned IS NULL');

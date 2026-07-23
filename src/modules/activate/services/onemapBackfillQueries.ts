@@ -78,17 +78,23 @@ export function buildCandidateQuery(mode: string): string {
 }
 
 /**
- * DRs that fell out of the lookback window still unresolved. Nothing will ever
- * retry these, so the number is surfaced rather than left to be inferred from
- * silence — a backlog that quietly stops being worked looks identical to a
- * backlog that was cleared.
+ * DRs this job actually worked, left still short, and can no longer reach
+ * because they fell out of the lookback window. Nothing will ever retry these,
+ * so the number is surfaced rather than left to be inferred from silence — a
+ * backlog that quietly stops being worked looks identical to a cleared one.
+ *
+ * Deliberately NOT `photo_count_verified_at IS NULL`. Every DR predating this
+ * job has a null verified_at simply because the column was never populated for
+ * it — 20,484 rows on the day this shipped, against 41 genuinely-unresolved
+ * ones. Counting those would emit a five-figure warning every 15 minutes and
+ * bury the signal it exists to raise.
  */
 export async function countAgedOut(): Promise<number> {
   const { rows } = await pool.query<{ count: string }>(
     `SELECT COUNT(*) AS count
      FROM dr_photo_unified_reviews
      WHERE created_at <= NOW() - INTERVAL '${LOOKBACK_WINDOW}'
-       AND (photo_count_verified_at IS NULL OR photo_count_mismatch = TRUE)`
+       AND photo_count_mismatch = TRUE`
   );
   return parseInt(rows[0]?.count ?? '0', 10);
 }
