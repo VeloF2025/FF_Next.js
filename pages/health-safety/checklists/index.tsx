@@ -145,7 +145,10 @@ function ChecklistsContent() {
 
 function ChecklistCard({ template }: { template: any }) {
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4 hover:border-[var(--ff-primary-500)] transition-colors">
+    <Link
+      href={`/health-safety/checklists/${template.id}`}
+      className="block bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4 hover:border-[var(--ff-primary-500)] transition-colors"
+    >
       <div className="flex items-start justify-between gap-3 mb-3">
         <h3 className="font-semibold text-[var(--ff-text-primary)] truncate">
           {template.name || 'Untitled Template'}
@@ -174,7 +177,7 @@ function ChecklistCard({ template }: { template: any }) {
           {template.item_count || 0} item{(template.item_count || 0) !== 1 ? 's' : ''}
         </span>
       </div>
-    </div>
+    </Link>
   );
 }
 

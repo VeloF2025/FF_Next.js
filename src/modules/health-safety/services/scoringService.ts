@@ -7,8 +7,6 @@
 import type {
   HSScoreInput,
   HSScoreResult,
-  AuditScoreInput,
-  AuditScoreResult,
   ScoringConfig,
 } from '../types/scoring.types';
 import { DEFAULT_SCORING_CONFIG } from '../types/scoring.types';
@@ -146,94 +144,6 @@ export function calculateContractorHSScore(
     gate_approved: gateApproved,
     gate_blockers: gateBlockers,
   };
-}
-
-/**
- * Calculate project audit score from responses
- */
-export function calculateAuditScore(input: AuditScoreInput): AuditScoreResult {
-  const { responses } = input;
-
-  // Filter out not_checked items
-  const checkedItems = responses.filter((r) => r.response !== 'not_checked');
-  const applicableItems = checkedItems.filter((r) => r.response !== 'na');
-
-  const totalItems = responses.length;
-  const checkedCount = checkedItems.length;
-  const passedItems = applicableItems.filter((r) => r.response === 'pass');
-  const failedItems = applicableItems.filter((r) => r.response === 'fail');
-  const naItems = checkedItems.filter((r) => r.response === 'na');
-
-  // Calculate score based on passed vs failed (NA items don't count)
-  let overallScore = 0;
-  if (applicableItems.length > 0) {
-    // Weight by severity
-    let weightedPassed = 0;
-    let weightedTotal = 0;
-
-    for (const item of applicableItems) {
-      const weight = getSeverityWeight(item.severity);
-      weightedTotal += weight;
-      if (item.response === 'pass') {
-        weightedPassed += weight;
-      }
-    }
-
-    overallScore = weightedTotal > 0 ? Math.round((weightedPassed / weightedTotal) * 100) : 0;
-  }
-
-  // Count critical failures
-  const criticalFailures = failedItems.filter(
-    (r) => r.severity === 'critical' && r.is_mandatory
-  ).length;
-
-  // If any critical mandatory item fails, cap score at amber threshold
-  let adjustedScore = overallScore;
-  if (criticalFailures > 0) {
-    adjustedScore = Math.min(adjustedScore, 79); // Cap at amber
-  }
-
-  const ragStatus = getRAGStatus(adjustedScore);
-
-  // Group by category for breakdown
-  const categoryBreakdown: Record<
-    string,
-    { total: number; passed: number; failed: number; score: number }
-  > = {};
-
-  // This would need category info passed in - simplified version
-  // In real implementation, responses would include category
-
-  return {
-    overall_score: adjustedScore,
-    rag_status: ragStatus,
-    total_items: totalItems,
-    checked_items: checkedCount,
-    passed_items: passedItems.length,
-    failed_items: failedItems.length,
-    na_items: naItems.length,
-    critical_failures: criticalFailures,
-    requires_immediate_action: criticalFailures > 0,
-    category_breakdown: categoryBreakdown,
-  };
-}
-
-/**
- * Get weight multiplier for severity level
- */
-function getSeverityWeight(severity: 'critical' | 'high' | 'medium' | 'low'): number {
-  switch (severity) {
-    case 'critical':
-      return 4;
-    case 'high':
-      return 3;
-    case 'medium':
-      return 2;
-    case 'low':
-      return 1;
-    default:
-      return 1;
-  }
 }
 
 /**
