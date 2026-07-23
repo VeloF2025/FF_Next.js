@@ -9,16 +9,13 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
-import { execFile, spawn } from 'child_process';
-import { promisify } from 'util';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import path from 'path';
 import fs from 'fs';
 import { apiResponse } from '@/lib/apiResponse';
 import { isVlmProxyAuthorized, secretsMatch } from '@/lib/vlm/photoProxyAuth';
+import { streamMinioObject, resolveLatestVersion, PHOTO_CONTENT_TYPES } from '@/lib/construction-qa/minioPhotoStream';
 
-const execFileAsync = promisify(execFile);
-const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
 const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-photos';
 
 // SharePoint Graph API config (credentials from .env)
@@ -121,143 +118,6 @@ async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void>
   res.status(404).json({ error: 'Photo not found in storage — may be awaiting QField sync', key: objectPath });
 }
 
-const MINIO_CONTENT_TYPES: Record<string, string> = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-  gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
-};
-
-/** Bytes needed before deciding whether stdout is object data or an `mc` diagnostic. */
-const MC_PROBE_BYTES = 4;
-
-type MinioOutcome = 'served' | 'not-found' | 'unavailable';
-
-/**
- * Pipe one MinIO object straight to the response.
- *
- * The photo is streamed rather than buffered. The previous implementation used
- * exec() with `maxBuffer: 50MB`, holding every in-flight image fully in memory;
- * under gallery load that drove the production heap past 12GB and caused
- * multi-hundred-millisecond GC stalls across all routes.
- *
- * Uses spawn() with an argv array (no shell), so the object path cannot be
- * interpreted as shell syntax. stderr is kept separate from stdout so `mc`
- * diagnostics can never be mistaken for image bytes.
- */
-function streamMinioObject(tryPath: string, res: NextApiResponse): Promise<MinioOutcome> {
-  return new Promise((resolve) => {
-    const mcPath = `local/${MINIO_BUCKET}/${tryPath}`;
-    const child = spawn('docker', ['exec', 'qfieldcloud-minio-1', 'mc', 'cat', mcPath], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let probe: Buffer = Buffer.alloc(0);
-    let streaming = false;
-    let settled = false;
-    let stderr = '';
-
-    const kill = () => { if (!child.killed) child.kill('SIGKILL'); };
-    const onClientGone = () => kill();
-    res.on('close', onClientGone);
-
-    const settle = (outcome: MinioOutcome) => {
-      if (settled) return;
-      settled = true;
-      res.off('close', onClientGone);
-      resolve(outcome);
-    };
-
-    child.stderr.on('data', (chunk: Buffer) => {
-      if (stderr.length < 2048) stderr += chunk.toString('utf-8');
-    });
-
-    // Begin piping once we've seen enough bytes to rule out an `mc` diagnostic.
-    const beginStream = () => {
-      streaming = true;
-      const ext = tryPath.split('.').pop()?.toLowerCase() || 'jpg';
-      res.setHeader('Content-Type', MINIO_CONTENT_TYPES[ext] || 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
-      res.write(probe);
-      child.stdout.pipe(res);
-      settle('served');
-    };
-
-    const onProbe = (chunk: Buffer) => {
-      probe = Buffer.concat([probe, chunk]);
-      if (probe.length < MC_PROBE_BYTES) return;
-      child.stdout.removeListener('data', onProbe);
-      child.stdout.pause();
-      if (probe.subarray(0, 3).toString('ascii') === 'mc:') {
-        kill();
-        settle('not-found');
-        return;
-      }
-      beginStream();
-    };
-
-    child.stdout.on('data', onProbe);
-
-    // stdout ended before the probe threshold: empty object, or a stub too small to be a photo.
-    child.stdout.on('end', () => {
-      if (streaming || settled) return;
-      child.stdout.removeListener('data', onProbe);
-      if (probe.length > 0 && probe.subarray(0, 3).toString('ascii') !== 'mc:') {
-        beginStream();
-        return;
-      }
-      settle('not-found');
-    });
-
-    child.on('error', (err) => {
-      log.error('construction-qa-photo-proxy: docker spawn failed', {
-        module: 'cqa-photo-proxy', error: err.message, path: tryPath,
-      });
-      settle('unavailable');
-    });
-
-    child.on('close', () => {
-      if (settled) return;
-      if (/Cannot connect to the Docker daemon|No such container/.test(stderr)) {
-        settle('unavailable');
-        return;
-      }
-      if (stderr.trim()) {
-        log.error('construction-qa-photo-proxy: mc cat failed', {
-          module: 'cqa-photo-proxy', error: stderr.trim().slice(0, 300), path: tryPath,
-        });
-      }
-      settle('not-found');
-    });
-  });
-}
-
-/** Resolve an unversioned MinIO key to its latest version. */
-async function resolveLatestVersion(objectPath: string): Promise<string | null> {
-  try {
-    const mcPath = `local/${MINIO_BUCKET}/${objectPath}/`;
-    // execFile with an argv array — no shell, so the key cannot be interpreted
-    // as shell syntax (the listing is small, so buffering it is fine here).
-    const { stdout } = await execFileAsync(
-      'docker',
-      ['exec', 'qfieldcloud-minio-1', 'mc', 'ls', mcPath],
-      { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 },
-    );
-
-    if (!stdout || !stdout.trim()) return null;
-
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    if (lines.length === 0) return null;
-
-    // Last line has latest version: "... v20260310120500-7bc5005f"
-    const parts = lines[lines.length - 1]!.trim().split(/\s+/);
-    const version = parts[parts.length - 1]!.replace(/\/$/, '');
-    if (!version.startsWith('v2')) return null;
-
-    return `${objectPath}/${version}`;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Serve a photo from shared local storage (/home/velo/storage/qa-photos/).
  * storage_key format: relative path e.g. "thembisa-pop-1/TEM.P.A001/photo.jpg"
@@ -277,13 +137,9 @@ async function proxyStoragePhoto(storageKey: string, res: NextApiResponse): Prom
   }
 
   const ext = path.extname(filePath).toLowerCase().slice(1);
-  const contentTypes: Record<string, string> = {
-    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-    gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
-  };
 
   const stat = fs.statSync(filePath);
-  res.setHeader('Content-Type', contentTypes[ext] || 'image/jpeg');
+  res.setHeader('Content-Type', PHOTO_CONTENT_TYPES[ext] || 'image/jpeg');
   res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
   res.setHeader('Content-Length', stat.size);
 
@@ -311,13 +167,9 @@ async function proxyLocalPhoto(storageKey: string, res: NextApiResponse): Promis
   }
 
   const ext = path.extname(filePath).toLowerCase().slice(1);
-  const contentTypes: Record<string, string> = {
-    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-    gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
-  };
 
   const stat = fs.statSync(filePath);
-  res.setHeader('Content-Type', contentTypes[ext] || 'image/jpeg');
+  res.setHeader('Content-Type', PHOTO_CONTENT_TYPES[ext] || 'image/jpeg');
   res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
   res.setHeader('Content-Length', stat.size);
 
