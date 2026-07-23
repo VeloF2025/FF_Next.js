@@ -55,6 +55,15 @@ SA-compliant (OHS Act / Construction Regulations) H&S management: project audit 
 
 The script targets **production** whenever `localhost:3000/api/health` answers and only falls back to dev — the dev path is just where the file lives (dev deploys are ungated). Repoint to `/home/velo/fibreflow-production/scripts/` at the next production deploy.
 
+Observed firing unattended before this was documented. A temporary `*/5` entry was installed alongside the real schedule purely to witness cron-driven ticks, then removed — `/home/velo/logs/hs-audit-reminders.log`:
+
+```
+[2026-07-24 01:30:01] OK: http://localhost:3000 — overdue=5 created=0 refreshed=5 resolved=0
+[2026-07-24 01:35:01] OK: http://localhost:3000 — overdue=5 created=0 refreshed=5 resolved=0
+```
+
+Two ticks exactly five minutes apart at `:00:01` — the scheduler invoked it, not a human. `overdue=5` matches the plain-SQL overdue count, so the run does real work rather than merely returning 200.
+
 ## Gate check logic
 
 Blockers: missing/expired/rejected/pending required docs (`safety_policy`, `liability_insurance`, `safety_plan`), critical/major/fatal incident in 12 months, overall score < 50, training score < 70 **only when training data exists** (NULL doesn't block). Weights: docs 25 / incidents 30 / training 15 / CAPA 15 / audits 15.

@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Raise an Action Centre item for every H&S audit that has gone overdue.
 #
-# Schedule: 40 6 * * 1-6 /home/velo/fibreflow-production/scripts/cron-hs-audit-reminders.sh >> /home/velo/logs/hs-audit-reminders.log 2>&1
+# Schedule: 40 6 * * 1-6 /home/velo/fibreflow-dev/scripts/cron-hs-audit-reminders.sh >> /home/velo/logs/hs-audit-reminders.log 2>&1
+#
+# The dev deploy dir is only where the file lives (dev deploys are ungated).
+# The script itself targets PRODUCTION whenever localhost:3000 answers, and
+# falls back to dev only when it does not.
 #
 # Why this exists: /api/cron/hs-audit-reminders shipped on 2026-07-23 with no
 # scheduler at all — the endpoint worked and had never once fired. The same

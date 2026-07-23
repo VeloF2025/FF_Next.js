@@ -11,8 +11,10 @@
  * config is no longer overdue (audit completed → next_audit_due advanced)
  * are auto-completed.
  *
- * Suggested crontab (velo, dev — install is gated, see goal §8.3):
- *   40 6 * * 1-6 curl -s -X POST -H "x-cron-secret: $CRON_SECRET" http://localhost:3005/api/cron/hs-audit-reminders
+ * Scheduled since 2026-07-24 by scripts/cron-hs-audit-reminders.sh — do not
+ * call this endpoint from a bare crontab curl: the wrapper adds the flock,
+ * the production-first probe and the CRON_SECRET read from the deploy env.
+ *   40 6 * * 1-6 /home/velo/fibreflow-dev/scripts/cron-hs-audit-reminders.sh >> /home/velo/logs/hs-audit-reminders.log 2>&1
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
