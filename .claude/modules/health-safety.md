@@ -1,102 +1,62 @@
 # Module: health-safety
 
-> **Last updated:** 2026-02-22  
-> **Path:** `src/modules/health-safety/`  
-> **Status:** Active  
-> **Complexity:** Medium
+> **Last updated:** 2026-07-23 (E2E remediation — docs/plans/health-safety-e2e-goal.md; PRs #2218–#2223+)
+> **Path:** `src/modules/health-safety/` + `pages/health-safety/` + `pages/projects/health-safety/` + `pages/api/health-safety/`
+> **Status:** Active — all five flows work E2E (audits, incidents, risks, CAPA, contractor compliance)
 
 ## Overview
 
-Health & Safety audit compliance tracking and management. Monitors regulatory compliance, audit trails, and safety incident reporting across FibreFlow projects.
+SA-compliant (OHS Act / Construction Regulations) H&S management: project audit wizard, incident reporting piggybacked on maintenance tickets, risk register with 5×5 matrix, CAPA lifecycle, contractor compliance documents + assignment gate, overdue-audit reminders via Action Items.
 
-| Property | Value |
-|----------|-------|
-| **Purpose** | Track H&S compliance, incidents, audits, and regulations by project |
-| **Primary use** | Project safety audits, incident documentation, compliance verification |
-| **Status** | Active (integrated into project detail pages) |
-| **Category** | admin/compliance |
+## The five flows (how they actually work)
 
-## Core Concepts
+### 1. Project audits
+- Configure on the project page H&S tab (`/projects/[id]?tab=health-safety`): frequency + **Audit scope** select — "All categories (default)" (config.template_id NULL → seeds from every active template that has items) or one template.
+- Start New Audit → `POST /api/health-safety/project/[projectId]/audits` counts seedable items FIRST (0 → 400, no audit row), creates the audit, seeds `hs_audit_responses` in one INSERT..SELECT (RETURNING-verified; rolled back if 0), logs activity.
+- Wizard (`/health-safety/audits/[auditId]`) groups by item category; pass/fail/na + notes + photo per item.
+- Complete → severity-weighted score (critical 4 / high 3 / medium 2 / low 1; any critical fail caps at 79), RAG (red <50, amber <80, green ≥80), status `completed` or **`requires_action`** when ≥1 fail (counts as completed everywhere), `next_audit_due` advances by frequency.
+- Project audit list: `/health-safety/project/[projectId]/audits`.
 
-### H&S Audit Workflow
+### 2. Incidents
+- Report at `/health-safety/incidents/new` (`?project_id=` pre-selects). POST `/api/health-safety/incidents` creates a maintenance ticket (`createTicket` with **created_by = authed user uuid** — NOT NULL) + `hs_ticket_details` row; on details-insert failure the ticket is deleted (shim = no transactions).
+- List `/health-safety/incidents` (payload shape `{data:{incidents,...}}`), detail `/health-safety/incidents/[id]` via `GET /api/health-safety/incidents/[incidentId]`.
+- Severity vocab in live data: `critical|major|moderate|minor` (type decls also mention `fatal` — vocabulary unification pending).
 
-Projects can be audited for H&S compliance:
-- Audit triggered via project detail page (H&S tab)
-- Checklist of safety requirements assessed
-- Compliance score calculated (% of requirements met)
-- Audit history maintained for trend analysis
+### 3. Risk register
+`/projects/health-safety/risks` — 5×5 matrix, `hs_risk_register` with GENERATED risk_score/risk_level columns, reviews table.
 
-### Incident Tracking
+### 4. CAPA
+`/projects/health-safety/capa` (+ `[id]` detail with comments + status form). Server enforces `CAPA_STATUS_TRANSITIONS` in `capa/[capaId].ts`.
 
-Safety incidents logged with:
-- Incident type (near-miss, minor, major, lost-time)
-- Date and location
-- Description and root cause analysis
-- Corrective actions
-- Follow-up verification
+### 5. Contractor compliance + gate
+- Docs/compliance/gate under `/api/health-safety/contractor/[contractorId]/…` — contractor ids are **uuid strings** end-to-end.
+- Assignment gate (`pages/api/contractors-projects.ts`): failed verdict → 403 with `gate_check`; gate **error** → assignment proceeds **fail-open** with `log.error` + `gate_check.error` in the 201 (fail-closed is a pending product decision).
+- Checklist admin: `/health-safety/checklists` (+ `/new`, `/[id]` editor with item CRUD).
 
-### Regulatory Compliance
+## Database (12 live tables — live schema is authoritative)
 
-Tracks jurisdiction-specific H&S requirements:
-- South African OHSA (Occupational Health and Safety Act)
-- Industry-specific standards (fiber optics, telecommunications)
-- Municipal/provincial regulations
-- Client-specific safety requirements
+`hs_checklist_templates`, `hs_checklist_items` (44-item seed — migration sql/450; docs that said 48 were wrong), `hs_project_config` (UNIQUE project_id; template_id NULL = all-categories scope), `hs_project_audits`, `hs_audit_responses`, `hs_contractor_compliance` (UNIQUE contractor_id + score/gate columns — sql/449), `hs_contractor_documents` (created by sql/449), `hs_ticket_details` (extends maintenance_tickets, **no FK** — 6 pre-remediation orphan rows kept as evidence), `hs_activity_log`, `hs_corrective_actions`, `hs_capa_comments`, `hs_risk_register` + `hs_risk_register_reviews`.
 
-## Database
+**Landmines**
+- `hs_activity_log` live columns are `activity_type/entity_type/entity_id/user_id(int)/description/metadata` — the migration-113-era `action/actor_id/details` never existed live. Write ONLY through `logHsActivity()` (`src/modules/health-safety/services/activityLog.ts`), always AFTER the main write; it never throws.
+- `maintenance_tickets.project_id` is TEXT (`p.id::text = t.project_id`), `contractor_id` uuid (`c.id = t.contractor_id`). HSE filter is `source_type IN ('hse_incident','hse_near_miss')` — NOT `ticket_type`.
+- `hs_activity_log.user_id` is a legacy INTEGER; app users are uuid → user recorded in `metadata.user_id/user_email`.
+- Legacy `scripts/migrations/113_health_safety_module.sql` was regenerated from live (2026-07-23) for scratch rebuilds — **never run it against live** (unguarded seed duplicates templates). Rebuild proof: `bash scripts/hs-scratch-rebuild-proof.sh`.
 
-### Tables
-- `h_and_s_audits` — Audit records with date, project_id, compliance_score, auditor
-- `h_and_s_incidents` — Incident log (type, severity, date, location, description)
-- `h_and_s_corrective_actions` — Actions taken in response to incidents/audits
-- `h_and_s_compliance_requirements` — Jurisdiction/industry requirements checklist
-- `h_and_s_audit_history` — Historical audit trends by project
+## Reminders cron
 
-## Components
+`POST /api/cron/hs-audit-reminders` (header `x-cron-secret: $CRON_SECRET`, fail-closed): creates/refreshes one Action Item per overdue active config (dedupe on `source_type='hs_audit_overdue'`, `source_id=config.id`, open status) and auto-completes items no longer overdue. Suggested crontab (velo, install gated): `40 6 * * 1-6 curl -s -X POST -H "x-cron-secret: $CRON_SECRET" http://localhost:3005/api/cron/hs-audit-reminders`
 
-| Component | Purpose |
-|-----------|---------|
-| H&S Tab (project detail) | Display audit status, recent incidents, compliance score |
-| Audit Modal | Trigger audit, fill checklist, calculate score |
-| Incident Form | Log new safety incident with severity classification |
-| Compliance Dashboard | Organization-wide H&S metrics and trends |
-| Corrective Action Tracker | Monitor and close corrective actions |
+## Gate check logic
 
-## Hooks
+Blockers: missing/expired/rejected/pending required docs (`safety_policy`, `liability_insurance`, `safety_plan`), critical/major/fatal incident in 12 months, overall score < 50, training score < 70 **only when training data exists** (NULL doesn't block). Weights: docs 25 / incidents 30 / training 15 / CAPA 15 / audits 15.
 
-- `useHSAudits()` — Fetch project's audit history
-- `useHSIncidents()` — Fetch incidents for a project or time period
-- `useComplianceStatus()` — Get current compliance score and status
-- `useCorrectiveActions()` — Track open corrective actions
+## History / deferred
 
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/projects/[projectId]/h-and-s/summary` | H&S status for project |
-| GET | `/api/projects/[projectId]/h-and-s/audits` | Audit history |
-| POST | `/api/projects/[projectId]/h-and-s/audits` | Create new audit |
-| GET | `/api/projects/[projectId]/h-and-s/incidents` | Incident log |
-| POST | `/api/projects/[projectId]/h-and-s/incidents` | Report incident |
-| GET | `/api/h-and-s/compliance-requirements` | List requirements by jurisdiction |
-| PATCH | `/api/projects/[projectId]/h-and-s/corrective-actions/[id]` | Update corrective action status |
-
-## Severity Levels
-
-| Level | Threshold | Action |
-|-------|-----------|--------|
-| **Green** | 90%+ compliance | Routine monitoring |
-| **Yellow** | 70–89% compliance | Improvement plan required |
-| **Red** | <70% compliance | Project halt / remediation required |
-
-## Recent Changes
-
-- **Feb 2026:** Enhanced H&S integration into project detail wayleaves tab
-- **Feb 2026:** Dark theme compliance fixes (dark variants added)
-- **Jan 2026:** Core H&S module created with audit workflow
+- 2026-07-23 remediation fixed: empty-wizard root cause, activity-log schema drift (phantom-write 500s), incident created_by 23502, contractor uuid/parseInt + dead `tickets` refs, all 404 pages, checklist editor, migration reproducibility, reminders cron. Dead code deleted: ContractorHSTab, InvestigationPanel/FiveWhysForm, investigate API, calculateAuditScore.
+- Deferred (Phases 4–9 of the Mar 2026 plan + more): training matrix, toolbox talks/DSTI, PPE issuance, permit-to-work, digital safety file, LTIFR/DIFR analytics, e-signatures, Annexure 3 / s16(2) letters, offline PWA capture, journey management, H&S RBAC, fail-closed gate.
 
 ## Related
-
-- `/projects` — Project module (H&S tab integrated)
-- `/skills/modules/incident-management.md` — Incident management procedures
-- `docs/REGULATORY-COMPLIANCE.md` — Detailed regulatory requirements by jurisdiction
+- `src/modules/health-safety/.claude.md` — quick reference (auto-loaded)
+- `.claude/skills/hns/SKILL.md` — /hns operational skill
+- `docs/plans/health-safety-e2e-goal.md` — the remediation plan/audit findings
