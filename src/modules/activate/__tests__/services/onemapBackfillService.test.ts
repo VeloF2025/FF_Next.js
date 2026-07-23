@@ -10,7 +10,9 @@ vi.mock('@/lib/logger', () => ({
 import { describe, it, expect, vi } from 'vitest';
 import { decidePhotoWrite, extractOntSerial } from '../../services/onemapBackfillService';
 import {
+  buildAgedOutQuery,
   buildCandidateQuery,
+  IN_SCOPE_FROM,
   LOOKBACK_WINDOW,
   RETRY_COOLDOWN,
 } from '../../services/onemapBackfillQueries';
@@ -84,6 +86,47 @@ describe('buildCandidateQuery', () => {
   it('preserves the pre-existing zero-photo modes', () => {
     expect(buildCandidateQuery('missing_photos')).toContain('photo_count = 0');
     expect(buildCandidateQuery('missing_serials')).toContain('ont_serial_scanned IS NULL');
+  });
+});
+
+describe('buildAgedOutQuery', () => {
+  const q = buildAgedOutQuery();
+
+  it('counts rows confirmed short, at any age', () => {
+    expect(q).toContain('photo_count_mismatch = TRUE');
+  });
+
+  it('ALSO counts in-scope rows the cron never reached before they aged out', () => {
+    // The blind spot this closes: photo_count_mismatch defaults to FALSE and is
+    // only written for a row that was actually attempted. A row the cron never
+    // got to keeps mismatch=FALSE and verified_at=NULL, so counting only
+    // mismatch would make it invisible to the selector AND the metric the
+    // moment it left the window.
+    expect(q).toContain('photo_count_verified_at IS NULL');
+    expect(q).toMatch(/photo_count_mismatch = TRUE\s*OR/);
+  });
+
+  it('excludes pre-go-live rows, whose null verified_at is an artifact not a backlog', () => {
+    expect(q).toContain(`TIMESTAMPTZ '${IN_SCOPE_FROM}'`);
+  });
+
+  it('binds the go-live guard to the never-verified arm ONLY', () => {
+    // A confirmed shortfall is worth reporting at any vintage, so the cutoff
+    // must not gate arm 1. Proven by exclusion, not just by position: nothing
+    // before the never-verified arm may mention the cutoff.
+    const armStart = q.indexOf('photo_count_verified_at IS NULL');
+    expect(armStart).toBeGreaterThan(-1);
+    expect(q.slice(0, armStart)).not.toContain(IN_SCOPE_FROM);
+    expect(q.slice(armStart)).toContain(`TIMESTAMPTZ '${IN_SCOPE_FROM}'`);
+  });
+
+  it('pins the cutoff to SAST midnight — the DB session runs in UTC', () => {
+    expect(IN_SCOPE_FROM).toMatch(/\+02:00$/);
+    expect(q).toContain('TIMESTAMPTZ');
+  });
+
+  it('only looks outside the lookback window — in-window rows are still retryable', () => {
+    expect(q).toContain(`created_at <= NOW() - INTERVAL '${LOOKBACK_WINDOW}'`);
   });
 });
 
