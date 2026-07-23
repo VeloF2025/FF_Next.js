@@ -17,7 +17,7 @@ export * from './types';
 export * from './constants/sa-regulations';
 
 // Services
-export { calculateContractorHSScore, calculateAuditScore } from './services/scoringService';
+export { calculateContractorHSScore } from './services/scoringService';
 export {
   checkContractorGate,
   batchCheckGate,
@@ -26,4 +26,4 @@ export {
 } from './services/gateService';
 
 // Components
-export { ProjectHSTab, ContractorHSTab, AuditWizard } from './components';
+export { ProjectHSTab, AuditWizard } from './components';

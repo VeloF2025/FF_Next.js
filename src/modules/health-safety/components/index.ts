@@ -5,7 +5,6 @@
  */
 
 export { ProjectHSTab } from './ProjectHSTab';
-export { ContractorHSTab } from './ContractorHSTab';
 export { AuditWizard } from './AuditWizard';
 export { ContractorHSGrid } from './ContractorHSGrid';
 export { ProjectIncidentsSection } from './ProjectIncidentsSection';

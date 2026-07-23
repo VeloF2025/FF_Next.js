@@ -180,7 +180,7 @@ export function ProjectHSTab({
         </button>
 
         <button
-          onClick={() => window.location.href = `/health-safety/incidents?project_id=${projectId}`}
+          onClick={() => window.location.href = `/health-safety/incidents/new?project_id=${projectId}`}
           className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary dark:hover:bg-gray-600 text-foreground rounded-lg transition-colors"
         >
           <AlertTriangle className="w-4 h-4" />
