@@ -43,6 +43,8 @@ export function ProjectHSTab({
   onConfigureHS,
 }: ProjectHSTabProps) {
   const [_showConfigModal, setShowConfigModal] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [startingAudit, setStartingAudit] = useState(false);
 
   // Fetch project H&S config
   const { data: configData, error: configError, mutate: _mutateConfig } = useSWR(
@@ -69,6 +71,9 @@ export function ProjectHSTab({
     }
 
     // Default: create audit and redirect
+    if (startingAudit) return;
+    setStartingAudit(true);
+    setAuditError(null);
     try {
       const res = await fetch(`/api/health-safety/project/${projectId}/audits`, {
         method: 'POST',
@@ -79,13 +84,18 @@ export function ProjectHSTab({
       if (res.ok) {
         const data = await res.json();
         mutateAudits();
-        // Could navigate to audit wizard here
         window.location.href = `/health-safety/audits/${data.data.id}`;
+      } else {
+        const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        setAuditError(err?.error?.message || 'Failed to start audit');
       }
     } catch (err) {
       log.error('Failed to create audit', { error: err, projectId }, 'ProjectHSTab');
+      setAuditError('Failed to start audit — network error');
+    } finally {
+      setStartingAudit(false);
     }
-  }, [projectId, onStartAudit, mutateAudits]);
+  }, [projectId, onStartAudit, mutateAudits, startingAudit]);
 
   if (isLoading) {
     return (
@@ -151,13 +161,21 @@ export function ProjectHSTab({
         </div>
       </div>
 
+      {/* Start-audit error (e.g. empty audit scope) */}
+      {auditError && (
+        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
+          {auditError}
+        </div>
+      )}
+
       {/* Quick Actions */}
       <div className="flex gap-3">
         <button
           onClick={handleStartAudit}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
+          disabled={startingAudit}
+          className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors disabled:opacity-50"
         >
-          <Plus className="w-4 h-4" />
+          {startingAudit ? <InlineSpinner size="sm" /> : <Plus className="w-4 h-4" />}
           Start New Audit
         </button>
 
@@ -243,7 +261,16 @@ function NotConfiguredState({
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [auditScope, setAuditScope] = useState('');
   const [auditFrequency, setAuditFrequency] = useState('weekly');
+
+  // Templates for the audit-scope select (only ones with items are seedable)
+  const { data: tplData } = useSWR(showForm ? '/api/health-safety/checklists' : null, fetcher);
+  const templates = (tplData?.data?.templates || []) as {
+    id: string;
+    name: string;
+    item_count: number;
+  }[];
   const [minScore, setMinScore] = useState('80');
   const [dailyBriefing, setDailyBriefing] = useState(true);
   const [heightWork, setHeightWork] = useState(false);
@@ -260,6 +287,7 @@ function NotConfiguredState({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          template_id: auditScope || null,
           audit_frequency: auditFrequency,
           min_score_threshold: parseInt(minScore) || 80,
           requires_daily_briefing: dailyBriefing,
@@ -272,8 +300,8 @@ function NotConfiguredState({
       });
 
       if (!res.ok) {
-        const err = await res.json().catch((_e: unknown) => ({ error: 'Unknown error' }));
-        throw new Error(err.error || 'Failed to save H&S configuration');
+        const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(err?.error?.message || 'Failed to save H&S configuration');
       }
 
       if (onConfigured) onConfigured();
@@ -322,6 +350,30 @@ function NotConfiguredState({
       )}
 
       <div className="space-y-4">
+        {/* Audit Scope */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Audit Scope
+          </label>
+          <select
+            value={auditScope}
+            onChange={(e) => setAuditScope(e.target.value)}
+            className="ff-input w-full"
+          >
+            <option value="">All categories (default)</option>
+            {templates
+              .filter((t) => t.item_count > 0)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.item_count} items)
+                </option>
+              ))}
+          </select>
+          <p className="text-xs text-muted-foreground mt-1">
+            Audits cover every active checklist template unless restricted to one.
+          </p>
+        </div>
+
         {/* Audit Frequency */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">

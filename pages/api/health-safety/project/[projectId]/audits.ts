@@ -9,8 +9,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -99,7 +100,7 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
     site_personnel_count,
   } = req.body;
 
-  // Verify project exists and has H&S config
+  // Verify project exists and read the configured audit scope
   const [project] = await sql`
     SELECT p.id, p.project_name, c.template_id
     FROM projects p
@@ -109,6 +110,31 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
 
   if (!project) {
     return apiResponse.notFound(res, 'Project', projectId);
+  }
+
+  // Audit scope (D1): a configured template_id restricts the audit to that
+  // template (even if since deactivated — an explicit pin wins); otherwise
+  // the audit covers ALL active templates that have items. Count seedable
+  // items BEFORE creating the audit — an empty wizard must never be created.
+  const countRows = project.template_id
+    ? await sql`
+        SELECT COUNT(*)::int AS count
+        FROM hs_checklist_items
+        WHERE template_id = ${project.template_id}
+      `
+    : await sql`
+        SELECT COUNT(*)::int AS count
+        FROM hs_checklist_items i
+        JOIN hs_checklist_templates t ON t.id = i.template_id
+        WHERE t.is_active = true
+      `;
+  const itemCount = (countRows[0] as { count: number }).count;
+
+  if (itemCount === 0) {
+    return apiResponse.badRequest(
+      res,
+      'No checklist items available for this audit scope. Add items to the configured template, or activate templates that have items, before starting an audit.'
+    );
   }
 
   // Create audit
@@ -130,36 +156,69 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
   `;
   const audit = auditRows[0]!;
 
-  // If template exists, pre-populate responses with 'not_checked'
-  if (project.template_id) {
-    const items = await sql`
-      SELECT id, category, severity, is_mandatory
-      FROM hs_checklist_items
-      WHERE template_id = ${project.template_id}
-      ORDER BY sort_order
-    `;
-
-    for (const item of items) {
-      await sql`
-        INSERT INTO hs_audit_responses (audit_id, checklist_item_id, response)
-        VALUES (${audit.id}, ${item.id}, 'not_checked')
-      `;
+  // Seed responses in one statement. RETURNING makes the row count
+  // authoritative — the pre-count above can go stale if templates/items
+  // change between the two queries, and an INSERT from an empty SELECT does
+  // not throw. Zero seeded rows is treated exactly like a seed failure: the
+  // audit is removed so no empty audit is left behind (no shim transactions).
+  let seededCount = 0;
+  try {
+    const seeded = project.template_id
+      ? await sql`
+          INSERT INTO hs_audit_responses (audit_id, checklist_item_id, response)
+          SELECT ${audit.id}, i.id, 'not_checked'
+          FROM hs_checklist_items i
+          WHERE i.template_id = ${project.template_id}
+          RETURNING id
+        `
+      : await sql`
+          INSERT INTO hs_audit_responses (audit_id, checklist_item_id, response)
+          SELECT ${audit.id}, i.id, 'not_checked'
+          FROM hs_checklist_items i
+          JOIN hs_checklist_templates t ON t.id = i.template_id
+          WHERE t.is_active = true
+          RETURNING id
+        `;
+    seededCount = seeded.length;
+    if (seededCount === 0) {
+      throw new Error('Audit scope produced zero checklist items at seed time');
     }
+  } catch (seedError) {
+    log.error('[H&S Project Audits API] Response seeding failed — rolling back audit', {
+      auditId: audit.id,
+      error: seedError,
+    });
+    try {
+      await sql`DELETE FROM hs_audit_responses WHERE audit_id = ${audit.id}`;
+      await sql`DELETE FROM hs_project_audits WHERE id = ${audit.id}`;
+    } catch (cleanupError) {
+      log.error('[H&S Project Audits API] Failed to clean up audit after seed failure', {
+        auditId: audit.id,
+        cleanupError,
+      });
+    }
+    return apiResponse.internalError(res, seedError);
   }
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (activity_type, entity_type, entity_id, description, metadata)
-    VALUES ('audit_created', 'project_audit', ${audit.id}::uuid, ${'New audit started'}, ${JSON.stringify({
+  await logHsActivity({
+    activityType: 'audit_created',
+    entityType: 'project_audit',
+    entityId: audit.id as string,
+    description: 'New audit started',
+    metadata: {
       project_id: projectId,
       project_name: project.project_name,
       audit_type,
-    })}::jsonb)
-  `;
+      seeded_items: seededCount,
+      scope: project.template_id ? 'template' : 'all_active_templates',
+    },
+    user: getAuthUser(req),
+  });
 
   return apiResponse.created(res, {
     ...audit,
     project_name: project.project_name,
+    seeded_items: seededCount,
   });
 }
 
