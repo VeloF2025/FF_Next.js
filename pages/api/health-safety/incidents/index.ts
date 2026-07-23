@@ -101,7 +101,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   if (project_id && contractor_id && severity && status && dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -113,7 +113,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && contractor_id && severity && status) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -125,7 +125,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && contractor_id && severity && dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -137,7 +137,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && contractor_id && status && dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -149,7 +149,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && contractor_id && severity) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -161,7 +161,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && contractor_id && status) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -173,7 +173,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && contractor_id && dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -185,7 +185,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && contractor_id) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -196,7 +196,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && severity && status && dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -208,7 +208,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && severity && status) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -219,7 +219,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && severity) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -230,7 +230,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id && status) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -241,7 +241,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -251,7 +251,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (contractor_id && severity && status && dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -263,7 +263,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (contractor_id && severity && status) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -274,7 +274,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (contractor_id && severity) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -285,7 +285,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (contractor_id && status) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -296,7 +296,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (contractor_id) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -306,7 +306,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (severity && status && dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -317,7 +317,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (severity && status) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -328,7 +328,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (severity) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -338,7 +338,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (status && dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -349,7 +349,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (status) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -359,7 +359,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (dolFilter) {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
@@ -369,7 +369,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else {
     incidents = await sql`
       SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
-             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.incident_date, hd.location, hd.dol_reportable,
              hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
       FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
       LEFT JOIN projects p ON p.id::text = t.project_id
