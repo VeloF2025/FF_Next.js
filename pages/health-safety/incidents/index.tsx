@@ -31,7 +31,8 @@ function IncidentsListContent() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const { data, error, isLoading } = useSWR('/api/health-safety/incidents', fetcher);
-  const incidents = Array.isArray(data?.data) ? data.data : [];
+  // API shape: { success, data: { incidents, total, stats } }
+  const incidents = Array.isArray(data?.data?.incidents) ? data.data.incidents : [];
 
   // Filter incidents
   const filteredIncidents = incidents.filter((incident: any) => {
