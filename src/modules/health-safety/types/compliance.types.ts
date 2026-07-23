@@ -22,7 +22,7 @@ export type DocumentStatus = 'pending' | 'valid' | 'expired' | 'rejected' | 'exp
 // Contractor H&S Compliance record
 export interface HSContractorCompliance {
   id: string;
-  contractor_id: number;
+  contractor_id: string;
   overall_score: number;
   rag_status: RAGStatus;
   document_score: number;
@@ -40,7 +40,7 @@ export interface HSContractorCompliance {
   updated_at: string;
   // Joined data
   contractor?: {
-    id: number;
+    id: string;
     company_name: string;
   };
 }
@@ -48,15 +48,15 @@ export interface HSContractorCompliance {
 // Contractor H&S Document
 export interface HSContractorDocument {
   id: string;
-  contractor_id: number;
+  contractor_id: string;
   document_type: HSDocumentType;
-  document_name: string;
+  file_name: string | null;
   file_url: string | null;
   file_size: number | null;
   issue_date: string | null;
   expiry_date: string | null;
   is_verified: boolean;
-  verified_by: number | null;
+  verified_by: string | null;
   verified_at: string | null;
   status: DocumentStatus;
   rejection_reason: string | null;
@@ -64,13 +64,13 @@ export interface HSContractorDocument {
   created_at: string;
   updated_at: string;
   // Joined data
-  verifier?: { id: number; full_name: string };
+  verifier?: { id: string; full_name: string };
 }
 
 export interface HSContractorDocumentInput {
-  contractor_id: number;
+  contractor_id: string;
   document_type: HSDocumentType;
-  document_name: string;
+  file_name?: string;
   file_url?: string;
   file_size?: number;
   issue_date?: string;
@@ -81,7 +81,7 @@ export interface HSContractorDocumentInput {
 // Gate check result
 export interface GateCheckResult {
   can_assign: boolean;
-  contractor_id: number;
+  contractor_id: string;
   overall_score: number;
   rag_status: RAGStatus;
   blockers: string[];

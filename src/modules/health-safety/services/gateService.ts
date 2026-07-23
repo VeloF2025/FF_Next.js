@@ -28,7 +28,7 @@ const sql = neon(process.env.DATABASE_URL!);
  * - Audit overdue
  * - Documents expiring soon
  */
-export async function checkContractorGate(contractorId: number): Promise<GateCheckResult> {
+export async function checkContractorGate(contractorId: string): Promise<GateCheckResult> {
   const blockers: string[] = [];
   const warnings: string[] = [];
 
@@ -61,7 +61,7 @@ export async function checkContractorGate(contractorId: number): Promise<GateChe
 
   // Check incidents
   const majorIncidents = recentIncidents.filter(
-    (i) => i.severity === 'major' || i.severity === 'fatal'
+    (i) => i.severity === 'major' || i.severity === 'critical' || i.severity === 'fatal'
   );
   if (majorIncidents.length > 0) {
     blockers.push(`${majorIncidents.length} major/fatal incident(s) in last 12 months`);
@@ -77,8 +77,8 @@ export async function checkContractorGate(contractorId: number): Promise<GateChe
     warnings.push(`H&S score (${overallScore}%) below recommended (70%)`);
   }
 
-  // Check training score
-  if (compliance.training_score < 70) {
+  // Check training score (null = no training data yet — do not block on absence)
+  if (compliance.training_score != null && compliance.training_score < 70) {
     blockers.push(`Training compliance (${compliance.training_score}%) below minimum (70%)`);
   }
 
@@ -128,7 +128,7 @@ export async function checkContractorGate(contractorId: number): Promise<GateChe
 /**
  * Get or create compliance record for contractor
  */
-async function getOrCreateCompliance(contractorId: number) {
+async function getOrCreateCompliance(contractorId: string) {
   const existing = await sql`
     SELECT * FROM hs_contractor_compliance
     WHERE contractor_id = ${contractorId}
@@ -152,15 +152,14 @@ async function getOrCreateCompliance(contractorId: number) {
 /**
  * Get contractor H&S documents
  */
-async function getContractorDocuments(contractorId: number) {
+async function getContractorDocuments(contractorId: string) {
   return await sql`
     SELECT
       id,
       document_type,
-      document_name,
+      file_name,
       status,
-      expiry_date,
-      is_verified
+      expiry_date
     FROM hs_contractor_documents
     WHERE contractor_id = ${contractorId}
     ORDER BY document_type
@@ -170,18 +169,18 @@ async function getContractorDocuments(contractorId: number) {
 /**
  * Get recent H&S incidents (tickets) for contractor
  */
-async function getRecentIncidents(contractorId: number) {
+async function getRecentIncidents(contractorId: string) {
   return await sql`
     SELECT
       t.id,
       t.ticket_uid,
-      htd.hs_severity as severity,
-      htd.hs_incident_type as incident_type,
+      htd.severity,
+      htd.incident_type,
       t.created_at
-    FROM tickets t
+    FROM maintenance_tickets t
     JOIN hs_ticket_details htd ON htd.ticket_id = t.id
-    WHERE t.assigned_contractor_id = ${contractorId.toString()}
-    AND t.ticket_type IN ('hse_incident', 'hse_near_miss')
+    WHERE t.contractor_id = ${contractorId}
+    AND t.source_type IN ('hse_incident', 'hse_near_miss')
     AND t.created_at >= NOW() - INTERVAL '12 months'
     ORDER BY t.created_at DESC
   `;
@@ -191,7 +190,7 @@ async function getRecentIncidents(contractorId: number) {
  * Update gate status in compliance record
  */
 async function updateGateStatus(
-  contractorId: number,
+  contractorId: string,
   canAssign: boolean,
   blockers: string[],
   warnings: string[]
@@ -212,9 +211,9 @@ async function updateGateStatus(
  * Batch check gate status for multiple contractors
  */
 export async function batchCheckGate(
-  contractorIds: number[]
-): Promise<Map<number, GateCheckResult>> {
-  const results = new Map<number, GateCheckResult>();
+  contractorIds: string[]
+): Promise<Map<string, GateCheckResult>> {
+  const results = new Map<string, GateCheckResult>();
 
   // Process in parallel for efficiency
   await Promise.all(
@@ -230,7 +229,7 @@ export async function batchCheckGate(
 /**
  * Quick gate check - returns just pass/fail without full details
  */
-export async function quickGateCheck(contractorId: number): Promise<boolean> {
+export async function quickGateCheck(contractorId: string): Promise<boolean> {
   const compliance = await sql`
     SELECT is_gate_approved FROM hs_contractor_compliance
     WHERE contractor_id = ${contractorId}
@@ -250,7 +249,7 @@ export async function quickGateCheck(contractorId: number): Promise<boolean> {
  * Get contractors blocked by H&S gate
  */
 export async function getBlockedContractors(): Promise<
-  { contractor_id: number; company_name: string; blockers: string[] }[]
+  { contractor_id: string; company_name: string; blockers: string[] }[]
 > {
   const rows = await sql`
     SELECT
@@ -263,7 +262,7 @@ export async function getBlockedContractors(): Promise<
     ORDER BY c.company_name
   `;
   return rows.map(r => ({
-    contractor_id: Number(r.contractor_id),
+    contractor_id: String(r.contractor_id),
     company_name: String(r.company_name),
     blockers: Array.isArray(r.blockers) ? r.blockers.map(String) : [],
   }));

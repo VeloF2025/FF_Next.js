@@ -38,8 +38,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.notFound(res, 'Contractor', contractorId);
     }
 
-    // Run gate check
-    const gateResult = await checkContractorGate(parseInt(contractorId));
+    // Run gate check (contractor ids are uuids)
+    const gateResult = await checkContractorGate(contractorId);
 
     // Get detailed breakdown for UI
     const breakdown = await getGateBreakdown(contractorId);
@@ -97,10 +97,10 @@ async function getGateBreakdown(contractorId: string) {
     SELECT
       COUNT(*) FILTER (WHERE hd.severity = 'critical' AND t.created_at > NOW() - INTERVAL '6 months')::int as recent_critical,
       COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as unresolved
-    FROM tickets t
+    FROM maintenance_tickets t
     LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
     WHERE t.contractor_id = ${contractorId}
-    AND t.ticket_type IN ('hse_incident', 'hse_near_miss')
+    AND t.source_type IN ('hse_incident', 'hse_near_miss')
   `;
 
   const incidentsPassed =

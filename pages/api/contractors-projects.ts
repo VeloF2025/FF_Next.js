@@ -226,9 +226,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // H&S Gate Check — block assignment if contractor fails compliance
+    // H&S Gate Check — block assignment if contractor fails compliance.
+    // A gate ERROR (not a failed verdict) stays fail-open by product decision,
+    // but must be loud and visible in the response — never silent.
+    let gateCheck: {
+      can_assign: boolean;
+      blockers: string[];
+      warnings: string[];
+      error?: string;
+    } | null = null;
     try {
-      const gateResult = await checkContractorGate(parseInt(contractorId));
+      const gateResult = await checkContractorGate(contractorId);
+      gateCheck = {
+        can_assign: gateResult.can_assign,
+        blockers: gateResult.blockers,
+        warnings: gateResult.warnings,
+      };
       if (!gateResult.can_assign) {
         log.warn('[Contractor Assignment] Gate check failed', {
           contractorId,
@@ -238,16 +251,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         return res.status(403).json({
           success: false,
           error: 'H&S compliance requirements not met',
-          gate_check: {
-            can_assign: false,
-            blockers: gateResult.blockers,
-            warnings: gateResult.warnings,
-          },
+          gate_check: gateCheck,
         });
       }
     } catch (gateError) {
-      // Gate check failure should not block assignment — log and continue
-      log.warn('[Contractor Assignment] Gate check error (non-blocking)', { gateError });
+      log.error('[Contractor Assignment] H&S gate check ERRORED — assignment proceeding fail-open', {
+        contractorId,
+        projectId,
+        gateError,
+      });
+      gateCheck = {
+        can_assign: true,
+        blockers: [],
+        warnings: ['H&S gate check could not be evaluated — assignment allowed fail-open'],
+        error: gateError instanceof Error ? gateError.message : String(gateError),
+      };
     }
 
     // Create assignment
@@ -289,7 +307,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return res.status(201).json({
       success: true,
       data: mapped,
-      message: 'Contractor assignment created successfully'
+      gate_check: gateCheck,
+      message: gateCheck?.error
+        ? 'Contractor assignment created (H&S gate could not be evaluated — fail-open)'
+        : gateCheck && gateCheck.warnings.length > 0
+          ? `Contractor assignment created with H&S warnings: ${gateCheck.warnings.join('; ')}`
+          : 'Contractor assignment created successfully'
     });
 
   } catch (error: any) {

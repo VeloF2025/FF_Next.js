@@ -52,12 +52,13 @@ async function handleGet(ticketId: string, res: NextApiResponse) {
     SELECT
       t.*,
       hd.*,
+      t.source_type AS ticket_type,
       p.project_name,
       c.company_name as contractor_name,
-      s.full_name as assigned_to_name
-    FROM tickets t
+      s.name as assigned_to_name
+    FROM maintenance_tickets t
     LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    LEFT JOIN projects p ON p.id = t.project_id
+    LEFT JOIN projects p ON p.id::text = t.project_id
     LEFT JOIN contractors c ON c.id = t.contractor_id
     LEFT JOIN staff s ON s.id = t.assigned_to
     WHERE t.id = ${ticketId}
@@ -79,14 +80,15 @@ async function handleGet(ticketId: string, res: NextApiResponse) {
     ? {
         started_at: ticket.investigation_started_at,
         completed_at: ticket.investigation_completed_at,
-        lead: ticket.investigation_lead,
+        lead: ticket.investigated_by,
         findings: ticket.investigation_findings,
         root_cause: ticket.root_cause,
       }
     : null;
 
-  // Get corrective actions
-  const correctiveActions = ticket.corrective_actions || [];
+  // Corrective actions live in hs_corrective_actions (CAPA module) — this
+  // legacy field never existed on hs_ticket_details; return an empty list.
+  const correctiveActions: unknown[] = [];
 
   // Get injured persons
   const injuredPersons = ticket.injured_persons || [];
@@ -166,7 +168,7 @@ async function handlePut(ticketId: string, req: NextApiRequest, res: NextApiResp
   // Get existing ticket
   const [existing] = await sql`
     SELECT t.*, hd.id as hs_details_id
-    FROM tickets t
+    FROM maintenance_tickets t
     LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
     WHERE t.id = ${ticketId}
   `;
@@ -205,10 +207,8 @@ async function handlePut(ticketId: string, req: NextApiRequest, res: NextApiResp
       witnesses = COALESCE(${witnesses ? JSON.stringify(witnesses) : null}::jsonb, witnesses),
       investigation_started_at = COALESCE(${investigation?.started_at}, investigation_started_at),
       investigation_completed_at = COALESCE(${investigation?.completed_at}, investigation_completed_at),
-      investigation_lead = COALESCE(${investigation?.lead}, investigation_lead),
       investigation_findings = COALESCE(${investigation?.findings}, investigation_findings),
       root_cause = COALESCE(${investigation?.root_cause}, root_cause),
-      corrective_actions = COALESCE(${corrective_actions ? JSON.stringify(corrective_actions) : null}::jsonb, corrective_actions),
       updated_at = NOW()
     WHERE ticket_id = ${ticketId}
   `;
@@ -216,7 +216,7 @@ async function handlePut(ticketId: string, req: NextApiRequest, res: NextApiResp
   // Update main ticket if priority changed
   if (newPriority !== existing.priority) {
     await sql`
-      UPDATE tickets
+      UPDATE maintenance_tickets
       SET priority = ${newPriority}, updated_at = NOW()
       WHERE id = ${ticketId}
     `;
@@ -257,7 +257,7 @@ async function handlePost(ticketId: string, req: NextApiRequest, res: NextApiRes
   // Get existing ticket
   const [existing] = await sql`
     SELECT t.*, hd.id as hs_details_id
-    FROM tickets t
+    FROM maintenance_tickets t
     LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
     WHERE t.id = ${ticketId}
   `;
@@ -296,7 +296,7 @@ async function handlePost(ticketId: string, req: NextApiRequest, res: NextApiRes
   // Update ticket priority based on severity
   const priority = SEVERITY_TO_PRIORITY[severity as keyof typeof SEVERITY_TO_PRIORITY] || 'medium';
   await sql`
-    UPDATE tickets
+    UPDATE maintenance_tickets
     SET priority = ${priority}, updated_at = NOW()
     WHERE id = ${ticketId}
   `;
