@@ -54,10 +54,10 @@ async function handleGet(ticketId: string, res: NextApiResponse) {
       hd.*,
       p.project_name,
       c.company_name as contractor_name,
-      s.full_name as assigned_to_name
-    FROM tickets t
+      s.name as assigned_to_name
+    FROM maintenance_tickets t
     LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    LEFT JOIN projects p ON p.id = t.project_id
+    LEFT JOIN projects p ON p.id::text = t.project_id
     LEFT JOIN contractors c ON c.id = t.contractor_id
     LEFT JOIN staff s ON s.id = t.assigned_to
     WHERE t.id = ${ticketId}
@@ -166,7 +166,7 @@ async function handlePut(ticketId: string, req: NextApiRequest, res: NextApiResp
   // Get existing ticket
   const [existing] = await sql`
     SELECT t.*, hd.id as hs_details_id
-    FROM tickets t
+    FROM maintenance_tickets t
     LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
     WHERE t.id = ${ticketId}
   `;
@@ -216,7 +216,7 @@ async function handlePut(ticketId: string, req: NextApiRequest, res: NextApiResp
   // Update main ticket if priority changed
   if (newPriority !== existing.priority) {
     await sql`
-      UPDATE tickets
+      UPDATE maintenance_tickets
       SET priority = ${newPriority}, updated_at = NOW()
       WHERE id = ${ticketId}
     `;
@@ -257,7 +257,7 @@ async function handlePost(ticketId: string, req: NextApiRequest, res: NextApiRes
   // Get existing ticket
   const [existing] = await sql`
     SELECT t.*, hd.id as hs_details_id
-    FROM tickets t
+    FROM maintenance_tickets t
     LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
     WHERE t.id = ${ticketId}
   `;
@@ -296,7 +296,7 @@ async function handlePost(ticketId: string, req: NextApiRequest, res: NextApiRes
   // Update ticket priority based on severity
   const priority = SEVERITY_TO_PRIORITY[severity as keyof typeof SEVERITY_TO_PRIORITY] || 'medium';
   await sql`
-    UPDATE tickets
+    UPDATE maintenance_tickets
     SET priority = ${priority}, updated_at = NOW()
     WHERE id = ${ticketId}
   `;

@@ -83,14 +83,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         -- Count open incidents for this contractor
         (
           SELECT COUNT(*)
-          FROM tickets t
+          FROM maintenance_tickets t
           JOIN hs_ticket_details htd ON htd.ticket_id = t.id
-          WHERE t.assigned_contractor_id = c.id::text
+          WHERE t.contractor_id = c.id
+            AND t.source_type IN ('hse_incident', 'hse_near_miss')
             AND t.status NOT IN ('closed', 'cancelled')
         )::int AS open_incidents
       FROM contractor_projects cp
       JOIN contractors c ON c.id = cp.contractor_id
-      LEFT JOIN hs_contractor_compliance hcc ON hcc.contractor_id = c.id::int
+      LEFT JOIN hs_contractor_compliance hcc ON hcc.contractor_id = c.id
       WHERE cp.project_id = ${projectId}
         AND cp.is_active = true
         AND cp.assignment_status IN ('assigned', 'active')

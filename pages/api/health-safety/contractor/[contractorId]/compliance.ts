@@ -58,7 +58,7 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
 
   // Get documents
   const documents = await sql`
-    SELECT id, contractor_id, document_type, document_name, file_url,
+    SELECT id, contractor_id, document_type, file_name, file_url,
            status, expiry_date, created_at, updated_at
     FROM hs_contractor_documents
     WHERE contractor_id = ${contractorId}
@@ -71,16 +71,16 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
   ).length;
   const totalRequiredDocs = 5; // letter_of_good_standing, liability_insurance, safety_plan, etc.
 
-  // Get incident stats (from maintenance tickets with H&S types)
+  // Get incident stats (from maintenance tickets with H&S source types)
   const [incidentStats] = await sql`
     SELECT
       COUNT(*) FILTER (WHERE t.created_at > NOW() - INTERVAL '12 months')::int as total_incidents,
       COUNT(*) FILTER (WHERE hd.severity = 'critical' AND t.created_at > NOW() - INTERVAL '12 months')::int as critical_incidents,
       COUNT(*) FILTER (WHERE t.status = 'open' OR t.status = 'in_progress')::int as open_incidents
-    FROM tickets t
+    FROM maintenance_tickets t
     LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
     WHERE t.contractor_id = ${contractorId}
-    AND t.ticket_type IN ('hse_incident', 'hse_near_miss')
+    AND t.source_type IN ('hse_incident', 'hse_near_miss')
   `;
 
   // Get training status (simplified - would need actual training tracking)
@@ -94,26 +94,25 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
   const validTraining = Object.values(trainingStatus).filter(Boolean).length;
   const totalTraining = 4;
 
-  // Get corrective actions
+  // Get corrective actions (CAPA module owns these since migration 235)
   const [caStats] = await sql`
     SELECT
-      COUNT(*) FILTER (WHERE t.status != 'closed')::int as open_actions,
-      COUNT(*) FILTER (WHERE t.status = 'closed')::int as closed_actions,
-      COUNT(*) FILTER (WHERE t.status != 'closed' AND t.due_date < NOW())::int as overdue_actions
-    FROM tickets t
-    LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    WHERE t.contractor_id = ${contractorId}
-    AND hd.corrective_action_required = true
+      COUNT(*) FILTER (WHERE ca.status != 'closed')::int as open_actions,
+      COUNT(*) FILTER (WHERE ca.status = 'closed')::int as closed_actions,
+      COUNT(*) FILTER (WHERE ca.status != 'closed' AND ca.due_date < NOW())::int as overdue_actions
+    FROM hs_corrective_actions ca
+    WHERE ca.contractor_id = ${contractorId}
   `;
 
-  // Get recent audits (from project audits where contractor was involved)
+  // Get recent audits on projects the contractor is assigned to
+  // (projects has no contractor_id column; contractor_projects is the link)
   const [auditStats] = await sql`
     SELECT
-      AVG(overall_score)::int as average_audit_score,
+      AVG(a.overall_score)::int as average_audit_score,
       COUNT(*)::int as total_audits
     FROM hs_project_audits a
-    JOIN projects p ON p.id = a.project_id
-    WHERE p.contractor_id = ${contractorId}
+    JOIN contractor_projects cp ON cp.project_id = a.project_id
+    WHERE cp.contractor_id = ${contractorId}
     AND a.status IN ('completed', 'requires_action')
     AND a.audit_date > NOW() - INTERVAL '12 months'
   `;

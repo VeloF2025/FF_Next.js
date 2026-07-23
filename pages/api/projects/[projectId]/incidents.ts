@@ -52,13 +52,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const project = projectResult[0] as { id: string; project_name: string };
     const limitNum = Math.min(parseInt(String(limit), 10) || 50, 100);
 
-    // Fetch incidents from tickets table where:
-    // 1. Project incidents (project_id = projectId AND ticket_type IN H&S types)
-    // 2. Contractor incidents (assigned_contractor_id is a contractor assigned to this project)
+    // Fetch H&S incidents from maintenance_tickets (live schema; the old
+    // "tickets" table and hs_* column names were renamed long ago — response
+    // field names are preserved via aliases for the UI):
+    // 1. Project incidents (t.project_id = projectId, source_type IN H&S types)
+    // 2. Contractor incidents (t.contractor_id assigned to this project)
     const incidentsResult = await sql`
       WITH project_contractors AS (
         SELECT
-          c.id::text AS contractor_id,
+          c.id AS contractor_id,
           c.company_name
         FROM contractor_projects cp
         JOIN contractors c ON c.id = cp.contractor_id
@@ -67,16 +69,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       )
       SELECT
         t.id,
-        t.ticket_type,
+        t.source_type AS ticket_type,
         t.title,
         t.status,
         t.priority,
         t.created_at,
-        htd.hs_incident_type,
-        htd.hs_severity,
+        htd.incident_type AS hs_incident_type,
+        htd.severity AS hs_severity,
         htd.incident_date,
-        htd.incident_location,
-        COALESCE(htd.is_dol_reportable, false) AS is_dol_reportable,
+        htd.location AS incident_location,
+        COALESCE(htd.dol_reportable, false) AS is_dol_reportable,
         CASE
           WHEN t.project_id = ${projectId} THEN 'project'
           ELSE 'contractor'
@@ -85,17 +87,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHEN t.project_id = ${projectId} THEN ${project.project_name}
           ELSE pc.company_name
         END AS source_name,
-        t.assigned_contractor_id AS contractor_id,
+        t.contractor_id,
         t.project_id
-      FROM tickets t
+      FROM maintenance_tickets t
       LEFT JOIN hs_ticket_details htd ON htd.ticket_id = t.id
-      LEFT JOIN project_contractors pc ON pc.contractor_id = t.assigned_contractor_id
-      WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+      LEFT JOIN project_contractors pc ON pc.contractor_id = t.contractor_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
         AND (
           t.project_id = ${projectId}
-          OR t.assigned_contractor_id IN (SELECT contractor_id FROM project_contractors)
+          OR t.contractor_id IN (SELECT contractor_id FROM project_contractors)
         )
-      ORDER BY COALESCE(htd.incident_date, t.created_at) DESC
+      ORDER BY COALESCE(htd.incident_date, t.created_at::date) DESC, t.created_at DESC
       LIMIT ${limitNum}
     `;
 
