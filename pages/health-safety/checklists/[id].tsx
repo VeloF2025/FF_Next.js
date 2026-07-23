@@ -34,7 +34,8 @@ interface TemplateData {
   description: string | null;
   is_active: boolean;
   is_default?: boolean;
-  items: EditableChecklistItem[];
+  // regulation_reference is nullable at the API boundary; normalized to '' on load
+  items: Array<Omit<EditableChecklistItem, 'regulation_reference'> & { regulation_reference: string | null }>;
 }
 
 function ChecklistEditorContent() {
@@ -42,7 +43,7 @@ function ChecklistEditorContent() {
   const { id } = router.query;
   const templateId = typeof id === 'string' ? id : undefined;
 
-  const { data, error, isLoading } = useSWR(
+  const { data, error, isLoading, mutate } = useSWR(
     templateId ? `/api/health-safety/checklists/${templateId}` : null,
     fetcher,
     { revalidateOnFocus: false }
@@ -58,13 +59,15 @@ function ChecklistEditorContent() {
   const [items, setItems] = useState<EditableChecklistItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   // Copy server data into editable state once, on first successful load.
   useEffect(() => {
     if (template && !loaded) {
       setName(template.name);
       setDescription(template.description || '');
-      setItems(template.items || []);
+      // regulation_reference can be NULL from the DB — controlled inputs need ''
+      setItems((template.items || []).map((it) => ({ ...it, regulation_reference: it.regulation_reference ?? '' })));
       setLoaded(true);
     }
   }, [template, loaded]);
@@ -86,6 +89,8 @@ function ChecklistEditorContent() {
         const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
         throw new Error(err?.error?.message || 'Failed to save checklist template');
       }
+      setSavedAt(Date.now());
+      await mutate();
     } catch (err) {
       log.error('Failed to save checklist template', { error: err, templateId });
       setSaveError(err instanceof Error ? err.message : 'Failed to save checklist template');
@@ -190,6 +195,9 @@ function ChecklistEditorContent() {
         >
           Cancel
         </Link>
+        {savedAt && !saving && !saveError && (
+          <span className="text-sm text-green-500">✓ Saved</span>
+        )}
       </div>
     </div>
   );

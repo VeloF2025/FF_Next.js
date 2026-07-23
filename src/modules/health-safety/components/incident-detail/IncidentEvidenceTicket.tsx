@@ -42,7 +42,11 @@ export function IncidentEvidenceTicket({ incident }: { incident: IncidentDetail 
           <ul className="list-disc list-inside space-y-1">
             {witnesses.map((w, i) => (
               <li key={i} className="text-sm text-[var(--ff-text-primary)]">
-                {typeof w === 'string' ? w : JSON.stringify(w)}
+                {typeof w === 'string'
+                  ? w
+                  : (w as { name?: string; contact?: string }).name
+                    ? `${(w as { name?: string; contact?: string }).name}${(w as { contact?: string }).contact ? ` (${(w as { contact?: string }).contact})` : ''}`
+                    : JSON.stringify(w)}
               </li>
             ))}
           </ul>
