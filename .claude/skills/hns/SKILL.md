@@ -1,188 +1,117 @@
 ---
 name: hns
-description: Health and Safety management for FibreFlow. Incidents, checklists, compliance tracking, overdue alerts. USE WHEN user says '/hns', 'health and safety', 'H&S', 'safety incident', 'H&S checklist', 'overdue checklist', 'safety compliance', 'open incidents', 'incident report'.
+description: Health and Safety management for FibreFlow. Audits, incidents, risks, CAPA, contractor gate, overdue alerts. USE WHEN user says '/hns', 'health and safety', 'H&S', 'safety incident', 'H&S audit', 'overdue audit', 'safety compliance', 'open incidents', 'incident report', 'CAPA', 'risk register'.
 ---
-
 
 # /hns — Health & Safety Agent
 
-Manages H&S compliance across all FibreFlow projects: incidents, checklists, and compliance reporting.
+Manages H&S compliance across FibreFlow projects: audits, incidents, risks, CAPA, contractor compliance. Full reference: `.claude/modules/health-safety.md`.
 
 ## Quick Reference
 
 | Item | Value |
 |------|-------|
-| **UI** | `/health-safety` |
-| **Checklists** | `/health-safety/checklists` |
-| **Incidents** | `/health-safety/incidents` |
-| **New Incident** | `/health-safety/incidents/new` |
+| **Dashboard** | `/projects/health-safety` |
+| **Incidents** | `/health-safety/incidents` (+`/new`, `/[id]`) |
+| **Checklists** | `/health-safety/checklists` (+`/new`, `/[id]` editor) |
+| **Risks / CAPA** | `/projects/health-safety/risks` · `/projects/health-safety/capa` |
+| **Audit wizard** | `/health-safety/audits/[auditId]` |
+| **Project tab** | `/projects/[id]?tab=health-safety` |
 
-## Common Tasks
-
-### Check Open Incidents
-```sql
--- All open incidents (not closed)
-SELECT
-  i.id,
-  i.incident_type,
-  i.severity,
-  i.description,
-  i.location,
-  i.reported_by,
-  i.created_at,
-  p.name as project
-FROM health_safety_incidents i
-LEFT JOIN projects p ON i.project_id = p.id
-WHERE i.status != 'closed'
-ORDER BY
-  CASE i.severity
-    WHEN 'critical' THEN 1
-    WHEN 'high' THEN 2
-    WHEN 'medium' THEN 3
-    WHEN 'low' THEN 4
-    ELSE 5
-  END,
-  i.created_at DESC;
-
--- Critical incidents requiring immediate action
-SELECT * FROM health_safety_incidents
-WHERE severity = 'critical' AND status = 'open';
-
--- Incidents by project this month
-SELECT
-  p.name as project,
-  i.severity,
-  COUNT(*) as count
-FROM health_safety_incidents i
-JOIN projects p ON i.project_id = p.id
-WHERE i.created_at >= DATE_TRUNC('month', CURRENT_DATE)
-GROUP BY p.name, i.severity
-ORDER BY p.name, count DESC;
-```
-
-### Check Overdue Checklists
-```sql
--- Checklists due today or overdue (not completed)
-SELECT
-  c.id,
-  c.checklist_type,
-  c.due_date,
-  c.assigned_to,
-  p.name as project,
-  CURRENT_DATE - c.due_date as days_overdue
-FROM health_safety_checklists c
-LEFT JOIN projects p ON c.project_id = p.id
-WHERE c.status != 'completed'
-  AND c.due_date <= CURRENT_DATE
-ORDER BY c.due_date ASC;
-
--- Completion rate by project
-SELECT
-  p.name as project,
-  COUNT(*) as total_checklists,
-  SUM(CASE WHEN c.status = 'completed' THEN 1 ELSE 0 END) as completed,
-  ROUND(
-    100.0 * SUM(CASE WHEN c.status = 'completed' THEN 1 ELSE 0 END) / COUNT(*),
-    1
-  ) as completion_pct
-FROM health_safety_checklists c
-JOIN projects p ON c.project_id = p.id
-WHERE c.due_date >= CURRENT_DATE - INTERVAL '30 days'
-GROUP BY p.name
-ORDER BY completion_pct ASC;
-```
-
-### Generate Safety Report
-```sql
--- Monthly safety summary
-SELECT
-  DATE_TRUNC('month', created_at) as month,
-  COUNT(*) as total_incidents,
-  SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical,
-  SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) as high,
-  SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) as medium,
-  SUM(CASE WHEN severity = 'low' THEN 1 ELSE 0 END) as low,
-  SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as resolved
-FROM health_safety_incidents
-WHERE created_at >= CURRENT_DATE - INTERVAL '12 months'
-GROUP BY month
-ORDER BY month DESC;
-```
-
-## DB Tables
+## DB Tables (live — see module doc for landmines)
 
 | Table | Purpose |
 |-------|---------|
-| `health_safety_incidents` | Incident reports |
-| `health_safety_checklists` | Scheduled compliance checklists |
-| `health_safety_checklist_items` | Individual checklist line items |
+| `hs_project_config` | Per-project audit config (template_id NULL = all-categories scope) |
+| `hs_project_audits` + `hs_audit_responses` | Audits + per-item answers |
+| `hs_checklist_templates` + `hs_checklist_items` | 8 templates, 44-item seed |
+| `maintenance_tickets` + `hs_ticket_details` | Incidents (`source_type IN ('hse_incident','hse_near_miss')`) |
+| `hs_risk_register` (+`_reviews`) | Risk register (generated score columns) |
+| `hs_corrective_actions` + `hs_capa_comments` | CAPA |
+| `hs_contractor_compliance` + `hs_contractor_documents` | Contractor gate inputs |
+| `hs_activity_log` | Audit trail (`activity_type/description/metadata` — NOT action/details) |
 
-## Incident Severity Levels
+## Common Tasks
 
-| Level | Response Time | Description |
-|-------|--------------|-------------|
-| `critical` | Immediate | Life-threatening, stop work |
-| `high` | Same day | Serious injury risk |
-| `medium` | 48 hours | Moderate risk |
-| `low` | 7 days | Minor, no immediate danger |
+### Open incidents
+```sql
+SELECT t.ticket_uid, t.title, hd.severity, hd.location, t.status, t.created_at, p.project_name
+FROM maintenance_tickets t
+JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+LEFT JOIN projects p ON p.id::text = t.project_id
+WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+  AND t.status NOT IN ('closed', 'resolved')
+ORDER BY CASE hd.severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END,
+         t.created_at DESC;
+```
 
-## Incident Statuses
+### Overdue audits
+```sql
+SELECT p.project_name, c.audit_frequency, c.next_audit_due::date,
+       (NOW()::date - c.next_audit_due::date) AS days_overdue
+FROM hs_project_config c
+JOIN projects p ON p.id = c.project_id
+WHERE c.is_active AND c.next_audit_due < NOW()
+ORDER BY c.next_audit_due;
+```
 
-| Status | Description |
-|--------|-------------|
-| `open` | Reported, under investigation |
-| `investigating` | Active investigation |
-| `remediated` | Fix applied, monitoring |
-| `closed` | Fully resolved and documented |
+### Audit results (last 90 days)
+```sql
+SELECT p.project_name, a.audit_date::date, a.status, a.overall_score, a.rag_status,
+       (SELECT count(*) FILTER (WHERE r.response='fail') FROM hs_audit_responses r WHERE r.audit_id=a.id) AS fails
+FROM hs_project_audits a
+JOIN projects p ON p.id = a.project_id
+WHERE a.status IN ('completed','requires_action')  -- requires_action IS completed (with actions)
+  AND a.audit_date > NOW() - INTERVAL '90 days'
+ORDER BY a.audit_date DESC;
+```
 
-## Checklist Types
+### Open CAPA / risk summary
+```sql
+SELECT ca.title, ca.severity, ca.status, ca.due_date,
+       (ca.status NOT IN ('closed') AND ca.due_date < NOW()::date) AS overdue
+FROM hs_corrective_actions ca WHERE ca.status != 'closed' ORDER BY ca.due_date;
 
-Typically includes:
-- **Pre-work safety checks** — Before starting on site
-- **Daily toolbox talks** — Daily safety briefings
-- **PPE compliance** — Personal Protective Equipment checks
-- **Equipment inspection** — Tool and machinery checks
-- **Site sign-off** — End of day site clearance
+SELECT risk_level, count(*) FROM hs_risk_register WHERE status='active' GROUP BY 1;
+```
 
-## API Endpoints
+### Contractor gate state
+```sql
+SELECT c.company_name, hcc.overall_score, hcc.rag_status, hcc.is_gate_approved,
+       hcc.gate_blockers, hcc.calculated_at
+FROM hs_contractor_compliance hcc
+JOIN contractors c ON c.id = hcc.contractor_id
+ORDER BY hcc.overall_score NULLS FIRST;
+```
+
+## API Endpoints (all withAuth)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/health-safety/incidents` | List incidents |
-| POST | `/api/health-safety/incidents` | Create incident |
-| PATCH | `/api/health-safety/incidents/[id]` | Update incident |
-| GET | `/api/health-safety/checklists` | List checklists |
-| POST | `/api/health-safety/checklists` | Create checklist |
-| PATCH | `/api/health-safety/checklists/[id]` | Complete checklist |
+| GET | `/api/health-safety/dashboard` | Aggregated metrics incl. overdue audits |
+| GET/POST | `/api/health-safety/incidents` (+ GET `/[incidentId]`) | Incidents |
+| GET/POST | `/api/health-safety/project/[projectId]/audits` | Create seeds responses; 400 on empty scope |
+| GET/PUT | `/api/health-safety/audits/[auditId]` | Wizard responses + completion scoring |
+| GET/PUT | `/api/health-safety/project/[projectId]/config` | Config; template_id null = all categories |
+| GET/POST/PUT/DELETE | `/api/health-safety/checklists` (+`/[id]`) | Template + item CRUD |
+| GET/POST + PUT | `/api/health-safety/capa` (+`/[capaId]`) | CAPA; server-enforced transitions |
+| GET/POST | `/api/health-safety/risks` | Risk register |
+| GET/PUT | `/api/health-safety/contractor/[contractorId]/{compliance,documents,gate-check}` | uuid ids |
+| POST | `/api/cron/hs-audit-reminders` | `x-cron-secret` header; Action Items for overdue audits |
 
-## Compliance Reporting
+## Severity / status vocab (live data)
 
-```sql
--- Contractor compliance summary
-SELECT
-  c.company_name,
-  COUNT(i.id) as incidents,
-  COUNT(DISTINCT ch.id) as checklists_assigned,
-  SUM(CASE WHEN ch.status = 'completed' THEN 1 ELSE 0 END) as checklists_done
-FROM contractors c
-LEFT JOIN health_safety_incidents i ON i.contractor_id = c.id
-  AND i.created_at >= CURRENT_DATE - INTERVAL '30 days'
-LEFT JOIN health_safety_checklists ch ON ch.contractor_id = c.id
-  AND ch.due_date >= CURRENT_DATE - INTERVAL '30 days'
-GROUP BY c.company_name
-ORDER BY incidents DESC;
-```
+- Incident severity: `critical` / `major` / `moderate` / `minor`
+- Audit status: `in_progress` / `completed` / `requires_action` (= completed with fails) / `cancelled`
+- Audit RAG: red <50 · amber 50–79 · green ≥80 (critical fail caps score at 79)
 
 ## Troubleshooting
 
-### Missing Incident Data
-- Check that `project_id` is set on all incidents
-- Verify contractor linking if contractor-specific reports needed
-
-### Overdue Alerts Not Showing
-- Confirm `due_date` column is populated on checklists
-- Verify UI filter is not excluding past-due items
+- **Audit wizard 0 items**: fixed 2026-07-23 — creation now 400s if the scope has no items. Check `hs_checklist_templates.is_active` + item counts.
+- **Risk/CAPA "Failed" toast but row saved**: was the hs_activity_log schema drift — fixed; all writes go through `logHsActivity()`. If it recurs, check that no code writes `action/actor_id/details` columns.
+- **Contractor endpoints 500**: ids are uuid — any `parseInt(contractorId)` reintroduction breaks them.
+- **Incident POST 500**: `created_by` must be threaded to `createTicket` (NOT NULL uuid).
 
 ## Related
-- `.claude/modules/projects.md` — Project context
-- `.claude/modules/contractors.md` — Contractor compliance tracking
+- `.claude/modules/health-safety.md` — full module reference
+- `docs/plans/health-safety-e2e-goal.md` — 2026-07-23 remediation plan
