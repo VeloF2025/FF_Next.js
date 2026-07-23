@@ -9,7 +9,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { calculateContractorHSScore } from '@/modules/health-safety/services/scoringService';
 import type { HSScoreInput } from '@/modules/health-safety/types/scoring.types';
 
@@ -229,14 +230,14 @@ async function handlePut(contractorId: string, req: NextApiRequest, res: NextApi
   // Recalculate score
   await recalculateComplianceScore(contractorId);
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('contractor_compliance', ${compliance.id}, 'updated', ${JSON.stringify({
-      contractor_id: contractorId,
-      company_name: contractor.company_name,
-    })}::jsonb)
-  `;
+  await logHsActivity({
+    activityType: 'contractor_compliance_updated',
+    entityType: 'contractor_compliance',
+    entityId: compliance.id as string,
+    description: `Contractor compliance updated: ${contractor.company_name}`,
+    metadata: { contractor_id: contractorId },
+    user: getAuthUser(req),
+  });
 
   return apiResponse.success(res, compliance);
 }

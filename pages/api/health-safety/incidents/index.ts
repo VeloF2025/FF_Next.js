@@ -11,7 +11,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import {
   INCIDENT_TYPE_CONFIG,
   SEVERITY_TO_PRIORITY,
@@ -617,6 +618,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const autoTitle =
     title || `${incidentConfig?.label || incident_type} - ${location || 'Unknown location'}`;
 
+  // Live maintenance_tickets.created_by is NOT NULL — thread the authenticated user
+  const user = getAuthUser(req);
+
   // Create maintenance ticket via standard service with HS- prefix
   const ticket = await createTicket({
     uid_prefix: 'HS',
@@ -630,44 +634,65 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     project_id: project_id || undefined,
     assigned_contractor_id: contractor_id || undefined,
     assigned_to: assigned_to || undefined,
+    created_by: user?.id,
   });
 
-  // Create H&S details (linked by ticket.id)
-  await sql`
-    INSERT INTO hs_ticket_details (
-      ticket_id, incident_type, severity, incident_date, incident_time,
-      location, description, immediate_actions, dol_reportable,
-      corrective_action_required, photos, injured_persons, witnesses
-    ) VALUES (
-      ${ticket.id},
-      ${incident_type},
-      ${severity},
-      ${incident_date || new Date().toISOString().split('T')[0]},
-      ${incident_time || null},
-      ${location || null},
-      ${description || null},
-      ${immediate_actions || null},
-      ${isDolReportable},
-      ${corrective_action_required},
-      ${photos ? JSON.stringify(photos) : '[]'}::jsonb,
-      ${injured_persons ? JSON.stringify(injured_persons) : '[]'}::jsonb,
-      ${witnesses ? JSON.stringify(witnesses) : '[]'}::jsonb
-    )
-  `;
+  // Create H&S details (linked by ticket.id). The Neon shim cannot run
+  // transactions, so on failure delete the just-created ticket rather than
+  // leave a ticket with no H&S details behind.
+  try {
+    await sql`
+      INSERT INTO hs_ticket_details (
+        ticket_id, incident_type, severity, incident_date, incident_time,
+        location, description, immediate_actions, dol_reportable,
+        corrective_action_required, photos, injured_persons, witnesses
+      ) VALUES (
+        ${ticket.id},
+        ${incident_type},
+        ${severity},
+        ${incident_date || new Date().toISOString().split('T')[0]},
+        ${incident_time || null},
+        ${location || null},
+        ${description || null},
+        ${immediate_actions || null},
+        ${isDolReportable},
+        ${corrective_action_required},
+        ${photos ? JSON.stringify(photos) : '[]'}::jsonb,
+        ${injured_persons ? JSON.stringify(injured_persons) : '[]'}::jsonb,
+        ${witnesses ? JSON.stringify(witnesses) : '[]'}::jsonb
+      )
+    `;
+  } catch (detailsError) {
+    log.error('[H&S Incidents API] Details insert failed — rolling back ticket', {
+      ticketId: ticket.id,
+      error: detailsError,
+    });
+    try {
+      await sql`DELETE FROM maintenance_tickets WHERE id = ${ticket.id}`;
+    } catch (cleanupError) {
+      log.error('[H&S Incidents API] Failed to clean up ticket after details insert failure', {
+        ticketId: ticket.id,
+        cleanupError,
+      });
+    }
+    return apiResponse.internalError(res, detailsError);
+  }
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('hs_incident', ${ticket.id}, 'reported', ${JSON.stringify({
-      ticket_id: ticket.id,
+  await logHsActivity({
+    activityType: 'incident_reported',
+    entityType: 'hs_incident',
+    entityId: ticket.id,
+    description: `Incident reported: ${autoTitle}`,
+    metadata: {
       ticket_uid: ticket.ticket_uid,
       incident_type,
       severity,
       dol_reportable: isDolReportable,
       project_id,
       contractor_id,
-    })}::jsonb)
-  `;
+    },
+    user,
+  });
 
   // Get full incident record
   const [incident] = await sql`

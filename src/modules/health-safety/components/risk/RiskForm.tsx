@@ -36,7 +36,7 @@ function getRiskLevel(l: number, s: number): RiskLevel {
 export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [projects, setProjects] = useState<{ id: string; project_name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState({
@@ -133,8 +133,8 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
         }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to create risk');
+        const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(err?.error?.message || 'Failed to create risk');
       }
       onSuccess();
     } catch (err) {
@@ -180,7 +180,7 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
               <label className={labelClass}>Project</label>
               <select value={form.project_id} onChange={(e) => set('project_id', e.target.value)} className={inputClass}>
                 <option value="">— All projects —</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>

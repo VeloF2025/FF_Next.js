@@ -8,8 +8,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -62,7 +63,8 @@ async function handleGet(ticketId: string, res: NextApiResponse) {
 
 // POST: Assign investigator / start investigation
 async function handlePost(ticketId: string, req: NextApiRequest, res: NextApiResponse) {
-  const userId = (req as any).userId || null;
+  const user = getAuthUser(req);
+  const userId = user?.id ?? null;
   const { investigated_by } = req.body;
 
   const assignee = investigated_by || userId;
@@ -81,19 +83,22 @@ async function handlePost(ticketId: string, req: NextApiRequest, res: NextApiRes
     return apiResponse.notFound(res, 'H&S ticket details', ticketId);
   }
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, actor_id, details)
-    VALUES ('hs_incident', ${ticketId}, 'investigation_started', ${userId},
-      ${JSON.stringify({ investigated_by: assignee })}::jsonb)
-  `;
+  await logHsActivity({
+    activityType: 'investigation_started',
+    entityType: 'hs_incident',
+    entityId: ticketId,
+    description: 'Incident investigation started',
+    metadata: { investigated_by: assignee },
+    user,
+  });
 
   return apiResponse.success(res, updated);
 }
 
 // PUT: Update investigation findings, complete, and optionally create CAPAs
 async function handlePut(ticketId: string, req: NextApiRequest, res: NextApiResponse) {
-  const userId = (req as any).userId || null;
+  const user = getAuthUser(req);
+  const userId = user?.id ?? null;
   const {
     root_cause,
     root_cause_method,
@@ -156,16 +161,17 @@ async function handlePut(ticketId: string, req: NextApiRequest, res: NextApiResp
     }
   }
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, actor_id, details)
-    VALUES ('hs_incident', ${ticketId},
-      ${complete ? 'investigation_completed' : 'investigation_updated'}, ${userId},
-      ${JSON.stringify({
-        root_cause_method,
-        capas_created: createdCapas.length,
-      })}::jsonb)
-  `;
+  await logHsActivity({
+    activityType: complete ? 'investigation_completed' : 'investigation_updated',
+    entityType: 'hs_incident',
+    entityId: ticketId,
+    description: complete ? 'Incident investigation completed' : 'Incident investigation updated',
+    metadata: {
+      root_cause_method,
+      capas_created: createdCapas.length,
+    },
+    user,
+  });
 
   return apiResponse.success(res, {
     investigation: updated,

@@ -10,7 +10,8 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -120,11 +121,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('checklist_template', ${template.id}, 'created', ${JSON.stringify({ name, category })}::jsonb)
-  `;
+  await logHsActivity({
+    activityType: 'checklist_template_created',
+    entityType: 'checklist_template',
+    entityId: template.id as string,
+    description: `Checklist template created: ${name}`,
+    metadata: { category },
+    user: getAuthUser(req),
+  });
 
   return apiResponse.created(res, template);
 }

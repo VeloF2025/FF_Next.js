@@ -9,7 +9,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { DOCUMENT_TYPES, REQUIRED_DOCUMENTS } from '@/modules/health-safety/types/compliance.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -220,16 +221,19 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
   `;
   const document = documentRows[0]!;
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('contractor_document', ${document.id}, 'created', ${JSON.stringify({
+  await logHsActivity({
+    activityType: 'contractor_document_created',
+    entityType: 'contractor_document',
+    entityId: document.id as string,
+    description: `Contractor document uploaded: ${document_type}`,
+    metadata: {
       contractor_id: contractorId,
       company_name: contractor.company_name,
       document_type,
       file_name,
-    })}::jsonb)
-  `;
+    },
+    user: getAuthUser(req),
+  });
 
   return apiResponse.created(res, {
     ...document,

@@ -4,10 +4,10 @@
 
 import { MapPin } from 'lucide-react';
 
-/** Slim project option for incident location form dropdown */
+/** Slim project option for incident location form dropdown (/api/projects returns `name`) */
 interface ProjectOption {
-  id: number;
-  project_name: string;
+  id: string | number;
+  name: string;
 }
 
 interface Contractor {
@@ -57,7 +57,7 @@ export function IncidentLocationFields({
             <option value="">— Select project —</option>
             {projects.map((p) => (
               <option key={p.id} value={String(p.id)}>
-                {p.project_name}
+                {p.name}
               </option>
             ))}
           </select>

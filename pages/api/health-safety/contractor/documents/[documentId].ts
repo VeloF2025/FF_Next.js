@@ -9,7 +9,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
 import { log } from '@/lib/logger';
 
@@ -29,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'PUT':
         return handlePut(documentId, req, res);
       case 'DELETE':
-        return handleDelete(documentId, res);
+        return handleDelete(documentId, req, res);
       default:
         return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
     }
@@ -114,17 +115,21 @@ async function handlePut(documentId: string, req: NextApiRequest, res: NextApiRe
   `;
   const document = documentRows[0]!;
 
-  // Log activity
   const action = status === 'valid' ? 'verified' : status === 'rejected' ? 'rejected' : 'updated';
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, actor_id, details)
-    VALUES ('contractor_document', ${documentId}, ${action}, ${verified_by || null}, ${JSON.stringify({
+  await logHsActivity({
+    activityType: `contractor_document_${action}`,
+    entityType: 'contractor_document',
+    entityId: documentId,
+    description: `Contractor document ${action}: ${existing.document_type}`,
+    metadata: {
       contractor_id: existing.contractor_id,
       company_name: existing.company_name,
       document_type: existing.document_type,
       status: newStatus,
-    })}::jsonb)
-  `;
+      verified_by: verified_by || null,
+    },
+    user: getAuthUser(req),
+  });
 
   return apiResponse.success(res, {
     ...document,
@@ -132,7 +137,7 @@ async function handlePut(documentId: string, req: NextApiRequest, res: NextApiRe
   });
 }
 
-async function handleDelete(documentId: string, res: NextApiResponse) {
+async function handleDelete(documentId: string, req: NextApiRequest, res: NextApiResponse) {
   // Get existing document
   const [existing] = await sql`
     SELECT d.*, c.company_name
@@ -148,16 +153,19 @@ async function handleDelete(documentId: string, res: NextApiResponse) {
   // Delete document
   await sql`DELETE FROM hs_contractor_documents WHERE id = ${documentId}`;
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('contractor_document', ${documentId}, 'deleted', ${JSON.stringify({
+  await logHsActivity({
+    activityType: 'contractor_document_deleted',
+    entityType: 'contractor_document',
+    entityId: documentId,
+    description: `Contractor document deleted: ${existing.document_type}`,
+    metadata: {
       contractor_id: existing.contractor_id,
       company_name: existing.company_name,
       document_type: existing.document_type,
       file_name: existing.file_name,
-    })}::jsonb)
-  `;
+    },
+    user: getAuthUser(req),
+  });
 
   return apiResponse.success(res, { message: 'Document deleted', id: documentId });
 }
