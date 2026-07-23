@@ -149,8 +149,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       AND rag_status IS NOT NULL
       ORDER BY project_id, audit_date DESC`,
 
-      // Total configured projects
-      sql`SELECT COUNT(*)::int as count FROM hs_project_config`,
+      // Total configured projects — must count the same population the
+      // overdue/upcoming lists draw from (active config on a project that
+      // still exists). A bare COUNT(*) reported 8 while only 5 projects were
+      // configured, inflating the denominator with deactivated and
+      // deleted-project rows.
+      sql`SELECT COUNT(*)::int as count
+      FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
+      WHERE pc.is_active = true`,
     ]);
 
     const hasTickets = ticketsTableExists[0]?.exists;

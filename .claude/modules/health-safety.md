@@ -45,7 +45,15 @@ SA-compliant (OHS Act / Construction Regulations) H&S management: project audit 
 
 ## Reminders cron
 
-`POST /api/cron/hs-audit-reminders` (header `x-cron-secret: $CRON_SECRET`, fail-closed): creates/refreshes one Action Item per overdue active config (dedupe on `source_type='hs_audit_overdue'`, `source_id=config.id`, open status) and auto-completes items no longer overdue. Suggested crontab (velo, install gated): `40 6 * * 1-6 curl -s -X POST -H "x-cron-secret: $CRON_SECRET" http://localhost:3005/api/cron/hs-audit-reminders`
+`POST /api/cron/hs-audit-reminders` (header `x-cron-secret: $CRON_SECRET`, fail-closed): creates/refreshes one Action Item per overdue active config (dedupe on `source_type='hs_audit_overdue'`, `source_id=config.id`, open status) and auto-completes items no longer overdue.
+
+**Scheduled** since 2026-07-24 via `scripts/cron-hs-audit-reminders.sh` (flock, prod→dev probe, `CRON_SECRET` read from the deploy `.env.local` — never hardcoded). Live entry in the `velo` crontab:
+
+```
+40 6 * * 1-6 /home/velo/fibreflow-dev/scripts/cron-hs-audit-reminders.sh >> /home/velo/logs/hs-audit-reminders.log 2>&1
+```
+
+The script targets **production** whenever `localhost:3000/api/health` answers and only falls back to dev — the dev path is just where the file lives (dev deploys are ungated). Repoint to `/home/velo/fibreflow-production/scripts/` at the next production deploy.
 
 ## Gate check logic
 
@@ -53,6 +61,7 @@ Blockers: missing/expired/rejected/pending required docs (`safety_policy`, `liab
 
 ## History / deferred
 
+- 2026-07-24 (Phase 0 close-out): 8 stranded audits cancelled (`backfill-hs-audit-scope.ts --execute`); 3 zombie `hs_project_config` rows for deleted projects deactivated — dashboard overdue now equals the plain-SQL count (5 == 5, was 5 vs 8); reminders cron scheduled and observed firing; dashboard `total_projects_configured` fixed (counted 8 unfiltered config rows while only 5 projects are configured). `hs_ticket_details` was **entirely** demo residue — all 6 rows orphaned, zero non-orphan rows.
 - 2026-07-23 remediation fixed: empty-wizard root cause, activity-log schema drift (phantom-write 500s), incident created_by 23502, contractor uuid/parseInt + dead `tickets` refs, all 404 pages, checklist editor, migration reproducibility, reminders cron. Dead code deleted: ContractorHSTab, InvestigationPanel/FiveWhysForm, investigate API, calculateAuditScore.
 - Deferred (Phases 4–9 of the Mar 2026 plan + more): training matrix, toolbox talks/DSTI, PPE issuance, permit-to-work, digital safety file, LTIFR/DIFR analytics, e-signatures, Annexure 3 / s16(2) letters, offline PWA capture, journey management, H&S RBAC, fail-closed gate.
 
