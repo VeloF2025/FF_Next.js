@@ -28,6 +28,23 @@
 
 import { Pool } from 'pg';
 
+/**
+ * The exact 8 stranded audits, identified in the 2026-07-23 audit and pinned
+ * by id so the script can never catch a legitimate audit started after the
+ * seeding fix shipped. The Thembisa audit has 5 responses — it is still one
+ * of the 8 the plan proposes to abandon (§8.2), included deliberately.
+ */
+const STRANDED_AUDIT_IDS = [
+  'faf10bd8-e27d-4e9f-8045-ac56bd1c23c6', // Thembisa POP 1, 2026-03-31, 5 responses
+  '86eebc08-5070-4f53-9d07-57f927226e21', // Phalaborwa - Ben Farm, 2026-06-22
+  '8179b708-fe4b-4df8-a274-a4f5696a4cc6', // Phalaborwa - Ben Farm, 2026-06-22
+  'a445fa0d-2d7f-48ef-912d-4d4c289502dd', // Mahikeng, 2026-07-13
+  '924bb2b8-1f7b-4ed3-ade9-dfe0d390f9dd', // Mahikeng, 2026-07-14
+  'bcc68853-6974-4a85-8c95-783459c037db', // Mahikeng, 2026-07-14
+  '34583bc3-0d53-4727-bbbf-031627d40445', // Phalaborwa - Ben Farm, 2026-07-14
+  '96ac579d-6c6f-4b9d-baf6-02aa41980dc6', // Phalaborwa - Ben Farm, 2026-07-14
+];
+
 async function main(): Promise<void> {
   const execute = process.argv.includes('--execute');
   const databaseUrl = process.env.DATABASE_URL;
@@ -38,18 +55,19 @@ async function main(): Promise<void> {
 
   const pool = new Pool({ connectionString: databaseUrl, max: 2 });
   try {
-    const { rows: targets } = await pool.query(`
+    const { rows: targets } = await pool.query(
+      `
       SELECT a.id, p.project_name, a.status, a.created_at::date AS created,
              (SELECT count(*) FROM hs_audit_responses r WHERE r.audit_id = a.id)::int AS responses
       FROM hs_project_audits a
       JOIN projects p ON p.id = a.project_id
-      JOIN hs_project_config c ON c.project_id = a.project_id
-      WHERE a.status = 'in_progress'
-        AND a.created_at >= '2026-03-01'
+      WHERE a.id = ANY($1::uuid[])
       ORDER BY a.created_at
-    `);
+    `,
+      [STRANDED_AUDIT_IDS]
+    );
 
-    process.stdout.write(`Stranded in_progress audits (real configured projects, since 2026-03-01): ${targets.length}\n`);
+    process.stdout.write(`Stranded audits (pinned by id, ${STRANDED_AUDIT_IDS.length} known): found ${targets.length}\n`);
     for (const t of targets) {
       process.stdout.write(
         `  ${t.id}  ${String(t.project_name).padEnd(24)} created ${t.created}  responses=${t.responses}\n`
@@ -73,16 +91,11 @@ async function main(): Promise<void> {
       return;
     }
 
-    const ids = targets.map((t) => t.id);
-    if (ids.length === 0) {
-      process.stdout.write('\nNothing to cancel.\n');
-      return;
-    }
     const { rowCount } = await pool.query(
       `UPDATE hs_project_audits
        SET status = 'cancelled', notes = COALESCE(notes || E'\\n', '') || 'Abandoned: stranded by pre-2026-07 empty-wizard bug (goal §8.2 backfill)'
        WHERE id = ANY($1::uuid[]) AND status = 'in_progress'`,
-      [ids]
+      [STRANDED_AUDIT_IDS]
     );
     process.stdout.write(`\nCancelled ${rowCount} stranded audits.\n`);
   } finally {

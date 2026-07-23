@@ -90,8 +90,10 @@ describe('PUT /api/health-safety/project/[projectId]/config — audit scope', ()
     expect(res._getStatusCode()).toBe(200);
     const upsert = sqlMock.mock.calls.find((c) => q(c).includes('INSERT INTO hs_project_config'));
     expect(upsert).toBeDefined();
-    // Preserve path: update keeps the stored value
-    expect(q(upsert!)).toMatch(/template_id = (COALESCE|hs_project_config\.template_id)/);
+    // Preserve path: update keeps the stored value verbatim (the old COALESCE
+    // form must be gone — it could never clear the value)
+    expect(q(upsert!)).toMatch(/template_id = hs_project_config\.template_id/);
+    expect(q(upsert!)).not.toMatch(/template_id = COALESCE/);
   });
 });
 

@@ -66,6 +66,9 @@ describe('POST /api/health-safety/project/[projectId]/audits', () => {
       if (text.includes('INSERT INTO hs_project_audits')) {
         return Promise.resolve([AUDIT]);
       }
+      if (text.includes('INSERT INTO hs_audit_responses')) {
+        return Promise.resolve(Array.from({ length: 24 }, (_, i) => ({ id: `r${i}` })));
+      }
       return Promise.resolve([]);
     });
 
@@ -94,6 +97,9 @@ describe('POST /api/health-safety/project/[projectId]/audits', () => {
       if (text.includes('INSERT INTO hs_project_audits')) {
         return Promise.resolve([AUDIT]);
       }
+      if (text.includes('INSERT INTO hs_audit_responses')) {
+        return Promise.resolve(Array.from({ length: 5 }, (_, i) => ({ id: `r${i}` })));
+      }
       return Promise.resolve([]);
     });
 
@@ -105,6 +111,34 @@ describe('POST /api/health-safety/project/[projectId]/audits', () => {
     expect(seedCall).toBeDefined();
     expect(q(seedCall!)).toContain('template_id');
     expect(seedCall!.slice(1)).toContain(TEMPLATE_ID);
+  });
+
+  it('rolls the audit back when seeding inserts zero rows (count/seed race)', async () => {
+    sqlMock.mockImplementation((strings: string[]) => {
+      const text = strings.join('?').replace(/\s+/g, ' ');
+      if (text.includes('FROM projects p')) {
+        return Promise.resolve([{ id: PROJECT_ID, project_name: 'Demo', template_id: null }]);
+      }
+      if (text.includes('COUNT(*)') && text.includes('hs_checklist_items')) {
+        return Promise.resolve([{ count: 24 }]);
+      }
+      if (text.includes('INSERT INTO hs_project_audits')) {
+        return Promise.resolve([AUDIT]);
+      }
+      // Seed INSERT..SELECT finds nothing (templates changed between queries)
+      if (text.includes('INSERT INTO hs_audit_responses')) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const { req, res } = postAudit();
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(500);
+    const auditDelete = sqlMock.mock.calls.find((c) => q(c).includes('DELETE FROM hs_project_audits'));
+    expect(auditDelete).toBeDefined();
+    expect(auditDelete!.slice(1)).toContain(AUDIT.id);
   });
 
   it('returns 400 and creates NO audit when the scope has zero items', async () => {

@@ -113,9 +113,9 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
   }
 
   // Audit scope (D1): a configured template_id restricts the audit to that
-  // template; otherwise the audit covers ALL active templates that have items.
-  // Count seedable items BEFORE creating the audit — an empty wizard must
-  // never be created.
+  // template (even if since deactivated — an explicit pin wins); otherwise
+  // the audit covers ALL active templates that have items. Count seedable
+  // items BEFORE creating the audit — an empty wizard must never be created.
   const countRows = project.template_id
     ? await sql`
         SELECT COUNT(*)::int AS count
@@ -156,24 +156,32 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
   `;
   const audit = auditRows[0]!;
 
-  // Seed responses in one statement. On failure, remove the audit row so no
-  // empty audit is left behind (the shim cannot run transactions).
+  // Seed responses in one statement. RETURNING makes the row count
+  // authoritative — the pre-count above can go stale if templates/items
+  // change between the two queries, and an INSERT from an empty SELECT does
+  // not throw. Zero seeded rows is treated exactly like a seed failure: the
+  // audit is removed so no empty audit is left behind (no shim transactions).
+  let seededCount = 0;
   try {
-    if (project.template_id) {
-      await sql`
-        INSERT INTO hs_audit_responses (audit_id, checklist_item_id, response)
-        SELECT ${audit.id}, i.id, 'not_checked'
-        FROM hs_checklist_items i
-        WHERE i.template_id = ${project.template_id}
-      `;
-    } else {
-      await sql`
-        INSERT INTO hs_audit_responses (audit_id, checklist_item_id, response)
-        SELECT ${audit.id}, i.id, 'not_checked'
-        FROM hs_checklist_items i
-        JOIN hs_checklist_templates t ON t.id = i.template_id
-        WHERE t.is_active = true
-      `;
+    const seeded = project.template_id
+      ? await sql`
+          INSERT INTO hs_audit_responses (audit_id, checklist_item_id, response)
+          SELECT ${audit.id}, i.id, 'not_checked'
+          FROM hs_checklist_items i
+          WHERE i.template_id = ${project.template_id}
+          RETURNING id
+        `
+      : await sql`
+          INSERT INTO hs_audit_responses (audit_id, checklist_item_id, response)
+          SELECT ${audit.id}, i.id, 'not_checked'
+          FROM hs_checklist_items i
+          JOIN hs_checklist_templates t ON t.id = i.template_id
+          WHERE t.is_active = true
+          RETURNING id
+        `;
+    seededCount = seeded.length;
+    if (seededCount === 0) {
+      throw new Error('Audit scope produced zero checklist items at seed time');
     }
   } catch (seedError) {
     log.error('[H&S Project Audits API] Response seeding failed — rolling back audit', {
@@ -201,7 +209,7 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
       project_id: projectId,
       project_name: project.project_name,
       audit_type,
-      seeded_items: itemCount,
+      seeded_items: seededCount,
       scope: project.template_id ? 'template' : 'all_active_templates',
     },
     user: getAuthUser(req),
@@ -210,7 +218,7 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
   return apiResponse.created(res, {
     ...audit,
     project_name: project.project_name,
-    seeded_items: itemCount,
+    seeded_items: seededCount,
   });
 }
 

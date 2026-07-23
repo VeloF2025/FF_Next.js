@@ -44,6 +44,7 @@ export function ProjectHSTab({
 }: ProjectHSTabProps) {
   const [_showConfigModal, setShowConfigModal] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [startingAudit, setStartingAudit] = useState(false);
 
   // Fetch project H&S config
   const { data: configData, error: configError, mutate: _mutateConfig } = useSWR(
@@ -70,6 +71,8 @@ export function ProjectHSTab({
     }
 
     // Default: create audit and redirect
+    if (startingAudit) return;
+    setStartingAudit(true);
     setAuditError(null);
     try {
       const res = await fetch(`/api/health-safety/project/${projectId}/audits`, {
@@ -89,8 +92,10 @@ export function ProjectHSTab({
     } catch (err) {
       log.error('Failed to create audit', { error: err, projectId }, 'ProjectHSTab');
       setAuditError('Failed to start audit — network error');
+    } finally {
+      setStartingAudit(false);
     }
-  }, [projectId, onStartAudit, mutateAudits]);
+  }, [projectId, onStartAudit, mutateAudits, startingAudit]);
 
   if (isLoading) {
     return (
@@ -167,9 +172,10 @@ export function ProjectHSTab({
       <div className="flex gap-3">
         <button
           onClick={handleStartAudit}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
+          disabled={startingAudit}
+          className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors disabled:opacity-50"
         >
-          <Plus className="w-4 h-4" />
+          {startingAudit ? <InlineSpinner size="sm" /> : <Plus className="w-4 h-4" />}
           Start New Audit
         </button>
 
