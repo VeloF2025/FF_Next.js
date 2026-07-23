@@ -10,7 +10,9 @@ vi.mock('@/lib/logger', () => ({
 import { describe, it, expect, vi } from 'vitest';
 import { decidePhotoWrite, extractOntSerial } from '../../services/onemapBackfillService';
 import {
+  buildAgedOutQuery,
   buildCandidateQuery,
+  IN_SCOPE_FROM,
   LOOKBACK_WINDOW,
   RETRY_COOLDOWN,
 } from '../../services/onemapBackfillQueries';
@@ -81,16 +83,39 @@ describe('buildCandidateQuery', () => {
     expect(q).not.toContain('DROP TABLE');
   });
 
-  it('unverified mode still picks up never-verified rows inside the window', () => {
-    // The selection query and the aged-out metric deliberately differ: a null
-    // verified_at means "not yet in scope" (selectable), not "unresolved"
-    // (alertable). Pinning both so they cannot be quietly conflated again.
-    expect(buildCandidateQuery('unverified')).toContain('photo_count_verified_at IS NULL');
-  });
-
   it('preserves the pre-existing zero-photo modes', () => {
     expect(buildCandidateQuery('missing_photos')).toContain('photo_count = 0');
     expect(buildCandidateQuery('missing_serials')).toContain('ont_serial_scanned IS NULL');
+  });
+});
+
+describe('buildAgedOutQuery', () => {
+  const q = buildAgedOutQuery();
+
+  it('counts rows confirmed short, at any age', () => {
+    expect(q).toContain('photo_count_mismatch = TRUE');
+  });
+
+  it('ALSO counts in-scope rows the cron never reached before they aged out', () => {
+    // The blind spot this closes: photo_count_mismatch defaults to FALSE and is
+    // only written for a row that was actually attempted. A row the cron never
+    // got to keeps mismatch=FALSE and verified_at=NULL, so counting only
+    // mismatch would make it invisible to the selector AND the metric the
+    // moment it left the window.
+    expect(q).toContain('photo_count_verified_at IS NULL');
+    expect(q).toMatch(/photo_count_mismatch = TRUE\s*OR/);
+  });
+
+  it('excludes pre-go-live rows, whose null verified_at is an artifact not a backlog', () => {
+    expect(q).toContain(`DATE '${IN_SCOPE_FROM}'`);
+    // The go-live guard must bind ONLY to the never-verified arm — a confirmed
+    // shortfall is worth reporting regardless of vintage.
+    const neverVerifiedArm = q.slice(q.indexOf('photo_count_verified_at IS NULL'));
+    expect(neverVerifiedArm).toContain(`DATE '${IN_SCOPE_FROM}'`);
+  });
+
+  it('only looks outside the lookback window — in-window rows are still retryable', () => {
+    expect(q).toContain(`created_at <= NOW() - INTERVAL '${LOOKBACK_WINDOW}'`);
   });
 });
 

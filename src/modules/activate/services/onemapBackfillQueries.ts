@@ -78,24 +78,51 @@ export function buildCandidateQuery(mode: string): string {
 }
 
 /**
- * DRs this job actually worked, left still short, and can no longer reach
- * because they fell out of the lookback window. Nothing will ever retry these,
- * so the number is surfaced rather than left to be inferred from silence — a
- * backlog that quietly stops being worked looks identical to a cleared one.
+ * Rows created before the cron went live were never in its scope — their null
+ * photo_count_verified_at is an artifact of nothing having populated the
+ * column for them (20,490 such rows the day this shipped), not a backlog this
+ * job failed to work. Counting them would emit a five-figure warning every 15
+ * minutes and bury the signal the metric exists to raise.
  *
- * Deliberately NOT `photo_count_verified_at IS NULL`. Every DR predating this
- * job has a null verified_at simply because the column was never populated for
- * it — 20,484 rows on the day this shipped, against 41 genuinely-unresolved
- * ones. Counting those would emit a five-figure warning every 15 minutes and
- * bury the signal it exists to raise.
+ * Note this is a go-live boundary, NOT "old rows have null verified_at".
+ * Fresh DRs land with a null verified_at every day — ~160/day, spread evenly
+ * across the lookback window — so age alone cannot separate the two.
  */
+export const IN_SCOPE_FROM = '2026-07-24';
+
+/**
+ * DRs that are unresolved and can no longer be reached, because they fell out
+ * of the lookback window. Nothing will ever retry these, so the number is
+ * surfaced rather than left to be inferred from silence — a backlog that
+ * quietly stops being worked looks identical to a cleared one.
+ *
+ * Two distinct populations, both genuinely stuck:
+ *  - confirmed short (photo_count_mismatch), at any age — something checked
+ *    and found photos missing;
+ *  - in-scope but never verified at all — the cron never reached them before
+ *    they aged out, which is exactly the throughput failure worth shouting
+ *    about. Excluding these would leave a blind spot on the window boundary:
+ *    photo_count_mismatch defaults to FALSE and is only ever written for a row
+ *    that was actually selected and attempted, so a row the cron never got to
+ *    would match neither the selector nor this metric.
+ */
+export function buildAgedOutQuery(): string {
+  return `
+    SELECT COUNT(*) AS count
+    FROM dr_photo_unified_reviews
+    WHERE created_at <= NOW() - INTERVAL '${LOOKBACK_WINDOW}'
+      AND (
+        photo_count_mismatch = TRUE
+        OR (
+          photo_count_verified_at IS NULL
+          AND created_at >= DATE '${IN_SCOPE_FROM}'
+        )
+      )
+  `;
+}
+
 export async function countAgedOut(): Promise<number> {
-  const { rows } = await pool.query<{ count: string }>(
-    `SELECT COUNT(*) AS count
-     FROM dr_photo_unified_reviews
-     WHERE created_at <= NOW() - INTERVAL '${LOOKBACK_WINDOW}'
-       AND photo_count_mismatch = TRUE`
-  );
+  const { rows } = await pool.query<{ count: string }>(buildAgedOutQuery());
   return parseInt(rows[0]?.count ?? '0', 10);
 }
 
