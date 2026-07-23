@@ -113,6 +113,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
               WHERE pc.next_audit_due IS NOT NULL
                 AND pc.next_audit_due <= NOW() + INTERVAL '14 days'
+                AND pc.is_active = true
                 AND pc.project_id = ${project_id}
               ORDER BY pc.next_audit_due ASC LIMIT 10`
         : sql`SELECT pc.project_id, p.project_name, pc.next_audit_due, pc.audit_frequency,
@@ -121,17 +122,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
               WHERE pc.next_audit_due IS NOT NULL
                 AND pc.next_audit_due <= NOW() + INTERVAL '14 days'
+                AND pc.is_active = true
               ORDER BY pc.next_audit_due ASC LIMIT 10`,
 
-      // Overdue audits
+      // Overdue audits (active configs on existing projects only)
       project_id
         ? sql`SELECT pc.project_id, p.project_name, pc.next_audit_due, pc.audit_frequency
               FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
-              WHERE pc.next_audit_due < NOW() AND pc.project_id = ${project_id}
+              WHERE pc.next_audit_due < NOW() AND pc.is_active = true AND pc.project_id = ${project_id}
               ORDER BY pc.next_audit_due ASC`
         : sql`SELECT pc.project_id, p.project_name, pc.next_audit_due, pc.audit_frequency
               FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
-              WHERE pc.next_audit_due < NOW()
+              WHERE pc.next_audit_due < NOW() AND pc.is_active = true
               ORDER BY pc.next_audit_due ASC`,
 
       // Recent activity (live columns: activity_type/description/metadata)
