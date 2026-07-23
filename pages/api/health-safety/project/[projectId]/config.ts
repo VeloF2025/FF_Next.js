@@ -67,11 +67,13 @@ async function handleGet(projectId: string, res: NextApiResponse) {
     });
   }
 
-  // Get recent audit stats
+  // Get recent audit stats. requires_action counts as completed — the audit
+  // finished, it just produced corrective actions (D7).
   const [auditStats] = await sql`
     SELECT
       COUNT(*)::int as total_audits,
-      COUNT(*) FILTER (WHERE status = 'completed')::int as completed_audits,
+      COUNT(*) FILTER (WHERE status IN ('completed', 'requires_action'))::int as completed_audits,
+      COUNT(*) FILTER (WHERE status = 'requires_action')::int as requires_action_audits,
       AVG(overall_score)::int as average_score,
       MAX(audit_date) as last_audit_date
     FROM hs_project_audits
@@ -119,35 +121,68 @@ async function handlePut(projectId: string, req: NextApiRequest, res: NextApiRes
   const nextAuditDue = new Date();
   nextAuditDue.setDate(nextAuditDue.getDate() + frequencyDays);
 
-  // Upsert config
-  const configRows = await sql`
-    INSERT INTO hs_project_config (
-      project_id, template_id, audit_frequency, custom_frequency_days,
-      next_audit_due, min_score_threshold, requires_daily_briefing,
-      height_work_permitted, hot_work_permitted, confined_space_work,
-      excavation_work, notes
-    ) VALUES (
-      ${projectId}, ${template_id || null}, ${audit_frequency}, ${custom_frequency_days || null},
-      ${nextAuditDue.toISOString().split('T')[0]}, ${min_score_threshold}, ${requires_daily_briefing},
-      ${height_work_permitted}, ${hot_work_permitted}, ${confined_space_work},
-      ${excavation_work}, ${notes || null}
-    )
-    ON CONFLICT (project_id)
-    DO UPDATE SET
-      template_id = COALESCE(${template_id}, hs_project_config.template_id),
-      audit_frequency = ${audit_frequency},
-      custom_frequency_days = ${custom_frequency_days || null},
-      next_audit_due = ${nextAuditDue.toISOString().split('T')[0]},
-      min_score_threshold = ${min_score_threshold},
-      requires_daily_briefing = ${requires_daily_briefing},
-      height_work_permitted = ${height_work_permitted},
-      hot_work_permitted = ${hot_work_permitted},
-      confined_space_work = ${confined_space_work},
-      excavation_work = ${excavation_work},
-      notes = COALESCE(${notes}, hs_project_config.notes),
-      updated_at = NOW()
-    RETURNING *
-  `;
+  // Upsert config. Audit scope (D1): template_id present in the body is an
+  // explicit assignment — including null, which means "all categories".
+  // A body without the key preserves the stored value. Two full statements
+  // because the shim forbids conditional SQL fragments.
+  const hasTemplateKey = Object.prototype.hasOwnProperty.call(req.body, 'template_id');
+  const configRows = hasTemplateKey
+    ? await sql`
+        INSERT INTO hs_project_config (
+          project_id, template_id, audit_frequency, custom_frequency_days,
+          next_audit_due, min_score_threshold, requires_daily_briefing,
+          height_work_permitted, hot_work_permitted, confined_space_work,
+          excavation_work, notes
+        ) VALUES (
+          ${projectId}, ${template_id || null}, ${audit_frequency}, ${custom_frequency_days || null},
+          ${nextAuditDue.toISOString().split('T')[0]}, ${min_score_threshold}, ${requires_daily_briefing},
+          ${height_work_permitted}, ${hot_work_permitted}, ${confined_space_work},
+          ${excavation_work}, ${notes || null}
+        )
+        ON CONFLICT (project_id)
+        DO UPDATE SET
+          template_id = ${template_id || null},
+          audit_frequency = ${audit_frequency},
+          custom_frequency_days = ${custom_frequency_days || null},
+          next_audit_due = ${nextAuditDue.toISOString().split('T')[0]},
+          min_score_threshold = ${min_score_threshold},
+          requires_daily_briefing = ${requires_daily_briefing},
+          height_work_permitted = ${height_work_permitted},
+          hot_work_permitted = ${hot_work_permitted},
+          confined_space_work = ${confined_space_work},
+          excavation_work = ${excavation_work},
+          notes = COALESCE(${notes}, hs_project_config.notes),
+          updated_at = NOW()
+        RETURNING *
+      `
+    : await sql`
+        INSERT INTO hs_project_config (
+          project_id, template_id, audit_frequency, custom_frequency_days,
+          next_audit_due, min_score_threshold, requires_daily_briefing,
+          height_work_permitted, hot_work_permitted, confined_space_work,
+          excavation_work, notes
+        ) VALUES (
+          ${projectId}, NULL, ${audit_frequency}, ${custom_frequency_days || null},
+          ${nextAuditDue.toISOString().split('T')[0]}, ${min_score_threshold}, ${requires_daily_briefing},
+          ${height_work_permitted}, ${hot_work_permitted}, ${confined_space_work},
+          ${excavation_work}, ${notes || null}
+        )
+        ON CONFLICT (project_id)
+        DO UPDATE SET
+          template_id = hs_project_config.template_id,
+          audit_frequency = ${audit_frequency},
+          custom_frequency_days = ${custom_frequency_days || null},
+          next_audit_due = ${nextAuditDue.toISOString().split('T')[0]},
+          min_score_threshold = ${min_score_threshold},
+          requires_daily_briefing = ${requires_daily_briefing},
+          height_work_permitted = ${height_work_permitted},
+          hot_work_permitted = ${hot_work_permitted},
+          confined_space_work = ${confined_space_work},
+          excavation_work = ${excavation_work},
+          notes = COALESCE(${notes}, hs_project_config.notes),
+          updated_at = NOW()
+        RETURNING *
+      `;
   const config = configRows[0]!;
 
   // Log activity
