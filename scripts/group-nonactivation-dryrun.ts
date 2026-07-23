@@ -22,22 +22,28 @@ async function main(): Promise<void> {
   const generatedDate = arg('generated', '');
   const out = arg('out', '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cohortDate) || !/^\d{4}-\d{2}-\d{2}$/.test(generatedDate)) {
+    // eslint-disable-next-line no-console -- CLI dry-run tool: console is the output channel
     console.error('Usage: --cohort YYYY-MM-DD --generated YYYY-MM-DD [--out dir]');
     process.exit(1);
   }
 
   const results = await buildGroupNonActivationReports({ cohortDate, generatedDate });
 
-  console.log(`\n${'GROUP'.padEnd(28)}${'cohort'.padStart(6)}${'act'.padStart(5)}${'MISS'.padStart(6)}${'PPtot'.padStart(6)}${'PPnew'.padStart(6)}${'PPnf'.padStart(5)}${'backlog'.padStart(8)}${'typos'.padStart(6)}`);
-  console.log('-'.repeat(80));
+  // eslint-disable-next-line no-console -- CLI dry-run tool: console is the output channel
+  console.log(`\n${'GROUP'.padEnd(28)}${'cohort'.padStart(6)}${'act'.padStart(5)}${'MISS'.padStart(6)}${'PPtot'.padStart(6)}${'PPnew'.padStart(6)}${'PPnf'.padStart(5)}${'backlog'.padStart(8)}${'typos'.padStart(6)}${'OLT'.padStart(5)}${'new'.padStart(4)}${'N2'.padStart(4)}${'N4'.padStart(4)}`);
+  // eslint-disable-next-line no-console -- CLI dry-run tool: console is the output channel
+  console.log('-'.repeat(97));
   for (const r of [...results].sort((a, b) => b.counts.miss - a.counts.miss)) {
     const c = r.counts;
+    // eslint-disable-next-line no-console -- CLI dry-run tool: console is the output channel
     console.log(
       r.groupName.padEnd(28) +
         String(c.cohort).padStart(6) + String(c.activated).padStart(5) +
         String(c.miss).padStart(6) + String(c.pp).padStart(6) +
         String(c.ppNew).padStart(6) + String(c.ppNotFound).padStart(5) +
-        String(c.backlog).padStart(8) + String(c.typos).padStart(6),
+        String(c.backlog).padStart(8) + String(c.typos).padStart(6) +
+        String(c.olt).padStart(5) + String(c.oltNew).padStart(4) +
+        String(c.oltNote2).padStart(4) + String(c.oltNote4).padStart(4),
     );
     if (out) {
       mkdirSync(out, { recursive: true });
@@ -51,17 +57,20 @@ async function main(): Promise<void> {
     acc[r.residualClass] = (acc[r.residualClass] ?? 0) + 1;
     return acc;
   }, {});
+  // eslint-disable-next-line no-console -- CLI dry-run tool: console is the output channel
   console.log(`\nOps worklist (open not_found): ${opsRows.length} — ${JSON.stringify(byClass)}`);
   if (out && opsRows.length > 0) {
     const opsBuffer = await buildOpsWorkbook(opsRows, generatedDate);
     writeFileSync(`${out}/Unresolved-PreProvision-${generatedDate}.xlsx`, opsBuffer);
   }
 
+  // eslint-disable-next-line no-console -- CLI dry-run tool: console is the output channel
   console.log(`\n${results.length} group workbooks + ops worklist built${out ? ` → ${out}` : ''}. Nothing sent.`);
   process.exit(0);
 }
 
 main().catch((err: unknown) => {
+  // eslint-disable-next-line no-console -- CLI dry-run tool: console is the output channel
   console.error(err);
   process.exit(1);
 });

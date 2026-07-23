@@ -6,7 +6,8 @@
  */
 import ExcelJS from 'exceljs';
 import type { TargetGroup, CohortRow, BacklogRow, PpRow } from './queries';
-import { isCanonicalDr, dayDiffIso, RESIDUAL_LABEL } from './format';
+import type { OltRow } from './oltQueries';
+import { isCanonicalDr, dayDiffIso, RESIDUAL_LABEL, oltIssueLabel, oltNoteFor } from './format';
 
 const HEADER_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF305496' } };
 const HEADER_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -19,6 +20,8 @@ export interface GroupReportData {
   cohort: CohortRow[];
   backlog: BacklogRow[];
   ppList: PpRow[];
+  /** Open OLT Note 2 / Note 4 worklist for the group's project (activations groups only). */
+  oltList: OltRow[];
   cohortDate: string;
   generatedDate: string;
 }
@@ -39,6 +42,14 @@ export interface GroupReportCounts {
   ppActivated: number;
   backlog: number;
   typos: number;
+  /** Total open OLT mismatches on the project (Note 2 + Note 4, all ages). */
+  olt: number;
+  /** Of the total, raised on the cohort day. */
+  oltNew: number;
+  /** Note 2 — no entry on 1Map (not_found + serial_other_dr). */
+  oltNote2: number;
+  /** Note 4 — Drop#/ONT serial mismatch (everything else). */
+  oltNote4: number;
 }
 
 function styleHeaderRow(row: ExcelJS.Row): void {
@@ -84,6 +95,14 @@ function addSummary(wb: ExcelJS.Workbook, d: GroupReportData, c: GroupReportCoun
     ws.addRow(['  not yet matched to a DR (not_found)', c.ppNotFound]);
     ws.addRow(['  linked, awaiting activation', c.ppLinkedAwaiting]);
     ws.addRow(['  activated but still on FT list', c.ppActivated]);
+  }
+  if (c.olt > 0) {
+    ws.addRow([]);
+    styleHeaderRow(ws.addRow([`1Map data issues (OLT recon) — project ${d.group.project ?? '—'}`, 'Count']));
+    ws.addRow(['TOTAL still open', c.olt]);
+    ws.addRow(['  raised yesterday', c.oltNew]);
+    ws.addRow(['  Note 2 — no entry on 1Map', c.oltNote2]);
+    ws.addRow(['  Note 4 — Drop# / ONT serial mismatch', c.oltNote4]);
   }
   ws.addRow([]);
   styleHeaderRow(ws.addRow(['Misses by submitter (yesterday)', 'Count']));
@@ -135,6 +154,41 @@ function addPreProvision(wb: ExcelJS.Workbook, d: GroupReportData): void {
   autosize(ws);
 }
 
+function addOltMismatches(wb: ExcelJS.Workbook, d: GroupReportData): void {
+  const ws = wb.addWorksheet('OLT Mismatches');
+  styleHeaderRow(
+    ws.addRow([
+      'DR Number',
+      'FT Note',
+      'Issue',
+      'ONT Serial (OES)',
+      'ONT Serial (1Map)',
+      'NOC Ticket',
+      'Raised',
+      'Aging (days)',
+      'Status',
+    ]),
+  );
+  // oltList is ordered new-first by the query.
+  d.oltList.forEach((r) => {
+    const note = oltNoteFor(r.fixStatus) === 'note2' ? 'Note 2' : 'Note 4';
+    const row = ws.addRow([
+      r.dropNumber,
+      note,
+      oltIssueLabel(r.fixStatus, r.oesSerial !== null),
+      r.oesSerial ?? '',
+      r.onemapSerial ?? '',
+      r.ticketUid ?? '',
+      r.raisedDate,
+      dayDiffIso(r.raisedDate, d.generatedDate),
+      r.isNew ? 'NEW (yesterday)' : 'CARRIED-OVER',
+    ]);
+    row.getCell(3).fill = MISS_FILL;
+    if (r.isNew) row.getCell(9).fill = DQ_FILL;
+  });
+  autosize(ws);
+}
+
 function addActivated(wb: ExcelJS.Workbook, d: GroupReportData): void {
   const ws = wb.addWorksheet('Activated');
   styleHeaderRow(
@@ -165,12 +219,17 @@ export async function buildGroupWorkbook(
     ppActivated: d.ppList.filter((r) => r.resolutionStatus === 'activated').length,
     backlog: d.backlog.length,
     typos: d.cohort.filter((r) => !r.activationDate && !r.onPp && !isCanonicalDr(r.dropNumber)).length,
+    olt: d.oltList.length,
+    oltNew: d.oltList.filter((r) => r.isNew).length,
+    oltNote2: d.oltList.filter((r) => oltNoteFor(r.fixStatus) === 'note2').length,
+    oltNote4: d.oltList.filter((r) => oltNoteFor(r.fixStatus) === 'note4').length,
   };
 
   const wb = new ExcelJS.Workbook();
   addSummary(wb, d, counts);
   addNotActivated(wb, d);
   if (d.group.showPp) addPreProvision(wb, d);
+  if (d.oltList.length > 0) addOltMismatches(wb, d);
   addActivated(wb, d);
 
   const buffer = Buffer.from(await wb.xlsx.writeBuffer());
