@@ -11,7 +11,8 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -28,7 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'PUT':
         return handlePut(id, req, res);
       case 'DELETE':
-        return handleDelete(id, res);
+        return handleDelete(id, req, res);
       default:
         return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
     }
@@ -123,16 +124,19 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
     }
   }
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('checklist_template', ${id}, 'updated', ${JSON.stringify({ name, category })}::jsonb)
-  `;
+  await logHsActivity({
+    activityType: 'checklist_template_updated',
+    entityType: 'checklist_template',
+    entityId: id,
+    description: `Checklist template updated: ${name}`,
+    metadata: { category },
+    user: getAuthUser(req),
+  });
 
   return apiResponse.success(res, template);
 }
 
-async function handleDelete(id: string, res: NextApiResponse) {
+async function handleDelete(id: string, req: NextApiRequest, res: NextApiResponse) {
   // Check template exists and is not default
   const [existing] = await sql`
     SELECT id, is_default, name FROM hs_checklist_templates WHERE id = ${id}
@@ -153,11 +157,13 @@ async function handleDelete(id: string, res: NextApiResponse) {
     WHERE id = ${id}
   `;
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('checklist_template', ${id}, 'deleted', ${JSON.stringify({ name: existing.name })}::jsonb)
-  `;
+  await logHsActivity({
+    activityType: 'checklist_template_deleted',
+    entityType: 'checklist_template',
+    entityId: id,
+    description: `Checklist template deactivated: ${existing.name}`,
+    user: getAuthUser(req),
+  });
 
   return apiResponse.success(res, { message: 'Template deactivated', id });
 }

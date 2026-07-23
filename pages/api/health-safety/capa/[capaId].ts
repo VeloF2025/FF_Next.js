@@ -8,8 +8,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { CAPA_STATUS_TRANSITIONS } from '@/modules/health-safety/types/capa.types';
 import type { CAPAStatus } from '@/modules/health-safety/types/capa.types';
 
@@ -69,7 +70,8 @@ async function handleGet(capaId: string, res: NextApiResponse) {
 }
 
 async function handlePut(capaId: string, req: NextApiRequest, res: NextApiResponse) {
-  const userId = (req as any).userId || null;
+  const user = getAuthUser(req);
+  const userId = user?.id ?? null;
   const {
     status,
     title,
@@ -149,13 +151,14 @@ async function handlePut(capaId: string, req: NextApiRequest, res: NextApiRespon
       VALUES (${capaId}, ${userId}, ${'Status changed from ' + current.status + ' to ' + status})
     `;
 
-    // Log activity
-    await sql`
-      INSERT INTO hs_activity_log (entity_type, entity_id, action, actor_id, details, previous_values)
-      VALUES ('capa', ${capaId}, 'status_changed', ${userId},
-        ${JSON.stringify({ new_status: status, previous_status: current.status })}::jsonb,
-        ${JSON.stringify({ status: current.status })}::jsonb)
-    `;
+    await logHsActivity({
+      activityType: 'capa_status_changed',
+      entityType: 'capa',
+      entityId: capaId,
+      description: `CAPA status changed from ${current.status} to ${status}`,
+      metadata: { new_status: status, previous_status: current.status },
+      user,
+    });
   }
 
   return apiResponse.success(res, updated);

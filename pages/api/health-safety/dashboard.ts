@@ -134,8 +134,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               WHERE pc.next_audit_due < NOW()
               ORDER BY pc.next_audit_due ASC`,
 
-      // Recent activity
-      sql`SELECT id, entity_type, entity_id, action, details, created_at
+      // Recent activity (live columns: activity_type/description/metadata)
+      sql`SELECT id, entity_type, entity_id, activity_type, description, metadata, created_at
       FROM hs_activity_log
       ORDER BY created_at DESC
       LIMIT 20`,

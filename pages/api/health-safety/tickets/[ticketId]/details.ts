@@ -11,7 +11,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import {
   INCIDENT_TYPE_CONFIG,
   SEVERITY_TO_PRIORITY,
@@ -221,15 +222,14 @@ async function handlePut(ticketId: string, req: NextApiRequest, res: NextApiResp
     `;
   }
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('hs_ticket', ${ticketId}, 'updated', ${JSON.stringify({
-      ticket_id: ticketId,
-      severity,
-      incident_type,
-    })}::jsonb)
-  `;
+  await logHsActivity({
+    activityType: 'hs_details_updated',
+    entityType: 'hs_ticket',
+    entityId: ticketId,
+    description: 'H&S ticket details updated',
+    metadata: { severity, incident_type },
+    user: getAuthUser(req),
+  });
 
   return handleGet(ticketId, res);
 }
@@ -301,15 +301,14 @@ async function handlePost(ticketId: string, req: NextApiRequest, res: NextApiRes
     WHERE id = ${ticketId}
   `;
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('hs_ticket', ${ticketId}, 'created', ${JSON.stringify({
-      ticket_id: ticketId,
-      incident_type,
-      severity,
-    })}::jsonb)
-  `;
+  await logHsActivity({
+    activityType: 'hs_details_created',
+    entityType: 'hs_ticket',
+    entityId: ticketId,
+    description: 'H&S ticket details created',
+    metadata: { incident_type, severity },
+    user: getAuthUser(req),
+  });
 
   return handleGet(ticketId, res);
 }

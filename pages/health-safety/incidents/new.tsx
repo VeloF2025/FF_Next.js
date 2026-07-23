@@ -45,7 +45,7 @@ function NewIncidentContent() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [projects, setProjects] = useState<{ id: number; project_name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string | number; name: string }[]>([]);
   const [contractors, setContractors] = useState<{ id: number; company_name: string }[]>([]);
   const [persons, setPersons] = useState<PersonInvolved[]>([]);
   const [witnesses, setWitnesses] = useState<string[]>([]);
@@ -122,8 +122,8 @@ function NewIncidentContent() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to create incident');
+        const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(err?.error?.message || 'Failed to create incident');
       }
 
       router.push('/projects/health-safety/incidents');

@@ -8,8 +8,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import type { CAPAInput } from '@/modules/health-safety/types/capa.types';
 import { CAPA_SEVERITY_CONFIG } from '@/modules/health-safety/types/capa.types';
 
@@ -178,7 +179,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return d.toISOString().split('T')[0];
   })();
 
-  const userId = (req as any).userId || null;
+  const user = getAuthUser(req);
+  const userId = user?.id ?? null;
 
   const capaRows = await sql`
     INSERT INTO hs_corrective_actions (
@@ -209,17 +211,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   `;
   const capa = capaRows[0]!;
 
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, actor_id, details)
-    VALUES ('capa', ${capa.id}, 'created', ${userId}, ${JSON.stringify({
-      title: body.title,
+  await logHsActivity({
+    activityType: 'capa_created',
+    entityType: 'capa',
+    entityId: capa.id as string,
+    description: `CAPA created: ${body.title}`,
+    metadata: {
       source_type: body.source_type,
       severity,
       project_id: body.project_id,
       contractor_id: body.contractor_id,
-    })}::jsonb)
-  `;
+    },
+    user,
+  });
 
   return apiResponse.created(res, capa);
 }

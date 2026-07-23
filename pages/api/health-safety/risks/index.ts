@@ -8,8 +8,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -107,7 +108,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-  const userId = (req as any).userId || null;
+  const user = getAuthUser(req);
+  const userId = user?.id ?? null;
   const body = req.body;
 
   if (!body.hazard_description || !body.risk_category || !body.likelihood || !body.severity) {
@@ -144,14 +146,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   `;
   const risk = riskRows[0]!;
 
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, actor_id, details)
-    VALUES ('risk', ${risk.id}, 'created', ${userId}, ${JSON.stringify({
-      hazard: body.hazard_description,
+  await logHsActivity({
+    activityType: 'risk_created',
+    entityType: 'risk',
+    entityId: risk.id as string,
+    description: `Risk created: ${body.hazard_description}`,
+    metadata: {
       category: body.risk_category,
       risk_score: body.likelihood * body.severity,
-    })}::jsonb)
-  `;
+    },
+    user,
+  });
 
   return apiResponse.created(res, risk);
 }
