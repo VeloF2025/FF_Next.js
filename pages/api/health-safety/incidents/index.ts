@@ -710,7 +710,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     FROM maintenance_tickets t
     JOIN hs_ticket_details hd ON hd.ticket_id = t.id
     LEFT JOIN projects p ON p.id::text = t.project_id
-    LEFT JOIN contractors c ON c.id::text = t.contractor_id
+    LEFT JOIN contractors c ON c.id = t.contractor_id
     WHERE t.id = ${ticket.id}
   `;
 
