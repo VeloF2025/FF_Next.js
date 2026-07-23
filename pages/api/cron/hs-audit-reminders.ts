@@ -24,6 +24,11 @@ const sql = neon(process.env.DATABASE_URL!);
 
 const SOURCE_TYPE = 'hs_audit_overdue';
 
+/** timestamptz comes back from the pg driver as a JS Date — format explicitly */
+function isoDate(value: unknown): string {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+}
+
 interface OverdueConfig {
   id: string;
   project_id: string;
@@ -45,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.unauthorized(res, 'Invalid cron secret');
   }
 
-  if (req.method !== 'POST' && req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
   }
 
@@ -65,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let refreshed = 0;
 
     for (const cfg of overdue) {
-      const description = `H&S audit overdue for ${cfg.project_name}: was due ${String(cfg.next_audit_due).slice(0, 10)} (${cfg.days_overdue} days overdue, ${cfg.audit_frequency} schedule)`;
+      const description = `H&S audit overdue for ${cfg.project_name}: was due ${isoDate(cfg.next_audit_due)} (${cfg.days_overdue} days overdue, ${cfg.audit_frequency} schedule)`;
 
       const [existing] = await sql`
         SELECT id FROM action_items
@@ -144,7 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       resolved: resolvedRows.length,
       projects: overdue.map((c) => ({
         project: c.project_name,
-        due: String(c.next_audit_due).slice(0, 10),
+        due: isoDate(c.next_audit_due),
         days_overdue: c.days_overdue,
       })),
     });

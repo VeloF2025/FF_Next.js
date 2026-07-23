@@ -49,6 +49,36 @@ describe('POST /api/cron/hs-audit-reminders', () => {
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
+  it('fails closed when CRON_SECRET is not configured', async () => {
+    delete process.env.CRON_SECRET;
+    const { req, res } = run('anything');
+    await handler(req, res);
+    expect(res._getStatusCode()).toBeGreaterThanOrEqual(500);
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  it('formats driver-returned Date objects as ISO dates in descriptions', async () => {
+    sqlMock.mockImplementation((strings: string[]) => {
+      const text = strings.join('$').replace(/\s+/g, ' ');
+      if (text.includes('FROM hs_project_config')) {
+        // pg returns timestamptz as a JS Date, not a string
+        return Promise.resolve([{ ...CFG, next_audit_due: new Date('2026-07-20T00:00:00Z') }]);
+      }
+      if (text.includes('SELECT id FROM action_items')) return Promise.resolve([]);
+      if (text.includes('UPDATE action_items') && text.includes('RETURNING id')) return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+
+    const { req, res } = run('test-secret');
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(200);
+    const insert = sqlMock.mock.calls.find((c) => q(c).includes('INSERT INTO action_items'));
+    const description = String(insert!.slice(1)[0]);
+    expect(description).toContain('2026-07-20');
+    expect(description).not.toMatch(/Mon Jul|Sun Jul|GMT/);
+  });
+
   it('creates an action item for an overdue config with no open item', async () => {
     sqlMock.mockImplementation((strings: string[]) => {
       const text = strings.join('$').replace(/\s+/g, ' ');
