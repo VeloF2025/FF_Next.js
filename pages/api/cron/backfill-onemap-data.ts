@@ -7,10 +7,17 @@
  *
  * This cron job handles the backfill case where:
  * - DRs exist in dr_photo_unified_reviews but have photo_count = 0
+ * - DRs ingested only PART of their 1Map photos (local < cloud) because the
+ *   1Map API was slow mid-ingest — see the 2026-07-23 incident, where 1Map
+ *   went from 0.1s to 30s+ per query for hours and DRs landed with 1-5 of
+ *   their 8-15 photos. The zero case is already covered by the wired
+ *   refetch-missing-photos cron; the PARTIAL case had no owner.
  * - DRs have no ONT/UPS serials even though data exists in OneMap
  *
- * Run schedule: Every 15 minutes (via vercel.json or external cron)
- * Limit: Processes up to 20 DRs per run to avoid timeout
+ * Run schedule: Every 15 minutes, via scripts/cron-backfill-onemap.sh.
+ * (vercel.json also lists it, but this app deploys to systemd on Velocity,
+ * so the vercel entry is inert — the shell cron is the real scheduler.)
+ * Limit: Processes up to 20 DRs per run, bounded by RUN_BUDGET_MS.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -22,6 +29,14 @@ import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 import { apiResponse } from '@/lib/apiResponse';
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
+
+// Nobody is waiting on this job, so it gets far more headroom than the 8s
+// interactive ack path — a degraded 1Map answers in 10-30s and we still want
+// the photos. RUN_BUDGET_MS stops a slow run before the next 15-min tick so
+// invocations never pile up (the shell wrapper also holds an flock).
+const RECORD_TIMEOUT_MS = 30_000;
+const DOWNLOAD_TIMEOUT_MS = 60_000;
+const RUN_BUDGET_MS = 240_000;
 
 interface BackfillResult {
   dropNumber: string;
@@ -37,6 +52,8 @@ interface BackfillResponse {
   processed: number;
   succeeded: number;
   failed: number;
+  deferred?: number;
+  budgetExhausted?: boolean;
   results: BackfillResult[];
   timestamp: string;
 }
@@ -56,7 +73,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
   try {
     // Try to get record from OneMap
     let response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
-      signal: AbortSignal.timeout(10000), // 10s timeout
+      signal: AbortSignal.timeout(RECORD_TIMEOUT_MS),
     });
 
     // If 404, try to trigger download
@@ -65,7 +82,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
 
       const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
         method: 'POST',
-        signal: AbortSignal.timeout(15000), // 15s timeout for download
+        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
       });
 
       if (downloadResponse.ok) {
@@ -74,7 +91,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
 
         // Retry fetch
         response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(RECORD_TIMEOUT_MS),
         });
       }
     }
@@ -86,26 +103,33 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
 
     const data = await response.json();
     let localPhotos = data.local_photos || [];
+    let cloudPhotoCount = data.photo_count || 0;
 
-    // If record exists but no local photos, try downloading
-    if (localPhotos.length === 0 && data.photo_count > 0) {
-      log.info(`Photos on cloud but not local for ${dropNumber}, triggering download`);
+    // Any shortfall triggers a re-download, not just a total absence. A DR that
+    // ingested 5 of its 10 photos is just as broken for QA as one that got zero,
+    // and only the zero case used to be handled here.
+    if (cloudPhotoCount > localPhotos.length) {
+      log.info(`Incomplete photo set for ${dropNumber}, triggering download`, {
+        localCount: localPhotos.length,
+        cloudCount: cloudPhotoCount,
+      });
 
       await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
         method: 'POST',
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
       });
 
       // Wait and retry
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const retryResponse = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(RECORD_TIMEOUT_MS),
       });
 
       if (retryResponse.ok) {
         const retryData = await retryResponse.json();
         localPhotos = retryData.local_photos || [];
+        cloudPhotoCount = retryData.photo_count || cloudPhotoCount;
         // Also update serials from retried data
         if (retryData.ont_barcode) data.ont_barcode = retryData.ont_barcode;
         if (retryData.ups_serial) data.ups_serial = retryData.ups_serial;
@@ -126,6 +150,12 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
     const ontSerial = extractOntSerial(data.ont_barcode);
     const upsSerial = data.ups_serial || null;
 
+    // Still short after the re-download: either 1Map holds orphaned metadata
+    // (a photo row with no fetchable file) or it is still degraded. Recording
+    // the mismatch is what lets the 'unverified' query pick this DR up again
+    // later instead of treating a partial set as done.
+    const stillIncomplete = photos.length < cloudPhotoCount;
+
     // Update unified table
     await pool.query(
       `UPDATE dr_photo_unified_reviews
@@ -135,9 +165,11 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
          photos_metadata = $2,
          ont_serial_scanned = COALESCE($3, ont_serial_scanned),
          ups_serial_scanned = COALESCE($4, ups_serial_scanned),
+         photo_count_verified_at = NOW(),
+         photo_count_mismatch = $5,
          updated_at = NOW()
-       WHERE drop_number = $5`,
-      [photos.length, JSON.stringify(photos), ontSerial, upsSerial, dropNumber]
+       WHERE drop_number = $6`,
+      [photos.length, JSON.stringify(photos), ontSerial, upsSerial, stillIncomplete, dropNumber]
     );
 
     result.success = true;
@@ -240,6 +272,29 @@ export default async function handler(
         `;
         break;
 
+      case 'unverified':
+        // Photo set never checked against 1Map, or checked and found short.
+        // A partial ingest is invisible to a photo_count-based query — the
+        // count looks fine, it is just wrong — so this keys off the
+        // verification columns from migration 135 instead. Self-limiting: a
+        // DR verified complete sets photo_count_mismatch = false and drops
+        // out; a mismatched one is retried at most every 6 hours.
+        query = `
+          SELECT drop_number
+          FROM dr_photo_unified_reviews
+          WHERE created_at > NOW() - INTERVAL '7 days'
+            AND (
+              photo_count_verified_at IS NULL
+              OR (
+                photo_count_mismatch = TRUE
+                AND photo_count_verified_at < NOW() - INTERVAL '6 hours'
+              )
+            )
+          ORDER BY created_at DESC
+          LIMIT $1
+        `;
+        break;
+
       case 'all_missing':
       default:
         // DRs missing either photos OR serials
@@ -277,9 +332,23 @@ export default async function handler(
     const results: BackfillResult[] = [];
     let succeeded = 0;
     let failed = 0;
+    const startedAt = Date.now();
+    let ranOutOfBudget = false;
 
     // Process each DR sequentially (to avoid overwhelming OneMap API)
     for (const row of pendingDRs) {
+      // A degraded 1Map can spend 30s+ on a single DR. Stop before the next
+      // tick rather than silently running long — the leftovers are still
+      // selected next run, so nothing is dropped, but say so out loud.
+      if (Date.now() - startedAt > RUN_BUDGET_MS) {
+        ranOutOfBudget = true;
+        log.warn('Run budget exhausted — deferring remaining DRs to next run', {
+          processed: results.length,
+          remaining: pendingDRs.length - results.length,
+        });
+        break;
+      }
+
       const result = await fetchAndUpdateFromOneMap(row.drop_number);
       results.push(result);
 
@@ -293,16 +362,19 @@ export default async function handler(
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    log.info(`Completed: ${succeeded}/${pendingDRs.length} succeeded`, {
+    log.info(`Completed: ${succeeded}/${results.length} succeeded`, {
       failed,
+      deferred: pendingDRs.length - results.length,
       results: results.slice(0, 5), // Log first 5 for brevity
     });
 
     return res.status(200).json({
       success: true,
-      processed: pendingDRs.length,
+      processed: results.length,
       succeeded,
       failed,
+      deferred: pendingDRs.length - results.length,
+      budgetExhausted: ranOutOfBudget,
       results,
       timestamp: new Date().toISOString(),
     });
