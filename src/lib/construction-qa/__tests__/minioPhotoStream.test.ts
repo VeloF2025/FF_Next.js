@@ -25,6 +25,11 @@ vi.mock('@/lib/logger', () => ({
 
 import { streamMinioObject, PHOTO_CONTENT_TYPES } from '../minioPhotoStream';
 
+// Exact `mc cat` stderr strings, captured from the real mc binary inside
+// qfieldcloud-minio-1 (see MC_AUTH_ERROR_RE comment in the module under test).
+const MC_AUTH_STDERR = 'mc: <ERROR> Unable to read from `local/qfieldcloud-prod/x.jpg`. Requested path `/local/qfieldcloud-prod/x.jpg` not found.';
+const MC_ABSENT_STDERR = 'mc: <ERROR> Unable to read from `local/qfieldcloud-prod/x.jpg`. Object does not exist.';
+
 /** A fake child process whose stdout/stderr the test drives directly. */
 function fakeChild() {
   const child = new EventEmitter() as EventEmitter & {
@@ -252,8 +257,9 @@ describe('streamMinioObject alias self-heal', () => {
   });
 
   const driveAuthError = (child: ReturnType<typeof fakeChild>) => {
-    // `mc` writes credential errors to stderr; stdout stays empty; non-zero exit.
-    child.stderr.write(Buffer.from('mc: <ERROR> Unable to initialize ... Access Denied.'));
+    // `mc cat` reports a credential-less/missing alias as "Requested path ... not
+    // found" on stderr (NOT "Access Denied" — that's mc ls); stdout stays empty.
+    child.stderr.write(Buffer.from(MC_AUTH_STDERR));
     child.stdout.end();
   };
 
@@ -311,9 +317,9 @@ describe('streamMinioObject alias self-heal', () => {
     const res = fakeRes();
 
     const promise = streamMinioObject('projects/a/missing.jpg', res);
-    // Absent object: stderr says the KEY (not the access key) does not exist —
-    // must NOT be read as an auth failure, so no heal and no retry.
-    child.stderr.write(Buffer.from('mc: <ERROR> Unable to stat ... The specified key does not exist.'));
+    // Absent object with GOOD creds: "Object does not exist" — must NOT be read
+    // as an auth failure, so no heal and no retry.
+    child.stderr.write(Buffer.from(MC_ABSENT_STDERR));
     child.stdout.end();
     await flush();
     child.emit('close', 1);
@@ -324,5 +330,72 @@ describe('streamMinioObject alias self-heal', () => {
       (c) => Array.isArray(c[1]) && (c[1] as string[]).join(' ').includes('mc alias set local'),
     );
     expect(healCall).toBeFalsy();
+  });
+
+  it('does not start a second attempt if the client disconnected during the heal', async () => {
+    const attempt1 = fakeChild();
+    spawnMock.mockReturnValueOnce(attempt1);
+    const res = fakeRes();
+
+    const promise = streamMinioObject('projects/a/photo.jpg', res);
+    driveAuthError(attempt1);
+    await flush();
+    attempt1.emit('close', 1); // → auth-error, then await healMinioAlias()
+    // Client hangs up while the heal is in flight.
+    res.destroy();
+
+    expect(await promise).toBe('not-found');
+    // Only the first attempt ran — no write against the destroyed response.
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * resolveLatestVersion resolves an unversioned key to its newest version via
+ * `mc ls`, and must self-heal the alias the same way when that ls hits an auth
+ * failure (a container recreate breaks ls just like cat).
+ */
+describe('resolveLatestVersion alias self-heal', () => {
+  let resolveLatestVersion: typeof import('../minioPhotoStream').resolveLatestVersion;
+
+  const LS_LINE = '[2026-03-10 12:05:00 UTC] 0B v20260310120500-7bc5005f/\n';
+  const authErr = () => Object.assign(new Error('mc failed'), { stderr: MC_AUTH_STDERR });
+
+  beforeEach(async () => {
+    spawnMock.mockReset();
+    execFileMock.mockReset();
+    vi.resetModules();
+    ({ resolveLatestVersion } = await import('../minioPhotoStream'));
+  });
+
+  it('heals and retries the ls, returning the resolved version', async () => {
+    let ls = 0;
+    execFileMock.mockImplementation((_c: string, args: string[], _o: unknown, cb: (e: unknown, r?: unknown) => void) => {
+      const isAlias = args.join(' ').includes('mc alias set local');
+      if (isAlias) return cb(null, { stdout: '', stderr: '' });
+      ls += 1;
+      // First ls hits the broken alias; the post-heal ls succeeds.
+      return ls === 1 ? cb(authErr()) : cb(null, { stdout: LS_LINE, stderr: '' });
+    });
+
+    const resolved = await resolveLatestVersion('projects/a/photo.jpg');
+    expect(resolved).toBe('projects/a/photo.jpg/v20260310120500-7bc5005f');
+    const healed = execFileMock.mock.calls.some(
+      (c) => Array.isArray(c[1]) && (c[1] as string[]).join(' ').includes('mc alias set local'),
+    );
+    expect(healed).toBe(true);
+  });
+
+  it('returns null (no heal) for a normal non-auth ls failure', async () => {
+    execFileMock.mockImplementation((_c: string, args: string[], _o: unknown, cb: (e: unknown, r?: unknown) => void) => {
+      if (args.join(' ').includes('mc alias set local')) return cb(null, { stdout: '', stderr: '' });
+      return cb(Object.assign(new Error('mc failed'), { stderr: MC_ABSENT_STDERR }));
+    });
+
+    expect(await resolveLatestVersion('projects/a/photo.jpg')).toBeNull();
+    const healed = execFileMock.mock.calls.some(
+      (c) => Array.isArray(c[1]) && (c[1] as string[]).join(' ').includes('mc alias set local'),
+    );
+    expect(healed).toBe(false);
   });
 });

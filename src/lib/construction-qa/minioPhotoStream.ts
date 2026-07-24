@@ -29,11 +29,20 @@ const MINIO_CONTAINER = 'qfieldcloud-minio-1';
  * access key and every `mc cat` then fails this way, 404-ing all qfield photos
  * across all projects until the alias is re-set. Self-heal below re-applies it.
  */
-// Precise: an unauthenticated alias only. Must NOT match "object does not
-// exist" / "specified key does not exist" (a genuinely absent object) — those
-// are normal not-founds and must not trigger a heal+retry on every miss.
+// Detects a broken/credential-less `local` alias from `mc cat` stderr. Verified
+// against the real mc binary (minio RELEASE.2025) inside qfieldcloud-minio-1:
+//
+//   credless / wrong-creds / missing alias → "... Requested path `<p>` not found."
+//   GOOD creds, object truly absent         → "... Object does not exist."
+//   GOOD creds, bucket absent               → "... Bucket `<b>` does not exist."
+//
+// So `mc cat` (unlike `mc ls`, which says "Access Denied") signals an auth/alias
+// failure with "Requested path ... not found" — and a genuine miss is "does not
+// exist". Matching "Requested path" is therefore the correct heal trigger; the
+// "does not exist" variants must NOT match, or every normal miss would heal+retry.
+// The S3-style strings are kept as a defensive net for other mc versions/ops.
 const MC_AUTH_ERROR_RE =
-  /Access Denied|InvalidAccessKeyId|Access Key Id you provided does not exist|SignatureDoesNotMatch/i;
+  /Requested path .*not found|Access Denied|InvalidAccessKeyId|SignatureDoesNotMatch/i;
 
 // Re-apply the `local` alias from the minio container's OWN root creds
 // (MINIO_ROOT_USER/PASSWORD). Expanded by the container's shell, so the secret
@@ -242,6 +251,14 @@ export async function streamMinioObject(objectPath: string, res: NextApiResponse
   if (first !== 'auth-error') return first;
 
   await healMinioAlias();
+
+  // The first attempt detached its disconnect guard when it settled 'auth-error',
+  // so nothing watched `res` during the heal await above. If the client hung up
+  // in that window, don't start a second attempt — writing to a destroyed
+  // response would emit an unhandled 'error'. (Once the retry starts, it
+  // re-attaches its own guard synchronously, so only this window is unguarded.)
+  if (res.writableEnded || res.destroyed) return 'not-found';
+
   const retry = await streamMinioAttempt(objectPath, res);
   return retry === 'auth-error' ? 'not-found' : retry;
 }
@@ -281,7 +298,12 @@ export async function resolveLatestVersion(objectPath: string): Promise<string |
     await healMinioAlias();
     try {
       return await listLatestVersion(objectPath);
-    } catch {
+    } catch (retryErr) {
+      log.error('minio-photo-stream: resolveLatestVersion retry failed after alias heal', {
+        module: 'minio-photo-stream',
+        path: objectPath,
+        error: retryErr instanceof Error ? retryErr.message : String(retryErr),
+      });
       return null;
     }
   }
