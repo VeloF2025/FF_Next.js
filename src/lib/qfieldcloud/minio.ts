@@ -10,7 +10,7 @@ const execAsync = promisify(exec);
 const BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
 export class MinioUnavailableError extends Error {}
 
-const SHELL_UNSAFE = /[;`$|&\\(){}\[\]!#'\n\r]/;
+const SHELL_UNSAFE = /[;`$|&\\(){}[\]!#'\n\r]/;
 
 function assertSafe(path: string): void {
   if (SHELL_UNSAFE.test(path)) throw new Error('Invalid characters in object path');
