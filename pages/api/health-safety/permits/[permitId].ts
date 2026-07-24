@@ -16,8 +16,16 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
-import { effectivePermitStatus, checkTransition } from '@/modules/health-safety/services/permitService';
+import {
+  effectivePermitStatus,
+  checkTransition,
+  allMandatoryPreconditionsMet,
+  TERMINAL_PERMIT_STATUSES,
+} from '@/modules/health-safety/services/permitService';
 import type { PermitStatus, PermitPrecondition } from '@/modules/health-safety/types/permit.types';
+
+/** Fields a PATCH may edit; used to detect an edit attempt on a terminal permit. */
+const EDITABLE_FIELDS = ['title', 'work_description', 'location', 'valid_from', 'valid_to', 'notes', 'precondition_confirmed'];
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -64,11 +72,6 @@ async function handleGet(permitId: string, res: NextApiResponse) {
   return apiResponse.success(res, { permit: { ...permit, effective_status: effective } });
 }
 
-function requiredMet(preconditions: PermitPrecondition[], confirmed: string[]): boolean {
-  const set = new Set(confirmed);
-  return preconditions.filter((p) => p.required).every((p) => set.has(p.text));
-}
-
 async function handlePatch(permitId: string, req: NextApiRequest, res: NextApiResponse) {
   const user = getAuthUser(req);
   const permit = await loadPermit(permitId);
@@ -87,10 +90,26 @@ async function handlePatch(permitId: string, req: NextApiRequest, res: NextApiRe
 
   const effective = effectivePermitStatus(permit.status as PermitStatus, permit.valid_to as string | null, new Date());
 
+  // A terminal permit (closed/expired/rejected) is a finished safety-file record:
+  // its fields — including which preconditions were confirmed — must not be
+  // rewritten from the API even though a status change is already blocked. The
+  // one write we still allow is persisting the lapse (approved/active → expired).
+  const attemptsFieldEdit = EDITABLE_FIELDS.some((f) => has(f));
+  if (TERMINAL_PERMIT_STATUSES.includes(effective) && attemptsFieldEdit) {
+    return apiResponse.badRequest(res, `Cannot edit a ${effective} permit`);
+  }
+
+  if (title !== undefined && (typeof title !== 'string' || title.trim().length === 0)) {
+    return apiResponse.badRequest(res, 'title cannot be empty');
+  }
+  if (valid_from && valid_to && String(valid_to) < String(valid_from)) {
+    return apiResponse.badRequest(res, 'valid_to cannot be before valid_from');
+  }
+
   // Status transition (if requested) is validated against the EFFECTIVE status.
   let newStatus = permit.status as PermitStatus;
   if (status && status !== permit.status) {
-    const check = checkTransition(effective, status as PermitStatus, { allPreconditionsMet: requiredMet(preconditions, confirmed) });
+    const check = checkTransition(effective, status as PermitStatus, { allPreconditionsMet: allMandatoryPreconditionsMet(preconditions, confirmed) });
     if (!check.ok) {
       return apiResponse.badRequest(res, check.reason!);
     }

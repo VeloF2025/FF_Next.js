@@ -6,8 +6,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { effectivePermitStatus, checkTransition } from '../services/permitService';
-import { PERMIT_STATUS_TRANSITIONS } from '../types/permit.types';
+import {
+  effectivePermitStatus,
+  checkTransition,
+  allMandatoryPreconditionsMet,
+  TERMINAL_PERMIT_STATUSES,
+} from '../services/permitService';
+import { PERMIT_STATUS_TRANSITIONS, type PermitPrecondition } from '../types/permit.types';
 
 const NOW = new Date('2026-07-24T12:00:00Z');
 const PAST = '2026-07-20T12:00:00Z';
@@ -67,5 +72,32 @@ describe('checkTransition', () => {
     expect(PERMIT_STATUS_TRANSITIONS.closed).toHaveLength(0);
     expect(PERMIT_STATUS_TRANSITIONS.rejected).toHaveLength(0);
     expect(checkTransition('closed', 'active', met).ok).toBe(false);
+  });
+});
+
+describe('allMandatoryPreconditionsMet', () => {
+  const preconds: PermitPrecondition[] = [
+    { text: 'A', required: true },
+    { text: 'B', required: true },
+    { text: 'C', required: false },
+  ];
+  it('is false until every required precondition is confirmed', () => {
+    expect(allMandatoryPreconditionsMet(preconds, ['A'])).toBe(false);
+    expect(allMandatoryPreconditionsMet(preconds, ['A', 'B'])).toBe(true);
+  });
+  it('ignores optional preconditions', () => {
+    expect(allMandatoryPreconditionsMet(preconds, ['A', 'B'])).toBe(true); // C not needed
+  });
+  it('is true when there are no required preconditions', () => {
+    expect(allMandatoryPreconditionsMet([{ text: 'x', required: false }], [])).toBe(true);
+  });
+});
+
+describe('TERMINAL_PERMIT_STATUSES', () => {
+  it('covers exactly the states with no outgoing transitions', () => {
+    for (const s of TERMINAL_PERMIT_STATUSES) {
+      expect(PERMIT_STATUS_TRANSITIONS[s]).toHaveLength(0);
+    }
+    expect(TERMINAL_PERMIT_STATUSES).toEqual(expect.arrayContaining(['closed', 'expired', 'rejected']));
   });
 });

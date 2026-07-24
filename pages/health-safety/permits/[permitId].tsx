@@ -15,6 +15,7 @@ import { projectsConfig } from '@/modules/navigation';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import { PermitStatusBadge } from '@/modules/health-safety/components/permits/PermitStatusBadge';
 import { PERMIT_STATUS_TRANSITIONS, PERMIT_STATUS_CONFIG, type PermitStatus, type PermitPrecondition } from '@/modules/health-safety/types/permit.types';
+import { allMandatoryPreconditionsMet } from '@/modules/health-safety/services/permitService';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
 
@@ -30,7 +31,7 @@ function Detail({ id }: { id: string }) {
   const confirmed: string[] = Array.isArray(permit?.precondition_confirmed) ? permit.precondition_confirmed : [];
   const effective: PermitStatus = permit?.effective_status ?? 'requested';
   const allowed = PERMIT_STATUS_TRANSITIONS[effective] || [];
-  const requiredMet = preconditions.filter((p) => p.required).every((p) => confirmed.includes(p.text));
+  const requiredMet = allMandatoryPreconditionsMet(preconditions, confirmed);
 
   async function patch(body: Record<string, unknown>) {
     setBusy(true); setMsg(null);

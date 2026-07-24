@@ -72,15 +72,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'Unknown permit_type_id');
   }
 
-  // Human-readable permit number: PTW-YYYYMMDD-NNN (per-day sequence). The
-  // unique index on permit_number is the correctness backstop against a race.
-  const seqRows = await sql`
-    SELECT (COUNT(*) + 1)::int AS seq FROM hs_permits WHERE created_at::date = CURRENT_DATE
-  `;
-  const seq = Number(seqRows[0]?.seq ?? 1);
+  // Human-readable permit number: PTW-YYYYMMDD-NNN. The sequence is MAX(existing
+  // suffix)+1 for the day, NOT COUNT+1 — COUNT would deterministically collide
+  // after a same-day delete (delete P002 of 003 → COUNT 2 → next seq 3 → clashes
+  // with the still-present P003). The unique index remains the backstop against
+  // a concurrent race.
   const now = new Date();
   const ymd = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}`;
-  const permitNumber = `PTW-${ymd}-${String(seq).padStart(3, '0')}`;
+  const prefix = `PTW-${ymd}-`;
+  const seqRows = await sql`
+    SELECT COALESCE(MAX((split_part(permit_number, '-', 3))::int), 0) + 1 AS next_seq
+    FROM hs_permits WHERE permit_number LIKE ${prefix + '%'}
+  `;
+  const permitNumber = `${prefix}${String(Number(seqRows[0]?.next_seq ?? 1)).padStart(3, '0')}`;
 
   const rows = await sql`
     INSERT INTO hs_permits (

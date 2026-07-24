@@ -7,11 +7,20 @@
  *     stored status — an expired permit must visibly block, not silently lapse.
  */
 
-import { PERMIT_STATUS_TRANSITIONS, type PermitStatus } from '../types/permit.types';
+import { PERMIT_STATUS_TRANSITIONS, type PermitStatus, type PermitPrecondition } from '../types/permit.types';
 
 export interface TransitionCheck {
   ok: boolean;
   reason?: string;
+}
+
+/** Terminal states — no further transitions and (server-side) no field edits. */
+export const TERMINAL_PERMIT_STATUSES: PermitStatus[] = ['closed', 'expired', 'rejected'];
+
+/** Every mandatory precondition of the type is present in the confirmed set. */
+export function allMandatoryPreconditionsMet(preconditions: PermitPrecondition[], confirmed: string[]): boolean {
+  const set = new Set(confirmed);
+  return preconditions.filter((p) => p.required).every((p) => set.has(p.text));
 }
 
 /**
