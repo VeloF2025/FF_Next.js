@@ -24,22 +24,42 @@ export interface ESignature {
   signed_ip: string;
 }
 
+/** Loopback / RFC1918 private / IPv6 ULA — the proxy hops, not a real client. */
+function isInternalIp(ip: string): boolean {
+  return (
+    ip === '::1' ||
+    ip.startsWith('127.') ||
+    ip.startsWith('10.') ||
+    ip.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+    /^(fc|fd)[0-9a-f]{2}:/i.test(ip) ||
+    ip.startsWith('::ffff:127.') ||
+    ip.startsWith('::ffff:10.') ||
+    ip.startsWith('::ffff:192.168.')
+  );
+}
+
 /**
  * The signer's real IP for the audit trail.
  *
- * Velocity's nginx uses `$proxy_add_x_forwarded_for`, which APPENDS the real
- * upstream socket address to whatever the client sent — so the LAST hop is the
- * IP nginx actually observed and the client cannot forge it, whereas the first
- * hop is client-controlled. Taking the last hop is deliberately different from
- * the first-hop idiom used for non-audit logging elsewhere: this value feeds a
- * legal §4.5 e-signature and must not be spoofable. (Assumes the single trusted
- * nginx in front of the app; add-a-CDN would need the trusted-proxy count
- * revisited.)
+ * nginx uses `$proxy_add_x_forwarded_for`, which APPENDS each proxy's observed
+ * upstream IP to the right, so the chain reads:
+ *   <client-forged entries…>, <real client>, <internal proxy hops…>
+ * A client can only inject entries at the LEFT (first-hop is spoofable); it can
+ * never insert one to the right of the real hops. So the rightmost PUBLIC hop
+ * is the real client and is unforgeable — walk from the right, skip the
+ * internal proxy hops (this deployment has more than one), and take the first
+ * public address. This is deliberately stricter than the first-hop idiom used
+ * for non-audit logging: signed_ip feeds a legal §4.5 e-signature.
  */
 export function clientIp(req: NextApiRequest): string {
   const fwd = req.headers['x-forwarded-for'];
   if (typeof fwd === 'string' && fwd.length > 0) {
     const hops = fwd.split(',').map((h) => h.trim()).filter(Boolean);
+    for (let i = hops.length - 1; i >= 0; i--) {
+      if (!isInternalIp(hops[i]!)) return hops[i]!;
+    }
+    // All hops internal (same-host request) — the last hop is the best we have.
     if (hops.length > 0) return hops[hops.length - 1]!;
   }
   return req.socket?.remoteAddress ?? 'unknown';

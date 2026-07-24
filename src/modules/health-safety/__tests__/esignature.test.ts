@@ -14,15 +14,23 @@ function reqWith(headers: Record<string, unknown>, remote?: string, body?: unkno
 }
 
 describe('clientIp', () => {
-  it('takes the LAST hop of x-forwarded-for (the IP nginx observed)', () => {
-    // nginx appends the real socket IP, so the last hop is trustworthy.
-    expect(clientIp(reqWith({ 'x-forwarded-for': '41.1.2.3, 10.0.0.1' }))).toBe('10.0.0.1');
+  it('takes the rightmost PUBLIC hop, skipping internal proxy hops', () => {
+    // Real chain behind two proxies: <real client>, <inner nginx>, <app localhost>.
+    expect(clientIp(reqWith({ 'x-forwarded-for': '105.209.144.156, 10.0.0.1, 127.0.0.1' }))).toBe('105.209.144.156');
   });
 
-  it('ignores a client-forged first hop and keeps the appended real IP', () => {
-    // A client sending its own X-Forwarded-For: 1.2.3.4 → nginx forwards
-    // "1.2.3.4, <real-ip>"; the forged value must NOT be chosen.
-    expect(clientIp(reqWith({ 'x-forwarded-for': '1.2.3.4, 196.25.99.1' }))).toBe('196.25.99.1');
+  it('ignores a client-forged public first hop and keeps the real appended one', () => {
+    // A client sends its own X-Forwarded-For: 8.8.8.8 → nginx appends the real
+    // client + proxy hops to the right; the forged leading entry must NOT win.
+    expect(clientIp(reqWith({ 'x-forwarded-for': '8.8.8.8, 196.25.99.1, 127.0.0.1' }))).toBe('196.25.99.1');
+  });
+
+  it('handles a single public hop', () => {
+    expect(clientIp(reqWith({ 'x-forwarded-for': '41.1.2.3' }))).toBe('41.1.2.3');
+  });
+
+  it('falls back to the last hop when every hop is internal (same-host request)', () => {
+    expect(clientIp(reqWith({ 'x-forwarded-for': '10.0.0.1, 127.0.0.1' }))).toBe('127.0.0.1');
   });
 
   it('falls back to the socket address when no forwarded header', () => {
