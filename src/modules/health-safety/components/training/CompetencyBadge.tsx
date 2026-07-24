@@ -4,10 +4,13 @@
  */
 
 import { CheckCircle2, AlertTriangle, XCircle, MinusCircle } from 'lucide-react';
+import type { CompetencyCellStatus } from '@/modules/health-safety/types/training.types';
 
-export type CompetencyStatus = 'current' | 'expiring_soon' | 'expired' | 'missing';
+// Re-exported so existing importers of `CompetencyStatus` from this component
+// keep working, but the single source of truth is training.types.ts.
+export type CompetencyStatus = CompetencyCellStatus;
 
-const CONFIG: Record<CompetencyStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
+const CONFIG: Record<CompetencyCellStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
   current: {
     label: 'Current',
     className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',

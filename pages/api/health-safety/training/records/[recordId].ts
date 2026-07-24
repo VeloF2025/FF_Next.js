@@ -43,8 +43,16 @@ async function handlePatch(recordId: string, req: NextApiRequest, res: NextApiRe
   const { completed_date, expiry_date, certificate_url, certificate_number, issued_by, notes, project_id } =
     req.body;
 
-  const hasExpiry = Object.prototype.hasOwnProperty.call(req.body, 'expiry_date');
-  const hasProject = Object.prototype.hasOwnProperty.call(req.body, 'project_id');
+  // has-key semantics for every nullable field: a field is changed only when
+  // the caller includes its key, and an explicit null clears it. A plain
+  // COALESCE would make it impossible to ever blank a certificate number.
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(req.body, k);
+  const hasExpiry = has('expiry_date');
+  const hasProject = has('project_id');
+  const hasCertUrl = has('certificate_url');
+  const hasCertNo = has('certificate_number');
+  const hasIssuedBy = has('issued_by');
+  const hasNotes = has('notes');
 
   const rows = await sql`
     UPDATE hs_worker_training
@@ -52,10 +60,10 @@ async function handlePatch(recordId: string, req: NextApiRequest, res: NextApiRe
       completed_date = COALESCE(${completed_date ?? null}::date, completed_date),
       expiry_date = CASE WHEN ${hasExpiry} THEN ${expiry_date ?? null}::date ELSE expiry_date END,
       project_id = CASE WHEN ${hasProject} THEN ${project_id ?? null}::uuid ELSE project_id END,
-      certificate_url = COALESCE(${certificate_url ?? null}, certificate_url),
-      certificate_number = COALESCE(${certificate_number ?? null}, certificate_number),
-      issued_by = COALESCE(${issued_by ?? null}, issued_by),
-      notes = COALESCE(${notes ?? null}, notes),
+      certificate_url = CASE WHEN ${hasCertUrl} THEN ${certificate_url ?? null} ELSE certificate_url END,
+      certificate_number = CASE WHEN ${hasCertNo} THEN ${certificate_number ?? null} ELSE certificate_number END,
+      issued_by = CASE WHEN ${hasIssuedBy} THEN ${issued_by ?? null} ELSE issued_by END,
+      notes = CASE WHEN ${hasNotes} THEN ${notes ?? null} ELSE notes END,
       updated_at = NOW()
     WHERE id = ${recordId}
     RETURNING *

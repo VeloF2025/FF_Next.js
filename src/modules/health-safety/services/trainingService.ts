@@ -28,9 +28,12 @@ const sql = neon(process.env.DATABASE_URL!);
 /**
  * Roll up a contractor's worker training into a single score.
  *
- * score = current_certs / total_certs * 100, rounded. A cert is "current" when
- * it has no expiry or has not yet expired. total_certs = 0 → score null (no
- * data — must NOT block the gate, matching the pre-existing NULL semantics).
+ * score = current_certs / total_certs * 100, rounded. Here "current" is the
+ * gate's broad sense — any cert not yet expired, which INCLUDES the
+ * expiring-soon bucket (that is a warning, not a failure). This is deliberately
+ * wider than the per-record `current` status used in the listing/gap views,
+ * which excludes expiring_soon. total_certs = 0 → score null (no data — must
+ * NOT block the gate, matching the pre-existing NULL semantics).
  */
 export async function computeContractorTrainingScore(
   contractorId: string

@@ -114,6 +114,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   if (hasStaff === hasTeamMember) {
     return apiResponse.badRequest(res, 'Exactly one of staff_id or team_member_id is required');
   }
+  // Surface an out-of-order date as a 400 rather than letting the DB CHECK
+  // (expiry_date >= completed_date) turn it into a 500.
+  if (expiry_date && completed_date && String(expiry_date) < String(completed_date)) {
+    return apiResponse.badRequest(res, 'expiry_date cannot be before completed_date');
+  }
 
   // Resolve the training type — needed to snapshot statutory flag and to derive
   // expiry from validity_months when the caller does not pass an explicit date.

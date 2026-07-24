@@ -100,6 +100,15 @@ describe('checkContractorGate — training-driven verdict', () => {
     expect(result.blockers.some((b) => /Training compliance \(50%\)/.test(b))).toBe(true);
   });
 
+  it('does not block at exactly the minimum (70% is not below 70%)', async () => {
+    primeSql();
+    trainingMock.mockResolvedValueOnce(score({ total_certs: 10, current_certs: 7, training_score: 70 }));
+
+    const result = await checkContractorGate('c1');
+    expect(result.can_assign).toBe(true);
+    expect(result.blockers.some((b) => /Training compliance/.test(b))).toBe(false);
+  });
+
   it('does not block when there is no training data (score null)', async () => {
     primeSql();
     trainingMock.mockResolvedValueOnce(score({ training_score: null }));

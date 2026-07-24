@@ -8,8 +8,13 @@
  * contractor_id is unpopulated in live data, so training rows carry it directly).
  */
 
-/** Competency status derived from expiry_date — never stored (goal §4.7). */
+/**
+ * Competency status derived from expiry_date — never stored (goal §4.7).
+ * `missing` is not a record state: it is used only by the per-project gap
+ * matrix, where a worker has no record at all for a required training type.
+ */
 export type CompetencyStatus = 'current' | 'expiring_soon' | 'expired';
+export type CompetencyCellStatus = CompetencyStatus | 'missing';
 
 /** Days before expiry at which a competency is flagged "expiring soon". */
 export const EXPIRING_SOON_DAYS = 30;

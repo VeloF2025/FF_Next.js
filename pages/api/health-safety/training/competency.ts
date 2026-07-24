@@ -34,9 +34,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // completed_date means the worker has no record for that type = a gap.
     const cells = await sql`
       WITH proj_workers AS (
-        SELECT DISTINCT staff_id, team_member_id, contractor_id, worker_name
+        -- One row per physical worker. DISTINCT is scoped to worker identity
+        -- only: if the same worker's records carry an inconsistent contractor_id
+        -- or name spelling, including those columns here would split them into
+        -- two "workers" and double-count the matrix.
+        SELECT DISTINCT ON (staff_id, team_member_id)
+               staff_id, team_member_id, contractor_id, worker_name
         FROM hs_worker_training
         WHERE project_id = ${project_id}::uuid
+        ORDER BY staff_id, team_member_id, created_at DESC
       ),
       stat_types AS (
         SELECT id, code, name
@@ -63,7 +69,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND w.training_type_id = st.id
           AND w.staff_id IS NOT DISTINCT FROM pw.staff_id
           AND w.team_member_id IS NOT DISTINCT FROM pw.team_member_id
-        ORDER BY w.completed_date DESC
+        -- created_at breaks ties when two records of the same type share a
+        -- completed_date (e.g. a re-issued certificate), so the resolved cell
+        -- is deterministic.
+        ORDER BY w.completed_date DESC, w.created_at DESC
         LIMIT 1
       ) latest ON true
       ORDER BY pw.worker_name, st.name

@@ -234,7 +234,6 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       can_assign: boolean;
       blockers: string[];
       warnings: string[];
-      error?: string;
     } | null = null;
     try {
       const gateResult = await checkContractorGate(contractorId);
@@ -310,13 +309,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
     const mapped = mapDbToAssignmentCore(assignment);
 
+    // Reaching here means the gate passed (an error would have returned 503,
+    // a failed verdict 403), so the only nuance left is non-blocking warnings.
     return res.status(201).json({
       success: true,
       data: mapped,
       gate_check: gateCheck,
-      message: gateCheck?.error
-        ? 'Contractor assignment created (H&S gate could not be evaluated — fail-open)'
-        : gateCheck && gateCheck.warnings.length > 0
+      message:
+        gateCheck && gateCheck.warnings.length > 0
           ? `Contractor assignment created with H&S warnings: ${gateCheck.warnings.join('; ')}`
           : 'Contractor assignment created successfully'
     });
