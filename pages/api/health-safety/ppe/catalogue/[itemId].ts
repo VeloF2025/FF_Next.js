@@ -10,8 +10,11 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
+import { PPE_CATEGORIES } from '@/modules/health-safety/types/ppe.types';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+const VALID_CATEGORIES = new Set(PPE_CATEGORIES.map((c) => c.value));
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { itemId } = req.query;
@@ -28,8 +31,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (lifespan_months != null && (!Number.isInteger(lifespan_months) || lifespan_months <= 0)) {
       return apiResponse.badRequest(res, 'lifespan_months must be a positive integer or null');
     }
+    if (category != null && !VALID_CATEGORIES.has(category)) {
+      return apiResponse.badRequest(res, `category must be one of: ${[...VALID_CATEGORIES].join(', ')}`);
+    }
     const has = (k: string) => Object.prototype.hasOwnProperty.call(req.body, k);
-    const sizeArr = has('sizes') && Array.isArray(sizes) ? sizes.filter((s) => typeof s === 'string') : null;
+    // If sizes is present it must be an array — reject a malformed value rather
+    // than silently leaving the field unchanged.
+    if (has('sizes') && !Array.isArray(sizes)) {
+      return apiResponse.badRequest(res, 'sizes must be an array');
+    }
+    const sizeArr = has('sizes') ? (sizes as unknown[]).filter((s) => typeof s === 'string') : null;
 
     const rows = await sql`
       UPDATE hs_ppe_catalogue

@@ -23,6 +23,11 @@ function q(call: unknown[]): string {
   return (call[0] as string[]).join('$').replace(/\s+/g, ' ');
 }
 
+/** The bound interpolated values of a tagged-template call (everything after the strings array). */
+function args(call: unknown[]): unknown[] {
+  return call.slice(1);
+}
+
 describe('POST /api/health-safety/ppe/issuance — validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,10 +75,18 @@ describe('GET /api/health-safety/ppe/issuance — replacement-status SQL', () =>
     expect(listQuery).toMatch(/signature_name IS NOT NULL\) AS acknowledged/);
   });
 
-  it('applies the outstanding filter only when requested', async () => {
+  it('binds the outstanding flag true only when status=outstanding is requested', async () => {
+    // The filter text is unconditionally present (it is gated by a bound boolean
+    // param, not a spliced fragment), so the flag's VALUE is what proves the
+    // filter is active — assert on the bound argument, not the query text.
     await get({ status: 'outstanding' });
-    const listQuery = sqlMock.mock.calls.map(q).find((t) => /replacement_status/.test(t));
-    // The outstanding branch: unsigned OR overdue.
-    expect(listQuery).toMatch(/i\.signature_name IS NULL OR/);
+    const on = sqlMock.mock.calls.find((c) => /replacement_status/.test(q(c)));
+    expect(args(on!)).toContain(true);
+
+    sqlMock.mockClear();
+    await get();
+    const off = sqlMock.mock.calls.find((c) => /replacement_status/.test(q(c)));
+    expect(args(off!)).toContain(false);
+    expect(args(off!)).not.toContain(true);
   });
 });

@@ -11,8 +11,11 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
+import { PPE_CATEGORIES } from '@/modules/health-safety/types/ppe.types';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+const VALID_CATEGORIES = new Set(PPE_CATEGORIES.map((c) => c.value));
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -47,6 +50,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
   if (lifespan_months != null && (!Number.isInteger(lifespan_months) || lifespan_months <= 0)) {
     return apiResponse.badRequest(res, 'lifespan_months must be a positive integer or null');
+  }
+  if (category != null && !VALID_CATEGORIES.has(category)) {
+    return apiResponse.badRequest(res, `category must be one of: ${[...VALID_CATEGORIES].join(', ')}`);
   }
 
   const [existing] = await sql`SELECT id FROM hs_ppe_catalogue WHERE code = ${code} LIMIT 1`;

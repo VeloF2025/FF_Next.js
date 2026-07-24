@@ -32,26 +32,35 @@ function CatalogueContent() {
     setErr(null);
     if (!form.code || !form.name) { setErr('Code and name are required'); return; }
     setSaving(true);
-    const res = await fetch('/api/health-safety/ppe/catalogue', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: form.code, name: form.name, category: form.category,
-        lifespan_months: form.lifespan_months ? parseInt(form.lifespan_months, 10) : null,
-        sizes: form.sizes ? form.sizes.split(',').map((s) => s.trim()).filter(Boolean) : [],
-      }),
-    });
-    const json = await res.json();
-    setSaving(false);
-    if (!res.ok || json?.success === false) { setErr(json?.error?.message || json?.error || 'Failed'); return; }
-    setForm({ code: '', name: '', category: 'head', lifespan_months: '', sizes: '' });
-    mutate(KEY);
+    try {
+      const res = await fetch('/api/health-safety/ppe/catalogue', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: form.code, name: form.name, category: form.category,
+          lifespan_months: form.lifespan_months ? parseInt(form.lifespan_months, 10) : null,
+          sizes: form.sizes ? form.sizes.split(',').map((s) => s.trim()).filter(Boolean) : [],
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json?.success === false) { setErr(json?.error?.message || json?.error || 'Failed'); return; }
+      setForm({ code: '', name: '', category: 'head', lifespan_months: '', sizes: '' });
+      mutate(KEY);
+    } catch {
+      setErr('Network error adding item');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function toggle(item: Item) {
-    await fetch(`/api/health-safety/ppe/catalogue/${item.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !item.is_active }),
-    });
-    mutate(KEY);
+    try {
+      await fetch(`/api/health-safety/ppe/catalogue/${item.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !item.is_active }),
+      });
+      mutate(KEY);
+    } catch {
+      setErr('Network error updating item');
+    }
   }
 
   return (
