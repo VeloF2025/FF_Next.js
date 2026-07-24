@@ -8,7 +8,17 @@
  * 3. GET /app?layer=5121 - Initialize layer access (CRITICAL!)
  * 4. Make API calls
  *
- * Layer ID: 5121 (Home Installation - Aerial)
+ * Layers:
+ * - READ_LAYER_ID  5121 "fibertime Installations"            — reads (searchDR/searchBySerial)
+ * - WRITE_LAYER_ID 6236 "fibertime Installations (contractor)" — writes (ONT/UPS/status)
+ *
+ * Why two layers (2026-07-24): 1Map made layer 5121 READ-ONLY for our accounts
+ * (canEditAttributes=false → writes to it 403 / silently drop 0 rows). Layer 6236 is a
+ * writable contractor view over the SAME records (same prop_id/drp/ph_ont/br_ser); writes
+ * to it persist and propagate back to 5121 (verified end-to-end on ETW + TEM, 2026-07-24).
+ * Reads stay on 5121 (they work for all projects on the shared cookie session); only the
+ * layerid on the write endpoint changed. The silent-drop detector (parseWriteResponse)
+ * still applies — 6236 writes echo the updated row in items[].
  *
  * Status: WORKING
  * NLNH Confidence: HIGH
@@ -23,7 +33,8 @@ const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD;
 if (!ONEMAP_PASSWORD) {
   logger.warn('ONEMAP_PASSWORD not set — authentication will fail');
 }
-const LAYER_ID = '5121';
+const LAYER_ID = '5121'; // read layer (searchDR/searchBySerial + /app?layer= init)
+const WRITE_LAYER_ID = '6236'; // write layer — 5121 is read-only for our accounts (see header)
 const BASE_URL = 'https://www.1map.co.za';
 const FETCH_TIMEOUT_MS = 30000; // 30 second timeout - 1Map search can take 10-15s under load
 
@@ -439,7 +450,7 @@ class OneMapApiService {
 
       const formData = new URLSearchParams({
         action: 'update',
-        layerid: LAYER_ID,
+        layerid: WRITE_LAYER_ID,
         sort: 'prop_id',
         templateExpression: '',
         start: '0',
@@ -551,7 +562,7 @@ class OneMapApiService {
 
       const formData = new URLSearchParams({
         action: 'update',
-        layerid: LAYER_ID,
+        layerid: WRITE_LAYER_ID,
         sort: 'prop_id',
         templateExpression: '',
         start: '0',
@@ -902,7 +913,7 @@ class OneMapApiService {
 
       const formData = new URLSearchParams({
         action: 'update',
-        layerid: LAYER_ID,
+        layerid: WRITE_LAYER_ID,
         sort: 'prop_id',
         templateExpression: '',
         start: '0',
