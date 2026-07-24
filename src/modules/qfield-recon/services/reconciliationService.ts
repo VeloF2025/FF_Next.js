@@ -74,7 +74,7 @@ export function buildReconciliation(input: BuildInput): ReconModel {
     const pon = ponOf(a);
     const s = bucket(a.kind, pon);
     if (a.kind === 'optical' && pon != null) observedOpticalPons.add(pon);
-    if (a.label) auditedLabels.add(a.label);
+    if (a.kind === 'civil' && a.label) auditedLabels.add(a.label);
 
     if (a.hasApplied) {
       s.applied += 1; totals.applied += 1;

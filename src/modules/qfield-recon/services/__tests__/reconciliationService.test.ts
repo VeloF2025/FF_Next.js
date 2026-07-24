@@ -71,12 +71,26 @@ describe('buildReconciliation', () => {
   });
 
   it('no design layer: optical never_captured via observed-sequence gap', () => {
-    const deltas = [163, 165, 166].map(pon => optical(`s${pon}`, pon, 'applied'));
+    const deltas: AuditDelta[] = [163, 165, 166].map(pon => optical(`s${pon}`, pon, 'applied'));
+    deltas.push(civil('MOA.P.Z1', 'applied', 'Pole Planted/ All Photos'));
     const model = buildReconciliation({ project, deltas, ponMap: emptyMap, presentPhotoKeys: new Set() });
     expect(model.designLayer.available).toBe(false);
     const gap = model.optical.find(p => p.ponNo === 164);
     expect(gap?.neverCaptured).toBe(1);
     // civil with no design layer lands in the null-PON bucket, not per-PON
-    expect(model.civil.every(p => p.ponNo === null || p.designFeatures === 0)).toBe(true);
+    const civilNull = model.civil.find(p => p.ponNo === null);
+    expect(civilNull).toBeDefined();
+    expect(civilNull!.applied).toBe(1);
+  });
+
+  it('in-flight (started/pending only) feature counts as stuck_recoverable', () => {
+    const deltas = [optical('9001', 200, 'started')];
+    const map: PonMap = { available: true, gpkgVersion: 'v', resolvedAt: 'now', designPons: [200], poleToPon: {} };
+    const model = buildReconciliation({ project, deltas, ponMap: map, presentPhotoKeys: new Set() });
+    const pon200 = model.optical.find(p => p.ponNo === 200)!;
+    expect(pon200.stuckRecoverable).toBe(1);
+    expect(pon200.applied).toBe(0);
+    expect(pon200.neverCaptured).toBe(0);
+    expect(model.stuckDeltas).toHaveLength(0); // 'started' is not in the STUCK set, so no stuck-delta row
   });
 });
