@@ -38,7 +38,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const talks = await sql`
     SELECT t.*, p.project_name,
       (SELECT COUNT(*) FROM hs_toolbox_attendance a WHERE a.talk_id = t.id)::int AS attendee_count,
-      (SELECT COUNT(*) FROM hs_toolbox_attendance a WHERE a.talk_id = t.id AND a.signature_name IS NOT NULL)::int AS signed_count
+      (SELECT COUNT(*) FROM hs_toolbox_attendance a WHERE a.talk_id = t.id AND a.signature_name IS NOT NULL)::int AS signed_count,
+      -- Serialize the pure date column as plain YYYY-MM-DD text (last-column-wins
+      -- over the t.* copy) so node-pg does not render it one day early on SAST.
+      t.talk_date::text AS talk_date
     FROM hs_toolbox_talks t
     LEFT JOIN projects p ON p.id = t.project_id
     WHERE (${projectId}::uuid IS NULL OR t.project_id = ${projectId}::uuid)
@@ -76,7 +79,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${JSON.stringify(photos)}::jsonb,
       ${userId}
     )
-    RETURNING *
+    RETURNING *, talk_date::text AS talk_date
   `;
   const talk = rows[0]!;
 

@@ -41,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 async function handleGet(talkId: string, res: NextApiResponse) {
   const [talk] = await sql`
-    SELECT t.*, p.project_name
+    SELECT t.*, p.project_name, t.talk_date::text AS talk_date
     FROM hs_toolbox_talks t
     LEFT JOIN projects p ON p.id = t.project_id
     WHERE t.id = ${talkId}
@@ -90,7 +90,7 @@ async function handlePatch(talkId: string, req: NextApiRequest, res: NextApiResp
       photo_urls = CASE WHEN ${hasPhotos} THEN ${JSON.stringify(photos)}::jsonb ELSE photo_urls END,
       updated_at = NOW()
     WHERE id = ${talkId}
-    RETURNING *
+    RETURNING *, talk_date::text AS talk_date
   `;
   if (rows.length === 0) {
     return apiResponse.notFound(res, 'Toolbox talk', talkId);

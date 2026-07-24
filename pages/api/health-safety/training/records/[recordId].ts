@@ -67,7 +67,7 @@ async function handlePatch(recordId: string, req: NextApiRequest, res: NextApiRe
       notes = CASE WHEN ${hasNotes} THEN ${notes ?? null} ELSE notes END,
       updated_at = NOW()
     WHERE id = ${recordId}
-    RETURNING *
+    RETURNING *, completed_date::text AS completed_date, expiry_date::text AS expiry_date
   `;
 
   if (rows.length === 0) {

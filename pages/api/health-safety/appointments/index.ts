@@ -43,8 +43,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const letters = await sql`
     SELECT
       l.id, l.letter_type, l.reference_number, l.project_id, l.contractor_id,
-      l.appointer_name, l.appointee_name, l.appointee_designation, l.appointment_date,
-      l.effective_from, l.status, l.signature_name, l.signed_at,
+      l.appointer_name, l.appointee_name, l.appointee_designation,
+      -- Pure date columns cast to plain YYYY-MM-DD text so node-pg does not
+      -- shift them one day early on the SAST server (signed_at is timestamptz
+      -- and round-trips correctly, so it is left as-is). Display only.
+      l.appointment_date::text AS appointment_date,
+      l.effective_from::text AS effective_from, l.status, l.signature_name, l.signed_at,
       (l.signature_image IS NOT NULL) AS has_signature,
       p.project_name, c.company_name AS contractor_name
     FROM hs_appointment_letters l
@@ -94,7 +98,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${appointer_name || null}, ${appointer_designation || null}, ${appointee_name.trim()}, ${appointee_designation || null},
       ${scope || typeDef.defaultScope}, ${appointment_date || null}, ${effective_from || null}, 'draft', ${notes || null}, ${user?.id ?? null}
     )
-    RETURNING *
+    RETURNING *, appointment_date::text AS appointment_date, effective_from::text AS effective_from
   `;
 
   await logHsActivity({

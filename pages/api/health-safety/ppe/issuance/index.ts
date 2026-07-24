@@ -50,7 +50,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         WHEN i.replacement_due <= CURRENT_DATE + make_interval(days => ${PPE_DUE_SOON_DAYS}) THEN 'due_soon'
         ELSE 'ok'
       END AS replacement_status,
-      (i.signature_name IS NOT NULL) AS acknowledged
+      (i.signature_name IS NOT NULL) AS acknowledged,
+      -- Serialize pure date columns as plain YYYY-MM-DD text (last-column-wins
+      -- over the i.* copies) so node-pg does not render them one day early on
+      -- SAST. Display only — status/arithmetic above use the raw date columns.
+      i.issued_date::text AS issued_date,
+      i.replacement_due::text AS replacement_due
     FROM hs_ppe_issuance i
     JOIN hs_ppe_catalogue c ON c.id = i.ppe_item_id
     LEFT JOIN projects p ON p.id = i.project_id
@@ -113,7 +118,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${sig?.signature_name ?? null}, ${sig?.signed_at ?? null}::timestamptz, ${sig?.signed_by ?? null}, ${sig?.signed_ip ?? null},
       ${notes || null}, ${user?.id ?? null}
     )
-    RETURNING *
+    RETURNING *, issued_date::text AS issued_date, replacement_due::text AS replacement_due
   `;
 
   await logHsActivity({

@@ -60,7 +60,13 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         WHEN wt.expiry_date < CURRENT_DATE THEN 'expired'
         WHEN wt.expiry_date <= CURRENT_DATE + make_interval(days => ${EXPIRING_SOON_DAYS}) THEN 'expiring_soon'
         ELSE 'current'
-      END AS competency_status
+      END AS competency_status,
+      -- Serialize pure date columns as plain YYYY-MM-DD text (last-column-wins
+      -- over the wt.* copies) so node-pg does not parse them into a local-TZ
+      -- Date that renders one day early on the SAST server. Display only —
+      -- the classification/arithmetic above uses the raw date columns.
+      wt.completed_date::text AS completed_date,
+      wt.expiry_date::text AS expiry_date
     FROM hs_worker_training wt
     JOIN hs_training_types tt ON tt.id = wt.training_type_id
     WHERE (${cid}::uuid IS NULL OR wt.contractor_id = ${cid}::uuid)
@@ -174,7 +180,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${notes || null},
       ${userId}
     )
-    RETURNING *
+    RETURNING *, completed_date::text AS completed_date, expiry_date::text AS expiry_date
   `;
   const record = rows[0]!;
 

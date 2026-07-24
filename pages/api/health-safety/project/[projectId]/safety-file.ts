@@ -35,7 +35,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     const letters = (await sql`
-      SELECT * FROM hs_appointment_letters WHERE project_id = ${projectId}
+      SELECT *,
+        -- Pure date columns as plain YYYY-MM-DD text (last-column-wins over *)
+        -- so the PDF renders them correctly on the SAST server. Display only.
+        appointment_date::text AS appointment_date,
+        effective_from::text AS effective_from
+      FROM hs_appointment_letters WHERE project_id = ${projectId}
       ORDER BY letter_type, created_at
     `) as unknown as AppointmentLetter[];
 
