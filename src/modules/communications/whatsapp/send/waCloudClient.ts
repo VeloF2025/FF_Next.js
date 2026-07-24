@@ -9,7 +9,9 @@ export type WaSendResult = {
   outcome?: 'DEFINITELY_REJECTED' | 'AMBIGUOUS';
 };
 
-const DEFINITE = new Set([400, 401, 403, 404, 405, 413, 415, 422, 429]);
+// Statuses that mean the request was permanently rejected (safe to treat as
+// terminal). 429 is deliberately EXCLUDED — rate-limiting is transient/retryable.
+const DEFINITE = new Set([400, 401, 403, 404, 405, 413, 415, 422]);
 
 function normalizePhone(phone: string): string {
   let p = phone.replace(/@s\.whatsapp\.net$/i, '').replace(/[\s\-+]/g, '');

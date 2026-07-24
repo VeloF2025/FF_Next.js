@@ -81,7 +81,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     `;
   } catch (e) {
     logger.error('cloud inbound persist failed', { error: e instanceof Error ? e.message : String(e) });
-    // Ack anyway so Meta stops retrying a message we may have already stored.
+    // Ack with 200 so Meta stops retrying, but report the row was NOT persisted.
+    return res.status(200).json({ ok: true, persisted: false });
   }
 
   return res.status(200).json({ ok: true, persisted: true });

@@ -16,10 +16,13 @@ export function WhatsAppConversationPanel({ ticketId, drNumber }: { ticketId: st
   const [draft, setDraft] = useState('');
   const [toPhone, setToPhone] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/noc/tickets/${ticketId}/whatsapp?dr=${encodeURIComponent(drNumber ?? '')}`);
+    const res = await fetch(`/api/noc/tickets/${ticketId}/whatsapp?dr=${encodeURIComponent(drNumber ?? '')}`, {
+      credentials: 'include',
+    });
     const json = await res.json();
     setItems(json?.data?.items ?? []);
     setLoading(false);
@@ -30,14 +33,27 @@ export function WhatsAppConversationPanel({ ticketId, drNumber }: { ticketId: st
   const send = async () => {
     if (!draft.trim() || !toPhone.trim()) return;
     setSending(true);
-    await fetch(`/api/noc/tickets/${ticketId}/whatsapp/reply`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ toPhone: toPhone.trim(), message: draft.trim() }),
-    });
-    setDraft('');
-    setSending(false);
-    await load();
+    setSendError(null);
+    try {
+      const res = await fetch(`/api/noc/tickets/${ticketId}/whatsapp/reply`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toPhone: toPhone.trim(), message: draft.trim() }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) {
+        // Do NOT clear the draft — the message was not sent; let the operator retry.
+        setSendError(json?.error ?? `Failed to send (HTTP ${res.status})`);
+        return;
+      }
+      setDraft('');
+      await load();
+    } catch {
+      setSendError('Network error — message not sent');
+    } finally {
+      setSending(false);
+    }
   };
 
   if (loading) return <div className="p-4 text-sm text-muted-foreground">Loading conversation…</div>;
@@ -58,6 +74,7 @@ export function WhatsAppConversationPanel({ ticketId, drNumber }: { ticketId: st
       )}
 
       <div className="mt-2 flex flex-col gap-2 border-t pt-2">
+        {sendError && <div className="text-xs text-red-600" role="alert">{sendError}</div>}
         <input
           className="rounded border px-2 py-1 text-sm"
           placeholder="Recipient phone (e.g. 27821234567)"

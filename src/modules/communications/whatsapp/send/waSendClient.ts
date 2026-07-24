@@ -10,7 +10,14 @@ export async function sendWhatsAppText(opts: {
   const channel: WaSendChannel = opts.channel ?? ((await getWaProvider()) === 'cloud' ? 'cloud' : 'waha');
 
   if (channel === 'cloud') {
-    const creds = await getWaCloudCreds();
+    // getWaCloudCreds throws WaCloudNotConfiguredError when creds are incomplete;
+    // surface that as a controlled result rather than an unhandled 500 upstream.
+    let creds;
+    try {
+      creds = await getWaCloudCreds();
+    } catch (e) {
+      return { ok: false, channel: 'cloud', error: e instanceof Error ? e.message : 'Cloud not configured', outcome: 'AMBIGUOUS' };
+    }
     return sendViaCloud({ toPhone: opts.toPhone, message: opts.message, creds, signal: opts.signal });
   }
 

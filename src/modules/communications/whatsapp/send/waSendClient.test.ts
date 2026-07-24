@@ -49,6 +49,13 @@ describe('sendWhatsAppText channel routing', () => {
     expect(r).toMatchObject({ ok: false, channel: 'waha', outcome: 'AMBIGUOUS' });
   });
 
+  it('returns ok:false (never throws) when Cloud creds are not configured', async () => {
+    vi.mocked(getWaCloudCreds).mockRejectedValue(new Error('WhatsApp Cloud credentials are not fully configured'));
+    const r = await sendWhatsAppText({ toPhone: '27821234567', message: 'hi', channel: 'cloud' });
+    expect(r).toMatchObject({ ok: false, channel: 'cloud', outcome: 'AMBIGUOUS' });
+    expect(sendViaCloud).not.toHaveBeenCalled();
+  });
+
   it('falls back to the configured provider when channel is omitted', async () => {
     vi.mocked(getWaProvider).mockResolvedValue('cloud');
     vi.mocked(getWaCloudCreds).mockResolvedValue({ phoneNumberId: 'PN1', accessToken: 'T', appSecret: 'S', verifyToken: 'V' });
