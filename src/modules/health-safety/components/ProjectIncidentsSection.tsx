@@ -61,7 +61,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 function getSeverityConfig(severity: string | null) {
   switch (severity) {
-    case 'fatal':
+    case 'critical':
       return { bg: 'bg-black', text: 'text-white', label: 'Fatal' };
     case 'major':
       return { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', label: 'Major' };

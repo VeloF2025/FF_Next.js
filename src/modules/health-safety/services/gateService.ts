@@ -21,7 +21,7 @@ const sql = neon(process.env.DATABASE_URL!);
  * Gate blockers (HARD BLOCK - cannot assign):
  * - Missing required documents (safety_policy, liability_insurance, safety_plan)
  * - Expired required documents
- * - Major/fatal incidents in last 12 months
+ * - Major/critical incidents in last 12 months
  * - Overall H&S score below minimum (50%)
  * - Training compliance below 70%
  *
@@ -67,12 +67,13 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
     }
   }
 
-  // Check incidents
+  // Check incidents. Severity vocabulary is critical|major|moderate|minor —
+  // 'critical' is the top tier (formerly 'fatal').
   const majorIncidents = recentIncidents.filter(
-    (i) => i.severity === 'major' || i.severity === 'critical' || i.severity === 'fatal'
+    (i) => i.severity === 'major' || i.severity === 'critical'
   );
   if (majorIncidents.length > 0) {
-    blockers.push(`${majorIncidents.length} major/fatal incident(s) in last 12 months`);
+    blockers.push(`${majorIncidents.length} major/critical incident(s) in last 12 months`);
   }
 
   // Check overall score

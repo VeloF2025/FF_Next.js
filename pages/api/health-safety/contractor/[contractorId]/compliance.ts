@@ -9,10 +9,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, getAuthUser } from '@/lib/auth';
+import { getAuthUser } from '@/lib/auth';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { calculateContractorHSScore } from '@/modules/health-safety/services/scoringService';
 import type { HSScoreInput } from '@/modules/health-safety/types/scoring.types';
+import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -130,7 +131,7 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
       minor: 0,
       moderate: 0,
       major: incidentStats?.critical_incidents || 0,
-      fatal: 0,
+      critical: 0,
     },
     training_records: {
       total: totalTraining,
@@ -276,4 +277,4 @@ async function recalculateComplianceScore(contractorId: string) {
   // Could be called from a cron job or after document updates
 }
 
-export default withAuth(handler);
+export default withHsPermission(handler);

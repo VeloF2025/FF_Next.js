@@ -11,9 +11,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
 import { checkContractorGate } from '@/modules/health-safety/services/gateService';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
+import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -158,4 +158,4 @@ async function getGateBreakdown(contractorId: string) {
   };
 }
 
-export default withAuth(handler);
+export default withHsPermission(handler);

@@ -211,7 +211,7 @@ export const INCIDENT_PENALTIES = {
   minor: 5,
   moderate: 15,
   major: 30,
-  fatal: 50,
+  critical: 50,
 } as const;
 
 // Compliance summary for dashboard

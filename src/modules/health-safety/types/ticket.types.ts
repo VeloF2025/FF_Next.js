@@ -14,8 +14,9 @@ export type HSIncidentType =
   | 'vehicle'
   | 'other';
 
-// H&S severity levels (maps to ticket priority)
-export type HSSeverity = 'minor' | 'moderate' | 'major' | 'fatal';
+// H&S severity levels (maps to ticket priority). Unified on the live data
+// vocabulary — critical|major|moderate|minor; the former 'fatal' is 'critical'.
+export type HSSeverity = 'minor' | 'moderate' | 'major' | 'critical';
 
 // Person involved in an incident
 export interface PersonInvolved {
@@ -98,7 +99,7 @@ export const SEVERITY_TO_PRIORITY: Record<HSSeverity, string> = {
   minor: 'normal',
   moderate: 'high',
   major: 'urgent',
-  fatal: 'critical',
+  critical: 'critical',
 };
 
 // Severity to SLA hours mapping
@@ -106,7 +107,7 @@ export const SEVERITY_SLA_HOURS: Record<HSSeverity, number> = {
   minor: 72, // 3 days
   moderate: 24, // 1 day
   major: 12, // 12 hours
-  fatal: 6, // 6 hours
+  critical: 6, // 6 hours
 };
 
 // Incident type configuration
@@ -175,17 +176,17 @@ export const SEVERITY_CONFIG: Record<
     description: 'Serious injury, hospitalization required, major property damage',
     dol_reportable: true,
   },
-  fatal: {
-    label: 'Fatal',
+  critical: {
+    label: 'Critical',
     color: 'red',
-    description: 'Fatality or permanent disability',
+    description: 'Fatality, permanent disability or major property damage',
     dol_reportable: true,
   },
 };
 
 // DoL (Department of Labour) reporting requirements per OHS Act
 export const DOL_REPORTING = {
-  reportable_severities: ['major', 'fatal'] as HSSeverity[],
+  reportable_severities: ['major', 'critical'] as HSSeverity[],
   reporting_deadline_hours: 24, // Must report within 24 hours
   form_reference: 'WCA Form 1', // Workers Compensation Act Form 1
   regulations: [

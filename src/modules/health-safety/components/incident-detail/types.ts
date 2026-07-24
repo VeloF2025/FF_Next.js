@@ -37,10 +37,8 @@ export interface IncidentDetail {
   contractor_name: string | null;
 }
 
-// Copied from IncidentCard (pages/health-safety/incidents/index.tsx). 'fatal' added —
-// HSSeverity has no 'critical' value, and without it fatal incidents fell back to 'UNKNOWN'.
+// Severity vocabulary: critical|major|moderate|minor (critical is the top tier).
 export const severityColors: Record<string, string> = {
-  fatal: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   major: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
   moderate: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
