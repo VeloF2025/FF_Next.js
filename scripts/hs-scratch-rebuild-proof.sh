@@ -4,7 +4,7 @@
 # Spins up a throwaway Postgres 15 container, creates minimal stubs for the
 # non-H&S tables the chain references (projects/staff/users/contractors — all
 # uuid ids, matching live), applies the H&S-relevant migrations in order:
-#   113 -> 235 -> 236 -> 237 -> 238 -> sql/449 -> sql/450
+#   113 -> 235 -> 236 -> 237 -> 238 -> sql/449 -> sql/450 -> sql/451
 # then diffs the resulting hs_* schema (columns + indexes) against the live
 # database. Before 449/450 are applied to live, the diff should list exactly
 # their pending changes; after the gated live apply it must be empty.
@@ -47,6 +47,7 @@ CREATE TABLE projects   (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), project_
 CREATE TABLE staff      (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT);
 CREATE TABLE users      (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT);
 CREATE TABLE contractors(id UUID PRIMARY KEY DEFAULT gen_random_uuid(), company_name TEXT);
+CREATE TABLE team_members(id UUID PRIMARY KEY DEFAULT gen_random_uuid(), first_name TEXT, last_name TEXT);
 SQL
 
 echo "[3/5] Applying H&S migration chain..."
@@ -57,7 +58,8 @@ for f in \
   "$MIG_DIR/237_hs_risk_register.sql" \
   "$MIG_DIR/238_hs_project_config_columns.sql" \
   "$MIG_DIR/sql/449_hs_contractor_schema_reconciliation.sql" \
-  "$MIG_DIR/sql/450_hs_checklist_seed_44.sql"
+  "$MIG_DIR/sql/450_hs_checklist_seed_44.sql" \
+  "$MIG_DIR/sql/451_hs_training_matrix.sql"
 do
   echo "    -> $(basename "$f")"
   psql "$SCRATCH_URL" -v ON_ERROR_STOP=1 -q -f "$f"

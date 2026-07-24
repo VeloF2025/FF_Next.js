@@ -10,6 +10,8 @@ import type { GateCheckResult, DocumentStatus } from '../types/compliance.types'
 import type { RAGStatus } from '../types/audit.types';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '../types/compliance.types';
 import { DEFAULT_SCORING_CONFIG } from '../types/scoring.types';
+import { TRAINING_GATE_MINIMUM } from '../types/training.types';
+import { computeAndPersistContractorTrainingScore } from './trainingService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -34,6 +36,12 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
 
   // Get or create compliance record
   const compliance = await getOrCreateCompliance(contractorId);
+
+  // Recompute the training score from live worker-training data (Phase 1). This
+  // replaces the previously inert stored value: it drives the score below and
+  // is persisted onto the compliance row for the dashboard. `training` is the
+  // authoritative training figure for the rest of this check.
+  const training = await computeAndPersistContractorTrainingScore(contractorId);
 
   // Get documents
   const documents = await getContractorDocuments(contractorId);
@@ -77,9 +85,22 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
     warnings.push(`H&S score (${overallScore}%) below recommended (70%)`);
   }
 
-  // Check training score (null = no training data yet — do not block on absence)
-  if (compliance.training_score != null && compliance.training_score < 70) {
-    blockers.push(`Training compliance (${compliance.training_score}%) below minimum (70%)`);
+  // Check training score (null = no training data yet — do not block on absence).
+  // Sourced from live worker-training data, not the stale stored column.
+  if (training.training_score != null && training.training_score < TRAINING_GATE_MINIMUM) {
+    blockers.push(
+      `Training compliance (${training.training_score}%) below minimum (${TRAINING_GATE_MINIMUM}%)`
+    );
+  }
+  // A worker with an EXPIRED STATUTORY certificate blocks outright, even if the
+  // overall percentage would otherwise pass — an expired legal competency is
+  // not a matter of degree (goal §7.3).
+  if (training.expired_statutory_certs > 0) {
+    blockers.push(
+      `${training.expired_statutory_certs} expired statutory training certificate(s)`
+    );
+  } else if (training.expiring_certs > 0) {
+    warnings.push(`${training.expiring_certs} training certificate(s) expiring soon`);
   }
 
   // Check audit due date
@@ -117,7 +138,7 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
     breakdown: {
       document_score: compliance.document_score,
       incident_score: compliance.incident_score,
-      training_score: compliance.training_score,
+      training_score: training.training_score,
       corrective_action_score: compliance.corrective_action_score,
       audit_score: compliance.audit_score,
     },

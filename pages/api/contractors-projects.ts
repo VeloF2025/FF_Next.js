@@ -227,8 +227,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // H&S Gate Check — block assignment if contractor fails compliance.
-    // A gate ERROR (not a failed verdict) stays fail-open by product decision,
-    // but must be loud and visible in the response — never silent.
+    // A gate ERROR (not just a failed verdict) FAILS CLOSED: a safety gate that
+    // waves contractors through whenever it breaks provides no guarantee at all
+    // (Hein, gate G1, 2026-07-24 — reverses the earlier fail-open default).
     let gateCheck: {
       can_assign: boolean;
       blockers: string[];
@@ -255,17 +256,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         });
       }
     } catch (gateError) {
-      log.error('[Contractor Assignment] H&S gate check ERRORED — assignment proceeding fail-open', {
+      const message = gateError instanceof Error ? gateError.message : String(gateError);
+      log.error('[Contractor Assignment] H&S gate check ERRORED — assignment BLOCKED (fail-closed)', {
         contractorId,
         projectId,
         gateError,
       });
-      gateCheck = {
-        can_assign: true,
-        blockers: [],
-        warnings: ['H&S gate check could not be evaluated — assignment allowed fail-open'],
-        error: gateError instanceof Error ? gateError.message : String(gateError),
-      };
+      return res.status(503).json({
+        success: false,
+        error: 'H&S gate check could not be evaluated — assignment blocked until it can be verified',
+        gate_check: {
+          can_assign: false,
+          blockers: ['H&S gate check could not be evaluated'],
+          warnings: [],
+          error: message,
+        },
+      });
     }
 
     // Create assignment

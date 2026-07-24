@@ -27,6 +27,7 @@ import {
   FileText,
   AlertCircle,
   ClipboardCheck,
+  GraduationCap,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -158,6 +159,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'Checklists',
           icon: ClipboardCheck,
           path: '/projects/health-safety/checklists',
+        },
+        {
+          id: 'training',
+          label: 'Training',
+          icon: GraduationCap,
+          path: '/projects/health-safety/training',
         },
         {
           id: 'capa',
