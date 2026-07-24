@@ -1,4 +1,4 @@
--- Migration: 247_wa_cloud_provider.sql
+-- Migration: 458_wa_cloud_provider.sql
 -- Description: Add the Cloud + WAHA 1:1 services to wa_message_logs and seed
 --              provider config for the official Meta WhatsApp Cloud API 1:1 provider.
 -- Created: 2026-07-24
