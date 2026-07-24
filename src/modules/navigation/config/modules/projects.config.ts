@@ -32,6 +32,7 @@ import {
   HardHat,
   FileCheck,
   FileSignature,
+  TrendingUp,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -193,6 +194,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'Appointments',
           icon: FileSignature,
           path: '/projects/health-safety/appointments',
+        },
+        {
+          id: 'analytics',
+          label: 'Injury Rates',
+          icon: TrendingUp,
+          path: '/projects/health-safety/analytics',
         },
         {
           id: 'capa',
