@@ -24,10 +24,24 @@ export interface ESignature {
   signed_ip: string;
 }
 
-/** First hop of x-forwarded-for (nginx sets it), else the socket address. */
+/**
+ * The signer's real IP for the audit trail.
+ *
+ * Velocity's nginx uses `$proxy_add_x_forwarded_for`, which APPENDS the real
+ * upstream socket address to whatever the client sent — so the LAST hop is the
+ * IP nginx actually observed and the client cannot forge it, whereas the first
+ * hop is client-controlled. Taking the last hop is deliberately different from
+ * the first-hop idiom used for non-audit logging elsewhere: this value feeds a
+ * legal §4.5 e-signature and must not be spoofable. (Assumes the single trusted
+ * nginx in front of the app; add-a-CDN would need the trusted-proxy count
+ * revisited.)
+ */
 export function clientIp(req: NextApiRequest): string {
   const fwd = req.headers['x-forwarded-for'];
-  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]!.trim();
+  if (typeof fwd === 'string' && fwd.length > 0) {
+    const hops = fwd.split(',').map((h) => h.trim()).filter(Boolean);
+    if (hops.length > 0) return hops[hops.length - 1]!;
+  }
   return req.socket?.remoteAddress ?? 'unknown';
 }
 

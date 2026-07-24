@@ -9,13 +9,20 @@ import { describe, it, expect } from 'vitest';
 import type { NextApiRequest } from 'next';
 import { captureESignature, clientIp } from '../services/esignature';
 
-function reqWith(headers: Record<string, unknown>, remote?: string): NextApiRequest {
-  return { headers, socket: { remoteAddress: remote } } as unknown as NextApiRequest;
+function reqWith(headers: Record<string, unknown>, remote?: string, body?: unknown): NextApiRequest {
+  return { headers, socket: { remoteAddress: remote }, body } as unknown as NextApiRequest;
 }
 
 describe('clientIp', () => {
-  it('takes the first hop of x-forwarded-for', () => {
-    expect(clientIp(reqWith({ 'x-forwarded-for': '41.1.2.3, 10.0.0.1' }))).toBe('41.1.2.3');
+  it('takes the LAST hop of x-forwarded-for (the IP nginx observed)', () => {
+    // nginx appends the real socket IP, so the last hop is trustworthy.
+    expect(clientIp(reqWith({ 'x-forwarded-for': '41.1.2.3, 10.0.0.1' }))).toBe('10.0.0.1');
+  });
+
+  it('ignores a client-forged first hop and keeps the appended real IP', () => {
+    // A client sending its own X-Forwarded-For: 1.2.3.4 → nginx forwards
+    // "1.2.3.4, <real-ip>"; the forged value must NOT be chosen.
+    expect(clientIp(reqWith({ 'x-forwarded-for': '1.2.3.4, 196.25.99.1' }))).toBe('196.25.99.1');
   });
 
   it('falls back to the socket address when no forwarded header', () => {
@@ -41,10 +48,10 @@ describe('captureESignature', () => {
     });
   });
 
-  it('never reads an IP from the request body — only headers/socket', () => {
-    // A client-supplied signed_ip in the body must be ignored; the helper only
-    // ever looks at headers/socket, so a forged body field cannot land in the row.
-    const req = reqWith({}, '10.0.0.5');
+  it('ignores a signed_ip supplied in the request body — audit IP is server-derived', () => {
+    // Pin the invariant: even if a client crafts signed_ip into the body, the
+    // captured value comes only from headers/socket.
+    const req = reqWith({}, '10.0.0.5', { signed_ip: '203.0.113.7', signed_by: 'attacker' });
     const sig = captureESignature(req, 'A. Nother', null, at);
     expect(sig.signed_ip).toBe('10.0.0.5');
     expect(sig.signed_by).toBeNull();

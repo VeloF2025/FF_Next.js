@@ -61,8 +61,20 @@ async function handleGet(talkId: string, res: NextApiResponse) {
 async function handlePatch(talkId: string, req: NextApiRequest, res: NextApiResponse) {
   const user = getAuthUser(req);
   const { topic, talk_type, talk_date, presenter_name, presenter_staff_id, location, notes, photo_urls } = req.body;
-  const hasPhotos = Object.prototype.hasOwnProperty.call(req.body, 'photo_urls');
-  const photos = hasPhotos && Array.isArray(photo_urls) ? photo_urls.filter((u) => typeof u === 'string') : null;
+
+  // topic is NOT NULL and required on create — don't let PATCH blank it.
+  if (topic !== undefined && (typeof topic !== 'string' || topic.trim().length === 0)) {
+    return apiResponse.badRequest(res, 'topic cannot be empty');
+  }
+
+  // has-key semantics: a field changes only when its key is present, and an
+  // explicit null clears the nullable ones (presenter, location, notes …).
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(req.body, k);
+  const hasPhotos = has('photo_urls');
+  if (hasPhotos && !Array.isArray(photo_urls)) {
+    return apiResponse.badRequest(res, 'photo_urls must be an array');
+  }
+  const photos = hasPhotos ? (photo_urls as unknown[]).filter((u) => typeof u === 'string') : [];
 
   const rows = await sql`
     UPDATE hs_toolbox_talks
@@ -70,11 +82,11 @@ async function handlePatch(talkId: string, req: NextApiRequest, res: NextApiResp
       topic = COALESCE(${topic ?? null}, topic),
       talk_type = COALESCE(${talk_type ?? null}, talk_type),
       talk_date = COALESCE(${talk_date ?? null}::date, talk_date),
-      presenter_name = COALESCE(${presenter_name ?? null}, presenter_name),
-      presenter_staff_id = COALESCE(${presenter_staff_id ?? null}::uuid, presenter_staff_id),
-      location = COALESCE(${location ?? null}, location),
-      notes = COALESCE(${notes ?? null}, notes),
-      photo_urls = CASE WHEN ${hasPhotos} THEN ${JSON.stringify(photos ?? [])}::jsonb ELSE photo_urls END,
+      presenter_name = CASE WHEN ${has('presenter_name')} THEN ${presenter_name ?? null} ELSE presenter_name END,
+      presenter_staff_id = CASE WHEN ${has('presenter_staff_id')} THEN ${presenter_staff_id ?? null}::uuid ELSE presenter_staff_id END,
+      location = CASE WHEN ${has('location')} THEN ${location ?? null} ELSE location END,
+      notes = CASE WHEN ${has('notes')} THEN ${notes ?? null} ELSE notes END,
+      photo_urls = CASE WHEN ${hasPhotos} THEN ${JSON.stringify(photos)}::jsonb ELSE photo_urls END,
       updated_at = NOW()
     WHERE id = ${talkId}
     RETURNING *

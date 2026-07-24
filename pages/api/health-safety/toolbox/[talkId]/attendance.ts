@@ -43,9 +43,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 async function handlePost(talkId: string, req: NextApiRequest, res: NextApiResponse) {
   const user = getAuthUser(req);
-  const { staff_id, team_member_id, worker_name, signature_name } = req.body;
+  const { staff_id, team_member_id, signature_name } = req.body;
+  const worker_name = typeof req.body.worker_name === 'string' ? req.body.worker_name.trim() : '';
 
-  if (!worker_name || typeof worker_name !== 'string') {
+  if (!worker_name) {
     return apiResponse.badRequest(res, 'worker_name is required');
   }
   if (staff_id && team_member_id) {
@@ -102,11 +103,22 @@ async function handleDelete(talkId: string, req: NextApiRequest, res: NextApiRes
   const rows = await sql`
     DELETE FROM hs_toolbox_attendance
     WHERE id = ${attendanceId} AND talk_id = ${talkId}
-    RETURNING id
+    RETURNING id, worker_name, (signature_name IS NOT NULL) AS was_signed
   `;
   if (rows.length === 0) {
     return apiResponse.notFound(res, 'Attendance record', attendanceId);
   }
+
+  // Removing a register entry — possibly a captured e-signature — must leave an
+  // audit trail, like every other mutation in this module.
+  await logHsActivity({
+    activityType: 'toolbox_attendee_removed',
+    entityType: 'toolbox_talk',
+    entityId: talkId,
+    description: `Attendee removed from toolbox talk: ${rows[0]!.worker_name}`,
+    metadata: { was_signed: rows[0]!.was_signed === true },
+    user: getAuthUser(req),
+  });
 
   return apiResponse.success(res, { deleted: true, id: attendanceId });
 }
