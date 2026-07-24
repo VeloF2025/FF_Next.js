@@ -39,9 +39,12 @@ export async function POST(
       SELECT dr_number FROM maintenance_tickets WHERE id = ${ticketId} LIMIT 1
     `) as { dr_number: string | null }[];
     const drNumber = ticketRows[0]?.dr_number ?? null;
+    // provider_message_id (the wamid, null for WAHA void sends) + ON CONFLICT keep
+    // a re-logged send idempotent against the migration-459 partial unique index.
     await sql`
-      INSERT INTO wa_message_logs (direction, service, message_type, group_jid, recipient_jid, message_content, status, drop_number, created_at)
-      VALUES ('outbound', ${result.channel}, 'text', NULL, ${body.toPhone}, ${body.message}, 'sent', ${drNumber}, NOW())
+      INSERT INTO wa_message_logs (direction, service, message_type, group_jid, recipient_jid, message_content, status, drop_number, provider_message_id, created_at)
+      VALUES ('outbound', ${result.channel}, 'text', NULL, ${body.toPhone}, ${body.message}, 'sent', ${drNumber}, ${result.providerMessageId ?? null}, NOW())
+      ON CONFLICT (provider_message_id) WHERE provider_message_id IS NOT NULL DO NOTHING
     `;
   } catch (e) {
     logger.error('outbound reply sent but log failed', { ticketId, error: e instanceof Error ? e.message : String(e) });

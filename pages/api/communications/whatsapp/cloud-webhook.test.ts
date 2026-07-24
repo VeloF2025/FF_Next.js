@@ -124,3 +124,20 @@ describe('POST cloud-webhook inbound', () => {
     expect(res._status).toBe(500);
   });
 });
+
+describe('POST cloud-webhook inbound idempotency (wamid)', () => {
+  it('inserts the wamid via ON CONFLICT DO NOTHING so a re-delivered message collapses to one row', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    const raw = inboundPayload('27831112222', 'hello there'); // wamid is 'wamid.in'
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    expect(res._status).toBe(200);
+    expect(res._body).toMatchObject({ ok: true, persisted: true });
+    const [strings, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    const text = strings.join('?').toUpperCase();
+    expect(text).toContain('PROVIDER_MESSAGE_ID');
+    expect(text).toContain('ON CONFLICT');
+    expect(text).toContain('DO NOTHING');
+    expect(values).toContain('wamid.in');
+  });
+});

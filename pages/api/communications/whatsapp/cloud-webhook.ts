@@ -75,9 +75,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const sql = db();
   try {
+    // ON CONFLICT keyed on the wamid (partial unique index, migration 459) makes
+    // a re-delivered Meta webhook event idempotent — one row per wamid.
     await sql`
-      INSERT INTO wa_message_logs (direction, service, message_type, group_jid, recipient_jid, message_content, status, created_at)
-      VALUES ('inbound', 'cloud', 'text', NULL, ${parsed.fromPhone}, ${parsed.text}, 'delivered', NOW())
+      INSERT INTO wa_message_logs (direction, service, message_type, group_jid, recipient_jid, message_content, status, provider_message_id, created_at)
+      VALUES ('inbound', 'cloud', 'text', NULL, ${parsed.fromPhone}, ${parsed.text}, 'delivered', ${parsed.wamid}, NOW())
+      ON CONFLICT (provider_message_id) WHERE provider_message_id IS NOT NULL DO NOTHING
     `;
   } catch (e) {
     logger.error('cloud inbound persist failed', { error: e instanceof Error ? e.message : String(e) });

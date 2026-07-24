@@ -59,4 +59,15 @@ describe('POST ticket whatsapp reply', () => {
     expect(res.status).toBe(502);
     expect(sqlMock).not.toHaveBeenCalled();
   });
+
+  it('logs the provider_message_id via ON CONFLICT DO NOTHING so a re-logged send stays one row', async () => {
+    vi.mocked(sendWhatsAppText).mockResolvedValue({ ok: true, channel: 'cloud', providerMessageId: 'wamid.9' });
+    await POST(replyReq({ toPhone: '27821234567', message: 'hi', channel: 'cloud' }) as never, { params: Promise.resolve({ id: 't1' }) } as never);
+    const [strings, ...values] = sqlMock.mock.calls[1] as [string[], ...unknown[]];
+    const text = strings.join('?').toUpperCase();
+    expect(text).toContain('PROVIDER_MESSAGE_ID');
+    expect(text).toContain('ON CONFLICT');
+    expect(text).toContain('DO NOTHING');
+    expect(values).toContain('wamid.9');
+  });
 });
