@@ -121,7 +121,7 @@ function TrainingContent() {
                   <td className="px-4 py-2 text-[var(--ff-text-secondary)]">
                     {r.expiry_date ? (
                       <span className="flex items-center gap-1">
-                        {r.expiry_date}
+                        {r.expiry_date.slice(0, 10)}
                         {r.days_to_expiry != null && r.days_to_expiry < 0 && (
                           <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
                         )}
