@@ -91,7 +91,8 @@ export interface GateCheckResult {
   breakdown: {
     document_score: number;
     incident_score: number;
-    training_score: number;
+    // null = no training data on file yet (does not block the gate)
+    training_score: number | null;
     corrective_action_score: number;
     audit_score: number;
   };

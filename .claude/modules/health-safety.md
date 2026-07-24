@@ -33,9 +33,17 @@ SA-compliant (OHS Act / Construction Regulations) H&S management: project audit 
 - Assignment gate (`pages/api/contractors-projects.ts`): failed verdict → 403 with `gate_check`; gate **error** → assignment proceeds **fail-open** with `log.error` + `gate_check.error` in the 201 (fail-closed is a pending product decision).
 - Checklist admin: `/health-safety/checklists` (+ `/new`, `/[id]` editor with item CRUD).
 
-## Database (12 live tables — live schema is authoritative)
+## Database (14 live tables — live schema is authoritative)
 
-`hs_checklist_templates`, `hs_checklist_items` (44-item seed — migration sql/450; docs that said 48 were wrong), `hs_project_config` (UNIQUE project_id; template_id NULL = all-categories scope), `hs_project_audits`, `hs_audit_responses`, `hs_contractor_compliance` (UNIQUE contractor_id + score/gate columns — sql/449), `hs_contractor_documents` (created by sql/449), `hs_ticket_details` (extends maintenance_tickets, **no FK** — emptied 2026-07-24 at gate G2: all 6 rows were orphans with blank incident fields from the 2026-01-22 demo seed, zero non-orphan rows ever existed), `hs_activity_log`, `hs_corrective_actions`, `hs_capa_comments`, `hs_risk_register` + `hs_risk_register_reviews`.
+`hs_checklist_templates`, `hs_checklist_items` (44-item seed — migration sql/450; docs that said 48 were wrong), `hs_project_config` (UNIQUE project_id; template_id NULL = all-categories scope), `hs_project_audits`, `hs_audit_responses`, `hs_contractor_compliance` (UNIQUE contractor_id + score/gate columns — sql/449), `hs_contractor_documents` (created by sql/449), `hs_ticket_details` (extends maintenance_tickets, **no FK** — emptied 2026-07-24 at gate G2: all 6 rows were orphans with blank incident fields from the 2026-01-22 demo seed, zero non-orphan rows ever existed), `hs_activity_log`, `hs_corrective_actions`, `hs_capa_comments`, `hs_risk_register` + `hs_risk_register_reviews`, `hs_training_types` + `hs_worker_training` (sql/451 — Phase 1 training matrix).
+
+## Training matrix & competency gate (Phase 1, sql/451)
+
+- **Worker model** — a worker is EITHER internal `staff` (`staff_id`) or a contractor field worker (`team_member_id`), enforced by a one-worker CHECK on `hs_worker_training`; `contractor_id` is carried on the row for gate aggregation. Decided against §4.2's "workers are staff": the gate is per-contractor and contractor workers live in `team_members`, whose own `contractor_id` is unpopulated (all 65 rows NULL) — so training rows carry the link directly. No new person table.
+- **Competency status** (`current`/`expiring_soon`/`expired`/`missing`) is derived in SQL from `expiry_date` at read time, never stored. `hs_training_types.validity_months` sets the refresher cadence; expiry auto-derives from `completed_date + validity_months` when not given explicitly.
+- **Gate** (`gateService.checkContractorGate`) recomputes the contractor training score live via `trainingService` on every check: `current_certs / total_certs`, NULL when there is no data (does NOT block). Blocks below 70% AND on any **expired statutory** certificate. `computeAndPersistContractorTrainingScore` writes the score onto `hs_contractor_compliance.training_score` for the dashboard.
+- **G1 fail-closed** (2026-07-24): `pages/api/contractors-projects.ts` returns 503 + blocked when the gate itself errors (was fail-open).
+- Endpoints under `/api/health-safety/training/*` (types, records, competency, pickers). UI at `/health-safety/training` (matrix, record CRUD, types admin) + `/health-safety/project/[projectId]/competency` (gap matrix); nav sub-tab under Projects → H&S.
 
 **Landmines**
 - `hs_activity_log` live columns are `activity_type/entity_type/entity_id/user_id(int)/description/metadata` — the migration-113-era `action/actor_id/details` never existed live. Write ONLY through `logHsActivity()` (`src/modules/health-safety/services/activityLog.ts`), always AFTER the main write; it never throws.
