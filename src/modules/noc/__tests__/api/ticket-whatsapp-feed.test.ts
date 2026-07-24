@@ -47,6 +47,25 @@ describe('buildConversation merges group + 1:1 streams sorted by time', () => {
     expect(getMessagesForDR).not.toHaveBeenCalled();
     expect(items[0].from).toBeNull();
   });
+
+  it('normalizes recipient_jid so a Cloud-format and a bridge JID-format row for the same subscriber join as one participant', async () => {
+    const logs = [
+      { id: 'c1', direction: 'inbound', service: 'cloud', recipient_jid: '27831112222', message_content: 'from cloud', created_at: '2026-07-24T08:00:00Z' },
+      { id: 'c2', direction: 'inbound', service: 'waha', recipient_jid: '27831112222@s.whatsapp.net', message_content: 'from bridge-style jid', created_at: '2026-07-24T08:01:00Z' },
+    ];
+    const items = await buildConversation(null, logs as never);
+    expect(items[0].from).toBe('27831112222');
+    expect(items[1].from).toBe('27831112222');
+    expect(items[0].from).toBe(items[1].from);
+  });
+
+  it('falls back to the raw recipient_jid when it cannot be normalized, rather than dropping it', async () => {
+    const logs = [
+      { id: 'c1', direction: 'inbound', service: 'waha', recipient_jid: 'garbled-not-a-number', message_content: 'hi', created_at: '2026-07-24T08:00:00Z' },
+    ];
+    const items = await buildConversation(null, logs as never);
+    expect(items[0].from).toBe('garbled-not-a-number');
+  });
 });
 
 describe('GET feed route', () => {

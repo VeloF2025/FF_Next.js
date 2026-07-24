@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { requireAuth } from '@/lib/auth/app-router';
 import { createLogger } from '@/lib/logger';
 import { sendWhatsAppText } from '@/modules/communications/whatsapp/send/waSendClient';
+import { normalizeMsisdn } from '@/modules/communications/whatsapp/utils/phone';
 
 const logger = createLogger('api:noc:ticket-whatsapp-reply');
 
@@ -47,11 +48,17 @@ export async function POST(
       SELECT dr_number FROM maintenance_tickets WHERE id = ${ticketId} LIMIT 1
     `) as { dr_number: string | null }[];
     const drNumber = ticketRows[0]?.dr_number ?? null;
+    // Store the canonical MSISDN, not whatever shape the caller typed — Cloud
+    // inbound always logs bare digits, so a manager-typed "+27 82 ..." would
+    // otherwise read as a different participant than the same number's inbound
+    // messages in the feed. Falls back to the raw value so an unnormalizable
+    // number is still logged rather than silently dropped.
+    const recipientJid = normalizeMsisdn(body.toPhone) ?? body.toPhone;
     // provider_message_id (the wamid, null for WAHA void sends) + ON CONFLICT keep
     // a re-logged send idempotent against the migration-459 partial unique index.
     await sql`
       INSERT INTO wa_message_logs (direction, service, message_type, group_jid, recipient_jid, message_content, status, drop_number, provider_message_id, created_at)
-      VALUES ('outbound', ${result.channel}, 'text', NULL, ${body.toPhone}, ${body.message}, 'sent', ${drNumber}, ${result.providerMessageId ?? null}, NOW())
+      VALUES ('outbound', ${result.channel}, 'text', NULL, ${recipientJid}, ${body.message}, 'sent', ${drNumber}, ${result.providerMessageId ?? null}, NOW())
       ON CONFLICT (provider_message_id) WHERE provider_message_id IS NOT NULL DO NOTHING
     `;
   } catch (e) {
