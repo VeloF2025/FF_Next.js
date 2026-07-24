@@ -29,9 +29,16 @@ def latest_version(project_id: str, filename: str) -> str | None:
     versions = [ln.strip().split()[-1] for ln in r.stdout.splitlines() if ln.strip()]
     return sorted(versions)[-1] if versions else None
 
+def _to_int(v) -> int | None:
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
+
 def main() -> int:
     project_id = sys.argv[sys.argv.index("--project-id") + 1]
     import geopandas as gpd
+    import pandas as pd
     with tempfile.TemporaryDirectory() as tmp:
         out = {"available": False, "designPons": [], "poleToPon": {}}
         pons_v = latest_version(project_id, "MOAPons.gpkg")
@@ -44,16 +51,21 @@ def main() -> int:
         if not mc_cat(f"{base}/MOAPoles.gpkg/{poles_v}", poles_p): print(json.dumps(out)); return 0
         pons = gpd.read_file(pons_p)
         poles = gpd.read_file(poles_p).to_crs(pons.crs)
-        design_pons = sorted({int(v) for v in pons["dp"].dropna() if str(v).strip().isdigit()})
+        design_pons = sorted({
+            n for n in (_to_int(v) for v in pons["dp"] if pd.notna(v)) if n is not None
+        })
         joined = gpd.sjoin(poles, pons[["dp", "geometry"]], predicate="within", how="inner")
         pole_to_pon = {}
         for _, row in joined.iterrows():
             label = row.get("label")
             dp = row.get("dp")
-            if not label or dp is None or not str(dp).strip().isdigit():
+            if pd.isna(label) or pd.isna(dp):
+                continue
+            pon = _to_int(dp)
+            if pon is None:
                 continue
             zone = row.get("zone")
-            pole_to_pon[str(label)] = {"pon": int(dp), "zone": None if zone is None else str(zone)}
+            pole_to_pon[str(label)] = {"pon": pon, "zone": None if pd.isna(zone) else str(zone)}
         print(json.dumps({"available": True, "designPons": design_pons, "poleToPon": pole_to_pon}))
     return 0
 

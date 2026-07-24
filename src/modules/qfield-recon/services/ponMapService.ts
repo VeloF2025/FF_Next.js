@@ -1,19 +1,19 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { query, queryOne } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { getDesignGpkgVersion } from './qfcDeltaRepo';
 import type { PonMap } from '../types';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const RESOLVER = 'scripts/qfield-recon/resolve_pon_poles.py';
 const UNAVAILABLE: PonMap = { available: false, gpkgVersion: null, resolvedAt: null, designPons: [], poleToPon: {} };
 
 interface ResolverOut { available: boolean; designPons: number[]; poleToPon: PonMap['poleToPon']; }
+type CachedPayload = Pick<ResolverOut, 'designPons' | 'poleToPon'>;
 
 async function runResolver(projectId: string): Promise<ResolverOut> {
-  const { stdout } = await execAsync(
-    `python3 ${RESOLVER} --project-id '${projectId}'`,
+  const { stdout } = await execFileAsync('python3', [RESOLVER, '--project-id', projectId],
     { maxBuffer: 32 * 1024 * 1024, timeout: 120_000 });
   return JSON.parse(stdout) as ResolverOut;
 }
@@ -22,7 +22,7 @@ export async function getPonMap(projectId: string): Promise<PonMap> {
   const version = await getDesignGpkgVersion(projectId);
   if (!version) return UNAVAILABLE;
 
-  const cached = await queryOne<{ payload: ResolverOut; resolved_at: string }>(
+  const cached = await queryOne<{ payload: CachedPayload; resolved_at: string }>(
     `SELECT payload, to_char(resolved_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS resolved_at
        FROM qfield_pole_pon_cache WHERE project_id = $1 AND gpkg_version = $2`,
     [projectId, version]);
