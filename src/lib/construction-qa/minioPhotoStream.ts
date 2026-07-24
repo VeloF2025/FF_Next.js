@@ -21,6 +21,66 @@ const execFileAsync = promisify(execFile);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
 const MINIO_CONTAINER = 'qfieldcloud-minio-1';
 
+/**
+ * `mc` stderr that means the `local` alias can't authenticate — the client
+ * credentials are missing or wrong, NOT that the object is absent. The alias
+ * config lives in the container's ephemeral `MC_CONFIG_DIR=/tmp/.mc`, so a
+ * container *recreate* (compose up, image bump, host reboot) drops the alias's
+ * access key and every `mc cat` then fails this way, 404-ing all qfield photos
+ * across all projects until the alias is re-set. Self-heal below re-applies it.
+ */
+// Precise: an unauthenticated alias only. Must NOT match "object does not
+// exist" / "specified key does not exist" (a genuinely absent object) — those
+// are normal not-founds and must not trigger a heal+retry on every miss.
+const MC_AUTH_ERROR_RE =
+  /Access Denied|InvalidAccessKeyId|Access Key Id you provided does not exist|SignatureDoesNotMatch/i;
+
+// Re-apply the `local` alias from the minio container's OWN root creds
+// (MINIO_ROOT_USER/PASSWORD). Expanded by the container's shell, so the secret
+// never enters this process, the argv, or any log line. The command is a fixed
+// string — no interpolation of caller data — so there is no injection surface.
+const MC_SET_ALIAS_CMD =
+  'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"';
+const HEAL_COOLDOWN_MS = 10_000;
+let healInFlight: Promise<void> | null = null;
+let lastHealAt = 0;
+
+/**
+ * Re-apply the `local` mc alias inside the minio container. Deduped (one heal
+ * covers every concurrent auth failure) and cooled down (a successful set that
+ * still leaves reads failing means the creds are genuinely wrong — don't spin
+ * re-healing on every photo). Best-effort: failures are logged, never thrown,
+ * so the caller just falls through to a normal 404.
+ */
+function healMinioAlias(): Promise<void> {
+  if (healInFlight) return healInFlight;
+  if (Date.now() - lastHealAt < HEAL_COOLDOWN_MS) return Promise.resolve();
+  const run = (async () => {
+    try {
+      await execFileAsync('docker', ['exec', MINIO_CONTAINER, 'sh', '-c', MC_SET_ALIAS_CMD], {
+        encoding: 'utf-8',
+        maxBuffer: 1024 * 1024,
+        timeout: 10_000,
+      });
+      log.warn('minio-photo-stream: re-applied `local` mc alias after auth failure', {
+        module: 'minio-photo-stream',
+      });
+    } catch (err) {
+      log.error('minio-photo-stream: mc alias self-heal failed', {
+        module: 'minio-photo-stream',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      lastHealAt = Date.now();
+    }
+  })();
+  healInFlight = run;
+  run.finally(() => {
+    if (healInFlight === run) healInFlight = null;
+  });
+  return run;
+}
+
 /** Extension → Content-Type for every photo backend in this module's callers. */
 export const PHOTO_CONTENT_TYPES: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
@@ -35,6 +95,11 @@ export const PHOTO_CONTENT_TYPES: Record<string, string> = {
 const MC_PROBE_BYTES = 4;
 
 export type MinioOutcome = 'served' | 'not-found' | 'unavailable';
+
+// Internal: a single `mc cat` attempt can additionally report an auth failure,
+// which the public streamMinioObject() converts into a self-heal + one retry
+// before collapsing to 'not-found'.
+type MinioAttemptOutcome = MinioOutcome | 'auth-error';
 
 function contentTypeFor(objectPath: string): string {
   const ext = objectPath.split('.').pop()?.toLowerCase() || 'jpg';
@@ -53,7 +118,7 @@ function contentTypeFor(objectPath: string): string {
  * destroyed rather than ended, so a truncated body surfaces as a broken
  * connection instead of a silently short 200.
  */
-export function streamMinioObject(objectPath: string, res: NextApiResponse): Promise<MinioOutcome> {
+function streamMinioAttempt(objectPath: string, res: NextApiResponse): Promise<MinioAttemptOutcome> {
   return new Promise((resolve) => {
     const child = spawn('docker', ['exec', MINIO_CONTAINER, 'mc', 'cat', `local/${MINIO_BUCKET}/${objectPath}`], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -73,7 +138,7 @@ export function streamMinioObject(objectPath: string, res: NextApiResponse): Pro
     res.on('close', onClientGone);
     const detach = () => res.off('close', onClientGone);
 
-    const settle = (outcome: MinioOutcome) => {
+    const settle = (outcome: MinioAttemptOutcome) => {
       if (settled) return;
       settled = true;
       // On 'served' the disconnect guard must outlive this resolve — it is
@@ -148,6 +213,13 @@ export function streamMinioObject(objectPath: string, res: NextApiResponse): Pro
         settle('unavailable');
         return;
       }
+      // Missing/invalid `local` alias creds — recoverable. Report 'auth-error'
+      // so the caller can self-heal the alias and retry, instead of masking a
+      // fixable outage as a plain 404. (Object-absent errors don't match this.)
+      if (MC_AUTH_ERROR_RE.test(stderr)) {
+        settle('auth-error');
+        return;
+      }
       if (stderr.trim()) {
         log.error('minio-photo-stream: mc cat failed', {
           module: 'minio-photo-stream', error: stderr.trim().slice(0, 300), path: objectPath,
@@ -158,27 +230,59 @@ export function streamMinioObject(objectPath: string, res: NextApiResponse): Pro
   });
 }
 
-/** Resolve an unversioned MinIO key to its latest version, or null if there isn't one. */
+/**
+ * Pipe one MinIO object to the response, self-healing the `local` mc alias on an
+ * authentication failure. A first attempt that reports 'auth-error' has written
+ * nothing to `res` (streaming never began), so it is safe to re-apply the alias
+ * and retry the same response once. A still-failing retry collapses to
+ * 'not-found' — the public contract stays 'served' | 'not-found' | 'unavailable'.
+ */
+export async function streamMinioObject(objectPath: string, res: NextApiResponse): Promise<MinioOutcome> {
+  const first = await streamMinioAttempt(objectPath, res);
+  if (first !== 'auth-error') return first;
+
+  await healMinioAlias();
+  const retry = await streamMinioAttempt(objectPath, res);
+  return retry === 'auth-error' ? 'not-found' : retry;
+}
+
+async function listLatestVersion(objectPath: string): Promise<string | null> {
+  const { stdout } = await execFileAsync(
+    'docker',
+    ['exec', MINIO_CONTAINER, 'mc', 'ls', `local/${MINIO_BUCKET}/${objectPath}/`],
+    { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 },
+  );
+
+  if (!stdout || !stdout.trim()) return null;
+
+  const lines = stdout.trim().split('\n').filter(Boolean);
+  if (lines.length === 0) return null;
+
+  // Last line holds the latest version: "... v20260310120500-7bc5005f"
+  const parts = lines[lines.length - 1]!.trim().split(/\s+/);
+  const version = parts[parts.length - 1]!.replace(/\/$/, '');
+  if (!version.startsWith('v2')) return null;
+
+  return `${objectPath}/${version}`;
+}
+
+/**
+ * Resolve an unversioned MinIO key to its latest version, or null if there isn't
+ * one. Self-heals the `local` alias on an auth failure (same ephemeral-config
+ * cause as streamMinioObject) so unversioned keys still resolve after a minio
+ * container recreate.
+ */
 export async function resolveLatestVersion(objectPath: string): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync(
-      'docker',
-      ['exec', MINIO_CONTAINER, 'mc', 'ls', `local/${MINIO_BUCKET}/${objectPath}/`],
-      { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 },
-    );
-
-    if (!stdout || !stdout.trim()) return null;
-
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    if (lines.length === 0) return null;
-
-    // Last line holds the latest version: "... v20260310120500-7bc5005f"
-    const parts = lines[lines.length - 1]!.trim().split(/\s+/);
-    const version = parts[parts.length - 1]!.replace(/\/$/, '');
-    if (!version.startsWith('v2')) return null;
-
-    return `${objectPath}/${version}`;
-  } catch {
-    return null;
+    return await listLatestVersion(objectPath);
+  } catch (err) {
+    const stderr = (err as { stderr?: string }).stderr ?? '';
+    if (!MC_AUTH_ERROR_RE.test(stderr)) return null;
+    await healMinioAlias();
+    try {
+      return await listLatestVersion(objectPath);
+    } catch {
+      return null;
+    }
   }
 }

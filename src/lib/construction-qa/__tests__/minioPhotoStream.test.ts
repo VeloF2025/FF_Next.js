@@ -229,3 +229,100 @@ describe('streamMinioObject', () => {
     expect(PHOTO_CONTENT_TYPES.heic).toBe('image/heic');
   });
 });
+
+/**
+ * Self-heal path: when the `local` mc alias loses its credentials (container
+ * recreate wipes /tmp/.mc), `mc cat` fails with an auth error on stderr. The
+ * module must re-apply the alias and retry the SAME response once, rather than
+ * masking a fixable outage as a 404. A fresh module instance per test resets the
+ * heal cooldown/dedupe state.
+ */
+describe('streamMinioObject alias self-heal', () => {
+  let streamMinioObject: typeof import('../minioPhotoStream').streamMinioObject;
+
+  beforeEach(async () => {
+    spawnMock.mockReset();
+    execFileMock.mockReset();
+    // promisify(execFile) → callback style; resolve the heal command by default.
+    execFileMock.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: (e: unknown, r: unknown) => void) =>
+      cb(null, { stdout: '', stderr: '' }),
+    );
+    vi.resetModules();
+    ({ streamMinioObject } = await import('../minioPhotoStream'));
+  });
+
+  const driveAuthError = (child: ReturnType<typeof fakeChild>) => {
+    // `mc` writes credential errors to stderr; stdout stays empty; non-zero exit.
+    child.stderr.write(Buffer.from('mc: <ERROR> Unable to initialize ... Access Denied.'));
+    child.stdout.end();
+  };
+
+  it('re-applies the alias and retries once, then serves the object', async () => {
+    const attempt1 = fakeChild();
+    const attempt2 = fakeChild();
+    spawnMock.mockReturnValueOnce(attempt1).mockReturnValueOnce(attempt2);
+    const res = fakeRes();
+
+    const promise = streamMinioObject('projects/a/photo.jpg', res);
+    driveAuthError(attempt1);
+    await flush();
+    attempt1.emit('close', 1); // auth-error → heal + retry
+    await flush();
+    attempt2.stdout.write(Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
+    attempt2.stdout.end();
+
+    expect(await promise).toBe('served');
+    await flush();
+    expect(res.body().subarray(0, 4)).toEqual(Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+
+    // The alias was re-set with a fixed command (no secret in argv — the shell
+    // expands $MINIO_ROOT_USER/$MINIO_ROOT_PASSWORD inside the container).
+    const healCall = execFileMock.mock.calls.find(
+      (c) => Array.isArray(c[1]) && (c[1] as string[]).join(' ').includes('mc alias set local'),
+    );
+    expect(healCall).toBeTruthy();
+    expect((healCall![1] as string[]).join(' ')).not.toContain('minioadmin');
+  });
+
+  it('collapses to not-found when the alias still fails after a heal', async () => {
+    const attempt1 = fakeChild();
+    const attempt2 = fakeChild();
+    spawnMock.mockReturnValueOnce(attempt1).mockReturnValueOnce(attempt2);
+    const res = fakeRes();
+
+    const promise = streamMinioObject('projects/a/photo.jpg', res);
+    driveAuthError(attempt1);
+    await flush();
+    attempt1.emit('close', 1);
+    await flush();
+    driveAuthError(attempt2);
+    await flush();
+    attempt2.emit('close', 1);
+
+    expect(await promise).toBe('not-found');
+    expect(res.body().length).toBe(0);
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not heal or retry when the object is genuinely absent', async () => {
+    const child = fakeChild();
+    spawnMock.mockReturnValueOnce(child);
+    const res = fakeRes();
+
+    const promise = streamMinioObject('projects/a/missing.jpg', res);
+    // Absent object: stderr says the KEY (not the access key) does not exist —
+    // must NOT be read as an auth failure, so no heal and no retry.
+    child.stderr.write(Buffer.from('mc: <ERROR> Unable to stat ... The specified key does not exist.'));
+    child.stdout.end();
+    await flush();
+    child.emit('close', 1);
+
+    expect(await promise).toBe('not-found');
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    const healCall = execFileMock.mock.calls.find(
+      (c) => Array.isArray(c[1]) && (c[1] as string[]).join(' ').includes('mc alias set local'),
+    );
+    expect(healCall).toBeFalsy();
+  });
+});
