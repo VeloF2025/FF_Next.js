@@ -109,6 +109,8 @@ export const RateLimits = {
   GENEROUS: { limit: 20, windowMs: 60 * 1000 },
   /** 100 requests per hour */
   HOURLY: { limit: 100, windowMs: 60 * 60 * 1000 },
+  /** 5 DR-claim attempts per 10 minutes per sender (WA Cloud webhook DR-probe guard) */
+  DR_PROBE: { limit: 5, windowMs: 10 * 60 * 1000 },
 };
 
 export default rateLimiter;
