@@ -57,7 +57,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   if (!VALID_CLASS.has(classification)) {
     return apiResponse.badRequest(res, `classification must be one of: ${[...VALID_CLASS].join(', ')}`);
   }
-  const days = Number.isInteger(days_lost) && days_lost >= 0 ? days_lost : 0;
+  // days_lost defaults to 0 when omitted, but a supplied value must be valid —
+  // don't silently coerce a negative/non-integer to 0.
+  if (days_lost != null && (!Number.isInteger(days_lost) || days_lost < 0)) {
+    return apiResponse.badRequest(res, 'days_lost must be a non-negative integer');
+  }
+  const days = Number.isInteger(days_lost) ? days_lost : 0;
 
   const rows = await sql`
     INSERT INTO hs_injuries (project_id, ticket_id, injury_date, classification, days_lost, body_part, description, created_by)

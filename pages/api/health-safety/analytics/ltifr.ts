@@ -98,9 +98,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         WHERE (${year}::int IS NULL OR EXTRACT(YEAR FROM injury_date) = ${year}::int) GROUP BY project_id
       ),
       merged AS (
+        -- NULL-safe join: the company-wide bucket has project_id NULL, and
+        -- NULL = NULL is unknown in SQL, so a plain equi-join would split it
+        -- into two rows. IS NOT DISTINCT FROM isn't allowed as a sole FULL JOIN
+        -- condition, so key on a COALESCE'd sentinel (hash-joinable).
         SELECT COALESCE(hrs.project_id, inj.project_id) AS project_id,
                COALESCE(hrs.hours, 0) AS hours, COALESCE(inj.lti, 0) AS lti, COALESCE(inj.recordable, 0) AS recordable
-        FROM hrs FULL OUTER JOIN inj ON hrs.project_id = inj.project_id
+        FROM hrs FULL OUTER JOIN inj
+          ON COALESCE(hrs.project_id::text, '') = COALESCE(inj.project_id::text, '')
       )
       SELECT m.project_id, p.project_name, m.hours::float AS hours_worked, m.lti AS lost_time_injuries, m.recordable AS recordable_injuries,
              CASE WHEN m.hours > 0 THEN ROUND(m.lti * 200000.0 / m.hours, 2) END AS ltifr,

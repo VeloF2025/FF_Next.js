@@ -35,11 +35,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const projectId = typeof req.query.project_id === 'string' ? req.query.project_id : null;
+  const year = typeof req.query.year === 'string' && /^\d{4}$/.test(req.query.year) ? parseInt(req.query.year, 10) : null;
   const rows = await sql`
     SELECT m.*, p.project_name
     FROM hs_man_hours m
     LEFT JOIN projects p ON p.id = m.project_id
     WHERE (${projectId}::uuid IS NULL OR m.project_id = ${projectId}::uuid)
+      AND (${year}::int IS NULL OR m.period_year = ${year}::int)
     ORDER BY m.period_year DESC, m.period_month DESC
   `;
   return apiResponse.success(res, { man_hours: rows });
@@ -57,29 +59,27 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'hours_worked must be a non-negative number');
   }
 
-  // Upsert on (project_id, period) — explicit branch rather than ON CONFLICT,
-  // because the uniqueness is enforced by two PARTIAL indexes (project_id NULL
-  // vs not), which ON CONFLICT arbiters cannot both target cleanly.
-  const [existing] = await sql`
-    SELECT id FROM hs_man_hours
-    WHERE period_year = ${period_year} AND period_month = ${period_month}
-      AND project_id IS NOT DISTINCT FROM ${project_id || null}::uuid
-    LIMIT 1
-  `;
-
-  const rows = existing
+  // Atomic upsert via ON CONFLICT — no check-then-act race. The uniqueness is
+  // enforced by two PARTIAL indexes (project_id NULL vs not), so the arbiter
+  // must reproduce the matching predicate; branch on whether a project is given.
+  const hc = Number.isInteger(headcount) ? headcount : null;
+  const rows = project_id
     ? await sql`
-        UPDATE hs_man_hours
-        SET hours_worked = ${hours}, headcount = ${Number.isInteger(headcount) ? headcount : null}, notes = ${notes || null}, updated_at = NOW()
-        WHERE id = ${existing.id}
-        RETURNING *
+        INSERT INTO hs_man_hours (project_id, period_year, period_month, hours_worked, headcount, notes, created_by)
+        VALUES (${project_id}, ${period_year}, ${period_month}, ${hours}, ${hc}, ${notes || null}, ${user?.id ?? null})
+        ON CONFLICT (project_id, period_year, period_month) WHERE project_id IS NOT NULL
+        DO UPDATE SET hours_worked = EXCLUDED.hours_worked, headcount = EXCLUDED.headcount, notes = EXCLUDED.notes, updated_at = NOW()
+        RETURNING *, (xmax = 0) AS inserted
       `
     : await sql`
         INSERT INTO hs_man_hours (project_id, period_year, period_month, hours_worked, headcount, notes, created_by)
-        VALUES (${project_id || null}, ${period_year}, ${period_month}, ${hours}, ${Number.isInteger(headcount) ? headcount : null}, ${notes || null}, ${user?.id ?? null})
-        RETURNING *
+        VALUES (NULL, ${period_year}, ${period_month}, ${hours}, ${hc}, ${notes || null}, ${user?.id ?? null})
+        ON CONFLICT (period_year, period_month) WHERE project_id IS NULL
+        DO UPDATE SET hours_worked = EXCLUDED.hours_worked, headcount = EXCLUDED.headcount, notes = EXCLUDED.notes, updated_at = NOW()
+        RETURNING *, (xmax = 0) AS inserted
       `;
   const row = rows[0]!;
+  const existing = row.inserted !== true; // xmax=0 → freshly inserted, else updated
 
   await logHsActivity({
     activityType: existing ? 'man_hours_updated' : 'man_hours_recorded',
