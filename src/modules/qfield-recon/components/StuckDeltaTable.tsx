@@ -1,32 +1,45 @@
+'use client';
+
+import { StandardDataTable } from '@/components/ui/StandardDataTable';
+import type { TableColumn } from '@/components/ui/StandardDataTable';
+import { Badge } from '@/components/ui/Badge';
 import type { StuckDelta } from '../types';
 
-export function StuckDeltaTable({ rows }: { rows: StuckDelta[] }) {
-  if (rows.length === 0) return <p className="mt-6 text-sm text-gray-500">No stuck deltas.</p>;
+interface StuckDeltaTableProps {
+  rows: StuckDelta[];
+  isLoading?: boolean;
+}
+
+export function StuckDeltaTable({ rows, isLoading }: StuckDeltaTableProps) {
+  const columns: TableColumn<StuckDelta>[] = [
+    { key: 'label', header: 'Feature', render: r => <span className="font-mono text-xs">{r.label ?? r.featureKey}</span> },
+    { key: 'kind', header: 'Kind', render: r => <span className="capitalize">{r.kind}</span> },
+    { key: 'status', header: 'Status' },
+    {
+      key: 'lastStatus', header: 'Last status',
+      render: r => <span className="text-xs uppercase text-[var(--ff-text-secondary)]">{r.lastStatus}</span>,
+    },
+    { key: 'createdAt', header: 'Created (UTC)', render: r => r.createdAt.replace('T', ' ').replace('Z', '') },
+    {
+      key: 'verdict',
+      header: 'Verdict',
+      render: r => r.supersededByAppliedTwin
+        ? <Badge variant="custom" colorClass="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]">Stale duplicate (recovered)</Badge>
+        : <Badge variant="custom" colorClass="bg-amber-500/20 text-amber-600">Genuinely stuck</Badge>,
+    },
+  ];
+
   return (
-    <section className="mt-6">
-      <h3 className="mb-2 font-semibold">Stuck deltas ({rows.length})</h3>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead><tr className="text-left text-gray-500">
-            <th className="py-1 pr-4">Feature</th><th className="pr-4">Kind</th><th className="pr-4">Status</th>
-            <th className="pr-4">Last status</th><th className="pr-4">Created (UTC)</th><th>Verdict</th>
-          </tr></thead>
-          <tbody>
-            {rows.map(r => (
-              <tr key={r.deltaId}>
-                <td className="py-1 pr-4 font-mono text-xs">{r.label ?? r.featureKey}</td>
-                <td className="pr-4">{r.kind}</td>
-                <td className="pr-4">{r.status}</td>
-                <td className="pr-4">{r.lastStatus}</td>
-                <td className="pr-4">{r.createdAt.replace('T', ' ').replace('Z', '')}</td>
-                <td>{r.supersededByAppliedTwin
-                  ? <span className="text-gray-500">stale duplicate (recovered)</span>
-                  : <span className="font-medium text-amber-700">genuinely stuck</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Stuck deltas ({rows.length})</h3>
+      <StandardDataTable
+        columns={columns}
+        data={rows}
+        isLoading={isLoading}
+        emptyMessage="No stuck deltas — nothing genuinely stuck or superseded"
+        getRowKey={r => r.deltaId}
+        stickyHeader
+      />
     </section>
   );
 }

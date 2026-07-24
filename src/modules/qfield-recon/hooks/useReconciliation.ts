@@ -12,6 +12,7 @@ interface ApiEnvelope<T> {
 
 export function useProjects() {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,10 +23,11 @@ export function useProjects() {
         return j;
       })
       .then(j => setProjects(j.data?.projects ?? []))
-      .catch(e => setError(e instanceof Error ? e.message : String(e)));
+      .catch(e => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
   }, []);
 
-  return { projects, error };
+  return { projects, loading, error };
 }
 
 export function useReconciliation(projectId: string | null) {
