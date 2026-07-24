@@ -9,7 +9,7 @@
  * 4. Make API calls
  *
  * Layers:
- * - READ_LAYER_ID  5121 "fibertime Installations"            — reads (searchDR/searchBySerial)
+ * - LAYER_ID       5121 "fibertime Installations"            — reads (searchDR/searchBySerial) + /app init
  * - WRITE_LAYER_ID 6236 "fibertime Installations (contractor)" — writes (ONT/UPS/status)
  *
  * Why two layers (2026-07-24): 1Map made layer 5121 READ-ONLY for our accounts
