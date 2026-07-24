@@ -51,6 +51,17 @@ function parseStatuses(payload: unknown): ParsedStatus[] {
   return out;
 }
 
+// A DR/drop reference embedded in free-form text: "DR" + 6–8 digits, optional
+// space/dash separator. Normalized to the canonical `DR<digits>` form stored in
+// maintenance_tickets.dr_number / wa_message_logs.drop_number so a Cloud inbound
+// surfaces in that ticket's conversation feed (feed route scopes by drop_number).
+const DR_IN_TEXT = /DR[\s-]?(\d{6,8})/i;
+
+function extractDrNumber(text: string): string | null {
+  const m = text.match(DR_IN_TEXT);
+  return m ? `DR${m[1]}` : null;
+}
+
 type ParsedInbound = { fromPhone: string; text: string; wamid: string | null };
 
 function parseInbound(payload: unknown): ParsedInbound | null {
@@ -111,13 +122,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const parsed = parseInbound(payload);
   if (!parsed) return res.status(200).json({ ok: true, persisted: false });
 
+  const dropNumber = extractDrNumber(parsed.text);
   const sql = db();
   try {
     // ON CONFLICT keyed on the wamid (partial unique index, migration 459) makes
     // a re-delivered Meta webhook event idempotent — one row per wamid.
+    // drop_number links the inbound to a ticket's feed when the text names a DR.
     await sql`
-      INSERT INTO wa_message_logs (direction, service, message_type, group_jid, recipient_jid, message_content, status, provider_message_id, created_at)
-      VALUES ('inbound', 'cloud', 'text', NULL, ${parsed.fromPhone}, ${parsed.text}, 'delivered', ${parsed.wamid}, NOW())
+      INSERT INTO wa_message_logs (direction, service, message_type, group_jid, recipient_jid, message_content, status, drop_number, provider_message_id, created_at)
+      VALUES ('inbound', 'cloud', 'text', NULL, ${parsed.fromPhone}, ${parsed.text}, 'delivered', ${dropNumber}, ${parsed.wamid}, NOW())
       ON CONFLICT (provider_message_id) WHERE provider_message_id IS NOT NULL DO NOTHING
     `;
   } catch (e) {

@@ -159,6 +159,28 @@ describe('POST cloud-webhook status callbacks', () => {
   });
 });
 
+describe('POST cloud-webhook inbound → ticket DR linkage', () => {
+  it('extracts a DR number from the text and stores it as drop_number so it joins the ticket feed', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    const raw = inboundPayload('27831112222', 'Hi, my line DR1853558 is down since morning');
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    expect(res._status).toBe(200);
+    const [, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    expect(values).toContain('DR1853558');
+  });
+
+  it('stores a NULL drop_number when the text carries no DR number', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    const raw = inboundPayload('27831112222', 'just a hello with no reference');
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    expect(res._status).toBe(200);
+    const [, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    expect(values).toContain(null);
+  });
+});
+
 describe('POST cloud-webhook inbound idempotency (wamid)', () => {
   it('inserts the wamid via ON CONFLICT DO NOTHING so a re-delivered message collapses to one row', async () => {
     vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
