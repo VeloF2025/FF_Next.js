@@ -6,12 +6,20 @@ import { sendWhatsAppText } from '@/modules/communications/whatsapp/send/waSendC
 
 const logger = createLogger('api:noc:ticket-whatsapp-reply');
 
+// Sending a WhatsApp reply to a customer is manager+ only, matching the sibling
+// regenerate-ai-summary route (middleware does NOT gate /api/*).
+const ALLOWED_ROLES = new Set(['super_admin', 'admin', 'manager']);
+
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const [, unauth] = await requireAuth(req);
+  const [user, unauth] = await requireAuth(req);
   if (unauth) return unauth;
+
+  if (!ALLOWED_ROLES.has(user.role)) {
+    return NextResponse.json({ success: false, error: 'manager+ role required' }, { status: 403 });
+  }
 
   const { id: ticketId } = await context.params;
   const body = (await req.json().catch(() => null)) as
