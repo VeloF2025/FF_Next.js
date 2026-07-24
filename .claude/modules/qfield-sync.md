@@ -1176,3 +1176,21 @@ docker-compose up -d nginx
 # Full restart (all services)
 docker-compose down && docker-compose up -d
 ```
+
+---
+
+## Audit Reconciliation Report (2026-07)
+
+Read-only report at `/qfield/reconciliation` reconciling QFieldCloud audit data
+per project/PON into applied ✓ / stuck (recoverable) / never-captured, plus
+stale-duplicate and photo-integrity detection. Built after the 2026-07-23 disk
+saturation incident made it hard to tell "stuck delta" from "genuinely missing
+audit". Never mutates QFieldCloud data (no re-applying, no deletes).
+
+- Reads live: QFieldCloud PG `localhost:5433` (read-only pool), MinIO
+  `qfieldcloud-prod` via `mc`, and design GPKGs for pole→PON resolution
+  (cached in `qfield_pole_pon_cache`, mig 460).
+- **Velo-only** (needs docker/mc/geopandas) — off-velo returns `503`. Requires
+  `QFIELDCLOUD_DATABASE_URL` in the server env.
+- Module quick-ref: `src/modules/qfield-recon/.claude.md`. Full design:
+  `docs/superpowers/specs/2026-07-24-qfield-audit-reconciliation-design.md`.
