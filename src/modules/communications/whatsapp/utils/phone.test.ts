@@ -60,6 +60,16 @@ describe('extractMsisdnFromContact', () => {
     expect(extractMsisdnFromContact('Call +27 83 111 2222 or 011 555 1234')).toBe('27831112222');
   });
 
+  it('ignores stray digits elsewhere in the contact field', () => {
+    // Naively stripping non-digits across the whole field yields 50821234567,
+    // which passes the length bound and would mask the real number.
+    expect(extractMsisdnFromContact('5 Rose St, cell 0821234567')).toBe('27821234567');
+  });
+
+  it('prefers the SA phone over a reference number appearing before it', () => {
+    expect(extractMsisdnFromContact('Invoice 123456789 call 0821234567')).toBe('27821234567');
+  });
+
   it('returns null for a contact holding only a name', () => {
     expect(extractMsisdnFromContact('Sipho')).toBeNull();
   });

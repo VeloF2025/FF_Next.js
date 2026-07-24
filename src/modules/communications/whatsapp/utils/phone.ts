@@ -13,6 +13,15 @@ const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
 // A phone-like run inside free-form text: starts and ends on a digit, with the
 // usual separators allowed between. Long enough (9+ chars) to skip stray digits.
 const PHONE_CANDIDATE = /\+?\d[\d\s().-]{7,}\d/g;
+// The whole field is nothing but phone characters, so collapsing it to digits
+// cannot pull in unrelated numbers.
+const PHONE_SHAPED = /^[+\d\s().-]+$/;
+
+// A normalized SA subscriber number. Used only to pick the most plausible
+// candidate out of free-form text — never to reject one outright.
+function isSouthAfrican(msisdn: string): boolean {
+  return msisdn.length === 11 && msisdn.startsWith('27');
+}
 
 /**
  * Canonicalize a phone number to bare digits, or null when the value cannot be
@@ -37,11 +46,21 @@ export function normalizeMsisdn(raw: string | null | undefined): string | null {
 export function extractMsisdnFromContact(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const cleaned = raw.replace(EMAIL, ' ');
-  const direct = normalizeMsisdn(cleaned);
-  if (direct) return direct;
+
+  // Common case: the field holds a phone number and nothing else.
+  if (PHONE_SHAPED.test(cleaned)) {
+    const direct = normalizeMsisdn(cleaned);
+    if (direct) return direct;
+  }
+
+  // Free-form text. Collapsing the whole field to digits would splice unrelated
+  // numbers (a street number, an invoice reference) onto the real one, so each
+  // phone-shaped run is normalized on its own. An SA number wins over an earlier
+  // non-SA digit run, which would otherwise shadow it by appearing first.
+  const candidates: string[] = [];
   for (const match of cleaned.matchAll(PHONE_CANDIDATE)) {
     const candidate = normalizeMsisdn(match[0]);
-    if (candidate) return candidate;
+    if (candidate) candidates.push(candidate);
   }
-  return null;
+  return candidates.find(isSouthAfrican) ?? candidates[0] ?? null;
 }
