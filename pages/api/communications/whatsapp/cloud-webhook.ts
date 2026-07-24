@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import { getWaCloudCreds } from '@/modules/communications/whatsapp/config/waProviderConfig';
+import { normalizeMsisdn, extractMsisdnFromContact } from '@/modules/communications/whatsapp/utils/phone';
 import { createLogger } from '@/lib/logger';
 
 export const config = { api: { bodyParser: false } };
@@ -64,13 +65,59 @@ function parseStatuses(payload: unknown): ParsedStatus[] {
 // surfaces in that ticket's conversation feed (feed route scopes by drop_number).
 // Word-bounded: the leading (?<![A-Za-z]) rejects "…dr123456" inside another word
 // (e.g. "ADDR123456"); the trailing (?!\d) rejects over-long digit runs.
-// NOTE: the sender is NOT verified against the DR — an inbound is trusted the same
-// way group-bridge messages are (Phase 1.5). Sender↔DR verification is Phase 2.
+// Extraction alone does NOT link the message — see verifyDrSender below.
 const DR_IN_TEXT = /(?<![A-Za-z])DR[\s-]?(\d{6,8})(?!\d)/i;
 
 function extractDrNumber(text: string): string | null {
   const m = text.match(DR_IN_TEXT);
   return m ? `DR${m[1]}` : null;
+}
+
+/**
+ * A DR named in inbound text is attacker-controlled: the Meta HMAC proves the
+ * webhook came from Meta, not that the sender owns the DR they typed. Cloud
+ * accepts messages from ANY WhatsApp number, so an unverified DR would let a
+ * stranger inject messages into an arbitrary ticket's operator-facing feed.
+ *
+ * The DR is therefore only returned when the sender's number matches the contact
+ * on a ticket carrying it. Every other outcome — unusable sender number, no such
+ * ticket, contact without a phone, lookup failure — returns null so the message
+ * still persists but stays unlinked, and warns with the wamid/sender/DR so ops
+ * can triage the miss.
+ */
+async function verifyDrSender(
+  sql: ReturnType<typeof db>,
+  dr: string,
+  fromPhone: string,
+  wamid: string | null,
+): Promise<string | null> {
+  const unlinked = (reason: string, extra?: Record<string, unknown>) => {
+    logger.warn(`cloud inbound DR left unlinked: ${reason}`, { wamid, fromPhone, dr, ...extra });
+    return null;
+  };
+
+  const sender = normalizeMsisdn(fromPhone);
+  if (!sender) return unlinked('sender number is not a usable MSISDN');
+
+  let rows: Array<{ client_contact: string | null }>;
+  try {
+    // dr_number is indexed (idx_tickets_dr_number) and a DR maps to a handful of
+    // tickets, so every candidate contact is fetched — capping the rows could
+    // skip the one ticket that names this sender.
+    rows = (await sql`
+      SELECT client_contact
+      FROM maintenance_tickets
+      WHERE dr_number = ${dr} AND client_contact IS NOT NULL
+    `) as Array<{ client_contact: string | null }>;
+  } catch (e) {
+    return unlinked('ticket lookup failed', { error: e instanceof Error ? e.message : String(e) });
+  }
+
+  // client_contact is free-form, so a phone is extracted from it before comparing.
+  const matched = rows.some((r) => extractMsisdnFromContact(r.client_contact) === sender);
+  if (!matched) return unlinked('sender is not a contact on any ticket for this DR', { tickets: rows.length });
+
+  return dr;
 }
 
 type ParsedInbound = { fromPhone: string; text: string; wamid: string | null };
@@ -147,12 +194,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const parsed = parseInbound(payload);
   if (!parsed) return res.status(200).json({ ok: true, persisted: false });
 
-  const dropNumber = extractDrNumber(parsed.text);
   const sql = db();
+  const claimedDr = extractDrNumber(parsed.text);
+  const dropNumber = claimedDr
+    ? await verifyDrSender(sql, claimedDr, parsed.fromPhone, parsed.wamid)
+    : null;
   try {
     // ON CONFLICT keyed on the wamid (partial unique index, migration 459) makes
     // a re-delivered Meta webhook event idempotent — one row per wamid.
-    // drop_number links the inbound to a ticket's feed when the text names a DR.
+    // drop_number links the inbound to a ticket's feed only once the sender has
+    // been verified as that ticket's contact.
     await sql`
       INSERT INTO wa_message_logs (direction, service, message_type, group_jid, recipient_jid, message_content, status, drop_number, provider_message_id, created_at)
       VALUES ('inbound', 'cloud', 'text', NULL, ${parsed.fromPhone}, ${parsed.text}, 'delivered', ${dropNumber}, ${parsed.wamid}, NOW())

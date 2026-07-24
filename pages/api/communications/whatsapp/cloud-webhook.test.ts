@@ -7,6 +7,12 @@ vi.mock('@/modules/communications/whatsapp/config/waProviderConfig', () => ({
 }));
 const sqlMock = vi.fn().mockResolvedValue([]);
 vi.mock('@neondatabase/serverless', () => ({ neon: () => sqlMock }));
+// The global setup mock hands out fresh spies on every createLogger() call, so
+// pin one stable logger instance here to assert on the ops-triage warnings.
+const { loggerMock } = vi.hoisted(() => ({
+  loggerMock: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+vi.mock('@/lib/logger', () => ({ createLogger: () => loggerMock }));
 
 import { getWaCloudCreds } from '@/modules/communications/whatsapp/config/waProviderConfig';
 import handler from './cloud-webhook';
@@ -189,11 +195,13 @@ describe('POST cloud-webhook status callbacks', () => {
 describe('POST cloud-webhook inbound → ticket DR linkage', () => {
   it('extracts a DR number from the text and stores it as drop_number so it joins the ticket feed', async () => {
     vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    // Ticket lookup: the sender owns this DR, so the link is trusted.
+    sqlMock.mockResolvedValueOnce([{ client_contact: '0831112222' }]);
     const raw = inboundPayload('27831112222', 'Hi, my line DR1853558 is down since morning');
     const res = mockRes();
     await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
     expect(res._status).toBe(200);
-    const [, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    const [, ...values] = sqlMock.mock.calls[1] as [string[], ...unknown[]];
     expect(values).toContain('DR1853558');
   });
 
@@ -217,6 +225,113 @@ describe('POST cloud-webhook inbound → ticket DR linkage', () => {
     const [, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
     expect(values).not.toContain('DR123456');
     expect(values).toContain(null);
+  });
+});
+
+describe('POST cloud-webhook inbound → sender verification', () => {
+  const drPayload = (from: string) => inboundPayload(from, 'my line DR1853558 is down');
+
+  async function post(raw: string) {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    return res;
+  }
+
+  // Located by statement rather than by index: an unusable sender short-circuits
+  // before the ticket lookup, so the INSERT is not always the second call.
+  function insertValues() {
+    const call = sqlMock.mock.calls.find(([strings]) =>
+      (strings as string[]).join('?').toUpperCase().includes('INSERT INTO WA_MESSAGE_LOGS'));
+    if (!call) throw new Error('no INSERT into wa_message_logs was issued');
+    const [, ...values] = call as [string[], ...unknown[]];
+    return values;
+  }
+
+  it('looks the ticket up by dr_number before trusting a text-extracted DR', async () => {
+    sqlMock.mockResolvedValueOnce([{ client_contact: '0831112222' }]);
+    await post(drPayload('27831112222'));
+    const [strings, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    const text = strings.join('?').toUpperCase();
+    expect(text).toContain('FROM MAINTENANCE_TICKETS');
+    expect(text).toContain('DR_NUMBER');
+    expect(values).toContain('DR1853558');
+  });
+
+  it('sets drop_number when the sender phone matches the ticket contact', async () => {
+    sqlMock.mockResolvedValueOnce([{ client_contact: '0831112222' }]);
+    const res = await post(drPayload('27831112222'));
+    expect(res._status).toBe(200);
+    expect(insertValues()).toContain('DR1853558');
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+  });
+
+  it('matches across differing phone formats on either side', async () => {
+    sqlMock.mockResolvedValueOnce([{ client_contact: '+27 83 111 2222' }]);
+    await post(drPayload('27831112222'));
+    expect(insertValues()).toContain('DR1853558');
+  });
+
+  it('stores a NULL drop_number and warns when the sender is not the ticket contact', async () => {
+    sqlMock.mockResolvedValueOnce([{ client_contact: '0849998888' }]);
+    const res = await post(drPayload('27831112222'));
+    expect(res._status).toBe(200);
+    expect(insertValues()).not.toContain('DR1853558');
+    expect(insertValues()).toContain(null);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ wamid: 'wamid.in', fromPhone: '27831112222', dr: 'DR1853558' }),
+    );
+  });
+
+  it('stores a NULL drop_number and warns when no ticket carries that DR', async () => {
+    sqlMock.mockResolvedValueOnce([]);
+    await post(drPayload('27831112222'));
+    expect(insertValues()).not.toContain('DR1853558');
+    expect(insertValues()).toContain(null);
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+
+  it('stores a NULL drop_number when the ticket contact holds no usable phone', async () => {
+    sqlMock.mockResolvedValueOnce([{ client_contact: 'Sipho' }]);
+    await post(drPayload('27831112222'));
+    expect(insertValues()).not.toContain('DR1853558');
+    expect(insertValues()).toContain(null);
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+
+  it('accepts the DR when any one of several tickets sharing it names the sender', async () => {
+    sqlMock.mockResolvedValueOnce([
+      { client_contact: 'Sipho' },
+      { client_contact: null },
+      { client_contact: '083 111 2222' },
+    ]);
+    await post(drPayload('27831112222'));
+    expect(insertValues()).toContain('DR1853558');
+  });
+
+  it('fails closed — a ticket lookup error stores NULL and still persists the message', async () => {
+    sqlMock.mockRejectedValueOnce(new Error('db down'));
+    const res = await post(drPayload('27831112222'));
+    expect(res._status).toBe(200);
+    expect(res._body).toMatchObject({ ok: true, persisted: true });
+    expect(insertValues()).not.toContain('DR1853558');
+    expect(insertValues()).toContain(null);
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+
+  it('stores a NULL drop_number when the sender phone itself is unusable', async () => {
+    await post(inboundPayload('12345', 'my line DR1853558 is down'));
+    expect(insertValues()).not.toContain('DR1853558');
+    expect(insertValues()).toContain(null);
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+
+  it('does not query tickets at all when the text carries no DR', async () => {
+    await post(inboundPayload('27831112222', 'just checking in'));
+    expect(sqlMock).toHaveBeenCalledOnce();
+    const [strings] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    expect(strings.join('?').toUpperCase()).toContain('INSERT INTO WA_MESSAGE_LOGS');
   });
 });
 

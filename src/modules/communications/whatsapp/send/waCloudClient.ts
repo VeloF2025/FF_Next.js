@@ -1,4 +1,5 @@
 import type { WaCloudCreds } from '../config/waProviderConfig';
+import { normalizeMsisdn } from '../utils/phone';
 
 export type WaSendChannel = 'cloud' | 'waha';
 export type WaSendResult = {
@@ -12,12 +13,6 @@ export type WaSendResult = {
 // Statuses that mean the request was permanently rejected (safe to treat as
 // terminal). 429 is deliberately EXCLUDED — rate-limiting is transient/retryable.
 const DEFINITE = new Set([400, 401, 403, 404, 405, 413, 415, 422]);
-
-function normalizePhone(phone: string): string {
-  let p = phone.replace(/@s\.whatsapp\.net$/i, '').replace(/[\s\-+]/g, '');
-  if (p.startsWith('0') && p.length === 10) p = '27' + p.slice(1);
-  return p;
-}
 
 function graphVersion(): string {
   return process.env.WHATSAPP_GRAPH_VERSION ?? 'v23.0';
@@ -33,7 +28,9 @@ export async function sendViaCloud(opts: {
       headers: { Authorization: `Bearer ${opts.creds.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
-        to: normalizePhone(opts.toPhone),
+        // Unnormalizable numbers are passed through so Graph returns its own
+        // rejection, exactly as before this shared helper existed.
+        to: normalizeMsisdn(opts.toPhone) ?? opts.toPhone,
         type: 'text',
         text: { body: opts.message },
       }),
