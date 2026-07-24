@@ -39,7 +39,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const projectId = typeof req.query.project_id === 'string' ? req.query.project_id : null;
   const rows = await sql`
-    SELECT i.*, p.project_name
+    SELECT i.*, p.project_name,
+      -- Pure date column as plain YYYY-MM-DD text (last-column-wins over i.*)
+      -- so node-pg does not render it one day early on SAST. Display only.
+      i.injury_date::text AS injury_date
     FROM hs_injuries i
     LEFT JOIN projects p ON p.id = i.project_id
     WHERE (${projectId}::uuid IS NULL OR i.project_id = ${projectId}::uuid)
@@ -68,7 +71,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const rows = await sql`
     INSERT INTO hs_injuries (project_id, ticket_id, injury_date, classification, days_lost, body_part, description, created_by)
     VALUES (${project_id || null}, ${ticket_id || null}, ${injury_date}, ${classification}, ${days}, ${body_part || null}, ${description || null}, ${user?.id ?? null})
-    RETURNING *
+    RETURNING *, injury_date::text AS injury_date
   `;
 
   await logHsActivity({

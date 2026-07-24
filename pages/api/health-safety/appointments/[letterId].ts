@@ -57,7 +57,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 async function handleGet(letterId: string, res: NextApiResponse) {
   const [letter] = await sql`
-    SELECT l.*, p.project_name, c.company_name AS contractor_name
+    SELECT l.*, p.project_name, c.company_name AS contractor_name,
+      -- Pure date columns as plain YYYY-MM-DD text (last-column-wins over l.*)
+      -- so node-pg does not render them one day early on SAST. Display only.
+      l.appointment_date::text AS appointment_date,
+      l.effective_from::text AS effective_from
     FROM hs_appointment_letters l
     LEFT JOIN projects p ON p.id = l.project_id
     LEFT JOIN contractors c ON c.id = l.contractor_id
@@ -133,7 +137,7 @@ async function handlePatch(letterId: string, req: NextApiRequest, res: NextApiRe
       notes = CASE WHEN ${has('notes')} THEN ${notes ?? null} ELSE notes END,
       updated_at = NOW()
     WHERE id = ${letterId}
-    RETURNING *
+    RETURNING *, appointment_date::text AS appointment_date, effective_from::text AS effective_from
   `;
 
   await logHsActivity({

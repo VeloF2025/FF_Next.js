@@ -66,7 +66,7 @@ async function handlePatch(issuanceId: string, req: NextApiRequest, res: NextApi
       signed_ip = COALESCE(${sig?.signed_ip ?? null}, signed_ip),
       updated_at = NOW()
     WHERE id = ${issuanceId}
-    RETURNING *
+    RETURNING *, issued_date::text AS issued_date, replacement_due::text AS replacement_due
   `;
   if (rows.length === 0) {
     return apiResponse.notFound(res, 'PPE issue', issuanceId);

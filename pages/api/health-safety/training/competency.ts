@@ -52,7 +52,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       SELECT
         pw.worker_name, pw.staff_id, pw.team_member_id, pw.contractor_id,
         st.id AS training_type_id, st.code AS training_code, st.name AS training_name,
-        latest.completed_date, latest.expiry_date,
+        -- Serialize the pure date columns as plain YYYY-MM-DD text so node-pg
+        -- does not shift them one day early on the SAST server. The CASE below
+        -- still classifies off latest.expiry_date (the raw date). Display only.
+        latest.completed_date::text AS completed_date, latest.expiry_date::text AS expiry_date,
         CASE
           WHEN latest.completed_date IS NULL THEN 'missing'
           WHEN latest.expiry_date IS NULL THEN 'current'
