@@ -15,80 +15,11 @@ import type { NextApiResponse } from 'next';
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
 import { log } from '@/lib/logger';
+import { MINIO_CONTAINER, MC_AUTH_ERROR_RE, healMinioAlias } from './mcAliasHeal';
 
 const execFileAsync = promisify(execFile);
 
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
-const MINIO_CONTAINER = 'qfieldcloud-minio-1';
-
-/**
- * `mc` stderr that means the `local` alias can't authenticate — the client
- * credentials are missing or wrong, NOT that the object is absent. The alias
- * config lives in the container's ephemeral `MC_CONFIG_DIR=/tmp/.mc`, so a
- * container *recreate* (compose up, image bump, host reboot) drops the alias's
- * access key and every `mc cat` then fails this way, 404-ing all qfield photos
- * across all projects until the alias is re-set. Self-heal below re-applies it.
- */
-// Detects a broken/credential-less `local` alias from `mc cat` stderr. Verified
-// against the real mc binary (minio RELEASE.2025) inside qfieldcloud-minio-1:
-//
-//   credless / wrong-creds / missing alias → "... Requested path `<p>` not found."
-//   GOOD creds, object truly absent         → "... Object does not exist."
-//   GOOD creds, bucket absent               → "... Bucket `<b>` does not exist."
-//
-// So `mc cat` (unlike `mc ls`, which says "Access Denied") signals an auth/alias
-// failure with "Requested path ... not found" — and a genuine miss is "does not
-// exist". Matching "Requested path" is therefore the correct heal trigger; the
-// "does not exist" variants must NOT match, or every normal miss would heal+retry.
-// The S3-style strings are kept as a defensive net for other mc versions/ops.
-const MC_AUTH_ERROR_RE =
-  /Requested path .*not found|Access Denied|InvalidAccessKeyId|SignatureDoesNotMatch/i;
-
-// Re-apply the `local` alias from the minio container's OWN root creds
-// (MINIO_ROOT_USER/PASSWORD). Expanded by the container's shell, so the secret
-// never enters this process, the argv, or any log line. The command is a fixed
-// string — no interpolation of caller data — so there is no injection surface.
-const MC_SET_ALIAS_CMD =
-  'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"';
-const HEAL_COOLDOWN_MS = 10_000;
-let healInFlight: Promise<void> | null = null;
-let lastHealAt = 0;
-
-/**
- * Re-apply the `local` mc alias inside the minio container. Deduped (one heal
- * covers every concurrent auth failure) and cooled down (a successful set that
- * still leaves reads failing means the creds are genuinely wrong — don't spin
- * re-healing on every photo). Best-effort: failures are logged, never thrown,
- * so the caller just falls through to a normal 404.
- */
-function healMinioAlias(): Promise<void> {
-  if (healInFlight) return healInFlight;
-  if (Date.now() - lastHealAt < HEAL_COOLDOWN_MS) return Promise.resolve();
-  const run = (async () => {
-    try {
-      await execFileAsync('docker', ['exec', MINIO_CONTAINER, 'sh', '-c', MC_SET_ALIAS_CMD], {
-        encoding: 'utf-8',
-        maxBuffer: 1024 * 1024,
-        timeout: 10_000,
-      });
-      log.warn('minio-photo-stream: re-applied `local` mc alias after auth failure', {
-        module: 'minio-photo-stream',
-      });
-    } catch (err) {
-      log.error('minio-photo-stream: mc alias self-heal failed', {
-        module: 'minio-photo-stream',
-        error: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      lastHealAt = Date.now();
-    }
-  })();
-  healInFlight = run;
-  run.finally(() => {
-    if (healInFlight === run) healInFlight = null;
-  });
-  return run;
-}
 
 /** Extension → Content-Type for every photo backend in this module's callers. */
 export const PHOTO_CONTENT_TYPES: Record<string, string> = {
