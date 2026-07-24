@@ -157,7 +157,17 @@ async function fixSingleDR(
         [fixResult, JSON.stringify(fixDetails), userId, resolution, userId, drNumber]
       );
 
-      // Update olt_mismatch_records (always)
+      // Update olt_mismatch_records (always).
+      // A successful 1Map write clears the record out of WHATEVER non-terminal bucket
+      // it sat in — not just 'pending'. Records auto-classified into the Investigate
+      // group (needs_investigation / not_found / empty_serial / serial_other_dr / …)
+      // are fixed from the same UI action and must transition too, otherwise they stay
+      // stuck in the tab after a genuine fix. The status set is limited to the
+      // non-terminal values permitted by the fix_status CHECK constraint; terminal
+      // states (fixed/resolved/escalated) are left untouched.
+      // NB the failure path below intentionally re-marks only the generic
+      // pending/needs_investigation buckets — a failed write must NOT clobber a
+      // specific classification like serial_other_dr, so the two clauses differ.
       await client.query(
         `UPDATE olt_mismatch_records
          SET fix_status = 'fixed',
@@ -166,7 +176,8 @@ async function fixSingleDR(
              fix_old_value = $2,
              fix_by = $3
          WHERE drop_number = $4
-           AND fix_status = 'pending'`,
+           AND fix_status IN ('pending', 'needs_investigation', 'needs_reinvestigation',
+                              'empty_serial', 'serial_other_dr', 'not_found')`,
         [fixResult, JSON.stringify(fixDetails), userId, drNumber]
       );
 
