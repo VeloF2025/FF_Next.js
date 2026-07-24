@@ -16,7 +16,8 @@ vi.mock('@neondatabase/serverless', () => ({
   neonConfig: { fetchConnectionCache: false },
 }));
 vi.mock('@/lib/auth', () => ({
-  withAuth: (h: (req: NextApiRequest, res: NextApiResponse) => unknown) => h,
+  
+  withPermission: () => (h: unknown) => h,withAuth: (h: (req: NextApiRequest, res: NextApiResponse) => unknown) => h,
   getAuthUser: vi.fn(() => ({ id: 'user-1', email: 'a@velocityfibre.co.za' })),
 }));
 

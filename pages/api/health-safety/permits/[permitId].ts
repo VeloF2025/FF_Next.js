@@ -13,7 +13,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, getAuthUser } from '@/lib/auth';
+import { getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import {
@@ -23,6 +23,7 @@ import {
   TERMINAL_PERMIT_STATUSES,
 } from '@/modules/health-safety/services/permitService';
 import type { PermitStatus, PermitPrecondition } from '@/modules/health-safety/types/permit.types';
+import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 /** Fields a PATCH may edit; used to detect an edit attempt on a terminal permit. */
 const EDITABLE_FIELDS = ['title', 'work_description', 'location', 'valid_from', 'valid_to', 'notes', 'precondition_confirmed'];
@@ -169,4 +170,4 @@ async function handleDelete(permitId: string, req: NextApiRequest, res: NextApiR
   return apiResponse.success(res, { deleted: true, id: permitId });
 }
 
-export default withAuth(handler);
+export default withHsPermission(handler);

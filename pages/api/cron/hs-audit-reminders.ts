@@ -26,6 +26,38 @@ const sql = neon(process.env.DATABASE_URL!);
 
 const SOURCE_TYPE = 'hs_audit_overdue';
 
+// WhatsApp overdue-audit notification (goal Phase 7). Opt-in: only fires when a
+// group JID is configured. Reuses the same message bridge as the canonical WA
+// sender (communications/whatsapp, db-health) — never the wa-feedback service.
+const WA_BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL || 'http://72.61.197.178:8083';
+const WA_HS_GROUP_JID = process.env.WA_HS_GROUP_JID;
+
+async function notifyOverdueViaWhatsApp(
+  overdue: { project_name: string; days_overdue: number }[]
+): Promise<void> {
+  if (!WA_HS_GROUP_JID || overdue.length === 0) return;
+  const lines = [
+    `⚠️ *H&S audits overdue: ${overdue.length}*`,
+    '',
+    ...overdue.slice(0, 15).map((c) => `• ${c.project_name} — ${c.days_overdue} day(s) overdue`),
+    overdue.length > 15 ? `…and ${overdue.length - 15} more` : null,
+    '',
+    '_Auto-detected by /api/cron/hs-audit-reminders_',
+  ].filter(Boolean);
+  try {
+    await fetch(`${WA_BRIDGE_URL}/send-message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group_jid: WA_HS_GROUP_JID, message: lines.join('\n') }),
+      signal: AbortSignal.timeout(5000),
+    });
+    log.info('[hs-audit-reminders] WA overdue notification sent', { overdue: overdue.length });
+  } catch (err) {
+    // Best-effort — a WA failure must never fail the reminders run.
+    log.warn('[hs-audit-reminders] WA notification failed (non-fatal)', { err });
+  }
+}
+
 /** timestamptz comes back from the pg driver as a JS Date — format explicitly */
 function isoDate(value: unknown): string {
   return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
@@ -136,6 +168,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         RETURNING id
       `;
     }
+
+    // Best-effort WhatsApp notification (opt-in via WA_HS_GROUP_JID).
+    await notifyOverdueViaWhatsApp(overdue.map((c) => ({ project_name: c.project_name, days_overdue: c.days_overdue })));
 
     log.info('[hs-audit-reminders] run complete', {
       overdue: overdue.length,

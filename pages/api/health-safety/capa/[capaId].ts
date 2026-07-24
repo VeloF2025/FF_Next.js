@@ -8,11 +8,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, getAuthUser } from '@/lib/auth';
+import { getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { CAPA_STATUS_TRANSITIONS } from '@/modules/health-safety/types/capa.types';
 import type { CAPAStatus } from '@/modules/health-safety/types/capa.types';
+import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -164,4 +165,4 @@ async function handlePut(capaId: string, req: NextApiRequest, res: NextApiRespon
   return apiResponse.success(res, updated);
 }
 
-export default withAuth(handler);
+export default withHsPermission(handler);

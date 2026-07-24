@@ -15,7 +15,8 @@ const { sqlMock, gateMock } = vi.hoisted(() => ({ sqlMock: vi.fn(), gateMock: vi
 
 vi.mock('@/lib/db-pool', () => ({ sql: sqlMock }));
 vi.mock('@/lib/auth', () => ({
-  withAuth: (h: (req: NextApiRequest, res: NextApiResponse) => unknown) => h,
+  
+  withPermission: () => (h: unknown) => h,withAuth: (h: (req: NextApiRequest, res: NextApiResponse) => unknown) => h,
   getAuthUser: vi.fn(() => ({ id: 'user-1', email: 'a@velocityfibre.co.za' })),
 }));
 vi.mock('@/modules/health-safety/services/gateService', () => ({

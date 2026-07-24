@@ -53,10 +53,10 @@ export function calculateContractorHSScore(
   incidentScore -= incidents.minor * config.incident_penalties.minor;
   incidentScore -= incidents.moderate * config.incident_penalties.moderate;
   incidentScore -= incidents.major * config.incident_penalties.major;
-  incidentScore -= incidents.fatal * config.incident_penalties.fatal;
+  incidentScore -= incidents.critical * config.incident_penalties.critical;
   incidentScore = Math.max(0, incidentScore);
 
-  if (incidents.fatal > 0) {
+  if (incidents.critical > 0) {
     issues.push('FATAL INCIDENT - Immediate review required');
     gateBlockers.push('Fatal incident in last 12 months');
   }

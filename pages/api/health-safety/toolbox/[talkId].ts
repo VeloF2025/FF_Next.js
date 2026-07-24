@@ -9,9 +9,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, getAuthUser } from '@/lib/auth';
+import { getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
+import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -124,4 +125,4 @@ async function handleDelete(talkId: string, req: NextApiRequest, res: NextApiRes
   return apiResponse.success(res, { deleted: true, id: talkId });
 }
 
-export default withAuth(handler);
+export default withHsPermission(handler);

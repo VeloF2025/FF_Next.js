@@ -19,7 +19,7 @@ export interface HSScoreInput {
     minor: number;
     moderate: number;
     major: number;
-    fatal: number;
+    critical: number;
   };
   training_records: {
     total: number;
@@ -112,7 +112,7 @@ export interface HSDashboardStats {
       minor: number;
       moderate: number;
       major: number;
-      fatal: number;
+      critical: number;
     };
     by_type: {
       injury: number;
@@ -155,7 +155,7 @@ export interface ScoringConfig {
     minor: number;
     moderate: number;
     major: number;
-    fatal: number;
+    critical: number;
   };
 }
 
@@ -176,6 +176,6 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     minor: 5,
     moderate: 15,
     major: 30,
-    fatal: 50,
+    critical: 50,
   },
 };

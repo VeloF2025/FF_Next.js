@@ -33,7 +33,9 @@ SA-compliant (OHS Act / Construction Regulations) H&S management: project audit 
 - Assignment gate (`pages/api/contractors-projects.ts`): failed verdict → 403 with `gate_check`; gate **error** → assignment proceeds **fail-open** with `log.error` + `gate_check.error` in the 201 (fail-closed is a pending product decision).
 - Checklist admin: `/health-safety/checklists` (+ `/new`, `/[id]` editor with item CRUD).
 
-## Database (14 live tables — live schema is authoritative)
+## Database (25 live tables — live schema is authoritative)
+
+Phases 4–9 added 11: `hs_training_types`, `hs_worker_training`, `hs_toolbox_talks`, `hs_toolbox_attendance`, `hs_ppe_catalogue`, `hs_ppe_issuance`, `hs_permit_types`, `hs_permits`, `hs_appointment_letters`, `hs_man_hours`, `hs_injuries` (sql/451–456). The original 14:
 
 `hs_checklist_templates`, `hs_checklist_items` (44-item seed — migration sql/450; docs that said 48 were wrong), `hs_project_config` (UNIQUE project_id; template_id NULL = all-categories scope), `hs_project_audits`, `hs_audit_responses`, `hs_contractor_compliance` (UNIQUE contractor_id + score/gate columns — sql/449), `hs_contractor_documents` (created by sql/449), `hs_ticket_details` (extends maintenance_tickets, **no FK** — emptied 2026-07-24 at gate G2: all 6 rows were orphans with blank incident fields from the 2026-01-22 demo seed, zero non-orphan rows ever existed), `hs_activity_log`, `hs_corrective_actions`, `hs_capa_comments`, `hs_risk_register` + `hs_risk_register_reviews`, `hs_training_types` + `hs_worker_training` (sql/451 — Phase 1 training matrix).
 
@@ -50,6 +52,25 @@ SA-compliant (OHS Act / Construction Regulations) H&S management: project audit 
 - `maintenance_tickets.project_id` is TEXT (`p.id::text = t.project_id`), `contractor_id` uuid (`c.id = t.contractor_id`). HSE filter is `source_type IN ('hse_incident','hse_near_miss')` — NOT `ticket_type`.
 - `hs_activity_log.user_id` is a legacy INTEGER; app users are uuid → user recorded in `metadata.user_id/user_email`.
 - Legacy `scripts/migrations/113_health_safety_module.sql` was regenerated from live (2026-07-23) for scratch rebuilds — **never run it against live** (unguarded seed duplicates templates). Rebuild proof: `bash scripts/hs-scratch-rebuild-proof.sh`.
+
+## Phases 4–9 build (2026-07-24) — 6 new capabilities, PRs #2231–#2237
+
+The Mar-2026 "deferred" list is now built. Each is a full flow (list/detail/create/edit, API, `logHsActivity`, project-scoped view) verified in a real browser with DB proof:
+
+- **Training matrix** (sql/451, `hs_training_types` + `hs_worker_training`): per-worker competency, cert expiry, per-project gap matrix. Worker = `staff` XOR `team_members` (contractor workers), `contractor_id` carried for gate aggregation (team_members' own link is unpopulated). The contractor gate now derives a **real** training score (current/total × 100; NULL = no data → does not block) and blocks on any **expired statutory** cert. **G1 fail-closed**: a gate ERROR now blocks assignment (503).
+- **Toolbox talks / DSTI** (sql/452, `hs_toolbox_talks` + `hs_toolbox_attendance`): per-project register, attendee list, **typed** e-signature (§4.5).
+- **PPE register** (sql/453, `hs_ppe_catalogue` + `hs_ppe_issuance`): catalogue with lifespan-driven replacement-due, size/qty, typed acknowledgement, outstanding view.
+- **Permit to Work** (sql/454, `hs_permit_types` + `hs_permits`): server-enforced lifecycle (`permitService`) — an expired permit's transition set is empty (visibly blocks); approval needs all mandatory preconditions; terminal permits are edit-locked.
+- **Digital safety file** (sql/455, `hs_appointment_letters`): statutory s16(2)/s8(1)/construction-supervisor/Annexure-3 letters with a **DRAWN** signature (§4.5 — PNG data URL, ≤500KB, server-derived audit IP), single **PDF export** via Puppeteer (`/project/[id]/safety-file`).
+- **LTIFR/DIFR/TRIFR** (sql/456, `hs_man_hours` + `hs_injuries`): rates computed in SQL on the 200,000-hour base; trend + per-project roll-up.
+
+**e-signature** (`services/esignature.ts`): typed name + timestamp + capturing-user uuid + **server-derived IP** (rightmost public x-forwarded-for hop — this deployment has two proxies, so first-hop is spoofable and pure last-hop is 127.0.0.1). Reused by toolbox/PPE (typed) and appointment letters (drawn).
+
+**RBAC (§4.8)**: every H&S endpoint is wrapped with `withHsPermission` (`services/hsAuth.ts`) — `withAuth` (401) + `withPermission('projects.health-safety', view|edit)` (view for GET, edit for writes; super_admin bypasses). Ratchet test `__tests__/rbacGates.test.ts` fails if a new endpoint ships bare `withAuth`. The `hs-audit-reminders` cron is exempt (x-cron-secret).
+
+**Severity vocab (§4.9)**: unified on `critical|major|moderate|minor` — `fatal` dropped from type declarations (`critical` is the top tier).
+
+**Known follow-up — TZ date display**: pure `date` columns (talk_date, issued_date, replacement_due, completed_date, expiry_date, appointment_date, injury_date) serialize via node-postgres's local-TZ Date parser, so a SAST server renders them **one day early** (DB `2026-05-01` → UI `2026-04-30`). SQL rate/overdue/expiry *classification* is unaffected (computed against `CURRENT_DATE`). Fix: cast these columns `::text` in the list/detail SELECTs (append `col::text AS col` after `SELECT *` — last-column-wins), or a scoped `pg.types.setTypeParser(1082, …)`. Not yet applied.
 
 ## Reminders cron
 
@@ -80,7 +101,7 @@ Blockers: missing/expired/rejected/pending required docs (`safety_policy`, `liab
 
 - 2026-07-24 (Phase 0 close-out): 8 stranded audits cancelled (`backfill-hs-audit-scope.ts --execute`); 3 zombie `hs_project_config` rows for deleted projects deactivated — dashboard overdue now equals the plain-SQL count (5 == 5, was 5 vs 8); reminders cron scheduled and observed firing; dashboard `total_projects_configured` fixed (counted 8 unfiltered config rows while only 5 projects are configured); 6 orphaned `hs_ticket_details` rows deleted at gate G2 (all demo residue). Gate decisions recorded: **G1 = fail-CLOSED** (block contractor assignment when the gate itself errors — reverses the previous fail-open default, wired in Phase 1); **§4.5 e-signature = typed** for toolbox/PPE registers, **drawn** for the statutory appointment letters only (Phase 5); **G3 = dev-only**, batch to production later.
 - 2026-07-23 remediation fixed: empty-wizard root cause, activity-log schema drift (phantom-write 500s), incident created_by 23502, contractor uuid/parseInt + dead `tickets` refs, all 404 pages, checklist editor, migration reproducibility, reminders cron. Dead code deleted: ContractorHSTab, InvestigationPanel/FiveWhysForm, investigate API, calculateAuditScore.
-- Deferred (Phases 4–9 of the Mar 2026 plan + more): training matrix, toolbox talks/DSTI, PPE issuance, permit-to-work, digital safety file, LTIFR/DIFR analytics, e-signatures, Annexure 3 / s16(2) letters, offline PWA capture, journey management, H&S RBAC, fail-closed gate.
+- 2026-07-24: Phases 4–9 **built** (training matrix, toolbox/DSTI, PPE, permit-to-work, digital safety file + appointment letters, LTIFR/DIFR, e-signatures, H&S RBAC, fail-closed gate, severity unification) — see the "Phases 4–9 build" section above. Still deferred: offline/PWA field capture, journey management.
 
 ## Related
 - `src/modules/health-safety/.claude.md` — quick reference (auto-loaded)

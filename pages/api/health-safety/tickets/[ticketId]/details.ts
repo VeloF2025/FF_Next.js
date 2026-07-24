@@ -11,7 +11,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, getAuthUser } from '@/lib/auth';
+import { getAuthUser } from '@/lib/auth';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import {
   INCIDENT_TYPE_CONFIG,
@@ -19,6 +19,7 @@ import {
   SEVERITY_SLA_HOURS,
 } from '@/modules/health-safety/types/ticket.types';
 import { log } from '@/lib/logger';
+import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -313,4 +314,4 @@ async function handlePost(ticketId: string, req: NextApiRequest, res: NextApiRes
   return handleGet(ticketId, res);
 }
 
-export default withAuth(handler);
+export default withHsPermission(handler);

@@ -9,7 +9,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+
+import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -232,4 +233,4 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
   return apiResponse.success(res, audit);
 }
 
-export default withAuth(handler);
+export default withHsPermission(handler);

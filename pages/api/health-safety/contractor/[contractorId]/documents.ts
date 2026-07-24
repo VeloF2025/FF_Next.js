@@ -9,9 +9,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, getAuthUser } from '@/lib/auth';
+import { getAuthUser } from '@/lib/auth';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { DOCUMENT_TYPES, REQUIRED_DOCUMENTS } from '@/modules/health-safety/types/compliance.types';
+import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -241,4 +242,4 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
   });
 }
 
-export default withAuth(handler);
+export default withHsPermission(handler);

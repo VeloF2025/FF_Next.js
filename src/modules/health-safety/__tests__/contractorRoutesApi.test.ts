@@ -22,7 +22,8 @@ vi.mock('@neondatabase/serverless', () => ({
 }));
 
 vi.mock('@/lib/auth', () => ({
-  withAuth: (handler: (req: NextApiRequest, res: NextApiResponse) => unknown) => handler,
+  
+  withPermission: () => (h: unknown) => h,withAuth: (handler: (req: NextApiRequest, res: NextApiResponse) => unknown) => handler,
   getAuthUser: vi.fn(() => ({ id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', email: 'hs@velocityfibre.co.za' })),
 }));
 

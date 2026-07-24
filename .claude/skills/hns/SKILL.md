@@ -17,6 +17,14 @@ Manages H&S compliance across FibreFlow projects: audits, incidents, risks, CAPA
 | **Risks / CAPA** | `/projects/health-safety/risks` · `/projects/health-safety/capa` |
 | **Audit wizard** | `/health-safety/audits/[auditId]` |
 | **Project tab** | `/projects/[id]?tab=health-safety` |
+| **Training matrix** | `/health-safety/training` (+ `/project/[id]/competency`) |
+| **Toolbox talks** | `/health-safety/toolbox` |
+| **PPE register** | `/health-safety/ppe` (+ catalogue) |
+| **Permits to Work** | `/health-safety/permits` |
+| **Appointment letters** | `/health-safety/appointments`; safety file PDF at `/health-safety/project/[id]/safety-file` |
+| **Injury rates** | `/health-safety/analytics` (LTIFR/DIFR/TRIFR) |
+
+Phases 4–9 (built 2026-07-24): training + competency gate, toolbox/DSTI, PPE, permit-to-work, digital safety file (drawn signatures), LTIFR analytics. RBAC via `withHsPermission` on every endpoint. Severity vocab = `critical|major|moderate|minor`. Full detail: `.claude/modules/health-safety.md`.
 
 ## DB Tables (live — see module doc for landmines)
 
