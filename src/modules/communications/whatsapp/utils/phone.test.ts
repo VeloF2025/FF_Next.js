@@ -70,6 +70,17 @@ describe('extractMsisdnFromContact', () => {
     expect(extractMsisdnFromContact('Invoice 123456789 call 0821234567')).toBe('27821234567');
   });
 
+  it('returns null rather than a spliced number when a stray digit trails the phone', () => {
+    // '0821234567 5' collapses to the 11-digit '08212345675', which is not a
+    // real MSISDN. Returning it would risk a coincidental match against a
+    // sender, so extraction fails closed instead.
+    expect(extractMsisdnFromContact('0821234567 5')).toBeNull();
+  });
+
+  it('returns null for digit noise that is not a subscriber number', () => {
+    expect(extractMsisdnFromContact('Invoice 123456789')).toBeNull();
+  });
+
   it('returns null for a contact holding only a name', () => {
     expect(extractMsisdnFromContact('Sipho')).toBeNull();
   });
