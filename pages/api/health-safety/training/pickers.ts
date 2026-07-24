@@ -11,7 +11,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-
 import { log } from '@/lib/logger';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 

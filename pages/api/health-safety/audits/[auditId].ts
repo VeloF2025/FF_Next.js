@@ -9,7 +9,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const getSql = () => neon(process.env.DATABASE_URL!);

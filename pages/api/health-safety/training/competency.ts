@@ -12,7 +12,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-
 import { log } from '@/lib/logger';
 import { EXPIRING_SOON_DAYS } from '@/modules/health-safety/types/training.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';

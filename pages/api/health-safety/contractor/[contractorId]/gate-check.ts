@@ -11,7 +11,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-
 import { checkContractorGate } from '@/modules/health-safety/services/gateService';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';

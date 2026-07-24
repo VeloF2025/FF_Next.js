@@ -12,17 +12,15 @@
  * handlers without splitting each into per-method routes.
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiHandler } from 'next';
 import { withAuth, withPermission } from '@/lib/auth';
 
 const HS_PERMISSION = 'projects.health-safety';
 
-type Handler = (req: NextApiRequest, res: NextApiResponse) => unknown | Promise<unknown>;
-
-export function withHsPermission(handler: Handler): Handler {
-  return withAuth(async (req: NextApiRequest, res: NextApiResponse) => {
+export function withHsPermission(handler: NextApiHandler): NextApiHandler {
+  return withAuth(async (req, res) => {
     const action = req.method === 'GET' || req.method === 'HEAD' ? 'view' : 'edit';
     // req.user is populated by the surrounding withAuth; withPermission reads it.
-    return withPermission(HS_PERMISSION, action)(handler as never)(req, res);
-  }) as Handler;
+    return withPermission(HS_PERMISSION, action)(handler)(req, res);
+  });
 }

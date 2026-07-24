@@ -9,9 +9,10 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 
+// Only endpoints UNDER pages/api/health-safety are scanned. The
+// hs-audit-reminders cron lives outside this tree (pages/api/cron) and
+// authenticates on x-cron-secret, so it is never a candidate here.
 const API_DIR = join(process.cwd(), 'pages/api/health-safety');
-// The cron endpoint authenticates on x-cron-secret, not a user session.
-const EXEMPT = new Set<string>([]);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -31,7 +32,6 @@ describe('H&S API RBAC gates', () => {
   it('gates every endpoint with withHsPermission (not bare withAuth)', () => {
     const offenders: string[] = [];
     for (const f of files) {
-      if (EXEMPT.has(f)) continue;
       const src = readFileSync(f, 'utf8');
       const rel = f.slice(f.indexOf('pages/api'));
       // Must route through withHsPermission and must NOT export a bare withAuth.

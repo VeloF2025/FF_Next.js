@@ -8,7 +8,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-
 import { getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';

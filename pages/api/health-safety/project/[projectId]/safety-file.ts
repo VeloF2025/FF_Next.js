@@ -12,7 +12,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-
 import { log } from '@/lib/logger';
 import { generateSafetyFileHtml, type SafetyFileData } from '@/templates/health-safety/safety-file-template';
 import type { AppointmentLetter } from '@/modules/health-safety/types/appointment.types';

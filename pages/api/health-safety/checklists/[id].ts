@@ -10,7 +10,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-
 import { getAuthUser } from '@/lib/auth';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
