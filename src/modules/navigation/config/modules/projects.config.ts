@@ -31,6 +31,7 @@ import {
   Megaphone,
   HardHat,
   FileCheck,
+  FileSignature,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -186,6 +187,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'Permits',
           icon: FileCheck,
           path: '/projects/health-safety/permits',
+        },
+        {
+          id: 'appointments',
+          label: 'Appointments',
+          icon: FileSignature,
+          path: '/projects/health-safety/appointments',
         },
         {
           id: 'capa',
