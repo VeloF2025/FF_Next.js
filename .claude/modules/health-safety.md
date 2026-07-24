@@ -35,7 +35,7 @@ SA-compliant (OHS Act / Construction Regulations) H&S management: project audit 
 
 ## Database (12 live tables — live schema is authoritative)
 
-`hs_checklist_templates`, `hs_checklist_items` (44-item seed — migration sql/450; docs that said 48 were wrong), `hs_project_config` (UNIQUE project_id; template_id NULL = all-categories scope), `hs_project_audits`, `hs_audit_responses`, `hs_contractor_compliance` (UNIQUE contractor_id + score/gate columns — sql/449), `hs_contractor_documents` (created by sql/449), `hs_ticket_details` (extends maintenance_tickets, **no FK** — 6 pre-remediation orphan rows kept as evidence), `hs_activity_log`, `hs_corrective_actions`, `hs_capa_comments`, `hs_risk_register` + `hs_risk_register_reviews`.
+`hs_checklist_templates`, `hs_checklist_items` (44-item seed — migration sql/450; docs that said 48 were wrong), `hs_project_config` (UNIQUE project_id; template_id NULL = all-categories scope), `hs_project_audits`, `hs_audit_responses`, `hs_contractor_compliance` (UNIQUE contractor_id + score/gate columns — sql/449), `hs_contractor_documents` (created by sql/449), `hs_ticket_details` (extends maintenance_tickets, **no FK** — emptied 2026-07-24 at gate G2: all 6 rows were orphans with blank incident fields from the 2026-01-22 demo seed, zero non-orphan rows ever existed), `hs_activity_log`, `hs_corrective_actions`, `hs_capa_comments`, `hs_risk_register` + `hs_risk_register_reviews`.
 
 **Landmines**
 - `hs_activity_log` live columns are `activity_type/entity_type/entity_id/user_id(int)/description/metadata` — the migration-113-era `action/actor_id/details` never existed live. Write ONLY through `logHsActivity()` (`src/modules/health-safety/services/activityLog.ts`), always AFTER the main write; it never throws.
@@ -45,7 +45,24 @@ SA-compliant (OHS Act / Construction Regulations) H&S management: project audit 
 
 ## Reminders cron
 
-`POST /api/cron/hs-audit-reminders` (header `x-cron-secret: $CRON_SECRET`, fail-closed): creates/refreshes one Action Item per overdue active config (dedupe on `source_type='hs_audit_overdue'`, `source_id=config.id`, open status) and auto-completes items no longer overdue. Suggested crontab (velo, install gated): `40 6 * * 1-6 curl -s -X POST -H "x-cron-secret: $CRON_SECRET" http://localhost:3005/api/cron/hs-audit-reminders`
+`POST /api/cron/hs-audit-reminders` (header `x-cron-secret: $CRON_SECRET`, fail-closed): creates/refreshes one Action Item per overdue active config (dedupe on `source_type='hs_audit_overdue'`, `source_id=config.id`, open status) and auto-completes items no longer overdue.
+
+**Scheduled** since 2026-07-24 via `scripts/cron-hs-audit-reminders.sh` (flock, prod→dev probe, `CRON_SECRET` read from the deploy `.env.local` — never hardcoded). Live entry in the `velo` crontab:
+
+```
+40 6 * * 1-6 /home/velo/fibreflow-dev/scripts/cron-hs-audit-reminders.sh >> /home/velo/logs/hs-audit-reminders.log 2>&1
+```
+
+The script targets **production** whenever `localhost:3000/api/health` answers and only falls back to dev — the dev path is just where the file lives (dev deploys are ungated). Repoint to `/home/velo/fibreflow-production/scripts/` at the next production deploy.
+
+Observed firing unattended before this was documented. A temporary `*/5` entry was installed alongside the real schedule purely to witness cron-driven ticks, then removed — `/home/velo/logs/hs-audit-reminders.log`:
+
+```
+[2026-07-24 01:30:01] OK: http://localhost:3000 — overdue=5 created=0 refreshed=5 resolved=0
+[2026-07-24 01:35:01] OK: http://localhost:3000 — overdue=5 created=0 refreshed=5 resolved=0
+```
+
+Two ticks exactly five minutes apart at `:00:01` — the scheduler invoked it, not a human. `overdue=5` matches the plain-SQL overdue count, so the run does real work rather than merely returning 200.
 
 ## Gate check logic
 
@@ -53,6 +70,7 @@ Blockers: missing/expired/rejected/pending required docs (`safety_policy`, `liab
 
 ## History / deferred
 
+- 2026-07-24 (Phase 0 close-out): 8 stranded audits cancelled (`backfill-hs-audit-scope.ts --execute`); 3 zombie `hs_project_config` rows for deleted projects deactivated — dashboard overdue now equals the plain-SQL count (5 == 5, was 5 vs 8); reminders cron scheduled and observed firing; dashboard `total_projects_configured` fixed (counted 8 unfiltered config rows while only 5 projects are configured); 6 orphaned `hs_ticket_details` rows deleted at gate G2 (all demo residue). Gate decisions recorded: **G1 = fail-CLOSED** (block contractor assignment when the gate itself errors — reverses the previous fail-open default, wired in Phase 1); **§4.5 e-signature = typed** for toolbox/PPE registers, **drawn** for the statutory appointment letters only (Phase 5); **G3 = dev-only**, batch to production later.
 - 2026-07-23 remediation fixed: empty-wizard root cause, activity-log schema drift (phantom-write 500s), incident created_by 23502, contractor uuid/parseInt + dead `tickets` refs, all 404 pages, checklist editor, migration reproducibility, reminders cron. Dead code deleted: ContractorHSTab, InvestigationPanel/FiveWhysForm, investigate API, calculateAuditScore.
 - Deferred (Phases 4–9 of the Mar 2026 plan + more): training matrix, toolbox talks/DSTI, PPE issuance, permit-to-work, digital safety file, LTIFR/DIFR analytics, e-signatures, Annexure 3 / s16(2) letters, offline PWA capture, journey management, H&S RBAC, fail-closed gate.
 
