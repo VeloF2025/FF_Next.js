@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAuth } from '@/lib/auth/app-router';
 import { getMessagesForDR } from '@/modules/noc/services/waMaintenanceProcessor';
 
 export type ConversationItem = {
@@ -40,7 +41,9 @@ export async function buildConversation(
     id: r.id,
     direction: r.direction === 'outbound' ? 'outbound' : 'inbound',
     channel: r.service === 'cloud' ? 'cloud' : 'waha',
-    from: r.recipient_jid,
+    // Outbound 1:1 rows store the counterparty in recipient_jid; the panel should
+    // render those as "You", so leave `from` null for outbound.
+    from: r.direction === 'outbound' ? null : r.recipient_jid,
     text: r.message_content,
     at: toIso(r.created_at),
   }));
@@ -49,22 +52,32 @@ export async function buildConversation(
 
 export async function GET(
   req: NextRequest,
-  _context: { params: Promise<{ id: string }> },
+  context: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const [, unauth] = await requireAuth(req);
+  if (unauth) return unauth;
+
+  const { id: ticketId } = await context.params;
   const sql = neon(process.env.DATABASE_URL!);
-  const dr = new URL(req.url).searchParams.get('dr');
-  // 1:1 messages logged for this ticket's contact live in wa_message_logs
-  // (service in cloud|waha). Phase 1 keys them by DR-derived recipient; refine
-  // the WHERE once ticket→customer-phone mapping is wired (see plan Open Items).
-  const logs = (await sql`
-    SELECT id, direction, service, recipient_jid, message_content, created_at
-    FROM wa_message_logs
-    WHERE service IN ('cloud','waha')
-      AND recipient_jid IS NOT NULL
-      AND ${dr ?? ''} <> ''
-    ORDER BY created_at ASC
-    LIMIT 200
-  `) as WaLogRow[];
+
+  // Scope the feed to THIS ticket's DR, derived server-side from the ticket —
+  // never a client-supplied query param — so the 1:1 feed cannot leak other
+  // tickets' / other customers' messages (blind-review H2/H3).
+  const ticketRows = (await sql`
+    SELECT dr_number FROM maintenance_tickets WHERE id = ${ticketId} LIMIT 1
+  `) as { dr_number: string | null }[];
+  const dr = ticketRows[0]?.dr_number ?? null;
+
+  const logs = dr
+    ? ((await sql`
+        SELECT id, direction, service, recipient_jid, message_content, created_at
+        FROM wa_message_logs
+        WHERE service IN ('cloud','waha')
+          AND drop_number = ${dr}
+        ORDER BY created_at ASC
+        LIMIT 200
+      `) as WaLogRow[])
+    : [];
   const items = await buildConversation(dr, logs);
   return NextResponse.json({ success: true, data: { items } });
 }
