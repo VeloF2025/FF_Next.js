@@ -30,8 +30,6 @@ export function WhatsAppConversationPanel({
     const resolved = extractMsisdnFromContact(clientContact);
     setToPhone(resolved ?? '');
     setPhoneResolved(resolved !== null);
-    // Only re-resolve if the ticket's contact itself changes, not on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientContact]);
 
   const load = useCallback(async () => {
