@@ -41,6 +41,21 @@ describe('POST ticket whatsapp reply', () => {
     expect(sendWhatsAppText).not.toHaveBeenCalled();
   });
 
+  it('returns 403 for a non-manager role and never sends', async () => {
+    vi.mocked(requireAuth).mockResolvedValue([{ id: 'u2', role: 'technician' }, null] as never);
+    const res = await POST(replyReq({ toPhone: '27821234567', message: 'hi' }) as never, { params: Promise.resolve({ id: 't1' }) } as never);
+    expect(res.status).toBe(403);
+    expect(sendWhatsAppText).not.toHaveBeenCalled();
+  });
+
+  it('allows a manager role to send', async () => {
+    vi.mocked(requireAuth).mockResolvedValue([{ id: 'u3', role: 'manager' }, null] as never);
+    vi.mocked(sendWhatsAppText).mockResolvedValue({ ok: true, channel: 'cloud', providerMessageId: 'wamid.m' });
+    const res = await POST(replyReq({ toPhone: '27821234567', message: 'hi', channel: 'cloud' }) as never, { params: Promise.resolve({ id: 't1' }) } as never);
+    expect(res.status).toBe(200);
+    expect(sendWhatsAppText).toHaveBeenCalledOnce();
+  });
+
   it('returns 400 when required fields are missing', async () => {
     const res = await POST(replyReq({ toPhone: '27821234567' }) as never, { params: Promise.resolve({ id: 't1' }) } as never);
     expect(res.status).toBe(400);
@@ -58,5 +73,16 @@ describe('POST ticket whatsapp reply', () => {
     const res = await POST(replyReq({ toPhone: '27821234567', message: 'hi' }) as never, { params: Promise.resolve({ id: 't1' }) } as never);
     expect(res.status).toBe(502);
     expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  it('logs the provider_message_id via ON CONFLICT DO NOTHING so a re-logged send stays one row', async () => {
+    vi.mocked(sendWhatsAppText).mockResolvedValue({ ok: true, channel: 'cloud', providerMessageId: 'wamid.9' });
+    await POST(replyReq({ toPhone: '27821234567', message: 'hi', channel: 'cloud' }) as never, { params: Promise.resolve({ id: 't1' }) } as never);
+    const [strings, ...values] = sqlMock.mock.calls[1] as [string[], ...unknown[]];
+    const text = strings.join('?').toUpperCase();
+    expect(text).toContain('PROVIDER_MESSAGE_ID');
+    expect(text).toContain('ON CONFLICT');
+    expect(text).toContain('DO NOTHING');
+    expect(values).toContain('wamid.9');
   });
 });
