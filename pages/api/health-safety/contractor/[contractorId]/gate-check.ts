@@ -69,9 +69,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function getGateBreakdown(contractorId: string) {
-  // Documents check
+  // Documents check. `expiry_date` stays raw for the gate compare below;
+  // `expiry_date_display` (::text) is what's surfaced in the `expires` field —
+  // see dateTextCast.test.ts.
   const documents = await sql`
-    SELECT document_type, status, expiry_date
+    SELECT document_type, status, expiry_date, expiry_date::text AS expiry_date_display
     FROM hs_contractor_documents
     WHERE contractor_id = ${contractorId}
     ORDER BY created_at DESC
@@ -84,7 +86,7 @@ async function getGateBreakdown(contractorId: string) {
       present: !!doc,
       valid:
         doc?.status === 'valid' && (!doc.expiry_date || new Date(doc.expiry_date) > new Date()),
-      expires: doc?.expiry_date,
+      expires: doc?.expiry_date_display,
     };
   }
 
