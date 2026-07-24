@@ -125,6 +125,40 @@ describe('POST cloud-webhook inbound', () => {
   });
 });
 
+describe('POST cloud-webhook status callbacks', () => {
+  const statusPayload = (wamid: string, status: string) => JSON.stringify({
+    entry: [{ changes: [{ value: { statuses: [{ id: wamid, status, recipient_id: '27831112222' }] } }] }],
+  });
+
+  it.each(['sent', 'delivered', 'read', 'failed'])(
+    'updates wa_message_logs.status to "%s" keyed on the wamid',
+    async (status) => {
+      vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+      const raw = statusPayload('wamid.out', status);
+      const res = mockRes();
+      await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+      expect(res._status).toBe(200);
+      expect(sqlMock).toHaveBeenCalledOnce();
+      const [strings, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+      const text = strings.join('?').toUpperCase();
+      expect(text).toContain('UPDATE WA_MESSAGE_LOGS');
+      expect(text).toContain('SET STATUS');
+      expect(text).toContain('WHERE PROVIDER_MESSAGE_ID');
+      expect(values).toContain(status);
+      expect(values).toContain('wamid.out');
+    },
+  );
+
+  it('ignores an unknown status value and does NOT touch the DB', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    const raw = statusPayload('wamid.out', 'bogus');
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    expect(res._status).toBe(200);
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST cloud-webhook inbound idempotency (wamid)', () => {
   it('inserts the wamid via ON CONFLICT DO NOTHING so a re-delivered message collapses to one row', async () => {
     vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);

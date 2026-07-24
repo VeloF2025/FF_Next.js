@@ -30,6 +30,27 @@ function verifyMetaSignature(rawBody: string, header: string | undefined, appSec
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// The delivery-receipt statuses Meta sends for our outbound messages. Kept in
+// sync with the wa_message_logs.status CHECK constraint (which also allows the
+// internal 'pending', never emitted by Meta).
+const CLOUD_STATUSES = new Set(['sent', 'delivered', 'read', 'failed']);
+
+type ParsedStatus = { wamid: string; status: string };
+
+function parseStatuses(payload: unknown): ParsedStatus[] {
+  const p = payload as {
+    entry?: Array<{ changes?: Array<{ value?: { statuses?: Array<{ id?: string; status?: string }> } }> }>;
+  };
+  const raw = p?.entry?.[0]?.changes?.[0]?.value?.statuses ?? [];
+  const out: ParsedStatus[] = [];
+  for (const s of raw) {
+    if (typeof s?.id === 'string' && typeof s?.status === 'string' && CLOUD_STATUSES.has(s.status)) {
+      out.push({ wamid: s.id, status: s.status });
+    }
+  }
+  return out;
+}
+
 type ParsedInbound = { fromPhone: string; text: string; wamid: string | null };
 
 function parseInbound(payload: unknown): ParsedInbound | null {
@@ -69,7 +90,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let payload: unknown;
   try { payload = JSON.parse(rawBody); } catch { return res.status(400).json({ error: 'Invalid JSON' }); }
 
-  // Status callbacks and non-message events → ack, no-op in Phase 1.
+  // Delivery-receipt callbacks (sent/delivered/read/failed) → update the matching
+  // outbound row by wamid. A single UPDATE per status; a failed UPDATE is logged
+  // but still acked so Meta stops retrying.
+  const statuses = parseStatuses(payload);
+  if (statuses.length > 0) {
+    const sql = db();
+    let updated = 0;
+    for (const s of statuses) {
+      try {
+        await sql`UPDATE wa_message_logs SET status = ${s.status} WHERE provider_message_id = ${s.wamid}`;
+        updated += 1;
+      } catch (e) {
+        logger.error('cloud status update failed', { wamid: s.wamid, status: s.status, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    return res.status(200).json({ ok: true, statuses: updated });
+  }
+
   const parsed = parseInbound(payload);
   if (!parsed) return res.status(200).json({ ok: true, persisted: false });
 
