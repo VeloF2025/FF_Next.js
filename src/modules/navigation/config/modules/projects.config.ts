@@ -28,6 +28,7 @@ import {
   AlertCircle,
   ClipboardCheck,
   GraduationCap,
+  Megaphone,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -165,6 +166,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'Training',
           icon: GraduationCap,
           path: '/projects/health-safety/training',
+        },
+        {
+          id: 'toolbox',
+          label: 'Toolbox Talks',
+          icon: Megaphone,
+          path: '/projects/health-safety/toolbox',
         },
         {
           id: 'capa',
