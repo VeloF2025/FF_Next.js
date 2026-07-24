@@ -30,6 +30,7 @@ import {
   GraduationCap,
   Megaphone,
   HardHat,
+  FileCheck,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -179,6 +180,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'PPE Register',
           icon: HardHat,
           path: '/projects/health-safety/ppe',
+        },
+        {
+          id: 'permits',
+          label: 'Permits',
+          icon: FileCheck,
+          path: '/projects/health-safety/permits',
         },
         {
           id: 'capa',
