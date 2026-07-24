@@ -494,7 +494,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
 
           {/* WhatsApp Tab */}
           {activeTab === 'whatsapp' && (
-            <WhatsAppConversationPanel ticketId={ticketId} drNumber={ticket.dr_number} />
+            <WhatsAppConversationPanel ticketId={ticketId} drNumber={ticket.dr_number} clientContact={ticket.client_contact} />
           )}
 
           {/* Verification Tab */}
