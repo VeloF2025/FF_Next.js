@@ -4,7 +4,7 @@
 # Spins up a throwaway Postgres 15 container, creates minimal stubs for the
 # non-H&S tables the chain references (projects/staff/users/contractors — all
 # uuid ids, matching live), applies the H&S-relevant migrations in order:
-#   113 -> 235 -> 236 -> 237 -> 238 -> sql/449 -> sql/450 -> sql/451 -> sql/452 -> sql/453
+#   113 -> 235 -> 236 -> 237 -> 238 -> sql/449 -> sql/450 -> sql/451 -> sql/452 -> sql/453 -> sql/454
 # then diffs the resulting hs_* schema (columns + indexes) against the live
 # database. Before 449/450 are applied to live, the diff should list exactly
 # their pending changes; after the gated live apply it must be empty.
@@ -61,7 +61,8 @@ for f in \
   "$MIG_DIR/sql/450_hs_checklist_seed_44.sql" \
   "$MIG_DIR/sql/451_hs_training_matrix.sql" \
   "$MIG_DIR/sql/452_hs_toolbox_talks.sql" \
-  "$MIG_DIR/sql/453_hs_ppe_register.sql"
+  "$MIG_DIR/sql/453_hs_ppe_register.sql" \
+  "$MIG_DIR/sql/454_hs_permits.sql"
 do
   echo "    -> $(basename "$f")"
   psql "$SCRATCH_URL" -v ON_ERROR_STOP=1 -q -f "$f"
