@@ -22,6 +22,13 @@ import { join } from 'path';
 // (endpoint file, pure `date` columns it must serialize as text). man-hours is
 // deliberately absent: hs_man_hours has no pure `date` column (period_year /
 // period_month are integers), so it needs no cast.
+//
+// SCOPE: this ratchet covers the worker-facing H&S record tables only. The
+// contractor-compliance surface (hs_contractor_documents.issue_date/expiry_date,
+// also pure `date`) shares this bug family but is intentionally out of scope —
+// its columns feed JS gate-check comparisons (new Date(d.expiry_date) > new Date()),
+// so a naive ::text cast there could perturb classification. Tracked as a
+// separate follow-up; do NOT read this list as "all H&S dates are covered".
 const CONTRACTS: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['pages/api/health-safety/training/records/index.ts', ['completed_date', 'expiry_date']],
   ['pages/api/health-safety/training/records/[recordId].ts', ['completed_date', 'expiry_date']],
