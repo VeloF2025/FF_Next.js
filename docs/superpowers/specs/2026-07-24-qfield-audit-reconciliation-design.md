@@ -64,9 +64,17 @@ photos are present in MinIO. Conclusion: nothing lost, but civil-164 is mostly
 outstanding field work — a result **only derivable with the design-layer join.**
 
 ### 2.5 Key JSON shapes in `core_delta.content`
-- Feature identity: `content->>'localPk'` ( == `content->>'sourcePk'` ==
-  `content->'old'->'attributes'->>'fid'` ). This is the join key linking an `error`
-  delta to its `applied` twin.
+- Feature identity: **`(kind, localPk)`**, where `localPk` is
+  `content->>'localPk'` ( == `content->>'sourcePk'` ==
+  `content->'old'->'attributes'->>'fid'` ) and `kind` is derived from
+  `Status` (optical = splitters, civil = poles). `localPk` alone is only
+  unique WITHIN a single QField layer — a splitter (optical) and a pole
+  (civil) can share the same `localPk`, so keying on `localPk` alone silently
+  merges cross-layer features into one. This was caught in testing: PON-161
+  optical read 11/14 (3 of its 14 splitter features collided with civil pole
+  deltas sharing the same `localPk` and were folded into the civil count)
+  before the composite `(kind, localPk)` key fixed it. `(kind, localPk)` is
+  the join key linking an `error` delta to its `applied` twin.
 - `content->>'method'` ∈ `create|patch|delete`.
 - `content->'new'->'attributes'->>'Status'` — audit outcome:
   - Optical: `"Optical Complete"`.
