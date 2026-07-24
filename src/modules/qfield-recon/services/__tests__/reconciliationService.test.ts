@@ -93,4 +93,19 @@ describe('buildReconciliation', () => {
     expect(pon200.neverCaptured).toBe(0);
     expect(model.stuckDeltas).toHaveLength(0); // 'started' is not in the STUCK set, so no stuck-delta row
   });
+
+  it('same localPk across optical and civil layers are distinct features (no merge)', () => {
+    const deltas = [
+      optical('3506', 161, 'applied'),                                  // optical splitter, localPk 3506
+      civil('MOA.P.X3506', 'applied', 'Pole Verified/ Civil Complete'), // civil pole that happens to reuse localPk 3506
+    ];
+    // give the civil delta the colliding featureKey explicitly:
+    deltas[1] = { ...deltas[1], featureKey: '3506' };
+    const map: PonMap = { available: true, gpkgVersion: 'v', resolvedAt: 'now', designPons: [161],
+      poleToPon: { 'MOA.P.X3506': { pon: 300, zone: '9' } } };
+    const model = buildReconciliation({ project, deltas, ponMap: map, presentPhotoKeys: new Set() });
+    expect(model.optical.find(p => p.ponNo === 161)!.applied).toBe(1);   // optical 3506 counted under PON 161
+    expect(model.civil.find(p => p.ponNo === 300)!.applied).toBe(1);     // civil 3506 counted under PON 300 — NOT merged away
+    expect(model.totals.applied).toBe(2);
+  });
 });

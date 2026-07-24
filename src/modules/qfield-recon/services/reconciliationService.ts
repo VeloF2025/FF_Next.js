@@ -17,11 +17,15 @@ interface FeatureAgg {
 function aggregateFeatures(deltas: AuditDelta[]): Map<string, FeatureAgg> {
   const map = new Map<string, FeatureAgg>();
   for (const d of deltas) {
-    let a = map.get(d.featureKey);
+    // localPk (featureKey) is unique only WITHIN a QField layer — a splitter
+    // (optical) and a pole (civil) can share the same localPk. Key on
+    // (kind, featureKey) so the two layers never merge.
+    const key = `${d.kind}:${d.featureKey}`;
+    let a = map.get(key);
     if (!a) {
       a = { featureKey: d.featureKey, label: d.label, kind: d.kind, ponNo: d.ponNo,
             hasApplied: false, hasStuck: false, deltas: [] };
-      map.set(d.featureKey, a);
+      map.set(key, a);
     }
     a.deltas.push(d);
     if (d.lastStatus === 'applied') a.hasApplied = true;
