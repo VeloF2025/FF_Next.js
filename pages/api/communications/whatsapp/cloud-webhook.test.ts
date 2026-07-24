@@ -157,6 +157,33 @@ describe('POST cloud-webhook status callbacks', () => {
     expect(res._status).toBe(200);
     expect(sqlMock).not.toHaveBeenCalled();
   });
+
+  it('guards against status regression — the UPDATE only advances (monotonic)', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    const raw = statusPayload('wamid.out', 'sent');
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    const [strings, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    const text = strings.join('?').toUpperCase();
+    // rank of the incoming status must exceed the row's current rank
+    expect(text).toContain('CASE STATUS');
+    expect(values).toContain(1); // rank('sent') = 1
+  });
+
+  it('applies status updates across multiple entries in one batched webhook', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    const raw = JSON.stringify({
+      entry: [
+        { changes: [{ value: { statuses: [{ id: 'wamid.a', status: 'delivered' }] } }] },
+        { changes: [{ value: { statuses: [{ id: 'wamid.b', status: 'read' }] } }] },
+      ],
+    });
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    expect(res._status).toBe(200);
+    expect(sqlMock).toHaveBeenCalledTimes(2);
+    expect(res._body).toMatchObject({ ok: true, statuses: 2 });
+  });
 });
 
 describe('POST cloud-webhook inbound → ticket DR linkage', () => {
@@ -177,6 +204,18 @@ describe('POST cloud-webhook inbound → ticket DR linkage', () => {
     await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
     expect(res._status).toBe(200);
     const [, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    expect(values).toContain(null);
+  });
+
+  it('does not match a DR embedded inside another word (word boundary)', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    // "ADDR123456" ends in "dr123456" but is not a DR reference.
+    const raw = inboundPayload('27831112222', 'the ADDR123456 field is wrong');
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    expect(res._status).toBe(200);
+    const [, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    expect(values).not.toContain('DR123456');
     expect(values).toContain(null);
   });
 });

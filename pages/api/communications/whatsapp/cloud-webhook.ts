@@ -30,10 +30,12 @@ function verifyMetaSignature(rawBody: string, header: string | undefined, appSec
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-// The delivery-receipt statuses Meta sends for our outbound messages. Kept in
-// sync with the wa_message_logs.status CHECK constraint (which also allows the
-// internal 'pending', never emitted by Meta).
-const CLOUD_STATUSES = new Set(['sent', 'delivered', 'read', 'failed']);
+// Delivery-receipt statuses Meta sends for our outbound messages, ranked by
+// progression so a later UPDATE can only advance the row (never regress it when
+// Meta redelivers out of order). Values stay within the wa_message_logs.status
+// CHECK constraint (which also allows the internal 'pending', never emitted here).
+const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3, failed: 3 };
+const CLOUD_STATUSES = new Set(Object.keys(STATUS_RANK));
 
 type ParsedStatus = { wamid: string; status: string };
 
@@ -41,11 +43,16 @@ function parseStatuses(payload: unknown): ParsedStatus[] {
   const p = payload as {
     entry?: Array<{ changes?: Array<{ value?: { statuses?: Array<{ id?: string; status?: string }> } }> }>;
   };
-  const raw = p?.entry?.[0]?.changes?.[0]?.value?.statuses ?? [];
+  // Meta can batch multiple entries/changes per POST — iterate all of them so no
+  // delivery receipt is silently dropped.
   const out: ParsedStatus[] = [];
-  for (const s of raw) {
-    if (typeof s?.id === 'string' && typeof s?.status === 'string' && CLOUD_STATUSES.has(s.status)) {
-      out.push({ wamid: s.id, status: s.status });
+  for (const entry of p?.entry ?? []) {
+    for (const change of entry?.changes ?? []) {
+      for (const s of change?.value?.statuses ?? []) {
+        if (typeof s?.id === 'string' && typeof s?.status === 'string' && CLOUD_STATUSES.has(s.status)) {
+          out.push({ wamid: s.id, status: s.status });
+        }
+      }
     }
   }
   return out;
@@ -55,7 +62,11 @@ function parseStatuses(payload: unknown): ParsedStatus[] {
 // space/dash separator. Normalized to the canonical `DR<digits>` form stored in
 // maintenance_tickets.dr_number / wa_message_logs.drop_number so a Cloud inbound
 // surfaces in that ticket's conversation feed (feed route scopes by drop_number).
-const DR_IN_TEXT = /DR[\s-]?(\d{6,8})/i;
+// Word-bounded: the leading (?<![A-Za-z]) rejects "…dr123456" inside another word
+// (e.g. "ADDR123456"); the trailing (?!\d) rejects over-long digit runs.
+// NOTE: the sender is NOT verified against the DR — an inbound is trusted the same
+// way group-bridge messages are (Phase 1.5). Sender↔DR verification is Phase 2.
+const DR_IN_TEXT = /(?<![A-Za-z])DR[\s-]?(\d{6,8})(?!\d)/i;
 
 function extractDrNumber(text: string): string | null {
   const m = text.match(DR_IN_TEXT);
@@ -110,7 +121,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let updated = 0;
     for (const s of statuses) {
       try {
-        await sql`UPDATE wa_message_logs SET status = ${s.status} WHERE provider_message_id = ${s.wamid}`;
+        // Only advance: the incoming status must outrank the row's current status,
+        // so an out-of-order redelivery (e.g. a late 'sent' after 'read') cannot
+        // regress the displayed delivery state.
+        await sql`
+          UPDATE wa_message_logs
+          SET status = ${s.status}
+          WHERE provider_message_id = ${s.wamid}
+            AND ${STATUS_RANK[s.status]} > CASE status
+              WHEN 'sent' THEN 1
+              WHEN 'delivered' THEN 2
+              WHEN 'read' THEN 3
+              WHEN 'failed' THEN 3
+              ELSE 0
+            END
+        `;
         updated += 1;
       } catch (e) {
         logger.error('cloud status update failed', { wamid: s.wamid, status: s.status, error: e instanceof Error ? e.message : String(e) });
