@@ -13,6 +13,13 @@ const { loggerMock } = vi.hoisted(() => ({
   loggerMock: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock('@/lib/logger', () => ({ createLogger: () => loggerMock }));
+const { rateLimiterCheck } = vi.hoisted(() => ({
+  rateLimiterCheck: vi.fn(() => ({ success: true, remaining: 4, resetAt: 0 })),
+}));
+vi.mock('@/lib/rateLimiter', () => ({
+  default: { check: (...args: unknown[]) => rateLimiterCheck(...args), reset: vi.fn() },
+  RateLimits: { DR_PROBE: { limit: 5, windowMs: 10 * 60 * 1000 } },
+}));
 
 import { getWaCloudCreds } from '@/modules/communications/whatsapp/config/waProviderConfig';
 import handler from './cloud-webhook';
@@ -44,7 +51,11 @@ const inboundPayload = (from: string, text: string) => JSON.stringify({
   entry: [{ changes: [{ value: { messages: [{ from, id: 'wamid.in', text: { body: text } }] } }] }],
 });
 
-beforeEach(() => { vi.clearAllMocks(); sqlMock.mockResolvedValue([]); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  sqlMock.mockResolvedValue([]);
+  rateLimiterCheck.mockReturnValue({ success: true, remaining: 4, resetAt: 0 });
+});
 afterEach(() => vi.unstubAllEnvs());
 
 describe('GET cloud-webhook verify handshake', () => {
@@ -332,6 +343,71 @@ describe('POST cloud-webhook inbound → sender verification', () => {
     expect(sqlMock).toHaveBeenCalledOnce();
     const [strings] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
     expect(strings.join('?').toUpperCase()).toContain('INSERT INTO WA_MESSAGE_LOGS');
+  });
+});
+
+describe('POST cloud-webhook inbound → DR-probe rate limiting', () => {
+  const drPayload = (from: string) => inboundPayload(from, 'my line DR1853558 is down');
+
+  it('checks the rate limit keyed on the normalized sender before verifying', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    sqlMock.mockResolvedValueOnce([{ client_contact: '0831112222' }]);
+    await handler(mockPostReq(drPayload('27831112222'), { 'x-hub-signature-256': sign(drPayload('27831112222')) }), mockRes());
+    expect(rateLimiterCheck).toHaveBeenCalledWith('dr-probe:27831112222', 5, 10 * 60 * 1000);
+  });
+
+  it('fails closed and skips the ticket lookup entirely when the sender is over the limit', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    rateLimiterCheck.mockReturnValue({ success: false, remaining: 0, resetAt: 123456 });
+    const raw = drPayload('27831112222');
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    expect(res._status).toBe(200);
+    expect(res._body).toMatchObject({ ok: true, persisted: true });
+    // Only the final INSERT ran — no maintenance_tickets lookup was attempted.
+    expect(sqlMock).toHaveBeenCalledOnce();
+    const [strings, ...values] = sqlMock.mock.calls[0] as [string[], ...unknown[]];
+    expect(strings.join('?').toUpperCase()).toContain('INSERT INTO WA_MESSAGE_LOGS');
+    expect(values).toContain(null); // drop_number stays unlinked
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.stringMatching(/rate limit/i),
+      expect.objectContaining({ wamid: 'wamid.in', fromPhone: '27831112222', dr: 'DR1853558' }),
+    );
+  });
+
+  it('does not rate-limit messages that carry no DR claim', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    rateLimiterCheck.mockReturnValue({ success: false, remaining: 0, resetAt: 123456 });
+    const raw = inboundPayload('27831112222', 'just checking in, no reference');
+    const res = mockRes();
+    await handler(mockPostReq(raw, { 'x-hub-signature-256': sign(raw) }), res);
+    expect(res._status).toBe(200);
+    expect(rateLimiterCheck).not.toHaveBeenCalled();
+  });
+
+  it('resumes normal verification once the sender is back under the limit', async () => {
+    vi.mocked(getWaCloudCreds).mockResolvedValue(CREDS);
+    // First message: sender is over the limit — fails closed.
+    rateLimiterCheck.mockReturnValueOnce({ success: false, remaining: 0, resetAt: 123456 });
+    const raw1 = drPayload('27831112222');
+    await handler(mockPostReq(raw1, { 'x-hub-signature-256': sign(raw1) }), mockRes());
+    expect(sqlMock).toHaveBeenCalledOnce(); // no ticket lookup on the blocked attempt
+
+    // Second message: the window has reset — check() now reports success again.
+    rateLimiterCheck.mockReturnValueOnce({ success: true, remaining: 4, resetAt: 0 });
+    sqlMock.mockResolvedValueOnce([{ client_contact: '0831112222' }]);
+    const raw2 = drPayload('27831112222');
+    const res2 = mockRes();
+    await handler(mockPostReq(raw2, { 'x-hub-signature-256': sign(raw2) }), res2);
+    expect(res2._status).toBe(200);
+    // Ticket lookup + INSERT both ran this time, and the DR was linked. Both
+    // handler calls issue an INSERT, so take the LAST one (this call's).
+    const insertCalls = sqlMock.mock.calls.filter(([strings]) =>
+      (strings as string[]).join('?').toUpperCase().includes('INSERT INTO WA_MESSAGE_LOGS'));
+    const lastInsert = insertCalls[insertCalls.length - 1];
+    expect(lastInsert).toBeDefined();
+    const [, ...values] = lastInsert as [string[], ...unknown[]];
+    expect(values).toContain('DR1853558');
   });
 });
 
