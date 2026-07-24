@@ -43,9 +43,23 @@ describe('generateSafetyFileHtml', () => {
     expect(html).not.toContain('base64');
   });
 
-  it('escapes untrusted text to prevent HTML injection', () => {
-    const html = generateSafetyFileHtml({ ...base, letters: [letter({ appointee_name: '<script>x</script>' })] });
+  it('escapes untrusted text in every interpolated field', () => {
+    const html = generateSafetyFileHtml({
+      ...base,
+      projectName: '<img onerror=alert(1)>',
+      letters: [letter({
+        appointee_name: '<script>x</script>',
+        scope: '</section><script>evil()</script>',
+        appointer_name: '"><b>bold</b>',
+        reference_number: 'APPT-<svg>',
+      })],
+    });
+    // No raw injected markup survives anywhere in the document.
     expect(html).not.toContain('<script>x</script>');
+    expect(html).not.toContain('<script>evil()</script>');
+    expect(html).not.toContain('<img onerror');
+    expect(html).not.toContain('<b>bold</b>');
+    expect(html).not.toContain('APPT-<svg>');
     expect(html).toContain('&lt;script&gt;');
   });
 

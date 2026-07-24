@@ -32,12 +32,19 @@ export function SignaturePad({ onCapture, busy }: Props) {
   }, []);
 
   function pos(e: React.PointerEvent<HTMLCanvasElement>) {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    // Correct for CSS size vs the canvas's intrinsic buffer size — the canvas
+    // is 400×140 but styled w-full, so on a narrow viewport the two differ and
+    // an uncorrected stroke drifts from the pointer.
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
 
   function start(e: React.PointerEvent<HTMLCanvasElement>) {
     if (busy) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     drawing.current = true;
     const ctx = canvasRef.current!.getContext('2d')!;
     const { x, y } = pos(e);

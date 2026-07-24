@@ -80,8 +80,9 @@ async function handlePatch(letterId: string, req: NextApiRequest, res: NextApiRe
   const isSigning = has('signature_image');
 
   // A signed letter is a finished legal record — no field edits, no re-sign.
+  // 409 (conflict with current state), not 400 (the request itself is well-formed).
   if (letter.status === 'signed') {
-    return apiResponse.badRequest(res, 'A signed appointment letter cannot be modified — delete and re-issue if needed');
+    return apiResponse.conflict(res, 'A signed appointment letter cannot be modified — delete and re-issue if needed');
   }
 
   if (isSigning) {
@@ -123,11 +124,11 @@ async function handlePatch(letterId: string, req: NextApiRequest, res: NextApiRe
     SET
       appointer_name = CASE WHEN ${has('appointer_name')} THEN ${appointer_name ?? null} ELSE appointer_name END,
       appointer_designation = CASE WHEN ${has('appointer_designation')} THEN ${appointer_designation ?? null} ELSE appointer_designation END,
-      appointee_name = COALESCE(${has('appointee_name') ? appointee_name : null}, appointee_name),
+      appointee_name = COALESCE(${has('appointee_name') && typeof appointee_name === 'string' ? appointee_name.trim() : null}, appointee_name),
       appointee_designation = CASE WHEN ${has('appointee_designation')} THEN ${appointee_designation ?? null} ELSE appointee_designation END,
       scope = CASE WHEN ${has('scope')} THEN ${scope ?? null} ELSE scope END,
-      appointment_date = CASE WHEN ${has('appointment_date')} THEN ${appointment_date ?? null}::date ELSE appointment_date END,
-      effective_from = CASE WHEN ${has('effective_from')} THEN ${effective_from ?? null}::date ELSE effective_from END,
+      appointment_date = CASE WHEN ${has('appointment_date')} THEN ${appointment_date || null}::date ELSE appointment_date END,
+      effective_from = CASE WHEN ${has('effective_from')} THEN ${effective_from || null}::date ELSE effective_from END,
       notes = CASE WHEN ${has('notes')} THEN ${notes ?? null} ELSE notes END,
       updated_at = NOW()
     WHERE id = ${letterId}
@@ -147,7 +148,11 @@ async function handlePatch(letterId: string, req: NextApiRequest, res: NextApiRe
 
 async function handleDelete(letterId: string, req: NextApiRequest, res: NextApiResponse) {
   const user = getAuthUser(req);
-  const rows = await sql`DELETE FROM hs_appointment_letters WHERE id = ${letterId} RETURNING id, reference_number`;
+  // Deleting is deliberately the correction path for a signed letter (a signed
+  // letter can't be edited — the PATCH lock message points here to re-issue).
+  // The activity log records whether a signed statutory record was removed so
+  // the deletion of a legal artefact is always auditable.
+  const rows = await sql`DELETE FROM hs_appointment_letters WHERE id = ${letterId} RETURNING id, reference_number, (status = 'signed') AS was_signed`;
   if (rows.length === 0) {
     return apiResponse.notFound(res, 'Appointment letter', letterId);
   }
@@ -155,7 +160,8 @@ async function handleDelete(letterId: string, req: NextApiRequest, res: NextApiR
     activityType: 'appointment_letter_deleted',
     entityType: 'appointment_letter',
     entityId: letterId,
-    description: `Appointment letter deleted: ${rows[0]!.reference_number}`,
+    description: `Appointment letter deleted: ${rows[0]!.reference_number}${rows[0]!.was_signed ? ' (was signed)' : ''}`,
+    metadata: { was_signed: rows[0]!.was_signed === true },
     user,
   });
   return apiResponse.success(res, { deleted: true, id: letterId });
