@@ -29,6 +29,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   Megaphone,
+  HardHat,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -172,6 +173,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'Toolbox Talks',
           icon: Megaphone,
           path: '/projects/health-safety/toolbox',
+        },
+        {
+          id: 'ppe',
+          label: 'PPE Register',
+          icon: HardHat,
+          path: '/projects/health-safety/ppe',
         },
         {
           id: 'capa',
