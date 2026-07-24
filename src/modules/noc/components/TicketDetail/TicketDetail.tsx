@@ -22,6 +22,7 @@ import {
   CheckSquare,
   History,
   MessageSquare,
+  MessageCircle,
   Pencil,
   X,
   Check,
@@ -43,6 +44,7 @@ import { AssignmentPanel } from '../Assignment/AssignmentPanel';
 import { RelatedTickets } from './RelatedTickets';
 import { NearbyTickets } from './NearbyTickets';
 import { NotesTab } from './NotesTab';
+import { WhatsAppConversationPanel } from './WhatsAppConversationPanel';
 import { HistoricalPhotosPanel } from './HistoricalPhotosPanel';
 import { useTicketNotes } from '../../hooks/useTicketNotesWithMutations';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,7 +62,7 @@ interface TicketDetailProps {
   backLink?: string;
 }
 
-type TabKey = 'overview' | 'activity' | 'notes' | 'attachments' | 'verification' | 'historical';
+type TabKey = 'overview' | 'activity' | 'notes' | 'whatsapp' | 'attachments' | 'verification' | 'historical';
 
 interface Tab {
   key: TabKey;
@@ -170,6 +172,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
     { key: 'overview', label: 'Overview', icon: FileText },
     { key: 'activity', label: 'Activity', icon: Activity, badge: activitySummary.total },
     { key: 'notes', label: 'Notes', icon: MessageSquare, badge: notesSummary.total },
+    { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
     { key: 'verification', label: 'Verification', icon: CheckSquare },
     {
       key: 'historical',
@@ -488,6 +491,11 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
 
           {/* Notes Tab */}
           {activeTab === 'notes' && <NotesTab ticketId={ticketId} />}
+
+          {/* WhatsApp Tab */}
+          {activeTab === 'whatsapp' && (
+            <WhatsAppConversationPanel ticketId={ticketId} drNumber={ticket.dr_number} />
+          )}
 
           {/* Verification Tab */}
           {activeTab === 'verification' && (
