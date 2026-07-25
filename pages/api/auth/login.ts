@@ -11,6 +11,7 @@ import {
   verifyPassword,
   signToken,
   createSession,
+  setSessionTokenHash,
   AUTH_COOKIE_NAME,
   type AuthUser,
   type AuthRole,
@@ -147,11 +148,7 @@ export default async function handler(
     const finalToken = await signToken(user, session.id, expiresIn);
 
     // Update session with token hash
-    await sql`
-      UPDATE user_sessions
-      SET token_hash = encode(sha256(${finalToken}::bytea), 'hex')
-      WHERE id = ${session.id}
-    `;
+    await setSessionTokenHash(session.id, finalToken);
 
     // Update last login
     await sql`
