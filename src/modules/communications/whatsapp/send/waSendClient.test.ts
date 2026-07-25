@@ -8,17 +8,17 @@ vi.mock('./waCloudClient', async (orig) => ({
   ...(await orig<typeof import('./waCloudClient')>()),
   sendViaCloud: vi.fn(),
 }));
-// NOTE (recon deviation): the plan assumed sendWhatsAppDM lived in
-// @/modules/noc/services/whatsappService. The real WAHA 1:1 sender is
-// sendWhatsAppDM(phone, message): Promise<void> in
-// @/modules/notifications/services/whatsappDelivery — mock that module.
-vi.mock('@/modules/notifications/services/whatsappDelivery', () => ({
-  sendWhatsAppDM: vi.fn(),
+// The raw WAHA 1:1 sender is sendWahaDm(phone, message): Promise<void>. It used
+// to be reached through @/modules/notifications/services/whatsappDelivery, which
+// made the two senders import each other; it now lives in the dependency-free
+// ./wahaDmClient (see importGraph.test.ts).
+vi.mock('./wahaDmClient', () => ({
+  sendWahaDm: vi.fn(),
 }));
 
 import { getWaProvider, getWaCloudCreds } from '../config/waProviderConfig';
 import { sendViaCloud } from './waCloudClient';
-import { sendWhatsAppDM } from '@/modules/notifications/services/whatsappDelivery';
+import { sendWahaDm } from './wahaDmClient';
 import { sendWhatsAppText } from './waSendClient';
 
 beforeEach(() => vi.clearAllMocks());
@@ -29,22 +29,22 @@ describe('sendWhatsAppText channel routing', () => {
     vi.mocked(sendViaCloud).mockResolvedValue({ ok: true, channel: 'cloud', providerMessageId: 'wamid.1' });
     const r = await sendWhatsAppText({ toPhone: '27821234567', message: 'hi', channel: 'cloud' });
     expect(sendViaCloud).toHaveBeenCalledOnce();
-    expect(sendWhatsAppDM).not.toHaveBeenCalled();
+    expect(sendWahaDm).not.toHaveBeenCalled();
     expect(r).toMatchObject({ ok: true, channel: 'cloud', providerMessageId: 'wamid.1' });
   });
 
   it('uses WAHA when channel="waha"', async () => {
-    // Real sendWhatsAppDM resolves void on success (throws on failure).
-    vi.mocked(sendWhatsAppDM).mockResolvedValue(undefined);
+    // Real sendWahaDm resolves void on success (throws on failure).
+    vi.mocked(sendWahaDm).mockResolvedValue(undefined);
     const r = await sendWhatsAppText({ toPhone: '27821234567', message: 'hi', channel: 'waha' });
-    expect(sendWhatsAppDM).toHaveBeenCalledWith('27821234567', 'hi');
+    expect(sendWahaDm).toHaveBeenCalledWith('27821234567', 'hi');
     expect(sendViaCloud).not.toHaveBeenCalled();
     expect(r.channel).toBe('waha');
     expect(r.ok).toBe(true);
   });
 
   it('reports ok:false when the WAHA DM throws', async () => {
-    vi.mocked(sendWhatsAppDM).mockRejectedValue(new Error('WAHA DM failed: HTTP 500 — down'));
+    vi.mocked(sendWahaDm).mockRejectedValue(new Error('WAHA DM failed: HTTP 500 — down'));
     const r = await sendWhatsAppText({ toPhone: '27821234567', message: 'hi', channel: 'waha' });
     expect(r).toMatchObject({ ok: false, channel: 'waha', outcome: 'AMBIGUOUS' });
   });
