@@ -13,11 +13,16 @@
  * interactive browser session.
  */
 import type { NextApiHandler, NextApiResponse } from 'next';
-import { withAuth, getUserSessions } from '@/lib/auth';
+import { withAuth, getUserSessions, isOwner } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { McpLifetimeCapError, MCP_LIFETIME_DAYS, mintFfMcpToken } from '@/lib/auth/mcpToken';
+import {
+  McpLifetimeCapError,
+  MCP_LIFETIME_DAYS,
+  OWNER_MAX_DAYS,
+  mintFfMcpToken,
+} from '@/lib/auth/mcpToken';
 import type { McpLifetime } from '@/lib/auth/mcpToken';
 
 const LOGGER = 'MeMcpTokens';
@@ -46,6 +51,11 @@ async function listHandler(
       expiresAt: s.expiresAt,
       lastUsedAt: s.lastUsedAt ?? null,
     })),
+    // Lets the UI warn before the user picks a lifetime the server will reject. The
+    // server enforces the cap regardless; this only avoids a confusing 400. Computed
+    // from the verified user, so the owner list itself never reaches the browser.
+    ownerCapped: isOwner(req.user),
+    ownerMaxDays: OWNER_MAX_DAYS,
   });
 }
 
