@@ -261,6 +261,22 @@ export interface WaMonitoredGroupInput {
 }
 
 // ============================================
+// Cloud Go-Live Readiness
+// ============================================
+
+/** Presence of one Cloud credential — never carries the value itself. */
+export interface WaConfigPresence {
+  key: string;
+  present: boolean;
+}
+
+export interface WaReadiness {
+  provider: 'bridge' | 'cloud';
+  cloudConfig: WaConfigPresence[];
+  cloudConfigured: boolean;
+}
+
+// ============================================
 // Tab Types for UI
 // ============================================
-export type WaAdminTab = 'services' | 'chat' | 'send' | 'monitored' | 'groups' | 'templates' | 'logs' | 'settings';
+export type WaAdminTab = 'services' | 'chat' | 'send' | 'monitored' | 'groups' | 'templates' | 'logs' | 'settings' | 'golive';

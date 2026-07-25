@@ -20,6 +20,7 @@ import type {
   WaPhoneNumber,
   WaPhoneNumberInput,
   WaSendMessageInput,
+  WaReadiness,
 } from '../types/wa-admin.types';
 
 const API_BASE = '/api/communications/whatsapp';
@@ -326,6 +327,14 @@ export const phonesApi = {
     }),
 };
 
+// ============================================
+// Cloud Go-Live API
+// ============================================
+export const goLiveApi = {
+  /** Read-only readiness: active provider + Cloud credential presence. */
+  readiness: () => fetchApi<WaReadiness>('/readiness'),
+};
+
 // Combined export
 export const waAdminApi = {
   monitoredGroups: monitoredGroupsApi,
@@ -336,6 +345,7 @@ export const waAdminApi = {
   logs: logsApi,
   messages: messagesApi,
   phones: phonesApi,
+  goLive: goLiveApi,
 };
 
 export default waAdminApi;
