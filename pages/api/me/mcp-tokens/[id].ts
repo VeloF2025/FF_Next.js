@@ -49,6 +49,13 @@ const authedHandler = withAuth(async (req, res) => {
   } catch (err) {
     // withAuth returns the handler promise without awaiting it, so its own try/catch
     // cannot intercept this rejection — fail closed here with structured JSON.
+    // Logged here as well as by internalError: this line carries the caller and the
+    // session id being revoked, which the generic handler does not have.
+    log.error('mcp token revoke failed', {
+      userId: authReq.user?.id,
+      sessionId: typeof authReq.query.id === 'string' ? authReq.query.id : null,
+      error: err instanceof Error ? err.message : String(err),
+    }, LOGGER);
     apiResponse.internalError(res, err instanceof Error ? err : new Error(String(err)));
   }
 });

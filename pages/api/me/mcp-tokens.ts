@@ -84,6 +84,10 @@ async function mintHandler(
     // The dropdown offers 1y to everyone, so a capped owner picking it is a normal
     // user action — answer with a clear 400, not a 500.
     if (err instanceof McpLifetimeCapError) {
+      log.warn('mcp token mint rejected: owner lifetime cap', {
+        userId: req.user.id,
+        lifetime: rawLifetime,
+      }, LOGGER);
       return apiResponse.badRequest(res, err.message);
     }
     throw err;
@@ -105,6 +109,13 @@ const authedHandler = withAuth(async (req, res) => {
   } catch (err) {
     // withAuth returns the handler promise without awaiting it, so its own try/catch
     // cannot intercept this rejection — fail closed here with structured JSON.
+    // Logged here as well as by internalError: this line carries the caller and method,
+    // which the generic handler does not have.
+    log.error('mcp token request failed', {
+      userId: authReq.user?.id,
+      method: authReq.method,
+      error: err instanceof Error ? err.message : String(err),
+    }, LOGGER);
     apiResponse.internalError(res, err instanceof Error ? err : new Error(String(err)));
   }
 });
