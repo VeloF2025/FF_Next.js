@@ -22,6 +22,16 @@ export async function POST(
 ) {
   const { id: ticketId } = await params;
   try {
+    // Authenticate FIRST — before parsing the body, uploading anything, or touching the
+    // VLM. This endpoint uploads files to storage, spends GPU time and writes a ticket
+    // note; none of that may happen for an unauthenticated caller.
+    const token = (await cookies()).get('ff_auth_token')?.value;
+    const jwt = token ? await verifyToken(token) : null;
+    if (!jwt) {
+      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
+    }
+    const createdBy: string = jwt.sub;
+
     if (!ticketId) {
       return NextResponse.json({ success: false, error: { message: 'Ticket ID is required' } }, { status: 400 });
     }
@@ -40,18 +50,6 @@ export async function POST(
     );
     if (dataUrls.length === 0) {
       return NextResponse.json({ success: false, error: { message: 'Images must be base64 image data URLs' } }, { status: 400 });
-    }
-
-    // Best-effort acting user (created_by is nullable).
-    let createdBy: string | null = null;
-    try {
-      const token = (await cookies()).get('ff_auth_token')?.value;
-      if (token) {
-        const jwt = await verifyToken(token);
-        if (jwt) createdBy = jwt.sub;
-      }
-    } catch {
-      /* unauthenticated context — leave createdBy null */
     }
 
     // Ticket cross-reference context for the prompt.
