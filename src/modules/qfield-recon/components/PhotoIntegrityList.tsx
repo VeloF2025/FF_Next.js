@@ -1,20 +1,49 @@
+'use client';
+
+import { CheckCircle2 } from 'lucide-react';
+import { StandardDataTable } from '@/components/ui/StandardDataTable';
+import type { TableColumn } from '@/components/ui/StandardDataTable';
+import { Badge } from '@/components/ui/Badge';
 import type { PhotoFlag } from '../types';
 
-export function PhotoIntegrityList({ flags }: { flags: PhotoFlag[] }) {
+interface PhotoIntegrityListProps {
+  flags: PhotoFlag[];
+  isLoading?: boolean;
+}
+
+export function PhotoIntegrityList({ flags, isLoading }: PhotoIntegrityListProps) {
+  if (!isLoading && flags.length === 0) {
+    return (
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Photo integrity</h3>
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-sm text-green-500">
+          <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+          All referenced photos are present in storage
+        </div>
+      </section>
+    );
+  }
+
+  const columns: TableColumn<PhotoFlag>[] = [
+    { key: 'label', header: 'Feature', render: f => <span className="font-mono text-xs">{f.label ?? f.featureKey}</span> },
+    {
+      key: 'photoKey', header: 'Photo key',
+      render: f => <span className="font-mono text-xs text-[var(--ff-text-secondary)]">{f.photoKey}</span>,
+    },
+    { key: 'status', header: 'Status', render: () => <Badge colorClass="bg-red-500/20 text-red-600">Missing</Badge> },
+  ];
+
   return (
-    <section className="mt-6">
-      <h3 className="mb-2 font-semibold">Photo integrity</h3>
-      {flags.length === 0
-        ? <p className="text-sm text-green-700">All referenced photos present in storage ✓</p>
-        : (
-          <ul className="text-sm text-red-700">
-            {flags.map(f => (
-              <li key={`${f.deltaId}-${f.photoKey}`} className="font-mono text-xs">
-                {(f.label ?? f.featureKey)} → {f.photoKey} <span className="text-red-500">MISSING</span>
-              </li>
-            ))}
-          </ul>
-        )}
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Photo integrity ({flags.length} missing)</h3>
+      <StandardDataTable
+        columns={columns}
+        data={flags}
+        isLoading={isLoading}
+        emptyMessage="No missing photos"
+        getRowKey={f => `${f.deltaId}-${f.photoKey}`}
+        stickyHeader
+      />
     </section>
   );
 }

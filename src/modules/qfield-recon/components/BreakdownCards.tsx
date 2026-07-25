@@ -1,21 +1,58 @@
+'use client';
+
+import { CheckCircle, Clock, XCircle, Copy } from 'lucide-react';
+import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
+import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import type { ReconModel } from '../types';
 
-const CARDS: Array<{ key: keyof ReconModel['totals']; label: string; tone: string }> = [
-  { key: 'applied', label: 'Applied ✓', tone: 'text-green-600' },
-  { key: 'stuckRecoverable', label: 'Stuck (recoverable)', tone: 'text-amber-600' },
-  { key: 'neverCaptured', label: 'Never captured', tone: 'text-red-600' },
-  { key: 'staleDuplicate', label: 'Stale duplicates (recovered)', tone: 'text-gray-500' },
-];
+interface BreakdownCardsProps {
+  totals: ReconModel['totals'];
+  /** Features never captured, split by kind — the combined total mixes optical features and civil poles. */
+  opticalNeverCaptured: number;
+  civilNeverCaptured: number;
+  isLoading?: boolean;
+}
 
-export function BreakdownCards({ totals }: { totals: ReconModel['totals'] }) {
-  return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-      {CARDS.map(c => (
-        <div key={c.key} className="rounded-lg border p-4">
-          <div className={`text-3xl font-bold ${c.tone}`}>{totals[c.key]}</div>
-          <div className="text-sm text-gray-600">{c.label}</div>
-        </div>
-      ))}
-    </div>
-  );
+export function BreakdownCards({ totals, opticalNeverCaptured, civilNeverCaptured, isLoading }: BreakdownCardsProps) {
+  const cards: EnhancedStatCardProps[] = [
+    {
+      title: 'Applied',
+      value: totals.applied,
+      icon: CheckCircle,
+      color: '#10B981',
+      description: 'Features net-complete in the audit trail',
+      variant: 'detailed',
+      isLoading,
+    },
+    {
+      title: 'Stuck (recoverable)',
+      value: totals.stuckRecoverable,
+      icon: Clock,
+      color: '#D97706',
+      description: 'Started but never confirmed applied',
+      variant: 'detailed',
+      isLoading,
+    },
+    {
+      title: 'Never captured',
+      value: totals.neverCaptured,
+      icon: XCircle,
+      color: '#EF4444',
+      description: `${opticalNeverCaptured} optical / ${civilNeverCaptured} civil (poles)`,
+      variant: 'detailed',
+      isLoading,
+    },
+    {
+      title: 'Stale duplicates',
+      value: totals.staleDuplicate,
+      icon: Copy,
+      color: '#6B7280',
+      subtitle: 'Recovered',
+      description: 'Superseded by an applied twin delta',
+      variant: 'detailed',
+      isLoading,
+    },
+  ];
+
+  return <StatsGrid cards={cards} columns={4} />;
 }
