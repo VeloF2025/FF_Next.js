@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-25T16:11:42.239Z",
+  "generatedAt": "2026-07-25T19:36:49.890Z",
   "routes": [
     {
       "path": "/api/action-items",
@@ -5107,30 +5107,6 @@
         "GET"
       ],
       "group": "sow"
-    },
-    {
-      "path": "/api/staff-documents-download",
-      "methods": [
-        "GET"
-      ],
-      "group": "staff-documents-download",
-      "description": "Staff Document Download/View API"
-    },
-    {
-      "path": "/api/staff-documents/:documentId",
-      "methods": [
-        "GET"
-      ],
-      "group": "staff-documents",
-      "description": "Staff Document API"
-    },
-    {
-      "path": "/api/staff-documents/expiring",
-      "methods": [
-        "GET"
-      ],
-      "group": "staff-documents",
-      "description": "Expiring Documents API"
     },
     {
       "path": "/api/stock-items",

@@ -26,13 +26,24 @@ import { join, resolve, relative } from 'node:path';
 export const DENIED_GROUPS = new Set(['accounting', 'staff', 'my']);
 
 /**
- * Surfaced by the first full run and left OUT of DENIED_GROUPS pending Hein's call —
- * the flattened-route convention means these are NOT covered by the groups above:
- *   `staff-documents`, `staff-documents-download`  (HR documents; `staff` does not match)
- *   `database`                                     (/api/database/query runs SQL; admin-gated)
- * Recorded here rather than added silently, because widening the guard is a judgement
- * call about what the connector is for, not a bug fix.
+ * Matches a denied group OR any hyphenated sibling of one: `staff` also withholds
+ * `staff-documents` and `staff-documents-download`.
+ *
+ * Exact matching is not enough here. Routes in this repo are flattened, so one logical
+ * area spreads across sibling group names (`contractors`, `contractors-documents`,
+ * `contractors-documents-export`, …). The first full run caught HR documents sitting in
+ * the catalogue because `staff` did not match `staff-documents` — and a guard that has
+ * to be re-audited every time someone adds a flat route is a guard that rots.
+ *
+ * `/api/database/query` was reviewed and deliberately left catalogued: it is
+ * withRole('admin') gated, so only an admin's connector reaches it at all.
  */
+export function isDeniedGroup(group: string): string | undefined {
+  for (const denied of DENIED_GROUPS) {
+    if (group === denied || group.startsWith(`${denied}-`)) return denied;
+  }
+  return undefined;
+}
 
 /** Only these are callable with an MCP credential; anything else is context noise. */
 const CATALOGUED_METHODS = new Set(['GET', 'HEAD']);
@@ -182,8 +193,9 @@ export function buildCatalogue(repoRoot: string): CatalogueResult {
 
   for (const { file, route, isAppRouter } of sources) {
     const group = groupOf(route);
-    if (DENIED_GROUPS.has(group)) {
-      deniedHits[group] = (deniedHits[group] ?? 0) + 1;
+    const denied = isDeniedGroup(group);
+    if (denied) {
+      deniedHits[denied] = (deniedHits[denied] ?? 0) + 1;
       continue;
     }
 

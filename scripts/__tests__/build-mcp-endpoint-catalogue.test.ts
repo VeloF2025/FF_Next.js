@@ -9,6 +9,7 @@ import {
   extractMethods,
   groupOf,
   hasDefaultExport,
+  isDeniedGroup,
   toAppRoute,
   toPagesRoute,
   type CatalogueResult,
@@ -28,6 +29,18 @@ describe('MCP endpoint catalogue', () => {
   describe('denylist', () => {
     it('emits no route from a denied group', () => {
       const leaked = result.routes.filter((r) => DENIED_GROUPS.has(r.group));
+      expect(leaked.map((r) => r.path)).toEqual([]);
+    });
+
+    it('emits no route from a hyphenated sibling of a denied group', () => {
+      // Routes here are flattened, so one area spreads across sibling group names.
+      // Exact matching left /api/staff-documents/* catalogued on the first real run.
+      //
+      // Asserted against literal prefixes, NOT against isDeniedGroup — reusing the
+      // function under test here makes the assertion vacuous the moment that function
+      // regresses, which is precisely when it needs to fire.
+      const WITHHELD_PREFIXES = ['/api/accounting', '/api/staff', '/api/my'];
+      const leaked = result.routes.filter((r) => WITHHELD_PREFIXES.some((p) => r.path.startsWith(p)));
       expect(leaked.map((r) => r.path)).toEqual([]);
     });
 
@@ -151,6 +164,30 @@ describe('description extraction', () => {
   it('truncates past 120 characters', () => {
     const long = `/**\n * ${'x'.repeat(200)}\n */`;
     expect(extractDescription(long)).toHaveLength(120);
+  });
+});
+
+describe('denied group matching', () => {
+  it('matches the group itself', () => {
+    expect(isDeniedGroup('staff')).toBe('staff');
+    expect(isDeniedGroup('accounting')).toBe('accounting');
+  });
+
+  it('matches hyphenated siblings, attributing them to the entry that caught them', () => {
+    expect(isDeniedGroup('staff-documents')).toBe('staff');
+    expect(isDeniedGroup('staff-documents-download')).toBe('staff');
+  });
+
+  it('does not over-match on a shared prefix without the hyphen', () => {
+    // 'stafford' must not be withheld just because it starts with 'staff'.
+    expect(isDeniedGroup('stafford')).toBeUndefined();
+    expect(isDeniedGroup('myriad')).toBeUndefined();
+  });
+
+  it('leaves unrelated groups alone', () => {
+    expect(isDeniedGroup('projects')).toBeUndefined();
+    // Reviewed and deliberately allowed: admin-gated, so only an admin's connector reaches it.
+    expect(isDeniedGroup('database')).toBeUndefined();
   });
 });
 
