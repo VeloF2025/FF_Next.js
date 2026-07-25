@@ -352,6 +352,15 @@ export function withOptionalAuth(
           );
 
           if (user) {
+            // Same gate as withAuth. This wrapper has no callers today, but it resolves
+            // the same credential, so gating it here keeps the read-only guarantee true
+            // for whatever adopts it next rather than relying on that author to remember.
+            if (isReadOnlyViolation(user, req.method)) {
+              return res.status(403).json({
+                success: false,
+                error: { code: MCP_READ_ONLY_CODE, message: MCP_READ_ONLY_MESSAGE },
+              });
+            }
             const optionalReq = req as NextApiRequest & { user?: AuthUser; sessionId?: string };
             optionalReq.user = user;
             optionalReq.sessionId = payload.sessionId;
@@ -421,6 +430,16 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
           );
 
           if (user) {
+            // withFleetAuth resolves the same JWT + session row as withAuth, so it must
+            // apply the same read-only gate — 11 fleet routes accept POST/PUT/PATCH/DELETE
+            // and would otherwise be writable with a read-only MCP token. Portal (plate)
+            // sessions below never carry a sessionKind, so they are unaffected.
+            if (isReadOnlyViolation(user, req.method)) {
+              return res.status(403).json({
+                success: false,
+                error: { code: MCP_READ_ONLY_CODE, message: MCP_READ_ONLY_MESSAGE },
+              });
+            }
             fleetReq.user = user;
             fleetReq.sessionId = payload.sessionId;
             fleetReq.authType = 'user';
