@@ -38,6 +38,9 @@ export interface JWTPayload {
   impersonatedBy?: string;
 }
 
+/** Browser sessions are full-access; `mcp` sessions are read-only (see src/lib/auth/readOnly.ts). */
+export type SessionKind = 'browser' | 'mcp';
+
 export interface Session {
   id: string;
   userId: string;
@@ -46,6 +49,9 @@ export interface Session {
   createdAt: Date;
   ipAddress?: string;
   userAgent?: string;
+  kind: SessionKind;
+  label?: string;
+  lastUsedAt?: Date;
 }
 
 export interface LoginCredentials {

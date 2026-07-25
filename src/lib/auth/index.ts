@@ -23,6 +23,7 @@ export {
 // Session management
 export {
   createSession,
+  setSessionTokenHash,
   createImpersonationSession,
   validateSession,
   getSession,
