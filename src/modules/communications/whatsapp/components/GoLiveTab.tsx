@@ -12,6 +12,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaReadiness } from '../types/wa-admin.types';
 import { WA_GO_LIVE_CHECKLIST } from './goLiveChecklist';
+import WaTestSendCard from './WaTestSendCard';
 
 const GoLiveTab: React.FC = () => {
   const [readiness, setReadiness] = useState<WaReadiness | null>(null);
@@ -124,6 +125,8 @@ const GoLiveTab: React.FC = () => {
           </div>
         )}
       </section>
+
+      <WaTestSendCard />
 
       {/* Static checklist */}
       <section

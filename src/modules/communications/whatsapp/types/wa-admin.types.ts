@@ -276,6 +276,25 @@ export interface WaReadiness {
   cloudConfigured: boolean;
 }
 
+/**
+ * Outcome of a Cloud test send. `ok` is the send result, not the HTTP result.
+ * `notConfigured` marks the "credentials incomplete" case specifically, so the
+ * UI can say so instead of showing a bare failure.
+ */
+export interface WaTestSendInput {
+  toPhone: string;
+  message?: string;
+}
+
+export interface WaTestSendResult {
+  ok: boolean;
+  channel: 'cloud' | 'waha';
+  providerMessageId?: string;
+  error?: string;
+  outcome?: 'DEFINITELY_REJECTED' | 'AMBIGUOUS';
+  notConfigured?: boolean;
+}
+
 // ============================================
 // Tab Types for UI
 // ============================================

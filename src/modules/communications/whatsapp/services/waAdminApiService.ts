@@ -21,6 +21,8 @@ import type {
   WaPhoneNumberInput,
   WaSendMessageInput,
   WaReadiness,
+  WaTestSendInput,
+  WaTestSendResult,
 } from '../types/wa-admin.types';
 
 const API_BASE = '/api/communications/whatsapp';
@@ -333,6 +335,16 @@ export const phonesApi = {
 export const goLiveApi = {
   /** Read-only readiness: active provider + Cloud credential presence. */
   readiness: () => fetchApi<WaReadiness>('/readiness'),
+
+  /**
+   * Send one Cloud-channel message to prove the credentials work.
+   * A rejected send comes back as success:true with data.ok === false.
+   */
+  testSend: (input: WaTestSendInput) =>
+    fetchApi<WaTestSendResult>('/test-send', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
 };
 
 // Combined export
