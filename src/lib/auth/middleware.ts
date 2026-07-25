@@ -12,7 +12,8 @@ import crypto from 'crypto';
 import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
 import { neon } from '@/lib/db-neon';
 import { verifyToken } from './jwt';
-import type { AuthUser, AuthRole } from './types';
+import { isReadOnlyViolation, MCP_READ_ONLY_CODE, MCP_READ_ONLY_MESSAGE } from './readOnly';
+import type { AuthUser, AuthRole, SessionKind } from './types';
 import { ROLE_HIERARCHY } from './types';
 import { log } from '@/lib/logger';
 
@@ -125,7 +126,8 @@ async function getUserAndValidateSession(
       u.profile_picture,
       u.department,
       s.id as session_id,
-      s.is_impersonation
+      s.is_impersonation,
+      s.kind
     FROM users u
     INNER JOIN user_sessions s ON s.user_id = u.id
     WHERE u.id = ${userId}
@@ -155,6 +157,7 @@ async function getUserAndValidateSession(
     profilePicture: row.profile_picture as string | undefined,
     department: row.department as string | undefined,
     isImpersonation: (row.is_impersonation as boolean) || undefined,
+    sessionKind: (row.kind as SessionKind) ?? 'browser',
   };
 }
 
@@ -199,6 +202,13 @@ export function withAuth(handler: AuthenticatedHandler): NextApiHandler {
         return res.status(401).json({
           success: false,
           error: { code: 'SESSION_INVALID', message: 'Session expired or invalid' },
+        });
+      }
+
+      if (isReadOnlyViolation(user, req.method)) {
+        return res.status(403).json({
+          success: false,
+          error: { code: MCP_READ_ONLY_CODE, message: MCP_READ_ONLY_MESSAGE },
         });
       }
 

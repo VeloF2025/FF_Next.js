@@ -10,10 +10,12 @@
  *   const userId = user.id;
  */
 
+import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './jwt';
 import { AUTH_COOKIE_NAME } from './middleware';
-import type { AuthUser } from './types';
+import { isReadOnlyViolation, MCP_READ_ONLY_CODE, MCP_READ_ONLY_MESSAGE } from './readOnly';
+import type { AuthUser, SessionKind } from './types';
 import { pool } from '@/lib/db';
 import { userHasPermission, type PermissionAction } from '@/lib/permissions';
 
@@ -48,22 +50,29 @@ export async function getUserFromRequest(req: NextRequest): Promise<AuthUser | n
   const payload = await verifyToken(token);
   if (!payload || !payload.sub) return null;
 
+  // The Pages Router path (middleware.ts) has always required the presented token to
+  // match the session's stored hash. Match it here so one credential cannot have two
+  // different security postures depending on which router serves the route.
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+
   try {
-    const result = await pool.query<AuthUser>(
+    const result = await pool.query<AuthUser & { kind: string }>(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.permissions,
-              u.is_active, u.profile_picture, u.department
+              u.is_active, u.profile_picture, u.department, s.kind
        FROM users u
        INNER JOIN user_sessions s ON s.user_id = u.id
        WHERE u.id = $1
          AND s.id = $2
+         AND s.token_hash = $3
          AND u.is_active = true
          AND s.expires_at > NOW()
        LIMIT 1`,
-      [payload.sub, payload.sessionId]
+      [payload.sub, payload.sessionId, tokenHash]
     );
 
-    const user = result.rows[0] ?? null;
-    return user;
+    const row = result.rows[0];
+    if (!row) return null;
+    return { ...row, sessionKind: (row.kind ?? 'browser') as SessionKind };
   } catch {
     return null;
   }
@@ -83,6 +92,15 @@ export async function requireAuth(
   const user = await getUserFromRequest(req);
   if (!user) {
     return [null, NextResponse.json({ error: 'Unauthorized' }, { status: 401 })];
+  }
+  if (isReadOnlyViolation(user, req.method)) {
+    return [
+      null,
+      NextResponse.json(
+        { success: false, error: { code: MCP_READ_ONLY_CODE, message: MCP_READ_ONLY_MESSAGE } },
+        { status: 403 }
+      ),
+    ];
   }
   return [user, null];
 }
