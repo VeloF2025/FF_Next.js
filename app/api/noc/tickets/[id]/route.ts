@@ -16,10 +16,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
-import { verifyToken } from '@/lib/auth/jwt';
+import { requireAuth } from '@/lib/auth/app-router';
 import {
   getTicketById,
   updateTicket,
@@ -126,6 +125,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Ticket detail is internal data — authenticate before reading it.
+    const [, unauthorized] = await requireAuth(req);
+    if (unauthorized) return unauthorized;
+
     const ticketId = params.id;
     const { searchParams } = new URL(req.url);
     const shouldEnrich = searchParams.get('enrich') === 'true';
@@ -176,6 +179,9 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const [authedUser, unauthorized] = await requireAuth(req);
+    if (unauthorized) return unauthorized;
+
     const ticketId = params.id;
 
     // Validate UUID format
@@ -195,16 +201,15 @@ export async function PUT(
       fieldsToUpdate: Object.keys(body)
     });
 
-    // Extract authenticated user for activity logging
-    const cookieStore = await cookies();
-    const token = cookieStore.get('ff_auth_token')?.value;
-    let actingUser: { id?: string; name?: string; email?: string; role?: string } = {};
-    if (token) {
-      const jwt = await verifyToken(token);
-      if (jwt) {
-        actingUser = { id: jwt.sub, name: (jwt as unknown as { name?: string }).name, email: jwt.email as string, role: jwt.role as string };
-      }
-    }
+    // The acting user is now REQUIRED, not best-effort: the block this replaces read the
+    // cookie only to label the activity log and never rejected anyone, so this update was
+    // reachable with no credential at all.
+    const actingUser = {
+      id: authedUser.id,
+      name: [authedUser.firstName, authedUser.lastName].filter(Boolean).join(' ') || undefined,
+      email: authedUser.email,
+      role: authedUser.role,
+    };
 
     // Capture old state for change detection
     const oldTicket = await getTicketById(ticketId);
@@ -350,6 +355,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const [authedUser, unauthorized] = await requireAuth(req);
+    if (unauthorized) return unauthorized;
+
     const ticketId = params.id;
 
     // Validate UUID format
@@ -359,16 +367,12 @@ export async function DELETE(
 
     logger.info('Soft deleting ticket', { ticketId });
 
-    // Extract authenticated user for activity logging
-    const cookieStore = await cookies();
-    const token = cookieStore.get('ff_auth_token')?.value;
-    let actingUser: { id?: string; name?: string; email?: string } = {};
-    if (token) {
-      const jwt = await verifyToken(token);
-      if (jwt) {
-        actingUser = { id: jwt.sub, name: (jwt as unknown as { name?: string }).name, email: jwt.email as string };
-      }
-    }
+    // Required, not best-effort — see the PUT handler. A delete must never be anonymous.
+    const actingUser = {
+      id: authedUser.id,
+      name: [authedUser.firstName, authedUser.lastName].filter(Boolean).join(' ') || undefined,
+      email: authedUser.email,
+    };
 
     const deletedTicket = await deleteTicket(ticketId);
 
