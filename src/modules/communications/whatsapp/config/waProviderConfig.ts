@@ -1,6 +1,11 @@
 import { neon } from '@neondatabase/serverless';
 
-export type WaProvider = 'bridge' | 'cloud';
+// Single source of truth. Re-exported from the types module rather than
+// redeclared, so the server and the admin UI can never drift apart on what a
+// provider is. The import direction matters: wa-admin.types has no runtime
+// imports, so this stays type-only and never drags `neon` into a client bundle.
+export type { WaProvider } from '../types/wa-admin.types';
+import type { WaProvider } from '../types/wa-admin.types';
 
 export type WaCloudCreds = {
   phoneNumberId: string;

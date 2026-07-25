@@ -17,8 +17,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, withRole } from '@/lib/auth';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import rateLimiter from '@/lib/rateLimiter';
 import { getWaReadiness } from '@/modules/communications/whatsapp/config/waGoLive';
 import { sendWhatsAppText } from '@/modules/communications/whatsapp/send/waSendClient';
 import { normalizeMsisdn } from '@/modules/communications/whatsapp/utils/phone';
@@ -26,6 +27,14 @@ import type { WaAdminApiResponse, WaTestSendResult } from '@/modules/communicati
 
 const DEFAULT_MESSAGE = 'FibreFlow WhatsApp Cloud test message. No action needed.';
 const MAX_MESSAGE_LENGTH = 1000;
+
+/**
+ * Per-operator cap. Without it this endpoint is a send oracle — a compromised
+ * manager account could blast arbitrary text at arbitrary numbers from the
+ * company's WhatsApp Business number. Verifying a setup needs a handful of
+ * sends, not a stream.
+ */
+const TEST_SEND_LIMIT = { limit: 5, windowMs: 10 * 60 * 1000 };
 
 async function handler(
   req: NextApiRequest,
@@ -47,6 +56,16 @@ async function handler(
 
   const text = (typeof message === 'string' && message.trim() ? message : DEFAULT_MESSAGE)
     .slice(0, MAX_MESSAGE_LENGTH);
+
+  const actor = (req as AuthenticatedNextApiRequest).user?.email ?? 'unknown';
+  const rl = rateLimiter.check(`wa-test-send:${actor}`, TEST_SEND_LIMIT.limit, TEST_SEND_LIMIT.windowMs);
+  if (!rl.success) {
+    log.warn('[WA Test Send] Rate limit exhausted', { actor, resetAt: rl.resetAt });
+    return res.status(429).json({
+      success: false,
+      error: 'Too many test sends. Wait a few minutes before trying again.',
+    });
+  }
 
   try {
     // Checked up front so incomplete credentials read as "not configured"

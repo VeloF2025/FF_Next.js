@@ -141,6 +141,40 @@ describe('PUT /api/communications/whatsapp/provider', () => {
     expect(audit?.[1]).toContain('hein@velocityfibre.co.za');
   });
 
+  // "Switched to cloud" is only half the story — an audit trail for the
+  // highest-risk action here has to answer what it was switched FROM.
+  it('records the previous provider as the audit old_value', async () => {
+    readinessMock.mockResolvedValue(CLOUD_READY);
+    queryMock.mockImplementation(async (text: string) => {
+      const sql = String(text).toUpperCase();
+      if (sql.includes('UPDATE')) return [{ config_value: 'cloud' }];
+      if (sql.includes('SELECT')) return [{ config_value: 'bridge' }];
+      return [];
+    });
+
+    await run({ provider: 'cloud', confirm: true });
+
+    const audit = queryMock.mock.calls.find((c) => String(c[0]).toUpperCase().includes('INSERT'));
+    const oldValue = (audit?.[1] as unknown[])?.find(
+      (p) => typeof p === 'string' && p.includes('bridge')
+    );
+    expect(oldValue).toBeDefined();
+  });
+
+  it('still flips when the previous value cannot be read', async () => {
+    readinessMock.mockResolvedValue(CLOUD_READY);
+    queryMock.mockImplementation(async (text: string) => {
+      const sql = String(text).toUpperCase();
+      if (sql.includes('UPDATE')) return [{ config_value: 'cloud' }];
+      if (sql.includes('SELECT')) throw new Error('read failed');
+      return [];
+    });
+
+    const res = await run({ provider: 'cloud', confirm: true });
+
+    expect(res._getStatusCode()).toBe(200);
+  });
+
   it('reports 404 when there is no wa_provider row to update', async () => {
     readinessMock.mockResolvedValue(CLOUD_READY);
     queryMock.mockResolvedValue([]);

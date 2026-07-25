@@ -14,18 +14,49 @@ for 1:1 sends only; group sends always go straight to the bridge regardless of
 `sendWhatsAppText({toPhone, message, channel?})` in
 `src/modules/communications/whatsapp/send/waSendClient.ts` is the **provider-aware 1:1
 sender** — it reads `wa_provider` (or an explicit `channel` override) and dispatches to
-either `sendViaCloud` (Graph API) or `sendWhatsAppDM` (WAHA). It **returns**
+either `sendViaCloud` (Graph API) or `sendWahaDm` (WAHA). It **returns**
 `{ok: false, ...}` on failure — it never throws.
 
-`sendWhatsAppDM(phone, message): Promise<void>` in
-`src/modules/notifications/services/whatsappDelivery.ts` is the **raw WAHA-only** 1:1
+`sendWahaDm(phone, message): Promise<void>` in
+`src/modules/communications/whatsapp/send/wahaDmClient.ts` is the **raw WAHA-only** 1:1
 sender — hardcoded to the bridge's WAHA endpoint, no provider awareness. It **throws** on
-HTTP failure.
+HTTP failure. `sendWhatsAppDM` in
+`src/modules/notifications/services/whatsappDelivery.ts` is now just an alias of it, kept
+so the long-standing `notifications/services` entry point does not move.
 
-⚠️ **These have opposite failure contracts.** Swapping a `sendWhatsAppDM` call site for
+⚠️ **`wahaDmClient.ts` imports nothing, and must stay that way.** Both senders depend on
+it; before Phase 4 each reached the raw call through the other, so `whatsappDelivery` and
+`waSendClient` imported each other. Keeping the bottom layer import-free is what stops the
+cycle re-forming. `send/importGraph.test.ts` fails if any of that changes — including if
+`waSendClient` ever imports `whatsappDelivery` again.
+
+⚠️ **These have opposite failure contracts.** Swapping a raw-WAHA call site for
 `sendWhatsAppText` without adding a `.ok` check turns a loud failure (unhandled
 rejection / caught throw) into a silent drop (successful-looking resolve with
 `ok: false` ignored).
+
+## Go-live admin surface (Phase 4 — 2026-07-25)
+
+"Go Live" tab in the WhatsApp portal (`components/GoLiveTab.tsx`), backed by three routes:
+
+| Route | Method | Gate | Purpose |
+|-------|--------|------|---------|
+| `/api/communications/whatsapp/readiness` | GET | manager+ | Active provider + **presence only** of each `cloud_*` key. Never returns a value. |
+| `/api/communications/whatsapp/test-send` | POST | manager+ | One message with `channel:'cloud'` pinned. Never reads/writes `wa_provider`. |
+| `/api/communications/whatsapp/provider` | PUT | **super_admin** | Flips `wa_provider`. Needs `confirm:true`; refuses `cloud` unless all 4 creds set; audited. |
+
+⚠️ `PUT /api/communications/whatsapp/config/[key]` is `withAuth`-only (any authenticated
+user, down to `viewer`). `wa_provider` **and all four `cloud_*` keys** are carved out to
+super_admin there — see `config/key-provider-guard.test.ts`. That carve-out is load-bearing,
+not tidiness: `getWaCloudCreds()` re-reads the row on **every** request with no caching, and
+`cloud-webhook.ts` validates Meta's HMAC against whatever `cloud_app_secret` currently holds.
+A writable `cloud_app_secret` therefore lets any authenticated user forge a signed webhook
+and inject fabricated inbound messages; a writable `cloud_access_token` /
+`cloud_phone_number_id` repoints outbound sends at an attacker's WABA.
+
+⚠️ **Still unresolved:** every *other* key on that route (notably `vps_password`,
+`vps_user`, `vps_host`) remains writable by any authenticated user. Do not assume a
+`wa_service_config` key is protected unless it is in `SUPER_ADMIN_ONLY_KEYS`.
 
 ## Send-path inventory (Phase 3, task 1 — 2026-07-25)
 
@@ -46,7 +77,7 @@ bridge forever, since Cloud can't do groups).
 | 9 | `src/modules/noc/services/snagGroupNotifications.ts:359` | `sendWhatsAppGroupImage` | GROUP | snags project group | non-resolution status, before-photo |
 | 10 | `src/modules/noc/services/snagGroupNotifications.ts:371` | `sendWhatsAppGroup` | GROUP | snags project group | status update, text fallback |
 | 11 | `src/modules/notifications/services/whatsappDelivery.ts:36` (`deliverWhatsApp`, group branch) | `sendWhatsAppGroup` | GROUP | `payload.wa_group_jid` | stays — Cloud can't do groups |
-| 12 | `src/modules/notifications/services/whatsappDelivery.ts:52` (`deliverWhatsApp`, DM branch) | `sendWhatsAppDM` | **DM** | individual user (staff/users phone lookup) | **only DM call site still hardcoded to WAHA — Phase 3 task 5 target** |
+| 12 | `src/modules/notifications/services/whatsappDelivery.ts` (`deliverWhatsApp`, DM branch) | `sendWhatsAppText` | **DM** | individual user (staff/users phone lookup) | ✅ rerouted in Phase 3 — provider-aware, with an explicit `.ok` check |
 | 13 | `src/services/oesNightlyReport.ts:131` | `sendWhatsAppGroupDocument` | GROUP | `OES_ACTIVATIONS_GROUP_JID` | v2 path |
 | 14 | `src/services/oesNightlyReport.ts:212` | `sendWhatsAppGroupDocument` | GROUP | `OES_ACTIVATIONS_GROUP_JID` | legacy path |
 

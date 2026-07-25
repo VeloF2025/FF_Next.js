@@ -66,6 +66,14 @@ async function handler(
       }
     }
 
+    // Read the outgoing value first so the audit row can answer "switched from
+    // what". Best-effort: a failed read must not block the flip itself.
+    const previous = await query<{ config_value: string }>(
+      `SELECT config_value FROM wa_service_config WHERE config_key = 'wa_provider' LIMIT 1`
+    )
+      .then((r) => r[0]?.config_value ?? null)
+      .catch(() => null);
+
     const rows = await query<{ config_value: string }>(
       `UPDATE wa_service_config
           SET config_value = $1, updated_at = NOW(), updated_by = $2
@@ -81,7 +89,7 @@ async function handler(
 
     // Best-effort audit, matching the existing WA admin routes: a wobbly audit
     // table must not make the caller think the flip failed when it did not.
-    await recordFlip(provider, actor, req).catch((auditError: unknown) => {
+    await recordFlip(provider, previous, actor, req).catch((auditError: unknown) => {
       log.error('[WA Provider] Failed to audit provider flip', {
         provider,
         actor,
@@ -98,7 +106,12 @@ async function handler(
   }
 }
 
-async function recordFlip(provider: Provider, actor: string | null, req: NextApiRequest): Promise<void> {
+async function recordFlip(
+  provider: Provider,
+  previous: string | null,
+  actor: string | null,
+  req: NextApiRequest
+): Promise<void> {
   const forwardedFor = req.headers['x-forwarded-for'];
   const ip = (typeof forwardedFor === 'string' ? forwardedFor.split(',')[0] : null)
     ?? req.socket?.remoteAddress
@@ -107,7 +120,15 @@ async function recordFlip(provider: Provider, actor: string | null, req: NextApi
   await query(
     `INSERT INTO wa_admin_audit_log (action, entity_type, entity_id, old_value, new_value, user_email, ip_address)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    ['update_config', 'config', 'wa_provider', null, JSON.stringify({ config_value: provider }), actor, ip]
+    [
+      'update_config',
+      'config',
+      'wa_provider',
+      previous === null ? null : JSON.stringify({ config_value: previous }),
+      JSON.stringify({ config_value: provider }),
+      actor,
+      ip,
+    ]
   );
 }
 

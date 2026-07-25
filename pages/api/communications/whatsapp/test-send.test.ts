@@ -41,9 +41,15 @@ import handler from './test-send';
 
 const CONFIGURED = { provider: 'bridge', cloudConfigured: true, cloudConfig: [] };
 
+// The rate limiter is a module-level singleton whose buckets are keyed by
+// operator, so each test gets its own operator — otherwise one test's sends
+// would eat the next test's allowance.
+let actorSeq = 0;
+let actor = '';
+
 function run(body: unknown, method: 'POST' | 'GET' = 'POST') {
   const { req, res } = createMocks<NextApiRequest, NextApiResponse>({ method, body });
-  (req as unknown as { user: unknown }).user = { email: 'ops@velocityfibre.co.za', role: 'manager' };
+  (req as unknown as { user: unknown }).user = { email: actor, role: 'manager' };
   return handler(req, res).then(() => res);
 }
 
@@ -52,6 +58,8 @@ beforeEach(() => {
   readinessMock.mockReset();
   getProviderMock.mockReset();
   queryMock.mockReset();
+  actorSeq += 1;
+  actor = `ops${actorSeq}@velocityfibre.co.za`;
 });
 
 describe('POST /api/communications/whatsapp/test-send', () => {
@@ -144,6 +152,23 @@ describe('POST /api/communications/whatsapp/test-send', () => {
     expect(queryMock).not.toHaveBeenCalled();
     // The channel is pinned to cloud rather than derived from configuration.
     expect((sendMock.mock.calls[0][0] as { channel: string }).channel).toBe('cloud');
+  });
+
+  // Without a cap this endpoint is a send oracle: a compromised manager account
+  // could blast arbitrary text at arbitrary numbers from the company's WABA.
+  it('stops sending once the per-user rate limit is exhausted', async () => {
+    readinessMock.mockResolvedValue(CONFIGURED);
+    sendMock.mockResolvedValue({ ok: true, channel: 'cloud' });
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      const res = await run({ toPhone: '27821234567' });
+      statuses.push(res._getStatusCode());
+    }
+
+    expect(statuses).toContain(429);
+    // The cap has to actually stop the send, not just colour the response.
+    expect(sendMock.mock.calls.length).toBeLessThan(12);
   });
 
   it('returns 500 only when the readiness lookup itself blows up', async () => {

@@ -19,13 +19,39 @@ import { log } from '@/lib/logger';
 /**
  * Keys this generic writer must not be used to change.
  *
- * wa_provider moves every 1:1 WhatsApp send onto a different transport and has
- * its own super_admin-gated route (/api/communications/whatsapp/provider) with
- * a readiness precondition and an audit trail. This route is withAuth-only, so
- * without the guard below any authenticated user could flip the provider here
- * and that gate would be decorative.
+ * This route is withAuth-only — no role check — so every key it can reach is
+ * writable by any authenticated user, down to a viewer. Two groups have to be
+ * carved out:
+ *
+ *  - `wa_provider` moves every 1:1 WhatsApp send onto a different transport and
+ *    has its own super_admin-gated route with a readiness precondition and an
+ *    audit trail. Writable here, that gate would be decorative.
+ *
+ *  - The `cloud_*` credentials are the asset that gate protects, and they are
+ *    read live from this table on every request (`getWaCloudCreds`, no cache).
+ *    Overwriting `cloud_app_secret` lets an attacker forge a Meta webhook whose
+ *    HMAC validates against their own secret (`cloud-webhook.ts` checks the
+ *    signature with whatever this table holds), injecting fabricated inbound
+ *    messages. Overwriting `cloud_access_token` / `cloud_phone_number_id`
+ *    repoints outbound sends at a WABA the attacker controls, leaking recipient
+ *    numbers and message text.
+ *
+ * Nothing is lost by gating these: the Settings tab only renders the service,
+ * validation, feature and general categories, and these keys are in the
+ * provider and cloud categories.
  */
-const SUPER_ADMIN_ONLY_KEYS = new Set(['wa_provider']);
+const SUPER_ADMIN_ONLY_KEYS = new Set([
+  'wa_provider',
+  'cloud_phone_number_id',
+  'cloud_access_token',
+  'cloud_app_secret',
+  'cloud_verify_token',
+]);
+
+/** Who is making this change, per the session withAuth already validated. */
+function actorEmail(req: NextApiRequest): string | null {
+  return (req as AuthenticatedNextApiRequest).user?.email ?? null;
+}
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -149,8 +175,9 @@ async function handlePut(
     });
   }
 
-  // Get user email from headers
-  const userEmail = req.headers['x-user-email'] as string || null;
+  // Attribution comes from the authenticated session, never from a header the
+  // caller controls — an x-user-email header can name anyone.
+  const userEmail = actorEmail(req);
 
   // Update the config
   const result = await pool.query(
@@ -226,7 +253,7 @@ async function logAdminAction(
   req: NextApiRequest
 ) {
   try {
-    const userEmail = req.headers['x-user-email'] as string || null;
+    const userEmail = actorEmail(req);
     const ipAddress = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || null;
 
     await pool.query(
