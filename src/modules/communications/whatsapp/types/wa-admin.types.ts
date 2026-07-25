@@ -264,6 +264,8 @@ export interface WaMonitoredGroupInput {
 // Cloud Go-Live Readiness
 // ============================================
 
+export type WaProvider = 'bridge' | 'cloud';
+
 /** Presence of one Cloud credential — never carries the value itself. */
 export interface WaConfigPresence {
   key: string;
@@ -271,9 +273,19 @@ export interface WaConfigPresence {
 }
 
 export interface WaReadiness {
-  provider: 'bridge' | 'cloud';
+  provider: WaProvider;
   cloudConfig: WaConfigPresence[];
   cloudConfigured: boolean;
+}
+
+export interface WaProviderFlipInput {
+  provider: WaProvider;
+  /** Must be true — the server refuses an unconfirmed flip. */
+  confirm: true;
+}
+
+export interface WaProviderFlipResult {
+  provider: WaProvider;
 }
 
 /**

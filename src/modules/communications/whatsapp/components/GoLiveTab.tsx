@@ -13,6 +13,7 @@ import { waAdminApi } from '../services/waAdminApiService';
 import type { WaReadiness } from '../types/wa-admin.types';
 import { WA_GO_LIVE_CHECKLIST } from './goLiveChecklist';
 import WaTestSendCard from './WaTestSendCard';
+import WaProviderFlipCard from './WaProviderFlipCard';
 
 const GoLiveTab: React.FC = () => {
   const [readiness, setReadiness] = useState<WaReadiness | null>(null);
@@ -127,6 +128,12 @@ const GoLiveTab: React.FC = () => {
       </section>
 
       <WaTestSendCard />
+
+      <WaProviderFlipCard
+        provider={readiness.provider}
+        cloudConfigured={readiness.cloudConfigured}
+        onFlipped={fetchReadiness}
+      />
 
       {/* Static checklist */}
       <section

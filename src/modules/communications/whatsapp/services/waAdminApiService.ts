@@ -23,6 +23,8 @@ import type {
   WaReadiness,
   WaTestSendInput,
   WaTestSendResult,
+  WaProviderFlipInput,
+  WaProviderFlipResult,
 } from '../types/wa-admin.types';
 
 const API_BASE = '/api/communications/whatsapp';
@@ -343,6 +345,13 @@ export const goLiveApi = {
   testSend: (input: WaTestSendInput) =>
     fetchApi<WaTestSendResult>('/test-send', {
       method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  /** Super-admin only. Moves every 1:1 send onto the given provider. */
+  setProvider: (input: WaProviderFlipInput) =>
+    fetchApi<WaProviderFlipResult>('/provider', {
+      method: 'PUT',
       body: JSON.stringify(input),
     }),
 };

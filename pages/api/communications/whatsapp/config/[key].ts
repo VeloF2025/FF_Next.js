@@ -13,8 +13,19 @@ import type {
   WaServiceConfigInput,
   WaAdminApiResponse
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+
+/**
+ * Keys this generic writer must not be used to change.
+ *
+ * wa_provider moves every 1:1 WhatsApp send onto a different transport and has
+ * its own super_admin-gated route (/api/communications/whatsapp/provider) with
+ * a readiness precondition and an audit trail. This route is withAuth-only, so
+ * without the guard below any authenticated user could flip the provider here
+ * and that gate would be decorative.
+ */
+const SUPER_ADMIN_ONLY_KEYS = new Set(['wa_provider']);
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -95,6 +106,16 @@ async function handlePut(
   req: NextApiRequest,
   res: NextApiResponse<WaAdminApiResponse<WaServiceConfig>>
 ) {
+  if (SUPER_ADMIN_ONLY_KEYS.has(key)) {
+    const role = (req as AuthenticatedNextApiRequest).user?.role;
+    if (role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        error: `"${key}" can only be changed by a super admin, via the WhatsApp Go Live tab`,
+      });
+    }
+  }
+
   const input = req.body as WaServiceConfigInput;
 
   if (input.config_value === undefined) {
