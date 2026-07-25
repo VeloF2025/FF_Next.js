@@ -4,8 +4,7 @@
  * screenshots attached. On any failure NO note is posted.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/jwt';
+import { requireAuth } from '@/lib/auth/app-router';
 import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
 import { vfStorage } from '@/services/vfStorageAdapter';
@@ -25,12 +24,14 @@ export async function POST(
     // Authenticate FIRST — before parsing the body, uploading anything, or touching the
     // VLM. This endpoint uploads files to storage, spends GPU time and writes a ticket
     // note; none of that may happen for an unauthenticated caller.
-    const token = (await cookies()).get('ff_auth_token')?.value;
-    const jwt = token ? await verifyToken(token) : null;
-    if (!jwt) {
-      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
-    }
-    const createdBy: string = jwt.sub;
+    //
+    // requireAuth, not a bare verifyToken: it validates the session row against the DB
+    // (not just the JWT signature), so a revoked or expired session is rejected — and it
+    // is the single chokepoint the read-only session gate hooks into, so this route
+    // inherits that gate rather than needing its own copy.
+    const [user, unauthorized] = await requireAuth(request);
+    if (unauthorized) return unauthorized;
+    const createdBy: string = user.id;
 
     if (!ticketId) {
       return NextResponse.json({ success: false, error: { message: 'Ticket ID is required' } }, { status: 400 });

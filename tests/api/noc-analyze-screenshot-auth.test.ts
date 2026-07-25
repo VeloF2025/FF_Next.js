@@ -12,10 +12,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cookieGet, verifyToken, uploadFile, analyzeInstallScreenshots, createTicketNote, poolQuery } = vi.hoisted(
+const { requireAuth, uploadFile, analyzeInstallScreenshots, createTicketNote, poolQuery } = vi.hoisted(
   () => ({
-    cookieGet: vi.fn(),
-    verifyToken: vi.fn(),
+    requireAuth: vi.fn(),
     uploadFile: vi.fn(),
     analyzeInstallScreenshots: vi.fn(),
     createTicketNote: vi.fn(),
@@ -23,8 +22,7 @@ const { cookieGet, verifyToken, uploadFile, analyzeInstallScreenshots, createTic
   }),
 );
 
-vi.mock('next/headers', () => ({ cookies: async () => ({ get: cookieGet }) }));
-vi.mock('@/lib/auth/jwt', () => ({ verifyToken }));
+vi.mock('@/lib/auth/app-router', () => ({ requireAuth }));
 vi.mock('@/lib/db', () => ({ default: { query: poolQuery } }));
 vi.mock('@/services/vfStorageAdapter', () => ({ vfStorage: { uploadFile } }));
 vi.mock('@/modules/noc/services/screenshotNoteVlmClient', () => ({ analyzeInstallScreenshots }));
@@ -44,6 +42,10 @@ function makeRequest() {
 
 const params = Promise.resolve({ id: 'ticket-1' });
 
+function unauthorizedResponse(status: number) {
+  return { status } as never;
+}
+
 describe('POST /api/noc/tickets/[id]/analyze-screenshot — authentication', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,21 +55,8 @@ describe('POST /api/noc/tickets/[id]/analyze-screenshot — authentication', () 
     createTicketNote.mockResolvedValue({ ok: true, note: { id: 'n1' } });
   });
 
-  it('401s when no auth cookie is present, doing no work at all', async () => {
-    cookieGet.mockReturnValue(undefined);
-
-    const res = await POST(makeRequest(), { params });
-
-    expect(res.status).toBe(401);
-    expect(verifyToken).not.toHaveBeenCalled();
-    expect(uploadFile).not.toHaveBeenCalled();
-    expect(analyzeInstallScreenshots).not.toHaveBeenCalled();
-    expect(createTicketNote).not.toHaveBeenCalled();
-  });
-
-  it('401s when the token is present but invalid, doing no work at all', async () => {
-    cookieGet.mockReturnValue({ value: 'forged.jwt.value' });
-    verifyToken.mockResolvedValue(null);
+  it('401s when unauthenticated, doing no work at all', async () => {
+    requireAuth.mockResolvedValue([null, unauthorizedResponse(401)]);
 
     const res = await POST(makeRequest(), { params });
 
@@ -77,9 +66,20 @@ describe('POST /api/noc/tickets/[id]/analyze-screenshot — authentication', () 
     expect(createTicketNote).not.toHaveBeenCalled();
   });
 
-  it('proceeds for a valid token and attributes the note to the verified subject', async () => {
-    cookieGet.mockReturnValue({ value: 'good.jwt.value' });
-    verifyToken.mockResolvedValue({ sub: 'user-42' });
+  it('403s a read-only MCP session, doing no work at all', async () => {
+    // requireAuth is the gate chokepoint: an mcp-kind session on a POST is refused there.
+    requireAuth.mockResolvedValue([null, unauthorizedResponse(403)]);
+
+    const res = await POST(makeRequest(), { params });
+
+    expect(res.status).toBe(403);
+    expect(uploadFile).not.toHaveBeenCalled();
+    expect(analyzeInstallScreenshots).not.toHaveBeenCalled();
+    expect(createTicketNote).not.toHaveBeenCalled();
+  });
+
+  it('proceeds for a valid session and attributes the note to the verified subject', async () => {
+    requireAuth.mockResolvedValue([{ id: 'user-42' }, null]);
 
     const res = await POST(makeRequest(), { params });
 
