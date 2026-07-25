@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { FibreFlowTokenList, type McpTokenRow } from './FibreFlowTokenList';
+import { FibreFlowTokenReveal } from './FibreFlowTokenReveal';
 
 /**
  * "FibreFlow (read-only)" — self-serve panel that mints a long-lived, READ-ONLY
@@ -36,13 +37,6 @@ interface MintResponse {
 }
 
 const MAX_LABEL_LENGTH = 60;
-
-function formatExpiry(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
 
 export function FibreFlowConnectPanel() {
   const [token, setToken] = useState<string | null>(null);
@@ -126,8 +120,6 @@ export function FibreFlowConnectPanel() {
     }
   }, [token]);
 
-  const expiry = formatExpiry(expiresAt);
-
   return (
     <div className="cx-glass flex flex-col gap-3 p-5">
       <div className="flex flex-col gap-0.5">
@@ -186,32 +178,12 @@ export function FibreFlowConnectPanel() {
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {token && (
-        <div className="flex flex-col gap-2">
-          <div className="rounded-md border border-border border-l-2 border-l-warning-500 bg-background p-3 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">Copy this now</span> — it will not be
-            shown again. It acts as a password: anyone holding it can read FibreFlow as you
-            until it expires.
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-foreground">Your token</span>
-            {expiry && <span className="text-[11px] text-muted-foreground">Expires {expiry}</span>}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              readOnly
-              value={token}
-              className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
-            />
-            <button
-              type="button"
-              onClick={() => void copyToken()}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-            >
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-        </div>
+        <FibreFlowTokenReveal
+          token={token}
+          expiresAt={expiresAt}
+          copied={copied}
+          onCopy={() => void copyToken()}
+        />
       )}
 
       <FibreFlowTokenList tokens={tokens} onRevoke={(id) => void revoke(id)} />

@@ -28,6 +28,16 @@ import type { McpLifetime } from '@/lib/auth/mcpToken';
 const LOGGER = 'MeMcpTokens';
 const MAX_LABEL_LENGTH = 60;
 
+/**
+ * Ceiling on concurrent active MCP sessions per user. Minting is authenticated and each
+ * token is read-only with only that user's own permissions, so the risk is not privilege
+ * escalation — it is a browser session being used to mint long-lived credentials in a
+ * loop, which both bloats `user_sessions` and leaves more revocable material lying around
+ * than a person can keep track of. A count check is a better fit than request-rate
+ * limiting: what matters is how many live tokens exist, not how fast they were asked for.
+ */
+const MAX_ACTIVE_TOKENS = 10;
+
 function uiEnabled(): boolean {
   return (process.env.FF_MCP_TOKEN_UI_ENABLED ?? '').trim().toLowerCase() === 'true';
 }
@@ -76,6 +86,18 @@ async function mintHandler(
     typeof rawLabel === 'string' && rawLabel.trim()
       ? rawLabel.trim().slice(0, MAX_LABEL_LENGTH)
       : undefined;
+
+  const active = await getUserSessions(req.user.id, 'mcp');
+  if (active.length >= MAX_ACTIVE_TOKENS) {
+    log.warn('mcp token mint rejected: active token cap', {
+      userId: req.user.id,
+      active: active.length,
+    }, LOGGER);
+    return apiResponse.badRequest(
+      res,
+      `You already have ${active.length} active read-only tokens (limit ${MAX_ACTIVE_TOKENS}). Revoke one before creating another.`
+    );
+  }
 
   try {
     const { token, expiresAt, sessionId } = await mintFfMcpToken(req.user, rawLifetime, {
