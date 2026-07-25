@@ -8,6 +8,7 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { sendWhatsAppText } from '@/modules/communications/whatsapp/send/waSendClient';
+import { sendWahaDm } from '@/modules/communications/whatsapp/send/wahaDmClient';
 import type { NotifyPayload } from '../types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -15,9 +16,8 @@ const sql = neon(process.env.DATABASE_URL!);
 // WA Bridge on VPS (direct — legacy 8092 proxy is deprecated)
 const WA_FEEDBACK_URL = process.env.WA_BRIDGE_URL || process.env.WA_FEEDBACK_URL || 'http://72.61.197.178:8083';
 
-// WAHA API (for individual DMs) — proven in fleet-check-reminders.ts
-const WAHA_API_URL = process.env.WAHA_API_URL || 'http://100.96.203.105:3001';
-const WAHA_SESSION = process.env.WAHA_SESSION || 'default';
+// WAHA config for individual DMs now lives in
+// @/modules/communications/whatsapp/send/wahaDmClient.
 
 /**
  * Send a WhatsApp notification to a user.
@@ -179,28 +179,17 @@ export async function sendWhatsAppGroupDocument(
 // =============================================================================
 
 /**
- * Send an individual WhatsApp DM via WAHA.
- * Phone format: +27821234567 or 0821234567 → 27821234567@c.us
+ * Send an individual WhatsApp DM via WAHA. Throws on HTTP failure.
+ *
+ * The HTTP call itself lives in the dependency-free
+ * `@/modules/communications/whatsapp/send/wahaDmClient`, so the provider-aware
+ * sender can reach it without importing this module back. Re-exported here to
+ * keep the long-standing `notifications/services` entry point stable.
+ *
+ * Note this is the raw WAHA path — it ignores `wa_provider`. New 1:1 callers
+ * should use `sendWhatsAppText` instead, as `deliverWhatsApp` does below.
  */
-export async function sendWhatsAppDM(phone: string, message: string): Promise<void> {
-  const chatId = formatPhoneForWAHA(phone);
-
-  const response = await fetch(`${WAHA_API_URL}/api/sendText`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      session: WAHA_SESSION,
-      chatId,
-      text: message,
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => 'unknown');
-    throw new Error(`WAHA DM failed: HTTP ${response.status} — ${text}`);
-  }
-}
+export const sendWhatsAppDM = sendWahaDm;
 
 // =============================================================================
 // Helpers
@@ -235,15 +224,6 @@ async function lookupUserPhone(userId: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-/** Format phone number for WAHA: +27xxx or 0xxx → 27xxx@c.us */
-function formatPhoneForWAHA(phone: string): string {
-  let cleaned = phone.replace(/[^\d]/g, '');
-  if (cleaned.startsWith('0')) {
-    cleaned = '27' + cleaned.substring(1);
-  }
-  return `${cleaned}@c.us`;
 }
 
 /** Build default WA message from notification payload */
