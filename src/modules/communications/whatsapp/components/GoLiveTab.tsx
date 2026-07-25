@@ -6,7 +6,7 @@
  * worked through before the provider is flipped.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, CheckCircle2, Circle, RefreshCw, Rocket } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { waAdminApi } from '../services/waAdminApiService';
@@ -20,15 +20,32 @@ const GoLiveTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Only the most recently requested read may apply. Two refreshes in flight
+  // otherwise let a slow earlier response overwrite a newer one, and a response
+  // arriving after unmount sets state on a dead component.
+  const requestSeq = useRef(0);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
   const fetchReadiness = useCallback(async () => {
+    const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
 
     const result = await waAdminApi.goLive.readiness();
 
+    if (!mounted.current || seq !== requestSeq.current) return;
+
     if (result.success && result.data) {
       setReadiness(result.data);
     } else {
+      // Deliberately does NOT clear `readiness`: a failed refresh keeps the
+      // last-known-good panel and shows the error inline, rather than throwing
+      // away the flip control and test send over a transient blip.
       setError(result.error || 'Failed to load go-live readiness');
     }
 
@@ -39,15 +56,17 @@ const GoLiveTab: React.FC = () => {
     fetchReadiness();
   }, [fetchReadiness]);
 
-  if (loading) {
+  if (loading && !readiness) {
     return <LoadingSpinner className="py-12" size="lg" label="Loading readiness..." />;
   }
 
-  if (error || !readiness) {
+  // Full-screen error only when there is nothing to show. The alert role sits on
+  // the message, not the wrapper, so the Retry control is not inside a live region.
+  if (!readiness) {
     return (
-      <div className="text-center py-12" role="alert">
+      <div className="text-center py-12">
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" aria-hidden="true" />
-        <p className="text-red-600 mb-4">{error || 'Readiness unavailable'}</p>
+        <p className="text-red-600 mb-4" role="alert">{error || 'Readiness unavailable'}</p>
         <button
           onClick={fetchReadiness}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -68,12 +87,23 @@ const GoLiveTab: React.FC = () => {
         </h3>
         <button
           onClick={fetchReadiness}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors"
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors disabled:opacity-50"
         >
-          <RefreshCw className="w-4 h-4" aria-hidden="true" />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
           Refresh
         </button>
       </div>
+
+      {/* A refresh failed but the panel below is still the last known good state. */}
+      {error && (
+        <div
+          role="alert"
+          className="p-3 border border-red-500/30 bg-red-500/10 rounded text-sm text-red-700 dark:text-red-400"
+        >
+          Could not refresh readiness: {error}. Showing the last loaded state.
+        </div>
+      )}
 
       {/* Active provider */}
       <section className="border border-[var(--ff-border-light)] rounded-lg p-4">

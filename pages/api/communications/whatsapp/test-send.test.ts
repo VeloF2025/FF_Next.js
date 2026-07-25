@@ -100,14 +100,26 @@ describe('POST /api/communications/whatsapp/test-send', () => {
     expect(body.data).toMatchObject({ ok: true, channel: 'cloud', providerMessageId: 'wamid.TEST' });
   });
 
-  it('falls back to a default message when none is supplied', async () => {
+  it('falls back to the default test message when none is supplied', async () => {
     readinessMock.mockResolvedValue(CONFIGURED);
     sendMock.mockResolvedValue({ ok: true, channel: 'cloud' });
 
     await run({ toPhone: '27821234567' });
 
     const sent = sendMock.mock.calls[0][0] as { message: string };
-    expect(sent.message.length).toBeGreaterThan(0);
+    // Pinned exactly: a non-empty check would pass on any wrong-but-present text,
+    // and this string is what a real customer number would receive.
+    expect(sent.message).toBe('FibreFlow WhatsApp Cloud test message. No action needed.');
+  });
+
+  it('uses the default when the supplied message is only whitespace', async () => {
+    readinessMock.mockResolvedValue(CONFIGURED);
+    sendMock.mockResolvedValue({ ok: true, channel: 'cloud' });
+
+    await run({ toPhone: '27821234567', message: '   ' });
+
+    const sent = sendMock.mock.calls[0][0] as { message: string };
+    expect(sent.message).toBe('FibreFlow WhatsApp Cloud test message. No action needed.');
   });
 
   // The whole point of the task: incomplete creds must read as "not configured",

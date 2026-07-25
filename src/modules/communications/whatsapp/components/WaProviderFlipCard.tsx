@@ -30,6 +30,11 @@ const WaProviderFlipCard: React.FC<WaProviderFlipCardProps> = ({ provider, cloud
   const blocked = target === 'cloud' && !cloudConfigured;
 
   const handleConfirm = async () => {
+    // Explicit re-entry guard, matching WaTestSendCard.handleSend. `disabled`
+    // alone leaves the door open if a second click lands before React commits
+    // the disabled state — and this write is the consequential one.
+    if (flipping) return;
+
     setFlipping(true);
     setError(null);
 

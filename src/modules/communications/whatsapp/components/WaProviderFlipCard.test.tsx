@@ -85,6 +85,22 @@ describe('WaProviderFlipCard', () => {
     expect(onFlipped).not.toHaveBeenCalled();
   });
 
+  // Double-click lands before React commits disabled={flipping}; without an
+  // explicit re-entry guard that fires the flip — and its audit insert — twice.
+  it('fires the flip once even if the confirm button is double-clicked', async () => {
+    const fetchMock = stubFlip({ provider: 'cloud' });
+
+    renderCard();
+    fireEvent.click(screen.getByRole('button', { name: /Switch to cloud/i }));
+    const confirm = await screen.findByRole('button', { name: /Yes, switch to cloud/i });
+
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('notifies the parent so readiness can be re-read after a successful flip', async () => {
     stubFlip({ provider: 'cloud' });
     const onFlipped = vi.fn();
