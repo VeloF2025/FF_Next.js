@@ -29,6 +29,7 @@ export {
   getSession,
   deleteSession,
   deleteAllUserSessions,
+  deleteEveryUserSession,
   getUserSessions,
   cleanupExpiredSessions,
   extendSession,

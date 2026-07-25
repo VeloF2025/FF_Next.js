@@ -187,6 +187,9 @@ export async function deleteSession(sessionId: string): Promise<void> {
  * Delete a user's sessions of one kind (logout everywhere).
  * Defaults to 'browser': MCP sessions are deliberately NOT swept by a logout — they
  * are revoked explicitly from the connections page.
+ *
+ * For a credential-compromise sweep (password reset, offboarding) use
+ * `deleteEveryUserSession` instead — this function will leave MCP tokens alive.
  */
 export async function deleteAllUserSessions(
   userId: string,
@@ -195,6 +198,21 @@ export async function deleteAllUserSessions(
   await sql`
     DELETE FROM user_sessions
     WHERE user_id = ${userId} AND kind = ${kind}
+  `;
+}
+
+/**
+ * Delete EVERY session a user holds, of every kind — the credential-compromise sweep.
+ *
+ * A password reset means "assume everything I had is burnt", so an MCP token must not
+ * outlive it. Kept as a distinct, kind-agnostic function rather than an argument to
+ * `deleteAllUserSessions` so that adding a future session kind cannot silently narrow
+ * this sweep.
+ */
+export async function deleteEveryUserSession(userId: string): Promise<void> {
+  await sql`
+    DELETE FROM user_sessions
+    WHERE user_id = ${userId}
   `;
 }
 
