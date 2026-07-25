@@ -13,6 +13,7 @@ import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
 import { neon } from '@/lib/db-neon';
 import { verifyToken } from './jwt';
 import { isReadOnlyViolation, MCP_READ_ONLY_CODE, MCP_READ_ONLY_MESSAGE } from './readOnly';
+import { touchSessionUsage } from './sessionUsage';
 import type { AuthUser, AuthRole, SessionKind } from './types';
 import { ROLE_HIERARCHY } from './types';
 import { log } from '@/lib/logger';
@@ -143,6 +144,9 @@ async function getUserAndValidateSession(
 
   const firstName = (row.first_name as string) || '';
   const lastName = (row.last_name as string) || '';
+  const sessionKind = (row.kind as SessionKind) ?? 'browser';
+
+  touchSessionUsage(sessionId, sessionKind);
 
   return {
     id: row.id as string,
@@ -157,7 +161,7 @@ async function getUserAndValidateSession(
     profilePicture: row.profile_picture as string | undefined,
     department: row.department as string | undefined,
     isImpersonation: (row.is_impersonation as boolean) || undefined,
-    sessionKind: (row.kind as SessionKind) ?? 'browser',
+    sessionKind,
   };
 }
 

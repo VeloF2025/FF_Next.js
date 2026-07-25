@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './jwt';
 import { AUTH_COOKIE_NAME } from './middleware';
 import { isReadOnlyViolation, MCP_READ_ONLY_CODE, MCP_READ_ONLY_MESSAGE } from './readOnly';
+import { touchSessionUsage } from './sessionUsage';
 import type { AuthUser, SessionKind } from './types';
 import { pool } from '@/lib/db';
 import { userHasPermission, type PermissionAction } from '@/lib/permissions';
@@ -72,7 +73,9 @@ export async function getUserFromRequest(req: NextRequest): Promise<AuthUser | n
 
     const row = result.rows[0];
     if (!row) return null;
-    return { ...row, sessionKind: (row.kind ?? 'browser') as SessionKind };
+    const sessionKind = (row.kind ?? 'browser') as SessionKind;
+    touchSessionUsage(payload.sessionId, sessionKind);
+    return { ...row, sessionKind };
   } catch {
     return null;
   }
