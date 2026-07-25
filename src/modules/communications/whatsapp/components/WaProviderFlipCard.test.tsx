@@ -85,9 +85,14 @@ describe('WaProviderFlipCard', () => {
     expect(onFlipped).not.toHaveBeenCalled();
   });
 
-  // Double-click lands before React commits disabled={flipping}; without an
-  // explicit re-entry guard that fires the flip — and its audit insert — twice.
-  it('fires the flip once even if the confirm button is double-clicked', async () => {
+  // Scope note, so nobody reads more into this than it proves: jsdom will not
+  // dispatch a click on a button React has already marked disabled, so this
+  // exercises the disabled attribute, NOT handleConfirm's `if (flipping)`
+  // re-entry guard. It pins the user-facing guarantee — the rendered button
+  // cannot be double-clicked into two flips — and would fail if `disabled`
+  // were dropped. The internal guard is defence in depth for a real browser's
+  // double-click timing, which jsdom cannot simulate.
+  it('renders the confirm button disabled once flipping, so a second click cannot fire', async () => {
     const fetchMock = stubFlip({ provider: 'cloud' });
 
     renderCard();
