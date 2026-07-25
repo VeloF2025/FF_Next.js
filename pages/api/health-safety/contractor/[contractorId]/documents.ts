@@ -50,11 +50,17 @@ async function handleGet(contractorId: string, req: NextApiRequest, res: NextApi
     return apiResponse.notFound(res, 'Contractor', contractorId);
   }
 
-  // Get documents — explicit branches to avoid conditional SQL fragments (Neon rule)
+  // Get documents — explicit branches to avoid conditional SQL fragments (Neon rule).
+  // `d.issue_date` never feeds a JS gate compare in this handler, so it's safe to
+  // cast in place (same-name, last-column-wins). `d.expiry_date` DOES feed the
+  // `new Date(d.expiry_date) > new Date()` compare in the compliance loop below,
+  // so its text cast goes to a differently-named `expiry_date_display` column —
+  // the raw `expiry_date` is swapped for it only after that compare has run
+  // (see the loop right after `compliance` is built). See dateTextCast.test.ts.
   let documents;
   if (status && type) {
     documents = await sql`
-      SELECT d.*,
+      SELECT d.*, d.issue_date::text AS issue_date, d.expiry_date::text AS expiry_date_display,
         CASE WHEN d.expiry_date IS NULL THEN 'no_expiry'
              WHEN d.expiry_date < NOW() THEN 'expired'
              WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
@@ -66,7 +72,7 @@ async function handleGet(contractorId: string, req: NextApiRequest, res: NextApi
     `;
   } else if (status) {
     documents = await sql`
-      SELECT d.*,
+      SELECT d.*, d.issue_date::text AS issue_date, d.expiry_date::text AS expiry_date_display,
         CASE WHEN d.expiry_date IS NULL THEN 'no_expiry'
              WHEN d.expiry_date < NOW() THEN 'expired'
              WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
@@ -77,7 +83,7 @@ async function handleGet(contractorId: string, req: NextApiRequest, res: NextApi
     `;
   } else if (type) {
     documents = await sql`
-      SELECT d.*,
+      SELECT d.*, d.issue_date::text AS issue_date, d.expiry_date::text AS expiry_date_display,
         CASE WHEN d.expiry_date IS NULL THEN 'no_expiry'
              WHEN d.expiry_date < NOW() THEN 'expired'
              WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
@@ -88,7 +94,7 @@ async function handleGet(contractorId: string, req: NextApiRequest, res: NextApi
     `;
   } else {
     documents = await sql`
-      SELECT d.*,
+      SELECT d.*, d.issue_date::text AS issue_date, d.expiry_date::text AS expiry_date_display,
         CASE WHEN d.expiry_date IS NULL THEN 'no_expiry'
              WHEN d.expiry_date < NOW() THEN 'expired'
              WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
@@ -129,6 +135,15 @@ async function handleGet(contractorId: string, req: NextApiRequest, res: NextApi
           : 'missing',
       document: validDoc || docs[0],
     };
+  }
+
+  // Swap the raw `expiry_date` (Date object, needed for the compare above) for
+  // the text-cast display value now that the gate compare is done. `documents`,
+  // `byType`, and `compliance[*].document` all reference the same objects, so
+  // this one pass fixes the value everywhere it's returned below.
+  for (const d of documents as any[]) {
+    d.expiry_date = d.expiry_date_display;
+    delete d.expiry_date_display;
   }
 
   // Add non-required document types
@@ -202,7 +217,9 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
     status = 'expired';
   }
 
-  // Create document record
+  // Create document record. The returned row is display-only (the `status`
+  // classification above already used the raw `expiry_date` from req.body), so
+  // it's safe to same-name-cast both date columns for the client response.
   const documentRows = await sql`
     INSERT INTO hs_contractor_documents (
       contractor_id, document_type, document_number, file_url, file_name,
@@ -218,7 +235,7 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
       ${status},
       ${notes || null}
     )
-    RETURNING *
+    RETURNING *, issue_date::text AS issue_date, expiry_date::text AS expiry_date
   `;
   const document = documentRows[0]!;
 

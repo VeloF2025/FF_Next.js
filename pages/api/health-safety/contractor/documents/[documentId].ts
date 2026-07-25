@@ -42,9 +42,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handleGet(documentId: string, res: NextApiResponse) {
+  // Display-only: no JS date compare on this row, so same-name-cast both columns.
   const documentRows = await sql`
     SELECT
       d.*,
+      d.issue_date::text AS issue_date,
+      d.expiry_date::text AS expiry_date,
       c.company_name as contractor_name,
       CASE
         WHEN d.expiry_date IS NULL THEN 'no_expiry'
@@ -97,7 +100,9 @@ async function handlePut(documentId: string, req: NextApiRequest, res: NextApiRe
   const verifiedAt = status === 'valid' ? now : existing.verified_at;
   const verifier = status === 'valid' && verified_by ? verified_by : existing.verified_by;
 
-  // Update document
+  // Update document. `existing` (above) kept its raw `expiry_date` for the
+  // classification compare; this returned row is a fresh, display-only
+  // round-trip result, so it's safe to same-name-cast both date columns.
   const documentRows = await sql`
     UPDATE hs_contractor_documents
     SET
@@ -112,7 +117,7 @@ async function handlePut(documentId: string, req: NextApiRequest, res: NextApiRe
       verified_at = ${verifiedAt},
       updated_at = NOW()
     WHERE id = ${documentId}
-    RETURNING *
+    RETURNING *, issue_date::text AS issue_date, expiry_date::text AS expiry_date
   `;
   const document = documentRows[0]!;
 
