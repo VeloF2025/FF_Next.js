@@ -85,4 +85,15 @@ describe('POST ticket whatsapp reply', () => {
     expect(text).toContain('DO NOTHING');
     expect(values).toContain('wamid.9');
   });
+
+  it('normalizes recipient_jid before logging so it matches the canonical form Cloud inbound stores', async () => {
+    vi.mocked(sendWhatsAppText).mockResolvedValue({ ok: true, channel: 'cloud', providerMessageId: 'wamid.9' });
+    await POST(replyReq({ toPhone: '+27 82 123 4567', message: 'hi', channel: 'cloud' }) as never, { params: Promise.resolve({ id: 't1' }) } as never);
+    // The send still receives the number exactly as the caller supplied it — the
+    // provider-aware client normalizes internally for the wire request.
+    expect(sendWhatsAppText).toHaveBeenCalledWith(expect.objectContaining({ toPhone: '+27 82 123 4567' }));
+    const [, ...values] = sqlMock.mock.calls[1] as [string[], ...unknown[]];
+    expect(values).toContain('27821234567');
+    expect(values).not.toContain('+27 82 123 4567');
+  });
 });

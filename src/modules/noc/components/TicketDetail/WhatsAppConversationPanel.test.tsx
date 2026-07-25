@@ -56,4 +56,44 @@ describe('WhatsAppConversationPanel', () => {
     expect((screen.getByPlaceholderText(/Type a reply/) as HTMLTextAreaElement).value).toBe('keep me');
     expect((screen.getByText('Send') as HTMLButtonElement).disabled).toBe(false);
   });
+
+  it('auto-resolves the recipient phone from the ticket client contact when it is a usable SA number', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ success: true, data: { items: [] } }),
+    }));
+    render(<WhatsAppConversationPanel ticketId="t1" drNumber="DR1" clientContact="0821234567" />);
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText(/Recipient phone/) as HTMLInputElement).value).toBe('27821234567'));
+    expect(screen.queryByText(/could not auto-resolve/i)).not.toBeInTheDocument();
+  });
+
+  it('leaves the recipient phone empty and shows a clear notice when the contact cannot be resolved to a number', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ success: true, data: { items: [] } }),
+    }));
+    render(<WhatsAppConversationPanel ticketId="t1" drNumber="DR1" clientContact="Ask at the gate for Sipho" />);
+    await waitFor(() => expect(screen.getByText(/could not auto-resolve/i)).toBeInTheDocument());
+    expect((screen.getByPlaceholderText(/Recipient phone/) as HTMLInputElement).value).toBe('');
+    // never a wrong number: Send must stay disabled until the operator supplies one
+    expect((screen.getByText('Send') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('shows the same clear notice when the ticket has no client contact at all', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ success: true, data: { items: [] } }),
+    }));
+    render(<WhatsAppConversationPanel ticketId="t1" drNumber="DR1" clientContact={null} />);
+    await waitFor(() => expect(screen.getByText(/could not auto-resolve/i)).toBeInTheDocument());
+    expect((screen.getByPlaceholderText(/Recipient phone/) as HTMLInputElement).value).toBe('');
+  });
+
+  it('still lets the operator type a number manually after an auto-resolve failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ success: true, data: { items: [] } }),
+    }));
+    render(<WhatsAppConversationPanel ticketId="t1" drNumber="DR1" clientContact={null} />);
+    await waitFor(() => expect(screen.getByText(/could not auto-resolve/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByPlaceholderText(/Recipient phone/), { target: { value: '27820000000' } });
+    expect((screen.getByPlaceholderText(/Recipient phone/) as HTMLInputElement).value).toBe('27820000000');
+  });
 });

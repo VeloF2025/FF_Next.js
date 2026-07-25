@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { requireAuth } from '@/lib/auth/app-router';
 import { getMessagesForDR } from '@/modules/noc/services/waMaintenanceProcessor';
+import { normalizeMsisdn } from '@/modules/communications/whatsapp/utils/phone';
 
 export type ConversationItem = {
   id: string;
@@ -43,7 +44,11 @@ export async function buildConversation(
     channel: r.service === 'cloud' ? 'cloud' : 'waha',
     // Outbound 1:1 rows store the counterparty in recipient_jid; the panel should
     // render those as "You", so leave `from` null for outbound.
-    from: r.direction === 'outbound' ? null : r.recipient_jid,
+    // Cloud and bridge write recipient_jid in different raw shapes (bare MSISDN vs
+    // JID-suffixed); normalize so the same subscriber reads as one participant
+    // regardless of channel. Falls back to the raw value so an unnormalizable jid
+    // is still shown rather than silently dropped.
+    from: r.direction === 'outbound' ? null : (r.recipient_jid ? (normalizeMsisdn(r.recipient_jid) ?? r.recipient_jid) : null),
     text: r.message_content,
     at: toIso(r.created_at),
   }));

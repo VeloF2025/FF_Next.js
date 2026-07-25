@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { getWaCloudCreds } from '@/modules/communications/whatsapp/config/waProviderConfig';
 import { normalizeMsisdn, extractMsisdnFromContact } from '@/modules/communications/whatsapp/utils/phone';
 import { createLogger } from '@/lib/logger';
+import rateLimiter, { RateLimits } from '@/lib/rateLimiter';
 
 export const config = { api: { bodyParser: false } };
 
@@ -120,6 +121,31 @@ async function verifyDrSender(
   return dr;
 }
 
+/**
+ * Every DR claim costs a maintenance_tickets lookup regardless of whether it
+ * verifies, so a sender spamming guessed DR numbers can drive DB load and warn-log
+ * noise even though there's no response-side oracle to actually learn anything
+ * from (Cloud always acks 200 the same way). Capped per normalized sender —
+ * once exceeded, the lookup is skipped entirely (fail closed: unlinked, same as
+ * any other unverifiable case) and ops is warned so a sustained probe is visible.
+ */
+async function resolveDropNumber(
+  sql: ReturnType<typeof db>,
+  dr: string,
+  fromPhone: string,
+  wamid: string | null,
+): Promise<string | null> {
+  const key = `dr-probe:${normalizeMsisdn(fromPhone) ?? fromPhone}`;
+  const rl = rateLimiter.check(key, RateLimits.DR_PROBE.limit, RateLimits.DR_PROBE.windowMs);
+  if (!rl.success) {
+    logger.warn('cloud inbound DR left unlinked: DR-probe rate limit exceeded', {
+      wamid, fromPhone, dr, resetAt: rl.resetAt,
+    });
+    return null;
+  }
+  return verifyDrSender(sql, dr, fromPhone, wamid);
+}
+
 type ParsedInbound = { fromPhone: string; text: string; wamid: string | null };
 
 function parseInbound(payload: unknown): ParsedInbound | null {
@@ -197,7 +223,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const sql = db();
   const claimedDr = extractDrNumber(parsed.text);
   const dropNumber = claimedDr
-    ? await verifyDrSender(sql, claimedDr, parsed.fromPhone, parsed.wamid)
+    ? await resolveDropNumber(sql, claimedDr, parsed.fromPhone, parsed.wamid)
     : null;
   try {
     // ON CONFLICT keyed on the wamid (partial unique index, migration 459) makes

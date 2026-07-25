@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
+import { extractMsisdnFromContact } from '@/modules/communications/whatsapp/utils/phone';
 
 type Item = {
   id: string;
@@ -10,13 +11,26 @@ type Item = {
   at: string;
 };
 
-export function WhatsAppConversationPanel({ ticketId, drNumber }: { ticketId: string; drNumber?: string | null }) {
+export function WhatsAppConversationPanel({
+  ticketId, drNumber, clientContact,
+}: { ticketId: string; drNumber?: string | null; clientContact?: string | null }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [toPhone, setToPhone] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // Resolved once from the ticket's contact on mount; null means "not attempted
+  // yet", false means "tried and failed" (shows the notice below), true means
+  // auto-filled. Never guesses a number — an unresolved contact leaves toPhone
+  // empty so the operator must supply one explicitly.
+  const [phoneResolved, setPhoneResolved] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const resolved = extractMsisdnFromContact(clientContact);
+    setToPhone(resolved ?? '');
+    setPhoneResolved(resolved !== null);
+  }, [clientContact]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +95,11 @@ export function WhatsAppConversationPanel({ ticketId, drNumber }: { ticketId: st
           value={toPhone}
           onChange={(e) => setToPhone(e.target.value)}
         />
+        {phoneResolved === false && (
+          <div className="text-xs text-amber-600">
+            Could not auto-resolve a phone number from this ticket&apos;s contact — enter the recipient manually.
+          </div>
+        )}
         <div className="flex gap-2">
           <textarea
             className="flex-1 rounded border px-2 py-1 text-sm"

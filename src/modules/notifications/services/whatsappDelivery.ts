@@ -7,6 +7,7 @@
 
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
+import { sendWhatsAppText } from '@/modules/communications/whatsapp/send/waSendClient';
 import type { NotifyPayload } from '../types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -49,7 +50,21 @@ export async function deliverWhatsApp(
       return;
     }
 
-    await sendWhatsAppDM(phone, message);
+    // sendWhatsAppText is the provider-aware (cloud|waha) sender. Unlike the raw
+    // WAHA sender it wraps internally, it returns {ok:false} on failure instead
+    // of throwing — the .ok check below is required, or a failed send would
+    // fall through to the "sent" log line untouched.
+    const result = await sendWhatsAppText({ toPhone: phone, message });
+    if (!result.ok) {
+      log.error('WA delivery failed', {
+        userId, error: result.error,
+      }, 'WADelivery');
+      await logDelivery(notificationId, userId, 'whatsapp', 'failed', null, result.error ?? 'WA send failed').catch((logErr: unknown) => {
+        log.warn('WA delivery log failed', { logError: logErr instanceof Error ? logErr.message : String(logErr) }, 'WADelivery');
+      });
+      return;
+    }
+
     await logDelivery(notificationId, userId, 'whatsapp', 'sent', phone, null);
     log.info('WA DM notification sent', {
       userId, phone: maskPhone(phone), event_type: payload.event_type,
