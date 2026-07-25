@@ -12,7 +12,7 @@ const { createSession, setSessionTokenHash, signToken } = vi.hoisted(() => ({
 vi.mock('../session', () => ({ createSession, setSessionTokenHash }));
 vi.mock('../jwt', () => ({ signToken }));
 
-import { McpLifetimeCapError, MCP_LIFETIME_DAYS, mintFfMcpToken } from '../mcpToken';
+import { MCP_LIFETIME_DAYS, mintFfMcpToken } from '../mcpToken';
 import type { AuthUser } from '../types';
 
 const asUser = (email: string): AuthUser =>
@@ -68,19 +68,21 @@ describe('mintFfMcpToken', () => {
     expect(order).toEqual(['create', 'sign', 'bind']);
   });
 
-  it('caps the owner at 90 days and creates nothing when rejected', async () => {
-    await expect(mintFfMcpToken(asUser('owner@x.co'), '1y')).rejects.toBeInstanceOf(
-      McpLifetimeCapError
-    );
-    expect(createSession).not.toHaveBeenCalled();
-  });
-
-  it('allows the owner 90d', async () => {
-    await expect(mintFfMcpToken(asUser('owner@x.co'), '90d')).resolves.toBeDefined();
-  });
-
-  it('allows a non-owner 1y', async () => {
+  it('allows 1y for a non-owner', async () => {
     await expect(mintFfMcpToken(asUser('lew@x.co'), '1y')).resolves.toBeDefined();
+    expect(createSession).toHaveBeenCalledWith(
+      'u1',
+      '',
+      undefined,
+      undefined,
+      expect.objectContaining({ expiryDays: MCP_LIFETIME_DAYS['1y'] })
+    );
+  });
+
+  // The owner used to be capped at 90 days. That cap was dropped deliberately — see the
+  // header comment in mcpToken.ts — so the owner must now get the same menu as anyone.
+  it('allows 1y for the owner too, with no special-casing', async () => {
+    await expect(mintFfMcpToken(asUser('owner@x.co'), '1y')).resolves.toBeDefined();
     expect(createSession).toHaveBeenCalledWith(
       'u1',
       '',

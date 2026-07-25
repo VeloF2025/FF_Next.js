@@ -27,7 +27,7 @@ const LIFETIME_OPTIONS = [
 type UiLifetime = (typeof LIFETIME_OPTIONS)[number]['value'];
 
 interface ListResponse {
-  data?: { tokens?: McpTokenRow[]; ownerCapped?: boolean; ownerMaxDays?: number };
+  data?: { tokens?: McpTokenRow[] };
   error?: { message?: string };
 }
 
@@ -44,8 +44,6 @@ export function FibreFlowConnectPanel() {
   const [lifetime, setLifetime] = useState<UiLifetime>('30d');
   const [label, setLabel] = useState('');
   const [tokens, setTokens] = useState<McpTokenRow[]>([]);
-  const [ownerCapped, setOwnerCapped] = useState(false);
-  const [ownerMaxDays, setOwnerMaxDays] = useState(90);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -56,8 +54,6 @@ export function FibreFlowConnectPanel() {
       if (!res.ok) throw new Error(`request failed (${res.status})`);
       const json = (await res.json().catch(() => null)) as ListResponse | null;
       setTokens(json?.data?.tokens ?? []);
-      setOwnerCapped(json?.data?.ownerCapped ?? false);
-      setOwnerMaxDays(json?.data?.ownerMaxDays ?? 90);
     } catch (e) {
       setError(`Could not load your tokens: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -168,12 +164,6 @@ export function FibreFlowConnectPanel() {
           {loading ? 'Generating…' : 'Generate token'}
         </button>
       </div>
-
-      {ownerCapped && (
-        <p className="text-[11px] text-muted-foreground">
-          Owner tokens are capped at {ownerMaxDays} days.
-        </p>
-      )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 

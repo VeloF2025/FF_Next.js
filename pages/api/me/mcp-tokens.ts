@@ -13,16 +13,11 @@
  * interactive browser session.
  */
 import type { NextApiHandler, NextApiResponse } from 'next';
-import { withAuth, getUserSessions, isOwner } from '@/lib/auth';
+import { withAuth, getUserSessions } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import {
-  McpLifetimeCapError,
-  MCP_LIFETIME_DAYS,
-  OWNER_MAX_DAYS,
-  mintFfMcpToken,
-} from '@/lib/auth/mcpToken';
+import { MCP_LIFETIME_DAYS, mintFfMcpToken } from '@/lib/auth/mcpToken';
 import type { McpLifetime } from '@/lib/auth/mcpToken';
 
 const LOGGER = 'MeMcpTokens';
@@ -61,11 +56,6 @@ async function listHandler(
       expiresAt: s.expiresAt,
       lastUsedAt: s.lastUsedAt ?? null,
     })),
-    // Lets the UI warn before the user picks a lifetime the server will reject. The
-    // server enforces the cap regardless; this only avoids a confusing 400. Computed
-    // from the verified user, so the owner list itself never reaches the browser.
-    ownerCapped: isOwner(req.user),
-    ownerMaxDays: OWNER_MAX_DAYS,
   });
 }
 
@@ -99,31 +89,21 @@ async function mintHandler(
     );
   }
 
-  try {
-    const { token, expiresAt, sessionId } = await mintFfMcpToken(req.user, rawLifetime, {
-      label,
-      ipAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim(),
-      userAgent: req.headers['user-agent'],
-    });
-    // sessionId is safe to log; the token is not.
-    log.info('minted read-only mcp token', {
-      userId: req.user.id,
-      sessionId,
-      lifetime: rawLifetime,
-    }, LOGGER);
-    return apiResponse.success(res, { token, expiresAt });
-  } catch (err) {
-    // The dropdown offers 1y to everyone, so a capped owner picking it is a normal
-    // user action — answer with a clear 400, not a 500.
-    if (err instanceof McpLifetimeCapError) {
-      log.warn('mcp token mint rejected: owner lifetime cap', {
-        userId: req.user.id,
-        lifetime: rawLifetime,
-      }, LOGGER);
-      return apiResponse.badRequest(res, err.message);
-    }
-    throw err;
-  }
+  // Every lifetime in the menu is valid for every identity, so there is nothing left for
+  // this to reject — a mint failure here is a genuine fault and belongs in the outer
+  // handler's 500 path, not a 400.
+  const { token, expiresAt, sessionId } = await mintFfMcpToken(req.user, rawLifetime, {
+    label,
+    ipAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim(),
+    userAgent: req.headers['user-agent'],
+  });
+  // sessionId is safe to log; the token is not.
+  log.info('minted read-only mcp token', {
+    userId: req.user.id,
+    sessionId,
+    lifetime: rawLifetime,
+  }, LOGGER);
+  return apiResponse.success(res, { token, expiresAt });
 }
 
 const authedHandler = withAuth(async (req, res) => {

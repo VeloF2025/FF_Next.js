@@ -14,7 +14,6 @@
  */
 import { createSession, setSessionTokenHash } from './session';
 import { signToken } from './jwt';
-import { isOwner } from './owner';
 import type { AuthUser } from './types';
 
 export type McpLifetime = '30d' | '90d' | '1y';
@@ -26,18 +25,17 @@ export const MCP_LIFETIME_DAYS: Record<McpLifetime, number> = {
 };
 
 /**
- * The owner identity bypasses participant scoping on the meeting endpoints, so a lost
- * owner token has tenant-wide read blast radius. Capped at 90 days, mirroring the
- * Cortex super-admin cap in src/lib/cortex/bridgeAuth.ts.
+ * Every identity gets the same lifetime menu, including the owner.
+ *
+ * An earlier revision capped the owner at 90 days, on the grounds that the owner
+ * bypasses participant scoping on the meeting endpoints and so has tenant-wide read
+ * blast radius. That cap was dropped deliberately: it was never the offboarding
+ * control — `withAuth`/`requireAuth` re-check `u.is_active` on EVERY request, so
+ * deactivating a user kills their tokens on the next call rather than at expiry — and
+ * the residual risk it addressed (an undetected leak) is already covered by instant
+ * per-token revocation and the `last_used_at` column, which makes a live-but-forgotten
+ * token visible in the connections list.
  */
-export const OWNER_MAX_DAYS = 90;
-
-export class McpLifetimeCapError extends Error {
-  constructor(maxDays: number = OWNER_MAX_DAYS) {
-    super(`Owner MCP tokens are capped at ${maxDays} days`);
-    this.name = 'McpLifetimeCapError';
-  }
-}
 
 export interface MintOptions {
   label?: string;
@@ -63,9 +61,6 @@ export async function mintFfMcpToken(
   opts?: MintOptions
 ): Promise<MintedToken> {
   const days = MCP_LIFETIME_DAYS[lifetime];
-  if (isOwner(user) && days > OWNER_MAX_DAYS) {
-    throw new McpLifetimeCapError();
-  }
 
   // create -> sign -> bind: the JWT embeds the session id, so the row must exist first,
   // and the row's token_hash can only be written once the JWT exists. Same three-step
