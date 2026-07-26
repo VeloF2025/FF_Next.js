@@ -204,9 +204,14 @@ export async function PUT(
     // The acting user is now REQUIRED, not best-effort: the block this replaces read the
     // cookie only to label the activity log and never rejected anyone, so this update was
     // reachable with no credential at all.
-    const actingUser = {
+    // No `name`: the block this replaces read it off the JWT, but JWTPayload has no name
+    // claim, so it was always undefined. AuthUser cannot supply one either — its declared
+    // firstName/lastName are camelCase while the query returns snake_case columns
+    // unaliased, so both are undefined at runtime. Omitting it keeps the previous
+    // behaviour honestly rather than computing undefined and looking like it means to.
+    const actingUser: { id?: string; name?: string; email?: string; role?: string } = {
       id: authedUser.id,
-      name: [authedUser.firstName, authedUser.lastName].filter(Boolean).join(' ') || undefined,
+      name: undefined,
       email: authedUser.email,
       role: authedUser.role,
     };
@@ -368,9 +373,10 @@ export async function DELETE(
     logger.info('Soft deleting ticket', { ticketId });
 
     // Required, not best-effort — see the PUT handler. A delete must never be anonymous.
-    const actingUser = {
+    // No `name` — see the PUT handler.
+    const actingUser: { id?: string; name?: string; email?: string } = {
       id: authedUser.id,
-      name: [authedUser.firstName, authedUser.lastName].filter(Boolean).join(' ') || undefined,
+      name: undefined,
       email: authedUser.email,
     };
 
