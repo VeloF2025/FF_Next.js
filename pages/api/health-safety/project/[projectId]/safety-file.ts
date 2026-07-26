@@ -59,15 +59,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     // hs_contractor_documents is contractor-level (no project_id), so it's
-    // scoped to this project via contractor_projects. Display-only export —
-    // issue_date/expiry_date are pure `date` columns, cast ::text so the PDF
-    // renders them correctly on the SAST server (see feedback_pg_date_col_tz_render_sast).
+    // scoped to this project via contractor_projects. EXISTS (not JOIN) --
+    // contractor_projects is UNIQUE(contractor_id, project_id, role), so a
+    // contractor can legitimately hold multiple roles on the same project;
+    // a JOIN would fan out and duplicate every document row per extra role.
+    // Also scoped to the contractor's CURRENT assignment (matches the
+    // precedent in pages/api/projects/[projectId]/contractors-hs.ts) --
+    // a removed/suspended/completed assignment's documents aren't part of
+    // the site's current safety file.
+    // Display-only export -- issue_date/expiry_date are pure `date` columns,
+    // cast ::text so the PDF renders them correctly on the SAST server (see
+    // feedback_pg_date_col_tz_render_sast).
     const contractorDocuments = (await sql`
       SELECT d.id, c.company_name, d.document_type, d.status,
         d.issue_date::text AS issue_date, d.expiry_date::text AS expiry_date
       FROM hs_contractor_documents d
-      JOIN contractor_projects cp ON cp.contractor_id = d.contractor_id AND cp.project_id = ${projectId}
       JOIN contractors c ON c.id = d.contractor_id
+      WHERE EXISTS (
+        SELECT 1 FROM contractor_projects cp
+        WHERE cp.contractor_id = d.contractor_id AND cp.project_id = ${projectId}
+          AND cp.is_active = true AND cp.assignment_status IN ('assigned', 'active')
+      )
       ORDER BY c.company_name, d.document_type, d.created_at DESC
     `) as unknown as SafetyFileContractorDocument[];
 

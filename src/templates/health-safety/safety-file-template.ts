@@ -22,7 +22,8 @@ export interface SafetyFileContractorDocument {
   id: string;
   company_name: string;
   document_type: HSDocumentType | string;
-  status: string;
+  /** hs_contractor_documents.status has no NOT NULL constraint (DEFAULT 'pending' only). */
+  status: string | null;
   issue_date: string | null;
   expiry_date: string | null;
 }
@@ -108,11 +109,16 @@ function contractorDocumentsSection(docs: SafetyFileContractorDocument[]): strin
   }
   const rows = docs
     .map((d) => {
-      const typeLabel = DOCUMENT_TYPES[d.document_type as HSDocumentType]?.label ?? esc(d.document_type);
+      // Raw (unescaped) fallback -- esc() below is the ONE place this gets
+      // escaped. Pre-escaping here too would double-escape any document_type
+      // not in DOCUMENT_TYPES (the column is unconstrained VARCHAR(100), so
+      // this path is reachable for legacy/unknown values).
+      const typeLabel = DOCUMENT_TYPES[d.document_type as HSDocumentType]?.label ?? d.document_type;
+      const status = d.status ?? 'pending';
       return `<tr>
         <td>${esc(d.company_name)}</td>
         <td>${esc(typeLabel)}</td>
-        <td><span class="status ${d.status === 'valid' ? 'signed' : 'draft'}">${esc(d.status.toUpperCase())}</span></td>
+        <td><span class="status ${status === 'valid' ? 'signed' : 'draft'}">${esc(status.toUpperCase())}</span></td>
         <td>${fmtDate(d.issue_date)}</td>
         <td>${fmtDate(d.expiry_date)}</td>
       </tr>`;
@@ -135,11 +141,14 @@ function riskRegisterSection(risks: SafetyFileRiskEntry[]): string {
   }
   const rows = risks
     .map((r) => {
-      const category = RISK_CATEGORIES[r.risk_category as RiskCategory]?.label ?? esc(r.risk_category);
+      // Raw (unescaped) fallbacks -- esc() at the render site below is the
+      // ONE place these get escaped. Pre-escaping here too would double-
+      // escape any value not in the lookup map.
+      const category = RISK_CATEGORIES[r.risk_category as RiskCategory]?.label ?? r.risk_category;
       const level = r.risk_level as RiskLevel;
       const residualLevel = r.residual_risk_level as RiskLevel;
-      const levelLabel = RISK_LEVEL_CONFIG[level]?.label ?? esc(r.risk_level);
-      const residualLabel = RISK_LEVEL_CONFIG[residualLevel]?.label ?? esc(r.residual_risk_level);
+      const levelLabel = RISK_LEVEL_CONFIG[level]?.label ?? r.risk_level;
+      const residualLabel = RISK_LEVEL_CONFIG[residualLevel]?.label ?? r.residual_risk_level;
       return `<tr>
         <td>${esc(r.hazard_description)}</td>
         <td>${esc(category)}</td>

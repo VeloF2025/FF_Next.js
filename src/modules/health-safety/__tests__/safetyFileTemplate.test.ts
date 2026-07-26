@@ -126,6 +126,19 @@ describe('generateSafetyFileHtml', () => {
     expect(html).toContain('No contractor documents on file for this project.');
   });
 
+  it('escapes an unmapped document_type exactly once (document_type is an unconstrained VARCHAR, not a closed enum)', () => {
+    const html = generateSafetyFileHtml({
+      ...base,
+      letters: [],
+      contractorDocuments: [contractorDoc({ document_type: 'Health & Safety <Legacy>' })],
+    });
+    // Correct single-escape: "&" -> "&amp;", "<"/">" -> "&lt;"/"&gt;".
+    expect(html).toContain('Health &amp; Safety &lt;Legacy&gt;');
+    // A double-escape bug would re-escape the already-escaped "&amp;" into "&amp;amp;".
+    expect(html).not.toContain('&amp;amp;');
+    expect(html).not.toContain('&amp;lt;');
+  });
+
   it('renders the risk register with category label, risk pill, and residual risk', () => {
     const html = generateSafetyFileHtml({
       ...base,
