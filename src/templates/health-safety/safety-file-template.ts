@@ -2,17 +2,53 @@
  * Digital safety file HTML generator (goal Phase 5, §7.5)
  *
  * Assembles a project's statutory appointment letters — each with its captured
- * (drawn) signature — into one self-contained HTML document, rendered to a
- * single PDF by the export endpoint's Puppeteer path (the sanctioned PDF route,
- * §4.6). No external assets at render time.
+ * (drawn) signature — plus the contractor compliance documents and risk
+ * register entries linked to the project, into one self-contained HTML
+ * document, rendered to a single PDF by the export endpoint's Puppeteer path
+ * (the sanctioned PDF route, §4.6). No external assets at render time.
+ *
+ * Contractor documents and risk register entries are rendered as compact
+ * register tables (one row per entry), not one page per row like the signed
+ * appointment letters -- matching how these appear in the real client H&S
+ * binders (a compliance register / risk register table, not per-item pages).
  */
 
 import { letterTypeDef, type AppointmentLetter } from '@/modules/health-safety/types/appointment.types';
+import { DOCUMENT_TYPES, type HSDocumentType } from '@/modules/health-safety/types/compliance.types';
+import { RISK_CATEGORIES, RISK_LEVEL_CONFIG, type RiskCategory, type RiskLevel } from '@/modules/health-safety/types/risk.types';
+
+/** Minimal shape the safety-file query selects -- not the full HSContractorDocument. */
+export interface SafetyFileContractorDocument {
+  id: string;
+  company_name: string;
+  document_type: HSDocumentType | string;
+  status: string;
+  issue_date: string | null;
+  expiry_date: string | null;
+}
+
+/** Minimal shape the safety-file query selects -- not the full RiskEntry. */
+export interface SafetyFileRiskEntry {
+  id: string;
+  hazard_description: string;
+  risk_category: RiskCategory | string;
+  likelihood: number;
+  severity: number;
+  risk_score: number;
+  risk_level: RiskLevel | string;
+  residual_risk_score: number;
+  residual_risk_level: RiskLevel | string;
+  existing_controls: string | null;
+  review_date: string | null;
+  status: string;
+}
 
 export interface SafetyFileData {
   projectName: string;
   generatedAt: string;
   letters: AppointmentLetter[];
+  contractorDocuments: SafetyFileContractorDocument[];
+  riskRegister: SafetyFileRiskEntry[];
   /** Compliance record counts, for the cover summary. */
   summary: { training: number; toolbox: number; ppe: number; permits: number; audits: number };
 }
@@ -66,9 +102,70 @@ function letterPage(letter: AppointmentLetter): string {
   </section>`;
 }
 
+function contractorDocumentsSection(docs: SafetyFileContractorDocument[]): string {
+  if (!docs.length) {
+    return `<section class="register"><h2>Contractor Compliance Documents</h2><p class="empty">No contractor documents on file for this project.</p></section>`;
+  }
+  const rows = docs
+    .map((d) => {
+      const typeLabel = DOCUMENT_TYPES[d.document_type as HSDocumentType]?.label ?? esc(d.document_type);
+      return `<tr>
+        <td>${esc(d.company_name)}</td>
+        <td>${esc(typeLabel)}</td>
+        <td><span class="status ${d.status === 'valid' ? 'signed' : 'draft'}">${esc(d.status.toUpperCase())}</span></td>
+        <td>${fmtDate(d.issue_date)}</td>
+        <td>${fmtDate(d.expiry_date)}</td>
+      </tr>`;
+    })
+    .join('\n');
+
+  return `
+  <section class="register">
+    <h2>Contractor Compliance Documents</h2>
+    <table class="reg-table">
+      <thead><tr><th>Contractor</th><th>Document</th><th>Status</th><th>Issued</th><th>Expires</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </section>`;
+}
+
+function riskRegisterSection(risks: SafetyFileRiskEntry[]): string {
+  if (!risks.length) {
+    return `<section class="register"><h2>Risk Register</h2><p class="empty">No risk assessments on file for this project.</p></section>`;
+  }
+  const rows = risks
+    .map((r) => {
+      const category = RISK_CATEGORIES[r.risk_category as RiskCategory]?.label ?? esc(r.risk_category);
+      const level = r.risk_level as RiskLevel;
+      const residualLevel = r.residual_risk_level as RiskLevel;
+      const levelLabel = RISK_LEVEL_CONFIG[level]?.label ?? esc(r.risk_level);
+      const residualLabel = RISK_LEVEL_CONFIG[residualLevel]?.label ?? esc(r.residual_risk_level);
+      return `<tr>
+        <td>${esc(r.hazard_description)}</td>
+        <td>${esc(category)}</td>
+        <td><span class="risk-pill risk-${esc(r.risk_level)}">${esc(levelLabel)} (${r.risk_score})</span></td>
+        <td><span class="risk-pill risk-${esc(r.residual_risk_level)}">${esc(residualLabel)} (${r.residual_risk_score})</span></td>
+        <td>${esc(r.existing_controls ?? '—')}</td>
+        <td>${fmtDate(r.review_date)}</td>
+      </tr>`;
+    })
+    .join('\n');
+
+  return `
+  <section class="register">
+    <h2>Risk Register</h2>
+    <table class="reg-table">
+      <thead><tr><th>Hazard</th><th>Category</th><th>Risk</th><th>Residual risk</th><th>Existing controls</th><th>Review date</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </section>`;
+}
+
 export function generateSafetyFileHtml(data: SafetyFileData): string {
   const { summary } = data;
   const pages = data.letters.map(letterPage).join('\n');
+  const contractorDocsHtml = contractorDocumentsSection(data.contractorDocuments);
+  const riskRegisterHtml = riskRegisterSection(data.riskRegister);
 
   return `<!doctype html><html><head><meta charset="utf-8" />
   <style>
@@ -100,6 +197,17 @@ export function generateSafetyFileHtml(data: SafetyFileData): string {
     .status { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
     .status.signed { background: #d1fae5; color: #065f46; }
     .status.draft { background: #fee2e2; color: #991b1b; }
+    .register { padding: 40px; page-break-before: always; }
+    .register h2 { margin: 0 0 16px; font-size: 20px; border-bottom: 2px solid #059669; padding-bottom: 8px; }
+    .register .empty { color: #666; font-style: italic; }
+    table.reg-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.reg-table th { text-align: left; padding: 6px 8px; background: #f3f4f6; color: #444; border-bottom: 1px solid #ddd; }
+    table.reg-table td { padding: 6px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+    .risk-pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; white-space: nowrap; }
+    .risk-low { background: #d1fae5; color: #065f46; }
+    .risk-medium { background: #fef3c7; color: #92400e; }
+    .risk-high { background: #ffedd5; color: #9a3412; }
+    .risk-extreme { background: #fee2e2; color: #991b1b; }
   </style></head><body>
     <div class="cover">
       <h1>Health &amp; Safety File</h1>
@@ -111,8 +219,12 @@ export function generateSafetyFileHtml(data: SafetyFileData): string {
         <div><div class="n">${summary.permits}</div><div class="l">Permits</div></div>
         <div><div class="n">${summary.audits}</div><div class="l">Audits</div></div>
         <div><div class="n">${data.letters.length}</div><div class="l">Appointments</div></div>
+        <div><div class="n">${data.contractorDocuments.length}</div><div class="l">Contractor Documents</div></div>
+        <div><div class="n">${data.riskRegister.length}</div><div class="l">Risk Entries</div></div>
       </div>
     </div>
+    ${contractorDocsHtml}
+    ${riskRegisterHtml}
     ${pages || '<section class="letter"><p>No appointment letters have been created for this project.</p></section>'}
   </body></html>`;
 }
