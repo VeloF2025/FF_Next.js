@@ -38,7 +38,11 @@ function tsUnionValues(typesSrc: string): string[] {
 }
 
 function tsArrayValues(typesSrc: string): string[] {
-  const match = typesSrc.match(/export const APPOINTMENT_LETTER_TYPES[\s\S]*?=\s*\[([\s\S]*)\];/);
+  // Non-greedy `[\s\S]*?` stops at the FIRST `];` after the opening bracket --
+  // i.e. this array's own close. A greedy match would instead run to the
+  // LAST `];` in the file, silently over-capturing if another array/object
+  // literal ending in `];` is ever added below this one.
+  const match = typesSrc.match(/export const APPOINTMENT_LETTER_TYPES[\s\S]*?=\s*\[([\s\S]*?)\];/);
   if (!match) throw new Error('Could not find the APPOINTMENT_LETTER_TYPES array declaration');
   return Array.from(match[1].matchAll(/value:\s*'(\w+)'/g)).map((m) => m[1]);
 }
