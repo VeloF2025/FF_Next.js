@@ -26,9 +26,10 @@ export async function POST(
     // note; none of that may happen for an unauthenticated caller.
     //
     // requireAuth, not a bare verifyToken: it validates the session row against the DB
-    // (not just the JWT signature), so a revoked or expired session is rejected — and it
-    // is the single chokepoint the read-only session gate hooks into, so this route
-    // inherits that gate rather than needing its own copy.
+    // (not just the JWT signature), so a revoked or expired session is rejected.
+    // It is also the single place the read-only MCP session gate WILL hook into (PR #2249,
+    // not yet merged — requireAuth can only return 401 today), so this route will inherit
+    // that gate instead of needing its own copy.
     const [user, unauthorized] = await requireAuth(request);
     if (unauthorized) return unauthorized;
     const createdBy: string = user.id;

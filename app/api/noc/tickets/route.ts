@@ -207,8 +207,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     // requireAuth rather than a bare verifyToken: it validates the session row against
-    // the DB, so a revoked session is refused, and it is where the read-only session
-    // gate lives — this route inherits it instead of needing its own copy.
+    // the DB, so a revoked session is refused. It is also where the read-only MCP session
+    // gate will live once PR #2249 merges — today requireAuth only ever returns 401.
     const [user, unauthorized] = await requireAuth(req);
     if (unauthorized) return unauthorized;
 

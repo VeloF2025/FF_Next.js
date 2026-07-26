@@ -66,8 +66,10 @@ describe('POST /api/noc/tickets/[id]/analyze-screenshot — authentication', () 
     expect(createTicketNote).not.toHaveBeenCalled();
   });
 
-  it('403s a read-only MCP session, doing no work at all', async () => {
-    // requireAuth is the gate chokepoint: an mcp-kind session on a POST is refused there.
+  it('relays any requireAuth denial verbatim, doing no work at all', async () => {
+    // Uses 403 as the stand-in denial. requireAuth only returns 401 today; the 403 case
+    // becomes real when the read-only MCP gate lands in it (PR #2249). What this pins is
+    // that the route returns whatever requireAuth denies with, and does no work first.
     requireAuth.mockResolvedValue([null, unauthorizedResponse(403)]);
 
     const res = await POST(makeRequest(), { params });
