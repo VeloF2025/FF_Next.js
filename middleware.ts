@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import arcjet, { detectBot, fixedWindow, shield } from "@arcjet/next";
+import { wouldDenyApiRequest } from '@/lib/auth/apiPublicRoutes';
 
 // TODO: Re-enable Clerk middleware when ready for production
 
@@ -241,6 +242,24 @@ export async function middleware(request: NextRequest) {
 
   // Apply rate limiting to API requests
   if (pathname.startsWith('/api/')) {
+    // LOG-ONLY api-auth audit. Changes no behaviour: it records requests a
+    // deny-by-default gate WOULD refuse, so the allowlist can be built from observed
+    // traffic instead of from reading code. Enforcement is a follow-up, and must not be
+    // switched on until these logs are quiet for the routes we intend to keep.
+    //
+    // Why this exists: middleware does not enforce session auth, so every API route is
+    // opt-in. An audit on 2026-07-27 found 50 mutating App Router routes reachable with
+    // no credential — five of which served NOC ticket CRUD to anonymous callers in
+    // production until PR #2255.
+    if (wouldDenyApiRequest(pathname, request)) {
+      edgeLog('warn', 'api-auth-audit: anonymous request to non-public API route', {
+        auditMode: 'log-only',
+        method: request.method,
+        path: pathname,
+        mutating: request.method !== 'GET' && request.method !== 'HEAD',
+      });
+    }
+
     // Get appropriate Arcjet protection
     const aj = getArcjetProtection(pathname, request.method);
 

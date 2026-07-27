@@ -1,0 +1,88 @@
+/**
+ * Which /api/* routes are legitimately reachable without a user session, and whether a
+ * request carries any credential at all.
+ *
+ * Background: `middleware.ts` does not enforce session auth — it only rate-limits. Every
+ * API route is therefore opt-in, and an audit on 2026-07-27 found 50 mutating App Router
+ * routes reachable with no credential (see the NOC incident: 5 of them served full ticket
+ * CRUD to anonymous callers in production).
+ *
+ * This module exists to make that class of bug measurable BEFORE it is enforced. Flipping
+ * a deny-by-default gate on an allowlist assembled by reading code is how a working
+ * integration gets taken down by a route nobody remembered. So the middleware consumes
+ * this in log-only mode first: it records what it WOULD refuse and refuses nothing.
+ *
+ * Edge-runtime safe: pure string work, no node APIs, no I/O.
+ */
+
+/** Cookie the app sets on login. Mirrors AUTH_COOKIE_NAME in src/lib/auth. */
+const SESSION_COOKIE = 'ff_auth_token';
+
+/**
+ * Prefixes that must stay reachable anonymously, with the reason each one is here.
+ * A prefix matches the exact path or anything below it.
+ *
+ * Keep the reason attached. An allowlist without reasons rots into "don't touch this",
+ * and the entries nobody can justify are exactly the ones that should be removed.
+ */
+export const PUBLIC_API_PREFIXES: ReadonlyArray<{ prefix: string; why: string }> = [
+  { prefix: '/api/health', why: 'liveness probe — deploy scripts and uptime checks' },
+  { prefix: '/api/monitoring', why: 'liveness/metrics probes' },
+  { prefix: '/api/auth', why: 'login, check-email, forgot/reset password — pre-session by definition' },
+  { prefix: '/api/my/login', why: 'staff portal PIN/OTP login — pre-session by definition' },
+  { prefix: '/api/cron', why: 'scheduled jobs; authenticate with their own secret header, not a session' },
+  { prefix: '/api/noc/webhooks', why: 'inbound provider callbacks (QContact) — no session to present' },
+  { prefix: '/api/communications/whatsapp/cloud-webhook', why: 'Meta WhatsApp Cloud webhook — signature-verified, not session-verified' },
+  { prefix: '/api/cortex-remote-mcp', why: 'MCP transport; the upstream OAuth server must issue its own 401 challenge' },
+  { prefix: '/api/ff-remote-mcp', why: 'MCP transport; same as above' },
+];
+
+/** True when the path is one the app intends to serve without a user session. */
+export function isPublicApiRoute(pathname: string): boolean {
+  return PUBLIC_API_PREFIXES.some(
+    ({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+/**
+ * Whether the request presents ANY credential — session cookie, bearer token, or a
+ * service secret header.
+ *
+ * Deliberately does NOT validate it. Middleware runs on the Edge runtime and cannot
+ * reach the database, so validity is the route handler's job. The question here is only
+ * "did this caller present anything at all", which is what distinguishes a logged-in
+ * user from an anonymous request. Treating a forged token as "credentialed" is fine:
+ * the handler still rejects it, and for audit purposes a forged token is not the
+ * anonymous-access signal we are hunting.
+ */
+export function hasAnyCredential(req: {
+  cookies: { get(name: string): { value: string } | undefined };
+  headers: { get(name: string): string | null };
+}): boolean {
+  if (req.cookies.get(SESSION_COOKIE)?.value) return true;
+
+  const authorization = req.headers.get('authorization');
+  if (authorization && authorization.trim() !== '') return true;
+
+  for (const header of ['x-internal-secret', 'x-api-key', 'x-cron-secret', 'x-ff-mcp-secret']) {
+    const value = req.headers.get(header);
+    if (value && value.trim() !== '') return true;
+  }
+
+  return false;
+}
+
+/**
+ * Would a deny-by-default API gate refuse this request?
+ *
+ * `true` means: an anonymous caller reached a route that is not on the public allowlist.
+ * In log-only mode this is recorded and the request proceeds untouched.
+ */
+export function wouldDenyApiRequest(
+  pathname: string,
+  req: Parameters<typeof hasAnyCredential>[0],
+): boolean {
+  if (!pathname.startsWith('/api/')) return false;
+  if (isPublicApiRoute(pathname)) return false;
+  return !hasAnyCredential(req);
+}
