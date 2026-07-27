@@ -35,6 +35,21 @@ export function isVlmFallback(result: VlmSlotResult): boolean {
   return result.confidence === 0 && result.feedback === FALLBACK_RESULT.feedback;
 }
 
+/**
+ * Strip VLM_PROXY_SECRET out of text bound for a log.
+ *
+ * Not logging `photoUrl` ourselves is not enough: when vLLM cannot read an image it
+ * quotes the URL it tried back at us, secret and all, inside its own error body —
+ *   VLM HTTP 500: {"error":{"message":"404, message='Not Found',
+ *                  url='https://…/photo-proxy?key=…&vlm=true&vlmkey=<SECRET>'"}}
+ * so the secret rides in on `err.message` unless it is scrubbed here. photoProxyAuth
+ * accepts the secret appearing in velo's on-box nginx access log; that is a narrower
+ * exposure than the application log, which is shipped and read far more widely.
+ */
+export function redactVlmKey(text: string): string {
+  return text.replace(/(vlmkey=)[^&'"\s]+/gi, '$1[REDACTED]');
+}
+
 export async function validatePhotoWithVlm(
   params: VlmValidateParams,
 ): Promise<VlmSlotResult> {
@@ -82,7 +97,21 @@ Respond with ONLY valid JSON (no markdown):
     };
     raw = json.choices?.[0]?.message?.content ?? '';
   } catch (err) {
-    log.error('worksQaVlmService: fetch failed', { slotKey, err });
+    // Spell the error out field by field. `{ err }` serialises an Error to `{}` —
+    // its properties are non-enumerable — so the previous log said only
+    // "fetch failed" with an empty object, and an HTTP error thrown above (vLLM
+    // reporting it could not read the image) was indistinguishable from the socket
+    // never opening. 11 054 such lines over 6 days named neither the status nor the
+    // 401 behind it. `cause` carries undici's real reason (ECONNREFUSED, DNS, TLS).
+    log.error('worksQaVlmService: VLM call failed', {
+      slotKey,
+      endpoint: VLM_CHAT_ENDPOINT,
+      // Never log photoUrl itself — it carries VLM_PROXY_SECRET in the query string.
+      photoUrlAuthorized: photoUrl.includes('vlmkey='),
+      name: err instanceof Error ? err.name : typeof err,
+      message: redactVlmKey(err instanceof Error ? err.message : String(err)),
+      cause: err instanceof Error && err.cause ? redactVlmKey(String(err.cause)) : undefined,
+    });
     return FALLBACK_RESULT;
   }
 
@@ -192,7 +221,14 @@ export async function classifyPhotoToSlot(photoUrl: string): Promise<VlmClassify
     };
     raw = json.choices?.[0]?.message?.content ?? '';
   } catch (err) {
-    log.error('worksQaVlmService.classify: fetch failed', { err });
+    // Same masking bug as validatePhotoWithVlm above — `{ err }` on an Error logs `{}`.
+    log.error('worksQaVlmService.classify: VLM call failed', {
+      endpoint: VLM_CHAT_ENDPOINT,
+      photoUrlAuthorized: photoUrl.includes('vlmkey='),
+      name: err instanceof Error ? err.name : typeof err,
+      message: redactVlmKey(err instanceof Error ? err.message : String(err)),
+      cause: err instanceof Error && err.cause ? redactVlmKey(String(err.cause)) : undefined,
+    });
     return CLASSIFY_FALLBACK;
   }
 
