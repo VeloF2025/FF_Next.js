@@ -17,7 +17,14 @@
 import { PDFDocument } from 'pdf-lib';
 import { PDFParse } from 'pdf-parse';
 
-import { detectLayout, extractFields, type PayslipLayout } from './payslipLayouts';
+import { log } from '@/lib/logger';
+
+import {
+  detectLayout,
+  extractFields,
+  findAnchorAnomalies,
+  type PayslipLayout,
+} from './payslipLayouts';
 
 export interface ExtractedPayslipPage {
   /** 1-based page number in the source PDF. */
@@ -45,6 +52,14 @@ export interface ExtractedPayslipPage {
   /** Which Sage layout this page was read as — useful when HR reports odd values. */
   layout: PayslipLayout;
 }
+
+/**
+ * Exported so the tests assert against this exact string rather than a
+ * substring of it — a filter on reworded prose passes vacuously, which would
+ * turn the "no anomalies on a good file" test into one that tests nothing.
+ */
+export const ANCHOR_ANOMALY_LOG_MESSAGE =
+  '[payslips/pdfSplitter] unexpected anchor label counts on page — extracted values may be wrong';
 
 export interface SplitResult {
   pages: ExtractedPayslipPage[];
@@ -98,6 +113,21 @@ export async function splitCombinedPayslipPdf(buffer: Buffer): Promise<SplitResu
 
     const rawText = perPageText[i] ?? '';
     const layout = detectLayout(rawText);
+
+    // Extraction takes the first match for each anchor, so an anchor occurring
+    // more often than the known templates produce means the value we read may
+    // not be the one a human would. Never fires on the templates we support —
+    // if it does, the payroll export changed shape and this page wants
+    // checking by hand.
+    const anchorAnomalies = findAnchorAnomalies(rawText, layout);
+    if (anchorAnomalies.length > 0) {
+      log.warn(ANCHOR_ANOMALY_LOG_MESSAGE, {
+        page: i + 1,
+        layout,
+        labels: anchorAnomalies,
+      });
+    }
+
     pages.push({
       page: i + 1,
       pdfBuffer,

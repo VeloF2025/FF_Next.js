@@ -10,7 +10,11 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { detectLayout, extractFields } from '../payslipLayouts';
+import {
+  detectLayout,
+  extractFields,
+  findAnchorAnomalies,
+} from '../payslipLayouts';
 
 /** Plain Paper, short name that fits inline next to the label. */
 const PLAIN_INLINE = [
@@ -177,6 +181,78 @@ describe('extractFields — Plain Paper layout', () => {
     // it in is how one employee's figure lands on another's payslip row.
     const f = extractFields('999.99\t177.12\tTotal earnings', 'plain_paper');
     expect(f.totalEarningsCents).toBe(17_712);
+  });
+});
+
+describe('findAnchorAnomalies', () => {
+  it('reports nothing for the well-formed sample pages', () => {
+    expect(findAnchorAnomalies(PLAIN_INLINE, 'plain_paper')).toEqual([]);
+    expect(findAnchorAnomalies(PLAIN_WRAPPED, 'plain_paper')).toEqual([]);
+    expect(findAnchorAnomalies(PLAIN_NO_ID, 'plain_paper')).toEqual([]);
+    expect(findAnchorAnomalies(VIP_SAMPLE, 'vip')).toEqual([]);
+  });
+
+  it('flags a new "Employee …" field that the name span would swallow', () => {
+    // The name is bounded by "Employee Code" … "Employee". If a future Sage
+    // template adds any other field whose label starts with that word, the
+    // span absorbs it and the surname becomes part of the new field's value —
+    // while both bounding anchors still occur exactly once each, so only the
+    // bare-word count notices.
+    const withNewField = [
+      'AC077\tEmployee Code\t',
+      'SIPHO NKOSI',
+      '(SIPHO)',
+      'Permanent\tEmployee Type',
+      'Employee',
+      '2026/07/31\tPay Date\tAcme Demo (Pty) Ltd',
+      '20 000.00\tTotal earnings',
+      '18 000.00\tNett pay',
+    ].join('\n');
+
+    expect(findAnchorAnomalies(withNewField, 'plain_paper')).toEqual([
+      'Employee (bare label)',
+    ]);
+    // Demonstrates why the flag matters: the name really is corrupted here.
+    expect(extractFields(withNewField, 'plain_paper').lastName).not.toBe('nkosi');
+  });
+
+  it('reports an anchor label that appears more than once', () => {
+    // A second "Nett pay" line (e.g. a corrections panel a future Sage
+    // template adds) would make the first-match-wins extraction pick the
+    // wrong figure silently. This is the signal that catches it.
+    const doubled = `${PLAIN_INLINE}\n10 000.00\tNett pay`;
+
+    expect(findAnchorAnomalies(doubled, 'plain_paper')).toEqual(['Nett pay']);
+  });
+
+  it('reports every duplicated anchor, not just the first', () => {
+    const doubled = [PLAIN_INLINE, '9 999.00\tNett pay', '1 234.00\tTotal earnings'].join(
+      '\n'
+    );
+
+    expect(findAnchorAnomalies(doubled, 'plain_paper').sort()).toEqual([
+      'Nett pay',
+      'Total earnings',
+    ]);
+  });
+
+  it('checks the anchors the active layout actually uses', () => {
+    // "Employee Code" is a Plain Paper anchor and means nothing to VIP, so
+    // duplicating it must not raise a VIP warning.
+    const doubled = `${VIP_SAMPLE}\nAC999\tEmployee Code\tAC998\tEmployee Code`;
+
+    expect(findAnchorAnomalies(doubled, 'vip')).toEqual([]);
+    expect(findAnchorAnomalies(`${VIP_SAMPLE}\nEmp Code  AC999`, 'vip')).toEqual([
+      'Emp Code',
+    ]);
+  });
+
+  it('is not left stateful by a previous call (global-regex lastIndex)', () => {
+    const doubled = `${PLAIN_INLINE}\n10 000.00\tNett pay`;
+
+    expect(findAnchorAnomalies(doubled, 'plain_paper')).toEqual(['Nett pay']);
+    expect(findAnchorAnomalies(doubled, 'plain_paper')).toEqual(['Nett pay']);
+    expect(findAnchorAnomalies(PLAIN_INLINE, 'plain_paper')).toEqual([]);
   });
 });
 

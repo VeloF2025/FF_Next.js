@@ -11,14 +11,18 @@
  * the regex anchors here are what trip first.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+
+import { log } from '@/lib/logger';
 
 import {
   splitCombinedPayslipPdf,
   periodToDateRange,
+  ANCHOR_ANOMALY_LOG_MESSAGE,
 } from '../pdfSplitter';
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'synthetic-payslips.pdf');
@@ -198,6 +202,56 @@ describe('splitCombinedPayslipPdf — Plain Paper fixture', () => {
       expect(page.rawText).toContain(`${onPage}\tTotal deductions`);
       expect(page.totalDeductionsCents).toBe(cents);
     });
+  });
+});
+
+describe('splitCombinedPayslipPdf — anchor anomaly logging', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('stays silent on both well-formed fixtures', async () => {
+    const warn = vi.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+    await splitCombinedPayslipPdf(fs.readFileSync(FIXTURE));
+    await splitCombinedPayslipPdf(
+      fs.readFileSync(path.join(__dirname, 'fixtures', 'synthetic-plain-paper-payslips.pdf'))
+    );
+
+    const anchorWarnings = warn.mock.calls.filter(
+      ([msg]) => msg === ANCHOR_ANOMALY_LOG_MESSAGE
+    );
+    expect(anchorWarnings).toEqual([]);
+  });
+
+  it('warns with the page number and labels when a page has an extra anchor', async () => {
+    const warn = vi.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+    // Build a one-page PDF carrying a duplicated "Nett pay" anchor.
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const page = doc.addPage([595, 842]);
+    const rows = [
+      ['Employee Code', 'AC900'],
+      ['Employee', 'DEMO PERSON'],
+      ['Nett pay', '1 000.00'],
+      ['Nett pay', '2 000.00'],
+    ];
+    rows.forEach(([label, value], i) => {
+      const y = 800 - i * 20;
+      // Right-to-left, as the Plain Paper template emits.
+      page.drawText(value!, { x: 300, y, size: 9, font });
+      page.drawText(label!, { x: 150, y, size: 9, font });
+    });
+
+    await splitCombinedPayslipPdf(Buffer.from(await doc.save()));
+
+    const anchorWarnings = warn.mock.calls.filter(
+      ([msg]) => msg === ANCHOR_ANOMALY_LOG_MESSAGE
+    );
+    expect(anchorWarnings).toHaveLength(1);
+    expect(anchorWarnings[0]![1]).toMatchObject({ page: 1, layout: 'plain_paper' });
+    expect((anchorWarnings[0]![1] as { labels: string[] }).labels).toContain('Nett pay');
   });
 });
 
