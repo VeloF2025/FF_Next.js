@@ -22,6 +22,7 @@ import { log } from '@/lib/logger';
 import {
   splitCombinedPayslipPdf,
   periodToDateRange,
+  ANCHOR_ANOMALY_LOG_MESSAGE,
 } from '../pdfSplitter';
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'synthetic-payslips.pdf');
@@ -217,8 +218,8 @@ describe('splitCombinedPayslipPdf — anchor anomaly logging', () => {
       fs.readFileSync(path.join(__dirname, 'fixtures', 'synthetic-plain-paper-payslips.pdf'))
     );
 
-    const anchorWarnings = warn.mock.calls.filter(([msg]) =>
-      String(msg).includes('anchor label counts')
+    const anchorWarnings = warn.mock.calls.filter(
+      ([msg]) => msg === ANCHOR_ANOMALY_LOG_MESSAGE
     );
     expect(anchorWarnings).toEqual([]);
   });
@@ -245,8 +246,8 @@ describe('splitCombinedPayslipPdf — anchor anomaly logging', () => {
 
     await splitCombinedPayslipPdf(Buffer.from(await doc.save()));
 
-    const anchorWarnings = warn.mock.calls.filter(([msg]) =>
-      String(msg).includes('anchor label counts')
+    const anchorWarnings = warn.mock.calls.filter(
+      ([msg]) => msg === ANCHOR_ANOMALY_LOG_MESSAGE
     );
     expect(anchorWarnings).toHaveLength(1);
     expect(anchorWarnings[0]![1]).toMatchObject({ page: 1, layout: 'plain_paper' });

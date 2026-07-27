@@ -53,6 +53,14 @@ export interface ExtractedPayslipPage {
   layout: PayslipLayout;
 }
 
+/**
+ * Exported so the tests assert against this exact string rather than a
+ * substring of it — a filter on reworded prose passes vacuously, which would
+ * turn the "no anomalies on a good file" test into one that tests nothing.
+ */
+export const ANCHOR_ANOMALY_LOG_MESSAGE =
+  '[payslips/pdfSplitter] unexpected anchor label counts on page — extracted values may be wrong';
+
 export interface SplitResult {
   pages: ExtractedPayslipPage[];
   /** Period inferred from the first page's Payment Dt. yyyy-mm format. */
@@ -113,10 +121,11 @@ export async function splitCombinedPayslipPdf(buffer: Buffer): Promise<SplitResu
     // checking by hand.
     const anchorAnomalies = findAnchorAnomalies(rawText, layout);
     if (anchorAnomalies.length > 0) {
-      log.warn(
-        '[payslips/pdfSplitter] unexpected anchor label counts on page — extracted values may be wrong',
-        { page: i + 1, layout, labels: anchorAnomalies }
-      );
+      log.warn(ANCHOR_ANOMALY_LOG_MESSAGE, {
+        page: i + 1,
+        layout,
+        labels: anchorAnomalies,
+      });
     }
 
     pages.push({
