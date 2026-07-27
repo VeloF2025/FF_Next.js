@@ -50,20 +50,30 @@ describe('hasAnyCredential', () => {
     expect(hasAnyCredential(req({ cookie: 'jwt.value.here' }))).toBe(true);
   });
 
-  it('accepts the staff-portal session cookie', () => {
-    // Two session systems exist. Missing this one would flag every authenticated
-    // /api/my request (49 routes: attendance, payslips, receipts, stores) as anonymous
-    // and drown the real signal in false positives.
-    expect(hasAnyCredential(req({ cookie: 'portal.jwt', cookieName: 'ff_portal_session' }))).toBe(true);
-    expect(wouldDenyApiRequest('/api/my/attendance', req({ cookie: 'p', cookieName: 'ff_portal_session' }))).toBe(false);
+  it('accepts BOTH portal session cookies — they are different systems', () => {
+    // ff_my_session is the STAFF portal (withMySession, ~49 routes under /api/my:
+    // attendance, payslips, receipts, stores). ff_portal_session is the FLEET portal.
+    // An earlier revision listed only the fleet cookie and claimed it was the staff one;
+    // the test passed because it asserted against a cookie /api/my never receives, while
+    // production would have logged every real staff request as anonymous.
+    expect(hasAnyCredential(req({ cookie: 'my.jwt', cookieName: 'ff_my_session' }))).toBe(true);
+    expect(hasAnyCredential(req({ cookie: 'fleet.jwt', cookieName: 'ff_portal_session' }))).toBe(true);
+  });
+
+  it('does not flag real staff-portal traffic', () => {
+    // The routes withMySession actually gates, with the cookie it actually sets.
+    for (const p of ['/api/my/attendance/clock-in', '/api/my/payslips', '/api/my/receipts', '/api/my/hub-summary']) {
+      expect(wouldDenyApiRequest(p, req({ cookie: 'm', cookieName: 'ff_my_session' })), p).toBe(false);
+    }
   });
 
   it('accepts a bearer token', () => {
     expect(hasAnyCredential(req({ headers: { authorization: 'Bearer abc' } }))).toBe(true);
   });
 
-  it('accepts a service secret header', () => {
+  it('accepts a service secret header that the codebase actually reads', () => {
     expect(hasAnyCredential(req({ headers: { 'x-cron-secret': 's' } }))).toBe(true);
+    expect(hasAnyCredential(req({ headers: { 'x-api-key': 'k' } }))).toBe(true);
   });
 
   it('rejects an empty or absent credential', () => {
@@ -87,7 +97,9 @@ describe('wouldDenyApiRequest', () => {
     expect(wouldDenyApiRequest('/api/health', req())).toBe(false);
     expect(wouldDenyApiRequest('/api/auth/login', req())).toBe(false);
     // MCP transport must stay anonymous so the upstream can issue its own 401 challenge.
-    expect(wouldDenyApiRequest('/api/ff-remote-mcp/mcp', req())).toBe(false);
+    expect(wouldDenyApiRequest('/api/cortex-remote-mcp/mcp', req())).toBe(false);
+    // Shared snag links are public by design — the URL token is the credential.
+    expect(wouldDenyApiRequest('/api/snags/shared/abc123', req())).toBe(false);
   });
 
   it('ignores non-API paths entirely', () => {

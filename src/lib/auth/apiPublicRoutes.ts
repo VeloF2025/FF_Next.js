@@ -16,15 +16,23 @@
  */
 
 /**
- * Every cookie that represents a logged-in caller.
+ * Every cookie that represents a logged-in caller. There are THREE separate session
+ * systems in this app, and each one missed here becomes a flood of false positives:
  *
- * There are TWO session systems, and missing the second one would have made this audit
- * worse than useless: `ff_auth_token` is the main app (src/lib/auth), `ff_portal_session`
- * is the staff portal behind `withMySession` (49 routes under /api/my — time & attendance,
- * payslips, receipts, stores). Checking only the first would have flagged every
- * authenticated staff-portal request as anonymous and drowned the real signal.
+ *   ff_auth_token      main app            src/lib/auth (withAuth / requireAuth)
+ *   ff_my_session      staff portal        withMySession — ~49 routes under /api/my
+ *                                          (attendance, payslips, receipts, stores);
+ *                                          MY_SESSION_COOKIE in
+ *                                          src/modules/attendance/portal/sessionUtils.ts
+ *   ff_portal_session  FLEET portal        PORTAL_SESSION_COOKIE in
+ *                                          src/modules/fleet/portal/createPortalSession.ts
+ *
+ * The middle and last are easy to confuse — sessionUtils.ts even carries a comment
+ * distinguishing them. Getting that wrong does not fail loudly: it produces a plausible
+ * dataset saying the staff portal is hammered by anonymous traffic, which would argue for
+ * allowlisting /api/my outright. Exactly backwards.
  */
-const SESSION_COOKIES = ['ff_auth_token', 'ff_portal_session'] as const;
+const SESSION_COOKIES = ['ff_auth_token', 'ff_my_session', 'ff_portal_session'] as const;
 
 /**
  * Prefixes that must stay reachable anonymously, with the reason each one is here.
@@ -42,7 +50,7 @@ export const PUBLIC_API_PREFIXES: ReadonlyArray<{ prefix: string; why: string }>
   { prefix: '/api/noc/webhooks', why: 'inbound provider callbacks (QContact) — no session to present' },
   { prefix: '/api/communications/whatsapp/cloud-webhook', why: 'Meta WhatsApp Cloud webhook — signature-verified, not session-verified' },
   { prefix: '/api/cortex-remote-mcp', why: 'MCP transport; the upstream OAuth server must issue its own 401 challenge' },
-  { prefix: '/api/ff-remote-mcp', why: 'MCP transport; same as above' },
+  { prefix: '/api/snags/shared', why: 'public subcontractor snag links; the URL share token IS the credential (pages/api/snags/shared/[token].ts)' },
 ];
 
 /** True when the path is one the app intends to serve without a user session. */
@@ -74,7 +82,9 @@ export function hasAnyCredential(req: {
   const authorization = req.headers.get('authorization');
   if (authorization && authorization.trim() !== '') return true;
 
-  for (const header of ['x-internal-secret', 'x-api-key', 'x-cron-secret', 'x-ff-mcp-secret']) {
+  // Only headers this codebase actually reads. Speculative entries would be dead OR
+  // branches that quietly widen what counts as "credentialed".
+  for (const header of ['x-api-key', 'x-cron-secret']) {
     const value = req.headers.get(header);
     if (value && value.trim() !== '') return true;
   }

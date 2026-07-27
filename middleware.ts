@@ -322,12 +322,22 @@ export async function middleware(request: NextRequest) {
     // opt-in. An audit on 2026-07-27 found 50 mutating App Router routes reachable with
     // no credential — five of which served NOC ticket CRUD to anonymous callers in
     // production until PR #2255.
-    if (wouldDenyApiRequest(pathname, request)) {
-      edgeLog('warn', 'api-auth-audit: anonymous request to non-public API route', {
-        auditMode: 'log-only',
-        method: request.method,
+    // try/catch matches edgeLog's own convention above: nothing in the observability
+    // path may ever break a request. The helpers are pure string work today, but this
+    // is cheap insurance against a future edit that is not.
+    try {
+      if (wouldDenyApiRequest(pathname, request)) {
+        edgeLog('warn', 'api-auth-audit: anonymous request to non-public API route', {
+          auditMode: 'log-only',
+          method: request.method,
+          path: pathname,
+          mutating: request.method !== 'GET' && request.method !== 'HEAD',
+        });
+      }
+    } catch (err) {
+      edgeLog('warn', 'api-auth-audit: audit check failed (request unaffected)', {
         path: pathname,
-        mutating: request.method !== 'GET' && request.method !== 'HEAD',
+        error: err instanceof Error ? err.message : String(err),
       });
     }
 
