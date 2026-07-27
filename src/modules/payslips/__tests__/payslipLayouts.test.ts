@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
   detectLayout,
   extractFields,
-  findDuplicateAnchors,
+  findAnchorAnomalies,
 } from '../payslipLayouts';
 
 /** Plain Paper, short name that fits inline next to the label. */
@@ -184,12 +184,36 @@ describe('extractFields — Plain Paper layout', () => {
   });
 });
 
-describe('findDuplicateAnchors', () => {
+describe('findAnchorAnomalies', () => {
   it('reports nothing for the well-formed sample pages', () => {
-    expect(findDuplicateAnchors(PLAIN_INLINE, 'plain_paper')).toEqual([]);
-    expect(findDuplicateAnchors(PLAIN_WRAPPED, 'plain_paper')).toEqual([]);
-    expect(findDuplicateAnchors(PLAIN_NO_ID, 'plain_paper')).toEqual([]);
-    expect(findDuplicateAnchors(VIP_SAMPLE, 'vip')).toEqual([]);
+    expect(findAnchorAnomalies(PLAIN_INLINE, 'plain_paper')).toEqual([]);
+    expect(findAnchorAnomalies(PLAIN_WRAPPED, 'plain_paper')).toEqual([]);
+    expect(findAnchorAnomalies(PLAIN_NO_ID, 'plain_paper')).toEqual([]);
+    expect(findAnchorAnomalies(VIP_SAMPLE, 'vip')).toEqual([]);
+  });
+
+  it('flags a new "Employee …" field that the name span would swallow', () => {
+    // The name is bounded by "Employee Code" … "Employee". If a future Sage
+    // template adds any other field whose label starts with that word, the
+    // span absorbs it and the surname becomes part of the new field's value —
+    // while both bounding anchors still occur exactly once each, so only the
+    // bare-word count notices.
+    const withNewField = [
+      'AC077\tEmployee Code\t',
+      'SIPHO NKOSI',
+      '(SIPHO)',
+      'Permanent\tEmployee Type',
+      'Employee',
+      '2026/07/31\tPay Date\tAcme Demo (Pty) Ltd',
+      '20 000.00\tTotal earnings',
+      '18 000.00\tNett pay',
+    ].join('\n');
+
+    expect(findAnchorAnomalies(withNewField, 'plain_paper')).toEqual([
+      'Employee (bare label)',
+    ]);
+    // Demonstrates why the flag matters: the name really is corrupted here.
+    expect(extractFields(withNewField, 'plain_paper').lastName).not.toBe('nkosi');
   });
 
   it('reports an anchor label that appears more than once', () => {
@@ -198,7 +222,7 @@ describe('findDuplicateAnchors', () => {
     // wrong figure silently. This is the signal that catches it.
     const doubled = `${PLAIN_INLINE}\n10 000.00\tNett pay`;
 
-    expect(findDuplicateAnchors(doubled, 'plain_paper')).toEqual(['Nett pay']);
+    expect(findAnchorAnomalies(doubled, 'plain_paper')).toEqual(['Nett pay']);
   });
 
   it('reports every duplicated anchor, not just the first', () => {
@@ -206,7 +230,7 @@ describe('findDuplicateAnchors', () => {
       '\n'
     );
 
-    expect(findDuplicateAnchors(doubled, 'plain_paper').sort()).toEqual([
+    expect(findAnchorAnomalies(doubled, 'plain_paper').sort()).toEqual([
       'Nett pay',
       'Total earnings',
     ]);
@@ -217,8 +241,8 @@ describe('findDuplicateAnchors', () => {
     // duplicating it must not raise a VIP warning.
     const doubled = `${VIP_SAMPLE}\nAC999\tEmployee Code\tAC998\tEmployee Code`;
 
-    expect(findDuplicateAnchors(doubled, 'vip')).toEqual([]);
-    expect(findDuplicateAnchors(`${VIP_SAMPLE}\nEmp Code  AC999`, 'vip')).toEqual([
+    expect(findAnchorAnomalies(doubled, 'vip')).toEqual([]);
+    expect(findAnchorAnomalies(`${VIP_SAMPLE}\nEmp Code  AC999`, 'vip')).toEqual([
       'Emp Code',
     ]);
   });
@@ -226,9 +250,9 @@ describe('findDuplicateAnchors', () => {
   it('is not left stateful by a previous call (global-regex lastIndex)', () => {
     const doubled = `${PLAIN_INLINE}\n10 000.00\tNett pay`;
 
-    expect(findDuplicateAnchors(doubled, 'plain_paper')).toEqual(['Nett pay']);
-    expect(findDuplicateAnchors(doubled, 'plain_paper')).toEqual(['Nett pay']);
-    expect(findDuplicateAnchors(PLAIN_INLINE, 'plain_paper')).toEqual([]);
+    expect(findAnchorAnomalies(doubled, 'plain_paper')).toEqual(['Nett pay']);
+    expect(findAnchorAnomalies(doubled, 'plain_paper')).toEqual(['Nett pay']);
+    expect(findAnchorAnomalies(PLAIN_INLINE, 'plain_paper')).toEqual([]);
   });
 });
 

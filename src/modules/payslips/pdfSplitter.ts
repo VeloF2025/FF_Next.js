@@ -22,7 +22,7 @@ import { log } from '@/lib/logger';
 import {
   detectLayout,
   extractFields,
-  findDuplicateAnchors,
+  findAnchorAnomalies,
   type PayslipLayout,
 } from './payslipLayouts';
 
@@ -106,15 +106,16 @@ export async function splitCombinedPayslipPdf(buffer: Buffer): Promise<SplitResu
     const rawText = perPageText[i] ?? '';
     const layout = detectLayout(rawText);
 
-    // Extraction takes the first match for each anchor, so a label appearing
-    // twice means the figure we read may not be the one a human would. Never
-    // seen on the templates we support — if it fires, the payroll export
-    // changed shape and the amounts on this page want checking by hand.
-    const duplicateAnchors = findDuplicateAnchors(rawText, layout);
-    if (duplicateAnchors.length > 0) {
+    // Extraction takes the first match for each anchor, so an anchor occurring
+    // more often than the known templates produce means the value we read may
+    // not be the one a human would. Never fires on the templates we support —
+    // if it does, the payroll export changed shape and this page wants
+    // checking by hand.
+    const anchorAnomalies = findAnchorAnomalies(rawText, layout);
+    if (anchorAnomalies.length > 0) {
       log.warn(
-        '[payslips/pdfSplitter] duplicate anchor labels on page — extracted amounts may be wrong',
-        { page: i + 1, layout, labels: duplicateAnchors }
+        '[payslips/pdfSplitter] unexpected anchor label counts on page — extracted values may be wrong',
+        { page: i + 1, layout, labels: anchorAnomalies }
       );
     }
 

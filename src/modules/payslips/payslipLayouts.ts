@@ -21,6 +21,8 @@
  * loosely is how you silently import the wrong number.
  */
 
+import { matchOne, parseRandToCents, splitName } from './payslipParsing';
+
 export type PayslipLayout = 'vip' | 'plain_paper';
 
 export interface ExtractedFields {
@@ -48,48 +50,6 @@ export function extractFields(text: string, layout: PayslipLayout): ExtractedFie
   return layout === 'plain_paper' ? extractPlainPaper(text) : extractVip(text);
 }
 
-/**
- * The labels each layout anchors a field on. Extraction takes the *first*
- * match, so a label appearing twice means the value picked may not be the one
- * a human would read off the page.
- *
- * Sources are `.match()`-only — never `.test()` — because a shared /g regex
- * carries `lastIndex` between `.test()` calls and would report duplicates
- * intermittently.
- */
-const ANCHOR_LABELS: Record<PayslipLayout, ReadonlyArray<readonly [string, RegExp]>> = {
-  plain_paper: [
-    ['Employee Code', /Employee\s+Code\b/gi],
-    ['Identity Number', /Identity\s+Number\b/gi],
-    ['Pay Date', /Pay\s+Date\b/gi],
-    ['Total earnings', /Total\s+earnings\b/gi],
-    ['Nett pay', /Nett\s+pay\b/gi],
-  ],
-  vip: [
-    ['Emp Code', /Emp\s*Code\b/gi],
-    ['Emp Name', /Emp\s*Name\b/gi],
-    ['Id Number', /Id\s*Number\b/gi],
-    ['Payment Dt', /Payment\s*Dt\b/gi],
-    ['Total Earnings', /Total\s+Earnings\b/gi],
-  ],
-};
-
-/**
- * Labels that occur more than once on a page. Always empty for the templates
- * we know about — Velocity's July 2026 export has zero across all 42 pages —
- * so a non-empty result means the payroll template changed shape and the
- * first-match-wins extraction may now be reading the wrong number.
- *
- * This exists because the July 2026 breakage came from exactly that: a Sage
- * template change that the parser had no way to announce. Callers log it;
- * nothing here throws, since a duplicate label is a suspicion, not proof.
- */
-export function findDuplicateAnchors(text: string, layout: PayslipLayout): string[] {
-  return ANCHOR_LABELS[layout]
-    .filter(([, pattern]) => (text.match(pattern) ?? []).length > 1)
-    .map(([label]) => label);
-}
-
 // ─── Plain Paper (current) ───────────────────────────────────────────
 
 /**
@@ -99,31 +59,40 @@ export function findDuplicateAnchors(text: string, layout: PayslipLayout): strin
  * inside the number — but deliberately NOT `\s`, which would let the capture
  * bridge a tab or newline and pick up a number from the neighbouring column.
  */
-const AMOUNT_BEFORE_TOTAL_EARNINGS =
+const PLAIN_TOTAL_EARNINGS =
   /([\d,\u00a0\u202f ]+\.\d{2})[\u00a0\u202f ]*\t[ ]*Total\s+earnings\b/i;
-const AMOUNT_BEFORE_NETT_PAY =
+const PLAIN_NETT_PAY =
   /([\d,\u00a0\u202f ]+\.\d{2})[\u00a0\u202f ]*\t[ ]*Nett\s+pay\b/i;
 
-function extractPlainPaper(text: string): ExtractedFields {
-  // Anchor every value on the label that follows it. The tab is required —
-  // it is what separates the value cell from the label cell, and without it
-  // a bare number on the preceding line could be picked up instead.
-  const empCode = matchOne(
-    text,
-    /(?:^|\t)[ ]*([A-Za-z0-9][A-Za-z0-9-]*)[ ]*\t[ ]*Employee\s+Code\b/im
-  );
-  const idNumber = matchOne(text, /(\d{13})[ ]*\t[ ]*Identity\s+Number\b/i);
-  const paymentDate = matchOne(
-    text,
-    /(\d{4}\/\d{2}\/\d{2})[ ]*\t[ ]*Pay\s+Date\b/i
-  );
+// The tab is required in each of these - it is what separates the value cell
+// from the label cell, and without it a bare number on the preceding line
+// could be picked up instead.
+const PLAIN_EMP_CODE =
+  /(?:^|\t)[ ]*([A-Za-z0-9][A-Za-z0-9-]*)[ ]*\t[ ]*Employee\s+Code\b/im;
+const PLAIN_ID_NUMBER = /(\d{13})[ ]*\t[ ]*Identity\s+Number\b/i;
+const PLAIN_PAY_DATE = /(\d{4}\/\d{2}\/\d{2})[ ]*\t[ ]*Pay\s+Date\b/i;
 
-  // "Total earnings" — never "Taxable earnings", which is the YTD figure and
+/**
+ * The bare "Employee" label that closes the name block. Anchored to the end of
+ * its line: "Employee" also occurs inside "Employee Code", and a future
+ * template could add an "Employee Type"/"Employee Status" field - a plain
+ * `\bEmployee\b` terminator would stop at whichever came first and silently
+ * truncate the name. Confirmed line-final on all 42 pages of the July export.
+ */
+const PLAIN_NAME_END = /\bEmployee[ \t]*$/im;
+
+/** The name block: everything between the code label and that terminator. */
+const PLAIN_NAME_SPAN = /Employee\s+Code\b([\s\S]{0,120}?)\bEmployee[ \t]*$/im;
+
+function extractPlainPaper(text: string): ExtractedFields {
+  const empCode = matchOne(text, PLAIN_EMP_CODE);
+  const idNumber = matchOne(text, PLAIN_ID_NUMBER);
+  const paymentDate = matchOne(text, PLAIN_PAY_DATE);
+
+  // "Total earnings" - never "Taxable earnings", which is the YTD figure and
   // is larger, so a loose anchor imports a wildly wrong gross.
-  const totalEarningsCents = parseRandToCents(
-    matchOne(text, AMOUNT_BEFORE_TOTAL_EARNINGS)
-  );
-  const nettPayCents = parseRandToCents(matchOne(text, AMOUNT_BEFORE_NETT_PAY));
+  const totalEarningsCents = parseRandToCents(matchOne(text, PLAIN_TOTAL_EARNINGS));
+  const nettPayCents = parseRandToCents(matchOne(text, PLAIN_NETT_PAY));
 
   // Derived, not read off the page — same as VIP. `commitImport` relies on
   // deductions being null only when earnings or nett is also null (it defaults
@@ -159,7 +128,7 @@ function extractPlainPaper(text: string): ExtractedFields {
  * missing its "Employee" label yields null rather than half the payslip.
  */
 function extractPlainPaperName(text: string): string | null {
-  const m = text.match(/Employee\s+Code\b([\s\S]{0,120}?)\bEmployee\b/i);
+  const m = text.match(PLAIN_NAME_SPAN);
   if (!m?.[1]) return null;
   const cleaned = m[1]
     .replace(/\([^)]*\)/g, ' ')
@@ -170,17 +139,19 @@ function extractPlainPaperName(text: string): string | null {
 
 // ─── VIP (legacy) ────────────────────────────────────────────────────
 
+const VIP_EMP_CODE = /Emp\s*Code\s+([A-Z0-9-]+)/i;
+const VIP_EMP_NAME =
+  /Emp\s*Name\s+([A-Za-z][A-Za-z .'-]+?)(?:\s{2,}|\n|\s+Emp\s|\s+Job\s|\s+Id\s|\s+Co\.|\s+Paypoint|$)/i;
+const VIP_ID_NUMBER = /Id\s*Number\s+(\d{13})/i;
+const VIP_PAYMENT_DT = /Payment\s*Dt\s+(\d{4}\/\d{2}\/\d{2})/i;
+const VIP_TOTAL_EARNINGS = /Total\s+Earnings\s+([\d,]+\.\d{2})/i;
+
 function extractVip(text: string): ExtractedFields {
-  const empCode = matchOne(text, /Emp\s*Code\s+([A-Z0-9-]+)/i);
-  const empName = matchOne(
-    text,
-    /Emp\s*Name\s+([A-Za-z][A-Za-z .'-]+?)(?:\s{2,}|\n|\s+Emp\s|\s+Job\s|\s+Id\s|\s+Co\.|\s+Paypoint|$)/i
-  );
-  const idNumber = matchOne(text, /Id\s*Number\s+(\d{13})/i);
-  const paymentDate = matchOne(text, /Payment\s*Dt\s+(\d{4}\/\d{2}\/\d{2})/i);
-  const totalEarningsCents = parseRandToCents(
-    matchOne(text, /Total\s+Earnings\s+([\d,]+\.\d{2})/i)
-  );
+  const empCode = matchOne(text, VIP_EMP_CODE);
+  const empName = matchOne(text, VIP_EMP_NAME);
+  const idNumber = matchOne(text, VIP_ID_NUMBER);
+  const paymentDate = matchOne(text, VIP_PAYMENT_DT);
+  const totalEarningsCents = parseRandToCents(matchOne(text, VIP_TOTAL_EARNINGS));
 
   // pdfjs returns text items in positional order, which interleaves the
   // earnings (left) and deductions (right) columns differently for each
@@ -228,46 +199,71 @@ function extractVip(text: string): ExtractedFields {
   };
 }
 
-// ─── Shared helpers ──────────────────────────────────────────────────
-
-/**
- * First initial + last name, which is what `staffMatcher` falls back to when
- * neither payroll code nor ID number resolves. Handles VIP's "Mr A Smith"
- * and Plain Paper's "PIETER JOHANNES VAN NIEKERK" alike.
- */
-function splitName(empName: string | null): {
-  firstInitial: string | null;
-  lastName: string | null;
-} {
-  if (!empName) return { firstInitial: null, lastName: null };
-  const tokens = empName
-    .replace(/^(Mr|Mrs|Ms|Miss|Dr)\.?\s+/i, '')
-    .trim()
-    .split(/\s+/);
-
-  const firstToken = tokens[0];
-  const firstInitial = firstToken
-    ? firstToken.replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase() || null
-    : null;
-  const lastName = tokens.length >= 2 ? tokens[tokens.length - 1]!.toLowerCase() : null;
-  return { firstInitial, lastName };
-}
-
-function matchOne(text: string, re: RegExp): string | null {
-  const m = text.match(re);
-  return m && m[1] ? m[1].trim() : null;
+/** Same pattern, forced global, for counting occurrences. */
+function globalise(re: RegExp): RegExp {
+  return re.flags.includes('g') ? re : new RegExp(re.source, `${re.flags}g`);
 }
 
 /**
- * "21,400.88" (VIP) and "25 000.00" (Plain Paper) both become cents.
- * Non-breaking and narrow no-break spaces are stripped too — some PDF
- * generators use them as the thousands separator.
+ * Every anchor the extractors actually depend on, paired with the *same*
+ * regex the extractor uses. Reusing the extraction patterns is deliberate: a
+ * hand-maintained list of label strings drifts away from the regexes it is
+ * meant to describe, and a missed anchor is a blind spot precisely where the
+ * check is supposed to see.
+ *
+ * Counting the full pattern (amount, tab and label — not the bare label) also
+ * keeps the check quiet: prose that merely mentions "Nett pay" cannot be
+ * mistaken for a second extractable value.
  */
-function parseRandToCents(raw: string | null): number | null {
-  if (raw === null) return null;
-  const cleaned = raw.replace(/[\s,]/g, '');
-  if (cleaned === '') return null;
-  const num = Number(cleaned);
-  if (!Number.isFinite(num)) return null;
-  return Math.round(num * 100);
+interface AnchorSpec {
+  readonly label: string;
+  /** Global twin of the extractor's own pattern. */
+  readonly pattern: RegExp;
+  /** How many times the known templates match it. More than this = drift. */
+  readonly expected: number;
+}
+
+const ANCHORS: Record<PayslipLayout, readonly AnchorSpec[]> = {
+  plain_paper: [
+    { label: 'Employee Code', pattern: globalise(PLAIN_EMP_CODE), expected: 1 },
+    { label: 'Employee (name terminator)', pattern: globalise(PLAIN_NAME_END), expected: 1 },
+    // The bare word, which the name span is bounded by. Two occurrences are
+    // normal: one inside "Employee Code", one as the terminator. A third means
+    // the template grew another "Employee …" field (e.g. "Employee Type")
+    // between them — the name span would then swallow it, and neither of the
+    // two anchors above would notice, because neither one changed count.
+    { label: 'Employee (bare label)', pattern: /\bEmployee\b/gi, expected: 2 },
+    { label: 'Identity Number', pattern: globalise(PLAIN_ID_NUMBER), expected: 1 },
+    { label: 'Pay Date', pattern: globalise(PLAIN_PAY_DATE), expected: 1 },
+    { label: 'Total earnings', pattern: globalise(PLAIN_TOTAL_EARNINGS), expected: 1 },
+    { label: 'Nett pay', pattern: globalise(PLAIN_NETT_PAY), expected: 1 },
+  ],
+  vip: [
+    { label: 'Emp Code', pattern: globalise(VIP_EMP_CODE), expected: 1 },
+    { label: 'Emp Name', pattern: globalise(VIP_EMP_NAME), expected: 1 },
+    { label: 'Id Number', pattern: globalise(VIP_ID_NUMBER), expected: 1 },
+    { label: 'Payment Dt', pattern: globalise(VIP_PAYMENT_DT), expected: 1 },
+    { label: 'Total Earnings', pattern: globalise(VIP_TOTAL_EARNINGS), expected: 1 },
+  ],
+};
+
+/**
+ * Anchors occurring more often than the known templates produce. Always empty
+ * for the templates we support — zero across all 42 pages of the July 2026
+ * Plain Paper export and all 25 of the March VIP export — so a non-empty
+ * result means the payroll template changed shape and extraction may now be
+ * reading something other than what a human would read off the page.
+ *
+ * This exists because the July 2026 breakage was exactly that: a Sage template
+ * change the parser had no way to announce. Callers log it; nothing here
+ * throws, since an extra match is a suspicion, not proof, and blocking payroll
+ * on a heuristic is worse than flagging it.
+ *
+ * Uses `.match()`, never `.test()` — a shared /g regex carries `lastIndex`
+ * between `.test()` calls and would report anomalies intermittently.
+ */
+export function findAnchorAnomalies(text: string, layout: PayslipLayout): string[] {
+  return ANCHORS[layout]
+    .filter(({ pattern, expected }) => (text.match(pattern) ?? []).length > expected)
+    .map(({ label }) => label);
 }
