@@ -14,6 +14,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { checkContractorGate } from '@/modules/health-safety/services/gateService';
 import { computeContractorMedicalSummary } from '@/modules/health-safety/services/medicalService';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
+import type { ContractorMedicalSummary } from '@/modules/health-safety/types/medical.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -67,6 +68,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     log.error('[H&S Gate Check API] Error', { error });
     return apiResponse.internalError(res, error);
   }
+}
+
+/**
+ * Panel summary for the medical check. A restricted or expiring-soon worker
+ * does not fail the check, but saying "all workers medically fit" while one is
+ * fit only with restrictions would mislead the reader — so those are called out
+ * even on the passing path.
+ */
+function medicalMessage(medical: ContractorMedicalSummary, passed: boolean): string {
+  if (medical.workers_with_medicals === 0) return 'No medical fitness records on file';
+  if (!passed) return `${medical.unfit} unfit, ${medical.expired} expired certificate(s)`;
+
+  const caveats: string[] = [];
+  if (medical.restricted > 0) caveats.push(`${medical.restricted} fit with restrictions`);
+  if (medical.expiring_soon > 0) caveats.push(`${medical.expiring_soon} expiring soon`);
+  return caveats.length > 0
+    ? `All certificates current (${caveats.join(', ')})`
+    : 'All workers medically fit with current certificates';
 }
 
 async function getGateBreakdown(contractorId: string) {
@@ -163,12 +182,7 @@ async function getGateBreakdown(contractorId: string) {
       expired: medical.expired,
       expiring_soon: medical.expiring_soon,
       restricted: medical.restricted,
-      message:
-        medical.workers_with_medicals === 0
-          ? 'No medical fitness records on file'
-          : medicalPassed
-            ? 'All workers medically fit with current certificates'
-            : `${medical.unfit} unfit, ${medical.expired} expired certificate(s)`,
+      message: medicalMessage(medical, medicalPassed),
     },
     overall: {
       passed:
