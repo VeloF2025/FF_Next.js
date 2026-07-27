@@ -12,6 +12,7 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { checkContractorGate } from '@/modules/health-safety/services/gateService';
+import { computeContractorMedicalSummary } from '@/modules/health-safety/services/medicalService';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
@@ -121,6 +122,11 @@ async function getGateBreakdown(contractorId: string) {
   // Training check (simplified)
   const trainingPassed = true; // Would check actual training records
 
+  // Per-worker medical fitness (migration 463). Same rollup the gate verdict
+  // uses, so this panel cannot disagree with `gate.blocking_reasons`.
+  const medical = await computeContractorMedicalSummary(contractorId);
+  const medicalPassed = medical.unfit === 0 && medical.expired === 0;
+
   return {
     documents: {
       passed: docsPassed,
@@ -150,12 +156,31 @@ async function getGateBreakdown(contractorId: string) {
       passed: trainingPassed,
       message: trainingPassed ? 'Training requirements met' : 'Missing required training',
     },
+    medical: {
+      passed: medicalPassed,
+      workers_with_medicals: medical.workers_with_medicals,
+      unfit: medical.unfit,
+      expired: medical.expired,
+      expiring_soon: medical.expiring_soon,
+      restricted: medical.restricted,
+      message:
+        medical.workers_with_medicals === 0
+          ? 'No medical fitness records on file'
+          : medicalPassed
+            ? 'All workers medically fit with current certificates'
+            : `${medical.unfit} unfit, ${medical.expired} expired certificate(s)`,
+    },
     overall: {
-      passed: docsPassed && incidentsPassed && scorePassed && ragPassed && trainingPassed,
-      checks_passed: [docsPassed, incidentsPassed, scorePassed && ragPassed, trainingPassed].filter(
-        Boolean
-      ).length,
-      checks_total: 4,
+      passed:
+        docsPassed && incidentsPassed && scorePassed && ragPassed && trainingPassed && medicalPassed,
+      checks_passed: [
+        docsPassed,
+        incidentsPassed,
+        scorePassed && ragPassed,
+        trainingPassed,
+        medicalPassed,
+      ].filter(Boolean).length,
+      checks_total: 5,
     },
   };
 }

@@ -28,6 +28,7 @@ import {
   AlertCircle,
   ClipboardCheck,
   GraduationCap,
+  HeartPulse,
   Megaphone,
   HardHat,
   FileCheck,
@@ -170,6 +171,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'Training',
           icon: GraduationCap,
           path: '/projects/health-safety/training',
+        },
+        {
+          id: 'medicals',
+          label: 'Medical Fitness',
+          icon: HeartPulse,
+          path: '/projects/health-safety/medicals',
         },
         {
           id: 'toolbox',
