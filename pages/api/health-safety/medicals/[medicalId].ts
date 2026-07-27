@@ -144,9 +144,11 @@ async function handlePatch(medicalId: string, req: NextApiRequest, res: NextApiR
     RETURNING *, exam_date::text AS exam_date, expiry_date::text AS expiry_date
   `;
   if (rows.length === 0) {
+    // Zero rows means the token no longer matches — the row was either edited
+    // or deleted since the SELECT above, so the message must cover both.
     return apiResponse.conflict(
       res,
-      'This medical record was changed by someone else while you were editing it — reload and reapply your change'
+      'This medical record was changed or removed by someone else while you were editing it — reload and reapply your change'
     );
   }
   const record = rows[0]!;
