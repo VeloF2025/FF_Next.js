@@ -11,7 +11,8 @@
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 
-import { BODY_TOO_LARGE, MAX_PROXY_BODY_BYTES, readCappedBody } from '@/lib/mcp/proxyStream';
+import { PassThrough } from 'node:stream';
+import { BODY_TOO_LARGE, MAX_PROXY_BODY_BYTES, pipeUpstreamResponse, readCappedBody } from '@/lib/mcp/proxyStream';
 
 /** A body that never ends, counting how much was actually pulled from it. */
 function endlessBody(method = 'POST') {
@@ -71,5 +72,68 @@ describe('readCappedBody', () => {
 
   it('defaults to a cap far above real MCP traffic but well below "unbounded"', () => {
     expect(MAX_PROXY_BODY_BYTES).toBe(4 * 1024 * 1024);
+  });
+});
+
+/** A web ReadableStream emitting the given chunks, like fetch's `upstream.body`. */
+function webStream(chunks: Uint8Array[]): ReadableStream<Uint8Array> {
+  let i = 0;
+  return new ReadableStream({
+    pull(controller) {
+      if (i < chunks.length) controller.enqueue(chunks[i++]!);
+      else controller.close();
+    },
+  });
+}
+
+/** A PassThrough standing in for NextApiResponse, collecting what was written. */
+function collectingRes() {
+  const sink = new PassThrough();
+  const received: Buffer[] = [];
+  sink.on('data', (c) => received.push(Buffer.from(c)));
+  return { res: sink as never, received, sink };
+}
+
+describe('pipeUpstreamResponse', () => {
+  it('streams the upstream body through without buffering it whole', async () => {
+    const chunks = [Buffer.from('hello '), Buffer.from('world')].map((b) => new Uint8Array(b));
+    const { res, received } = collectingRes();
+
+    await pipeUpstreamResponse({ body: webStream(chunks), arrayBuffer: async () => new ArrayBuffer(0) }, res);
+
+    expect(Buffer.concat(received).toString()).toBe('hello world');
+  });
+
+  it('settles rather than hanging when the upstream body is empty', async () => {
+    // The promise must always settle — a pending promise here hangs the request handler.
+    const { res, received } = collectingRes();
+
+    await pipeUpstreamResponse({ body: webStream([]), arrayBuffer: async () => new ArrayBuffer(0) }, res);
+
+    expect(Buffer.concat(received).length).toBe(0);
+  });
+
+  it('falls back to a buffered send when there is no stream at all', async () => {
+    const payload = new TextEncoder().encode('{"ok":true}');
+    const received: Buffer[] = [];
+    const res = { send: (b: Buffer) => { received.push(b); } } as never;
+
+    await pipeUpstreamResponse({ body: null, arrayBuffer: async () => payload.buffer }, res);
+
+    expect(Buffer.concat(received).toString()).toBe('{"ok":true}');
+  });
+
+  it('rejects instead of hanging when the upstream stream errors mid-flight', async () => {
+    const failing = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(Buffer.from('partial')));
+        controller.error(new Error('upstream exploded'));
+      },
+    });
+    const { res } = collectingRes();
+
+    await expect(
+      pipeUpstreamResponse({ body: failing, arrayBuffer: async () => new ArrayBuffer(0) }, res),
+    ).rejects.toThrow(/upstream exploded/);
   });
 });
