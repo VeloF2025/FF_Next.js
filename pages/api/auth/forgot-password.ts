@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { generateResetToken } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
+import { resolveSmtpTransportSecurity } from '@/lib/smtpConfig';
 
 const logger = createLogger('forgot-password');
 
@@ -87,12 +88,9 @@ async function sendResetEmail(
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      // Port 465 is implicit TLS, so it must connect secure. Deriving this from the
-      // port (as src/modules/receipts/email.ts does) means a missing SMTP_SECURE
-      // can't silently produce a plaintext connect to 465, which hangs until the
-      // greeting times out and drops the reset email.
-      secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+      // Port and TLS mode are resolved together so they cannot diverge — a
+      // missing SMTP_SECURE must not produce a plaintext connect to 465.
+      ...resolveSmtpTransportSecurity(),
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
