@@ -64,8 +64,15 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     WITH ranked AS (
       SELECT
         m.*,
+        -- Partitioned by (contractor, worker), NOT by worker alone, so that
+        -- ?contractor_id=X&latest_only=true returns exactly the rows the gate
+        -- scores for X (medicalService applies DISTINCT ON per worker AFTER
+        -- filtering to the contractor). Ranking globally would let a
+        -- certificate submitted under a different contractor mark X's own
+        -- current certificate as superseded, and the list would then disagree
+        -- with the gate panel. Backed by hs_worker_medicals_worker_latest_idx.
         ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(m.staff_id, m.team_member_id)
+          PARTITION BY m.contractor_id, COALESCE(m.staff_id, m.team_member_id)
           ORDER BY m.exam_date DESC, m.created_at DESC
         ) = 1 AS is_latest
       FROM hs_worker_medicals m

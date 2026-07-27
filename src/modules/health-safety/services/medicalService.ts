@@ -22,6 +22,13 @@ const sql = neon(process.env.DATABASE_URL!);
 /**
  * Summarise a contractor's medical fitness position.
  *
+ * "Latest" is scoped to THIS contractor's rows (the filter runs before the
+ * DISTINCT ON): contractor_id on a medical row is the assertion "this
+ * certificate is evidence for that contractor", so a certificate captured under
+ * a different contractor must neither credit nor supersede this one. The list
+ * endpoint's `is_latest` uses the same (contractor, worker) partition, so the
+ * two surfaces always agree.
+ *
  * `workers_with_medicals = 0` means there is no medical data on file at all —
  * which must NOT block the gate, matching the pre-existing "absence of data is
  * not evidence of non-compliance" semantics used by the training score.
