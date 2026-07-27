@@ -46,7 +46,7 @@ import psycopg2.extras
 
 # Pure staleness arithmetic (no DB deps) — unit-tested/CI-gated by
 # scripts/test_qfield_gpkg_resolution.py.
-from qfield_gpkg_resolution import gpkg_sync_lag_days
+from qfield_gpkg_resolution import select_stale_gpkgs
 
 QFC_CONTAINER = "qfieldcloud-db-1"
 QFC_DB_USER = "qfieldcloud_db_admin"
@@ -114,21 +114,21 @@ def qfc_latest_dcim_upload():
     return latest
 
 
-def last_gpkg_sync(conn):
-    """{qfield_project_uuid(str): last successful GPKG scan(datetime)}.
+def gpkg_sync_rows(conn):
+    """One row PER REGISTERED GPKG: {qf_uuid, gpkg_path, last_version}.
 
-    MAX across gpkg_path rows: a project can have several registered GPKGs (civil +
-    optical), and one of them still advancing means the pipeline is alive for that
-    project. Taking MIN would flag every project whose optical audit finished months
-    ago; MAX only stays behind when NOTHING is advancing.
+    Deliberately NOT aggregated. An earlier version took MAX(last_synced_at) per
+    project and reported a single figure; measured against production that hid three
+    live multi-day freezes behind an actively-syncing sibling, because 8 of 9 projects
+    register two or more GPKGs. It also used last_synced_at, which the pending-rescan
+    path refreshes for an unchanged file — see gpkg_version_lag_days.
     """
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
-            SELECT qf_project_id::text AS qf_uuid, MAX(last_synced_at) AS last_synced
+            SELECT qf_project_id::text AS qf_uuid, gpkg_path, last_version
             FROM qfield_gpkg_sync_state
-            GROUP BY qf_project_id
         """)
-        return {r["qf_uuid"]: r["last_synced"] for r in cur.fetchall()}
+        return [dict(r) for r in cur.fetchall()]
 
 
 def linked_active_qfield_projects(conn):
@@ -195,10 +195,11 @@ def main():
     ap.add_argument("--threshold", type=int, default=20,
                     help="Min QFieldCloud DCIM photos before flagging a 0-ingested project (default 20)")
     ap.add_argument("--stale-days", type=float, default=3.0,
-                    help="Flag a project whose GPKG ingest is this many days behind its "
-                         "newest upstream photo (default 3). The ingest cron runs 4x/day, so "
-                         "anything past ~1 day is already abnormal; 3 absorbs a long weekend "
-                         "of crew inactivity without alerting.")
+                    help="Flag a GPKG whose ingested version is this many days older than the "
+                         "newest photo in its project (default 3). Crew inactivity cannot "
+                         "accumulate lag — both sides are upstream timestamps, so a finished "
+                         "site sits at ~0 forever. The margin absorbs a crew that photographs "
+                         "for a few days before re-uploading the GPKG.")
     ap.add_argument("--no-wa", action="store_true", help="Log only; do not post to WhatsApp")
     args = ap.parse_args()
 
@@ -222,9 +223,11 @@ def main():
     try:
         rows = linked_active_qfield_projects(conn)
         stuck = stuck_sync_projects(conn, args.threshold)
-        synced_at = last_gpkg_sync(conn)
+        sync_rows = gpkg_sync_rows(conn)
     finally:
         conn.close()
+
+    qf_name_by_uuid = {r["qf_uuid"]: r["qf_name"] for r in rows}
 
     # Extract gap: upstream photos in QFieldCloud but nothing in qfield_photo_validations.
     extract_gap = []
@@ -234,30 +237,26 @@ def main():
             extract_gap.append((r["ff_name"], r["qf_name"], src))
     extract_gap.sort(key=lambda x: x[2], reverse=True)
 
-    # Stale gap: extraction worked once but stopped advancing while photos kept arriving.
-    # Only projects with a sync-state row qualify — a project with none is either
-    # unregistered (already an EXTRACT-GAP) or has never run, and double-reporting it
-    # here would just be noise.
-    stale_gap = []
-    for r in rows:
-        qf_uuid = r["qf_uuid"]
-        if int(r["ingested"]) == 0 or qf_uuid not in synced_at:
-            continue
-        lag = gpkg_sync_lag_days(synced_at[qf_uuid], newest_upstream.get(qf_uuid))
-        if lag is not None and lag > args.stale_days:
-            stale_gap.append((r["ff_name"], r["qf_name"], lag, int(r["ingested"])))
-    stale_gap.sort(key=lambda x: x[2], reverse=True)
+    # Stale gap: a registered GPKG stopped advancing while photos kept arriving.
+    # Reported per FILE, and measured against the GPKG's own version rather than the
+    # last script run — see select_stale_gpkgs / gpkg_version_lag_days for why both
+    # of those matter (the earlier per-project last_synced_at form found 1 of 16).
+    stale_gap = [
+        (qf_name_by_uuid.get(qf_uuid, qf_uuid), path, lag)
+        for qf_uuid, path, lag in select_stale_gpkgs(sync_rows, newest_upstream, args.stale_days)
+    ]
 
     print(f"Coverage check: {len(rows)} linked/active QField project(s) examined, "
-          f"threshold={args.threshold}, stale-days={args.stale_days}. "
-          f"extract-gap={len(extract_gap)}, sync-gap={len(stuck)}, stale-gpkg={len(stale_gap)}.")
+          f"{len(sync_rows)} registered GPKG(s) tracked, threshold={args.threshold}, "
+          f"stale-days={args.stale_days}. extract-gap={len(extract_gap)}, "
+          f"sync-gap={len(stuck)}, stale-gpkg={len(stale_gap)}.")
     for ff_name, qf_name, src in extract_gap:
         print(f"  EXTRACT-GAP: {ff_name} ← {qf_name}: {src} photos upstream, 0 extracted")
     for ff_name, ingested in stuck:
         print(f"  SYNC-GAP: {ff_name}: {ingested} photos extracted, 0 on the dashboard (pole_qa_photos empty)")
-    for ff_name, qf_name, lag, ingested in stale_gap:
-        print(f"  STALE-GPKG: {ff_name} ← {qf_name}: last GPKG sync is {lag:.1f}d behind the "
-              f"newest field photo ({ingested} extracted so far)")
+    for qf_name, path, lag in stale_gap:
+        print(f"  STALE-GPKG: {qf_name} / {path}: the ingested version is {lag:.1f}d older "
+              f"than the newest field photo")
 
     if (extract_gap or stuck or stale_gap) and not args.no_wa:
         lines = ["⚠️ Works-QA: QField photos not reaching the dashboard", ""]
@@ -265,9 +264,9 @@ def main():
             lines.append(f"• {ff_name} ({qf_name}): {src} photos upstream, not extracted — register in extract-gpkg-photos.py")
         for ff_name, ingested in stuck:
             lines.append(f"• {ff_name}: {ingested} photos extracted but sync produced 0 pole rows — check works-qa-sync")
-        for ff_name, qf_name, lag, _ingested in stale_gap:
-            lines.append(f"• {ff_name} ({qf_name}): GPKG ingest {lag:.1f} days behind the newest "
-                         f"field photo — GPKG renamed/deleted? check extract-gpkg-photos.py PROJECTS")
+        for qf_name, path, lag in stale_gap:
+            lines.append(f"• {qf_name} / {path}: ingesting a GPKG {lag:.1f} days older than the "
+                         f"newest field photo — renamed/deleted? check extract-gpkg-photos.py PROJECTS")
         post_wa("\n".join(lines))
 
     # Exit 0 always — this is a monitor, not a gate; the cron continues.

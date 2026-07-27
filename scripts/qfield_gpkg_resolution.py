@@ -53,33 +53,52 @@ def normalize_stem(name):
 def is_family_member(configured_name, candidate_name):
     """True when candidate is the configured GPKG, or a renamed successor of it.
 
-    Match is a normalized prefix that must end on a WORD BOUNDARY, so
-    'Civil audit.gpkg' claims 'Civil audit updated_27_07.gpkg' and
-    'Civil_Audit_V02.gpkg' but never 'Civil auditor.gpkg' — and never a different
-    form entirely ('Optical Audit.gpkg', 'MAMPoles.gpkg').
+    Match is a normalized prefix that must end on a WORD BOUNDARY **and** whose
+    remainder must contain a DIGIT:
 
-    The prefix direction matters: crews only ever APPEND to the name ("updated_27_07",
-    "V02"). A suffix or substring match would let a project's optical audit capture
-    its civil audit and silently ingest the wrong layer.
+        Civil audit.gpkg  →  Civil audit updated_27_07.gpkg   ✓  ("updated 27 07")
+                             Civil_Audit_V02.gpkg             ✓  ("v02")
+                             Poles HLD.gpkg                   ✗  (no digit)
+                             Poles drag and drop.gpkg         ✗  (no digit)
+
+    The digit requirement separates a rename from a SIBLING DOCUMENT. Every real
+    rename here stamps a version or date; the dangerous look-alikes do not. Without
+    it, Thembisa POP 1 (registered on the generic 'Poles.gpkg') adopts any
+    'Poles <word>.gpkg' — and its MinIO folder ALREADY holds 'Poles drag and drop.shp'
+    while THM POP 3 carries a real 'Poles HLD.gpkg'. One QGIS "export to GeoPackage"
+    would repoint that ingest at a scratch layer with no photo columns: a silent
+    freeze, the exact failure this module exists to prevent.
+
+    Prefix direction matters too: crews only ever APPEND. A suffix or substring match
+    would let a project's optical audit capture its civil audit.
     """
     base = normalize_stem(configured_name)
     cand = normalize_stem(candidate_name)
     if not base or not cand:
         return False
-    return cand == base or cand.startswith(base + " ")
+    if cand == base:
+        return True
+    if not cand.startswith(base + " "):
+        return False
+    return any(ch.isdigit() for ch in cand[len(base) + 1:])
 
 
 def family_members(configured_name, candidate_versions):
     """{filename: version} — the candidates belonging to configured_name's family.
 
-    Versionless entries are dropped: QFieldCloud keeps an empty folder behind a file
-    that was created and never written (Mahikeng's 'Civil_Audit_V02.gpkg'), and such
-    a placeholder must never win the newest-file contest.
+    Two kinds of entry are dropped:
+      * versionless — QFieldCloud keeps an empty folder behind a file that was created
+        and never written (Mahikeng's 'Civil_Audit_V02.gpkg'); a placeholder must never
+        win the newest-file contest;
+      * unparseable version ids — anything not 'v<14 digits>-…'. Ordering is by parsed
+        timestamp (see pick_latest_gpkg), so a token that cannot be parsed cannot be
+        ranked. Silently sorting it as a plain string is how an unexpected key shape
+        would win the contest and get downloaded.
     """
     return {
         name: ver
         for name, ver in (candidate_versions or {}).items()
-        if ver and is_family_member(configured_name, name)
+        if ver and version_timestamp(ver) and is_family_member(configured_name, name)
     }
 
 
@@ -90,23 +109,20 @@ def pick_latest_gpkg(configured_name, candidate_versions):
     Returns (filename, version_id), or (None, None) to mean "no redirect — use the
     configured name". Fails OPEN to today's behaviour rather than skipping a project.
 
-    REQUIRES THE CONFIGURED FILE TO EXIST UNDER ITS EXACT NAME. A family whose
-    configured member is absent returns (None, None) even when other members are
-    present, which deliberately keeps the blast radius at the reported bug — the
-    configured name is the anchor of trust, and without it there is nothing to prove
-    the family root ever meant this project's form.
+    REQUIRES THE CONFIGURED FILE TO EXIST UNDER ITS EXACT NAME — the configured name
+    is the anchor of trust; without it nothing proves the family root ever meant this
+    project's form. The presence test is exact, NOT normalized, even though membership
+    is. Three ALTERNATE_GPKGS entries (Mamelodi / Thembisa POP 1 / POP 3 →
+    'civil_audit_.gpkg') name files absent from MinIO, and 'civil_audit_' normalizes to
+    exactly 'civil audit' — so a normalized presence test would treat Thembisa's real
+    'Civil Audit.gpkg' as "found" and ingest a never-before-ingested audit through a
+    second fallback (pick_photo_table) in the same run. Those need their own
+    verification, not silent adoption by a resolver written for a different bug.
 
-    The presence test is exact, NOT normalized, even though family membership is
-    normalized. Three ALTERNATE_GPKGS entries (Mamelodi / Thembisa POP 1 / POP 3 →
-    'civil_audit_.gpkg') name files that are not in MinIO at all, and 'civil_audit_'
-    normalizes to exactly 'civil audit' — so a normalized presence test would treat
-    Thembisa's real 'Civil Audit.gpkg' as "the configured file, found" and start
-    ingesting a never-before-ingested audit through a second fallback
-    (pick_photo_table) in the same run. Those entries need their own verification,
-    not silent adoption by a resolver written for a different bug.
-
-    The configured file wins ties so two files sharing a version id can never
-    flip-flop the choice between runs.
+    Ordering is by PARSED version timestamp, not raw string compare: string order only
+    matches upload order while every id is the same 'v<14 digits>-<hash>' shape, and
+    family_members has already discarded anything that is not. The configured file
+    wins ties so two files sharing a version can never flip-flop the choice.
     """
     family = family_members(configured_name, candidate_versions)
     if not family or configured_name not in family:
@@ -114,12 +130,12 @@ def pick_latest_gpkg(configured_name, candidate_versions):
 
     def rank(item):
         name, version = item
-        return (version, 1 if name == configured_name else 0)
+        return (version_timestamp(version), 1 if name == configured_name else 0)
 
     return max(family.items(), key=rank)
 
 
-def pick_photo_table(configured_table, photo_column_counts):
+def pick_photo_table(configured_table, photo_column_counts, prefer_stem=None):
     """Choose the photo-bearing layer inside a GPKG.
 
     photo_column_counts: {table_name: number_of_detected_photo_columns}, in the
@@ -133,6 +149,14 @@ def pick_photo_table(configured_table, photo_column_counts):
     would have used anyway, and skips GPKG relation/attachment side-tables
     ('civil_audit__civil_audit'), which carry none.
 
+    `prefer_stem` breaks ties. Without it, an exact tie fell to whichever table came
+    first in sqlite_master order — i.e. CREATION order, the OLDEST layer. A GPKG that
+    kept both copies of a form (a QGIS "Save As" leaving 'civil_audit_updated_22_07'
+    beside 'civil_audit_updated_27_07', identical column counts) would therefore ingest
+    the stale one and reproduce the freeze one level down. Passing the resolved
+    filename makes the layer whose name matches the file win instead; failing that,
+    the LAST tying table wins, since sqlite_master order puts the newest layer last.
+
     Returns None when nothing has photo columns — the caller then errors out loudly
     instead of ingesting an arbitrary layer.
     """
@@ -141,11 +165,19 @@ def pick_photo_table(configured_table, photo_column_counts):
         if table.lower() == (configured_table or "").lower():
             return table
 
-    best = None
-    for table, n in counts.items():
-        if n > 0 and (best is None or n > counts[best]):
-            best = table
-    return best
+    best_n = max((n for n in counts.values() if n > 0), default=0)
+    if not best_n:
+        return None
+    tied = [t for t, n in counts.items() if n == best_n]
+    if len(tied) == 1:
+        return tied[0]
+
+    if prefer_stem:
+        stem = normalize_stem(prefer_stem)
+        for table in tied:
+            if normalize_stem(table) == stem:
+                return table
+    return tied[-1]
 
 
 def parse_pg_timestamp(value):
@@ -173,23 +205,85 @@ def parse_pg_timestamp(value):
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
 
-def gpkg_sync_lag_days(last_synced_at, latest_upstream_photo_at):
-    """How many days the GPKG ingest is behind the newest field photo upstream.
+def gpkg_version_lag_days(last_version, latest_upstream_photo_at):
+    """Days between the GPKG version we last ingested and the newest field photo.
 
-    Returns a float, or None when either side is unknown — an unknown lag is NOT
-    a zero lag, and the caller must not treat it as healthy.
+    Returns a float, or None when either side is unknown — an unknown lag is NOT a
+    zero lag, and the caller must not treat it as healthy.
 
-    This is the freeze detector: crews upload photos continuously, so a project
-    whose newest DCIM upload is days newer than its last successful GPKG scan is
-    not reaching the dashboard, whatever the cause (renamed GPKG, deleted GPKG,
-    failed download, renamed layer). Negative lags clamp to 0.0 — a sync newer
-    than the newest photo just means we are fully caught up.
+    MEASURE THE GPKG, NOT THE SCRIPT RUN. The obvious signal — `last_synced_at` vs the
+    newest photo — means "the script touched this row", not "the GPKG advanced": the
+    pending-rescan path re-upserts NOW() for an UNCHANGED file whenever photos await
+    upload, so any row with pending_count > 0 (6 of 16 live) reports 0.0d forever.
+    Lawley's LAWPoles.gpkg sat frozen 5.3 days at 0.0d. Measured against production
+    that signal caught 1 of 16 GPKGs while 4 real multi-day freezes ran silent.
+
+    The version id encodes when the file we actually read was uploaded, so this lag
+    only falls when a NEWER GPKG arrives — the very event that unfreezes the ingest.
+    Negative lags clamp to 0.0.
     """
-    synced = parse_pg_timestamp(last_synced_at)
+    version_at = version_timestamp(last_version)
     newest = parse_pg_timestamp(latest_upstream_photo_at)
-    if synced is None or newest is None:
+    if version_at is None or newest is None:
         return None
-    return max(0.0, (newest - synced).total_seconds() / 86400.0)
+    return max(0.0, (newest - version_at).total_seconds() / 86400.0)
+
+
+def select_stale_gpkgs(sync_rows, newest_upstream, stale_days):
+    """Pick the GPKGs whose ingest has frozen while photos kept arriving.
+
+    sync_rows:       [{qf_uuid, gpkg_path, last_version}]  — one row PER FILE
+    newest_upstream: {qf_uuid: newest DCIM upload timestamp}
+    Returns [(qf_uuid, gpkg_path, lag_days)] sorted worst-first.
+
+    PER FILE, never per project. Aggregating with MAX(last_synced_at) let any active
+    sibling mask a stuck one: measured live, Themb'elihle's Optical Audit.gpkg (9.6d
+    frozen), THM POP 3's Optical Audit.gpkg (7.3d) and THM POP 1's Poles.gpkg (3.0d)
+    all collapsed to 0.0d because another GPKG in the same project was advancing. 8 of
+    9 projects carry two or more registered paths, so the aggregate hid the majority.
+
+    A row whose lag cannot be computed (unknown version or no upstream photos) is
+    skipped rather than flagged — this monitor must not cry wolf on missing data.
+    """
+    out = []
+    for row in sync_rows or []:
+        lag = gpkg_version_lag_days(row.get("last_version"), newest_upstream.get(row.get("qf_uuid")))
+        if lag is not None and lag > stale_days:
+            out.append((row["qf_uuid"], row["gpkg_path"], lag))
+    out.sort(key=lambda r: r[2], reverse=True)
+    return out
+
+
+# `mc ls` renders a versioned file's version folder as a directory entry:
+#   [2026-07-27 15:06:40 UTC]     0B Civil audit updated_27_07.gpkg/
+# Anchor on the bracketed timestamp + size token so names containing spaces survive.
+_MC_DIR_RE = re.compile(r"^\[[^\]]*\]\s+\S+\s+(.+/)$")
+
+
+def parse_mc_gpkg_names(mc_ls_output):
+    """Extract the .gpkg directory names from `mc ls <prefix>/` output.
+
+    Lives here rather than beside the subprocess call so the parsing is testable
+    without MinIO — fiddly string handling (spaces in names, a size token that is not
+    always '0B') is exactly what silently returns [] and freezes an ingest.
+
+    Entries whose name contains a path separator are rejected: the name is
+    interpolated straight into a MinIO prefix, and a '/' would let a crafted key
+    address a different object. Non-recursive `mc ls` should never emit one, but the
+    guard means that assumption is enforced here rather than trusted.
+    """
+    names = []
+    for line in (mc_ls_output or "").split("\n"):
+        m = _MC_DIR_RE.match(line.strip())
+        if not m:
+            continue
+        name = m.group(1).rstrip("/")
+        if not name.lower().endswith(GPKG_SUFFIX):
+            continue
+        if "/" in name or name.startswith("."):
+            continue
+        names.append(name)
+    return names
 
 
 def version_timestamp(version_id):

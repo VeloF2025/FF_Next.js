@@ -22,11 +22,14 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from qfield_gpkg_resolution import (  # noqa: E402
-    gpkg_sync_lag_days,
+    family_members,
+    gpkg_version_lag_days,
     is_family_member,
     normalize_stem,
+    parse_mc_gpkg_names,
     pick_latest_gpkg,
     pick_photo_table,
+    select_stale_gpkgs,
     version_timestamp,
 )
 
@@ -175,10 +178,29 @@ def main():
           not is_family_member("Civil audit.gpkg", "Civil auditor.gpkg"))
     check("match is prefix-only, never suffix ('Extra Civil audit')",
           not is_family_member("Civil audit.gpkg", "Extra Civil audit.gpkg"))
-    check("'Poles.gpkg' does not claim 'Poles HLD.gpkg' family-wise? (it does — same form)",
-          is_family_member("Poles.gpkg", "Poles HLD.gpkg"))
     check("'Optical Audit.gpkg' does not claim 'Optical access.gpkg'",
           not is_family_member("Optical Audit.gpkg", "Optical access.gpkg"))
+
+    print("\nis_family_member — a rename is version-stamped; a sibling document is not:")
+    # Thembisa POP 1 is registered on the generic 'Poles.gpkg' and its live MinIO folder
+    # already holds 'Poles drag and drop.shp/.dbf/.prj/.shx' and 'Cage with Poles.*';
+    # sibling THM POP 3 already carries a real 'Poles HLD.gpkg'. Exporting any of those
+    # to GPKG must NOT repoint the ingest at a scratch/design layer.
+    check("'Poles.gpkg' does NOT claim 'Poles HLD.gpkg' (no digit → not a rename)",
+          not is_family_member("Poles.gpkg", "Poles HLD.gpkg"))
+    check("'Poles.gpkg' does NOT claim 'Poles drag and drop.gpkg'",
+          not is_family_member("Poles.gpkg", "Poles drag and drop.gpkg"))
+    check("'Poles.gpkg' does NOT claim 'Poles Audit.gpkg'",
+          not is_family_member("Poles.gpkg", "Poles Audit.gpkg"))
+    # …while every real rename in this estate carries a date or version number.
+    check("still claims 'Civil audit updated_27_07.gpkg' (digits)",
+          is_family_member("Civil audit.gpkg", "Civil audit updated_27_07.gpkg"))
+    check("still claims 'Civil_Audit_V02.gpkg' (digits)",
+          is_family_member("Civil audit.gpkg", "Civil_Audit_V02.gpkg"))
+    check("still claims 'Optical Audit 2.0.gpkg' from 'Optical Audit.gpkg' (digits)",
+          is_family_member("Optical Audit.gpkg", "Optical Audit 2.0.gpkg"))
+    check("'Poles.gpkg' claims a genuinely version-stamped 'Poles v2.gpkg'",
+          is_family_member("Poles.gpkg", "Poles v2.gpkg"))
     check("'Optical Audit 2.0.gpkg' does not claim plain 'Optical Audit.gpkg' (narrower→wider)",
           not is_family_member("Optical Audit 2.0.gpkg", "Optical Audit.gpkg"))
     check("empty configured name claims nothing",
@@ -214,12 +236,23 @@ def main():
           == "Civil audit.gpkg")
 
     print("\nNO-OP for every registered project (real MinIO listings):")
+    # Assert the FAMILY SET, not just the winner. Checking only the winner proves
+    # nothing here: every candidate carries the same version, so pick_latest_gpkg's
+    # tie-break returns the configured file whether or not the pattern over-matched.
+    # Verified by mutation — replacing the word-boundary prefix with a bare substring
+    # match (a severe over-match bug) left all 16 winner-only checks GREEN. Comparing
+    # the set is what actually fails, because a wrongly-claimed sibling shows up in it.
     for project, configured in REGISTERED:
         listing = versions_for(project)
         chosen, _ = pick_latest_gpkg(configured, listing)
-        # Every file carries V_OLD here, so the configured file wins on the tie rule:
-        # any other answer means the pattern over-matched a neighbouring GPKG.
         check(f"{project} / {configured} → itself", chosen == configured)
+        fam = set(family_members(configured, listing))
+        expected = {configured} if project != "Mahikeng" else {
+            "Civil audit.gpkg",
+            "Civil audit updated_22_07.gpkg",
+            "Civil audit updated_27_07.gpkg",
+        }
+        check(f"{project} / {configured} family == {sorted(expected)}", fam == expected)
 
     print("\nNO-OP even when a neighbour is newer (over-match would redirect):")
     for project, configured in REGISTERED:
@@ -256,26 +289,92 @@ def main():
           pick_photo_table("nope", {"a": 0, "b": 0}) is None)
     check("empty table set → None", pick_photo_table("civil_audit", {}) is None)
 
-    print("\ngpkg_sync_lag_days — the Mahikeng freeze:")
-    # Real values: last successful sync 2026-07-22 05:00Z, newest DCIM 2026-07-27 14:53Z.
-    lag = gpkg_sync_lag_days("2026-07-22 05:00:45.188835+00", "2026-07-27 14:53:24.295485+00")
+    print("\npick_photo_table — an exact tie must not silently pick the OLDEST layer:")
+    # A QGIS "Save As" can leave both copies of a form in one GPKG with identical photo
+    # column counts. sqlite_master lists in creation order, so a plain `>` scan returns
+    # the older layer — reproducing the very freeze this module fixes, one level down.
+    TIED = {"civil_audit_updated_22_07": 8, "civil_audit_updated_27_07": 8}
+    check("the layer matching the resolved filename wins the tie",
+          pick_photo_table("civil_audit", TIED,
+                           prefer_stem="Civil audit updated_27_07.gpkg") == "civil_audit_updated_27_07")
+    check("without a stem hint, the LAST tying table wins (newest created), not the first",
+          pick_photo_table("civil_audit", TIED) == "civil_audit_updated_27_07")
+    check("a strictly higher count still beats the stem preference",
+          pick_photo_table("nope", {"a": 8, "b": 12}, prefer_stem="a.gpkg") == "b")
+
+    print("\ngpkg_version_lag_days — measured from the GPKG, not the script run:")
+    # Real Mahikeng values: ingested version v20260722042348, newest DCIM 2026-07-27 14:53Z.
+    lag = gpkg_version_lag_days("v20260722042348-1cd13adf", "2026-07-27 14:53:24.295485+00")
     check("Mahikeng lag is ~5.4 days", lag is not None and 5.3 < lag < 5.5)
     check("lag exceeds the 3-day default threshold", lag > 3.0)
     now = datetime(2026, 7, 27, 14, 0, tzinfo=timezone.utc)
-    check("a healthy project (synced after the newest photo) has 0 lag",
-          gpkg_sync_lag_days(now, now - timedelta(hours=6)) == 0.0)
+    check("a fresh GPKG (newer than the newest photo) has 0 lag",
+          gpkg_version_lag_days("v20260727140000-abcd1234", now - timedelta(hours=6)) == 0.0)
     check("negative lag clamps to 0, never negative",
-          gpkg_sync_lag_days(now + timedelta(days=2), now) == 0.0)
-    check("finished project (both old) has ~0 lag, so no alert",
-          gpkg_sync_lag_days(now - timedelta(days=90), now - timedelta(days=90, hours=1)) == 0.0)
-    check("unknown last-sync → None, NOT 0 (unknown is not healthy)",
-          gpkg_sync_lag_days(None, now) is None)
-    check("unknown upstream → None", gpkg_sync_lag_days(now, None) is None)
-    check("unparseable timestamp → None", gpkg_sync_lag_days("not a date", now) is None)
-    check("naive timestamps are read as UTC, not rejected",
-          gpkg_sync_lag_days(datetime(2026, 7, 22, 5, 0), datetime(2026, 7, 24, 5, 0)) == 2.0)
+          gpkg_version_lag_days("v20260729140000-abcd1234", now) == 0.0)
+    check("finished site (GPKG and photos both old) has ~0 lag, so no alert",
+          gpkg_version_lag_days("v20260101120000-abcd1234", "2026-01-01 12:00:00+00") == 0.0)
+    check("unknown version → None, NOT 0 (unknown is not healthy)",
+          gpkg_version_lag_days(None, now) is None)
+    check("unparseable version → None", gpkg_version_lag_days("garbage", now) is None)
+    check("unknown upstream → None", gpkg_version_lag_days("v20260722042348-x", None) is None)
+    check("naive upstream timestamp is read as UTC, not rejected",
+          gpkg_version_lag_days("v20260722050000-x", datetime(2026, 7, 24, 5, 0)) == 2.0)
     check("two-digit '+00' offset parses (fromisoformat rejects it before 3.11)",
-          gpkg_sync_lag_days("2026-07-22 05:00:00+00", "2026-07-24 05:00:00+00") == 2.0)
+          gpkg_version_lag_days("v20260722050000-x", "2026-07-24 05:00:00+00") == 2.0)
+
+    print("\ngpkg_version_lag_days survives a pending-rescan (the last_synced_at trap):")
+    # Live Lawley row: LAWPoles.gpkg frozen at v20260722075537 for 5 days, but
+    # pending_count=30 made the extractor re-upsert last_synced_at=NOW() every run, so
+    # a last_synced_at-based lag read 0.0d throughout. The version-based lag cannot be
+    # moved by a re-scan, because the version only changes when a NEW file is uploaded.
+    frozen = gpkg_version_lag_days("v20260722075537-c26eb3c2", "2026-07-27 14:53:24+00")
+    check("Lawley's frozen LAWPoles reports ~5.3d, not 0.0d", frozen is not None and 5.2 < frozen < 5.4)
+    check("and therefore breaches the threshold the old signal missed", frozen > 3.0)
+
+    print("\nselect_stale_gpkgs — per FILE, so an active sibling cannot mask a stuck one:")
+    UP = {"projA": "2026-07-27 14:53:24+00", "projB": "2026-07-27 14:53:24+00"}
+    rows_in = [
+        # Live shape: one project, one frozen GPKG + one advancing sibling.
+        {"qf_uuid": "projA", "gpkg_path": "Optical Audit.gpkg", "last_version": "v20260718040000-a"},
+        {"qf_uuid": "projA", "gpkg_path": "Poles.gpkg", "last_version": "v20260727120000-b"},
+        {"qf_uuid": "projB", "gpkg_path": "Civil Audit.gpkg", "last_version": "v20260727130000-c"},
+    ]
+    stale = select_stale_gpkgs(rows_in, UP, 3.0)
+    check("flags the frozen sibling", [s[1] for s in stale] == ["Optical Audit.gpkg"])
+    check("does not flag the advancing GPKG in the same project",
+          "Poles.gpkg" not in [s[1] for s in stale])
+    check("reports the owning project and a lag over threshold",
+          stale[0][0] == "projA" and stale[0][2] > 3.0)
+    check("sorted worst-first", select_stale_gpkgs(
+        rows_in + [{"qf_uuid": "projB", "gpkg_path": "Old.gpkg", "last_version": "v20260101000000-d"}],
+        UP, 3.0)[0][1] == "Old.gpkg")
+    check("a project with no upstream photos is skipped, not flagged",
+          select_stale_gpkgs([{"qf_uuid": "ghost", "gpkg_path": "X.gpkg",
+                               "last_version": "v20260101000000-d"}], UP, 3.0) == [])
+    check("an unparseable version is skipped, not flagged",
+          select_stale_gpkgs([{"qf_uuid": "projA", "gpkg_path": "X.gpkg",
+                               "last_version": "weird"}], UP, 3.0) == [])
+    check("empty input → no flags", select_stale_gpkgs([], UP, 3.0) == [])
+    check("None input → no flags", select_stale_gpkgs(None, UP, 3.0) == [])
+
+    print("\nparse_mc_gpkg_names — `mc ls` output parsing:")
+    MC_OUT = (
+        "[2026-07-27 15:06:40 UTC]     0B Civil audit updated_27_07.gpkg/\n"
+        "[2026-07-27 15:06:40 UTC]     0B Civil audit.gpkg/\n"
+        "[2026-07-27 15:06:40 UTC]     0B DCIM/\n"
+        "[2026-07-27 15:06:40 UTC] 1.3MiB notes.txt\n"
+        "\n"
+    )
+    names = parse_mc_gpkg_names(MC_OUT)
+    check("keeps only .gpkg entries", names == ["Civil audit updated_27_07.gpkg", "Civil audit.gpkg"])
+    check("names containing spaces survive intact", "Civil audit updated_27_07.gpkg" in names)
+    check("non-gpkg directories excluded", "DCIM" not in names)
+    check("empty/garbage input → []", parse_mc_gpkg_names("") == [] and parse_mc_gpkg_names(None) == [])
+    check("a size token other than 0B still parses",
+          parse_mc_gpkg_names("[2026-07-27 15:06:40 UTC] 2.1MiB Big.gpkg/") == ["Big.gpkg"])
+    check("an embedded path separator is rejected (never built into a MinIO prefix)",
+          parse_mc_gpkg_names("[2026-07-27 15:06:40 UTC]     0B ../other/evil.gpkg/") == [])
 
     print("\nversion_timestamp:")
     check("parses a QFieldCloud version id",

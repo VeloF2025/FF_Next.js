@@ -32,7 +32,18 @@ from qfield_step_detection import detect_step_columns, is_photo_value
 # Pure GPKG family resolution (no MinIO/DB deps) — unit-tested/CI-gated by
 # scripts/test_qfield_gpkg_resolution.py. Lets a project survive the crew renaming
 # its audit GPKG ("Civil audit.gpkg" → "Civil audit updated_27_07.gpkg").
-from qfield_gpkg_resolution import is_family_member, pick_latest_gpkg, pick_photo_table
+from qfield_gpkg_resolution import (
+    is_family_member,
+    parse_mc_gpkg_names,
+    pick_latest_gpkg,
+    pick_photo_table,
+)
+
+# Upper bound on how many same-family GPKGs we will version-list in one run. Each costs
+# an `mc ls` subprocess, and a project collaborator can create arbitrarily many
+# same-prefixed copies. Truncation is LOGGED, never silent — a quiet cap would be the
+# same class of invisible failure this module exists to remove.
+MAX_FAMILY_CANDIDATES = 25
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -370,10 +381,15 @@ def minio_list_dcim_directory(qf_project_id):
         return {}
 
 
-# `mc ls` renders a "directory" (a versioned file's version folder) as
-#   [2026-07-27 15:06:40 UTC]     0B Civil audit updated_27_07.gpkg/
-# Anchor on the bracketed timestamp + size token so names containing spaces survive.
-_MC_DIR_RE = re.compile(r"^\[[^\]]*\]\s+\S+\s+(.+/)$")
+def sqlite_ident(name):
+    """Quote a SQLite identifier that came from an untrusted GPKG.
+
+    Table names now reach SQL from the file itself (pick_photo_table's fallback picks
+    any layer in sqlite_master), not just from the hard-coded PROJECTS config — so the
+    bracket-quoting these queries used is no longer backed by a trusted value. SQLite
+    escapes a double quote inside a quoted identifier by doubling it.
+    """
+    return '"' + str(name).replace('"', '""') + '"'
 
 
 def minio_list_gpkg_versions(qf_project_id, gpkg_path):
@@ -426,21 +442,25 @@ def minio_list_gpkg_family(qf_project_id, configured_path):
         print(f"    WARN: mc ls files/ error for {qf_project_id}: {e}")
         return {}
 
-    names = []
-    for line in result.stdout.strip().split("\n"):
-        m = _MC_DIR_RE.match(line.strip())
-        if not m:
-            continue
-        name = m.group(1).rstrip("/")
-        if name.lower().endswith(".gpkg"):
-            names.append(name)
-
     # Only version-list the family members — the whole point is to avoid touching
-    # unrelated GPKGs (a project can carry a dozen: poles, optical, boundaries…).
+    # unrelated GPKGs (a project can carry a dozen: poles, optical, boundaries…, and
+    # the FT projects each hold ~90 dated "OES FF DDMMYYYY.gpkg" exports).
+    candidates = sorted(n for n in parse_mc_gpkg_names(result.stdout)
+                        if is_family_member(configured_path, n))
+    if len(candidates) > MAX_FAMILY_CANDIDATES:
+        # Keep the configured file whatever else goes: without it pick_latest_gpkg
+        # refuses to redirect at all, so dropping it would turn a cap into a silent
+        # loss of the whole feature. Descending order keeps the newest date-stamped
+        # names, which are the plausible rename targets.
+        keep = [configured_path] if configured_path in candidates else []
+        keep += [n for n in sorted(candidates, reverse=True) if n != configured_path]
+        dropped = sorted(set(candidates) - set(keep[:MAX_FAMILY_CANDIDATES]))
+        print(f"    WARN: {len(candidates)} family candidates for '{configured_path}' exceeds "
+              f"cap {MAX_FAMILY_CANDIDATES}; NOT version-listing {len(dropped)}: {dropped}")
+        candidates = keep[:MAX_FAMILY_CANDIDATES]
+
     family = {}
-    for name in names:
-        if not is_family_member(configured_path, name):
-            continue
+    for name in candidates:
         versions = minio_list_gpkg_versions(qf_project_id, name)
         if versions:
             family[name] = versions[-1]
@@ -643,10 +663,10 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                 # which have none.
                 photo_col_counts = {}
                 for t in tables:
-                    t_cols = [r[1] for r in db.execute(f"PRAGMA table_info([{t}])").fetchall()]
+                    t_cols = [r[1] for r in db.execute(f"PRAGMA table_info({sqlite_ident(t)})").fetchall()]
                     t_steps, t_extra = detect_step_columns(t_cols)
                     photo_col_counts[t] = len(t_steps) + len(t_extra)
-                fallback = pick_photo_table(config["table_name"], photo_col_counts)
+                fallback = pick_photo_table(config["table_name"], photo_col_counts, prefer_stem=gpkg_path)
                 if fallback:
                     print(f"  TABLE-FALLBACK: '{config['table_name']}' absent; using "
                           f"'{fallback}' ({photo_col_counts[fallback]} photo columns). "
@@ -658,7 +678,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     db.close()
                     return 0, 0
 
-        rows = db.execute(f"SELECT * FROM [{table_name}]").fetchall()
+        rows = db.execute(f"SELECT * FROM {sqlite_ident(table_name)}").fetchall()
         columns = rows[0].keys() if rows else []
         label_col = config["label_col"]
 
@@ -670,6 +690,19 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
 
         if not step_cols and not extra_cols:
             print(f"  SKIP: No photo columns detected")
+            db.close()
+            return 0, 0
+
+        # A layer can carry photo columns and still be the wrong one — the fallback
+        # picks by photo-column count, which a sibling form also satisfies. Without the
+        # label column every row is skipped later, yet execution would still reach the
+        # sync-state upsert and stamp last_version/last_synced_at for a run that
+        # ingested nothing: the project then looks freshly synced forever. Bail BEFORE
+        # any state is written so the freeze stays visible.
+        if rows and label_col not in columns:
+            print(f"  ERROR: table '{table_name}' has {len(step_cols) + len(extra_cols)} photo "
+                  f"column(s) but no label column '{label_col}' — refusing to record a sync. "
+                  f"Columns: {list(columns)[:12]}")
             db.close()
             return 0, 0
 
