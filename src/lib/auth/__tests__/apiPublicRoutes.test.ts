@@ -2,17 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import {
   PUBLIC_API_PREFIXES,
+  SECRET_QUERY_PARAMS,
   hasAnyCredential,
   isPublicApiRoute,
   wouldDenyApiRequest,
 } from '../apiPublicRoutes';
 
-function req(opts: { cookie?: string; cookieName?: string; headers?: Record<string, string> } = {}) {
+function req(
+  opts: { cookie?: string; cookieName?: string; headers?: Record<string, string>; query?: Record<string, string> } = {},
+) {
   const headers = opts.headers ?? {};
+  const query = opts.query ?? {};
   const name = opts.cookieName ?? 'ff_auth_token';
   return {
     cookies: { get: (n: string) => (n === name && opts.cookie ? { value: opts.cookie } : undefined) },
     headers: { get: (n: string) => headers[n.toLowerCase()] ?? null },
+    searchParams: { get: (n: string) => query[n] ?? null },
   };
 }
 
@@ -85,6 +90,28 @@ describe('hasAnyCredential', () => {
     ]) {
       expect(hasAnyCredential(req({ headers: { [h]: 'secret' } })), h).toBe(true);
     }
+  });
+
+  it('accepts a credential carried in the query string', () => {
+    // A third transport, not another header. The VLM photo-proxy authorises via
+    // ?vlm=true&vlmkey=<secret> precisely because vLLM fetches with a plain GET and
+    // cannot send headers (src/lib/vlm/photoProxyAuth.ts, #2211). A cookies+headers-only
+    // check is structurally blind to it.
+    expect(hasAnyCredential(req({ query: { vlm: 'true', vlmkey: 's' } }))).toBe(true);
+    expect(hasAnyCredential(req({ query: { secret: 's' } }))).toBe(true);
+    expect(
+      wouldDenyApiRequest('/api/construction-qa/photo-proxy', req({ query: { vlm: 'true', vlmkey: 's' } })),
+    ).toBe(false);
+  });
+
+  it('still flags the same route with no query credential', () => {
+    expect(wouldDenyApiRequest('/api/construction-qa/photo-proxy', req({ query: { vlm: 'true' } }))).toBe(true);
+  });
+
+  it('marks every credential-bearing query param as unloggable', () => {
+    // These values must never reach a log line — middleware redacts by this set.
+    expect(SECRET_QUERY_PARAMS.has('vlmkey')).toBe(true);
+    expect(SECRET_QUERY_PARAMS.has('secret')).toBe(true);
   });
 
   it('does not flag real WhatsApp-bridge traffic', () => {

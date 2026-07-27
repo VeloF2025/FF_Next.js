@@ -61,8 +61,24 @@ export function isPublicApiRoute(pathname: string): boolean {
 }
 
 /**
- * Whether the request presents ANY credential — session cookie, bearer token, or a
- * service secret header.
+ * Query params that carry a credential.
+ *
+ * A third transport, not a variation on the header list. `/api/construction-qa/photo-proxy`
+ * authorises the VLM via `?vlm=true&vlmkey=<VLM_PROXY_SECRET>` precisely BECAUSE vLLM
+ * fetches image URLs with a plain GET and cannot send headers — see
+ * src/lib/vlm/photoProxyAuth.ts and the #2211 bypass incident. Several construction-qa
+ * and cron routes also accept `?secret=` as an alternate transport for CRON_SECRET.
+ *
+ * A cookies+headers-only check is structurally blind to all of it.
+ */
+const CREDENTIAL_QUERY_PARAMS = ['vlmkey', 'secret'] as const;
+
+/** Param names whose VALUES must never reach a log line. */
+export const SECRET_QUERY_PARAMS: ReadonlySet<string> = new Set(CREDENTIAL_QUERY_PARAMS);
+
+/**
+ * Whether the request presents ANY credential — session cookie, bearer token, service
+ * secret header, or credential-bearing query param.
  *
  * Deliberately does NOT validate it. Middleware runs on the Edge runtime and cannot
  * reach the database, so validity is the route handler's job. The question here is only
@@ -74,6 +90,8 @@ export function isPublicApiRoute(pathname: string): boolean {
 export function hasAnyCredential(req: {
   cookies: { get(name: string): { value: string } | undefined };
   headers: { get(name: string): string | null };
+  /** Optional so non-URL callers still type-check; omitted means "no query credential". */
+  searchParams?: { get(name: string): string | null };
 }): boolean {
   for (const cookie of SESSION_COOKIES) {
     if (req.cookies.get(cookie)?.value) return true;
@@ -107,6 +125,11 @@ export function hasAnyCredential(req: {
     'x-internal-key',
   ]) {
     const value = req.headers.get(header);
+    if (value && value.trim() !== '') return true;
+  }
+
+  for (const param of CREDENTIAL_QUERY_PARAMS) {
+    const value = req.searchParams?.get(param);
     if (value && value.trim() !== '') return true;
   }
 

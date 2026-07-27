@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import arcjet, { detectBot, fixedWindow, shield } from "@arcjet/next";
-import { wouldDenyApiRequest } from '@/lib/auth/apiPublicRoutes';
+import { SECRET_QUERY_PARAMS, wouldDenyApiRequest } from '@/lib/auth/apiPublicRoutes';
 
 // TODO: Re-enable Clerk middleware when ready for production
 
@@ -326,7 +326,7 @@ export async function middleware(request: NextRequest) {
     // path may ever break a request. The helpers are pure string work today, but this
     // is cheap insurance against a future edit that is not.
     try {
-      if (wouldDenyApiRequest(pathname, request)) {
+      if (wouldDenyApiRequest(pathname, { cookies: request.cookies, headers: request.headers, searchParams })) {
         edgeLog('warn', 'api-auth-audit: anonymous request to non-public API route', {
           auditMode: 'log-only',
           method: request.method,
@@ -345,7 +345,12 @@ export async function middleware(request: NextRequest) {
     edgeLog('info', 'API Request', {
       method: request.method,
       path: pathname,
-      query: Object.fromEntries(searchParams),
+      // Redacted: some routes carry their credential IN the query string
+      // (?vlmkey= for the VLM photo-proxy, ?secret= for several cron routes), so
+      // logging params verbatim writes live secrets into the app log on every call.
+      query: Object.fromEntries(
+        [...searchParams.entries()].map(([k, v]) => [k, SECRET_QUERY_PARAMS.has(k) ? '[redacted]' : v])
+      ),
       ip: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent')
     });
