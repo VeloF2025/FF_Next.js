@@ -139,19 +139,24 @@ describe('pipeUpstreamResponse', () => {
     ).rejects.toThrow(/upstream exploded/);
   });
 
-  it('destroys the upstream stream when the client disconnects early', async () => {
-    // Measured before the fix: a bare .pipe() left the upstream at destroyed === false
-    // and still being pulled after the client socket died. On a public unauthenticated
-    // proxy that is its own DoS — hang up immediately, leave a large response draining.
-    let pulled = 0;
+  it('cancels the upstream source when the client disconnects early', async () => {
+    // Deterministic, not timing-based. A web ReadableStream's cancel() fires the moment
+    // Readable.fromWeb tears it down, carrying the reason — so this asserts the teardown
+    // itself rather than sampling a pull counter across wall-clock windows and hoping CI
+    // load does not shift it.
+    //
+    // The property under test: with a bare .pipe() the source is NOT torn down when the
+    // destination dies — measured at destroyed === false and still being pulled. On a
+    // public unauthenticated proxy that is its own DoS: hang up immediately and leave a
+    // large response draining.
+    let cancelReason: { code?: string } | null = null;
     const endless = new ReadableStream<Uint8Array>({
       async pull(controller) {
-        // Yield between chunks. A synchronous enqueue loop with a flowing consumer never
-        // returns to the event loop, so timers never fire and the TEST hangs rather than
-        // the code under test.
         await new Promise((r) => setTimeout(r, 5));
-        pulled++;
         controller.enqueue(new Uint8Array(1024));
+      },
+      cancel(reason) {
+        cancelReason = reason;
       },
     });
     const { res, sink } = collectingRes();
@@ -160,16 +165,10 @@ describe('pipeUpstreamResponse', () => {
     await new Promise((r) => setTimeout(r, 20));
     sink.destroy(); // client goes away
 
-    // Must settle, not hang, and must not treat a normal hang-up as an error.
+    // Must settle, and must not treat an ordinary hang-up as an error.
     await expect(done).resolves.toBeUndefined();
 
-    // Let any chunk already in flight land, then prove the count has STOPPED growing.
-    // Exact equality would be wrong: one pull can legitimately be mid-flight when the
-    // socket dies. The property that matters is that it stops, not that it never ticks
-    // once more. Before this fix the count kept climbing indefinitely.
-    await new Promise((r) => setTimeout(r, 40));
-    const settled = pulled;
-    await new Promise((r) => setTimeout(r, 80));
-    expect(pulled, 'upstream still being pulled long after the client disconnected').toBe(settled);
+    expect(cancelReason, 'upstream source was never cancelled — it is still draining').not.toBeNull();
+    expect((cancelReason as unknown as { code?: string })?.code).toBe('ERR_STREAM_PREMATURE_CLOSE');
   });
 });
