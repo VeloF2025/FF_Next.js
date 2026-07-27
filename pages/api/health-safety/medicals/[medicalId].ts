@@ -17,6 +17,7 @@ import {
   MEDICAL_OUTCOMES,
   type MedicalOutcome,
 } from '@/modules/health-safety/types/medical.types';
+import { blankToNull } from '@/modules/health-safety/services/inputNormalize';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -99,10 +100,14 @@ async function handlePatch(medicalId: string, req: NextApiRequest, res: NextApiR
   if (has('exam_date') && !req.body.exam_date) {
     return apiResponse.badRequest(res, 'exam_date cannot be cleared');
   }
-  const examDate = String(pick('exam_date', existing.exam_date));
-  const expiryDate = pick<string | null>('expiry_date', (existing.expiry_date as string) ?? null);
+  // Normalised before use and bound in that same form: an empty string reaching
+  // `${...}::date` or `${...}::uuid` is a Postgres cast error, i.e. a 500 where
+  // the caller should have seen the field simply cleared.
+  const examDate = String(pick('exam_date', existing.exam_date)).trim();
+  const expiryDate = blankToNull(pick('expiry_date', existing.expiry_date));
+  const projectId = blankToNull(pick('project_id', existing.project_id));
   const outcome = pick<MedicalOutcome>('outcome', existing.outcome as MedicalOutcome);
-  const restrictions = pick<string | null>('restrictions', (existing.restrictions as string) ?? null);
+  const restrictions = blankToNull(pick('restrictions', existing.restrictions));
 
   if (!MEDICAL_OUTCOMES[outcome]) {
     return apiResponse.badRequest(
@@ -132,11 +137,11 @@ async function handlePatch(medicalId: string, req: NextApiRequest, res: NextApiR
       expiry_date = ${expiryDate}::date,
       outcome = ${outcome},
       restrictions = ${restrictions},
-      practitioner = ${pick('practitioner', existing.practitioner)},
-      practice_number = ${pick('practice_number', existing.practice_number)},
-      certificate_number = ${pick('certificate_number', existing.certificate_number)},
-      certificate_url = ${pick('certificate_url', existing.certificate_url)},
-      project_id = ${pick('project_id', existing.project_id)}::uuid,
+      practitioner = ${blankToNull(pick('practitioner', existing.practitioner))},
+      practice_number = ${blankToNull(pick('practice_number', existing.practice_number))},
+      certificate_number = ${blankToNull(pick('certificate_number', existing.certificate_number))},
+      certificate_url = ${blankToNull(pick('certificate_url', existing.certificate_url))},
+      project_id = ${projectId}::uuid,
       notes = ${pick('notes', existing.notes)},
       updated_at = NOW()
     WHERE id = ${medicalId}

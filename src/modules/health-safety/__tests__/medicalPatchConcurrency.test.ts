@@ -115,6 +115,23 @@ describe('PATCH medicals — optimistic concurrency', () => {
     expect(sqlMock).toHaveBeenCalledTimes(1);
   });
 
+  it('normalises an empty-string date/uuid to NULL instead of letting the cast 500', async () => {
+    // `${''}::date` and `${''}::uuid` are Postgres cast errors, so an empty
+    // string from a cleared <input type="date"> would surface as a 500 rather
+    // than simply clearing the field.
+    sqlMock
+      .mockResolvedValueOnce([EXISTING])
+      .mockResolvedValueOnce([EXISTING])
+      .mockResolvedValueOnce([]);
+
+    const res = await patch({ expiry_date: '', project_id: '', certificate_number: '  ' });
+
+    expect(res._getStatusCode()).toBe(200);
+    const bound = sqlMock.mock.calls[1]!.slice(1);
+    expect(bound).not.toContain('');
+    expect(bound).not.toContain('  ');
+  });
+
   it('404s on an unknown id without attempting an update', async () => {
     sqlMock.mockResolvedValueOnce([]);
     const res = await patch({ notes: 'x' });
