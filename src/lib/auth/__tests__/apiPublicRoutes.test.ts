@@ -71,9 +71,32 @@ describe('hasAnyCredential', () => {
     expect(hasAnyCredential(req({ headers: { authorization: 'Bearer abc' } }))).toBe(true);
   });
 
-  it('accepts a service secret header that the codebase actually reads', () => {
-    expect(hasAnyCredential(req({ headers: { 'x-cron-secret': 's' } }))).toBe(true);
-    expect(hasAnyCredential(req({ headers: { 'x-api-key': 'k' } }))).toBe(true);
+  it('accepts every service secret header the codebase actually reads', () => {
+    // Each verified by grep against real route code. The bridge headers matter most:
+    // the Go WhatsApp Bridge is a separate VPS posting 24/7 across every monitored
+    // group, so missing it would out-noise even the staff-portal gap.
+    for (const h of [
+      'x-api-key',
+      'x-cron-secret',
+      'x-bridge-secret',
+      'x-wa-bridge-secret',
+      'x-webhook-secret',
+      'x-internal-key',
+    ]) {
+      expect(hasAnyCredential(req({ headers: { [h]: 'secret' } })), h).toBe(true);
+    }
+  });
+
+  it('does not flag real WhatsApp-bridge traffic', () => {
+    // The routes the bridge actually posts to, with the header it actually sends.
+    for (const p of [
+      '/api/communications/whatsapp/inbound',
+      '/api/activate/dr-acknowledgment',
+      '/api/field-ops/wa-message',
+      '/api/noc/wa-monitored-groups',
+    ]) {
+      expect(wouldDenyApiRequest(p, req({ headers: { 'x-bridge-secret': 's' } })), p).toBe(false);
+    }
   });
 
   it('rejects an empty or absent credential', () => {

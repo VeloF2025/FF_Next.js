@@ -82,9 +82,30 @@ export function hasAnyCredential(req: {
   const authorization = req.headers.get('authorization');
   if (authorization && authorization.trim() !== '') return true;
 
-  // Only headers this codebase actually reads. Speculative entries would be dead OR
-  // branches that quietly widen what counts as "credentialed".
-  for (const header of ['x-api-key', 'x-cron-secret']) {
+  // Only headers this codebase actually reads — every one verified by grep. Speculative
+  // entries would be dead OR branches that quietly widen what counts as "credentialed".
+  //
+  //   x-api-key           general service callers
+  //   x-cron-secret       scheduled jobs
+  //   x-bridge-secret     Go WhatsApp Bridge → FF, 7 routes (inbound messages, DR acks,
+  //                       field-ops). A separate VPS posting continuously, 24/7 — the
+  //                       highest-volume machine caller in the system.
+  //   x-wa-bridge-secret  same bridge, peer-service reads (noc/wa-monitored-groups)
+  //   x-webhook-secret    dev/build harness progress callback
+  //   x-internal-key      OLT report queue processor
+  //
+  // ⚠️ x-internal-key is compared against a literal committed to source
+  // (pages/api/system/olt-report/process-lookup-queue.ts:234). Recognising it here is
+  // correct — it IS how that caller authenticates today — but the literal itself is a
+  // committed credential and wants rotating into an env var. Out of scope for this PR.
+  for (const header of [
+    'x-api-key',
+    'x-cron-secret',
+    'x-bridge-secret',
+    'x-wa-bridge-secret',
+    'x-webhook-secret',
+    'x-internal-key',
+  ]) {
     const value = req.headers.get(header);
     if (value && value.trim() !== '') return true;
   }
