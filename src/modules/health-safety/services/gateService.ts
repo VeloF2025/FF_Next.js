@@ -12,6 +12,7 @@ import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '../types/compliance.types';
 import { DEFAULT_SCORING_CONFIG } from '../types/scoring.types';
 import { TRAINING_GATE_MINIMUM } from '../types/training.types';
 import { computeAndPersistContractorTrainingScore } from './trainingService';
+import { computeContractorMedicalSummary } from './medicalService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -24,11 +25,14 @@ const sql = neon(process.env.DATABASE_URL!);
  * - Major/critical incidents in last 12 months
  * - Overall H&S score below minimum (50%)
  * - Training compliance below 70%
+ * - A worker whose latest medical says unfit, or whose Certificate of Fitness
+ *   has lapsed
  *
  * Gate warnings (can assign but flagged):
  * - Score below recommended (70%)
  * - Audit overdue
  * - Documents expiring soon
+ * - Medical certificates expiring soon, or workers fit only with restrictions
  */
 export async function checkContractorGate(contractorId: string): Promise<GateCheckResult> {
   const blockers: string[] = [];
@@ -42,6 +46,10 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
   // is persisted onto the compliance row for the dashboard. `training` is the
   // authoritative training figure for the rest of this check.
   const training = await computeAndPersistContractorTrainingScore(contractorId);
+
+  // Per-worker medical fitness (migration 463). Scored over each worker's
+  // LATEST Certificate of Fitness — superseded certificates must not block.
+  const medical = await computeContractorMedicalSummary(contractorId);
 
   // Get documents
   const documents = await getContractorDocuments(contractorId);
@@ -102,6 +110,22 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
     );
   } else if (training.expiring_certs > 0) {
     warnings.push(`${training.expiring_certs} training certificate(s) expiring soon`);
+  }
+
+  // Check per-worker medical fitness. No medical data at all does not block
+  // (same "absence is not evidence" rule the training score follows), but a
+  // worker who is on file as unfit, or whose certificate has lapsed, does —
+  // an expired legal fitness certificate is not a matter of degree.
+  if (medical.unfit > 0) {
+    blockers.push(`${medical.unfit} worker(s) medically unfit for duty`);
+  }
+  if (medical.expired > 0) {
+    blockers.push(`${medical.expired} expired medical certificate(s)`);
+  } else if (medical.expiring_soon > 0) {
+    warnings.push(`${medical.expiring_soon} medical certificate(s) expiring soon`);
+  }
+  if (medical.restricted > 0) {
+    warnings.push(`${medical.restricted} worker(s) medically fit with restrictions`);
   }
 
   // Check audit due date
