@@ -17,7 +17,7 @@ import { BODY_TOO_LARGE, MAX_PROXY_BODY_BYTES, pipeUpstreamResponse, readCappedB
 /** A body that never ends, counting how much was actually pulled from it. */
 function endlessBody(method = 'POST') {
   const CHUNK = Buffer.alloc(64 * 1024, 0x61);
-  const state = { pulled: 0, destroyed: false };
+  const state = { pulled: 0, paused: false };
   const stream = new Readable({
     read() {
       state.pulled += CHUNK.length;
@@ -26,9 +26,9 @@ function endlessBody(method = 'POST') {
   });
   const req = Object.assign(stream, {
     method,
-    destroy() {
-      state.destroyed = true;
-      Readable.prototype.destroy.call(stream);
+    pause() {
+      state.paused = true;
+      return Readable.prototype.pause.call(stream);
     },
   });
   return { req: req as never, state };
@@ -65,7 +65,9 @@ describe('readCappedBody', () => {
     const result = await readCappedBody(req, cap);
 
     expect(result).toBe(BODY_TOO_LARGE);
-    expect(state.destroyed).toBe(true);
+    // paused, NOT destroyed: destroying the request tears down the socket shared with
+    // the response, so the caller would get ECONNRESET instead of the 413.
+    expect(state.paused).toBe(true);
     // Bounded by the cap plus at most one chunk of overshoot — not unbounded.
     expect(state.pulled).toBeLessThanOrEqual(cap + 64 * 1024);
   });

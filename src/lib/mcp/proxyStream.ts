@@ -47,9 +47,12 @@ export async function readCappedBody(
     const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += buf.length;
     if (total > maxBytes) {
-      // Stop consuming. Destroying the request prevents the sender from continuing to
-      // stream into a socket we have already given up on.
-      req.destroy();
+      // pause(), NOT destroy(). Measured directly: req.destroy() tears down the socket
+      // SHARED with the response, so the caller receives ECONNRESET and never sees the
+      // 413 — the error we carefully build is unreachable. pause() stops us reading, TCP
+      // backpressure stalls the sender, and the 413 is delivered (verified: 413 in 37ms
+      // having read 65 KB of an 8 MB body).
+      req.pause();
       return BODY_TOO_LARGE;
     }
     chunks.push(buf);
