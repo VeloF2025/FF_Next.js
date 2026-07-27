@@ -12,7 +12,18 @@ export type ChecklistCategory =
   | 'first_aid'
   | 'fire'
   | 'fibre_specific'
-  | 'site_conditions';
+  | 'site_conditions'
+  // added 2026-07-27 (H&S docs-vs-module alignment audit, rec #5): daily
+  // pre-use equipment checklists seen in the real client files. Seeded
+  // inactive (migration 462) -- activate per-project when the equipment is
+  // actually on site, see hs_checklist_templates.is_active.
+  | 'ladder'
+  | 'hand_tools'
+  | 'fire_equipment'
+  | 'road_cutter'
+  | 'compactor'
+  | 'barricading'
+  | 'traffic_signage';
 
 export type ItemSeverity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -128,6 +139,55 @@ export const CHECKLIST_CATEGORIES: Record<ChecklistCategory, CategoryInfo> = {
     description: 'General site housekeeping and welfare',
     icon: 'Building',
     regulation: 'Construction Reg 24-26',
+  },
+  ladder: {
+    value: 'ladder',
+    label: 'Ladder Inspection',
+    description: 'Daily pre-use ladder inspection',
+    icon: 'MoveVertical',
+    regulation: 'General Safety Reg 13A',
+  },
+  hand_tools: {
+    value: 'hand_tools',
+    label: 'Hand Tool Inspection',
+    description: 'Daily pre-use hand and power tool inspection',
+    icon: 'Wrench',
+    regulation: 'General Safety Regulations Section 8',
+  },
+  fire_equipment: {
+    value: 'fire_equipment',
+    label: 'Fire Equipment Inspection',
+    description: 'Periodic fire extinguisher and fire-fighting equipment inspection',
+    icon: 'FlameKindling',
+    regulation: 'Construction Reg 29',
+  },
+  road_cutter: {
+    value: 'road_cutter',
+    label: 'Road Cutter',
+    description: 'Daily pre-use road cutter / concrete saw checklist',
+    icon: 'Disc',
+    regulation: 'General Safety Regulations',
+  },
+  compactor: {
+    value: 'compactor',
+    label: 'Compactor',
+    description: 'Daily pre-use plate compactor / wacker checklist',
+    icon: 'Square',
+    regulation: 'General Safety Regulations',
+  },
+  barricading: {
+    value: 'barricading',
+    label: 'Barricading',
+    description: 'Daily excavation and trench barricading checklist',
+    icon: 'Construction',
+    regulation: 'Construction Reg 13',
+  },
+  traffic_signage: {
+    value: 'traffic_signage',
+    label: 'Traffic Signage',
+    description: 'Daily traffic accommodation signage checklist',
+    icon: 'Signpost',
+    regulation: 'Site Traffic Management Plan',
   },
 };
 
