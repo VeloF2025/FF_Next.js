@@ -146,11 +146,37 @@ describe('extractFields — Plain Paper layout', () => {
     expect(f.nettPayCents).toBe(1_974_126);
   });
 
-  it('keeps earnings − deductions === nett for every sample', () => {
-    for (const sample of [PLAIN_INLINE, PLAIN_WRAPPED, PLAIN_NO_ID]) {
-      const f = extractFields(sample, 'plain_paper');
-      expect(f.totalEarningsCents! - f.totalDeductionsCents!).toBe(f.nettPayCents);
+  it('derives deductions to the figure Sage prints on the page', () => {
+    // Deductions is derived (earnings - nett) rather than read off the page,
+    // so it can never be null on its own. It must still reproduce Sage's own
+    // printed "Total deductions" line exactly, or the stored row would
+    // disagree with the PDF the staff member downloads.
+    const printedOnPage: Array<[string, number]> = [
+      [PLAIN_INLINE, 355_812], //  "3 558.12\tTotal deductions"
+      [PLAIN_WRAPPED, 485_812], // "4 858.12\tTotal deductions"
+      [PLAIN_NO_ID, 296_061], //   "2 960.61\tTotal deductions"
+    ];
+    for (const [sample, expected] of printedOnPage) {
+      expect(extractFields(sample, 'plain_paper').totalDeductionsCents).toBe(expected);
     }
+  });
+
+  it('parses non-breaking spaces used as a thousands separator', () => {
+    const nbsp = PLAIN_INLINE.replace(
+      '25 000.00\tTotal earnings',
+      '25\u00a0000.00\tTotal earnings'
+    ).replace('21 441.88\tNett pay', '21\u202f441.88\tNett pay');
+
+    const f = extractFields(nbsp, 'plain_paper');
+    expect(f.totalEarningsCents).toBe(2_500_000);
+    expect(f.nettPayCents).toBe(2_144_188);
+  });
+
+  it('never bridges a tab when capturing an amount', () => {
+    // The neighbouring column's number must stay out of the capture — pulling
+    // it in is how one employee's figure lands on another's payslip row.
+    const f = extractFields('999.99\t177.12\tTotal earnings', 'plain_paper');
+    expect(f.totalEarningsCents).toBe(17_712);
   });
 });
 

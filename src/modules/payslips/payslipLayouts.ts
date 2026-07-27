@@ -50,13 +50,25 @@ export function extractFields(text: string, layout: PayslipLayout): ExtractedFie
 
 // ─── Plain Paper (current) ───────────────────────────────────────────
 
+/**
+ * A rand amount sitting immediately before its label, e.g. "25 000.00\tTotal
+ * earnings". The thousands separator may be a plain space or a non-breaking /
+ * narrow no-break space depending on the generator, so all three are allowed
+ * inside the number — but deliberately NOT `\s`, which would let the capture
+ * bridge a tab or newline and pick up a number from the neighbouring column.
+ */
+const AMOUNT_BEFORE_TOTAL_EARNINGS =
+  /([\d,\u00a0\u202f ]+\.\d{2})[\u00a0\u202f ]*\t[ ]*Total\s+earnings\b/i;
+const AMOUNT_BEFORE_NETT_PAY =
+  /([\d,\u00a0\u202f ]+\.\d{2})[\u00a0\u202f ]*\t[ ]*Nett\s+pay\b/i;
+
 function extractPlainPaper(text: string): ExtractedFields {
   // Anchor every value on the label that follows it. The tab is required —
   // it is what separates the value cell from the label cell, and without it
   // a bare number on the preceding line could be picked up instead.
   const empCode = matchOne(
     text,
-    /(?:^|\t)[ ]*([A-Z0-9][A-Z0-9-]*)[ ]*\t[ ]*Employee\s+Code\b/im
+    /(?:^|\t)[ ]*([A-Za-z0-9][A-Za-z0-9-]*)[ ]*\t[ ]*Employee\s+Code\b/im
   );
   const idNumber = matchOne(text, /(\d{13})[ ]*\t[ ]*Identity\s+Number\b/i);
   const paymentDate = matchOne(
@@ -67,14 +79,21 @@ function extractPlainPaper(text: string): ExtractedFields {
   // "Total earnings" — never "Taxable earnings", which is the YTD figure and
   // is larger, so a loose anchor imports a wildly wrong gross.
   const totalEarningsCents = parseRandToCents(
-    matchOne(text, /([\d ,]+\.\d{2})[ ]*\t[ ]*Total\s+earnings\b/i)
+    matchOne(text, AMOUNT_BEFORE_TOTAL_EARNINGS)
   );
-  const totalDeductionsCents = parseRandToCents(
-    matchOne(text, /([\d ,]+\.\d{2})[ ]*\t[ ]*Total\s+deductions\b/i)
-  );
-  const nettPayCents = parseRandToCents(
-    matchOne(text, /([\d ,]+\.\d{2})[ ]*\t[ ]*Nett\s+pay\b/i)
-  );
+  const nettPayCents = parseRandToCents(matchOne(text, AMOUNT_BEFORE_NETT_PAY));
+
+  // Derived, not read off the page — same as VIP. `commitImport` relies on
+  // deductions being null only when earnings or nett is also null (it defaults
+  // a null to 0 when writing the row), so an independently-parsed deductions
+  // field that could fail on its own would let a 0 overwrite a correct stored
+  // value on re-import. Deriving also guarantees gross - deductions == net on
+  // every row. Verified against the July 2026 export: the derived figure equals
+  // Sage's printed "Total deductions" on all 42 pages.
+  const totalDeductionsCents =
+    totalEarningsCents !== null && nettPayCents !== null
+      ? totalEarningsCents - nettPayCents
+      : null;
 
   const empName = extractPlainPaperName(text);
 
