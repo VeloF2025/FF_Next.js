@@ -22,10 +22,18 @@ import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { medicalId } = req.query;
   if (!medicalId || typeof medicalId !== 'string') {
     return apiResponse.badRequest(res, 'medicalId is required');
+  }
+  // The id goes straight into a uuid comparison; without this a malformed value
+  // is a Postgres cast error caught by the handler's catch-all, i.e. a 500 for
+  // what is plainly a bad request.
+  if (!UUID_RE.test(medicalId)) {
+    return apiResponse.badRequest(res, 'medicalId must be a uuid');
   }
 
   try {

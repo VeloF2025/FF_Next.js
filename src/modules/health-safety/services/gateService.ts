@@ -121,7 +121,12 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
   }
   if (medical.expired > 0) {
     blockers.push(`${medical.expired} expired medical certificate(s)`);
-  } else if (medical.expiring_soon > 0) {
+  }
+  // Independent of the blocker above, not `else if`: expired and expiring-soon
+  // are different workers (separate COUNT(*) FILTER clauses), so suppressing the
+  // warning because someone else is already blocking discards real information
+  // the H&S officer needs in order to fix both.
+  if (medical.expiring_soon > 0) {
     warnings.push(`${medical.expiring_soon} medical certificate(s) expiring soon`);
   }
   if (medical.restricted > 0) {

@@ -47,8 +47,14 @@ export async function computeContractorMedicalSummary(
     )
     SELECT
       COUNT(*)::int AS workers_with_medicals,
+      -- Mutually exclusive with expiring_soon and expired, so the three always
+      -- sum to workers_with_medicals. (hs_worker_training's rollup deliberately
+      -- uses a WIDER "current" as its score numerator; this one is a display
+      -- count, and an overlapping definition would double-count the moment
+      -- anything consumed it.)
       COUNT(*) FILTER (
-        WHERE expiry_date IS NULL OR expiry_date >= CURRENT_DATE
+        WHERE expiry_date IS NULL
+           OR expiry_date > CURRENT_DATE + make_interval(days => ${EXPIRING_SOON_DAYS})
       )::int AS current,
       COUNT(*) FILTER (
         WHERE expiry_date IS NOT NULL

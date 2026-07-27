@@ -99,9 +99,11 @@ export interface HSWorkerMedicalView extends HSWorkerMedical {
 export interface ContractorMedicalSummary {
   contractor_id: string;
   workers_with_medicals: number;
+  /** current + expiring_soon + expired === workers_with_medicals (disjoint) */
   current: number;
   expiring_soon: number;
   expired: number;
+  /** outcome counts — these overlap the expiry buckets above by design */
   unfit: number;
   restricted: number;
 }

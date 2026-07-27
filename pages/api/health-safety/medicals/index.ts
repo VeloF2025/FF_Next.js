@@ -168,6 +168,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   if (hasStaff === hasTeamMember) {
     return apiResponse.badRequest(res, 'Exactly one of staff_id or team_member_id is required');
   }
+  // A contractor worker's certificate with no contractor_id is invisible to
+  // every gate — computeContractorMedicalSummary filters by contractor_id, so
+  // the record would silently never affect the thing it exists to drive.
+  // contractor_id stays optional for internal staff (NULL = Velocity employee),
+  // matching hs_worker_training.
+  if (hasTeamMember && !(typeof contractor_id === 'string' && contractor_id.length > 0)) {
+    return apiResponse.badRequest(
+      res,
+      'contractor_id is required for a contractor worker — without it the record cannot reach any compliance gate'
+    );
+  }
   // Surface each DB CHECK as a 400 rather than letting it become a 500.
   if (expiry_date && String(expiry_date) < String(exam_date)) {
     return apiResponse.badRequest(res, 'expiry_date cannot be before exam_date');

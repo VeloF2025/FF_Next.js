@@ -50,6 +50,12 @@ function RecordMedicalContent() {
       setErr('Worker and examination date are required');
       return;
     }
+    // Mirrors the server rule: without a contractor, a contractor worker's
+    // certificate never reaches any compliance gate.
+    if (workerKind === 'team_member' && !form.contractor_id) {
+      setErr('Select the contractor — it is what drives the compliance gate');
+      return;
+    }
     // Mirrors the DB CHECK (hs_worker_medicals_restrictions_stated) so the user
     // sees the problem in the form rather than as a server error.
     if (outcome === 'fit_with_restriction' && !form.restrictions.trim()) {
@@ -138,7 +144,7 @@ function RecordMedicalContent() {
 
         {workerKind === 'team_member' && (
           <div>
-            <label className={labelCls}>Contractor (drives the compliance gate)</label>
+            <label className={labelCls}>Contractor * (drives the compliance gate)</label>
             <select className={inputCls} value={form.contractor_id} onChange={(e) => set('contractor_id', e.target.value)}>
               <option value="">Select contractor…</option>
               {contractors.map((c: { id: string; company_name: string }) => (

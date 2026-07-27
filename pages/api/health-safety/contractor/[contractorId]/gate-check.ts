@@ -141,8 +141,10 @@ async function getGateBreakdown(contractorId: string) {
   // Training check (simplified)
   const trainingPassed = true; // Would check actual training records
 
-  // Per-worker medical fitness (migration 463). Same rollup the gate verdict
-  // uses, so this panel cannot disagree with `gate.blocking_reasons`.
+  // Per-worker medical fitness (migration 463). Same rollup and same pass
+  // condition the gate verdict uses, so the two agree for any given snapshot.
+  // (This is a second, independent call — as with training and documents above —
+  // so a write landing between the two could still desync one response.)
   const medical = await computeContractorMedicalSummary(contractorId);
   const medicalPassed = medical.unfit === 0 && medical.expired === 0;
 
