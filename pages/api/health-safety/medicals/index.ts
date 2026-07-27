@@ -21,6 +21,7 @@ import {
   MEDICAL_OUTCOMES,
   type MedicalOutcome,
 } from '@/modules/health-safety/types/medical.types';
+import { blankToNull } from '@/modules/health-safety/services/inputNormalize';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -173,7 +174,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   // the record would silently never affect the thing it exists to drive.
   // contractor_id stays optional for internal staff (NULL = Velocity employee),
   // matching hs_worker_training.
-  if (hasTeamMember && !(typeof contractor_id === 'string' && contractor_id.length > 0)) {
+  if (hasTeamMember && !blankToNull(contractor_id)) {
     return apiResponse.badRequest(
       res,
       'contractor_id is required for a contractor worker — without it the record cannot reach any compliance gate'

@@ -68,15 +68,21 @@ describe('1. contractor_id is required for a contractor worker', () => {
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a blank contractor_id just as firmly', async () => {
-    const res = await post({
-      team_member_id: UUID,
-      contractor_id: '',
-      exam_date: '2026-03-01',
-      worker_name: 'W',
-    });
-    expect(res._getStatusCode()).toBe(400);
-  });
+  it.each([[''], ['   '], ['\t']])(
+    'rejects a blank/whitespace contractor_id (%j) just as firmly',
+    async (value) => {
+      const res = await post({
+        team_member_id: UUID,
+        contractor_id: value,
+        exam_date: '2026-03-01',
+        worker_name: 'W',
+      });
+      // Whitespace-only used to slip past a length-only check and then fail as a
+      // raw uuid-cast 500 downstream.
+      expect(res._getStatusCode()).toBe(400);
+      expect(sqlMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('accepts a team_member medical that names its contractor', async () => {
     const res = await post({
