@@ -39,7 +39,11 @@ const CONTRACTS: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['pages/api/health-safety/appointments/index.ts', ['appointment_date', 'effective_from']],
   ['pages/api/health-safety/appointments/[letterId].ts', ['appointment_date', 'effective_from']],
   ['pages/api/health-safety/injuries/index.ts', ['injury_date']],
-  ['pages/api/health-safety/project/[projectId]/safety-file.ts', ['appointment_date', 'effective_from']],
+  // safety-file.ts also casts the contractor-documents/risk-register pure date
+  // columns it pulls in (2026-07-26, safety-file full export): issue_date/
+  // expiry_date (hs_contractor_documents) and review_date (hs_risk_register).
+  // All are display-only in this export -- no JS gate compare here at all.
+  ['pages/api/health-safety/project/[projectId]/safety-file.ts', ['appointment_date', 'effective_from', 'issue_date', 'expiry_date', 'review_date']],
 
   // Contractor documents: unlike the tables above, hs_contractor_documents
   // rows also feed JS gate-check comparisons (new Date(d.expiry_date) > new

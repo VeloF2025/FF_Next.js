@@ -6,7 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, isOwner, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -19,7 +19,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
   const userName = authReq.user?.name?.toLowerCase() || '';
-  const isHein = userEmail === 'hein@velocityfibre.co.za';
+  const isHein = isOwner(authReq.user);
   const meetingId = req.query.id as string;
   const { notes } = req.body;
 

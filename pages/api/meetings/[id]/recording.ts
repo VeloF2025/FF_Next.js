@@ -1,7 +1,7 @@
 // 🟢 WORKING: Stream a meeting recording MP4 with Range request support for video seeking
 // Access restricted to meeting participants only; hein@ sees all
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, isOwner, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import * as fs from 'fs';
@@ -25,7 +25,7 @@ interface MeetingRecordingRow {
  * enabling seek operations in standard HTML5 <video> elements.
  *
  * Access control:
- *   - hein@velocityfibre.co.za: unrestricted access
+ *   - Owner identity (see src/lib/auth/owner.ts): unrestricted access
  *   - Other roles: must appear in the meeting's participants JSON array by email
  *
  * Supports:
@@ -40,7 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
-  const isHein = userEmail === 'hein@velocityfibre.co.za';
+  const isHein = isOwner(authReq.user);
 
   if (!userEmail) {
     apiResponse.forbidden(res, 'User email is required for recording access');

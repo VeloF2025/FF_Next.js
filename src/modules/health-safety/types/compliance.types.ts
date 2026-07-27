@@ -15,6 +15,12 @@ export type HSDocumentType =
   | 'medical_fitness'
   | 'equipment_inspection'
   | 'risk_assessment'
+  // added 2026-07-26 (H&S docs-vs-module alignment audit): present in every
+  // client's real H&S file, previously had no document_type value at all.
+  // hs_contractor_documents.document_type is unconstrained VARCHAR(100), so no
+  // migration is needed for these two.
+  | 'letter_of_good_standing'
+  | 'tax_clearance'
   | 'other';
 
 export type DocumentStatus = 'pending' | 'valid' | 'expired' | 'rejected' | 'expiring_soon';
@@ -171,6 +177,24 @@ export const DOCUMENT_TYPES: Record<HSDocumentType, DocumentTypeConfig> = {
     required_for_gate: false,
     typical_validity_months: 0,
     icon: 'AlertTriangle',
+  },
+  letter_of_good_standing: {
+    value: 'letter_of_good_standing',
+    label: 'Letter of Good Standing',
+    description: 'COIDA Letter of Good Standing (Compensation Fund/CF, lapses annually)',
+    // Not gate-required by default -- flagged for a product decision, see PR
+    // description. Flip to true only on explicit instruction.
+    required_for_gate: false,
+    typical_validity_months: 12,
+    icon: 'BadgeCheck',
+  },
+  tax_clearance: {
+    value: 'tax_clearance',
+    label: 'Tax Clearance Certificate',
+    description: 'SARS Tax Clearance Certificate / PIN',
+    required_for_gate: false,
+    typical_validity_months: 12,
+    icon: 'Receipt',
   },
   other: {
     value: 'other',

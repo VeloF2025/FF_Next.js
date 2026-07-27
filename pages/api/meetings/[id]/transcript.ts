@@ -1,7 +1,7 @@
 // 🟢 WORKING: Retrieve transcript for a specific meeting (VTT or plain text)
 // Access restricted to meeting participants only; hein@ sees all
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, isOwner, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { neon } from '@neondatabase/serverless';
 import { parseVttSpeakers } from '@/lib/graph/transcripts';
@@ -28,7 +28,7 @@ interface StoredTranscriptRow {
  * Returns the transcript for a meeting in both raw and structured (speaker-parsed) form.
  *
  * Access control:
- *   - hein@velocityfibre.co.za: unrestricted access
+ *   - Owner identity (see src/lib/auth/owner.ts): unrestricted access
  *   - Other roles: must appear in the meeting's participants JSON array by email
  *
  * Response body:
@@ -44,7 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
-  const isHein = userEmail === 'hein@velocityfibre.co.za';
+  const isHein = isOwner(authReq.user);
 
   if (!userEmail) {
     return apiResponse.forbidden(res, 'User email is required for transcript access');
