@@ -136,4 +136,38 @@ describe('pipeUpstreamResponse', () => {
       pipeUpstreamResponse({ body: failing, arrayBuffer: async () => new ArrayBuffer(0) }, res),
     ).rejects.toThrow(/upstream exploded/);
   });
+
+  it('destroys the upstream stream when the client disconnects early', async () => {
+    // Measured before the fix: a bare .pipe() left the upstream at destroyed === false
+    // and still being pulled after the client socket died. On a public unauthenticated
+    // proxy that is its own DoS — hang up immediately, leave a large response draining.
+    let pulled = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        // Yield between chunks. A synchronous enqueue loop with a flowing consumer never
+        // returns to the event loop, so timers never fire and the TEST hangs rather than
+        // the code under test.
+        await new Promise((r) => setTimeout(r, 5));
+        pulled++;
+        controller.enqueue(new Uint8Array(1024));
+      },
+    });
+    const { res, sink } = collectingRes();
+
+    const done = pipeUpstreamResponse({ body: endless, arrayBuffer: async () => new ArrayBuffer(0) }, res);
+    await new Promise((r) => setTimeout(r, 20));
+    sink.destroy(); // client goes away
+
+    // Must settle, not hang, and must not treat a normal hang-up as an error.
+    await expect(done).resolves.toBeUndefined();
+
+    // Let any chunk already in flight land, then prove the count has STOPPED growing.
+    // Exact equality would be wrong: one pull can legitimately be mid-flight when the
+    // socket dies. The property that matters is that it stops, not that it never ticks
+    // once more. Before this fix the count kept climbing indefinitely.
+    await new Promise((r) => setTimeout(r, 40));
+    const settled = pulled;
+    await new Promise((r) => setTimeout(r, 80));
+    expect(pulled, 'upstream still being pulled long after the client disconnected').toBe(settled);
+  });
 });

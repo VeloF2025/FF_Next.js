@@ -13,6 +13,7 @@
  * argument for one implementation with one place to fix.
  */
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 /**
@@ -79,9 +80,18 @@ export async function pipeUpstreamResponse(
 
   const nodeStream = Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]);
 
-  await new Promise<void>((resolve, reject) => {
-    nodeStream.on('error', reject);
-    res.on('close', resolve);
-    nodeStream.pipe(res).on('finish', resolve).on('error', reject);
-  });
+  try {
+    // pipeline(), not pipe(). A bare .pipe() does NOT tear down the source when the
+    // destination goes away: measured directly, after the client socket was destroyed the
+    // upstream stream kept being pulled and was still `destroyed === false`. On a public
+    // unauthenticated proxy that is its own denial of service — open many requests, hang
+    // up immediately, and each one goes on draining a large upstream response into a dead
+    // socket. That would have undone most of the cap this function exists to provide.
+    await pipeline(nodeStream, res);
+  } catch (err) {
+    // The client hanging up mid-response is normal traffic, not a failure: pipeline has
+    // already destroyed both streams, which is the whole point of using it.
+    if ((err as NodeJS.ErrnoException)?.code === 'ERR_STREAM_PREMATURE_CLOSE') return;
+    throw err;
+  }
 }
