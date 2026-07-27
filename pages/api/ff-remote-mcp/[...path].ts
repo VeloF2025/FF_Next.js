@@ -101,9 +101,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!HOP_BY_HOP.has(key.toLowerCase())) res.setHeader(key, value);
     });
 
-    return pipeUpstreamResponse(upstream, res);
+    // `return await`, not `return`. A bare `return <promise>` leaves the try scope before
+    // the promise settles, so a later rejection escapes THIS catch — the headersSent
+    // guard becomes dead code and the failure is never logged. See PR #2262.
+    return await pipeUpstreamResponse(upstream, res);
   } catch (error) {
     log.error('FibreFlow remote MCP proxy failed', { upstreamUrl, error });
+
+    // Streaming can fail AFTER the upstream status and first bytes are on the wire, and
+    // res.status(502) then throws ERR_HTTP_HEADERS_SENT. Destroying is the only honest
+    // signal left: it marks the body TRUNCATED rather than letting a partial response
+    // look complete.
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+
     return res.status(502).json({
       success: false,
       error: {
