@@ -29,6 +29,11 @@ import psycopg2.extras
 # file is run as `python3 scripts/extract-gpkg-photos.py` (the only invocation).
 from qfield_step_detection import detect_step_columns, is_photo_value
 
+# Pure GPKG family resolution (no MinIO/DB deps) — unit-tested/CI-gated by
+# scripts/test_qfield_gpkg_resolution.py. Lets a project survive the crew renaming
+# its audit GPKG ("Civil audit.gpkg" → "Civil audit updated_27_07.gpkg").
+from qfield_gpkg_resolution import is_family_member, pick_latest_gpkg, pick_photo_table
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
 DB_URL = os.environ.get("DATABASE_URL")
@@ -98,6 +103,10 @@ PROJECTS = {
     # handled by STEP_PATTERNS (leading-word, number-agnostic). Pole label lives in
     # the "Name" column (e.g. HT_MFKGP4_D2964PL); "Lable"/"Pole_ID" are empty/junk.
     # GPKG file is "Civil audit.gpkg" (lower-case "audit"); table match is case-insensitive.
+    # gpkg_path is the FAMILY ROOT, not necessarily the file that gets read: the crew
+    # renames rather than overwrites ("Civil audit updated_27_07.gpkg"), and
+    # resolve_gpkg_path() follows that to the newest member each run. Leave it at the
+    # root — pinning a dated name here would need re-pinning after every rename.
     "Mahikeng": {
         "qf_project_id": "e801cd43-7efe-4f7a-bed5-ee0410f3dfd6",
         "ff_project_id": "7794d0ba-95c9-491b-8cb5-7f300c61aa23",
@@ -361,8 +370,14 @@ def minio_list_dcim_directory(qf_project_id):
         return {}
 
 
-def minio_download_latest(qf_project_id, gpkg_path, dest_path):
-    """Download the latest version of a GPKG from MinIO."""
+# `mc ls` renders a "directory" (a versioned file's version folder) as
+#   [2026-07-27 15:06:40 UTC]     0B Civil audit updated_27_07.gpkg/
+# Anchor on the bracketed timestamp + size token so names containing spaces survive.
+_MC_DIR_RE = re.compile(r"^\[[^\]]*\]\s+\S+\s+(.+/)$")
+
+
+def minio_list_gpkg_versions(qf_project_id, gpkg_path):
+    """Sorted version ids for one GPKG in MinIO ([] on any failure)."""
     prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/"
     try:
         result = subprocess.run(
@@ -370,9 +385,7 @@ def minio_download_latest(qf_project_id, gpkg_path, dest_path):
             capture_output=True, text=True, timeout=15,
         )
         if result.returncode != 0 or not result.stdout.strip():
-            return None, None
-
-        # Parse versions, pick latest.
+            return []
         # Use STANDARD-marker parsing to handle filenames containing spaces.
         versions = []
         for line in result.stdout.strip().split("\n"):
@@ -385,10 +398,89 @@ def minio_download_latest(qf_project_id, gpkg_path, dest_path):
             ver = line[std_idx + len(" STANDARD "):].strip().rstrip("/")
             if ver:
                 versions.append(ver)
+        versions.sort()
+        return versions
+    except Exception as e:
+        print(f"    MinIO error listing versions of {gpkg_path}: {e}")
+        return []
+
+
+def minio_list_gpkg_family(qf_project_id, configured_path):
+    """{gpkg_filename: latest_version} for every GPKG in the project's files/ dir.
+
+    One `mc ls` of files/ plus one per GPKG found — a handful of small calls, unlike
+    DCIM which holds thousands of objects and is never walked here. Returns {} on any
+    failure so the caller falls back to the configured filename (fail OPEN: a MinIO
+    hiccup must not skip the project or redirect it somewhere unexpected).
+    """
+    prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/"
+    try:
+        result = subprocess.run(
+            ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", prefix],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            print(f"    WARN: mc ls files/ failed for {qf_project_id}: {result.stderr.strip()[:120]}")
+            return {}
+    except Exception as e:
+        print(f"    WARN: mc ls files/ error for {qf_project_id}: {e}")
+        return {}
+
+    names = []
+    for line in result.stdout.strip().split("\n"):
+        m = _MC_DIR_RE.match(line.strip())
+        if not m:
+            continue
+        name = m.group(1).rstrip("/")
+        if name.lower().endswith(".gpkg"):
+            names.append(name)
+
+    # Only version-list the family members — the whole point is to avoid touching
+    # unrelated GPKGs (a project can carry a dozen: poles, optical, boundaries…).
+    family = {}
+    for name in names:
+        if not is_family_member(configured_path, name):
+            continue
+        versions = minio_list_gpkg_versions(qf_project_id, name)
+        if versions:
+            family[name] = versions[-1]
+    return family
+
+
+def resolve_gpkg_path(qf_project_id, configured_path):
+    """Follow a crew rename: the newest GPKG in configured_path's family.
+
+    Returns the filename to actually read. Falls back to configured_path whenever
+    the family cannot be listed or the configured file is still the newest.
+    """
+    family = minio_list_gpkg_family(qf_project_id, configured_path)
+    chosen, chosen_version = pick_latest_gpkg(configured_path, family)
+
+    if not chosen:
+        # pick_latest_gpkg refuses to redirect when the configured file itself is
+        # missing. Say so out loud — that is a real misconfiguration (the download
+        # below will fail), just not one this function is allowed to guess its way out of.
+        if family and configured_path not in family:
+            print(f"  WARN: configured '{configured_path}' is not in MinIO. Same-family "
+                  f"files exist ({sorted(family)}) but auto-redirect requires the "
+                  f"configured file to exist — fix PROJECTS/ALTERNATE_GPKGS instead.")
+        return configured_path
+
+    if chosen == configured_path:
+        return configured_path
+
+    print(f"  REDIRECT: configured '{configured_path}' ({family.get(configured_path)}) is "
+          f"no longer the newest in its family — reading '{chosen}' ({chosen_version}) "
+          f"instead. Family: {sorted(family)}")
+    return chosen
+
+
+def minio_download_latest(qf_project_id, gpkg_path, dest_path):
+    """Download the latest version of a GPKG from MinIO."""
+    try:
+        versions = minio_list_gpkg_versions(qf_project_id, gpkg_path)
         if not versions:
             return None, None
-
-        versions.sort()
         latest = versions[-1]
 
         # Download
@@ -473,7 +565,14 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
     print(f"\n{'='*60}")
     print(f"Project: {project_name}")
     print(f"  QField: {qf_id}")
-    print(f"  GPKG:   {config['gpkg_path']}")
+
+    # Crews rename an audit GPKG rather than overwriting it, which silently pins the
+    # ingest to a dead file (Mahikeng: 918 photos missed over 5 days). Follow the
+    # rename to the newest member of the configured file's family. Every downstream
+    # step — sync-state lookup, download, sync-state upsert — must use gpkg_path, not
+    # config["gpkg_path"], or the delta check compares against the wrong state row.
+    gpkg_path = resolve_gpkg_path(qf_id, config["gpkg_path"])
+    print(f"  GPKG:   {gpkg_path}")
 
     # Check delta — skip if GPKG version unchanged AND nothing was left pending last run.
     # pending_count = photos referenced by the GPKG whose binary had not yet uploaded to
@@ -484,7 +583,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
     if not force:
         cur.execute(
             "SELECT last_version, pending_count FROM qfield_gpkg_sync_state WHERE qf_project_id = %s AND gpkg_path = %s",
-            (qf_id, config["gpkg_path"]),
+            (qf_id, gpkg_path),
         )
         state = cur.fetchone()
     else:
@@ -495,7 +594,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
         tmp_path = tmp.name
 
     try:
-        version, size = minio_download_latest(qf_id, config["gpkg_path"], tmp_path)
+        version, size = minio_download_latest(qf_id, gpkg_path, tmp_path)
         if not version:
             print(f"  SKIP: Could not download GPKG")
             return 0, 0
@@ -537,9 +636,27 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
             if match:
                 table_name = match[0]
             else:
-                print(f"  ERROR: Table '{config['table_name']}' not found. Available: {tables}")
-                db.close()
-                return 0, 0
+                # A renamed GPKG renames its layer too ('civil_audit' →
+                # 'civil_audit_updated_27_07'), so fall back to whichever table
+                # actually carries photo columns. Counting rather than guessing
+                # also skips GPKG relation side-tables ('civil_audit__civil_audit'),
+                # which have none.
+                photo_col_counts = {}
+                for t in tables:
+                    t_cols = [r[1] for r in db.execute(f"PRAGMA table_info([{t}])").fetchall()]
+                    t_steps, t_extra = detect_step_columns(t_cols)
+                    photo_col_counts[t] = len(t_steps) + len(t_extra)
+                fallback = pick_photo_table(config["table_name"], photo_col_counts)
+                if fallback:
+                    print(f"  TABLE-FALLBACK: '{config['table_name']}' absent; using "
+                          f"'{fallback}' ({photo_col_counts[fallback]} photo columns). "
+                          f"Available: {tables}")
+                    table_name = fallback
+                else:
+                    print(f"  ERROR: Table '{config['table_name']}' not found and no "
+                          f"table has photo columns. Available: {tables}")
+                    db.close()
+                    return 0, 0
 
         rows = db.execute(f"SELECT * FROM [{table_name}]").fetchall()
         columns = rows[0].keys() if rows else []
@@ -784,7 +901,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     last_synced_at = NOW(),
                     row_count = EXCLUDED.row_count,
                     pending_count = EXCLUDED.pending_count
-            """, (qf_id, config["gpkg_path"], version, len(rows), photos_skipped_missing))
+            """, (qf_id, gpkg_path, version, len(rows), photos_skipped_missing))
             conn.commit()
 
         print(f"  Photos found: {photos_found}, New upserted: {photos_upserted}, Skipped (no MinIO): {photos_skipped_missing}")
