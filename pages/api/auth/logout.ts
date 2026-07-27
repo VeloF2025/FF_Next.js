@@ -8,10 +8,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
 import {
   verifyToken,
+  getSession,
   deleteSession,
   deleteAllUserSessions,
   AUTH_COOKIE_NAME,
 } from '@/lib/auth';
+import { MCP_READ_ONLY_CODE, MCP_READ_ONLY_MESSAGE } from '@/lib/auth/readOnly';
 import { log } from '@/lib/logger';
 
 interface LogoutRequestBody {
@@ -40,6 +42,24 @@ export default async function handler(
       const payload = await verifyToken(token);
 
       if (payload) {
+        // This route resolves the user itself rather than going through withAuth, so it
+        // does not inherit the read-only gate — check explicitly. Without this an MCP
+        // token can POST here and, with allDevices, terminate every session on the
+        // account including the owner's live browser session. Destructive, and precisely
+        // what a read-only credential must not be able to do.
+        //
+        // NOT done by wrapping the handler in withAuth: this route deliberately clears
+        // the cookie even for an invalid or expired token, and withAuth would 401 those
+        // callers, leaving a stale cookie nobody can shed.
+        const session = await getSession(payload.sessionId);
+        if (session?.kind === 'mcp') {
+          log.warn('Refused logout from a read-only MCP session', { userId: payload.sub });
+          return res.status(403).json({
+            success: false,
+            error: { code: MCP_READ_ONLY_CODE, message: MCP_READ_ONLY_MESSAGE },
+          });
+        }
+
         if (allDevices) {
           // Delete all sessions for this user
           await deleteAllUserSessions(payload.sub);
