@@ -15,8 +15,16 @@
  * Edge-runtime safe: pure string work, no node APIs, no I/O.
  */
 
-/** Cookie the app sets on login. Mirrors AUTH_COOKIE_NAME in src/lib/auth. */
-const SESSION_COOKIE = 'ff_auth_token';
+/**
+ * Every cookie that represents a logged-in caller.
+ *
+ * There are TWO session systems, and missing the second one would have made this audit
+ * worse than useless: `ff_auth_token` is the main app (src/lib/auth), `ff_portal_session`
+ * is the staff portal behind `withMySession` (49 routes under /api/my — time & attendance,
+ * payslips, receipts, stores). Checking only the first would have flagged every
+ * authenticated staff-portal request as anonymous and drowned the real signal.
+ */
+const SESSION_COOKIES = ['ff_auth_token', 'ff_portal_session'] as const;
 
 /**
  * Prefixes that must stay reachable anonymously, with the reason each one is here.
@@ -59,7 +67,9 @@ export function hasAnyCredential(req: {
   cookies: { get(name: string): { value: string } | undefined };
   headers: { get(name: string): string | null };
 }): boolean {
-  if (req.cookies.get(SESSION_COOKIE)?.value) return true;
+  for (const cookie of SESSION_COOKIES) {
+    if (req.cookies.get(cookie)?.value) return true;
+  }
 
   const authorization = req.headers.get('authorization');
   if (authorization && authorization.trim() !== '') return true;

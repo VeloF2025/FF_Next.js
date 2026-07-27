@@ -7,10 +7,11 @@ import {
   wouldDenyApiRequest,
 } from '../apiPublicRoutes';
 
-function req(opts: { cookie?: string; headers?: Record<string, string> } = {}) {
+function req(opts: { cookie?: string; cookieName?: string; headers?: Record<string, string> } = {}) {
   const headers = opts.headers ?? {};
+  const name = opts.cookieName ?? 'ff_auth_token';
   return {
-    cookies: { get: (n: string) => (n === 'ff_auth_token' && opts.cookie ? { value: opts.cookie } : undefined) },
+    cookies: { get: (n: string) => (n === name && opts.cookie ? { value: opts.cookie } : undefined) },
     headers: { get: (n: string) => headers[n.toLowerCase()] ?? null },
   };
 }
@@ -45,8 +46,16 @@ describe('isPublicApiRoute', () => {
 });
 
 describe('hasAnyCredential', () => {
-  it('accepts a session cookie', () => {
+  it('accepts the main app session cookie', () => {
     expect(hasAnyCredential(req({ cookie: 'jwt.value.here' }))).toBe(true);
+  });
+
+  it('accepts the staff-portal session cookie', () => {
+    // Two session systems exist. Missing this one would flag every authenticated
+    // /api/my request (49 routes: attendance, payslips, receipts, stores) as anonymous
+    // and drown the real signal in false positives.
+    expect(hasAnyCredential(req({ cookie: 'portal.jwt', cookieName: 'ff_portal_session' }))).toBe(true);
+    expect(wouldDenyApiRequest('/api/my/attendance', req({ cookie: 'p', cookieName: 'ff_portal_session' }))).toBe(false);
   });
 
   it('accepts a bearer token', () => {
