@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Send,
   MonitorSmartphone,
+  Rocket,
 } from 'lucide-react';
 import type { WaAdminTab } from './types/wa-admin.types';
 
@@ -26,6 +27,7 @@ import GroupsTab from './components/GroupsTab';
 import TemplatesTab from './components/TemplatesTab';
 import LogsTab from './components/LogsTab';
 import SettingsTab from './components/SettingsTab';
+import GoLiveTab from './components/GoLiveTab';
 
 interface TabConfig {
   id: WaAdminTab;
@@ -43,6 +45,7 @@ const tabs: TabConfig[] = [
   { id: 'templates', label: 'Templates', icon: FileText, component: TemplatesTab },
   { id: 'logs', label: 'Logs', icon: ScrollText, component: LogsTab },
   { id: 'settings', label: 'Settings', icon: Settings, component: SettingsTab },
+  { id: 'golive', label: 'Go Live', icon: Rocket, component: GoLiveTab },
 ];
 
 const WhatsAppPortal: React.FC = () => {

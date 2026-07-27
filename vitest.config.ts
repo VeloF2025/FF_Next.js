@@ -51,6 +51,7 @@ export default defineConfig({
       { find: '@/lib/rateLimiter', replacement: path.resolve(__dirname, './src/lib/rateLimiter') },
       { find: '@/lib/featureFlags', replacement: path.resolve(__dirname, './src/lib/featureFlags') },
       { find: '@/lib/utils', replacement: path.resolve(__dirname, './src/lib/utils') },
+      { find: '@/lib/smtpConfig', replacement: path.resolve(__dirname, './src/lib/smtpConfig') },
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
       { find: '@/lib/neon', replacement: path.resolve(__dirname, './src/lib/neon') },
       { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
