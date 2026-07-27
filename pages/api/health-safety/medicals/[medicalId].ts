@@ -80,7 +80,8 @@ async function handlePatch(medicalId: string, req: NextApiRequest, res: NextApiR
   // the restriction) spans two columns, so it can only be checked against the
   // RESULTING row, not against the patch in isolation.
   const [existing] = await sql`
-    SELECT *, exam_date::text AS exam_date, expiry_date::text AS expiry_date
+    SELECT *, exam_date::text AS exam_date, expiry_date::text AS expiry_date,
+           updated_at::text AS updated_at_token
     FROM hs_worker_medicals WHERE id = ${medicalId} LIMIT 1
   `;
   if (!existing) {
@@ -92,7 +93,13 @@ async function handlePatch(medicalId: string, req: NextApiRequest, res: NextApiR
   const has = (k: string) => Object.prototype.hasOwnProperty.call(req.body, k);
   const pick = <T>(k: string, current: T): T => (has(k) ? (req.body[k] ?? null) : current);
 
-  const examDate = String(pick('exam_date', existing.exam_date) ?? existing.exam_date);
+  // exam_date is NOT NULL in the schema, so unlike every other field here an
+  // explicit null cannot mean "clear it" — reject it rather than silently
+  // falling back to the existing value and reporting success.
+  if (has('exam_date') && !req.body.exam_date) {
+    return apiResponse.badRequest(res, 'exam_date cannot be cleared');
+  }
+  const examDate = String(pick('exam_date', existing.exam_date));
   const expiryDate = pick<string | null>('expiry_date', (existing.expiry_date as string) ?? null);
   const outcome = pick<MedicalOutcome>('outcome', existing.outcome as MedicalOutcome);
   const restrictions = pick<string | null>('restrictions', (existing.restrictions as string) ?? null);
@@ -113,6 +120,11 @@ async function handlePatch(medicalId: string, req: NextApiRequest, res: NextApiR
     );
   }
 
+  // Optimistic concurrency. Every omitted key is written back from the snapshot
+  // read above, so without this guard two concurrent PATCHes that each touch a
+  // different field would have the later one silently revert the earlier one.
+  // Comparing updated_at::text (not the Date) keeps the round-trip lossless —
+  // timestamptz has microsecond precision, a JS Date only milliseconds.
   const rows = await sql`
     UPDATE hs_worker_medicals
     SET
@@ -128,8 +140,15 @@ async function handlePatch(medicalId: string, req: NextApiRequest, res: NextApiR
       notes = ${pick('notes', existing.notes)},
       updated_at = NOW()
     WHERE id = ${medicalId}
+      AND updated_at::text = ${existing.updated_at_token}
     RETURNING *, exam_date::text AS exam_date, expiry_date::text AS expiry_date
   `;
+  if (rows.length === 0) {
+    return apiResponse.conflict(
+      res,
+      'This medical record was changed by someone else while you were editing it — reload and reapply your change'
+    );
+  }
   const record = rows[0]!;
 
   await logHsActivity({

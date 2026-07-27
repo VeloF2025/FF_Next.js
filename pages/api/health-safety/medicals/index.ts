@@ -25,6 +25,8 @@ import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     switch (req.method) {
@@ -48,10 +50,19 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   // Every filter is folded into the WHERE via a NULL-guard so there is exactly
   // one query shape — the Neon shim binds each ${} as a value, never as a SQL
   // fragment, so conditional fragments are not an option here.
-  const cid = typeof contractor_id === 'string' ? contractor_id : null;
-  const sid = typeof staff_id === 'string' ? staff_id : null;
-  const tmid = typeof team_member_id === 'string' ? team_member_id : null;
-  const pid = typeof project_id === 'string' ? project_id : null;
+  // Pre-validate the uuid filters: without this a malformed id reaches the
+  // ${...}::uuid cast and Postgres raises, turning a caller mistake into a 500.
+  const uuidFilters = { contractor_id, staff_id, team_member_id, project_id };
+  for (const [name, value] of Object.entries(uuidFilters)) {
+    if (typeof value === 'string' && value !== '' && !UUID_RE.test(value)) {
+      return apiResponse.badRequest(res, `${name} must be a uuid`);
+    }
+  }
+  const asUuid = (v: unknown) => (typeof v === 'string' && v !== '' ? v : null);
+  const cid = asUuid(contractor_id);
+  const sid = asUuid(staff_id);
+  const tmid = asUuid(team_member_id);
+  const pid = asUuid(project_id);
   const st = typeof status === 'string' ? status : null;
   const oc = typeof outcome === 'string' ? outcome : null;
   // `latest_only` collapses superseded certificates to one row per worker — the
