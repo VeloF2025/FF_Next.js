@@ -83,7 +83,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!HOP_BY_HOP.has(key.toLowerCase())) res.setHeader(key, value);
     });
 
-    return pipeUpstreamResponse(upstream, res);
+    // `return await`, not `return`. A bare `return <promise>` inside try/catch leaves the
+    // try scope before the promise settles, so a later rejection escapes THIS catch and
+    // becomes the handler's own rejection — the headersSent guard below would be dead
+    // code and the failure would never be logged. Verified by execution: without await,
+    // the catch does not run.
+    return await pipeUpstreamResponse(upstream, res);
   } catch (error) {
     log.error('Cortex remote MCP proxy failed', { upstreamUrl, error });
 
