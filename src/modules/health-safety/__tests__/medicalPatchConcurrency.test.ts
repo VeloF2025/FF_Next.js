@@ -30,7 +30,7 @@ vi.mock('@/lib/auth', () => ({
 import detailHandler from '../../../../pages/api/health-safety/medicals/[medicalId]';
 
 const EXISTING = {
-  id: 'med-1',
+  id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
   worker_name: 'Test Worker',
   contractor_id: null,
   project_id: null,
@@ -53,7 +53,7 @@ function queryText(call: unknown[]): string {
 async function patch(body: Record<string, unknown>) {
   const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
     method: 'PATCH',
-    query: { medicalId: 'med-1' },
+    query: { medicalId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa' },
     body,
   });
   await detailHandler(req, res);

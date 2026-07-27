@@ -32,6 +32,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!libraryId || typeof libraryId !== 'string') {
     return apiResponse.badRequest(res, 'libraryId is required');
   }
+  // The id goes straight into a uuid comparison; without this a malformed value
+  // is a Postgres cast error caught by the handler's catch-all, i.e. a 500 for
+  // what is plainly a bad request.
+  if (!UUID_RE.test(libraryId)) {
+    return apiResponse.badRequest(res, 'libraryId must be a uuid');
+  }
 
   try {
     switch (req.method) {

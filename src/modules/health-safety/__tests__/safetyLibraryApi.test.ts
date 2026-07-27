@@ -35,7 +35,7 @@ import indexHandler from '../../../../pages/api/health-safety/library/index';
 import detailHandler from '../../../../pages/api/health-safety/library/[libraryId]';
 
 const EXISTING_MSDS = {
-  id: 'lib-1',
+  id: 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb',
   content_type: 'msds',
   title: 'Isopropyl Alcohol',
   reference: null,
@@ -69,7 +69,7 @@ async function post(body: Record<string, unknown>) {
 async function patch(body: Record<string, unknown>) {
   const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
     method: 'PATCH',
-    query: { libraryId: 'lib-1' },
+    query: { libraryId: 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb' },
     body,
   });
   await detailHandler(req, res);
