@@ -242,24 +242,6 @@ export async function middleware(request: NextRequest) {
 
   // Apply rate limiting to API requests
   if (pathname.startsWith('/api/')) {
-    // LOG-ONLY api-auth audit. Changes no behaviour: it records requests a
-    // deny-by-default gate WOULD refuse, so the allowlist can be built from observed
-    // traffic instead of from reading code. Enforcement is a follow-up, and must not be
-    // switched on until these logs are quiet for the routes we intend to keep.
-    //
-    // Why this exists: middleware does not enforce session auth, so every API route is
-    // opt-in. An audit on 2026-07-27 found 50 mutating App Router routes reachable with
-    // no credential — five of which served NOC ticket CRUD to anonymous callers in
-    // production until PR #2255.
-    if (wouldDenyApiRequest(pathname, request)) {
-      edgeLog('warn', 'api-auth-audit: anonymous request to non-public API route', {
-        auditMode: 'log-only',
-        method: request.method,
-        path: pathname,
-        mutating: request.method !== 'GET' && request.method !== 'HEAD',
-      });
-    }
-
     // Get appropriate Arcjet protection
     const aj = getArcjetProtection(pathname, request.method);
 
@@ -323,6 +305,29 @@ export async function middleware(request: NextRequest) {
     } else if (!ARCJET_KEY) {
       edgeLog('warn', 'Arcjet not configured', {
         message: 'ARCJET_KEY not found - rate limiting disabled',
+      });
+    }
+
+    // LOG-ONLY api-auth audit. Changes no behaviour: it records requests that a
+    // deny-by-default gate WOULD refuse, so the allowlist can be built from observed
+    // traffic rather than from reading code. Enforcement is a follow-up and must not be
+    // switched on until these logs are quiet for the routes we intend to keep.
+    //
+    // Placed AFTER the Arcjet decision on purpose. Bots and rate-limited callers are
+    // already refused above, and logging them here would both flood the log and poison
+    // the data — the allowlist must be built from traffic we actually intend to serve,
+    // not from what a scanner happened to probe.
+    //
+    // Why this exists: middleware does not enforce session auth, so every API route is
+    // opt-in. An audit on 2026-07-27 found 50 mutating App Router routes reachable with
+    // no credential — five of which served NOC ticket CRUD to anonymous callers in
+    // production until PR #2255.
+    if (wouldDenyApiRequest(pathname, request)) {
+      edgeLog('warn', 'api-auth-audit: anonymous request to non-public API route', {
+        auditMode: 'log-only',
+        method: request.method,
+        path: pathname,
+        mutating: request.method !== 'GET' && request.method !== 'HEAD',
       });
     }
 
