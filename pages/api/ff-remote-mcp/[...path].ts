@@ -7,12 +7,18 @@
  * OAuth 2.1 authorization server and answers 401 with the WWW-Authenticate challenge
  * that drives discovery.
  *
- * Cloned from pages/api/cortex-remote-mcp/[...path].ts (PR #2059, in production since
- * 2026-06). Only the upstream port and env var differ; the path handling and header
- * stripping are unchanged on purpose — that file has been reviewed and is load-bearing.
+ * Path handling and header stripping are taken unchanged from
+ * pages/api/cortex-remote-mcp/[...path].ts (PR #2059, in production since 2026-06) —
+ * that logic is reviewed and load-bearing.
+ *
+ * Body/response bounds are NOT copied: both proxies now share src/lib/mcp/proxyStream.ts.
+ * The original buffered both directions in full, and cloning it verbatim reproduced a
+ * live DoS (see PR #2262). "Byte-identical to a reviewed production file" is not a safety
+ * argument — it doubles whatever that file already has wrong.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
+import { BODY_TOO_LARGE, MAX_PROXY_BODY_BYTES, pipeUpstreamResponse, readCappedBody } from '@/lib/mcp/proxyStream';
 
 export const config = {
   api: {
@@ -48,15 +54,6 @@ function pathFromQuery(req: NextApiRequest): string {
   return '/' + parts.map((segment) => encodeURIComponent(segment)).join('/');
 }
 
-async function readRawBody(req: NextApiRequest): Promise<Buffer | undefined> {
-  if (req.method === 'GET' || req.method === 'HEAD') return undefined;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
-}
-
 function forwardHeaders(req: NextApiRequest): Headers {
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
@@ -83,7 +80,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const upstreamUrl = `${UPSTREAM}${targetPath}${query}`;
 
   try {
-    const rawBody = await readRawBody(req);
+    const rawBody = await readCappedBody(req);
+    if (rawBody === BODY_TOO_LARGE) {
+      log.warn('FibreFlow remote MCP request body over cap', { upstreamUrl, maxBytes: MAX_PROXY_BODY_BYTES });
+      return res.status(413).json({
+        success: false,
+        error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds the proxy limit' },
+      });
+    }
+
     const upstream = await fetch(upstreamUrl, {
       method: req.method,
       headers: forwardHeaders(req),
@@ -96,8 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!HOP_BY_HOP.has(key.toLowerCase())) res.setHeader(key, value);
     });
 
-    const body = Buffer.from(await upstream.arrayBuffer());
-    return res.send(body);
+    return pipeUpstreamResponse(upstream, res);
   } catch (error) {
     log.error('FibreFlow remote MCP proxy failed', { upstreamUrl, error });
     return res.status(502).json({
