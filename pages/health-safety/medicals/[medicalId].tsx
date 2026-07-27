@@ -42,7 +42,7 @@ interface MedicalDetail {
 
 function MedicalContent({ medicalId }: { medicalId: string }) {
   const router = useRouter();
-  const { data } = useSWR(`/api/health-safety/medicals/${medicalId}`, fetcher);
+  const { data, mutate } = useSWR(`/api/health-safety/medicals/${medicalId}`, fetcher);
   const record: MedicalDetail | undefined = data?.data;
 
   const [form, setForm] = useState({
@@ -96,7 +96,10 @@ function MedicalContent({ medicalId }: { medicalId: string }) {
       });
       const json = await res.json();
       setMsg(res.ok ? 'Saved' : json?.error?.message || 'Failed to save');
-      if (res.ok) router.replace(router.asPath);
+      // Revalidate through SWR, not router.replace(asPath) — a same-route
+      // replace re-renders from the SWR cache, so the outcome/status badges
+      // would keep showing the pre-save values until a hard reload.
+      if (res.ok) await mutate();
     } catch {
       setMsg('Network error saving record');
     } finally {
