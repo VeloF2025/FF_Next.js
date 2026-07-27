@@ -47,7 +47,10 @@ export function isVlmFallback(result: VlmSlotResult): boolean {
  * exposure than the application log, which is shipped and read far more widely.
  */
 export function redactVlmKey(text: string): string {
-  return text.replace(/(vlmkey=)[^&'"\s]+/gi, '$1[REDACTED]');
+  // `%3D` as well as `=`: the observed leak quotes the URL unencoded, but anything that
+  // re-encodes it on the way (a redirect Location header, a proxy's own error text)
+  // would otherwise slip straight past a `=`-only pattern.
+  return text.replace(/(vlmkey(?:=|%3D))[^&'"\s]+/gi, '$1[REDACTED]');
 }
 
 export async function validatePhotoWithVlm(
@@ -148,8 +151,9 @@ Respond with ONLY valid JSON (no markdown):
   } catch (err) {
     log.error('worksQaVlmService: JSON parse failed', {
       slotKey,
-      match: match[0].slice(0, 300),
-      err,
+      match: redactVlmKey(match[0].slice(0, 300)),
+      name: err instanceof Error ? err.name : typeof err,
+      message: redactVlmKey(err instanceof Error ? err.message : String(err)),
     });
     return FALLBACK_RESULT;
   }
@@ -261,8 +265,9 @@ export async function classifyPhotoToSlot(photoUrl: string): Promise<VlmClassify
     return { slot_key, confidence: slot_key ? confidence : 0, reasoning };
   } catch (err) {
     log.error('worksQaVlmService.classify: JSON parse failed', {
-      match: match[0].slice(0, 300),
-      err,
+      match: redactVlmKey(match[0].slice(0, 300)),
+      name: err instanceof Error ? err.name : typeof err,
+      message: redactVlmKey(err instanceof Error ? err.message : String(err)),
     });
     return CLASSIFY_FALLBACK;
   }
