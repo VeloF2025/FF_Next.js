@@ -43,6 +43,14 @@ setInterval(() => {
 const SMTP_ENABLED = process.env.SMTP_HOST && process.env.SMTP_USER;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
 
+// Auth mail must NOT reuse SMTP_FROM: that is the shared procurement@ mailbox,
+// which supplier-facing RFQ mail deliberately sends from so suppliers can reply.
+// The default stays on velocityfibre.co.za because that domain's SPF authorises
+// the relay we authenticate against; fibreflow.app publishes no SPF record, so a
+// no-reply there is accepted by the relay but filtered as spam by the recipient.
+const AUTH_EMAIL_FROM =
+  process.env.SMTP_FROM_AUTH || 'FibreFlow <noreply@velocityfibre.co.za>';
+
 interface ForgotPasswordRequest {
   email: string;
 }
@@ -96,7 +104,7 @@ async function sendResetEmail(
     });
 
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'noreply@fibreflow.app',
+      from: AUTH_EMAIL_FROM,
       to: email,
       subject: 'Reset Your FibreFlow Password',
       html: `
