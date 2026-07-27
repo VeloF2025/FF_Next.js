@@ -1,4 +1,4 @@
--- Rollback: 461_mcp_sessions.sql
+-- Rollback: 463_mcp_sessions.sql
 --
 -- Dropping `kind` destroys the only marker distinguishing MCP sessions from browser
 -- ones, so any surviving MCP session becomes indistinguishable from a login. Delete
