@@ -48,6 +48,48 @@ export function extractFields(text: string, layout: PayslipLayout): ExtractedFie
   return layout === 'plain_paper' ? extractPlainPaper(text) : extractVip(text);
 }
 
+/**
+ * The labels each layout anchors a field on. Extraction takes the *first*
+ * match, so a label appearing twice means the value picked may not be the one
+ * a human would read off the page.
+ *
+ * Sources are `.match()`-only — never `.test()` — because a shared /g regex
+ * carries `lastIndex` between `.test()` calls and would report duplicates
+ * intermittently.
+ */
+const ANCHOR_LABELS: Record<PayslipLayout, ReadonlyArray<readonly [string, RegExp]>> = {
+  plain_paper: [
+    ['Employee Code', /Employee\s+Code\b/gi],
+    ['Identity Number', /Identity\s+Number\b/gi],
+    ['Pay Date', /Pay\s+Date\b/gi],
+    ['Total earnings', /Total\s+earnings\b/gi],
+    ['Nett pay', /Nett\s+pay\b/gi],
+  ],
+  vip: [
+    ['Emp Code', /Emp\s*Code\b/gi],
+    ['Emp Name', /Emp\s*Name\b/gi],
+    ['Id Number', /Id\s*Number\b/gi],
+    ['Payment Dt', /Payment\s*Dt\b/gi],
+    ['Total Earnings', /Total\s+Earnings\b/gi],
+  ],
+};
+
+/**
+ * Labels that occur more than once on a page. Always empty for the templates
+ * we know about — Velocity's July 2026 export has zero across all 42 pages —
+ * so a non-empty result means the payroll template changed shape and the
+ * first-match-wins extraction may now be reading the wrong number.
+ *
+ * This exists because the July 2026 breakage came from exactly that: a Sage
+ * template change that the parser had no way to announce. Callers log it;
+ * nothing here throws, since a duplicate label is a suspicion, not proof.
+ */
+export function findDuplicateAnchors(text: string, layout: PayslipLayout): string[] {
+  return ANCHOR_LABELS[layout]
+    .filter(([, pattern]) => (text.match(pattern) ?? []).length > 1)
+    .map(([label]) => label);
+}
+
 // ─── Plain Paper (current) ───────────────────────────────────────────
 
 /**
