@@ -115,6 +115,92 @@ describe('splitCombinedPayslipPdf — synthetic fixture', () => {
   });
 });
 
+/**
+ * End-to-end cover for the Plain Paper layout through real pdfjs output —
+ * `payslipLayouts.test.ts` pins the regexes against hand-authored text, but
+ * only a generated PDF proves the assumptions about tab placement and
+ * right-to-left item order actually hold.
+ */
+describe('splitCombinedPayslipPdf — Plain Paper fixture', () => {
+  const PLAIN_FIXTURE = path.join(
+    __dirname,
+    'fixtures',
+    'synthetic-plain-paper-payslips.pdf'
+  );
+
+  it('detects the layout and derives the period', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages, period, numPages } = await splitCombinedPayslipPdf(buffer);
+
+    expect(numPages).toBe(4);
+    expect(pages).toHaveLength(4);
+    expect(period).toBe('2026-07');
+    expect(pages.every((p) => p.layout === 'plain_paper')).toBe(true);
+  });
+
+  it('extracts a page whose name sits inline beside the label', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages } = await splitCombinedPayslipPdf(buffer);
+
+    const p1 = pages[0]!;
+    expect(p1.empCode).toBe('AC002');
+    expect(p1.empName).toBe('JANE DOE');
+    expect(p1.firstInitial).toBe('J');
+    expect(p1.lastName).toBe('doe');
+    expect(p1.idNumber).toBe('8001015009088');
+    expect(p1.paymentDate).toBe('2026/07/31');
+    // Space-separated amounts, and not the larger YTD "Taxable earnings".
+    expect(p1.totalEarningsCents).toBe(2_500_000);
+    expect(p1.totalDeductionsCents).toBe(355_812);
+    expect(p1.nettPayCents).toBe(2_144_188);
+  });
+
+  it('reassembles a name Sage wrapped onto its own lines', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages } = await splitCombinedPayslipPdf(buffer);
+
+    const p2 = pages[1]!;
+    expect(p2.empName).toBe('PIETER JOHANNES VAN NIEKERK');
+    expect(p2.firstInitial).toBe('P');
+    expect(p2.lastName).toBe('niekerk');
+    expect(p2.totalEarningsCents).toBe(3_000_000);
+    expect(p2.nettPayCents).toBe(2_514_188);
+  });
+
+  it('handles a page with no Id Number without inventing one', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages } = await splitCombinedPayslipPdf(buffer);
+
+    const p3 = pages[2]!;
+    expect(p3.empCode).toBe('AC032');
+    expect(p3.idNumber).toBeNull();
+    expect(p3.empName).toBe('THABO GLADWELL MOKOENA');
+    expect(p3.totalEarningsCents).toBe(2_270_187);
+  });
+
+  it('derives deductions to the figure actually printed on each page', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages } = await splitCombinedPayslipPdf(buffer);
+
+    // Deductions is derived (earnings - nett), so asserting the arithmetic
+    // would be a tautology. What matters is that the derived value equals the
+    // "Total deductions" figure Sage prints — otherwise the stored row would
+    // contradict the PDF the staff member downloads.
+    const printed: Array<[string, number]> = [
+      ['3 558.12', 355_812],
+      ['4 858.12', 485_812],
+      ['2 960.61', 296_061],
+      ['71.06', 7_106],
+    ];
+
+    printed.forEach(([onPage, cents], i) => {
+      const page = pages[i]!;
+      expect(page.rawText).toContain(`${onPage}\tTotal deductions`);
+      expect(page.totalDeductionsCents).toBe(cents);
+    });
+  });
+});
+
 describe('periodToDateRange', () => {
   it('returns first/last day of month', () => {
     expect(periodToDateRange('2026-04')).toEqual({
