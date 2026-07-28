@@ -1,0 +1,5704 @@
+{
+  "generatedAt": "2026-07-28T09:47:52.331Z",
+  "routes": [
+    {
+      "path": "/api/action-items",
+      "methods": [
+        "GET"
+      ],
+      "group": "action-items"
+    },
+    {
+      "path": "/api/action-items/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "action-items"
+    },
+    {
+      "path": "/api/action-items/my-items",
+      "methods": [
+        "GET"
+      ],
+      "group": "action-items",
+      "description": "GET /api/action-items/my-items"
+    },
+    {
+      "path": "/api/action-items/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "action-items"
+    },
+    {
+      "path": "/api/activate/:dropNumber",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/[dropNumber]"
+    },
+    {
+      "path": "/api/activate/action-centre/disputes",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "Action Centre — Disputes"
+    },
+    {
+      "path": "/api/activate/action-centre/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/action-centre/items"
+    },
+    {
+      "path": "/api/activate/action-centre/overview",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/action-centre/overview"
+    },
+    {
+      "path": "/api/activate/action-centre/recon",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/action-centre/recon"
+    },
+    {
+      "path": "/api/activate/action-centre/rule-runs",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/action-centre/rule-runs"
+    },
+    {
+      "path": "/api/activate/action-centre/tickets",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/action-centre/tickets"
+    },
+    {
+      "path": "/api/activate/activity-log",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/activity-log"
+    },
+    {
+      "path": "/api/activate/admin/retry-failed",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/retry-failed"
+    },
+    {
+      "path": "/api/activate/categorize-photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/categorize-photos"
+    },
+    {
+      "path": "/api/activate/check-oes-coordinates",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/check-oes-coordinates"
+    },
+    {
+      "path": "/api/activate/check-oes-view",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/check-oes-view"
+    },
+    {
+      "path": "/api/activate/check-photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/check-photos"
+    },
+    {
+      "path": "/api/activate/civil-photo-gallery",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/civil-photo-gallery"
+    },
+    {
+      "path": "/api/activate/civil-photo-gallery/photo",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/civil-photo-gallery/photo?id=<uuid>"
+    },
+    {
+      "path": "/api/activate/dr/:dropNumber/pdf-context",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/dr/[dropNumber]/pdf-context"
+    },
+    {
+      "path": "/api/activate/drops",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "DR Photo Unified Drops API"
+    },
+    {
+      "path": "/api/activate/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "Activate Module - Excel Export API"
+    },
+    {
+      "path": "/api/activate/final-decision",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/final-decision"
+    },
+    {
+      "path": "/api/activate/health-check",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/health-check"
+    },
+    {
+      "path": "/api/activate/human-review",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/human-review"
+    },
+    {
+      "path": "/api/activate/import-pp-data",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/import-pp-data"
+    },
+    {
+      "path": "/api/activate/non-invoiceables/billing-crossref",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/non-invoiceables/billing-crossref"
+    },
+    {
+      "path": "/api/activate/non-invoiceables/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/non-invoiceables/items"
+    },
+    {
+      "path": "/api/activate/non-invoiceables/overview",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/non-invoiceables/overview"
+    },
+    {
+      "path": "/api/activate/non-invoiceables/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate"
+    },
+    {
+      "path": "/api/activate/photo-gallery",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/photo-gallery"
+    },
+    {
+      "path": "/api/activate/photo/:path*",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/photo/[drNumber]/[filename]"
+    },
+    {
+      "path": "/api/activate/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate"
+    },
+    {
+      "path": "/api/activate/reporting/activation-progress",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/activation-progress"
+    },
+    {
+      "path": "/api/activate/reporting/daily-counts",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/daily-counts"
+    },
+    {
+      "path": "/api/activate/reporting/discrepancy",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/discrepancy"
+    },
+    {
+      "path": "/api/activate/reporting/funnel",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/funnel"
+    },
+    {
+      "path": "/api/activate/reporting/installation-gaps",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/installation-gaps"
+    },
+    {
+      "path": "/api/activate/reporting/maturity-tracking",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/maturity-tracking"
+    },
+    {
+      "path": "/api/activate/reporting/offline-devices",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/offline-devices"
+    },
+    {
+      "path": "/api/activate/reporting/pending-aging",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/pending-aging"
+    },
+    {
+      "path": "/api/activate/reporting/penetration-curve",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/penetration-curve"
+    },
+    {
+      "path": "/api/activate/reporting/resubmissions",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/resubmissions"
+    },
+    {
+      "path": "/api/activate/reporting/serial-mismatches",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "Serial Mismatches Report API"
+    },
+    {
+      "path": "/api/activate/reporting/serial-swaps",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "Serial Swaps Report API"
+    },
+    {
+      "path": "/api/activate/reporting/serial-validation",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/serial-validation"
+    },
+    {
+      "path": "/api/activate/reporting/team-performance",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/team-performance"
+    },
+    {
+      "path": "/api/activate/reporting/time-to-activation",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/time-to-activation"
+    },
+    {
+      "path": "/api/activate/reporting/trends",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/trends"
+    },
+    {
+      "path": "/api/activate/reporting/user-attribution",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/user-attribution"
+    },
+    {
+      "path": "/api/activate/reporting/vlm-accuracy",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/reporting/vlm-accuracy"
+    },
+    {
+      "path": "/api/activate/serial-history",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API: /api/activate/serial-history"
+    },
+    {
+      "path": "/api/activate/serial-verification",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "Serial Verification API"
+    },
+    {
+      "path": "/api/activate/sharepoint-sync",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "SharePoint DR Sync API"
+    },
+    {
+      "path": "/api/activate/sitecam-appeals",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate"
+    },
+    {
+      "path": "/api/activate/sitecam-failed",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "GET /api/activate/sitecam-failed?status=pending|resolved"
+    },
+    {
+      "path": "/api/activate/staff-by-project",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/staff-by-project"
+    },
+    {
+      "path": "/api/activate/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/summary"
+    },
+    {
+      "path": "/api/activate/sync-installer-names",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/sync-installer-names"
+    },
+    {
+      "path": "/api/activate/validate-prerequisites",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/validate-prerequisites"
+    },
+    {
+      "path": "/api/activate/validate-qa",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API Route: /api/activate/validate-qa"
+    },
+    {
+      "path": "/api/activate/wa-contacts",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "WhatsApp Contacts API"
+    },
+    {
+      "path": "/api/activate/wa-photo/:path*",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API: /api/activate/wa-photo/[...path]"
+    },
+    {
+      "path": "/api/activate/wa-photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "activate",
+      "description": "API: /api/activate/wa-photos"
+    },
+    {
+      "path": "/api/admin/permissions",
+      "methods": [
+        "GET"
+      ],
+      "group": "admin",
+      "description": "Permissions API"
+    },
+    {
+      "path": "/api/admin/permissions/me",
+      "methods": [
+        "GET"
+      ],
+      "group": "admin",
+      "description": "User Permissions API"
+    },
+    {
+      "path": "/api/admin/permissions/module-access",
+      "methods": [
+        "GET"
+      ],
+      "group": "admin",
+      "description": "Module Access API"
+    },
+    {
+      "path": "/api/admin/roles",
+      "methods": [
+        "GET"
+      ],
+      "group": "admin",
+      "description": "Roles API"
+    },
+    {
+      "path": "/api/admin/roles/:role",
+      "methods": [
+        "GET"
+      ],
+      "group": "admin",
+      "description": "Single Role API"
+    },
+    {
+      "path": "/api/admin/users",
+      "methods": [
+        "GET"
+      ],
+      "group": "admin",
+      "description": "Users API"
+    },
+    {
+      "path": "/api/admin/users/:userId",
+      "methods": [
+        "GET"
+      ],
+      "group": "admin",
+      "description": "Single User API"
+    },
+    {
+      "path": "/api/admin/users/:userId/permissions",
+      "methods": [
+        "GET"
+      ],
+      "group": "admin",
+      "description": "User Permissions API"
+    },
+    {
+      "path": "/api/analytics/dashboard/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics"
+    },
+    {
+      "path": "/api/analytics/dashboard/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics"
+    },
+    {
+      "path": "/api/analytics/dashboard/trends",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics"
+    },
+    {
+      "path": "/api/analytics/projects/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics"
+    },
+    {
+      "path": "/api/analytics/reports/activations",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/activations"
+    },
+    {
+      "path": "/api/analytics/reports/assets-register",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/assets-register"
+    },
+    {
+      "path": "/api/analytics/reports/build-milestones",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "Build Milestone Overview API"
+    },
+    {
+      "path": "/api/analytics/reports/cos-breakdown",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/cos-breakdown"
+    },
+    {
+      "path": "/api/analytics/reports/expense-pivot",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/expense-pivot"
+    },
+    {
+      "path": "/api/analytics/reports/income-statement",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/income-statement"
+    },
+    {
+      "path": "/api/analytics/reports/opex",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/opex"
+    },
+    {
+      "path": "/api/analytics/reports/pre-provisions",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/pre-provisions"
+    },
+    {
+      "path": "/api/analytics/reports/project-detail",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/project-detail"
+    },
+    {
+      "path": "/api/analytics/reports/project-fin",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/project-fin"
+    },
+    {
+      "path": "/api/analytics/reports/project-revenue",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/project-revenue"
+    },
+    {
+      "path": "/api/analytics/reports/revenue-by-client",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/revenue-by-client"
+    },
+    {
+      "path": "/api/analytics/reports/revenue-overview",
+      "methods": [
+        "GET"
+      ],
+      "group": "analytics",
+      "description": "GET /api/analytics/reports/revenue-overview"
+    },
+    {
+      "path": "/api/assets",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Assets API Route - List and Create"
+    },
+    {
+      "path": "/api/assets/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Single Asset API Route"
+    },
+    {
+      "path": "/api/assets/:id/documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Asset Documents API Route"
+    },
+    {
+      "path": "/api/assets/:id/history",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Asset Assignment History API Route"
+    },
+    {
+      "path": "/api/assets/:id/maintenance",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Asset Maintenance API Route"
+    },
+    {
+      "path": "/api/assets/calibration-due",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Assets Calibration Due API Route"
+    },
+    {
+      "path": "/api/assets/categories",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Asset Categories API Route"
+    },
+    {
+      "path": "/api/assets/categories/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Single Category API Route"
+    },
+    {
+      "path": "/api/assets/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Assets Dashboard API Route"
+    },
+    {
+      "path": "/api/assets/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Asset Export API"
+    },
+    {
+      "path": "/api/assets/maintenance",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Maintenance API Route"
+    },
+    {
+      "path": "/api/assets/maintenance-due",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Assets Maintenance Due API Route"
+    },
+    {
+      "path": "/api/assets/maintenance/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Single Maintenance Record API Route"
+    },
+    {
+      "path": "/api/assets/maintenance/overdue",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Overdue Maintenance API Route"
+    },
+    {
+      "path": "/api/assets/maintenance/upcoming",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Upcoming Maintenance API Route"
+    },
+    {
+      "path": "/api/assets/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "assets",
+      "description": "Asset Search API Route"
+    },
+    {
+      "path": "/api/auth/entra/callback",
+      "methods": [
+        "GET"
+      ],
+      "group": "auth",
+      "description": "Entra SSO — auth-code callback (Phase 6, DARK behind ENTRA_SSO_ENABLED)."
+    },
+    {
+      "path": "/api/auth/entra/login",
+      "methods": [
+        "GET"
+      ],
+      "group": "auth",
+      "description": "Entra SSO — login initiator (Phase 6, DARK behind ENTRA_SSO_ENABLED)."
+    },
+    {
+      "path": "/api/auth/me",
+      "methods": [
+        "GET"
+      ],
+      "group": "auth",
+      "description": "Current User API"
+    },
+    {
+      "path": "/api/auth/me/teams",
+      "methods": [
+        "GET"
+      ],
+      "group": "auth",
+      "description": "Current User Teams API"
+    },
+    {
+      "path": "/api/billing/dispute-pack",
+      "methods": [
+        "GET"
+      ],
+      "group": "billing",
+      "description": "GET /api/billing/dispute-pack"
+    },
+    {
+      "path": "/api/billing/dr-history",
+      "methods": [
+        "GET"
+      ],
+      "group": "billing",
+      "description": "GET /api/billing/dr-history"
+    },
+    {
+      "path": "/api/billing/expected-recoveries",
+      "methods": [
+        "GET"
+      ],
+      "group": "billing",
+      "description": "FT expected-recovery audit read (audit rec #2)."
+    },
+    {
+      "path": "/api/billing/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "billing",
+      "description": "GET /api/billing/projects"
+    },
+    {
+      "path": "/api/billing/reconcile",
+      "methods": [
+        "GET"
+      ],
+      "group": "billing",
+      "description": "GET  /api/billing/reconcile?id=<uuid>  — Return billing week row + deductions"
+    },
+    {
+      "path": "/api/billing/status",
+      "methods": [
+        "GET"
+      ],
+      "group": "billing",
+      "description": "API Route: /api/billing/status"
+    },
+    {
+      "path": "/api/billing/weekly",
+      "methods": [
+        "GET"
+      ],
+      "group": "billing",
+      "description": "API Route: /api/billing/weekly"
+    },
+    {
+      "path": "/api/chat/access",
+      "methods": [
+        "GET"
+      ],
+      "group": "chat",
+      "description": "Chat Access Check API"
+    },
+    {
+      "path": "/api/clients",
+      "methods": [
+        "GET"
+      ],
+      "group": "clients"
+    },
+    {
+      "path": "/api/clients/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "clients"
+    },
+    {
+      "path": "/api/clients/:id/kyc-documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "clients",
+      "description": "KYC Documents API"
+    },
+    {
+      "path": "/api/clients/:id/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "clients",
+      "description": "API: Get Client Projects with PO Information"
+    },
+    {
+      "path": "/api/clients/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "clients"
+    },
+    {
+      "path": "/api/communications/badge-counts",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "Badge Counts API"
+    },
+    {
+      "path": "/api/communications/email-outbox",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "GET /api/communications/email-outbox"
+    },
+    {
+      "path": "/api/communications/feed",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "GET /api/communications/feed"
+    },
+    {
+      "path": "/api/communications/messages",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "Internal Messages API"
+    },
+    {
+      "path": "/api/communications/messages-thread",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "Message Thread API"
+    },
+    {
+      "path": "/api/communications/messages-unread-count",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "Unread Message Count"
+    },
+    {
+      "path": "/api/communications/settings",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "GET/PUT /api/communications/settings"
+    },
+    {
+      "path": "/api/communications/whatsapp/chat",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Chat Messages API"
+    },
+    {
+      "path": "/api/communications/whatsapp/cloud-webhook",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications"
+    },
+    {
+      "path": "/api/communications/whatsapp/config",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Config API"
+    },
+    {
+      "path": "/api/communications/whatsapp/config/:key",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Config by Key API"
+    },
+    {
+      "path": "/api/communications/whatsapp/groups",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Monitored Groups API"
+    },
+    {
+      "path": "/api/communications/whatsapp/groups/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Monitored Group by ID API"
+    },
+    {
+      "path": "/api/communications/whatsapp/logs",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Message Logs API"
+    },
+    {
+      "path": "/api/communications/whatsapp/logs/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Message Logs Export API"
+    },
+    {
+      "path": "/api/communications/whatsapp/monitored-groups",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Monitored Groups API"
+    },
+    {
+      "path": "/api/communications/whatsapp/monitored-groups/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Monitored Group API"
+    },
+    {
+      "path": "/api/communications/whatsapp/phones",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Phone Numbers API"
+    },
+    {
+      "path": "/api/communications/whatsapp/phones/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Phone Number API"
+    },
+    {
+      "path": "/api/communications/whatsapp/readiness",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Cloud go-live readiness (read-only)"
+    },
+    {
+      "path": "/api/communications/whatsapp/services/:service/pairing-status",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Service Pairing Status API"
+    },
+    {
+      "path": "/api/communications/whatsapp/services/status",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Services Status API"
+    },
+    {
+      "path": "/api/communications/whatsapp/templates",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Templates API"
+    },
+    {
+      "path": "/api/communications/whatsapp/templates/:key",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Template by Key API"
+    },
+    {
+      "path": "/api/conduit/actuals",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit",
+      "description": "GET /api/conduit/actuals?project=Lawley"
+    },
+    {
+      "path": "/api/conduit/baselines",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit",
+      "description": "GET  /api/conduit/baselines  — list all baselines (newest first)"
+    },
+    {
+      "path": "/api/conduit/debug",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit"
+    },
+    {
+      "path": "/api/conduit/milestones",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit",
+      "description": "GET  /api/conduit/milestones?projectId=xxx  — list milestones for project"
+    },
+    {
+      "path": "/api/conduit/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit",
+      "description": "GET  /api/conduit/projects  — list all conduit projects"
+    },
+    {
+      "path": "/api/conduit/projects/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit",
+      "description": "GET    /api/conduit/projects/[id] — fetch single project"
+    },
+    {
+      "path": "/api/conduit/projects/:id/detail",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit",
+      "description": "GET /api/conduit/projects/[id]/detail"
+    },
+    {
+      "path": "/api/conduit/selectlists",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit",
+      "description": "GET  /api/conduit/selectlists          — all lists grouped by list_name (for dropdowns)"
+    },
+    {
+      "path": "/api/conduit/staff",
+      "methods": [
+        "GET"
+      ],
+      "group": "conduit",
+      "description": "GET /api/conduit/staff — staff list for velocity_responsible dropdown"
+    },
+    {
+      "path": "/api/construction-qa/batch-approve",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "/api/construction-qa/batch-approve"
+    },
+    {
+      "path": "/api/construction-qa/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "Construction QA - Excel Export API"
+    },
+    {
+      "path": "/api/construction-qa/features",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "Construction QA Features API"
+    },
+    {
+      "path": "/api/construction-qa/fno-reports",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "FNO QField reports API."
+    },
+    {
+      "path": "/api/construction-qa/photo-proxy",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "GET /api/construction-qa/photo-proxy?key={storage_key}&source={source}"
+    },
+    {
+      "path": "/api/construction-qa/pon-features",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "PON Features API"
+    },
+    {
+      "path": "/api/construction-qa/project-dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "Project Dashboard API"
+    },
+    {
+      "path": "/api/construction-qa/reports",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "Construction QA Reports API"
+    },
+    {
+      "path": "/api/construction-qa/review",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "Construction QA Review API"
+    },
+    {
+      "path": "/api/construction-qa/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "Global Search API"
+    },
+    {
+      "path": "/api/construction-qa/zone-hierarchy",
+      "methods": [
+        "GET"
+      ],
+      "group": "construction-qa",
+      "description": "Zone Hierarchy API"
+    },
+    {
+      "path": "/api/contractors",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Contractors API Route - List and Create"
+    },
+    {
+      "path": "/api/contractors-detail",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-detail",
+      "description": "Contractors Detail API"
+    },
+    {
+      "path": "/api/contractors-directors",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-directors",
+      "description": "Contractor Directors API"
+    },
+    {
+      "path": "/api/contractors-documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-documents",
+      "description": "Contractors Documents List API - Flat Endpoint"
+    },
+    {
+      "path": "/api/contractors-documents-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-documents-export",
+      "description": "API Route: Export Contractor Documents Report"
+    },
+    {
+      "path": "/api/contractors-documents-report",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-documents-report",
+      "description": "API Route: Contractor Documents Report"
+    },
+    {
+      "path": "/api/contractors-documents-report-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-documents-report-summary",
+      "description": "API Route: All Contractors Documents Summary"
+    },
+    {
+      "path": "/api/contractors-list",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-list",
+      "description": "Contractors List API"
+    },
+    {
+      "path": "/api/contractors-onboarding-stages",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-onboarding-stages",
+      "description": "Contractor Onboarding Stages API (Flattened for Vercel)"
+    },
+    {
+      "path": "/api/contractors-projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-projects",
+      "description": "Contractor Projects API - Flat Endpoint"
+    },
+    {
+      "path": "/api/contractors-rag",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-rag",
+      "description": "Contractors RAG Status API"
+    },
+    {
+      "path": "/api/contractors-teams",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-teams",
+      "description": "API Route: /api/contractors-teams"
+    },
+    {
+      "path": "/api/contractors-verify",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors-verify",
+      "description": "Contractor Verification API"
+    },
+    {
+      "path": "/api/contractors/:contractorId",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Contractors API - Single Contractor (Pages Router)"
+    },
+    {
+      "path": "/api/contractors/:contractorId/claims",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Contractor Progress Claims API — List & Submit"
+    },
+    {
+      "path": "/api/contractors/:contractorId/invoices",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Contractor Invoices API — List & Create"
+    },
+    {
+      "path": "/api/contractors/:contractorId/invoices/:invoiceId",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Contractor Invoice Detail API"
+    },
+    {
+      "path": "/api/contractors/:contractorId/onboarding/stages",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Contractor Onboarding Stages API"
+    },
+    {
+      "path": "/api/contractors/:contractorId/payments",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Contractor Payments API"
+    },
+    {
+      "path": "/api/contractors/:contractorId/payments/totals",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Contractor Payment Totals API"
+    },
+    {
+      "path": "/api/contractors/:contractorId/site-visits",
+      "methods": [
+        "GET"
+      ],
+      "group": "contractors",
+      "description": "Site Visits API — Contractor scope"
+    },
+    {
+      "path": "/api/cortex-bridge/:path*",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "group": "cortex-bridge",
+      "description": "Public Cortex Bridge proxy for remote MCP/API clients."
+    },
+    {
+      "path": "/api/cortex-review",
+      "methods": [
+        "GET"
+      ],
+      "group": "cortex-review"
+    },
+    {
+      "path": "/api/cortex/meeting-review/:meetingId",
+      "methods": [
+        "GET"
+      ],
+      "group": "cortex",
+      "description": "Cortex Meeting Reviewer Proxy"
+    },
+    {
+      "path": "/api/cortex/query",
+      "methods": [
+        "GET"
+      ],
+      "group": "cortex",
+      "description": "Cortex cited-knowledge search proxy."
+    },
+    {
+      "path": "/api/dashboard/pinned-links",
+      "methods": [
+        "GET"
+      ],
+      "group": "dashboard"
+    },
+    {
+      "path": "/api/dashboard/quick-links",
+      "methods": [
+        "GET"
+      ],
+      "group": "dashboard"
+    },
+    {
+      "path": "/api/database/health",
+      "methods": [
+        "GET"
+      ],
+      "group": "database",
+      "description": "Database Health Check API Route"
+    },
+    {
+      "path": "/api/database/info",
+      "methods": [
+        "GET"
+      ],
+      "group": "database"
+    },
+    {
+      "path": "/api/database/query",
+      "methods": [
+        "GET"
+      ],
+      "group": "database"
+    },
+    {
+      "path": "/api/demo/project-map",
+      "methods": [
+        "GET"
+      ],
+      "group": "demo",
+      "description": "Demo Mode - Name Map"
+    },
+    {
+      "path": "/api/departments",
+      "methods": [
+        "GET"
+      ],
+      "group": "departments",
+      "description": "Departments API - List and Create"
+    },
+    {
+      "path": "/api/departments/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "departments",
+      "description": "Department API - Single Department Operations"
+    },
+    {
+      "path": "/api/departments/:id/report",
+      "methods": [
+        "GET"
+      ],
+      "group": "departments",
+      "description": "Department Report API"
+    },
+    {
+      "path": "/api/deployment-health",
+      "methods": [
+        "GET"
+      ],
+      "group": "deployment-health",
+      "description": "Deployment Health API"
+    },
+    {
+      "path": "/api/dev-queue",
+      "methods": [
+        "GET"
+      ],
+      "group": "dev-queue"
+    },
+    {
+      "path": "/api/dev-queue/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "dev-queue"
+    },
+    {
+      "path": "/api/dev-queue/:id/attachments",
+      "methods": [
+        "GET"
+      ],
+      "group": "dev-queue"
+    },
+    {
+      "path": "/api/dev-queue/:id/progress",
+      "methods": [
+        "GET"
+      ],
+      "group": "dev-queue"
+    },
+    {
+      "path": "/api/dev-queue/columns",
+      "methods": [
+        "GET"
+      ],
+      "group": "dev-queue"
+    },
+    {
+      "path": "/api/devops/schema",
+      "methods": [
+        "GET"
+      ],
+      "group": "devops",
+      "description": "DevOps DB Schema Explorer API"
+    },
+    {
+      "path": "/api/dr-dashboard/:path*",
+      "methods": [
+        "GET"
+      ],
+      "group": "dr-dashboard",
+      "description": "API Proxy for DR Dashboard Backend"
+    },
+    {
+      "path": "/api/dr-dashboard/sessions",
+      "methods": [
+        "GET"
+      ],
+      "group": "dr-dashboard",
+      "description": "DR Sessions API - Fetches real data from BOSS VPS"
+    },
+    {
+      "path": "/api/dr-dashboard/sessions/:dr/:action*",
+      "methods": [
+        "GET"
+      ],
+      "group": "dr-dashboard",
+      "description": "DR Session Actions API - Photos and Evaluation"
+    },
+    {
+      "path": "/api/dr-dashboard/vlm-status",
+      "methods": [
+        "GET"
+      ],
+      "group": "dr-dashboard",
+      "description": "VLM Status Check API"
+    },
+    {
+      "path": "/api/drops/sync-serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "drops",
+      "description": "Serial Sync API Endpoint"
+    },
+    {
+      "path": "/api/eod/reconciliation",
+      "methods": [
+        "GET"
+      ],
+      "group": "eod",
+      "description": "EOD Reconciliation API"
+    },
+    {
+      "path": "/api/eod/sheets",
+      "methods": [
+        "GET"
+      ],
+      "group": "eod",
+      "description": "EOD Sheets API"
+    },
+    {
+      "path": "/api/eod/sheets/:sheetId",
+      "methods": [
+        "GET"
+      ],
+      "group": "eod",
+      "description": "EOD Sheet Detail API"
+    },
+    {
+      "path": "/api/exfo/config",
+      "methods": [
+        "GET"
+      ],
+      "group": "exfo",
+      "description": "EXFO Sync Config API"
+    },
+    {
+      "path": "/api/exfo/results",
+      "methods": [
+        "GET"
+      ],
+      "group": "exfo",
+      "description": "EXFO Test Results API"
+    },
+    {
+      "path": "/api/exfo/sync",
+      "methods": [
+        "GET"
+      ],
+      "group": "exfo",
+      "description": "EXFO Exchange Sync API"
+    },
+    {
+      "path": "/api/field-stock/reports/daily-reconciliation",
+      "methods": [
+        "GET"
+      ],
+      "group": "field-stock",
+      "description": "Daily Stock Reconciliation Report API"
+    },
+    {
+      "path": "/api/field/attendance",
+      "methods": [
+        "GET"
+      ],
+      "group": "field",
+      "description": "GET /api/field/attendance"
+    },
+    {
+      "path": "/api/field/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "field",
+      "description": "Field Task Export API"
+    },
+    {
+      "path": "/api/field/quality-checks",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/schedules",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/sync",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/tasks",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/tasks/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "field",
+      "description": "Field App — Task by ID"
+    },
+    {
+      "path": "/api/field/technicians",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/users",
+      "methods": [
+        "GET"
+      ],
+      "group": "field",
+      "description": "Generic field-user create/list endpoint."
+    },
+    {
+      "path": "/api/fleet/analytics",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Analytics API - KPIs"
+    },
+    {
+      "path": "/api/fleet/analytics/compliance",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Analytics API - Driver Compliance"
+    },
+    {
+      "path": "/api/fleet/analytics/cost-trends",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Analytics API - Cost Trends"
+    },
+    {
+      "path": "/api/fleet/analytics/tco",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Analytics API - TCO Report"
+    },
+    {
+      "path": "/api/fleet/analytics/upcoming-services",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Analytics API - Upcoming Services"
+    },
+    {
+      "path": "/api/fleet/analytics/vehicle-scorecard",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Scorecard API"
+    },
+    {
+      "path": "/api/fleet/available-drivers",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Available Drivers API"
+    },
+    {
+      "path": "/api/fleet/check-in/audit",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Check-In Audit Trail API"
+    },
+    {
+      "path": "/api/fleet/check-in/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Check-In Items"
+    },
+    {
+      "path": "/api/fleet/check-in/photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Check-In Photos"
+    },
+    {
+      "path": "/api/fleet/check-in/records",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Check-In Records"
+    },
+    {
+      "path": "/api/fleet/check-in/records/:recordId",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Check-In Record by ID"
+    },
+    {
+      "path": "/api/fleet/check-in/sync",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Check-In Offline Sync"
+    },
+    {
+      "path": "/api/fleet/check-in/templates",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Check-In Templates"
+    },
+    {
+      "path": "/api/fleet/check-in/templates/:templateId",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Check-In Template by ID"
+    },
+    {
+      "path": "/api/fleet/check-in/vehicle/:vehicleId",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Check-In by Vehicle"
+    },
+    {
+      "path": "/api/fleet/drivers",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Drivers API"
+    },
+    {
+      "path": "/api/fleet/drivers-documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Drivers Documents API"
+    },
+    {
+      "path": "/api/fleet/drivers/:staffId/scorecard",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Driver Scorecard API"
+    },
+    {
+      "path": "/api/fleet/drivers/leaderboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Driver Leaderboard API"
+    },
+    {
+      "path": "/api/fleet/expiring",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Expiring Items API"
+    },
+    {
+      "path": "/api/fleet/fuel/anomalies",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Fuel Anomalies API"
+    },
+    {
+      "path": "/api/fleet/fuel/cost-breakdown",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Fuel Cost Breakdown API"
+    },
+    {
+      "path": "/api/fleet/fuel/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Fuel Summary API"
+    },
+    {
+      "path": "/api/fleet/fuel/transactions",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Fuel Transactions API"
+    },
+    {
+      "path": "/api/fleet/fuel/trends",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Fuel Efficiency Trends API"
+    },
+    {
+      "path": "/api/fleet/fuel/vehicles",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Fuel Stats API"
+    },
+    {
+      "path": "/api/fleet/import/template",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Import Template Download API"
+    },
+    {
+      "path": "/api/fleet/investigation",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet GPS Investigation Jobs List API"
+    },
+    {
+      "path": "/api/fleet/investigation/:jobId",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet GPS Investigation Job API"
+    },
+    {
+      "path": "/api/fleet/investigation/:jobId/trips",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet GPS Investigation Trips API"
+    },
+    {
+      "path": "/api/fleet/locations",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Authorized Locations API"
+    },
+    {
+      "path": "/api/fleet/maintenance/history",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Maintenance API - Service History"
+    },
+    {
+      "path": "/api/fleet/maintenance/intervals",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Maintenance API - Service Intervals"
+    },
+    {
+      "path": "/api/fleet/maintenance/intervals/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Maintenance API - Single Service Interval"
+    },
+    {
+      "path": "/api/fleet/mileage",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Mileage Report API"
+    },
+    {
+      "path": "/api/fleet/mileage/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Mileage Export API"
+    },
+    {
+      "path": "/api/fleet/mileage/project-assignments",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Project Assignments API"
+    },
+    {
+      "path": "/api/fleet/mileage/project-summaries",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Mileage Project Summaries API"
+    },
+    {
+      "path": "/api/fleet/portal/session",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Portal - Session Check API"
+    },
+    {
+      "path": "/api/fleet/positions/live",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Last-known position per active vehicle, for the live map."
+    },
+    {
+      "path": "/api/fleet/vehicles",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicles API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/assignment",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Assignment API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/calibration",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Fleet Vehicle Calibration"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/check-records",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "API: Vehicle Check-In Records"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Documents API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/finance",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Finance API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/fuel",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Fuel History API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/fuel-transactions",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Fuel Transactions API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/insurance",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Insurance API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/lease",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Lease/Rental API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/license-disc",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle License Disc API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/odometer",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Odometer API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/odometer-anomalies",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Odometer Anomalies API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Photos API"
+    },
+    {
+      "path": "/api/fleet/vehicles/:id/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Fleet Vehicle Statistics API"
+    },
+    {
+      "path": "/api/fno-atlas/coverage-geometry",
+      "methods": [
+        "GET"
+      ],
+      "group": "fno-atlas"
+    },
+    {
+      "path": "/api/fno-atlas/coverage-kml",
+      "methods": [
+        "GET"
+      ],
+      "group": "fno-atlas"
+    },
+    {
+      "path": "/api/fno-atlas/coverage-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "fno-atlas"
+    },
+    {
+      "path": "/api/foto/download-report",
+      "methods": [
+        "GET"
+      ],
+      "group": "foto",
+      "description": "GET /api/foto/download-report?dr_number=DR1234567"
+    },
+    {
+      "path": "/api/foto/evaluation/:dr_number",
+      "methods": [
+        "GET"
+      ],
+      "group": "foto",
+      "description": "GET /api/foto/evaluation/[dr_number]"
+    },
+    {
+      "path": "/api/foto/photo-proxy",
+      "methods": [
+        "GET"
+      ],
+      "group": "foto",
+      "description": "GET /api/foto/photo-proxy?url={photo_url}"
+    },
+    {
+      "path": "/api/foto/photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "foto",
+      "description": "Photos API Endpoint"
+    },
+    {
+      "path": "/api/geocode",
+      "methods": [
+        "GET"
+      ],
+      "group": "geocode",
+      "description": "GET /api/geocode?lat=<number>&lon=<number>"
+    },
+    {
+      "path": "/api/health",
+      "methods": [
+        "GET"
+      ],
+      "group": "health",
+      "description": "Health Check API"
+    },
+    {
+      "path": "/api/health-safety/analytics/ltifr",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Injury-Rate Analytics (goal Phase 6, §7.6)"
+    },
+    {
+      "path": "/api/health-safety/appointments",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Appointment Letters API"
+    },
+    {
+      "path": "/api/health-safety/appointments/:letterId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Appointment Letter detail API"
+    },
+    {
+      "path": "/api/health-safety/audits/:auditId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Audit Detail API"
+    },
+    {
+      "path": "/api/health-safety/capa",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "CAPA API - List and Create"
+    },
+    {
+      "path": "/api/health-safety/capa/:capaId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "CAPA Detail API"
+    },
+    {
+      "path": "/api/health-safety/checklists",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Checklist Templates API"
+    },
+    {
+      "path": "/api/health-safety/checklists/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Checklist Template Detail API"
+    },
+    {
+      "path": "/api/health-safety/contractor/:contractorId/compliance",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "Contractor H&S Compliance API"
+    },
+    {
+      "path": "/api/health-safety/contractor/:contractorId/documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "Contractor H&S Documents API"
+    },
+    {
+      "path": "/api/health-safety/contractor/:contractorId/gate-check",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "Contractor H&S Gate Check API"
+    },
+    {
+      "path": "/api/health-safety/contractor/documents/:documentId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "Contractor H&S Document Detail API"
+    },
+    {
+      "path": "/api/health-safety/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Dashboard API"
+    },
+    {
+      "path": "/api/health-safety/incidents",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Incidents API"
+    },
+    {
+      "path": "/api/health-safety/incidents/:incidentId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Incident Detail API"
+    },
+    {
+      "path": "/api/health-safety/injuries",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Injuries API"
+    },
+    {
+      "path": "/api/health-safety/library",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Safety Library API"
+    },
+    {
+      "path": "/api/health-safety/library/:libraryId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Safety Library entry detail API"
+    },
+    {
+      "path": "/api/health-safety/man-hours",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Man-Hours API"
+    },
+    {
+      "path": "/api/health-safety/medicals",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Worker Medical Fitness API"
+    },
+    {
+      "path": "/api/health-safety/medicals/:medicalId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Worker Medical Fitness detail API"
+    },
+    {
+      "path": "/api/health-safety/permits",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Permits API"
+    },
+    {
+      "path": "/api/health-safety/permits/:permitId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Permit detail API"
+    },
+    {
+      "path": "/api/health-safety/permits/types",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Permit Types API"
+    },
+    {
+      "path": "/api/health-safety/ppe/catalogue",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S PPE Catalogue API"
+    },
+    {
+      "path": "/api/health-safety/ppe/issuance",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S PPE Issuance API"
+    },
+    {
+      "path": "/api/health-safety/project/:projectId/audits",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "Project H&S Audits API"
+    },
+    {
+      "path": "/api/health-safety/project/:projectId/config",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "Project H&S Configuration API"
+    },
+    {
+      "path": "/api/health-safety/project/:projectId/safety-file",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Digital Safety File export (goal Phase 5, §7.5)"
+    },
+    {
+      "path": "/api/health-safety/risks",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "Risk Register API"
+    },
+    {
+      "path": "/api/health-safety/tickets/:ticketId/details",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Ticket Details API"
+    },
+    {
+      "path": "/api/health-safety/toolbox",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Toolbox Talks API"
+    },
+    {
+      "path": "/api/health-safety/toolbox/:talkId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Toolbox Talk detail API"
+    },
+    {
+      "path": "/api/health-safety/training/competency",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Per-Project Competency Gap API"
+    },
+    {
+      "path": "/api/health-safety/training/pickers",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Training form pickers"
+    },
+    {
+      "path": "/api/health-safety/training/records",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Worker Training Records API"
+    },
+    {
+      "path": "/api/health-safety/training/types",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Training Types API"
+    },
+    {
+      "path": "/api/health/db",
+      "methods": [
+        "GET"
+      ],
+      "group": "health"
+    },
+    {
+      "path": "/api/help-center/manual",
+      "methods": [
+        "GET"
+      ],
+      "group": "help-center"
+    },
+    {
+      "path": "/api/livekit/config",
+      "methods": [
+        "GET"
+      ],
+      "group": "livekit"
+    },
+    {
+      "path": "/api/livekit/recordings",
+      "methods": [
+        "GET"
+      ],
+      "group": "livekit"
+    },
+    {
+      "path": "/api/livekit/rooms",
+      "methods": [
+        "GET"
+      ],
+      "group": "livekit"
+    },
+    {
+      "path": "/api/livekit/schedule",
+      "methods": [
+        "GET"
+      ],
+      "group": "livekit"
+    },
+    {
+      "path": "/api/manco-action-items",
+      "methods": [
+        "GET"
+      ],
+      "group": "manco-action-items"
+    },
+    {
+      "path": "/api/manco-action-items/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "manco-action-items"
+    },
+    {
+      "path": "/api/manco-action-items/comments",
+      "methods": [
+        "GET"
+      ],
+      "group": "manco-action-items"
+    },
+    {
+      "path": "/api/manco-action-items/linked-meetings",
+      "methods": [
+        "GET"
+      ],
+      "group": "manco-action-items"
+    },
+    {
+      "path": "/api/manco-action-items/meeting-context",
+      "methods": [
+        "GET"
+      ],
+      "group": "manco-action-items"
+    },
+    {
+      "path": "/api/manco-action-items/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "manco-action-items"
+    },
+    {
+      "path": "/api/marketing-activations",
+      "methods": [
+        "GET"
+      ],
+      "group": "marketing-activations"
+    },
+    {
+      "path": "/api/materials/catalog",
+      "methods": [
+        "GET"
+      ],
+      "group": "materials",
+      "description": "Material Catalog API"
+    },
+    {
+      "path": "/api/meetings",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings"
+    },
+    {
+      "path": "/api/meetings/:id/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings",
+      "description": "GET /api/meetings/[id]/export?type=summary|transcript|action-items"
+    },
+    {
+      "path": "/api/meetings/:id/recording",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings"
+    },
+    {
+      "path": "/api/meetings/:id/transcript",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings"
+    },
+    {
+      "path": "/api/meetings/webhook",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings"
+    },
+    {
+      "path": "/api/mission-control/:path*",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "group": "mission-control"
+    },
+    {
+      "path": "/api/monitoring/health",
+      "methods": [
+        "GET"
+      ],
+      "group": "monitoring",
+      "description": "Health endpoint alias for monitoring tools"
+    },
+    {
+      "path": "/api/noc/analytics/fault-trends",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Fault Trends Analytics API Route"
+    },
+    {
+      "path": "/api/noc/attachments/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Attachment API Route - Get and Delete"
+    },
+    {
+      "path": "/api/noc/dashboard/sla",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Dashboard SLA API Route"
+    },
+    {
+      "path": "/api/noc/dashboard/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Dashboard Summary API Route"
+    },
+    {
+      "path": "/api/noc/dashboard/workload",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Dashboard Workload API Route"
+    },
+    {
+      "path": "/api/noc/dr-lookup/:drNumber",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "DR Lookup API Route"
+    },
+    {
+      "path": "/api/noc/escalations",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Escalation List API Route"
+    },
+    {
+      "path": "/api/noc/escalations/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Escalation Detail API Route"
+    },
+    {
+      "path": "/api/noc/handovers/pending",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Pending Handovers API"
+    },
+    {
+      "path": "/api/noc/import/weekly/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Weekly Import API - Get Import Status"
+    },
+    {
+      "path": "/api/noc/import/weekly/:id/progress",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Weekly Import API - Get Import Progress"
+    },
+    {
+      "path": "/api/noc/import/weekly/history",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Weekly Import API - Import History"
+    },
+    {
+      "path": "/api/noc/migration/status",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "VF Migration Status Endpoint"
+    },
+    {
+      "path": "/api/noc/migration/vf-renumber",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "VF Migration Renumber Endpoint"
+    },
+    {
+      "path": "/api/noc/nearby-drops",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Nearby Drops API"
+    },
+    {
+      "path": "/api/noc/nearby-tickets",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Nearby Tickets API"
+    },
+    {
+      "path": "/api/noc/notifications/status",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "WhatsApp Notification Status API Route"
+    },
+    {
+      "path": "/api/noc/process-photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Maintenance Photo Processing Endpoint"
+    },
+    {
+      "path": "/api/noc/project-team-assignments",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc"
+    },
+    {
+      "path": "/api/noc/qcontact/alignment",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "QContact Alignment Report Endpoint"
+    },
+    {
+      "path": "/api/noc/qcontact/debug-case",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "QContact Case Debug Endpoint"
+    },
+    {
+      "path": "/api/noc/qcontact/discover-statuses",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "QContact Status Discovery Endpoint"
+    },
+    {
+      "path": "/api/noc/repeat-faults/check",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Repeat Fault Pattern Check API Route"
+    },
+    {
+      "path": "/api/noc/risk-acceptances",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Risk Acceptances API - Global List"
+    },
+    {
+      "path": "/api/noc/statuses",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "API: /api/noc/statuses"
+    },
+    {
+      "path": "/api/noc/sync/fibertime",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "FiberTime QContact Sync API Route"
+    },
+    {
+      "path": "/api/noc/sync/qcontact/log",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "QContact Sync Log API Route"
+    },
+    {
+      "path": "/api/noc/sync/qcontact/status",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "QContact Sync Status API Route"
+    },
+    {
+      "path": "/api/noc/teams",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Teams API Route - List and Create"
+    },
+    {
+      "path": "/api/noc/teams/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Individual Team API Route"
+    },
+    {
+      "path": "/api/noc/teams/:id/members",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Team Members API Route"
+    },
+    {
+      "path": "/api/noc/tickets",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Ticket CRUD API Route - List and Create"
+    },
+    {
+      "path": "/api/noc/tickets-duplicate-check",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Duplicate Ticket Check"
+    },
+    {
+      "path": "/api/noc/tickets/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Ticket CRUD API Route - Individual Ticket Operations"
+    },
+    {
+      "path": "/api/noc/tickets/:id/activities",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc"
+    },
+    {
+      "path": "/api/noc/tickets/:id/attachments",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Ticket Attachments API Route"
+    },
+    {
+      "path": "/api/noc/tickets/:id/handover-history",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Handover History API Route"
+    },
+    {
+      "path": "/api/noc/tickets/:id/historical-photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "GET /api/noc/tickets/[id]/historical-photos"
+    },
+    {
+      "path": "/api/noc/tickets/:id/notes",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Ticket Notes API"
+    },
+    {
+      "path": "/api/noc/tickets/:id/notes/:noteId",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Individual Ticket Note API"
+    },
+    {
+      "path": "/api/noc/tickets/:id/qa-readiness",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "QA Readiness Status API Route"
+    },
+    {
+      "path": "/api/noc/tickets/:id/report",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "GET /api/noc/tickets/[id]/report — streams a PDF of the ticket's"
+    },
+    {
+      "path": "/api/noc/tickets/:id/risk-acceptances",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Risk Acceptances List API Route"
+    },
+    {
+      "path": "/api/noc/tickets/:id/verification",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Verification Steps API Route"
+    },
+    {
+      "path": "/api/noc/tickets/:id/whatsapp",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc"
+    },
+    {
+      "path": "/api/noc/tickets/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Ticket Summary API — lightweight status + type counts"
+    },
+    {
+      "path": "/api/noc/users",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Users API Route for Assignment Dropdown"
+    },
+    {
+      "path": "/api/noc/verification",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "API: /api/noc/verification"
+    },
+    {
+      "path": "/api/noc/wa-dr-photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Get photos for a specific DR from WhatsApp maintenance tracking"
+    },
+    {
+      "path": "/api/noc/wa-messages",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "WhatsApp Maintenance Messages List Endpoint"
+    },
+    {
+      "path": "/api/noc/wa-monitored-groups",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Read-only listing of monitored WhatsApp groups, scoped by group_type."
+    },
+    {
+      "path": "/api/noc/wa-photos/:path*",
+      "methods": [
+        "GET"
+      ],
+      "group": "noc",
+      "description": "Maintenance WhatsApp Photos API"
+    },
+    {
+      "path": "/api/nokia/velocity",
+      "methods": [
+        "GET"
+      ],
+      "group": "nokia"
+    },
+    {
+      "path": "/api/notifications",
+      "methods": [
+        "GET"
+      ],
+      "group": "notifications",
+      "description": "GET /api/notifications"
+    },
+    {
+      "path": "/api/notifications/preferences",
+      "methods": [
+        "GET"
+      ],
+      "group": "notifications",
+      "description": "GET/PUT /api/notifications/preferences"
+    },
+    {
+      "path": "/api/notifications/unread-count",
+      "methods": [
+        "GET"
+      ],
+      "group": "notifications",
+      "description": "GET /api/notifications/unread-count"
+    },
+    {
+      "path": "/api/odoo/sync/assets",
+      "methods": [
+        "GET"
+      ],
+      "group": "odoo",
+      "description": "Odoo Asset Sync API"
+    },
+    {
+      "path": "/api/odoo/sync/attachments",
+      "methods": [
+        "GET"
+      ],
+      "group": "odoo",
+      "description": "Odoo Attachment Sync API"
+    },
+    {
+      "path": "/api/odoo/sync/stock-movements",
+      "methods": [
+        "GET"
+      ],
+      "group": "odoo",
+      "description": "Odoo Stock Movements Sync API"
+    },
+    {
+      "path": "/api/onemap/properties",
+      "methods": [
+        "GET"
+      ],
+      "group": "onemap"
+    },
+    {
+      "path": "/api/onemap/properties-enhanced",
+      "methods": [
+        "GET"
+      ],
+      "group": "onemap"
+    },
+    {
+      "path": "/api/onemap/properties-with-mapping",
+      "methods": [
+        "GET"
+      ],
+      "group": "onemap"
+    },
+    {
+      "path": "/api/pipeline/approval-types",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Approval Types API"
+    },
+    {
+      "path": "/api/pipeline/approvals/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Approval Detail API"
+    },
+    {
+      "path": "/api/pipeline/approvals/:id/documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Approval Documents API"
+    },
+    {
+      "path": "/api/pipeline/authorities",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Service Authorities API"
+    },
+    {
+      "path": "/api/pipeline/authorities/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Service Authority API"
+    },
+    {
+      "path": "/api/pipeline/authorities/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Service Authorities Quick Search API"
+    },
+    {
+      "path": "/api/pipeline/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Dashboard API"
+    },
+    {
+      "path": "/api/pipeline/documents/:path*",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Document Proxy API"
+    },
+    {
+      "path": "/api/pipeline/expiring",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Expiring Approvals API"
+    },
+    {
+      "path": "/api/pipeline/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "GET /api/pipeline/export"
+    },
+    {
+      "path": "/api/pipeline/followups",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Due Follow-ups API"
+    },
+    {
+      "path": "/api/pipeline/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Projects API"
+    },
+    {
+      "path": "/api/pipeline/projects/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Project Detail API"
+    },
+    {
+      "path": "/api/pipeline/projects/:id/approvals",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Project Approvals API"
+    },
+    {
+      "path": "/api/pipeline/projects/:id/documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "API: Pipeline Project Documents"
+    },
+    {
+      "path": "/api/pipeline/projects/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "Pipeline Projects Search API"
+    },
+    {
+      "path": "/api/pipeline/smartsheet/config",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "API: Smartsheet sync configuration"
+    },
+    {
+      "path": "/api/pipeline/smartsheet/history",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "API: Smartsheet sync history"
+    },
+    {
+      "path": "/api/pipeline/smartsheet/sheets",
+      "methods": [
+        "GET"
+      ],
+      "group": "pipeline",
+      "description": "API: List Smartsheet sheets"
+    },
+    {
+      "path": "/api/planning/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "planning"
+    },
+    {
+      "path": "/api/planning/items/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "planning"
+    },
+    {
+      "path": "/api/poles",
+      "methods": [
+        "GET"
+      ],
+      "group": "poles"
+    },
+    {
+      "path": "/api/procurement/adjustments",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Adjustments API"
+    },
+    {
+      "path": "/api/procurement/aggregate-metrics",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/approvals/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/approvals/all",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/approvals/all"
+    },
+    {
+      "path": "/api/procurement/approvals/pending",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/audit-logs",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq-lifecycle",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/boq-lifecycle?boqId=xxx"
+    },
+    {
+      "path": "/api/procurement/boq-spend-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/boq-spend-summary"
+    },
+    {
+      "path": "/api/procurement/boq-stock-view",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/boq-stock-view"
+    },
+    {
+      "path": "/api/procurement/boq/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq/change-history",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq/compare-versions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq/templates",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq/versions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/budget/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Procurement Budget Dashboard API"
+    },
+    {
+      "path": "/api/procurement/budget/templates",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Budget Templates API"
+    },
+    {
+      "path": "/api/procurement/budget/templates/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Single Budget Template API"
+    },
+    {
+      "path": "/api/procurement/bundles",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Bundles API - List and Create"
+    },
+    {
+      "path": "/api/procurement/bundles/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Bundles API - Single Bundle Operations"
+    },
+    {
+      "path": "/api/procurement/bundles/:id/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Bundle Items API"
+    },
+    {
+      "path": "/api/procurement/bundles/:id/items/:itemId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Bundle Single Item API"
+    },
+    {
+      "path": "/api/procurement/bundles/reports/consumption",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bundle Item Consumption Report API"
+    },
+    {
+      "path": "/api/procurement/bundles/reports/cost-analysis",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bundle Cost Analysis Report API"
+    },
+    {
+      "path": "/api/procurement/bundles/reports/inventory-value",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bundle Inventory Value Report API"
+    },
+    {
+      "path": "/api/procurement/bundles/reports/usage",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bundle Usage Report API"
+    },
+    {
+      "path": "/api/procurement/categories",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Categories API - List and Create"
+    },
+    {
+      "path": "/api/procurement/categories/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Categories API - Single Category Operations"
+    },
+    {
+      "path": "/api/procurement/cost-centers",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Cost Centers API"
+    },
+    {
+      "path": "/api/procurement/cost-centers/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Single Cost Center API"
+    },
+    {
+      "path": "/api/procurement/cost-centers/:id/allocations",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Cost Center Allocations API"
+    },
+    {
+      "path": "/api/procurement/cost-centers/:id/transactions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Cost Center Transactions API"
+    },
+    {
+      "path": "/api/procurement/cost-centers/types",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Cost Center Types API"
+    },
+    {
+      "path": "/api/procurement/documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Procurement Documents API"
+    },
+    {
+      "path": "/api/procurement/fault-reports",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/fault-reports/:faultId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/fault-reports/analytics",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/field-stock/accountability/exceptions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Exceptions List API"
+    },
+    {
+      "path": "/api/procurement/field-stock/accountability/holders",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Holder Accountability List API"
+    },
+    {
+      "path": "/api/procurement/field-stock/accountability/holders/:holderId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Holder Accountability Detail API"
+    },
+    {
+      "path": "/api/procurement/field-stock/consumptions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Consumptions API"
+    },
+    {
+      "path": "/api/procurement/field-stock/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Dashboard API"
+    },
+    {
+      "path": "/api/procurement/field-stock/dashboard-v2",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Dashboard v2 API"
+    },
+    {
+      "path": "/api/procurement/field-stock/export-serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bootstock Serial Export API"
+    },
+    {
+      "path": "/api/procurement/field-stock/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Items API"
+    },
+    {
+      "path": "/api/procurement/field-stock/locations",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Locations API"
+    },
+    {
+      "path": "/api/procurement/field-stock/locations/:locationId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Location by ID API"
+    },
+    {
+      "path": "/api/procurement/field-stock/my-serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/my-serials"
+    },
+    {
+      "path": "/api/procurement/field-stock/pickings",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Pickings API"
+    },
+    {
+      "path": "/api/procurement/field-stock/pickings/:pickingId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Picking Detail API"
+    },
+    {
+      "path": "/api/procurement/field-stock/returns",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Returns API"
+    },
+    {
+      "path": "/api/procurement/field-stock/serial-drift",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Serial-register drift API (PR-11) — read-only reconciliation drift detection."
+    },
+    {
+      "path": "/api/procurement/field-stock/serial-recon",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Serial Reconciliation API"
+    },
+    {
+      "path": "/api/procurement/field-stock/serial-source",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/serial-source?serialNumber=XYZ"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Serials API"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/:serialNumber",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Serial by Number API"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/serials/projects"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/serials/search"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/timeline",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/warehouses",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/serials/warehouses"
+    },
+    {
+      "path": "/api/procurement/grn",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/grn-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GRN Register CSV Export"
+    },
+    {
+      "path": "/api/procurement/grn/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/grn/:id/register-assets",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GRN Asset Registration API"
+    },
+    {
+      "path": "/api/procurement/grn/available-pos",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/metrics/aggregate",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Aggregate Procurement Metrics API"
+    },
+    {
+      "path": "/api/procurement/open-orders",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/open-orders"
+    },
+    {
+      "path": "/api/procurement/open-orders-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Open Orders CSV Export"
+    },
+    {
+      "path": "/api/procurement/projects/summaries",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Project Procurement Summaries API"
+    },
+    {
+      "path": "/api/procurement/purchase-orders",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/purchase-orders-approval",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "PO Approval Status API"
+    },
+    {
+      "path": "/api/procurement/purchase-orders-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Purchase Orders CSV Export"
+    },
+    {
+      "path": "/api/procurement/purchase-orders/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/quote-evaluations",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/reports-data",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Procurement Reports Data API"
+    },
+    {
+      "path": "/api/procurement/requisitions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/requisitions-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Purchase Requisitions CSV Export"
+    },
+    {
+      "path": "/api/procurement/requisitions/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/rfq",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/rfq-suppliers",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/rfq-suppliers?rfqId=xxx"
+    },
+    {
+      "path": "/api/procurement/rfq/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/soh-audit/template",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/soh-audit/template"
+    },
+    {
+      "path": "/api/procurement/soh-audit/versions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET  /api/procurement/soh-audit/versions        — list all versions"
+    },
+    {
+      "path": "/api/procurement/soh-audit/warehouses",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET  /api/procurement/soh-audit/warehouses — list active warehouses"
+    },
+    {
+      "path": "/api/procurement/spend-by-supplier-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Spend by Supplier CSV Export"
+    },
+    {
+      "path": "/api/procurement/stock",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/stock-categories",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/stock-categories"
+    },
+    {
+      "path": "/api/procurement/stock-items-search",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/stock-takes",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Takes API - List and Create"
+    },
+    {
+      "path": "/api/procurement/stock-takes/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Takes API - Single Stock Take Operations"
+    },
+    {
+      "path": "/api/procurement/stock-takes/:id/lines",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Take Lines API"
+    },
+    {
+      "path": "/api/procurement/stock-takes/reasons",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Adjustment Reasons API"
+    },
+    {
+      "path": "/api/procurement/supplier-item-codes",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/tab-badges",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/threads",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET  /api/procurement/threads  — List procurement threads with optional filters"
+    },
+    {
+      "path": "/api/procurement/threads/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/threads/[id] — Fetch a single procurement thread with linked document details"
+    },
+    {
+      "path": "/api/project-import/status",
+      "methods": [
+        "GET"
+      ],
+      "group": "project-import",
+      "description": "Project Import Status API"
+    },
+    {
+      "path": "/api/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Projects API Route - List and Create projects"
+    },
+    {
+      "path": "/api/projects/:projectId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects"
+    },
+    {
+      "path": "/api/projects/:projectId/activation-check",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Activation Check API"
+    },
+    {
+      "path": "/api/projects/:projectId/agreements",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Agreements API (PRD-058)"
+    },
+    {
+      "path": "/api/projects/:projectId/boq-utilization",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "GET /api/projects/[projectId]/boq-utilization"
+    },
+    {
+      "path": "/api/projects/:projectId/boq-utilization-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "BOQ Utilization CSV Export"
+    },
+    {
+      "path": "/api/projects/:projectId/budget",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API endpoint for project budget management"
+    },
+    {
+      "path": "/api/projects/:projectId/budget/alerts",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API endpoint for budget alerts"
+    },
+    {
+      "path": "/api/projects/:projectId/budget/alerts/:alertId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API endpoint for individual budget alert actions"
+    },
+    {
+      "path": "/api/projects/:projectId/budget/categories",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API endpoint for budget category management"
+    },
+    {
+      "path": "/api/projects/:projectId/budget/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Budget Items API"
+    },
+    {
+      "path": "/api/projects/:projectId/budget/transactions",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API endpoint for budget transaction history"
+    },
+    {
+      "path": "/api/projects/:projectId/client-pos",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Client Purchase Order API - List and Create"
+    },
+    {
+      "path": "/api/projects/:projectId/client-pos/:poId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Client Purchase Order API - Get, Update, Delete"
+    },
+    {
+      "path": "/api/projects/:projectId/client-pos/:poId/assign-drops",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Assign Drops to Client PO API"
+    },
+    {
+      "path": "/api/projects/:projectId/contractors-hs",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Contractors H&S API"
+    },
+    {
+      "path": "/api/projects/:projectId/cross-validation",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Document Cross-Validation API"
+    },
+    {
+      "path": "/api/projects/:projectId/customer-invoices",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Customer Invoice API - List and Create"
+    },
+    {
+      "path": "/api/projects/:projectId/customer-invoices/:invoiceId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Customer Invoice API - Get, Update, Actions"
+    },
+    {
+      "path": "/api/projects/:projectId/customer-invoices/generate",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Generate Customer Invoice from Activated Drops"
+    },
+    {
+      "path": "/api/projects/:projectId/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Dashboard API"
+    },
+    {
+      "path": "/api/projects/:projectId/documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Documents API - List and Create"
+    },
+    {
+      "path": "/api/projects/:projectId/documents/:documentId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Document API - Single document operations"
+    },
+    {
+      "path": "/api/projects/:projectId/drops/uninvoiced",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Uninvoiced Drops API"
+    },
+    {
+      "path": "/api/projects/:projectId/finance/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Finance Dashboard API"
+    },
+    {
+      "path": "/api/projects/:projectId/hs-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project H&S Summary API"
+    },
+    {
+      "path": "/api/projects/:projectId/incidents",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Incidents API"
+    },
+    {
+      "path": "/api/projects/:projectId/maintenance-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Maintenance Summary API"
+    },
+    {
+      "path": "/api/projects/:projectId/phases",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API endpoint for managing project phases"
+    },
+    {
+      "path": "/api/projects/:projectId/phases/:phaseId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API endpoint for managing a specific project phase"
+    },
+    {
+      "path": "/api/projects/:projectId/pipeline-links",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Pipeline Links API"
+    },
+    {
+      "path": "/api/projects/:projectId/pipeline-links/:linkId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Pipeline Link API"
+    },
+    {
+      "path": "/api/projects/:projectId/pon-daily-log",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API Route: /api/projects/[projectId]/pon-daily-log"
+    },
+    {
+      "path": "/api/projects/:projectId/pon-progress",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API Route: /api/projects/[projectId]/pon-progress"
+    },
+    {
+      "path": "/api/projects/:projectId/pon-stages",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API Route: /api/projects/[projectId]/pon-stages"
+    },
+    {
+      "path": "/api/projects/:projectId/pon-targets",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API Route: /api/projects/[projectId]/pon-targets"
+    },
+    {
+      "path": "/api/projects/:projectId/prereqs",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API Route: /api/projects/[projectId]/prereqs"
+    },
+    {
+      "path": "/api/projects/:projectId/procurement-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Procurement Summary API"
+    },
+    {
+      "path": "/api/projects/:projectId/progress",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "API endpoint for project progress tracking"
+    },
+    {
+      "path": "/api/projects/:projectId/requirements",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Requirements API"
+    },
+    {
+      "path": "/api/projects/:projectId/requirements/:requirementId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Requirement API - Single Requirement Operations"
+    },
+    {
+      "path": "/api/projects/:projectId/site-visits",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Site Visits API — Project scope"
+    },
+    {
+      "path": "/api/projects/:projectId/sp-tracker",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "SP Tracker Data Endpoint"
+    },
+    {
+      "path": "/api/projects/:projectId/spare-usage",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Spare Usage API"
+    },
+    {
+      "path": "/api/projects/:projectId/team",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Team API"
+    },
+    {
+      "path": "/api/projects/:projectId/team-search",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Team Member Search API"
+    },
+    {
+      "path": "/api/projects/:projectId/timeline",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Timeline API"
+    },
+    {
+      "path": "/api/projects/:projectId/tracker",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "PON Tracker API"
+    },
+    {
+      "path": "/api/projects/:projectId/wayleaves",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Project Wayleaves API"
+    },
+    {
+      "path": "/api/projects/:projectId/wayleaves/:approvalId",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Single Wayleave Approval API"
+    },
+    {
+      "path": "/api/projects/expiring-documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Unified Expiring Documents API (PRD-058)"
+    },
+    {
+      "path": "/api/projects/portfolio-dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Portfolio Dashboard API (PRD-058)"
+    },
+    {
+      "path": "/api/projects/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects"
+    },
+    {
+      "path": "/api/projects/search-for-linking",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects",
+      "description": "Projects Search API for Pipeline Linking"
+    },
+    {
+      "path": "/api/projects/stale",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects"
+    },
+    {
+      "path": "/api/projects/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "projects"
+    },
+    {
+      "path": "/api/qa-review-history",
+      "methods": [
+        "GET"
+      ],
+      "group": "qa-review-history",
+      "description": "API Route: /api/qa-review-history"
+    },
+    {
+      "path": "/api/qfield",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "QField System API"
+    },
+    {
+      "path": "/api/qfield-sync-cables",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield-sync-cables",
+      "description": "API endpoint for fetching fiber cable data for QField Sync comparison"
+    },
+    {
+      "path": "/api/qfield-sync-current",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield-sync-current",
+      "description": "QField Sync Current Job API Endpoint"
+    },
+    {
+      "path": "/api/qfield-sync-dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield-sync-dashboard",
+      "description": "QField Sync Dashboard API Endpoint"
+    },
+    {
+      "path": "/api/qfield-sync-drops",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield-sync-drops",
+      "description": "API endpoint for fetching drop data for QField Sync comparison"
+    },
+    {
+      "path": "/api/qfield-sync-history",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield-sync-history",
+      "description": "QField Sync History API Endpoint"
+    },
+    {
+      "path": "/api/qfield-sync-poles",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield-sync-poles",
+      "description": "API endpoint for fetching pole data for QField Sync comparison"
+    },
+    {
+      "path": "/api/qfield/gpkg-layers",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "GET /api/qfield/gpkg-layers?qfieldProjectId=<uuid>"
+    },
+    {
+      "path": "/api/qfield/photo-proxy",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "GET /api/qfield/photo-proxy?key={photo_key}"
+    },
+    {
+      "path": "/api/qfield/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "API Route: /api/qfield/projects"
+    },
+    {
+      "path": "/api/qfield/projects/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "API Route: /api/qfield/projects/[id]"
+    },
+    {
+      "path": "/api/qfield/projects/discover",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "API Route: /api/qfield/projects/discover"
+    },
+    {
+      "path": "/api/qfield/qa-assignments",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "GET/POST /api/qfield/qa-assignments"
+    },
+    {
+      "path": "/api/qfield/qa-hierarchy",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "GET /api/qfield/qa-hierarchy"
+    },
+    {
+      "path": "/api/qfield/qa-projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "GET /api/qfield/qa-projects"
+    },
+    {
+      "path": "/api/qfield/qa-stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "GET /api/qfield/qa-stats"
+    },
+    {
+      "path": "/api/qfield/qa-validations",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield",
+      "description": "GET/POST /api/qfield/qa-validations"
+    },
+    {
+      "path": "/api/qfield/reconciliation",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield"
+    },
+    {
+      "path": "/api/qfield/reconciliation-projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield"
+    },
+    {
+      "path": "/api/realtime/poll",
+      "methods": [
+        "GET"
+      ],
+      "group": "realtime",
+      "description": "Polling-based real-time API"
+    },
+    {
+      "path": "/api/reminder-preferences",
+      "methods": [
+        "GET"
+      ],
+      "group": "reminder-preferences"
+    },
+    {
+      "path": "/api/reminders",
+      "methods": [
+        "GET"
+      ],
+      "group": "reminders"
+    },
+    {
+      "path": "/api/reports/ont-serials-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "reports",
+      "description": "ONT Serials Master Export"
+    },
+    {
+      "path": "/api/reports/progress-today",
+      "methods": [
+        "GET"
+      ],
+      "group": "reports",
+      "description": "API Route: /api/reports/progress-today"
+    },
+    {
+      "path": "/api/reports/uptake",
+      "methods": [
+        "GET"
+      ],
+      "group": "reports",
+      "description": "API Route: /api/reports/uptake?projectId=<uuid> OR ?project=<name>"
+    },
+    {
+      "path": "/api/reports/uptake-pdf",
+      "methods": [
+        "GET"
+      ],
+      "group": "reports",
+      "description": "API Route: /api/reports/uptake-pdf?projectId=<uuid> OR ?project=<name>"
+    },
+    {
+      "path": "/api/reports/weekly-activations",
+      "methods": [
+        "GET"
+      ],
+      "group": "reports",
+      "description": "API Route: /api/reports/weekly-activations"
+    },
+    {
+      "path": "/api/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "search"
+    },
+    {
+      "path": "/api/settings/procurement/notifications",
+      "methods": [
+        "GET"
+      ],
+      "group": "settings",
+      "description": "Procurement Notifications Settings API"
+    },
+    {
+      "path": "/api/settings/procurement/sequences",
+      "methods": [
+        "GET"
+      ],
+      "group": "settings",
+      "description": "Procurement Number Sequences Settings API"
+    },
+    {
+      "path": "/api/settings/procurement/terms",
+      "methods": [
+        "GET"
+      ],
+      "group": "settings",
+      "description": "Procurement Default Terms Settings API"
+    },
+    {
+      "path": "/api/settings/procurement/workflows",
+      "methods": [
+        "GET"
+      ],
+      "group": "settings",
+      "description": "Procurement Approval Workflows Settings API"
+    },
+    {
+      "path": "/api/settings/system/features",
+      "methods": [
+        "GET"
+      ],
+      "group": "settings",
+      "description": "System Feature Settings API"
+    },
+    {
+      "path": "/api/site-visits/upcoming",
+      "methods": [
+        "GET"
+      ],
+      "group": "site-visits",
+      "description": "Upcoming Site Visits API"
+    },
+    {
+      "path": "/api/sitecam/escalations",
+      "methods": [
+        "GET"
+      ],
+      "group": "sitecam",
+      "description": "GET /api/sitecam/escalations"
+    },
+    {
+      "path": "/api/sitecam/site/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "sitecam",
+      "description": "GET /api/sitecam/site/:id"
+    },
+    {
+      "path": "/api/sitecam/submission/:drNumber",
+      "methods": [
+        "GET"
+      ],
+      "group": "sitecam",
+      "description": "GET /api/sitecam/submission/:drNumber"
+    },
+    {
+      "path": "/api/snags",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snags API"
+    },
+    {
+      "path": "/api/snags/by-status",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snags By Status API"
+    },
+    {
+      "path": "/api/snags/closeout-report",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snag Closeout Report API"
+    },
+    {
+      "path": "/api/snags/count-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snags Count Summary API"
+    },
+    {
+      "path": "/api/snags/hierarchy-stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snags Hierarchy Stats API"
+    },
+    {
+      "path": "/api/snags/photos",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snag Photos API"
+    },
+    {
+      "path": "/api/snags/report-options",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snag Report Options API"
+    },
+    {
+      "path": "/api/snags/reports",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snag Reports API"
+    },
+    {
+      "path": "/api/snags/reports-scope-pdf",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "GET /api/snags/reports-scope-pdf?id=<uuid>"
+    },
+    {
+      "path": "/api/snags/reports-scope-xlsx",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "GET /api/snags/reports-scope-xlsx?id=<uuid>"
+    },
+    {
+      "path": "/api/snags/resolution-report",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snag Resolution Report API"
+    },
+    {
+      "path": "/api/snags/resolve-poles",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Pole Resolution API"
+    },
+    {
+      "path": "/api/snags/shared/:token",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Shared Snag Ticket API (public — no auth required)"
+    },
+    {
+      "path": "/api/snags/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Snags Stats API"
+    },
+    {
+      "path": "/api/snags/zone-pon-options",
+      "methods": [
+        "GET"
+      ],
+      "group": "snags",
+      "description": "Zone/PON Options API"
+    },
+    {
+      "path": "/api/sow",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/drops",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow",
+      "description": "SOW Drops API"
+    },
+    {
+      "path": "/api/sow/drops/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/drops/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/fibre",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/import-status",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/import/:importId/status",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/list",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/poles",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow",
+      "description": "SOW Poles API"
+    },
+    {
+      "path": "/api/sow/project",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/project/:projectId",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/project/:projectId/poles-with-drops",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/project/:projectId/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/sow/tables/check",
+      "methods": [
+        "GET"
+      ],
+      "group": "sow"
+    },
+    {
+      "path": "/api/stock-items",
+      "methods": [
+        "GET"
+      ],
+      "group": "stock-items",
+      "description": "Stock Items API - List & Create"
+    },
+    {
+      "path": "/api/stock-items/:itemId",
+      "methods": [
+        "GET"
+      ],
+      "group": "stock-items",
+      "description": "Stock Items API - Single Item CRUD"
+    },
+    {
+      "path": "/api/stock-items/checkouts",
+      "methods": [
+        "GET"
+      ],
+      "group": "stock-items",
+      "description": "Stock Items API - List Checkouts"
+    },
+    {
+      "path": "/api/stock-items/stock-items-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "stock-items",
+      "description": "Stock Items CSV Export"
+    },
+    {
+      "path": "/api/stock/serial-history",
+      "methods": [
+        "GET"
+      ],
+      "group": "stock",
+      "description": "Serial Unit History API"
+    },
+    {
+      "path": "/api/stock/serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "stock",
+      "description": "Stock Item Serials API"
+    },
+    {
+      "path": "/api/storage/list",
+      "methods": [
+        "GET"
+      ],
+      "group": "storage",
+      "description": "Unified Storage List API"
+    },
+    {
+      "path": "/api/suppliers",
+      "methods": [
+        "GET"
+      ],
+      "group": "suppliers",
+      "description": "Suppliers API endpoint"
+    },
+    {
+      "path": "/api/suppliers/:supplierId",
+      "methods": [
+        "GET"
+      ],
+      "group": "suppliers",
+      "description": "Individual Supplier API endpoint"
+    },
+    {
+      "path": "/api/suppliers/:supplierId/compliance",
+      "methods": [
+        "GET"
+      ],
+      "group": "suppliers",
+      "description": "Supplier Compliance API endpoint"
+    },
+    {
+      "path": "/api/suppliers/:supplierId/ratings",
+      "methods": [
+        "GET"
+      ],
+      "group": "suppliers",
+      "description": "Supplier Ratings API endpoint"
+    },
+    {
+      "path": "/api/suppliers/statistics",
+      "methods": [
+        "GET"
+      ],
+      "group": "suppliers",
+      "description": "Suppliers Statistics API endpoint"
+    },
+    {
+      "path": "/api/suppliers/suppliers-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "suppliers",
+      "description": "Suppliers CSV Export"
+    },
+    {
+      "path": "/api/system/approve-recovery",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Recovery Approval API"
+    },
+    {
+      "path": "/api/system/data-sync/history",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Data Sync History API"
+    },
+    {
+      "path": "/api/system/data-sync/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Data Sync Stats API"
+    },
+    {
+      "path": "/api/system/deploy-health",
+      "methods": [
+        "GET"
+      ],
+      "group": "system"
+    },
+    {
+      "path": "/api/system/design-audit",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Design System Audit API"
+    },
+    {
+      "path": "/api/system/health",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "System Health API Endpoint"
+    },
+    {
+      "path": "/api/system/olt-report",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Report List API"
+    },
+    {
+      "path": "/api/system/olt-report/:importId",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Report Import Detail API"
+    },
+    {
+      "path": "/api/system/olt-report/admin-users",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Get Admin Users API"
+    },
+    {
+      "path": "/api/system/olt-report/auto-detect-status",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Auto-Detect Status API"
+    },
+    {
+      "path": "/api/system/olt-report/displaced-report",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Displaced ONT Report API"
+    },
+    {
+      "path": "/api/system/olt-report/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Report Excel Export API"
+    },
+    {
+      "path": "/api/system/olt-report/imports",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Report Imports History API"
+    },
+    {
+      "path": "/api/system/olt-report/ledger",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Per-DR three-way reconciliation ledger API (audit rec #3)."
+    },
+    {
+      "path": "/api/system/olt-report/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Report Projects API"
+    },
+    {
+      "path": "/api/system/olt-report/records",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Report Records API"
+    },
+    {
+      "path": "/api/system/olt-report/reporting",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Report Reporting API"
+    },
+    {
+      "path": "/api/system/olt-report/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "OLT Report Stats API"
+    },
+    {
+      "path": "/api/system/promote-canonical",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "API: Auto-promote high-frequency corrections to canonical"
+    },
+    {
+      "path": "/api/system/self-healing",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Self-Healing System API"
+    },
+    {
+      "path": "/api/system/services",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "Service Registry API"
+    },
+    {
+      "path": "/api/system/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "System Statistics API"
+    },
+    {
+      "path": "/api/system/vlm/corrections",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "API: VLM Corrections"
+    },
+    {
+      "path": "/api/system/vlm/metrics",
+      "methods": [
+        "GET"
+      ],
+      "group": "system",
+      "description": "API: VLM Metrics"
+    },
+    {
+      "path": "/api/technicians",
+      "methods": [
+        "GET"
+      ],
+      "group": "technicians",
+      "description": "API Route: /api/technicians"
+    },
+    {
+      "path": "/api/technicians/:id/performance",
+      "methods": [
+        "GET"
+      ],
+      "group": "technicians",
+      "description": "API Route: /api/technicians/[id]/performance"
+    },
+    {
+      "path": "/api/technicians/discover",
+      "methods": [
+        "GET"
+      ],
+      "group": "technicians",
+      "description": "API Route: /api/technicians/discover"
+    },
+    {
+      "path": "/api/tracker/:projectId",
+      "methods": [
+        "GET"
+      ],
+      "group": "tracker"
+    },
+    {
+      "path": "/api/tracker/build/:projectId",
+      "methods": [
+        "GET"
+      ],
+      "group": "tracker",
+      "description": "GET /api/tracker/build/[projectId]"
+    },
+    {
+      "path": "/api/tracker/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "tracker",
+      "description": "GET /api/tracker/dashboard"
+    },
+    {
+      "path": "/api/tracker/export/master/:projectId",
+      "methods": [
+        "GET"
+      ],
+      "group": "tracker",
+      "description": "GET /api/tracker/export/master/[projectId]"
+    },
+    {
+      "path": "/api/tracker/export/pon/:projectId",
+      "methods": [
+        "GET"
+      ],
+      "group": "tracker",
+      "description": "GET /api/tracker/export/pon/[projectId]"
+    },
+    {
+      "path": "/api/tracker/master/:projectId",
+      "methods": [
+        "GET"
+      ],
+      "group": "tracker",
+      "description": "GET  /api/tracker/master/[projectId]    — list all master tracker rows for project"
+    },
+    {
+      "path": "/api/tracker/migrate",
+      "methods": [
+        "GET"
+      ],
+      "group": "tracker"
+    },
+    {
+      "path": "/api/tracker/selectlists",
+      "methods": [
+        "GET"
+      ],
+      "group": "tracker",
+      "description": "GET  /api/tracker/selectlists          — all lists grouped by list_name (for dropdowns)"
+    },
+    {
+      "path": "/api/uploads/:path*",
+      "methods": [
+        "GET"
+      ],
+      "group": "uploads",
+      "description": "File Serving API - Catch-all route"
+    },
+    {
+      "path": "/api/user-sidebar-preferences",
+      "methods": [
+        "GET"
+      ],
+      "group": "user-sidebar-preferences"
+    },
+    {
+      "path": "/api/users/profile",
+      "methods": [
+        "GET"
+      ],
+      "group": "users",
+      "description": "User Profile API"
+    },
+    {
+      "path": "/api/version",
+      "methods": [
+        "GET"
+      ],
+      "group": "version",
+      "description": "Version API Endpoint"
+    },
+    {
+      "path": "/api/vlm-training/:dropNumber",
+      "methods": [
+        "GET"
+      ],
+      "group": "vlm-training"
+    },
+    {
+      "path": "/api/vlm-training/list",
+      "methods": [
+        "GET"
+      ],
+      "group": "vlm-training"
+    },
+    {
+      "path": "/api/vlm-training/report",
+      "methods": [
+        "GET"
+      ],
+      "group": "vlm-training",
+      "description": "GET /api/vlm-training/report"
+    },
+    {
+      "path": "/api/wa-monitor-daily-drops",
+      "methods": [
+        "GET"
+      ],
+      "group": "wa-monitor-daily-drops",
+      "description": "WA Monitor Daily Drops API"
+    },
+    {
+      "path": "/api/wa-monitor-dr-validation",
+      "methods": [
+        "GET"
+      ],
+      "group": "wa-monitor-dr-validation",
+      "description": "WA Monitor DR Validation API (Enhanced for Janice's format)"
+    },
+    {
+      "path": "/api/wa-monitor-drops",
+      "methods": [
+        "GET"
+      ],
+      "group": "wa-monitor-drops",
+      "description": "WA Monitor Drops API"
+    },
+    {
+      "path": "/api/wa-monitor-health",
+      "methods": [
+        "GET"
+      ],
+      "group": "wa-monitor-health",
+      "description": "WA Monitor System Health Check API"
+    },
+    {
+      "path": "/api/wa-monitor-project-stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "wa-monitor-project-stats",
+      "description": "WA Monitor Project Stats API"
+    },
+    {
+      "path": "/api/wa-monitor-projects-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "wa-monitor-projects-summary",
+      "description": "WA Monitor Projects Summary API"
+    },
+    {
+      "path": "/api/works-qa/assignable-users",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/photo-snags",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/pole-detail",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/pole-snag-report",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/poles",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/pon-zip",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/project-dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/recent",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/zone-zip",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/works-qa/zones",
+      "methods": [
+        "GET"
+      ],
+      "group": "works-qa"
+    },
+    {
+      "path": "/api/ws",
+      "methods": [
+        "GET"
+      ],
+      "group": "ws",
+      "description": "WebSocket API Route"
+    }
+  ]
+}

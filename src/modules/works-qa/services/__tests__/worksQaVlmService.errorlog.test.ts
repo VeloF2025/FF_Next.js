@@ -144,6 +144,17 @@ describe('validatePhotoWithVlm error logging', () => {
     expect(serialized).toContain('404');
   });
 
+  it('reports whether the URL was authorised — the outage signal itself', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('boom')));
+
+    // Unauthorised: what the cron actually sent for six days.
+    await validatePhotoWithVlm(PARAMS);
+    expect(lastErrorPayload().photoUrlAuthorized).toBe(false);
+
+    await validatePhotoWithVlm({ ...PARAMS, photoUrl: `${PARAMS.photoUrl}&vlmkey=abc` });
+    expect(lastErrorPayload().photoUrlAuthorized).toBe(true);
+  });
+
   it('redactVlmKey scrubs every occurrence and keeps surrounding params', () => {
     expect(redactVlmKey('a?vlmkey=abc123&source=qfield')).toBe('a?vlmkey=[REDACTED]&source=qfield');
     expect(redactVlmKey("url='x?vlmkey=abc' and url='y?vlmkey=def'"))
@@ -208,16 +219,5 @@ describe('classifyPhotoToSlot error logging', () => {
 
     expect(lastErrorPayload().name).toBe('TypeError');
     expect(String(lastErrorPayload().cause)).toContain('ECONNREFUSED');
-  });
-
-  it('reports whether the URL was authorised — the outage signal itself', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('boom')));
-
-    // Unauthorised: what the cron actually sent for six days.
-    await validatePhotoWithVlm(PARAMS);
-    expect(lastErrorPayload().photoUrlAuthorized).toBe(false);
-
-    await validatePhotoWithVlm({ ...PARAMS, photoUrl: `${PARAMS.photoUrl}&vlmkey=abc` });
-    expect(lastErrorPayload().photoUrlAuthorized).toBe(true);
   });
 });
