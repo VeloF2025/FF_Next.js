@@ -167,20 +167,24 @@ async function getProjectStatus(
   const latestWeekEnding = latestWeekResult.rows[0]?.week_ending ?? null;
 
   // ── Weeks behind the global frontier ───────────────────────────────────
-  // Both values are 'YYYY-MM-DD' text, so Date.UTC parsing is timezone-safe.
-  // FT bills on a fixed weekly cadence, so a whole-week division is exact;
-  // Math.max clamps the impossible "ahead of newest" case to 0.
-  const weeksBehind =
+  // Both values are 'YYYY-MM-DD' text, so Date.parse of an explicit Z instant
+  // is timezone- and DST-safe.
+  //
+  // CEIL, not round. FT bills on a weekly cadence but nothing enforces it —
+  // `ft_weekly_billing` has only UNIQUE(week_ending, project), no CHECK on
+  // day-of-week or 7-day spacing. A backfill or correction could leave a gap
+  // that isn't a multiple of 7, and Math.round would report a real 3-day gap
+  // as 0 weeks behind, dropping the project out of `stale` (filtered on
+  // > 0) — silently hiding exactly what this signal exists to surface.
+  // Ceil means any gap at all reports as at least 1 week behind; for the
+  // normal whole-week case it is identical to round.
+  const msBehind =
     latestWeekEnding && newestWeekEnding
-      ? Math.max(
-          0,
-          Math.round(
-            (Date.parse(`${newestWeekEnding}T00:00:00Z`) -
-              Date.parse(`${latestWeekEnding}T00:00:00Z`)) /
-              (7 * 24 * 60 * 60 * 1000),
-          ),
-        )
+      ? Date.parse(`${newestWeekEnding}T00:00:00Z`) -
+        Date.parse(`${latestWeekEnding}T00:00:00Z`)
       : 0;
+  // Math.max clamps the impossible "ahead of the global newest" case to 0.
+  const weeksBehind = Math.max(0, Math.ceil(msBehind / (7 * 24 * 60 * 60 * 1000)));
 
   // ── Currently excluded: DISTINCT dr_number from latest week only ────────
   // CRITICAL: anchored to latest week — never aggregate across weeks

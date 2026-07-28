@@ -135,6 +135,36 @@ describe('GET /api/billing/status — stale billing week signal', () => {
     });
   });
 
+  // Nothing in the schema enforces a 7-day cadence — ft_weekly_billing has only
+  // UNIQUE(week_ending, project). A backfill or correction can leave an
+  // off-cadence gap, and rounding to the nearest week would report a real
+  // 3-day gap as 0 and drop the project out of `stale` entirely.
+  it('reports an off-cadence gap smaller than a week as 1 week behind, not 0', async () => {
+    stubDb(
+      ['Lawley', 'Mamelodi'],
+      { Lawley: '2026-07-26', Mamelodi: '2026-07-23' }, // 3 days
+      '2026-07-26',
+    );
+
+    const data = await call();
+
+    expect(data?.stale).toEqual([
+      { project: 'Mamelodi', latest_week_ending: '2026-07-23', weeks_behind: 1 },
+    ]);
+  });
+
+  it('rounds an off-cadence gap up to whole weeks (10 days → 2)', async () => {
+    stubDb(
+      ['Lawley', 'Mamelodi'],
+      { Lawley: '2026-07-26', Mamelodi: '2026-07-16' }, // 10 days
+      '2026-07-26',
+    );
+
+    const data = await call();
+
+    expect(data?.stale[0]?.weeks_behind).toBe(2);
+  });
+
   it('returns a well-formed empty payload when no project has billed', async () => {
     mockQuery.mockResolvedValue({ rows: [] });
 

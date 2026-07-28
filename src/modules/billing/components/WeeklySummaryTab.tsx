@@ -224,8 +224,13 @@ export function WeeklySummaryTab() {
   return (
     <div className="space-y-6">
       {/* Stale-week warning — sits ABOVE the cards because it qualifies them.
-          Every metric below is anchored to the latest week, so a project that
-          never got its FT payment PDF is silently absent from the totals. */}
+          Wording is deliberately scoped to "anchored to the latest billing
+          week": that covers Currently Excluded (omits these projects entirely,
+          since they have no row in the latest week group) and Recovered This
+          Month (computed from their OLDER week). It must NOT claim the cards
+          exclude these projects — `totals` in /api/billing/status sums every
+          project unconditionally, and PP Outstanding reads live from
+          oes_pp_data and isn't week-anchored at all. */}
       {!loading && staleProjects.length > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -237,8 +242,9 @@ export function WeeklySummaryTab() {
             </span>
           </div>
           <p className="text-xs text-[var(--ff-text-tertiary)] mb-2">
-            The metrics below exclude these projects — their FT payment PDF is missing
-            for the newer week(s). Upload it to bring them current.
+            Any figure below that is anchored to the latest billing week is incomplete
+            or out of date for these projects — their FT payment PDF is missing for the
+            newer week(s). Upload it to bring them current.
           </p>
           <ul className="space-y-1">
             {staleProjects.map((s) => (
