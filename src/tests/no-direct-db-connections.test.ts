@@ -32,6 +32,22 @@ describe('No Direct Database Connections', () => {
     'sowApi.ts',
     'staffApi.ts',
     'ClientsDebug.tsx',  // Dev-only debug component
+    // Server-side, but in directories excludedDirs does not cover (`config/`
+    // and a module-root `queries.ts`). Listed as PATHS, not bare filenames:
+    // entries containing '/' are matched as a path suffix. `queries.ts` as a
+    // basename would have exempted all EIGHT files of that name under src/,
+    // handing a free pass to any future one that genuinely leaks DB code into
+    // the client — the exact thing this test exists to catch.
+    // Both verified as genuinely backend rather than assumed:
+    //   reached only from pages/api/** and the WA send clients; no component
+    //   imports it, and it appears in no client chunk.
+    'modules/communications/whatsapp/config/waProviderConfig.ts',
+    //   five files reference it, all in type position and therefore erased at
+    //   compile time — StatusPill.tsx, SummaryBar.tsx, FilterBar.tsx and
+    //   filters.ts via `import type`, and types.ts via a type-position
+    //   `import('...').ReceiptStatus` expression. Nothing is pulled into the
+    //   bundle; confirmed absent from every client chunk.
+    'modules/receipts/queries.ts',
   ];
 
   function isExcluded(filePath: string): boolean {
@@ -42,9 +58,20 @@ describe('No Direct Database Connections', () => {
       }
     }
     
-    // Check if file is in allowed list
-    const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || '';
-    return allowedFiles.includes(fileName);
+    // Check if file is in allowed list. An entry containing '/' is matched
+    // against the path RELATIVE TO src/, exactly — not as a suffix. `endsWith`
+    // would have exempted any deeper path ending the same way (a hypothetical
+    // src/vendor/modules/receipts/queries.ts), which is a subtler version of
+    // the basename hole this replaced. A bare filename still matches by
+    // basename, preserving the original entries above.
+    const normalised = filePath.replace(/\\/g, '/');
+    const relative = normalised.startsWith(srcDir.replace(/\\/g, '/') + '/')
+      ? normalised.slice(srcDir.replace(/\\/g, '/').length + 1)
+      : normalised;
+    const fileName = normalised.split('/').pop() || '';
+    return allowedFiles.some((allowed) =>
+      allowed.includes('/') ? relative === allowed : fileName === allowed
+    );
   }
 
   function scanDirectory(dir: string): string[] {

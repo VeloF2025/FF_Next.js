@@ -80,6 +80,13 @@ export default defineConfig({
       //   the txn stub given a client, plus per-test stub queues that cannot
       //   bleed.
       'tests/api/procurement/field-stock/returns-create-hardening.test.ts',
+      // Integration test against the live shared DB (its own header says so):
+      // it default-imports `pool` from '@/lib/db' and issues real queries inside
+      // transactions it always ROLLBACKs. vitest.setup.ts globally mocks
+      // '@/lib/db' with stubs and no default export, so under the unit config
+      // the import is undefined before a single query runs — it cannot pass here
+      // by construction, regardless of the data. Run it directly when needed.
+      'tests/api/activate/pp-data-gps-backfill.test.ts',
     ],
     testTimeout: 10000,
     hookTimeout: 10000,
