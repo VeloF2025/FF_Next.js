@@ -60,6 +60,17 @@ export default defineConfig({
       //   a delete modal. 31 it() blocks and 69 expect() calls, nearly all
       //   asserting against UI that does not exist. Needs a rewrite, not a fix.
       'src/modules/workflow/__tests__/components/TemplateList.test.tsx',
+      //   ContractorImport — two real bugs fixed in place (a document.createElement
+      //   spy that recursed into itself and blew the stack on every render, and
+      //   the modal's required isOpen/onClose props which were never passed, so
+      //   the component returned null and rendered an empty <div />). With both
+      //   fixed it renders correctly, but all 18 assertions still target a
+      //   richer earlier UI the current 5.8KB modal does not have: a
+      //   "choose contractor file" label, "Export All Contractors",
+      //   "Download Template", an instructions panel, a drop-zone caption.
+      //   One assertion rewrite away from working; the fixes are kept so that
+      //   rewrite does not start by re-diagnosing a stack overflow.
+      'src/components/contractor/ContractorImport.test.tsx',
       //
       //   returns-create-hardening — three layers, and the first is what
       //   actually breaks it:

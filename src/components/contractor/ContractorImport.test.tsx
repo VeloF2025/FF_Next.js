@@ -28,15 +28,22 @@ const mockLink = {
   click: vi.fn(),
   style: { display: '' }
 };
-vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
+// Capture the real implementation BEFORE spying. The previous fallback called
+// `document.createElement(tagName)`, which by then *was* the spy — so any tag
+// other than 'a' recursed into itself until the stack blew. React creates
+// elements on every render, so this took out all 18 tests in the file with
+// "Maximum call stack size exceeded" before a single assertion ran.
+const realCreateElement = document.createElement.bind(document);
+vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
   if (tagName === 'a') {
     return mockLink as unknown as HTMLAnchorElement;
   }
-  return document.createElement(tagName);
+  return realCreateElement(tagName);
 });
 
 describe('ContractorImport Component', () => {
   const mockOnComplete = vi.fn();
+  const mockOnClose = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,7 +71,7 @@ describe('ContractorImport Component', () => {
   describe('Initial State', () => {
     test('should render initial state correctly', () => {
       // 🟢 WORKING: Test initial render
-      render(<ContractorImport onComplete={mockOnComplete} />);
+      render(<ContractorImport isOpen onClose={mockOnClose} onComplete={mockOnComplete} />);
 
       expect(screen.getByText('Import Contractors')).toBeInTheDocument();
       expect(screen.getByText('Upload CSV or Excel files to bulk import contractor data')).toBeInTheDocument();
@@ -75,7 +82,7 @@ describe('ContractorImport Component', () => {
 
     test('should show import instructions initially', () => {
       // 🟢 WORKING: Test instructions display
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       expect(screen.getByText('How to Import Contractors')).toBeInTheDocument();
       expect(screen.getByText('Required Fields')).toBeInTheDocument();
@@ -86,7 +93,7 @@ describe('ContractorImport Component', () => {
   describe('File Selection', () => {
     test('should handle valid file selection', async () => {
       // 🟢 WORKING: Test valid file selection
-      render(<ContractorImport onComplete={mockOnComplete} />);
+      render(<ContractorImport isOpen onClose={mockOnClose} onComplete={mockOnComplete} />);
 
       const file = new File(['Company Name,Email\nTest Company,test@example.com'], 'test.csv', {
         type: 'text/csv'
@@ -108,7 +115,7 @@ describe('ContractorImport Component', () => {
         error: 'Invalid file type'
       });
 
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const file = new File(['test'], 'test.txt', { type: 'text/plain' });
       const fileInput = screen.getByLabelText(/choose contractor file/i);
@@ -126,7 +133,7 @@ describe('ContractorImport Component', () => {
 
     test('should handle drag and drop', async () => {
       // 🟢 WORKING: Test drag and drop functionality
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const dropZone = screen.getByText('Drop your CSV or Excel file here').closest('div');
       const file = new File(['Company Name,Email\nTest Company,test@example.com'], 'test.csv', {
@@ -154,7 +161,7 @@ describe('ContractorImport Component', () => {
   describe('Import Process', () => {
     test('should handle successful import', async () => {
       // 🟢 WORKING: Test successful import flow
-      render(<ContractorImport onComplete={mockOnComplete} />);
+      render(<ContractorImport isOpen onClose={mockOnClose} onComplete={mockOnComplete} />);
 
       const file = new File(['Company Name,Email\nTest Company,test@example.com'], 'test.csv', {
         type: 'text/csv'
@@ -195,7 +202,7 @@ describe('ContractorImport Component', () => {
         contractors: []
       });
 
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const file = new File(['Company Name,Email\nTest Company,invalid-email'], 'test.csv', {
         type: 'text/csv'
@@ -219,7 +226,7 @@ describe('ContractorImport Component', () => {
       // 🟢 WORKING: Test import exception handling
       mockContractorImportService.importFromFile.mockRejectedValue(new Error('Import failed'));
 
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const file = new File(['Company Name,Email\nTest Company,test@example.com'], 'test.csv', {
         type: 'text/csv'
@@ -238,7 +245,7 @@ describe('ContractorImport Component', () => {
 
     test('should handle import mode selection', async () => {
       // 🟢 WORKING: Test import mode selection
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const file = new File(['Company Name,Email\nTest Company,test@example.com'], 'test.csv', {
         type: 'text/csv'
@@ -266,7 +273,7 @@ describe('ContractorImport Component', () => {
   describe('Template and Export Actions', () => {
     test('should download template', async () => {
       // 🟢 WORKING: Test template download
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const downloadButton = screen.getByText('Download Template');
       fireEvent.click(downloadButton);
@@ -309,7 +316,7 @@ describe('ContractorImport Component', () => {
 
       mockContractorService.getAll.mockResolvedValue(mockContractors);
 
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const exportButton = screen.getByText('Export All Contractors');
       fireEvent.click(exportButton);
@@ -325,7 +332,7 @@ describe('ContractorImport Component', () => {
       // 🟢 WORKING: Test export with no contractors
       mockContractorService.getAll.mockResolvedValue([]);
 
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       
@@ -343,7 +350,7 @@ describe('ContractorImport Component', () => {
   describe('UI State Management', () => {
     test('should reset import state correctly', async () => {
       // 🟢 WORKING: Test state reset
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       // Upload file and import
       const file = new File(['Company Name,Email\nTest Company,test@example.com'], 'test.csv', {
@@ -370,7 +377,7 @@ describe('ContractorImport Component', () => {
 
     test('should handle cancellation during file preview', async () => {
       // 🟢 WORKING: Test file preview cancellation
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const file = new File(['Company Name,Email\nTest Company,test@example.com'], 'test.csv', {
         type: 'text/csv'
@@ -395,7 +402,7 @@ describe('ContractorImport Component', () => {
         () => new Promise(resolve => setTimeout(resolve, 100))
       );
 
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const file = new File(['Company Name,Email\nTest Company,test@example.com'], 'test.csv', {
         type: 'text/csv'
@@ -420,7 +427,7 @@ describe('ContractorImport Component', () => {
   describe('Accessibility', () => {
     test('should have proper accessibility attributes', () => {
       // 🟢 WORKING: Test accessibility
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const fileInput = screen.getByLabelText(/choose contractor file/i);
       expect(fileInput).toHaveAttribute('accept', '.csv,.xlsx,.xls');
@@ -431,7 +438,7 @@ describe('ContractorImport Component', () => {
 
     test('should have proper ARIA labels', () => {
       // 🟢 WORKING: Test ARIA labels
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const heading = screen.getByRole('heading', { name: /import contractors/i });
       expect(heading).toBeInTheDocument();
@@ -450,7 +457,7 @@ describe('ContractorImport Component', () => {
         throw new Error('Service error');
       });
 
-      render(<ContractorImport />);
+      render(<ContractorImport isOpen onClose={mockOnClose} />);
 
       const file = new File(['test'], 'test.csv', { type: 'text/csv' });
       const fileInput = screen.getByLabelText(/choose contractor file/i);
