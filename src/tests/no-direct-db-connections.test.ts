@@ -33,15 +33,19 @@ describe('No Direct Database Connections', () => {
     'staffApi.ts',
     'ClientsDebug.tsx',  // Dev-only debug component
     // Server-side, but in directories excludedDirs does not cover (`config/`
-    // and a module-root `queries.ts`). Both verified as genuinely backend
-    // rather than assumed:
-    //   waProviderConfig.ts — reached only from pages/api/** and the WA send
-    //   clients; no component imports it, and it appears in no client chunk.
-    'waProviderConfig.ts',
-    //   queries.ts (receipts) — the three review components that reference it
-    //   use `import type` only, which is erased at compile time, so nothing is
-    //   pulled into the bundle; confirmed absent from every client chunk.
-    'queries.ts',
+    // and a module-root `queries.ts`). Listed as PATHS, not bare filenames:
+    // entries containing '/' are matched as a path suffix. `queries.ts` as a
+    // basename would have exempted all EIGHT files of that name under src/,
+    // handing a free pass to any future one that genuinely leaks DB code into
+    // the client — the exact thing this test exists to catch.
+    // Both verified as genuinely backend rather than assumed:
+    //   reached only from pages/api/** and the WA send clients; no component
+    //   imports it, and it appears in no client chunk.
+    'modules/communications/whatsapp/config/waProviderConfig.ts',
+    //   the three review components that reference it use `import type` only,
+    //   which is erased at compile time, so nothing is pulled into the bundle;
+    //   confirmed absent from every client chunk.
+    'modules/receipts/queries.ts',
   ];
 
   function isExcluded(filePath: string): boolean {
@@ -52,9 +56,14 @@ describe('No Direct Database Connections', () => {
       }
     }
     
-    // Check if file is in allowed list
-    const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || '';
-    return allowedFiles.includes(fileName);
+    // Check if file is in allowed list. An entry containing '/' is matched as a
+    // path suffix so it exempts exactly one file; a bare filename still matches
+    // by basename, preserving the original entries above.
+    const normalised = filePath.replace(/\\/g, '/');
+    const fileName = normalised.split('/').pop() || '';
+    return allowedFiles.some((allowed) =>
+      allowed.includes('/') ? normalised.endsWith(allowed) : fileName === allowed
+    );
   }
 
   function scanDirectory(dir: string): string[] {
