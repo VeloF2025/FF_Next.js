@@ -35,11 +35,16 @@ vi.mock('../../services/WorkflowTemplateService', () => ({
 }));
 
 // Mock child components to isolate accessibility testing
+// `group`, not `main`: the canvas is nested inside the editor, and a `main`
+// landmark inside another landmark is itself an axe violation
+// (landmark-main-is-top-level). The real EditorCanvas declares no role at all,
+// so claiming `main` here was the mock inventing semantics the component has
+// never had.
 vi.mock('../../components/editor/EditorCanvas', () => ({
   EditorCanvas: () => (
     <div
       data-testid="editor-canvas"
-      role="main"
+      role="group"
       aria-label="Workflow editor canvas"
       tabIndex={0}
     >

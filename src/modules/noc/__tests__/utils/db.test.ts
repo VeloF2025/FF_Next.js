@@ -465,9 +465,12 @@ describe('Database Connection Utility', () => {
 
       const health = await healthCheck();
 
+      // Only the UPPER bound was flaky. Keep a lower bound tied to the mocked
+      // 10ms delay: `setTimeout` guarantees it, so this cannot flake, and it
+      // still fails if `latency` is ever hardcoded, faked, or measured across
+      // the wrong span — which a bare `>= 0` on `Date.now() - start` cannot.
       expect(typeof health.latency).toBe('number');
-      expect(Number.isFinite(health.latency)).toBe(true);
-      expect(health.latency).toBeGreaterThanOrEqual(0);
+      expect(health.latency).toBeGreaterThanOrEqual(10);
     });
   });
 
