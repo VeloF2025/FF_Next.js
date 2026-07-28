@@ -5,8 +5,15 @@ import { CortexHero } from '@/components/cortex/CortexHero';
 import { CortexReviewPanel } from '@/components/cortex/CortexReviewPanel';
 import { CortexCitedSearch } from '@/components/cortex/CortexCitedSearch';
 import { CortexConnectPanel } from '@/components/cortex/CortexConnectPanel';
+import { FibreFlowConnectPanel } from '@/components/cortex/FibreFlowConnectPanel';
 
-export default function CortexPage({ mcpEnabled }: { mcpEnabled: boolean }) {
+export default function CortexPage({
+  mcpEnabled,
+  ffMcpEnabled,
+}: {
+  mcpEnabled: boolean;
+  ffMcpEnabled: boolean;
+}) {
   return (
     <AppLayout>
       <Head>
@@ -27,6 +34,10 @@ export default function CortexPage({ mcpEnabled }: { mcpEnabled: boolean }) {
             </PermissionGate>
           )}
 
+          {/* No PermissionGate: a read-only FibreFlow token grants nothing beyond what
+              the signed-in user can already see in the app. */}
+          {ffMcpEnabled && <FibreFlowConnectPanel />}
+
           <CortexCitedSearch />
           <CortexReviewPanel />
         </div>
@@ -41,5 +52,7 @@ export default function CortexPage({ mcpEnabled }: { mcpEnabled: boolean }) {
 export const getServerSideProps = async () => {
   const mcpEnabled =
     (process.env.CORTEX_MCP_TOKEN_UI_ENABLED ?? '').trim().toLowerCase() === 'true';
-  return { props: { mcpEnabled } };
+  const ffMcpEnabled =
+    (process.env.FF_MCP_TOKEN_UI_ENABLED ?? '').trim().toLowerCase() === 'true';
+  return { props: { mcpEnabled, ffMcpEnabled } };
 };

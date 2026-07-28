@@ -58,6 +58,7 @@ describe('/api/me/mcp-tokens', () => {
   });
 
   it('defaults to 30d and passes the verified user through', async () => {
+    getUserSessions.mockResolvedValue([]);
     mintFfMcpToken.mockResolvedValue({
       token: 'jwt',
       expiresAt: new Date('2026-08-24'),
@@ -70,6 +71,30 @@ describe('/api/me/mcp-tokens', () => {
       '30d',
       expect.objectContaining({ label: undefined })
     );
+  });
+
+  it('refuses to mint past the active-token cap, and mints nothing', async () => {
+    getUserSessions.mockResolvedValue(
+      Array.from({ length: 10 }, (_, i) => ({ id: `s${i}`, kind: 'mcp' }))
+    );
+    const res = makeRes();
+    await handler(makeReq('POST', {}), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(mintFfMcpToken).not.toHaveBeenCalled();
+  });
+
+  it('still mints at one below the cap', async () => {
+    getUserSessions.mockResolvedValue(
+      Array.from({ length: 9 }, (_, i) => ({ id: `s${i}`, kind: 'mcp' }))
+    );
+    mintFfMcpToken.mockResolvedValue({
+      token: 'jwt',
+      expiresAt: new Date('2026-08-24'),
+      sessionId: 's1',
+    });
+    const res = makeRes();
+    await handler(makeReq('POST', {}), res as never);
+    expect(mintFfMcpToken).toHaveBeenCalledTimes(1);
   });
 
   it('lists only mcp sessions and never leaks token_hash', async () => {

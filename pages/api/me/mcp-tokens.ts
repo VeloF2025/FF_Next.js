@@ -17,11 +17,21 @@ import { withAuth, getUserSessions } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { McpLifetimeCapError, MCP_LIFETIME_DAYS, mintFfMcpToken } from '@/lib/auth/mcpToken';
+import { MCP_LIFETIME_DAYS, mintFfMcpToken } from '@/lib/auth/mcpToken';
 import type { McpLifetime } from '@/lib/auth/mcpToken';
 
 const LOGGER = 'MeMcpTokens';
 const MAX_LABEL_LENGTH = 60;
+
+/**
+ * Ceiling on concurrent active MCP sessions per user. Minting is authenticated and each
+ * token is read-only with only that user's own permissions, so the risk is not privilege
+ * escalation — it is a browser session being used to mint long-lived credentials in a
+ * loop, which both bloats `user_sessions` and leaves more revocable material lying around
+ * than a person can keep track of. A count check is a better fit than request-rate
+ * limiting: what matters is how many live tokens exist, not how fast they were asked for.
+ */
+const MAX_ACTIVE_TOKENS = 10;
 
 function uiEnabled(): boolean {
   return (process.env.FF_MCP_TOKEN_UI_ENABLED ?? '').trim().toLowerCase() === 'true';
@@ -67,31 +77,33 @@ async function mintHandler(
       ? rawLabel.trim().slice(0, MAX_LABEL_LENGTH)
       : undefined;
 
-  try {
-    const { token, expiresAt, sessionId } = await mintFfMcpToken(req.user, rawLifetime, {
-      label,
-      ipAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim(),
-      userAgent: req.headers['user-agent'],
-    });
-    // sessionId is safe to log; the token is not.
-    log.info('minted read-only mcp token', {
+  const active = await getUserSessions(req.user.id, 'mcp');
+  if (active.length >= MAX_ACTIVE_TOKENS) {
+    log.warn('mcp token mint rejected: active token cap', {
       userId: req.user.id,
-      sessionId,
-      lifetime: rawLifetime,
+      active: active.length,
     }, LOGGER);
-    return apiResponse.success(res, { token, expiresAt });
-  } catch (err) {
-    // The dropdown offers 1y to everyone, so a capped owner picking it is a normal
-    // user action — answer with a clear 400, not a 500.
-    if (err instanceof McpLifetimeCapError) {
-      log.warn('mcp token mint rejected: owner lifetime cap', {
-        userId: req.user.id,
-        lifetime: rawLifetime,
-      }, LOGGER);
-      return apiResponse.badRequest(res, err.message);
-    }
-    throw err;
+    return apiResponse.badRequest(
+      res,
+      `You already have ${active.length} active read-only tokens (limit ${MAX_ACTIVE_TOKENS}). Revoke one before creating another.`
+    );
   }
+
+  // Every lifetime in the menu is valid for every identity, so there is nothing left for
+  // this to reject — a mint failure here is a genuine fault and belongs in the outer
+  // handler's 500 path, not a 400.
+  const { token, expiresAt, sessionId } = await mintFfMcpToken(req.user, rawLifetime, {
+    label,
+    ipAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim(),
+    userAgent: req.headers['user-agent'],
+  });
+  // sessionId is safe to log; the token is not.
+  log.info('minted read-only mcp token', {
+    userId: req.user.id,
+    sessionId,
+    lifetime: rawLifetime,
+  }, LOGGER);
+  return apiResponse.success(res, { token, expiresAt });
 }
 
 const authedHandler = withAuth(async (req, res) => {

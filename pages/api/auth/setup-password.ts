@@ -15,6 +15,7 @@ import {
   checkPasswordStrength,
   signToken,
   createSession,
+  setSessionTokenHash,
   AUTH_COOKIE_NAME,
   type AuthUser,
   type AuthRole,
@@ -314,11 +315,7 @@ export default async function handler(
     const token = await signToken(user, session.id, '24h');
 
     // Update session with token hash
-    await sql`
-      UPDATE user_sessions
-      SET token_hash = encode(sha256(${token}::bytea), 'hex')
-      WHERE id = ${session.id}
-    `;
+    await setSessionTokenHash(session.id, token);
 
     // Set httpOnly cookie
     const cookie = serialize(AUTH_COOKIE_NAME, token, {
