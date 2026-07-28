@@ -289,10 +289,10 @@ def main():
             extract_gap.append((r["ff_name"], r["qf_name"], src))
     extract_gap.sort(key=lambda x: x[2], reverse=True)
 
-    # Stale gap: a registered GPKG stopped advancing while photos kept arriving.
-    # Reported per FILE, and measured against the GPKG's own version rather than the
-    # last script run — see select_stale_gpkgs / gpkg_version_lag_days for why both
-    # of those matter (the earlier per-project last_synced_at form found 1 of 16).
+    # Stale gap: a newer file exists that we are not ingesting — either a newer version
+    # of the tracked path, or a newer same-family sibling (a rename). Reported PER FILE;
+    # see select_stale_gpkgs for why per-project aggregation and photo-based lag both
+    # failed on live data.
     stale_gap = [
         (qf_name_by_uuid.get(qf_uuid, qf_uuid), path, behind, available)
         for qf_uuid, path, behind, available in select_stale_gpkgs(
