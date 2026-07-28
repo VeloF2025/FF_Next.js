@@ -5,7 +5,7 @@
  *
  * Features:
  * - Look up GPS coordinates from DR number via sow_drops
- * - Look up customer info from onemap_drops
+ * - Look up customer info from onemap_properties
  * - Cross-reference with existing FibreFlow data
  *
  * @module maintenance/services/ticketEnrichmentService
@@ -191,8 +191,34 @@ export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> 
 
 /**
  * Look up drop info from 1Map data
- * 🟢 WORKING: Cross-references DR number with onemap_drops table
+ * 🟢 WORKING: Cross-references DR number with the onemap_properties table.
+ *
+ * Reads `onemap_properties`, NOT `onemap_drops` — the latter holds 0 rows, so
+ * this lookup used to return null for every ticket and no enrichment ever
+ * reached the UI.
+ *
+ * `onemap_properties` stores roughly one row per workflow stage per drop, and
+ * the contact number is captured at sign-up but not carried onto the
+ * "Home Installation: Installed" row. Since tickets are raised against
+ * installed drops, the ORDER BY below is what makes the difference between
+ * finding a contact number and silently reporting none — do not reduce this to
+ * a bare LIMIT 1.
  */
+const ONEMAP_PROPERTY_COLUMNS = `
+        drop_number,
+        property_id,
+        latitude,
+        longitude,
+        location_address AS address,
+        NULLIF(TRIM(CONCAT_WS(' ', contact_name, contact_surname)), '') AS customer_name,
+        contact_number,
+        status`;
+
+/** Rows carrying a contact win; newest 1Map edit breaks the tie. */
+const ONEMAP_ROW_PREFERENCE = `
+      ORDER BY (contact_number IS NOT NULL AND contact_number <> '') DESC,
+               last_modified_date DESC NULLS LAST`;
+
 export async function lookupOneMapDrop(drNumber: string): Promise<OneMapDropInfo | null> {
   if (!drNumber) return null;
 
@@ -203,17 +229,10 @@ export async function lookupOneMapDrop(drNumber: string): Promise<OneMapDropInfo
 
     // Try exact match first
     let result = await queryOne<OneMapDropInfo>(
-      `SELECT
-        drop_number,
-        property_id,
-        latitude,
-        longitude,
-        address,
-        customer_name,
-        contact_number,
-        status
-      FROM onemap_drops
+      `SELECT ${ONEMAP_PROPERTY_COLUMNS}
+      FROM onemap_properties
       WHERE UPPER(drop_number) = $1
+      ${ONEMAP_ROW_PREFERENCE}
       LIMIT 1`,
       [normalized]
     );
@@ -226,17 +245,10 @@ export async function lookupOneMapDrop(drNumber: string): Promise<OneMapDropInfo
     // Try without DR prefix
     const numericPart = normalized.replace(/^DR/i, '');
     result = await queryOne<OneMapDropInfo>(
-      `SELECT
-        drop_number,
-        property_id,
-        latitude,
-        longitude,
-        address,
-        customer_name,
-        contact_number,
-        status
-      FROM onemap_drops
+      `SELECT ${ONEMAP_PROPERTY_COLUMNS}
+      FROM onemap_properties
       WHERE drop_number LIKE $1
+      ${ONEMAP_ROW_PREFERENCE}
       LIMIT 1`,
       [`%${numericPart}%`]
     );
