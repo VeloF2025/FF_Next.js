@@ -12,14 +12,29 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────────
 
-const { mockQuery, mockQueryOne, mockTxnQuery, mockTransaction } = vi.hoisted(() => {
+const { mockQuery, mockQueryOne, mockTxnQuery, mockClientQuery, mockTransaction } = vi.hoisted(() => {
   const mockTxnQuery = vi.fn().mockResolvedValue([]);
 
+  // The handler calls promoteSerial(txn.client, …), and promoteSerial picks its
+  // path by testing `'release' in poolOrClient`: with `release` it treats the
+  // argument as a checked-out PoolClient and lets the caller own the
+  // transaction; without it, it assumes a Pool and calls .connect(). The txn
+  // stub previously exposed only { query, queryOne }, so txn.client was
+  // undefined and the first accept threw before asserting anything.
+  //
+  // client.query is a *pg* client, so it resolves { rows }, unlike db-pool's
+  // query() which resolves a bare array. Separate mock, separate shape.
+  const mockClientQuery = vi.fn().mockResolvedValue({ rows: [] });
+
   // transaction(cb) — simulate real BEGIN/COMMIT/ROLLBACK around the callback
-  const mockTransaction = vi.fn().mockImplementation(async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery }) => Promise<unknown>) => {
+  const mockTransaction = vi.fn().mockImplementation(async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery; client: { query: typeof mockClientQuery; release: () => void; escapeLiteral: (v: string) => string } }) => Promise<unknown>) => {
     mockTxnQuery('BEGIN');
     try {
-      const result = await cb({ query: mockTxnQuery, queryOne: mockTxnQuery });
+      const result = await cb({
+        query: mockTxnQuery,
+        queryOne: mockTxnQuery,
+        client: { query: mockClientQuery, release: () => {}, escapeLiteral: (v: string) => `'${String(v).replace(/'/g, "''")}'` },
+      });
       mockTxnQuery('COMMIT');
       return result;
     } catch (err) {
@@ -31,7 +46,7 @@ const { mockQuery, mockQueryOne, mockTxnQuery, mockTransaction } = vi.hoisted(()
   const mockQuery = vi.fn().mockResolvedValue([]);
   const mockQueryOne = vi.fn().mockResolvedValue(null);
 
-  return { mockQuery, mockQueryOne, mockTxnQuery, mockTransaction };
+  return { mockQuery, mockQueryOne, mockTxnQuery, mockClientQuery, mockTransaction };
 });
 
 vi.mock('@/lib/db-pool', () => ({
@@ -151,11 +166,19 @@ function mockHappyPath() {
 describe('POST /returns/[id]/accept hardening (C.3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Re-apply transaction mock (clearAllMocks resets implementations)
-    mockTransaction.mockImplementation(async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery }) => Promise<unknown>) => {
+    // Re-apply transaction mock (clearAllMocks resets implementations).
+    // `client` must be here too, not only in the vi.hoisted definition — this
+    // override runs before every test and would otherwise hand the handler a
+    // txn without it, so promoteSerial(txn.client, …) throws
+    // "Cannot use 'in' operator to search for 'release' in undefined".
+    mockTransaction.mockImplementation(async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery; client: { query: typeof mockClientQuery; release: () => void; escapeLiteral: (v: string) => string } }) => Promise<unknown>) => {
       mockTxnQuery('BEGIN');
       try {
-        const result = await cb({ query: mockTxnQuery, queryOne: mockTxnQuery });
+        const result = await cb({
+          query: mockTxnQuery,
+          queryOne: mockTxnQuery,
+          client: { query: mockClientQuery, release: () => {}, escapeLiteral: (v: string) => `'${String(v).replace(/'/g, "''")}'` },
+        });
         mockTxnQuery('COMMIT');
         return result;
       } catch (err) {
@@ -164,6 +187,7 @@ describe('POST /returns/[id]/accept hardening (C.3)', () => {
       }
     });
     mockTxnQuery.mockResolvedValue([]);
+    mockClientQuery.mockResolvedValue({ rows: [] });
   });
 
   it('rejects non-inspector role (technician) with 403', async () => {
@@ -347,9 +371,19 @@ describe('POST /returns/[id]/accept hardening (C.3)', () => {
     );
     expect(hasReturnMovement).toBe(true);
 
-    // serial UPDATE must set holder_id = NULL
-    const hasHolderNullUpdate = allTxnCalls.some(
-      (s) => typeof s === 'string' && s.includes('stock_serials') && s.includes('holder_id = NULL')
+    // The serial UPDATE must clear holder_id. It no longer appears in the txn
+    // query log as the literal 'holder_id = NULL': stock_serials writes now go
+    // exclusively through promoteSerial (serialLifecycle.ts calls itself "the
+    // ONLY sanctioned write path"), which runs on txn.client and parameterises
+    // the holder — `SET status = $1, holder_id = $2` with $2 bound to null. So
+    // assert on the parameter, in the client mock, rather than on SQL text in
+    // the wrong mock.
+    const hasHolderNullUpdate = mockClientQuery.mock.calls.some(
+      ([sql, params]) =>
+        typeof sql === 'string' &&
+        sql.includes('UPDATE stock_serials') &&
+        Array.isArray(params) &&
+        params[1] === null
     );
     expect(hasHolderNullUpdate).toBe(true);
   });

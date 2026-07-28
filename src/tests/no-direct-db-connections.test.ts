@@ -32,6 +32,16 @@ describe('No Direct Database Connections', () => {
     'sowApi.ts',
     'staffApi.ts',
     'ClientsDebug.tsx',  // Dev-only debug component
+    // Server-side, but in directories excludedDirs does not cover (`config/`
+    // and a module-root `queries.ts`). Both verified as genuinely backend
+    // rather than assumed:
+    //   waProviderConfig.ts — reached only from pages/api/** and the WA send
+    //   clients; no component imports it, and it appears in no client chunk.
+    'waProviderConfig.ts',
+    //   queries.ts (receipts) — the three review components that reference it
+    //   use `import type` only, which is erased at compile time, so nothing is
+    //   pulled into the bundle; confirmed absent from every client chunk.
+    'queries.ts',
   ];
 
   function isExcluded(filePath: string): boolean {

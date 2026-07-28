@@ -415,7 +415,7 @@ describe('Dashboard Service - Statistics', () => {
 
       // Verify query calculates time difference
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('closed_at'),
+        expect.stringContaining('resolved_at'),
         expect.any(Array)
       );
     });
@@ -467,7 +467,7 @@ describe('Dashboard Service - Statistics', () => {
 
       // Assert
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('closed_at'),
+        expect.stringContaining('resolved_at'),
         expect.arrayContaining([startDate, endDate])
       );
     });

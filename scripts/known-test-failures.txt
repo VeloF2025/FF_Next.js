@@ -66,21 +66,11 @@ src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT 
 src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should return 404 when ticket not found
 src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should update single field
 src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should update ticket with partial data
-src/modules/noc/__tests__/services/dashboardService.test.ts > Dashboard Service - Statistics > getAverageResolutionTime > should calculate average resolution time in hours
-src/modules/noc/__tests__/services/dashboardService.test.ts > Dashboard Service - Statistics > getAverageResolutionTime > should filter by date range when provided
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should have proper ARIA labels and roles
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should support keyboard navigation
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Loading States > should show loading overlay when loading template
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should show error icon when validation has errors
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should show validation button when validation result exists
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should toggle validation panel when validation button is clicked
-src/tests/no-direct-db-connections.test.ts > No Direct Database Connections > should not have any direct database connections in frontend code
-tests/api/activate/pp-data-gps-backfill.test.ts > GPS backfill for resolved PP serials > dr_photo_unified_reviews gets GPS from drops
-tests/api/activate/pp-data-gps-backfill.test.ts > GPS backfill for resolved PP serials > oes_pp_data with resolved_drop_number and NULL GPS gets backfilled from drops
-tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > admits stores role → 200
-tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > marks stock_return_lines.status="processed" after disposition applied
-tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > rejects supplier_return disposition with 422 and rolls back
-tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > RETURNABLE + resolved holder → postReturnFromHolderWith runs (custody + movement SQL in txn)
-tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > updates stock_returns.status=restocked on full success
 tests/api/procurement/field-stock/returns-flow-integration.test.ts > Returns full flow integration > Happy path — tech creates → storeman inspects → accept restocks > end-to-end with mixed dispositions: restock + scrap
 tests/api/procurement/field-stock/returns-flow-integration.test.ts > Returns full flow integration > Idempotency > POST /returns with same idempotency_key returns existing return (200 not 201)
