@@ -298,8 +298,9 @@ async function importProjectResult(
       invoiceTotal: null,
       status: 'skipped',
       statusReason:
-        `No week-ending date found in "${pdfName}" — it does not look like an FT payment ` +
-        `summary. Check that "<Project> WE<code>.pdf" is in the bundle.`,
+        `No week-ending date found in "${pdfName}". Either it is not the FT payment ` +
+        `summary (check that "<Project> WE<code>.pdf" is in the bundle), or its ` +
+        `"PAYMENT SUMMARY AS AT:" header could not be parsed.`,
     };
   }
 

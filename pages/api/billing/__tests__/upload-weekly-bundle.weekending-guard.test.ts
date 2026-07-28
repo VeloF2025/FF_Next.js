@@ -113,6 +113,10 @@ describe('POST /api/billing/upload-weekly-bundle — empty weekEnding guard', ()
     expect(project?.status).toBe('skipped');
     expect(project?.statusReason).toContain('No week-ending date found');
     expect(project?.statusReason).toContain('Tembisa POP03 WE260726 notes.pdf');
+    // Both causes must be named — an empty weekEnding also happens when a
+    // GENUINE payment PDF's "PAYMENT SUMMARY AS AT:" header fails to parse,
+    // so the message must not assert it's the wrong file.
+    expect(project?.statusReason).toContain('PAYMENT SUMMARY AS AT');
 
     // The whole point: nothing reached Postgres, so `week_ending = ''` can't
     // raise `invalid input syntax for type date: ""`.
