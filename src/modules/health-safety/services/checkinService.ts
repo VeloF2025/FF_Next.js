@@ -174,10 +174,22 @@ export async function listCheckins(filters: {
       c.*,
       c.checkin_date::text AS checkin_date,
       p.project_name,
-      ct.company_name AS contractor_name
+      ct.company_name AS contractor_name,
+      -- Derived, not stored: whether the worker's registered contractor agrees
+      -- with the one this check-in was filed under. NULL = no worker record to
+      -- check (name-only), false = the worker has no contractor recorded, so
+      -- the attribution is unproven. Computed at read time so it reflects the
+      -- data as it stands today: once team_members.contractor_id is populated,
+      -- historical rows stop showing as unverified without a backfill.
+      CASE
+        WHEN c.team_member_id IS NULL THEN NULL
+        WHEN tm.contractor_id IS NULL THEN false
+        ELSE tm.contractor_id = c.contractor_id
+      END AS contractor_link_verified
     FROM hs_daily_checkins c
     LEFT JOIN projects p ON p.id = c.project_id
     LEFT JOIN contractors ct ON ct.id = c.contractor_id
+    LEFT JOIN team_members tm ON tm.id = c.team_member_id
     WHERE c.checkin_date = ${filters.checkinDate}::date
       AND (${pid}::uuid IS NULL OR c.project_id = ${pid}::uuid)
       AND (${cid}::uuid IS NULL OR c.contractor_id = ${cid}::uuid)

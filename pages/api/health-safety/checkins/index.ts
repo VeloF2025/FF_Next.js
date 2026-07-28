@@ -49,6 +49,10 @@ function deriveWarnings(row: Record<string, unknown>): CheckinWarning[] {
   // doing permit work with no permit open.
   const noPermit = row.activities_without_permit;
   if (Array.isArray(noPermit) && noPermit.length > 0) warnings.push('activity_without_permit');
+  // false (not null) = there IS a worker record and it names no contractor, so
+  // the attribution was accepted on trust. NULL means name-only, already
+  // covered by medical_unverifiable.
+  if (row.contractor_link_verified === false) warnings.push('contractor_link_unverified');
   return warnings;
 }
 
@@ -106,6 +110,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       workers_with_ppe_gap: checkins.filter((c) => c.warnings.includes('ppe_incomplete')).length,
       medical_unverifiable: checkins.filter((c) => c.warnings.includes('medical_unverifiable')).length,
       activity_without_permit: checkins.filter((c) => c.warnings.includes('activity_without_permit')).length,
+      contractor_link_unverified: checkins.filter((c) =>
+        c.warnings.includes('contractor_link_unverified')
+      ).length,
       clocked_in_without_checkin: missing.length,
     };
 

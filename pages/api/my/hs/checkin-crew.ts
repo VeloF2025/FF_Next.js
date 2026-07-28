@@ -230,14 +230,6 @@ export default withMySession(async (req, res, session) => {
       members,
     });
 
-    log.info('[my/hs-checkin-crew] recorded', {
-      staffId: session.staffId,
-      contractorId,
-      crewSize: created.length,
-      requested: crew.length,
-      blocked: created.filter((c) => c.clearance === 'blocked').length,
-    });
-
     // If the unique index still absorbed a row (a race between the pre-check
     // and the write), say so by name — `recorded` being smaller than the crew
     // submitted must never be the only signal.
@@ -247,6 +239,21 @@ export default withMySession(async (req, res, session) => {
     const skipped = crew
       .map((c) => c.worker_name)
       .filter((n) => !writtenNames.has(n.trim().toLowerCase()));
+
+    log.info('[my/hs-checkin-crew] recorded', {
+      staffId: session.staffId,
+      contractorId,
+      crewSize: created.length,
+      requested: crew.length,
+      blocked: created.filter((c) => c.clearance === 'blocked').length,
+      // The compensating control for accepting workers whose contractor link is
+      // absent. Logged HERE (after it is computed) so it reaches an operator
+      // even before any UI consumes the response field.
+      contractorLinkUnverified: crew.filter(
+        (c) => c.team_member_id && unlinked.has(c.team_member_id)
+      ).length,
+      skipped: skipped.length,
+    });
 
     return apiResponse.created(res, {
       submission_id: submissionId,

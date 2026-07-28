@@ -120,7 +120,8 @@ export type CheckinWarning =
   | 'ppe_incomplete'
   | 'hazard_reported'
   | 'medical_unverifiable'
-  | 'activity_without_permit';
+  | 'activity_without_permit'
+  | 'contractor_link_unverified';
 
 export const CHECKIN_BLOCK_REASON_LABELS: Record<CheckinBlockReason, string> = {
   self_declared_unfit: 'Declared not fit for duty',
@@ -136,6 +137,11 @@ export const CHECKIN_WARNING_LABELS: Record<CheckinWarning, string> = {
   // contractor could dodge the medical gate simply by not registering anyone.
   medical_unverifiable: 'Height/plant work declared by an unregistered worker — medical could not be verified',
   activity_without_permit: 'Declared an activity with no matching permit open today',
+  // The compensating control for accepting a worker whose employer is not
+  // recorded. Without it, "we accepted this on trust" would be invisible, and
+  // the decision to accept unlinked workers would rest on nothing.
+  contractor_link_unverified:
+    'Worker is not recorded against this contractor — attribution unproven',
 };
 
 export interface HSDailyCheckin {

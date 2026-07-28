@@ -153,6 +153,37 @@ describe('MEDIUM: contractor binding is conditional, not strict', () => {
   });
 });
 
+describe('the unlinked-contractor compensating control actually reaches someone', () => {
+  const read = (rel: string) => readFileSync(join(process.cwd(), rel), 'utf8');
+
+  it('is logged where it is known, not before it is computed', () => {
+    // The justification for ACCEPTING an unlinked worker is that the gap is
+    // visible. It was previously computed after the only log call, so it
+    // reached nobody — making the justification theoretical.
+    const ep = read('pages/api/my/hs/checkin-crew.ts');
+    const logAt = ep.indexOf("log.info('[my/hs-checkin-crew] recorded'");
+    const unlinkedAt = ep.indexOf('const { unlinked, foreign }');
+    expect(unlinkedAt).toBeGreaterThan(-1);
+    expect(logAt).toBeGreaterThan(unlinkedAt);
+    expect(ep).toMatch(/contractorLinkUnverified:/);
+  });
+
+  it('is derived for the officer board rather than trusted from the row', () => {
+    // Derived at read time, so it reflects the data as it stands: once
+    // team_members.contractor_id is populated, history stops showing as
+    // unverified without a backfill.
+    const svc = read('src/modules/health-safety/services/checkinService.ts');
+    expect(svc).toMatch(/AS contractor_link_verified/);
+    expect(svc).toMatch(/LEFT JOIN team_members tm ON tm\.id = c\.team_member_id/);
+  });
+
+  it('becomes a warning and a count on the board', () => {
+    const board = read('pages/api/health-safety/checkins/index.ts');
+    expect(board).toMatch(/row\.contractor_link_verified === false/);
+    expect(board).toMatch(/contractor_link_unverified: checkins\.filter/);
+  });
+});
+
 describe('MEDIUM: duplicates are refused by name on BOTH paths', () => {
   beforeEach(() => {
     vi.clearAllMocks();
