@@ -31,7 +31,9 @@ Utility category. Consent and data availability are the bottlenecks.
 
 ---
 
-## 2. Data readiness — measured, not assumed
+## 2. Data readiness — measured, then corrected
+
+### 2.1 What our own tables hold
 
 Queried against the shared Supabase DB on 2026-07-28, last 90 days,
 `COUNT(DISTINCT maintenance_tickets.id)`:
@@ -40,16 +42,52 @@ Queried against the shared Supabase DB on 2026-07-28, last 90 days,
 |---|---|---|
 | Tickets created | 4,125 | 100% |
 | Have `client_contact` populated | 161 | 3.9% |
-| Contact recoverable via `dr_number` → `onemap_properties.contact_number` | 785 | 19.0% |
-| **No route to a subscriber number** | **~3,340** | **~81%** |
+| Contact present in our `onemap_properties` mirror | 785 | 19.0% |
 
 By source, `client_contact` is populated **only** on `pp_data` (161 of 1,606).
 `wa_no_oes` (942), `manual` (937), `olt_mismatch` (394) and `snags` (245) carry
 **zero** contacts. `dr_number` is far better populated (2,962 of 4,125).
 
-**Conclusion: the subscriber's number is not in our data and cannot be derived from
-it at usable coverage.** It has to arrive with the ticket, from the FNO — the same
-party that must supply consent. Treat contact and consent as one ask.
+### 2.2 ⚠️ Correction — 1Map holds far more than our mirror
+
+An earlier draft of this document concluded from the numbers above that the
+subscriber's number "cannot be derived at usable coverage" and must come from the
+FNO. **That conclusion was wrong**, and it was wrong because it measured our
+mirror rather than 1Map.
+
+Queried directly against the live 1Map API (layer 5121, authenticated session,
+2026-07-28): **11 of 12 sampled DRs that are blank in our mirror have a populated
+`contnr` (contact number) in 1Map.** All 20 DRs sampled returned records.
+
+The cause is a lossy ingest, not missing data:
+
+- `onemap_properties` is populated by `scripts/import-onemap-smart.js` from
+  **spreadsheet exports**, mapping a single CSV column
+  (`Contact Number (e.g.0123456789)`) into `contact_number`.
+- The live 1Map record carries **216 fields**, of which roughly 25 are
+  phone-bearing: `contnr`, `contnr_alt`, `cnt_cell`, `cell01`–`cell20`,
+  `cell_sales`, `cell_pe`, `cell_hs`, `cell_hi`, plus `email`. **We import one.**
+- `scripts/backfill-contact-info.js` attempts to fill the gap from BOSS, but BOSS
+  reads the *installations* layer, which does not carry the sign-up contact —
+  measured across 20 DRs, BOSS never returned a number our mirror lacked.
+
+**Revised conclusion: the numbers are very likely already in 1Map. The work is to
+sync `contnr` (and the `cell*` fallbacks) from the 1Map API rather than from
+spreadsheet exports.** Consent from the FNO is still required regardless — see §4 —
+but "we have no way to reach the subscriber" is not a correct statement of the
+problem.
+
+**Confidence: MEDIUM.** The sample is 12 blank DRs; a 50-DR follow-up run was cut
+short. A server-side run over a few hundred DRs should firm up the real coverage
+before this is used to size anything.
+
+### 2.3 Related defects found while measuring
+
+- `ticketEnrichmentService.lookupOneMapDrop()` queried `onemap_drops` (0 rows), so
+  ticket enrichment never returned anything. Fixed in PR #2289.
+- `oneMapApiService.authenticate()` returns `true` whenever a session cookie comes
+  back, without checking the credentials were accepted — so a failed login surfaces
+  later as a misleading "API returned failure".
 
 ### FNO attribution per ticket
 
@@ -189,7 +227,7 @@ send must **fail closed** unless all four hold:
 | # | Precondition | Why |
 |---|---|---|
 | 1 | Consent indicator present on the ticket | Meta opt-in policy + POPIA |
-| 2 | Subscriber contact number present and SA-normalisable | 96% of tickets lack one today (§2) |
+| 2 | Subscriber contact number present and SA-normalisable | Most tickets lack one on the ticket itself; 1Map usually has it (§2.2) |
 | 3 | FNO resolvable for the ticket | Template names the appointing party; ~20% unresolved |
 | 4 | An approved template for the event type | Business-initiated cannot be free-form |
 
@@ -202,11 +240,15 @@ Tracked as Phase 5.
 
 ## 6. Sequencing
 
-1. Negotiate §4 into the FNO agreement, with §2 as the evidence for why contact +
-   consent must accompany every ticket.
-2. Submit §3 templates to Meta — they can sit approved indefinitely at no cost.
-3. Build the Phase 5 preconditions.
-4. Only then: set the `cloud_*` credentials, wire the Meta webhook, and flip
+1. Sync `contnr` (plus the `cell*` fallbacks) from the 1Map API into
+   `onemap_properties` — §2.2 indicates the numbers are already there and the
+   export-based ingest is simply dropping them. This is likely the single biggest
+   unlock, and it is ours to do, not the FNO's.
+2. Negotiate §4 into the FNO agreement. Consent is required regardless of where the
+   number comes from, and the FNO remains the only lawful source of that consent.
+3. Submit §3 templates to Meta — they can sit approved indefinitely at no cost.
+4. Build the Phase 5 preconditions.
+5. Only then: set the `cloud_*` credentials, wire the Meta webhook, and flip
    `wa_provider` — all Hein-gated, via the Go Live tab.
 
 ## References
