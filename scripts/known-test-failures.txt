@@ -18,10 +18,14 @@
 #   56 failing tests across 8 files, + 10 files that fail to COLLECT (0 tests) —
 #   missing TEST_DATABASE_URL, a vi.mock hoisting error, `jest is not defined`.
 
-# --- Intermittent: fails roughly 1 run in 6, passes otherwise. Listed so the
-# --- flake cannot redden a build. Worth fixing properly; until then it is
-# --- expected to show up in the "started passing" report most runs.
+# --- Intermittent. Listed so a flake cannot redden a build; expect these in
+# --- the "started passing" report most runs. Both are worth fixing properly.
+# ---   module-structure: fails roughly 1 run in 6, no clear trigger.
+# ---   db latency: asserts on measured query latency, so it fails whenever
+# ---   the box is loaded — observed once in ~8 runs. Inherently timing-
+# ---   sensitive; the real fix is to stop asserting on wall-clock.
 src/modules/noc/__tests__/module-structure.test.ts > Maintenance Module Structure > Server Exports (index.ts) > should export from index.ts without errors
+src/modules/noc/__tests__/utils/db.test.ts > Database Connection Utility > Health Check > should measure query latency
 
 # --- Deterministic failures (identical across three consecutive runs) ---
 pages/api/cortex/meeting-review/__tests__/handler.test.ts [ pages/api/cortex/meeting-review/__tests__/handler.test.ts ]

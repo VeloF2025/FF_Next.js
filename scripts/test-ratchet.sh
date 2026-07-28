@@ -78,20 +78,48 @@ run_suite() {
   return 0
 }
 
-run_suite "$@" || exit 1
+# Flake guard. This runner is single-concurrency and shared with the production
+# service, so a run competing with a `next build` can time tests out, and vitest
+# has been observed segfaulting outright (once in ~8 runs) with swap near full.
+# Either is noise, not a regression.
+#
+# The rule: PASS only if some attempt comes back both complete and clean. At
+# most two attempts, and the retry happens only when we are otherwise about to
+# fail, so the happy path costs one run.
+#
+# Deliberately not "fail on failures common to both runs". That intersection
+# dismissed any item which first appeared on the second run without ever giving
+# it a second observation, so two different one-off failures — one on each run —
+# cancelled each other out and the gate reported clean. Requiring a clean run is
+# symmetric and has no such gap: if the retry surfaces anything unlisted, same
+# item or not, the run fails and reports the union.
+: > "$WORK/confirmed.txt"
+: > "$WORK/new-first.txt"
 
-# Flake guard. One known test fails roughly 1 run in 6, and this runner is
-# single-concurrency and shared with the production service, so a run competing
-# with a `next build` can time tests out. Only re-run when we are about to fail,
-# so the happy path costs nothing, and require the SAME new failure both times.
-if [ -s "$WORK/new.txt" ]; then
+if run_suite "$@"; then
+  first_completed=1
   cp "$WORK/new.txt" "$WORK/new-first.txt"
-  echo -e "${YELLOW}  $(wc -l < "$WORK/new.txt") unlisted failure(s) — re-running once to rule out a flake…${NC}"
-  run_suite "$@" || exit 1
-  # Only failures present in BOTH runs count. A real regression repeats.
-  comm -12 "$WORK/new-first.txt" "$WORK/new.txt" > "$WORK/confirmed.txt"
 else
-  : > "$WORK/confirmed.txt"
+  first_completed=0
+fi
+
+if [ "$first_completed" -eq 0 ] || [ -s "$WORK/new-first.txt" ]; then
+  if [ "$first_completed" -eq 0 ]; then
+    echo -e "${YELLOW}  run did not complete — retrying once before failing…${NC}"
+  else
+    echo -e "${YELLOW}  $(wc -l < "$WORK/new-first.txt") unlisted failure(s) — re-running once; the retry must come back clean…${NC}"
+  fi
+
+  # A second incomplete run is not noise. Fail, and say so plainly rather than
+  # letting a crash masquerade as "no new failures".
+  run_suite "$@" || {
+    echo -e "${RED}✗ Unit tests: the run did not complete on either attempt.${NC}"
+    exit 1
+  }
+
+  if [ -s "$WORK/new.txt" ]; then
+    sort -u "$WORK/new-first.txt" "$WORK/new.txt" > "$WORK/confirmed.txt"
+  fi
 fi
 
 if [ -s "$WORK/confirmed.txt" ]; then
