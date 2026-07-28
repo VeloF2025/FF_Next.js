@@ -124,8 +124,19 @@ if command -v python3 >/dev/null 2>&1; then
     fail "QField step detection: regression detected"
     tail -20 /tmp/ci-qfield-stepdetect.txt | sed 's/^/    /'
   fi
+
+  # Same contract, one layer up: which GPKG (and which layer inside it) the extractor
+  # reads. Over-matching here silently swaps a project onto the wrong audit form, so
+  # the suite asserts a no-op against every registered project's real MinIO listing.
+  if python3 scripts/test_qfield_gpkg_resolution.py > /tmp/ci-qfield-gpkgresolve.txt 2>&1; then
+    pass "QField GPKG resolution: all checks pass"
+  else
+    fail "QField GPKG resolution: regression detected"
+    tail -20 /tmp/ci-qfield-gpkgresolve.txt | sed 's/^/    /'
+  fi
 else
   skip "QField step detection: python3 not available"
+  skip "QField GPKG resolution: python3 not available"
 fi
 
 # ─── Gate 3: TypeScript ──────────────────────────────────────────────────────
