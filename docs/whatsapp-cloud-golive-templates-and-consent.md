@@ -48,6 +48,12 @@ By source, `client_contact` is populated **only** on `pp_data` (161 of 1,606).
 `wa_no_oes` (942), `manual` (937), `olt_mismatch` (394) and `snags` (245) carry
 **zero** contacts. `dr_number` is far better populated (2,962 of 4,125).
 
+These are a rolling 90-day window on a live table, so re-running them a few days
+later will drift by a ticket or two as rows age in and out. An independent re-run on
+2026-07-28 reproduced 4,125 and 161 exactly, and returned 787 / 936 / 246 / 2,963
+against the 785 / 937 / 245 / 2,962 above. Treat them as accurate to ±0.1%, not as
+fixed constants.
+
 ### 2.2 ⚠️ Correction — 1Map holds far more than our mirror
 
 An earlier draft of this document concluded from the numbers above that the
@@ -83,8 +89,9 @@ before this is used to size anything.
 
 ### 2.3 Related defects found while measuring
 
-- `ticketEnrichmentService.lookupOneMapDrop()` queried `onemap_drops` (0 rows), so
-  ticket enrichment never returned anything. Fixed in PR #2289.
+- `ticketEnrichmentService.lookupOneMapDrop()` queries `onemap_drops` (0 rows), so
+  ticket enrichment returns nothing. **Still live in the codebase** — fix proposed
+  in PR #2289, open and not yet merged as at 2026-07-28.
 - `oneMapApiService.authenticate()` returns `true` whenever a session cookie comes
   back, without checking the credentials were accepted — so a future credential
   expiry would surface as a misleading "API returned failure" rather than an auth
@@ -104,11 +111,24 @@ maintenance_tickets.project_id → public.projects.id::text
 public.projects.client_id      → public.clients.company_name
 ```
 
-Current values: `fibertime` (5,885 tickets), `Herotel Proprietary Limited` (37).
-**But ~20% of current tickets have no `project_id`**, so no FNO can be named
-(21.6% in July 2026; 9.8–30.8% across recent months). The templates below name the
-appointing FNO in the first line, so an unresolved FNO must **block the send** — a
-blank or wrong brand is worse than no message.
+Current values (all-time, as at 2026-07-28): `fibertime` (5,900 tickets),
+`Herotel Proprietary Limited` (37).
+
+Two distinct measures, which an earlier draft conflated — they are not the same
+number and should not be quoted interchangeably:
+
+| Measure | Definition | Figure (as at 2026-07-28) |
+|---|---|---|
+| Missing `project_id` | ticket has no project at all | **23.0%** all-time (1,837 / 8,002) |
+| **FNO unresolvable** | `clients.company_name` is NULL after the join — no project, *or* a project with no client | **9.8%–30.8%** by month over Mar–Jul 2026; 21.4% in July |
+
+The second is the one that matters here, because it is what actually determines
+whether a template can be filled. Monthly detail: Mar 20.1%, Apr 18.2%, May 30.8%,
+Jun 9.8%, Jul 21.4%. (Jan–Feb 2026 are excluded — 13 and 147 tickets, ~100%
+unresolved, too small and too early to be representative.)
+
+The templates below name the appointing FNO in the first line, so an unresolved FNO
+must **block the send** — a blank or wrong brand is worse than no message.
 
 ---
 
@@ -222,6 +242,22 @@ attorney — it is a commercial draft, not legal advice.**
 > that Velocity Fibre processes such information as an operator on the Client's
 > behalf, and that Velocity Fibre shall not use it for any other purpose or retain it
 > beyond the period required for service delivery and record-keeping.
+>
+> **6.** The Client indemnifies Velocity Fibre against any claim, penalty,
+> regulatory finding or platform sanction — including suspension or restriction of
+> Velocity Fibre's WhatsApp Business account — arising from a consent indicator
+> transmitted under clause 3 that was inaccurate, withdrawn, or not obtained in
+> accordance with clause 2. Velocity Fibre's obligation is limited to not initiating
+> contact where the indicator is absent, and to ceasing contact on notice under
+> clause 4; it is not obliged to independently verify the Client's consent records.
+
+**Why clause 6 exists.** Without it, clause 3 obligates the Client to send a consent
+indicator but leaves Velocity carrying the entire downside if that indicator is
+wrong. The exposure is not hypothetical: Meta reactively audits opt-in flows, and
+the penalty lands on the *sender's* number — template sending blocks through to
+permanent account disabling — regardless of who supplied the bad data. A POPIA
+complaint would likewise name Velocity as the party that sent the message. This is
+the first gap a client's own counsel would find.
 
 ---
 
@@ -233,7 +269,7 @@ send must **fail closed** unless all four hold:
 | # | Precondition | Why |
 |---|---|---|
 | 1 | Consent indicator present on the ticket | Meta opt-in policy + POPIA |
-| 2 | Subscriber contact number present and SA-normalisable | Most tickets lack one on the ticket itself; 1Map usually has it (§2.2) |
+| 2 | Subscriber contact number present and SA-normalisable | Most tickets lack one on the ticket itself. 1Map appears to hold it — **MEDIUM confidence, 12-DR sample (§2.2)**, not yet sized |
 | 3 | FNO resolvable for the ticket | Template names the appointing party; ~20% unresolved |
 | 4 | An approved template for the event type | Business-initiated cannot be free-form |
 
@@ -246,15 +282,19 @@ Tracked as Phase 5.
 
 ## 6. Sequencing
 
-1. Sync `contnr` (plus the `cell*` fallbacks) from the 1Map API into
-   `onemap_properties` — §2.2 indicates the numbers are already there and the
-   export-based ingest is simply dropping them. This is likely the single biggest
-   unlock, and it is ours to do, not the FNO's.
-2. Negotiate §4 into the FNO agreement. Consent is required regardless of where the
+1. **Size the 1Map contact coverage properly first** (issue #2292, step 1): a
+   server-side run over a few hundred blank DRs. Everything below depends on the
+   answer, and today it rests on a 12-DR sample at MEDIUM confidence (§2.2) —
+   do not commit to a plan or a client conversation on that basis.
+2. If coverage holds up, sync `contnr` (plus the `cell*` fallbacks) from the 1Map
+   API into `onemap_properties`. On the current evidence this looks like the
+   biggest single unlock, and it is ours to do rather than the FNO's — but that
+   ranking is provisional until step 1 lands.
+3. Negotiate §4 into the FNO agreement. Consent is required regardless of where the
    number comes from, and the FNO remains the only lawful source of that consent.
-3. Submit §3 templates to Meta — they can sit approved indefinitely at no cost.
-4. Build the Phase 5 preconditions.
-5. Only then: set the `cloud_*` credentials, wire the Meta webhook, and flip
+4. Submit §3 templates to Meta — they can sit approved indefinitely at no cost.
+5. Build the Phase 5 preconditions.
+6. Only then: set the `cloud_*` credentials, wire the Meta webhook, and flip
    `wa_provider` — all Hein-gated, via the Go Live tab.
 
 ## References
