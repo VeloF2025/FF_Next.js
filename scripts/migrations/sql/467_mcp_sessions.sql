@@ -1,4 +1,4 @@
--- scripts/migrations/sql/463_mcp_sessions.sql
+-- scripts/migrations/sql/467_mcp_sessions.sql
 -- Read-only MCP tokens: tag sessions by kind so (a) "log out everywhere" can sweep
 -- browser sessions without silently killing every user's MCP connection, and (b) the
 -- auth wrappers can apply the read-only gate. Idempotent; safe to re-run.

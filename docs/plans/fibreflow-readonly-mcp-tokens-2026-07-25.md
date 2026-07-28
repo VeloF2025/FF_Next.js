@@ -33,7 +33,7 @@ The MCP server itself. This plan ends when a user can mint a token and `curl -H 
 | File | Change | Responsibility |
 |---|---|---|
 | `src/lib/auth/owner.ts` | **Create** | Single source of truth for the owner-bypass identity. Pure, no DB. |
-| `scripts/migrations/sql/463_mcp_sessions.sql` | **Create** | `kind`, `label`, `last_used_at` columns + index on `user_sessions`. |
+| `scripts/migrations/sql/467_mcp_sessions.sql` | **Create** | `kind`, `label`, `last_used_at` columns + index on `user_sessions`. |
 | `src/lib/auth/types.ts` | Modify | Add `SessionKind`; add `sessionKind` to `AuthUser`; extend `Session`. |
 | `src/lib/auth/session.ts` | Modify | `createSession` gains an options bag (`kind`, `expiryDays`, `label`); extract `setSessionTokenHash`; `getUserSessions`/`getSession` return the new columns. |
 | `src/lib/auth/readOnly.ts` | **Create** | Pure predicate: is this (user, method) pair a read-only violation? |
@@ -207,7 +207,7 @@ git commit -m "refactor(auth): centralise owner bypass in isOwner() helper"
 ### Task 2: `user_sessions` migration
 
 **Files:**
-- Create: `scripts/migrations/sql/463_mcp_sessions.sql` (+ `rollback_463_mcp_sessions.sql`)
+- Create: `scripts/migrations/sql/467_mcp_sessions.sql` (+ `rollback_467_mcp_sessions.sql`)
 
 **Interfaces:**
 - Consumes: nothing.
@@ -216,7 +216,7 @@ git commit -m "refactor(auth): centralise owner bypass in isOwner() helper"
 - [ ] **Step 1: Write the migration**
 
 ```sql
--- scripts/migrations/sql/463_mcp_sessions.sql
+-- scripts/migrations/sql/467_mcp_sessions.sql
 -- Read-only MCP tokens: tag sessions by kind so (a) "log out everywhere" can sweep
 -- browser sessions without silently killing every user's MCP connection, and (b) the
 -- auth wrappers can apply the read-only gate. Idempotent; safe to re-run.
@@ -260,7 +260,7 @@ Run the migration a second time. Expected: completes with no error and no change
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/migrations/sql/463_mcp_sessions.sql scripts/migrations/sql/rollback_463_mcp_sessions.sql
+git add scripts/migrations/sql/467_mcp_sessions.sql scripts/migrations/sql/rollback_467_mcp_sessions.sql
 git commit -m "feat(db): add kind/label/last_used_at to user_sessions for MCP tokens"
 ```
 
