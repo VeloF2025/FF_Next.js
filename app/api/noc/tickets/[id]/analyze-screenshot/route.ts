@@ -4,8 +4,7 @@
  * screenshots attached. On any failure NO note is posted.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/jwt';
+import { requireAuth } from '@/lib/auth/app-router';
 import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
 import { vfStorage } from '@/services/vfStorageAdapter';
@@ -22,6 +21,19 @@ export async function POST(
 ) {
   const { id: ticketId } = await params;
   try {
+    // Authenticate FIRST — before parsing the body, uploading anything, or touching the
+    // VLM. This endpoint uploads files to storage, spends GPU time and writes a ticket
+    // note; none of that may happen for an unauthenticated caller.
+    //
+    // requireAuth, not a bare verifyToken: it validates the session row against the DB
+    // (not just the JWT signature), so a revoked or expired session is rejected.
+    // It is also the single place the read-only MCP session gate WILL hook into (PR #2249,
+    // not yet merged — requireAuth can only return 401 today), so this route will inherit
+    // that gate instead of needing its own copy.
+    const [user, unauthorized] = await requireAuth(request);
+    if (unauthorized) return unauthorized;
+    const createdBy: string = user.id;
+
     if (!ticketId) {
       return NextResponse.json({ success: false, error: { message: 'Ticket ID is required' } }, { status: 400 });
     }
@@ -40,18 +52,6 @@ export async function POST(
     );
     if (dataUrls.length === 0) {
       return NextResponse.json({ success: false, error: { message: 'Images must be base64 image data URLs' } }, { status: 400 });
-    }
-
-    // Best-effort acting user (created_by is nullable).
-    let createdBy: string | null = null;
-    try {
-      const token = (await cookies()).get('ff_auth_token')?.value;
-      if (token) {
-        const jwt = await verifyToken(token);
-        if (jwt) createdBy = jwt.sub;
-      }
-    } catch {
-      /* unauthenticated context — leave createdBy null */
     }
 
     // Ticket cross-reference context for the prompt.

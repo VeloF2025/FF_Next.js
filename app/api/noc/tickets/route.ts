@@ -15,9 +15,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
-import { verifyToken } from '@/lib/auth/jwt';
+import { requireAuth } from '@/lib/auth/app-router';
 import {
   listTickets,
   createTicket,
@@ -88,6 +87,11 @@ const VALID_PRIORITIES: TicketPriority[] = [
  */
 export async function GET(req: NextRequest) {
   try {
+    // Ticket data is internal. Without this, anyone could list every NOC ticket
+    // unauthenticated and harvest ids for the [id] routes.
+    const [, unauthorized] = await requireAuth(req);
+    if (unauthorized) return unauthorized;
+
     const { searchParams } = new URL(req.url);
 
     // Parse filters from query params
@@ -202,28 +206,15 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    // requireAuth rather than a bare verifyToken: it validates the session row against
+    // the DB, so a revoked session is refused. It is also where the read-only MCP session
+    // gate will live once PR #2249 merges — today requireAuth only ever returns 401.
+    const [user, unauthorized] = await requireAuth(req);
+    if (unauthorized) return unauthorized;
+
     const body: CreateTicketPayload = await req.json();
-
-    // Extract user ID from JWT cookie for created_by (UUID column)
-    const cookieStore = await cookies();
-    const token = cookieStore.get('ff_auth_token')?.value;
-    if (token) {
-      const payload = await verifyToken(token);
-      if (payload?.sub) {
-        body.created_by = payload.sub;
-      }
-    }
-
-    if (!body.created_by) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
-          meta: { timestamp: new Date().toISOString() },
-        },
-        { status: 401 }
-      );
-    }
+    // Always the verified user; never a client-supplied created_by.
+    body.created_by = user.id;
 
     // Validate required fields
     const errors: Record<string, string> = {};

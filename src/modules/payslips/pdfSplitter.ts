@@ -1,11 +1,14 @@
 /**
- * Combined VIP-payslip PDF splitter.
+ * Combined payslip PDF splitter.
  *
- * VIP exports the monthly payroll as a single PDF — one page per employee,
- * each page carrying Emp Code / Emp Name / Id Number / Payment Dt / Nett Pay.
+ * Sage exports the monthly payroll as a single PDF — one page per employee.
  * HR drops the file into the importer; this module splits it into per-page
  * PDFs and extracts the matching fields so the API can pair each page with
  * a staff record.
+ *
+ * Two page layouts are supported — the legacy VIP export and the Plain Paper
+ * Payslip export Velocity moved to in July 2026. Layout detection and the
+ * field regexes live in `./payslipLayouts`.
  *
  * pdf-parse v2 is used for text extraction; pdf-lib for the per-page split.
  * Both are already in the project bundle from prior work.
@@ -13,6 +16,15 @@
 
 import { PDFDocument } from 'pdf-lib';
 import { PDFParse } from 'pdf-parse';
+
+import { log } from '@/lib/logger';
+
+import {
+  detectLayout,
+  extractFields,
+  findAnchorAnomalies,
+  type PayslipLayout,
+} from './payslipLayouts';
 
 export interface ExtractedPayslipPage {
   /** 1-based page number in the source PDF. */
@@ -37,7 +49,17 @@ export interface ExtractedPayslipPage {
   pdfBuffer: Buffer;
   /** Raw page text (kept for raw_data column on the payslip row). */
   rawText: string;
+  /** Which Sage layout this page was read as — useful when HR reports odd values. */
+  layout: PayslipLayout;
 }
+
+/**
+ * Exported so the tests assert against this exact string rather than a
+ * substring of it — a filter on reworded prose passes vacuously, which would
+ * turn the "no anomalies on a good file" test into one that tests nothing.
+ */
+export const ANCHOR_ANOMALY_LOG_MESSAGE =
+  '[payslips/pdfSplitter] unexpected anchor label counts on page — extracted values may be wrong';
 
 export interface SplitResult {
   pages: ExtractedPayslipPage[];
@@ -90,11 +112,28 @@ export async function splitCombinedPayslipPdf(buffer: Buffer): Promise<SplitResu
     const pdfBuffer = Buffer.from(pdfBytes);
 
     const rawText = perPageText[i] ?? '';
+    const layout = detectLayout(rawText);
+
+    // Extraction takes the first match for each anchor, so an anchor occurring
+    // more often than the known templates produce means the value we read may
+    // not be the one a human would. Never fires on the templates we support —
+    // if it does, the payroll export changed shape and this page wants
+    // checking by hand.
+    const anchorAnomalies = findAnchorAnomalies(rawText, layout);
+    if (anchorAnomalies.length > 0) {
+      log.warn(ANCHOR_ANOMALY_LOG_MESSAGE, {
+        page: i + 1,
+        layout,
+        labels: anchorAnomalies,
+      });
+    }
+
     pages.push({
       page: i + 1,
       pdfBuffer,
       rawText,
-      ...extractFields(rawText),
+      layout,
+      ...extractFields(rawText, layout),
     });
   }
 
@@ -104,108 +143,6 @@ export async function splitCombinedPayslipPdf(buffer: Buffer): Promise<SplitResu
   // an image-only page), surface this in the log via the returned numPages
   // — callers can decide whether to flag the import.
   return { pages, period, numPages: Math.max(numPages, pdfParseTotal) };
-}
-
-interface ExtractedFields {
-  empCode: string | null;
-  empName: string | null;
-  firstInitial: string | null;
-  lastName: string | null;
-  idNumber: string | null;
-  paymentDate: string | null;
-  totalEarningsCents: number | null;
-  totalDeductionsCents: number | null;
-  nettPayCents: number | null;
-}
-
-function extractFields(text: string): ExtractedFields {
-  const empCode = matchOne(text, /Emp\s*Code\s+([A-Z0-9-]+)/i);
-  const empName = matchOne(
-    text,
-    /Emp\s*Name\s+([A-Za-z][A-Za-z .'-]+?)(?:\s{2,}|\n|\s+Emp\s|\s+Job\s|\s+Id\s|\s+Co\.|\s+Paypoint|$)/i
-  );
-  const idNumber = matchOne(text, /Id\s*Number\s+(\d{13})/i);
-  const paymentDate = matchOne(text, /Payment\s*Dt\s+(\d{4}\/\d{2}\/\d{2})/i);
-  const totalEarningsCents = parseCentsAfter(text, /Total\s+Earnings\s+([\d,]+\.\d{2})/i);
-
-  // pdfjs returns text items in positional order, which interleaves the
-  // earnings (left) and deductions (right) columns differently for each
-  // page. The "Total Deductions" label and its value can land far apart,
-  // and "NETT PAY" appears as a bare label without its value adjacent.
-  //
-  // Primary heuristic: nett pay is rendered with thousand-separators
-  // (e.g. "21,400.88") while earnings/deductions sub-totals never use
-  // thousand-separators in this VIP template. The unique comma-decimal
-  // number on the page is the nett.
-  //
-  // Fallback: if the page contains more than one comma-decimal number
-  // (e.g. an account number, year-to-date totals, a salary in the
-  // hundreds of thousands), pick the largest one whose value is also
-  // ≤ totalEarningsCents — nett pay is always less than earnings before
-  // deductions (deductions can't be negative).
-  let nettPayCents: number | null = null;
-  const commaDecimalCents = [
-    ...text.matchAll(/(\d{1,3}(?:,\d{3})+\.\d{2})/g),
-  ]
-    .map((m) => parseRandToCents(m[1]!))
-    .filter((c): c is number => c !== null);
-
-  if (commaDecimalCents.length === 1) {
-    nettPayCents = commaDecimalCents[0]!;
-  } else if (commaDecimalCents.length > 1 && totalEarningsCents !== null) {
-    const candidates = commaDecimalCents
-      .filter((c) => c <= totalEarningsCents && c > 0)
-      .sort((a, b) => b - a);
-    nettPayCents = candidates[0] ?? null;
-  }
-
-  const totalDeductionsCents =
-    totalEarningsCents !== null && nettPayCents !== null
-      ? totalEarningsCents - nettPayCents
-      : null;
-
-  let firstInitial: string | null = null;
-  let lastName: string | null = null;
-  if (empName) {
-    const tokens = empName.replace(/^(Mr|Mrs|Ms|Miss|Dr)\.?\s+/i, '').trim().split(/\s+/);
-    if (tokens.length >= 1) {
-      const firstToken = tokens[0]!;
-      firstInitial = firstToken.replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase() || null;
-    }
-    if (tokens.length >= 2) {
-      lastName = tokens[tokens.length - 1]!.toLowerCase();
-    }
-  }
-
-  return {
-    empCode,
-    empName: empName ? empName.trim() : null,
-    firstInitial,
-    lastName,
-    idNumber,
-    paymentDate,
-    totalEarningsCents,
-    totalDeductionsCents,
-    nettPayCents,
-  };
-}
-
-function matchOne(text: string, re: RegExp): string | null {
-  const m = text.match(re);
-  return m && m[1] ? m[1].trim() : null;
-}
-
-function parseCentsAfter(text: string, re: RegExp): number | null {
-  const raw = matchOne(text, re);
-  if (!raw) return null;
-  return parseRandToCents(raw);
-}
-
-function parseRandToCents(raw: string): number | null {
-  const cleaned = raw.replace(/,/g, '');
-  const num = Number(cleaned);
-  if (!Number.isFinite(num)) return null;
-  return Math.round(num * 100);
 }
 
 /** "2026/04/30" → "2026-04". null if input is null or malformed. */

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
+import { BODY_TOO_LARGE, MAX_PROXY_BODY_BYTES, pipeUpstreamResponse, readCappedBody } from '@/lib/mcp/proxyStream';
 
 export const config = {
   api: {
@@ -35,15 +36,6 @@ function pathFromQuery(req: NextApiRequest): string {
   return '/' + parts.map((segment) => encodeURIComponent(segment)).join('/');
 }
 
-async function readRawBody(req: NextApiRequest): Promise<Buffer | undefined> {
-  if (req.method === 'GET' || req.method === 'HEAD') return undefined;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
-}
-
 function forwardHeaders(req: NextApiRequest): Headers {
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
@@ -70,7 +62,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const upstreamUrl = `${UPSTREAM}${targetPath}${query}`;
 
   try {
-    const rawBody = await readRawBody(req);
+    const rawBody = await readCappedBody(req);
+    if (rawBody === BODY_TOO_LARGE) {
+      log.warn('Cortex remote MCP request body over cap', { upstreamUrl, maxBytes: MAX_PROXY_BODY_BYTES });
+      return res.status(413).json({
+        success: false,
+        error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds the proxy limit' },
+      });
+    }
+
     const upstream = await fetch(upstreamUrl, {
       method: req.method,
       headers: forwardHeaders(req),
@@ -83,10 +83,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!HOP_BY_HOP.has(key.toLowerCase())) res.setHeader(key, value);
     });
 
-    const body = Buffer.from(await upstream.arrayBuffer());
-    return res.send(body);
+    // `return await`, not `return`. A bare `return <promise>` inside try/catch leaves the
+    // try scope before the promise settles, so a later rejection escapes THIS catch and
+    // becomes the handler's own rejection — the headersSent guard below would be dead
+    // code and the failure would never be logged. Verified by execution: without await,
+    // the catch does not run.
+    return await pipeUpstreamResponse(upstream, res);
   } catch (error) {
     log.error('Cortex remote MCP proxy failed', { upstreamUrl, error });
+
+    // Streaming the response introduced a failure mode buffering did not have: once the
+    // upstream's status and first bytes are on the wire, res.status(502) throws
+    // ERR_HTTP_HEADERS_SENT (verified against a real server). Destroying the socket is
+    // the only honest signal left — it tells the client the body is TRUNCATED, rather
+    // than letting a partial response look complete.
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+
     return res.status(502).json({
       success: false,
       error: {
