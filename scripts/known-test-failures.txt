@@ -28,44 +28,6 @@ src/modules/noc/__tests__/module-structure.test.ts > Maintenance Module Structur
 src/modules/noc/__tests__/utils/db.test.ts > Database Connection Utility > Health Check > should measure query latency
 
 # --- Deterministic failures (identical across three consecutive runs) ---
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Accessibility > should have proper accessibility attributes
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Accessibility > should have proper ARIA labels
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Error Boundaries > should handle service errors gracefully
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > File Selection > should handle drag and drop
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > File Selection > should handle valid file selection
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > File Selection > should reject invalid file types
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Import Process > should handle import errors
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Import Process > should handle import exceptions
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Import Process > should handle import mode selection
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Import Process > should handle successful import
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Initial State > should render initial state correctly
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Initial State > should show import instructions initially
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Template and Export Actions > should download template
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Template and Export Actions > should export all contractors
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Template and Export Actions > should handle export when no contractors exist
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should disable actions during import
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should handle cancellation during file preview
-src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should reset import state correctly
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should reject delete with invalid UUID
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should return 404 when ticket not found
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should soft delete ticket by ID
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets/[id] - Get ticket detail > should get ticket by valid ID
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets/[id] - Get ticket detail > should reject invalid UUID format
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets/[id] - Get ticket detail > should return 404 when ticket not found
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list all tickets without filters
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list tickets with multiple filters
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list tickets with pagination
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list tickets with status filter
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list tickets with type filter
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > POST /api/noc/tickets - Create ticket > should create ticket with minimal required fields
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > POST /api/noc/tickets - Create ticket > should create ticket with valid data
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > POST /api/noc/tickets - Create ticket > should reject ticket with invalid source enum
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > POST /api/noc/tickets - Create ticket > should reject ticket without required fields
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should reject update with empty payload
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should reject update with invalid UUID
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should return 404 when ticket not found
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should update single field
-src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should update ticket with partial data
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should have proper ARIA labels and roles
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should support keyboard navigation
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Loading States > should show loading overlay when loading template

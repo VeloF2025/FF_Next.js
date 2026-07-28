@@ -34,7 +34,8 @@ describe('No Direct Database Connections', () => {
     'ClientsDebug.tsx',  // Dev-only debug component
     // Server-side, but in directories excludedDirs does not cover (`config/`
     // and a module-root `queries.ts`). Listed as PATHS, not bare filenames:
-    // entries containing '/' are matched as a path suffix. `queries.ts` as a
+    // entries containing '/' are matched against the src-relative path exactly
+    // (see isExcluded below). `queries.ts` as a
     // basename would have exempted all EIGHT files of that name under src/,
     // handing a free pass to any future one that genuinely leaks DB code into
     // the client — the exact thing this test exists to catch.

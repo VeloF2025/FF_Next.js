@@ -18,6 +18,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { NextRequest } from 'next/server';
+import { AUTH_COOKIE_NAME } from '@/lib/auth/middleware';
 import type {
   Ticket,
   CreateTicketPayload,
@@ -94,9 +96,68 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // Mock next/headers so cookies() doesn't throw in test env
+// The routes are typed `(req: NextRequest)` and authenticate via
+// `req.cookies.get(AUTH_COOKIE_NAME)` (src/lib/auth/app-router.ts:27). A plain
+// Web `Request` has headers but NO `cookies`, so that line threw
+// "Cannot read properties of undefined (reading 'get')" before any handler
+// logic ran — which is why every test in this file returned 500 regardless of
+// what it was asserting. Mocking next/headers' cookies() does not help: that is
+// a different API from the request's own cookie jar.
+//
+// NextRequest parses its cookie jar from the Cookie header, so seeding one here
+// makes extractToken return a token and the mocked verifyToken then supplies the
+// test user.
+function makeRequest(url: string, init: RequestInit = {}): NextRequest {
+  const headers = new Headers(init.headers);
+  if (!headers.has('cookie')) headers.set('cookie', `${AUTH_COOKIE_NAME}=mock-token`);
+  return new NextRequest(url, { ...init, headers });
+}
+
 vi.mock('next/headers', () => ({
   cookies: vi.fn(() => ({ get: vi.fn(() => ({ value: 'mock-token' })) })),
 }));
+
+const { mockPoolQuery } = vi.hoisted(() => ({ mockPoolQuery: vi.fn() }));
+
+// requireAuth() re-validates the JWT against a live user+session row
+// (src/lib/auth/app-router.ts:60-77) and returns 401 when the query yields
+// nothing. The global @/lib/db mock in vitest.setup.ts resolves undefined, so
+// `result.rows[0]` threw, was swallowed by the catch, and every request 401'd.
+//
+// The mock is hoisted and controllable, NOT hardwired to always return a row.
+// A hardwired row makes the whole file pass even if the routes drop requireAuth
+// entirely — the auth assertions become decorative, which is exactly what this
+// file did before.
+//
+// The `Authentication` describe block drives this mock to empty rows and
+// asserts 401 for all six authenticated handlers in the family: GET and POST on
+// route.ts, and GET/PUT/DELETE on [id]/route.ts. Each was verified to fail with
+// requireAuth bypassed at its call site. That is what makes the positive cases
+// mean anything — on their own they only show that a request WITH valid auth
+// succeeds, which a route with no auth at all also satisfies.
+vi.mock('@/lib/db', () => ({
+  pool: { query: mockPoolQuery, connect: vi.fn(), end: vi.fn() },
+  db: { query: vi.fn(), connect: vi.fn(), end: vi.fn() },
+  query: vi.fn(),
+  sql: vi.fn(async () => []),
+  getDbCircuitStats: vi.fn(() => ({ state: 'closed', failures: 0 })),
+  resetDbCircuit: vi.fn(),
+}));
+
+/** The authenticated user+session row requireAuth expects to find. */
+const AUTH_ROW = {
+  id: 'test-user-id-123',
+  email: 'test@velocityfibre.co.za',
+  first_name: 'Test',
+  last_name: 'User',
+  role: 'admin',
+  permissions: null,
+  is_active: true,
+  profile_picture: null,
+  department: null,
+  kind: 'browser',
+};
+
 
 // Mock JWT verification to return a test user
 vi.mock('@/lib/auth/jwt', () => ({
@@ -138,6 +199,8 @@ vi.mock('@neondatabase/serverless', () => ({
 describe('Ticket CRUD API Endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Authenticated by default; the unauthenticated block below overrides this.
+    mockPoolQuery.mockResolvedValue({ rows: [AUTH_ROW] });
   });
 
   afterEach(() => {
@@ -166,7 +229,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets');
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets');
       const response = await GET(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -195,7 +258,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets?status=open');
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets?status=open');
       const response = await GET(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -219,7 +282,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets?ticket_type=maintenance');
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets?ticket_type=maintenance');
       const response = await GET(mockRequest);
       expect(response.status).toBe(200);
       expect(listTickets).toHaveBeenCalledWith({
@@ -241,7 +304,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets?page=2&pageSize=10');
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets?page=2&pageSize=10');
       const response = await GET(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -267,7 +330,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets?status=open&priority=high&assigned_to=user123');
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets?status=open&priority=high&assigned_to=user123');
       const response = await GET(mockRequest);
       expect(response.status).toBe(200);
       expect(listTickets).toHaveBeenCalledWith({
@@ -285,7 +348,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets');
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets');
       const response = await GET(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -317,7 +380,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { POST } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets', {
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createPayload),
@@ -351,7 +414,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { POST } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets', {
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createPayload),
@@ -370,7 +433,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { POST } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets', {
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invalidPayload),
@@ -395,7 +458,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { POST } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets', {
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invalidPayload),
@@ -423,7 +486,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { POST } = await import('@/app/api/noc/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/noc/tickets', {
+      const mockRequest = makeRequest('http://localhost/api/noc/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createPayload),
@@ -449,7 +512,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`);
       const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -467,7 +530,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`);
       const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -483,7 +546,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${invalidId}`);
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${invalidId}`);
       const response = await GET(mockRequest, { params: { id: invalidId } });      const data = await response.json();
 
       expect(response.status).toBe(422);
@@ -502,7 +565,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { GET } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`);
       const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -532,7 +595,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -563,7 +626,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -583,7 +646,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${invalidId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${invalidId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -602,7 +665,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -627,7 +690,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -652,7 +715,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -680,7 +743,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'DELETE',
       });
 
@@ -699,7 +762,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${invalidId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${invalidId}`, {
         method: 'DELETE',
       });
 
@@ -718,7 +781,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'DELETE',
       });
 
@@ -738,7 +801,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
+      const mockRequest = makeRequest(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'DELETE',
       });
 
@@ -746,6 +809,85 @@ describe('Ticket CRUD API Endpoints', () => {
 
       expect(response.status).toBe(500);
       expect(data.error.code).toBe('DATABASE_ERROR');
+    });
+  });
+
+  // ==================== Authentication (negative) ====================
+  //
+  // These exist because without them the whole file passes even if the routes
+  // drop requireAuth entirely — the positive cases assert only that a request
+  // WITH valid auth succeeds, which a route with no auth at all also satisfies.
+  // This endpoint shipped unauthenticated to production once already, so the
+  // gate needs a test that fails when the gate is gone.
+  describe('Authentication', () => {
+    it('GET /tickets returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { GET } = await import('@/app/api/noc/tickets/route');
+      const response = await GET(makeRequest('http://localhost/api/noc/tickets'));
+      expect(response.status).toBe(401);
+    });
+
+    it('GET /tickets returns 401 when no auth cookie is presented', async () => {
+      const { GET } = await import('@/app/api/noc/tickets/route');
+      const req = new NextRequest('http://localhost/api/noc/tickets', {
+        headers: new Headers(),
+      });
+      const response = await GET(req);
+      expect(response.status).toBe(401);
+    });
+
+    // The [id] route has its own three handlers with their own requireAuth
+    // calls. Covering only the collection route left 3 of 6 authenticated
+    // handlers with no negative case, while the file read as "auth is tested
+    // here" — verified: bypassing requireAuth in [id]/route.ts left the whole
+    // suite green.
+    const TICKET_ID = '123e4567-e89b-12d3-a456-426614174000';
+
+    it('GET /tickets/[id] returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { GET } = await import('@/app/api/noc/tickets/[id]/route');
+      const response = await GET(
+        makeRequest(`http://localhost/api/noc/tickets/${TICKET_ID}`),
+        { params: { id: TICKET_ID } },
+      );
+      expect(response.status).toBe(401);
+    });
+
+    it('PUT /tickets/[id] returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
+      const response = await PUT(
+        makeRequest(`http://localhost/api/noc/tickets/${TICKET_ID}`, {
+          method: 'PUT',
+          body: JSON.stringify({ title: 'updated' }),
+          headers: { 'content-type': 'application/json' },
+        }),
+        { params: { id: TICKET_ID } },
+      );
+      expect(response.status).toBe(401);
+    });
+
+    it('DELETE /tickets/[id] returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
+      const response = await DELETE(
+        makeRequest(`http://localhost/api/noc/tickets/${TICKET_ID}`, { method: 'DELETE' }),
+        { params: { id: TICKET_ID } },
+      );
+      expect(response.status).toBe(401);
+    });
+
+    it('POST /tickets returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { POST } = await import('@/app/api/noc/tickets/route');
+      const response = await POST(
+        makeRequest('http://localhost/api/noc/tickets', {
+          method: 'POST',
+          body: JSON.stringify({ title: 'x', ticket_type: 'maintenance' }),
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+      expect(response.status).toBe(401);
     });
   });
 });
