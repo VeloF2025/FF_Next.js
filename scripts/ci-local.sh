@@ -224,14 +224,16 @@ else
 
   # Ratcheted rather than non-blocking, matching GHA. Previously any failure
   # was downgraded to a warning here, so a new broken test slipped through both
-  # this gate and CI. Baseline lives in scripts/test-ratchet.sh; a run that does
-  # not complete fails rather than passing silently.
+  # this gate and CI. Known failures live in scripts/known-test-failures.txt;
+  # a run that does not complete fails rather than passing silently.
+  # Full suite locally (unlike the PR job, which only runs affected tests) —
+  # this is the last gate before a deploy, so it should see everything.
   if bash "$(dirname "$0")/test-ratchet.sh" > /tmp/ci-tests.txt 2>&1; then
-    pass "$(grep -oE 'Unit tests: .*' /tmp/ci-tests.txt | head -1 || echo 'Unit tests: at or below baseline')"
-    grep -E 'Below baseline|MAX_FAILING' /tmp/ci-tests.txt | head -2 | sed 's/^/    /' || true
+    pass "Unit tests: no new failures"
+    grep -E 'now pass — delete them' /tmp/ci-tests.txt | head -1 | sed 's/^/    /' || true
   else
-    fail "Unit tests: regressed above baseline (or the run did not complete)"
-    grep -E 'failing (tests|files):|no summary line|FAIL ' /tmp/ci-tests.txt | head -12 | sed 's/^/    /'
+    fail "Unit tests: NEW failure(s), or the run did not complete"
+    grep -E 'NEW test failure|no summary line|^    [a-z]' /tmp/ci-tests.txt | head -12 | sed 's/^/    /'
   fi
 
   echo -e "\n${CYAN}── Gate 6: Build ──${NC}\n"

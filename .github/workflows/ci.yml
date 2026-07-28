@@ -14,7 +14,12 @@ jobs:
     name: Lint, type-check, unit tests
     runs-on: [self-hosted, linux, fibreflow]
     steps:
+      # fetch-depth: 0 so the PR job can diff against its base branch —
+      # `vitest --changed origin/<base>` needs that ref to exist locally, and
+      # the default shallow clone does not provide it.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -26,13 +31,29 @@ jobs:
         run: npm run type-check
         continue-on-error: true
 
-      # Ratcheted, NOT continue-on-error. The old step allowed any outcome
-      # through, so a failing test — or a run killed at the 5-minute cap —
-      # reported green. It had never once produced a real result: one test file
-      # deadlocked and the suite never terminated. The deadlock is fixed; this
-      # gate now fails on any NEW failure while tolerating the known ones.
-      # Baseline lives in scripts/test-ratchet.sh. The suite runs in ~40s; the
-      # cap is generous only because this runner is shared with production.
-      - name: Unit tests (ratchet gate)
+      # Ratcheted, NOT continue-on-error. The old step let any outcome through,
+      # so a failing test — or a run killed at the 5-minute cap — reported
+      # green. It had never once produced a real result: one test file
+      # deadlocked and the suite never terminated. The deadlock is fixed; these
+      # gates fail on any failure not in scripts/known-test-failures.txt.
+      #
+      # PRs run only the tests their diff affects; master runs everything. Note
+      # the trade-off this accepts: a regression in a test the diff does not
+      # reach is caught only after merge, on the master run. The whole suite
+      # takes ~40s, so the split buys little wall-clock — the ~7min of `npm ci`
+      # plus lint dominates either way.
+      #
+      # BASE_REF goes through env, never inlined into run: — a branch name is
+      # attacker-controlled on a fork PR and would otherwise be a shell
+      # injection vector.
+      - name: Unit tests — affected by this PR (ratchet gate)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash scripts/test-ratchet.sh --changed "origin/${BASE_REF}"
+        timeout-minutes: 15
+
+      - name: Unit tests — full suite (ratchet gate)
+        if: github.event_name != 'pull_request'
         run: bash scripts/test-ratchet.sh
         timeout-minutes: 15
