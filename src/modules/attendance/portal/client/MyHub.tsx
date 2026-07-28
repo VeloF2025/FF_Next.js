@@ -32,6 +32,7 @@ import {
   CorrectionsTile,
   StoresTile,
   SiteCamTile,
+  HsCheckinTile,
 } from './tiles';
 
 type HubSummary = HubSummaryResponse;
@@ -79,6 +80,31 @@ export function MyHub({ profile }: MyHubProps) {
       );
     }
   }, [vehicleHandoffPending]);
+
+  // Daily H&S check-in status. Loaded separately from hub-summary so a failure
+  // here degrades to a "Loading…" tile rather than blanking the whole hub.
+  const [hsCheckin, setHsCheckin] = React.useState<
+    { completed: boolean; clearance: string | null } | null
+  >(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/my/hs/checkin', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled || !j?.data) return;
+        setHsCheckin({
+          completed: Boolean(j.data.completed),
+          clearance: j.data.checkin?.clearance ?? null,
+        });
+      })
+      .catch(() => {
+        /* tile stays in its loading state; the hub itself must still render */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -132,6 +158,7 @@ export function MyHub({ profile }: MyHubProps) {
       {isPending ? (
         <div className="grid grid-cols-2 gap-3">
           <ClockTile summary={summary} onClick={() => router.push('/my/attendance')} />
+          <HsCheckinTile status={hsCheckin} onClick={() => router.push('/my/hs-checkin')} />
           {canSeeSiteCam(profile.role, profile.authRole, profile.accountStatus) && (
             <SiteCamTile onClick={() => router.push('/my/sitecam')} />
           )}
@@ -139,6 +166,7 @@ export function MyHub({ profile }: MyHubProps) {
       ) : (
         <div className="grid grid-cols-2 gap-3">
           <ClockTile summary={summary} onClick={() => router.push('/my/attendance')} />
+          <HsCheckinTile status={hsCheckin} onClick={() => router.push('/my/hs-checkin')} />
           <VehicleTile
             summary={summary}
             hasVehicle={profile.hasAssignedVehicle}
