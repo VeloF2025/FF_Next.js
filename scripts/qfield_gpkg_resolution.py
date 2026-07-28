@@ -270,10 +270,9 @@ def parse_mc_gpkg_names(mc_ls_output):
     without MinIO — fiddly string handling (spaces in names, a size token that is not
     always '0B') is exactly what silently returns [] and freezes an ingest.
 
-    Entries whose name contains a path separator are rejected: the name is
-    interpolated straight into a MinIO prefix, and a '/' would let a crafted key
-    address a different object. Non-recursive `mc ls` should never emit one, but the
-    guard means that assumption is enforced here rather than trusted.
+    Names containing a path separator are rejected: the name is interpolated straight
+    into a MinIO prefix, so a '/' could address a different object. Non-recursive
+    `mc ls` should never emit one; this enforces that rather than trusting it.
     """
     names = []
     for line in (mc_ls_output or "").split("\n"):
