@@ -75,7 +75,15 @@ run_suite() {
   # failure would have parsed as a new one. Stripping here rather than trusting
   # NO_COLOR/FORCE_COLOR to be honoured: the env vars are set above as well, but
   # the parser must not depend on a tool's colour heuristics.
-  sed -E "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" "$raw" > "$OUTPUT"
+  #
+  # The parameter class includes ?<>=! , not just digits and ';', so private-mode
+  # sequences are stripped too — `ESC[?25l` (cursor hide) would otherwise fail to
+  # match at all and pass through verbatim, landing inside an identifier and
+  # making a known failure look new. --reporter=basic does not emit those today,
+  # but a parser guarding a merge gate should not depend on that staying true.
+  # A literal ESC byte is required to start a match, so test names containing
+  # '[', '→' or other unicode can never be corrupted by this.
+  sed -E "s|$(printf '\033')\[[0-9;?<>=!]*[a-zA-Z]||g" "$raw" > "$OUTPUT"
 
   # A hung, killed or crashed run emits no summary. That MUST fail: treating a
   # missing summary as "no failures" is exactly how the old setup reported a
