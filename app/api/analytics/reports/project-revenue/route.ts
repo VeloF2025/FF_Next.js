@@ -24,9 +24,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
-import { verifyToken } from '@/lib/auth/jwt';
+import { requireAuth } from '@/lib/auth/app-router';
 import { userHasPermission } from '@/lib/permissions';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
 
@@ -105,16 +104,18 @@ function matchProject(name: string, pcNames: string[]): string | null {
   return prefix ?? null;
 }
 
-export async function GET(_req: NextRequest): Promise<NextResponse> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('ff_auth_token')?.value;
-  if (!token) return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Auth required' } }, { status: 401 });
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  // requireAuth resolves the user through a user_sessions JOIN (session row exists,
+  // token_hash matches, not expired, user still active). The previous preamble
+  // verified only the JWT signature, so a revoked session — including a revoked MCP
+  // token, whose JWT can be signed for up to a year — kept working here until the
+  // token expired on its own. See issue #2284.
+  const [user, unauth] = await requireAuth(req);
+  if (unauth) return unauth;
+  const userId = user.id;
 
-  const payload = await verifyToken(token);
-  if (!payload?.sub) return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } }, { status: 401 });
-
-  const hasAccess = await userHasPermission(payload.sub, 'analytics.reports', 'view');
-  if (!hasAccess && !ALLOWED_USERS.has(payload.sub)) {
+  const hasAccess = await userHasPermission(userId, 'analytics.reports', 'view');
+  if (!hasAccess && !ALLOWED_USERS.has(userId)) {
     return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access restricted' } }, { status: 403 });
   }
 
