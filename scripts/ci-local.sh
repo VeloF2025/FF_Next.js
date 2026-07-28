@@ -220,16 +220,18 @@ if [ "$MODE" = "--quick" ] || [ "$MODE" = "--pre-deploy" ]; then
   echo -e "\n${YELLOW}Skipped: tests + build (${MODE} mode)${NC}"
   SKIPPED=$((SKIPPED + 2))
 else
-  echo -e "\n${CYAN}── Gate 5: Unit Tests ──${NC}\n"
+  echo -e "\n${CYAN}── Gate 5: Unit Tests (ratchet) ──${NC}\n"
 
-  if npm test -- --run > /tmp/ci-tests.txt 2>&1; then
-    TEST_COUNT=$(grep -oP '\d+ passed' /tmp/ci-tests.txt | head -1 || echo "? passed")
-    pass "Unit tests: ${TEST_COUNT}"
+  # Ratcheted rather than non-blocking, matching GHA. Previously any failure
+  # was downgraded to a warning here, so a new broken test slipped through both
+  # this gate and CI. Baseline lives in scripts/test-ratchet.sh; a run that does
+  # not complete fails rather than passing silently.
+  if bash "$(dirname "$0")/test-ratchet.sh" > /tmp/ci-tests.txt 2>&1; then
+    pass "$(grep -oE 'Unit tests: .*' /tmp/ci-tests.txt | head -1 || echo 'Unit tests: at or below baseline')"
+    grep -E 'Below baseline|MAX_FAILING' /tmp/ci-tests.txt | head -2 | sed 's/^/    /' || true
   else
-    # Tests are non-blocking (pre-existing failures) but we report
-    TEST_FAIL=$(grep -oP '\d+ failed' /tmp/ci-tests.txt | head -1 || echo "? failed")
-    echo -e "${YELLOW}  ⚠ Unit tests: ${TEST_FAIL} (non-blocking)${NC}"
-    WARNED=$((WARNED + 1))
+    fail "Unit tests: regressed above baseline (or the run did not complete)"
+    grep -E 'failing (tests|files):|no summary line|FAIL ' /tmp/ci-tests.txt | head -12 | sed 's/^/    /'
   fi
 
   echo -e "\n${CYAN}── Gate 6: Build ──${NC}\n"

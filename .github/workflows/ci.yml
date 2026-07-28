@@ -26,7 +26,13 @@ jobs:
         run: npm run type-check
         continue-on-error: true
 
-      - name: Unit tests (non-blocking — pre-existing failures)
-        run: npm test -- --run --reporter=basic
-        continue-on-error: true
-        timeout-minutes: 5
+      # Ratcheted, NOT continue-on-error. The old step allowed any outcome
+      # through, so a failing test — or a run killed at the 5-minute cap —
+      # reported green. It had never once produced a real result: one test file
+      # deadlocked and the suite never terminated. The deadlock is fixed; this
+      # gate now fails on any NEW failure while tolerating the known ones.
+      # Baseline lives in scripts/test-ratchet.sh. The suite runs in ~40s; the
+      # cap is generous only because this runner is shared with production.
+      - name: Unit tests (ratchet gate)
+        run: bash scripts/test-ratchet.sh
+        timeout-minutes: 15

@@ -67,8 +67,17 @@ vi.mock('../../components/editor/forms', () => {
   };
 });
 
-// Mock timers for auto-save testing
-vi.useFakeTimers();
+// Mock timers for auto-save testing.
+//
+// `shouldAdvanceTime` is load-bearing, not a style choice. These tests await
+// testing-library's `waitFor`, which polls on a timer. With plain fake timers
+// installed and nothing advancing them, that poll can never fire, so `waitFor`
+// blocks forever: this file span at ~280% CPU and never terminated, which took
+// the whole suite with it. CI killed the run at its 5-minute cap and
+// `continue-on-error` reported the kill as success — so the unit-test step had
+// never once produced a real result. Auto-advancing lets `waitFor` resolve
+// while keeping fake timers for the auto-save assertions.
+vi.useFakeTimers({ shouldAdvanceTime: true });
 
 describe('WorkflowEditor Component', () => {
   const renderWithProvider = (templateId?: string) => {
@@ -94,7 +103,9 @@ describe('WorkflowEditor Component', () => {
   afterEach(() => {
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
-    vi.useFakeTimers();
+    // Must match the module-scope call above — a plain useFakeTimers() here
+    // would re-introduce the deadlock for every test after the first.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   describe('Initial Rendering', () => {
