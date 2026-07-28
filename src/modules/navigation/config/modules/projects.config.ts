@@ -30,6 +30,7 @@ import {
   GraduationCap,
   HeartPulse,
   BookOpen,
+  ShieldCheck,
   Megaphone,
   HardHat,
   FileCheck,
@@ -172,6 +173,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'Training',
           icon: GraduationCap,
           path: '/projects/health-safety/training',
+        },
+        {
+          id: 'checkins',
+          label: 'Daily Check-In',
+          icon: ShieldCheck,
+          path: '/projects/health-safety/checkins',
         },
         {
           id: 'medicals',

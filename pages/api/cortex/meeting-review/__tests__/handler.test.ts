@@ -74,7 +74,11 @@ vi.mock('@/lib/db-neon', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  // Both exports are needed. The module exposes `log` and `createLogger`, and a
+  // mock providing only `log` fails the file at collection time rather than
+  // failing a test, so the gap was invisible in the summary counts.
+  log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
 // Captured fetch calls (url + parsed body), so we can assert the upstream target.

@@ -13,6 +13,7 @@ import { DEFAULT_SCORING_CONFIG } from '../types/scoring.types';
 import { TRAINING_GATE_MINIMUM } from '../types/training.types';
 import { computeAndPersistContractorTrainingScore } from './trainingService';
 import { computeContractorMedicalSummary } from './medicalService';
+import { computeContractorCheckinSummary, sastToday } from './checkinService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -27,6 +28,7 @@ const sql = neon(process.env.DATABASE_URL!);
  * - Training compliance below 70%
  * - A worker whose latest medical says unfit, or whose Certificate of Fitness
  *   has lapsed
+ * - A worker blocked at today's daily site check-in and not yet cleared
  *
  * Gate warnings (can assign but flagged):
  * - Score below recommended (70%)
@@ -50,6 +52,11 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
   // Per-worker medical fitness (migration 463). Scored over each worker's
   // LATEST Certificate of Fitness — superseded certificates must not block.
   const medical = await computeContractorMedicalSummary(contractorId);
+
+  // Today's site check-ins (migration 465). Scoped to TODAY only: this is a
+  // daily control, so yesterday's blocked worker must not still be blocking
+  // the contractor today once they have declared fit again.
+  const checkins = await computeContractorCheckinSummary(contractorId, sastToday());
 
   // Get documents
   const documents = await getContractorDocuments(contractorId);
@@ -131,6 +138,27 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
   }
   if (medical.restricted > 0) {
     warnings.push(`${medical.restricted} worker(s) medically fit with restrictions`);
+  }
+
+  // Daily site check-in. A worker blocked at check-in and not yet cleared by an
+  // H&S officer is, by the definition of the check-in, not cleared to work.
+  if (checkins.blocked > 0) {
+    blockers.push(
+      `${checkins.blocked} worker(s) blocked at today's H&S check-in and not yet cleared`
+    );
+  }
+  // Independent of the blocker above (not `else if`): these describe different
+  // workers, so reporting one must not suppress the other.
+  if (checkins.medical_unverifiable > 0) {
+    warnings.push(
+      `${checkins.medical_unverifiable} unregistered worker(s) declared height/plant work — medical could not be verified`
+    );
+  }
+  if (checkins.overridden > 0) {
+    warnings.push(`${checkins.overridden} check-in(s) cleared by override today`);
+  }
+  if (checkins.hazards_reported > 0) {
+    warnings.push(`${checkins.hazards_reported} hazard(s) reported at check-in today`);
   }
 
   // Check audit due date
