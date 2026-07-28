@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import arcjet, { detectBot, fixedWindow, shield } from "@arcjet/next";
+import { SECRET_QUERY_PARAMS, wouldDenyApiRequest } from '@/lib/auth/apiPublicRoutes';
 
 // TODO: Re-enable Clerk middleware when ready for production
 
@@ -307,11 +308,49 @@ export async function middleware(request: NextRequest) {
       });
     }
 
+    // LOG-ONLY api-auth audit. Changes no behaviour: it records requests that a
+    // deny-by-default gate WOULD refuse, so the allowlist can be built from observed
+    // traffic rather than from reading code. Enforcement is a follow-up and must not be
+    // switched on until these logs are quiet for the routes we intend to keep.
+    //
+    // Placed AFTER the Arcjet decision on purpose. Bots and rate-limited callers are
+    // already refused above, and logging them here would both flood the log and poison
+    // the data — the allowlist must be built from traffic we actually intend to serve,
+    // not from what a scanner happened to probe.
+    //
+    // Why this exists: middleware does not enforce session auth, so every API route is
+    // opt-in. An audit on 2026-07-27 found 50 mutating App Router routes reachable with
+    // no credential — five of which served NOC ticket CRUD to anonymous callers in
+    // production until PR #2255.
+    // try/catch matches edgeLog's own convention above: nothing in the observability
+    // path may ever break a request. The helpers are pure string work today, but this
+    // is cheap insurance against a future edit that is not.
+    try {
+      if (wouldDenyApiRequest(pathname, { cookies: request.cookies, headers: request.headers, searchParams })) {
+        edgeLog('warn', 'api-auth-audit: anonymous request to non-public API route', {
+          auditMode: 'log-only',
+          method: request.method,
+          path: pathname,
+          mutating: request.method !== 'GET' && request.method !== 'HEAD',
+        });
+      }
+    } catch (err) {
+      edgeLog('warn', 'api-auth-audit: audit check failed (request unaffected)', {
+        path: pathname,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     // Log API requests
     edgeLog('info', 'API Request', {
       method: request.method,
       path: pathname,
-      query: Object.fromEntries(searchParams),
+      // Redacted: some routes carry their credential IN the query string
+      // (?vlmkey= for the VLM photo-proxy, ?secret= for several cron routes), so
+      // logging params verbatim writes live secrets into the app log on every call.
+      query: Object.fromEntries(
+        [...searchParams.entries()].map(([k, v]) => [k, SECRET_QUERY_PARAMS.has(k) ? '[redacted]' : v])
+      ),
       ip: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent')
     });

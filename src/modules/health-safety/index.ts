@@ -18,12 +18,12 @@ export * from './constants/sa-regulations';
 
 // Services
 export { calculateContractorHSScore } from './services/scoringService';
+export { checkContractorGate } from './services/gateService';
 export {
-  checkContractorGate,
   batchCheckGate,
   quickGateCheck,
   getBlockedContractors,
-} from './services/gateService';
+} from './services/gateQueries';
 
 // Components
 export { ProjectHSTab, AuditWizard } from './components';

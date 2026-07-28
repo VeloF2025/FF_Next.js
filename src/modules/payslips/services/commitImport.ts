@@ -117,10 +117,18 @@ export async function runCommitImport(
   const importPages = pages.filter((p) => planByPage.get(p.page) === 'import');
 
   // Validate amounts are parseable on every page that's actually being imported.
+  // Deductions is checked too: the INSERT below coalesces a null to 0, so an
+  // unparseable deductions value would otherwise write an inconsistent row
+  // (gross - 0 != net) and, on a re-import, overwrite a correct stored value
+  // with 0 via the `sameAmounts` comparison above.
   for (const p of importPages) {
-    if (p.totalEarningsCents === null || p.nettPayCents === null) {
+    if (
+      p.totalEarningsCents === null ||
+      p.nettPayCents === null ||
+      p.totalDeductionsCents === null
+    ) {
       throw new Error(
-        `page ${p.page} has unparseable amounts (earnings or nett missing) — skip it or fix the source PDF`
+        `page ${p.page} has unparseable amounts (earnings, deductions or nett missing) — skip it or fix the source PDF`
       );
     }
   }

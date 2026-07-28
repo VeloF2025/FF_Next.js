@@ -12,6 +12,7 @@ import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '../types/compliance.types';
 import { DEFAULT_SCORING_CONFIG } from '../types/scoring.types';
 import { TRAINING_GATE_MINIMUM } from '../types/training.types';
 import { computeAndPersistContractorTrainingScore } from './trainingService';
+import { computeContractorMedicalSummary } from './medicalService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -24,11 +25,14 @@ const sql = neon(process.env.DATABASE_URL!);
  * - Major/critical incidents in last 12 months
  * - Overall H&S score below minimum (50%)
  * - Training compliance below 70%
+ * - A worker whose latest medical says unfit, or whose Certificate of Fitness
+ *   has lapsed
  *
  * Gate warnings (can assign but flagged):
  * - Score below recommended (70%)
  * - Audit overdue
  * - Documents expiring soon
+ * - Medical certificates expiring soon, or workers fit only with restrictions
  */
 export async function checkContractorGate(contractorId: string): Promise<GateCheckResult> {
   const blockers: string[] = [];
@@ -42,6 +46,10 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
   // is persisted onto the compliance row for the dashboard. `training` is the
   // authoritative training figure for the rest of this check.
   const training = await computeAndPersistContractorTrainingScore(contractorId);
+
+  // Per-worker medical fitness (migration 463). Scored over each worker's
+  // LATEST Certificate of Fitness — superseded certificates must not block.
+  const medical = await computeContractorMedicalSummary(contractorId);
 
   // Get documents
   const documents = await getContractorDocuments(contractorId);
@@ -102,6 +110,27 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
     );
   } else if (training.expiring_certs > 0) {
     warnings.push(`${training.expiring_certs} training certificate(s) expiring soon`);
+  }
+
+  // Check per-worker medical fitness. No medical data at all does not block
+  // (same "absence is not evidence" rule the training score follows), but a
+  // worker who is on file as unfit, or whose certificate has lapsed, does —
+  // an expired legal fitness certificate is not a matter of degree.
+  if (medical.unfit > 0) {
+    blockers.push(`${medical.unfit} worker(s) medically unfit for duty`);
+  }
+  if (medical.expired > 0) {
+    blockers.push(`${medical.expired} expired medical certificate(s)`);
+  }
+  // Independent of the blocker above, not `else if`: expired and expiring-soon
+  // are different workers (separate COUNT(*) FILTER clauses), so suppressing the
+  // warning because someone else is already blocking discards real information
+  // the H&S officer needs in order to fix both.
+  if (medical.expiring_soon > 0) {
+    warnings.push(`${medical.expiring_soon} medical certificate(s) expiring soon`);
+  }
+  if (medical.restricted > 0) {
+    warnings.push(`${medical.restricted} worker(s) medically fit with restrictions`);
   }
 
   // Check audit due date
@@ -227,65 +256,4 @@ async function updateGateStatus(
       updated_at = NOW()
     WHERE contractor_id = ${contractorId}
   `;
-}
-
-/**
- * Batch check gate status for multiple contractors
- */
-export async function batchCheckGate(
-  contractorIds: string[]
-): Promise<Map<string, GateCheckResult>> {
-  const results = new Map<string, GateCheckResult>();
-
-  // Process in parallel for efficiency
-  await Promise.all(
-    contractorIds.map(async (id) => {
-      const result = await checkContractorGate(id);
-      results.set(id, result);
-    })
-  );
-
-  return results;
-}
-
-/**
- * Quick gate check - returns just pass/fail without full details
- */
-export async function quickGateCheck(contractorId: string): Promise<boolean> {
-  const compliance = await sql`
-    SELECT is_gate_approved FROM hs_contractor_compliance
-    WHERE contractor_id = ${contractorId}
-    LIMIT 1
-  `;
-
-  if (compliance.length === 0) {
-    // No compliance record - needs full check
-    const result = await checkContractorGate(contractorId);
-    return result.can_assign;
-  }
-
-  return compliance[0]!.is_gate_approved;
-}
-
-/**
- * Get contractors blocked by H&S gate
- */
-export async function getBlockedContractors(): Promise<
-  { contractor_id: string; company_name: string; blockers: string[] }[]
-> {
-  const rows = await sql`
-    SELECT
-      hcc.contractor_id,
-      c.company_name,
-      hcc.gate_blockers as blockers
-    FROM hs_contractor_compliance hcc
-    JOIN contractors c ON c.id = hcc.contractor_id
-    WHERE hcc.is_gate_approved = false
-    ORDER BY c.company_name
-  `;
-  return rows.map(r => ({
-    contractor_id: String(r.contractor_id),
-    company_name: String(r.company_name),
-    blockers: Array.isArray(r.blockers) ? r.blockers.map(String) : [],
-  }));
 }

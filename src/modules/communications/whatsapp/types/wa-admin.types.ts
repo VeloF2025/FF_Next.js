@@ -261,6 +261,53 @@ export interface WaMonitoredGroupInput {
 }
 
 // ============================================
+// Cloud Go-Live Readiness
+// ============================================
+
+export type WaProvider = 'bridge' | 'cloud';
+
+/** Presence of one Cloud credential — never carries the value itself. */
+export interface WaConfigPresence {
+  key: string;
+  present: boolean;
+}
+
+export interface WaReadiness {
+  provider: WaProvider;
+  cloudConfig: WaConfigPresence[];
+  cloudConfigured: boolean;
+}
+
+export interface WaProviderFlipInput {
+  provider: WaProvider;
+  /** Must be true — the server refuses an unconfirmed flip. */
+  confirm: true;
+}
+
+export interface WaProviderFlipResult {
+  provider: WaProvider;
+}
+
+/**
+ * Outcome of a Cloud test send. `ok` is the send result, not the HTTP result.
+ * `notConfigured` marks the "credentials incomplete" case specifically, so the
+ * UI can say so instead of showing a bare failure.
+ */
+export interface WaTestSendInput {
+  toPhone: string;
+  message?: string;
+}
+
+export interface WaTestSendResult {
+  ok: boolean;
+  channel: 'cloud' | 'waha';
+  providerMessageId?: string;
+  error?: string;
+  outcome?: 'DEFINITELY_REJECTED' | 'AMBIGUOUS';
+  notConfigured?: boolean;
+}
+
+// ============================================
 // Tab Types for UI
 // ============================================
-export type WaAdminTab = 'services' | 'chat' | 'send' | 'monitored' | 'groups' | 'templates' | 'logs' | 'settings';
+export type WaAdminTab = 'services' | 'chat' | 'send' | 'monitored' | 'groups' | 'templates' | 'logs' | 'settings' | 'golive';

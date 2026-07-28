@@ -23,12 +23,11 @@ import { join } from 'path';
 // deliberately absent: hs_man_hours has no pure `date` column (period_year /
 // period_month are integers), so it needs no cast.
 //
-// SCOPE: this ratchet covers the worker-facing H&S record tables only. The
-// contractor-compliance surface (hs_contractor_documents.issue_date/expiry_date,
-// also pure `date`) shares this bug family but is intentionally out of scope —
-// its columns feed JS gate-check comparisons (new Date(d.expiry_date) > new Date()),
-// so a naive ::text cast there could perturb classification. Tracked as a
-// separate follow-up; do NOT read this list as "all H&S dates are covered".
+// SCOPE: this ratchet originally covered the worker-facing H&S record tables
+// only. It now also covers the contractor-compliance surface
+// (hs_contractor_documents.issue_date/expiry_date, also pure `date`) — see
+// CONTRACTS and DISPLAY_ALIAS_CONTRACTS below for the display-vs-compare split
+// that surface requires.
 const CONTRACTS: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['pages/api/health-safety/training/records/index.ts', ['completed_date', 'expiry_date']],
   ['pages/api/health-safety/training/records/[recordId].ts', ['completed_date', 'expiry_date']],
@@ -40,7 +39,36 @@ const CONTRACTS: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['pages/api/health-safety/appointments/index.ts', ['appointment_date', 'effective_from']],
   ['pages/api/health-safety/appointments/[letterId].ts', ['appointment_date', 'effective_from']],
   ['pages/api/health-safety/injuries/index.ts', ['injury_date']],
-  ['pages/api/health-safety/project/[projectId]/safety-file.ts', ['appointment_date', 'effective_from']],
+  // safety-file.ts also casts the contractor-documents/risk-register pure date
+  // columns it pulls in (2026-07-26, safety-file full export): issue_date/
+  // expiry_date (hs_contractor_documents) and review_date (hs_risk_register).
+  // All are display-only in this export -- no JS gate compare here at all.
+  ['pages/api/health-safety/project/[projectId]/safety-file.ts', ['appointment_date', 'effective_from', 'issue_date', 'expiry_date', 'review_date']],
+
+  // Contractor documents: unlike the tables above, hs_contractor_documents
+  // rows also feed JS gate-check comparisons (new Date(d.expiry_date) > new
+  // Date()) elsewhere in these same files. `issue_date` never feeds a compare
+  // anywhere in this surface, so it's always safe to same-name-cast. `expiry_date`
+  // is same-name-cast ONLY in paths that are purely display (POST create's
+  // RETURNING, GET single document, PUT's UPDATE...RETURNING) — the paths where
+  // the raw `expiry_date` also feeds a gate compare use a *differently-named*
+  // `expiry_date_display` alias instead (see DISPLAY_ALIAS_CONTRACTS below). A
+  // same-name cast on a compare-feeding column would silently turn a timestamp
+  // compare into a date-only compare and is exactly the regression this ratchet
+  // exists to catch.
+  ['pages/api/health-safety/contractor/[contractorId]/documents.ts', ['issue_date', 'expiry_date']],
+  ['pages/api/health-safety/contractor/documents/[documentId].ts', ['issue_date', 'expiry_date']],
+];
+
+// Columns cast to text under a DIFFERENT name (`<col>_display`) because the
+// same query's raw `<col>` value is also consumed by a JS gate/classification
+// compare later in the same handler. Display code must read `<col>_display`,
+// not `<col>`, for these endpoints — the raw `<col>` stays a Date object so the
+// gate compare is byte-for-byte unchanged from before this fix.
+const DISPLAY_ALIAS_CONTRACTS: ReadonlyArray<readonly [string, readonly string[]]> = [
+  ['pages/api/health-safety/contractor/[contractorId]/compliance.ts', ['expiry_date']],
+  ['pages/api/health-safety/contractor/[contractorId]/documents.ts', ['expiry_date']],
+  ['pages/api/health-safety/contractor/[contractorId]/gate-check.ts', ['expiry_date']],
 ];
 
 // Matches `<col>::text AS <col>` allowing an optional table alias qualifier
@@ -49,11 +77,24 @@ function castRegex(col: string): RegExp {
   return new RegExp(`(?:\\w+\\.)?${col}::text\\s+AS\\s+${col}\\b`, 'i');
 }
 
+// Matches `<col>::text AS <col>_display` (the split-alias variant).
+function displayAliasRegex(col: string): RegExp {
+  return new RegExp(`(?:\\w+\\.)?${col}::text\\s+AS\\s+${col}_display\\b`, 'i');
+}
+
 describe('H&S pure-date columns are cast to text for display', () => {
   for (const [rel, cols] of CONTRACTS) {
     it(`${rel} casts ${cols.join(', ')} to ::text`, () => {
       const src = readFileSync(join(process.cwd(), rel), 'utf8');
       const missing = cols.filter((c) => !castRegex(c).test(src));
+      expect(missing).toEqual([]);
+    });
+  }
+
+  for (const [rel, cols] of DISPLAY_ALIAS_CONTRACTS) {
+    it(`${rel} casts ${cols.join(', ')} to a _display alias (gate compare stays on the raw column)`, () => {
+      const src = readFileSync(join(process.cwd(), rel), 'utf8');
+      const missing = cols.filter((c) => !displayAliasRegex(c).test(src));
       expect(missing).toEqual([]);
     });
   }
