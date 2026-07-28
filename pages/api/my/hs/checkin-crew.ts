@@ -1,4 +1,5 @@
 /**
+ * GET  /api/my/hs/checkin-crew — bootstrap lists for the crew check-in form
  * POST /api/my/hs/checkin-crew — a crew lead records today's declaration for a
  * subcontractor crew in one submission.
  *
@@ -38,6 +39,7 @@ import {
   findCrewNamesAlreadyCheckedIn,
   classifyTeamMembers,
 } from '@/modules/health-safety/services/checkinCrewWrite';
+import { loadCrewBootstrap } from '@/modules/health-safety/services/checkinCrewBootstrap';
 import { CHECKIN_ACTIVITIES } from '@/modules/health-safety/types/checkin.types';
 
 export const config = { api: { bodyParser: { sizeLimit: '64kb' } } };
@@ -52,8 +54,8 @@ interface CrewMemberInput {
 }
 
 export default withMySession(async (req, res, session) => {
-  if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
   }
 
   const today = sastWorkDate(new Date());
@@ -61,7 +63,8 @@ export default withMySession(async (req, res, session) => {
   try {
     // Only a supervisor or admin may attest for other people. `supervisor` is
     // a valid staff.role in the DB constraint even though nobody holds it yet —
-    // assigning it is an admin action, not a schema change.
+    // assigning it is an admin action, not a schema change. The gate covers
+    // GET too: the roster of every contractor's workers is not a general read.
     const [me] = await sql<{ role: string | null }>`
       SELECT role FROM staff WHERE id = ${session.staffId} LIMIT 1
     `;
@@ -70,6 +73,15 @@ export default withMySession(async (req, res, session) => {
         res,
         'Only a supervisor or admin can submit a crew check-in'
       );
+    }
+
+    if (req.method === 'GET') {
+      const bootstrap = await loadCrewBootstrap(session.staffId, today);
+      return apiResponse.success(res, {
+        checkin_date: today,
+        activities: Object.values(CHECKIN_ACTIVITIES),
+        ...bootstrap,
+      });
     }
 
     const body = req.body ?? {};

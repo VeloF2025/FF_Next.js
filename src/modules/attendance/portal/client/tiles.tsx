@@ -16,6 +16,7 @@ import {
   Package,
   Camera,
   ShieldCheck,
+  Users,
 } from 'lucide-react';
 
 import type { HubSummaryResponse } from './api';
@@ -255,6 +256,36 @@ export function HsCheckinTile({
           ? 'bg-red-500/15 text-red-300 border-red-500/30'
           : 'bg-orange-500/15 text-orange-300 border-orange-500/30'
       }
+    />
+  );
+}
+
+/**
+ * Crew H&S check-in — supervisors/admins only (MyHub gates on profile.role;
+ * the API enforces the same gate server-side). `recordedToday` is null while
+ * loading OR when the status fetch failed: the tile still renders and the
+ * page itself will explain any problem — fail-open, like the hub itself.
+ */
+export function HsCrewCheckinTile({
+  recordedToday,
+  onClick,
+}: {
+  recordedToday: number | null;
+  onClick: () => void;
+}) {
+  return (
+    <Tile
+      onClick={onClick}
+      icon={<Users className="w-5 h-5" />}
+      iconClass="bg-orange-500/15 text-orange-300"
+      title="Crew check-in"
+      subtitle={
+        recordedToday != null && recordedToday > 0
+          ? `${recordedToday} recorded today`
+          : 'Record your crew’s H&S declaration'
+      }
+      badge={recordedToday != null && recordedToday > 0 ? String(recordedToday) : null}
+      badgeClass="bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
     />
   );
 }

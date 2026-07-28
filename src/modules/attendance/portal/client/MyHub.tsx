@@ -33,6 +33,7 @@ import {
   StoresTile,
   SiteCamTile,
   HsCheckinTile,
+  HsCrewCheckinTile,
 } from './tiles';
 
 type HubSummary = HubSummaryResponse;
@@ -106,6 +107,31 @@ export function MyHub({ profile }: MyHubProps) {
     };
   }, []);
 
+  // Crew check-in tile data — supervisors/admins only. Fail-open like the
+  // self check-in tile above: a failed fetch leaves the default subtitle, it
+  // never blanks the tile or the hub.
+  const canCrewCheckin = profile.role === 'supervisor' || profile.role === 'admin';
+  const [crewRecordedToday, setCrewRecordedToday] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!canCrewCheckin) return;
+    let cancelled = false;
+    fetch('/api/my/hs/checkin-crew', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled || !j?.data) return;
+        setCrewRecordedToday(
+          typeof j.data.recorded_today === 'number' ? j.data.recorded_today : 0
+        );
+      })
+      .catch(() => {
+        /* tile keeps its default subtitle; the hub itself must still render */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canCrewCheckin]);
+
   React.useEffect(() => {
     let cancelled = false;
     getHubSummary()
@@ -167,6 +193,12 @@ export function MyHub({ profile }: MyHubProps) {
         <div className="grid grid-cols-2 gap-3">
           <ClockTile summary={summary} onClick={() => router.push('/my/attendance')} />
           <HsCheckinTile status={hsCheckin} onClick={() => router.push('/my/hs-checkin')} />
+          {canCrewCheckin && (
+            <HsCrewCheckinTile
+              recordedToday={crewRecordedToday}
+              onClick={() => router.push('/my/hs-checkin-crew')}
+            />
+          )}
           <VehicleTile
             summary={summary}
             hasVehicle={profile.hasAssignedVehicle}

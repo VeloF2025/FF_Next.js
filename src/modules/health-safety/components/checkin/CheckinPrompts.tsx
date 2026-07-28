@@ -51,6 +51,44 @@ export function YesNo({
   );
 }
 
+export interface CheckinActivityOption {
+  value: string;
+  label: string;
+  requires_medical: boolean;
+}
+
+/** The "what will you/they do today" multi-select, shared by self and crew. */
+export function ActivityPicker({
+  options,
+  selected,
+  onChange,
+}: {
+  options: CheckinActivityOption[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {options.map((a) => (
+        <label key={a.value} className="flex items-center gap-3 text-sm text-neutral-200">
+          <input
+            type="checkbox"
+            className="w-4 h-4"
+            checked={selected.includes(a.value)}
+            onChange={(e) =>
+              onChange(
+                e.target.checked ? [...selected, a.value] : selected.filter((v) => v !== a.value)
+              )
+            }
+          />
+          {a.label}
+          {a.requires_medical && <span className="text-xs text-neutral-500">needs a medical</span>}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 const BLOCK_REASON_TEXT: Record<string, string> = {
   self_declared_unfit: 'You told us you are not fit for duty',
   medical_not_current: 'No current Certificate of Fitness for the work you selected',
