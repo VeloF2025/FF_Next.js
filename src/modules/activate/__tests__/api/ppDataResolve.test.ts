@@ -134,3 +134,46 @@ describe('runLocalResolution — dead source removal', () => {
     expect(issuedQueries().some((q) => q.includes('arch_offline_devices'))).toBe(false);
   });
 });
+
+// Both of these sources referenced a column that does not exist, so every run
+// threw and matchSource swallowed it — neither had ever resolved anything. The
+// column names are pinned here because the failure mode is silent: the query
+// only breaks at runtime, against a database no unit test connects to.
+describe('runLocalResolution — column names that must match the live schema', () => {
+  // Assert on executable SQL only. The statements carry `--` comments that
+  // quote the old broken column names on purpose, and matching those would
+  // make these tests pass or fail on prose rather than on the query.
+  function withoutSqlComments(sql: string): string {
+    return sql
+      .split('\n')
+      .filter((line) => !/^\s*--/.test(line))
+      .join('\n');
+  }
+  function onemapQuery(): string {
+    return withoutSqlComments(issuedQueries().find((q) => q.includes('FROM onemap_properties')) ?? '');
+  }
+  function fotoQuery(): string {
+    return withoutSqlComments(issuedQueries().find((q) => q.includes('FROM foto_ai_reviews')) ?? '');
+  }
+
+  it('reads onemap_properties.pole_number, never a bare op.pole', async () => {
+    await runLocalResolution();
+    expect(onemapQuery()).toContain('op.pole_number');
+    // `op.pole,` / `op.pole)` — the broken form. op.pole_number must not match.
+    expect(onemapQuery()).not.toMatch(/op\.pole(?!_number)/);
+  });
+
+  it('reads foto_ai_reviews.dr_number, never fr.drop_number', async () => {
+    await runLocalResolution();
+    expect(fotoQuery()).toContain('fr.dr_number');
+    expect(fotoQuery()).not.toContain('fr.drop_number');
+  });
+
+  // dr_number carries placeholders like 'TEST_1765038691267'. Without this
+  // guard the column fix alone would start writing them into
+  // resolved_drop_number — worse than leaving the serial unresolved.
+  it('only accepts a real DR from foto_ai_reviews', async () => {
+    await runLocalResolution();
+    expect(fotoQuery()).toContain("fr.dr_number ~ '^DR[0-9]+$'");
+  });
+});

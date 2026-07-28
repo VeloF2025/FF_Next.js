@@ -224,7 +224,11 @@ export async function runLocalResolution(): Promise<{
     SET resolution_status = 'located_onemap',
         resolved_drop_number = op.drop_number,
         resolved_source = 'onemap_properties',
-        resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
+        -- op.pole_number, not op.pole: the column has always been pole_number,
+        -- so this statement threw "column op.pole does not exist" on every run
+        -- and was swallowed by matchSource's catch. This source has never
+        -- resolved anything.
+        resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole_number),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM onemap_properties op
     WHERE UPPER(TRIM(op.ont_barcode)) = UPPER(TRIM(pp.serial_number))
@@ -270,7 +274,11 @@ export async function runLocalResolution(): Promise<{
   matchedLocal += await matchSource('foto_ai_reviews', 'located_local', `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_local',
-        resolved_drop_number = fr.drop_number,
+        -- fr.dr_number, not fr.drop_number: the column has always been
+        -- dr_number, so this statement threw "column fr.drop_number does not
+        -- exist" on every run and was swallowed. This source has never resolved
+        -- anything either.
+        resolved_drop_number = fr.dr_number,
         resolved_source = 'foto_ai_reviews',
         resolved_details = jsonb_build_object(
           'matched_field', CASE
@@ -281,6 +289,12 @@ export async function runLocalResolution(): Promise<{
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM foto_ai_reviews fr
     WHERE (UPPER(TRIM(fr.vlm_ont_serial_step6)) = UPPER(TRIM(pp.serial_number)) OR UPPER(TRIM(fr.vlm_ont_serial_step9)) = UPPER(TRIM(pp.serial_number)))
+      -- Real DR only. This column carries placeholders — 'TEST_1765038691267'
+      -- and similar — and without this guard the first run after the column fix
+      -- would write one into resolved_drop_number, which is worse than leaving
+      -- the serial not_found. Same trap loeks_field_mappings already guards
+      -- against ('DR NEEDED', 'ACTIVATION NEEDED').
+      AND fr.dr_number ~ '^DR[0-9]+$'
       AND pp.resolution_status = 'not_found'
   `);
 
