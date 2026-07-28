@@ -9,6 +9,17 @@ on:
 permissions:
   contents: read
 
+# The runner is self-hosted and single-concurrency, so without this every push
+# to a PR queued another full run and none of the superseded ones were
+# cancelled — four pushes produced a 40-minute backlog, with later PRs waiting
+# behind runs whose commits no longer existed.
+#
+# Superseded PR runs are cancelled; master runs never are, since every commit
+# that lands on master must be tested on its own.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ci:
     name: Lint, type-check, unit tests
