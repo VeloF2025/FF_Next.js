@@ -41,3 +41,33 @@ export function resolveSmtpTransportSecurity(
     secure: secureEnv === 'true' || port === IMPLICIT_TLS_PORT,
   };
 }
+
+/** Minimal surface we use from a nodemailer transport. */
+export interface SmtpTransport {
+  sendMail: (message: Record<string, unknown>) => Promise<unknown>;
+}
+
+/**
+ * Build a nodemailer transport from the SMTP_* env, or return null when SMTP is
+ * not configured. Callers must treat null as "cannot send" rather than assuming
+ * success — a mailer that reports success without sending is worse than none.
+ *
+ * nodemailer is required lazily so it never has to resolve in a client bundle.
+ */
+export function createSmtpTransport(): SmtpTransport | null {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) return null;
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const nodemailer = require(/* webpackIgnore: true */ 'nodemailer');
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    ...resolveSmtpTransportSecurity(),
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: {
+      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
+    },
+  });
+}
