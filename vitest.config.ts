@@ -32,9 +32,11 @@ export default defineConfig({
       'tests/api/contractors/rag.test.ts',
       'tests/api/contractors/teams.test.ts',
       // Same class as tests/db/** above, just living outside that directory:
-      // each throws at module load when TEST_DATABASE_URL is unset, and each
-      // builds a real pg.Pool inside vi.hoisted, so they cannot be skipped
-      // gracefully either — the pool is constructed before any test runs.
+      // each throws at module load when TEST_DATABASE_URL is unset, before any
+      // describe/it runs, and each constructs a real pg.Pool at module scope
+      // (inside vi.hoisted in reports-scope and reports-scope-xlsx, as a plain
+      // top-level const in the other four). Either way the pool is built before
+      // any test executes, so they cannot be skipped gracefully.
       // Excluding them stops six files failing collection on every unit run;
       // set TEST_DATABASE_URL and target them directly to run them.
       'pages/api/snags/__tests__/reports-scope.test.ts',
@@ -43,19 +45,40 @@ export default defineConfig({
       'src/modules/construction-qa/services/reportNumberGenerator.test.ts',
       'tests/migrations/358_snag_reports_scope.test.ts',
       'tests/migrations/378_rbac_field_stock_force_correct.test.ts',
-      // Stale: these describe code that has since changed underneath them, so
-      // they are noise rather than signal. Excluded with the diagnosis recorded
-      // so picking them up again does not start from zero.
-      //   TemplateList — uses jest.* (undefined under vitest), and every
-      //   assertion targets data-testid / copy that TemplateList.tsx does not
-      //   contain; the component has no data-testid attributes at all. Needs
-      //   the syntax converted AND all 25 assertions rewritten.
+      // Not runnable as written. Excluded with the diagnosis recorded so that
+      // picking them up does not start from zero.
+      //
+      //   TemplateList — written for jest, which is not a dependency of this
+      //   repo at all (no `jest` in package.json, no jest.config anywhere; only
+      //   jest-axe). So this was likely never runnable under any runner wired
+      //   into this project, rather than having gone stale after a refactor.
+      //   Beyond the syntax, the file contradicts the component wholesale:
+      //   TemplateList.tsx has zero data-testid attributes, exposes only
+      //   onTemplateSelect / onTemplateEdit / selectedTemplateId, has no
+      //   category/status/sort dropdowns, no "No workflow templates found"
+      //   copy, no "Create New Template" button, and uses confirm() rather than
+      //   a delete modal. 31 it() blocks and 69 expect() calls, nearly all
+      //   asserting against UI that does not exist. Needs a rewrite, not a fix.
       'src/modules/workflow/__tests__/components/TemplateList.test.tsx',
-      //   returns-create-hardening — its @/lib/db mock is missing `pool`, and
-      //   underneath that the handler now derives the role from a staff row it
-      //   queries (staffRow.auth_role via isReturnCreator), while the tests
-      //   still set req.user.role and never stub that lookup, so all 11 return
-      //   403/500. Needs the mock completed AND each case restubbed.
+      //
+      //   returns-create-hardening — three layers, and the first is what
+      //   actually breaks it:
+      //     1. _create.ts calls the real promoteSerial(txn.client, …) inside
+      //        transaction(). The test's txn stub has no `client`, so it throws
+      //        on client.query('BEGIN') and the first case 500s.
+      //     2. That case consumes only 2 of its 5 queued mockResolvedValueOnce
+      //        values. vi.clearAllMocks() clears call history but NOT queued
+      //        one-shot return values, so the 3 leftovers bleed into the next
+      //        test, corrupt its staffRow, and cascade as 403s through the rest
+      //        of the file.
+      //     3. Its @/lib/db mock is also missing `pool` — a traceable
+      //        regression: a8794e967 removed pool/default as "false signal"
+      //        when the handler only imported sql, then 713195767 added
+      //        transaction() to _create.ts without updating the mock.
+      //   The staff-row lookup IS stubbed correctly; the 403s are downstream of
+      //   (1) and (2), not a role-derivation bug. Needs promoteSerial mocked or
+      //   the txn stub given a client, plus per-test stub queues that cannot
+      //   bleed.
       'tests/api/procurement/field-stock/returns-create-hardening.test.ts',
     ],
     testTimeout: 10000,
