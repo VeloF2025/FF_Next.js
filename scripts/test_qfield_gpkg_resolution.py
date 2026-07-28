@@ -268,6 +268,25 @@ def main():
     check("no registered project redirects onto a newer neighbour",
           not any("wrongly redirected" in f for f in _FAILURES))
 
+    print("\nThe POP 1 hazard, end-to-end through its REAL listing:")
+    # GPKG_LISTINGS stays honest — POP 1 holds 'Poles drag and drop.shp/.dbf/.prj/.shx',
+    # not yet a .gpkg. So inject the export that would create the collision rather than
+    # pretending the fixture already contains it, and prove the resolver holds.
+    pop1 = versions_for("Thembisa POP 1")
+    pop1["Poles drag and drop.gpkg"] = V_NEW   # the QGIS "export to GeoPackage"
+    pop1["Poles HLD.gpkg"] = V_NEW             # the shape THM POP 3 already carries
+    chosen, _ = pick_latest_gpkg("Poles.gpkg", pop1)
+    check("a newer 'Poles drag and drop.gpkg' does NOT capture 'Poles.gpkg'",
+          chosen == "Poles.gpkg")
+    check("neither does a newer 'Poles HLD.gpkg'", chosen != "Poles HLD.gpkg")
+    check("and neither joins the family at all",
+          set(family_members("Poles.gpkg", pop1)) == {"Poles.gpkg"})
+    # The same project must still accept a genuine, version-stamped rename.
+    pop1_renamed = dict(pop1)
+    pop1_renamed["Poles updated_28_07.gpkg"] = V_NEW
+    check("but a version-stamped 'Poles updated_28_07.gpkg' IS followed",
+          pick_latest_gpkg("Poles.gpkg", pop1_renamed)[0] == "Poles updated_28_07.gpkg")
+
     print("\nUnresolvable ALTERNATE_GPKGS stay unresolved (not silently adopted):")
     for project, configured in REGISTERED_MISSING:
         listing = versions_for(project)
@@ -357,6 +376,15 @@ def main():
                                "last_version": "weird"}], UP, 3.0) == [])
     check("empty input → no flags", select_stale_gpkgs([], UP, 3.0) == [])
     check("None input → no flags", select_stale_gpkgs(None, UP, 3.0) == [])
+    # Pin the comparison as strictly-greater. Exactly-at-threshold must NOT flag, or
+    # `--stale-days 3` would mean "3 or more" and every boundary run would alert.
+    # A `>` → `>=` slip is otherwise invisible: no other fixture lag lands on 3.0.
+    boundary = [{"qf_uuid": "projA", "gpkg_path": "Edge.gpkg",
+                 "last_version": "v20260724145324-a"}]
+    check("lag exactly == stale_days does NOT flag (strictly greater)",
+          select_stale_gpkgs(boundary, {"projA": "2026-07-27 14:53:24+00"}, 3.0) == [])
+    check("a hair over the threshold DOES flag",
+          len(select_stale_gpkgs(boundary, {"projA": "2026-07-27 15:53:24+00"}, 3.0)) == 1)
 
     print("\nparse_mc_gpkg_names — `mc ls` output parsing:")
     MC_OUT = (
