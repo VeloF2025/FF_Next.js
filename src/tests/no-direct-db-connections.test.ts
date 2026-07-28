@@ -58,13 +58,19 @@ describe('No Direct Database Connections', () => {
       }
     }
     
-    // Check if file is in allowed list. An entry containing '/' is matched as a
-    // path suffix so it exempts exactly one file; a bare filename still matches
-    // by basename, preserving the original entries above.
+    // Check if file is in allowed list. An entry containing '/' is matched
+    // against the path RELATIVE TO src/, exactly — not as a suffix. `endsWith`
+    // would have exempted any deeper path ending the same way (a hypothetical
+    // src/vendor/modules/receipts/queries.ts), which is a subtler version of
+    // the basename hole this replaced. A bare filename still matches by
+    // basename, preserving the original entries above.
     const normalised = filePath.replace(/\\/g, '/');
+    const relative = normalised.startsWith(srcDir.replace(/\\/g, '/') + '/')
+      ? normalised.slice(srcDir.replace(/\\/g, '/').length + 1)
+      : normalised;
     const fileName = normalised.split('/').pop() || '';
     return allowedFiles.some((allowed) =>
-      allowed.includes('/') ? normalised.endsWith(allowed) : fileName === allowed
+      allowed.includes('/') ? relative === allowed : fileName === allowed
     );
   }
 
