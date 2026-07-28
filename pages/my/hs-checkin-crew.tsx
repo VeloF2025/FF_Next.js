@@ -106,9 +106,8 @@ const HsCheckinCrewPage: NextPage & { getLayout?: (p: React.ReactElement) => Rea
   }, []);
 
   // A member registered to a DIFFERENT contractor would be refused by the
-  // server, so it is not offered. NULL contractor_id stays selectable — the
-  // link is absent from the register, not contradicted (today that is all 65
-  // live rows; the server records these as contractor_link_unverified).
+  // server, so it is not offered. NULL contractor_id stays selectable (today:
+  // every live row) — the server records these as contractor_link_unverified.
   const rosterForContractor = contractorId
     ? roster.filter((m) => !m.contractor_id || m.contractor_id === contractorId)
     : [];
