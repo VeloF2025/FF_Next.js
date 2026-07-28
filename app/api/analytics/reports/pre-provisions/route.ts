@@ -59,14 +59,14 @@ export interface PreProvisionsData {
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
-  // requireAuth resolves the user through a user_sessions JOIN (session row exists,
-  // token_hash matches, not expired, user still active). The previous preamble
-  // verified only the JWT signature, so a revoked session — including a revoked MCP
-  // token, whose JWT can be signed for up to a year — kept working here until the
-  // token expired on its own. See issue #2284.
-  const [user, unauth] = await requireAuth(req);
-  if (unauth) return unauth;
-  const userId = user.id;
+    // requireAuth resolves the user through a user_sessions JOIN (session row exists,
+    // token_hash matches, not expired, user still active). The previous preamble
+    // verified only the JWT signature, so a revoked session — including a revoked MCP
+    // token, whose JWT can be signed for up to a year — kept working here until the
+    // token expired on its own. See issue #2284.
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+    const userId = user.id;
 
     const hasAccess = await userHasPermission(userId, 'analytics.reports', 'view');
     if (!hasAccess && !ALLOWED_USERS.has(userId)) {

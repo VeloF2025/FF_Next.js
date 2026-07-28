@@ -96,7 +96,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const buFilter = req.nextUrl.searchParams.get('businessUnit') ?? '';
   const projFilter = req.nextUrl.searchParams.get('project') ?? '';
 
-  logger.info('COS breakdown requested', { userId: userId, buFilter, projFilter });
+  logger.info('COS breakdown requested', { userId, buFilter, projFilter });
 
   try {
     const { values } = await getWorksheetRange('Data');
