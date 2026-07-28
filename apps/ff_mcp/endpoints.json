@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-25T19:36:49.890Z",
+  "generatedAt": "2026-07-28T08:51:32.312Z",
   "routes": [
     {
       "path": "/api/action-items",
@@ -1116,6 +1116,14 @@
       "description": "WhatsApp Phone Number API"
     },
     {
+      "path": "/api/communications/whatsapp/readiness",
+      "methods": [
+        "GET"
+      ],
+      "group": "communications",
+      "description": "WhatsApp Cloud go-live readiness (read-only)"
+    },
+    {
       "path": "/api/communications/whatsapp/services/:service/pairing-status",
       "methods": [
         "GET"
@@ -1486,8 +1494,7 @@
     {
       "path": "/api/cortex-remote-mcp/:path*",
       "methods": [
-        "GET",
-        "HEAD"
+        "GET"
       ],
       "group": "cortex-remote-mcp"
     },
@@ -2442,12 +2449,44 @@
       "description": "H&S Injuries API"
     },
     {
+      "path": "/api/health-safety/library",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Safety Library API"
+    },
+    {
+      "path": "/api/health-safety/library/:libraryId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Safety Library entry detail API"
+    },
+    {
       "path": "/api/health-safety/man-hours",
       "methods": [
         "GET"
       ],
       "group": "health-safety",
       "description": "H&S Man-Hours API"
+    },
+    {
+      "path": "/api/health-safety/medicals",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Worker Medical Fitness API"
+    },
+    {
+      "path": "/api/health-safety/medicals/:medicalId",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S Worker Medical Fitness detail API"
     },
     {
       "path": "/api/health-safety/permits",
