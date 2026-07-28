@@ -340,10 +340,18 @@ export async function runLocalResolution(): Promise<{
   // olt_serial — the order the old CASE expression implied but could not
   // guarantee, since an OR join picks an arbitrary matching row.
   //
-  // `column` is a compile-time union, never caller input, so interpolating it
-  // into the statement carries no injection surface.
-  type OfflineSerialColumn = 'serial_number' | 'expected_serial' | 'olt_serial';
-  const offlineDevicesMatch = (column: OfflineSerialColumn): string => `
+  // `column` is a compile-time union fed only from the literal list below, so
+  // interpolating it carries no injection surface today. The runtime check is
+  // deliberate defence-in-depth: types vanish at runtime, and a later edit that
+  // widens the union or routes caller input through this helper would otherwise
+  // turn a safe string build into an injection point with nothing to catch it.
+  const OFFLINE_SERIAL_COLUMNS = ['serial_number', 'expected_serial', 'olt_serial'] as const;
+  type OfflineSerialColumn = (typeof OFFLINE_SERIAL_COLUMNS)[number];
+  const offlineDevicesMatch = (column: OfflineSerialColumn): string => {
+    if (!OFFLINE_SERIAL_COLUMNS.includes(column)) {
+      throw new Error(`Refusing to build offline_devices query for unknown column: ${column}`);
+    }
+    return `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_local',
         resolved_drop_number = od.drop_number,
@@ -358,7 +366,8 @@ export async function runLocalResolution(): Promise<{
       AND od.drop_number IS NOT NULL
       AND pp.resolution_status = 'not_found'
   `;
-  for (const column of ['serial_number', 'expected_serial', 'olt_serial'] as const) {
+  };
+  for (const column of OFFLINE_SERIAL_COLUMNS) {
     matchedLocal += await matchSource('offline_devices', 'located_local', offlineDevicesMatch(column));
   }
 
@@ -1656,7 +1665,15 @@ async function handler(
           gps_updated: gps,
           steps: {
             eod_scan: eodResult,
-            local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
+            // `failures` rides along here too: resolve-all is the action the
+            // UI's "Resolve All" button calls, so dropping it would leave the
+            // caller blind to a source that could not run — the exact silence
+            // this field exists to remove.
+            local_scan: {
+              resolved: localResult.total_resolved,
+              sources: localResult.sources,
+              failures: localResult.failures,
+            },
             wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
             wa_photo_vlm: { resolved: vlmResult.total_pp_matched, photos_processed: vlmResult.total_vlm_processed, drs_scanned: vlmResult.drs_scanned },
             wa_message_scan: msgScanResult,
