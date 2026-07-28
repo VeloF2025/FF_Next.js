@@ -15,9 +15,41 @@ LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
 CRON_SECRET="ad2bd65646c1e1242ade2bbcf0b0a684c3cce0c53f2684e8369d7bb9bc27a3d7"
 PROD_URL="http://localhost:3000"
 
-# Load DATABASE_URL from .env.local for the SharePoint Python script
-if [ -f "$PROJECT_DIR/.env.local" ]; then
-  export DATABASE_URL=$(grep '^DATABASE_URL=' "$PROJECT_DIR/.env.local" | cut -d= -f2-)
+# Load DATABASE_URL for the Python/psql steps. Try .env.local then .env: the two deploy
+# dirs disagree about which one holds it — fibreflow-dev keeps DATABASE_URL in
+# .env.local, fibreflow-production keeps it in .env — so an .env.local-only read made
+# this script silently unusable from prod. It exported an EMPTY string and carried on,
+# so every psql call failed with a confusing connection error instead of naming the
+# real problem.
+#
+# UNREADABLE is reported separately from ABSENT: if an ACL change makes an env file
+# unreadable to the cron user, "not found" would send someone hunting for a missing
+# key that is actually right there.
+DB_AVAILABLE=true
+if [ -z "${DATABASE_URL:-}" ]; then
+  for envfile in "$PROJECT_DIR/.env.local" "$PROJECT_DIR/.env"; do
+    [ -e "$envfile" ] || continue
+    if [ ! -r "$envfile" ]; then
+      echo "$LOG_PREFIX WARNING: $envfile exists but is not readable by $(id -un)" >&2
+      continue
+    fi
+    # Strip only WRAPPING quotes — `tr -d '"'` would silently mangle a password
+    # containing a literal quote. `cut -f2-` keeps any '=' inside the value.
+    val=$(grep -m1 '^DATABASE_URL=' "$envfile" | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/' || true)
+    if [ -n "$val" ]; then
+      export DATABASE_URL="$val"
+      break
+    fi
+  done
+fi
+if [ -z "${DATABASE_URL:-}" ]; then
+  # Do NOT exit. Steps 1 and 3 are curl calls against a running server that has its own
+  # DB connection and never read this variable — aborting here would turn a config gap
+  # into a full outage of an ingest path that would have succeeded. Skip only the steps
+  # that genuinely need it, matching the per-step "FAILED — continuing" fault isolation
+  # the rest of this script already uses.
+  echo "$LOG_PREFIX ERROR: DATABASE_URL not found in $PROJECT_DIR/.env.local or .env — skipping DB-dependent steps (0, 2, 3-query)" >&2
+  DB_AVAILABLE=false
 fi
 
 echo "$LOG_PREFIX === QA Ingest Cron Start ==="
@@ -25,11 +57,15 @@ echo "$LOG_PREFIX === QA Ingest Cron Start ==="
 # ── 0. GPKG Photo Extraction ─────────────────────────────────────────────────
 # Extract photo references from QFieldCloud GPKGs into qfield_photo_validations
 # with proper feature_id and checklist_step assignments from GPKG columns.
-echo "$LOG_PREFIX [GPKG] Extracting photo references from GPKGs..."
-if python3 "$PROJECT_DIR/scripts/extract-gpkg-photos.py" --all 2>&1; then
-  echo "$LOG_PREFIX [GPKG] Extraction complete"
+if [ "$DB_AVAILABLE" = true ]; then
+  echo "$LOG_PREFIX [GPKG] Extracting photo references from GPKGs..."
+  if python3 "$PROJECT_DIR/scripts/extract-gpkg-photos.py" --all 2>&1; then
+    echo "$LOG_PREFIX [GPKG] Extraction complete"
+  else
+    echo "$LOG_PREFIX [GPKG] Extraction FAILED (exit $?) — continuing with ingestion"
+  fi
 else
-  echo "$LOG_PREFIX [GPKG] Extraction FAILED (exit $?) — continuing with ingestion"
+  echo "$LOG_PREFIX [GPKG] SKIPPED — no DATABASE_URL"
 fi
 
 # ── 1. QField Ingest ──────────────────────────────────────────────────────────
@@ -44,20 +80,33 @@ echo "$LOG_PREFIX [QField] Result: $QF_RESULT"
 # ── 2. SharePoint Ingest ─────────────────────────────────────────────────────
 SP_PROJECTS=("Lawley" "Mohadin" "Mamelodi" "Etwatwa" "Thembisa POP 1" "Thembisa POP 3")
 
-for proj in "${SP_PROJECTS[@]}"; do
-  echo "$LOG_PREFIX [SharePoint] Ingesting $proj..."
-  if python3 "$PROJECT_DIR/scripts/ingest-sharepoint-qa.py" --project "$proj" 2>&1; then
-    echo "$LOG_PREFIX [SharePoint] $proj complete"
-  else
-    echo "$LOG_PREFIX [SharePoint] $proj FAILED (exit $?)"
-  fi
-done
+if [ "$DB_AVAILABLE" = true ]; then
+  for proj in "${SP_PROJECTS[@]}"; do
+    echo "$LOG_PREFIX [SharePoint] Ingesting $proj..."
+    if python3 "$PROJECT_DIR/scripts/ingest-sharepoint-qa.py" --project "$proj" 2>&1; then
+      echo "$LOG_PREFIX [SharePoint] $proj complete"
+    else
+      echo "$LOG_PREFIX [SharePoint] $proj FAILED (exit $?)"
+    fi
+  done
+else
+  echo "$LOG_PREFIX [SharePoint] SKIPPED — no DATABASE_URL"
+fi
 
 # ── 3. VLM Validation ──────────────────────────────────────────────────────
 # Process pending reviews through VLM (up to 20 per run)
 echo "$LOG_PREFIX [VLM] Processing pending reviews..."
-PENDING_IDS=$(psql "$DATABASE_URL" -t -A -c \
-  "SELECT id || '|' || discipline FROM construction_qa_reviews WHERE vlm_status = 'pending' ORDER BY updated_at DESC LIMIT 20" 2>/dev/null)
+# The curl below needs review ids that only this query can supply, so no DATABASE_URL
+# means nothing to validate — an empty list, not an error. `|| true` matters under
+# `set -e`: a failing command substitution in an assignment aborts the whole script,
+# which would skip the completion log and make the run look like it died mid-way.
+PENDING_IDS=""
+if [ "$DB_AVAILABLE" = true ]; then
+  PENDING_IDS=$(psql "$DATABASE_URL" -t -A -c \
+    "SELECT id || '|' || discipline FROM construction_qa_reviews WHERE vlm_status = 'pending' ORDER BY updated_at DESC LIMIT 20" 2>/dev/null || true)
+else
+  echo "$LOG_PREFIX [VLM] SKIPPED query — no DATABASE_URL"
+fi
 
 VLM_COUNT=0
 for entry in $PENDING_IDS; do
