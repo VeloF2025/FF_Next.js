@@ -31,6 +31,12 @@ const logger = createLogger('api/billing/status');
 interface ProjectStatus {
   project: string;
   latest_week_ending: string | null;
+  /**
+   * Whole weeks this project's latest billing week trails the newest week in
+   * `ft_weekly_billing` overall. 0 = current. >0 means every metric below is
+   * anchored to a STALE week and is not comparable with the other projects.
+   */
+  weeks_behind: number;
   currently_excluded: number;
   pp_outstanding: number;
   recovered_this_month: number;
@@ -38,6 +44,14 @@ interface ProjectStatus {
 
 interface StatusResponse {
   projects: ProjectStatus[];
+  /** Newest week present in ft_weekly_billing across ALL projects. */
+  newest_week_ending: string | null;
+  /**
+   * Projects whose latest billing week trails `newest_week_ending`. Callers
+   * that aggregate `totals` MUST surface this — a non-empty list means the
+   * totals mix weeks and under-count the stale projects.
+   */
+  stale: { project: string; latest_week_ending: string | null; weeks_behind: number }[];
   totals: {
     currently_excluded: number;
     pp_outstanding: number;
@@ -71,15 +85,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     if (projects.length === 0) {
       const emptyResponse: StatusResponse = {
         projects: [],
+        newest_week_ending: null,
+        stale: [],
         totals: { currently_excluded: 0, pp_outstanding: 0, recovered_this_month: 0 },
       };
       return apiResponse.success(res, emptyResponse);
     }
 
+    // ── Newest billing week across ALL projects ───────────────────────────
+    // Deliberately NOT filtered by `projectFilter`: staleness is only
+    // meaningful against the global frontier. Scoping this to the filtered
+    // project would make every project look current when viewed alone.
+    // ::text — `week_ending` is a `date` column and node-postgres would
+    // otherwise hand back a Date parsed in server-local time (SAST), which
+    // serializes back a day early.
+    const newestResult = await pool.query<{ newest: string | null }>(
+      `SELECT MAX(week_ending)::text AS newest FROM ft_weekly_billing`,
+    );
+    const newestWeekEnding = newestResult.rows[0]?.newest ?? null;
+
     // ── Compute metrics per project ───────────────────────────────────────
     const projectStatuses: ProjectStatus[] = await Promise.all(
-      projects.map(proj => getProjectStatus(proj))
+      projects.map(proj => getProjectStatus(proj, newestWeekEnding))
     );
+
+    const stale = projectStatuses
+      .filter(ps => ps.weeks_behind > 0)
+      .map(ps => ({
+        project: ps.project,
+        latest_week_ending: ps.latest_week_ending,
+        weeks_behind: ps.weeks_behind,
+      }));
 
     // ── Aggregate totals ──────────────────────────────────────────────────
     const totals = projectStatuses.reduce(
@@ -93,10 +129,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     logger.info('Billing status fetched', {
       projectCount: projectStatuses.length,
+      newestWeekEnding,
+      staleProjects: stale.map(s => `${s.project}@${s.latest_week_ending}`),
       totals,
     });
 
-    const response: StatusResponse = { projects: projectStatuses, totals };
+    const response: StatusResponse = {
+      projects: projectStatuses,
+      newest_week_ending: newestWeekEnding,
+      stale,
+      totals,
+    };
     return apiResponse.success(res, response);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch billing status';
@@ -107,16 +150,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
 // ─── Per-project Status Query ─────────────────────────────────────────────────
 
-async function getProjectStatus(project: string): Promise<ProjectStatus> {
+async function getProjectStatus(
+  project: string,
+  newestWeekEnding: string | null,
+): Promise<ProjectStatus> {
   // ── Latest week_ending for this project ────────────────────────────────
+  // ::text so the `date` column doesn't come back as a server-local Date
+  // (see the newest-week query above) — this value is rendered to the user.
   const latestWeekResult = await pool.query<{ week_ending: string }>(
-    `SELECT week_ending FROM ft_weekly_billing
+    `SELECT week_ending::text AS week_ending FROM ft_weekly_billing
      WHERE project = $1
      ORDER BY week_ending DESC
      LIMIT 1`,
     [project]
   );
   const latestWeekEnding = latestWeekResult.rows[0]?.week_ending ?? null;
+
+  // ── Weeks behind the global frontier ───────────────────────────────────
+  // Both values are 'YYYY-MM-DD' text, so Date.UTC parsing is timezone-safe.
+  // FT bills on a fixed weekly cadence, so a whole-week division is exact;
+  // Math.max clamps the impossible "ahead of newest" case to 0.
+  const weeksBehind =
+    latestWeekEnding && newestWeekEnding
+      ? Math.max(
+          0,
+          Math.round(
+            (Date.parse(`${newestWeekEnding}T00:00:00Z`) -
+              Date.parse(`${latestWeekEnding}T00:00:00Z`)) /
+              (7 * 24 * 60 * 60 * 1000),
+          ),
+        )
+      : 0;
 
   // ── Currently excluded: DISTINCT dr_number from latest week only ────────
   // CRITICAL: anchored to latest week — never aggregate across weeks
@@ -173,6 +237,7 @@ async function getProjectStatus(project: string): Promise<ProjectStatus> {
   return {
     project,
     latest_week_ending: latestWeekEnding,
+    weeks_behind: weeksBehind,
     currently_excluded: currentlyExcluded,
     pp_outstanding: ppOutstanding,
     recovered_this_month: recoveredThisMonth,
