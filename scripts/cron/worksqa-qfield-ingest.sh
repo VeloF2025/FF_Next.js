@@ -40,6 +40,27 @@ if [ -z "${DATABASE_URL:-}" ]; then
 fi
 export DATABASE_URL
 
+# VLM_PROXY_SECRET authorises the photo-proxy's `?vlm=true` path, which is the ONLY
+# way vLLM can fetch a photo (it GETs image URLs with no headers, so the credential
+# has to ride in the query string — see src/lib/vlm/photoProxyAuth.ts).
+#
+# Step 3 below runs as a plain tsx CLI, NOT inside Next.js, so nothing loads .env.local
+# for it: every var it needs must be exported here. Missing this one cost 11 054
+# consecutive scoring failures (2026-07-21 → 07-27, scored=0 every run) — the proxy
+# fail-closed to 401, vLLM could not read the image, and the error was logged as a
+# bare "fetch failed". It is intentionally NOT fatal: steps 1, 2 and 4 do useful work
+# without it, and step 3 now aborts with a clear message of its own.
+if [ -z "${VLM_PROXY_SECRET:-}" ]; then
+  VLM_PROXY_SECRET="$(env_value "$ROOT/.env.local" VLM_PROXY_SECRET)"
+  [ -z "$VLM_PROXY_SECRET" ] && VLM_PROXY_SECRET="$(env_value "$ROOT/.env.production" VLM_PROXY_SECRET)"
+  [ -z "$VLM_PROXY_SECRET" ] && VLM_PROXY_SECRET="$(env_value "$ROOT/.env" VLM_PROXY_SECRET)"
+fi
+if [ -n "${VLM_PROXY_SECRET:-}" ]; then
+  export VLM_PROXY_SECRET
+else
+  echo "[$(date '+%F %T %Z')] WARNING: VLM_PROXY_SECRET not resolvable from $ROOT/.env* — VLM scoring will be skipped" >&2
+fi
+
 # Python with psycopg2 (system python3 has it on velo); allow override.
 PYTHON="${PYTHON:-/usr/bin/python3}"
 
