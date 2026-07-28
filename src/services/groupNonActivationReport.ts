@@ -21,6 +21,7 @@ import { addDaysIso } from '@/lib/group-nonactivation/format';
 import { groupCaption, sendGroupReport, sendOpsReport } from '@/lib/group-nonactivation/delivery';
 import { getConsolidatedNotFound } from '@/lib/group-nonactivation/opsQueries';
 import { buildOpsWorkbook } from '@/lib/group-nonactivation/buildOpsWorkbook';
+import { sendFailureAlert } from '@/lib/group-nonactivation/alert';
 
 export interface GroupReportResult {
   groupJid: string;
@@ -100,7 +101,7 @@ export interface RunReportResult {
   generatedDate: string;
   dryRun: boolean;
   groups: { groupName: string; counts: GroupReportCounts; sent: boolean; url: string | null; error?: string }[];
-  ops: { totalNotFound: number; sent: boolean; url: string | null };
+  ops: { totalNotFound: number; sent: boolean; url: string | null; error?: string };
 }
 
 /**
@@ -144,6 +145,7 @@ export async function runGroupNonActivationReport(opts: {
   const opsRows = await getConsolidatedNotFound(opts.generatedDate);
   let opsUrl: string | null = null;
   let opsSent = false;
+  let opsError: string | undefined;
   if (!dryRun && opsRows.length > 0) {
     try {
       const opsBuffer = await buildOpsWorkbook(opsRows, opts.generatedDate);
@@ -151,9 +153,10 @@ export async function runGroupNonActivationReport(opts: {
       opsSent = true;
       log.info('Unresolved PP ops view sent', { total: opsRows.length }, 'GroupNonActivationReport');
     } catch (err) {
+      opsError = err instanceof Error ? err.message : String(err);
       log.error(
         'Unresolved PP ops view send failed',
-        { error: err instanceof Error ? err.message : String(err) },
+        { error: opsError },
         'GroupNonActivationReport',
       );
     }
@@ -161,11 +164,17 @@ export async function runGroupNonActivationReport(opts: {
     log.info('No unresolved PP serials — ops worklist skipped', {}, 'GroupNonActivationReport');
   }
 
-  return {
+  const result: RunReportResult = {
     cohortDate: opts.cohortDate,
     generatedDate: opts.generatedDate,
     dryRun,
     groups,
-    ops: { totalNotFound: opsRows.length, sent: opsSent, url: opsUrl },
+    ops: { totalNotFound: opsRows.length, sent: opsSent, url: opsUrl, error: opsError },
   };
+
+  // A run that builds everything and then fails to deliver used to be visible
+  // only as an error line in the app log. Raise it out-of-band instead.
+  if (!dryRun) await sendFailureAlert(result);
+
+  return result;
 }
