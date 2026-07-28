@@ -142,11 +142,21 @@ export async function runLocalResolution(): Promise<{
   matched_local: number;
   total_resolved: number;
   sources: Record<string, number>;
+  /**
+   * Sources whose query could not run at all (missing table, bad column, …).
+   * A source that never executes resolves nothing while looking identical to
+   * one that ran and found no matches — so report it rather than infer health
+   * from a zero. Empty on a clean run.
+   */
+  failures: { source: string; error: string }[];
 }> {
   const sources: Record<string, number> = {};
+  const failures: { source: string; error: string }[] = [];
   let matchedLocal = 0;
 
-  // Helper: run a single source match, return count
+  // Helper: run a single source match, return count.
+  // One broken source must not abort the rest of the scan, so failures are
+  // collected and returned rather than thrown — but they are never silent.
   const matchSource = async (
     name: string,
     status: string,
@@ -156,12 +166,16 @@ export async function runLocalResolution(): Promise<{
       const result = await pool.query(query);
       const count = result.rowCount || 0;
       if (count > 0) {
-        sources[name] = count;
+        // Accumulate: a source split across several passes (offline_devices)
+        // still reports one total under its own name.
+        sources[name] = (sources[name] ?? 0) + count;
         logger.info(`PP local match: ${name}`, { count });
       }
       return count;
     } catch (err) {
-      logger.warn(`PP local match skipped: ${name}`, { error: String(err) });
+      const error = err instanceof Error ? err.message : String(err);
+      failures.push({ source: name, error });
+      logger.error(`PP local match FAILED: ${name}`, { error });
       return 0;
     }
   };
@@ -210,7 +224,11 @@ export async function runLocalResolution(): Promise<{
     SET resolution_status = 'located_onemap',
         resolved_drop_number = op.drop_number,
         resolved_source = 'onemap_properties',
-        resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
+        -- op.pole_number, not op.pole: the column has always been pole_number,
+        -- so this statement threw "column op.pole does not exist" on every run
+        -- and was swallowed by matchSource's catch. This source has never
+        -- resolved anything.
+        resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole_number),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM onemap_properties op
     WHERE UPPER(TRIM(op.ont_barcode)) = UPPER(TRIM(pp.serial_number))
@@ -256,7 +274,11 @@ export async function runLocalResolution(): Promise<{
   matchedLocal += await matchSource('foto_ai_reviews', 'located_local', `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_local',
-        resolved_drop_number = fr.drop_number,
+        -- fr.dr_number, not fr.drop_number: the column has always been
+        -- dr_number, so this statement threw "column fr.drop_number does not
+        -- exist" on every run and was swallowed. This source has never resolved
+        -- anything either.
+        resolved_drop_number = fr.dr_number,
         resolved_source = 'foto_ai_reviews',
         resolved_details = jsonb_build_object(
           'matched_field', CASE
@@ -267,6 +289,12 @@ export async function runLocalResolution(): Promise<{
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM foto_ai_reviews fr
     WHERE (UPPER(TRIM(fr.vlm_ont_serial_step6)) = UPPER(TRIM(pp.serial_number)) OR UPPER(TRIM(fr.vlm_ont_serial_step9)) = UPPER(TRIM(pp.serial_number)))
+      -- Real DR only. This column carries placeholders — 'TEST_1765038691267'
+      -- and similar — and without this guard the first run after the column fix
+      -- would write one into resolved_drop_number, which is worse than leaving
+      -- the serial not_found. Same trap loeks_field_mappings already guards
+      -- against ('DR NEEDED', 'ACTIVATION NEEDED').
+      AND fr.dr_number ~ '^DR[0-9]+$'
       AND pp.resolution_status = 'not_found'
   `);
 
@@ -311,28 +339,51 @@ export async function runLocalResolution(): Promise<{
       AND pp.resolution_status = 'not_found'
   `);
 
-  // 9. offline_devices — serial, expected_serial, or olt_serial
-  matchedLocal += await matchSource('offline_devices', 'located_local', `
+  // 9. offline_devices — serial_number, then expected_serial, then olt_serial.
+  //
+  // Three sequential passes, deliberately NOT one OR'd predicate. Postgres
+  // cannot hash-join an OR of three different equalities, so the single
+  // statement planned as a nested loop over the entire table: 891,848
+  // offline_devices rows x 433 not_found rows = 386,170,184 join-filter
+  // comparisons (measured via EXPLAIN ANALYZE), which was ~200s of this
+  // endpoint's ~239s runtime. Split, each pass hash joins — measured at
+  // 429ms + 449ms + 56ms.
+  //
+  // Splitting also makes column precedence deterministic. Every pass matches
+  // only rows still 'not_found', so serial_number beats expected_serial beats
+  // olt_serial — the order the old CASE expression implied but could not
+  // guarantee, since an OR join picks an arbitrary matching row.
+  //
+  // `column` is a compile-time union fed only from the literal list below, so
+  // interpolating it carries no injection surface today. The runtime check is
+  // deliberate defence-in-depth: types vanish at runtime, and a later edit that
+  // widens the union or routes caller input through this helper would otherwise
+  // turn a safe string build into an injection point with nothing to catch it.
+  const OFFLINE_SERIAL_COLUMNS = ['serial_number', 'expected_serial', 'olt_serial'] as const;
+  type OfflineSerialColumn = (typeof OFFLINE_SERIAL_COLUMNS)[number];
+  const offlineDevicesMatch = (column: OfflineSerialColumn): string => {
+    if (!OFFLINE_SERIAL_COLUMNS.includes(column)) {
+      throw new Error(`Refusing to build offline_devices query for unknown column: ${column}`);
+    }
+    return `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_local',
         resolved_drop_number = od.drop_number,
         resolved_source = 'offline_devices',
         resolved_details = jsonb_build_object(
-          'matched_field', CASE
-            WHEN od.serial_number = pp.serial_number THEN 'serial_number'
-            WHEN od.expected_serial = pp.serial_number THEN 'expected_serial'
-            ELSE 'olt_serial'
-          END,
+          'matched_field', '${column}',
           'serial_mismatch', od.serial_mismatch
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM offline_devices od
-    WHERE (UPPER(TRIM(od.serial_number)) = UPPER(TRIM(pp.serial_number))
-        OR UPPER(TRIM(od.expected_serial)) = UPPER(TRIM(pp.serial_number))
-        OR UPPER(TRIM(od.olt_serial)) = UPPER(TRIM(pp.serial_number)))
+    WHERE UPPER(TRIM(od.${column})) = UPPER(TRIM(pp.serial_number))
       AND od.drop_number IS NOT NULL
       AND pp.resolution_status = 'not_found'
-  `);
+  `;
+  };
+  for (const column of OFFLINE_SERIAL_COLUMNS) {
+    matchedLocal += await matchSource('offline_devices', 'located_local', offlineDevicesMatch(column));
+  }
 
   // 10. olt_mismatch_records — OLT serial correction records
   matchedLocal += await matchSource('olt_mismatch_records', 'located_local', `
@@ -353,24 +404,14 @@ export async function runLocalResolution(): Promise<{
       AND pp.resolution_status = 'not_found'
   `);
 
-  // 11. arch_offline_devices — Historical OLT network snapshots
-  matchedLocal += await matchSource('arch_offline_devices', 'located_local', `
-    UPDATE oes_pp_data pp
-    SET resolution_status = 'located_local',
-        resolved_drop_number = aod.drop_number,
-        resolved_source = 'arch_offline_devices',
-        resolved_details = jsonb_build_object(
-          'oes_status', aod.oes_status,
-          'last_down_reason', aod.last_down_reason
-        ),
-        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
-    FROM arch_offline_devices aod
-    WHERE UPPER(TRIM(aod.serial_number)) = UPPER(TRIM(pp.serial_number))
-      AND aod.drop_number IS NOT NULL
-      AND pp.resolution_status = 'not_found'
-  `);
+  // NOTE: a pass over `arch_offline_devices` (historical OLT snapshots) used to
+  // sit here. That table exists in no schema on this database, so the statement
+  // threw on every run and was swallowed by matchSource's catch — it has never
+  // resolved anything. Removed rather than left to report a failure daily now
+  // that failures are surfaced. Recoverable from git history if the table is
+  // ever created.
 
-  // 12. onemap_installations — Separate from onemap_properties
+  // 11. onemap_installations — Separate from onemap_properties
   matchedLocal += await matchSource('onemap_installations', 'located_local', `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_local',
@@ -385,7 +426,7 @@ export async function runLocalResolution(): Promise<{
       AND pp.resolution_status = 'not_found'
   `);
 
-  // 13. loeks_field_mappings — Loeks/Mohadin field install mapping (serial → DR)
+  // 12. loeks_field_mappings — Loeks/Mohadin field install mapping (serial → DR)
   matchedLocal += await matchSource('loeks_field_mappings', 'located_local', `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_local',
@@ -407,8 +448,15 @@ export async function runLocalResolution(): Promise<{
     matched_local: matchedLocal,
     total_resolved: totalResolved,
     sources,
+    failures,
   };
 
+  if (failures.length > 0) {
+    logger.error('Local resolution completed with unusable sources', {
+      failed: failures.length,
+      sources: failures.map((f) => f.source),
+    });
+  }
   logger.info('Local resolution complete', results);
   return results;
 }
@@ -1631,7 +1679,15 @@ async function handler(
           gps_updated: gps,
           steps: {
             eod_scan: eodResult,
-            local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
+            // `failures` rides along here too: resolve-all is the action the
+            // UI's "Resolve All" button calls, so dropping it would leave the
+            // caller blind to a source that could not run — the exact silence
+            // this field exists to remove.
+            local_scan: {
+              resolved: localResult.total_resolved,
+              sources: localResult.sources,
+              failures: localResult.failures,
+            },
             wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
             wa_photo_vlm: { resolved: vlmResult.total_pp_matched, photos_processed: vlmResult.total_vlm_processed, drs_scanned: vlmResult.drs_scanned },
             wa_message_scan: msgScanResult,

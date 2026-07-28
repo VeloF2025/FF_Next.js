@@ -39,7 +39,7 @@ START_TIME=$(date +%s)
 # 2026-05-21: raised 75→76 catches — origin/master already at 76 before this branch (olt-report/reporting.ts:166, date-parse fallback for CSV export); verified by counting on a clean checkout of origin/master HEAD. Not introduced by feat/wa-dr-ticket-linking — my new files have 0 silent catches.
 # 2026-05-25: held at 185 — origin/master actually emits 186 (PR-10 #1762 left a react-refresh/only-export-components warning on SerialLifecyclePanel.tsx that was never accounted for in the baseline). Rather than ratchet up, this branch removes the warning at source: the pure fn `activatedSharePct` moved to serialLifecycle.utils.ts so the component module exports only components. Net lint count returns to 185.
 # 2026-07-24: raised 76→77 catches — origin/master already at 77 before this branch (communications/whatsapp/cloud-webhook.ts, landed via PR #2239) without bumping the baseline. Verified: all 77 no-silent-catch offenders are in files feat/hs-date-tz-fix does not touch; its edits add only `::text` date casts + one test file (0 silent catches).
-# 2026-07-25: raised 77→78 catches — origin/master already at 78 before this branch, again without the baseline being bumped. Verified by swapping cloud-webhook.ts (the only pages/api file feat/wa-cloud-phase3 touches) back to its origin/master content within a full pages/api scan: count stayed at 78. This branch adds no new catch blocks anywhere in pages/api.
+# 2026-07-25: raised 77→78 catches — origin/master already at 78 before this branch, again without the baseline being bumped. Verified by swapping cloud-webhook.ts (the only pages/api file feat/wa-cloud-phase3 touches) back to its origin/master content within a full pages/api scan: count stayed at 78. This branch adds no new catch blocks anywhere in pages/api. (Independently re-verified by feat/hs-contractor-docs-date-tz via `git stash` on a clean checkout of origin/master HEAD c6ef5c9e8 — same result, same root cause, two branches landed the same bump concurrently.)
 MAX_LINT_WARNINGS=185
 MAX_LINT_ERRORS=0
 MAX_SILENT_CATCHES=78
@@ -124,8 +124,19 @@ if command -v python3 >/dev/null 2>&1; then
     fail "QField step detection: regression detected"
     tail -20 /tmp/ci-qfield-stepdetect.txt | sed 's/^/    /'
   fi
+
+  # Same contract, one layer up: which GPKG (and which layer inside it) the extractor
+  # reads. Over-matching here silently swaps a project onto the wrong audit form, so
+  # the suite asserts a no-op against every registered project's real MinIO listing.
+  if python3 scripts/test_qfield_gpkg_resolution.py > /tmp/ci-qfield-gpkgresolve.txt 2>&1; then
+    pass "QField GPKG resolution: all checks pass"
+  else
+    fail "QField GPKG resolution: regression detected"
+    tail -20 /tmp/ci-qfield-gpkgresolve.txt | sed 's/^/    /'
+  fi
 else
   skip "QField step detection: python3 not available"
+  skip "QField GPKG resolution: python3 not available"
 fi
 
 # ─── Gate 3: TypeScript ──────────────────────────────────────────────────────

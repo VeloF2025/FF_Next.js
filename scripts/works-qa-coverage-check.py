@@ -2,24 +2,46 @@
 """
 Works-QA ⇄ QField coverage check — the "never silently miss" guarantee.
 
-Flags QField projects that have field photos in QFieldCloud but ZERO rows in
-FibreFlow's qfield_photo_validations, and are linked to an active (non-archived)
-FibreFlow project. These are projects whose photos will never reach the Works-QA
-dashboard until they're registered in extract-gpkg-photos.py's PROJECTS dict.
+Flags three ways QField photos fail to reach the Works-QA dashboard, for projects
+linked to an active (non-archived) FibreFlow project:
 
-This closes the gap that left Mahikeng's 543 photos invisible for a day: the
-ingestion is deliberately a registered-projects allow-list (safe, deterministic
-pole labels), and this check makes a missing registration LOUD instead of silent.
+  EXTRACT-GAP  photos in QFieldCloud, ZERO rows in qfield_photo_validations —
+               the project was never registered in extract-gpkg-photos.py PROJECTS.
+  SYNC-GAP     rows extracted, ZERO rows in pole_qa_photos — works-qa-sync is stuck.
+  STALE-GPKG   a newer file exists that we are not ingesting — either a newer
+               version of the tracked GPKG, or a newer same-family sibling (a rename).
+
+The first closes the gap that left Mahikeng's 543 photos invisible for a day: the
+ingestion is deliberately a registered-projects allow-list (safe, deterministic pole
+labels), and this check makes a missing registration LOUD instead of silent.
+
+STALE-GPKG closes the sequel. On 2026-07-27 Mahikeng was missing 918 photos — 571
+ingested against 1 458 in the field — because the crew renamed the GPKG
+("Civil audit.gpkg" → "Civil audit updated_27_07.gpkg") and PROJECTS still pinned the
+dead file. Both zero-checks passed happily: 597 rows had been extracted and synced,
+just none since 22 July. A count of >0 is not evidence of a working ingest, so this
+asks whether a newer file exists that we are not reading — either a newer version of
+the tracked path, or a newer same-family SIBLING (which is how a rename presents: the
+tracked path stops changing and looks perfectly dormant). Flagged once that file has
+gone unread for --stale-days. A dormant form can never trip it, because "nothing newer
+exists" is not the same as "we are behind".
+
+Not covered: a GPKG deleted outright from MinIO. gpkg_behind_days fails quiet on a
+missing listing so a transient mc failure cannot page, which means a genuine deletion
+reads the same as a blip.
 
 Sources of truth:
-  * QFieldCloud DB (docker exec qfieldcloud-db-1) — DCIM photo counts per project.
-  * FibreFlow DB (DATABASE_URL) — links + qfield_photo_validations counts.
+  * QFieldCloud DB (docker exec qfieldcloud-db-1) — DCIM photo counts.
+  * MinIO (docker exec qfieldcloud-minio-1) — newest version of each tracked GPKG
+    and of its same-family siblings.
+  * FibreFlow DB (DATABASE_URL) — links, qfield_photo_validations, qfield_gpkg_sync_state.
 
 A single WhatsApp summary is posted (Velo Test group) when anything is flagged.
 Run on velo (needs docker + DATABASE_URL). Read-only; writes nothing.
 
 Usage:
-  DATABASE_URL=… python3 scripts/works-qa-coverage-check.py [--threshold 20] [--no-wa]
+  DATABASE_URL=… python3 scripts/works-qa-coverage-check.py \
+      [--threshold 20] [--stale-days 3] [--no-wa]
 """
 import argparse
 import json
@@ -27,9 +49,15 @@ import os
 import subprocess
 import sys
 import urllib.request
+from datetime import datetime, timezone
 
 import psycopg2
 import psycopg2.extras
+
+# Pure staleness arithmetic (no DB deps) — unit-tested/CI-gated by
+# scripts/test_qfield_gpkg_resolution.py.
+from qfield_minio import minio_newest_versions, minio_sibling_newest
+from qfield_staleness import select_stale_gpkgs
 
 QFC_CONTAINER = "qfieldcloud-db-1"
 QFC_DB_USER = "qfieldcloud_db_admin"
@@ -62,6 +90,23 @@ def qfc_dcim_counts():
         uid, n = line.split("\t", 1)
         counts[uid.strip()] = int(n.strip())
     return counts
+
+
+def gpkg_sync_rows(conn):
+    """One row PER REGISTERED GPKG: {qf_uuid, gpkg_path, last_version}.
+
+    Deliberately NOT aggregated. An earlier version took MAX(last_synced_at) per
+    project and reported a single figure; measured against production that hid three
+    live multi-day freezes behind an actively-syncing sibling, because 8 of 9 projects
+    register two or more GPKGs. It also used last_synced_at, which the pending-rescan
+    path refreshes for an unchanged file — see select_stale_gpkgs.
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("""
+            SELECT qf_project_id::text AS qf_uuid, gpkg_path, last_version
+            FROM qfield_gpkg_sync_state
+        """)
+        return [dict(r) for r in cur.fetchall()]
 
 
 def linked_active_qfield_projects(conn):
@@ -127,6 +172,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--threshold", type=int, default=20,
                     help="Min QFieldCloud DCIM photos before flagging a 0-ingested project (default 20)")
+    ap.add_argument("--stale-days", type=float, default=3.0,
+                    help="Flag a GPKG when MinIO has held a newer version this many days "
+                         "without it being ingested (default 3). A dormant form never trips "
+                         "this, however old it is — only an unread newer file does. The margin "
+                         "absorbs the 4x/day cron plus a weekend.")
     ap.add_argument("--no-wa", action="store_true", help="Log only; do not post to WhatsApp")
     args = ap.parse_args()
 
@@ -148,8 +198,13 @@ def main():
     try:
         rows = linked_active_qfield_projects(conn)
         stuck = stuck_sync_projects(conn, args.threshold)
+        sync_rows = gpkg_sync_rows(conn)
     finally:
         conn.close()
+
+    qf_name_by_uuid = {r["qf_uuid"]: r["qf_name"] for r in rows}
+    minio_newest = minio_newest_versions(sync_rows)
+    sibling_newest = minio_sibling_newest(sync_rows)
 
     # Extract gap: upstream photos in QFieldCloud but nothing in qfield_photo_validations.
     extract_gap = []
@@ -159,19 +214,37 @@ def main():
             extract_gap.append((r["ff_name"], r["qf_name"], src))
     extract_gap.sort(key=lambda x: x[2], reverse=True)
 
+    # Stale gap: a newer file exists that we are not ingesting — either a newer version
+    # of the tracked path, or a newer same-family sibling (a rename). Reported PER FILE;
+    # see select_stale_gpkgs for why per-project aggregation and photo-based lag both
+    # failed on live data.
+    stale_gap = [
+        (qf_name_by_uuid.get(qf_uuid, qf_uuid), path, behind, available)
+        for qf_uuid, path, behind, available in select_stale_gpkgs(
+            sync_rows, minio_newest, sibling_newest, datetime.now(timezone.utc), args.stale_days)
+    ]
+
     print(f"Coverage check: {len(rows)} linked/active QField project(s) examined, "
-          f"threshold={args.threshold}. extract-gap={len(extract_gap)}, sync-gap={len(stuck)}.")
+          f"{len(sync_rows)} registered GPKG(s) tracked, threshold={args.threshold}, "
+          f"stale-days={args.stale_days}. extract-gap={len(extract_gap)}, "
+          f"sync-gap={len(stuck)}, stale-gpkg={len(stale_gap)}.")
     for ff_name, qf_name, src in extract_gap:
         print(f"  EXTRACT-GAP: {ff_name} ← {qf_name}: {src} photos upstream, 0 extracted")
     for ff_name, ingested in stuck:
         print(f"  SYNC-GAP: {ff_name}: {ingested} photos extracted, 0 on the dashboard (pole_qa_photos empty)")
+    for qf_name, path, behind, available in stale_gap:
+        print(f"  STALE-GPKG: {qf_name} / {path}: newer file available ({available}), "
+              f"unread for {behind:.1f}d")
 
-    if (extract_gap or stuck) and not args.no_wa:
+    if (extract_gap or stuck or stale_gap) and not args.no_wa:
         lines = ["⚠️ Works-QA: QField photos not reaching the dashboard", ""]
         for ff_name, qf_name, src in extract_gap:
             lines.append(f"• {ff_name} ({qf_name}): {src} photos upstream, not extracted — register in extract-gpkg-photos.py")
         for ff_name, ingested in stuck:
             lines.append(f"• {ff_name}: {ingested} photos extracted but sync produced 0 pole rows — check works-qa-sync")
+        for qf_name, path, behind, _available in stale_gap:
+            lines.append(f"• {qf_name} / {path}: a newer version has been in MinIO for "
+                         f"{behind:.1f} days and is not being ingested — check extract-gpkg-photos.py")
         post_wa("\n".join(lines))
 
     # Exit 0 always — this is a monitor, not a gate; the cron continues.

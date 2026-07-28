@@ -71,8 +71,15 @@ export async function createSession(
 }
 
 /**
- * Bind a signed JWT to its session row. Extracted from pages/api/auth/login.ts so the
- * login flow and the MCP mint share one implementation.
+ * Bind a signed JWT to its session row.
+ *
+ * Currently used ONLY by the MCP mint. pages/api/auth/login.ts and setup-password.ts
+ * still run their own inline `UPDATE user_sessions SET token_hash = ...`; wiring them to
+ * this helper is deliberately deferred to a later PR in this stack, so that a change to
+ * the login path is reviewed on its own rather than riding along with new functionality.
+ *
+ * Stated in the present tense because an earlier revision of this comment claimed the
+ * extraction had already happened, which a reader of this file alone would have believed.
  */
 export async function setSessionTokenHash(sessionId: string, token: string): Promise<void> {
   await sql`
@@ -184,12 +191,16 @@ export async function deleteSession(sessionId: string): Promise<void> {
 }
 
 /**
- * Delete a user's sessions of one kind (logout everywhere).
- * Defaults to 'browser': MCP sessions are deliberately NOT swept by a logout — they
- * are revoked explicitly from the connections page.
+ * Delete a user's sessions of one single kind.
+ *
+ * NOTE: no production caller passes through here today. "Log out of all devices"
+ * deliberately uses `deleteEveryUserSession` — a user who asks to be signed out
+ * everywhere means everywhere, connectors included — and routine logout drops only
+ * the current session via `deleteSession`. This is kept for kind-scoped sweeps
+ * (e.g. a future "revoke all my MCP tokens" action) and is covered by tests only.
  *
  * For a credential-compromise sweep (password reset, offboarding) use
- * `deleteEveryUserSession` instead — this function will leave MCP tokens alive.
+ * `deleteEveryUserSession` — this function will leave other kinds alive.
  */
 export async function deleteAllUserSessions(
   userId: string,
