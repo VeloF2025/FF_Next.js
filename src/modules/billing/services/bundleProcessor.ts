@@ -28,6 +28,7 @@ import {
 export type BundleFileKind =
   | 'ft-payment-pdf'
   | 'notes-xlsx'
+  | 'notes-pdf'
   | 'zone-uptake-pdf'
   | 'zone-pon-uptake-pdf'
   | 'unknown';
@@ -50,6 +51,7 @@ export interface ClassifiedFile extends BundleFile {
  *
  * - `<Project> WE<code>.pdf`               → ft-payment-pdf
  * - `<Project> WE<code> notes.xlsx`        → notes-xlsx
+ * - `<Project> WE<code> notes.pdf`         → notes-pdf (ignored; see below)
  * - `<Project>_installation uptake per zone_<code>.pdf`       → zone-uptake-pdf
  * - `<Project>_installation uptake per zone per pon_<code>.pdf` → zone-pon-uptake-pdf
  */
@@ -59,6 +61,15 @@ export function classifyFile(file: BundleFile): ClassifiedFile {
 
   if (lower.endsWith('.xlsx') && /\bnotes\b/i.test(name)) {
     return { ...file, kind: 'notes-xlsx', projectHint: extractHint(name, 'notes') };
+  }
+  // FT sometimes ships the notes workbook as a print-to-PDF alongside (or
+  // instead of) the XLSX. It is NOT the payment summary — parsing it as one
+  // yields an empty weekEnding and every count defaulted to 0, which used to
+  // reach the DB as `week_ending = ''` and blow up with
+  // `invalid input syntax for type date: ""`. Classify it explicitly so the
+  // catch-all `.pdf` branch below can't claim it.
+  if (lower.endsWith('.pdf') && /\bnotes\b/i.test(name)) {
+    return { ...file, kind: 'notes-pdf', projectHint: extractHint(name, 'notes') };
   }
   if (lower.endsWith('.pdf') && /per\s+pon/i.test(name)) {
     return { ...file, kind: 'zone-pon-uptake-pdf', projectHint: extractHint(name, 'uptake') };
@@ -216,6 +227,16 @@ export async function processProjectGroup(
         case 'zone-pon-uptake-pdf': {
           zonePonUptake = await parseZoneUptakePdf(buf, file.originalName);
           warnings.push(...zonePonUptake.parseWarnings);
+          break;
+        }
+        case 'notes-pdf': {
+          // Deductions are only readable from the XLSX — a PDF print of the
+          // same workbook carries no extractable table. Warn so a group that
+          // shipped ONLY the PDF doesn't silently lose its deductions.
+          warnings.push(
+            `Ignored notes PDF "${file.originalName}" — deductions are read from the notes XLSX, ` +
+            `and this file is not the FT payment summary.`,
+          );
           break;
         }
         case 'unknown': {

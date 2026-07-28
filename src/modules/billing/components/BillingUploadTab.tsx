@@ -651,6 +651,7 @@ function FileKindBadge({ kind }: { kind: string }) {
   const map: Record<string, { label: string; cls: string }> = {
     'ft-payment-pdf': { label: 'Payment PDF', cls: 'text-red-300 bg-red-500/10' },
     'notes-xlsx': { label: 'Notes XLSX', cls: 'text-green-300 bg-green-500/10' },
+    'notes-pdf': { label: 'Notes PDF (ignored)', cls: 'text-slate-300 bg-slate-500/10' },
     'zone-uptake-pdf': { label: 'Zone uptake', cls: 'text-blue-300 bg-blue-500/10' },
     'zone-pon-uptake-pdf': { label: 'Zone+PON uptake', cls: 'text-purple-300 bg-purple-500/10' },
     unknown: { label: 'Unknown', cls: 'text-amber-300 bg-amber-500/10' },
