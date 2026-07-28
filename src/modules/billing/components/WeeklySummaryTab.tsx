@@ -24,6 +24,13 @@ interface BillingStatusMetrics {
   recoveredThisMonth: number;   // deductions reversed in current calendar month
 }
 
+/** A project whose latest billing week trails the newest week overall. */
+interface StaleProject {
+  project: string;
+  latest_week_ending: string | null;
+  weeks_behind: number;
+}
+
 const STATUS_BADGE: Record<FtWeeklyBilling['reconciliation_status'], string> = {
   pending:    'bg-amber-500/10 text-amber-400 border-amber-500/20',
   reconciled: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -36,6 +43,7 @@ export function WeeklySummaryTab() {
   const [projectFilter, setProjectFilter] = useState<string>('All');
   const [rows, setRows] = useState<FtWeeklyBilling[]>([]);
   const [metrics, setMetrics] = useState<BillingStatusMetrics | null>(null);
+  const [staleProjects, setStaleProjects] = useState<StaleProject[]>([]);
   const [projectOptions, setProjectOptions] = useState<BillableProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +118,11 @@ export function WeeklySummaryTab() {
             ppOutstanding: totals.pp_outstanding ?? 0,
             recoveredThisMonth: totals.recovered_this_month ?? 0,
           } : null);
+          // `stale` is computed against the GLOBAL newest week, so it stays
+          // meaningful even when the view is filtered to one project.
+          setStaleProjects(
+            Array.isArray(statusData.data?.stale) ? statusData.data.stale : [],
+          );
         }
       } catch (err) {
         if (!cancelled) {
@@ -210,6 +223,44 @@ export function WeeklySummaryTab() {
 
   return (
     <div className="space-y-6">
+      {/* Stale-week warning — sits ABOVE the cards because it qualifies them.
+          Wording is deliberately scoped to "anchored to the latest billing
+          week": that covers Currently Excluded (omits these projects entirely,
+          since they have no row in the latest week group) and Recovered This
+          Month (computed from their OLDER week). It must NOT claim the cards
+          exclude these projects — `totals` in /api/billing/status sums every
+          project unconditionally, and PP Outstanding reads live from
+          oes_pp_data and isn't week-anchored at all. */}
+      {!loading && staleProjects.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-4 h-4 text-amber-400" />
+            <span className="text-sm font-medium text-amber-400">
+              {staleProjects.length === 1
+                ? '1 project is behind the latest billing week'
+                : `${staleProjects.length} projects are behind the latest billing week`}
+            </span>
+          </div>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mb-2">
+            Any figure below that is anchored to the latest billing week is incomplete
+            or out of date for these projects — their FT payment PDF is missing for the
+            newer week(s). Upload it to bring them current.
+          </p>
+          <ul className="space-y-1">
+            {staleProjects.map((s) => (
+              <li key={s.project} className="text-xs text-[var(--ff-text-secondary)]">
+                <span className="font-medium">{s.project}</span>
+                {' — last billed '}
+                {s.latest_week_ending ?? 'never'}
+                {' ('}
+                {s.weeks_behind === 1 ? '1 week' : `${s.weeks_behind} weeks`}
+                {' behind)'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Metric Cards — display-only snapshots from latest week */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
