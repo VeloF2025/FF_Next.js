@@ -207,51 +207,55 @@ def parse_pg_timestamp(value):
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
 
-def gpkg_version_lag_days(last_version, latest_upstream_photo_at):
-    """Days between the GPKG version we last ingested and the newest field photo.
+def gpkg_behind_days(ingested_version, available_version, now):
+    """Days we have been sitting on an older version than MinIO holds; None if not behind.
 
-    Returns a float, or None when either side is unknown — an unknown lag is NOT a
-    zero lag, and the caller must not treat it as healthy.
-
-    MEASURE THE GPKG, NOT THE SCRIPT RUN. The obvious signal — `last_synced_at` vs the
-    newest photo — means "the script touched this row", not "the GPKG advanced": the
-    pending-rescan path re-upserts NOW() for an UNCHANGED file whenever photos await
-    upload, so any row with pending_count > 0 (6 of 16 live) reports 0.0d forever.
-    Lawley's LAWPoles.gpkg sat frozen 5.3 days at 0.0d. Measured against production
-    that signal caught 1 of 16 GPKGs while 4 real multi-day freezes ran silent.
-
-    The version id encodes when the file we actually read was uploaded, so this lag
-    only falls when a NEWER GPKG arrives — the very event that unfreezes the ingest.
-    Negative lags clamp to 0.0.
+    Returns None when the two versions match (nothing to ingest — the form is simply
+    dormant) or when either id is unparseable. Otherwise the age of the version we
+    are NOT reading: how long the newer file has been available and ignored.
     """
-    version_at = version_timestamp(last_version)
-    newest = parse_pg_timestamp(latest_upstream_photo_at)
-    if version_at is None or newest is None:
+    if not available_version or available_version == ingested_version:
         return None
-    return max(0.0, (newest - version_at).total_seconds() / 86400.0)
+    available_at = version_timestamp(available_version)
+    if available_at is None or version_timestamp(ingested_version) is None:
+        return None
+    return max(0.0, (now - available_at).total_seconds() / 86400.0)
 
 
-def select_stale_gpkgs(sync_rows, newest_upstream, stale_days):
-    """Pick the GPKGs whose ingest has frozen while photos kept arriving.
+def select_stale_gpkgs(sync_rows, minio_newest, now, stale_days):
+    """Pick the GPKGs where a newer file exists that we are not ingesting.
 
-    sync_rows:       [{qf_uuid, gpkg_path, last_version}]  — one row PER FILE
-    newest_upstream: {qf_uuid: newest DCIM upload timestamp}
-    Returns [(qf_uuid, gpkg_path, lag_days)] sorted worst-first.
+    sync_rows:    [{qf_uuid, gpkg_path, last_version}]      — one row PER FILE
+    minio_newest: {(qf_uuid, gpkg_path): newest version id} — one entry PER FILE
+    Returns [(qf_uuid, gpkg_path, days_behind, available_version)], worst-first.
 
-    PER FILE, never per project. Aggregating with MAX(last_synced_at) let any active
-    sibling mask a stuck one: measured live, Themb'elihle's Optical Audit.gpkg (9.6d
-    frozen), THM POP 3's Optical Audit.gpkg (7.3d) and THM POP 1's Poles.gpkg (3.0d)
-    all collapsed to 0.0d because another GPKG in the same project was advancing. 8 of
-    9 projects carry two or more registered paths, so the aggregate hid the majority.
+    COMPARE LIKE WITH LIKE. Two earlier shapes both failed on production data:
 
-    A row whose lag cannot be computed (unknown version or no upstream photos) is
-    skipped rather than flagged — this monitor must not cry wolf on missing data.
+      * MAX(last_synced_at) per project vs the newest photo — per-project against
+        per-project — let any active sibling MASK a stuck file (1 of 16 detected).
+      * last_version of one file vs the newest DCIM upload anywhere in the project —
+        per-file numerator, per-project denominator — CRIED WOLF instead: all 5 rows
+        it flagged had already ingested every version MinIO held. DCIM is project-wide
+        and cannot be attributed to a form, so any project whose forms are worked at
+        different times over-fires, and a finished form's lag grows forever.
+
+    So the question is not "how old is what we read" but "is there something newer we
+    are failing to read". A dormant form (no newer version) can never flag no matter
+    how long it lies untouched; a genuinely stuck one flags as soon as the newer file
+    has been available longer than stale_days. That also makes the alert actionable:
+    it names a file that demonstrably exists and is being skipped.
+
+    Skipped, not flagged, when the comparison cannot be computed — a transient MinIO
+    listing failure yields no entry, and this monitor must fail quiet on missing data
+    rather than page on it.
     """
     out = []
     for row in sync_rows or []:
-        lag = gpkg_version_lag_days(row.get("last_version"), newest_upstream.get(row.get("qf_uuid")))
-        if lag is not None and lag > stale_days:
-            out.append((row["qf_uuid"], row["gpkg_path"], lag))
+        key = (row.get("qf_uuid"), row.get("gpkg_path"))
+        available = (minio_newest or {}).get(key)
+        behind = gpkg_behind_days(row.get("last_version"), available, now)
+        if behind is not None and behind > stale_days:
+            out.append((key[0], key[1], behind, available))
     out.sort(key=lambda r: r[2], reverse=True)
     return out
 

@@ -935,6 +935,20 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     row_count = EXCLUDED.row_count,
                     pending_count = EXCLUDED.pending_count
             """, (qf_id, gpkg_path, version, len(rows), photos_skipped_missing))
+
+            # Retire the row we just superseded. After a redirect the old path keeps a
+            # row whose last_version can never advance again — nothing writes to it and
+            # nothing deletes it — so the staleness monitor would report it as behind
+            # forever, paging on this fix's own success and burying the real signal.
+            # Scoped to the configured path of THIS project: the resolver only ever
+            # redirects away from that one name.
+            if gpkg_path != config["gpkg_path"]:
+                cur.execute(
+                    "DELETE FROM qfield_gpkg_sync_state WHERE qf_project_id = %s::uuid AND gpkg_path = %s",
+                    (qf_id, config["gpkg_path"]),
+                )
+                if cur.rowcount:
+                    print(f"  Retired superseded sync-state row for '{config['gpkg_path']}'")
             conn.commit()
 
         print(f"  Photos found: {photos_found}, New upserted: {photos_upserted}, Skipped (no MinIO): {photos_skipped_missing}")

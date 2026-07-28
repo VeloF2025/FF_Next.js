@@ -8,7 +8,7 @@ linked to an active (non-archived) FibreFlow project:
   EXTRACT-GAP  photos in QFieldCloud, ZERO rows in qfield_photo_validations —
                the project was never registered in extract-gpkg-photos.py PROJECTS.
   SYNC-GAP     rows extracted, ZERO rows in pole_qa_photos — works-qa-sync is stuck.
-  STALE-GPKG   extraction WORKED but stopped advancing while photos kept arriving.
+  STALE-GPKG   MinIO holds a NEWER version of a tracked GPKG that we are not reading.
 
 The first closes the gap that left Mahikeng's 543 photos invisible for a day: the
 ingestion is deliberately a registered-projects allow-list (safe, deterministic pole
@@ -19,12 +19,15 @@ ingested against 1 458 in the field — because the crew renamed the GPKG
 ("Civil audit.gpkg" → "Civil audit updated_27_07.gpkg") and PROJECTS still pinned the
 dead file. Both zero-checks passed happily: 597 rows had been extracted and synced,
 just none since 22 July. A count of >0 is not evidence of a working ingest, so this
-compares the last successful GPKG sync against the newest photo upstream and flags
-any project whose ingest has fallen behind. That is cause-agnostic on purpose —
-renamed GPKG, deleted GPKG, failed download, renamed layer all present identically.
+asks whether MinIO holds a NEWER version of a tracked GPKG than the one we ingested,
+and flags it once that newer file has gone unread for --stale-days. Cause-agnostic on
+purpose (renamed, deleted, failed download, renamed layer all present identically) —
+and, critically, a dormant form can never trip it, because "nothing newer exists" is
+not the same as "we are behind".
 
 Sources of truth:
-  * QFieldCloud DB (docker exec qfieldcloud-db-1) — DCIM photo counts + newest upload.
+  * QFieldCloud DB (docker exec qfieldcloud-db-1) — DCIM photo counts.
+  * MinIO (docker exec qfieldcloud-minio-1) — newest version of each tracked GPKG.
   * FibreFlow DB (DATABASE_URL) — links, qfield_photo_validations, qfield_gpkg_sync_state.
 
 A single WhatsApp summary is posted (Velo Test group) when anything is flagged.
@@ -40,6 +43,7 @@ import os
 import subprocess
 import sys
 import urllib.request
+from datetime import datetime, timezone
 
 import psycopg2
 import psycopg2.extras
@@ -47,6 +51,8 @@ import psycopg2.extras
 # Pure staleness arithmetic (no DB deps) — unit-tested/CI-gated by
 # scripts/test_qfield_gpkg_resolution.py.
 from qfield_gpkg_resolution import select_stale_gpkgs
+
+MINIO_BUCKET = "qfieldcloud-prod"
 
 QFC_CONTAINER = "qfieldcloud-db-1"
 QFC_DB_USER = "qfieldcloud_db_admin"
@@ -81,37 +87,36 @@ def qfc_dcim_counts():
     return counts
 
 
-def qfc_latest_dcim_upload():
-    """{qfield_project_uuid(str): newest DCIM upload timestamp(str)} from QFieldCloud.
+def minio_newest_versions(sync_rows):
+    """{(qf_uuid, gpkg_path): newest version id} — one `mc ls` per tracked GPKG.
 
-    Joins filestorage_fileversion because filestorage_file has no per-upload time —
-    a re-uploaded photo gets a new version row, and it is version time that says
-    'the crew is still working here'.
+    This is the denominator that makes the staleness check like-for-like: the newest
+    version OF THE SAME FILE, not the newest photo somewhere in the project. ~16 calls
+    per run. A path that fails to list is simply absent from the result, which
+    select_stale_gpkgs treats as "cannot compute" and skips.
     """
-    sql = (
-        "SELECT p.id::text, MAX(fv.created_at) "
-        "FROM core_project p "
-        "JOIN filestorage_file f ON f.project_id = p.id "
-        "JOIN filestorage_fileversion fv ON fv.file_id = f.id "
-        "WHERE f.name LIKE 'DCIM/%' GROUP BY p.id"
-    )
-    out = subprocess.run(
-        ["docker", "exec", QFC_CONTAINER, "psql", "-U", QFC_DB_USER, "-d", QFC_DB_NAME,
-         "-t", "-A", "-F", "\t", "-c", sql],
-        capture_output=True, text=True, timeout=120,
-    )
-    if out.returncode != 0:
-        print(f"WARN: could not read newest DCIM uploads: {out.stderr.strip()[:200]}", file=sys.stderr)
-        return {}
-    latest = {}
-    for line in out.stdout.splitlines():
-        line = line.strip()
-        if not line or "\t" not in line:
-            continue
-        uid, ts = line.split("\t", 1)
-        if ts.strip():
-            latest[uid.strip()] = ts.strip()
-    return latest
+    out = {}
+    for row in sync_rows:
+        prefix = f"local/{MINIO_BUCKET}/projects/{row['qf_uuid']}/files/{row['gpkg_path']}/"
+        try:
+            res = subprocess.run(
+                ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", prefix],
+                capture_output=True, text=True, timeout=30,
+            )
+            if res.returncode != 0:
+                continue
+            versions = []
+            for line in res.stdout.strip().split("\n"):
+                idx = line.find(" STANDARD ")
+                if idx != -1:
+                    v = line[idx + len(" STANDARD "):].strip().rstrip("/")
+                    if v:
+                        versions.append(v)
+            if versions:
+                out[(row["qf_uuid"], row["gpkg_path"])] = sorted(versions)[-1]
+        except Exception as e:  # noqa: BLE001 — a listing failure must not fail the monitor
+            print(f"  WARN: mc ls failed for {row['gpkg_path']}: {e}", file=sys.stderr)
+    return out
 
 
 def gpkg_sync_rows(conn):
@@ -121,7 +126,7 @@ def gpkg_sync_rows(conn):
     project and reported a single figure; measured against production that hid three
     live multi-day freezes behind an actively-syncing sibling, because 8 of 9 projects
     register two or more GPKGs. It also used last_synced_at, which the pending-rescan
-    path refreshes for an unchanged file — see gpkg_version_lag_days.
+    path refreshes for an unchanged file — see select_stale_gpkgs.
     """
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
@@ -195,11 +200,10 @@ def main():
     ap.add_argument("--threshold", type=int, default=20,
                     help="Min QFieldCloud DCIM photos before flagging a 0-ingested project (default 20)")
     ap.add_argument("--stale-days", type=float, default=3.0,
-                    help="Flag a GPKG whose ingested version is this many days older than the "
-                         "newest photo in its project (default 3). Crew inactivity cannot "
-                         "accumulate lag — both sides are upstream timestamps, so a finished "
-                         "site sits at ~0 forever. The margin absorbs a crew that photographs "
-                         "for a few days before re-uploading the GPKG.")
+                    help="Flag a GPKG when MinIO has held a newer version this many days "
+                         "without it being ingested (default 3). A dormant form never trips "
+                         "this, however old it is — only an unread newer file does. The margin "
+                         "absorbs the 4x/day cron plus a weekend.")
     ap.add_argument("--no-wa", action="store_true", help="Log only; do not post to WhatsApp")
     args = ap.parse_args()
 
@@ -217,8 +221,6 @@ def main():
               "`filestorage_file.name LIKE 'DCIM/%'` assumption may be broken; "
               "the extract-gap check cannot function.", file=sys.stderr)
 
-    newest_upstream = qfc_latest_dcim_upload()
-
     conn = psycopg2.connect(db_url)
     try:
         rows = linked_active_qfield_projects(conn)
@@ -228,6 +230,7 @@ def main():
         conn.close()
 
     qf_name_by_uuid = {r["qf_uuid"]: r["qf_name"] for r in rows}
+    minio_newest = minio_newest_versions(sync_rows)
 
     # Extract gap: upstream photos in QFieldCloud but nothing in qfield_photo_validations.
     extract_gap = []
@@ -242,8 +245,9 @@ def main():
     # last script run — see select_stale_gpkgs / gpkg_version_lag_days for why both
     # of those matter (the earlier per-project last_synced_at form found 1 of 16).
     stale_gap = [
-        (qf_name_by_uuid.get(qf_uuid, qf_uuid), path, lag)
-        for qf_uuid, path, lag in select_stale_gpkgs(sync_rows, newest_upstream, args.stale_days)
+        (qf_name_by_uuid.get(qf_uuid, qf_uuid), path, behind, available)
+        for qf_uuid, path, behind, available in select_stale_gpkgs(
+            sync_rows, minio_newest, datetime.now(timezone.utc), args.stale_days)
     ]
 
     print(f"Coverage check: {len(rows)} linked/active QField project(s) examined, "
@@ -254,9 +258,9 @@ def main():
         print(f"  EXTRACT-GAP: {ff_name} ← {qf_name}: {src} photos upstream, 0 extracted")
     for ff_name, ingested in stuck:
         print(f"  SYNC-GAP: {ff_name}: {ingested} photos extracted, 0 on the dashboard (pole_qa_photos empty)")
-    for qf_name, path, lag in stale_gap:
-        print(f"  STALE-GPKG: {qf_name} / {path}: the ingested version is {lag:.1f}d older "
-              f"than the newest field photo")
+    for qf_name, path, behind, available in stale_gap:
+        print(f"  STALE-GPKG: {qf_name} / {path}: MinIO has {available}, unread for "
+              f"{behind:.1f}d")
 
     if (extract_gap or stuck or stale_gap) and not args.no_wa:
         lines = ["⚠️ Works-QA: QField photos not reaching the dashboard", ""]
@@ -264,9 +268,9 @@ def main():
             lines.append(f"• {ff_name} ({qf_name}): {src} photos upstream, not extracted — register in extract-gpkg-photos.py")
         for ff_name, ingested in stuck:
             lines.append(f"• {ff_name}: {ingested} photos extracted but sync produced 0 pole rows — check works-qa-sync")
-        for qf_name, path, lag in stale_gap:
-            lines.append(f"• {qf_name} / {path}: ingesting a GPKG {lag:.1f} days older than the "
-                         f"newest field photo — renamed/deleted? check extract-gpkg-photos.py PROJECTS")
+        for qf_name, path, behind, _available in stale_gap:
+            lines.append(f"• {qf_name} / {path}: a newer version has been in MinIO for "
+                         f"{behind:.1f} days and is not being ingested — check extract-gpkg-photos.py")
         post_wa("\n".join(lines))
 
     # Exit 0 always — this is a monitor, not a gate; the cron continues.

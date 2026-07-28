@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from qfield_gpkg_resolution import (  # noqa: E402
     family_members,
-    gpkg_version_lag_days,
+    gpkg_behind_days,
     is_family_member,
     normalize_stem,
     parse_mc_gpkg_names,
@@ -321,70 +321,61 @@ def main():
     check("a strictly higher count still beats the stem preference",
           pick_photo_table("nope", {"a": 8, "b": 12}, prefer_stem="a.gpkg") == "b")
 
-    print("\ngpkg_version_lag_days — measured from the GPKG, not the script run:")
-    # Real Mahikeng values: ingested version v20260722042348, newest DCIM 2026-07-27 14:53Z.
-    lag = gpkg_version_lag_days("v20260722042348-1cd13adf", "2026-07-27 14:53:24.295485+00")
-    check("Mahikeng lag is ~5.4 days", lag is not None and 5.3 < lag < 5.5)
-    check("lag exceeds the 3-day default threshold", lag > 3.0)
-    now = datetime(2026, 7, 27, 14, 0, tzinfo=timezone.utc)
-    check("a fresh GPKG (newer than the newest photo) has 0 lag",
-          gpkg_version_lag_days("v20260727140000-abcd1234", now - timedelta(hours=6)) == 0.0)
-    check("negative lag clamps to 0, never negative",
-          gpkg_version_lag_days("v20260729140000-abcd1234", now) == 0.0)
-    check("finished site (GPKG and photos both old) has ~0 lag, so no alert",
-          gpkg_version_lag_days("v20260101120000-abcd1234", "2026-01-01 12:00:00+00") == 0.0)
-    check("unknown version → None, NOT 0 (unknown is not healthy)",
-          gpkg_version_lag_days(None, now) is None)
-    check("unparseable version → None", gpkg_version_lag_days("garbage", now) is None)
-    check("unknown upstream → None", gpkg_version_lag_days("v20260722042348-x", None) is None)
-    check("naive upstream timestamp is read as UTC, not rejected",
-          gpkg_version_lag_days("v20260722050000-x", datetime(2026, 7, 24, 5, 0)) == 2.0)
-    check("two-digit '+00' offset parses (fromisoformat rejects it before 3.11)",
-          gpkg_version_lag_days("v20260722050000-x", "2026-07-24 05:00:00+00") == 2.0)
+    print("\ngpkg_behind_days — 'is something newer being ignored', not 'how old is this':")
+    NOW = datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)
+    check("same version → None (dormant, never stale however old)",
+          gpkg_behind_days("v20260101000000-a", "v20260101000000-a", NOW) is None)
+    check("a form untouched for 200 days is still NOT behind",
+          gpkg_behind_days("v20260101000000-a", "v20260101000000-a", NOW) is None)
+    check("newer version available → days since it appeared",
+          abs(gpkg_behind_days("v20260722042348-a", "v20260724120000-b", NOW) - 4.0) < 0.01)
+    check("no available version (listing failed) → None, not a flag",
+          gpkg_behind_days("v20260722042348-a", None, NOW) is None)
+    check("unparseable available version → None",
+          gpkg_behind_days("v20260722042348-a", "garbage", NOW) is None)
+    check("unparseable ingested version → None",
+          gpkg_behind_days("garbage", "v20260724120000-b", NOW) is None)
+    check("future version clamps to 0, never negative",
+          gpkg_behind_days("v20260722042348-a", "v20260729120000-b", NOW) == 0.0)
 
-    print("\ngpkg_version_lag_days survives a pending-rescan (the last_synced_at trap):")
-    # Live Lawley row: LAWPoles.gpkg frozen at v20260722075537 for 5 days, but
-    # pending_count=30 made the extractor re-upsert last_synced_at=NOW() every run, so
-    # a last_synced_at-based lag read 0.0d throughout. The version-based lag cannot be
-    # moved by a re-scan, because the version only changes when a NEW file is uploaded.
-    frozen = gpkg_version_lag_days("v20260722075537-c26eb3c2", "2026-07-27 14:53:24+00")
-    check("Lawley's frozen LAWPoles reports ~5.3d, not 0.0d", frozen is not None and 5.2 < frozen < 5.4)
-    check("and therefore breaches the threshold the old signal missed", frozen > 3.0)
-
-    print("\nselect_stale_gpkgs — per FILE, so an active sibling cannot mask a stuck one:")
-    UP = {"projA": "2026-07-27 14:53:24+00", "projB": "2026-07-27 14:53:24+00"}
-    rows_in = [
-        # Live shape: one project, one frozen GPKG + one advancing sibling.
-        {"qf_uuid": "projA", "gpkg_path": "Optical Audit.gpkg", "last_version": "v20260718040000-a"},
-        {"qf_uuid": "projA", "gpkg_path": "Poles.gpkg", "last_version": "v20260727120000-b"},
-        {"qf_uuid": "projB", "gpkg_path": "Civil Audit.gpkg", "last_version": "v20260727130000-c"},
+    print("\nselect_stale_gpkgs — dormancy must never flag, a real backlog must:")
+    # Live shape on 2026-07-28: EVERY tracked path had already ingested the newest
+    # version MinIO held. The previous signal (per-file version vs project-wide newest
+    # photo) flagged 5 of them; all 5 were dormant forms with nothing to ingest.
+    DORMANT = [
+        {"qf_uuid": "p1", "gpkg_path": "Optical Audit.gpkg", "last_version": "v20260717161648-a"},
+        {"qf_uuid": "p2", "gpkg_path": "LAWPoles.gpkg", "last_version": "v20260722075537-b"},
     ]
-    stale = select_stale_gpkgs(rows_in, UP, 3.0)
-    check("flags the frozen sibling", [s[1] for s in stale] == ["Optical Audit.gpkg"])
-    check("does not flag the advancing GPKG in the same project",
-          "Poles.gpkg" not in [s[1] for s in stale])
-    check("reports the owning project and a lag over threshold",
-          stale[0][0] == "projA" and stale[0][2] > 3.0)
-    check("sorted worst-first", select_stale_gpkgs(
-        rows_in + [{"qf_uuid": "projB", "gpkg_path": "Old.gpkg", "last_version": "v20260101000000-d"}],
-        UP, 3.0)[0][1] == "Old.gpkg")
-    check("a project with no upstream photos is skipped, not flagged",
-          select_stale_gpkgs([{"qf_uuid": "ghost", "gpkg_path": "X.gpkg",
-                               "last_version": "v20260101000000-d"}], UP, 3.0) == [])
-    check("an unparseable version is skipped, not flagged",
-          select_stale_gpkgs([{"qf_uuid": "projA", "gpkg_path": "X.gpkg",
-                               "last_version": "weird"}], UP, 3.0) == [])
-    check("empty input → no flags", select_stale_gpkgs([], UP, 3.0) == [])
-    check("None input → no flags", select_stale_gpkgs(None, UP, 3.0) == [])
-    # Pin the comparison as strictly-greater. Exactly-at-threshold must NOT flag, or
-    # `--stale-days 3` would mean "3 or more" and every boundary run would alert.
-    # A `>` → `>=` slip is otherwise invisible: no other fixture lag lands on 3.0.
-    boundary = [{"qf_uuid": "projA", "gpkg_path": "Edge.gpkg",
-                 "last_version": "v20260724145324-a"}]
-    check("lag exactly == stale_days does NOT flag (strictly greater)",
-          select_stale_gpkgs(boundary, {"projA": "2026-07-27 14:53:24+00"}, 3.0) == [])
+    DORMANT_MINIO = {
+        ("p1", "Optical Audit.gpkg"): "v20260717161648-a",   # identical → nothing to do
+        ("p2", "LAWPoles.gpkg"): "v20260722075537-b",
+    }
+    check("a fortnight-old dormant form does NOT flag",
+          select_stale_gpkgs(DORMANT, DORMANT_MINIO, NOW, 3.0) == [])
+
+    BEHIND = [{"qf_uuid": "p1", "gpkg_path": "Civil Audit.gpkg", "last_version": "v20260720000000-a"}]
+    BEHIND_MINIO = {("p1", "Civil Audit.gpkg"): "v20260722000000-b"}
+    got = select_stale_gpkgs(BEHIND, BEHIND_MINIO, NOW, 3.0)
+    check("a genuinely unread newer version DOES flag", len(got) == 1)
+    check("and names the available version so the alert is actionable",
+          got[0][1] == "Civil Audit.gpkg" and got[0][3] == "v20260722000000-b")
+    check("a newer version that only just appeared does not flag yet",
+          select_stale_gpkgs(BEHIND, {("p1", "Civil Audit.gpkg"): "v20260728100000-c"}, NOW, 3.0) == [])
+    check("a path missing from the MinIO listing is skipped, not flagged",
+          select_stale_gpkgs(BEHIND, {}, NOW, 3.0) == [])
+    check("empty/None input → no flags",
+          select_stale_gpkgs([], BEHIND_MINIO, NOW, 3.0) == []
+          and select_stale_gpkgs(None, BEHIND_MINIO, NOW, 3.0) == [])
+    multi = select_stale_gpkgs(
+        BEHIND + [{"qf_uuid": "p2", "gpkg_path": "Old.gpkg", "last_version": "v20260101000000-x"}],
+        {**BEHIND_MINIO, ("p2", "Old.gpkg"): "v20260102000000-y"}, NOW, 3.0)
+    check("sorted worst-first", multi[0][1] == "Old.gpkg")
+    # Pin the comparison as strictly-greater: exactly-at-threshold must not flag.
+    edge = {("p1", "Civil Audit.gpkg"): "v20260725120000-z"}   # available exactly 3.0d ago
+    check("behind exactly == stale_days does NOT flag (strictly greater)",
+          select_stale_gpkgs(BEHIND, edge, NOW, 3.0) == [])
     check("a hair over the threshold DOES flag",
-          len(select_stale_gpkgs(boundary, {"projA": "2026-07-27 15:53:24+00"}, 3.0)) == 1)
+          len(select_stale_gpkgs(BEHIND, edge, NOW + timedelta(hours=1), 3.0)) == 1)
 
     print("\nparse_mc_gpkg_names — `mc ls` output parsing:")
     MC_OUT = (
