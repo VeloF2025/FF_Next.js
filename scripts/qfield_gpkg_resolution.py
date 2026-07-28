@@ -18,8 +18,10 @@ Two independent defences live here:
   * follow the rename  — pick the newest member of the configured file's family,
     then find the photo table inside it (the layer name tracks the filename, so it
     drifts too);
-  * notice the freeze  — compare the last successful GPKG sync against the newest
-    field photo upstream, so any *other* way of getting stuck still gets flagged.
+  * notice the freeze  — compare the version of the GPKG we ingested against the
+    newest field photo upstream, per file, so any *other* way of getting stuck still
+    gets flagged. Measuring the GPKG rather than the last script run is the whole
+    point; see gpkg_version_lag_days for what the obvious signal gets wrong.
 
 Split out from extract-gpkg-photos.py / works-qa-coverage-check.py so it is
 unit-testable without MinIO or psycopg2 — gated in CI by
