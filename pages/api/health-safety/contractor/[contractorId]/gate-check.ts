@@ -12,7 +12,9 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { checkContractorGate } from '@/modules/health-safety/services/gateService';
+import { computeContractorMedicalSummary } from '@/modules/health-safety/services/medicalService';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
+import type { ContractorMedicalSummary } from '@/modules/health-safety/types/medical.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -68,6 +70,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
+/**
+ * Panel summary for the medical check. A restricted or expiring-soon worker
+ * does not fail the check, but saying "all workers medically fit" while one is
+ * fit only with restrictions would mislead the reader — so those are called out
+ * even on the passing path.
+ */
+function medicalMessage(medical: ContractorMedicalSummary, passed: boolean): string {
+  if (medical.workers_with_medicals === 0) return 'No medical fitness records on file';
+  if (!passed) return `${medical.unfit} unfit, ${medical.expired} expired certificate(s)`;
+
+  const caveats: string[] = [];
+  if (medical.restricted > 0) caveats.push(`${medical.restricted} fit with restrictions`);
+  if (medical.expiring_soon > 0) caveats.push(`${medical.expiring_soon} expiring soon`);
+  return caveats.length > 0
+    ? `All certificates current (${caveats.join(', ')})`
+    : 'All workers medically fit with current certificates';
+}
+
 async function getGateBreakdown(contractorId: string) {
   // Documents check. `expiry_date` stays raw for the gate compare below;
   // `expiry_date_display` (::text) is what's surfaced in the `expires` field —
@@ -121,6 +141,13 @@ async function getGateBreakdown(contractorId: string) {
   // Training check (simplified)
   const trainingPassed = true; // Would check actual training records
 
+  // Per-worker medical fitness (migration 463). Same rollup and same pass
+  // condition the gate verdict uses, so the two agree for any given snapshot.
+  // (This is a second, independent call — as with training and documents above —
+  // so a write landing between the two could still desync one response.)
+  const medical = await computeContractorMedicalSummary(contractorId);
+  const medicalPassed = medical.unfit === 0 && medical.expired === 0;
+
   return {
     documents: {
       passed: docsPassed,
@@ -150,12 +177,26 @@ async function getGateBreakdown(contractorId: string) {
       passed: trainingPassed,
       message: trainingPassed ? 'Training requirements met' : 'Missing required training',
     },
+    medical: {
+      passed: medicalPassed,
+      workers_with_medicals: medical.workers_with_medicals,
+      unfit: medical.unfit,
+      expired: medical.expired,
+      expiring_soon: medical.expiring_soon,
+      restricted: medical.restricted,
+      message: medicalMessage(medical, medicalPassed),
+    },
     overall: {
-      passed: docsPassed && incidentsPassed && scorePassed && ragPassed && trainingPassed,
-      checks_passed: [docsPassed, incidentsPassed, scorePassed && ragPassed, trainingPassed].filter(
-        Boolean
-      ).length,
-      checks_total: 4,
+      passed:
+        docsPassed && incidentsPassed && scorePassed && ragPassed && trainingPassed && medicalPassed,
+      checks_passed: [
+        docsPassed,
+        incidentsPassed,
+        scorePassed && ragPassed,
+        trainingPassed,
+        medicalPassed,
+      ].filter(Boolean).length,
+      checks_total: 5,
     },
   };
 }

@@ -33,6 +33,9 @@ export {
   extendSession,
 } from './session';
 
+// Owner identity
+export { isOwner, ownerEmails } from './owner';
+
 // Middleware (Pages Router)
 export {
   withAuth,

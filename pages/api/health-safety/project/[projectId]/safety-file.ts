@@ -13,7 +13,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { generateSafetyFileHtml, type SafetyFileData } from '@/templates/health-safety/safety-file-template';
+import {
+  generateSafetyFileHtml,
+  type SafetyFileData,
+  type SafetyFileContractorDocument,
+  type SafetyFileRiskEntry,
+} from '@/templates/health-safety/safety-file-template';
 import type { AppointmentLetter } from '@/modules/health-safety/types/appointment.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
@@ -53,10 +58,48 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         (SELECT COUNT(*) FROM hs_project_audits WHERE project_id = ${projectId})::int AS audits
     `;
 
+    // hs_contractor_documents is contractor-level (no project_id), so it's
+    // scoped to this project via contractor_projects. EXISTS (not JOIN) --
+    // contractor_projects is UNIQUE(contractor_id, project_id, role), so a
+    // contractor can legitimately hold multiple roles on the same project;
+    // a JOIN would fan out and duplicate every document row per extra role.
+    // Also scoped to the contractor's CURRENT assignment (matches the
+    // precedent in pages/api/projects/[projectId]/contractors-hs.ts) --
+    // a removed/suspended/completed assignment's documents aren't part of
+    // the site's current safety file.
+    // Display-only export -- issue_date/expiry_date are pure `date` columns,
+    // cast ::text so the PDF renders them correctly on the SAST server (see
+    // feedback_pg_date_col_tz_render_sast).
+    const contractorDocuments = (await sql`
+      SELECT d.id, c.company_name, d.document_type, d.status,
+        d.issue_date::text AS issue_date, d.expiry_date::text AS expiry_date
+      FROM hs_contractor_documents d
+      JOIN contractors c ON c.id = d.contractor_id
+      WHERE EXISTS (
+        SELECT 1 FROM contractor_projects cp
+        WHERE cp.contractor_id = d.contractor_id AND cp.project_id = ${projectId}
+          AND cp.is_active = true AND cp.assignment_status IN ('assigned', 'active')
+      )
+      ORDER BY c.company_name, d.document_type, d.created_at DESC
+    `) as unknown as SafetyFileContractorDocument[];
+
+    // review_date is the only pure `date` column on hs_risk_register; same
+    // display-only cast as above.
+    const riskRegister = (await sql`
+      SELECT id, hazard_description, risk_category, likelihood, severity, risk_score, risk_level,
+        residual_risk_score, residual_risk_level, existing_controls, status,
+        review_date::text AS review_date
+      FROM hs_risk_register
+      WHERE project_id = ${projectId}
+      ORDER BY risk_score DESC, created_at
+    `) as unknown as SafetyFileRiskEntry[];
+
     const data: SafetyFileData = {
       projectName: String(project.project_name ?? 'Project'),
       generatedAt: new Date().toISOString(),
       letters,
+      contractorDocuments,
+      riskRegister,
       summary: {
         training: Number(summary?.training ?? 0),
         toolbox: Number(summary?.toolbox ?? 0),

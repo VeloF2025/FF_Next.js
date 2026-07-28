@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, isOwner, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { syncFirefliesToNeon } from '@/services/fireflies/firefliesService';
 import { log } from '@/lib/logger';
@@ -15,7 +15,7 @@ async function handler(
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
   const userName = authReq.user?.name?.toLowerCase() || '';
-  const isHein = userEmail === 'hein@velocityfibre.co.za';
+  const isHein = isOwner(authReq.user);
 
   if (!userEmail) {
     return apiResponse.forbidden(res, 'User email required for meeting access');
