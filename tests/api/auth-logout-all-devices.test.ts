@@ -14,15 +14,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMocks } from 'node-mocks-http';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const { verifyToken, deleteSession, deleteEveryUserSession, deleteAllUserSessions } = vi.hoisted(() => ({
-  verifyToken: vi.fn(),
-  deleteSession: vi.fn(),
-  deleteEveryUserSession: vi.fn(),
-  deleteAllUserSessions: vi.fn(),
-}));
+const { verifyToken, getSession, deleteSession, deleteEveryUserSession, deleteAllUserSessions } =
+  vi.hoisted(() => ({
+    verifyToken: vi.fn(),
+    getSession: vi.fn(),
+    deleteSession: vi.fn(),
+    deleteEveryUserSession: vi.fn(),
+    deleteAllUserSessions: vi.fn(),
+  }));
 
+// `getSession` is not imported by this handler yet — the read-only gate that calls it
+// lands in the next PR of this stack. Mocked here anyway so this file keeps testing the
+// sweep rather than silently exercising the handler's catch block once that gate arrives:
+// an unmocked `getSession` is `undefined`, `await undefined(...)` throws, and the catch
+// returns a bland 200 that looks nothing like the assertion that was meant to run.
 vi.mock('@/lib/auth', () => ({
   verifyToken,
+  getSession,
   deleteSession,
   deleteEveryUserSession,
   deleteAllUserSessions,
@@ -50,6 +58,8 @@ describe('POST /api/auth/logout — allDevices sweeps every session kind', () =>
   beforeEach(() => {
     vi.clearAllMocks();
     verifyToken.mockResolvedValue({ sub: USER_ID, sessionId: SESSION_ID });
+    // A browser session: the caller is a real user, not a read-only MCP token.
+    getSession.mockResolvedValue({ id: SESSION_ID, userId: USER_ID, kind: 'browser' });
   });
 
   it('allDevices sweeps kind-agnostically, so an MCP token cannot survive it', async () => {
