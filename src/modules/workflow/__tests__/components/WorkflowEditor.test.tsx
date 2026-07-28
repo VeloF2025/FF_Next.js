@@ -2,8 +2,9 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useEffect } from 'react';
 import { WorkflowEditor } from '../../components/editor/WorkflowEditor';
-import { WorkflowEditorProvider } from '../../context/WorkflowEditorContext';
+import { WorkflowEditorProvider, useWorkflowEditor } from '../../context/WorkflowEditorContext';
 import { workflowManagementService } from '../../services/WorkflowManagementService';
 import {
   mockWorkflowTemplates,
@@ -79,11 +80,33 @@ vi.mock('../../components/editor/forms', () => {
 // while keeping fake timers for the auto-save assertions.
 vi.useFakeTimers({ shouldAdvanceTime: true });
 
+// Drives `validateTemplate()` through the same public context API the toolbar
+// calls on click. Nothing in production validates on load — the toolbar and the
+// validation panel both validate on user interaction — so the "validation
+// result exists" precondition those tests name has to be established here
+// rather than assumed. This is a harness, not a stand-in for the real toolbar.
+function ValidateOnLoad() {
+  const { state, validateTemplate } = useWorkflowEditor();
+  useEffect(() => {
+    if (state.templateId) void validateTemplate();
+  }, [state.templateId, validateTemplate]);
+  return null;
+}
+
 describe('WorkflowEditor Component', () => {
   const renderWithProvider = (templateId?: string) => {
     return render(
       <WorkflowEditorProvider>
         <WorkflowEditor templateId={templateId} />
+      </WorkflowEditorProvider>
+    );
+  };
+
+  const renderValidated = (templateId: string) => {
+    return render(
+      <WorkflowEditorProvider>
+        <WorkflowEditor templateId={templateId} />
+        <ValidateOnLoad />
       </WorkflowEditorProvider>
     );
   };
@@ -150,8 +173,11 @@ describe('WorkflowEditor Component', () => {
 
       renderWithProvider('template-1');
 
-      expect(screen.getByText('Loading template...')).toBeInTheDocument();
-      expect(screen.getByRole('status', { hidden: true })).toBeInTheDocument(); // Loading spinner
+      // Two nodes legitimately carry this copy while loading: the visible
+      // overlay and the `sr-only` aria-live region that announces it. `getBy*`
+      // throws on multiple matches, so assert on the set, not on a single node.
+      expect(screen.getAllByText('Loading template...')).toHaveLength(2);
+      expect(screen.getAllByRole('status', { hidden: true }).length).toBeGreaterThan(0);
     });
 
     it('should hide loading overlay after template loads', async () => {
@@ -376,8 +402,20 @@ describe('WorkflowEditor Component', () => {
   });
 
   describe('Validation Panel', () => {
-    it('should show validation button when validation result exists', async () => {
+    it('should not show the validation button before anything has validated', async () => {
       renderWithProvider('template-1');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('editor-canvas')).toBeInTheDocument();
+      });
+
+      // Loading a template does not validate it — the button is gated on a
+      // result that only user interaction produces.
+      expect(screen.queryByTitle(/\d+ errors, \d+ warnings/)).not.toBeInTheDocument();
+    });
+
+    it('should show validation button when validation result exists', async () => {
+      renderValidated('template-1');
 
       await waitFor(() => {
         expect(screen.getByTitle(/\d+ errors, \d+ warnings/)).toBeInTheDocument();
@@ -386,7 +424,7 @@ describe('WorkflowEditor Component', () => {
 
     it('should toggle validation panel when validation button is clicked', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
-      renderWithProvider('template-1');
+      renderValidated('template-1');
 
       // Wait for component to load with validation results
       await waitFor(() => {
@@ -414,12 +452,17 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should show error icon when validation has errors', async () => {
-      renderWithProvider('template-1');
+      renderValidated('template-1');
 
+      // `toHaveClass` takes class names, not a RegExp — passing one made this
+      // look for a literal class called "/text-red-600|border-red-200/", which
+      // no element can have. Both names were wrong too: the error branch styles
+      // with red-400/red-500, not red-600/red-200.
       await waitFor(() => {
-        // Should show error icon since mockWorkflowValidationResult.isValid is false
         const validationButton = screen.getByTitle(/\d+ errors, \d+ warnings/);
-        expect(validationButton).toHaveClass(/text-red-600|border-red-200/);
+        // mockWorkflowValidationResult.isValid is false → error styling.
+        expect(validationButton).toHaveClass('text-red-400', 'border-red-500/30');
+        expect(validationButton).not.toHaveClass('text-green-400');
       });
     });
   });
@@ -567,8 +610,12 @@ describe('WorkflowEditor Component', () => {
     it('should have proper ARIA labels and roles', async () => {
       renderWithProvider('template-1');
 
+      // Not `main`: the editor renders inside the app shell, which already owns
+      // the page's single `main` landmark. Asserting `main` here would have
+      // forced a duplicate landmark — an a11y defect. `region` + accessible
+      // name is the correct landmark for a self-contained section.
       await waitFor(() => {
-        expect(screen.getByRole('main')).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Workflow editor' })).toBeInTheDocument();
       });
 
       // Check for accessibility attributes
@@ -584,17 +631,24 @@ describe('WorkflowEditor Component', () => {
       renderWithProvider('template-1');
 
       await waitFor(() => {
-        expect(screen.getByTitle('Save Template')).toBeInTheDocument();
+        expect(screen.getByTitle('Zoom In')).toBeInTheDocument();
       });
 
-      const saveButton = screen.getByTitle('Save Template');
-      
-      // Should be focusable
-      saveButton.focus();
-      expect(document.activeElement).toBe(saveButton);
+      // Deliberately not `Save Template`: it renders `disabled` until there are
+      // unsaved changes, and `.focus()` on a disabled button silently no-ops —
+      // so the original assertion could never pass, and would not have told us
+      // anything about keyboard support if it had.
+      const zoomIn = screen.getByTitle('Zoom In');
 
-      // Should respond to Enter key
+      zoomIn.focus();
+      expect(document.activeElement).toBe(zoomIn);
+
+      // Enter on the focused control must actually invoke it, not just not throw.
+      expect(screen.getByText('100%')).toBeInTheDocument();
       await user.keyboard('{Enter}');
+      await waitFor(() => {
+        expect(screen.getByText('120%')).toBeInTheDocument();
+      });
     });
   });
 });

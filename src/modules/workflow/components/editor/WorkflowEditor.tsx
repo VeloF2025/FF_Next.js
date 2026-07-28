@@ -147,6 +147,12 @@ export function WorkflowEditor({ templateId, className = '' }: WorkflowEditorPro
   return (
     <div
       ref={editorRef}
+      // `region`, not `main`: this editor renders *inside* the app shell, which
+      // already provides the page's single `main` landmark (AppLayout.tsx,
+      // AppRouterLayout.tsx, app/layout.tsx). A second `main` would be an
+      // a11y defect, not an improvement — a document gets exactly one.
+      role="region"
+      aria-label="Workflow editor"
       className={`workflow-editor h-screen flex flex-col bg-[var(--ff-bg-tertiary)] ${className}`}
     >
       {/* Editor Header */}
