@@ -230,20 +230,17 @@ def select_stale_gpkgs(sync_rows, minio_newest, now, stale_days):
     Returns [(qf_uuid, gpkg_path, days_behind, available_version)], worst-first.
 
     COMPARE LIKE WITH LIKE. Two earlier shapes both failed on production data:
-
-      * MAX(last_synced_at) per project vs the newest photo — per-project against
-        per-project — let any active sibling MASK a stuck file (1 of 16 detected).
-      * last_version of one file vs the newest DCIM upload anywhere in the project —
-        per-file numerator, per-project denominator — CRIED WOLF instead: all 5 rows
-        it flagged had already ingested every version MinIO held. DCIM is project-wide
-        and cannot be attributed to a form, so any project whose forms are worked at
-        different times over-fires, and a finished form's lag grows forever.
+    MAX(last_synced_at) per project vs the newest photo (per-project against
+    per-project) let an active sibling MASK a stuck file — 1 of 16 detected. Then
+    last_version of one file vs the newest DCIM upload anywhere in the project
+    (per-file numerator, per-project denominator) CRIED WOLF — all 5 rows it flagged
+    had already ingested every version MinIO held, because DCIM cannot be attributed
+    to a form and a finished form's lag grows forever.
 
     So the question is not "how old is what we read" but "is there something newer we
-    are failing to read". A dormant form (no newer version) can never flag no matter
-    how long it lies untouched; a genuinely stuck one flags as soon as the newer file
-    has been available longer than stale_days. That also makes the alert actionable:
-    it names a file that demonstrably exists and is being skipped.
+    are failing to read". A dormant form can never flag however long it lies untouched;
+    a stuck one flags once the newer file has been available past stale_days. It also
+    names that file, so the alert is actionable.
 
     Skipped, not flagged, when the comparison cannot be computed — a transient MinIO
     listing failure yields no entry, and this monitor must fail quiet on missing data
