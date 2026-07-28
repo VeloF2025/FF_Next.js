@@ -5,7 +5,7 @@
  *
  * Features:
  * - Look up GPS coordinates from DR number via sow_drops
- * - Look up customer info from onemap_drops
+ * - Look up customer info from onemap_properties
  * - Cross-reference with existing FibreFlow data
  *
  * @module maintenance/services/ticketEnrichmentService
@@ -50,7 +50,16 @@ export interface DropInfo {
  */
 export interface OneMapDropInfo {
   drop_number: string;
-  property_id: number | null;
+  /**
+   * 1Map's own property identifier — `onemap_properties.property_id`, a
+   * varchar, so this is a string at runtime.
+   *
+   * Deliberately NOT the same field the old `onemap_drops.property_id` held:
+   * that was an integer FK into `onemap_properties.id`. Same name, different
+   * meaning and different type. Nothing currently reads it; anything that
+   * starts to must not assume the old semantics.
+   */
+  property_id: string | null;
   latitude: number | null;
   longitude: number | null;
   address: string | null;
@@ -191,8 +200,49 @@ export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> 
 
 /**
  * Look up drop info from 1Map data
- * 🟢 WORKING: Cross-references DR number with onemap_drops table
+ * 🟢 WORKING: Cross-references DR number with the onemap_properties table.
+ *
+ * Reads `onemap_properties`, NOT `onemap_drops` — the latter holds 0 rows, so
+ * this lookup used to return null for every ticket and no enrichment ever
+ * reached the UI.
+ *
+ * `onemap_properties` stores roughly one row per workflow stage per drop, and
+ * the contact number is captured at sign-up but not carried onto the
+ * "Home Installation: Installed" row. Since tickets are raised against
+ * installed drops, the ORDER BY below is what makes the difference between
+ * finding a contact number and silently reporting none — do not reduce this to
+ * a bare LIMIT 1.
  */
+const ONEMAP_PROPERTY_COLUMNS = `
+        drop_number,
+        property_id,
+        latitude,
+        longitude,
+        location_address AS address,
+        NULLIF(TRIM(CONCAT_WS(' ', contact_name, contact_surname)), '') AS customer_name,
+        contact_number,
+        status`;
+
+/**
+ * Rows carrying a contact win.
+ *
+ * `last_modified_date` is kept as a secondary sort but does almost no work: of
+ * the 6,840 drops that have more than one contact-bearing row, every one has it
+ * NULL on all of them. `id DESC` is therefore the tie-break that actually
+ * decides, favouring the most recently imported row.
+ *
+ * A deterministic tie-break is required, not cosmetic: some drops carry several
+ * genuinely different numbers across import batches (DR1729512 has six
+ * contact-bearing rows). Without a populated sort column the winner is chosen by
+ * physical row order, which is stable only until the next VACUUM or replan — the
+ * same ticket could show a different phone number after a routine maintenance
+ * job. Picking the newest import is a rule; heap order is not.
+ */
+const ONEMAP_ROW_PREFERENCE = `
+      ORDER BY (contact_number IS NOT NULL AND contact_number <> '') DESC,
+               last_modified_date DESC NULLS LAST,
+               id DESC`;
+
 export async function lookupOneMapDrop(drNumber: string): Promise<OneMapDropInfo | null> {
   if (!drNumber) return null;
 
@@ -203,17 +253,10 @@ export async function lookupOneMapDrop(drNumber: string): Promise<OneMapDropInfo
 
     // Try exact match first
     let result = await queryOne<OneMapDropInfo>(
-      `SELECT
-        drop_number,
-        property_id,
-        latitude,
-        longitude,
-        address,
-        customer_name,
-        contact_number,
-        status
-      FROM onemap_drops
+      `SELECT ${ONEMAP_PROPERTY_COLUMNS}
+      FROM onemap_properties
       WHERE UPPER(drop_number) = $1
+      ${ONEMAP_ROW_PREFERENCE}
       LIMIT 1`,
       [normalized]
     );
@@ -223,22 +266,22 @@ export async function lookupOneMapDrop(drNumber: string): Promise<OneMapDropInfo
       return result;
     }
 
-    // Try without DR prefix
+    // Fall back to matching with the DR prefix stripped from BOTH sides, for
+    // rows stored as "1735912" rather than "DR1735912".
+    //
+    // This is an equality test, never a substring one. A `LIKE '%1729500%'`
+    // here would match nine distinct drops (DR1729500…DR1729509) in the live
+    // table, so a miss on the exact lookup could attach a different customer's
+    // name, phone number and GPS to the ticket — strictly worse than returning
+    // nothing.
     const numericPart = normalized.replace(/^DR/i, '');
     result = await queryOne<OneMapDropInfo>(
-      `SELECT
-        drop_number,
-        property_id,
-        latitude,
-        longitude,
-        address,
-        customer_name,
-        contact_number,
-        status
-      FROM onemap_drops
-      WHERE drop_number LIKE $1
+      `SELECT ${ONEMAP_PROPERTY_COLUMNS}
+      FROM onemap_properties
+      WHERE REGEXP_REPLACE(UPPER(drop_number), '^DR', '') = $1
+      ${ONEMAP_ROW_PREFERENCE}
       LIMIT 1`,
-      [`%${numericPart}%`]
+      [numericPart]
     );
 
     if (result) {
