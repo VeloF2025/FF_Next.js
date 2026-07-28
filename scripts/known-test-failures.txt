@@ -28,10 +28,6 @@ src/modules/noc/__tests__/module-structure.test.ts > Maintenance Module Structur
 src/modules/noc/__tests__/utils/db.test.ts > Database Connection Utility > Health Check > should measure query latency
 
 # --- Deterministic failures (identical across three consecutive runs) ---
-pages/api/cortex/meeting-review/__tests__/handler.test.ts [ pages/api/cortex/meeting-review/__tests__/handler.test.ts ]
-pages/api/snags/__tests__/reports-scope.test.ts [ pages/api/snags/__tests__/reports-scope.test.ts ]
-pages/api/snags/__tests__/reports-scope-xlsx.test.ts [ pages/api/snags/__tests__/reports-scope-xlsx.test.ts ]
-pages/api/snags/__tests__/reports-source-filter.test.ts [ pages/api/snags/__tests__/reports-source-filter.test.ts ]
 src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Accessibility > should have proper accessibility attributes
 src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Accessibility > should have proper ARIA labels
 src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Error Boundaries > should handle service errors gracefully
@@ -50,8 +46,6 @@ src/components/contractor/ContractorImport.test.tsx > ContractorImport Component
 src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should disable actions during import
 src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should handle cancellation during file preview
 src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should reset import state correctly
-src/modules/construction-qa/services/reportNumberGenerator.test.ts [ src/modules/construction-qa/services/reportNumberGenerator.test.ts ]
-src/modules/data-sync/__tests__/eodSheetService.test.ts [ src/modules/data-sync/__tests__/eodSheetService.test.ts ]
 src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should reject delete with invalid UUID
 src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should return 404 when ticket not found
 src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should soft delete ticket by ID
@@ -74,7 +68,6 @@ src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT 
 src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should update ticket with partial data
 src/modules/noc/__tests__/services/dashboardService.test.ts > Dashboard Service - Statistics > getAverageResolutionTime > should calculate average resolution time in hours
 src/modules/noc/__tests__/services/dashboardService.test.ts > Dashboard Service - Statistics > getAverageResolutionTime > should filter by date range when provided
-src/modules/workflow/__tests__/components/TemplateList.test.tsx [ src/modules/workflow/__tests__/components/TemplateList.test.tsx ]
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should have proper ARIA labels and roles
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should support keyboard navigation
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Loading States > should show loading overlay when loading template
@@ -89,8 +82,5 @@ tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /retur
 tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > rejects supplier_return disposition with 422 and rolls back
 tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > RETURNABLE + resolved holder → postReturnFromHolderWith runs (custody + movement SQL in txn)
 tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > updates stock_returns.status=restocked on full success
-tests/api/procurement/field-stock/returns-create-hardening.test.ts [ tests/api/procurement/field-stock/returns-create-hardening.test.ts ]
 tests/api/procurement/field-stock/returns-flow-integration.test.ts > Returns full flow integration > Happy path — tech creates → storeman inspects → accept restocks > end-to-end with mixed dispositions: restock + scrap
 tests/api/procurement/field-stock/returns-flow-integration.test.ts > Returns full flow integration > Idempotency > POST /returns with same idempotency_key returns existing return (200 not 201)
-tests/migrations/358_snag_reports_scope.test.ts [ tests/migrations/358_snag_reports_scope.test.ts ]
-tests/migrations/378_rbac_field_stock_force_correct.test.ts [ tests/migrations/378_rbac_field_stock_force_correct.test.ts ]
