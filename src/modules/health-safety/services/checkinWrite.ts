@@ -32,6 +32,7 @@ export interface CreateCheckinInput {
   ppeComplete: boolean;
   declaredActivities: CheckinActivity[];
   hazardReported: string | null;
+  activitiesWithoutPermit: CheckinActivity[];
   clearance: Extract<CheckinClearance, 'cleared' | 'blocked'>;
   blockedReasons: CheckinBlockReason[];
   gpsLat: number | null;
@@ -49,7 +50,7 @@ export async function createCheckin(input: CreateCheckinInput) {
       capture_mode, submission_id, submitted_by_staff_id,
       signature_name, signed_at,
       fit_for_duty, ppe_complete, declared_activities, hazard_reported,
-      clearance, blocked_reasons,
+      clearance, blocked_reasons, activities_without_permit,
       gps_lat, gps_lon, attendance_entry_id, risk_register_id, created_by
     ) VALUES (
       ${input.checkinDate}::date,
@@ -69,6 +70,7 @@ export async function createCheckin(input: CreateCheckinInput) {
       ${input.hazardReported},
       ${input.clearance},
       ${input.blockedReasons}::text[],
+      ${input.activitiesWithoutPermit}::text[],
       ${input.gpsLat},
       ${input.gpsLon},
       ${input.attendanceEntryId}::uuid,

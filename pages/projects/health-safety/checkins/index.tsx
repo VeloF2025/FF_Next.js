@@ -15,8 +15,8 @@ import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { projectsConfig } from '@/modules/navigation';
-import { ShieldCheck, AlertTriangle, UserX } from 'lucide-react';
-import { CHECKIN_WARNING_LABELS } from '@/modules/health-safety/types/checkin.types';
+import { ShieldCheck, UserX } from 'lucide-react';
+import { CheckinBoardRow, type CheckinRow } from '@/modules/health-safety/components/checkin/CheckinBoardRow';
 
 const fetcher = (url: string) =>
   fetch(url, { credentials: 'include' }).then((r) => {
@@ -24,19 +24,6 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
-interface CheckinRow {
-  id: string;
-  worker_name: string;
-  project_name: string | null;
-  contractor_name: string | null;
-  capture_mode: string;
-  clearance: string;
-  blocked_reasons: string[];
-  declared_activities: string[];
-  hazard_reported: string | null;
-  warnings: string[];
-  clearance_note: string | null;
-}
 
 function CheckinsContent() {
   const [clearanceFilter, setClearanceFilter] = useState('');
@@ -161,77 +148,14 @@ function CheckinsContent() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
-                const blocked = r.clearance === 'blocked';
-                return (
-                  <tr
-                    key={r.id}
-                    className={`border-t border-[var(--ff-border-light)] ${
-                      blocked ? 'bg-red-50/60 dark:bg-red-900/10' : ''
-                    }`}
-                  >
-                    <td className="px-4 py-2 font-medium text-[var(--ff-text-primary)]">
-                      {r.worker_name}
-                      {r.capture_mode === 'crew_lead' && (
-                        <span
-                          className="ml-2 text-xs text-[var(--ff-text-tertiary)]"
-                          title="Attested by a crew lead, not declared personally"
-                        >
-                          lead-attested
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-[var(--ff-text-secondary)]">
-                      {r.contractor_name ?? 'Velocity'}
-                      {r.project_name ? ` · ${r.project_name}` : ''}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded whitespace-nowrap ${
-                          blocked
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                            : r.clearance === 'cleared_by_override'
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                              : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        }`}
-                      >
-                        {blocked && <AlertTriangle className="w-3 h-3" />}
-                        {blocked ? 'Blocked' : r.clearance === 'cleared_by_override' ? 'Overridden' : 'Cleared'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-[var(--ff-text-secondary)] text-xs">
-                      {[
-                        ...r.blocked_reasons.map((b) =>
-                          b === 'self_declared_unfit' ? 'Declared unfit' : 'No current medical'
-                        ),
-                        ...r.warnings.map(
-                          (w) => CHECKIN_WARNING_LABELS[w as keyof typeof CHECKIN_WARNING_LABELS] ?? w
-                        ),
-                      ].join(' · ') || '—'}
-                      {r.hazard_reported && (
-                        <div className="mt-1 text-[var(--ff-text-tertiary)]">
-                          &ldquo;{r.hazard_reported}&rdquo;
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right whitespace-nowrap">
-                      {blocked ? (
-                        <button
-                          onClick={() => clear(r)}
-                          disabled={busyId === r.id}
-                          className="text-[var(--ff-primary-500)] hover:underline disabled:opacity-50"
-                        >
-                          {busyId === r.id ? 'Clearing…' : 'Clear'}
-                        </button>
-                      ) : (
-                        <span className="text-[var(--ff-text-tertiary)]" title={r.clearance_note ?? ''}>
-                          —
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {rows.map((r) => (
+                <CheckinBoardRow
+                  key={r.id}
+                  row={r}
+                  busy={busyId === r.id}
+                  onClear={() => clear(r)}
+                />
+              ))}
             </tbody>
           </table>
         </div>

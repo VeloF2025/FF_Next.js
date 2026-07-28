@@ -8,9 +8,10 @@
 import { neon } from '@neondatabase/serverless';
 import { sastWorkDate } from '@/modules/attendance/portal/clockUtils';
 import type { CheckinMedicalStatus } from './checkinClearance';
-import type {
-  CheckinActivity,
-  ContractorCheckinSummary,
+import {
+  MEDICAL_REQUIRED_ACTIVITIES,
+  type CheckinActivity,
+  type ContractorCheckinSummary,
 } from '../types/checkin.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -35,10 +36,16 @@ export function sastToday(): string {
  * `unverifiable` when there is no structured identity to look one up by — an
  * unregistered crew member recorded by name only.
  */
-export async function lookupMedicalStatus(worker: {
-  staffId?: string | null;
-  teamMemberId?: string | null;
-}): Promise<CheckinMedicalStatus> {
+export async function lookupMedicalStatus(
+  worker: { staffId?: string | null; teamMemberId?: string | null },
+  /**
+   * The SAST calendar day to judge validity against. NOT Postgres CURRENT_DATE:
+   * the dev/prod session timezone is UTC, so between 00:00 and 02:00 SAST the
+   * two disagree by a day and a certificate that expired yesterday would still
+   * read as valid — for exactly the height/plant work this gate exists to stop.
+   */
+  asOfDate: string = sastToday()
+): Promise<CheckinMedicalStatus> {
   const staffId = worker.staffId ?? null;
   const teamMemberId = worker.teamMemberId ?? null;
   if (!staffId && !teamMemberId) return 'unverifiable';
@@ -47,7 +54,7 @@ export async function lookupMedicalStatus(worker: {
     SELECT
       m.expiry_date,
       m.outcome,
-      (m.expiry_date IS NULL OR m.expiry_date >= CURRENT_DATE) AS still_valid
+      (m.expiry_date IS NULL OR m.expiry_date >= ${asOfDate}::date) AS still_valid
     FROM hs_worker_medicals m
     WHERE (${staffId}::uuid IS NOT NULL AND m.staff_id = ${staffId}::uuid)
        OR (${teamMemberId}::uuid IS NOT NULL AND m.team_member_id = ${teamMemberId}::uuid)
@@ -68,7 +75,9 @@ export async function lookupMedicalStatus(worker: {
  */
 export async function findActivitiesWithoutPermit(
   projectId: string,
-  activities: CheckinActivity[]
+  activities: CheckinActivity[],
+  /** SAST calendar day — see lookupMedicalStatus for why not CURRENT_DATE. */
+  asOfDate: string = sastToday()
 ): Promise<CheckinActivity[]> {
   if (activities.length === 0) return [];
 
@@ -78,8 +87,8 @@ export async function findActivitiesWithoutPermit(
     JOIN hs_permit_types pt ON pt.id = p.permit_type_id
     WHERE p.project_id = ${projectId}
       AND p.status IN ('approved', 'active')
-      AND (p.valid_from IS NULL OR p.valid_from <= CURRENT_DATE)
-      AND (p.valid_to IS NULL OR p.valid_to >= CURRENT_DATE)
+      AND (p.valid_from IS NULL OR p.valid_from <= ${asOfDate}::date)
+      AND (p.valid_to IS NULL OR p.valid_to >= ${asOfDate}::date)
   `;
   const open = new Set(rows.map((r) => String(r.code)));
   return activities.filter((a) => !open.has(a));
@@ -107,9 +116,12 @@ export async function computeContractorCheckinSummary(
       COUNT(DISTINCT submission_id) FILTER (
         WHERE hazard_reported IS NOT NULL AND btrim(hazard_reported) <> ''
       )::int AS hazards_reported,
+      -- Bound from MEDICAL_REQUIRED_ACTIVITIES rather than hardcoded here: a
+      -- literal copy would drift silently from the list that drives the actual
+      -- clearance decision, leaving the gate's warning count quietly stale.
       COUNT(*) FILTER (
         WHERE staff_id IS NULL AND team_member_id IS NULL
-          AND declared_activities && ARRAY['working_at_heights','confined_space','plant_operation']
+          AND declared_activities && ${MEDICAL_REQUIRED_ACTIVITIES}::text[]
       )::int AS medical_unverifiable
     FROM hs_daily_checkins
     WHERE contractor_id = ${contractorId}

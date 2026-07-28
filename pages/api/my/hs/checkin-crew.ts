@@ -31,10 +31,12 @@ import {
   lookupMedicalStatus,
   findActivitiesWithoutPermit,
 } from '@/modules/health-safety/services/checkinService';
+import { raiseHazardToRiskRegister } from '@/modules/health-safety/services/checkinWrite';
 import {
-  createCheckin,
-  raiseHazardToRiskRegister,
-} from '@/modules/health-safety/services/checkinWrite';
+  createCrewCheckins,
+  findCrewAlreadyCheckedIn,
+  filterTeamMembersOfContractor,
+} from '@/modules/health-safety/services/checkinCrewWrite';
 import { CHECKIN_ACTIVITIES } from '@/modules/health-safety/types/checkin.types';
 
 export const config = { api: { bodyParser: { sizeLimit: '64kb' } } };
@@ -117,10 +119,17 @@ export default withMySession(async (req, res, session) => {
       if (tmId && !UUID_RE.test(tmId)) {
         return apiResponse.badRequest(res, `team_member_id for "${name}" must be a uuid`);
       }
+      // STRICT boolean. `raw.fit_for_duty !== false` would treat the string
+      // "false", 0, or null as fit — silently flipping an unfit worker to
+      // cleared on malformed input, which the DB CHECK cannot catch because the
+      // row it receives already claims fit_for_duty = true.
+      if (raw.fit_for_duty !== undefined && typeof raw.fit_for_duty !== 'boolean') {
+        return apiResponse.badRequest(res, `fit_for_duty for "${name}" must be true or false`);
+      }
       crew.push({
         worker_name: name,
         team_member_id: tmId,
-        fit_for_duty: raw.fit_for_duty !== false, // default fit; the lead unticks
+        fit_for_duty: raw.fit_for_duty ?? true, // omitted = fit; the lead unticks
       });
     }
 
@@ -131,7 +140,33 @@ export default withMySession(async (req, res, session) => {
 
     const leadName = session.staffName?.trim() || 'Crew lead';
     const submissionId = crypto.randomUUID();
-    const withoutPermit = await findActivitiesWithoutPermit(projectId, activities);
+
+    // A supervisor must not be able to attest for another contractor's worker
+    // simply by knowing their uuid — that attestation would feed the WRONG
+    // contractor's compliance gate.
+    const claimedIds = crew.map((c) => c.team_member_id).filter((v): v is string => !!v);
+    const ownedIds = await filterTeamMembersOfContractor(contractorId, claimedIds);
+    const foreign = crew.filter((c) => c.team_member_id && !ownedIds.has(c.team_member_id));
+    if (foreign.length > 0) {
+      return apiResponse.badRequest(
+        res,
+        `Not registered to this contractor: ${foreign.map((f) => f.worker_name).join(', ')}`
+      );
+    }
+
+    // Refuse a duplicate submission with a clear message rather than letting the
+    // per-day unique index surface as a 500 — or, worse, silently inflating the
+    // contractor's compliance counts.
+    const already = await findCrewAlreadyCheckedIn(contractorId, today, claimedIds);
+    const dupes = crew.filter((c) => c.team_member_id && already.has(c.team_member_id));
+    if (dupes.length > 0) {
+      return apiResponse.conflict(
+        res,
+        `Already checked in today: ${dupes.map((d) => d.worker_name).join(', ')}. Resubmit with only the remaining crew.`
+      );
+    }
+
+    const withoutPermit = await findActivitiesWithoutPermit(projectId, activities, today);
     const needsMedical = requiresMedical(activities);
 
     // One hazard per submission, raised once — not once per crew member.
@@ -144,12 +179,11 @@ export default withMySession(async (req, res, session) => {
         })
       : null;
 
-    const created = [];
+    const members = [];
     for (const member of crew) {
       const medicalStatus = needsMedical
-        ? await lookupMedicalStatus({ teamMemberId: member.team_member_id })
+        ? await lookupMedicalStatus({ teamMemberId: member.team_member_id }, today)
         : 'current';
-
       const decision = deriveClearance({
         fit_for_duty: member.fit_for_duty,
         ppe_complete: body.ppe_complete,
@@ -158,38 +192,39 @@ export default withMySession(async (req, res, session) => {
         hazard_reported: hazard,
         activities_without_permit: withoutPermit,
       });
-
-      created.push(
-        await createCheckin({
-          checkinDate: today,
-          projectId,
-          contractorId,
-          staffId: null,
-          teamMemberId: member.team_member_id ?? null,
-          workerName: member.worker_name,
-          captureMode: 'crew_lead',
-          submissionId,
-          submittedByStaffId: session.staffId,
-          signatureName: leadName,
-          fitForDuty: member.fit_for_duty,
-          ppeComplete: body.ppe_complete,
-          declaredActivities: activities,
-          hazardReported: hazard,
-          clearance: decision.clearance,
-          blockedReasons: decision.blocked_reasons,
-          gpsLat: typeof body.lat === 'number' ? body.lat : null,
-          gpsLon: typeof body.lon === 'number' ? body.lon : null,
-          attendanceEntryId: null,
-          riskRegisterId,
-          createdBy: null,
-        })
-      );
+      members.push({
+        workerName: member.worker_name,
+        teamMemberId: member.team_member_id ?? null,
+        fitForDuty: member.fit_for_duty,
+        clearance: decision.clearance,
+        blockedReasons: decision.blocked_reasons,
+      });
     }
+
+    // All-or-nothing: a failure partway previously left some of the crew
+    // committed and the rest not, with a retry duplicating the successful ones.
+    const created = await createCrewCheckins({
+      checkinDate: today,
+      projectId,
+      contractorId,
+      submissionId,
+      submittedByStaffId: session.staffId,
+      signatureName: leadName,
+      ppeComplete: body.ppe_complete,
+      declaredActivities: activities,
+      hazardReported: hazard,
+      activitiesWithoutPermit: withoutPermit,
+      gpsLat: typeof body.lat === 'number' ? body.lat : null,
+      gpsLon: typeof body.lon === 'number' ? body.lon : null,
+      riskRegisterId,
+      members,
+    });
 
     log.info('[my/hs-checkin-crew] recorded', {
       staffId: session.staffId,
       contractorId,
       crewSize: created.length,
+      requested: crew.length,
       blocked: created.filter((c) => c.clearance === 'blocked').length,
     });
 

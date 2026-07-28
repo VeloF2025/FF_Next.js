@@ -44,6 +44,11 @@ function deriveWarnings(row: Record<string, unknown>): CheckinWarning[] {
   if (unidentified && activities.some((a) => CHECKIN_ACTIVITIES[a]?.requires_medical)) {
     warnings.push('medical_unverifiable');
   }
+  // Persisted at write time (migration 466). Previously this warning existed
+  // only in the submitter's response, so an officer never saw that someone was
+  // doing permit work with no permit open.
+  const noPermit = row.activities_without_permit;
+  if (Array.isArray(noPermit) && noPermit.length > 0) warnings.push('activity_without_permit');
   return warnings;
 }
 
@@ -100,6 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Workers affected, which for PPE is the number that matters.
       workers_with_ppe_gap: checkins.filter((c) => c.warnings.includes('ppe_incomplete')).length,
       medical_unverifiable: checkins.filter((c) => c.warnings.includes('medical_unverifiable')).length,
+      activity_without_permit: checkins.filter((c) => c.warnings.includes('activity_without_permit')).length,
       clocked_in_without_checkin: missing.length,
     };
 

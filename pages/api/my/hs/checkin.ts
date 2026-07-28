@@ -35,6 +35,25 @@ export const config = { api: { bodyParser: { sizeLimit: '16kb' } } };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Accept a client-supplied attendance_entry_id only when it is the caller's own
+ * open/closed entry. A uuid alone proves nothing about ownership, and linking a
+ * check-in to someone else's attendance row would quietly corrupt the audit
+ * trail this record exists to be.
+ */
+async function resolveOwnAttendanceEntry(
+  staffId: string,
+  raw: unknown
+): Promise<string | null> {
+  if (typeof raw !== 'string' || !UUID_RE.test(raw)) return null;
+  const rows = await sql<{ id: string }>`
+    SELECT id FROM attendance_entries
+    WHERE id = ${raw}::uuid AND staff_id = ${staffId}::uuid
+    LIMIT 1
+  `;
+  return rows[0]?.id ?? null;
+}
+
 export default withMySession(async (req, res, session) => {
   const today = sastWorkDate(new Date());
 
@@ -54,7 +73,7 @@ export default withMySession(async (req, res, session) => {
         WHERE staff_id = ${session.staffId} AND capture_mode = 'self'
         ORDER BY checkin_date DESC LIMIT 1
       `;
-      const medicalStatus = await lookupMedicalStatus({ staffId: session.staffId });
+      const medicalStatus = await lookupMedicalStatus({ staffId: session.staffId }, today);
 
       return apiResponse.success(res, {
         checkin_date: today,
@@ -101,9 +120,9 @@ export default withMySession(async (req, res, session) => {
     }
 
     const medicalStatus = requiresMedical(activities)
-      ? await lookupMedicalStatus({ staffId: session.staffId })
+      ? await lookupMedicalStatus({ staffId: session.staffId }, today)
       : 'current';
-    const withoutPermit = await findActivitiesWithoutPermit(projectId, activities);
+    const withoutPermit = await findActivitiesWithoutPermit(projectId, activities, today);
 
     const decision = deriveClearance({
       fit_for_duty: body.fit_for_duty,
@@ -124,32 +143,54 @@ export default withMySession(async (req, res, session) => {
         })
       : null;
 
-    const checkin = await createCheckin({
-      checkinDate: today,
-      projectId,
-      contractorId: null, // Velocity-internal; crew submissions carry theirs
-      staffId: session.staffId,
-      teamMemberId: null,
-      workerName,
-      captureMode: 'self',
-      submissionId: crypto.randomUUID(),
-      submittedByStaffId: session.staffId,
-      signatureName: workerName,
-      fitForDuty: body.fit_for_duty,
-      ppeComplete: body.ppe_complete,
-      declaredActivities: activities,
-      hazardReported: hazard,
-      clearance: decision.clearance,
-      blockedReasons: decision.blocked_reasons,
-      gpsLat: typeof body.lat === 'number' ? body.lat : null,
-      gpsLon: typeof body.lon === 'number' ? body.lon : null,
-      attendanceEntryId:
-        typeof body.attendance_entry_id === 'string' && UUID_RE.test(body.attendance_entry_id)
-          ? body.attendance_entry_id
-          : null,
-      riskRegisterId,
-      createdBy: null,
-    });
+    let checkin;
+    try {
+      checkin = await createCheckin({
+        checkinDate: today,
+        projectId,
+        contractorId: null, // Velocity-internal; crew submissions carry theirs
+        staffId: session.staffId,
+        teamMemberId: null,
+        workerName,
+        captureMode: 'self',
+        submissionId: crypto.randomUUID(),
+        submittedByStaffId: session.staffId,
+        signatureName: workerName,
+        fitForDuty: body.fit_for_duty,
+        ppeComplete: body.ppe_complete,
+        declaredActivities: activities,
+        hazardReported: hazard,
+        clearance: decision.clearance,
+        blockedReasons: decision.blocked_reasons,
+        activitiesWithoutPermit: withoutPermit,
+        gpsLat: typeof body.lat === 'number' ? body.lat : null,
+        gpsLon: typeof body.lon === 'number' ? body.lon : null,
+        // Only accepted when it is the caller's OWN entry — a client-supplied id
+        // for someone else's attendance row would corrupt the audit trail.
+        attendanceEntryId: await resolveOwnAttendanceEntry(
+          session.staffId,
+          body.attendance_entry_id
+        ),
+        riskRegisterId,
+        createdBy: null,
+      });
+    } catch (err) {
+      // Two submissions racing past the findSelfCheckin check both reach the
+      // INSERT; the partial unique index rejects the loser. That is the
+      // intended outcome, not an error — return the row that won.
+      const raced = await findSelfCheckin(session.staffId, today);
+      if (raced) {
+        // Recovered, but log it: a rising rate here means the client is
+        // double-submitting, which is worth knowing rather than silently
+        // absorbing.
+        log.warn('[my/hs-checkin] concurrent submit resolved to the existing row', {
+          staffId: session.staffId,
+          err: err instanceof Error ? err.message : String(err),
+        });
+        return apiResponse.success(res, { checkin: raced, already_completed: true });
+      }
+      throw err;
+    }
 
     log.info('[my/hs-checkin] recorded', {
       staffId: session.staffId,
