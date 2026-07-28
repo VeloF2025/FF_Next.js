@@ -13,7 +13,7 @@ import {
   checkPasswordStrength,
   hashResetToken,
   isResetTokenExpired,
-  deleteAllUserSessions,
+  deleteEveryUserSession,
 } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
@@ -154,9 +154,11 @@ export default async function handler(
       WHERE id = ${user.id}
     `;
 
-    // Invalidate all existing sessions for security
+    // Invalidate all existing sessions for security — every kind, including MCP tokens.
+    // A reset means "assume everything I had is burnt", so `deleteAllUserSessions` (which
+    // defaults to browser-only so a logout does not kill MCP tokens) is the wrong call here.
     try {
-      await deleteAllUserSessions(user.id);
+      await deleteEveryUserSession(user.id);
       log.info('All sessions invalidated after password reset', { userId: user.id });
     } catch (sessionError) {
       // Don't fail the password reset if session cleanup fails

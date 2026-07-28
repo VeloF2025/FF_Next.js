@@ -23,11 +23,13 @@ export {
 // Session management
 export {
   createSession,
+  setSessionTokenHash,
   createImpersonationSession,
   validateSession,
   getSession,
   deleteSession,
   deleteAllUserSessions,
+  deleteEveryUserSession,
   getUserSessions,
   cleanupExpiredSessions,
   extendSession,
