@@ -117,12 +117,6 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn(() => ({ get: vi.fn(() => ({ value: 'mock-token' })) })),
 }));
 
-// requireAuth() re-validates the JWT against a live user+session row
-// (src/lib/auth/app-router.ts:60-77) and returns 401 when the query yields
-// nothing. The global @/lib/db mock in vitest.setup.ts resolves undefined, so
-// `result.rows[0]` threw, was swallowed by the catch, and every request 401'd.
-// Stub the row so the REAL auth path runs end to end rather than mocking
-// requireAuth away — that keeps the session/token-hash check under test.
 const { mockPoolQuery } = vi.hoisted(() => ({ mockPoolQuery: vi.fn() }));
 
 // requireAuth() re-validates the JWT against a live user+session row
@@ -132,10 +126,15 @@ const { mockPoolQuery } = vi.hoisted(() => ({ mockPoolQuery: vi.fn() }));
 //
 // The mock is hoisted and controllable, NOT hardwired to always return a row.
 // A hardwired row makes the whole file pass even if the routes drop requireAuth
-// entirely — the auth assertions become decorative. See the "unauthenticated"
-// describe block below, which drives this mock to empty and asserts 401; those
-// tests fail if requireAuth is removed from a route, which is the only thing
-// that makes the positive cases meaningful.
+// entirely — the auth assertions become decorative, which is exactly what this
+// file did before.
+//
+// The `Authentication` describe block drives this mock to empty rows and
+// asserts 401 for all six authenticated handlers in the family: GET and POST on
+// route.ts, and GET/PUT/DELETE on [id]/route.ts. Each was verified to fail with
+// requireAuth bypassed at its call site. That is what makes the positive cases
+// mean anything — on their own they only show that a request WITH valid auth
+// succeeds, which a route with no auth at all also satisfies.
 vi.mock('@/lib/db', () => ({
   pool: { query: mockPoolQuery, connect: vi.fn(), end: vi.fn() },
   db: { query: vi.fn(), connect: vi.fn(), end: vi.fn() },
