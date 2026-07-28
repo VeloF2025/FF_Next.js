@@ -283,6 +283,26 @@ async function importProjectResult(
     };
   }
 
+  // Guard: a summary with no week-ending date must never reach the DB.
+  // `ft_weekly_billing.week_ending` is a `date` column, so an empty string
+  // raises `invalid input syntax for type date: ""` — an opaque Postgres error
+  // for what is really "the file we parsed isn't an FT payment summary".
+  if (!r.summary.weekEnding) {
+    const pdfName =
+      r.files.find((f) => f.kind === 'ft-payment-pdf')?.originalName ?? 'the payment PDF';
+    return {
+      ...base,
+      billingWeekId: null,
+      pricePerDrop: null,
+      invoiceSubtotal: null,
+      invoiceTotal: null,
+      status: 'skipped',
+      statusReason:
+        `No week-ending date found in "${pdfName}" — it does not look like an FT payment ` +
+        `summary. Check that "<Project> WE<code>.pdf" is in the bundle.`,
+    };
+  }
+
   const projectId = r.resolution.project.id;
   const canonicalName = r.resolution.project.name;
   const summary = r.summary;
