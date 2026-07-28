@@ -15,9 +15,25 @@ LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
 CRON_SECRET="ad2bd65646c1e1242ade2bbcf0b0a684c3cce0c53f2684e8369d7bb9bc27a3d7"
 PROD_URL="http://localhost:3000"
 
-# Load DATABASE_URL from .env.local for the SharePoint Python script
-if [ -f "$PROJECT_DIR/.env.local" ]; then
-  export DATABASE_URL=$(grep '^DATABASE_URL=' "$PROJECT_DIR/.env.local" | cut -d= -f2-)
+# Load DATABASE_URL for the Python scripts. Try .env.local then .env: the two deploy
+# dirs disagree about which one holds it — fibreflow-dev keeps DATABASE_URL in
+# .env.local, fibreflow-production keeps it in .env — so an .env.local-only read makes
+# this script silently unusable from prod. It exports an EMPTY string rather than
+# failing, which is worse than erroring: the run continues and every psql call fails
+# with a confusing connection error instead of naming the real problem.
+if [ -z "${DATABASE_URL:-}" ]; then
+  for envfile in "$PROJECT_DIR/.env.local" "$PROJECT_DIR/.env"; do
+    [ -f "$envfile" ] || continue
+    val=$(grep -m1 '^DATABASE_URL=' "$envfile" 2>/dev/null | cut -d= -f2- | tr -d '"' || true)
+    if [ -n "$val" ]; then
+      export DATABASE_URL="$val"
+      break
+    fi
+  done
+fi
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "$LOG_PREFIX ERROR: DATABASE_URL not found in $PROJECT_DIR/.env.local or .env" >&2
+  exit 1
 fi
 
 echo "$LOG_PREFIX === QA Ingest Cron Start ==="
