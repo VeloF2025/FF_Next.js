@@ -17,17 +17,29 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 // ── Hoisted mocks (must precede all imports) ───────────────────────────────────
 
-const { mockNeonSql, mockQuery, mockQueryOne, mockTxnQuery, mockTransaction } = vi.hoisted(() => {
+const { mockNeonSql, mockQuery, mockQueryOne, mockTxnQuery, mockClientQuery, txnClient, mockTransaction } = vi.hoisted(() => {
   const mockNeonSql = vi.fn();
   const mockQuery = vi.fn().mockResolvedValue([]);
   const mockQueryOne = vi.fn().mockResolvedValue(null);
   const mockTxnQuery = vi.fn().mockResolvedValue([]);
 
+  // _create.ts routes serialized lines through promoteSerial(txn.client, …).
+  // promoteSerial picks its path by testing `'release' in poolOrClient`, so the
+  // txn needs a `client` with release; client.query is a *pg* client and
+  // resolves { rows } (unlike db-pool's query, which resolves a bare array), and
+  // withSerialEventContext's setLocal needs escapeLiteral.
+  const mockClientQuery = vi.fn().mockResolvedValue({ rows: [] });
+  const txnClient = {
+    query: mockClientQuery,
+    release: () => {},
+    escapeLiteral: (v: string) => `'${String(v).replace(/'/g, "''")}'`,
+  };
+
   const mockTransaction = vi.fn().mockImplementation(
-    async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery }) => Promise<unknown>) => {
+    async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery; client: typeof txnClient }) => Promise<unknown>) => {
       mockTxnQuery('BEGIN');
       try {
-        const result = await cb({ query: mockTxnQuery, queryOne: mockTxnQuery });
+        const result = await cb({ query: mockTxnQuery, queryOne: mockTxnQuery, client: txnClient });
         mockTxnQuery('COMMIT');
         return result;
       } catch (err) {
@@ -37,7 +49,7 @@ const { mockNeonSql, mockQuery, mockQueryOne, mockTxnQuery, mockTransaction } = 
     }
   );
 
-  return { mockNeonSql, mockQuery, mockQueryOne, mockTxnQuery, mockTransaction };
+  return { mockNeonSql, mockQuery, mockQueryOne, mockTxnQuery, mockClientQuery, txnClient, mockTransaction };
 });
 
 // inspect.ts still uses the Neon shim — mock @neondatabase/serverless for it
@@ -169,20 +181,31 @@ function mockDriverStaff() {
 }
 
 function mockCreateReturn() {
+  // _create.ts splits across TWO clients, and this helper used to stub only the
+  // Neon one — so the header INSERT resolved empty and the handler threw
+  // "Failed to create return header" before any assertion ran.
+  //
+  //   via the Neon `sql` tag : generate_return_number(), and the final SELECT
+  //   via `transaction(txn)`  : the header INSERT (txn.queryOne) and one
+  //                             txn.query per line
+  //
+  // The txn stub uses the same mock for query and queryOne, so these are queued
+  // in strict CALL order — and the stub itself calls mockTxnQuery('BEGIN')
+  // before invoking the callback, which consumes a queued value. Without a
+  // filler for it the header row is handed to the BEGIN marker and the real
+  // INSERT resolves undefined, so the handler throws "Failed to create return
+  // header". ('COMMIT' at the end falls through to the default.)
+  mockTxnQuery.mockResolvedValueOnce([]); // consumed by the stub's BEGIN marker
+
+  // transaction: INSERT stock_returns ... RETURNING id  (txn.queryOne)
+  mockTxnQuery.mockResolvedValueOnce({ id: RETURN_ID });
+  // transaction: INSERT stock_return_lines x2  (txn.query)
+  mockTxnQuery.mockResolvedValueOnce([]);
+  mockTxnQuery.mockResolvedValueOnce([]);
+
   // 1. generate_return_number()
   mockNeonSql.mockResolvedValueOnce([{ num: 'RET-202605-00001' }]);
-  // 2. INSERT stock_returns RETURNING *
-  mockNeonSql.mockResolvedValueOnce([{
-    id: RETURN_ID,
-    return_number: 'RET-202605-00001',
-    status: 'pending',
-    returned_by_id: TECH_STAFF_ID,
-  }]);
-  // 3. INSERT line 1
-  mockNeonSql.mockResolvedValueOnce([]);
-  // 4. INSERT line 2
-  mockNeonSql.mockResolvedValueOnce([]);
-  // 5. SELECT full return with lines
+  // 2. SELECT full return with lines
   mockNeonSql.mockResolvedValueOnce([{
     id: RETURN_ID,
     return_number: 'RET-202605-00001',
@@ -266,11 +289,17 @@ describe('Returns full flow integration', () => {
 
     // Re-apply defaults after clearAllMocks
     mockTxnQuery.mockResolvedValue([]);
+    // `client` must be here too, not only in the vi.hoisted definition — this
+    // override runs before every test and would otherwise hand the handler a txn
+    // without it, so promoteSerial(txn.client, …) throws "Cannot use 'in'
+    // operator to search for 'release' in undefined". Same trap as
+    // returns-accept-hardening.
+    mockClientQuery.mockResolvedValue({ rows: [] });
     mockTransaction.mockImplementation(
-      async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery }) => Promise<unknown>) => {
+      async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery; client: typeof txnClient }) => Promise<unknown>) => {
         mockTxnQuery('BEGIN');
         try {
-          const result = await cb({ query: mockTxnQuery, queryOne: mockTxnQuery });
+          const result = await cb({ query: mockTxnQuery, queryOne: mockTxnQuery, client: txnClient });
           mockTxnQuery('COMMIT');
           return result;
         } catch (err) {
@@ -395,20 +424,32 @@ describe('Returns full flow integration', () => {
         typeof s === 'string' && s.includes('field_stock_movements') && s.includes("'return'")
       )).toBe(true);
 
-      // UPDATE stock_serials: restock sets status='available', holder_id=NULL
-      expect(txnCalls.some((s) =>
-        typeof s === 'string' && s.includes('stock_serials') && s.includes("'available'")
-      )).toBe(true);
+      // stock_serials writes go exclusively through promoteSerial
+      // (serialLifecycle.ts calls itself "the ONLY sanctioned write path"),
+      // which runs on txn.client and PARAMETERISES status and holder — so these
+      // never appear in txnCalls as literal SQL text. Assert on the bound
+      // params of the client mock instead: [toStatus, toHolderId, serialId].
+      const serialUpdates = mockClientQuery.mock.calls.filter(
+        ([sql]) => typeof sql === 'string' && sql.includes('UPDATE stock_serials')
+      );
 
-      // Scrap branch: UPDATE stock_serials status='scrapped'
-      expect(txnCalls.some((s) =>
-        typeof s === 'string' && s.includes('stock_serials') && s.includes("'scrapped'")
-      )).toBe(true);
+      // Restock branch lands on 'in_stock', not 'available'. Both are valid
+      // members of the serial-status vocabulary (serialLifecycle.ts), where
+      // 'available' is annotated "legacy until backfill rename" — which is
+      // presumably why the test was written against it. So the old assertion was
+      // not searching for a nonexistent status, it was searching for the
+      // superseded one. Observed sequence for this flow:
+      // 'returned' on create, then 'in_stock' (restock) and 'scrapped' (scrap)
+      // on accept.
+      expect(serialUpdates.some(([, params]) => Array.isArray(params) && params[0] === 'in_stock')).toBe(true);
 
-      // serial UPDATE must clear holder_id
-      expect(txnCalls.some((s) =>
-        typeof s === 'string' && s.includes('stock_serials') && s.includes('holder_id = NULL')
-      )).toBe(true);
+      // Scrap branch: status='scrapped'
+      expect(serialUpdates.some(([, params]) => Array.isArray(params) && params[0] === 'scrapped')).toBe(true);
+
+      // Restocked serial must have its holder cleared (param 2 is toHolderId)
+      expect(
+        serialUpdates.some(([, params]) => Array.isArray(params) && params[0] === 'in_stock' && params[1] === null)
+      ).toBe(true);
 
       // stock_return_lines marked 'processed' — one per line
       const processedUpdates = txnCalls.filter(
@@ -431,19 +472,17 @@ describe('Returns full flow integration', () => {
 
       // First call — creates the return (single line body)
       mockTechStaff();
+      // Same split as mockCreateReturn(): the header INSERT and the line INSERT
+      // run on the transaction client, not the Neon `sql` tag, and the stub's
+      // BEGIN marker consumes one queued value before the callback runs.
+      mockTxnQuery.mockResolvedValueOnce([]);                 // stub's BEGIN
+      mockTxnQuery.mockResolvedValueOnce({ id: RETURN_ID });  // header INSERT (txn.queryOne)
+      mockTxnQuery.mockResolvedValueOnce([]);                 // single line INSERT
+
       // Idempotency check: no existing row found
       mockNeonSql.mockResolvedValueOnce([]);
       // generate_return_number
       mockNeonSql.mockResolvedValueOnce([{ num: 'RET-202605-00001' }]);
-      // INSERT stock_returns RETURNING *
-      mockNeonSql.mockResolvedValueOnce([{
-        id: RETURN_ID,
-        return_number: 'RET-202605-00001',
-        status: 'pending',
-        returned_by_id: TECH_STAFF_ID,
-      }]);
-      // INSERT single line
-      mockNeonSql.mockResolvedValueOnce([]);
       // SELECT full return
       mockNeonSql.mockResolvedValueOnce([{
         id: RETURN_ID,

@@ -25,7 +25,6 @@
 # ---   the box is loaded — observed once in ~8 runs. Inherently timing-
 # ---   sensitive; the real fix is to stop asserting on wall-clock.
 src/modules/noc/__tests__/module-structure.test.ts > Maintenance Module Structure > Server Exports (index.ts) > should export from index.ts without errors
-src/modules/noc/__tests__/utils/db.test.ts > Database Connection Utility > Health Check > should measure query latency
 
 # --- Deterministic failures (identical across three consecutive runs) ---
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should have proper ARIA labels and roles
@@ -34,5 +33,3 @@ src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEdit
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should show error icon when validation has errors
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should show validation button when validation result exists
 src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should toggle validation panel when validation button is clicked
-tests/api/procurement/field-stock/returns-flow-integration.test.ts > Returns full flow integration > Happy path — tech creates → storeman inspects → accept restocks > end-to-end with mixed dispositions: restock + scrap
-tests/api/procurement/field-stock/returns-flow-integration.test.ts > Returns full flow integration > Idempotency > POST /returns with same idempotency_key returns existing return (200 not 201)
