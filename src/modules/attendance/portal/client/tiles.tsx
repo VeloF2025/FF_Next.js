@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Package,
   Camera,
+  ShieldCheck,
 } from 'lucide-react';
 
 import type { HubSummaryResponse } from './api';
@@ -207,6 +208,53 @@ export function SiteCamTile({ onClick }: { onClick: () => void }) {
       iconClass="bg-sky-500/15 text-sky-300"
       title="SiteCam"
       subtitle="Capture installation photos"
+    />
+  );
+}
+
+/**
+ * Daily H&S check-in. Deliberately the loudest tile when outstanding: the
+ * whole feature depends on people doing it, and a quiet "not done" reads as
+ * optional. A blocked check-in stays visible until an H&S officer clears it,
+ * because the worker cannot resolve it themselves.
+ */
+export function HsCheckinTile({
+  status,
+  onClick,
+}: {
+  status: { completed: boolean; clearance: string | null } | null;
+  onClick: () => void;
+}) {
+  const blocked = status?.clearance === 'blocked';
+  const done = status?.completed === true;
+
+  return (
+    <Tile
+      onClick={onClick}
+      icon={<ShieldCheck className="w-5 h-5" />}
+      iconClass={
+        blocked
+          ? 'bg-red-500/15 text-red-300'
+          : done
+            ? 'bg-emerald-500/15 text-emerald-300'
+            : 'bg-orange-500/15 text-orange-300'
+      }
+      title="H&amp;S check-in"
+      subtitle={
+        status === null
+          ? 'Loading…'
+          : blocked
+            ? 'Blocked — an H&S officer must clear you'
+            : done
+              ? 'Done for today'
+              : 'Not done today — tap to complete'
+      }
+      badge={status === null ? null : blocked ? 'Blocked' : done ? null : 'Due'}
+      badgeClass={
+        blocked
+          ? 'bg-red-500/15 text-red-300 border-red-500/30'
+          : 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+      }
     />
   );
 }
