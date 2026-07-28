@@ -40,7 +40,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   log.info('PP re-resolve triggered', {}, 'pp-reresolve');
   try {
     const result = await runLocalResolution();
-    log.info('PP re-resolve complete', { resolved: result.total_resolved }, 'pp-reresolve');
+    // A source that could not run resolves nothing while looking exactly like a
+    // source that ran and matched nothing — so say so at ERROR, not by omission.
+    if (result.failures.length > 0) {
+      log.error(
+        'PP re-resolve completed with unusable sources',
+        { failed: result.failures.length, failures: result.failures },
+        'pp-reresolve',
+      );
+    }
+    log.info(
+      'PP re-resolve complete',
+      { resolved: result.total_resolved, failedSources: result.failures.length },
+      'pp-reresolve',
+    );
     return apiResponse.success(res, result, 'PP re-resolve complete');
   } catch (error: unknown) {
     log.error('PP re-resolve failed', { error: error instanceof Error ? error.message : String(error) }, 'pp-reresolve');
