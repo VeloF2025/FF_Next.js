@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { resolveSmtpTransportSecurity } from '@/lib/smtpConfig';
+import { describe, it, expect, afterEach } from 'vitest';
+import { resolveSmtpTransportSecurity, createSmtpTransport } from '@/lib/smtpConfig';
 
 describe('resolveSmtpTransportSecurity', () => {
   it('forces TLS on port 465 when SMTP_SECURE is unset', () => {
@@ -60,5 +60,32 @@ describe('resolveSmtpTransportSecurity', () => {
       port: 587,
       secure: false,
     });
+  });
+});
+
+describe('createSmtpTransport', () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  // Callers must treat null as "cannot send". Returning a transport that
+  // silently drops mail would be worse than returning nothing.
+  it('returns null when SMTP_HOST is missing', () => {
+    delete process.env.SMTP_HOST;
+    process.env.SMTP_USER = 'ops@example.test';
+    expect(createSmtpTransport()).toBeNull();
+  });
+
+  it('returns null when SMTP_USER is missing', () => {
+    process.env.SMTP_HOST = 'smtp.example.test';
+    delete process.env.SMTP_USER;
+    expect(createSmtpTransport()).toBeNull();
+  });
+
+  it('returns null when neither is set', () => {
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_USER;
+    expect(createSmtpTransport()).toBeNull();
   });
 });
