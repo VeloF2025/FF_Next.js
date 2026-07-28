@@ -54,6 +54,18 @@ export async function createCrewCheckins(input: CrewBatchInput) {
   return transaction(async (txn) => {
     const inserted = [];
     for (const m of input.members) {
+      // Explicit arbiter rather than a bare ON CONFLICT DO NOTHING: the bare
+      // form absorbs a violation of ANY unique constraint on the table,
+      // including hs_daily_checkins_crew_name_unique (a name repeated inside
+      // one submission), which is a caller bug that should surface loudly
+      // rather than become a quiet undercount.
+      const conflictTarget = m.teamMemberId
+        ? `ON CONFLICT (team_member_id, checkin_date)
+             WHERE capture_mode = 'crew_lead' AND team_member_id IS NOT NULL
+           DO NOTHING`
+        : `ON CONFLICT (contractor_id, checkin_date, lower(btrim(worker_name)))
+             WHERE capture_mode = 'crew_lead' AND team_member_id IS NULL
+           DO NOTHING`;
       const rows = await txn.query(
         `INSERT INTO hs_daily_checkins (
            checkin_date, project_id, contractor_id,
@@ -72,7 +84,7 @@ export async function createCrewCheckins(input: CrewBatchInput) {
            $13, $14::text[], $15::text[],
            $16, $17, $18::uuid
          )
-         ON CONFLICT DO NOTHING
+         ${conflictTarget}
          RETURNING *, checkin_date::text AS checkin_date`,
         [
           input.checkinDate,
@@ -129,23 +141,79 @@ export async function findCrewAlreadyCheckedIn(
 }
 
 /**
- * Which of the supplied team_member_ids actually belong to this contractor.
+ * Classify supplied team_member_ids against the claimed contractor.
  *
- * Without this, any supervisor could attest fit-for-duty for another
- * contractor's registered worker simply by knowing their uuid, and that
- * attestation would feed the wrong contractor's compliance gate.
+ * A strict `contractor_id = $1` check is wrong TODAY: `team_members.contractor_id`
+ * is NULL for all 65 live rows (and `teams.contractor_id` for all 22), so a
+ * strict check rejects every real worker. That does not merely break the crew
+ * path — it pushes leads to submit everyone name-only, and a worker with no id
+ * cannot have their medical looked up, which silently downgrades the medical
+ * gate from enforcing to advisory for the entire subcontractor population. The
+ * workaround would defeat the control this feature exists to provide.
+ *
+ * So the binding is conditional:
+ *   - the row names a DIFFERENT contractor  -> foreign, refused
+ *   - the row names THIS contractor         -> owned, verified
+ *   - the row names no contractor (NULL)    -> unlinked: accepted, because the
+ *     linkage is absent from the data rather than contradicted by it, but
+ *     recorded as unverified so it is visible instead of silently assumed
+ *
+ * This tightens automatically the moment `team_members.contractor_id` is
+ * populated, with no code change.
  */
-export async function filterTeamMembersOfContractor(
+export async function classifyTeamMembers(
   contractorId: string,
   teamMemberIds: string[]
-): Promise<Set<string>> {
-  if (teamMemberIds.length === 0) return new Set();
+): Promise<{ owned: Set<string>; unlinked: Set<string>; foreign: Set<string> }> {
+  const owned = new Set<string>();
+  const unlinked = new Set<string>();
+  const foreign = new Set<string>();
+  if (teamMemberIds.length === 0) return { owned, unlinked, foreign };
+
   return transaction(async (txn) => {
-    const rows = await txn.query<{ id: string }>(
-      `SELECT id FROM team_members
-       WHERE id = ANY($1::uuid[]) AND contractor_id = $2::uuid`,
-      [teamMemberIds, contractorId]
+    const rows = await txn.query<{ id: string; contractor_id: string | null }>(
+      `SELECT id, contractor_id FROM team_members WHERE id = ANY($1::uuid[])`,
+      [teamMemberIds]
     );
-    return new Set(rows.map((r) => String(r.id)));
+    const seen = new Set(rows.map((r) => String(r.id)));
+    for (const r of rows) {
+      const id = String(r.id);
+      if (r.contractor_id == null) unlinked.add(id);
+      else if (String(r.contractor_id) === contractorId) owned.add(id);
+      else foreign.add(id);
+    }
+    // An id that matches no team_members row at all is foreign by definition.
+    for (const id of teamMemberIds) if (!seen.has(id)) foreign.add(id);
+    return { owned, unlinked, foreign };
+  });
+}
+
+/**
+ * Name-only crew members already recorded today for this contractor.
+ *
+ * Registered members are deduplicated by id; these are deduplicated on the
+ * normalised name, matching hs_daily_checkins_one_crew_name_per_day. Without
+ * this pre-check the unique index still holds, but ON CONFLICT DO NOTHING drops
+ * the row silently — which is exactly the "quiet wrong answer" migration 466
+ * says it is avoiding.
+ */
+export async function findCrewNamesAlreadyCheckedIn(
+  contractorId: string,
+  checkinDate: string,
+  names: string[]
+): Promise<Set<string>> {
+  if (names.length === 0) return new Set();
+  return transaction(async (txn) => {
+    const rows = await txn.query<{ name: string }>(
+      `SELECT lower(btrim(worker_name)) AS name
+       FROM hs_daily_checkins
+       WHERE contractor_id = $1::uuid
+         AND checkin_date = $2::date
+         AND capture_mode = 'crew_lead'
+         AND team_member_id IS NULL
+         AND lower(btrim(worker_name)) = ANY($3::text[])`,
+      [contractorId, checkinDate, names.map((n) => n.trim().toLowerCase())]
+    );
+    return new Set(rows.map((r) => String(r.name)));
   });
 }

@@ -35,7 +35,8 @@ import { raiseHazardToRiskRegister } from '@/modules/health-safety/services/chec
 import {
   createCrewCheckins,
   findCrewAlreadyCheckedIn,
-  filterTeamMembersOfContractor,
+  findCrewNamesAlreadyCheckedIn,
+  classifyTeamMembers,
 } from '@/modules/health-safety/services/checkinCrewWrite';
 import { CHECKIN_ACTIVITIES } from '@/modules/health-safety/types/checkin.types';
 
@@ -141,24 +142,33 @@ export default withMySession(async (req, res, session) => {
     const leadName = session.staffName?.trim() || 'Crew lead';
     const submissionId = crypto.randomUUID();
 
-    // A supervisor must not be able to attest for another contractor's worker
-    // simply by knowing their uuid — that attestation would feed the WRONG
-    // contractor's compliance gate.
+    // A supervisor must not be able to attest for a worker who belongs to a
+    // DIFFERENT contractor — that attestation would feed the wrong gate.
+    // Workers with no contractor recorded at all are accepted but flagged: see
+    // classifyTeamMembers for why refusing them would be worse than allowing
+    // them (it pushes leads to name-only submissions, which silently downgrades
+    // the medical gate to advisory for every subcontractor worker).
     const claimedIds = crew.map((c) => c.team_member_id).filter((v): v is string => !!v);
-    const ownedIds = await filterTeamMembersOfContractor(contractorId, claimedIds);
-    const foreign = crew.filter((c) => c.team_member_id && !ownedIds.has(c.team_member_id));
-    if (foreign.length > 0) {
+    const { unlinked, foreign } = await classifyTeamMembers(contractorId, claimedIds);
+    const foreignCrew = crew.filter((c) => c.team_member_id && foreign.has(c.team_member_id));
+    if (foreignCrew.length > 0) {
       return apiResponse.badRequest(
         res,
-        `Not registered to this contractor: ${foreign.map((f) => f.worker_name).join(', ')}`
+        `Registered to a different contractor: ${foreignCrew.map((f) => f.worker_name).join(', ')}`
       );
     }
 
-    // Refuse a duplicate submission with a clear message rather than letting the
-    // per-day unique index surface as a 500 — or, worse, silently inflating the
-    // contractor's compliance counts.
+    // Duplicates are refused by name, not silently dropped by the unique index.
+    // Registered workers are matched by id; name-only workers on the normalised
+    // name, so both paths get the same loud error.
     const already = await findCrewAlreadyCheckedIn(contractorId, today, claimedIds);
-    const dupes = crew.filter((c) => c.team_member_id && already.has(c.team_member_id));
+    const nameOnly = crew.filter((c) => !c.team_member_id).map((c) => c.worker_name);
+    const namesTaken = await findCrewNamesAlreadyCheckedIn(contractorId, today, nameOnly);
+    const dupes = crew.filter(
+      (c) =>
+        (c.team_member_id && already.has(c.team_member_id)) ||
+        (!c.team_member_id && namesTaken.has(c.worker_name.trim().toLowerCase()))
+    );
     if (dupes.length > 0) {
       return apiResponse.conflict(
         res,
@@ -228,9 +238,23 @@ export default withMySession(async (req, res, session) => {
       blocked: created.filter((c) => c.clearance === 'blocked').length,
     });
 
+    // If the unique index still absorbed a row (a race between the pre-check
+    // and the write), say so by name — `recorded` being smaller than the crew
+    // submitted must never be the only signal.
+    const writtenNames = new Set(
+      created.map((c) => String(c.worker_name).trim().toLowerCase())
+    );
+    const skipped = crew
+      .map((c) => c.worker_name)
+      .filter((n) => !writtenNames.has(n.trim().toLowerCase()));
+
     return apiResponse.created(res, {
       submission_id: submissionId,
       recorded: created.length,
+      skipped,
+      contractor_link_unverified: crew
+        .filter((c) => c.team_member_id && unlinked.has(c.team_member_id))
+        .map((c) => c.worker_name),
       blocked: created.filter((c) => c.clearance === 'blocked').length,
       checkins: created,
     });

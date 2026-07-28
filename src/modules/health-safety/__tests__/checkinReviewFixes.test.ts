@@ -100,16 +100,17 @@ describe('HIGH: per-member fit_for_duty is a strict boolean', () => {
   });
 });
 
-describe('MEDIUM: a supervisor cannot attest for another contractor’s worker', () => {
+describe('MEDIUM: contractor binding is conditional, not strict', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     poolSqlMock.mockResolvedValue([{ role: 'supervisor' }]);
     sqlMock.mockResolvedValue([]);
   });
 
-  it('refuses a team_member_id that does not belong to the submitted contractor', async () => {
-    // filterTeamMembersOfContractor returns nothing => the id is foreign.
-    txnQueryMock.mockResolvedValueOnce([]);
+  it('refuses a worker registered to a DIFFERENT contractor', async () => {
+    txnQueryMock.mockResolvedValueOnce([
+      { id: MEMBER, contractor_id: '00000000-0000-4000-8000-000000000000' },
+    ]);
     const res = await postCrew({
       project_id: PROJECT,
       contractor_id: CONTRACTOR,
@@ -117,13 +118,52 @@ describe('MEDIUM: a supervisor cannot attest for another contractor’s worker',
       crew: [{ worker_name: 'Someone else', team_member_id: MEMBER }],
     });
     expect(res._getStatusCode()).toBe(400);
-    expect(JSON.parse(res._getData()).error.message).toMatch(/Not registered to this contractor/);
+    expect(JSON.parse(res._getData()).error.message).toMatch(/different contractor/i);
   });
 
-  it('refuses a duplicate submission for a worker already recorded today', async () => {
+  it('ACCEPTS a worker whose contractor is not recorded, and says the link is unverified', async () => {
+    // team_members.contractor_id is NULL for every live row. A strict check
+    // would reject every real worker, pushing leads to name-only submissions —
+    // and a worker with no id cannot have their medical verified, which would
+    // downgrade the medical gate to advisory for all subcontractor workers.
     txnQueryMock
-      .mockResolvedValueOnce([{ id: MEMBER }]) // belongs to the contractor
-      .mockResolvedValueOnce([{ team_member_id: MEMBER }]); // already checked in
+      .mockResolvedValueOnce([{ id: MEMBER, contractor_id: null }]) // classify
+      .mockResolvedValueOnce([]) // no duplicate by id
+      .mockResolvedValueOnce([]) // no duplicate by name
+      .mockResolvedValue([{ worker_name: 'Thabo', clearance: 'cleared' }]); // insert
+    const res = await postCrew({
+      project_id: PROJECT,
+      contractor_id: CONTRACTOR,
+      ppe_complete: true,
+      crew: [{ worker_name: 'Thabo', team_member_id: MEMBER }],
+    });
+    expect(res._getStatusCode()).toBe(201);
+    expect(JSON.parse(res._getData()).data.contractor_link_unverified).toEqual(['Thabo']);
+  });
+
+  it('refuses an id matching no team_members row at all', async () => {
+    txnQueryMock.mockResolvedValueOnce([]); // nothing found => foreign
+    const res = await postCrew({
+      project_id: PROJECT,
+      contractor_id: CONTRACTOR,
+      ppe_complete: true,
+      crew: [{ worker_name: 'Ghost', team_member_id: MEMBER }],
+    });
+    expect(res._getStatusCode()).toBe(400);
+  });
+});
+
+describe('MEDIUM: duplicates are refused by name on BOTH paths', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    poolSqlMock.mockResolvedValue([{ role: 'supervisor' }]);
+    sqlMock.mockResolvedValue([]);
+  });
+
+  it('refuses a registered worker already recorded today', async () => {
+    txnQueryMock
+      .mockResolvedValueOnce([{ id: MEMBER, contractor_id: CONTRACTOR }])
+      .mockResolvedValueOnce([{ team_member_id: MEMBER }]);
     const res = await postCrew({
       project_id: PROJECT,
       contractor_id: CONTRACTOR,
@@ -132,6 +172,23 @@ describe('MEDIUM: a supervisor cannot attest for another contractor’s worker',
     });
     expect(res._getStatusCode()).toBe(409);
     expect(JSON.parse(res._getData()).error.message).toMatch(/Already checked in today/);
+  });
+
+  it('refuses a NAME-ONLY worker already recorded today, by name', async () => {
+    // Previously this was absorbed by ON CONFLICT DO NOTHING with no message —
+    // the quiet drop migration 466's own comment says it is avoiding.
+    // classifyTeamMembers and findCrewAlreadyCheckedIn both early-return
+    // without querying when there are no ids, so the name lookup is the FIRST
+    // query this request makes.
+    txnQueryMock.mockResolvedValueOnce([{ name: 'thabo m' }]);
+    const res = await postCrew({
+      project_id: PROJECT,
+      contractor_id: CONTRACTOR,
+      ppe_complete: true,
+      crew: [{ worker_name: '  Thabo M  ' }],
+    });
+    expect(res._getStatusCode()).toBe(409);
+    expect(JSON.parse(res._getData()).error.message).toMatch(/Thabo M/);
   });
 });
 
