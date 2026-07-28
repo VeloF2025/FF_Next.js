@@ -47,6 +47,9 @@ export default defineConfig({
       // @/lib → ./lib fallback at the end.
       { find: '@sentry/nextjs', replacement: path.resolve(__dirname, 'src/lib/sentry/__stubs__/sentry-nextjs.ts') },
       { find: /^@\/lib\/sentry/, replacement: path.resolve(__dirname, 'src/lib/sentry') },
+      // @/lib/mcp/* lives at src/lib/mcp/ (MCP edge-proxy stream bounds) — explicit
+      // src-first override before the generic @/lib → ./lib fallback below.
+      { find: /^@\/lib\/mcp/, replacement: path.resolve(__dirname, 'src/lib/mcp') },
       { find: /^@\/lib\/observability/, replacement: path.resolve(__dirname, 'src/lib/observability') },
       { find: '@/lib/rateLimiter', replacement: path.resolve(__dirname, './src/lib/rateLimiter') },
       { find: '@/lib/featureFlags', replacement: path.resolve(__dirname, './src/lib/featureFlags') },

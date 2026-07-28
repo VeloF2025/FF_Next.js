@@ -11,14 +11,18 @@
  * the regex anchors here are what trip first.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+
+import { log } from '@/lib/logger';
 
 import {
   splitCombinedPayslipPdf,
   periodToDateRange,
+  ANCHOR_ANOMALY_LOG_MESSAGE,
 } from '../pdfSplitter';
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'synthetic-payslips.pdf');
@@ -112,6 +116,142 @@ describe('splitCombinedPayslipPdf — synthetic fixture', () => {
   it('throws on non-PDF input', async () => {
     const garbage = Buffer.from('this is not a PDF file');
     await expect(splitCombinedPayslipPdf(garbage)).rejects.toThrow();
+  });
+});
+
+/**
+ * End-to-end cover for the Plain Paper layout through real pdfjs output —
+ * `payslipLayouts.test.ts` pins the regexes against hand-authored text, but
+ * only a generated PDF proves the assumptions about tab placement and
+ * right-to-left item order actually hold.
+ */
+describe('splitCombinedPayslipPdf — Plain Paper fixture', () => {
+  const PLAIN_FIXTURE = path.join(
+    __dirname,
+    'fixtures',
+    'synthetic-plain-paper-payslips.pdf'
+  );
+
+  it('detects the layout and derives the period', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages, period, numPages } = await splitCombinedPayslipPdf(buffer);
+
+    expect(numPages).toBe(4);
+    expect(pages).toHaveLength(4);
+    expect(period).toBe('2026-07');
+    expect(pages.every((p) => p.layout === 'plain_paper')).toBe(true);
+  });
+
+  it('extracts a page whose name sits inline beside the label', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages } = await splitCombinedPayslipPdf(buffer);
+
+    const p1 = pages[0]!;
+    expect(p1.empCode).toBe('AC002');
+    expect(p1.empName).toBe('JANE DOE');
+    expect(p1.firstInitial).toBe('J');
+    expect(p1.lastName).toBe('doe');
+    expect(p1.idNumber).toBe('8001015009088');
+    expect(p1.paymentDate).toBe('2026/07/31');
+    // Space-separated amounts, and not the larger YTD "Taxable earnings".
+    expect(p1.totalEarningsCents).toBe(2_500_000);
+    expect(p1.totalDeductionsCents).toBe(355_812);
+    expect(p1.nettPayCents).toBe(2_144_188);
+  });
+
+  it('reassembles a name Sage wrapped onto its own lines', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages } = await splitCombinedPayslipPdf(buffer);
+
+    const p2 = pages[1]!;
+    expect(p2.empName).toBe('PIETER JOHANNES VAN NIEKERK');
+    expect(p2.firstInitial).toBe('P');
+    expect(p2.lastName).toBe('niekerk');
+    expect(p2.totalEarningsCents).toBe(3_000_000);
+    expect(p2.nettPayCents).toBe(2_514_188);
+  });
+
+  it('handles a page with no Id Number without inventing one', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages } = await splitCombinedPayslipPdf(buffer);
+
+    const p3 = pages[2]!;
+    expect(p3.empCode).toBe('AC032');
+    expect(p3.idNumber).toBeNull();
+    expect(p3.empName).toBe('THABO GLADWELL MOKOENA');
+    expect(p3.totalEarningsCents).toBe(2_270_187);
+  });
+
+  it('derives deductions to the figure actually printed on each page', async () => {
+    const buffer = fs.readFileSync(PLAIN_FIXTURE);
+    const { pages } = await splitCombinedPayslipPdf(buffer);
+
+    // Deductions is derived (earnings - nett), so asserting the arithmetic
+    // would be a tautology. What matters is that the derived value equals the
+    // "Total deductions" figure Sage prints — otherwise the stored row would
+    // contradict the PDF the staff member downloads.
+    const printed: Array<[string, number]> = [
+      ['3 558.12', 355_812],
+      ['4 858.12', 485_812],
+      ['2 960.61', 296_061],
+      ['71.06', 7_106],
+    ];
+
+    printed.forEach(([onPage, cents], i) => {
+      const page = pages[i]!;
+      expect(page.rawText).toContain(`${onPage}\tTotal deductions`);
+      expect(page.totalDeductionsCents).toBe(cents);
+    });
+  });
+});
+
+describe('splitCombinedPayslipPdf — anchor anomaly logging', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('stays silent on both well-formed fixtures', async () => {
+    const warn = vi.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+    await splitCombinedPayslipPdf(fs.readFileSync(FIXTURE));
+    await splitCombinedPayslipPdf(
+      fs.readFileSync(path.join(__dirname, 'fixtures', 'synthetic-plain-paper-payslips.pdf'))
+    );
+
+    const anchorWarnings = warn.mock.calls.filter(
+      ([msg]) => msg === ANCHOR_ANOMALY_LOG_MESSAGE
+    );
+    expect(anchorWarnings).toEqual([]);
+  });
+
+  it('warns with the page number and labels when a page has an extra anchor', async () => {
+    const warn = vi.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+    // Build a one-page PDF carrying a duplicated "Nett pay" anchor.
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const page = doc.addPage([595, 842]);
+    const rows = [
+      ['Employee Code', 'AC900'],
+      ['Employee', 'DEMO PERSON'],
+      ['Nett pay', '1 000.00'],
+      ['Nett pay', '2 000.00'],
+    ];
+    rows.forEach(([label, value], i) => {
+      const y = 800 - i * 20;
+      // Right-to-left, as the Plain Paper template emits.
+      page.drawText(value!, { x: 300, y, size: 9, font });
+      page.drawText(label!, { x: 150, y, size: 9, font });
+    });
+
+    await splitCombinedPayslipPdf(Buffer.from(await doc.save()));
+
+    const anchorWarnings = warn.mock.calls.filter(
+      ([msg]) => msg === ANCHOR_ANOMALY_LOG_MESSAGE
+    );
+    expect(anchorWarnings).toHaveLength(1);
+    expect(anchorWarnings[0]![1]).toMatchObject({ page: 1, layout: 'plain_paper' });
+    expect((anchorWarnings[0]![1] as { labels: string[] }).labels).toContain('Nett pay');
   });
 });
 

@@ -31,7 +31,7 @@ function numArg(flag: string, def: number): number {
   if (raw === undefined) return def;
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) {
-    console.error(`ERROR: ${flag} must be a positive number (got "${raw}")`);
+    console.error(`ERROR: ${flag} must be a positive number (got "${raw}")`);  // eslint-disable-line no-console
     process.exit(1);
   }
   return n;
@@ -103,7 +103,7 @@ async function scoreOne(pool: Pool, task: ScoreTask): Promise<'scored' | 'skippe
     );
     return 'scored';
   } catch (err) {
-    console.error(`  score failed row=${task.rowId} slot=${task.slotKey}: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`  score failed row=${task.rowId} slot=${task.slotKey}: ${err instanceof Error ? err.message : String(err)}`);  // eslint-disable-line no-console
     return 'errored';
   }
 }
@@ -123,7 +123,22 @@ async function runPool(pool: Pool, tasks: ScoreTask[], concurrency: number) {
 
 async function main() {
   const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) { console.error('ERROR: DATABASE_URL not set'); process.exit(1); }
+  if (!dbUrl) { console.error('ERROR: DATABASE_URL not set'); process.exit(1); }  // eslint-disable-line no-console
+
+  // Without VLM_PROXY_SECRET every photo URL we hand vLLM is unauthorised: the
+  // proxy fails closed with 401, vLLM cannot read the image, and EVERY slot errors.
+  // This is not a partial degradation, so refuse the run instead of grinding out
+  // thousands of guaranteed failures (11 054 of them between 2026-07-21 and 07-27,
+  // which read as "the VLM is broken" rather than "the cron lost an env var").
+  // Exit 1 — the cron treats step 3 as non-fatal and continues to the coverage check.
+  if (!process.env.VLM_PROXY_SECRET) {
+    console.error(  // eslint-disable-line no-console
+      'ERROR: VLM_PROXY_SECRET not set — every photo-proxy fetch would 401 and all ' +
+      'scoring would fail. This script runs outside Next.js, so .env.local is NOT ' +
+      'auto-loaded; export it from the caller (see scripts/cron/worksqa-qfield-ingest.sh).',
+    );
+    process.exit(1);
+  }
 
   const limit = numArg('--limit', 500);
   const concurrency = numArg('--concurrency', 4);
@@ -142,9 +157,9 @@ async function main() {
       [...projParams, String(freshHours)],
     );
     const freshTasks = tasksForRows(fresh.rows);
-    console.log(`Phase 1 (fresh <${freshHours}h): ${fresh.rows.length} rows, ${freshTasks.length} eligible slots`);
+    console.log(`Phase 1 (fresh <${freshHours}h): ${fresh.rows.length} rows, ${freshTasks.length} eligible slots`);  // eslint-disable-line no-console
     const freshRes = await runPool(pool, freshTasks, concurrency);
-    console.log(`  fresh: scored=${freshRes.scored} errored=${freshRes.errored} skipped=${freshRes.skipped}`);
+    console.log(`  fresh: scored=${freshRes.scored} errored=${freshRes.errored} skipped=${freshRes.skipped}`);  // eslint-disable-line no-console
 
     // Phase 2 — backlog: oldest first, capped at --limit eligible slots.
     const backlog = await pool.query<ScorableRow>(
@@ -156,12 +171,12 @@ async function main() {
       [...projParams, String(freshHours), limit],
     );
     const backlogTasks = tasksForRows(backlog.rows).slice(0, limit);
-    console.log(`Phase 2 (backlog): ${backlog.rows.length} rows scanned, scoring ${backlogTasks.length} slots (limit ${limit})`);
+    console.log(`Phase 2 (backlog): ${backlog.rows.length} rows scanned, scoring ${backlogTasks.length} slots (limit ${limit})`);  // eslint-disable-line no-console
     const backRes = await runPool(pool, backlogTasks, concurrency);
-    console.log(`  backlog: scored=${backRes.scored} errored=${backRes.errored} skipped=${backRes.skipped}`);
+    console.log(`  backlog: scored=${backRes.scored} errored=${backRes.errored} skipped=${backRes.skipped}`);  // eslint-disable-line no-console
 
     const totalErr = freshRes.errored + backRes.errored;
-    console.log(`TOTAL: scored=${freshRes.scored + backRes.scored} errored=${totalErr}`);
+    console.log(`TOTAL: scored=${freshRes.scored + backRes.scored} errored=${totalErr}`);  // eslint-disable-line no-console
     if (totalErr > 0) process.exitCode = 1; // cron logs a WARNING
   } finally {
     await pool.end();
@@ -169,6 +184,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('works-qa-vlm-score failed:', err instanceof Error ? err.message : String(err));
+  console.error('works-qa-vlm-score failed:', err instanceof Error ? err.message : String(err));  // eslint-disable-line no-console
   process.exit(1);
 });
