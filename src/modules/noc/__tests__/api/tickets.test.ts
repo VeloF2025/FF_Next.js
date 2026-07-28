@@ -123,31 +123,42 @@ vi.mock('next/headers', () => ({
 // `result.rows[0]` threw, was swallowed by the catch, and every request 401'd.
 // Stub the row so the REAL auth path runs end to end rather than mocking
 // requireAuth away — that keeps the session/token-hash check under test.
+const { mockPoolQuery } = vi.hoisted(() => ({ mockPoolQuery: vi.fn() }));
+
+// requireAuth() re-validates the JWT against a live user+session row
+// (src/lib/auth/app-router.ts:60-77) and returns 401 when the query yields
+// nothing. The global @/lib/db mock in vitest.setup.ts resolves undefined, so
+// `result.rows[0]` threw, was swallowed by the catch, and every request 401'd.
+//
+// The mock is hoisted and controllable, NOT hardwired to always return a row.
+// A hardwired row makes the whole file pass even if the routes drop requireAuth
+// entirely — the auth assertions become decorative. See the "unauthenticated"
+// describe block below, which drives this mock to empty and asserts 401; those
+// tests fail if requireAuth is removed from a route, which is the only thing
+// that makes the positive cases meaningful.
 vi.mock('@/lib/db', () => ({
-  pool: {
-    query: vi.fn(async () => ({
-      rows: [{
-        id: 'test-user-id-123',
-        email: 'test@velocityfibre.co.za',
-        first_name: 'Test',
-        last_name: 'User',
-        role: 'admin',
-        permissions: null,
-        is_active: true,
-        profile_picture: null,
-        department: null,
-        kind: 'browser',
-      }],
-    })),
-    connect: vi.fn(),
-    end: vi.fn(),
-  },
+  pool: { query: mockPoolQuery, connect: vi.fn(), end: vi.fn() },
   db: { query: vi.fn(), connect: vi.fn(), end: vi.fn() },
   query: vi.fn(),
   sql: vi.fn(async () => []),
   getDbCircuitStats: vi.fn(() => ({ state: 'closed', failures: 0 })),
   resetDbCircuit: vi.fn(),
 }));
+
+/** The authenticated user+session row requireAuth expects to find. */
+const AUTH_ROW = {
+  id: 'test-user-id-123',
+  email: 'test@velocityfibre.co.za',
+  first_name: 'Test',
+  last_name: 'User',
+  role: 'admin',
+  permissions: null,
+  is_active: true,
+  profile_picture: null,
+  department: null,
+  kind: 'browser',
+};
+
 
 // Mock JWT verification to return a test user
 vi.mock('@/lib/auth/jwt', () => ({
@@ -189,6 +200,8 @@ vi.mock('@neondatabase/serverless', () => ({
 describe('Ticket CRUD API Endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Authenticated by default; the unauthenticated block below overrides this.
+    mockPoolQuery.mockResolvedValue({ rows: [AUTH_ROW] });
   });
 
   afterEach(() => {
@@ -797,6 +810,44 @@ describe('Ticket CRUD API Endpoints', () => {
 
       expect(response.status).toBe(500);
       expect(data.error.code).toBe('DATABASE_ERROR');
+    });
+  });
+
+  // ==================== Authentication (negative) ====================
+  //
+  // These exist because without them the whole file passes even if the routes
+  // drop requireAuth entirely — the positive cases assert only that a request
+  // WITH valid auth succeeds, which a route with no auth at all also satisfies.
+  // This endpoint shipped unauthenticated to production once already, so the
+  // gate needs a test that fails when the gate is gone.
+  describe('Authentication', () => {
+    it('GET /tickets returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { GET } = await import('@/app/api/noc/tickets/route');
+      const response = await GET(makeRequest('http://localhost/api/noc/tickets'));
+      expect(response.status).toBe(401);
+    });
+
+    it('GET /tickets returns 401 when no auth cookie is presented', async () => {
+      const { GET } = await import('@/app/api/noc/tickets/route');
+      const req = new NextRequest('http://localhost/api/noc/tickets', {
+        headers: new Headers(),
+      });
+      const response = await GET(req);
+      expect(response.status).toBe(401);
+    });
+
+    it('POST /tickets returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { POST } = await import('@/app/api/noc/tickets/route');
+      const response = await POST(
+        makeRequest('http://localhost/api/noc/tickets', {
+          method: 'POST',
+          body: JSON.stringify({ title: 'x', ticket_type: 'maintenance' }),
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+      expect(response.status).toBe(401);
     });
   });
 });
