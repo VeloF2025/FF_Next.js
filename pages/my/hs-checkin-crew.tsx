@@ -3,10 +3,9 @@
  * subcontractor crew in one submission.
  *
  * This is a lead ATTESTING for other people, not a personal declaration —
- * weaker evidence, and the page says so. The contractor picker is mandatory
- * because without a contractor_id the rows never reach the compliance gate
- * they exist to feed. GPS is captured silently: a lead standing on site should
- * not have to fight a permission banner to record their crew.
+ * weaker evidence, and the page says so. The contractor picker is mandatory:
+ * without a contractor_id the rows never reach the compliance gate they exist
+ * to feed. GPS is captured silently — no permission banner to fight on site.
  */
 
 import type { NextPage } from 'next';
@@ -75,11 +74,15 @@ const HsCheckinCrewPage: NextPage & { getLayout?: (p: React.ReactElement) => Rea
           setNotAllowed(true);
           return null;
         }
+        // Any other failure (expired session, server error) must NOT fall
+        // through to an empty, silently unusable form.
+        if (!r.ok) throw new Error(`bootstrap failed: ${r.status}`);
         return r.json();
       })
       .then((j) => {
+        if (j == null) return; // 403 path
         const d = j?.data;
-        if (!d) return;
+        if (!d) throw new Error('bootstrap returned no data');
         setProjects(d.projects ?? []);
         setContractors(d.contractors ?? []);
         setRoster(d.team_members ?? []);
@@ -109,6 +112,15 @@ const HsCheckinCrewPage: NextPage & { getLayout?: (p: React.ReactElement) => Rea
   const rosterForContractor = contractorId
     ? roster.filter((m) => !m.contractor_id || m.contractor_id === contractorId)
     : [];
+
+  function changeContractor(id: string) {
+    setContractorId(id);
+    // Roster links belong to the previous contractor's filter: kept, they leave
+    // rows locked to a worker the picker no longer offers and the server 400s
+    // the submit as cross-contractor. Names stay; the lead relinks under the
+    // new roster.
+    setRows((prev) => prev.map((r) => (r.teamMemberId ? { ...r, teamMemberId: null } : r)));
+  }
 
   async function submit() {
     setError(null);
@@ -154,8 +166,7 @@ const HsCheckinCrewPage: NextPage & { getLayout?: (p: React.ReactElement) => Rea
   }
 
   function recordAnother() {
-    // Same site, next crew: keep project and contractor, but every declaration
-    // (PPE, activities, hazard, the crew itself) must be made afresh.
+    // Keep project + contractor; every declaration must be made afresh.
     setRows([newCrewRow(1)]);
     setPpe(null);
     setSelected([]);
@@ -231,7 +242,7 @@ const HsCheckinCrewPage: NextPage & { getLayout?: (p: React.ReactElement) => Rea
 
         <div className={cardCls}>
           <label className={labelCls} htmlFor="contractor">Which contractor do they work for?</label>
-          <select id="contractor" className={inputCls} value={contractorId} onChange={(e) => setContractorId(e.target.value)}>
+          <select id="contractor" className={inputCls} value={contractorId} onChange={(e) => changeContractor(e.target.value)}>
             <option value="">Choose a contractor…</option>
             {contractors.map((c) => (
               <option key={c.id} value={c.id}>{c.company_name}</option>
