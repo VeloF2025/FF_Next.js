@@ -39,9 +39,9 @@ describe('CrewOutcome', () => {
     expect(screen.getByText(/already checked in today/i)).toBeInTheDocument();
     expect(screen.getByText('Thabo M')).toBeInTheDocument();
 
-    // Blocked worker named, with a human reason.
+    // Blocked worker named, with the same human label the officer board uses.
     expect(screen.getByText('Anna K')).toBeInTheDocument();
-    expect(screen.getByText(/marked not fit for duty/i)).toBeInTheDocument();
+    expect(screen.getByText(/declared not fit for duty/i)).toBeInTheDocument();
 
     // Unverified contractor link surfaced, not swallowed.
     expect(screen.getByText('Sipho D')).toBeInTheDocument();

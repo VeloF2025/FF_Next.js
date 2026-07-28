@@ -10,6 +10,7 @@
 
 import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { CHECKIN_CARD } from './CheckinPrompts';
+import { CHECKIN_BLOCK_REASON_LABELS } from '../../types/checkin.types';
 
 export interface CrewSubmitResult {
   recorded: number;
@@ -19,10 +20,11 @@ export interface CrewSubmitResult {
   checkins: { worker_name: string; clearance: string; blocked_reasons: string[] }[];
 }
 
-const BLOCK_REASON_TEXT: Record<string, string> = {
-  self_declared_unfit: 'marked not fit for duty',
-  medical_not_current: 'no current Certificate of Fitness for the selected work',
-};
+// One vocabulary for block reasons everywhere (same labels the officer board
+// uses), so the lead and the officer talk about the same thing in the same
+// words. Unknown codes fall back to the raw value rather than disappearing.
+const reasonText = (r: string): string =>
+  (CHECKIN_BLOCK_REASON_LABELS as Record<string, string>)[r] ?? r;
 
 export function CrewOutcome({
   requested,
@@ -81,7 +83,7 @@ export function CrewOutcome({
                 {c.worker_name}
                 <span className="text-red-300">
                   {' — '}
-                  {c.blocked_reasons.map((r) => BLOCK_REASON_TEXT[r] ?? r).join('; ')}
+                  {c.blocked_reasons.map(reasonText).join('; ')}
                 </span>
               </li>
             ))}
