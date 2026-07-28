@@ -837,6 +837,47 @@ describe('Ticket CRUD API Endpoints', () => {
       expect(response.status).toBe(401);
     });
 
+    // The [id] route has its own three handlers with their own requireAuth
+    // calls. Covering only the collection route left 3 of 6 authenticated
+    // handlers with no negative case, while the file read as "auth is tested
+    // here" — verified: bypassing requireAuth in [id]/route.ts left the whole
+    // suite green.
+    const TICKET_ID = '123e4567-e89b-12d3-a456-426614174000';
+
+    it('GET /tickets/[id] returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { GET } = await import('@/app/api/noc/tickets/[id]/route');
+      const response = await GET(
+        makeRequest(`http://localhost/api/noc/tickets/${TICKET_ID}`),
+        { params: { id: TICKET_ID } },
+      );
+      expect(response.status).toBe(401);
+    });
+
+    it('PUT /tickets/[id] returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
+      const response = await PUT(
+        makeRequest(`http://localhost/api/noc/tickets/${TICKET_ID}`, {
+          method: 'PUT',
+          body: JSON.stringify({ title: 'updated' }),
+          headers: { 'content-type': 'application/json' },
+        }),
+        { params: { id: TICKET_ID } },
+      );
+      expect(response.status).toBe(401);
+    });
+
+    it('DELETE /tickets/[id] returns 401 when the session row does not resolve', async () => {
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+      const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
+      const response = await DELETE(
+        makeRequest(`http://localhost/api/noc/tickets/${TICKET_ID}`, { method: 'DELETE' }),
+        { params: { id: TICKET_ID } },
+      );
+      expect(response.status).toBe(401);
+    });
+
     it('POST /tickets returns 401 when the session row does not resolve', async () => {
       mockPoolQuery.mockResolvedValue({ rows: [] });
       const { POST } = await import('@/app/api/noc/tickets/route');
