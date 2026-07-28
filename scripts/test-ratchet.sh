@@ -55,11 +55,27 @@ run_suite() {
   # fails loudly instead of hanging a local run forever. GHA has its own
   # timeout-minutes, but `bash scripts/ci-local.sh` has nothing else to stop it.
   # A kill produces no summary line, which the check below turns into a failure.
+  local raw="$WORK/out.raw"
   if command -v timeout >/dev/null 2>&1; then
-    timeout "${RATCHET_TIMEOUT_SECS:-900}" npm test -- --run --reporter=basic "$@" > "$OUTPUT" 2>&1 || true
+    NO_COLOR=1 FORCE_COLOR=0 timeout "${RATCHET_TIMEOUT_SECS:-900}" \
+      npm test -- --run --reporter=basic "$@" > "$raw" 2>&1 || true
   else
-    npm test -- --run --reporter=basic "$@" > "$OUTPUT" 2>&1 || true
+    NO_COLOR=1 FORCE_COLOR=0 \
+      npm test -- --run --reporter=basic "$@" > "$raw" 2>&1 || true
   fi
+
+  # Strip ANSI escapes before anything is parsed.
+  #
+  # This is not cosmetic. vitest disables colour when stdout is a file, so
+  # redirecting locally produced clean text and every check below matched. On
+  # GitHub Actions it emits colour anyway, turning the summary into
+  # "\e[2m      Tests \e[22m \e[1m\e[31m6 failed" — which matches neither the
+  # summary regex nor the FAIL-line extraction. The first CI run of this gate
+  # therefore reported a completed suite as "did not complete", and every known
+  # failure would have parsed as a new one. Stripping here rather than trusting
+  # NO_COLOR/FORCE_COLOR to be honoured: the env vars are set above as well, but
+  # the parser must not depend on a tool's colour heuristics.
+  sed -E "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" "$raw" > "$OUTPUT"
 
   # A hung, killed or crashed run emits no summary. That MUST fail: treating a
   # missing summary as "no failures" is exactly how the old setup reported a
