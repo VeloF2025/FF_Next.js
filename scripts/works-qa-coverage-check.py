@@ -8,7 +8,8 @@ linked to an active (non-archived) FibreFlow project:
   EXTRACT-GAP  photos in QFieldCloud, ZERO rows in qfield_photo_validations —
                the project was never registered in extract-gpkg-photos.py PROJECTS.
   SYNC-GAP     rows extracted, ZERO rows in pole_qa_photos — works-qa-sync is stuck.
-  STALE-GPKG   MinIO holds a NEWER version of a tracked GPKG that we are not reading.
+  STALE-GPKG   a newer file exists that we are not ingesting — either a newer
+               version of the tracked GPKG, or a newer same-family sibling (a rename).
 
 The first closes the gap that left Mahikeng's 543 photos invisible for a day: the
 ingestion is deliberately a registered-projects allow-list (safe, deterministic pole
@@ -19,15 +20,20 @@ ingested against 1 458 in the field — because the crew renamed the GPKG
 ("Civil audit.gpkg" → "Civil audit updated_27_07.gpkg") and PROJECTS still pinned the
 dead file. Both zero-checks passed happily: 597 rows had been extracted and synced,
 just none since 22 July. A count of >0 is not evidence of a working ingest, so this
-asks whether MinIO holds a NEWER version of a tracked GPKG than the one we ingested,
-and flags it once that newer file has gone unread for --stale-days. Cause-agnostic on
-purpose (renamed, deleted, failed download, renamed layer all present identically) —
-and, critically, a dormant form can never trip it, because "nothing newer exists" is
-not the same as "we are behind".
+asks whether a newer file exists that we are not reading — either a newer version of
+the tracked path, or a newer same-family SIBLING (which is how a rename presents: the
+tracked path stops changing and looks perfectly dormant). Flagged once that file has
+gone unread for --stale-days. A dormant form can never trip it, because "nothing newer
+exists" is not the same as "we are behind".
+
+Not covered: a GPKG deleted outright from MinIO. gpkg_behind_days fails quiet on a
+missing listing so a transient mc failure cannot page, which means a genuine deletion
+reads the same as a blip.
 
 Sources of truth:
   * QFieldCloud DB (docker exec qfieldcloud-db-1) — DCIM photo counts.
-  * MinIO (docker exec qfieldcloud-minio-1) — newest version of each tracked GPKG.
+  * MinIO (docker exec qfieldcloud-minio-1) — newest version of each tracked GPKG
+    and of its same-family siblings.
   * FibreFlow DB (DATABASE_URL) — links, qfield_photo_validations, qfield_gpkg_sync_state.
 
 A single WhatsApp summary is posted (Velo Test group) when anything is flagged.
@@ -50,7 +56,8 @@ import psycopg2.extras
 
 # Pure staleness arithmetic (no DB deps) — unit-tested/CI-gated by
 # scripts/test_qfield_gpkg_resolution.py.
-from qfield_gpkg_resolution import select_stale_gpkgs
+from qfield_gpkg_resolution import is_family_member, parse_mc_gpkg_names
+from qfield_staleness import select_stale_gpkgs
 
 MINIO_BUCKET = "qfieldcloud-prod"
 
@@ -60,6 +67,34 @@ QFC_DB_NAME = "qfieldcloud_db"
 
 WA_BRIDGE_URL = "http://72.61.197.178:8083/send-message"
 WA_VELO_TEST_GROUP = "120363421664266245@g.us"
+
+
+def _mc_ls(prefix, timeout=30):
+    """`mc ls <prefix>` stdout, or None if the listing failed."""
+    try:
+        res = subprocess.run(
+            ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", prefix],
+            capture_output=True, text=True, timeout=timeout,
+        )
+        return res.stdout if res.returncode == 0 else None
+    except Exception as e:  # noqa: BLE001 — a listing failure must not fail the monitor
+        print(f"  WARN: mc ls failed for {prefix}: {e}", file=sys.stderr)
+        return None
+
+
+def _newest_version(prefix):
+    """Newest version id under a versioned-file prefix, or None."""
+    out = _mc_ls(prefix)
+    if out is None:
+        return None
+    versions = []
+    for line in out.strip().split("\n"):
+        idx = line.find(" STANDARD ")
+        if idx != -1:
+            v = line[idx + len(" STANDARD "):].strip().rstrip("/")
+            if v:
+                versions.append(v)
+    return sorted(versions)[-1] if versions else None
 
 
 def qfc_dcim_counts():
@@ -88,34 +123,47 @@ def qfc_dcim_counts():
 
 
 def minio_newest_versions(sync_rows):
-    """{(qf_uuid, gpkg_path): newest version id} — one `mc ls` per tracked GPKG.
+    """{(qf_uuid, gpkg_path): newest version id} for each tracked GPKG's OWN path.
 
-    This is the denominator that makes the staleness check like-for-like: the newest
-    version OF THE SAME FILE, not the newest photo somewhere in the project. ~16 calls
-    per run. A path that fails to list is simply absent from the result, which
-    select_stale_gpkgs treats as "cannot compute" and skips.
+    The denominator that makes staleness like-for-like: the newest version of the same
+    file, not the newest photo somewhere in the project. A path that fails to list is
+    absent from the result, which select_stale_gpkgs treats as "cannot compute".
     """
     out = {}
     for row in sync_rows:
-        prefix = f"local/{MINIO_BUCKET}/projects/{row['qf_uuid']}/files/{row['gpkg_path']}/"
-        try:
-            res = subprocess.run(
-                ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", prefix],
-                capture_output=True, text=True, timeout=30,
-            )
-            if res.returncode != 0:
+        newest = _newest_version(
+            f"local/{MINIO_BUCKET}/projects/{row['qf_uuid']}/files/{row['gpkg_path']}/")
+        if newest:
+            out[(row["qf_uuid"], row["gpkg_path"])] = newest
+    return out
+
+
+def minio_sibling_newest(sync_rows):
+    """{(qf_uuid, gpkg_path): (sibling_name, version)} — newest same-family sibling.
+
+    Catches a RENAME, where the new work lives at a different path and the tracked one
+    just sits there looking dormant. Uses the LOOSE family rule (no version-marker
+    requirement), because the resolver deliberately declines non-numeric renames like
+    "Civil audit new.gpkg" — this is the only thing that would ever report one.
+
+    Lists each project's files/ directory once, then version-lists only the siblings.
+    """
+    out = {}
+    dir_cache = {}
+    for row in sync_rows:
+        qf, path = row["qf_uuid"], row["gpkg_path"]
+        if qf not in dir_cache:
+            listing = _mc_ls(f"local/{MINIO_BUCKET}/projects/{qf}/files/")
+            dir_cache[qf] = parse_mc_gpkg_names(listing) if listing else []
+        best = None
+        for name in dir_cache[qf]:
+            if name == path or not is_family_member(path, name, require_version_marker=False):
                 continue
-            versions = []
-            for line in res.stdout.strip().split("\n"):
-                idx = line.find(" STANDARD ")
-                if idx != -1:
-                    v = line[idx + len(" STANDARD "):].strip().rstrip("/")
-                    if v:
-                        versions.append(v)
-            if versions:
-                out[(row["qf_uuid"], row["gpkg_path"])] = sorted(versions)[-1]
-        except Exception as e:  # noqa: BLE001 — a listing failure must not fail the monitor
-            print(f"  WARN: mc ls failed for {row['gpkg_path']}: {e}", file=sys.stderr)
+            v = _newest_version(f"local/{MINIO_BUCKET}/projects/{qf}/files/{name}/")
+            if v and (best is None or v > best[1]):
+                best = (name, v)
+        if best:
+            out[(qf, path)] = best
     return out
 
 
@@ -231,6 +279,7 @@ def main():
 
     qf_name_by_uuid = {r["qf_uuid"]: r["qf_name"] for r in rows}
     minio_newest = minio_newest_versions(sync_rows)
+    sibling_newest = minio_sibling_newest(sync_rows)
 
     # Extract gap: upstream photos in QFieldCloud but nothing in qfield_photo_validations.
     extract_gap = []
@@ -247,7 +296,7 @@ def main():
     stale_gap = [
         (qf_name_by_uuid.get(qf_uuid, qf_uuid), path, behind, available)
         for qf_uuid, path, behind, available in select_stale_gpkgs(
-            sync_rows, minio_newest, datetime.now(timezone.utc), args.stale_days)
+            sync_rows, minio_newest, sibling_newest, datetime.now(timezone.utc), args.stale_days)
     ]
 
     print(f"Coverage check: {len(rows)} linked/active QField project(s) examined, "
@@ -259,8 +308,8 @@ def main():
     for ff_name, ingested in stuck:
         print(f"  SYNC-GAP: {ff_name}: {ingested} photos extracted, 0 on the dashboard (pole_qa_photos empty)")
     for qf_name, path, behind, available in stale_gap:
-        print(f"  STALE-GPKG: {qf_name} / {path}: MinIO has {available}, unread for "
-              f"{behind:.1f}d")
+        print(f"  STALE-GPKG: {qf_name} / {path}: newer file available ({available}), "
+              f"unread for {behind:.1f}d")
 
     if (extract_gap or stuck or stale_gap) and not args.no_wa:
         lines = ["⚠️ Works-QA: QField photos not reaching the dashboard", ""]

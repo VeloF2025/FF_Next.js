@@ -23,15 +23,14 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from qfield_gpkg_resolution import (  # noqa: E402
     family_members,
-    gpkg_behind_days,
     is_family_member,
     normalize_stem,
     parse_mc_gpkg_names,
     pick_latest_gpkg,
     pick_photo_table,
-    select_stale_gpkgs,
     version_timestamp,
 )
+from qfield_staleness import gpkg_behind_days, select_stale_gpkgs  # noqa: E402
 
 _FAILURES = []
 
@@ -351,31 +350,64 @@ def main():
         ("p2", "LAWPoles.gpkg"): "v20260722075537-b",
     }
     check("a fortnight-old dormant form does NOT flag",
-          select_stale_gpkgs(DORMANT, DORMANT_MINIO, NOW, 3.0) == [])
+          select_stale_gpkgs(DORMANT, DORMANT_MINIO, {}, NOW, 3.0) == [])
 
     BEHIND = [{"qf_uuid": "p1", "gpkg_path": "Civil Audit.gpkg", "last_version": "v20260720000000-a"}]
     BEHIND_MINIO = {("p1", "Civil Audit.gpkg"): "v20260722000000-b"}
-    got = select_stale_gpkgs(BEHIND, BEHIND_MINIO, NOW, 3.0)
+    got = select_stale_gpkgs(BEHIND, BEHIND_MINIO, {}, NOW, 3.0)
     check("a genuinely unread newer version DOES flag", len(got) == 1)
     check("and names the available version so the alert is actionable",
           got[0][1] == "Civil Audit.gpkg" and got[0][3] == "v20260722000000-b")
     check("a newer version that only just appeared does not flag yet",
-          select_stale_gpkgs(BEHIND, {("p1", "Civil Audit.gpkg"): "v20260728100000-c"}, NOW, 3.0) == [])
+          select_stale_gpkgs(BEHIND, {("p1", "Civil Audit.gpkg"): "v20260728100000-c"}, {}, NOW, 3.0) == [])
     check("a path missing from the MinIO listing is skipped, not flagged",
-          select_stale_gpkgs(BEHIND, {}, NOW, 3.0) == [])
+          select_stale_gpkgs(BEHIND, {}, {}, NOW, 3.0) == [])
     check("empty/None input → no flags",
-          select_stale_gpkgs([], BEHIND_MINIO, NOW, 3.0) == []
-          and select_stale_gpkgs(None, BEHIND_MINIO, NOW, 3.0) == [])
+          select_stale_gpkgs([], BEHIND_MINIO, {}, NOW, 3.0) == []
+          and select_stale_gpkgs(None, BEHIND_MINIO, {}, NOW, 3.0) == [])
     multi = select_stale_gpkgs(
         BEHIND + [{"qf_uuid": "p2", "gpkg_path": "Old.gpkg", "last_version": "v20260101000000-x"}],
-        {**BEHIND_MINIO, ("p2", "Old.gpkg"): "v20260102000000-y"}, NOW, 3.0)
+        {**BEHIND_MINIO, ("p2", "Old.gpkg"): "v20260102000000-y"}, {}, NOW, 3.0)
     check("sorted worst-first", multi[0][1] == "Old.gpkg")
     # Pin the comparison as strictly-greater: exactly-at-threshold must not flag.
     edge = {("p1", "Civil Audit.gpkg"): "v20260725120000-z"}   # available exactly 3.0d ago
     check("behind exactly == stale_days does NOT flag (strictly greater)",
-          select_stale_gpkgs(BEHIND, edge, NOW, 3.0) == [])
+          select_stale_gpkgs(BEHIND, edge, {}, NOW, 3.0) == [])
     check("a hair over the threshold DOES flag",
-          len(select_stale_gpkgs(BEHIND, edge, NOW + timedelta(hours=1), 3.0)) == 1)
+          len(select_stale_gpkgs(BEHIND, edge, {}, NOW + timedelta(hours=1), 3.0)) == 1)
+
+    print("\nselect_stale_gpkgs — the RENAME case, replayed from Mahikeng's real state:")
+    # The founding incident, exactly as production looked on 2026-07-27. The tracked
+    # path is UNCHANGED in MinIO (it looks perfectly dormant); the real work moved to a
+    # different filename. A same-path comparison is structurally blind to this, so
+    # without the sibling clause the monitor would miss the very freeze it exists for.
+    MHK = [{"qf_uuid": "mhk", "gpkg_path": "Civil audit.gpkg",
+            "last_version": "v20260722042348-1cd13adf"}]
+    MHK_SAME = {("mhk", "Civil audit.gpkg"): "v20260722042348-1cd13adf"}   # dormant
+    check("same-path check alone does NOT see the rename (it is dormant)",
+          select_stale_gpkgs(MHK, MHK_SAME, {}, NOW, 3.0) == [])
+    # A NON-NUMERIC rename — the kind the resolver deliberately declines to follow, so
+    # this alert is the only thing that can report it.
+    MHK_SIB = {("mhk", "Civil audit.gpkg"): ("Civil audit new.gpkg", "v20260724000000-x")}
+    got_mhk = select_stale_gpkgs(MHK, MHK_SAME, MHK_SIB, NOW, 3.0)
+    check("a newer SIBLING flags it", len(got_mhk) == 1)
+    check("and names the sibling so the alert is actionable",
+          "Civil audit new.gpkg" in got_mhk[0][3])
+    check("the resolver still declines that non-numeric rename (strict/loose split)",
+          not is_family_member("Civil audit.gpkg", "Civil audit new.gpkg")
+          and is_family_member("Civil audit.gpkg", "Civil audit new.gpkg",
+                               require_version_marker=False))
+    check("a sibling OLDER than what we ingested is not a backlog",
+          select_stale_gpkgs(MHK, MHK_SAME,
+                             {("mhk", "Civil audit.gpkg"): ("Civil audit old.gpkg", "v20260101000000-x")},
+                             NOW, 3.0) == [])
+    check("a sibling that only just appeared does not flag yet",
+          select_stale_gpkgs(MHK, MHK_SAME,
+                             {("mhk", "Civil audit.gpkg"): ("Civil audit new.gpkg", "v20260728110000-x")},
+                             NOW, 3.0) == [])
+    check("an unrelated form is never treated as a sibling",
+          not is_family_member("Civil audit.gpkg", "Optical Audit.gpkg",
+                               require_version_marker=False))
 
     print("\nparse_mc_gpkg_names — `mc ls` output parsing:")
     MC_OUT = (

@@ -18,10 +18,9 @@ Two independent defences live here:
   * follow the rename  — pick the newest member of the configured file's family,
     then find the photo table inside it (the layer name tracks the filename, so it
     drifts too);
-  * notice the freeze  — compare the version of the GPKG we ingested against the
-    newest field photo upstream, per file, so any *other* way of getting stuck still
-    gets flagged. Measuring the GPKG rather than the last script run is the whole
-    point; see gpkg_version_lag_days for what the obvious signal gets wrong.
+  * notice the freeze  — per file, ask whether a newer file exists that we are not
+    reading: a newer version of the tracked path, or a newer same-family sibling
+    (which is how a rename presents). See select_stale_gpkgs.
 
 Split out from extract-gpkg-photos.py / works-qa-coverage-check.py so it is
 unit-testable without MinIO or psycopg2 — gated in CI by
@@ -52,7 +51,7 @@ def normalize_stem(name):
     return s.strip().lower()
 
 
-def is_family_member(configured_name, candidate_name):
+def is_family_member(configured_name, candidate_name, require_version_marker=True):
     """True when candidate is the configured GPKG, or a renamed successor of it.
 
     Match is a normalized prefix that must end on a WORD BOUNDARY **and** whose
@@ -63,16 +62,21 @@ def is_family_member(configured_name, candidate_name):
                              Poles HLD.gpkg                   ✗  (no digit)
                              Poles drag and drop.gpkg         ✗  (no digit)
 
-    The digit requirement separates a rename from a SIBLING DOCUMENT. Every real
-    rename here stamps a version or date; the dangerous look-alikes do not. Without
-    it, Thembisa POP 1 (registered on the generic 'Poles.gpkg') adopts any
+    The digit requirement separates a rename from a SIBLING DOCUMENT. Without it,
+    Thembisa POP 1 (registered on the generic 'Poles.gpkg') adopts any
     'Poles <word>.gpkg' — and its MinIO folder ALREADY holds 'Poles drag and drop.shp'
     while THM POP 3 carries a real 'Poles HLD.gpkg'. One QGIS "export to GeoPackage"
-    would repoint that ingest at a scratch layer with no photo columns: a silent
-    freeze, the exact failure this module exists to prevent.
+    would repoint that ingest at a scratch layer with no photo columns. Prefix
+    direction matters too: crews only APPEND, so a substring match would let a
+    project's optical audit capture its civil audit.
 
-    Prefix direction matters too: crews only ever APPEND. A suffix or substring match
-    would let a project's optical audit capture its civil audit.
+    `require_version_marker=False` drops the digit test — the looser "could be a
+    rename" question. Deliberate asymmetry: the RESOLVER must be strict because it
+    silently changes which file feeds the database; the MONITOR only prints a line for
+    a human, so it asks the broader question. Mahikeng holds `PON Progress.gpkg`,
+    `PON Progress V2.gpkg` AND `PON Progress new.gpkg` — the same crew uses both
+    conventions, so `Civil audit new.gpkg` is a rename the resolver declines and only
+    the loose form can report.
     """
     base = normalize_stem(configured_name)
     cand = normalize_stem(candidate_name)
@@ -82,6 +86,8 @@ def is_family_member(configured_name, candidate_name):
         return True
     if not cand.startswith(base + " "):
         return False
+    if not require_version_marker:
+        return True
     return any(ch.isdigit() for ch in cand[len(base) + 1:])
 
 
@@ -111,20 +117,16 @@ def pick_latest_gpkg(configured_name, candidate_versions):
     Returns (filename, version_id), or (None, None) to mean "no redirect — use the
     configured name". Fails OPEN to today's behaviour rather than skipping a project.
 
-    REQUIRES THE CONFIGURED FILE TO EXIST UNDER ITS EXACT NAME — the configured name
-    is the anchor of trust; without it nothing proves the family root ever meant this
-    project's form. The presence test is exact, NOT normalized, even though membership
-    is. Three ALTERNATE_GPKGS entries (Mamelodi / Thembisa POP 1 / POP 3 →
+    REQUIRES THE CONFIGURED FILE TO EXIST UNDER ITS EXACT NAME — it is the anchor of
+    trust. The presence test is exact, NOT normalized, even though membership is:
+    three ALTERNATE_GPKGS entries (Mamelodi / Thembisa POP 1 / POP 3 →
     'civil_audit_.gpkg') name files absent from MinIO, and 'civil_audit_' normalizes to
-    exactly 'civil audit' — so a normalized presence test would treat Thembisa's real
-    'Civil Audit.gpkg' as "found" and ingest a never-before-ingested audit through a
-    second fallback (pick_photo_table) in the same run. Those need their own
-    verification, not silent adoption by a resolver written for a different bug.
+    exactly 'civil audit', so a normalized test would treat Thembisa's real
+    'Civil Audit.gpkg' as "found" and ingest a never-reviewed audit through a second
+    fallback in the same run.
 
-    Ordering is by PARSED version timestamp, not raw string compare: string order only
-    matches upload order while every id is the same 'v<14 digits>-<hash>' shape, and
-    family_members has already discarded anything that is not. The configured file
-    wins ties so two files sharing a version can never flip-flop the choice.
+    Ordering is by PARSED version timestamp, not string compare; family_members has
+    already dropped anything unparseable. The configured file wins ties.
     """
     family = family_members(configured_name, candidate_versions)
     if not family or configured_name not in family:
@@ -180,81 +182,6 @@ def pick_photo_table(configured_table, photo_column_counts, prefer_stem=None):
             if normalize_stem(table) == stem:
                 return table
     return tied[-1]
-
-
-def parse_pg_timestamp(value):
-    """Parse a Postgres/QFieldCloud timestamp into an aware UTC datetime, or None.
-
-    Handles both the psycopg2 datetime objects the FibreFlow side returns and the
-    text psql -A emits for QFieldCloud ('2026-07-27 14:53:24.295485+00' — note the
-    two-digit offset, which datetime.fromisoformat rejects before Python 3.11).
-    Naive values are read as UTC, matching how both databases store these columns.
-    """
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        dt = value
-    else:
-        s = str(value).strip()
-        if not s:
-            return None
-        # '…+00' / '…-05' → '…+00:00' / '…-05:00'
-        s = re.sub(r"([+-]\d{2})$", r"\1:00", s)
-        try:
-            dt = datetime.fromisoformat(s)
-        except ValueError:
-            return None
-    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
-
-
-def gpkg_behind_days(ingested_version, available_version, now):
-    """Days we have been sitting on an older version than MinIO holds; None if not behind.
-
-    Returns None when the two versions match (nothing to ingest — the form is simply
-    dormant) or when either id is unparseable. Otherwise the age of the version we
-    are NOT reading: how long the newer file has been available and ignored.
-    """
-    if not available_version or available_version == ingested_version:
-        return None
-    available_at = version_timestamp(available_version)
-    if available_at is None or version_timestamp(ingested_version) is None:
-        return None
-    return max(0.0, (now - available_at).total_seconds() / 86400.0)
-
-
-def select_stale_gpkgs(sync_rows, minio_newest, now, stale_days):
-    """Pick the GPKGs where a newer file exists that we are not ingesting.
-
-    sync_rows:    [{qf_uuid, gpkg_path, last_version}]      — one row PER FILE
-    minio_newest: {(qf_uuid, gpkg_path): newest version id} — one entry PER FILE
-    Returns [(qf_uuid, gpkg_path, days_behind, available_version)], worst-first.
-
-    COMPARE LIKE WITH LIKE. Two earlier shapes both failed on production data:
-    MAX(last_synced_at) per project vs the newest photo (per-project against
-    per-project) let an active sibling MASK a stuck file — 1 of 16 detected. Then
-    last_version of one file vs the newest DCIM upload anywhere in the project
-    (per-file numerator, per-project denominator) CRIED WOLF — all 5 rows it flagged
-    had already ingested every version MinIO held, because DCIM cannot be attributed
-    to a form and a finished form's lag grows forever.
-
-    So the question is not "how old is what we read" but "is there something newer we
-    are failing to read". A dormant form can never flag however long it lies untouched;
-    a stuck one flags once the newer file has been available past stale_days. It also
-    names that file, so the alert is actionable.
-
-    Skipped, not flagged, when the comparison cannot be computed — a transient MinIO
-    listing failure yields no entry, and this monitor must fail quiet on missing data
-    rather than page on it.
-    """
-    out = []
-    for row in sync_rows or []:
-        key = (row.get("qf_uuid"), row.get("gpkg_path"))
-        available = (minio_newest or {}).get(key)
-        behind = gpkg_behind_days(row.get("last_version"), available, now)
-        if behind is not None and behind > stale_days:
-            out.append((key[0], key[1], behind, available))
-    out.sort(key=lambda r: r[2], reverse=True)
-    return out
 
 
 # `mc ls` renders a versioned file's version folder as a directory entry:
