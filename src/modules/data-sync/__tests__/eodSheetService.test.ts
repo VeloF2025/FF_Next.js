@@ -1,10 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock db-neon so neon() returns a controllable sql tag function
-const mockSql = vi.fn();
-vi.mock('@/lib/db-neon', () => ({ neon: () => mockSql }));
+// Both mocks go through vi.hoisted. vi.mock factories are hoisted above plain
+// const declarations, so a factory closing over `const mockLogSerialChange`
+// threw "Cannot access 'mockLogSerialChange' before initialization" at module
+// load — the file collected 0 tests rather than failing one.
+const { mockSql, mockLogSerialChange } = vi.hoisted(() => ({
+  mockSql: vi.fn(),
+  mockLogSerialChange: vi.fn(),
+}));
 
-const mockLogSerialChange = vi.fn();
+// The service imports { sql, transaction } from '@/lib/db-pool'. This file used
+// to mock '@/lib/db-neon' instead — a module the service no longer uses — so the
+// real db-pool was in play and every query resolved to undefined ("Cannot read
+// properties of undefined (reading 'rows')"). `transaction` is stubbed too:
+// the service imports it, and a mock missing an imported export fails the file.
+vi.mock('@/lib/db-pool', () => ({
+  sql: mockSql,
+  transaction: async (cb: (txn: { query: typeof mockSql }) => unknown) => cb({ query: mockSql }),
+}));
+
 vi.mock('@/modules/activate/services/activity-log/serialHistory', () => ({
   logSerialChange: mockLogSerialChange,
 }));

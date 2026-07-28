@@ -27,7 +27,16 @@ export function touchSessionUsage(sessionId: string, kind: SessionKind): void {
       [sessionId]
     )
     .catch((err: unknown) => {
-      log.debug('last_used_at update failed (ignored)', {
+      // warn, not debug. This repo's logger only emits info/debug when LOG_STDOUT=true,
+      // so a debug line here is invisible in production — and "best-effort" is exactly
+      // the excuse under which a permanently-failing write goes unnoticed for months.
+      // The logger's own comment records a 2026-07-10 outage that stayed invisible for
+      // three days for the same reason.
+      //
+      // Accepted cost: during a database outage this fires once per mcp request. That is
+      // noise on top of an already-visible incident, which is the better failure than
+      // silence during an invisible one.
+      log.warn('last_used_at update failed (ignored)', {
         sessionId,
         error: err instanceof Error ? err.message : String(err),
       }, LOGGER);

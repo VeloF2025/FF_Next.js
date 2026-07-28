@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { generateResetToken } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
+import { resolveSmtpTransportSecurity } from '@/lib/smtpConfig';
 
 const logger = createLogger('forgot-password');
 
@@ -42,6 +43,14 @@ setInterval(() => {
 // Email sending configuration
 const SMTP_ENABLED = process.env.SMTP_HOST && process.env.SMTP_USER;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
+
+// Auth mail must NOT reuse SMTP_FROM: that is the shared procurement@ mailbox,
+// which supplier-facing RFQ mail deliberately sends from so suppliers can reply.
+// The default stays on velocityfibre.co.za because that domain's SPF authorises
+// the relay we authenticate against; fibreflow.app publishes no SPF record, so a
+// no-reply there is accepted by the relay but filtered as spam by the recipient.
+const AUTH_EMAIL_FROM =
+  process.env.SMTP_FROM_AUTH || 'FibreFlow <noreply@velocityfibre.co.za>';
 
 interface ForgotPasswordRequest {
   email: string;
@@ -79,8 +88,9 @@ async function sendResetEmail(
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
+      // Port and TLS mode are resolved together so they cannot diverge — a
+      // missing SMTP_SECURE must not produce a plaintext connect to 465.
+      ...resolveSmtpTransportSecurity(),
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -92,7 +102,7 @@ async function sendResetEmail(
     });
 
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'noreply@fibreflow.app',
+      from: AUTH_EMAIL_FROM,
       to: email,
       subject: 'Reset Your FibreFlow Password',
       html: `

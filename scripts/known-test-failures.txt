@@ -1,0 +1,96 @@
+# Known-failing tests and collection errors — the CI ratchet allowlist.
+#
+# Each line is a vitest FAIL identifier, matched verbatim. A failure NOT listed
+# here fails CI; a listed one is tolerated.
+#
+# Why identifiers and not a failure COUNT: a count lets a PR swap one failure
+# for another and stay green, and it cannot work on a partial run — the PR job
+# only runs tests affected by the diff, so its failure count is meaningless
+# against a whole-suite baseline. Identifiers work for both.
+#
+# DELETE lines as you fix them; the ratchet prints entries that have started
+# passing so this file can be pruned. Never ADD a line to turn a red build
+# green — that is the habit this gate exists to break.
+#
+# Captured 2026-07-28 at master 62ffc71e8: the first run in this repo's history
+# where the suite actually completed (~40s, 630 files, 7200 tests). Three
+# consecutive runs produced byte-identical failure sets.
+#   56 failing tests across 8 files, + 10 files that fail to COLLECT (0 tests) —
+#   missing TEST_DATABASE_URL, a vi.mock hoisting error, `jest is not defined`.
+
+# --- Intermittent. Listed so a flake cannot redden a build; expect these in
+# --- the "started passing" report most runs. Both are worth fixing properly.
+# ---   module-structure: fails roughly 1 run in 6, no clear trigger.
+# ---   db latency: asserts on measured query latency, so it fails whenever
+# ---   the box is loaded — observed once in ~8 runs. Inherently timing-
+# ---   sensitive; the real fix is to stop asserting on wall-clock.
+src/modules/noc/__tests__/module-structure.test.ts > Maintenance Module Structure > Server Exports (index.ts) > should export from index.ts without errors
+src/modules/noc/__tests__/utils/db.test.ts > Database Connection Utility > Health Check > should measure query latency
+
+# --- Deterministic failures (identical across three consecutive runs) ---
+pages/api/cortex/meeting-review/__tests__/handler.test.ts [ pages/api/cortex/meeting-review/__tests__/handler.test.ts ]
+pages/api/snags/__tests__/reports-scope.test.ts [ pages/api/snags/__tests__/reports-scope.test.ts ]
+pages/api/snags/__tests__/reports-scope-xlsx.test.ts [ pages/api/snags/__tests__/reports-scope-xlsx.test.ts ]
+pages/api/snags/__tests__/reports-source-filter.test.ts [ pages/api/snags/__tests__/reports-source-filter.test.ts ]
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Accessibility > should have proper accessibility attributes
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Accessibility > should have proper ARIA labels
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Error Boundaries > should handle service errors gracefully
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > File Selection > should handle drag and drop
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > File Selection > should handle valid file selection
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > File Selection > should reject invalid file types
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Import Process > should handle import errors
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Import Process > should handle import exceptions
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Import Process > should handle import mode selection
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Import Process > should handle successful import
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Initial State > should render initial state correctly
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Initial State > should show import instructions initially
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Template and Export Actions > should download template
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Template and Export Actions > should export all contractors
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > Template and Export Actions > should handle export when no contractors exist
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should disable actions during import
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should handle cancellation during file preview
+src/components/contractor/ContractorImport.test.tsx > ContractorImport Component > UI State Management > should reset import state correctly
+src/modules/construction-qa/services/reportNumberGenerator.test.ts [ src/modules/construction-qa/services/reportNumberGenerator.test.ts ]
+src/modules/data-sync/__tests__/eodSheetService.test.ts [ src/modules/data-sync/__tests__/eodSheetService.test.ts ]
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should reject delete with invalid UUID
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should return 404 when ticket not found
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > DELETE /api/noc/tickets/[id] - Soft delete ticket > should soft delete ticket by ID
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets/[id] - Get ticket detail > should get ticket by valid ID
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets/[id] - Get ticket detail > should reject invalid UUID format
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets/[id] - Get ticket detail > should return 404 when ticket not found
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list all tickets without filters
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list tickets with multiple filters
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list tickets with pagination
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list tickets with status filter
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > GET /api/noc/tickets - List tickets > should list tickets with type filter
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > POST /api/noc/tickets - Create ticket > should create ticket with minimal required fields
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > POST /api/noc/tickets - Create ticket > should create ticket with valid data
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > POST /api/noc/tickets - Create ticket > should reject ticket with invalid source enum
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > POST /api/noc/tickets - Create ticket > should reject ticket without required fields
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should reject update with empty payload
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should reject update with invalid UUID
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should return 404 when ticket not found
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should update single field
+src/modules/noc/__tests__/api/tickets.test.ts > Ticket CRUD API Endpoints > PUT /api/noc/tickets/[id] - Update ticket > should update ticket with partial data
+src/modules/noc/__tests__/services/dashboardService.test.ts > Dashboard Service - Statistics > getAverageResolutionTime > should calculate average resolution time in hours
+src/modules/noc/__tests__/services/dashboardService.test.ts > Dashboard Service - Statistics > getAverageResolutionTime > should filter by date range when provided
+src/modules/workflow/__tests__/components/TemplateList.test.tsx [ src/modules/workflow/__tests__/components/TemplateList.test.tsx ]
+src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should have proper ARIA labels and roles
+src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Accessibility > should support keyboard navigation
+src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Loading States > should show loading overlay when loading template
+src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should show error icon when validation has errors
+src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should show validation button when validation result exists
+src/modules/workflow/__tests__/components/WorkflowEditor.test.tsx > WorkflowEditor Component > Validation Panel > should toggle validation panel when validation button is clicked
+src/tests/no-direct-db-connections.test.ts > No Direct Database Connections > should not have any direct database connections in frontend code
+tests/api/activate/pp-data-gps-backfill.test.ts > GPS backfill for resolved PP serials > dr_photo_unified_reviews gets GPS from drops
+tests/api/activate/pp-data-gps-backfill.test.ts > GPS backfill for resolved PP serials > oes_pp_data with resolved_drop_number and NULL GPS gets backfilled from drops
+tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > admits stores role → 200
+tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > marks stock_return_lines.status="processed" after disposition applied
+tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > rejects supplier_return disposition with 422 and rolls back
+tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > RETURNABLE + resolved holder → postReturnFromHolderWith runs (custody + movement SQL in txn)
+tests/api/procurement/field-stock/returns-accept-hardening.test.ts > POST /returns/[id]/accept hardening (C.3) > updates stock_returns.status=restocked on full success
+tests/api/procurement/field-stock/returns-create-hardening.test.ts [ tests/api/procurement/field-stock/returns-create-hardening.test.ts ]
+tests/api/procurement/field-stock/returns-flow-integration.test.ts > Returns full flow integration > Happy path — tech creates → storeman inspects → accept restocks > end-to-end with mixed dispositions: restock + scrap
+tests/api/procurement/field-stock/returns-flow-integration.test.ts > Returns full flow integration > Idempotency > POST /returns with same idempotency_key returns existing return (200 not 201)
+tests/migrations/358_snag_reports_scope.test.ts [ tests/migrations/358_snag_reports_scope.test.ts ]
+tests/migrations/378_rbac_field_stock_force_correct.test.ts [ tests/migrations/378_rbac_field_stock_force_correct.test.ts ]

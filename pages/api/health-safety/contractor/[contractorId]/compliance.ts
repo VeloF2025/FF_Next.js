@@ -57,10 +57,14 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
   `;
   const compliance = complianceRows[0]!;
 
-  // Get documents
+  // Get documents. `expiry_date` stays a raw Date for the gate compare below;
+  // `expiry_date_display` is the ::text cast shown to the client (see the
+  // documentsForDisplay mapping ahead of the response) — a same-name cast here
+  // would corrupt the compare (see dateTextCast.test.ts).
   const documents = await sql`
     SELECT id, contractor_id, document_type, file_name, file_url,
-           status, expiry_date, created_at, updated_at
+           status, expiry_date, expiry_date::text AS expiry_date_display,
+           created_at, updated_at
     FROM hs_contractor_documents
     WHERE contractor_id = ${contractorId}
     ORDER BY document_type, created_at DESC
@@ -70,6 +74,11 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
   const validDocs = documents.filter(
     (d: any) => d.status === 'valid' && (!d.expiry_date || new Date(d.expiry_date) > new Date())
   ).length;
+
+  const documentsForDisplay = documents.map(({ expiry_date_display, ...rest }: any) => ({
+    ...rest,
+    expiry_date: expiry_date_display,
+  }));
   const totalRequiredDocs = 5; // letter_of_good_standing, liability_insurance, safety_plan, etc.
 
   // Get incident stats (from maintenance tickets with H&S source types)
@@ -167,7 +176,7 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
     },
     score: scoreResult,
     documents: {
-      items: documents,
+      items: documentsForDisplay,
       valid_count: validDocs,
       required_count: totalRequiredDocs,
       percentage: totalRequiredDocs > 0 ? Math.round((validDocs / totalRequiredDocs) * 100) : 0,
