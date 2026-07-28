@@ -33,6 +33,9 @@ export default async function handler(
 
   try {
     const { allDevices = false } = (req.body || {}) as LogoutRequestBody;
+    // Tracks whether the sweep actually ran, so the response cannot claim "all devices"
+    // when the gate below withheld it.
+    let sweptAllDevices = false;
 
     // Get token from cookie
     const token = req.cookies[AUTH_COOKIE_NAME];
@@ -61,14 +64,32 @@ export default async function handler(
         }
 
         if (allDevices) {
-          // "All devices" includes MCP connectors. This is the flow a user reaches for
-          // when they suspect compromise, so it must not leave a read credential alive
-          // that outlives the sweep — hence the kind-agnostic sweep, not the
-          // browser-only `deleteAllUserSessions`. Routine sign-out takes the branch
-          // below, which drops only the current session and leaves connectors running.
-          await deleteEveryUserSession(payload.sub);
+          // The account-wide sweep needs a session we could positively identify as not
+          // being an MCP one. `getSession` returns null both when the row is gone and
+          // when it has expired, while the JWT stays cryptographically valid until its
+          // own exp — which is exactly the state a REVOKED MCP token sits in. The JWT
+          // does not carry `kind`, so a null lookup means "unidentifiable credential",
+          // and `session?.kind === 'mcp'` above cannot catch it. Sweeping every session
+          // on the account off an unidentifiable credential is precisely the destructive
+          // act this gate exists to prevent, so fail closed and skip it.
+          //
+          // Only the sweep is withheld: the cookie is still cleared below, so this keeps
+          // the stale-cookie relief that is the reason this route avoids withAuth.
+          if (session) {
+            // "All devices" includes MCP connectors. It must not leave a read credential
+            // alive that outlives the sweep — hence the kind-agnostic sweep, not the
+            // browser-only `deleteAllUserSessions`.
+            await deleteEveryUserSession(payload.sub);
+            sweptAllDevices = true;
+          } else {
+            log.warn('Refused all-devices logout for an unresolvable session', {
+              userId: payload.sub,
+            });
+          }
         } else {
-          // Delete just this session
+          // Delete just this session. Safe to leave permissive when the row is already
+          // gone: it is a no-op on a missing id, and it is not account-wide. Routine
+          // sign-out takes this branch and leaves connectors running.
           await deleteSession(payload.sessionId);
         }
       }
@@ -87,7 +108,9 @@ export default async function handler(
 
     return res.status(200).json({
       success: true,
-      data: { message: allDevices ? 'Logged out from all devices' : 'Logged out successfully' },
+      data: {
+        message: sweptAllDevices ? 'Logged out from all devices' : 'Logged out successfully',
+      },
     });
   } catch (error) {
     log.error('Logout error', { error });

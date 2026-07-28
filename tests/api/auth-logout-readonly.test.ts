@@ -88,6 +88,36 @@ describe('POST /api/auth/logout — read-only gate', () => {
     expect(deleteAllUserSessions).not.toHaveBeenCalled();
   });
 
+  /**
+   * `getSession` returns null both when the row is gone and when it has expired, while
+   * the JWT stays valid until its own exp. That is the state a REVOKED MCP token sits
+   * in — and since the JWT carries no `kind`, the `session?.kind === 'mcp'` check above
+   * cannot see it: `undefined === 'mcp'` is false, so the gate silently does not fire.
+   * Without the null check, a revoked read-only token could still wipe every session on
+   * the account, which is the exact act this gate exists to prevent.
+   */
+  it('refuses the all-devices sweep when the session cannot be resolved', async () => {
+    getSession.mockResolvedValue(null);
+    const { req, res } = post({ allDevices: true });
+
+    await handler(req, res);
+
+    expect(deleteEveryUserSession).not.toHaveBeenCalled();
+    expect(deleteAllUserSessions).not.toHaveBeenCalled();
+  });
+
+  it('does not claim "all devices" when the sweep was withheld', async () => {
+    getSession.mockResolvedValue(null);
+    const { req, res } = post({ allDevices: true });
+
+    await handler(req, res);
+
+    // Cookie relief is preserved — only the destructive sweep is withheld.
+    expect(res._getStatusCode()).toBe(200);
+    expect(JSON.parse(res._getData()).data.message).toBe('Logged out successfully');
+    expect(String(res.getHeader('Set-Cookie'))).toContain('Max-Age=0');
+  });
+
   it('still clears the cookie when the token is invalid', async () => {
     // This route deliberately forgives a bad token so a stale cookie can always be shed.
     // The gate must not turn that into a 401 — which is why withAuth was not used.
