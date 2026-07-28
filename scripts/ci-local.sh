@@ -231,16 +231,26 @@ if [ "$MODE" = "--quick" ] || [ "$MODE" = "--pre-deploy" ]; then
   echo -e "\n${YELLOW}Skipped: tests + build (${MODE} mode)${NC}"
   SKIPPED=$((SKIPPED + 2))
 else
-  echo -e "\n${CYAN}── Gate 5: Unit Tests ──${NC}\n"
+  echo -e "\n${CYAN}── Gate 5: Unit Tests (ratchet) ──${NC}\n"
 
-  if npm test -- --run > /tmp/ci-tests.txt 2>&1; then
-    TEST_COUNT=$(grep -oP '\d+ passed' /tmp/ci-tests.txt | head -1 || echo "? passed")
-    pass "Unit tests: ${TEST_COUNT}"
+  # Ratcheted rather than non-blocking, matching GHA. Previously any failure
+  # was downgraded to a warning here, so a new broken test slipped through both
+  # this gate and CI. Known failures live in scripts/known-test-failures.txt;
+  # a run that does not complete fails rather than passing silently.
+  # Full suite locally (unlike the PR job, which only runs affected tests) —
+  # this is the last gate before a deploy, so it should see everything.
+  if bash "$(dirname "$0")/test-ratchet.sh" > /tmp/ci-tests.txt 2>&1; then
+    pass "Unit tests: no new failures"
+    grep -E 'now pass — delete them' /tmp/ci-tests.txt | head -1 | sed 's/^/    /' || true
   else
-    # Tests are non-blocking (pre-existing failures) but we report
-    TEST_FAIL=$(grep -oP '\d+ failed' /tmp/ci-tests.txt | head -1 || echo "? failed")
-    echo -e "${YELLOW}  ⚠ Unit tests: ${TEST_FAIL} (non-blocking)${NC}"
-    WARNED=$((WARNED + 1))
+    fail "Unit tests: NEW failure(s), or the run did not complete"
+    # `|| true` is load-bearing under `set -euo pipefail` (line 18): if the
+    # ratchet fails in a way that emits none of these markers — missing execute
+    # bit, syntax error, script not found — grep matches nothing and exits 1,
+    # which would kill ci-local.sh here and silently skip the Build and Secret
+    # Scan gates plus the final summary. Same bug this file already had to fix
+    # twice (see the CATCH_COUNT and EMPTY_CATCH notes above).
+    grep -E 'NEW test failure|no summary line|^    [a-z]' /tmp/ci-tests.txt | head -12 | sed 's/^/    /' || true
   fi
 
   echo -e "\n${CYAN}── Gate 6: Build ──${NC}\n"
