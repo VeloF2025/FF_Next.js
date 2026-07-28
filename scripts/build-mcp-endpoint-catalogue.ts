@@ -23,7 +23,19 @@ import { join, resolve, relative } from 'node:path';
  * controls. Its job is to stop an agent wandering into payroll while answering a
  * question about drops.
  */
-export const DENIED_GROUPS = new Set(['accounting', 'staff', 'my']);
+export const DENIED_GROUPS = new Set([
+  'accounting',
+  'staff',
+  'my',
+  // The MCP edge proxies are TRANSPORT, not data. They forward any method and body to an
+  // internal service on 127.0.0.1 and are unauthenticated by design (the upstream issues
+  // its own OAuth challenge). An agent has no reason to call them, and cataloguing them
+  // invites exactly the wandering this list exists to prevent.
+  'cortex-remote-mcp',
+  // NOTE: 'ff-remote-mcp' belongs here too, but that route ships with PR #2254 and does
+  // not exist on this branch — the "every denied entry matched something" test rejects
+  // speculative entries, correctly. Add it when #2254 lands.
+]);
 
 /**
  * Matches a denied group OR any hyphenated sibling of one: `staff` also withholds
@@ -119,9 +131,12 @@ export function toAppRoute(relPath: string): string {
  * Which HTTP methods a handler answers.
  *
  * Both comparison directions count. The `!==` guard (`if (req.method !== 'GET') return
- * 405`) is the dominant idiom in this codebase — 462 files use it against 210 for
- * `===`. Matching only `===`, as a first reading of the plan suggested, would drop
- * two-thirds of the read surface and leave Claude concluding those routes don't exist.
+ * 405`) is by a wide margin the dominant idiom here — roughly 812 files versus 237 for
+ * `===` at time of writing. Matching only `===` would drop most of the read surface and
+ * leave the agent concluding those routes do not exist.
+ *
+ * Treat the figures as indicative, not as a fixture: they move with the codebase, and an
+ * earlier revision of this comment quoted counts that no longer reproduced.
  */
 export function extractMethods(source: string, isAppRouter: boolean): string[] {
   const found = new Set<string>();
@@ -142,9 +157,11 @@ export function extractMethods(source: string, isAppRouter: boolean): string[] {
   for (const m of source.matchAll(/\bcase\s+['"](GET|HEAD|POST|PUT|PATCH|DELETE)['"]\s*:/g)) {
     found.add(m[1]!);
   }
-  for (const m of source.matchAll(/\bmethods\s*:\s*\[([^\]]*)\]/g)) {
-    for (const q of m[1]!.matchAll(/['"](GET|HEAD|POST|PUT|PATCH|DELETE)['"]/g)) found.add(q[1]!);
-  }
+  // A `methods: [...]` array literal is deliberately NOT matched. It is not scoped to an
+  // HTTP dispatch context, so it also hits things like Socket.IO's CORS config in
+  // pages/api/ws.ts:49 (`methods: ['GET', 'POST']`) — a route whose real verb is decided by
+  // its own `req.method !== 'GET'` guard. Inferring verbs from an arbitrary object key is
+  // guessing, and a wrong GET sends an agent to a 405.
   return [...found];
 }
 
@@ -223,8 +240,17 @@ export function buildCatalogue(repoRoot: string): CatalogueResult {
     const description = extractDescription(source);
     const existing = byPath.get(route);
     if (existing) {
-      // App Router shadows the Pages equivalent at runtime; keep one entry, union methods.
-      existing.methods = [...new Set([...existing.methods, ...readable])].sort();
+      // Path collision between the two routers. The PAGES entry wins at runtime — verified
+      // against Next.js 14's matcher registration order, and consistent with a case where
+      // an App page was silently shadowed by a Pages dynamic route and never built.
+      //
+      // Do NOT union the methods. The losing side's handler never runs, so advertising its
+      // verbs would put a method in the catalogue that 405s in practice — a false positive,
+      // which for a discovery tool is worse than an omission. Pages routes are walked
+      // first, so the existing entry is already the winner: keep it untouched.
+      //
+      // No such collision exists in this repo today (0 overlapping paths across 125 app
+      // and ~1143 pages routes); this is here so the first one cannot surprise us.
       if (!existing.description && description) existing.description = description;
       continue;
     }

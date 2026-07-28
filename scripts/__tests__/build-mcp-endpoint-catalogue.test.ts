@@ -144,6 +144,13 @@ describe('method extraction', () => {
   it('returns nothing when no method markers are present', () => {
     expect(extractMethods('export default handler;', false)).toEqual([]);
   });
+
+  it('ignores a methods:[...] array literal — it is not an HTTP dispatch signal', () => {
+    // Real case: Socket.IO CORS config in pages/api/ws.ts:49. Inferring verbs from an
+    // arbitrary object key is guessing, and a wrong GET sends an agent to a 405.
+    const socketIoCors = `const io = new Server({ cors: { origin: '*', methods: ['GET', 'POST'] } });`;
+    expect(extractMethods(socketIoCors, false)).toEqual([]);
+  });
 });
 
 describe('description extraction', () => {
@@ -188,6 +195,12 @@ describe('denied group matching', () => {
     expect(isDeniedGroup('projects')).toBeUndefined();
     // Reviewed and deliberately allowed: admin-gated, so only an admin's connector reaches it.
     expect(isDeniedGroup('database')).toBeUndefined();
+  });
+
+  it('withholds the MCP transport proxy', () => {
+    // Transport, not data: it forwards any method/body to an internal service and is
+    // unauthenticated by design. An agent has no reason to call it.
+    expect(isDeniedGroup('cortex-remote-mcp')).toBe('cortex-remote-mcp');
   });
 });
 

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-28T08:51:32.312Z",
+  "generatedAt": "2026-07-28T09:04:11.109Z",
   "routes": [
     {
       "path": "/api/action-items",
@@ -1490,13 +1490,6 @@
       ],
       "group": "cortex-bridge",
       "description": "Public Cortex Bridge proxy for remote MCP/API clients."
-    },
-    {
-      "path": "/api/cortex-remote-mcp/:path*",
-      "methods": [
-        "GET"
-      ],
-      "group": "cortex-remote-mcp"
     },
     {
       "path": "/api/cortex-review",
