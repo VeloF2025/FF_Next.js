@@ -89,8 +89,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       cleared: checkins.filter((c) => c.clearance === 'cleared').length,
       blocked: checkins.filter((c) => c.clearance === 'blocked').length,
       overridden: checkins.filter((c) => c.clearance === 'cleared_by_override').length,
-      hazards: checkins.filter((c) => c.warnings.includes('hazard_reported')).length,
-      ppe_gaps: checkins.filter((c) => c.warnings.includes('ppe_incomplete')).length,
+      // DISTINCT hazards, not rows carrying one: a crew lead reports a single
+      // hazard that is then stamped on every crew member's row, so counting
+      // rows would report one trench as three hazards.
+      hazards: new Set(
+        checkins
+          .filter((c) => c.warnings.includes('hazard_reported'))
+          .map((c) => String(c.risk_register_id ?? c.submission_id))
+      ).size,
+      // Workers affected, which for PPE is the number that matters.
+      workers_with_ppe_gap: checkins.filter((c) => c.warnings.includes('ppe_incomplete')).length,
       medical_unverifiable: checkins.filter((c) => c.warnings.includes('medical_unverifiable')).length,
       clocked_in_without_checkin: missing.length,
     };

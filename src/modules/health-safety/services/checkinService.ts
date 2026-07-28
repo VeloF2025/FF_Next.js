@@ -102,7 +102,9 @@ export async function computeContractorCheckinSummary(
       COUNT(*) FILTER (WHERE clearance = 'cleared')::int AS cleared,
       COUNT(*) FILTER (WHERE clearance = 'blocked')::int AS blocked,
       COUNT(*) FILTER (WHERE clearance = 'cleared_by_override')::int AS overridden,
-      COUNT(*) FILTER (
+      -- DISTINCT submissions, not rows: one crew hazard is stamped on every
+      -- member of that crew, so counting rows would triple-report it.
+      COUNT(DISTINCT submission_id) FILTER (
         WHERE hazard_reported IS NOT NULL AND btrim(hazard_reported) <> ''
       )::int AS hazards_reported,
       COUNT(*) FILTER (

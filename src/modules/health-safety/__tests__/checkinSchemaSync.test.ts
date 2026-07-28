@@ -61,6 +61,23 @@ describe('hs_daily_checkins vocabularies stay in sync with the TS types', () => 
   });
 });
 
+describe('counts describe what their names claim', () => {
+  it('the contractor rollup counts DISTINCT hazard submissions, not rows', () => {
+    // One hazard reported by a crew lead is stamped on every crew member's row.
+    // COUNT(*) would report a single trench as three hazards.
+    const svc = read('src/modules/health-safety/services/checkinService.ts');
+    expect(svc).toMatch(/COUNT\(DISTINCT submission_id\) FILTER \(\s*\n\s*WHERE hazard_reported/);
+    expect(svc).not.toMatch(/COUNT\(\*\) FILTER \(\s*\n\s*WHERE hazard_reported/);
+  });
+
+  it('the board de-duplicates hazards and names the PPE stat for what it counts', () => {
+    const board = read('pages/api/health-safety/checkins/index.ts');
+    expect(board).toMatch(/hazards: new Set\(/);
+    // "ppe_gaps" would read as a count of gaps; it is a count of workers.
+    expect(board).toMatch(/workers_with_ppe_gap:/);
+  });
+});
+
 describe('the design decisions are enforced by the database, not just the handlers', () => {
   const migration = read(MIGRATION_PATH);
 
