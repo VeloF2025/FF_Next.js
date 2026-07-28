@@ -233,7 +233,13 @@ else
     grep -E 'now pass — delete them' /tmp/ci-tests.txt | head -1 | sed 's/^/    /' || true
   else
     fail "Unit tests: NEW failure(s), or the run did not complete"
-    grep -E 'NEW test failure|no summary line|^    [a-z]' /tmp/ci-tests.txt | head -12 | sed 's/^/    /'
+    # `|| true` is load-bearing under `set -euo pipefail` (line 18): if the
+    # ratchet fails in a way that emits none of these markers — missing execute
+    # bit, syntax error, script not found — grep matches nothing and exits 1,
+    # which would kill ci-local.sh here and silently skip the Build and Secret
+    # Scan gates plus the final summary. Same bug this file already had to fix
+    # twice (see the CATCH_COUNT and EMPTY_CATCH notes above).
+    grep -E 'NEW test failure|no summary line|^    [a-z]' /tmp/ci-tests.txt | head -12 | sed 's/^/    /' || true
   fi
 
   echo -e "\n${CYAN}── Gate 6: Build ──${NC}\n"

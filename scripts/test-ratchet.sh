@@ -50,7 +50,16 @@ run_suite() {
   # A non-zero exit is expected whenever anything fails — that is the case being
   # measured, so it must not abort the script. Completeness is judged from the
   # summary line below, never from the exit code.
-  npm test -- --run --reporter=basic "$@" > "$OUTPUT" 2>&1 || true
+  #
+  # Bounded by `timeout` so a future deadlock (this gate exists because of one)
+  # fails loudly instead of hanging a local run forever. GHA has its own
+  # timeout-minutes, but `bash scripts/ci-local.sh` has nothing else to stop it.
+  # A kill produces no summary line, which the check below turns into a failure.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "${RATCHET_TIMEOUT_SECS:-900}" npm test -- --run --reporter=basic "$@" > "$OUTPUT" 2>&1 || true
+  else
+    npm test -- --run --reporter=basic "$@" > "$OUTPUT" 2>&1 || true
+  fi
 
   # A hung, killed or crashed run emits no summary. That MUST fail: treating a
   # missing summary as "no failures" is exactly how the old setup reported a
