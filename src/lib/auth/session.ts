@@ -71,8 +71,15 @@ export async function createSession(
 }
 
 /**
- * Bind a signed JWT to its session row. Extracted from pages/api/auth/login.ts so the
- * login flow and the MCP mint share one implementation.
+ * Bind a signed JWT to its session row.
+ *
+ * Currently used ONLY by the MCP mint. pages/api/auth/login.ts and setup-password.ts
+ * still run their own inline `UPDATE user_sessions SET token_hash = ...`; wiring them to
+ * this helper is deliberately deferred to a later PR in this stack, so that a change to
+ * the login path is reviewed on its own rather than riding along with new functionality.
+ *
+ * Stated in the present tense because an earlier revision of this comment claimed the
+ * extraction had already happened, which a reader of this file alone would have believed.
  */
 export async function setSessionTokenHash(sessionId: string, token: string): Promise<void> {
   await sql`
