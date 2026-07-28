@@ -19,6 +19,8 @@ export interface AuthUser {
   department?: string;
   /** True when the current session is an impersonation started by an admin */
   isImpersonation?: boolean;
+  /** Kind of session that authenticated this request. Absent for users not derived from a request. */
+  sessionKind?: SessionKind;
 }
 
 export type AuthRole = 'super_admin' | 'admin' | 'manager' | 'storeman' | 'technician' | 'viewer' | 'system';
