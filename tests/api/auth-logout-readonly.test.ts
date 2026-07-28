@@ -10,17 +10,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMocks } from 'node-mocks-http';
 
-const { verifyToken, getSession, deleteSession, deleteAllUserSessions } = vi.hoisted(() => ({
-  verifyToken: vi.fn(),
-  getSession: vi.fn(),
-  deleteSession: vi.fn(),
-  deleteAllUserSessions: vi.fn(),
-}));
+const { verifyToken, getSession, deleteSession, deleteEveryUserSession, deleteAllUserSessions } =
+  vi.hoisted(() => ({
+    verifyToken: vi.fn(),
+    getSession: vi.fn(),
+    deleteSession: vi.fn(),
+    deleteEveryUserSession: vi.fn(),
+    deleteAllUserSessions: vi.fn(),
+  }));
 
+// Both sweep functions are mocked, and the negatives below assert on BOTH. Asserting
+// only the one the handler happens to call today would go quietly vacuous the moment
+// that choice changes — which is exactly what happened when `allDevices` moved from
+// `deleteAllUserSessions` to `deleteEveryUserSession`.
 vi.mock('@/lib/auth', () => ({
   verifyToken,
   getSession,
   deleteSession,
+  deleteEveryUserSession,
   deleteAllUserSessions,
   AUTH_COOKIE_NAME: 'ff_auth_token',
 }));
@@ -52,7 +59,8 @@ describe('POST /api/auth/logout — read-only gate', () => {
     expect(res._getStatusCode()).toBe(403);
     expect(JSON.parse(res._getData()).error.code).toBe('MCP_READ_ONLY');
     // The whole point: a read-only credential must not be able to end the account's
-    // live browser session.
+    // live browser session — by either sweep.
+    expect(deleteEveryUserSession).not.toHaveBeenCalled();
     expect(deleteAllUserSessions).not.toHaveBeenCalled();
     expect(deleteSession).not.toHaveBeenCalled();
   });
@@ -74,7 +82,10 @@ describe('POST /api/auth/logout — read-only gate', () => {
     await handler(req, res);
 
     expect(res._getStatusCode()).toBe(200);
-    expect(deleteAllUserSessions).toHaveBeenCalledWith('user-1');
+    // Kind-agnostic: "all devices" must include MCP connectors, so the browser-only
+    // sweep is the wrong one here.
+    expect(deleteEveryUserSession).toHaveBeenCalledWith('user-1');
+    expect(deleteAllUserSessions).not.toHaveBeenCalled();
   });
 
   it('still clears the cookie when the token is invalid', async () => {
