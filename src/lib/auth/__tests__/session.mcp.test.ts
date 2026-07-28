@@ -59,20 +59,22 @@ describe('createSession with MCP options', () => {
 
 /**
  * The session-KIND scoping is the security-relevant change in this PR, and it had no
- * coverage: `deleteAllUserSessions` now deletes FEWER rows than before (browser only by
- * default), and `deleteEveryUserSession` is the sweep that must not miss anything.
+ * coverage: `deleteAllUserSessions` deletes FEWER rows than before (one kind only), and
+ * `deleteEveryUserSession` is the sweep that must not miss anything.
  *
- * Getting the split backwards in either direction is bad in a different way:
- *   - if logout swept mcp sessions, every connector would die on any logout
- *   - if a password reset did NOT sweep them, a compromised account would keep a live
- *     90-day read credential after the user thought they had locked it down
+ * The kind-scoped variant has no production caller — both real sweeps
+ * ("log out of all devices", password reset) are deliberately kind-agnostic, since a
+ * user asking to be signed out everywhere means connectors too. These tests pin the
+ * split so a future kind-scoped caller cannot silently get the predicate backwards:
+ * if a compromise sweep failed to clear mcp rows, the account would keep a live
+ * 90-day read credential after the user thought they had locked it down.
  */
 describe('session deletion is scoped by kind', () => {
   beforeEach(() => {
     calls.length = 0;
   });
 
-  it('deleteAllUserSessions defaults to browser only — a logout must not kill MCP tokens', async () => {
+  it('deleteAllUserSessions scopes to a single kind, defaulting to browser', async () => {
     await deleteAllUserSessions('u1');
 
     expect(calls[0]!.text).toContain('DELETE FROM user_sessions');

@@ -9,7 +9,7 @@ import { serialize } from 'cookie';
 import {
   verifyToken,
   deleteSession,
-  deleteAllUserSessions,
+  deleteEveryUserSession,
   AUTH_COOKIE_NAME,
 } from '@/lib/auth';
 import { log } from '@/lib/logger';
@@ -41,8 +41,12 @@ export default async function handler(
 
       if (payload) {
         if (allDevices) {
-          // Delete all sessions for this user
-          await deleteAllUserSessions(payload.sub);
+          // "All devices" includes MCP connectors. This is the flow a user reaches for
+          // when they suspect compromise, so it must not leave a read credential alive
+          // that outlives the sweep — hence the kind-agnostic sweep, not the
+          // browser-only `deleteAllUserSessions`. Routine sign-out takes the branch
+          // below, which drops only the current session and leaves connectors running.
+          await deleteEveryUserSession(payload.sub);
         } else {
           // Delete just this session
           await deleteSession(payload.sessionId);
