@@ -449,28 +449,40 @@ describe('Database Connection Utility', () => {
     });
 
     it('should measure query latency', async () => {
-      // 🟢 WORKING: Latency is measured and reported.
+      // 🟢 WORKING: Latency spans exactly the query, measured off a fake clock.
       //
-      // Deliberately asserts that a latency was MEASURED, not that it fell
-      // under some duration. The previous `toBeLessThan(1000)` was an assertion
-      // about the machine, not the code: the CI runner is single-concurrency and
-      // shared with the production service, so a `setTimeout(10)` competing with
-      // a `next build` can easily exceed a second. That made this the flakiest
-      // test in the suite (~1 run in 8) and it had to be allowlisted to stop it
-      // reddening builds — see issue #2280.
-      mockPoolDirectQuery.mockImplementation(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        return { rows: [{ now: new Date().toISOString() }] };
-      });
+      // No wall-clock, in either direction. The original `toBeLessThan(1000)`
+      // asserted about the machine, not the code — the CI runner is
+      // single-concurrency and shared with the production service, so a 10ms
+      // sleep competing with a `next build` can exceed a second. That made this
+      // the flakiest test in the suite (issue #2280).
+      //
+      // A real-timer LOWER bound is no better: `Date.now()` truncates to whole
+      // milliseconds, so a `setTimeout(…, 10)` that fires at 9.7ms measured
+      // from a start sampled at x.9ms legitimately reports 9. Both bounds are
+      // assertions about OS scheduling.
+      //
+      // Driving `Date.now()` directly removes the timer from the assertion
+      // entirely: the mocked query advances the clock by a known amount, so the
+      // expected latency is exact. That is strictly stronger than any bound —
+      // it fails if `latency` is hardcoded, faked, or measured across the wrong
+      // span — and it cannot flake, because no real time is involved.
+      const QUERY_MS = 42;
+      let clock = 1_700_000_000_000;
+      const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
 
-      const health = await healthCheck();
+      try {
+        mockPoolDirectQuery.mockImplementation(async () => {
+          clock += QUERY_MS;
+          return { rows: [{ now: new Date().toISOString() }] };
+        });
 
-      // Only the UPPER bound was flaky. Keep a lower bound tied to the mocked
-      // 10ms delay: `setTimeout` guarantees it, so this cannot flake, and it
-      // still fails if `latency` is ever hardcoded, faked, or measured across
-      // the wrong span — which a bare `>= 0` on `Date.now() - start` cannot.
-      expect(typeof health.latency).toBe('number');
-      expect(health.latency).toBeGreaterThanOrEqual(10);
+        const health = await healthCheck();
+
+        expect(health.latency).toBe(QUERY_MS);
+      } finally {
+        nowSpy.mockRestore();
+      }
     });
   });
 
