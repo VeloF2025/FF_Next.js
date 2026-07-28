@@ -86,8 +86,14 @@ before this is used to size anything.
 - `ticketEnrichmentService.lookupOneMapDrop()` queried `onemap_drops` (0 rows), so
   ticket enrichment never returned anything. Fixed in PR #2289.
 - `oneMapApiService.authenticate()` returns `true` whenever a session cookie comes
-  back, without checking the credentials were accepted — so a failed login surfaces
-  later as a misleading "API returned failure".
+  back, without checking the credentials were accepted — so a future credential
+  expiry would surface as a misleading "API returned failure" rather than an auth
+  error. Not currently causing an outage.
+
+The production 1Map credential (`ettiene@`) is **verified working** end-to-end:
+login returns 302 and `getattributes` returns `success: true`. The 1Map read path
+and the OLT report endpoints that depend on it are healthy. Syncing `contnr` is
+tracked in issue #2292.
 
 ### FNO attribution per ticket
 
