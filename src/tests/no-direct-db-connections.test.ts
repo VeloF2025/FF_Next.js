@@ -42,9 +42,11 @@ describe('No Direct Database Connections', () => {
     //   reached only from pages/api/** and the WA send clients; no component
     //   imports it, and it appears in no client chunk.
     'modules/communications/whatsapp/config/waProviderConfig.ts',
-    //   the three review components that reference it use `import type` only,
-    //   which is erased at compile time, so nothing is pulled into the bundle;
-    //   confirmed absent from every client chunk.
+    //   five files reference it, all in type position and therefore erased at
+    //   compile time — StatusPill.tsx, SummaryBar.tsx, FilterBar.tsx and
+    //   filters.ts via `import type`, and types.ts via a type-position
+    //   `import('...').ReceiptStatus` expression. Nothing is pulled into the
+    //   bundle; confirmed absent from every client chunk.
     'modules/receipts/queries.ts',
   ];
 
