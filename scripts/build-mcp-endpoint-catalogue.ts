@@ -32,9 +32,7 @@ export const DENIED_GROUPS = new Set([
   // its own OAuth challenge). An agent has no reason to call them, and cataloguing them
   // invites exactly the wandering this list exists to prevent.
   'cortex-remote-mcp',
-  // NOTE: 'ff-remote-mcp' belongs here too, but that route ships with PR #2254 and does
-  // not exist on this branch — the "every denied entry matched something" test rejects
-  // speculative entries, correctly. Add it when #2254 lands.
+  'ff-remote-mcp',
 ]);
 
 /**

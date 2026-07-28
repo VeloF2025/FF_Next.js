@@ -197,10 +197,11 @@ describe('denied group matching', () => {
     expect(isDeniedGroup('database')).toBeUndefined();
   });
 
-  it('withholds the MCP transport proxy', () => {
-    // Transport, not data: it forwards any method/body to an internal service and is
-    // unauthenticated by design. An agent has no reason to call it.
+  it('withholds both MCP transport proxies', () => {
+    // Transport, not data: they forward any method/body to an internal service and are
+    // unauthenticated by design. An agent has no reason to call them.
     expect(isDeniedGroup('cortex-remote-mcp')).toBe('cortex-remote-mcp');
+    expect(isDeniedGroup('ff-remote-mcp')).toBe('ff-remote-mcp');
   });
 });
 
