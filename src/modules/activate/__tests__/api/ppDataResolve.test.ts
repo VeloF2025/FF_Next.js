@@ -29,7 +29,10 @@ vi.mock('@/modules/activate/services/cascadePpResolution', () => ({
   cascadePpResolution: vi.fn(),
 }));
 
-import { runLocalResolution } from '../../../../../pages/api/activate/pp-data-resolve';
+import {
+  backfillGpsCoordinates,
+  runLocalResolution,
+} from '../../../../../pages/api/activate/pp-data-resolve';
 
 /** Every UPDATE statement the scan issued, in order. */
 function issuedQueries(): string[] {
@@ -175,5 +178,42 @@ describe('runLocalResolution — column names that must match the live schema', 
   it('only accepts a real DR from foto_ai_reviews', async () => {
     await runLocalResolution();
     expect(fotoQuery()).toContain("fr.dr_number ~ '^DR[0-9]+$'");
+  });
+});
+
+describe('backfillGpsCoordinates — 1Map fallback', () => {
+  function gpsQueries(): string[] {
+    return issuedQueries().map((sql) => sql.replace(/\s+/g, ' '));
+  }
+
+  it('reads the populated onemap_properties table, never onemap_drops', async () => {
+    await backfillGpsCoordinates();
+
+    const queries = gpsQueries();
+    expect(queries.filter((sql) => sql.includes('FROM onemap_properties'))).toHaveLength(2);
+    expect(queries.every((sql) => !/\bonemap_drops\b/.test(sql))).toBe(true);
+  });
+
+  it('matches the complete DR number with or without its prefix', async () => {
+    await backfillGpsCoordinates();
+
+    const onemapQueries = gpsQueries().filter((sql) => sql.includes('FROM onemap_properties'));
+    for (const sql of onemapQueries) {
+      expect(sql).toMatch(/REGEXP_REPLACE\(UPPER\(TRIM\(drop_number\)\), '\^DR', ''\)/);
+      expect(sql).toMatch(
+        /REGEXP_REPLACE\(UPPER\(TRIM\((?:pp\.resolved_drop_number|d\.drop_number)\)\), '\^DR', ''\)/,
+      );
+      expect(sql).not.toMatch(/\bLIKE\b/);
+    }
+  });
+
+  it('chooses one deterministic GPS row per normalized drop', async () => {
+    await backfillGpsCoordinates();
+
+    const onemapQueries = gpsQueries().filter((sql) => sql.includes('FROM onemap_properties'));
+    for (const sql of onemapQueries) {
+      expect(sql).toMatch(/DISTINCT ON \(normalized_drop_number\)/);
+      expect(sql).toMatch(/ORDER BY normalized_drop_number,[\s\S]*\bid DESC/);
+    }
   });
 });

@@ -1486,11 +1486,11 @@ async function runEODSheetScan(): Promise<{
 
 /**
  * Backfill GPS on resolved PP records and their linked tables.
- * Priority: drops → oes_activations → onemap_drops
+ * Priority: drops → oes_activations → onemap_properties
  * Also propagates to dr_photo_unified_reviews and fills gaps in the drops table.
  * All UPDATEs are idempotent (WHERE latitude IS NULL).
  */
-async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; drops: number }> {
+export async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; drops: number }> {
   try {
     let pp = 0, unified = 0, drops = 0;
 
@@ -1518,15 +1518,27 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
     `);
     pp += r2.rowCount ?? 0;
 
-    // oes_pp_data: onemap_drops second fallback
+    // oes_pp_data: latest deterministic onemap_properties row as second fallback.
     const r3 = await pool.query(`
       UPDATE oes_pp_data pp
-      SET latitude = od.latitude::numeric, longitude = od.longitude::numeric, updated_at = NOW()
-      FROM onemap_drops od
-      WHERE od.drop_number = pp.resolved_drop_number
+      SET latitude = op.latitude::numeric, longitude = op.longitude::numeric, updated_at = NOW()
+      FROM (
+        SELECT DISTINCT ON (normalized_drop_number)
+               normalized_drop_number, latitude, longitude
+        FROM (
+          SELECT REGEXP_REPLACE(UPPER(TRIM(drop_number)), '^DR', '') AS normalized_drop_number,
+                 latitude, longitude, last_modified_date, id
+          FROM onemap_properties
+          WHERE drop_number IS NOT NULL
+            AND latitude IS NOT NULL
+            AND longitude IS NOT NULL
+        ) candidates
+        ORDER BY normalized_drop_number, last_modified_date DESC NULLS LAST, id DESC
+      ) op
+      WHERE op.normalized_drop_number =
+            REGEXP_REPLACE(UPPER(TRIM(pp.resolved_drop_number)), '^DR', '')
         AND pp.resolved_drop_number IS NOT NULL
         AND pp.latitude IS NULL
-        AND od.latitude IS NOT NULL AND od.longitude IS NOT NULL
     `);
     pp += r3.rowCount ?? 0;
 
@@ -1563,14 +1575,26 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
     `);
     drops += r6.rowCount ?? 0;
 
-    // drops: onemap_drops second fallback
+    // drops: latest deterministic onemap_properties row as second fallback.
     const r7 = await pool.query(`
       UPDATE drops d
-      SET latitude = od.latitude::numeric, longitude = od.longitude::numeric, updated_at = NOW()
-      FROM onemap_drops od
-      WHERE od.drop_number = d.drop_number
+      SET latitude = op.latitude::numeric, longitude = op.longitude::numeric, updated_at = NOW()
+      FROM (
+        SELECT DISTINCT ON (normalized_drop_number)
+               normalized_drop_number, latitude, longitude
+        FROM (
+          SELECT REGEXP_REPLACE(UPPER(TRIM(drop_number)), '^DR', '') AS normalized_drop_number,
+                 latitude, longitude, last_modified_date, id
+          FROM onemap_properties
+          WHERE drop_number IS NOT NULL
+            AND latitude IS NOT NULL
+            AND longitude IS NOT NULL
+        ) candidates
+        ORDER BY normalized_drop_number, last_modified_date DESC NULLS LAST, id DESC
+      ) op
+      WHERE op.normalized_drop_number =
+            REGEXP_REPLACE(UPPER(TRIM(d.drop_number)), '^DR', '')
         AND d.latitude IS NULL
-        AND od.latitude IS NOT NULL AND od.longitude IS NOT NULL
     `);
     drops += r7.rowCount ?? 0;
 
