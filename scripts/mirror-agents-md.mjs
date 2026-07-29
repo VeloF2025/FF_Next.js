@@ -179,7 +179,11 @@ const rendered = emit.map((target) => ({
   content: render(target.source, target.canonical),
 }));
 const desiredOutputs = new Set(rendered.map((target) => target.out));
-const orphaned = listGeneratedAgentsMd(ROOT)
+const managedMirrors = [];
+for (const scanRoot of SCAN_ROOTS) {
+  listGeneratedAgentsMd(resolve(ROOT, scanRoot), managedMirrors);
+}
+const orphaned = managedMirrors
   .filter((file) => !desiredOutputs.has(file))
   .sort();
 

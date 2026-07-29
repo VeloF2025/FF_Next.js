@@ -8,6 +8,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   unlinkSync,
   writeFileSync,
@@ -71,8 +72,16 @@ test("--check distinguishes stale and missing mirrors", (context) => {
 test("--check reports and write mode removes orphaned mirrors", (context) => {
   const root = createFixture();
   const mirror = resolve(root, "src", "config", "AGENTS.md");
+  const outsideMirror = resolve(root, "docs", "AGENTS.md");
+  const outsideContent = [
+    "<!-- GENERATED — do not edit. Canonical source: fixture.md -->",
+    "Out-of-scope fixture",
+    "",
+  ].join("\n");
   context.after(() => rmSync(root, { recursive: true, force: true }));
 
+  mkdirSync(dirname(outsideMirror), { recursive: true });
+  writeFileSync(outsideMirror, outsideContent, "utf8");
   assert.equal(runGenerator(root).status, 0);
   unlinkSync(resolve(root, "src", "config", "source-4.ts"));
 
@@ -82,5 +91,6 @@ test("--check reports and write mode removes orphaned mirrors", (context) => {
 
   assert.equal(runGenerator(root).status, 0);
   assert.equal(existsSync(mirror), false);
+  assert.equal(readFileSync(outsideMirror, "utf8"), outsideContent);
   assert.equal(runGenerator(root, "--check").status, 0);
 });
