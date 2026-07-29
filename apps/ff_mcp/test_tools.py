@@ -9,6 +9,7 @@ Run with:  FF_MCP_CALLBACK_SECRET=test-secret python3 -m pytest apps/ff_mcp/ -q
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 from pathlib import Path
 
@@ -198,3 +199,96 @@ def test_fibreflow_get_without_a_credential_explains_how_to_reconnect(svc, monke
     monkeypatch.setattr(tools, "get_access_token", lambda: None)
     out = json.loads(tools._fibreflow_get_sync("/api/projects"))
     assert "Reconnect" in out["error"]
+
+
+def test_rate_limit_is_safe_under_real_concurrency(svc):
+    """fibreflow_get runs on a worker-thread pool, so _rate_limit genuinely executes
+    concurrently. Unlocked, the sweep iterates _call_times while another thread inserts
+    into it -> "dictionary changed size during iteration", which the caller swallows and
+    reports to Claude as a nonsense tool error instead of data.
+
+    The parameters matter. A handful of threads doing a few calls each will NOT
+    reproduce this: CPython only switches threads every 5ms by default, and a short
+    comprehension usually finishes inside one slice. Reproducing it needs a switch
+    interval small enough to preempt mid-comprehension AND a dict large enough that the
+    comprehension spans a switch. Verified against the unlocked implementation: these
+    values fail it 7/7 times across repeated runs.
+    """
+    import sys
+    import threading
+
+    _, tools = svc
+    tools._call_times.clear()
+
+    old_interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    try:
+        stale_ts = time.time() - tools._RATE_WINDOW_SECONDS - 10
+        for i in range(4000):
+            tools._call_times[f"stale-{i:016d}"] = [stale_ts]
+
+        errors: list[str] = []
+        start = threading.Barrier(8)
+
+        def hammer(i: int) -> None:
+            try:
+                start.wait(timeout=10)
+                for j in range(60):
+                    tools._rate_limit(f"tok-{i}-{j}".ljust(20, "x"))
+            except BaseException as exc:  # noqa: BLE001 - the point is to catch anything
+                errors.append(repr(exc))
+
+        threads = [threading.Thread(target=hammer, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=60)
+
+        assert not errors, f"concurrent _rate_limit raised: {errors[:3]}"
+    finally:
+        sys.setswitchinterval(old_interval)
+        tools._call_times.clear()
+
+
+def test_rate_limit_does_not_lose_increments_under_contention(svc, monkeypatch):
+    """Two threads sharing one token must not both read the same list, both append, and
+    lose one — that would make the budget quietly more permissive than it claims.
+
+    The budget is lifted for the duration: with the real ceiling the list stops growing
+    at RATE_LIMIT_PER_HOUR by design, which would mask a lost update rather than expose
+    it. What is under test is the read-modify-write, not the ceiling.
+    """
+    import threading
+
+    _, tools = svc
+    tools._call_times.clear()
+    token = "shared-token-value"
+    key = token[-16:]
+    monkeypatch.setattr(tools, "RATE_LIMIT_PER_HOUR", 10_000)
+
+    import sys
+
+    per_thread = 200
+    start = threading.Barrier(4)
+    old_interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+
+    def hammer() -> None:
+        start.wait(timeout=10)
+        for _ in range(per_thread):
+            try:
+                tools._rate_limit(token)
+            except RuntimeError:
+                pass  # over budget is expected; we are counting recorded calls
+
+    threads = [threading.Thread(target=hammer) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
+
+    sys.setswitchinterval(old_interval)
+    # Every call must be recorded exactly once. Unlocked, two threads read the same
+    # list, both append, and one increment is lost — a budget quietly more permissive
+    # than it advertises.
+    assert len(tools._call_times[key]) == per_thread * 4

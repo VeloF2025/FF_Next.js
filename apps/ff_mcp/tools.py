@@ -14,6 +14,7 @@ into payroll while answering a question about drops.
 from __future__ import annotations
 
 import json
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -42,6 +43,8 @@ MAX_RESPONSE_CHARS = 15_000
 RATE_LIMIT_PER_HOUR = 40
 _RATE_WINDOW_SECONDS = 3600
 _call_times: dict[str, list[float]] = defaultdict(list)
+# Guards every read-modify-write of _call_times; see _rate_limit.
+_call_times_lock = threading.Lock()
 
 
 def _canonical(path: str) -> str:
@@ -95,31 +98,47 @@ def _access_token() -> str:
 
 
 def _rate_limit(token: str) -> None:
-    """Fixed-window-free sliding limiter keyed by token. Raises when over budget."""
+    """Sliding-window limiter keyed by token. Raises when over budget.
+
+    Holds _call_times_lock for the whole read-sweep-append-write sequence. This is not
+    theoretical caution: fibreflow_get now runs on a real worker-thread pool
+    (anyio.to_thread), so two concurrent calls genuinely execute this at once. Without
+    the lock the sweep iterates the dict while another thread inserts into it —
+    "RuntimeError: dictionary changed size during iteration", which the caller would
+    swallow and report to Claude as a nonsense tool error — and two calls sharing a key
+    can both read the same list, both append, and lose one increment, making the limit
+    quietly more permissive than it claims.
+    """
     now = time.time()
     # Key on a digest-length prefix rather than the token itself so the raw credential is
     # not held as a dict key any longer than the request needs it.
     key = token[-16:]
-    # Sweep keys that have gone quiet, not just old timestamps within a key. Without
-    # this the dict grows one entry per token ever seen, forever, in a process systemd
-    # keeps alive indefinitely.
-    for stale in [k for k, v in _call_times.items() if not v or now - max(v) >= _RATE_WINDOW_SECONDS]:
-        if stale != key:
-            del _call_times[stale]
 
-    recent = [t for t in _call_times[key] if now - t < _RATE_WINDOW_SECONDS]
-    if len(recent) >= RATE_LIMIT_PER_HOUR:
-        oldest = min(recent)
-        wait_minutes = int((_RATE_WINDOW_SECONDS - (now - oldest)) // 60) + 1
+    with _call_times_lock:
+        # Sweep keys that have gone quiet, not just old timestamps within a key. Without
+        # this the dict grows one entry per token ever seen, forever, in a process
+        # systemd keeps alive indefinitely. The comprehension materialises before the
+        # loop body deletes, and the lock keeps other threads out meanwhile.
+        for stale in [
+            k for k, v in _call_times.items()
+            if not v or now - max(v) >= _RATE_WINDOW_SECONDS
+        ]:
+            if stale != key:
+                del _call_times[stale]
+
+        recent = [t for t in _call_times[key] if now - t < _RATE_WINDOW_SECONDS]
+        if len(recent) >= RATE_LIMIT_PER_HOUR:
+            oldest = min(recent)
+            wait_minutes = int((_RATE_WINDOW_SECONDS - (now - oldest)) // 60) + 1
+            _call_times[key] = recent
+            raise RuntimeError(
+                f"Rate limit reached: {RATE_LIMIT_PER_HOUR} FibreFlow requests per hour "
+                f"for this connection. Try again in about {wait_minutes} minute(s). If "
+                "you are gathering a lot of data, narrow the query or use the endpoint's "
+                "page/limit parameters instead of fetching everything."
+            )
+        recent.append(now)
         _call_times[key] = recent
-        raise RuntimeError(
-            f"Rate limit reached: {RATE_LIMIT_PER_HOUR} FibreFlow requests per hour for "
-            f"this connection. Try again in about {wait_minutes} minute(s). If you are "
-            "gathering a lot of data, narrow the query or use the endpoint's page/limit "
-            "parameters instead of fetching everything."
-        )
-    recent.append(now)
-    _call_times[key] = recent
 
 
 def _reject(message: str, **extra) -> str:
