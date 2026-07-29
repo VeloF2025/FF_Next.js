@@ -120,6 +120,13 @@ proxy then fails closed (502) and FibreFlow itself is unaffected.
   follows whatever branch is checked out and can sit frozen behind origin.
 - **Read-only is enforced server-side**, in `withAuth`/`requireAuth`. The tool layer
   does not enforce it and must not pretend to.
+- **Cloudflare 403s the default Python User-Agent.** Both `*.fibreflow.app` hosts sit
+  behind Cloudflare, which answers `Error 1010 browser_signature_banned` to
+  `Python-urllib/*`. Measured on dev: `Python-urllib/3.12` → **403**, while
+  `ff-remote-mcp/0.1` and `ff-remote-mcp-oauth/0.1` → **200**. The explicit `User-Agent`
+  headers in `tools.py` and `server.py` are therefore load-bearing, not decoration —
+  strip them and every tool call and token validation starts failing with an HTML error
+  page. Any script written against these endpoints needs one too.
 - **The path guards run on a canonical path** — unquoted until stable, then lower-cased.
   Next.js decodes percent-escapes before routing and its route dirs are lower-case, so
   checking the raw string let `/api/Accounting/ledger` and `/api/%2e%2e/x` straight past.
