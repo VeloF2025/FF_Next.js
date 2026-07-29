@@ -5,7 +5,12 @@
 
 ## Status
 
-**All four PRs open, CI green, awaiting blind-review verdicts. Nothing merged yet. Nothing deployed to dev or prod.**
+**All four PRs open, CI green, blind-reviewed, review findings fixed. Nothing merged yet. Nothing deployed to dev or prod.**
+
+Blind review found **13 issues across the four PRs, including one HIGH**. All were
+reproduced before fixing; two were disputed with evidence rather than changed (see
+the reconciliation comments on each PR). Tests grew 36→60 (Python) and 35→51 (JS)
+as a result.
 
 | PR | Branch | Tasks | CI |
 |---|---|---|---|
@@ -35,6 +40,24 @@ Also verified: session row `kind='mcp' label='Claude connector'` 90d with `last_
 5. **The RFC 9728 well-known file was a static file hardcoding prod.** Served from dev it advertised **production** as the authorization server. Replaced with a host-aware API route + `next.config` rewrite (#2299).
 6. **`complete_pending` pops the state**, so validating the token after consuming it burns the request on a transient failure. Added `peek_pending`.
 
+## What blind review caught that mutation testing did not
+
+- **HIGH, #2299 — host-header injection into OAuth discovery.** My comment claimed the
+  edge sets `x-forwarded-host`. It does not: `docs/VPS/*.conf` set `Host`, `X-Real-IP`,
+  `X-Forwarded-For`, `X-Forwarded-Proto` and never touch it. Combined with the
+  `Cache-Control: public` the handler itself set, a spoofed request could poison another
+  user's discovery document toward an attacker's OAuth server. **Lesson: a security
+  comment that asserts an infra property must cite the config, or it is hand-waving.**
+- **#2298 — the denylist was case- and encoding-bypassable.** `/api/Accounting/ledger`
+  and `/api/%73taff/list` sailed through. Next.js lower-cases route dirs and decodes
+  before routing, so the guard has to run on the canonical path, not the raw string.
+- **#2298 — the tools blocked the event loop.** FastMCP calls a *sync* tool inline
+  (`func_metadata.py: return fn(**args)`), so one slow upstream stalled every user for
+  30s. Now `async` + `anyio.to_thread`.
+- **#2299 — `ReadWritePaths` named a directory nothing created.** Under
+  `ProtectSystem=strict` that fails namespace setup *before* `ExecStartPre` runs, so the
+  unit would not have started on a clean host. `StateDirectory` is the right mechanism.
+
 ## Test-quality lessons (three decorative tests caught by mutation testing)
 
 Mutation testing found **three tests that asserted nothing**, each of which looked fine:
@@ -58,7 +81,9 @@ The `playwriter` MCP tool **echoes its params in error messages**. Two `addCooki
 
 ## Where to resume
 
-1. Collect the four blind-review verdicts, fix findings, merge in any order (they are independent).
+1. Merge in any order — they are independent, all CI-green, all reviewed. (The four
+   were re-trial-merged after the fixes: 139 tests pass on the merged tree and the full
+   OAuth round trip was re-run on it.)
 2. `bash scripts/deploy-local.sh dev`.
 3. Install the unit on velo: copy `deployment/systemd/ff-remote-mcp.service` to `~/.config/systemd/user/`, create `~/.ff-remote-mcp.env` (chmod 600) with `FF_MCP_CALLBACK_SECRET`, `FF_APP_BASE=https://dev.fibreflow.app`, `FF_REMOTE_MCP_PUBLIC_BASE=https://dev.fibreflow.app/api/ff-remote-mcp`; add the same secret + `FF_REMOTE_MCP_URL=http://127.0.0.1:7416` to the dev app env; `systemctl --user enable --now ff-remote-mcp`.
 4. Add the connector in claude.ai and do the two-user scoping check.
