@@ -1,5 +1,10 @@
 /**
- * Pins the 1Map side of NOC ticket enrichment.
+ * Pins both lookup sides of NOC ticket enrichment.
+ *
+ * Both had the same defect: an exact-match miss fell through to
+ * `drop_number LIKE '%<digits>%'`, which returns whichever unrelated drop the
+ * planner reaches first. See the lookupSOWDrop block at the bottom for the
+ * measured blast radius on `sow_drops`.
  *
  * This lookup previously queried `onemap_drops`, which holds 0 rows — so it
  * always returned null and no ticket was ever enriched with a customer name,
@@ -26,7 +31,7 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-import { lookupOneMapDrop } from '../../services/ticketEnrichmentService';
+import { lookupOneMapDrop, lookupSOWDrop } from '../../services/ticketEnrichmentService';
 
 /** SQL text of every query the service issued, whitespace-collapsed. */
 function sqlIssued(): string[] {
@@ -152,5 +157,87 @@ describe('lookupOneMapDrop', () => {
     queryOneMock.mockImplementation(() => Promise.reject(new Error('db down')));
 
     await expect(lookupOneMapDrop('DR1735912')).resolves.toBeNull();
+  });
+});
+
+/**
+ * `sow_drops` supplies the pole number, contractor, municipality, PON/zone and
+ * GPS rendered on the ticket, so a lookup that returns the wrong row sends a
+ * technician to a stranger's address.
+ *
+ * Measured against the live table on 2026-07-29: of 4,134 distinct ticket DR
+ * numbers, 422 miss the exact match. The old `LIKE '%<digits>%'` fallback
+ * returned a row for 27 of them and every one was a different drop — `DR173`
+ * matched 10,107 rows, `DR185` matched 6,829. It never once returned the right
+ * drop, because all 64,030 rows store `drop_number` DR-prefixed, so there is no
+ * prefix-less row for the fallback to rescue.
+ */
+describe('lookupSOWDrop', () => {
+  it('never uses a substring match that could hit a different drop', async () => {
+    queryOneMock.mockResolvedValue(null);
+
+    // DR173 is a real truncated ticket DR: as a substring it matched 10,107 rows.
+    await lookupSOWDrop('DR173');
+
+    for (const sql of sqlIssued()) {
+      expect(sql).not.toMatch(/LIKE/i);
+    }
+    for (const call of queryOneMock.mock.calls) {
+      for (const param of (call[1] as unknown[]) ?? []) {
+        expect(String(param)).not.toContain('%');
+      }
+    }
+  });
+
+  it('gives up after the exact match instead of guessing', async () => {
+    queryOneMock.mockResolvedValue(null);
+
+    await expect(lookupSOWDrop('DR173')).resolves.toBeNull();
+    // A second query here means a fallback was reintroduced. Every row in
+    // sow_drops is DR-prefixed, so no fallback can do anything but collide.
+    expect(queryOneMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('matches on the normalised DR, case-insensitively, against sow_drops', async () => {
+    queryOneMock.mockResolvedValue(null);
+
+    await lookupSOWDrop('dr1735912');
+
+    const [sql] = sqlIssued();
+    expect(sql).toContain('sow_drops');
+    expect(sql).toMatch(/UPPER\(drop_number\)\s*=\s*\$1/i);
+    expect(queryOneMock.mock.calls[0]?.[1]).toEqual(['DR1735912']);
+  });
+
+  it('returns the drop on an exact match', async () => {
+    queryOneMock.mockResolvedValueOnce({
+      drop_number: 'DR1735912',
+      pole_number: 'LAW.P.A123',
+      latitude: -26.2708,
+      longitude: 27.8546,
+      address: '12 Rose Street, Lawley',
+      municipality: 'City of Johannesburg',
+      pon_no: 4,
+      zone_no: 7,
+      contractor: 'Acme Fibre',
+      status: 'Installed',
+    });
+
+    await expect(lookupSOWDrop('DR1735912')).resolves.toMatchObject({
+      drop_number: 'DR1735912',
+      pole_number: 'LAW.P.A123',
+      contractor: 'Acme Fibre',
+    });
+  });
+
+  it('returns null for an empty DR without touching the database', async () => {
+    await expect(lookupSOWDrop('')).resolves.toBeNull();
+    expect(queryOneMock).not.toHaveBeenCalled();
+  });
+
+  it('never throws when the query fails', async () => {
+    queryOneMock.mockImplementation(() => Promise.reject(new Error('db down')));
+
+    await expect(lookupSOWDrop('DR1735912')).resolves.toBeNull();
   });
 });

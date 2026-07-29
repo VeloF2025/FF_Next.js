@@ -134,6 +134,23 @@ function normalizeDRNumber(drNumber: string): string {
 /**
  * Look up drop info from SOW data
  * 🟢 WORKING: Cross-references DR number with sow_drops table
+ *
+ * Exact match only. This used to fall back to `drop_number LIKE '%<digits>%'`
+ * when the exact lookup missed, which could only ever return the wrong drop:
+ *
+ * - Every one of the 64,030 `sow_drops` rows stores `drop_number` DR-prefixed,
+ *   trimmed and uppercase (measured 2026-07-29: 0 rows without the prefix, 0
+ *   untrimmed, 0 mixed-case). So a stripped-prefix match is equivalent to the
+ *   exact match above and cannot add a hit — unlike `onemap_properties`, where
+ *   3,896 rows really are stored bare and lookupOneMapDrop's fallback earns its
+ *   keep. That asymmetry is deliberate.
+ * - The substring form did fire: of the 4,134 distinct ticket DR numbers, 422
+ *   miss the exact match and 27 of those got a row back — every one of them a
+ *   different drop. `DR173` alone matched 10,107 rows and `DR185` matched 6,829.
+ *
+ * Those rows feed the pole number, contractor, municipality, PON/zone and GPS
+ * shown on the ticket, so a collision sends a technician to a stranger's
+ * address. Returning nothing is strictly better than returning someone else.
  */
 export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> {
   if (!drNumber) return null;
@@ -143,8 +160,7 @@ export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> 
   try {
     logger.debug('Looking up SOW drop', { drNumber: normalized });
 
-    // Try exact match first
-    let result = await queryOne<DropInfo>(
+    const result = await queryOne<DropInfo>(
       `SELECT
         drop_number,
         pole_number,
@@ -162,34 +178,7 @@ export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> 
       [normalized]
     );
 
-    if (result) {
-      logger.debug('SOW drop found', { drNumber: normalized });
-      return result;
-    }
-
-    // Try without DR prefix
-    const numericPart = normalized.replace(/^DR/i, '');
-    result = await queryOne<DropInfo>(
-      `SELECT
-        drop_number,
-        pole_number,
-        latitude,
-        longitude,
-        address,
-        municipality,
-        pon_no,
-        zone_no,
-        contractor,
-        status
-      FROM sow_drops
-      WHERE drop_number LIKE $1
-      LIMIT 1`,
-      [`%${numericPart}%`]
-    );
-
-    if (result) {
-      logger.debug('SOW drop found via fuzzy match', { drNumber: normalized });
-    }
+    logger.debug(result ? 'SOW drop found' : 'SOW drop not found', { drNumber: normalized });
 
     return result;
   } catch (error) {
