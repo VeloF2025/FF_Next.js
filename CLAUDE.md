@@ -80,7 +80,7 @@ bash scripts/deploy-local.sh production   # After hours only, with Hein's approv
 
 ## CI
 
-Active CI for this repo runs on the `velo-fibreflow` self-hosted runner on `velo-server` (systemd user unit `gha-runner-fibreflow.service`, labels `self-hosted, linux, fibreflow`). Repository workflows use `runs-on: [self-hosted, linux, fibreflow]`; GitHub-hosted workflows are disabled here.
+Full application CI runs on the `velo-fibreflow` self-hosted runner on `velo-server` (systemd user unit `gha-runner-fibreflow.service`, labels `self-hosted, linux, fibreflow`). The dependency-free agent-docs gate runs on `ubuntu-latest` because it executes PR-controlled generator code; keep that job off persistent self-hosted runners.
 
 - Re-register: `~/bin/install-gha-runner VelocityFibre/FF_Next.js fibreflow` (idempotent — uses `--replace`).
 - Runner assignment: `gh run view <id> --json jobs` (the runner inventory API requires repository administration permission).

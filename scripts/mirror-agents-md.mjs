@@ -5,7 +5,7 @@
  *
  *   node scripts/mirror-agents-md.mjs             # write
  *   node scripts/mirror-agents-md.mjs --dry-run   # preview
- *   node scripts/mirror-agents-md.mjs --check     # exit 1 if STALE or MISSING
+ *   node scripts/mirror-agents-md.mjs --check     # exit 1 if out of sync
  *
  * `--check` compares rendered content to disk rather than using `git diff`:
  * git cannot see an untracked file, so a diff-based gate passes silently when a
@@ -16,6 +16,7 @@ import {
   existsSync,
   readdirSync,
   readFileSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import {
@@ -44,7 +45,12 @@ const MIN_DOC_LINES = 10;
 const SCAN_ROOTS = ["src"];
 
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rb|rs|java|kt|php)$/;
-const SKIP_DIRS = new Set(["node_modules", ".next"]);
+const SKIP_DIRS = new Set([".git", "node_modules", ".next"]);
+const GENERATED_PREFIX = "<!-- GENERATED — do not edit. Canonical source:";
+
+function writeLine(stream, message = "") {
+  stream.write(`${message}\n`);
+}
 
 function listClaudeMd(dir, acc = []) {
   if (!existsSync(dir)) return acc;
@@ -53,6 +59,23 @@ function listClaudeMd(dir, acc = []) {
     const full = resolve(dir, entry.name);
     if (entry.isDirectory()) listClaudeMd(full, acc);
     else if (entry.name === ".claude.md") acc.push(full);
+  }
+  return acc;
+}
+
+function listGeneratedAgentsMd(dir, acc = []) {
+  if (!existsSync(dir)) return acc;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const full = resolve(dir, entry.name);
+    if (entry.isDirectory()) {
+      listGeneratedAgentsMd(full, acc);
+    } else if (
+      entry.name === "AGENTS.md"
+      && readFileSync(full, "utf8").startsWith(GENERATED_PREFIX)
+    ) {
+      acc.push(full);
+    }
   }
   return acc;
 }
@@ -143,7 +166,8 @@ const CHECK = argv.includes("--check");
 const DRY = argv.includes("--dry-run");
 
 if (!existsSync(resolve(ROOT, "CLAUDE.md"))) {
-  console.error(
+  writeLine(
+    process.stderr,
     "[agents] FAIL — no CLAUDE.md at the repo root. Write it first; mirroring an absent file helps nobody.",
   );
   process.exit(1);
@@ -154,6 +178,10 @@ const rendered = emit.map((target) => ({
   ...target,
   content: render(target.source, target.canonical),
 }));
+const desiredOutputs = new Set(rendered.map((target) => target.out));
+const orphaned = listGeneratedAgentsMd(ROOT)
+  .filter((file) => !desiredOutputs.has(file))
+  .sort();
 
 for (const target of rendered) {
   const targetDir = dirname(target.out);
@@ -163,13 +191,15 @@ for (const target of rendered) {
   const rel = relative(ROOT, target.out);
 
   if (chainBytes > CODEX_LIMIT_BYTES) {
-    console.error(
+    writeLine(
+      process.stderr,
       `[agents] FAIL — the instruction chain ending at ${rel} is ${(chainBytes / 1024).toFixed(1)} KB, over Codex's default 32 KiB limit.`,
     );
     process.exit(1);
   }
   if (chainBytes > WARN_BYTES) {
-    console.warn(
+    writeLine(
+      process.stderr,
       `[agents] warn — the instruction chain ending at ${rel} is ${(chainBytes / 1024).toFixed(1)} KB, approaching the default 32 KiB limit.`,
     );
   }
@@ -178,6 +208,7 @@ for (const target of rendered) {
 const stale = [];
 const missing = [];
 const written = [];
+const removed = [];
 
 for (const target of rendered) {
   const rel = relative(ROOT, target.out);
@@ -199,24 +230,38 @@ for (const target of rendered) {
   written.push(rel);
 }
 
+for (const file of orphaned) {
+  if (!DRY && !CHECK) unlinkSync(file);
+  removed.push(relative(ROOT, file));
+}
+
 if (CHECK) {
-  if (missing.length === 0 && stale.length === 0) {
-    console.log(
+  if (missing.length === 0 && stale.length === 0 && orphaned.length === 0) {
+    writeLine(
+      process.stdout,
       `[agents:check] OK — ${emit.length} AGENTS.md mirror(s) match their canonical source.`,
     );
     process.exit(0);
   }
-  console.error("[agents:check] FAIL — AGENTS.md is out of sync with CLAUDE.md:\n");
-  for (const item of missing) console.error(`  MISSING  ${item}`);
-  for (const item of stale) console.error(`  STALE    ${item}`);
-  console.error("\nFix: node scripts/mirror-agents-md.mjs");
+  writeLine(
+    process.stderr,
+    "[agents:check] FAIL — AGENTS.md is out of sync with CLAUDE.md:\n",
+  );
+  for (const item of missing) writeLine(process.stderr, `  MISSING  ${item}`);
+  for (const item of stale) writeLine(process.stderr, `  STALE    ${item}`);
+  for (const file of orphaned) {
+    writeLine(process.stderr, `  ORPHAN   ${relative(ROOT, file)}`);
+  }
+  writeLine(process.stderr, "\nFix: node scripts/mirror-agents-md.mjs");
   process.exit(1);
 }
 
-console.log(
+writeLine(
+  process.stdout,
   DRY
-    ? `[agents] dry-run — ${written.length} file(s) would be written.`
-    : `[agents] wrote ${written.length} file(s).`,
+    ? `[agents] dry-run — ${written.length} file(s) would be written and ${removed.length} orphan(s) would be removed.`
+    : `[agents] wrote ${written.length} file(s) and removed ${removed.length} orphan(s).`,
 );
-for (const item of written) console.log(`  ${item}`);
-for (const item of skipped) console.log(`  [skip] ${item}`);
+for (const item of written) writeLine(process.stdout, `  ${item}`);
+for (const item of removed) writeLine(process.stdout, `  [remove] ${item}`);
+for (const item of skipped) writeLine(process.stdout, `  [skip] ${item}`);
