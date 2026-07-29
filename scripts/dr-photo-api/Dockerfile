@@ -1,13 +1,9 @@
-# dr-photo-api (BOSS) — reconstructed 2026-07-18 from the running container.
-#
-# The original image (boss-vps-dr-photo-api:latest) was DANGLING with no build
-# context on disk, and the source lived only in the container's writable layer.
-# This Dockerfile is a best-effort rebuild — VALIDATE it (build + smoke test the
-# /api/record endpoint) before relying on it to recreate the container.
+# dr-photo-api (BOSS) — reconstructed from the running container on 2026-07-18
+# and build + /health smoke validated on 2026-07-29.
 #
 # Secrets (ONEMAP_EMAIL/ONEMAP_PASSWORD, DATABASE_URL, *_API_KEY) come from the
 # environment / docker-compose.yml at runtime — never baked into the image.
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
 
 WORKDIR /app
 

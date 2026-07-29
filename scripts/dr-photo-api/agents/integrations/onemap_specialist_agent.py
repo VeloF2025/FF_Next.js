@@ -76,6 +76,55 @@ _V1_TOKEN_TTL = 1200.0
 _V1_TOKEN: Optional[Tuple[float, str]] = None  # (obtained_monotonic, token)
 _V1_LOCK = asyncio.Lock()
 
+# --- Cross-project record resolution via the parent account -----------------
+# The parent account sees contractor layer 6236 across every project with one
+# v1 token. This preserves all Property IDs, unlike the per-project web fallback
+# which returns only the first matching row. Photo binaries remain on the
+# primary token and layer 5121 because the parent account cannot read them.
+# If ONEMAP_RESOLVE_* is unset this path is skipped.
+RESOLVE_EMAIL = os.getenv("ONEMAP_RESOLVE_EMAIL")
+RESOLVE_PASSWORD = os.getenv("ONEMAP_RESOLVE_PASSWORD")
+RESOLVE_LAYER_ID = "6236"
+_RESOLVE_TOKEN_TTL = 1200.0
+_RESOLVE_TOKEN: Optional[Tuple[float, str]] = None
+_RESOLVE_LOCK = asyncio.Lock()
+
+_DR_NUMBER_RE = re.compile(r"^[A-Z0-9]{3,20}$")
+_DR_SEARCH_RE = re.compile(r"^[A-Z0-9%]{1,20}$")
+_SITE_RE = re.compile(r"^[A-Z0-9]{2,10}$")
+
+
+def normalize_dr_number(dr_number: str) -> str:
+    """Return the canonical DR identifier or reject unsafe CQL input."""
+    if not isinstance(dr_number, str):
+        raise ValueError("DR number must be a string")
+
+    normalized = dr_number.strip().upper()
+    if not normalized.startswith("DR"):
+        normalized = f"DR{normalized}"
+    if not _DR_NUMBER_RE.fullmatch(normalized):
+        raise ValueError("DR number must contain 3-20 alphanumeric characters")
+    return normalized
+
+
+def _normalize_dr_search_pattern(dr_pattern: str) -> str:
+    normalized = dr_pattern.strip().upper()
+    if not _DR_SEARCH_RE.fullmatch(normalized):
+        raise ValueError("DR search pattern may contain only alphanumerics and %")
+    return normalized
+
+
+def _normalize_site(site: str) -> str:
+    normalized = site.strip().upper()
+    if not _SITE_RE.fullmatch(normalized):
+        raise ValueError("Site must contain 2-10 alphanumeric characters")
+    return normalized
+
+
+def _cql_literal(value: str) -> str:
+    """Quote a CQL string literal, including any legitimate apostrophe."""
+    return "'" + value.replace("'", "''") + "'"
+
 
 class PhotoType(Enum):
     """Standard photo types in Fibertime installations."""
@@ -320,6 +369,60 @@ class OneMapSpecialistAgent:
             _V1_TOKEN = (time.monotonic(), self._token)
             logger.debug("Successfully authenticated with 1Map (token cached)")
 
+    async def _resolve_authenticate(
+        self,
+        force: bool = False,
+        rejected_token: Optional[str] = None,
+    ) -> str:
+        """Mint/cache a v1 token for the parent account."""
+        global _RESOLVE_TOKEN
+
+        if not force:
+            cached = _RESOLVE_TOKEN
+            if cached is not None and (time.monotonic() - cached[0]) < _RESOLVE_TOKEN_TTL:
+                return cached[1]
+
+        async with _RESOLVE_LOCK:
+            cached = _RESOLVE_TOKEN
+            if cached is not None and (time.monotonic() - cached[0]) < _RESOLVE_TOKEN_TTL:
+                if not force or cached[1] != rejected_token:
+                    return cached[1]
+
+            response = await self._client.get(
+                "/auth/login",
+                params={"email": RESOLVE_EMAIL, "password": RESOLVE_PASSWORD},
+            )
+            if response.status_code != 200:
+                raise Exception(f"Resolve authentication failed: {response.status_code}")
+            token = (response.json().get("apiToken") or {}).get("token")
+            if not token:
+                raise Exception("No token received from resolve authentication")
+
+            _RESOLVE_TOKEN = (time.monotonic(), token)
+            logger.debug("Resolve (parent-account) token cached")
+            return token
+
+    async def _resolve_features(self, dr_number: str) -> List[Dict]:
+        """Fetch all contractor-layer features for a DR via the parent account."""
+        dr_number = normalize_dr_number(dr_number)
+        token = await self._resolve_authenticate()
+        endpoint = f"/attributes/{RESOLVE_LAYER_ID}/unsorted"
+        params = {
+            "token": token,
+            "includeData": "true",
+            "CQL_FILTER": f"{self.DR_FIELD}={_cql_literal(dr_number)}",
+        }
+        response = await self._client.get(endpoint, params=params)
+        if response.status_code in (401, 403):
+            params["token"] = await self._resolve_authenticate(
+                force=True,
+                rejected_token=token,
+            )
+            response = await self._client.get(endpoint, params=params)
+        if response.status_code != 200:
+            raise Exception(f"Resolve query failed: {response.status_code} - {response.text[:200]}")
+        return response.json().get("result", {}).get("geomResult", {}).get("features", [])
+
     async def _request(
         self,
         method: str,
@@ -413,24 +516,31 @@ class OneMapSpecialistAgent:
         """
         logger.info(f"Fetching DR: {dr_number}")
 
-        # Normalize DR number
-        if not dr_number.upper().startswith("DR"):
-            dr_number = f"DR{dr_number}"
+        dr_number = normalize_dr_number(dr_number)
 
         data = await self._request(
             "GET",
             f"/attributes/{self.FIBERTIME_LAYER_ID}/unsorted",
             params={
                 "includeData": "true",
-                "CQL_FILTER": f"{self.DR_FIELD}='{dr_number}'"
+                "CQL_FILTER": f"{self.DR_FIELD}={_cql_literal(dr_number)}"
             }
         )
 
         features = data.get("result", {}).get("geomResult", {}).get("features", [])
 
+        if not features and RESOLVE_EMAIL and RESOLVE_PASSWORD:
+            # Prefer the all-project parent query because it preserves every
+            # Property ID. Fail open to the established web-session fallback.
+            try:
+                features = await self._resolve_features(dr_number)
+                if features:
+                    logger.info(f"DR {dr_number} resolved via parent account (layer 6236)")
+            except Exception as e:
+                logger.warning(f"Parent-account resolve (6236) failed for {dr_number}: {e}")
+
         if not features:
-            # v1 (default Etwatwa account) sees nothing → try the per-project
-            # web-session fallback before giving up (account-gating workaround).
+            # Last resort: per-project web-session fallback.
             web_record = await self._web_get_dr(dr_number)
             if web_record:
                 return web_record
@@ -639,13 +749,14 @@ class OneMapSpecialistAgent:
         Returns:
             List of matching DRRecord objects
         """
+        dr_pattern = _normalize_dr_search_pattern(dr_pattern)
         logger.info(f"Searching for DRs matching: {dr_pattern}")
 
         # Build CQL filter
         if "%" in dr_pattern:
-            cql_filter = f"{self.DR_FIELD} LIKE '{dr_pattern}'"
+            cql_filter = f"{self.DR_FIELD} LIKE {_cql_literal(dr_pattern)}"
         else:
-            cql_filter = f"{self.DR_FIELD}='{dr_pattern}'"
+            cql_filter = f"{self.DR_FIELD}={_cql_literal(dr_pattern)}"
 
         data = await self._request(
             "GET",
@@ -685,15 +796,16 @@ class OneMapSpecialistAgent:
         Returns:
             List of DRRecord objects
         """
+        site = _normalize_site(site)
         if not self._check_site_access(site):
             raise PermissionError(f"Access denied to site '{site}'")
 
         logger.info(f"Searching site {site}")
 
         # Build CQL filter
-        cql_filter = f"site='{site}'"
+        cql_filter = f"site={_cql_literal(site)}"
         if status:
-            cql_filter += f" AND status='{status}'"
+            cql_filter += f" AND status={_cql_literal(status)}"
 
         data = await self._request(
             "GET",
@@ -717,11 +829,14 @@ class OneMapSpecialistAgent:
         feature_id = feature.get("id", "")
         primary_id = feature_id.split(".")[-1] if "." in feature_id else ""
 
-        # Extract coordinates
-        geometry = feature.get("geometry", {})
+        # A partial geometry can contain a null coordinate. Do not pass that
+        # through to haversine/GPS validation as if it were a usable point.
+        geometry = feature.get("geometry") or {}
         coords = geometry.get("coordinates", [])
         coordinates = None
-        if coords and len(coords) >= 2:
+        if (coords and len(coords) >= 2
+                and isinstance(coords[0], (int, float))
+                and isinstance(coords[1], (int, float))):
             coordinates = {"lng": coords[0], "lat": coords[1]}
 
         # Extract photo attachment IDs

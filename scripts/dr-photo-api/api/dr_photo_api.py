@@ -125,6 +125,7 @@ for _handler in logging.getLogger().handlers:
 from agents.integrations.onemap_specialist_agent import (
     OneMapSpecialistAgent,
     PhotoType,
+    normalize_dr_number,
 )
 
 
@@ -2075,7 +2076,10 @@ async def health_check():
 @app.get("/api/record/{dr_number}", response_model=DRRecordResponse)
 async def get_dr_record(dr_number: str):
     """Get DR record details from 1Map (found results TTL-cached)."""
-    dr_number = dr_number.strip().upper()
+    try:
+        dr_number = normalize_dr_number(dr_number)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     cached = _record_cache_get(dr_number)
     if cached is not None:
         return cached
@@ -2250,7 +2254,11 @@ async def download_dr_photos(dr_number: str):
                     gps_validation_status = None
                     gps_distance_km = None
 
-                    if gps_metadata["has_gps"] and site_coords:
+                    if (gps_metadata["has_gps"] and site_coords
+                            and isinstance(gps_metadata.get("latitude"), (int, float))
+                            and isinstance(gps_metadata.get("longitude"), (int, float))):
+                        # Partial EXIF GPS can report has_gps=True with one null
+                        # coordinate; require a real point before haversine.
                         photo_coords = (
                             gps_metadata["latitude"],
                             gps_metadata["longitude"]
@@ -2315,7 +2323,7 @@ async def download_dr_photos(dr_number: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error downloading photos for DR {dr_number}: {e}")
+        logger.error(f"Error downloading photos for DR {dr_number}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

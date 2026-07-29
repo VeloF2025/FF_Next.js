@@ -1,0 +1,40 @@
+services:
+  dr-photo-api:
+    image: "${DR_PHOTO_API_IMAGE_ID:?set reviewed sha256 image ID}"
+    container_name: dr-photo-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8003:8001"
+      - "100.96.203.105:8003:8001"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      ONEMAP_EMAIL: ${ONEMAP_EMAIL:?set ONEMAP_EMAIL}
+      ONEMAP_PASSWORD: ${ONEMAP_PASSWORD:?set ONEMAP_PASSWORD}
+      ONEMAP_RESOLVE_EMAIL: ${ONEMAP_RESOLVE_EMAIL:?set ONEMAP_RESOLVE_EMAIL}
+      ONEMAP_RESOLVE_PASSWORD: ${ONEMAP_RESOLVE_PASSWORD:?set ONEMAP_RESOLVE_PASSWORD}
+      VLLM_URL: ${VLLM_URL:-http://192.168.1.150:8100}
+      DR_PHOTOS_PATH: /app/data/dr_photos
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - /srv/data/boss/dr_photos:/app/data/dr_photos
+      - /srv/data/boss/dr_sessions:/app/data/dr_sessions
+    networks:
+      - boss-network
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request,sys;
+          sys.exit(0 if urllib.request.urlopen(
+          'http://localhost:8001/health',timeout=5).status==200 else 1)
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  boss-network:
+    external: true
