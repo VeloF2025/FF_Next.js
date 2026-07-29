@@ -6,6 +6,28 @@ Lets a FibreFlow user add FibreFlow to claude.ai as a **custom connector** and r
 Connector URL: `https://app.fibreflow.app/api/ff-remote-mcp/mcp`
 (dev: `https://dev.fibreflow.app/api/ff-remote-mcp/mcp`)
 
+## Approved exposure policy
+
+Hein approved this policy on 2026-07-29:
+
+- Keep the dev connector registered while it is the test target. After the production
+  connector passes a real claude.ai DCR/OAuth and live-tool smoke test, remove the dev
+  registration from Claude, temporarily stop the dev MCP service to freeze new
+  authorizations, and revoke its dev grants. Derive the exact session IDs from the
+  frozen dev OAuth store's `ff_token` JWTs; do not use a pre-cutover database snapshot,
+  which has a race, or a bulk `kind='mcp'` deletion, which would also revoke production
+  grants in the shared database. The dev service may then be restarted as an explicit
+  engineering test surface.
+- Keep H&S routes, including medical and incident routes, available through the
+  connector. Do not add `health-safety` or those route prefixes to `DENIED_GROUPS`.
+  This is intentional so authorized users can prompt against H&S data; each request
+  still runs as that user through the route's existing access controls and the
+  server-side MCP read-only gate.
+
+This approval did not decide whether connector consent should be restricted to a group.
+The deployed page remains available to every authenticated user until Hein decides that
+separate access-scope question.
+
 ## Shape
 
 ```

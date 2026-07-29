@@ -343,7 +343,25 @@ Add `FF_MCP_CALLBACK_SECRET` and `FF_REMOTE_MCP_URL` to the prod env. **After ho
 
 The connector is additive: nothing existing depends on it. To disable, `systemctl --user stop ff-remote-mcp` — the edge proxy then fails closed and existing grants stop working with no effect on FibreFlow itself. To revoke every grant: `DELETE FROM user_sessions WHERE kind='mcp' AND label='Claude connector'`.
 
-## Open questions for Hein
+## Resolved exposure questions
 
-1. **Prod URL** — connectors should point at `app.fibreflow.app`, but dev is where this gets proven. Fine to leave the dev connector registered afterwards, or should it be removed once prod is live?
-2. **Who else gets it** — the consent page is available to every authenticated user. Restrict to a group first, or open from the start?
+Hein approved these decisions on 2026-07-29:
+
+1. **Prod URL** — keep the dev connector registered while it is the test target. After
+   the production connector passes a real claude.ai DCR/OAuth and live-tool smoke test,
+   remove the dev registration from Claude, temporarily stop the dev MCP service to
+   freeze new authorizations, and revoke its dev grants. Derive the exact session IDs
+   from the frozen dev OAuth store's `ff_token` JWTs; do not use a pre-cutover database
+   snapshot, which has a race, or a bulk MCP-session deletion, which would also revoke
+   production grants in the shared database. The dev service may then be restarted for
+   explicit engineering tests.
+2. **H&S data** — keep H&S medical and incident routes available through the connector;
+   do not add `health-safety` or those route prefixes to the denylist. Authorized users
+   need to prompt against that data, and requests remain subject to each route's
+   existing access controls plus the server-side MCP read-only gate.
+
+### Still open: connector audience
+
+The deployed consent page is available to every authenticated user. Hein's H&S decision
+did not settle whether connector consent should be restricted to a group, so that
+separate access-scope question remains open.
