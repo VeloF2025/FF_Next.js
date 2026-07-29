@@ -1,6 +1,26 @@
 # /goal — Health & Safety Phases 4–9: build the rest of the module (run autonomously until DONE)
 
-> **How to use:** start a fresh session on Opus, in a worktree off `master`, and run:
+> ## ✅ DELIVERED — historical record, do NOT execute
+>
+> Written 2026-07-23; **executed to completion on 2026-07-24** and merged to master as
+> PRs **#2229** (Phase 0 close-out), **#2231** (P1 training + gate), **#2232** (P2 toolbox),
+> **#2233** (P3 PPE), **#2234** (P4 permits), **#2236** (P5 safety file), **#2237** (P6 LTIFR),
+> **#2238** (P7 RBAC + severity + docs). Migrations `451`–`457` are live
+> (`scripts/migrations/sql/451_hs_training_matrix.sql` … `457_hs_severity_check.sql`).
+> All phases reached **production** on 2026-07-24; a later TZ date fix shipped as #2240/#2245.
+>
+> This file is kept for the design rationale in §2 and §4 — it is **not** a pending plan.
+> Re-running the `/goal` command below would rebuild work that already exists.
+>
+> Where the module actually stands now: `.claude/modules/health-safety.md`,
+> and the completion handoff `.claude/handoffs/2026-07-24-hs-phases-4-9-complete.md`
+> (handoffs are untracked — local tree only).
+>
+> Two §4 decisions were overridden during execution, so read that section as *proposed*,
+> not as *what shipped*: e-signatures are **drawn** on appointment letters (§4.5 said typed
+> only), and the contractor gate ships **fail-closed** (§4.10 said fail-open-but-loud).
+
+> **How to use:** ~~start a fresh session on Opus, in a worktree off `master`, and run:~~ (superseded — see above)
 > `/goal Execute docs/plans/health-safety-phases-4-9-goal.md to completion. Work autonomously through Spec → Migrate → Build → Test → Deploy(dev) → Browser-verify → PR for each phase in §5 order; do not stop to ask; only halt for a Confirmation Gate (§8) or a genuine external blocker. Loop until every Success Criterion (§7) is verified true in a real browser against dev.fibreflow.app with DB side-effect proof, then write a handoff and stop.`
 
 ---
