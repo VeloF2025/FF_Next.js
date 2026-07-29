@@ -18,7 +18,9 @@ claude.ai ──► app.fibreflow.app/api/ff-remote-mcp/*   (edge proxy, unauthe
               app.fibreflow.app/mcp/authorize?state_id=…   (consent page, user's session)
                         │  Allow ⇒ POST /api/mcp/consent
                         ▼
-              mintFfMcpToken() ⇒ POST 127.0.0.1:7416/authorize/complete
+     /api/mcp/consent: mintFfMcpToken() mints the token locally
+                (no network), then POSTs it to
+                127.0.0.1:7416/authorize/complete
                         │  (X-FF-MCP-Secret)
                         ▼
               redirectUrl back to claude.ai — connected
@@ -34,7 +36,8 @@ secret, and nothing else. No `JWT_SECRET`, no DB connection, no service credenti
 | `apps/ff_mcp/config.py` | Settings + the startup secret guard |
 | `apps/ff_mcp/oauth.py` | OAuth 2.1 provider (copied from Cortex's `cortex_mcp`) |
 | `apps/ff_mcp/server.py` | HTTP surface: `/authorize/complete`, metadata, `/help` |
-| `apps/ff_mcp/tools.py` | `list_endpoints`, `describe_endpoint`, `fibreflow_get` |
+| `apps/ff_mcp/catalogue.py` | `list_endpoints`, `describe_endpoint` |
+| `apps/ff_mcp/tools.py` | `fibreflow_get` + the path/denylist guards |
 | `apps/ff_mcp/endpoints.json` | Generated catalogue (`npm run mcp:catalogue`) |
 | `pages/api/ff-remote-mcp/[...path].ts` | Edge proxy — the only public path |
 | `pages/api/mcp/consent.ts` | Mints the token, calls the service back |
@@ -48,12 +51,19 @@ secret, and nothing else. No `JWT_SECRET`, no DB connection, no service credenti
 | `FF_REMOTE_MCP_PORT` | 7416 (localhost only) |
 | `FF_APP_BASE` | `https://dev.fibreflow.app` or `https://app.fibreflow.app` |
 | `FF_REMOTE_MCP_PUBLIC_BASE` | `<FF_APP_BASE>/api/ff-remote-mcp` |
-| `FF_REMOTE_MCP_STORE` | `~/.ff-remote-mcp/oauth.json` (chmod 600) |
+| `FF_REMOTE_MCP_STORE` | `~/.local/state/ff-remote-mcp/oauth.json` — systemd's `StateDirectory` creates it 0700 |
 | `FF_MCP_CALLBACK_SECRET` | Shared with `/api/mcp/consent`. **Never in a tracked file** |
 | `FF_REMOTE_MCP_URL` | Read by the *edge proxy*: upstream, default `http://127.0.0.1:7416` |
 
 Secrets live in `~/.ff-remote-mcp.env` (chmod 600, untracked) and
 `.claude/credentials.local.md`.
+
+**One instance per host.** dev and production run under the same OS user, so the port
+(7416) and the OAuth store are shared state. Running a second environment means
+overriding `FF_REMOTE_MCP_PORT`, `StateDirectory`, and `EnvironmentFile` in a drop-in —
+and repointing that environment's `FF_REMOTE_MCP_URL` — not just `WorkingDirectory`.
+Two processes doing write-tmp-then-rename against one `oauth.json` destroy each other's
+grants.
 
 ## Operating it
 
@@ -104,13 +114,25 @@ proxy then fails closed (502) and FibreFlow itself is unaffected.
   follows whatever branch is checked out and can sit frozen behind origin.
 - **Read-only is enforced server-side**, in `withAuth`/`requireAuth`. The tool layer
   does not enforce it and must not pretend to.
+- **The path guards run on a canonical path** — unquoted until stable, then lower-cased.
+  Next.js decodes percent-escapes before routing and its route dirs are lower-case, so
+  checking the raw string let `/api/Accounting/ledger` and `/api/%2e%2e/x` straight past.
+- **`x-forwarded-host` is attacker-controlled here.** The nginx configs in `docs/VPS/`
+  set `Host`, `X-Real-IP`, `X-Forwarded-For` and `X-Forwarded-Proto` — never
+  `X-Forwarded-Host` — so it passes through from any caller.
+  `pages/api/mcp/resource-metadata.ts` therefore resolves against an allow-list and
+  answers `Cache-Control: no-store`; do not "simplify" it back to echoing the header.
 
 ## Tests
 
 ```bash
-FF_MCP_CALLBACK_SECRET=test-secret python3 -m pytest apps/ff_mcp/ -q     # 36 cases
-npx vitest run pages/api/mcp tests/pages/mcp-authorize.test.tsx
+FF_MCP_CALLBACK_SECRET=test-secret python3 -m pytest apps/ff_mcp/ -q
+npx vitest run pages/api/mcp/__tests__ tests/pages/mcp-authorize.test.tsx \
+              tests/api/mcp-resource-metadata.test.ts tests/api/ff-remote-mcp-proxy.test.ts
 ```
+
+Pass vitest the **test file or its directory**, not the source directory: `vitest run
+pages/api/mcp` matches no `*.test.ts` and exits 1, which reads as a failure.
 
 Related: `docs/plans/fibreflow-remote-mcp-connector-2026-07-25.md` (the plan),
 `pages/api/cortex-remote-mcp/[...path].ts` (the sibling proxy this one was cloned from),

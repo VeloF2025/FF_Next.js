@@ -30,8 +30,7 @@ describe('/.well-known/oauth-protected-resource/api/ff-remote-mcp/mcp', () => {
   });
 
   it('advertises the host the request arrived on, not a hardcoded one', () => {
-    const res = call({ host: 'dev.fibreflow.app' });
-    expect(body(res)).toEqual({
+    expect(body(call({ host: 'dev.fibreflow.app' }))).toEqual({
       resource: 'https://dev.fibreflow.app/api/ff-remote-mcp/mcp',
       authorization_servers: ['https://dev.fibreflow.app/api/ff-remote-mcp'],
       scopes_supported: ['fibreflow.read'],
@@ -40,12 +39,13 @@ describe('/.well-known/oauth-protected-resource/api/ff-remote-mcp/mcp', () => {
   });
 
   it('does not send a dev connector to production', () => {
-    const payload = body(call({ host: 'dev.fibreflow.app' }));
-    // The exact bug the static file had.
-    expect(JSON.stringify(payload)).not.toContain('app.fibreflow.app/api');
+    // The exact bug the deleted static file had.
+    expect(JSON.stringify(body(call({ host: 'dev.fibreflow.app' })))).not.toContain(
+      'app.fibreflow.app/api'
+    );
   });
 
-  it('prefers x-forwarded-host, which is what the edge sets', () => {
+  it('honours x-forwarded-host when it names a known environment', () => {
     const payload = body(call({ host: 'localhost:3005', 'x-forwarded-host': 'dev.fibreflow.app' }));
     expect(payload.resource).toBe('https://dev.fibreflow.app/api/ff-remote-mcp/mcp');
   });
@@ -55,11 +55,44 @@ describe('/.well-known/oauth-protected-resource/api/ff-remote-mcp/mcp', () => {
     expect(payload.resource).toBe('https://dev.fibreflow.app/api/ff-remote-mcp/mcp');
   });
 
+  // --- the header is attacker-controlled: nginx never sets or strips it ---
+
+  const ALLOWED = [
+    'https://app.fibreflow.app/api/ff-remote-mcp',
+    'https://dev.fibreflow.app/api/ff-remote-mcp',
+  ];
+
+  it.each([
+    // A spoofed forwarded header must lose to the genuine Host, not override it.
+    ['a spoofed x-forwarded-host', { host: 'dev.fibreflow.app', 'x-forwarded-host': 'evil.example' }],
+    ['a spoofed Host', { host: 'evil.example' }],
+    ['a look-alike subdomain', { host: 'dev.fibreflow.app.evil.example' }],
+    ['a look-alike prefix', { host: 'evil-dev.fibreflow.app.co' }],
+    ['a comma-smuggled second host', { 'x-forwarded-host': 'evil.example, dev.fibreflow.app' }],
+    ['both headers spoofed', { host: 'evil.example', 'x-forwarded-host': 'evil.example' }],
+  ])('never names an attacker host as the authorization server — %s', (_label, headers) => {
+    const payload = body(call(headers as Record<string, string>));
+    expect(JSON.stringify(payload)).not.toContain('evil');
+    // Whatever it resolves to must be an allow-listed environment, never the claim.
+    expect(ALLOWED).toContain(payload.authorization_servers[0]);
+  });
+
+  it('never marks the response publicly cacheable', () => {
+    // It varies by request host; a shared cache keyed on path alone could hand one
+    // environment's document — or a poisoned one — to another client.
+    const res = call({ host: 'dev.fibreflow.app' });
+    const cacheControl = res.setHeader.mock.calls.find((c) => c[0] === 'Cache-Control')?.[1];
+    expect(cacheControl).toBe('no-store');
+    expect(String(cacheControl)).not.toContain('public');
+  });
+
   it('lets FF_APP_BASE pin the value regardless of the request host', () => {
-    process.env.FF_APP_BASE = 'https://app.fibreflow.app/';
-    const payload = body(call({ host: 'attacker.example' }));
-    expect(payload.resource).toBe('https://app.fibreflow.app/api/ff-remote-mcp/mcp');
-    expect(payload.authorization_servers).toEqual(['https://app.fibreflow.app/api/ff-remote-mcp']);
+    // Pinned to dev, NOT prod: prod is also the no-match fallback, so pinning to it
+    // would produce the same answer with the pin removed and prove nothing.
+    process.env.FF_APP_BASE = 'https://dev.fibreflow.app/';
+    const payload = body(call({ host: 'app.fibreflow.app' }));
+    expect(payload.resource).toBe('https://dev.fibreflow.app/api/ff-remote-mcp/mcp');
+    expect(payload.authorization_servers).toEqual(['https://dev.fibreflow.app/api/ff-remote-mcp']);
   });
 
   it('uses http for local development hosts', () => {
@@ -73,12 +106,10 @@ describe('/.well-known/oauth-protected-resource/api/ff-remote-mcp/mcp', () => {
   });
 
   it('rejects non-GET methods', () => {
-    const res = call({ host: 'dev.fibreflow.app' }, 'POST');
-    expect(res.status).toHaveBeenCalledWith(405);
+    expect(call({ host: 'dev.fibreflow.app' }, 'POST').status).toHaveBeenCalledWith(405);
   });
 
   it('serves HEAD, which discovery clients use to probe', () => {
-    const res = call({ host: 'dev.fibreflow.app' }, 'HEAD');
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(call({ host: 'dev.fibreflow.app' }, 'HEAD').status).toHaveBeenCalledWith(200);
   });
 });

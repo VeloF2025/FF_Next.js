@@ -24,8 +24,22 @@ EnvironmentFile=%h/.ff-remote-mcp.env
 
 Environment=FF_REMOTE_MCP_HOST=127.0.0.1
 Environment=FF_REMOTE_MCP_PORT=7416
-Environment=FF_REMOTE_MCP_STORE=%h/.ff-remote-mcp/oauth.json
 
+# systemd creates and owns this directory (%S/ff-remote-mcp), so the service works on a
+# clean host. Do NOT point the store at a bare path under $HOME: with
+# ProtectSystem=strict, a ReadWritePaths target that does not yet exist fails the mount
+# namespace setup before ExecStartPre could create it.
+StateDirectory=ff-remote-mcp
+StateDirectoryMode=0700
+Environment=FF_REMOTE_MCP_STORE=%S/ff-remote-mcp/oauth.json
+
+# ONE instance per host. dev and production run under the same OS user, so a second
+# instance started from a WorkingDirectory drop-in alone would collide twice: on the
+# loopback port, and on the OAuth store — two processes doing write-tmp-then-rename
+# against one oauth.json cross-contaminate or destroy each other's grants. Running both
+# means overriding FF_REMOTE_MCP_PORT, StateDirectory/FF_REMOTE_MCP_STORE and
+# EnvironmentFile as well, and repointing FF_REMOTE_MCP_URL in that environment's app.
+#
 # Set per environment in the EnvironmentFile, not here:
 #   FF_APP_BASE                 https://dev.fibreflow.app | https://app.fibreflow.app
 #   FF_REMOTE_MCP_PUBLIC_BASE   <FF_APP_BASE>/api/ff-remote-mcp
@@ -42,9 +56,6 @@ StandardError=journal
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-# A DIRECTORY, not the file: the OAuth store is written atomically (write .tmp, then
-# rename), so the rename needs write access to the containing directory.
-ReadWritePaths=%h/.ff-remote-mcp
 
 [Install]
 WantedBy=default.target
