@@ -1,0 +1,42 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: settings
+<!-- Staff org structure management: positions, departments, reporting hierarchy -->
+
+## Purpose
+Manages staff organisation settings (positions, departments, reporting hierarchy) and system/procurement configuration flags.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `StaffSettings.tsx` | Tabbed UI: Positions / Departments / Reporting Hierarchy |
+| `components/PositionsTab.tsx` | CRUD for job positions with level classification |
+| `components/DepartmentsTab.tsx` | CRUD for departments |
+| `components/HierarchyTab.tsx` | Visual reporting structure tree |
+| `hooks/useStaffSettings.ts` | In-memory state; initialises from `StaffPosition` enum defaults |
+
+## API Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET/POST | `/api/departments` | List / create departments |
+| GET/PUT/DELETE | `/api/departments/[id]` | Department detail ops |
+| GET | `/api/departments/[id]/report` | Department report |
+| GET/PUT | `/api/settings/system/features` | Feature flags |
+| GET/PUT | `/api/settings/procurement/terms` | Procurement payment terms |
+| GET/PUT | `/api/settings/procurement/sequences` | PO/RFQ sequence numbers |
+| GET/PUT | `/api/settings/procurement/workflows` | Procurement approval workflows |
+| GET/PUT | `/api/settings/procurement/notifications` | Notification preferences |
+
+## Database Tables
+- `departments` — department records
+- `staff` — uses `position` / `department_id` FK
+
+## Critical Rules
+- `useStaffSettings` is in-memory only — positions/departments are seeded from enum defaults on `initializePositions()` / `initializeDepartments()`, not from DB yet
+- Settings page lives at `/settings?tab=staff-org` (via `StaffSettings` component) and `/settings?tab=workflow` (workflow templates)
+- `NEVER expose sensitive config` (DB credentials, API keys) through settings endpoints
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

@@ -1,0 +1,52 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: analytics
+<!-- Operational + financial analytics dashboard and multi-report registry -->
+
+## Purpose
+Two-layer analytics: (1) operational dashboard with live KPI cards, daily progress chart, project status, team performance; (2) financial reports registry sourced from SharePoint Shareholder Model Excel tabs.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `AnalyticsDashboard.tsx` | Main dashboard — lazy-loads all chart components |
+| `hooks/useAnalyticsData.ts` | Data hook for dashboard (currently mock data — replace with real API) |
+| `components/AnalyticsStatsCards.tsx` | KPI stat cards |
+| `components/DailyProgressChart.tsx` | Progress over time chart |
+| `components/ProjectStatusView.tsx` | Project completion grid |
+| `components/TeamPerformanceTable.tsx` | Team productivity table |
+| `components/KeyInsights.tsx` | Auto-generated insight bullets |
+| `reports/index.ts` | `REPORT_REGISTRY` — all available report definitions |
+| `reports/ReportTabLayout.tsx` | Common tab layout for report pages |
+| `reports/income-statement/` | P&L by month |
+| `reports/cos-breakdown/` | COS by category |
+| `reports/activations/` | OES activations by year/month/week |
+| `reports/revenue-by-client/` | Contract revenue grouped by client |
+| `reports/opex/` | Monthly OPEX breakdown |
+| `types/analytics.types.ts` | `DailyProgress`, `ProjectMetrics`, `TeamPerformance`, `AnalyticsStats`, `TimeRange` |
+
+## API Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/analytics/dashboard/stats` | Dashboard KPI stats |
+| GET | `/api/analytics/dashboard/summary` | Dashboard summary |
+| GET | `/api/analytics/dashboard/trends` | Trend data |
+| GET | `/api/analytics/projects/summary` | Project-level summary |
+
+## Critical Rules
+- `useAnalyticsData` hook currently uses **mock data** — real API calls are a pending TODO
+- Financial reports pull from SharePoint Shareholder Model via Graph API (read-only)
+- All chart components are lazy-loaded — wrap in `<Suspense>` if adding new ones
+- Time range filter: `'24h' | '7d' | '30d' | '90d' | 'all'`
+- Reports registry: add new report in `reports/index.ts` `REPORT_REGISTRY`, then map component in the client page
+
+## Common Issues
+| Issue | Fix |
+|-------|-----|
+| Dashboard shows stale/fake data | `useAnalyticsData` is mock — wire to real `/api/analytics` endpoints |
+| Report page blank | Check `REPORT_REGISTRY` id matches component key in client page map |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

@@ -1,0 +1,46 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: help-center
+<!-- Static user manual with full-text search, TOC navigation, and AI chat assistant -->
+
+## Purpose
+Searchable FibreFlow user manual with collapsible TOC, markdown rendering, and an AI chat assistant (RAG via pgvector).
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `HelpCenterPage.tsx` | Main layout: sidebar TOC + search + content |
+| `components/TableOfContents.tsx` | Interactive nested section tree |
+| `components/SearchBar.tsx` | Full-text search with `<mark>` highlighting |
+| `components/SectionRenderer.tsx` | Renders section content (text/markdown/video/images) |
+| `components/MarkdownRenderer.tsx` | Markdown → HTML (no image handling — text/code only) |
+| `components/ChatWidget.tsx` | AI chat interface |
+| `data/manual-content.ts` | Static manual content — DO NOT edit manually |
+| `hooks/useHelpCenter.ts` | Navigation state, search, breadcrumbs, prev/next |
+| `index.ts` | Re-exports `HelpCenterPage` |
+
+## Content Structure
+Manual content lives in `data/manual-content.ts` (auto-generated from `docs/user-manuals/source/fibreflow-complete.md`).
+Regenerate with: `npm run embed-manual`
+
+Images: `public/help-center/screenshots/` (34 PNGs) — reference via absolute path `/help-center/screenshots/01-login.png`.
+
+## AI Chat (RAG)
+- Embedding model: OpenAI `text-embedding-3-small` (1536 dims)
+- Storage: `help_center_knowledge` table with pgvector `vector(1536)` column
+- Rate limit: 10 req/min per user (429 with retry-after)
+- Permission gate: `communications.chat-data-lookups` for DB query tool
+- Tools: `search_knowledge`, `query_database` (read-only), `get_schema`
+- Ingest script: `scripts/ingest-knowledge.js`
+
+## Critical Rules
+- `data/manual-content.ts` is auto-generated — run `npm run embed-manual`, never edit manually
+- `SectionRenderer` handles `![alt](src)` inline images; `MarkdownRenderer` does NOT
+- Always use absolute paths for screenshots — relative paths (`../screenshots/...`) don't resolve in browser
+- `stripMarkdown()` helper required for search result previews (strips formatting)
+- Mobile: sidebar auto-closes on section navigation
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

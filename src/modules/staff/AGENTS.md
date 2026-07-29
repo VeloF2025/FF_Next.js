@@ -1,0 +1,64 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: staff
+<!-- Staff HR management — profiles, T&A, compliance, documents, payslips, disciplinary -->
+
+## Purpose
+Employee lifecycle management: profiles, time & attendance, payslips, receipts, compliance documents, disciplinary records, performance, and VehicleAssignment.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `StaffPage.tsx` | Entry point → renders `StaffList` |
+| `components/StaffList.tsx` | Staff list with filters and search |
+| `components/StaffDetail.tsx` | Full employee profile (multi-tab) |
+| `components/StaffForm.tsx` | Create/edit form (create = minimal: name+email+phone) |
+| `components/StaffImportAdvanced.tsx` | Bulk Excel import |
+| `components/tabs/TimeAttendanceTab.tsx` | T&A records per staff member |
+| `components/tabs/ComplianceTab.tsx` | Document compliance status |
+| `components/tabs/DisciplinaryTab.tsx` | Disciplinary incidents |
+| `components/tabs/ReceiptsTab.tsx` | Expense receipts (VLM-extracted) |
+| `components/analytics/` | Staff analytics charts |
+| `hooks/useStaffFeatures.ts` | Feature flags per role |
+
+## API Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET/POST | `/api/staff` | List / create (auto-assigns VFxxx employee ID) |
+| GET/PUT/DELETE | `/api/staff/[staffId]` | Profile CRUD |
+| POST | `/api/staff/[staffId]/cv-upload` | CV upload to VF Storage |
+| GET/POST | `/api/staff/[staffId]/documents` | Document management |
+| GET/POST | `/api/staff/[staffId]/disciplinary` | Disciplinary records |
+| GET/POST | `/api/staff/[staffId]/performance` | Performance records |
+| GET | `/api/staff/attendance-entries` | T&A entries |
+| GET | `/api/staff/attendance-overview` | Roster overview |
+| POST | `/api/staff/attendance-selfie` | Selfie clock-in |
+| POST | `/api/staff/attendance-bulk-lock` | Lock attendance period |
+| GET/POST | `/api/staff/payslips/import` | Payslip upload (super_admin only) |
+| GET | `/api/staff/alerts` | Compliance/document expiry alerts |
+
+## Database Tables
+- `staff` — employee records (auto-generated `employee_id` = VFxxx)
+- `staff_documents` — uploaded docs (ID, licence, certs)
+- `staff_availability` — availability schedule
+- `staff_vehicle_assignments` — vehicle allocation history
+
+## Critical Rules
+- Create flow: only name + email + phone required; server generates employee ID in `POST /api/staff`
+- After create, redirect to `/staff/[newId]` detail page — not back to list
+- URL pattern: public = `https://vf.fibreflow.app/storage/{path}`, internal = `http://100.96.203.105:8091/{path}` — build from `result.path`, never naive domain replace
+- Payslips restricted to `super_admin` only
+- T&A portal lives at `/my` (dark theme); do NOT use light card styles there
+- Email lookups must use `LOWER()` — case-insensitive
+
+## Common Issues
+| Issue | Fix |
+|-------|-----|
+| Storage URL broken after upload | Build URL from `result.path`, not `result.url` |
+| Employee ID clash | Server-generated sequential VFxxx — never client-supplied |
+| T&A selfie fails on mobile | Camera-only flow — no file-upload fallback |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

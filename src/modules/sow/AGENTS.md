@@ -1,0 +1,52 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: sow
+<!-- Statement of Work: Excel import pipeline for drops, fibres, poles -->
+
+## Purpose
+Imports SOW Excel documents into the database (drops, fibres, poles) and provides dashboards, list views, and validation tooling for project planning data.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `SOWDashboard.tsx` | Navigation hub (import / list / export / approvals / validation) |
+| `SOWImportPage.tsx` | Import wizard with URL param validation + `SOWUploadWizard` |
+| `SOWListPage.tsx` | Paginated list of SOW documents |
+| `ImportsDataGridPage.tsx` | Advanced data grid view of imported records |
+| `components/SOWStats.tsx` | Summary stats cards |
+| `hooks/useSOWDocuments.ts` | Data fetching for SOW list |
+| `hooks/useSOWFilters.ts` | Filter state management |
+
+## API Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/sow/import` | Upload + parse Excel → insert drops/fibres/poles |
+| GET | `/api/sow/import-status` | Poll async import progress |
+| GET | `/api/sow/import/[importId]/status` | Status for specific import job |
+| GET | `/api/sow/list` | List all SOW imports |
+| GET | `/api/sow/drops` | List all drops |
+| GET | `/api/sow/drops/search` | Search drops |
+| GET | `/api/sow/drops/stats` | Drop statistics |
+| GET | `/api/sow/fibre` | List fibre records |
+| GET | `/api/sow/poles` | List pole records |
+| GET | `/api/sow/project/[projectId]` | Project-scoped SOW |
+| GET | `/api/sow/project/[projectId]/summary` | Project drop/pole summary |
+| POST | `/api/sow/project/[projectId]/import` | Import SOW for specific project |
+| GET | `/api/sow/summary` | Cross-project summary |
+
+## Database Tables
+- `sow_imports` — import job records (status, timestamps, source file)
+- `drops` — imported drop records (also used by qfield-qa for zone/PON hierarchy)
+- `fibres` — fibre segment records
+- `poles` — pole locations
+
+## Critical Rules
+- `drops` table is shared with qfield-qa for zone_no/pon_no hierarchy — SOW imports populate this
+- `projectId` URL param must match UUID regex `/^[a-f0-9-]{36}$/i` — SOWImportPage rejects and redirects on invalid format
+- NEVER modify imported SOW data directly; re-import or use correction scripts
+- Two distinct `drops` use cases: SOW drops (`/api/sow/drops`) vs WA Monitor drops (`qa_photo_reviews`)
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

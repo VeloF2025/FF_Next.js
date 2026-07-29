@@ -1,0 +1,40 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# non-invoiceables module
+
+Unified Action Centre data layer: aggregates items that block billing — pre-provisions, serial mismatches, offline devices, and FT billing deductions — into a single actionable list.
+
+**Page:** `/activate/action-centre` (page: `pages/activate/action-centre.tsx`; tabs driven by `?tab=` query param)
+**API routes:** `pages/api/activate/non-invoiceables/`
+- `overview.ts` — GET counts/KPIs/weekly trend per category; 11 parallel queries
+- `items.ts` — GET paginated list merged from 4 source tables in JS; sorted by days_open DESC
+- `billing-crossref.ts` — GET per-billing-week cross-reference: which FT deductions already had a ticket
+- `link-to-existing.ts` — POST stamps source row's ticket FK to an existing ticket
+- `projects.ts` — GET distinct project list across all source tables
+
+**Source tables → categories:**
+- `oes_pp_data` → `pre_provision` (ONT not yet activated in OES)
+- `olt_mismatch_records` + `offline_devices (serial_mismatch=true)` → `serial_mismatch`
+- `offline_devices (serial_mismatch IS NOT TRUE)` → `offline`
+- `ft_billing_deductions` latest week: note1→`low_signal`, note2→`missing_dr`, note3→`degraded`
+
+**DB tables:** `oes_pp_data`, `olt_mismatch_records`, `offline_devices`, `ft_billing_deductions`, `ft_weekly_billing`, `maintenance_tickets`; `olt_mismatch_records` has no `project` col — always JOIN through `olt_report_imports`; `offline_devices` has no `project` col — JOIN through `drops → projects`.
+
+**Key files:**
+- `types.ts` — `NonInvoiceableItem`, `NonInvoiceableCategory`, `ActionStatus`, `NOTE_TO_CATEGORY` map, `CATEGORY_TICKET_TYPES` (degraded = [] — monitor only, no tickets)
+- `components/NonInvoiceablesPage.tsx` — root page wrapper with tab state
+- `components/OverviewDashboard.tsx` — summary tiles + per-category/project counts
+- `components/ItemsTable.tsx` — filterable paginated table of individual issues
+- `components/BillingCrossRefTab.tsx` — billing week cross-reference view
+- `components/CreateTicketModal.tsx` — create NOC ticket from an issue; uses `link-to-existing` when a duplicate is detected
+
+**Gotchas:**
+- Items API merges results from up to 4 separate SQL queries in JS (not a SQL UNION) — sort and pagination happen after the merge; max 200 results per page
+- `degraded` category is monitor-only: `CATEGORY_TICKET_TYPES.degraded = []`, never raise tickets
+- `false_positive` status is set only manually — never auto-close
+- `coverage_rate` KPI counts only pp + serial_mismatch ticketed/open; billing deduction categories (low_signal, missing_dr, degraded) do not have ticket FKs in source tables
+- Billing deductions sourced from latest week only for overview; `billing_crossref` takes explicit `billing_week_id` or `week_ending + project`
+- `repeat_offenders` = DR numbers deducted in ≥2 distinct weeks in `ft_billing_deductions`

@@ -1,0 +1,61 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: wa-monitor
+<!-- WhatsApp QA drop monitoring — fully isolated, zero FF module dependencies -->
+
+## Purpose
+Receives photos from WhatsApp field groups, validates drops against SOW data, tracks submission status, and sends feedback to installers.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `services/waMonitorService.ts` | Barrel re-export for fetch/summary/stats sub-services |
+| `services/wa-monitor/fetchService.ts` | getAllDrops, getPaginatedDrops, getDropById |
+| `services/wa-monitor/summaryService.ts` | calculateSummary, getDailyDropsPerProject |
+| `services/wa-monitor/statsService.ts` | getProjectStats, validateConnection |
+| `services/waMonitorApiService.ts` | Frontend API client |
+| `services/scanSerialService.ts` | ONT serial number scan |
+| `components/WaMonitorDashboard.tsx` | 30s auto-refresh, paginated grid (20/page), daily drops |
+| `components/QaReviewCard.tsx` | Per-drop review card with feedback action |
+| `types/wa-monitor.types.ts` | QaReviewDrop, WaMonitorSummary, DailyDropsPerProject |
+
+## API Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/wa-monitor-drops` | Paginated drops with filters |
+| GET | `/api/wa-monitor-daily-drops` | Daily drops grouped by project |
+| POST | `/api/wa-monitor-send-feedback` | Send WA feedback to installer |
+| GET | `/api/wa-monitor-project-stats` | Per-project stats |
+| GET | `/api/wa-monitor-projects-summary` | All-projects summary |
+| GET | `/api/wa-monitor-dr-validation` | DR/serial validation |
+| GET | `/api/wa-monitor-scan-serial` | Scan/look up ONT serial |
+| GET | `/api/wa-monitor-health` | Bridge health check |
+
+## Database Tables
+- `qa_photo_reviews` — WA photo submissions (NOT the same as `drops` from sow module)
+
+## Infrastructure
+| Service | Address | Purpose |
+|---------|---------|---------|
+| sender-2 | `100.96.203.105:8081` | Sends WA messages via `/send-message` |
+| bridge-2 | `100.96.203.105:8083` | Receives incoming WA messages |
+| wa-feedback | `100.96.203.105:8092` | FF proxy → sender-2 |
+| Python monitor | `/opt/wa-monitor/prod/` | Listens on bridge-2 |
+
+**Monitored groups**: Lawley `120363418298130331@g.us`, Mohadin `120363421532174586@g.us`, Mamelodi `120363408849234743@g.us`
+
+## Critical Rules
+- **FULLY ISOLATED** — NEVER import from other FF modules
+- Restart: `bash /opt/wa-monitor/prod/restart-monitor.sh` — NEVER `systemctl restart` (keeps stale Python cache)
+- `qa_photo_reviews` table ≠ `drops` table — do NOT confuse them
+
+## Common Issues
+| Issue | Fix |
+|-------|-----|
+| Not receiving photos | `tail -f /home/louis/whatsapp-bridge-2/bridge.log` |
+| Feedback not sending | `curl http://100.96.203.105:8092/health`; restart wa-feedback if down |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

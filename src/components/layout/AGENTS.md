@@ -1,0 +1,111 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Component: layout
+<!-- Shared layout components including AppLayout and sidebar -->
+
+## Purpose
+Application layout with collapsible sidebar, theme support, and navigation system.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `sidebar/NavigationMenu.tsx` | Main navigation with external link support |
+| `sidebar/types.ts` | NavItem/NavSection type definitions |
+| `sidebar/config/*.ts` | Section configurations |
+| `AppLayout.tsx` | Main layout wrapper |
+
+## External Links Feature (Jan 2026)
+Sidebar now supports external links that open in new tabs:
+
+```typescript
+// In sidebar config (e.g., communicationsSection.ts)
+{
+  to: 'https://external-app.com',
+  icon: ExternalIcon,
+  label: 'External App',
+  shortLabel: 'Ext',
+  permissions: [],
+  external: true,  // <-- Opens in new tab
+}
+```
+
+**Visual indicators:**
+- External links show arrow icon (↗) when sidebar expanded
+- Tooltip shows "Label ↗" when sidebar collapsed
+- Uses `<a target="_blank">` instead of Next.js `<Link>`
+
+## Current External Links
+- **PDF Tools** → PDFCraft at `NEXT_PUBLIC_PDFCRAFT_URL` (default: localhost:3007)
+
+## NavItem Type
+```typescript
+interface NavItem {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  shortLabel: string;
+  permissions: Permission[];
+  subItems?: NavItem[];
+  external?: boolean;  // Opens in new tab
+}
+```
+
+## Dark Mode FOUC Prevention (Jan 2026)
+
+**Problem:** Flash of light content before dark mode applies on navigation.
+
+**Root Cause:** ThemeContext applies `dark` class via `useEffect` which runs AFTER initial paint.
+
+**Solution:** Inline blocking script in both routers that applies theme before hydration.
+
+### Implementation Files
+| File | Router | Purpose |
+|------|--------|---------|
+| `pages/_document.tsx` | Pages Router | Inline theme script in `<body>` |
+| `app/layout.tsx` | App Router | Inline theme script in `<body>` |
+
+### How It Works
+1. Server renders `<html class="dark">` and `<body style="background-color:#1a1d23">`
+2. Blocking `<script>` runs immediately before React hydrates
+3. Script reads localStorage `fibreflow-theme-preference`
+4. Applies `dark` class and `color-scheme` CSS property
+5. React hydrates with correct theme already applied
+
+### Key Code Pattern
+```typescript
+// In layout files - runs BEFORE React
+const themeInitScript = `
+(function() {
+  var DARK_BG = '#1a1d23';
+  var LIGHT_BG = '#ffffff';
+  try {
+    var stored = localStorage.getItem('fibreflow-theme-preference');
+    var theme = 'dark'; // Default
+    if (stored) {
+      var pref = JSON.parse(stored);
+      if (pref.theme === 'light' || pref.theme === 'dark') {
+        theme = pref.theme;
+      }
+    }
+    var isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    document.body.style.backgroundColor = isDark ? DARK_BG : LIGHT_BG;
+  } catch (e) {
+    document.documentElement.classList.add('dark');
+  }
+})();
+`;
+```
+
+### Critical Notes
+- Script must be **blocking** (no `async` or `defer`)
+- Must run **before** `<Providers>` wrapper
+- Both routers need the fix (App Router + Pages Router)
+- Default to dark theme on error (matches DEFAULT_THEME)
+
+---
+<!-- Last updated: 2026-01-22 - Added FOUC fix documentation -->

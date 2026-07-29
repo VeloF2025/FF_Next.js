@@ -1,0 +1,65 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: notifications
+<!-- Unified Notification Service (UNS): in-app bell, email (Resend), WhatsApp (group + DM) -->
+
+## Purpose
+Central notification bus — single `notify()` call dispatches to in-app bell, email via Resend, and WhatsApp. User preferences override system defaults per event type per channel.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `services/notificationBus.ts` | Core `notify()`, channel resolution, read helpers |
+| `services/emailDelivery.ts` | Resend email dispatch + default HTML template |
+| `services/whatsappDelivery.ts` | WA group (bridge :8092) + individual DM (WAHA :3001) |
+| `constants/index.ts` | Event registry: `DEFAULT_CHANNEL_PREFERENCES`, `EVENT_ICONS`, `EVENT_SEVERITY`, `EVENT_LABELS`, `EVENT_GROUPS` |
+| `types/index.ts` | `NotifyPayload`, `UserNotification`, `ChannelPreferences`, etc. |
+| `hooks/useNotifications.ts` | TanStack Query hooks: `useUnreadCount` (30s poll), list, mutations |
+
+## API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/notifications` | List (params: `limit` max 100, `offset`, `unread_only`) |
+| GET | `/api/notifications/unread-count` | Integer count for bell badge (polled 30s) |
+| POST | `/api/notifications/mark-read` | Body: `{ notification_ids: string[] }` |
+| POST | `/api/notifications/mark-all-read` | Mark all read for auth user |
+| GET | `/api/notifications/preferences` | Merged preferences (system defaults + user overrides) |
+| PUT | `/api/notifications/preferences` | Update channel preferences per event type |
+
+## Database Tables
+- `user_notifications` — in-app store; indexed on `(user_id, is_read, created_at DESC)`
+- `notification_preferences` — per-user per-event overrides; UNIQUE `(user_id, event_type)`
+- `notification_delivery_log` — email/WA audit: `sent|delivered|failed|skipped`
+
+## Channel Resolution (precedence)
+1. User row in `notification_preferences`
+2. `DEFAULT_CHANNEL_PREFERENCES[event_type]` from constants
+3. Fallback: `{ in_app: true, email: false, whatsapp: false }`
+
+## Critical Rules
+- **Always fire-and-forget**: `notify({...}).catch(() => {})` — never `await` in a request handler
+- **Callers resolve `recipient_user_ids`** — bus does not look up recipients
+- Adding a new event type requires updating ALL FOUR maps in `constants/index.ts`: `DEFAULT_CHANNEL_PREFERENCES`, `EVENT_ICONS`, `EVENT_SEVERITY`, `EVENT_LABELS` (+ `EVENT_GROUPS` for UI)
+- WA DM phone format: `0821234567` or `+27821234567` → `27821234567@c.us`
+- Email is lazy-imported to avoid build errors when `RESEND_API_KEY` is missing
+- Delivery errors are caught and logged — never propagate back to calling module
+
+## Environment Variables
+| Variable | Purpose |
+|----------|---------|
+| `RESEND_API_KEY` | Resend email |
+| `WA_FEEDBACK_URL` | WA group bridge `http://100.96.203.105:8092` |
+| `WAHA_API_URL` | Individual DM `http://100.96.203.105:3001` |
+| `WAHA_SESSION` | WAHA session name (default: `default`) |
+
+## Active Callers
+| Module | Events |
+|--------|--------|
+| NOC | `noc.ticket_assigned`, `noc.qa_rejected`, `noc.ticket_closed`, `noc.sla_warning` |
+| QField QA | `activate.qa_rejected` |
+| Procurement | `procurement.approved`, `procurement.rejected` |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

@@ -1,0 +1,46 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: qa-learning
+<!-- HITL few-shot learning: stores human VLM corrections for future prompt injection -->
+
+## Purpose
+Captures human overrides of VLM QA decisions and builds few-shot example sets for prompt enhancement, isolated by workflow type.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `services/correctionService.ts` | Stores human corrections (step categorisation overrides) |
+| `services/fewShotService.ts` | Selects optimal few-shot examples (canonical > confusion pairs > high-confidence mistakes > recent) |
+| `services/ocrLearningService.ts` | OCR-specific corrections (meter readings, serials) |
+| `services/passFailCommentService.ts` | Stores PASS/FAIL + comment corrections |
+| `services/passFailCommentQuery.ts` | Query-side for pass/fail corrections |
+| `services/confirmedCorrectService.ts` | Records examples VLM got right (positive reinforcement) |
+| `services/positiveExampleService.ts` | Curated canonical positive examples |
+| `types/learning.types.ts` | `WorkflowType`, `CorrectionRecord`, `FewShotExample`, `QaDecisionValue` |
+| `index.ts` | Public exports |
+
+## Database Tables
+- `qa_correction_examples` — human corrections with vlm_decision, correct_decision, confidence
+- `qa_workflow_steps` — step definitions per workflow type
+- `qa_pass_fail_corrections` — PASS/FAIL override records
+- `qa_comment_corrections` — comment text corrections
+
+## Critical Rules
+- Workflow types: `'dr_photo'` | `'civil_works'` | `'optical_works'` — never mix across workflows
+- Few-shot selection priority: canonical → confusion pairs → high-confidence mistakes (≥0.8) → recent (≤30 days)
+- Max default examples per prompt: 5 (`DEFAULT_MAX_EXAMPLES`)
+- `correctionToFewShot()` transforms a `CorrectionRecord` → `FewShotExample` for prompt injection
+- Isolation is mandatory — a correction in `dr_photo` must never appear in `civil_works` prompts
+- Consumer: `@/modules/activate` calls `getRelevantExamples()` before each VLM step evaluation
+
+## Common Issues
+| Problem | Fix |
+|---------|-----|
+| VLM not improving | Check `qa_correction_examples` has records; verify workflow_type matches consumer call |
+| Confusion pairs not selected | `includeConfusionPairs` must be `true` in `FewShotSelectionOptions` |
+| Wrong examples bleeding in | Query always filters by `workflowType` — check caller passes correct type |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->
