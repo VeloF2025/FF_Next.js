@@ -110,7 +110,16 @@ export interface EnrichedTicketData {
 
 /**
  * Normalize DR number for lookup
- * Handles various formats: DR1853428, dr1853428, 1853428
+ * Handles various formats: DR1853428, dr1853428, D1853428, 1853428
+ *
+ * The `D` is optional because the pattern used to require it (`/DR?(\d+)/`), so
+ * the bare "1853428" fell through unchanged and could never equal a DR-prefixed
+ * stored value — the docstring claimed the format was supported while the code
+ * dropped it. Callers write `dr_number` unnormalised, so the form is reachable.
+ *
+ * Anchored deliberately: unanchored, this finds the digits inside
+ * `DR-LAW-A-045` and rewrites it to `DR045`. Anything that is not a plain
+ * optionally-prefixed number passes through untouched, as before.
  */
 function normalizeDRNumber(drNumber: string): string {
   if (!drNumber) return '';
@@ -118,8 +127,8 @@ function normalizeDRNumber(drNumber: string): string {
   // Remove leading/trailing whitespace
   const normalized = drNumber.trim().toUpperCase();
 
-  // Extract numeric portion if prefixed with DR
-  const match = normalized.match(/DR?(\d+)/i);
+  // Extract the numeric portion, with or without a D/DR prefix
+  const match = normalized.match(/^D?R?(\d+)$/);
   if (match) {
     return `DR${match[1]}`;
   }
@@ -131,21 +140,7 @@ function normalizeDRNumber(drNumber: string): string {
 // Lookup Functions
 // ============================================================================
 
-/**
- * Look up drop info from SOW data
- * 🟢 WORKING: Cross-references DR number with sow_drops table
- */
-export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> {
-  if (!drNumber) return null;
-
-  const normalized = normalizeDRNumber(drNumber);
-
-  try {
-    logger.debug('Looking up SOW drop', { drNumber: normalized });
-
-    // Try exact match first
-    let result = await queryOne<DropInfo>(
-      `SELECT
+const SOW_DROP_COLUMNS = `
         drop_number,
         pole_number,
         latitude,
@@ -155,7 +150,33 @@ export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> 
         pon_no,
         zone_no,
         contractor,
-        status
+        status`;
+
+/**
+ * Look up drop info from SOW data
+ * 🟢 WORKING: Cross-references DR number with sow_drops table
+ *
+ * Both lookups are equality tests. This used to fall back to
+ * `drop_number LIKE '%<digits>%'` when the exact match missed, which returned
+ * whichever unrelated drop the planner reached first: of the 4,134 distinct
+ * ticket DR numbers, 422 miss the exact match, and the substring fallback
+ * returned a row for 27 of them — every one a different drop. `DR173` alone
+ * matched 10,107 rows and `DR185` matched 6,829 (measured 2026-07-29).
+ *
+ * These rows supply the pole number, contractor, municipality, PON/zone and GPS
+ * rendered on the ticket, so a collision points a technician at a stranger's
+ * address. Returning nothing beats returning someone else.
+ */
+export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> {
+  if (!drNumber) return null;
+
+  const normalized = normalizeDRNumber(drNumber);
+
+  try {
+    logger.debug('Looking up SOW drop', { drNumber: normalized });
+
+    let result = await queryOne<DropInfo>(
+      `SELECT ${SOW_DROP_COLUMNS}
       FROM sow_drops
       WHERE UPPER(drop_number) = $1
       LIMIT 1`,
@@ -167,29 +188,25 @@ export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> 
       return result;
     }
 
-    // Try without DR prefix
+    // Match with the DR prefix stripped from BOTH sides, for rows stored as
+    // "1735912" rather than "DR1735912". Every sow_drops row is currently
+    // DR-prefixed, so this adds nothing today — it is kept because the sibling
+    // table onemap_properties holds 3,896 bare rows, so an import source that
+    // stores them bare is a demonstrated failure mode in this system rather
+    // than a hypothetical one. Crucially it stays an equality test: reverting
+    // it to LIKE is what caused the collisions described above.
     const numericPart = normalized.replace(/^DR/i, '');
     result = await queryOne<DropInfo>(
-      `SELECT
-        drop_number,
-        pole_number,
-        latitude,
-        longitude,
-        address,
-        municipality,
-        pon_no,
-        zone_no,
-        contractor,
-        status
+      `SELECT ${SOW_DROP_COLUMNS}
       FROM sow_drops
-      WHERE drop_number LIKE $1
+      WHERE REGEXP_REPLACE(UPPER(drop_number), '^DR', '') = $1
       LIMIT 1`,
-      [`%${numericPart}%`]
+      [numericPart]
     );
 
-    if (result) {
-      logger.debug('SOW drop found via fuzzy match', { drNumber: normalized });
-    }
+    logger.debug(result ? 'SOW drop found via prefix-insensitive match' : 'SOW drop not found', {
+      drNumber: normalized,
+    });
 
     return result;
   } catch (error) {
