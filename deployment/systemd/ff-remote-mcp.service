@@ -1,3 +1,8 @@
+# Requires apps/ff_mcp/ to be present in the deploy directory. ExecStart runs
+# `python3 -m ff_mcp`; without the module it exits instantly and Restart=always
+# crash-loops until StartLimitBurst trips it into a failed state. Verify with
+# `ls <WorkingDirectory>/ff_mcp/server.py` before enabling.
+
 [Unit]
 Description=FibreFlow Remote MCP (Claude Custom Connector OAuth)
 After=network-online.target

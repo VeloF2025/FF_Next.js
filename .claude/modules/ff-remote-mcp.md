@@ -67,6 +67,12 @@ grants.
 
 ## Operating it
 
+> **Do not enable the unit until `apps/ff_mcp/` is on master.** The unit runs
+> `python3 -m ff_mcp`; if the Python service is not deployed, `ExecStart` fails
+> immediately and `Restart=always` crash-loops it until `StartLimitBurst=5` trips it
+> into a permanently failed state needing `systemctl --user reset-failed`. Check first:
+> `ls /home/velo/fibreflow-dev/apps/ff_mcp/server.py`.
+
 ```bash
 systemctl --user status ff-remote-mcp
 systemctl --user restart ff-remote-mcp
