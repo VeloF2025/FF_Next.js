@@ -165,16 +165,16 @@ describe('lookupOneMapDrop', () => {
  * GPS rendered on the ticket, so a lookup that returns the wrong row sends a
  * technician to a stranger's address.
  *
- * Measured against the live table on 2026-07-29: of 4,134 distinct ticket DR
- * numbers, 422 miss the exact match. The old `LIKE '%<digits>%'` fallback
- * returned a row for 27 of them and every one was a different drop — `DR173`
- * matched 10,107 rows, `DR185` matched 6,829.
+ * The measurements behind these tests live in one place — lookupSOWDrop's doc
+ * comment — and are re-derivable via
+ * `scripts/check-sow-drop-lookup-collisions.sql`. Deliberately not repeated
+ * here: duplicated figures drift apart when only one copy gets corrected.
  */
 describe('lookupSOWDrop', () => {
   it('never uses a substring match that could hit a different drop', async () => {
     queryOneMock.mockResolvedValue(null);
 
-    // DR173 is a real truncated ticket DR: as a substring it matched 10,107 rows.
+    // DR173 is a real truncated ticket DR, and the worst measured collision.
     await lookupSOWDrop('DR173');
 
     for (const sql of sqlIssued()) {

@@ -156,16 +156,24 @@ const SOW_DROP_COLUMNS = `
  * Look up drop info from SOW data
  * 🟢 WORKING: Cross-references DR number with sow_drops table
  *
- * Both lookups are equality tests. This used to fall back to
+ * Both queries are equality tests. This used to fall back to
  * `drop_number LIKE '%<digits>%'` when the exact match missed, which returned
- * whichever unrelated drop the planner reached first: of the 4,134 distinct
- * ticket DR numbers, 422 miss the exact match, and the substring fallback
- * returned a row for 27 of them — every one a different drop. `DR173` alone
- * matched 10,107 rows and `DR185` matched 6,829 (measured 2026-07-29).
+ * whichever unrelated drop the planner reached first.
  *
  * These rows supply the pole number, contractor, municipality, PON/zone and GPS
  * rendered on the ticket, so a collision points a technician at a stranger's
  * address. Returning nothing beats returning someone else.
+ *
+ * The substring form never once resolved a DR the exact match had missed —
+ * every row it returned belonged to a different drop. A prefix-stripping
+ * fallback only helps if some row is stored without the `DR` prefix, and none
+ * is; `onemap_properties` carries thousands of such rows, `sow_drops` none.
+ * For scale, `DR173` alone matched 10,107 rows.
+ *
+ * Sole record of these measurements — the tests cite this doc rather than
+ * restating them. Re-derive with
+ * `scripts/check-sow-drop-lookup-collisions.sql` (read-only, ~40s), which also
+ * explains which of its counts drift with ticket volume and which do not.
  */
 export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> {
   if (!drNumber) return null;
