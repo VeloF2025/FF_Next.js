@@ -15,6 +15,7 @@ import { getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { computeAndPersistContractorTrainingScore } from '@/modules/health-safety/services/trainingService';
+import { blankToNull } from '@/modules/health-safety/services/inputNormalize';
 import { EXPIRING_SOON_DAYS } from '@/modules/health-safety/types/training.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
@@ -121,6 +122,16 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   if (hasStaff === hasTeamMember) {
     return apiResponse.badRequest(res, 'Exactly one of staff_id or team_member_id is required');
   }
+  // A contractor worker's certificate with no contractor_id is invisible to
+  // the contractor training rollup, so it would never affect the compliance
+  // gate that the record exists to drive.
+  const normalizedContractorId = blankToNull(contractor_id);
+  if (hasTeamMember && !normalizedContractorId) {
+    return apiResponse.badRequest(
+      res,
+      'contractor_id is required for a contractor worker — without it the record cannot reach any compliance gate'
+    );
+  }
   // Surface an out-of-order date as a 400 rather than letting the DB CHECK
   // (expiry_date >= completed_date) turn it into a 500.
   if (expiry_date && completed_date && String(expiry_date) < String(completed_date)) {
@@ -164,7 +175,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${training_type_id},
       ${hasStaff ? staff_id : null},
       ${hasTeamMember ? team_member_id : null},
-      ${contractor_id || null},
+      ${normalizedContractorId},
       ${worker_name},
       ${project_id || null},
       ${completed_date},
@@ -191,15 +202,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     description: `Training recorded: ${type.name} for ${worker_name}`,
     metadata: {
       training_type_id,
-      contractor_id: contractor_id || null,
+      contractor_id: normalizedContractorId,
       expiry_date: record.expiry_date,
     },
     user,
   });
 
   // Keep the contractor gate score fresh the moment training changes.
-  if (contractor_id) {
-    await computeAndPersistContractorTrainingScore(contractor_id);
+  if (normalizedContractorId) {
+    await computeAndPersistContractorTrainingScore(normalizedContractorId);
   }
 
   return apiResponse.created(res, record);

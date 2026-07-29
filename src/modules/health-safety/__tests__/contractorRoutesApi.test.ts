@@ -79,7 +79,11 @@ describe('GET /api/health-safety/contractor/[contractorId]/gate-check', () => {
       blockers: [],
       warnings: [],
       checked_at: new Date().toISOString(),
-      breakdown: {},
+      breakdown: {
+        training_score: 100,
+        training_passed: true,
+        training_expired_statutory_certs: 0,
+      },
       documents: [],
     });
   });
@@ -106,6 +110,40 @@ describe('GET /api/health-safety/contractor/[contractorId]/gate-check', () => {
     const allSql = sqlMock.mock.calls.map(q).join('\n');
     expect(allSql).toContain('maintenance_tickets');
     expect(allSql).not.toMatch(/FROM tickets\b/);
+  });
+
+  it('does not show a green training panel when the gate blocks on training', async () => {
+    gateMock.mockResolvedValueOnce({
+      can_assign: false,
+      contractor_id: CONTRACTOR_ID,
+      overall_score: 80,
+      rag_status: 'green',
+      blockers: ['Training compliance (50%) below minimum (70%)'],
+      warnings: [],
+      checked_at: new Date().toISOString(),
+      breakdown: {
+        training_score: 50,
+        training_passed: false,
+        training_expired_statutory_certs: 0,
+      },
+      documents: [],
+    });
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: 'GET',
+      query: { contractorId: CONTRACTOR_ID },
+    });
+
+    await gateCheckHandler(req, res);
+
+    expect(res._getStatusCode()).toBe(200);
+    const body = JSON.parse(res._getData());
+    expect(body.data.gate.passed).toBe(false);
+    expect(body.data.breakdown.training).toMatchObject({
+      passed: false,
+      score: 50,
+      expired_statutory_certs: 0,
+    });
+    expect(body.data.breakdown.overall.passed).toBe(false);
   });
 });
 

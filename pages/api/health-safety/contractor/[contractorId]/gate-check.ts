@@ -13,8 +13,13 @@ import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { checkContractorGate } from '@/modules/health-safety/services/gateService';
 import { computeContractorMedicalSummary } from '@/modules/health-safety/services/medicalService';
-import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
+import {
+  REQUIRED_DOCUMENTS,
+  DOCUMENT_TYPES,
+  type GateCheckResult,
+} from '@/modules/health-safety/types/compliance.types';
 import type { ContractorMedicalSummary } from '@/modules/health-safety/types/medical.types';
+import { TRAINING_GATE_MINIMUM } from '@/modules/health-safety/types/training.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -44,7 +49,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const gateResult = await checkContractorGate(contractorId);
 
     // Get detailed breakdown for UI
-    const breakdown = await getGateBreakdown(contractorId);
+    const breakdown = await getGateBreakdown(contractorId, gateResult.breakdown);
 
     return apiResponse.success(res, {
       contractor: {
@@ -88,7 +93,21 @@ function medicalMessage(medical: ContractorMedicalSummary, passed: boolean): str
     : 'All workers medically fit with current certificates';
 }
 
-async function getGateBreakdown(contractorId: string) {
+function trainingMessage(training: GateCheckResult['breakdown']): string {
+  if (training.training_passed && training.training_score == null) {
+    return 'No training records on file';
+  }
+  if (training.training_passed) return 'Training requirements met';
+  if (training.training_expired_statutory_certs > 0) {
+    return `${training.training_expired_statutory_certs} expired statutory training certificate(s)`;
+  }
+  return `Training compliance (${training.training_score}%) below minimum (${TRAINING_GATE_MINIMUM}%)`;
+}
+
+async function getGateBreakdown(
+  contractorId: string,
+  gateTraining: GateCheckResult['breakdown']
+) {
   // Documents check. `expiry_date` stays raw for the gate compare below;
   // `expiry_date_display` (::text) is what's surfaced in the `expires` field —
   // see dateTextCast.test.ts.
@@ -138,8 +157,9 @@ async function getGateBreakdown(contractorId: string) {
   const scorePassed = !compliance || (compliance.overall_score || 0) >= 50;
   const ragPassed = !compliance || compliance.rag_status !== 'red';
 
-  // Training check (simplified)
-  const trainingPassed = true; // Would check actual training records
+  // This is the exact live training result used by checkContractorGate above,
+  // so the panel and verdict cannot disagree within one response.
+  const trainingPassed = gateTraining.training_passed;
 
   // Per-worker medical fitness (migration 463). Same rollup and same pass
   // condition the gate verdict uses, so the two agree for any given snapshot.
@@ -175,7 +195,9 @@ async function getGateBreakdown(contractorId: string) {
     },
     training: {
       passed: trainingPassed,
-      message: trainingPassed ? 'Training requirements met' : 'Missing required training',
+      score: gateTraining.training_score,
+      expired_statutory_certs: gateTraining.training_expired_statutory_certs,
+      message: trainingMessage(gateTraining),
     },
     medical: {
       passed: medicalPassed,

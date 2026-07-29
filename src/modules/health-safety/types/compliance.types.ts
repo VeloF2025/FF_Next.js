@@ -99,6 +99,8 @@ export interface GateCheckResult {
     incident_score: number;
     // null = no training data on file yet (does not block the gate)
     training_score: number | null;
+    training_passed: boolean;
+    training_expired_statutory_certs: number;
     corrective_action_score: number;
     audit_score: number;
   };

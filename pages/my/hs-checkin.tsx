@@ -57,10 +57,15 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
 
   React.useEffect(() => {
     fetch('/api/my/hs/checkin', { credentials: 'include' })
-      .then((r) => r.json())
+      .then(async (r) => {
+        // A failed bootstrap must surface an error instead of falling through
+        // to an empty, silently unusable form.
+        if (!r.ok) throw new Error(`bootstrap failed: ${r.status}`);
+        return r.json();
+      })
       .then((j) => {
         const d = j?.data;
-        if (!d) return;
+        if (!d) throw new Error('bootstrap returned no data');
         setProjects(d.projects ?? []);
         setActivities(d.activities ?? []);
         setMedicalStatus(d.medical_status ?? null);
