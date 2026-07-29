@@ -100,8 +100,12 @@ async def authorize_complete(request: Request):
     Localhost-bound and secret-authenticated. Deliberately terse in its responses: a
     caller that fails the secret check learns nothing about whether the state existed.
     """
-    supplied = request.headers.get("x-ff-mcp-secret", "")
-    if not hmac.compare_digest(supplied, CALLBACK_SECRET):
+    # Compare as BYTES: hmac.compare_digest raises TypeError on str inputs containing
+    # non-ASCII, which would surface as an uncaught 500 instead of a clean 403 — an
+    # attacker-triggerable error path, and a noisier signal than the deliberate silence
+    # below.
+    supplied = request.headers.get("x-ff-mcp-secret", "").encode("utf-8", "surrogateescape")
+    if not hmac.compare_digest(supplied, CALLBACK_SECRET.encode("utf-8")):
         # Logged loudly: on a localhost-only listener this should be unreachable, so a
         # hit here means either a misconfigured secret or something running locally that
         # should not be.

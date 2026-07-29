@@ -187,13 +187,61 @@ async def test_callback_rejects_a_missing_secret(svc):
 
 
 @pytest.mark.asyncio
-async def test_callback_rejects_an_unknown_state(svc, monkeypatch):
+async def test_callback_rejects_an_unknown_state_without_validating_the_token(svc, monkeypatch):
+    """Asserts the fast-path guard actually runs, not merely that a 400 comes back.
+
+    An earlier version checked only the status code and was decorative: deleting the
+    `peek_pending` guard entirely still produced 400, because complete_pending raises
+    the same ValueError for an unknown state and the second except turns it into an
+    identical response. Proving the guard fires means proving nothing downstream of it
+    ran — here, that FibreFlow was never asked to validate a token for a state that
+    does not exist.
+    """
     server, _ = svc
-    monkeypatch.setattr(server, "validate_ff_token", lambda t: None)
+    validated: list[str] = []
+    monkeypatch.setattr(server, "validate_ff_token", lambda t: validated.append(t))
+
     resp = await server.authorize_complete(
         FakeRequest({"x-ff-mcp-secret": "test-secret"}, {"stateId": "nope", "token": "t"})
     )
+
     assert resp.status_code == 400
+    assert json.loads(resp.body)["error"] == "unknown or expired authorization request"
+    assert validated == [], "token was validated for a state that does not exist"
+
+
+@pytest.mark.asyncio
+async def test_callback_rejects_a_pending_state_that_has_expired(svc, monkeypatch):
+    """Drives the clock: only an unknown state_id was covered, never a real one that
+    aged out, so the 600s expiry semantics themselves were untested."""
+    server, _ = svc
+    monkeypatch.setattr(server, "validate_ff_token", lambda t: None)
+    state_id = await _pending_state(server)
+    assert server.oauth_provider.peek_pending(state_id) is not None
+
+    import ff_mcp.oauth as oauth
+
+    real_now = oauth._now()
+    monkeypatch.setattr(oauth, "_now", lambda: real_now + 601)
+
+    assert server.oauth_provider.peek_pending(state_id) is None
+    resp = await server.authorize_complete(
+        FakeRequest({"x-ff-mcp-secret": "test-secret"}, {"stateId": state_id, "token": "t"})
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_callback_answers_403_not_500_on_a_non_ascii_secret_header(svc):
+    """hmac.compare_digest raises TypeError on non-ASCII str inputs, which would
+    surface as an uncaught 500 — an attacker-triggerable error path."""
+    server, _ = svc
+    state_id = await _pending_state(server)
+    resp = await server.authorize_complete(
+        FakeRequest({"x-ff-mcp-secret": "sécret-with-noñ-ascii"}, {"stateId": state_id, "token": "t"})
+    )
+    assert resp.status_code == 403
+    assert server.oauth_provider.peek_pending(state_id) is not None
 
 
 @pytest.mark.asyncio

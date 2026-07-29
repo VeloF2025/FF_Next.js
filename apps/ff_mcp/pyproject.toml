@@ -3,7 +3,12 @@ name = "ff-mcp"
 version = "0.1.0"
 description = "FibreFlow Remote MCP service — read-only FibreFlow access for Claude connectors"
 requires-python = ">=3.11"
-dependencies = ["mcp[cli]>=1.0.0"]
+# Bounded deliberately. PKCE code_verifier checking, refresh-token client_id binding,
+# redirect_uri allow-listing, and the bearer-token gate on /mcp are all enforced INSIDE
+# the mcp package, not in this repo — so the service's auth properties are a property of
+# the pinned SDK. An unbounded range lets a major version change that model with no diff
+# here to catch it. Verified against 1.27.0; raise the floor when re-verified.
+dependencies = ["mcp[cli]>=1.27.0,<2"]
 
 [project.scripts]
 ff-mcp = "ff_mcp.__main__:main"

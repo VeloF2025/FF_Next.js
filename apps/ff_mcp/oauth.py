@@ -81,10 +81,29 @@ class FibreFlowOAuthProvider(
             )
             return empty
 
+    def _purge_expired(self) -> None:
+        """Drop entries that can no longer be used.
+
+        Without this the store only ever grows: abandoned Connect attempts, unused
+        codes and rotated access tokens are removed lazily, on a lookup of that exact
+        key, which never comes. The whole dict is re-serialised on every mutation, so
+        the file also gets slower to write over the service's uptime.
+        """
+        now = _now()
+        for bucket in ("pending", "codes", "access", "refresh"):
+            entries = self.data.get(bucket, {})
+            for key in [k for k, v in entries.items() if (v or {}).get("expires_at", 0) < now]:
+                del entries[key]
+
     def _save(self) -> None:
+        self._purge_expired()
         tmp = self.store_path.with_suffix(self.store_path.suffix + ".tmp")
-        tmp.write_text(json.dumps(self.data, indent=2, sort_keys=True))
-        os.chmod(tmp, 0o600)
+        # Created 0600 up front, not chmod'ed after writing: the file holds every
+        # connected user's FibreFlow token, and chmod-after-write leaves a window in
+        # which it exists at the default umask.
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as handle:
+            handle.write(json.dumps(self.data, indent=2, sort_keys=True))
         tmp.replace(self.store_path)
 
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
