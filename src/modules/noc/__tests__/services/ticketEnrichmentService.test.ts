@@ -168,9 +168,7 @@ describe('lookupOneMapDrop', () => {
  * Measured against the live table on 2026-07-29: of 4,134 distinct ticket DR
  * numbers, 422 miss the exact match. The old `LIKE '%<digits>%'` fallback
  * returned a row for 27 of them and every one was a different drop — `DR173`
- * matched 10,107 rows, `DR185` matched 6,829. It never once returned the right
- * drop, because all 64,030 rows store `drop_number` DR-prefixed, so there is no
- * prefix-less row for the fallback to rescue.
+ * matched 10,107 rows, `DR185` matched 6,829.
  */
 describe('lookupSOWDrop', () => {
   it('never uses a substring match that could hit a different drop', async () => {
@@ -189,13 +187,18 @@ describe('lookupSOWDrop', () => {
     }
   });
 
-  it('gives up after the exact match instead of guessing', async () => {
-    queryOneMock.mockResolvedValue(null);
+  it('falls back to a prefix-insensitive equality match, not a guess', async () => {
+    queryOneMock
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ drop_number: 'DR1735912', pole_number: 'LAW.P.A123' });
 
-    await expect(lookupSOWDrop('DR173')).resolves.toBeNull();
-    // A second query here means a fallback was reintroduced. Every row in
-    // sow_drops is DR-prefixed, so no fallback can do anything but collide.
-    expect(queryOneMock).toHaveBeenCalledTimes(1);
+    const result = await lookupSOWDrop('DR1735912');
+
+    expect(queryOneMock).toHaveBeenCalledTimes(2);
+    expect(result?.drop_number).toBe('DR1735912');
+    // Whole-number equality on the stripped value — never a substring of it.
+    expect(queryOneMock.mock.calls[1]?.[1]).toEqual(['1735912']);
+    expect(sqlIssued()[1]).toMatch(/REGEXP_REPLACE\(UPPER\(drop_number\), *'\^DR', *''\) *= *\$1/i);
   });
 
   it('matches on the normalised DR, case-insensitively, against sow_drops', async () => {
@@ -207,6 +210,29 @@ describe('lookupSOWDrop', () => {
     expect(sql).toContain('sow_drops');
     expect(sql).toMatch(/UPPER\(drop_number\)\s*=\s*\$1/i);
     expect(queryOneMock.mock.calls[0]?.[1]).toEqual(['DR1735912']);
+  });
+
+  // normalizeDRNumber's docstring has always claimed to accept "1853428", but
+  // the pattern required a literal D, so the bare form fell through unchanged
+  // and could never equal a DR-prefixed stored value. Callers write dr_number
+  // to the database unnormalised, so the form is reachable.
+  it('prefixes a bare numeric DR so it can match a DR-prefixed row', async () => {
+    queryOneMock.mockResolvedValue(null);
+
+    await lookupSOWDrop('1853428');
+
+    expect(queryOneMock.mock.calls[0]?.[1]).toEqual(['DR1853428']);
+  });
+
+  // The normalisation is anchored so it cannot rewrite DR-{PROJECT}-{ZONE}
+  // references: an unanchored pattern finds the digits in DR-LAW-A-045 and
+  // turns it into DR045, silently pointing the lookup at a different drop.
+  it('leaves a DR-{PROJECT}-{ZONE} reference untouched', async () => {
+    queryOneMock.mockResolvedValue(null);
+
+    await lookupSOWDrop('DR-LAW-A-045');
+
+    expect(queryOneMock.mock.calls[0]?.[1]).toEqual(['DR-LAW-A-045']);
   });
 
   it('returns the drop on an exact match', async () => {
