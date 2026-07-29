@@ -174,3 +174,53 @@ describe('pages/mcp/authorize', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 });
+
+describe('pages/mcp/authorize — late router hydration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthMock.mockReturnValue(AUTHED);
+    vi.stubGlobal('fetch', fetchMock);
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { assign, href: 'https://dev.fibreflow.app/mcp/authorize' },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('recovers once router.isReady flips true with the state_id populated', async () => {
+    // The dependency array carries router.isReady as a primitive precisely so this
+    // re-runs. If it did not, a user whose query hydrates late would sit on "Loading…"
+    // forever and the connector would never be authorized.
+    routerState.isReady = false;
+    routerState.query = {};
+    routerState.asPath = '/mcp/authorize';
+    const { rerender } = render(<McpAuthorizePage />);
+    expect(screen.getByText(/Loading/i)).toBeTruthy();
+
+    routerState.isReady = true;
+    routerState.query = { state_id: STATE_ID };
+    routerState.asPath = `/mcp/authorize?state_id=${STATE_ID}`;
+    rerender(<McpAuthorizePage />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Allow$/ })).toBeTruthy());
+    expect(screen.queryByText(/Could not authorize/i)).toBeNull();
+  });
+
+  it('labels the button while returning to Claude, so the wait is not a dead click', async () => {
+    routerState.isReady = true;
+    routerState.query = { state_id: STATE_ID };
+    routerState.asPath = `/mcp/authorize?state_id=${STATE_ID}`;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { redirectUrl: 'https://claude.ai/cb' } }),
+    });
+    render(<McpAuthorizePage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Allow$/ }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Returning to Claude/i })).toBeTruthy());
+  });
+});
