@@ -1,0 +1,66 @@
+# Requires apps/ff_mcp/ to be present in the deploy directory. ExecStart runs
+# `python3 -m ff_mcp`; without the module it exits instantly and Restart=always
+# crash-loops until StartLimitBurst trips it into a failed state. Verify with
+# `ls <WorkingDirectory>/ff_mcp/server.py` before enabling.
+
+[Unit]
+Description=FibreFlow Remote MCP (Claude Custom Connector OAuth)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+
+# The DEPLOY directory, not a workspace checkout. A workspace tree follows whatever
+# branch is checked out and can sit frozen behind origin for weeks; the deploy dir is
+# what scripts/deploy-local.sh updates. Pointing a long-running service at a workspace
+# is how the QField sync silently froze (crons were repointed for the same reason).
+# Production uses /home/velo/fibreflow-production/apps — override in the drop-in.
+WorkingDirectory=/home/velo/fibreflow-dev/apps
+Environment=PYTHONPATH=/home/velo/fibreflow-dev/apps
+
+# FF_MCP_CALLBACK_SECRET lives HERE, never inline in this unit — unit files are
+# world-readable and this one is tracked in git. The env file is chmod 600 and
+# untracked. The service refuses to start when the secret is unset or blank, so a
+# missing env file fails loudly rather than accepting any local caller.
+EnvironmentFile=%h/.ff-remote-mcp.env
+
+Environment=FF_REMOTE_MCP_HOST=127.0.0.1
+Environment=FF_REMOTE_MCP_PORT=7416
+
+# systemd creates and owns this directory (%S/ff-remote-mcp), so the service works on a
+# clean host. Do NOT point the store at a bare path under $HOME: with
+# ProtectSystem=strict, a ReadWritePaths target that does not yet exist fails the mount
+# namespace setup before ExecStartPre could create it.
+StateDirectory=ff-remote-mcp
+StateDirectoryMode=0700
+Environment=FF_REMOTE_MCP_STORE=%S/ff-remote-mcp/oauth.json
+
+# ONE instance per host. dev and production run under the same OS user, so a second
+# instance started from a WorkingDirectory drop-in alone would collide twice: on the
+# loopback port, and on the OAuth store — two processes doing write-tmp-then-rename
+# against one oauth.json cross-contaminate or destroy each other's grants. Running both
+# means overriding FF_REMOTE_MCP_PORT, StateDirectory/FF_REMOTE_MCP_STORE and
+# EnvironmentFile as well, and repointing FF_REMOTE_MCP_URL in that environment's app.
+#
+# Set per environment in the EnvironmentFile, not here:
+#   FF_APP_BASE                 https://dev.fibreflow.app | https://app.fibreflow.app
+#   FF_REMOTE_MCP_PUBLIC_BASE   <FF_APP_BASE>/api/ff-remote-mcp
+#   FF_MCP_CALLBACK_SECRET      shared with FibreFlow's /api/mcp/consent
+
+ExecStart=/usr/bin/python3 -m ff_mcp
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=default.target

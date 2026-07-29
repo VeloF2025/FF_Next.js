@@ -235,6 +235,19 @@ const nextConfig = {
     ];
   },
 
+  async rewrites() {
+    return [
+      // RFC 9728 discovery for the remote MCP connector. Must be host-aware, so it is
+      // an API route rather than a file under public/ — a static file hardcodes one
+      // environment's hostname, and dev would advertise production as its
+      // authorization server.
+      {
+        source: '/.well-known/oauth-protected-resource/api/ff-remote-mcp/mcp',
+        destination: '/api/mcp/resource-metadata',
+      },
+    ];
+  },
+
   // DISABLED: Legacy neon/api/server.ts proxy - zero-auth CRUD server
   // The Neon API server has no authentication and should not be proxied.
   // SOW imports now use proper Next.js API routes with withAuth.
