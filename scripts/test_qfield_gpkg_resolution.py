@@ -9,9 +9,10 @@ file, and the extractor logged "SKIP: Already processed this version" for 5 days
 
 The load-bearing assertion is NO-OP FOR EVERY REGISTERED PROJECT: family resolution must
 not move any project except Mahikeng off the file it reads today. GPKG_LISTINGS below is
-the real `mc ls .../files/` output for all 9 registered QField projects (captured
-2026-07-27), so a pattern that over-matches — pulling a project's optical audit into its
-civil family, or a dated OES export into a poles family — fails here rather than in prod.
+the real `mc ls .../files/` output for all 10 registered QField projects
+(captured 2026-07-27 through 2026-07-29), so a pattern that over-matches —
+pulling a project's optical audit into its civil family, or a dated OES export
+into a poles family — fails here rather than in prod.
 
 Run:  python3 scripts/test_qfield_gpkg_resolution.py   (no DB / MinIO / deps required)
 Wired into CI via scripts/ci-local.sh.
@@ -97,6 +98,11 @@ GPKG_LISTINGS = {
         "PON Progress.gpkg", "PON Progress V2.gpkg", "PON Progress new.gpkg",
         "cable_span_V4.gpkg", "DemandPoints.gpkg",
     ],
+    "Namakgale": [
+        "Civil Audit.gpkg", "Cable Span.gpkg", "Namakgale Existing DC.gpkg",
+        "Namakgale P3 (A1) AOI.gpkg", "Namakgale P3 (A1) BH Civil.gpkg",
+        "Namakgale P3 (A1) BH MHs.gpkg", "Namakgale P3 (A1) Demands.gpkg",
+    ],
 }
 
 # Every registered gpkg_path, exactly as PROJECTS / ALTERNATE_GPKGS / OPTICAL_GPKGS
@@ -118,6 +124,7 @@ REGISTERED = [
     ("Thembisa POP 3", "Optical Audit.gpkg"),
     ("Tonga", "Civil Audit.gpkg"),
     ("Mahikeng", "Civil audit.gpkg"),
+    ("Namakgale", "Civil Audit.gpkg"),
 ]
 
 # ALTERNATE_GPKGS entries naming a file that is NOT in MinIO. They must stay unresolved:

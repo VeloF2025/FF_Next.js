@@ -28,7 +28,8 @@ and photo-integrity checks against MinIO. Read-only — never mutates QFieldClou
 - QFieldCloud PG `localhost:5433` — read-only `qfcPool` (`QFIELDCLOUD_DATABASE_URL`
   env, never a tracked file)
 - MinIO `qfieldcloud-prod` bucket via `mc` (photo presence + design GPKG fetch)
-- Design GPKGs (`MOAPons`/`MOAPoles`) resolved by the Python script, cached in
+- Verified per-project design GPKGs (`MOAPons`/`MOAPoles`; Mahikeng
+  `PON Progress V2`/`MahikengPoles`) resolved by the Python script, cached in
   `qfield_pole_pon_cache` (mig 460), keyed by `(project_id, gpkg_version)`
 
 ## Critical Rules
