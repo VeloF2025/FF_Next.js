@@ -25,6 +25,15 @@ interface SnagPerPhotoResult {
   photos: SnagPhoto[];
 }
 
+interface PoleMatch {
+  id: string;
+  pole_number: string;
+  zone_no: number | null;
+  pon_no: number | null;
+  latitude: string | null;
+  longitude: string | null;
+}
+
 /**
  * Create one snag per photo/pole instance from the TQR grid.
  *
@@ -139,14 +148,42 @@ export async function createSnagsPerPhoto(
           normalizedRef = normalizedRef.replace(/^P([A-Z])/, 'P.$1'); // PH → P.H
         }
 
-        // Match P.H890 → ETW.P.H890 in poles table
-        const poleRows = await sql`
+        // Prefer a full pole label before falling back to a project-scoped suffix.
+        let poleRows = await sql`
           SELECT id, pole_number, zone_no, pon_no, latitude, longitude
           FROM poles
           WHERE project_id = ${projectId}
-            AND pole_number ILIKE '%' || ${normalizedRef}
-          LIMIT 1
-        ` as Array<{ id: string; pole_number: string; zone_no: number | null; pon_no: number | null; latitude: string | null; longitude: string | null }>;
+            AND UPPER(TRIM(pole_number)) = UPPER(${normalizedRef})
+          ORDER BY UPPER(TRIM(pole_number)), id
+          LIMIT 2
+        ` as PoleMatch[];
+
+        let matchMode = 'exact';
+        if (poleRows.length === 0) {
+          matchMode = 'suffix';
+          poleRows = await sql`
+            SELECT id, pole_number, zone_no, pon_no, latitude, longitude
+            FROM poles
+            WHERE project_id = ${projectId}
+              AND RIGHT(
+                UPPER(TRIM(pole_number)),
+                LENGTH(UPPER(${normalizedRef}))
+              ) = UPPER(${normalizedRef})
+            ORDER BY UPPER(TRIM(pole_number)), id
+            LIMIT 2
+          ` as PoleMatch[];
+        }
+
+        if (poleRows.length > 1) {
+          log.warn('SnagPerPhoto: ambiguous pole reference', {
+            projectId,
+            reference: poleRef,
+            normalizedReference: normalizedRef,
+            matchMode,
+            candidates: poleRows.map((pole) => pole.pole_number),
+          });
+          poleRows = [];
+        }
 
         if (poleRows[0]) {
           const pole = poleRows[0];
