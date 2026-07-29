@@ -51,6 +51,12 @@ function RecordTrainingContent() {
       setErr('Training type, worker and completed date are required');
       return;
     }
+    // Mirrors the server rule: without a contractor, a contractor worker's
+    // certificate never reaches the compliance gate.
+    if (workerKind === 'team_member' && !form.contractor_id) {
+      setErr('Select the contractor — it is what drives the compliance gate');
+      return;
+    }
     setSaving(true);
     const payload: Record<string, unknown> = {
       training_type_id: form.training_type_id,

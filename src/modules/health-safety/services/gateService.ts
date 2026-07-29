@@ -103,7 +103,11 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
 
   // Check training score (null = no training data yet — do not block on absence).
   // Sourced from live worker-training data, not the stale stored column.
-  if (training.training_score != null && training.training_score < TRAINING_GATE_MINIMUM) {
+  const trainingBelowMinimum =
+    training.training_score != null && training.training_score < TRAINING_GATE_MINIMUM;
+  const trainingHasExpiredStatutory = training.expired_statutory_certs > 0;
+  const trainingPassed = !trainingBelowMinimum && !trainingHasExpiredStatutory;
+  if (trainingBelowMinimum) {
     blockers.push(
       `Training compliance (${training.training_score}%) below minimum (${TRAINING_GATE_MINIMUM}%)`
     );
@@ -111,7 +115,7 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
   // A worker with an EXPIRED STATUTORY certificate blocks outright, even if the
   // overall percentage would otherwise pass — an expired legal competency is
   // not a matter of degree (goal §7.3).
-  if (training.expired_statutory_certs > 0) {
+  if (trainingHasExpiredStatutory) {
     blockers.push(
       `${training.expired_statutory_certs} expired statutory training certificate(s)`
     );
@@ -197,6 +201,8 @@ export async function checkContractorGate(contractorId: string): Promise<GateChe
       document_score: compliance.document_score,
       incident_score: compliance.incident_score,
       training_score: training.training_score,
+      training_passed: trainingPassed,
+      training_expired_statutory_certs: training.expired_statutory_certs,
       corrective_action_score: compliance.corrective_action_score,
       audit_score: compliance.audit_score,
     },

@@ -88,6 +88,7 @@ describe('checkContractorGate — training-driven verdict', () => {
 
     const result = await checkContractorGate('c1');
     expect(result.can_assign).toBe(false);
+    expect(result.breakdown.training_passed).toBe(false);
     expect(result.blockers.some((b) => /expired statutory/i.test(b))).toBe(true);
   });
 
@@ -97,6 +98,7 @@ describe('checkContractorGate — training-driven verdict', () => {
 
     const result = await checkContractorGate('c1');
     expect(result.can_assign).toBe(false);
+    expect(result.breakdown.training_passed).toBe(false);
     expect(result.blockers.some((b) => /Training compliance \(50%\)/.test(b))).toBe(true);
   });
 
