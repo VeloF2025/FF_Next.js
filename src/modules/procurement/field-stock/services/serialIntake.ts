@@ -82,19 +82,25 @@ export async function receiveSerials(
         client,
         { sourceTable: ctx.sourceTable, sourceId: ctx.sourceId, payload: ctx.payload },
         async () => {
-          for (const item of chunk) {
-            const res = await client.query(
-              `INSERT INTO stock_serials
-                 (id, stock_item_id, serial_number, current_location_id,
-                  status, received_reference, received_date, condition)
-               VALUES (gen_random_uuid(), $1, $2, $3,
-                  'in_stock', $4, NOW(), $5)
-               ON CONFLICT (stock_item_id, serial_number) DO NOTHING`,
-              [item.stockItemId, item.serialNumber, item.locationId,
-               ctx.receivedReference, item.condition ?? 'new'],
-            );
-            inserted += res.rowCount ?? 0;
-          }
+          const res = await client.query(
+            `INSERT INTO stock_serials
+               (id, stock_item_id, serial_number, current_location_id,
+                status, received_reference, received_date, condition)
+             SELECT
+               gen_random_uuid(), incoming.stock_item_id, incoming.serial_number,
+               incoming.location_id, 'in_stock', $5, NOW(), incoming.condition
+             FROM unnest($1::uuid[], $2::text[], $3::uuid[], $4::text[])
+               AS incoming(stock_item_id, serial_number, location_id, condition)
+             ON CONFLICT (stock_item_id, serial_number) DO NOTHING`,
+            [
+              chunk.map((item) => item.stockItemId),
+              chunk.map((item) => item.serialNumber),
+              chunk.map((item) => item.locationId),
+              chunk.map((item) => item.condition ?? 'new'),
+              ctx.receivedReference,
+            ],
+          );
+          inserted = res.rowCount ?? 0;
         },
       );
       await client.query('COMMIT');

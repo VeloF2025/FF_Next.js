@@ -31,6 +31,7 @@ const pool = new Pool({ connectionString: TEST_DB_URL });
 const ITEM_ID = 'dd000000-0000-0000-0000-0000000000a1';
 const LOC_WH = '10000000-0000-0000-0000-000000000001'; // seeded warehouse
 const SN = 'TC-INTAKE-ONT-0001';
+const SN_NULL_LOCATION = 'TC-INTAKE-ONT-0002';
 
 beforeAll(async () => {
   await pool.query(
@@ -103,5 +104,42 @@ describe('receiveSerials — genesis stock receipt', () => {
       [ITEM_ID],
     );
     expect(rows[0].n).toBe(1);
+  });
+
+  it('zips a multi-row batch with null locations and skips conflicts', async () => {
+    const result = await receiveSerials(
+      pool,
+      [
+        { stockItemId: ITEM_ID, serialNumber: SN, locationId: LOC_WH },
+        { stockItemId: ITEM_ID, serialNumber: SN_NULL_LOCATION, locationId: null },
+      ],
+      { sourceTable: 'ont_serial_import', sourceId: randomUUID(), receivedReference: 'BATCH TEST' },
+    );
+    expect(result).toEqual({ received: 1, skipped: 1 });
+
+    const { rows: serials } = await pool.query(
+      `SELECT serial_number, current_location_id, received_reference
+         FROM stock_serials
+        WHERE stock_item_id = $1
+        ORDER BY serial_number`,
+      [ITEM_ID],
+    );
+    expect(serials).toHaveLength(2);
+    expect(serials[1]).toMatchObject({
+      serial_number: SN_NULL_LOCATION,
+      current_location_id: null,
+      received_reference: 'BATCH TEST',
+    });
+
+    const { rows: events } = await pool.query(
+      `SELECT e.source_table
+         FROM stock_serial_events e
+         JOIN stock_serials s ON s.id = e.serial_id
+        WHERE s.stock_item_id = $1
+        ORDER BY s.serial_number`,
+      [ITEM_ID],
+    );
+    expect(events).toHaveLength(2);
+    expect(events[1]?.source_table).toBe('ont_serial_import');
   });
 });
