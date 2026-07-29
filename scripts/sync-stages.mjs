@@ -17,6 +17,7 @@
 import { config } from 'dotenv';
 import pg from 'pg';
 import { authenticate, fetchAllRecords } from './lib/onemap-client.mjs';
+import { upsertProperties } from './lib/onemap-property-sync.mjs';
 // Load both: prod keeps DATABASE_URL in .env and ONEMAP_PASSWORD in .env.local
 // (.env.local wins for overlapping keys). On the workstation .env.local has both.
 config({ path: ['.env.local', '.env'] });
@@ -158,49 +159,6 @@ async function ensureLiveImport(client) {
   } finally {
     await client.query(`SELECT pg_advisory_unlock(hashtext($1))`, [LIVE_IMPORT_FILENAME]);
   }
-}
-
-/**
- * Upsert live 1Map records into onemap_properties keyed by (import_id, property_id).
- * Maps the raw getattributes fields; leaves contact PII untouched (not needed here).
- */
-async function upsertProperties(client, records, importId) {
-  let n = 0;
-  for (const r of records) {
-    if (!r.prop_id) continue;
-    await client.query(
-      `INSERT INTO onemap_properties (
-         import_id, property_id, drop_number, ont_barcode, ups_serial, status,
-         site, pole_number, location_address, latitude, longitude,
-         home_signup_date, installation_date, last_modified_by, last_modified_date, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
-       ON CONFLICT (import_id, property_id) DO UPDATE SET
-         drop_number = EXCLUDED.drop_number,
-         ont_barcode = EXCLUDED.ont_barcode,
-         ups_serial = EXCLUDED.ups_serial,
-         status = EXCLUDED.status,
-         site = EXCLUDED.site,
-         pole_number = EXCLUDED.pole_number,
-         location_address = EXCLUDED.location_address,
-         latitude = EXCLUDED.latitude,
-         longitude = EXCLUDED.longitude,
-         home_signup_date = EXCLUDED.home_signup_date,
-         installation_date = EXCLUDED.installation_date,
-         last_modified_by = EXCLUDED.last_modified_by,
-         last_modified_date = EXCLUDED.last_modified_date,
-         updated_at = NOW()`,
-      [
-        importId, String(r.prop_id), r.drp || null, r.ph_ont || null, r.br_ser || null, r.status || null,
-        r.site || null, r.pole || null, r.address || null,
-        Number.isFinite(Number(r.latitude)) ? Number(r.latitude) : null,
-        Number.isFinite(Number(r.longitude)) ? Number(r.longitude) : null,
-        r.last_modified_signup_date || null, r.last_modified_install_date || null,
-        r.last_modified_by || null, r.last_modified_date || null,
-      ],
-    );
-    n++;
-  }
-  return n;
 }
 
 async function syncSite(site, projectId, pool, projectName, records) {
