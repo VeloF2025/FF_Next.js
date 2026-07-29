@@ -7,7 +7,15 @@
 > **#2233** (P3 PPE), **#2234** (P4 permits), **#2236** (P5 safety file), **#2237** (P6 LTIFR),
 > **#2238** (P7 RBAC + severity + docs). Migrations `451`–`457` are live
 > (`scripts/migrations/sql/451_hs_training_matrix.sql` … `457_hs_severity_check.sql`).
-> All phases reached **production** on 2026-07-24; a later TZ date fix shipped as #2240/#2245.
+> A later TZ date fix shipped as #2240/#2245.
+>
+> All ten are **in production**, verified by ancestry rather than asserted — every merge
+> commit above is an ancestor of the deployed production HEAD (`d2d0dd1a0`, checked
+> 2026-07-29 against `/home/velo/fibreflow-production`). Re-check with:
+> `sudo -u velo git -C /home/velo/fibreflow-production rev-parse HEAD`, then
+> `git merge-base --is-ancestor <merge-sha> <prod-head>`. The 2026-07-24 date above is the
+> **merge** date (repo-verifiable); the deploy that carried them to prod is not recorded in
+> this repo, so no deploy date is claimed here.
 >
 > This file is kept for the design rationale in §2 and §4 — it is **not** a pending plan.
 > Re-running the `/goal` command below would rebuild work that already exists.
@@ -16,9 +24,19 @@
 > and the completion handoff `.claude/handoffs/2026-07-24-hs-phases-4-9-complete.md`
 > (handoffs are untracked — local tree only).
 >
-> Two §4 decisions were overridden during execution, so read that section as *proposed*,
-> not as *what shipped*: e-signatures are **drawn** on appointment letters (§4.5 said typed
-> only), and the contractor gate ships **fail-closed** (§4.10 said fail-open-but-loud).
+> Read §4 as *proposed*, not as *what shipped* — three decisions changed during execution:
+>
+> - **§4.5** — appointment letters sign with a **drawn** signature (§4.5 said typed only).
+>   Scoped: toolbox talks and PPE still use typed e-signature as written.
+> - **§4.10** — the contractor gate ships **fail-closed** (§4.10 said fail-open-but-loud).
+>   Enforced in the caller, `pages/api/contractors-projects.ts` (503 + `can_assign:false`
+>   when the gate throws), not inside `gateService` itself.
+> - **§4.2** — "workers are `staff`" did not survive contact with the data. A worker is
+>   `staff_id` XOR `team_member_id`, because contractor field workers live in `team_members`
+>   whose own `contractor_id` is unpopulated. This took §4.2's own fallback clause rather
+>   than reversing it — no new person table was created — but the shape differs from what
+>   §4.2 reads like. See `.claude/modules/health-safety.md`, "Training matrix & competency
+>   gate".
 
 > **How to use:** ~~start a fresh session on Opus, in a worktree off `master`, and run:~~ (superseded — see above)
 > `/goal Execute docs/plans/health-safety-phases-4-9-goal.md to completion. Work autonomously through Spec → Migrate → Build → Test → Deploy(dev) → Browser-verify → PR for each phase in §5 order; do not stop to ask; only halt for a Confirmation Gate (§8) or a genuine external blocker. Loop until every Success Criterion (§7) is verified true in a real browser against dev.fibreflow.app with DB side-effect proof, then write a handoff and stop.`
