@@ -7,10 +7,15 @@
 
 **All four PRs open, CI green, blind-reviewed, review findings fixed. Nothing merged yet. Nothing deployed to dev or prod.**
 
-Blind review found **13 issues across the four PRs, including one HIGH**. All were
-reproduced before fixing; two were disputed with evidence rather than changed (see
-the reconciliation comments on each PR). Tests grew 36→60 (Python) and 35→51 (JS)
-as a result.
+Blind review ran **two rounds** and found **~20 issues across the four PRs, including
+two HIGHs**. Every finding was reproduced before fixing; two were disputed with
+evidence rather than changed (reconciliation comments on each PR). Tests grew
+36→66 (Python) and 35→57 (JS).
+
+**Merge in dependency order: #2294, #2295, #2298, then #2299 last.** #2299 ships the
+systemd unit and a doc describing a working service; until #2298 puts `apps/ff_mcp/`
+on master, enabling that unit crash-loops it into a failed state. Both files now carry
+a warning, but the order removes the window.
 
 | PR | Branch | Tasks | CI |
 |---|---|---|---|
@@ -57,6 +62,15 @@ Also verified: session row `kind='mcp' label='Claude connector'` 90d with `last_
 - **#2299 — `ReadWritePaths` named a directory nothing created.** Under
   `ProtectSystem=strict` that fails namespace setup *before* `ExecStartPre` runs, so the
   unit would not have started on a clean host. `StateDirectory` is the right mechanism.
+- **#2298, round 2 — my own fix introduced a race.** Making `fibreflow_get` async put it
+  on a real thread pool, so the stale-key sweep added in the same round began iterating
+  `_call_times` while another thread inserted into it. Now under a `threading.Lock`.
+  **Lesson: a fix that changes the concurrency model invalidates the reasoning behind
+  every other change in the same round.**
+- **#2298, round 2 — a decorative test on a security path.** `test_callback_rejects_an_
+  unknown_state` asserted only `status_code == 400`, and deleting the `peek_pending`
+  guard still produced 400 because `complete_pending` raises the same error downstream.
+  Proving a guard fired means proving what came *after* it did not run.
 
 ## Test-quality lessons (three decorative tests caught by mutation testing)
 
@@ -67,6 +81,13 @@ Mutation testing found **three tests that asserted nothing**, each of which look
 - **Startup secret guard (Python).** After the module split the guard moved to `config.py`, which the test helper did not evict from `sys.modules`; run after any test that had already imported config, it executed nothing and passed. Proven order-dependent (`DID NOT RAISE`), then fixed.
 
 **Generalisable:** a mutation that "survives" is either a missing test or a mutation that never applied. Two of mine never applied because the perl pattern used double quotes against single-quoted source. Always confirm the mutation landed (`grep -c`) before concluding a line is well tested.
+
+**Concurrency tests need calibration, not just threads.** My first race test — 12 threads,
+40 calls each — passed against the *unlocked* implementation. CPython switches threads
+every 5ms by default and a short comprehension finishes inside one slice. Reproducing it
+needed `sys.setswitchinterval(1e-6)` plus a dict large enough that the comprehension spans
+a switch; I calibrated in a standalone harness (8 threads, 4000 keys → failed 7/7) before
+writing the test. A green concurrency test proves nothing until you have watched it go red.
 
 ## Credential incident — handled, no action needed
 
