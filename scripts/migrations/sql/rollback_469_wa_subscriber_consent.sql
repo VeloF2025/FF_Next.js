@@ -25,6 +25,13 @@ DROP INDEX IF EXISTS ux_wa_subscriber_consent_msisdn;
 -- Constraints go with the table, but drop them explicitly so a partially-applied
 -- forward run (table created, constraints added, later statement failed) still rolls
 -- back cleanly on re-run.
+--
+-- All four must be listed. Missing one silently weakens that property: the DROP TABLE
+-- below would clean it up in the normal case, so the omission is invisible until the
+-- exact scenario this block exists for — a forward run that failed partway, leaving the
+-- table and some constraints behind.
+ALTER TABLE IF EXISTS wa_subscriber_consent DROP CONSTRAINT IF EXISTS wa_subscriber_consent_timestamps_chk;
+ALTER TABLE IF EXISTS wa_subscriber_consent DROP CONSTRAINT IF EXISTS wa_subscriber_consent_msisdn_chk;
 ALTER TABLE IF EXISTS wa_subscriber_consent DROP CONSTRAINT IF EXISTS wa_subscriber_consent_source_chk;
 ALTER TABLE IF EXISTS wa_subscriber_consent DROP CONSTRAINT IF EXISTS wa_subscriber_consent_status_chk;
 
