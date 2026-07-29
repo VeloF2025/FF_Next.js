@@ -35,6 +35,32 @@ const CALLBACK_TIMEOUT_MS = 10_000;
 const serviceUrl = (): string =>
   (process.env.FF_REMOTE_MCP_URL || 'http://127.0.0.1:7416').replace(/\/$/, '');
 
+/** Node types this header as string | string[]; narrow it rather than asserting. */
+function firstForwardedFor(raw: string | string[] | undefined): string | undefined {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value?.split(',')[0]?.trim() || undefined;
+}
+
+/**
+ * The redirectUrl is the one value that crosses back out to the browser, where
+ * pages/mcp/authorize.tsx hands it to window.location.assign. A `javascript:` or
+ * `data:` URI there would execute in the user's authenticated origin, so the scheme is
+ * checked here rather than trusted.
+ *
+ * The upstream is a loopback service behind a shared secret, so this is defence in
+ * depth, not a live hole — but it costs one line and this endpoint is the trust
+ * boundary. The host is deliberately NOT pinned: the OAuth redirect_uri belongs to
+ * whichever client registered, and hardcoding claude.ai would break any other one.
+ */
+function isSafeRedirect(value: unknown): value is string {
+  if (typeof value !== 'string' || !value) return false;
+  try {
+    return ['https:', 'http:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
 function badGateway(res: NextApiResponse): void {
   res.status(502).json({
     success: false,
@@ -64,7 +90,7 @@ async function consentHandler(
 
   const { token, sessionId } = await mintFfMcpToken(req.user, '90d', {
     label: 'Claude connector',
-    ipAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim(),
+    ipAddress: firstForwardedFor(req.headers['x-forwarded-for']),
     userAgent: req.headers['user-agent'],
   });
 
@@ -89,7 +115,7 @@ async function consentHandler(
     }, LOGGER);
   }
 
-  if (typeof redirectUrl !== 'string' || !redirectUrl) {
+  if (!isSafeRedirect(redirectUrl)) {
     try {
       await deleteSession(sessionId);
     } catch (err) {
