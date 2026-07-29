@@ -164,16 +164,14 @@ const SOW_DROP_COLUMNS = `
  * rendered on the ticket, so a collision points a technician at a stranger's
  * address. Returning nothing beats returning someone else.
  *
- * The substring form never once resolved a DR the exact match had missed —
- * every row it returned belonged to a different drop. A prefix-stripping
- * fallback only helps if some row is stored without the `DR` prefix, and none
- * is; `onemap_properties` carries thousands of such rows, `sow_drops` none.
- * For scale, `DR173` alone matched 10,107 rows.
+ * Measured against production, the substring form never once resolved a DR the
+ * exact match had missed — every row it returned belonged to a different drop.
+ * It could not do otherwise: a prefix-stripping fallback only helps when some
+ * row is stored without the `DR` prefix, and no `sow_drops` row is.
  *
- * Sole record of these measurements — the tests cite this doc rather than
- * restating them. Re-derive with
- * `scripts/check-sow-drop-lookup-collisions.sql` (read-only, ~40s), which also
- * explains which of its counts drift with ticket volume and which do not.
+ * Figures are deliberately not quoted here. They live with the queries that
+ * produce them, in `scripts/check-sow-drop-lookup-collisions.sql` (read-only,
+ * ~40s) — run that rather than trusting a number in a comment.
  */
 export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> {
   if (!drNumber) return null;
@@ -199,9 +197,10 @@ export async function lookupSOWDrop(drNumber: string): Promise<DropInfo | null> 
     // Match with the DR prefix stripped from BOTH sides, for rows stored as
     // "1735912" rather than "DR1735912". Every sow_drops row is currently
     // DR-prefixed, so this adds nothing today — it is kept because the sibling
-    // table onemap_properties holds 3,896 bare rows, so an import source that
-    // stores them bare is a demonstrated failure mode in this system rather
-    // than a hypothetical one. Crucially it stays an equality test: reverting
+    // table onemap_properties holds thousands of bare rows (query 5 of the
+    // script above), so an import source that stores them bare is a
+    // demonstrated failure mode in this system rather than a hypothetical one.
+    // Crucially it stays an equality test: reverting
     // it to LIKE is what caused the collisions described above.
     const numericPart = normalized.replace(/^DR/i, '');
     result = await queryOne<DropInfo>(
