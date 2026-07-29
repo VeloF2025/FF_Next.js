@@ -12,7 +12,8 @@ secret, and nothing else — no JWT_SECRET, no database connection, no service
 credential. If a tool needs data the user cannot see, the answer is "no".
 
 Layout: config.py (settings + the startup secret guard), oauth.py (the authorization
-server, copied from Cortex), tools.py (the three tools), this file (the HTTP surface).
+server, copied from Cortex), catalogue.py (endpoint discovery), tools.py (the read
+tool and its path guards), this file (the HTTP surface).
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import anyio.to_thread
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
@@ -120,7 +122,9 @@ async def authorize_complete(request: Request):
         return JSONResponse({"error": "unknown or expired authorization request"}, status_code=400)
 
     try:
-        validate_ff_token(token)
+        # On a worker thread: validate_ff_token does blocking HTTP with a 15s timeout,
+        # and this handler runs on the single shared event loop.
+        await anyio.to_thread.run_sync(validate_ff_token, token)
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
@@ -184,4 +188,5 @@ async def remote_help(request: Request):
 
 
 # Tool registration lives in tools.py; importing it binds the tools to `mcp`.
+from . import catalogue as _catalogue  # noqa: E402,F401  (import for side effects)
 from . import tools as _tools  # noqa: E402,F401  (import for side effects)

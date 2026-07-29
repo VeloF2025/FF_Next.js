@@ -19,21 +19,22 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import defaultdict
+from functools import partial
 from pathlib import Path
+
+import anyio.to_thread
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 
 from .config import FF_APP_BASE
 from .server import mcp
 
-CATALOGUE_PATH = Path(__file__).with_name("endpoints.json")
 
 # Mirrors DENIED_GROUPS in scripts/build-mcp-endpoint-catalogue.ts. Omitting a group
 # from the catalogue is not enough on its own — Claude can construct a path it never saw
 # listed — so fibreflow_get refuses them too.
 DENIED_GROUPS = ("accounting", "staff", "my", "cortex-remote-mcp", "ff-remote-mcp")
 
-MAX_ROWS = 200
 MAX_RESPONSE_CHARS = 15_000
 
 # Ceiling on upstream calls per token per hour. The guard is against an agent
@@ -43,9 +44,22 @@ _RATE_WINDOW_SECONDS = 3600
 _call_times: dict[str, list[float]] = defaultdict(list)
 
 
-def _load_routes() -> list[dict]:
-    data = json.loads(CATALOGUE_PATH.read_text())
-    return data.get("routes", [])
+def _canonical(path: str) -> str:
+    """Decode and lower-case a path for guard checks.
+
+    The guards must run on what FibreFlow will ACTUALLY route, not on the raw string.
+    Next.js decodes percent-escapes before matching and route directories are all
+    lower-case, so checking the raw string lets `/api/Accounting/ledger` and
+    `/api/%2e%2e/x` walk straight past an exact-match denylist and a literal ".."
+    substring check. Decoding is repeated until stable so a double-encoded `%252e`
+    cannot survive one pass.
+    """
+    prev, cur = None, path
+    for _ in range(5):
+        if cur == prev:
+            break
+        prev, cur = cur, urllib.parse.unquote(cur)
+    return cur.lower()
 
 
 def _group_of(path: str) -> str:
@@ -58,9 +72,13 @@ def _denied_group(group: str) -> str | None:
 
     Routes in this repo are flattened, so one logical area spreads across sibling group
     names. Exact matching would leave `staff-documents` reachable.
+
+    Lower-cases defensively even though callers pass an already-canonical path — this
+    predicate is the guard, and it should not depend on every caller remembering.
     """
+    normalised = group.lower()
     for denied in DENIED_GROUPS:
-        if group == denied or group.startswith(denied + "-"):
+        if normalised == denied or normalised.startswith(denied + "-"):
             return denied
     return None
 
@@ -82,6 +100,13 @@ def _rate_limit(token: str) -> None:
     # Key on a digest-length prefix rather than the token itself so the raw credential is
     # not held as a dict key any longer than the request needs it.
     key = token[-16:]
+    # Sweep keys that have gone quiet, not just old timestamps within a key. Without
+    # this the dict grows one entry per token ever seen, forever, in a process systemd
+    # keeps alive indefinitely.
+    for stale in [k for k, v in _call_times.items() if not v or now - max(v) >= _RATE_WINDOW_SECONDS]:
+        if stale != key:
+            del _call_times[stale]
+
     recent = [t for t in _call_times[key] if now - t < _RATE_WINDOW_SECONDS]
     if len(recent) >= RATE_LIMIT_PER_HOUR:
         oldest = min(recent)
@@ -97,118 +122,29 @@ def _rate_limit(token: str) -> None:
     _call_times[key] = recent
 
 
-@mcp.tool()
-def list_endpoints(filter: str = "", group: str = "") -> str:
-    """Discover FibreFlow API endpoints. Call this FIRST, before fibreflow_get, whenever
-    you are not certain a path exists.
-
-    FibreFlow has hundreds of read endpoints; guessing a path wastes a call and can make
-    you conclude data is missing when it is not. Filter by keyword (matches the path and
-    description) or by group (the first path segment, e.g. "projects", "noc", "fleet").
-    Results are capped, and the reply states how many matched in total — if the total
-    exceeds what is shown, narrow the filter rather than assuming you have seen
-    everything.
-    """
-    routes = _load_routes()
-    needle = filter.strip().lower()
-    wanted_group = group.strip().lower()
-
-    matched = [
-        r
-        for r in routes
-        if (not wanted_group or r.get("group", "").lower() == wanted_group)
-        and (
-            not needle
-            or needle in r.get("path", "").lower()
-            or needle in (r.get("description") or "").lower()
-        )
-    ]
-
-    shown = matched[:MAX_ROWS]
-    payload = {
-        "matched": len(matched),
-        "shown": len(shown),
-        "truncated": len(matched) > len(shown),
-        "routes": shown,
-    }
-    if payload["truncated"]:
-        payload["note"] = (
-            f"{len(matched)} endpoints matched; showing the first {len(shown)}. "
-            "Narrow with a more specific filter or a group to see the rest."
-        )
-    if not matched:
-        payload["note"] = (
-            "Nothing matched. Try a broader keyword, or call list_endpoints with no "
-            "arguments to see the available groups."
-        )
-    return json.dumps(payload, indent=2)
-
-
-@mcp.tool()
-def describe_endpoint(path: str) -> str:
-    """Show what a specific FibreFlow endpoint accepts before you call it.
-
-    Use this when list_endpoints has given you a path containing :params (e.g.
-    /api/projects/:projectId) so you know which values you must supply. Returns the
-    methods, the description, and the required path parameters.
-    """
-    wanted = path.strip()
-    for route in _load_routes():
-        if route.get("path") == wanted:
-            params = [
-                seg[1:] for seg in route["path"].split("/") if seg.startswith(":")
-            ]
-            return json.dumps(
-                {
-                    "path": route["path"],
-                    "methods": route.get("methods", []),
-                    "group": route.get("group"),
-                    "description": route.get("description"),
-                    "pathParams": params,
-                    "note": (
-                        "Substitute a real value for each pathParam before calling "
-                        "fibreflow_get."
-                        if params
-                        else None
-                    ),
-                },
-                indent=2,
-            )
-    return json.dumps(
-        {
-            "error": f"No catalogued endpoint matches {wanted!r}.",
-            "hint": "Call list_endpoints with a keyword to find the correct path.",
-        },
-        indent=2,
-    )
-
-
 def _reject(message: str, **extra) -> str:
     return json.dumps({"error": message, **extra}, indent=2)
 
 
-@mcp.tool()
-def fibreflow_get(path: str, query: str = "") -> str:
-    """Read data from FibreFlow as the signed-in user. Read-only — FibreFlow refuses
-    every write made with this connection.
+def _fibreflow_get_sync(path: str, query: str = "") -> str:
+    """The body of fibreflow_get. Sync, because it does blocking HTTP.
 
-    Use a path from list_endpoints (e.g. "/api/projects"), not a full URL. Pass query
-    parameters as a urlencoded string (e.g. "limit=20&status=active"). You see exactly
-    what that user sees in the app: their projects, their permissions, nothing more. A
-    403 or 404 means they lack access to that data — report it rather than retrying
-    variants of the path.
+    The tool wrapper runs this on a worker thread. It must not be called directly from
+    the event loop — see the note on fibreflow_get.
     """
     target = path.strip()
-    if not target.startswith("/api/"):
+    # Every guard below runs on the canonical form, never on the raw string.
+    canonical = _canonical(target)
+    if not canonical.startswith("/api/"):
         return _reject(
             "path must be a FibreFlow API path beginning with /api/ — not a full URL "
             "and not an app page.",
             received=target,
         )
-    if ".." in target or "//" in target[1:]:
+    if ".." in canonical or "//" in canonical[1:]:
         return _reject("path must not contain '..' or '//'.", received=target)
 
-    group = _group_of(target)
+    group = _group_of(canonical)
     denied = _denied_group(group)
     if denied:
         # Stated plainly so the model stops rather than probing sibling paths.
@@ -269,3 +205,21 @@ def fibreflow_get(path: str, query: str = "") -> str:
             indent=2,
         )
     return body
+
+
+@mcp.tool()
+async def fibreflow_get(path: str, query: str = "") -> str:
+    """Read data from FibreFlow as the signed-in user. Read-only — FibreFlow refuses
+    every write made with this connection.
+
+    Use a path from list_endpoints (e.g. "/api/projects"), not a full URL. Pass query
+    parameters as a urlencoded string (e.g. "limit=20&status=active"). You see exactly
+    what that user sees in the app: their projects, their permissions, nothing more. A
+    403 or 404 means they lack access to that data — report it rather than retrying
+    variants of the path.
+    """
+    # async + to_thread, deliberately. FastMCP calls a SYNC tool inline on the event
+    # loop (func_metadata.py: `return fn(**args)` with no thread offload), and this
+    # service is a single process, so one slow FibreFlow response would stall every
+    # other user's tool call AND the OAuth endpoints for the whole 30s timeout.
+    return await anyio.to_thread.run_sync(partial(_fibreflow_get_sync, path, query))

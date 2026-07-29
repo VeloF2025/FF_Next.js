@@ -58,12 +58,28 @@ class FibreFlowOAuthProvider(
         self.data = self._load()
 
     def _load(self) -> dict:
-        if self.store_path.exists():
+        empty = {"clients": {}, "pending": {}, "codes": {}, "access": {}, "refresh": {}}
+        if not self.store_path.exists():
+            return empty
+        try:
+            return json.loads(self.store_path.read_text())
+        except Exception as exc:
+            # Cortex swallows this with a bare `except: pass`. Starting empty is the only
+            # thing we CAN do, but doing it silently means every client registration and
+            # every live grant vanishes with no trace and every user is mysteriously
+            # logged out. Preserve the file and say so loudly.
+            corrupt = self.store_path.with_suffix(self.store_path.suffix + ".corrupt")
             try:
-                return json.loads(self.store_path.read_text())
-            except Exception:
-                pass
-        return {"clients": {}, "pending": {}, "codes": {}, "access": {}, "refresh": {}}
+                self.store_path.replace(corrupt)
+            except OSError:
+                corrupt = None
+            print(
+                f"[ff-remote-mcp] OAUTH STORE UNREADABLE ({exc}); starting with an empty "
+                f"store — every existing grant is gone and all users must reconnect."
+                + (f" Previous file kept at {corrupt}." if corrupt else ""),
+                flush=True,
+            )
+            return empty
 
     def _save(self) -> None:
         tmp = self.store_path.with_suffix(self.store_path.suffix + ".tmp")
