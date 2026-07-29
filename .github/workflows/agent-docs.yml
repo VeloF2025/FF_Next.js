@@ -1,0 +1,16 @@
+name: agent-docs
+
+on: [pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: [self-hosted, linux, fibreflow]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/mirror-agents-md.mjs --check

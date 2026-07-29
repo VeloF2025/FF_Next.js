@@ -1,0 +1,51 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: qfield-recon
+<!-- Read-only QField audit reconciliation report — applied / stuck / never-captured -->
+
+## Purpose
+Reconciles QFieldCloud audit deltas per project/PON into a three-way breakdown:
+applied ✓ / stuck (recoverable) / never-captured, plus stale-duplicate detection
+and photo-integrity checks against MinIO. Read-only — never mutates QFieldCloud.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `app/(main)/qfield/reconciliation` | Page: project selector + dashboard |
+| `pages/api/qfield/reconciliation.ts` | `GET ?projectId=` → `ReconModel` |
+| `pages/api/qfield/reconciliation-projects.ts` | `GET` project list for selector |
+| `services/reconciliationService.ts` | Pure classification logic (unit-tested) |
+| `services/qfcDeltaRepo.ts` | QFieldCloud SELECTs (audit deltas via `qfcPool`) |
+| `services/ponMapService.ts` | Resolver orchestration + FF-DB cache |
+| `src/lib/qfieldcloud/qfcPool.ts` | Read-only `pg.Pool` to QFieldCloud PG 5433 |
+| `src/lib/qfieldcloud/minio.ts` | `mc` wrapper — DCIM photo-key listing |
+| `scripts/qfield-recon/resolve_pon_poles.py` | geopandas pole→PON spatial join |
+
+## Data Sources
+- QFieldCloud PG `localhost:5433` — read-only `qfcPool` (`QFIELDCLOUD_DATABASE_URL`
+  env, never a tracked file)
+- MinIO `qfieldcloud-prod` bucket via `mc` (photo presence + design GPKG fetch)
+- Design GPKGs (`MOAPons`/`MOAPoles`) resolved by the Python script, cached in
+  `qfield_pole_pon_cache` (mig 460), keyed by `(project_id, gpkg_version)`
+
+## Critical Rules
+- **Feature identity = `(kind, localPk)`**, NOT `localPk` alone. `localPk`
+  (`content->>'localPk'`) is unique only WITHIN a QField layer — a splitter
+  (optical) and a pole (civil) can share it. Keying by localPk alone silently
+  merges cross-layer features (caught in testing: PON-161 optical read 11/14
+  before the composite-key fix, commit `fc5af449f`).
+- `kind` (`optical`|`civil`) is derived from `Status`, not a stored column.
+- **Velo-only** (needs docker/mc/geopandas) — off-velo returns `503`, mirrors
+  `photo-proxy`. Requires `QFIELDCLOUD_DATABASE_URL` in the server env.
+
+## Common Issues
+| Problem | Fix |
+|---------|-----|
+| 503 from the API | Not running on velo, or `QFIELDCLOUD_DATABASE_URL` unset |
+| Civil PON counts look off | Check `qfield_pole_pon_cache` is fresh vs current GPKG version |
+| Optical/civil counts merge | Verify features keyed by `(kind, localPk)`, not `localPk` alone |
+
+See `docs/superpowers/specs/2026-07-24-qfield-audit-reconciliation-design.md` for full design.

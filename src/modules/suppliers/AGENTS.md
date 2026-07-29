@@ -1,0 +1,43 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: suppliers
+<!-- Supplier CRM with portal access, compliance docs, RFQ invites, and performance tracking -->
+
+## Purpose
+Manages the supplier directory, supplier portal (per-supplier tabbed view), compliance tracking, RFQ invitations, and procurement integration.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `SuppliersPage.tsx` | Directory: card/list toggle, search, status/category/preferred filters |
+| `SuppliersPortalPage.tsx` | Per-supplier portal with tabbed nav |
+| `context/SuppliersPortalContext.tsx` | Portal state: selected supplier, tab, permissions |
+| `components/SuppliersTabsNav.tsx` | Tab nav: Dashboard / RFQ Invites / Profile / Performance / Documents / Messages |
+| `components/tabs/` | Individual tab components |
+| `hooks/` | `useSuppliers`, `useSuppliersPortalContext`, `useSelectedSupplier` |
+
+## API Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET/POST | `/api/suppliers` | List / create suppliers |
+| GET/PUT/DELETE | `/api/suppliers/[supplierId]` | Supplier detail |
+| GET | `/api/suppliers/statistics` | Aggregate stats |
+| GET | `/api/suppliers/suppliers-export` | CSV export |
+| GET | `/api/suppliers/[supplierId]/compliance` | Compliance doc status |
+| GET | `/api/suppliers/[supplierId]/ratings` | Performance ratings |
+
+## Database Tables
+- `suppliers` — core supplier records (name, email, registration_number, status, is_preferred)
+
+## Critical Rules
+- Supplier search uses `name`, `registrationNumber`/`registrationNo`, and `email` — both camelCase aliases exist due to legacy schema
+- Card/list toggle is UI-only state (not persisted)
+- `isPreferred` filter shows VF-preferred suppliers only
+- Storage is VF Storage (not Firebase — old `.claude.md` was wrong)
+- NEVER expose supplier pricing across competitors
+- `tax_number` (field key `taxNumber`) holds the **SA VAT number** — the UI label is "VAT Number". `vat_registered` (bool) drives PO VAT rate (15% if true, 0% if false). Column not yet renamed to `vat_number` (avoids broad refactor).
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

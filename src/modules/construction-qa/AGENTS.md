@@ -1,0 +1,102 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Construction QA Module
+
+## Purpose
+Pre-activation construction quality assurance for three disciplines: Civil (pole planting), Optical (cable stringing), and Splicing (dome joints). Uses a 5-phase wizard with VLM-assisted photo validation.
+
+## Key Files
+
+### Components
+- `components/ConstructionQaCentrePage.tsx` — Main QA centre page
+- `components/wizard/ReviewWizard.tsx` — 5-phase QA wizard (prerequisites, photo review, data validation, final decision, feedback)
+- `components/wizard/Phase*.tsx` — Individual wizard phase components
+
+### Services
+- `services/vlmConstructionService.ts` — VLM validation via Qwen3-VL on :8100
+- `services/qfieldIngestionService.ts` — QField photo ingestion pipeline
+
+### Types
+- `types/construction.types.ts` — All type definitions, checklists, reason codes
+- `types/index.ts` — Re-exports
+
+## API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/construction-qa/features` | List features with filters/pagination |
+| POST | `/api/construction-qa/vlm-validate` | Trigger VLM validation on photos |
+| POST | `/api/construction-qa/review` | Save partial review state (phases 2-3) |
+| POST | `/api/construction-qa/final-decision` | Phase 4 — PASS/FAIL/REWORK_NEEDED |
+| GET | `/api/construction-qa/photo-proxy` | Proxy photos from MinIO/SharePoint |
+| POST | `/api/construction-qa/ingest-qfield` | Trigger QField photo ingestion |
+| GET | `/api/construction-qa/review?id={id}` | Get review detail with photos + activity |
+
+## Database Tables (migrations 183-186)
+- `construction_qa_reviews` — Primary QA record per feature
+- `construction_qa_photos` — Individual photo records
+- `construction_qa_activity` — Immutable audit log
+- `construction_qa_assignments` — Reviewer assignment records
+
+## Disciplines & Checklists
+| Discipline | Feature Type | Steps | Required |
+|------------|-------------|-------|----------|
+| Civil | Pole | 7 | 5 required, 2 conditional |
+| Optical | Cable span | 6 | All required |
+| Splicing | Joint | 7 | All required |
+
+## Workflow Status Lifecycle
+`pending` → `in_review` → `approved` / `rejected` / `rework_needed` / `escalated`
+
+## Critical Rules
+- Types derived from PRD (`docs/PRD-civil-qa.md`)
+- VLM confidence must be >= threshold before auto-suggestions
+- HITL corrections logged to `vlm_corrections` table for model improvement
+- WhatsApp feedback uses same bridge as Activate module (port 8083)
+- Photo proxy abstracts storage backends (MinIO, SharePoint, WhatsApp, upload)
+
+## OTDR Testing (EXFO Exchange Integration)
+
+### Overview
+OTDR Testing tab in Construction QA displays fiber test results synced from EXFO Exchange cloud platform. Results are imported via automated daily sync from 4 EXFO workspaces (all Mohadin/MOA project).
+
+### Key Files
+- `components/OtdrTestingPage.tsx` — Main OTDR results page with filters, table, detail drawer, PDF export
+- `services/exfoSyncService.ts` — Sync engine (search API pagination, measurement detail fetch, name parsing)
+- `services/exfoAuthService.ts` — Firebase Identity Toolkit auth for EXFO API
+- `services/exfoApiService.ts` — EXFO REST API client (search, measurement, workspaces)
+
+### API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/exfo/results` | List test results with filters/pagination |
+| POST | `/api/exfo/sync` | Trigger manual sync (one or all workspaces) |
+| GET | `/api/exfo/sync` | Get sync history |
+| GET | `/api/exfo/config` | List sync workspace configs |
+
+### Database Tables (migration 211)
+- `exfo_test_results` — Primary test result records (2,857 rows across 4 workspaces)
+- `exfo_sync_history` — Sync batch tracking
+- `exfo_sync_config` — Workspace sync configuration
+
+### EXFO Workspaces (Mohadin)
+| Workspace ID | Name | Results |
+|-------------|------|---------|
+| 137861 | MOA.01 - STS - 1 | ~1,463 |
+| 137863 | MOA.01 - STS - 2 | ~720 |
+| 137652 | MOA.00 - MOA - Splice | ~670 |
+| 137865 | MOA.01 - STS - 3 | ~4 |
+
+### Daily Sync
+- Cron: `0 4 * * *` on Velocity (production server)
+- Script: `/home/velo/fibreflow-production/scripts/exfo-daily-sync.mjs`
+- Incremental: only fetches measurement details for new results
+- Auth: Firebase Identity Toolkit with EXFO credentials from `.env.local`
+
+### Test Name Parsing
+Test names like `MOA.01.171009.P.B72-C1P3.L1-L2` are parsed into structured fields:
+- `parsed_project` (MOA), `parsed_section` (01), `parsed_section_num` (171009)
+- `parsed_pole` (B72), `parsed_cabinet` (C1), `parsed_port` (P3)
+- `parsed_link` (L1), `parsed_fiber` (L2)

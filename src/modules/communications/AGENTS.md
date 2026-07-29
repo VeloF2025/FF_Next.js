@@ -1,0 +1,67 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: communications
+<!-- Unified communications hub: email, WhatsApp, meetings, notifications, inbox -->
+
+## Purpose
+Consolidated communications centre with 6 tabs (Inbox, Email, WhatsApp, Meetings, Notifications, Settings) plus a legacy `CommunicationsDashboard` for overview/action-items.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `CommunicationsHub.tsx` | Primary entry point — 6-tab hub (use this) |
+| `CommunicationsDashboard.tsx` | Legacy 4-tab dashboard (overview/meetings/action-items/notifications) |
+| `email/EmailTab.tsx` | Compose + outbox list |
+| `email/services/` | Email send + outbox service |
+| `whatsapp/WhatsAppPortal.tsx` | WA admin portal |
+| `whatsapp/services/waAdminApiService.ts` | Frontend API client for WA services |
+| `messaging/InboxPanel.tsx` | Internal messages inbox |
+| `notifications/NotificationsTab.tsx` | UNS notifications with module filter |
+| `settings/SettingsTab.tsx` | Per-user communication preferences |
+| `components/CommunicationsMeetingsTab.tsx` | Meetings list shared by both hub variants |
+| `@/hooks/useCommunications.ts` | Shared data hook (meetings + stats) |
+
+## API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/communications/messages` | Internal message list |
+| POST | `/api/communications/messages` | Send internal message |
+| GET | `/api/communications/messages-thread` | Thread view |
+| GET | `/api/communications/messages-unread-count` | Badge count |
+| POST | `/api/communications/messages-read` | Mark read |
+| GET | `/api/communications/badge-counts` | All badge counts |
+| GET | `/api/communications/feed` | Combined activity feed |
+| GET/POST | `/api/communications/email-outbox` | Email queue |
+| POST | `/api/communications/email-send` | Send email |
+| GET/POST | `/api/communications/settings` | User comm settings |
+| GET/POST | `/api/communications/whatsapp/phones` | Phone registry |
+| POST | `/api/communications/whatsapp/send-message` | Send WA message |
+| GET | `/api/communications/whatsapp/logs/` | Message logs |
+
+## Database Tables
+- `internal_messages` + `internal_message_recipients`
+- `email_outbox`
+- `user_notifications` + `notification_preferences`
+- `user_communication_settings`
+- `wa_group_config` + `wa_monitored_groups`
+- `wa_message_logs` + `wa_message_templates`
+- `wa_phone_numbers` + `wa_service_config`
+- `action_items` (meetings-derived)
+
+## WA Services (Velocity server)
+| Service | Port | Phone |
+|---------|------|-------|
+| Sender | 8081 | +27 82 418 9511 (Hein) |
+| Bridge | 8083 | +27 64 041 2391 (Louis) |
+
+## Critical Rules
+- Never restart WA services without checking session validity via `servicesApi.pairingStatus()` first
+- `CommunicationsHub.tsx` is the active entry point; `CommunicationsDashboard.tsx` is legacy — prefer Hub
+- Meetings data in Hub comes from `useCommunications.ts` — separate pipeline from `MeetingsDashboard.tsx`
+- `?tab=` URL param controls active tab in both components — keep param names in sync with `TAB_NAMES` array
+- Notifications fetch from `/api/notifications` (UNS), not a communications-specific endpoint
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

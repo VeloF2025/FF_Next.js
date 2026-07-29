@@ -1,0 +1,22 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# noc module
+
+Network Operations Centre — full ticket lifecycle (creation → QA → closure) with QContact bidirectional sync, 6 disciplines, SLA tracking, and a drag-and-drop Kanban board.
+
+**Pages:** `/noc/tickets` (list/kanban), `/noc/tickets/[id]` (detail), `/noc/wa-tracking`
+**API routes (App Router):** `app/api/noc/tickets/route.ts` — GET list / POST create; `tickets/[id]/route.ts` — GET/PUT/DELETE; `tickets/[id]/notes`, `verification`, `handover`, `fault-cause`, `report`, `qa-readiness`, `activities`; `tickets/summary/route.ts` — status counts for Kanban headers; `teams`, `escalations`, `sync/qcontact`, `dashboard/*`, `import/weekly`, `webhooks/qcontact`
+**API routes (Pages Router, legacy):** `pages/api/noc/` — `verification.ts`, `verification-step.ts`, `ticket-attachment.ts`, `wa-ticket.ts`, `nearby-tickets.ts`, `tickets-duplicate-check.ts`, `qcontact/*`, `statuses.ts`
+**DB tables:** `maintenance_tickets` — two-axis taxonomy: `ticket_type` (discipline) + `ticket_category` (kind); `ticket_notes` — `visibility` toggle; `ticket_activities` — audit log; `maintenance_attachments` — VF Storage paths; `maintenance_qcontact_sync_log`; `teams` — `discipline` maps to TicketType
+**Key files:**
+- `services/ticketService.ts` — CRUD, UID gen via atomic DB sequence, soft-delete only (CANCELLED is terminal; never hard-delete)
+- `services/qcontactSyncOrchestrator.ts` / `SyncInbound.ts` / `SyncOutbound.ts` — bidirectional FF↔QContact sync; QContact Note 403 is expected (falls back to `description` PATCH); custom fields `c__update` / `c__feedback` are dropdowns, reject free text
+- `components/KanbanBoard/KanbanBoard.tsx` — `@hello-pangea/dnd` drag-and-drop; fetches up to 2500 tickets (`KANBAN_PAGE_SIZE`); column headers use separate `useTicketSummary` so true counts survive the page cap; optimistic status moves with rollback on error; `STATUS_COLUMN_MAP` collapses 14 DB statuses into 7 visible columns; mobile (<768px) auto-falls back to `TicketList` with opt-in "Switch to Kanban" button
+- `components/KanbanBoard/KanbanCard.tsx` — shows `ticket_uid`, T1 label, `ticket_category`, source badge, priority, DR number, assignee, time-in-status (`status_changed_at`); hover chevrons trigger `onQuickMove(id, 'forward'|'backward')`; `data-quick-move` attr blocks click-through to detail route
+- `components/KanbanBoard/KanbanColumn.tsx` — CSS transitions only (no framer-motion); `totalCount` from summary shown as `shown/total` when page cap is hit; default view shows all 7 columns except `closed` (filter `c.status !== 'closed'`) — so `verified` IS shown by default; the `closed` column appears only in the Completed sub-tab
+- `types/ticket.ts` — all enums: `TicketType` (civils/optical/activations/maintenance/dev_ops/unspecified), `TicketCategory` (maintenance/snag/hse_incident/dev_ops/sales_lead/unspecified), `TicketStatus` (14 values, incl. `new` + `cancelled`), `TicketPriority` (5), `FaultCause` (7), `TicketSource` (16)
+**Status flow:** `new` → `open` → `assigned` → `in_progress` → `pending_qa` → `qa_in_progress` → `qa_rejected|qa_approved` → `pending_handover` → `handed_to_ops` → `resolved` → `verified` → `closed`; `cancelled` = terminal soft-delete (any state → cancelled)
+**Gotchas:** `assigned_team` and `assigned_team_id` must be written together on assignment; Kanban default view excludes `closed`+`cancelled` at API level — Completed sub-tab re-includes them; `maintenance_tickets.category` is QContact's legacy hierarchy field, `ticket_category` is the T2 axis — different columns, do not conflate; `duplicateTicketService.checkExisting()` must run before auto-creating tickets from WA/OLT/snag pipelines; the `closed` column (not `verified`) is the one hidden from the default Kanban view — `verified` is visible by default

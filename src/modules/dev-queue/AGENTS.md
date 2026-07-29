@@ -1,0 +1,60 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: dev-queue
+<!-- Kanban board for feature requests with voting, drag-drop, GitHub sync -->
+
+## Purpose
+Internal product backlog board: create/vote on feature requests, drag between kanban columns, auto-sync approved XS/S/M items to GitHub Issues in `VelocityFibre/mvp-builds`.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `DevQueueDashboard.tsx` | Main entry — tabs: board, analytics, settings |
+| `components/DevQueueKanban.tsx` | Drag-drop board (`@hello-pangea/dnd`) |
+| `components/DevQueueCard.tsx` | Draggable item card; click to edit |
+| `components/AddDevQueueItemModal.tsx` | Create + edit modal |
+| `components/DevQueueAnalytics.tsx` | Stats dashboard |
+| `services/devQueueService.ts` | API client singleton |
+| `services/githubMvpSync.ts` | Creates GitHub Issues for eligible items (effort XS/S/M) |
+| `services/harnessTrigger.ts` | Triggers Claude agent harness for automated dev |
+| `hooks/useDevQueue.ts` | Board state + CRUD operations |
+| `types/devQueue.ts` | `DevQueueItem`, `DevQueueBoard`, `DevQueueStatus` etc. |
+
+## API Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/dev-queue` | Full board with columns + items |
+| POST | `/api/dev-queue` | Create item |
+| GET | `/api/dev-queue/[id]` | Single item with comments |
+| PUT | `/api/dev-queue/[id]` | Update (creator/admin only) |
+| DELETE | `/api/dev-queue/[id]` | Delete (creator/admin only) |
+| POST | `/api/dev-queue/move` | Move item between columns |
+| POST | `/api/dev-queue/vote` | Toggle vote (unique constraint prevents double vote) |
+| GET/POST | `/api/dev-queue/[id]/attachments` | Attachments |
+
+## Database Tables
+- `dev_queue_items` — items (title, description, status, priority, effort_estimate, votes, agent_spec, agent_status)
+- `dev_queue_columns` — board columns (name, position, color, wip_limit)
+- `dev_queue_votes` — user votes with unique(item_id, user_id)
+- `dev_queue_comments` — discussion threads
+- `dev_queue_attachments` — file/URL attachments
+
+## Critical Rules
+- Status field = column name exactly: Backlog, Under Review, Approved, In Progress, Testing, Completed
+- Drag-drop is admin-only; regular users click card to edit
+- Vote is a toggle — clicking again removes the vote (unique constraint)
+- GitHub sync runs when item moves to "Approved" and effort is XS, S, or M
+- `devQueueService.fixed.ts` exists — check which is canonical before editing service logic
+- Export (`handleExport`) is a TODO in `DevQueueDashboard.tsx`
+
+## Common Issues
+| Problem | Fix |
+|---------|-----|
+| Hydration error on DragDropContext | Only render after mount (check `useEffect` mount guard) |
+| GitHub issue not created | Verify effort is XS/S/M and GITHUB_TOKEN env var is set |
+| Vote not toggling | Unique constraint on `dev_queue_votes(item_id, user_id)` — check DB |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

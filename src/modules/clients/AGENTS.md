@@ -1,0 +1,51 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: clients
+<!-- ISP customer CRM — CRUD, KYC documents, project links -->
+
+## Purpose
+Manages fiber customer records including contact details, KYC document uploads, project associations, and analytics.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `ClientsPage.tsx` | Entry point — renders `ClientList` |
+| `ClientDetailPage.tsx` | Single client view with tabbed sections |
+| `ClientEditPage.tsx` | Edit form for existing client |
+| `ClientCreatePage.tsx` | New client creation form |
+| `components/ClientList.tsx` | Table + search + filter + delete confirmation |
+| `components/ClientForm.tsx` | Shared create/edit form |
+| `components/ClientDetail.tsx` | Detail view with sections |
+| `components/ClientAnalytics.tsx` | Summary stats and charts |
+| `components/ClientProjectsTab.tsx` | Projects linked to a client |
+| `@/services/clientService.ts` | API client wrapper (React Query) |
+| `@/types/client/` | Modular type tree (`@/types/client.types.ts` is deprecated re-export) |
+
+## API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/clients` | List all clients (filter params supported) |
+| POST | `/api/clients` | Create client |
+| GET/PUT/DELETE | `/api/clients/[id]` | Single client CRUD |
+| GET | `/api/clients/summary` | Aggregate stats for summary cards |
+| GET/POST | `/api/clients/kyc-documents` | KYC document upload/list |
+| GET/POST | `/api/clients/[id]/kyc-documents` | KYC docs for a specific client |
+| GET | `/api/clients/[id]/projects` | Projects linked to client |
+| GET | `/api/clients/projects` | All projects with client associations |
+
+## Database Tables
+- `clients` — core client records
+- `kyc_documents` — document metadata + storage references
+- `projects` — linked via `client_id` FK
+- `purchase_orders` — referenced in client detail view
+
+## Critical Rules
+- `@/types/client.types.ts` is a deprecated shim — import from `@/types/client/` directly
+- Client search is dual: local filter (instant) + API filter (server-side); both must stay in sync
+- Email lookups use `LOWER()` for case-insensitive matching
+- All selection UIs must sort alphabetically
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

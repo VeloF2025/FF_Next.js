@@ -1,0 +1,85 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Accounting Module
+
+## Purpose
+Full double-entry accounting system for FibreFlow. Handles chart of accounts, journal entries, AP/AR, bank reconciliation, financial reporting, and Sage migration.
+
+## Key Services
+| Service | Purpose |
+|---------|---------|
+| `chartOfAccountsService.ts` | GL account CRUD, account hierarchy |
+| `journalEntryService.ts` | Double-entry journal entries |
+| `supplierInvoiceService.ts` | AP invoice management, 3-way match |
+| `supplierPaymentService.ts` | Supplier payment processing |
+| `customerPaymentService.ts` | AR payment allocation |
+| `creditNoteService.ts` | Credit note creation/application |
+| `bankReconciliationService.ts` | Bank statement import, matching |
+| `apAgingService.ts` | Accounts payable aging report |
+| `arAgingService.ts` | Accounts receivable aging report |
+| `financialReportingService.ts` | Trial balance, income statement, balance sheet |
+| `fiscalPeriodService.ts` | Fiscal period open/close management |
+| `glIntegrationHooks.ts` | Auto-create GL entries from procurement (GRN, PO) |
+| `sageImportService.ts` | Import from Sage accounting |
+| `sageMigrationService.ts` | Full Sage migration workflow |
+
+## Utilities
+| Utility | Purpose |
+|---------|---------|
+| `doubleEntry.ts` | Debit/credit validation, balanced entry checks |
+| `aging.ts` | Aging bucket calculations (current, 30, 60, 90+) |
+| `autoMatch.ts` | Bank transaction auto-matching rules |
+| `bankCsvParsers.ts` | CSV parsers for different bank formats |
+| `paymentAllocation.ts` | Payment-to-invoice allocation logic |
+| `threeWayMatch.ts` | PO-GRN-Invoice 3-way matching |
+
+## API Routes (`pages/api/accounting/`)
+- Chart of Accounts: `chart-of-accounts.ts`, `chart-of-accounts-detail.ts`
+- Journal Entries: `journal-entries.ts`, `journal-entries-detail.ts`, `journal-entries-action.ts`
+- Supplier Invoices: `supplier-invoices.ts`, `supplier-invoices-detail.ts`, `supplier-invoices-action.ts`
+- Supplier Payments: `supplier-payments.ts`, `supplier-payments-action.ts`
+- Customer: `customer-invoices-list.ts`, `customer-statements.ts`, `customer-payments.ts`, `customer-payments-action.ts`
+- Credit Notes: `credit-notes.ts`, `credit-notes-action.ts`
+- Supplier Returns: `supplier-returns.ts`
+- Bank: `bank-accounts.ts`, `bank-transfers.ts`, `bank-transactions.ts`, `bank-transactions-import.ts`, `bank-transactions-action.ts`, `bank-reconciliations.ts`, `bank-reconciliations-action.ts`
+- Reports: `reports-trial-balance.ts`, `reports-income-statement.ts`, `reports-balance-sheet.ts`, `reports-cash-flow.ts`, `reports-budget-vs-actual.ts`, `reports-project-profitability.ts`, `reports-vat-return.ts`, `reports-account-transactions.ts`, `reports-audit-trail.ts`
+- CSV Exports: `income-statement-export.ts`, `balance-sheet-export.ts`, `cash-flow-export.ts`, `vat-return-export.ts`, `budget-vs-actual-export.ts`, `trial-balance-export.ts`, `customer-report-export.ts`, `supplier-report-export.ts`, `bank-transactions-export.ts`, `account-transactions-export.ts`, `audit-trail-export.ts`, `ar-aging-export.ts`, `ap-aging-export.ts`
+- Fiscal: `fiscal-periods.ts`, `fiscal-periods-action.ts`
+- AP/AR Aging: `ap-aging.ts`, `ar-aging.ts`
+- Accountant's Area: `default-accounts.ts`, `opening-balances.ts`, `year-end.ts`
+- Sage: `sage-migration.ts`, `sage-migration-action.ts`
+
+## Shared Components (`src/components/accounting/`)
+| Component | Purpose |
+|-----------|---------|
+| `AccountDrillDown.tsx` | Reusable lazy-loading drill-down panel for account transactions (used by IS, BS, TB, BvA) |
+
+## Pages
+Pages live in the standalone accounting app at **fin.fibreflow.app** (separate Next.js project), not in this repo. This module exposes services + API routes only — the UI pages were extracted. See user memory `project_accounting_app.md`.
+
+## Reports Hub
+The reports hub UI also lives in the standalone accounting app.
+14 reports across 4 categories: Financial Statements (IS, BS, Cash Flow, Trial Balance), Tax & Budget (VAT Return, Budget vs Actual), Transaction Reports (Customer, Supplier, Bank, Account Transactions, AR Aging, AP Aging), Analysis (Project Profitability, Audit Trail).
+
+### Report Features (Phase 2-4, Feb 2025)
+- **Drill-down**: Income Statement, Balance Sheet, Trial Balance, Budget vs Actual — click any account to expand inline transaction detail
+- **Cost centre filtering**: Income Statement, Balance Sheet, Trial Balance — dropdown loads from `/api/accounting/cost-centres`
+- **Comparative periods**: Income Statement (prior period), Balance Sheet (prior year), Trial Balance (compare period) — shows Prior/Current/Variance columns
+- **CSV export**: All 13 report pages have Export CSV buttons → dedicated `*-export.ts` API routes
+
+## Critical Rules
+- All journal entries MUST balance (total debits = total credits)
+- GL integration hooks auto-fire on GRN confirm and PO approval
+- Fiscal periods must be open before posting entries
+- Bank reconciliation uses auto-match before manual matching
+- 3-way match: PO amount vs GRN quantity vs Invoice amount
+- **gl_journal_lines uses `gl_account_id` NOT `account_id`** — always JOIN with `jl.gl_account_id = ga.id`
+- `account_subtype` column exists on `gl_accounts` but may be NULL — use `hasSubtype` detection pattern with fallback to `account_name ILIKE` matching
+- Neon returns numeric values as strings — always `Number()` before arithmetic
+- **Neon returns Date objects for DATE columns** — `String(dateObj).split('T')[0]` fails; use `dateObj instanceof Date ? dateObj.toISOString().split('T')[0] : String(val).split('T')[0]`
+- **gl_journal_entries has NO `total_debit`/`total_credit` columns** — must compute via `SUM(jl.debit)` / `SUM(jl.credit)` JOIN on `gl_journal_lines`
+- **users table** has `first_name` + `last_name` (NOT `name`) and `id` is `VARCHAR(255)` (NOT UUID) — cast both sides for JOINs: `u.id::TEXT = je.created_by::TEXT`
+- **No conditional SQL fragments** — `${cond ? sql\`AND x\` : sql\`\`}` breaks Neon; use nullable param pattern: `(${ccId}::TEXT IS NULL OR jl.cost_center_id = ${ccId}::UUID)`

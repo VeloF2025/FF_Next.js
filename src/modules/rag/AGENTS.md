@@ -1,0 +1,44 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: rag
+<!-- RAG = Red/Amber/Green contractor health scoring (NOT retrieval-augmented generation) -->
+
+## Purpose
+Traffic-light health scoring system for contractors across 5 categories: overall, financial, compliance, performance, safety. Feeds contractor management dashboards.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `components/RagDashboard.tsx` | Dashboard with summary cards + contractor list |
+| `components/RagStatusBadge.tsx` | Colored badge for green/amber/red status |
+| `components/RagSummaryCards.tsx` | Aggregate counts by status |
+| `services/ragApiService.ts` | Frontend: `getContractorRagStatus()`, `getAllContractorsRagStatus()` |
+| `services/ragCalculationService.ts` | Backend: derives RAG scores from input data |
+| `types/rag.types.ts` | All types + `RAG_STATUS_CONFIG` + `RAG_CATEGORY_CONFIG` constants |
+| `utils/ragRules.ts` | Scoring thresholds per category |
+
+## API Endpoints
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/contractors-rag?contractorId=<id>` | Single contractor RAG status |
+| GET | `/api/contractors-rag` | All contractors RAG + summary stats |
+
+## Critical Rules
+- RAG here means **Red/Amber/Green** — nothing to do with vector/embedding RAG
+- Categories: `overall`, `financial`, `compliance`, `performance`, `safety`
+- Compliance RAG is driven by `contractor-documents-report` module data (expired/missing docs → red)
+- `RagStatus` = `'green' | 'amber' | 'red'` — use `isValidRagStatus()` to guard unknown values
+- `calculatedAt` is a `Date` object — format to SAST before display
+- No direct DB writes from frontend; calculation runs server-side in `ragCalculationService.ts`
+
+## Common Issues
+| Problem | Fix |
+|---------|-----|
+| All contractors show green | Calculation input may be missing — check `RagCalculationInput` data sources |
+| Compliance always red | Linked to expired/missing contractor documents — check `contractor_documents` table |
+| Score not updating | RAG is recalculated on each API call, not cached — verify calculation service inputs |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

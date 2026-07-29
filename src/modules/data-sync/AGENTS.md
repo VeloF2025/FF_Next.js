@@ -1,0 +1,39 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# data-sync module
+
+Unified tab dashboard at `/system/data-sync` for all inbound data-sync operations: NOC, Activate, OLT serial reconciliation, EOD install sheets, QField, FT billing, and history.
+
+**Page:** `/system/data-sync?group=<id>` — `group` query param selects the active section; no param = OverviewDashboard
+**API routes:**
+- `pages/api/system/data-sync/stats.ts` — cross-group stats for OverviewDashboard
+- `pages/api/system/data-sync/history.ts` — unified sync operation timeline (UNION across op types)
+- `pages/api/system/olt-report/` — OLT import, records, fix, swap-fix, auto-detect, escalations, reporting, queue processor (~15 routes)
+- `pages/api/eod/` — EOD extract (VLM), sheets CRUD, reconciliation, pdf-pages, scan-barcode
+- QField routes live under `pages/api/qfield-sync-*` (separate directory)
+**DB tables:**
+- `olt_report_imports` / `olt_report_records` — OLT CSV import batches and per-DR serial mismatch rows
+- `olt_auto_detect_runs` / `olt_onemap_lookup_queue` — auto-detect run tracking + cache-miss API lookup queue
+- `eod_install_sheets` / `eod_install_sheet_entries` — EOD paper install sheets (VLM-extracted); `photo_hash` dedup; `match_status` ∈ pending/matched_all/partial_match/missing_wa/missing_eod/not_activated
+- `ft_weekly_billing` / `ft_billing_deductions` — Fibertime weekly billing reconciliation
+**Key files:**
+- `components/DataSyncPage.tsx` — main page; filters groups by BOTH RBAC (`usePermission`) AND feature toggles (`useSystemFeatures`)
+- `hooks/useSystemFeatures.ts` — fetches `/api/settings/system/features`; defaults to enabled when key absent or loading
+- `hooks/useOltState.ts` — shared OLT tab state + fetch logic; tab-specific state stays local in each tab component
+- `services/oltAutoDetectService.ts` — compares OES serials vs cached `onemap_properties`; queues cache misses for live 1Map API
+- `services/oltQueueProcessorService.ts` — batch-processes 1Map lookup queue (batch=50, concurrency=3); called directly (not via HTTP) to avoid auth issues
+- `services/eodVlmService.ts` — 4-pass EOD extraction: EXIF rotate → barcode scan → VLM → post-process; `EOD_MIN_WIDTH_FOR_BARCODES_PX=1200` triggers low-res warning
+- `services/eodSheetService.ts` — uses `db-pool` (pg.Pool); writes back matched DR serials to `oes_activations`
+- `services/eodReconciliationService.ts` — uses Neon shim (not pg.Pool); 3-way reconcile: EOD ↔ WA DRs ↔ OES (OES date is install_date+1)
+**Gotchas:**
+- Tab visibility = RBAC **AND** feature settings; feature defaults to enabled when key is absent or still loading
+- `eodReconciliationService` still uses Neon shim — conditional SQL quirks apply; other EOD services use `db-pool`
+- EOD VLM: `ALCLB` prefix strictly required; VLM commonly hallucinates `ALCL0` — post-processor rejects it
+- OLT queue processor runs fire-and-forget via `/api/system/olt-report/process-lookup-queue` — never await inline
+- `pon_manual_overrides` must be LEFT JOIN — lazy-insert table, no guaranteed row
+- `scope_string` in `pon_stage_tracking` = metres of stringing, not a count
+
+<!-- Auto-updated by /kb. Last: 2026-05-30 -->

@@ -1,0 +1,39 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: field-app
+<!-- Field technician portal with offline task management and sync -->
+
+## Purpose
+Mobile-optimised portal for field technicians: view assigned tasks, update status offline, sync when back online.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `FieldAppPortal.tsx` | Re-exports `components/FieldAppPortal` |
+| `components/FieldAppPortal.tsx` | Main portal: tabs (tasks/technicians/overview), offline listeners, sync trigger |
+| `components/TaskCard.tsx` | Individual task card with status indicator |
+| `components/TaskDialog.tsx` | Task detail dialog for updates |
+| `components/TechnicianCard.tsx` | Technician summary card |
+| `components/OfflineStatus.tsx` | Offline banner UI |
+| `components/DeviceStatus.tsx` | Device connectivity indicator |
+| `types/field-app.types.ts` | `FieldTask`, `FieldTechnician` interfaces |
+
+## Critical Rules
+- Offline detection via `navigator.onLine` + `window` `online`/`offline` events — set up in `setupOfflineListeners()`
+- `syncOfflineData()` is currently a 2-second simulated delay — real sync not yet implemented
+- Task status update sets `syncStatus: 'pending'` + `offline: !isOnline` for deferred sync
+- `handleExport()` and `handleTechnicianSelect()` are empty stubs — not implemented
+- No API calls in current implementation — data is local state only (stub module)
+- This is an early-stage module; no services or API routes exist yet
+
+## Common Issues
+| Problem | Fix |
+|---------|-----|
+| Tasks always empty | No API fetch yet; `tasks` state is never populated from server |
+| Sync does nothing | `syncOfflineData()` is a stub — implement with real API calls |
+| Technicians list empty | `technicians` state initialises as `[]` with no fetch |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

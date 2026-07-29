@@ -1,0 +1,72 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: activate
+<!-- DR photo review with VLM AI, 12-step QA wizard, 4-way serial verification, WA bridge ACKs -->
+
+## Purpose
+QA Centre for fibre drop activations: VLM-driven photo review, 4-way serial verification (OES/Offline/OneMap/WA), QA wizard, and WhatsApp bridge acknowledgements.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `services/vlmExtractionService.ts` | VLM data extraction (power, serials); images must be <1024px |
+| `services/qaAutoFailService.ts` | Auto-fail logic, swap detection, 4-way serial check |
+| `services/activityLogService.ts` | Event timeline + `logSerialChange()` audit trail |
+| `services/swapMessageParser.ts` | Parse ONT swap messages from WA pre-provision groups |
+| `services/serialVerificationService.ts` | VLM serial extraction + confidence scoring |
+| `components/wizard/QaWizardContainer.tsx` | 12-step QA wizard orchestration |
+| `components/ActivityTab.tsx` | Timeline + QA History + Serial History views |
+
+## API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/activate/drops` | Paginated DR list (QA Centre) |
+| POST | `/api/activate/extract-data` | VLM extraction |
+| POST | `/api/activate/final-decision` | Phase 4 decision + auto-ticket |
+| POST | `/api/activate/ensure-data` | Sync photos if 1Map has more (on QA wizard open) |
+| POST | `/api/activate/refresh` | Manual BOSS API refresh for a DR |
+| POST | `/api/activate/send-feedback` | WhatsApp feedback to technician |
+| POST | `/api/activate/dr-acknowledgment` | Bridge ACK reply (WA_BRIDGE_SECRET auth, NOT withAuth) |
+| POST | `/api/activate/wa-swap-message` | ONT swap from WA pre-provision group |
+| GET | `/api/activate/serial-verification` | 4-way serial comparison |
+| GET | `/api/activate/serial-history` | Serial change audit trail |
+| GET | `/api/activate/wa-photos` | WA photos with VLM results for a DR |
+| GET | `/api/activate/reporting/serial-mismatches` | Mismatch report with team accountability |
+
+## Database Tables
+- `dr_photo_unified_reviews` — ALL DR data stored here during processing (page views read only from DB)
+- `dr_activity_log` — event timeline (18+ event types)
+- `serial_change_history` — 4-way serial audit (source, actor, old→new)
+- `wa_photos` — WhatsApp photos; filter with `purpose = 'activation'`
+- `offline_devices` — serial mismatch tracking
+- `oes_activations` — OES data; DRs not here are NOT activated
+- `ont_swap_records` — ONT swaps reported via WA pre-provision groups
+
+## Critical Rules
+- DRs appear in `/activate` ONLY after existing in `oes_activations` — OES is the source of truth
+- NEVER call BOSS API from page views — only from: initial processing, explicit user refresh, photo serving, VLM extraction
+- Bridge endpoints use `WA_BRIDGE_SECRET` env var, NOT `withAuth` (`dr-acknowledgment`, `process-new-dr`, `wa-swap-message`)
+- VLM serial confidence **< 95%** → show "please double-check", NOT a mismatch warning
+- OES-only records (`is_oes_only = TRUE`) must never appear in QA Centre — filter explicitly
+- Reporting APIs must use `res.status(200).json()` directly, NOT `apiResponse.success()` (causes double-wrap)
+- Use regular `<img>` NOT Next.js `<Image>` for activation photos (auth-protected proxy)
+
+## Photo Proxy Architecture
+- `wa_*` filename prefix → VPS `72.61.197.178:8866`
+- Other photos → BOSS API `100.96.203.105:8003`
+- Proxy handler: `pages/api/activate/photo/[...path].ts`
+
+## Common Issues
+| Issue | Fix |
+|-------|-----|
+| DR not in QA Centre | Must exist in `oes_activations` first |
+| OES-only records showing | Add `(is_oes_only = FALSE OR is_oes_only IS NULL)` to query |
+| False mismatch warning | Check VLM confidence — must be ≥95% to show mismatch |
+| Reporting tab blank | Remove `apiResponse.success()` wrapper from reporting API |
+| VLM cron failing | Check `CRON_SECRET` in `.env.production` — may be placeholder |
+| Missing photos after initial sync | Open QA Wizard to trigger `ensure-data` photo sync |
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->

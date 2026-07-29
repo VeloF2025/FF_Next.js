@@ -1,0 +1,50 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: livekit
+<!-- LiveKit WebRTC video meeting rooms — create, token, record, schedule -->
+
+## Purpose
+Provides LiveKit-powered video meeting rooms for internal use: room creation, access token generation, recording via Egress, and meeting scheduling.
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `index.ts` | Re-exports types and `livekitService` (server-side only) |
+| `services/livekitService.ts` | Core: `createRoom`, `generateToken`, `listRooms`, `deleteRoom`, `startRecording`, `stopRecording` |
+| `types/livekit.types.ts` | `LiveKitRoom`, `LiveKitMeeting`, `TokenRequest/Response`, `RecordingResponse` |
+| `components/MeetingRoom.tsx` | In-meeting UI |
+| `components/PreJoin.tsx` | Pre-join screen (name + device check) |
+| `components/ScheduleMeetingModal.tsx` | Schedule future meeting (used from `MeetingsDashboard`) |
+
+## API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/livekit/rooms` | Create room |
+| GET | `/api/livekit/rooms` | List active rooms |
+| DELETE | `/api/livekit/rooms` | Delete room |
+| POST | `/api/livekit/token` | Generate participant token |
+| POST/DELETE | `/api/livekit/recording` | Start/stop Egress recording |
+| GET | `/api/livekit/recordings` | List recordings |
+| POST | `/api/livekit/schedule` | Schedule a meeting |
+| POST | `/api/livekit/webhooks` | LiveKit event webhook |
+| GET | `/api/livekit/config` | Client config (URL only — no secrets) |
+
+## Database Tables
+- `livekit_meetings` — scheduled/active meeting records
+
+## Environment Variables
+- `LIVEKIT_URL` — WebSocket URL (ws:// or wss://)
+- `LIVEKIT_API_KEY` + `LIVEKIT_API_SECRET`
+- `EGRESS_OUTPUT_PATH` — recording output dir (default `/opt/recordings`)
+
+## Critical Rules
+- All three env vars must be set — `validateConfig()` returns false and operations fail silently if any are missing
+- Tokens have 6-hour TTL; `identity` derived from `participantName` (lowercased, spaces → hyphens)
+- Recording requires Egress service deployed separately on VPS — not bundled with LiveKit server
+- `livekitService.ts` is server-side only — import only in API routes or server components
+- Room name pattern: `ff-<timestamp36>-<random6>` via `generateRoomName()`
+
+<!-- Auto-updated by /kb. Last: 2026-05-12 -->
