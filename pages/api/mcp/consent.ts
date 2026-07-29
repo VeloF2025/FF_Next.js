@@ -20,7 +20,7 @@
 import type { NextApiResponse } from 'next';
 import { withAuth, deleteSession } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { mintFfMcpToken } from '@/lib/auth/mcpToken';
 
@@ -53,22 +53,22 @@ function firstForwardedFor(raw: string | string[] | undefined): string | undefin
  * whichever client registered, and hardcoding claude.ai would break any other one.
  */
 function isSafeRedirect(value: unknown): value is string {
-  if (typeof value !== 'string' || !value) return false;
-  try {
-    return ['https:', 'http:'].includes(new URL(value).protocol);
-  } catch {
-    return false;
-  }
+  // A prefix test, not `new URL(...)` in a try/catch: an unparseable URL is simply not
+  // safe, so the exception path carried no information — and a catch that logs nothing
+  // is exactly what the no-silent-catch gate exists to stop. This also rejects
+  // scheme-relative "//host" and anything with no scheme at all.
+  return typeof value === 'string' && /^https?:\/\/\S/i.test(value);
 }
 
+const GATEWAY_MESSAGE =
+  'Authorization could not be completed. Return to Claude and try connecting again.';
+
 function badGateway(res: NextApiResponse): void {
-  res.status(502).json({
-    success: false,
-    error: {
-      code: 'BAD_GATEWAY',
-      message: 'Authorization could not be completed. Return to Claude and try connecting again.',
-    },
-  });
+  // Through apiResponse, not a hand-rolled res.json: the helper is what stamps
+  // meta.timestamp onto every error body, and a hand-rolled shape drifts from the rest
+  // of the API surface. ErrorCode.BAD_GATEWAY was added alongside this — 502 had no
+  // entry in the enum at all.
+  apiResponse.error(res, ErrorCode.BAD_GATEWAY, GATEWAY_MESSAGE);
 }
 
 async function consentHandler(
@@ -85,7 +85,9 @@ async function consentHandler(
     // Config fault, not a user error — and minting before discovering it would only
     // create a session we immediately have to delete.
     log.error('mcp consent rejected: FF_MCP_CALLBACK_SECRET is not configured', {}, LOGGER);
-    return badGateway(res);
+    // 500, not 502: no upstream call was attempted, so this is our own misconfiguration
+    // rather than a bad gateway. Same fail-closed outcome, honest label.
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, GATEWAY_MESSAGE);
   }
 
   const { token, sessionId } = await mintFfMcpToken(req.user, '90d', {
@@ -106,7 +108,20 @@ async function consentHandler(
       const payload: unknown = await upstream.json().catch(() => null);
       redirectUrl = (payload as { redirectUrl?: unknown } | null)?.redirectUrl;
     } else {
-      log.warn('mcp consent callback refused', { status: upstream.status, sessionId }, LOGGER);
+      // Body included: without it, prod debugging cannot tell "state expired" from
+      // "bad secret". Logged only — never echoed to the browser.
+      const detail = await upstream.text().catch((readErr) => {
+        log.warn('mcp consent callback body unreadable', {
+          sessionId,
+          error: readErr instanceof Error ? readErr.message : String(readErr),
+        }, LOGGER);
+        return '';
+      });
+      log.warn('mcp consent callback refused', {
+        status: upstream.status,
+        sessionId,
+        detail: detail.slice(0, 500),
+      }, LOGGER);
     }
   } catch (err) {
     log.warn('mcp consent callback unreachable', {

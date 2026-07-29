@@ -107,13 +107,40 @@ describe('/api/mcp/consent', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('502s without minting when the callback secret is not configured', async () => {
+  it('500s (a local misconfiguration, not a bad gateway) without minting when the secret is unset', async () => {
     delete process.env.FF_MCP_CALLBACK_SECRET;
     const res = makeRes();
     await handler(makeReq('POST', { stateId: VALID_STATE_ID }), res as never);
-    expect(res.status).toHaveBeenCalledWith(502);
+    // Not 502: no upstream call is attempted at this point, so blaming the gateway
+    // would send an operator looking in the wrong place.
+    expect(res.status).toHaveBeenCalledWith(500);
     expect(mintFfMcpToken).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('emits errors through apiResponse, so every failure body carries meta.timestamp', async () => {
+    // A hand-rolled res.json drifts from the shape every other route returns.
+    mintFfMcpToken.mockResolvedValue(MINTED);
+    fetchMock.mockResolvedValue({ ok: false, status: 400, text: async () => 'state expired' });
+    const res = makeRes();
+    await handler(makeReq('POST', { stateId: VALID_STATE_ID }), res as never);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(res.status).toHaveBeenCalledWith(502);
+    expect(payload.error.code).toBe('BAD_GATEWAY');
+    expect(payload.meta?.timestamp).toBeTruthy();
+  });
+
+  it('logs the upstream refusal reason, but never returns it to the browser', async () => {
+    mintFfMcpToken.mockResolvedValue(MINTED);
+    fetchMock.mockResolvedValue({ ok: false, status: 400, text: async () => 'state expired' });
+    const res = makeRes();
+    await handler(makeReq('POST', { stateId: VALID_STATE_ID }), res as never);
+
+    const refusal = logWarn.mock.calls.find((c) => String(c[0]).includes('callback refused'));
+    expect(refusal?.[1]).toEqual(expect.objectContaining({ status: 400, detail: 'state expired' }));
+    // Upstream detail is for operators, not for the browser.
+    expect(responseBody(res)).not.toContain('state expired');
   });
 
   it('mints for the verified req.user, calls the service callback, and returns only the redirectUrl', async () => {

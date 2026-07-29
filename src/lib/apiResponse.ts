@@ -59,6 +59,7 @@ export enum ErrorCode {
   INTERNAL_ERROR = 'INTERNAL_ERROR',
   DATABASE_ERROR = 'DATABASE_ERROR',
   SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
+  BAD_GATEWAY = 'BAD_GATEWAY',
   GATEWAY_TIMEOUT = 'GATEWAY_TIMEOUT',
   
   // Business logic errors
@@ -87,6 +88,7 @@ const STATUS_CODE_MAP: Record<ErrorCode, number> = {
   [ErrorCode.INTERNAL_ERROR]: 500,
   [ErrorCode.DATABASE_ERROR]: 500,
   [ErrorCode.SERVICE_UNAVAILABLE]: 503,
+  [ErrorCode.BAD_GATEWAY]: 502,
   [ErrorCode.GATEWAY_TIMEOUT]: 504,
   
   // Business logic errors (usually 400 or 422)
