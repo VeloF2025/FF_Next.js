@@ -64,6 +64,42 @@ BEGIN
   END IF;
 END $$;
 
+-- The unique index below only catches byte-identical duplicates, so on its own it
+-- leaves the real hazard open: the SAME subscriber stored twice in two shapes —
+-- '27821234567' and '0821234567', or one with a stray '+' or trailing space — one row
+-- granted and one withdrawn, with the lookup silently reading whichever shape it
+-- happens to normalize to. That is a consent misread, not a cosmetic inconsistency.
+--
+-- Every write path (the FNO payload, ops_manual entry, and bulk import) is supposed to
+-- normalize through normalizeMsisdn first. This makes that an invariant the database
+-- enforces rather than one three separate callers are each trusted to remember, and it
+-- subsumes the empty-string case for free.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'wa_subscriber_consent_msisdn_chk') THEN
+    ALTER TABLE wa_subscriber_consent
+      ADD CONSTRAINT wa_subscriber_consent_msisdn_chk CHECK (msisdn ~ '^27[0-9]{9}$');
+  END IF;
+END $$;
+
+-- Timestamps must agree with the status they describe. Without this a row can claim
+-- status='granted' with granted_at NULL, or carry both timestamps at once, which
+-- destroys the audit trail these columns exist to provide — the one record showing WHEN
+-- a subscriber opted in or out. The guard reads `status`, so this is an audit-integrity
+-- constraint rather than a consent-correctness one, but a consent record that cannot
+-- say when it was given is not worth much under POPIA.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'wa_subscriber_consent_timestamps_chk') THEN
+    ALTER TABLE wa_subscriber_consent
+      ADD CONSTRAINT wa_subscriber_consent_timestamps_chk CHECK (
+        (status = 'granted'   AND granted_at   IS NOT NULL AND withdrawn_at IS NULL)
+        OR
+        (status = 'withdrawn' AND withdrawn_at IS NOT NULL)
+      );
+  END IF;
+END $$;
+
 -- One row per subscriber number. This is what makes the guard's lookup a single
 -- unambiguous read rather than a "pick the newest and hope" over duplicates, and it is
 -- the arbiter an upsert needs to turn a repeated FNO payload into an update instead of

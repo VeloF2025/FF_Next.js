@@ -1,7 +1,7 @@
 import { createLogger } from '@/lib/logger';
 import { getConsentForMsisdn } from '../consent/consentRepo';
 import { extractMsisdnFromContact } from '../utils/phone';
-import { isApprovedTemplateKey } from './approvedTemplates';
+import { getSendableTemplate, renderTemplate, type TemplateVariableName } from './approvedTemplates';
 import { getTicketOutboundContext } from './ticketOutboundContext';
 
 const logger = createLogger('wa:outbound-preconditions');
@@ -29,12 +29,30 @@ export type OutboundBlockReason =
   | 'fno_unresolved'
   /** No approved template for the event type. */
   | 'no_approved_template'
+  /** The template is approved but the ticket cannot fill one of its variables. */
+  | 'template_variables_missing'
   /** The checks could not be completed — DB failure, missing ticket, or a bug. */
   | 'precondition_check_failed';
 
 export type OutboundPreconditionResult =
-  | { allowed: true; msisdn: string; fno: string; templateKey: string }
-  | { allowed: false; reasons: OutboundBlockReason[] };
+  | {
+      allowed: true;
+      msisdn: string;
+      fno: string;
+      templateKey: string;
+      /**
+       * The rendered body to send. The caller sends THIS and nothing else — it is the
+       * approved copy with ticket-derived variables filled in, so no caller-supplied
+       * text can reach the provider.
+       */
+      message: string;
+    }
+  | {
+      allowed: false;
+      reasons: OutboundBlockReason[];
+      /** Which template variables the ticket could not fill, when that was the block. */
+      missingVariables?: readonly TemplateVariableName[];
+    };
 
 export interface OutboundPreconditionInput {
   ticketId: string;
@@ -57,11 +75,22 @@ const REASON_ORDER: readonly OutboundBlockReason[] = [
   'consent_withdrawn',
   'fno_unresolved',
   'no_approved_template',
+  'template_variables_missing',
   'precondition_check_failed',
 ];
 
-function blocked(reasons: ReadonlySet<OutboundBlockReason>): OutboundPreconditionResult {
-  return { allowed: false, reasons: REASON_ORDER.filter((r) => reasons.has(r)) };
+function blocked(
+  reasons: ReadonlySet<OutboundBlockReason>,
+  missingVariables?: readonly TemplateVariableName[],
+): OutboundPreconditionResult {
+  const result: OutboundPreconditionResult = {
+    allowed: false,
+    reasons: REASON_ORDER.filter((r) => reasons.has(r)),
+  };
+  if (missingVariables && missingVariables.length > 0) {
+    return { ...result, missingVariables };
+  }
+  return result;
 }
 
 /**
@@ -109,9 +138,34 @@ export async function evaluateOutboundPreconditions(
     const fno = context.fno;
     if (!fno) reasons.add('fno_unresolved');
 
-    // 3. Approved template for the event type.
-    const templateKey = input.templateKey?.trim() ?? '';
-    if (!isApprovedTemplateKey(templateKey)) reasons.add('no_approved_template');
+    // 3. Approved template, and the copy it actually sends. The template supplies the
+    // body; the caller supplies neither text nor variables, so an approved key cannot
+    // be used as cover for arbitrary free text.
+    const template = getSendableTemplate(input.templateKey);
+    let renderedMessage: string | null = null;
+    let missingVariables: readonly TemplateVariableName[] | undefined;
+    if (!template) {
+      reasons.add('no_approved_template');
+    } else {
+      const render = renderTemplate(template, {
+        clientName: context.clientName,
+        fno: context.fno,
+        address: context.address,
+        drNumber: context.drNumber,
+        loggedAt: context.loggedAt,
+        dueAt: context.dueAt,
+        resolvedAt: context.resolvedAt,
+      });
+      if (render.rendered) {
+        renderedMessage = render.rendered.message;
+      } else {
+        // The template is approved but this ticket cannot fill it. Blocked rather than
+        // sent with a gap: a message reading "the fault at  has been resolved" is worse
+        // than none, and #2276 requires a blank variable to refuse.
+        reasons.add('template_variables_missing');
+        missingVariables = render.missing;
+      }
+    }
 
     // 4. Consent, which is keyed on the MSISDN. Without a number there is no key
     // to look up, and no row can exist — so "no consent" is the literal truth
@@ -124,16 +178,22 @@ export async function evaluateOutboundPreconditions(
       reasons.add('no_consent');
     }
 
-    // The `!msisdn || !fno || !templateKey` arm is unreachable given the checks
-    // above, and is kept because it is what makes "never send a blank variable"
-    // a property of the type rather than of the reader's care: the success
-    // branch cannot be reached with an empty string in it.
-    if (reasons.size > 0 || !msisdn || !fno || !templateKey) {
+    // The trailing conditions are unreachable given the checks above, and are kept
+    // because they make "never send a blank value" a property of the type rather than of
+    // the reader's care: the success branch cannot be reached with an empty string or a
+    // null in it.
+    if (reasons.size > 0 || !msisdn || !fno || !template || !renderedMessage) {
       if (reasons.size === 0) reasons.add('precondition_check_failed');
-      return blocked(reasons);
+      return blocked(reasons, missingVariables);
     }
 
-    return { allowed: true, msisdn, fno, templateKey };
+    return {
+      allowed: true,
+      msisdn,
+      fno,
+      templateKey: template.key,
+      message: renderedMessage,
+    };
   } catch (error) {
     logger.error('outbound precondition check failed', {
       ticketId: input.ticketId,

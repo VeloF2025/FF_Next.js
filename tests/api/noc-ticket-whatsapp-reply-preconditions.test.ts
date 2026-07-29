@@ -25,16 +25,32 @@ vi.mock('@/lib/db-pool', () => ({ query: queryMock }));
 vi.mock('@/lib/logger', () => ({ createLogger: () => loggerMock }));
 
 const TICKET_ID = '11111111-2222-4333-8444-555555555555';
-const APPROVED_KEY = 'fault_update';
+const APPROVED_KEY = 'fault_logged_ack';
 const CONTACT_MSISDN = '27831112222';
 
-type TicketRow = { client_contact: string | null; onemap_contact: string | null; fno: string | null };
+type TicketRow = {
+  client_contact: string | null;
+  onemap_contact: string | null;
+  fno: string | null;
+  client_name: string | null;
+  address: string | null;
+  dr_number: string | null;
+  logged_at: string | null;
+  due_at: string | null;
+  resolved_at: string | null;
+};
 type ConsentRow = { msisdn: string; status: string; drop_number: string | null; source: string };
 
 const ticketRow = (over: Partial<TicketRow> = {}): TicketRow => ({
   client_contact: '083 111 2222',
   onemap_contact: null,
   fno: 'Vumatel',
+  client_name: 'Thabo Mokoena',
+  address: '12 Rose Street, Lawley',
+  dr_number: 'DR1234',
+  logged_at: '2026-07-29 08:15',
+  due_at: '2026-07-30 10:00',
+  resolved_at: '2026-07-31 14:20',
   ...over,
 });
 
@@ -61,9 +77,12 @@ function post(body: Record<string, unknown>) {
   ] as const;
 }
 
+// `message` is deliberately still present: it must be IGNORED, never transmitted.
+// Leaving it in the fixture is what makes that assertable.
+const CALLER_TEXT = 'off the cuff, not approved by anyone';
 const validBody = {
   toPhone: '083 111 2222',
-  message: 'Your fault has been logged.',
+  message: CALLER_TEXT,
   templateKey: APPROVED_KEY,
 };
 
@@ -120,17 +139,45 @@ describe('POST reply — blocked sends never reach the provider', () => {
 
     expect(sendWhatsAppText).not.toHaveBeenCalled();
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toMatchObject({ reasons: ['fno_unresolved'] });
+    // The FNO is unresolved, and consequently the template's {{2}} cannot be filled.
+    // Both are reported: the guard returns everything wrong, not the first thing.
+    await expect(res.json()).resolves.toMatchObject({
+      reasons: ['fno_unresolved', 'template_variables_missing'],
+      missingVariables: ['fno'],
+    });
   });
 
-  it('does not send a free-form message with no approved template', async () => {
+  // Free-form sending is now structurally impossible: the body carries no message at
+  // all, so there are two distinct refusals to pin.
+  it('rejects a request that names no template', async () => {
     stubDb({ ticket: ticketRow(), consent: grantedConsent });
 
     const res = await callRoute({ toPhone: '083 111 2222', message: 'off the cuff' });
 
     expect(sendWhatsAppText).not.toHaveBeenCalled();
+    // 400, not 422: a request with no templateKey is malformed, not policy-blocked.
+    expect(res.status).toBe(400);
+  });
+
+  it('does not send when the named template is not approved', async () => {
+    stubDb({ ticket: ticketRow(), consent: grantedConsent });
+
+    const res = await callRoute({ ...validBody, templateKey: 'not_approved_anywhere' });
+
+    expect(sendWhatsAppText).not.toHaveBeenCalled();
     expect(res.status).toBe(422);
     await expect(res.json()).resolves.toMatchObject({ reasons: ['no_approved_template'] });
+  });
+
+  it('never transmits caller-supplied text, even alongside a valid template', async () => {
+    stubDb({ ticket: ticketRow(), consent: grantedConsent });
+
+    const res = await callRoute({ ...validBody, message: CALLER_TEXT });
+
+    expect(res.status).toBe(200);
+    const sent = sendWhatsAppText.mock.calls[0]?.[0] as { message: string };
+    expect(sent.message).not.toContain('off the cuff');
+    expect(sent.message).toContain('Hello Thabo Mokoena');
   });
 
   it('does not send to a number that is not the ticket subscriber', async () => {
@@ -163,7 +210,8 @@ describe('POST reply — blocked sends never reach the provider', () => {
       'outbound reply refused by preconditions',
       expect.objectContaining({
         ticketId: TICKET_ID,
-        reasons: ['no_consent', 'fno_unresolved'],
+        reasons: ['no_consent', 'fno_unresolved', 'template_variables_missing'],
+        missingVariables: ['fno'],
       }),
     );
   });
@@ -188,8 +236,13 @@ describe('POST reply — the permitted send', () => {
 
     expect(res.status).toBe(200);
     expect(sendWhatsAppText).toHaveBeenCalledTimes(1);
-    expect(sendWhatsAppText).toHaveBeenCalledWith(
-      expect.objectContaining({ toPhone: CONTACT_MSISDN, message: validBody.message }),
-    );
+    // The rendered approved template, NOT the caller's text.
+    const sent = sendWhatsAppText.mock.calls[0]?.[0] as { toPhone: string; message: string };
+    expect(sent.toPhone).toBe(CONTACT_MSISDN);
+    expect(sent.message).not.toBe(CALLER_TEXT);
+    expect(sent.message).toContain('Hello Thabo Mokoena');
+    expect(sent.message).toContain('appointed by Vumatel');
+    expect(sent.message).toContain('Reference: DR1234');
+    expect(sent.message).not.toMatch(/\{\{\d+\}\}/);
   });
 });

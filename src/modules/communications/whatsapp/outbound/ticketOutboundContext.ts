@@ -12,12 +12,29 @@ export interface TicketOutboundContext {
   onemapContact: string | null;
   /** Resolved FNO company name, or null when unresolved. Never a placeholder. */
   fno: string | null;
+  /**
+   * Values the approved templates interpolate. Read here, server-side, so the copy a
+   * subscriber receives is assembled entirely from the ticket — a caller cannot supply
+   * or influence any of it.
+   */
+  clientName: string | null;
+  address: string | null;
+  drNumber: string | null;
+  loggedAt: string | null;
+  dueAt: string | null;
+  resolvedAt: string | null;
 }
 
 interface ContextRow {
   client_contact: string | null;
   onemap_contact: string | null;
   fno: string | null;
+  client_name: string | null;
+  address: string | null;
+  dr_number: string | null;
+  logged_at: string | null;
+  due_at: string | null;
+  resolved_at: string | null;
 }
 
 // Notes on the joins, both of which are load-bearing:
@@ -36,11 +53,21 @@ interface ContextRow {
 // This recovers a contact for roughly 36% of tickets versus 4% from
 // client_contact alone, which is the difference between the guard being usable
 // and it blocking nearly everything.
+// Timestamps are formatted in SQL, in Africa/Johannesburg. A subscriber-facing
+// "Logged: ..." line must read as local time; handing back a raw UTC timestamptz and
+// letting the template stringify it would show the wrong hour for two months of the
+// year and an ISO suffix no subscriber should see.
 const CONTEXT_SQL = `
   SELECT
     NULLIF(TRIM(COALESCE(mt.client_contact, '')), '')   AS client_contact,
     NULLIF(TRIM(COALESCE(op.contact_number, '')), '')   AS onemap_contact,
-    NULLIF(TRIM(COALESCE(c.company_name, '')), '')      AS fno
+    NULLIF(TRIM(COALESCE(c.company_name, '')), '')      AS fno,
+    NULLIF(TRIM(COALESCE(mt.client_name, '')), '')      AS client_name,
+    NULLIF(TRIM(COALESCE(mt.address, '')), '')          AS address,
+    NULLIF(TRIM(COALESCE(mt.dr_number, '')), '')        AS dr_number,
+    TO_CHAR(mt.created_at  AT TIME ZONE 'Africa/Johannesburg', 'YYYY-MM-DD HH24:MI') AS logged_at,
+    TO_CHAR(mt.due_at      AT TIME ZONE 'Africa/Johannesburg', 'YYYY-MM-DD HH24:MI') AS due_at,
+    TO_CHAR(mt.resolved_at AT TIME ZONE 'Africa/Johannesburg', 'YYYY-MM-DD HH24:MI') AS resolved_at
   FROM maintenance_tickets mt
   LEFT JOIN projects p ON p.id::text = mt.project_id
   LEFT JOIN clients  c ON c.id = p.client_id
@@ -75,6 +102,12 @@ export async function getTicketOutboundContext(
     clientContact: row.client_contact ?? null,
     onemapContact: row.onemap_contact ?? null,
     fno: row.fno ?? null,
+    clientName: row.client_name ?? null,
+    address: row.address ?? null,
+    drNumber: row.dr_number ?? null,
+    loggedAt: row.logged_at ?? null,
+    dueAt: row.due_at ?? null,
+    resolvedAt: row.resolved_at ?? null,
   };
 }
 

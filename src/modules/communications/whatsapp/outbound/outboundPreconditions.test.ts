@@ -17,16 +17,34 @@ vi.mock('@/lib/logger', () => ({
 import { evaluateOutboundPreconditions } from './outboundPreconditions';
 
 const TICKET_ID = '11111111-2222-4333-8444-555555555555';
-const APPROVED_KEY = 'fault_update';
+// A real template key: the approved set is the intersection of what is defined in
+// approvedTemplates.ts and what this env var lists, so an invented key blocks.
+const APPROVED_KEY = 'fault_logged_ack';
 const MSISDN = '27821234567';
 
-type TicketRow = { client_contact: string | null; onemap_contact: string | null; fno: string | null };
+type TicketRow = {
+  client_contact: string | null;
+  onemap_contact: string | null;
+  fno: string | null;
+  client_name: string | null;
+  address: string | null;
+  dr_number: string | null;
+  logged_at: string | null;
+  due_at: string | null;
+  resolved_at: string | null;
+};
 type ConsentRow = { msisdn: string; status: string; drop_number: string | null; source: string };
 
 const ticketRow = (over: Partial<TicketRow> = {}): TicketRow => ({
   client_contact: '083 111 2222',
   onemap_contact: null,
   fno: 'Vumatel',
+  client_name: 'Thabo Mokoena',
+  address: '12 Rose Street, Lawley',
+  dr_number: 'DR1234',
+  logged_at: '2026-07-29 08:15',
+  due_at: '2026-07-30 10:00',
+  resolved_at: '2026-07-31 14:20',
   ...over,
 });
 
@@ -65,9 +83,11 @@ describe('evaluateOutboundPreconditions', () => {
       ticketId: TICKET_ID, templateKey: APPROVED_KEY,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       allowed: true, msisdn: '27831112222', fno: 'Vumatel', templateKey: APPROVED_KEY,
     });
+    // The guard supplies the body; the caller never does.
+    expect(result).toHaveProperty('message');
   });
 
   it('keys the consent lookup on the canonical MSISDN, not the raw contact field', async () => {
@@ -101,7 +121,7 @@ describe('evaluateOutboundPreconditions', () => {
       ticketId: TICKET_ID, templateKey: APPROVED_KEY,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       allowed: true, msisdn: MSISDN, fno: 'Vumatel', templateKey: APPROVED_KEY,
     });
   });
@@ -118,7 +138,7 @@ describe('evaluateOutboundPreconditions', () => {
       ticketId: TICKET_ID, templateKey: APPROVED_KEY,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       allowed: true, msisdn: MSISDN, fno: 'Vumatel', templateKey: APPROVED_KEY,
     });
     expect(consentParams).toEqual([MSISDN]);
@@ -161,7 +181,14 @@ describe('evaluateOutboundPreconditions', () => {
       ticketId: TICKET_ID, templateKey: APPROVED_KEY,
     });
 
-    expect(result).toEqual({ allowed: false, reasons: ['fno_unresolved'] });
+    // Both facts are reported: the FNO is unresolved, and consequently the template's
+    // {{2}} cannot be filled. The guard reports everything wrong rather than the first
+    // thing, so the second reason is a feature of that, not double-counting.
+    expect(result).toMatchObject({
+      allowed: false,
+      reasons: ['fno_unresolved', 'template_variables_missing'],
+      missingVariables: ['fno'],
+    });
   });
 
   it('blocks when no template key is supplied', async () => {
@@ -256,5 +283,106 @@ describe('evaluateOutboundPreconditions', () => {
     });
 
     expect(result).toEqual({ allowed: false, reasons: ['precondition_check_failed'] });
+  });
+});
+
+/**
+ * The template must DEFINE the message, not merely permit one.
+ *
+ * The first version of this guard checked only that templateKey was allowlisted while
+ * the route sent caller-supplied free text alongside it — so an approved key acted as
+ * cover for arbitrary content. Meta approves copy, so a check that does not constrain
+ * the copy enforces nothing. These pin the body.
+ */
+describe('evaluateOutboundPreconditions — the template defines the copy', () => {
+  it('renders the approved body from ticket data', async () => {
+    stubDb({ ticket: ticketRow(), consent: consentGranted });
+
+    const result = await evaluateOutboundPreconditions({
+      ticketId: TICKET_ID, templateKey: 'fault_logged_ack',
+    });
+
+    expect(result.allowed).toBe(true);
+    if (!result.allowed) throw new Error('expected allowed');
+    // Every variable interpolated, no placeholder left behind.
+    expect(result.message).toContain('Hello Thabo Mokoena');
+    expect(result.message).toContain('appointed by Vumatel');
+    expect(result.message).toContain('12 Rose Street, Lawley');
+    expect(result.message).toContain('Reference: DR1234');
+    expect(result.message).toContain('Logged: 2026-07-29 08:15');
+    expect(result.message).not.toMatch(/\{\{\d+\}\}/);
+  });
+
+  it('blocks when a template variable is blank instead of sending a gap', async () => {
+    // address fills {{3}}; a blank one would render "the fault reported at ."
+    stubDb({ ticket: ticketRow({ address: '   ' }), consent: consentGranted });
+
+    const result = await evaluateOutboundPreconditions({
+      ticketId: TICKET_ID, templateKey: 'fault_logged_ack',
+    });
+
+    expect(result).toMatchObject({
+      allowed: false,
+      reasons: ['template_variables_missing'],
+      missingVariables: ['address'],
+    });
+  });
+
+  it('blocks a defined template that Meta has not approved', async () => {
+    // Defined in code, absent from the env allowlist. Both gates are required.
+    vi.stubEnv('WA_APPROVED_TEMPLATE_KEYS', 'fault_logged_ack');
+    stubDb({ ticket: ticketRow(), consent: consentGranted });
+
+    const result = await evaluateOutboundPreconditions({
+      ticketId: TICKET_ID, templateKey: 'fault_resolved',
+    });
+
+    expect(result).toEqual({ allowed: false, reasons: ['no_approved_template'] });
+  });
+
+  it('blocks an allowlisted key that names no defined template', async () => {
+    // The reverse gate: an env entry cannot conjure copy that does not exist.
+    vi.stubEnv('WA_APPROVED_TEMPLATE_KEYS', 'invented_key');
+    stubDb({ ticket: ticketRow(), consent: consentGranted });
+
+    const result = await evaluateOutboundPreconditions({
+      ticketId: TICKET_ID, templateKey: 'invented_key',
+    });
+
+    expect(result).toEqual({ allowed: false, reasons: ['no_approved_template'] });
+  });
+
+  it('renders each approved template only from its own variables', async () => {
+    vi.stubEnv('WA_APPROVED_TEMPLATE_KEYS', 'fault_resolved');
+    stubDb({ ticket: ticketRow(), consent: consentGranted });
+
+    const result = await evaluateOutboundPreconditions({
+      ticketId: TICKET_ID, templateKey: 'fault_resolved',
+    });
+
+    expect(result.allowed).toBe(true);
+    if (!result.allowed) throw new Error('expected allowed');
+    expect(result.message).toContain('Completed: 2026-07-31 14:20');
+    // fault_resolved does not name the FNO, so its copy must not carry one.
+    expect(result.message).not.toContain('Vumatel');
+    expect(result.message).not.toMatch(/\{\{\d+\}\}/);
+  });
+
+  it('ignores a value that itself looks like a placeholder', async () => {
+    // A '{{2}}' inside an address must be data, never re-read as a placeholder.
+    stubDb({
+      ticket: ticketRow({ client_name: '{{2}}' }),
+      consent: consentGranted,
+    });
+
+    const result = await evaluateOutboundPreconditions({
+      ticketId: TICKET_ID, templateKey: 'fault_logged_ack',
+    });
+
+    expect(result.allowed).toBe(true);
+    if (!result.allowed) throw new Error('expected allowed');
+    // The literal survives as text; the FNO did not get substituted into its place.
+    expect(result.message).toContain('Hello {{2}}');
+    expect(result.message).toContain('appointed by Vumatel');
   });
 });
