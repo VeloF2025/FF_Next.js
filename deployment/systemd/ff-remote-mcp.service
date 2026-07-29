@@ -1,0 +1,50 @@
+[Unit]
+Description=FibreFlow Remote MCP (Claude Custom Connector OAuth)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+
+# The DEPLOY directory, not a workspace checkout. A workspace tree follows whatever
+# branch is checked out and can sit frozen behind origin for weeks; the deploy dir is
+# what scripts/deploy-local.sh updates. Pointing a long-running service at a workspace
+# is how the QField sync silently froze (crons were repointed for the same reason).
+# Production uses /home/velo/fibreflow-production/apps — override in the drop-in.
+WorkingDirectory=/home/velo/fibreflow-dev/apps
+Environment=PYTHONPATH=/home/velo/fibreflow-dev/apps
+
+# FF_MCP_CALLBACK_SECRET lives HERE, never inline in this unit — unit files are
+# world-readable and this one is tracked in git. The env file is chmod 600 and
+# untracked. The service refuses to start when the secret is unset or blank, so a
+# missing env file fails loudly rather than accepting any local caller.
+EnvironmentFile=%h/.ff-remote-mcp.env
+
+Environment=FF_REMOTE_MCP_HOST=127.0.0.1
+Environment=FF_REMOTE_MCP_PORT=7416
+Environment=FF_REMOTE_MCP_STORE=%h/.ff-remote-mcp/oauth.json
+
+# Set per environment in the EnvironmentFile, not here:
+#   FF_APP_BASE                 https://dev.fibreflow.app | https://app.fibreflow.app
+#   FF_REMOTE_MCP_PUBLIC_BASE   <FF_APP_BASE>/api/ff-remote-mcp
+#   FF_MCP_CALLBACK_SECRET      shared with FibreFlow's /api/mcp/consent
+
+ExecStart=/usr/bin/python3 -m ff_mcp
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+# A DIRECTORY, not the file: the OAuth store is written atomically (write .tmp, then
+# rename), so the rename needs write access to the containing directory.
+ReadWritePaths=%h/.ff-remote-mcp
+
+[Install]
+WantedBy=default.target

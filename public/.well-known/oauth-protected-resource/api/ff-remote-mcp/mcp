@@ -1,1 +1,0 @@
-{"resource":"https://app.fibreflow.app/api/ff-remote-mcp/mcp","authorization_servers":["https://app.fibreflow.app/api/ff-remote-mcp"],"scopes_supported":["fibreflow.read"],"bearer_methods_supported":["header"]}
