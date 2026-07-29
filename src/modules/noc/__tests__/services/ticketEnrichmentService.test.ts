@@ -165,10 +165,10 @@ describe('lookupOneMapDrop', () => {
  * GPS rendered on the ticket, so a lookup that returns the wrong row sends a
  * technician to a stranger's address.
  *
- * The measurements behind these tests live in one place — lookupSOWDrop's doc
- * comment — and are re-derivable via
- * `scripts/check-sow-drop-lookup-collisions.sql`. Deliberately not repeated
- * here: duplicated figures drift apart when only one copy gets corrected.
+ * The measurements behind these tests live in exactly one place, alongside the
+ * queries that produce them: `scripts/check-sow-drop-lookup-collisions.sql`.
+ * Deliberately not repeated here, and not in lookupSOWDrop's doc comment
+ * either — duplicated figures drift apart when only one copy gets corrected.
  */
 describe('lookupSOWDrop', () => {
   it('never uses a substring match that could hit a different drop', async () => {
