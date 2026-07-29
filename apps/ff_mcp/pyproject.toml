@@ -1,0 +1,20 @@
+[project]
+name = "ff-mcp"
+version = "0.1.0"
+description = "FibreFlow Remote MCP service — read-only FibreFlow access for Claude connectors"
+requires-python = ">=3.11"
+dependencies = ["mcp[cli]>=1.0.0"]
+
+[project.scripts]
+ff-mcp = "ff_mcp.__main__:main"
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["ff_mcp*"]
+
+[tool.setuptools.package-data]
+ff_mcp = ["endpoints.json"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

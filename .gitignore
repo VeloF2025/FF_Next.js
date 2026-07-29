@@ -179,3 +179,7 @@ docs/superpowers/benchmarks/2026-05-30-codegraph/raw/
 
 # Never track the literal-\$HOME mistake (Claude session logs leaked secrets — #1830)
 $HOME/
+
+# Python bytecode (apps/ff_mcp)
+__pycache__/
+*.py[cod]
