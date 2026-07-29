@@ -134,9 +134,17 @@ if command -v python3 >/dev/null 2>&1; then
     fail "QField GPKG resolution: regression detected"
     tail -20 /tmp/ci-qfield-gpkgresolve.txt | sed 's/^/    /'
   fi
+
+  if python3 scripts/test_qfield_hierarchy.py > /tmp/ci-qfield-hierarchy.txt 2>&1; then
+    pass "QField hierarchy mapping: all checks pass"
+  else
+    fail "QField hierarchy mapping: regression detected"
+    tail -20 /tmp/ci-qfield-hierarchy.txt | sed 's/^/    /'
+  fi
 else
   skip "QField step detection: python3 not available"
   skip "QField GPKG resolution: python3 not available"
+  skip "QField hierarchy mapping: python3 not available"
 fi
 
 # ─── Gate 3: TypeScript ──────────────────────────────────────────────────────

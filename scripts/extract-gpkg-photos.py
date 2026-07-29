@@ -28,6 +28,11 @@ import psycopg2.extras
 # scripts/test_extract_gpkg_step_detection.py. scripts/ is sys.path[0] when this
 # file is run as `python3 scripts/extract-gpkg-photos.py` (the only invocation).
 from qfield_step_detection import detect_step_columns, is_photo_value
+from qfield_hierarchy_sync import (
+    hierarchy_backfill_needed,
+    resolve_spatial_pon_map,
+    sync_hierarchy,
+)
 
 # Pure GPKG family resolution (no MinIO/DB deps) — unit-tested/CI-gated by
 # scripts/test_qfield_gpkg_resolution.py. Lets a project survive the crew renaming
@@ -124,6 +129,19 @@ PROJECTS = {
         "gpkg_path": "Civil audit.gpkg",
         "table_name": "civil_audit",
         "label_col": "Name",
+        "zone_col": "Phase",
+        "spatial_pon": True,
+    },
+    # HT Namakgale keeps all Phase 1 poles in one audit layer. Unlike the FT
+    # forms its hierarchy columns are capitalized and Phase is the zone.
+    "Namakgale": {
+        "qf_project_id": "b32184d6-1776-4b89-8afd-2907dfca86d4",
+        "ff_project_id": "183fe626-7bf7-4793-bdb9-1a1dc2e21aa6",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "poles_phase_1",
+        "label_col": "NAME",
+        "pon_col": "PON",
+        "zone_col": "Phase",
     },
     # NOTE: "Phalaborwa - Ben Farm" (qf ef0b7147…, ff 67df5c8d…) is NOT registered
     # yet. Its civil audit is split across three team GPKGs — "Civil Audit (BF|LLK|
@@ -186,83 +204,6 @@ def _gpkg_version_age_days(version):
     except ValueError:
         return None
     return (datetime.now(timezone.utc) - ts).days
-
-
-# ── PON/zone sync ─────────────────────────────────────────────────────────────
-
-def sync_pon_zone(cur, conn, ff_project_id, rows, columns, label_col):
-    """
-    Sync pon_no and zone_no from GPKG to poles table.
-
-    Handles two patterns:
-    1. Direct columns: pon_no + zone_no (most projects)
-    2. Block label: BL column like VTN_TOG_Z0A_B048 → extract number → pon_no
-    """
-    col_set = set(columns)
-
-    # Detect which pattern this GPKG uses
-    has_pon_no = "pon_no" in col_set
-    has_zone_no = "zone_no" in col_set
-    has_bl = "BL" in col_set
-
-    if not has_pon_no and not has_bl:
-        return 0  # No PON data in this GPKG
-
-    updates = []
-    for row in rows:
-        label = row[label_col] if label_col in row.keys() else None
-        if not label:
-            continue
-        label = str(label).strip()
-        if not label:
-            continue
-
-        pon_no = None
-        zone_no = None
-
-        if has_pon_no:
-            # Direct pon_no column (Lawley, Mamelodi, Etwatwa, THM1, THM3)
-            raw_pon = row["pon_no"]
-            if raw_pon is not None:
-                try:
-                    pon_no = int(str(raw_pon).strip().split(",")[0])  # Handle "30,035" → 30
-                except (ValueError, IndexError):
-                    pass
-            if has_zone_no:
-                raw_zone = row["zone_no"]
-                if raw_zone is not None:
-                    try:
-                        zone_no = int(str(raw_zone).strip())
-                    except ValueError:
-                        pass
-        elif has_bl:
-            # Block label pattern (Tonga): VTN_TOG_Z0A_B048 → pon_no=48
-            bl = row["BL"]
-            if bl:
-                m = re.search(r"_B(\d+)$", str(bl).strip())
-                if m:
-                    pon_no = int(m.group(1))
-                    zone_no = 1  # Tonga is all zone 1
-
-        if pon_no is not None:
-            updates.append((pon_no, zone_no, ff_project_id, label))
-
-    if not updates:
-        return 0
-
-    # Batch update — only where values differ
-    psycopg2.extras.execute_batch(cur, """
-        UPDATE poles SET
-            pon_no = COALESCE(%s, pon_no),
-            zone_no = COALESCE(%s, zone_no),
-            updated_at = NOW()
-        WHERE project_id = %s AND pole_number = %s
-          AND (pon_no IS DISTINCT FROM %s OR zone_no IS DISTINCT FROM %s)
-    """, [(p, z, pid, lbl, p, z) for p, z, pid, lbl in updates], page_size=200)
-
-    updated = cur.rowcount
-    conn.commit()
-    return updated
 
 
 # ── QFieldCloud API + MinIO helpers ──────────────────────────────────────────
@@ -600,6 +541,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
     # GPKG before all photos finish uploading), so a GPKG with outstanding pending photos
     # must be re-scanned even when its version is unchanged — otherwise the late binaries
     # are never ingested until the next GPKG re-upload. See migration 423.
+    hierarchy_backfill = hierarchy_backfill_needed(cur, ff_id, config)
     if not force:
         cur.execute(
             "SELECT last_version, pending_count FROM qfield_gpkg_sync_state WHERE qf_project_id = %s AND gpkg_path = %s",
@@ -632,13 +574,16 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
             # can always --force to override.
             version_age = _gpkg_version_age_days(version)
             stale = version_age is not None and version_age > PENDING_RESCAN_MAX_AGE_DAYS
-            if pending == 0 or stale:
+            if (pending == 0 or stale) and not hierarchy_backfill:
                 reason = ("Already processed this version" if pending == 0
                           else f"{pending} still pending but GPKG is {version_age}d old "
                                f"(>{PENDING_RESCAN_MAX_AGE_DAYS}d) — giving up")
                 print(f"  SKIP: {reason}")
                 return 0, 0
-            print(f"  RE-SCAN: same version but {pending} photo(s) were pending upload last run")
+            if hierarchy_backfill:
+                print("  RE-SCAN: Work QA hierarchy backfill required")
+            else:
+                print(f"  RE-SCAN: same version but {pending} photo(s) were pending upload last run")
 
         # Open GPKG
         db = sqlite3.connect(tmp_path)
@@ -705,6 +650,12 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                   f"Columns: {list(columns)[:12]}")
             db.close()
             return 0, 0
+
+        spatial_pon_map = (
+            resolve_spatial_pon_map(qf_id)
+            if config.get("spatial_pon")
+            else {}
+        )
 
         # ── Batch-list MinIO DCIM directory once per project ─────────────────
         # dcim_index maps filename.jpg -> versioned storage key (or absent if not uploaded)
@@ -902,24 +853,24 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
 
         db.close()
 
-        # ── Sync PON/zone assignments from GPKG to poles + reviews ──
+        # ── Sync PON/zone assignments into planning, reviews, and Work QA ──
         if not dry_run:
-            poles_pon_updated = sync_pon_zone(cur, conn, ff_id, rows, columns, label_col)
-            if poles_pon_updated > 0:
-                print(f"  PON/zone: {poles_pon_updated} poles updated, cascading to reviews...")
-                cur.execute("""
-                    UPDATE construction_qa_reviews r
-                    SET zone_no = p.zone_no, pon_no = p.pon_no, updated_at = NOW()
-                    FROM poles p
-                    WHERE r.project_id = %s
-                      AND r.feature_type = 'pole'
-                      AND r.feature_id = p.pole_number
-                      AND p.project_id = r.project_id
-                      AND (r.zone_no IS DISTINCT FROM p.zone_no OR r.pon_no IS DISTINCT FROM p.pon_no)
-                """, (ff_id,))
-                reviews_updated = cur.rowcount
-                conn.commit()
-                print(f"  PON/zone: {reviews_updated} reviews updated")
+            hierarchy_result = sync_hierarchy(
+                cur,
+                conn,
+                ff_id,
+                rows,
+                label_col,
+                config,
+                spatial_pon_map,
+            )
+            print(
+                "  Hierarchy: "
+                f"{hierarchy_result['mapped']} GPKG poles mapped; "
+                f"{hierarchy_result['qa_poles']} Work QA rows, "
+                f"{hierarchy_result['poles']} planning poles, and "
+                f"{hierarchy_result['reviews']} reviews changed"
+            )
 
         if not dry_run:
             # Update sync state. pending_count records how many photo references were
