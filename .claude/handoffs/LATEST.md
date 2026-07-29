@@ -5,7 +5,13 @@
 
 ## Status
 
-**All four PRs open, CI green, blind-reviewed, review findings fixed. Nothing merged yet. Nothing deployed to dev or prod.**
+**ALL FOUR PRs MERGED. Deployed to dev. The connector works end to end on
+`dev.fibreflow.app` and returns real data. Production is untouched.**
+
+Dev is on `d96d677e8`. `ff-remote-mcp.service` is enabled and running under systemd
+(user unit, `127.0.0.1:7416`); the shared secret is in `~/.ff-remote-mcp.env` (0600) and
+in `/home/velo/fibreflow-dev/.env.local` as `FF_MCP_CALLBACK_SECRET` +
+`FF_REMOTE_MCP_URL` (a timestamped backup of that file was taken first).
 
 Blind review ran **two rounds** and found **~20 issues across the four PRs, including
 two HIGHs**. Every finding was reproduced before fixing; two were disputed with
@@ -26,15 +32,22 @@ a warning, but the order removes the window.
 
 All four are based on `master` (not stacked) — deliberately, so each gets real CI. All four trial-merged cleanly AND the suites were re-run on the merged tree: **63 JS + 36 Python pass**.
 
-## Task 8 (E2E) — done, but NOT on dev
+## Task 8 (E2E) — DONE, on dev
 
-The full round trip was proven against a **production build of the trial-merged tree** running locally on :3011, with the Python service on :7416, against the **real shared Postgres**. Evidence is pasted on #2294 and #2295. Proven end to end:
+Proven against **`https://dev.fibreflow.app`** — real edge, real Cloudflare, real
+systemd service, real shared Postgres:
 
 DCR 201 → `/authorize` 302 → consent page 200 → `POST /api/mcp/consent` 200 (mints, calls back, returns `redirectUrl`, **no token in the body**) → code→token exchange 200 with PKCE → `initialize` → `tools/list` → `fibreflow_get /api/projects` **returned real project rows**.
 
 Also verified: session row `kind='mcp' label='Claude connector'` 90d with `last_used_at` populated · consent failure ⇒ 502 and **zero orphan sessions** · `POST` with the connector token ⇒ **403 `MCP_READ_ONLY`** while `GET` ⇒ 200 · revoking the row ⇒ same OAuth token now 401 `SESSION_INVALID` · denylist and non-`/api` paths refused · browser check: unauthenticated `/mcp/authorize?state_id=X` redirects to `/sign-in?returnUrl=…state_id%3DX` with the **state_id intact**.
 
-**Still outstanding for a literal "Task 8 on dev":** merge, `bash scripts/deploy-local.sh dev`, install the systemd unit on velo, then add the connector in claude.ai against `https://dev.fibreflow.app/api/ff-remote-mcp/mcp`. Two Definition-of-Done items were NOT covered locally: adding it through the real claude.ai UI, and the **two-user scoping check** (two connectors returning different result sets).
+**Two Definition-of-Done items remain unverified**, both needing a human or a second
+account: adding the connector through the real **claude.ai UI** (the protocol flow is
+proven, the UI path is not), and the **two-user scoping check** (two connectors
+returning different `/api/meetings` result sets).
+
+**Connector URL for claude.ai:** `https://dev.fibreflow.app/api/ff-remote-mcp/mcp`
+(no client ID or secret — DCR issues them).
 
 ## Things the plan got wrong (all fixed, all worth knowing)
 
@@ -102,10 +115,13 @@ The `playwriter` MCP tool **echoes its params in error messages**. Two `addCooki
 
 ## Where to resume
 
-1. Merge in any order — they are independent, all CI-green, all reviewed. (The four
-   were re-trial-merged after the fixes: 139 tests pass on the merged tree and the full
-   OAuth round trip was re-run on it.)
-2. `bash scripts/deploy-local.sh dev`.
-3. Install the unit on velo: copy `deployment/systemd/ff-remote-mcp.service` to `~/.config/systemd/user/`, create `~/.ff-remote-mcp.env` (chmod 600) with `FF_MCP_CALLBACK_SECRET`, `FF_APP_BASE=https://dev.fibreflow.app`, `FF_REMOTE_MCP_PUBLIC_BASE=https://dev.fibreflow.app/api/ff-remote-mcp`; add the same secret + `FF_REMOTE_MCP_URL=http://127.0.0.1:7416` to the dev app env; `systemctl --user enable --now ff-remote-mcp`.
-4. Add the connector in claude.ai and do the two-user scoping check.
-5. **Production is untouched and requires Hein's explicit approval.** Do not set `FF_MCP_TOKEN_UI_ENABLED` on prod.
+1. **Add the connector in claude.ai** against
+   `https://dev.fibreflow.app/api/ff-remote-mcp/mcp` and confirm the UI path works.
+2. **Two-user scoping check** — a second user's connector must return their own
+   `/api/meetings`, not everyone's. This is the property that makes per-user OAuth worth
+   building rather than a service token, and it is the last untested one.
+3. **Production, only with Hein's explicit approval and after hours.** It needs: the
+   prod deploy, a *separate* `FF_MCP_CALLBACK_SECRET` + `FF_REMOTE_MCP_URL` in the prod
+   app env, and a systemd drop-in overriding `WorkingDirectory`, `FF_REMOTE_MCP_PORT`,
+   `StateDirectory` and `EnvironmentFile` — the base unit is dev-shaped and one instance
+   per host is the documented assumption. Do not set `FF_MCP_TOKEN_UI_ENABLED` on prod.
