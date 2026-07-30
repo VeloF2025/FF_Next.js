@@ -2,7 +2,6 @@ import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { NextApiResponse } from 'next';
 
-import { apiResponse } from '@/lib/apiResponse';
 import {
   createCortexConsentHandler,
   type CortexConsentDependencies,
@@ -15,12 +14,6 @@ export const MINTED_TOKEN = 'jwt-never-echo';
 interface VerifiedUser {
   id: string;
   email: string;
-}
-
-interface PermissionBoundary {
-  key: string;
-  action: string;
-  allowed: boolean;
 }
 
 export interface CapturedLog {
@@ -54,8 +47,7 @@ export interface HarnessResponse {
 }
 
 interface ConsentHarnessOptions {
-  user?: VerifiedUser | null;
-  permission?: PermissionBoundary;
+  user?: VerifiedUser;
   callbackBase?: string;
   callbackSecret?: string | null;
   mintToken?: CortexConsentDependencies['mintToken'];
@@ -112,18 +104,6 @@ function nextResponse(response: ServerResponse): NextApiResponse {
   return next as unknown as NextApiResponse;
 }
 
-function sendBoundaryError(
-  response: NextApiResponse,
-  status: number,
-  code: string,
-  message: string,
-): void {
-  response.status(status).json({
-    success: false,
-    error: { code, message },
-  });
-}
-
 export async function startCallbackServer(
   responder: CallbackResponder,
   port = 0,
@@ -161,7 +141,6 @@ export async function startConsentHandler(
   url: string;
   logs: CapturedLog[];
   post(path: string, body: Record<string, unknown>): Promise<HarnessResponse>;
-  get(path: string): Promise<HarnessResponse>;
 }> {
   const previousUrl = process.env.CORTEX_REMOTE_MCP_URL;
   const previousSecret = process.env.CORTEX_MCP_CALLBACK_SECRET;
@@ -188,13 +167,9 @@ export async function startConsentHandler(
     fetchImpl: options.fetchImpl,
     logger,
   });
-  const user = options.user === undefined
-    ? { id: 'user-1', email: 'reviewer@velocityfibre.co.za' }
-    : options.user;
-  const permission = options.permission ?? {
-    key: 'cortex.review',
-    action: 'view',
-    allowed: true,
+  const user = options.user ?? {
+    id: 'user-1',
+    email: 'reviewer@velocityfibre.co.za',
   };
 
   const server = http.createServer((request, response) => {
@@ -202,9 +177,6 @@ export async function startConsentHandler(
       const res = nextResponse(response);
       const bodyText = await readBody(request);
       const body = bodyText ? JSON.parse(bodyText) : undefined;
-      if (!user) {
-        return sendBoundaryError(res, 401, 'UNAUTHORIZED', 'Authentication required');
-      }
       const req = Object.assign(request, {
         body,
         query: {},
@@ -212,21 +184,6 @@ export async function startConsentHandler(
         user,
         sessionId: 'test-session',
       });
-      if (request.method !== 'POST') {
-        return apiResponse.methodNotAllowed(res, request.method ?? 'UNKNOWN', ['POST']);
-      }
-      if (
-        permission.key !== 'cortex.review'
-        || permission.action !== 'view'
-        || !permission.allowed
-      ) {
-        return sendBoundaryError(
-          res,
-          403,
-          'FORBIDDEN',
-          'Missing required permission: cortex.review',
-        );
-      }
       await handler(req as never, res);
     })().catch((error: unknown) => {
       if (!response.headersSent) {
@@ -247,14 +204,13 @@ export async function startConsentHandler(
   const url = `http://127.0.0.1:${port}`;
 
   async function request(
-    method: 'GET' | 'POST',
     path: string,
-    body?: Record<string, unknown>,
+    body: Record<string, unknown>,
   ): Promise<HarnessResponse> {
     const response = await fetch(`${url}${path}`, {
-      method,
-      headers: body ? { 'content-type': 'application/json' } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
     });
     return {
       status: response.status,
@@ -266,8 +222,7 @@ export async function startConsentHandler(
   return {
     url,
     logs,
-    post: (path, body) => request('POST', path, body),
-    get: (path) => request('GET', path),
+    post: request,
   };
 }
 

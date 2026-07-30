@@ -25,7 +25,6 @@ describe('POST /api/cortex/mcp-consent — verified consent', () => {
     });
     const app = await startConsentHandler({
       user: { id: 'user-1', email: 'lew@velocityfibre.co.za' },
-      permission: { key: 'cortex.review', action: 'view', allowed: true },
       callbackBase: callback.url,
       mintToken: async (email, lifetime) => {
         mintedFor.push([email, lifetime]);
