@@ -2,8 +2,8 @@
  * Construction QA Module Navigation Configuration
  *
  * Provides tab-based navigation for the Construction QA module:
- * - QA Centre: Feature list for quality assurance review (civil and optical)
- * - Reports: Construction-specific analytics and reporting
+ * - QA Centre: Operational Zone Delivery register
+ * - Works QA, OTDR Testing, Snags, Reports: operational follow-up sequence
  */
 
 import { HardHat, ClipboardCheck, BarChart3, Radio, AlertTriangle, LayoutGrid, List, Table2, Camera } from 'lucide-react';
@@ -23,6 +23,14 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       icon: ClipboardCheck,
       path: '/field-ops',
       rbacKey: 'construction-qa.qa-centre',
+    },
+    {
+      id: 'works-qa',
+      label: 'Works QA',
+      shortLabel: 'Works QA',
+      icon: Camera,
+      path: '/field-ops/works-qa',
+      rbacKey: 'construction-qa.works-qa',
     },
     {
       id: 'otdr-testing',
@@ -45,14 +53,6 @@ export const constructionQaConfig: ModuleNavigationConfig = {
         { id: 'summary', label: 'Summary', icon: Table2, path: '/field-ops/snags/summary' },
         { id: 'reports', label: 'Reports', icon: BarChart3, path: '/field-ops/snags/reports' },
       ],
-    },
-    {
-      id: 'works-qa',
-      label: 'Works QA',
-      shortLabel: 'Works QA',
-      icon: Camera,
-      path: '/field-ops/works-qa',
-      rbacKey: 'construction-qa.works-qa',
     },
     {
       id: 'reports',

@@ -10,7 +10,8 @@
 | **VLM** | Qwen3-VL-8B-Instruct for photo validation |
 
 ## Key Features
-- **QA Centre Dashboard**: Project-level QA status with zone/PON drill-down
+- **QA Centre Zone Register**: Operational one-row-per-zone delivery status with server-authored gates, blockers, QA, and handover state
+- **Zone Delivery Workspace**: Stable `/field-ops/zone?project_id=…&zone_no=…` route for audited PON milestones, discipline QA, evidence, snags, and activity
 - **5-Phase Review Wizard**: Prerequisites → Photo Review → Data Validation → Final Decision → Feedback
 - **VLM Photo Validation**: AI validates construction photos against standards
 - **QField Photo Ingestion**: Auto-ingest from QFieldCloud via webhook
@@ -24,7 +25,7 @@
 ```
 src/modules/construction-qa/
 ├── components/
-│   ├── ConstructionQaCentrePage.tsx  # Main QA centre
+│   ├── ConstructionQaCentrePage.tsx  # Legacy feature-review surface
 │   ├── OtdrTestingPage.tsx           # OTDR test results
 │   ├── dashboard/
 │   │   ├── FieldOpsDashboardPage.tsx # Field ops overview
@@ -50,6 +51,12 @@ src/modules/construction-qa/
 ├── services/
 │   ├── qfieldIngestionService.ts     # QField photo pipeline
 │   └── vlmConstructionService.ts     # VLM validation service
+├── zone-delivery/                    # Register, workspace, lifecycle service
+│   ├── components/                   # Register/workspace UI
+│   ├── hooks/                        # Typed API clients
+│   ├── repositories/                 # Transaction-scoped reads/writes
+│   ├── services/                     # Gates, audit, handover, storage
+│   └── types/                        # Zone Delivery contracts
 └── types/
     └── construction.types.ts         # Type definitions (1,103 lines)
 ```
@@ -69,11 +76,32 @@ pages/api/construction-qa/
 └── push-qfield-comment.ts  # Push comments to QFieldCloud
 ```
 
+Zone Delivery uses seven flat routes under `pages/api/zone-delivery/`:
+`register`, `zone`, `scope`, `pon-milestone`, `zone-qa`, `document`, and
+`activity`. Reads use `construction-qa.qa-centre:view`; six action permissions
+separately gate scope, construction, testing, operations, Zone QA, and document
+management. Snag status writes use `construction-qa.snags:edit` and return
+recalculation failures so a repeated saved status can retry reconciliation.
+
 ## Database Tables
 - `qa_photo_reviews` — Photo review records with VLM results
 - `qa_pon_features` — PON-level feature tracking
 - `construction_qa_decisions` — Final QA decisions
-- `exfo_tests` — OTDR test results
+- `exfo_test_results` — OTDR test results
+- Migration 470 adds `pon_delivery_state`, `zone_delivery_state`,
+  `zone_delivery_documents`, `zone_delivery_snag_links`, and
+  `zone_delivery_activity`; its rollback removes them in dependency order.
+
+## Zone Delivery safety
+- PON gates and automatic handover are calculated on the server, never inferred
+  from Works QA or OTDR evidence in the browser.
+- Scope approval covers the exact canonical PON set. Material scope or reopen
+  changes atomically invalidate both current Zone QA outcomes and eligibility.
+- Test packs, FACs, and CACs are stored in VF Storage with active metadata and
+  SHA-256 checksums. JSON evidence is rejected until EXFO ownership is provable;
+  supervised uploads validate PDF/OOXML structure and URLs are allow-listed.
+- The database is shared by dev and production. Applying migration 470 requires
+  Hein's explicit approval; verification must use the isolated Docker fixture.
 
 ## Dependencies
 - VLM service (Qwen3 on :8100) for photo validation

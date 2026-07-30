@@ -34,6 +34,8 @@ export async function setup() {
 
   const seed = await fs.readFile(path.join(process.cwd(),
     'tests/db/setup/seed.sql'), 'utf8');
+  const zoneDeliverySeed = await fs.readFile(path.join(process.cwd(),
+    'tests/db/setup/zone-delivery-seed.sql'), 'utf8');
   const migration = await fs.readFile(path.join(process.cwd(),
     'scripts/migrations/sql/362_serial_master_register.sql'), 'utf8');
   const triggers = await fs.readFile(path.join(process.cwd(),
@@ -53,13 +55,17 @@ export async function setup() {
   //   NULL in all prod rows; this trigger fires on the canonical install column.
   const dropsTrigger = await fs.readFile(path.join(process.cwd(),
     'scripts/migrations/sql/367_drops_install_trigger.sql'), 'utf8');
+  const zoneDeliveryMigration = await fs.readFile(path.join(process.cwd(),
+    'scripts/migrations/sql/470_zone_delivery_handover.sql'), 'utf8');
   const pool = new Pool({ connectionString: URL });
   await pool.query(seed);
+  await pool.query(zoneDeliverySeed);
   await pool.query(migration);
   await pool.query(triggers);
   await pool.query(triggerFix);
   await pool.query(triggerFix2);
   await pool.query(dropsTrigger);
+  await pool.query(zoneDeliveryMigration);
   await pool.end();
   process.env.DATABASE_URL_TEST = URL;
   // Service-layer integration tests (tests/db/services/*) call into the
