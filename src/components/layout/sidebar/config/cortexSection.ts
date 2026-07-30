@@ -2,7 +2,7 @@
  * Cortex section configuration
  */
 
-import { Brain } from 'lucide-react';
+import { Brain, Cable } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const cortexSection: NavSection = {
@@ -16,6 +16,13 @@ export const cortexSection: NavSection = {
       label: 'Cortex',
       shortLabel: 'Cortex',
       rbacKey: 'cortex.review',
+      permissions: [],
+    },
+    {
+      to: '/connections/fibreflow',
+      icon: Cable,
+      label: 'AI Connections',
+      shortLabel: 'Connections',
       permissions: [],
     },
   ],
