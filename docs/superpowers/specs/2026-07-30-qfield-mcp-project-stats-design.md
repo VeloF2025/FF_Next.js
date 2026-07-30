@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-30
 
-**Status:** Approved design; awaiting written-spec review
+**Status:** Approved for implementation
 
 **Delivery:** PR 1 of 2
 
@@ -145,8 +145,8 @@ Resolution follows this order:
 1. exact FibreFlow UUID;
 2. exact QField UUID;
 3. exact case-insensitive FibreFlow project code;
-4. exact case-insensitive project name;
-5. partial case-insensitive name match.
+4. exact case-insensitive FibreFlow or linked QField project name;
+5. partial case-insensitive FibreFlow or linked QField project name match.
 
 The resolver then prefers an active registered QField project linked through
 `qfield_project_links`.
@@ -156,8 +156,11 @@ The resolver then prefers an active registered QField project linked through
 - FibreFlow project without a valid QField link: return a structured `422`.
 - No visible match: return `404`.
 
-Resolution must respect the authenticated user's existing project access. It
-must not reveal inaccessible projects as candidates.
+Resolution runs only after the authenticated user passes FibreFlow's existing
+resource-level `projects:view` permission. The current PostgreSQL project APIs
+do not implement per-project row visibility, so this feature must not claim or
+invent a narrower row-level scope. Ambiguity candidates are returned only after
+that resource permission succeeds.
 
 ## Data Sources and Ownership
 
@@ -173,6 +176,11 @@ must not reveal inaccessible projects as candidates.
 New QField reads must use the established read-only QField connection. The
 aggregator must not depend on the legacy endpoints that swallow source errors or
 truncate source records.
+
+`qfield_projects.id` is the internal registration/link UUID, while
+`qfield_projects.qfield_project_id` is the external QFieldCloud UUID. QA rows are
+scoped by the external UUID. Both values must remain distinct in the resolver;
+using the registration UUID for QA would silently empty aliased projects.
 
 The legacy `core_layer`/`core_feature` readers are not a valid source in the
 current production QField schema. They must not be reused or treated as evidence
@@ -200,6 +208,11 @@ A later failed or stuck duplicate does not remove an earlier successfully
 applied state. It is reported as an anomaly and cannot create an additional
 planted pole. Photo completeness and QA approval are separate quality measures
 and are not prerequisites for the planted count.
+
+Photo-complete and photo-incomplete headline counts describe the currently
+planted population only. A planted pole with no recognized photo-state event
+remains planted and is reported as an unmapped quality-state warning rather than
+being forced into either photo bucket.
 
 The pole section returns:
 
@@ -345,7 +358,8 @@ optional source must not consume the entire request budget.
 - The route is GET-only and authenticated with existing FibreFlow auth.
 - The MCP passes the signed-in user's existing read-only credential.
 - No service-level FibreFlow credential or database secret is added to the MCP.
-- Existing project visibility and role rules apply before project resolution.
+- Existing `projects:view` resource permission applies before project
+  resolution; no legacy Firestore project-access service is introduced.
 - Drill-down excludes customer names, addresses, geometry, photo bodies, and
   other record-level personal data unless a later separately approved design
   explicitly requires them.
