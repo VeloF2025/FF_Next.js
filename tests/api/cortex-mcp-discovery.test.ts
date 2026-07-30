@@ -20,13 +20,18 @@ describe('Cortex MCP discovery', () => {
 
     expect(rewrites).toEqual(expect.arrayContaining([
       {
+        source: '/.well-known/oauth-authorization-server/api/ff-remote-mcp',
+        destination:
+          '/api/ff-remote-mcp/.well-known/oauth-authorization-server/api/ff-remote-mcp',
+      },
+      {
         source: '/.well-known/oauth-protected-resource/api/cortex-remote-mcp/mcp',
         destination: '/api/mcp/resource-metadata?connector=cortex',
       },
       {
         source: '/.well-known/oauth-authorization-server/api/cortex-remote-mcp',
         destination:
-          '/api/cortex-remote-mcp/.well-known/oauth-authorization-server',
+          '/api/cortex-remote-mcp/.well-known/oauth-authorization-server/api/cortex-remote-mcp',
       },
     ]));
   });

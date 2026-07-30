@@ -114,13 +114,17 @@ class FibreFlowOAuthProvider(
         if not client_info.redirect_uris:
             raise ValueError("redirect_uris is required")
         client_id = client_info.client_id or "ffmcp_" + secrets.token_urlsafe(24)
-        client_secret = client_info.client_secret or secrets.token_urlsafe(32)
+        client_secret = (
+            None
+            if client_info.token_endpoint_auth_method == "none"
+            else client_info.client_secret or secrets.token_urlsafe(32)
+        )
         full = client_info.model_copy(
             update={
                 "client_id": client_id,
                 "client_secret": client_secret,
                 "client_id_issued_at": _now(),
-                "client_secret_expires_at": 0,
+                "client_secret_expires_at": 0 if client_secret else None,
                 "scope": client_info.scope or SCOPE,
             }
         )
