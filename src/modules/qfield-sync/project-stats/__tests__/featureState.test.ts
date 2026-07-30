@@ -127,4 +127,138 @@ describe('buildQFieldInfrastructure', () => {
       expect.objectContaining({ type: 'sync_mismatch', featureKey: 'dr-1' }),
     );
   });
+
+  it('leaves pole-quality events unassigned when only a cable shares the local key', () => {
+    const snapshot = buildQFieldInfrastructure([
+      {
+        ...delta('shared', 'String Complete', '2026-07-29T08:00:00Z'),
+        cableId: 'C-1',
+      },
+      delta('shared', 'Q/A Failed', '2026-07-29T09:00:00Z'),
+    ]);
+
+    expect(snapshot.poles.qfieldTotal).toBe(0);
+    expect(snapshot.cables.byStatus).toEqual({ 'String Complete': 1 });
+    expect(snapshot.anomalies).toContainEqual(
+      expect.objectContaining({
+        type: 'unknown_status',
+        featureKey: 'shared',
+        status: 'Q/A Failed',
+      }),
+    );
+  });
+
+  it('excludes non-applied cable and drop histories from the current snapshot', () => {
+    const snapshot = buildQFieldInfrastructure([
+      {
+        ...delta('cable-1', 'String Complete', '2026-07-29T08:00:00Z', 'error'),
+        cableId: 'C-1',
+      },
+      {
+        ...delta('drop-1', 'Drop Updated', '2026-07-29T09:00:00Z', 'pending'),
+        dropNumber: 'DR-1',
+        installationStatus: 'Installed',
+        qcStatus: 'Approved',
+      },
+    ]);
+
+    expect(snapshot.cables.qfieldTotal).toBe(0);
+    expect(snapshot.cables.byStatus).toEqual({});
+    expect(snapshot.drops.qfieldTotal).toBe(0);
+    expect(snapshot.drops.installationByStatus).toEqual({});
+    expect(snapshot.comparisonRecords.cables.size).toBe(0);
+    expect(snapshot.comparisonRecords.drops.size).toBe(0);
+    expect(snapshot.anomalies.filter(({ type }) => type === 'stuck')).toHaveLength(2);
+  });
+
+  it('preserves and flags unknown drop projection labels', () => {
+    const snapshot = buildQFieldInfrastructure([
+      {
+        ...delta('drop-1', 'Drop Updated', '2026-07-29T08:00:00Z'),
+        dropNumber: 'DR-1',
+        installationStatus: 'Awaiting Permit',
+        qcStatus: 'Manual Review',
+      },
+    ]);
+
+    expect(snapshot.drops.installationByStatus).toEqual({ 'Awaiting Permit': 1 });
+    expect(snapshot.drops.qcByStatus).toEqual({ 'Manual Review': 1 });
+    expect(snapshot.drops.installed).toBe(0);
+    expect(snapshot.drops.approved).toBe(0);
+    expect(snapshot.anomalies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'unknown_status', status: 'Awaiting Permit' }),
+        expect.objectContaining({ type: 'unknown_status', status: 'Manual Review' }),
+      ]),
+    );
+  });
+
+  it('flags a cable identity change and keeps the latest applied identity', () => {
+    const snapshot = buildQFieldInfrastructure([
+      {
+        ...delta('local-1', 'String Complete', '2026-07-29T08:00:00Z'),
+        cableId: 'C-1',
+      },
+      {
+        ...delta('local-1', 'String Tested', '2026-07-29T09:00:00Z'),
+        cableId: 'C-2',
+      },
+    ]);
+
+    expect(snapshot.comparisonRecords.cables).toEqual(
+      new Map([['c-2', { status: 'String Tested' }]]),
+    );
+    expect(snapshot.anomalies).toContainEqual(
+      expect.objectContaining({ type: 'sync_mismatch', featureKey: 'c-2' }),
+    );
+  });
+
+  it('flags a drop identity change and keeps the latest applied identity', () => {
+    const snapshot = buildQFieldInfrastructure([
+      {
+        ...delta('local-1', 'Drop Updated', '2026-07-29T08:00:00Z'),
+        dropNumber: 'DR-1',
+        installationStatus: 'Planned',
+        qcStatus: 'Pending',
+      },
+      {
+        ...delta('local-1', 'Drop Updated', '2026-07-29T09:00:00Z'),
+        dropNumber: 'DR-2',
+        installationStatus: 'Installed',
+        qcStatus: 'Approved',
+      },
+    ]);
+
+    expect(snapshot.drops.qfieldTotal).toBe(1);
+    expect(snapshot.comparisonRecords.drops).toEqual(
+      new Map([['dr-2', { installationStatus: 'Installed', qcStatus: 'Approved' }]]),
+    );
+    expect(snapshot.anomalies).toContainEqual(
+      expect.objectContaining({ type: 'sync_mismatch', featureKey: 'dr-2' }),
+    );
+  });
+
+  it('does not carry an older cable length when the latest applied projection is missing', () => {
+    const snapshot = buildQFieldInfrastructure([
+      {
+        ...delta('local-1', 'String Complete', '2026-07-29T08:00:00Z'),
+        cableId: 'C-1',
+        cableLengthM: 120,
+      },
+      {
+        ...delta('local-1', 'String Tested', '2026-07-29T09:00:00Z'),
+        cableId: 'C-1',
+        cableLengthM: null,
+      },
+    ]);
+
+    expect(snapshot.cables.totalLengthM).toBeNull();
+    expect(snapshot.anomalies).toContainEqual(
+      expect.objectContaining({
+        type: 'sync_mismatch',
+        featureKey: 'local-1',
+        status: 'String Tested',
+      }),
+    );
+  });
 });

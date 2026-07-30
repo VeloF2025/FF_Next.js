@@ -1,6 +1,6 @@
 import type { QFieldDelta } from './qfieldDeltaRepo';
 import type { CableStats, DropStats, PoleStats, ProjectStatsAnomaly } from './types';
-
+import { emptyCables, emptyDrops, emptyPoles } from './featureStateDefaults';
 const PLANTING_EVENTS = new Set([
   'Pole Planted/ All Photos',
   'Pole Planted - Photos Incomplete',
@@ -8,6 +8,8 @@ const PLANTING_EVENTS = new Set([
 ]);
 const REMOVAL_EVENTS = new Set(['Pole Removed/Canceled', 'Pole Canceled / Removed']);
 const STUCK = new Set(['error', 'not_applied', 'conflict']);
+const DROP_INSTALLATION_STATES = new Set(['installed', 'planned', 'in progress']);
+const DROP_QC_STATES = new Set(['approved', 'pending', 'failed']);
 type FeatureKind = 'pole' | 'cable' | 'drop';
 interface FeatureHistory {
   kind: FeatureKind;
@@ -55,10 +57,9 @@ function isPoleQualityEvent(status: string | null): boolean {
       status?.startsWith('Photo '),
   );
 }
-function groupHistories(deltas: QFieldDelta[]): {
-  groups: FeatureHistory[];
-  unassigned: QFieldDelta[];
-} {
+function groupHistories(
+  deltas: QFieldDelta[],
+): { groups: FeatureHistory[]; unassigned: QFieldDelta[] } {
   const candidates = new Map<string, Set<FeatureKind>>();
   for (const row of deltas) {
     const kind = kindOf(row);
@@ -74,7 +75,9 @@ function groupHistories(deltas: QFieldDelta[]): {
     const kinds = candidates.get(row.featureKey) ?? new Set<FeatureKind>();
     let kind: FeatureKind | undefined;
     if (explicitKind !== 'unknown') kind = explicitKind;
-    else if (isPoleQualityEvent(statusOf(row)) && kinds.has('pole')) kind = 'pole';
+    else if (isPoleQualityEvent(statusOf(row))) {
+      if (kinds.has('pole')) kind = 'pole';
+    }
     else if (kinds.size === 1) kind = [...kinds][0];
     if (!kind) {
       unassigned.push(row);
@@ -91,12 +94,13 @@ function anomaly(
   type: ProjectStatsAnomaly['type'],
   row: QFieldDelta,
   featureKey = row.featureKey,
+  status = statusOf(row),
 ): ProjectStatsAnomaly {
   return {
     type,
     featureKey,
     label: row.label?.trim() || null,
-    status: statusOf(row),
+    status,
     occurredAt: row.createdAt || null,
   };
 }
@@ -133,28 +137,16 @@ function inspectHistory(
   }
   return applied;
 }
-function emptyPoles(): PoleStats {
-  return {
-    qfieldTotal: 0, planted: 0, photoComplete: 0, photoIncomplete: 0,
-    qaPassed: 0, qaFailed: 0, applied: 0, stuckRecoverable: 0,
-    staleDuplicates: 0, designTotal: null, neverCaptured: null,
-    referencedPhotos: 0, presentPhotos: null, missingPhotos: null, byStatus: {},
-  };
+function distinctIdentities(
+  rows: QFieldDelta[],
+  pick: (row: QFieldDelta) => string | null,
+): Set<string> {
+  return new Set(
+    rows.map(pick).map(normalize).filter((value): value is string => value !== null),
+  );
 }
-function emptyCables(): CableStats {
-  return {
-    qfieldTotal: 0, fibreflowTotal: null, totalLengthM: null,
-    synchronized: null, needsSync: null, qfieldOnly: null, fibreflowOnly: null,
-    byStatus: {},
-  };
-}
-function emptyDrops(): DropStats {
-  return {
-    qfieldTotal: 0, fibreflowTotal: null, installed: 0, planned: 0,
-    inProgress: 0, approved: 0, pending: 0, failed: 0, synchronized: null,
-    needsSync: null, qfieldOnly: null, fibreflowOnly: null,
-    installationByStatus: {}, qcByStatus: {},
-  };
+function validCableLength(value: number | null): value is number {
+  return value !== null && Number.isFinite(value) && value >= 0;
 }
 function addCandidate<T>(
   candidates: Map<string, ComparisonCandidate<T>[]>,
@@ -225,36 +217,40 @@ export function buildQFieldInfrastructure(deltas: QFieldDelta[]): QFieldInfrastr
       continue;
     }
     if (history.kind === 'cable') {
+      if (!latestApplied) continue;
       cables.qfieldTotal += 1;
-      const status = latestApplied && statusOf(latestApplied);
+      const status = statusOf(latestApplied);
       if (status) increment(cables.byStatus, status);
-      const lengthRow = [...applied].reverse().find(
-        (row) => row.cableLengthM !== null && Number.isFinite(row.cableLengthM) &&
-          row.cableLengthM >= 0,
-      );
-      if (lengthRow?.cableLengthM !== null && lengthRow?.cableLengthM !== undefined) {
-        cableLength += lengthRow.cableLengthM;
+      const length = latestApplied.cableLengthM;
+      if (validCableLength(length)) {
+        cableLength += length;
         cableLengths += 1;
+      } else if (length !== null || applied.some((row) => validCableLength(row.cableLengthM))) {
+        anomalies.push(anomaly('sync_mismatch', latestApplied));
       }
-      const identityRow = [...applied].reverse().find((row) => normalize(row.cableId));
-      const identity = identityRow ? normalize(identityRow.cableId) : null;
-      if (latestApplied && identity) {
+      const identity = normalize(latestApplied.cableId);
+      if (identity) {
         addCandidate(cableCandidates, identity, { row: latestApplied, value: { status } });
+        if (distinctIdentities(applied, (row) => row.cableId).size > 1) {
+          anomalies.push(anomaly('sync_mismatch', latestApplied, identity));
+        }
       } else anomalies.push(anomaly('sync_mismatch', latestApplied ?? history.rows.at(-1)!));
       continue;
     }
-    const identityRow = [...applied].reverse().find((row) => normalize(row.dropNumber)) ??
-      [...history.rows].reverse().find((row) => normalize(row.dropNumber));
-    const identity = identityRow ? normalize(identityRow.dropNumber) : null;
-    if (!identity || !identityRow) {
+    if (!latestApplied) continue;
+    const identity = normalize(latestApplied.dropNumber);
+    if (!identity) {
       anomalies.push(anomaly('sync_mismatch', latestApplied ?? history.rows.at(-1)!));
       continue;
+    }
+    if (distinctIdentities(applied, (row) => row.dropNumber).size > 1) {
+      anomalies.push(anomaly('sync_mismatch', latestApplied, identity));
     }
     const value = {
       installationStatus: latestApplied?.installationStatus?.trim() || null,
       qcStatus: latestApplied?.qcStatus?.trim() || null,
     };
-    addCandidate(dropCandidates, identity, { row: latestApplied ?? identityRow, value });
+    addCandidate(dropCandidates, identity, { row: latestApplied, value });
   }
   cables.totalLengthM = cableLengths > 0 ? cableLength : null;
   const cableRecords = new Map<string, { status: string | null }>();
@@ -268,15 +264,24 @@ export function buildQFieldInfrastructure(deltas: QFieldDelta[]): QFieldInfrastr
     qcStatus: string | null;
   }>();
   for (const [identity, candidates] of dropCandidates) {
-    const appliedCandidates = candidates.filter(({ row }) => row.lastStatus === 'applied');
-    const winner = latestCandidate(appliedCandidates.length > 0 ? appliedCandidates : candidates);
+    const winner = latestCandidate(candidates);
     drops.qfieldTotal += 1;
     dropRecords.set(identity, winner.value);
     const { installationStatus, qcStatus } = winner.value;
-    if (installationStatus) increment(drops.installationByStatus, installationStatus);
-    if (qcStatus) increment(drops.qcByStatus, qcStatus);
     const installation = installationStatus?.toLowerCase();
     const qc = qcStatus?.toLowerCase();
+    if (installationStatus) {
+      increment(drops.installationByStatus, installationStatus);
+      if (installation && !DROP_INSTALLATION_STATES.has(installation)) {
+        anomalies.push(anomaly('unknown_status', winner.row, identity, installationStatus));
+      }
+    }
+    if (qcStatus) {
+      increment(drops.qcByStatus, qcStatus);
+      if (qc && !DROP_QC_STATES.has(qc)) {
+        anomalies.push(anomaly('unknown_status', winner.row, identity, qcStatus));
+      }
+    }
     if (installation === 'installed') drops.installed += 1;
     if (installation === 'planned') drops.planned += 1;
     if (installation === 'in progress') drops.inProgress += 1;
