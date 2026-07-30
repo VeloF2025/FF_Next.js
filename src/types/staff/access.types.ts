@@ -9,6 +9,17 @@
 export const STAFF_SENSITIVE_PERMISSION = 'people.staff.sensitive';
 
 /**
+ * Permission key for training certificates (migration 471).
+ *
+ * Deliberately separate from STAFF_SENSITIVE_PERMISSION and not implied by it:
+ * a certificate custodian should not thereby see salaries and bank details, and
+ * an HR administrator should not automatically become a competency verifier.
+ * Actions: view (metadata + binary), create (upload), edit (verify/reject/
+ * revoke), delete (remove an unverified submission).
+ */
+export const STAFF_TRAINING_CERTIFICATES_PERMISSION = 'people.staff.training-certificates';
+
+/**
  * Fields that require sensitive data access
  * These are only visible to HR admins or self-viewing
  */

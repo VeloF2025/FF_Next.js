@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { canApproveDocuments } from '@/services/staff/staffAccessService';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { recordOcrCorrections } from '@/modules/qa-learning';
@@ -63,6 +64,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get the current user for verifier ID from Clerk (needed for HITL recording)
     const userId = (req as AuthenticatedNextApiRequest).user.id;
+
+    // Authorize against the STORED document type, before anything is written.
+    // Verifying is what turns pending evidence into evidence a statutory gate
+    // accepts, so a certification needs the dedicated edit permission — a
+    // create-only custodian cannot approve their own submission.
+    if (!(await canApproveDocuments(userId, documentType))) {
+      return apiResponse.forbidden(res, 'You do not have permission to verify this document');
+    }
     // If edited OCR metadata provided, update the document first
     if (editedOcrMetadata && Object.keys(editedOcrMetadata).length > 0) {
       await sql`

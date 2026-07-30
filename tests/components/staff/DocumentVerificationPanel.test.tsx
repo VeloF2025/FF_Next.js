@@ -139,7 +139,13 @@ describe('DocumentVerificationPanel', () => {
     it('should display download/view link', () => {
       render(<DocumentVerificationPanel {...defaultProps} />);
       const link = screen.getByRole('link', { name: /view|download|open/i });
-      expect(link).toHaveAttribute('href', mockDocument.fileUrl);
+      // The panel must link to the permission-checked route, never the raw VF
+      // Storage URL — the API no longer returns one.
+      expect(link).toHaveAttribute(
+        'href',
+        `/api/staff-documents-download?documentId=${mockDocument.id}&inline=true`
+      );
+      expect(link).not.toHaveAttribute('href', mockDocument.fileUrl);
     });
 
     it('should open link in new tab', () => {
@@ -161,7 +167,10 @@ describe('DocumentVerificationPanel', () => {
       };
       render(<DocumentVerificationPanel {...defaultProps} document={imageDoc} />);
       const img = screen.getByRole('img');
-      expect(img).toHaveAttribute('src', imageDoc.fileUrl);
+      expect(img).toHaveAttribute(
+        'src',
+        `/api/staff-documents-download?documentId=${imageDoc.id}&inline=true`
+      );
     });
   });
 

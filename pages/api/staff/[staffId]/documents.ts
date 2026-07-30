@@ -9,7 +9,10 @@ import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import type { DocumentType, VerificationStatus } from '@/types/staff-document.types';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
-import { canAccessStaffDocuments } from '@/services/staff/staffAccessService';
+import {
+  canAccessStaffDocuments,
+  canAccessTrainingCertificates,
+} from '@/services/staff/staffAccessService';
 import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
@@ -25,84 +28,57 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
 
   if (req.method === 'GET') {
     try {
-      // Check if user can access documents for this staff member
-      const canAccess = await canAccessStaffDocuments(userId, staffId);
-      if (!canAccess) {
+      // Three scopes, decided server-side:
+      //   full HR / self          — every document type, as before;
+      //   certificate custodian   — certification documents only, so a training
+      //                             grant never widens into IDs and bank details;
+      //   neither                 — nothing.
+      const canAccessAll = await canAccessStaffDocuments(userId, staffId);
+      const canAccessCertificates = canAccessAll || (await canAccessTrainingCertificates(userId));
+      if (!canAccessCertificates) {
         return res.status(403).json({
           error: 'Access denied',
           message: 'You do not have permission to view documents for this staff member'
         });
       }
-      let query = sql`
-        SELECT
-          sd.*,
-          s.name as staff_name,
-          v.name as verifier_name
-        FROM staff_documents sd
-        LEFT JOIN staff s ON s.id = sd.staff_id
-        LEFT JOIN staff v ON v.id = sd.verified_by
-        WHERE sd.staff_id = ${staffId}
-      `;
+      // Explicit branches rather than a conditional fragment: the Neon shim
+      // binds every interpolation as a parameter, so SQL cannot be spliced in.
+      // The projection is column-by-column and deliberately excludes file_path
+      // and file_url — the binary is reachable only through the protected
+      // download route, which re-checks permission per request.
+      const documents = canAccessAll
+        ? await sql`
+            SELECT
+              sd.id, sd.staff_id, sd.document_type, sd.document_name,
+              sd.file_size, sd.mime_type, sd.expiry_date, sd.issued_date,
+              sd.issuing_authority, sd.document_number, sd.verification_status,
+              sd.verified_by, sd.verified_at, sd.verification_notes,
+              sd.ocr_metadata, sd.created_at, sd.updated_at,
+              CONCAT(s.first_name, ' ', s.last_name) as staff_name,
+              CONCAT(v.first_name, ' ', v.last_name) as verifier_name
+            FROM staff_documents sd
+            LEFT JOIN staff s ON s.id = sd.staff_id
+            LEFT JOIN staff v ON v.id = sd.verified_by
+            WHERE sd.staff_id = ${staffId}
+            ORDER BY sd.created_at DESC
+          `
+        : await sql`
+            SELECT
+              sd.id, sd.staff_id, sd.document_type, sd.document_name,
+              sd.file_size, sd.mime_type, sd.expiry_date, sd.issued_date,
+              sd.issuing_authority, sd.document_number, sd.verification_status,
+              sd.verified_by, sd.verified_at, sd.verification_notes,
+              sd.ocr_metadata, sd.created_at, sd.updated_at,
+              CONCAT(s.first_name, ' ', s.last_name) as staff_name,
+              CONCAT(v.first_name, ' ', v.last_name) as verifier_name
+            FROM staff_documents sd
+            LEFT JOIN staff s ON s.id = sd.staff_id
+            LEFT JOIN staff v ON v.id = sd.verified_by
+            WHERE sd.staff_id = ${staffId}
+              AND sd.document_type = 'certification'
+            ORDER BY sd.created_at DESC
+          `;
 
-      // Apply filters
-      if (documentType && typeof documentType === 'string') {
-        query = sql`
-          SELECT
-            sd.*,
-            s.name as staff_name,
-            v.name as verifier_name
-          FROM staff_documents sd
-          LEFT JOIN staff s ON s.id = sd.staff_id
-          LEFT JOIN staff v ON v.id = sd.verified_by
-          WHERE sd.staff_id = ${staffId}
-            AND sd.document_type = ${documentType}
-        `;
-      }
-
-      if (verificationStatus && typeof verificationStatus === 'string') {
-        query = sql`
-          SELECT
-            sd.*,
-            s.name as staff_name,
-            v.name as verifier_name
-          FROM staff_documents sd
-          LEFT JOIN staff s ON s.id = sd.staff_id
-          LEFT JOIN staff v ON v.id = sd.verified_by
-          WHERE sd.staff_id = ${staffId}
-            AND sd.verification_status = ${verificationStatus}
-        `;
-      }
-
-      // If both filters
-      if (documentType && verificationStatus && typeof documentType === 'string' && typeof verificationStatus === 'string') {
-        query = sql`
-          SELECT
-            sd.*,
-            s.name as staff_name,
-            v.name as verifier_name
-          FROM staff_documents sd
-          LEFT JOIN staff s ON s.id = sd.staff_id
-          LEFT JOIN staff v ON v.id = sd.verified_by
-          WHERE sd.staff_id = ${staffId}
-            AND sd.document_type = ${documentType}
-            AND sd.verification_status = ${verificationStatus}
-        `;
-      }
-
-      // Execute query - need to rebuild without filters for now due to tagged template limitations
-      const documents = await sql`
-        SELECT
-          sd.*,
-          CONCAT(s.first_name, ' ', s.last_name) as staff_name,
-          CONCAT(v.first_name, ' ', v.last_name) as verifier_name
-        FROM staff_documents sd
-        LEFT JOIN staff s ON s.id = sd.staff_id
-        LEFT JOIN staff v ON v.id = sd.verified_by
-        WHERE sd.staff_id = ${staffId}
-        ORDER BY sd.created_at DESC
-      `;
-
-      // Filter in JS if needed (tagged templates make dynamic WHERE harder)
       let filtered = documents;
       if (documentType && typeof documentType === 'string') {
         filtered = filtered.filter(d => d.document_type === documentType);
@@ -135,7 +111,8 @@ function mapDbToDocument(row: Record<string, unknown>) {
     staffId: row.staff_id,
     documentType: row.document_type,
     documentName: row.document_name,
-    fileUrl: row.file_url,
+    // The protected route, never the storage location.
+    downloadUrl: `/api/staff-documents-download?documentId=${row.id as string}`,
     fileSize: row.file_size,
     mimeType: row.mime_type,
     expiryDate: row.expiry_date ? new Date(row.expiry_date as string).toISOString() : undefined,

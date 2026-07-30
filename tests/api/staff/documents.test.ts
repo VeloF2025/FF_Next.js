@@ -31,6 +31,9 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/services/staff/staffAccessService', () => ({
   canAccessStaffDocuments: vi.fn().mockResolvedValue(true),
+  // Certificate-scoped fallback for callers without full HR access. Full access
+  // short-circuits before this is consulted.
+  canAccessTrainingCertificates: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -52,6 +55,9 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps queued one-shot values; a leftover would bleed into
+    // the next test and silently return the wrong rows.
+    mockSql.mockReset();
 
     req = {
       method: 'GET',
@@ -100,8 +106,7 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
 
     // Handler calls sql twice - once for query variable, once for actual fetch
     mockSql
-      .mockResolvedValueOnce([]) // First call (unused query variable)
-      .mockResolvedValueOnce(mockDocuments); // Second call (actual documents fetch)
+      .mockResolvedValueOnce(mockDocuments); // The handler's single query
 
     await handler(req as NextApiRequest, res as NextApiResponse);
 
@@ -152,8 +157,6 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
 
     // Handler calls sql multiple times for different query variations
     mockSql
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce(mockDocuments);
 
     await handler(req as NextApiRequest, res as NextApiResponse);
@@ -192,8 +195,6 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
 
     // Handler calls sql multiple times for different query variations
     mockSql
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce(mockDocuments);
 
     await handler(req as NextApiRequest, res as NextApiResponse);
@@ -206,7 +207,6 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
   it('should return empty array when no documents exist', async () => {
     // Handler calls sql twice
     mockSql
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     await handler(req as NextApiRequest, res as NextApiResponse);
@@ -249,7 +249,6 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
 
   it('should return 500 on database error', async () => {
     mockSql
-      .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error('Database connection failed'));
 
     await handler(req as NextApiRequest, res as NextApiResponse);
@@ -299,10 +298,9 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
       verifier_name: 'Admin User',
     };
 
-    // Handler calls sql twice
-    mockSql
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([mockDocument]);
+    // The handler now runs exactly one query (it previously fired up to three
+    // extra tagged-template queries whose results were never used).
+    mockSql.mockResolvedValueOnce([mockDocument]);
 
     await handler(req as NextApiRequest, res as NextApiResponse);
 
@@ -313,7 +311,10 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
     expect(doc).toHaveProperty('staffId', 'staff-123');
     expect(doc).toHaveProperty('documentType', 'certification');
     expect(doc).toHaveProperty('documentName', 'Safety Cert');
-    expect(doc).toHaveProperty('fileUrl');
+    // The storage URL is no longer returned; callers get the protected route,
+    // which re-checks permission on every request.
+    expect(doc).not.toHaveProperty('fileUrl');
+    expect(doc).toHaveProperty('downloadUrl', '/api/staff-documents-download?documentId=doc-1');
     expect(doc).toHaveProperty('fileSize', 1024);
     expect(doc).toHaveProperty('mimeType', 'application/pdf');
     expect(doc).toHaveProperty('issuingAuthority', 'SafetyCorp');

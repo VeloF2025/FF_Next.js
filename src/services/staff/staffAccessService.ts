@@ -12,7 +12,22 @@ import {
   type StaffAccessLevel,
   type StaffAccessResult,
 } from '@/types/staff/access.types';
+import {
+  CERTIFICATION_DOCUMENT_TYPE,
+  canAccessTrainingCertificates,
+  canCreateTrainingCertificates,
+  canEditTrainingCertificates,
+  canDeleteTrainingCertificates,
+} from './trainingCertificateAccess';
 import { createLogger } from '@/lib/logger';
+
+export { STAFF_TRAINING_CERTIFICATES_PERMISSION } from '@/types/staff/access.types';
+export {
+  canAccessTrainingCertificates,
+  canCreateTrainingCertificates,
+  canEditTrainingCertificates,
+  canDeleteTrainingCertificates,
+} from './trainingCertificateAccess';
 
 const sql = neon(process.env.DATABASE_URL!);
 const log = createLogger('StaffAccessService');
@@ -163,8 +178,29 @@ export async function canAccessStaffDocuments(
 }
 
 /**
+ * Check if a user can read one specific document.
+ *
+ * Type-aware: a certification is a training certificate, reachable either by the
+ * dedicated view permission or by the existing HR/self scope. Every other type
+ * keeps exactly the previous rule, so this narrows nothing that used to work.
+ */
+export async function canAccessStaffDocument(
+  userId: string,
+  targetStaffId: string,
+  documentType: string
+): Promise<boolean> {
+  if (documentType === CERTIFICATION_DOCUMENT_TYPE) {
+    if (await canAccessTrainingCertificates(userId)) {
+      return true;
+    }
+  }
+  return canAccessStaffDocuments(userId, targetStaffId);
+}
+
+/**
  * Check if a user can upload documents for a staff member
- * - HR admins can upload for anyone
+ * - Certifications require the dedicated create permission
+ * - HR admins can upload every other type for anyone
  * - Users can upload their own driver's license
  */
 export async function canUploadStaffDocument(
@@ -172,6 +208,13 @@ export async function canUploadStaffDocument(
   targetStaffId: string,
   documentType?: string
 ): Promise<boolean> {
+  // Uploading a certificate creates competency evidence, which is what the
+  // dedicated permission exists to control. HR-sensitive edit is not a
+  // substitute, and version one has no employee self-submission.
+  if (documentType === CERTIFICATION_DOCUMENT_TYPE) {
+    return canCreateTrainingCertificates(userId);
+  }
+
   const access = await checkStaffAccess(userId, targetStaffId);
 
   // HR admins can upload anything
@@ -188,61 +231,39 @@ export async function canUploadStaffDocument(
 }
 
 /**
- * Check if a user can approve/verify documents (HR admins only)
+ * Check if a user can delete one specific document.
+ *
+ * Certifications require the dedicated delete permission; nothing else may
+ * remove competency evidence. Other types require HR edit — previously these
+ * routes checked nothing at all.
  */
-export async function canApproveDocuments(userId: string): Promise<boolean> {
-  return canEditSensitiveStaffData(userId);
+export async function canDeleteStaffDocument(
+  userId: string,
+  targetStaffId: string,
+  documentType: string
+): Promise<boolean> {
+  if (documentType === CERTIFICATION_DOCUMENT_TYPE) {
+    return canDeleteTrainingCertificates(userId);
+  }
+  const access = await checkStaffAccess(userId, targetStaffId);
+  return access.canEditSensitive;
 }
 
 /**
- * Export columns for staff export based on access level
+ * Check if a user can approve/verify documents.
+ *
+ * Verifying a certificate turns pending evidence into evidence that satisfies a
+ * statutory gate, so it needs the dedicated edit permission — notably, a
+ * create-only custodian cannot approve their own submission.
  */
-export function getExportColumns(access: StaffAccessResult): string[] {
-  const baseColumns = [
-    'Employee ID',
-    'Name',
-    'Email',
-    'Phone',
-    'Position',
-    'Department',
-    'Level',
-    'Status',
-    'Manager',
-    'Skills',
-    'Experience Years',
-    'Address',
-    'City',
-    'Province',
-    'Postal Code',
-    'Start Date',
-    'Contract Type',
-    'Working Hours',
-    'Available Weekends',
-    'Available Nights',
-    'Current Projects',
-    'Max Projects',
-  ];
-
-  if (access.canViewSensitive) {
-    return [
-      ...baseColumns,
-      // Add sensitive columns
-      'Salary',
-      'Hourly Rate',
-      'Salary Grade',
-      'SA ID Number',
-      'Passport Number',
-      'Tax Number',
-      'UIF Number',
-      'Bank Name',
-      'Bank Account Number',
-      'Bank Branch Code',
-      'Emergency Contact Name',
-      'Emergency Contact Phone',
-      'Next of Kin Name',
-      'Next of Kin Phone',
-    ];
+export async function canApproveDocuments(
+  userId: string,
+  documentType?: string
+): Promise<boolean> {
+  if (documentType === CERTIFICATION_DOCUMENT_TYPE) {
+    return canEditTrainingCertificates(userId);
   }
-
-  return baseColumns;
+  return canEditSensitiveStaffData(userId);
 }
+
+export { getExportColumns } from './staffExportColumns';

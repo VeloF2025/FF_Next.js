@@ -87,7 +87,7 @@
 - Consumes: existing `staff_documents`, `hs_training_types`, `hs_worker_training`, `access_permissions`, `role_permissions`, and `schema_migrations`.
 - Produces: `hs_worker_training.staff_document_id`, lifecycle columns, verified-only indexes, four fibre type rows, `people.staff.training-certificates`, and a rollback that restores the previous schema.
 
-- [ ] **Step 1: Confirm the migration number and current source schemas**
+- [x] **Step 1: Confirm the migration number and current source schemas**
 
 Run:
 
@@ -101,7 +101,7 @@ rg -n "CREATE TABLE IF NOT EXISTS hs_worker_training|chk_verification_status|upd
 
 Expected: `470` is the highest forward migration. If another `471_*.sql` exists, use the next unused number consistently instead of `471`.
 
-- [ ] **Step 2: Write the failing schema-contract test**
+- [x] **Step 2: Write the failing schema-contract test**
 
 The test must read the forward, rollback, and preflight SQL and assert these exact contracts:
 
@@ -120,7 +120,7 @@ expect(rollback).toContain("SET verification_status = 'rejected'");
 expect(rollback).toContain('DROP COLUMN IF EXISTS staff_document_id');
 ```
 
-- [ ] **Step 3: Run the schema-contract test and verify red**
+- [x] **Step 3: Run the schema-contract test and verify red**
 
 Run:
 
@@ -130,7 +130,7 @@ npx vitest run src/modules/health-safety/__tests__/trainingCertificateSchemaSync
 
 Expected: FAIL because the three SQL files do not exist.
 
-- [ ] **Step 4: Write the read-only preflight**
+- [x] **Step 4: Write the read-only preflight**
 
 Make the preflight return named counts without modifying data:
 
@@ -152,7 +152,7 @@ SELECT COUNT(*) AS revoked_staff_document_count
 FROM staff_documents WHERE verification_status = 'revoked';
 ```
 
-- [ ] **Step 5: Write the additive forward migration**
+- [x] **Step 5: Write the additive forward migration**
 
 The migration must:
 
@@ -183,7 +183,7 @@ It must also:
 - grant `{view,create,edit,delete}` only to `super_admin`;
 - insert its own filename into `schema_migrations` using the repository's current convention.
 
-- [ ] **Step 6: Write the rollback**
+- [x] **Step 6: Write the rollback**
 
 The rollback must first preserve terminal state:
 
@@ -200,7 +200,7 @@ WHERE verification_status = 'revoked';
 
 Then restore the previous staff status constraint and expiry function, remove the new role and access permission, delete only unused seeded fibre types, drop new indexes and lifecycle constraint, drop new training columns, and delete the migration filename from `schema_migrations`.
 
-- [ ] **Step 7: Run schema tests and a throwaway PostgreSQL apply/rollback proof**
+- [x] **Step 7: Run schema tests and a throwaway PostgreSQL apply/rollback proof**
 
 Run:
 
@@ -212,7 +212,7 @@ Then use a disposable PostgreSQL database containing the prerequisite tables, ap
 
 Expected: test PASS; both forward applications succeed; rollback succeeds; no new column/index remains after rollback. Do not connect this proof to the shared FibreFlow database.
 
-- [ ] **Step 8: Commit the schema unit**
+- [x] **Step 8: Commit the schema unit**
 
 ```bash
 git add scripts/migrations/sql/471_hs_training_certificate_upload.sql \
@@ -275,11 +275,11 @@ export function resolveTrainingExpiry(
 ): string | null;
 ```
 
-- [ ] **Step 1: Write failing unit cases for mapping and expiry**
+- [x] **Step 1: Write failing unit cases for mapping and expiry**
 
 Cover one type, multiple types, duplicate input ids, explicit expiry, catalogue-derived expiry, no expiry, inactive/unknown type, duplicate certificate, and expiry before completion. Assert all linked rows use the same returned document id and start pending.
 
-- [ ] **Step 2: Run the service test and verify red**
+- [x] **Step 2: Run the service test and verify red**
 
 Run:
 
@@ -289,7 +289,7 @@ npx vitest run src/modules/health-safety/__tests__/trainingCertificateService.te
 
 Expected: FAIL because the service modules and lifecycle types do not exist.
 
-- [ ] **Step 3: Add storage-safe types**
+- [x] **Step 3: Add storage-safe types**
 
 Add the lifecycle fields to `HSWorkerTraining`, replace new-response reliance on `certificate_url` with `staff_document_id`, and add:
 
@@ -304,11 +304,11 @@ export interface LinkedTrainingTypeSummary {
 
 Extend staff document status to include `revoked`; public document shapes expose `downloadUrl?: string` and `trainingTypes?: LinkedTrainingTypeSummary[]`, never a raw path.
 
-- [ ] **Step 4: Implement pure validation and expiry resolution**
+- [x] **Step 4: Implement pure validation and expiry resolution**
 
 Use UTC calendar arithmetic, reject invalid ISO dates, and clamp month addition to the last valid day of the target month. Normalize training type ids with `trim()` and reject rather than silently discard duplicates.
 
-- [ ] **Step 5: Implement transactional submission creation**
+- [x] **Step 5: Implement transactional submission creation**
 
 Within the caller-provided transaction:
 
@@ -321,7 +321,7 @@ Within the caller-provided transaction:
 
 Use parameterized `TxnClient.query` calls and no storage operation inside the service.
 
-- [ ] **Step 6: Run the focused tests**
+- [x] **Step 6: Run the focused tests**
 
 Run:
 
@@ -332,7 +332,7 @@ npm run type-check
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the domain unit**
+- [x] **Step 7: Commit the domain unit**
 
 ```bash
 git add src/modules/health-safety/services/trainingCertificateService.ts \

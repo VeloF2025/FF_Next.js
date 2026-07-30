@@ -7,14 +7,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import {
+  canAccessStaffDocuments,
+  canAccessSensitiveStaffData,
+  canAccessTrainingCertificates,
+} from '@/services/staff/staffAccessService';
 import { createLogger } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('ExpiringDocumentsAPI');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // withAuth has already attached `user`; AuthenticatedHandler is typed against
+  // the base request, so narrow here (same idiom as ./[documentId]/verify.ts).
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
@@ -29,15 +38,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
+    // Scope, decided server-side. A per-staff request is authorized against that
+    // employee; the all-staff request needs the HR-sensitive grant, because it
+    // is a cross-employee read.
+    const userId = authReq.user.id;
+    const canAccessAll =
+      staffId && typeof staffId === 'string'
+        ? await canAccessStaffDocuments(userId, staffId)
+        : await canAccessSensitiveStaffData(userId);
+    const certificatesOnly = !canAccessAll && (await canAccessTrainingCertificates(userId));
+    if (!canAccessAll && !certificatesOnly) {
+      return apiResponse.forbidden(res, 'You do not have permission to view these documents');
+    }
+
+    // `certificatesOnly` is bound as a parameter rather than spliced in as a
+    // SQL fragment: the Neon shim parameterises every interpolation, so a
+    // conditional fragment would be sent as a literal string. One static query
+    // shape, scoped by a bound boolean.
+    //
+    // The projection is column-by-column and omits file_path and file_url.
     let documents;
 
     if (staffId && typeof staffId === 'string') {
-      // Get expiring documents for specific staff member
       documents = await sql`
         SELECT
-          sd.*,
-          s.name as staff_name,
-          s.email as staff_email
+            sd.id, sd.staff_id, sd.document_type, sd.document_name,
+            sd.file_size, sd.mime_type, sd.expiry_date, sd.issued_date,
+            sd.issuing_authority, sd.document_number, sd.verification_status,
+            sd.verified_by, sd.verified_at, sd.verification_notes,
+            sd.created_at, sd.updated_at,
+            s.name as staff_name,
+            s.email as staff_email
         FROM staff_documents sd
         LEFT JOIN staff s ON s.id = sd.staff_id
         WHERE sd.staff_id = ${staffId}
@@ -45,50 +76,64 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND sd.expiry_date <= CURRENT_DATE + INTERVAL '1 day' * ${daysNum}
           AND sd.expiry_date >= CURRENT_DATE
           AND sd.verification_status != 'expired'
+          AND (${certificatesOnly}::boolean = false OR sd.document_type = 'certification')
         ORDER BY sd.expiry_date ASC
       `;
     } else {
-      // Get all expiring documents
       documents = await sql`
         SELECT
-          sd.*,
-          s.name as staff_name,
-          s.email as staff_email
+            sd.id, sd.staff_id, sd.document_type, sd.document_name,
+            sd.file_size, sd.mime_type, sd.expiry_date, sd.issued_date,
+            sd.issuing_authority, sd.document_number, sd.verification_status,
+            sd.verified_by, sd.verified_at, sd.verification_notes,
+            sd.created_at, sd.updated_at,
+            s.name as staff_name,
+            s.email as staff_email
         FROM staff_documents sd
         LEFT JOIN staff s ON s.id = sd.staff_id
         WHERE sd.expiry_date IS NOT NULL
           AND sd.expiry_date <= CURRENT_DATE + INTERVAL '1 day' * ${daysNum}
           AND sd.expiry_date >= CURRENT_DATE
           AND sd.verification_status != 'expired'
+          AND (${certificatesOnly}::boolean = false OR sd.document_type = 'certification')
         ORDER BY sd.expiry_date ASC
       `;
     }
 
-    // Also get already expired documents
     let expiredDocuments;
     if (staffId && typeof staffId === 'string') {
       expiredDocuments = await sql`
         SELECT
-          sd.*,
-          s.name as staff_name,
-          s.email as staff_email
+            sd.id, sd.staff_id, sd.document_type, sd.document_name,
+            sd.file_size, sd.mime_type, sd.expiry_date, sd.issued_date,
+            sd.issuing_authority, sd.document_number, sd.verification_status,
+            sd.verified_by, sd.verified_at, sd.verification_notes,
+            sd.created_at, sd.updated_at,
+            s.name as staff_name,
+            s.email as staff_email
         FROM staff_documents sd
         LEFT JOIN staff s ON s.id = sd.staff_id
         WHERE sd.staff_id = ${staffId}
           AND sd.expiry_date IS NOT NULL
           AND sd.expiry_date < CURRENT_DATE
+          AND (${certificatesOnly}::boolean = false OR sd.document_type = 'certification')
         ORDER BY sd.expiry_date DESC
       `;
     } else {
       expiredDocuments = await sql`
         SELECT
-          sd.*,
-          s.name as staff_name,
-          s.email as staff_email
+            sd.id, sd.staff_id, sd.document_type, sd.document_name,
+            sd.file_size, sd.mime_type, sd.expiry_date, sd.issued_date,
+            sd.issuing_authority, sd.document_number, sd.verification_status,
+            sd.verified_by, sd.verified_at, sd.verification_notes,
+            sd.created_at, sd.updated_at,
+            s.name as staff_name,
+            s.email as staff_email
         FROM staff_documents sd
         LEFT JOIN staff s ON s.id = sd.staff_id
         WHERE sd.expiry_date IS NOT NULL
           AND sd.expiry_date < CURRENT_DATE
+          AND (${certificatesOnly}::boolean = false OR sd.document_type = 'certification')
         ORDER BY sd.expiry_date DESC
       `;
     }
@@ -146,7 +191,8 @@ function mapDbToDocument(row: Record<string, unknown>) {
     staffId: row.staff_id,
     documentType: row.document_type,
     documentName: row.document_name,
-    fileUrl: row.file_url,
+    // The protected route, never the storage location.
+    downloadUrl: `/api/staff-documents-download?documentId=${row.id as string}`,
     fileSize: row.file_size,
     mimeType: row.mime_type,
     expiryDate: row.expiry_date ? new Date(row.expiry_date as string).toISOString() : undefined,
