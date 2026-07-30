@@ -25,6 +25,14 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       rbacKey: 'construction-qa.qa-centre',
     },
     {
+      id: 'works-qa',
+      label: 'Works QA',
+      shortLabel: 'Works QA',
+      icon: Camera,
+      path: '/field-ops/works-qa',
+      rbacKey: 'construction-qa.works-qa',
+    },
+    {
       id: 'otdr-testing',
       label: 'OTDR Testing',
       shortLabel: 'OTDR',
@@ -45,14 +53,6 @@ export const constructionQaConfig: ModuleNavigationConfig = {
         { id: 'summary', label: 'Summary', icon: Table2, path: '/field-ops/snags/summary' },
         { id: 'reports', label: 'Reports', icon: BarChart3, path: '/field-ops/snags/reports' },
       ],
-    },
-    {
-      id: 'works-qa',
-      label: 'Works QA',
-      shortLabel: 'Works QA',
-      icon: Camera,
-      path: '/field-ops/works-qa',
-      rbacKey: 'construction-qa.works-qa',
     },
     {
       id: 'reports',
