@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-28T09:47:52.331Z",
+  "generatedAt": "2026-07-30T06:29:08.970Z",
   "routes": [
     {
       "path": "/api/action-items",
@@ -2362,6 +2362,14 @@
       "description": "CAPA Detail API"
     },
     {
+      "path": "/api/health-safety/checkins",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "GET /api/health-safety/checkins — the daily check-in board."
+    },
+    {
       "path": "/api/health-safety/checklists",
       "methods": [
         "GET"
@@ -2707,6 +2715,23 @@
       ],
       "group": "materials",
       "description": "Material Catalog API"
+    },
+    {
+      "path": "/api/mcp/resource-metadata",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "group": "mcp",
+      "description": "RFC 9728 protected-resource metadata for the FibreFlow remote MCP connector."
+    },
+    {
+      "path": "/api/me/mcp-tokens",
+      "methods": [
+        "GET"
+      ],
+      "group": "me",
+      "description": "FibreFlow read-only MCP tokens — self-serve mint + list."
     },
     {
       "path": "/api/meetings",
@@ -4693,6 +4718,13 @@
       ],
       "group": "qfield",
       "description": "GET /api/qfield/photo-proxy?key={photo_key}"
+    },
+    {
+      "path": "/api/qfield/project-stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "qfield"
     },
     {
       "path": "/api/qfield/projects",
