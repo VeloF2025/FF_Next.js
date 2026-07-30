@@ -30,4 +30,26 @@ describe('ZoneDeliverySnags', () => {
         `/field-ops/snags?project_id=${encodeURIComponent(projectId)}&zone_no=12&pon_no=4`,
       );
   });
+
+  it('labels reused post-handover snag evidence as maintenance', () => {
+    render(<ZoneDeliverySnags zone={{
+      ...zoneFixture,
+      status: 'handed_over',
+      handedOverAt: '2026-07-10T08:00:00.000Z',
+      snags: [{
+        snagId,
+        status: 'open',
+        closedAt: null,
+        qaDiscipline: null,
+        ponStageId,
+        ponNo: 4,
+        affectedGate: 'technically_live',
+        handoverBlocking: false,
+        requiresReconfirmation: false,
+        reconfirmedAt: null,
+      }],
+    }} />);
+    expect(screen.getByText('Maintenance')).toBeInTheDocument();
+    expect(screen.queryByText('Civil Zone QA')).not.toBeInTheDocument();
+  });
 });

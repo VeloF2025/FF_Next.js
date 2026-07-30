@@ -93,10 +93,11 @@ function milestoneView(
 export function qaView(aggregate: ZoneAggregate, discipline: 'civil' | 'optical') {
   const zone = aggregate.zone;
   const activity = latestActivity(aggregate, `${discipline}_zone_qa_recorded`);
+  const approverUserId = zone?.[`${discipline}_qa_approved_by`];
   return {
     status: (zone?.[`${discipline}_qa_status`] ?? 'not_started') as ZoneQaStatus,
     effectiveAt: iso(zone?.[`${discipline}_qa_effective_at`] as Time ?? null),
-    approverEmail: activity?.actor_email ?? null,
+    approverEmail: approverUserId ? activity?.actor_email ?? null : null,
     notes: String(zone?.[`${discipline}_qa_notes`] ?? ''),
   };
 }

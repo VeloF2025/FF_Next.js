@@ -7,9 +7,12 @@ import { ZoneDeliveryTimestamp } from './ZoneDeliveryTimestamp';
 const titleCase = (value: string) =>
   value.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase());
 
-function originLabel(snag: ZoneSnagView): string {
+function originLabel(zone: ZoneDeliveryView, snag: ZoneSnagView): string {
   if (snag.qaDiscipline === 'civil') return 'Civil Zone QA';
   if (snag.qaDiscipline === 'optical') return 'Optical Zone QA';
+  if (zone.status === 'handed_over'
+    && !snag.handoverBlocking
+    && !snag.requiresReconfirmation) return 'Maintenance';
   if (snag.affectedGate) return `${titleCase(snag.affectedGate)} gate`;
   return 'Zone delivery';
 }
@@ -31,7 +34,7 @@ export function ZoneDeliverySnags({ zone }: { zone: ZoneDeliveryView }) {
             <li key={snag.snagId} className="rounded border border-[var(--border-color)] p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{originLabel(snag)}</span>
+                  <span className="font-medium">{originLabel(zone, snag)}</span>
                   <span>{titleCase(snag.status)}</span>
                   {snag.ponNo !== undefined && <span>PON {snag.ponNo}</span>}
                   <span>{snag.handoverBlocking ? 'Blocking' : 'Non-blocking'}</span>

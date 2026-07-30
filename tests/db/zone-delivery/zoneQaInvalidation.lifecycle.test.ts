@@ -176,8 +176,18 @@ describe('Zone QA invalidation lifecycle', () => {
     expect(priorEligibility).not.toBeNull();
     expect(view.rowVersion).toBeGreaterThan(priorVersion);
     expect(view).toMatchObject({
-      civilQa: { status: 'not_started', notes: '', effectiveAt: null },
-      opticalQa: { status: 'not_started', notes: '', effectiveAt: null },
+      civilQa: {
+        status: 'not_started',
+        notes: '',
+        effectiveAt: null,
+        approverEmail: null,
+      },
+      opticalQa: {
+        status: 'not_started',
+        notes: '',
+        effectiveAt: null,
+        approverEmail: null,
+      },
       eligibleForZoneQaAt: null,
     });
     const actions = (await service.getActivity(key)).map(item => item.action);
@@ -225,8 +235,16 @@ describe('Zone QA invalidation lifecycle', () => {
     }, actor('testing-confirm'));
     expect(reopened.rowVersion).toBeGreaterThan(approved.rowVersion);
     expect(reopened).toMatchObject({
-      civilQa: { status: 'not_started', effectiveAt: null },
-      opticalQa: { status: 'not_started', effectiveAt: null },
+      civilQa: {
+        status: 'not_started',
+        effectiveAt: null,
+        approverEmail: null,
+      },
+      opticalQa: {
+        status: 'not_started',
+        effectiveAt: null,
+        approverEmail: null,
+      },
       eligibleForZoneQaAt: null,
     });
     expect((await service.getActivity(key)).map(item => item.action)).toEqual(
