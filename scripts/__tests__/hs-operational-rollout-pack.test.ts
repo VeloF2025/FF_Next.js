@@ -232,6 +232,7 @@ describe('H&S operational rollout pack', () => {
     expect(draft).toContain('does not reduce your pay');
     expect(draft).toContain('answer truthfully');
     expect(draft).toContain('Crew leads');
+    expect(draft).toContain('do not continue with that gated activity');
   });
 
   it('summarizes source and review counts without worker names', () => {
