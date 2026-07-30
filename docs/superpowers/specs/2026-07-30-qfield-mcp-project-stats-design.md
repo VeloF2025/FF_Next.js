@@ -30,12 +30,15 @@ The approved business definition is:
 > A planted pole is one distinct QField civil feature that is physically in the
 > ground. Missing photos or pending QA do not make it unplanted.
 
-Current QField statuses that prove physical planting are:
+Current QField statuses that establish physical planting are:
 
 - `Pole Planted/ All Photos`;
 - `Pole Planted - Photos Incomplete`; and
-- `(ADMIN) Q/A Passed`, because QA passage is a later state that implies the pole
-  was already planted.
+- `Pole Verified/ Civil Complete`.
+
+QA and photo-status changes preserve the most recent physical state. Explicit
+`Pole Removed/Canceled` and `Pole Canceled / Removed` events change the physical
+state back to not planted. A later planting event can establish it again.
 
 PR 2 will address connector/session diagnostics separately. It is deliberately
 outside this design.
@@ -179,12 +182,15 @@ Feature identity remains `(kind, localPk)`, never `localPk` alone.
 
 For each civil feature:
 
-1. consider successfully applied, status-bearing deltas;
-2. select the most recent such delta deterministically by timestamp and ID;
-3. trim surrounding whitespace from its status;
-4. count it as planted when the canonical status is one of:
-   `Pole Planted/ All Photos`, `Pole Planted - Photos Incomplete`, or
-   `(ADMIN) Q/A Passed`.
+1. consider successfully applied, status-bearing deltas in deterministic
+   timestamp-and-ID order;
+2. trim surrounding whitespace from each status;
+3. set physical state to planted for `Pole Planted/ All Photos`,
+   `Pole Planted - Photos Incomplete`, or `Pole Verified/ Civil Complete`;
+4. set physical state to not planted for `Pole Removed/Canceled` or
+   `Pole Canceled / Removed`; and
+5. leave physical state unchanged for QA, photo, WIP, and other non-physical
+   status changes.
 
 A later failed or stuck duplicate does not remove an earlier successfully
 applied state. It is reported as an anomaly and cannot create an additional
@@ -359,8 +365,8 @@ never logged.
 
 ### Unit tests
 
-- physical planting classification across complete-photo, incomplete-photo, and
-  QA-passed states;
+- physical planting state transitions across planting, verification,
+  removal/cancellation, photo, and QA events;
 - latest-successfully-applied selection;
 - `(kind, localPk)` feature identity;
 - stuck and stale duplicate handling;
@@ -401,8 +407,9 @@ never logged.
 
 1. A natural-language Mahikeng planted-pole question selects the curated MCP tool
    without generic endpoint discovery.
-2. The returned planted count includes distinct latest-applied features in every
-   approved physical-planting state, regardless of photo completeness or QA.
+2. The returned planted count includes distinct features whose last applied
+   physical-state event leaves them in the ground, regardless of later photo or
+   QA state.
 3. Summary and section totals agree.
 4. No hard record limit can silently undercount an aggregate.
 5. Source failure cannot appear as a zero.
