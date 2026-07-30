@@ -62,13 +62,26 @@ export function VehicleTile({
   if (!hasVehicle) return null;
 
   const reg = summary?.assignedVehicle?.registration ?? '…';
+  const checkDue = summary?.assignedVehicle?.requiredCheckType ?? null;
   return (
     <Tile
       onClick={onClick}
       icon={<Car className="w-5 h-5" />}
-      iconClass="bg-emerald-500/15 text-emerald-300"
+      iconClass={
+        checkDue
+          ? 'bg-orange-500/15 text-orange-300'
+          : 'bg-emerald-500/15 text-emerald-300'
+      }
       title="My Vehicle"
-      subtitle={pending ? 'Opening…' : reg}
+      subtitle={
+        pending
+          ? 'Opening…'
+          : checkDue
+            ? `${reg} · ${checkDue === 'weekly' ? 'Weekly inspection due' : 'Daily check due'}`
+            : reg
+      }
+      badge={checkDue ? `${checkDue} due` : null}
+      badgeClass="bg-orange-500/15 text-orange-300 border-orange-500/30"
       disabled={pending}
     />
   );

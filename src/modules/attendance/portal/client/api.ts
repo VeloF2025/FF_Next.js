@@ -178,7 +178,9 @@ export interface HubSummaryResponse {
   } | null;
   assignedVehicle: {
     id: string;
+    vehicleId: string | null;
     registration: string | null;
+    requiredCheckType: 'daily' | 'weekly' | null;
   } | null;
   latestPayslip: {
     id: string;
@@ -234,6 +236,7 @@ export function payslipDownloadUrl(payslipId: string): string {
 
 export interface FleetHandoffResponse {
   sessionId: string;
+  vehicleId: string;
   vehicleRegistration: string | null;
   expiresAt: string;
 }

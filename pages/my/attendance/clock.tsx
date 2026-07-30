@@ -330,7 +330,10 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
       )}
 
       {state === 'success' && (
-        <SuccessView message={successMessage ?? 'Done.'} onDone={() => router.push('/my/attendance')} />
+        <SuccessView
+          message={successMessage ?? 'Done.'}
+          onDone={() => router.push(action === 'in' ? '/my' : '/my/attendance')}
+        />
       )}
       {state === 'queued' && (
         <QueuedView

@@ -119,6 +119,7 @@ export default withMySession(async (req, res, session) => {
 
     return apiResponse.success(res, {
       sessionId: portalSession.sessionId,
+      vehicleId: row.vehicle_id,
       vehicleRegistration: row.registration,
       expiresAt: portalSession.expiresAt,
     });
