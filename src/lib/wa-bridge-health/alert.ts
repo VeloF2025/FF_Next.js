@@ -27,8 +27,34 @@ function messageOf(err: unknown): string {
  * nowhere until someone sets a new var.
  */
 function alertRecipient(): string | undefined {
-  return (process.env.INFRA_ALERT_EMAIL_TO ?? process.env.REPORT_ALERT_EMAIL_TO)?.trim() || undefined;
+  // `||` not `??`: an INFRA_ALERT_EMAIL_TO set to an empty string must still
+  // fall through to REPORT_ALERT_EMAIL_TO. With `??` a blank value would count
+  // as "configured" and silently drop email alerting entirely.
+  const configured = process.env.INFRA_ALERT_EMAIL_TO?.trim() || process.env.REPORT_ALERT_EMAIL_TO?.trim();
+  return configured || undefined;
 }
+
+/**
+ * Cap how long a channel may block. This runs on a 5-minute cron against a
+ * long-lived server with module-level debounce state; an SMTP connection that
+ * hangs (dropped packets to an unreachable relay) would otherwise stall the
+ * invocation on nodemailer's internal default and can overlap the next tick.
+ */
+async function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+const SEND_TIMEOUT_MS = 20_000;
 
 async function alertByEmail(subject: string, text: string): Promise<string | null> {
   const to = alertRecipient();
@@ -37,12 +63,18 @@ async function alertByEmail(subject: string, text: string): Promise<string | nul
   const transporter = createSmtpTransport();
   if (!transporter) return 'email: SMTP not configured';
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to,
-    subject: sanitizeHeader(subject),
-    text,
-  });
+  await withTimeout(
+    Promise.resolve(
+      transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to,
+        subject: sanitizeHeader(subject),
+        text,
+      }),
+    ),
+    SEND_TIMEOUT_MS,
+    'smtp send',
+  );
   return null;
 }
 
@@ -70,7 +102,11 @@ export async function dispatchBridgeAlert(
   }
 
   try {
-    await sendWhatsAppGroup(WA_INFRA_GROUP_JID, `${subject}\n\n${text}`);
+    await withTimeout(
+      Promise.resolve(sendWhatsAppGroup(WA_INFRA_GROUP_JID, `${subject}\n\n${text}`)),
+      SEND_TIMEOUT_MS,
+      'whatsapp send',
+    );
     delivered.push('whatsapp');
   } catch (err) {
     // Expected during a genuine bridge outage — the bridge is what we send over.
