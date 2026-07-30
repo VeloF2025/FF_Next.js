@@ -28,3 +28,19 @@
 
 - Only the Task 8 route, tests, and this report were changed.
 - No writes, deployment, migration, or production retrieval changes were made.
+
+## Fix round 1 — auth and request-ID coverage
+
+- Added a route-local outer request-ID wrapper around the unchanged
+  `withAuth(withPermission('projects', 'view')(...))` composition. It assigns
+  one request-scoped ID before auth and adds the same ID to every JSON response
+  metadata envelope, including auth and RBAC failures.
+- The raw handler reuses the request-attached ID, so service context,
+  `X-Request-Id`, and response metadata cannot diverge.
+- RED: default-export tests reproduced missing request ID headers on 401, 403,
+  and fail-closed permission-check 500 responses.
+- GREEN: focused API tests pass 12/12; Task 8 regression tests pass 78/78
+  across 14 files.
+- Scoped ESLint and staged `npm run ci:quick` passed. The latter reports the
+  existing 58 TypeScript errors as non-blocking and found no changed-file or
+  secret-scan issue.
