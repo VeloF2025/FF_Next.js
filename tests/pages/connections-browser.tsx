@@ -33,6 +33,10 @@ function response(status: number, body?: unknown): Response {
   });
 }
 
+function destinationText(destination: Parameters<NextRouter['replace']>[0]): string {
+  return typeof destination === 'string' ? destination : destination.pathname ?? '/';
+}
+
 class ConnectionsNetwork {
   private readonly user: ApiUser;
 
@@ -114,7 +118,13 @@ class ConnectionsNetwork {
   };
 }
 
-function routerAt(pathname: string): NextRouter {
+function routerAt(pathname: string, internalPaths: string[]): NextRouter {
+  const navigate = async (
+    destination: Parameters<NextRouter['replace']>[0],
+  ): Promise<boolean> => {
+    internalPaths.push(destinationText(destination));
+    return true;
+  };
   return {
     basePath: '',
     route: pathname,
@@ -125,8 +135,8 @@ function routerAt(pathname: string): NextRouter {
     isFallback: false,
     isReady: true,
     isPreview: false,
-    push: async () => true,
-    replace: async () => true,
+    push: navigate,
+    replace: navigate,
     reload: () => undefined,
     back: () => undefined,
     forward: () => undefined,
@@ -184,10 +194,11 @@ export function renderConnectionsPage(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  const internalPaths: string[] = [];
 
-  return render(
+  const result = render(
     <AppRouterContext.Provider value={appRouter}>
-      <RouterContext.Provider value={routerAt(pathname)}>
+      <RouterContext.Provider value={routerAt(pathname, internalPaths)}>
         <PathnameContext.Provider value={pathname}>
           <AuthProvider>
             <ThemeProvider enableSystemTheme={false}>
@@ -200,6 +211,7 @@ export function renderConnectionsPage(
       </RouterContext.Provider>
     </AppRouterContext.Provider>,
   );
+  return Object.assign(result, { internalPaths });
 }
 
 export function resetConnectionsBrowser(): void {

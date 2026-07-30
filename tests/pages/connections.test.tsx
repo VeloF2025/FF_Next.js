@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.unmock('@/contexts/AuthContext');
@@ -36,6 +36,24 @@ describe('Connections pages', () => {
     expect(await screen.findByRole('heading', { name: 'FibreFlow Operations' }))
       .toBeInTheDocument();
     expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
+  it('redirects a logged-out FibreFlow visitor before rendering connection controls', async () => {
+    const browser = renderConnectionsPage(
+      <FibreFlowConnectionsPage />,
+      '/connections/fibreflow',
+      false,
+      { authenticated: false },
+    );
+
+    await waitFor(() => {
+      expect(browser.internalPaths).toEqual(['/sign-in']);
+      expect(screen.queryByRole('heading', { name: 'FibreFlow Operations' }))
+        .not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Active sessions' }))
+        .not.toBeInTheDocument();
+      expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
+    });
   });
 
   it('shows authorized Cortex content with one main landmark', async () => {
