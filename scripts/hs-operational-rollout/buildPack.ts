@@ -106,6 +106,13 @@ function renderAnnouncement(): string {
 
 Good morning team,
 
+Every working day in **My FibreFlow**:
+
+1. **Clock in** at the start of your shift.
+2. Complete **Daily H&S check-in** after clocking in and before field work.
+3. If you are assigned a vehicle, complete **Daily vehicle check** when the pre-trip check is due and before using the vehicle.
+4. **Clock out** at the end of your shift.
+
 The FibreFlow H&S check-in is required every working day after you clock in and before field work starts. Open **My FibreFlow** and complete **Daily H&S check-in**.
 
 Please answer truthfully. If you are unfit for duty or unsure whether it is safe to continue, declare that honestly and report it to your supervisor or H&S officer. A truthful declaration that you are unfit does not reduce your pay. Never choose an answer merely to obtain clearance.

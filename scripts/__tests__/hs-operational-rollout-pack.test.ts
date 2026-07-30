@@ -216,11 +216,23 @@ describe('H&S operational rollout pack', () => {
   it('marks the announcement as unsent and includes the approved safety messages', () => {
     const draft = buildPack(snapshot)['staff-announcement-DRAFT.md'];
 
+    const clockIn = draft.indexOf('**Clock in**');
+    const hsCheckin = draft.indexOf('**Daily H&S check-in**');
+    const vehicleCheck = draft.indexOf('**Daily vehicle check**');
+    const clockOut = draft.indexOf('**Clock out**');
+
     expect(draft).toContain('DRAFT — DO NOT SEND');
+    expect(clockIn).toBeGreaterThan(-1);
+    expect(hsCheckin).toBeGreaterThan(clockIn);
+    expect(vehicleCheck).toBeGreaterThan(hsCheckin);
+    expect(clockOut).toBeGreaterThan(vehicleCheck);
+    expect(draft).toContain('assigned a vehicle');
+    expect(draft).toContain('pre-trip check is due');
     expect(draft).toContain('required every working day after you clock in');
     expect(draft).toContain('does not reduce your pay');
     expect(draft).toContain('answer truthfully');
     expect(draft).toContain('Crew leads');
+    expect(draft).toContain('do not continue with that gated activity');
   });
 
   it('summarizes source and review counts without worker names', () => {
