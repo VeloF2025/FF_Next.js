@@ -46,6 +46,9 @@ describe('ConnectionsNav', () => {
   it('renders horizontal FibreFlow and Cortex tabs', () => {
     renderWithRouter(<ConnectionsNav />, '/connections/fibreflow');
 
+    expect(screen.getByRole('navigation', {
+      name: 'AI Connections navigation',
+    })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'FibreFlow' }))
       .toHaveAttribute('href', '/connections/fibreflow');
     expect(screen.getByRole('link', { name: 'Cortex' }))

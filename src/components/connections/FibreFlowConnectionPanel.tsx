@@ -36,6 +36,7 @@ const MAX_LABEL_LENGTH = 60;
 
 interface ManualTokenControlsProps {
   copied: boolean;
+  error: string | null;
   expiresAt: string;
   label: string;
   lifetime: UiLifetime;
@@ -49,6 +50,7 @@ interface ManualTokenControlsProps {
 
 function ManualTokenControls({
   copied,
+  error,
   expiresAt,
   label,
   lifetime,
@@ -102,6 +104,11 @@ function ManualTokenControls({
           {loading ? 'Generating…' : 'Generate token'}
         </button>
       </div>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       {token && (
         <FibreFlowTokenReveal
           token={token}
@@ -122,17 +129,19 @@ export function FibreFlowConnectionPanel() {
   const [label, setLabel] = useState('');
   const [tokens, setTokens] = useState<McpTokenRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
+    setSessionError(null);
     try {
       const res = await fetch('/api/me/mcp-tokens');
       if (!res.ok) throw new Error(`request failed (${res.status})`);
       const json = (await res.json().catch(() => null)) as ListResponse | null;
       setTokens(json?.data?.tokens ?? []);
     } catch (e) {
-      setError(`Could not load your tokens: ${e instanceof Error ? e.message : String(e)}`);
+      setSessionError(`Could not load your tokens: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, []);
 
@@ -142,7 +151,7 @@ export function FibreFlowConnectionPanel() {
 
   const generate = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setManualError(null);
     setCopied(false);
     try {
       const res = await fetch('/api/me/mcp-tokens', {
@@ -163,7 +172,7 @@ export function FibreFlowConnectionPanel() {
       await refresh();
     } catch (e) {
       setToken(null);
-      setError(`Could not generate a token: ${e instanceof Error ? e.message : String(e)}`);
+      setManualError(`Could not generate a token: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -171,13 +180,14 @@ export function FibreFlowConnectionPanel() {
 
   const revoke = useCallback(
     async (id: string) => {
-      setError(null);
+      setSessionError(null);
       try {
-        const res = await fetch(`/api/me/mcp-tokens/${id}`, { method: 'DELETE' });
+        const encodedId = encodeURIComponent(id);
+        const res = await fetch(`/api/me/mcp-tokens/${encodedId}`, { method: 'DELETE' });
         if (!res.ok) throw new Error(`${res.status}`);
         await refresh();
       } catch (e) {
-        setError(`Could not revoke: ${e instanceof Error ? e.message : String(e)}`);
+        setSessionError(`Could not revoke: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
     [refresh]
@@ -185,11 +195,12 @@ export function FibreFlowConnectionPanel() {
 
   const copyToken = useCallback(async () => {
     if (!token) return;
+    setManualError(null);
     try {
       await navigator.clipboard.writeText(token);
       setCopied(true);
     } catch {
-      setError('Copy failed — select the text and copy manually.');
+      setManualError('Copy failed — select the text and copy manually.');
     }
   }, [token]);
 
@@ -207,7 +218,11 @@ export function FibreFlowConnectionPanel() {
         <p className="mt-1 text-sm text-[var(--ff-text-secondary)]">
           Review or revoke the connector sessions associated with your account.
         </p>
-        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+        {sessionError && (
+          <p role="alert" className="mt-3 text-sm text-destructive">
+            {sessionError}
+          </p>
+        )}
         <div className="mt-4">
           <FibreFlowTokenList tokens={tokens} onRevoke={(id) => void revoke(id)} />
         </div>
@@ -229,6 +244,7 @@ export function FibreFlowConnectionPanel() {
         {advancedOpen && (
           <ManualTokenControls
             copied={copied}
+            error={manualError}
             expiresAt={expiresAt}
             label={label}
             lifetime={lifetime}

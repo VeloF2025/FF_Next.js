@@ -5,7 +5,7 @@ import { CortexHero } from '@/components/cortex/CortexHero';
 import { CortexReviewPanel } from '@/components/cortex/CortexReviewPanel';
 import { CortexCitedSearch } from '@/components/cortex/CortexCitedSearch';
 import { CortexConnectPanel } from '@/components/cortex/CortexConnectPanel';
-import { FibreFlowConnectionPanel as FibreFlowConnectPanel } from '@/components/connections/FibreFlowConnectionPanel';
+import { FibreFlowConnectPanel } from '@/components/cortex/FibreFlowConnectPanel';
 
 export default function CortexPage({
   mcpEnabled,
