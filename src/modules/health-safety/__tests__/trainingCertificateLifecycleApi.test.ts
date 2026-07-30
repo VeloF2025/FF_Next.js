@@ -135,6 +135,33 @@ describe('allowed transitions', () => {
     expect(updates(txn, 'hs_worker_training')[0].params).toContain('Issued in error by the provider');
   });
 
+  it('revoking preserves who verified it and when', async () => {
+    // The design requires revocation to keep the document and its audit
+    // history. Stamping the revoker over verified_by/verified_at would destroy
+    // the record of the original approval on the row a verifier actually reads.
+    const txn = createTxn({
+      document: {
+        id: DOCUMENT_ID,
+        staff_id: STAFF_ID,
+        document_type: 'certification',
+        verification_status: 'verified',
+        file_name: 'cert.pdf',
+      },
+    });
+    await transitionTrainingCertificate(txn, DOCUMENT_ID, ACTOR, {
+      status: 'revoked',
+      reason: 'Issued in error by the provider',
+    });
+
+    const documentUpdate = updates(txn, 'staff_documents')[0];
+    expect(documentUpdate.text).toMatch(
+      /verified_by = CASE WHEN \$2 = 'verified' THEN[\s\S]*?ELSE verified_by END/
+    );
+    expect(documentUpdate.text).toMatch(
+      /verified_at = CASE WHEN \$2 = 'verified' THEN NOW\(\) ELSE verified_at END/
+    );
+  });
+
   it('leaves the actor nullable on the document when the user has no staff row', async () => {
     const txn = createTxn();
     await transitionTrainingCertificate(

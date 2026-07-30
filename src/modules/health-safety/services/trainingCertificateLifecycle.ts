@@ -158,8 +158,8 @@ export async function transitionTrainingCertificate(
     `UPDATE staff_documents
         SET verification_status = $2,
             status = $2,
-            verified_by = $3::uuid,
-            verified_at = NOW(),
+            verified_by = CASE WHEN $2 = 'verified' THEN $3::uuid ELSE verified_by END,
+            verified_at = CASE WHEN $2 = 'verified' THEN NOW() ELSE verified_at END,
             verification_notes = COALESCE($4, verification_notes),
             updated_at = NOW()
       WHERE id = $1`,
