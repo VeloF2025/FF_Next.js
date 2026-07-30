@@ -791,7 +791,7 @@ export interface TrainingCertificateUploadFormProps {
 
 The form posts `FormData` to `/api/staff-training-certificates-upload`. The staff dialog supplies `staffId`; the H&S page leaves it unset and renders employee selection.
 
-- [ ] **Step 1: Write failing UI tests**
+- [x] **Step 1: Write failing UI tests**
 
 With Testing Library, assert:
 
@@ -804,7 +804,7 @@ With Testing Library, assert:
 - certificate-required types on `/health-safety/training/new` show an upload-flow link and no URL field;
 - restricted action flags hide upload/download/verify controls.
 
-- [ ] **Step 2: Run the UI test and verify red**
+- [x] **Step 2: Run the UI test and verify red**
 
 Run:
 
@@ -814,27 +814,27 @@ npx vitest run src/modules/health-safety/__tests__/trainingCertificateUploadUi.t
 
 Expected: FAIL because the shared components do not exist.
 
-- [ ] **Step 3: Implement focused field and multi-select components**
+- [x] **Step 3: Implement focused field and multi-select components**
 
 `TrainingCertificateFields` owns file, certificate number, provider, completion date, and optional expiry. `TrainingTypeMultiSelect` accepts active `HSTrainingType[]`, selected ids, and `onChange(ids)`. Keep each below 200 lines.
 
-- [ ] **Step 4: Implement the shared form**
+- [x] **Step 4: Implement the shared form**
 
 Use explicit `details -> review -> submitting` state. Submit only after review, await the API response, parse `apiResponse` errors, then call `onSuccess`. Do not optimistically show success.
 
-- [ ] **Step 5: Add the H&S page and training index action**
+- [x] **Step 5: Add the H&S page and training index action**
 
 Create `/health-safety/training/certificates/new` with `AppLayout` and `ModulePage`, staff selection from the existing picker API, and a back link. Add **Upload certificate** to the H&S training index without adding a sidebar.
 
-- [ ] **Step 6: Add the staff-profile dialog**
+- [x] **Step 6: Add the staff-profile dialog**
 
 Add a small **Upload training certificate** action to `StaffDocumentList`, render `TrainingCertificateUploadDialog`, refresh documents after success, and render linked competency chips from the list API. Do not add certificate logic to the existing 690-line generic wizard.
 
-- [ ] **Step 7: Restrict manual training UI**
+- [x] **Step 7: Restrict manual training UI**
 
 Remove `certificate_url` state/input/payload. If the selected type has `requires_certificate = true`, replace the save action with a link to the upload page. Preserve contractor/manual entry only for types with `requires_certificate = false`.
 
-- [ ] **Step 8: Run UI and type checks**
+- [x] **Step 8: Run UI and type checks**
 
 Run:
 
@@ -846,7 +846,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit the UI unit**
+- [x] **Step 9: Commit the UI unit**
 
 ```bash
 git add src/modules/health-safety/components/training \
