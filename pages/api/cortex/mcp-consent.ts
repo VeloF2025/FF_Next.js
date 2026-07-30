@@ -81,15 +81,13 @@ export function createCortexConsentHandler(
           },
           body: JSON.stringify({ stateId, token }),
           signal: AbortSignal.timeout(CALLBACK_TIMEOUT_MS),
+          redirect: 'manual',
         });
         if (upstream.ok) {
-          const payload: unknown = await upstream.json().catch((error) => {
+          const payload: unknown = await upstream.json().catch(() => {
             logger.warn(
               'Cortex MCP consent callback returned invalid JSON',
-              {
-                userId: req.user.id,
-                error: error instanceof Error ? error.message : String(error),
-              },
+              { userId: req.user.id },
               'CortexMcpConsent',
             );
             return null;

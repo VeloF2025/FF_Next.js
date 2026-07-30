@@ -9,6 +9,9 @@ import {
   VALID_STATE_ID,
 } from './mcpConsent.testHarness';
 
+const GATEWAY_MESSAGE =
+  'Authorization could not be completed. Return to Claude and try connecting again.';
+
 afterEach(closeConsentHarnesses);
 
 describe('POST /api/cortex/mcp-consent — verified consent', () => {
@@ -136,5 +139,67 @@ describe('POST /api/cortex/mcp-consent — verified consent', () => {
         value: originalTimeout,
       });
     }
+  });
+
+  it('does not forward the secret or bearer across an upstream redirect', async () => {
+    const redirectedOrigin = await startCallbackServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ redirectUrl: 'https://claude.ai/callback' }));
+    });
+    const callback = await startCallbackServer((_request, response) => {
+      response.writeHead(307, {
+        location: `${redirectedOrigin.url}/stolen`,
+      });
+      response.end();
+    });
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+    });
+
+    const response = await app.post('/api/cortex/mcp-consent', {
+      stateId: VALID_STATE_ID,
+    });
+
+    expect(callback.requests).toHaveLength(1);
+    expect(redirectedOrigin.requests).toEqual([]);
+    expect(response.status).toBe(502);
+    expect(response.json).toMatchObject({
+      success: false,
+      error: {
+        code: 'BAD_GATEWAY',
+        message: GATEWAY_MESSAGE,
+      },
+    });
+    expect(JSON.stringify(response.json)).not.toContain(MINTED_TOKEN);
+    expect(JSON.stringify(response.json)).not.toContain(CALLBACK_SECRET);
+  });
+
+  it('does not log sensitive malformed callback JSON', async () => {
+    const sensitiveBearer = 'b3ar';
+    const sensitiveSecret = 's3cr';
+    const callback = await startCallbackServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(`${sensitiveBearer}${sensitiveSecret}`);
+    });
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      callbackSecret: sensitiveSecret,
+      mintToken: async () => ({ token: sensitiveBearer, expiresAt: null }),
+    });
+
+    const response = await app.post('/api/cortex/mcp-consent', {
+      stateId: VALID_STATE_ID,
+    });
+
+    expect(response.status).toBe(502);
+    expect(response.json.error).toEqual({
+      code: 'BAD_GATEWAY',
+      message: GATEWAY_MESSAGE,
+    });
+    expect(JSON.stringify(response.json)).not.toContain(sensitiveBearer);
+    expect(JSON.stringify(response.json)).not.toContain(sensitiveSecret);
+    expect(JSON.stringify(app.logs)).not.toContain(sensitiveBearer);
+    expect(JSON.stringify(app.logs)).not.toContain(sensitiveSecret);
   });
 });
