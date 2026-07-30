@@ -12,6 +12,7 @@ import {
   readTransactionTime,
   readZoneAggregate,
   type ActivityRow,
+  type DocumentRow,
   type PonStateRow,
   type ZoneAggregate,
 } from '../repositories/zoneDeliveryReadRepository';
@@ -162,6 +163,16 @@ export function buildZoneView(aggregate: ZoneAggregate): ZoneDeliveryView {
   };
 }
 
+function snapshotDocument(doc: DocumentRow) {
+  return {
+    id: doc.id, ponStageId: doc.pon_stage_id, documentType: doc.document_type,
+    documentSource: doc.document_source, sourceRef: doc.source_ref,
+    filename: doc.filename, mimeType: doc.mime_type, sizeBytes: Number(doc.size_bytes),
+    checksumSha256: doc.checksum_sha256, uploadedBy: doc.uploaded_by,
+    uploadedAt: iso(doc.uploaded_at),
+  };
+}
+
 function buildSnapshot(aggregate: ZoneAggregate) {
   const scope = aggregate.pons.map(pon => ({
     ponStageId: pon.pon_stage_id,
@@ -177,11 +188,17 @@ function buildSnapshot(aggregate: ZoneAggregate) {
     for (const { gate, at, by } of milestones) {
       const effectiveAt = iso(pon[at] as Time);
       if (effectiveAt) {
+        const testPack = gate === 'testing_passed'
+          ? aggregate.documents.find(doc => doc.id === pon.testing_test_pack_document_id)
+          : undefined;
         evidence[gate] = {
           effectiveAt,
           actorUserId: pon[by],
           ...(gate === 'testing_passed'
-            ? { testPackDocumentId: pon.testing_test_pack_document_id }
+            ? {
+              testPackDocumentId: pon.testing_test_pack_document_id,
+              testPackDocument: testPack ? snapshotDocument(testPack) : null,
+            }
             : {}),
         };
       }
@@ -200,12 +217,7 @@ function buildSnapshot(aggregate: ZoneAggregate) {
     zoneQa: { civil: qa('civil'), optical: qa('optical') },
     documents: aggregate.documents
       .filter(doc => doc.superseded_at === null)
-      .map(doc => ({
-        id: doc.id,
-        ponStageId: doc.pon_stage_id,
-        documentType: doc.document_type,
-        checksumSha256: doc.checksum_sha256,
-      })),
+      .map(snapshotDocument),
     snagIds: aggregate.snagLinks.map(link => link.snag_id).sort(),
   };
 }
@@ -216,12 +228,12 @@ export async function recalculateZone(
   actor: DeliveryActor,
 ): Promise<ZoneDeliveryView> {
   const locked = await lockZone(client, key);
-  let aggregate = await readZoneAggregate(client, key);
+  let aggregate = await readZoneAggregate(client, key, true);
   if (!locked) return buildZoneView(aggregate);
   let calculation = calculateAggregate(aggregate);
   if (calculation.eligibleForZoneQa && !aggregate.zone?.eligible_for_zone_qa_at) {
     await stampEligibility(client, key);
-    aggregate = await readZoneAggregate(client, key);
+    aggregate = await readZoneAggregate(client, key, true);
     calculation = calculateAggregate(aggregate);
   }
   if (calculation.eligibleForHandover && !aggregate.zone?.handed_over_at) {
@@ -241,7 +253,7 @@ export async function recalculateZone(
         newValue: { handedOverAt: iso(stamped.handed_over_at), snapshot },
       });
     }
-    aggregate = await readZoneAggregate(client, key);
+    aggregate = await readZoneAggregate(client, key, true);
   }
   return buildZoneView(aggregate);
 }

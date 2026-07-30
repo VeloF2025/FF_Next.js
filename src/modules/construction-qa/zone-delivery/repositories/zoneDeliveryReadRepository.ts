@@ -103,6 +103,7 @@ const iso = (value: Timestamp): string =>
 export async function readZoneAggregate(
   client: PoolClient,
   key: ZoneKey,
+  lockSnags = false,
 ): Promise<ZoneAggregate> {
   const [project, zone, pons, documents, snagLinks, activities] = await Promise.all([
     client.query<{ project_name: string }>(
@@ -141,6 +142,7 @@ export async function readZoneAggregate(
       JOIN snags s ON s.id = l.snag_id
       WHERE l.project_id = $1 AND l.zone_no = $2
       ORDER BY l.linked_at, l.snag_id
+      ${lockSnags ? 'FOR UPDATE OF s' : ''}
     `, [key.projectId, key.zoneNo]),
     client.query<ActivityRow>(`
       SELECT * FROM zone_delivery_activity
@@ -215,14 +217,14 @@ export async function constructionQaIsApproved(
   ponNo: number,
   discipline: 'civil' | 'optical',
 ): Promise<boolean> {
-  const { rows } = await client.query<{ total: string; rejected: string }>(`
-    SELECT COUNT(*)::text AS total,
-      COUNT(*) FILTER (WHERE workflow_status <> 'approved')::text AS rejected
+  const { rows } = await client.query<{ workflow_status: string }>(`
+    SELECT workflow_status
     FROM construction_qa_reviews
     WHERE project_id = $1 AND zone_no = $2 AND pon_no = $3
       AND discipline = $4
+    ORDER BY id FOR UPDATE
   `, [key.projectId, key.zoneNo, ponNo, discipline]);
-  return rows[0]!.total !== '0' && rows[0]!.rejected === '0';
+  return rows.length > 0 && rows.every(row => row.workflow_status === 'approved');
 }
 
 export async function readSnag(

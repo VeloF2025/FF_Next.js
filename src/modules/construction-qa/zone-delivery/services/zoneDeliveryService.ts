@@ -102,6 +102,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         return previous.scope_status !== pon.scopeStatus || (previous.scope_reason ?? '') !== (pon.reason?.trim() ?? '');
       });
       validateMeta(input, now, changing);
+      if (zone?.scope_approved_at && !changing) return buildZoneView(aggregate);
       const savedZone = await write.writeScopeApproval(client, input, input.expectedRowVersion, input.effectiveAt, actor.userId);
       if (!savedZone) versionConflict();
       for (const pon of input.pons) {
