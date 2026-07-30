@@ -57,7 +57,7 @@ interface StaffDbRow {
 
 interface CheckinDbRow {
   id: string;
-  checkin_date: Date | string;
+  checkin_date: string;
   staff_id: string | null;
   team_member_id: string | null;
   contractor_id: string | null;
@@ -85,10 +85,6 @@ function shiftDate(isoDate: string, days: number): string {
   const date = new Date(`${isoDate}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-function dateText(value: Date | string): string {
-  return value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
 }
 
 function memberName(member: TeamMemberRow): string {
@@ -190,7 +186,7 @@ export async function loadSnapshotFromPool(
       [snapshotDate]
     );
     const checkinsResult = await client.query<CheckinDbRow>(
-      `SELECT c.id::text AS id, c.checkin_date,
+      `SELECT c.id::text AS id, c.checkin_date::text AS checkin_date,
               c.staff_id::text, c.team_member_id::text, c.contractor_id::text,
               ct.company_name AS contractor_name, c.worker_name,
               c.capture_mode, c.clearance, c.declared_activities,
@@ -220,10 +216,7 @@ export async function loadSnapshotFromPool(
       isTeamLead: row.is_team_lead,
       userId: row.user_id,
     }));
-    const checkins = checkinsResult.rows.map((row) => ({
-      ...row,
-      checkin_date: dateText(row.checkin_date),
-    }));
+    const checkins = checkinsResult.rows;
     const todayCheckins = checkins.filter(
       (row) => row.checkin_date === snapshotDate
     );

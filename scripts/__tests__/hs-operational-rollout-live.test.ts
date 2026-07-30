@@ -1,11 +1,64 @@
-import { newDb } from 'pg-mem';
+import { DataType, newDb } from 'pg-mem';
 import { describe, expect, it } from 'vitest';
 
 import { loadSnapshotFromPool } from '../hs-operational-rollout/loadSnapshot';
 
+function emulateSastNodePgDateParsing<Row>(
+  text: string,
+  result: { rows: Row[] }
+): { rows: Row[] } {
+  if (
+    !text.includes('FROM hs_daily_checkins c') ||
+    text.includes('c.checkin_date::text AS checkin_date')
+  ) {
+    return result;
+  }
+
+  return {
+    rows: result.rows.map((row) => {
+      const checkinRow = row as Row & { checkin_date?: Date | string };
+      if (!checkinRow.checkin_date) return row;
+      const storedDate =
+        checkinRow.checkin_date instanceof Date
+          ? checkinRow.checkin_date.toISOString().slice(0, 10)
+          : checkinRow.checkin_date.slice(0, 10);
+      return {
+        ...checkinRow,
+        checkin_date: new Date(`${storedDate}T00:00:00+02:00`),
+      };
+    }),
+  };
+}
+
+function enablePgMemDateToTextCast(db: ReturnType<typeof newDb>): void {
+  const dateType = db.public.getType(DataType.date) as unknown as {
+    doCanCast(to: { primary: string }): boolean | null;
+    doCast(
+      value: {
+        setConversion(
+          converter: (raw: Date) => string,
+          hashConverter: (text: string) => { text: string }
+        ): unknown;
+      },
+      to: { primary: string }
+    ): unknown;
+  };
+  const canCast = dateType.doCanCast.bind(dateType);
+  const cast = dateType.doCast.bind(dateType);
+  dateType.doCanCast = (to) => to.primary === DataType.text || canCast(to);
+  dateType.doCast = (value, to) =>
+    to.primary === DataType.text
+      ? value.setConversion(
+          (raw) => raw.toISOString().slice(0, 10),
+          (text) => ({ text })
+        )
+      : cast(value, to);
+}
+
 describe('H&S operational rollout live loader', () => {
-  it('loads a normalized snapshot from a disposable PostgreSQL database', async () => {
+  it('preserves PostgreSQL pure dates when node-postgres runs in SAST', async () => {
     const db = newDb();
+    enablePgMemDateToTextCast(db);
     db.public.none(`
       CREATE TABLE contractors (
         id uuid PRIMARY KEY,
@@ -100,7 +153,8 @@ describe('H&S operational rollout live loader', () => {
         return {
           async query<Row>(text: string, values?: unknown[]) {
             transactionQueries.push(text);
-            return client.query(text, values) as Promise<{ rows: Row[] }>;
+            const result = (await client.query(text, values)) as { rows: Row[] };
+            return emulateSastNodePgDateParsing(text, result);
           },
           release() {
             client.release();
