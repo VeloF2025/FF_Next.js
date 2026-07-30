@@ -22,7 +22,11 @@ import {
 } from '@/modules/fleet/services/checkInService';
 import type { VlmAnalysisType } from '@/modules/fleet/types/check-in.types';
 import type { VlmAnalysisType as LearningVlmAnalysisType } from '@/types/vlm-learning';
-import { withFleetAuth } from '@/lib/auth/middleware';
+import {
+  withFleetAuth,
+  type FleetAuthenticatedRequest,
+} from '@/lib/auth/middleware';
+import { canAccessPortalVehicle } from '@/modules/fleet/portal/authorization';
 import { recordVlmCorrection, recordCorrectExtraction } from '@/services/vlmLearningService';
 import { VLM_FLEET_MODEL } from '@/lib/vlm';
 
@@ -59,7 +63,7 @@ interface ProcessVlmResponse {
 }
 
 async function handler(
-  req: NextApiRequest,
+  req: FleetAuthenticatedRequest,
   res: NextApiResponse
 ) {
   // Only POST allowed
@@ -88,6 +92,14 @@ async function handler(
     const validTypes: VlmAnalysisType[] = ['odometer', 'license_plate', 'fuel_gauge', 'fuel_receipt', 'damage'];
     if (!validTypes.includes(analysisType)) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, `Invalid analysisType. Must be one of: ${validTypes.join(', ')}`);
+    }
+
+    if (!canAccessPortalVehicle(req, vehicleId)) {
+      return apiResponse.error(
+        res,
+        ErrorCode.FORBIDDEN,
+        'Vehicle does not match the authenticated portal session'
+      );
     }
 
     const startTime = Date.now();

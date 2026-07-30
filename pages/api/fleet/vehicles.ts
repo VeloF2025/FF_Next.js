@@ -15,6 +15,7 @@ import { getSql } from '@/lib/neon-sql';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import type { FleetVehicle, VehicleType, OwnershipType, VehicleStatus } from '@/modules/fleet/types';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { canAccessPortalVehicle } from '@/modules/fleet/portal/authorization';
 import { log } from '@/lib/logger';
 
 const getSqlInstance = () => getSql();
@@ -66,6 +67,17 @@ export default withFleetAuth(withErrorHandler(async (req: any, res: any) => {
   switch (req.method) {
     case 'GET': {
       const { id, status, type, search, assigned, page = '1', limit = '50' } = req.query;
+
+      if (
+        req.authType === 'portal' &&
+        (typeof id !== 'string' || !canAccessPortalVehicle(req, id))
+      ) {
+        return apiResponse.error(
+          res,
+          ErrorCode.FORBIDDEN,
+          'Vehicle does not match the authenticated portal session'
+        );
+      }
 
       // Single vehicle by ID
       if (id) {

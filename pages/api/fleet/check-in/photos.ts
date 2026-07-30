@@ -21,7 +21,10 @@ import path from 'path';
 import FormData from 'form-data';
 import axios from 'axios';
 import { log } from '@/lib/logger';
-import { withFleetAuth } from '@/lib/auth/middleware';
+import {
+  withFleetAuth,
+  type FleetAuthenticatedRequest,
+} from '@/lib/auth/middleware';
 import { recordVlmCorrection } from '@/services/vlmLearningService';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -88,7 +91,23 @@ async function uploadToStorage(
   };
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function canAccessPortalRecord(
+  req: FleetAuthenticatedRequest,
+  recordId: string
+): Promise<boolean> {
+  if (req.authType !== 'portal') return true;
+
+  const rows = await sql`
+    SELECT 1
+    FROM fleet_check_records
+    WHERE id = ${recordId}
+      AND vehicle_id = ${req.portalSession?.vehicleId ?? ''}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+async function handler(req: FleetAuthenticatedRequest, res: NextApiResponse) {
   try {
     switch (req.method) {
       case 'GET': {
@@ -96,6 +115,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         if (!recordId || typeof recordId !== 'string') {
           return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Record ID is required');
+        }
+
+        if (!(await canAccessPortalRecord(req, recordId))) {
+          return apiResponse.error(
+            res,
+            ErrorCode.FORBIDDEN,
+            'Record does not belong to the authenticated portal vehicle'
+          );
         }
 
         const photos = await getPhotosForRecord(recordId);
@@ -114,6 +141,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         if (!recordId) {
           return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Record ID is required');
+        }
+        if (!(await canAccessPortalRecord(req, recordId))) {
+          return apiResponse.error(
+            res,
+            ErrorCode.FORBIDDEN,
+            'Record does not belong to the authenticated portal vehicle'
+          );
         }
         if (!photoType) {
           return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Photo type is required');

@@ -11,10 +11,28 @@ import {
   checkSyncStatus,
 } from '@/modules/fleet/services/checkInService';
 import type { SyncCheckRecordRequest, SyncCheckRecordResponse } from '@/modules/fleet/types/check-in.types';
-import { withFleetAuth } from '@/lib/auth/middleware';
+import {
+  withFleetAuth,
+  type FleetAuthenticatedRequest,
+} from '@/lib/auth/middleware';
+import { canAccessPortalVehicle } from '@/modules/fleet/portal/authorization';
 import { log } from '@/lib/logger';
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+function applyPortalIdentity(
+  req: FleetAuthenticatedRequest,
+  request: SyncCheckRecordRequest
+): SyncCheckRecordRequest {
+  if (req.authType !== 'portal' || !req.portalSession) return request;
+
+  return {
+    ...request,
+    vehicleId: req.portalSession.vehicleId,
+    driverId: req.portalSession.driverId ?? request.driverId,
+    driverName: req.portalSession.driverName ?? request.driverName,
+  };
+}
+
+async function handler(req: FleetAuthenticatedRequest, res: NextApiResponse) {
   try {
     switch (req.method) {
       case 'GET': {
@@ -39,24 +57,48 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Handle single record sync
         if (!Array.isArray(body)) {
-          const request = body as SyncCheckRecordRequest;
+          const submittedRequest = body as SyncCheckRecordRequest;
 
-          if (!request.offlineId) {
+          if (!submittedRequest.offlineId) {
             return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Offline ID is required');
           }
-          if (!request.vehicleId) {
+          if (!submittedRequest.vehicleId) {
             return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Vehicle ID is required');
           }
-          if (!request.driverId) {
+          if (!submittedRequest.driverId) {
             return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Driver ID is required');
           }
+          if (!canAccessPortalVehicle(req, submittedRequest.vehicleId)) {
+            return apiResponse.error(
+              res,
+              ErrorCode.FORBIDDEN,
+              'Vehicle does not match the authenticated portal session'
+            );
+          }
 
+          const request = applyPortalIdentity(req, submittedRequest);
           const result = await syncOfflineCheckRecord(request);
           return apiResponse.success(res, result);
         }
 
         // Handle batch sync
-        const requests = body as SyncCheckRecordRequest[];
+        const submittedRequests = body as SyncCheckRecordRequest[];
+        if (
+          submittedRequests.some(
+            (request) =>
+              request.vehicleId &&
+              !canAccessPortalVehicle(req, request.vehicleId)
+          )
+        ) {
+          return apiResponse.error(
+            res,
+            ErrorCode.FORBIDDEN,
+            'Vehicle does not match the authenticated portal session'
+          );
+        }
+        const requests = submittedRequests.map((request) =>
+          applyPortalIdentity(req, request)
+        );
         const results: SyncCheckRecordResponse[] = [];
 
         for (const request of requests) {

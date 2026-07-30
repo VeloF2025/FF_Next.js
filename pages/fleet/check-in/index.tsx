@@ -27,11 +27,17 @@ type PageState = 'select-vehicle' | 'check-in' | 'complete';
 export default function CheckInPage() {
   const router = useRouter();
   const { currentUser } = useAuth();
-  const { session: portalSession } = usePortalSession();
+  const {
+    session: portalSession,
+    isLoading: portalSessionLoading,
+  } = usePortalSession();
 
   // URL params - vehicle pre-selected from portal
   const urlVehicleId = router.query.vehicleId as string | undefined;
   const urlCheckType = router.query.type as CheckType | undefined;
+  const requestedVehicleId =
+    portalSession?.vehicleId ??
+    (portalSessionLoading ? undefined : urlVehicleId);
   const isFromPortal = Boolean(urlVehicleId); // Coming from portal with pre-selected vehicle
   const isVehicleLocked = isFromPortal; // Lock selection when coming from portal
 
@@ -98,23 +104,25 @@ export default function CheckInPage() {
       }
     }
 
+    if (urlVehicleId && portalSessionLoading) return;
+
     // Only load vehicle list if not coming from portal
-    if (!urlVehicleId) {
+    if (!requestedVehicleId) {
       loadVehicles();
     } else {
       setIsLoading(false);
     }
-  }, [urlVehicleId]);
+  }, [portalSessionLoading, requestedVehicleId, urlVehicleId]);
 
   // Handle URL params for pre-selected vehicle
   useEffect(() => {
-    if (urlVehicleId && !selectedVehicle) {
-      autoSelectVehicle(urlVehicleId);
+    if (requestedVehicleId && !selectedVehicle) {
+      autoSelectVehicle(requestedVehicleId);
     }
     if (urlCheckType) {
       setCheckType(urlCheckType);
     }
-  }, [urlVehicleId, urlCheckType, selectedVehicle, autoSelectVehicle]);
+  }, [requestedVehicleId, urlCheckType, selectedVehicle, autoSelectVehicle]);
 
   // Check vehicle availability when selected
   const handleVehicleSelect = async (vehicle: Vehicle) => {
@@ -262,7 +270,10 @@ export default function CheckInPage() {
                   </span>
                 </div>
                 <p className="text-xs text-green-600 dark:text-green-500 mt-1 ml-6">
-                  {checkType === 'daily' ? 'Daily' : 'Weekly'} check-in • Vehicle confirmed via plate scan
+                  {checkType === 'daily' ? 'Daily' : 'Weekly'} check-in •{' '}
+                  {portalSession?.source === 'my'
+                    ? 'Assigned vehicle confirmed'
+                    : 'Vehicle confirmed via plate scan'}
                 </p>
               </div>
             )}

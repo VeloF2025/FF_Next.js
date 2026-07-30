@@ -30,7 +30,10 @@ export interface HubSummary {
   } | null;
   assignedVehicle: {
     id: string;
+    vehicleId: string | null;
     registration: string | null;
+    checkStatusAvailable: boolean;
+    requiredCheckType: 'daily' | 'weekly' | null;
   } | null;
   latestPayslip: {
     id: string;
@@ -46,6 +49,62 @@ export interface HubSummary {
   } | null;
   pendingCorrectionsCount: number;
   recentEntryCount: number;
+}
+
+interface VehicleCheckReminderRow extends Record<string, unknown> {
+  vehicle_id: string;
+  required_check_type: 'daily' | 'weekly' | null;
+}
+
+interface VehicleCheckReminderResult {
+  available: boolean;
+  reminder: VehicleCheckReminderRow | null;
+}
+
+async function findVehicleCheckReminder(
+  registration: string | null
+): Promise<VehicleCheckReminderResult> {
+  if (!registration) return { available: true, reminder: null };
+
+  try {
+    const rows = await sql<VehicleCheckReminderRow>`
+      WITH sast_today AS (
+        SELECT
+          (NOW() AT TIME ZONE 'Africa/Johannesburg')::date AS work_date,
+          EXTRACT(ISODOW FROM NOW() AT TIME ZONE 'Africa/Johannesburg')::int AS weekday
+      )
+      SELECT
+        v.id AS vehicle_id,
+        CASE
+          WHEN d.weekday = 1
+            AND (
+              s.weekly_last_check IS NULL
+              OR s.weekly_last_check < d.work_date - 6
+            )
+            THEN 'weekly'
+          WHEN s.weekly_last_check = d.work_date
+            OR s.daily_last_check = d.work_date
+            THEN NULL
+          ELSE 'daily'
+        END AS required_check_type
+      FROM fleet_vehicles v
+      CROSS JOIN sast_today d
+      LEFT JOIN fleet_check_schedule s ON s.vehicle_id = v.id
+      WHERE v.registration = ${registration}
+        AND v.status = 'active'
+      LIMIT 1
+    `;
+    return {
+      available: rows.length > 0,
+      reminder: rows[0] ?? null,
+    };
+  } catch (error) {
+    log.warn('[my/hub-summary] vehicle check reminder unavailable', {
+      error,
+      registration,
+    });
+    return { available: false, reminder: null };
+  }
 }
 
 export default withMySession(async (req, res, session) => {
@@ -67,6 +126,9 @@ export default withMySession(async (req, res, session) => {
       findLatestPayslipForStaff(session.staffId),
       findLatestReceiptForStaff(session.staffId),
     ]);
+    const vehicleReminder = await findVehicleCheckReminder(
+      vehicle?.vehicle_registration ?? null
+    );
 
     const now = Date.now();
     const clockInDate = openEntry ? new Date(openEntry.clock_in_at as string | Date) : null;
@@ -79,7 +141,14 @@ export default withMySession(async (req, res, session) => {
           }
         : null,
       assignedVehicle: vehicle
-        ? { id: vehicle.id, registration: vehicle.vehicle_registration }
+        ? {
+            id: vehicle.id,
+            vehicleId: vehicleReminder.reminder?.vehicle_id ?? null,
+            registration: vehicle.vehicle_registration,
+            checkStatusAvailable: vehicleReminder.available,
+            requiredCheckType:
+              vehicleReminder.reminder?.required_check_type ?? null,
+          }
         : null,
       latestPayslip,
       latestReceipt,

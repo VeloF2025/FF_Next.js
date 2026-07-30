@@ -12,10 +12,14 @@ import {
   getFleetCheckInStats,
 } from '@/modules/fleet/services/checkInService';
 import type { CreateCheckRecordInput, CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
-import { withFleetAuth } from '@/lib/auth/middleware';
+import { canAccessPortalVehicle } from '@/modules/fleet/portal/authorization';
+import {
+  withFleetAuth,
+  type FleetAuthenticatedRequest,
+} from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: FleetAuthenticatedRequest, res: NextApiResponse) {
   try {
     switch (req.method) {
       case 'GET': {
@@ -48,7 +52,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       case 'POST': {
-        const input = req.body as CreateCheckRecordInput;
+        const submittedInput = req.body as CreateCheckRecordInput;
+        const portalSession = req.authType === 'portal' ? req.portalSession : null;
+
+        if (
+          !canAccessPortalVehicle(req, submittedInput.vehicleId)
+        ) {
+          return apiResponse.error(
+            res,
+            ErrorCode.FORBIDDEN,
+            'Vehicle does not match the authenticated portal session'
+          );
+        }
+
+        const input: CreateCheckRecordInput = portalSession
+          ? {
+              ...submittedInput,
+              vehicleId: portalSession.vehicleId,
+              driverId: portalSession.driverId ?? submittedInput.driverId,
+              driverName: portalSession.driverName ?? submittedInput.driverName,
+            }
+          : submittedInput;
 
         if (!input.vehicleId) {
           return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Vehicle ID is required');

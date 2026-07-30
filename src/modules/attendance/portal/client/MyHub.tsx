@@ -23,6 +23,10 @@ import { getHubSummary, requestFleetHandoff } from './api';
 import type { AccountStatus, AttendanceProfile, HubSummaryResponse, StaffRole } from './api';
 import { MyPortalShell } from './MyPortalShell';
 import { InstallPrompt } from './InstallPrompt';
+import {
+  ComplianceReminders,
+  type VehicleCheckDue,
+} from './ComplianceReminders';
 import { isStoresAuthorised } from '@/modules/field-stock-pwa/lib/storesRoles';
 import {
   ClockTile,
@@ -63,17 +67,20 @@ export function MyHub({ profile }: MyHubProps) {
   const [vehicleHandoffPending, setVehicleHandoffPending] = React.useState(false);
   const [vehicleHandoffError, setVehicleHandoffError] = React.useState<string | null>(null);
 
-  const handleVehicleTap = React.useCallback(async () => {
+  const handleVehicleTap = React.useCallback(async (checkType?: VehicleCheckDue) => {
     if (vehicleHandoffPending) return;
     setVehicleHandoffPending(true);
     setVehicleHandoffError(null);
     try {
-      await requestFleetHandoff();
+      const handoff = await requestFleetHandoff();
       // Hard nav: the new ff_portal_session cookie is httpOnly so the
-      // /fleet/portal page can only see it after a real navigation,
+      // fleet page can only see it after a real navigation,
       // not a client-side router.push (Next.js may keep the previous
       // request context alive).
-      window.location.assign('/fleet/portal?from=my');
+      const target = checkType
+        ? `/fleet/check-in?vehicleId=${encodeURIComponent(handoff.vehicleId)}&type=${checkType}`
+        : '/fleet/portal?from=my';
+      window.location.assign(target);
     } catch (err) {
       setVehicleHandoffPending(false);
       setVehicleHandoffError(
@@ -87,20 +94,25 @@ export function MyHub({ profile }: MyHubProps) {
   const [hsCheckin, setHsCheckin] = React.useState<
     { completed: boolean; clearance: string | null } | null
   >(null);
+  const [hsCheckinUnavailable, setHsCheckinUnavailable] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
     fetch('/api/my/hs/checkin', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error('H&S check status unavailable');
+        return r.json();
+      })
       .then((j) => {
-        if (cancelled || !j?.data) return;
+        if (cancelled) return;
+        if (!j?.data) throw new Error('H&S check status unavailable');
         setHsCheckin({
           completed: Boolean(j.data.completed),
           clearance: j.data.checkin?.clearance ?? null,
         });
       })
       .catch(() => {
-        /* tile stays in its loading state; the hub itself must still render */
+        if (!cancelled) setHsCheckinUnavailable(true);
       });
     return () => {
       cancelled = true;
@@ -181,6 +193,27 @@ export function MyHub({ profile }: MyHubProps) {
         </div>
       )}
 
+      <ComplianceReminders
+        hsStatus={
+          hsCheckinUnavailable
+            ? 'unavailable'
+            : hsCheckin?.completed === false
+              ? 'due'
+              : null
+        }
+        vehicleCheckStatus={
+          summary?.assignedVehicle
+            ? summary.assignedVehicle.checkStatusAvailable
+              ? summary.assignedVehicle.requiredCheckType
+              : 'unavailable'
+            : null
+        }
+        vehicleRegistration={summary?.assignedVehicle?.registration ?? null}
+        vehiclePending={vehicleHandoffPending}
+        onHsCheckin={() => router.push('/my/hs-checkin')}
+        onVehicleCheck={(checkType) => void handleVehicleTap(checkType)}
+      />
+
       {isPending ? (
         <div className="grid grid-cols-2 gap-3">
           <ClockTile summary={summary} onClick={() => router.push('/my/attendance')} />
@@ -203,7 +236,7 @@ export function MyHub({ profile }: MyHubProps) {
             summary={summary}
             hasVehicle={profile.hasAssignedVehicle}
             pending={vehicleHandoffPending}
-            onClick={handleVehicleTap}
+            onClick={() => void handleVehicleTap()}
           />
           <PayslipsTile summary={summary} onClick={() => router.push('/my/payslips')} />
           <ReceiptsTile summary={summary} onClick={() => router.push('/my/receipts')} />

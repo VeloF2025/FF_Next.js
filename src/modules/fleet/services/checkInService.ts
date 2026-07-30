@@ -1122,23 +1122,29 @@ async function updateCheckScheduleAfterCheckIn(
   vehicleId: string,
   checkType: CheckType
 ): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
-
   if (checkType === 'daily') {
     await sql`
       INSERT INTO fleet_check_schedule (vehicle_id, daily_last_check, reminder_sent_daily)
-      VALUES (${vehicleId}, ${today}, false)
+      VALUES (
+        ${vehicleId},
+        (NOW() AT TIME ZONE 'Africa/Johannesburg')::date,
+        false
+      )
       ON CONFLICT (vehicle_id) DO UPDATE SET
-        daily_last_check = ${today},
+        daily_last_check = EXCLUDED.daily_last_check,
         reminder_sent_daily = false,
         updated_at = NOW()
     `;
   } else {
     await sql`
       INSERT INTO fleet_check_schedule (vehicle_id, weekly_last_check, reminder_sent_weekly)
-      VALUES (${vehicleId}, ${today}, false)
+      VALUES (
+        ${vehicleId},
+        (NOW() AT TIME ZONE 'Africa/Johannesburg')::date,
+        false
+      )
       ON CONFLICT (vehicle_id) DO UPDATE SET
-        weekly_last_check = ${today},
+        weekly_last_check = EXCLUDED.weekly_last_check,
         reminder_sent_weekly = false,
         updated_at = NOW()
     `;
