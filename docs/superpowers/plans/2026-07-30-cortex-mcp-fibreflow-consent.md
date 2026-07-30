@@ -93,7 +93,9 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 | Action | File | Responsibility |
 |---|---|---|
 | Create | `pages/api/cortex/mcp-consent.ts` | Authenticated/permissioned Cortex mint and loopback callback |
-| Create | `pages/api/cortex/__tests__/mcpConsent.handler.test.ts` | Trust-boundary, callback, timeout, redirect, and redaction tests |
+| Create | `pages/api/cortex/__tests__/mcpConsent.testHarness.ts` | Real loopback callback/handler harness and deterministic external-boundary adapters |
+| Create | `pages/api/cortex/__tests__/mcpConsent.handler.test.ts` | Identity, successful callback, wire contract and redaction tests |
+| Create | `pages/api/cortex/__tests__/mcpConsent.errors.test.ts` | Method, validation, timeout, upstream and redirect failure tests |
 | Create | `pages/cortex/mcp/authorize.tsx` | Standalone login-preserving Cortex consent controller |
 | Create | `src/components/cortex/CortexMcpConsentCard.tsx` | Cortex-specific read-only consent presentation |
 | Create | `tests/pages/cortex-mcp-authorize.test.tsx` | Hydration, login round-trip, duplicate-submit, cancel, and redirect tests |
@@ -882,7 +884,9 @@ git commit -m "docs(mcp): make FibreFlow consent the primary flow"
 
 **Files:**
 - Create: `pages/api/cortex/mcp-consent.ts`
+- Create: `pages/api/cortex/__tests__/mcpConsent.testHarness.ts`
 - Create: `pages/api/cortex/__tests__/mcpConsent.handler.test.ts`
+- Create: `pages/api/cortex/__tests__/mcpConsent.errors.test.ts`
 - Modify: `.env.example`
 
 **Interfaces:**
@@ -973,7 +977,8 @@ Also assert:
 Run:
 
 ```bash
-npx vitest run pages/api/cortex/__tests__/mcpConsent.handler.test.ts
+npx vitest run pages/api/cortex/__tests__/mcpConsent.handler.test.ts \
+  pages/api/cortex/__tests__/mcpConsent.errors.test.ts
 ```
 
 Expected: FAIL because `/api/cortex/mcp-consent` does not exist.
@@ -1108,6 +1113,7 @@ Run:
 
 ```bash
 npx vitest run pages/api/cortex/__tests__/mcpConsent.handler.test.ts \
+  pages/api/cortex/__tests__/mcpConsent.errors.test.ts \
   pages/api/mcp/__tests__/consent.test.ts \
   tests/api/ff-remote-mcp-proxy.test.ts \
   tests/api/mcp-proxy-route-errors.test.ts
@@ -1121,7 +1127,9 @@ Run:
 
 ```bash
 git add .env.example pages/api/cortex/mcp-consent.ts \
-  pages/api/cortex/__tests__/mcpConsent.handler.test.ts
+  pages/api/cortex/__tests__/mcpConsent.testHarness.ts \
+  pages/api/cortex/__tests__/mcpConsent.handler.test.ts \
+  pages/api/cortex/__tests__/mcpConsent.errors.test.ts
 git commit -m "feat(cortex): authorize MCP from verified FibreFlow sessions"
 ```
 
@@ -1712,6 +1720,7 @@ Run:
 
 ```bash
 npx vitest run pages/api/cortex/__tests__/mcpConsent.handler.test.ts \
+  pages/api/cortex/__tests__/mcpConsent.errors.test.ts \
   pages/api/mcp/__tests__/consent.test.ts \
   tests/pages/cortex-mcp-authorize.test.tsx \
   tests/pages/mcp-authorize.test.tsx \
