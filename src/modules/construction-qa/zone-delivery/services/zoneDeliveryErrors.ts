@@ -4,12 +4,14 @@ export type ZoneDeliveryErrorCode =
   | 'EVIDENCE_REQUIRED'
   | 'VERSION_CONFLICT'
   | 'HANDOVER_LOCKED'
+  | 'ZONE_NOT_FOUND'
   | 'VALIDATION_ERROR';
 
 export class ZoneDeliveryError extends Error {
   constructor(
     public readonly code: ZoneDeliveryErrorCode,
     message: string,
+    public readonly status = code === 'ZONE_NOT_FOUND' ? 404 : undefined,
   ) {
     super(message);
     this.name = 'ZoneDeliveryError';

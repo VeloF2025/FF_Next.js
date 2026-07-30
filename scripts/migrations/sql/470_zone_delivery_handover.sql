@@ -51,6 +51,19 @@ CREATE TABLE IF NOT EXISTS zone_delivery_state (
       OR (handed_over_at IS NOT NULL AND handover_snapshot IS NOT NULL)
     )
 );
+CREATE OR REPLACE FUNCTION enforce_zone_delivery_canonical_zone() RETURNS TRIGGER AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pon_stage_tracking
+    WHERE project_id = NEW.project_id AND zone_no = NEW.zone_no) THEN
+    RAISE EXCEPTION 'Zone delivery state requires a canonical PON' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_zone_delivery_canonical_zone ON zone_delivery_state;
+CREATE TRIGGER trg_zone_delivery_canonical_zone
+  BEFORE INSERT OR UPDATE OF project_id, zone_no ON zone_delivery_state FOR EACH ROW
+  EXECUTE FUNCTION enforce_zone_delivery_canonical_zone();
 CREATE OR REPLACE FUNCTION protect_zone_delivery_handover()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -66,8 +79,7 @@ END;
 $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_zone_delivery_handover_immutable ON zone_delivery_state;
 CREATE TRIGGER trg_zone_delivery_handover_immutable
-  BEFORE UPDATE ON zone_delivery_state
-  FOR EACH ROW EXECUTE FUNCTION protect_zone_delivery_handover();
+  BEFORE UPDATE ON zone_delivery_state FOR EACH ROW EXECUTE FUNCTION protect_zone_delivery_handover();
 CREATE TABLE IF NOT EXISTS zone_delivery_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL,
@@ -234,40 +246,31 @@ CREATE TABLE IF NOT EXISTS zone_delivery_activity (
 );
 CREATE INDEX IF NOT EXISTS idx_zone_delivery_activity_zone_time ON zone_delivery_activity(project_id, zone_no, recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_zone_delivery_activity_pon_time
-  ON zone_delivery_activity(pon_stage_id, recorded_at DESC)
-  WHERE pon_stage_id IS NOT NULL;
+  ON zone_delivery_activity(pon_stage_id, recorded_at DESC) WHERE pon_stage_id IS NOT NULL;
 CREATE OR REPLACE FUNCTION reject_zone_delivery_activity_mutation()
 RETURNS TRIGGER AS $$
 BEGIN
   RAISE EXCEPTION 'zone_delivery_activity is append-only';
 END;
 $$ LANGUAGE plpgsql;
-DROP TRIGGER IF EXISTS trg_zone_delivery_activity_append_only
-  ON zone_delivery_activity;
+DROP TRIGGER IF EXISTS trg_zone_delivery_activity_append_only ON zone_delivery_activity;
 CREATE TRIGGER trg_zone_delivery_activity_append_only
-  BEFORE UPDATE OR DELETE ON zone_delivery_activity
-  FOR EACH ROW EXECUTE FUNCTION reject_zone_delivery_activity_mutation();
-INSERT INTO access_permissions (
-  type, key, parent_key, label, description, sort_order, is_active
-) VALUES
-  ('action', 'construction-qa.zone-delivery.scope-manage',
-   'construction-qa.qa-centre', 'Zone Delivery - Manage Scope',
-   'Approve and maintain the included PON scope', 20, TRUE),
-  ('action', 'construction-qa.zone-delivery.construction-confirm',
-   'construction-qa.qa-centre', 'Zone Delivery - Confirm Construction',
-   'Confirm civil and optical construction milestones', 21, TRUE),
-  ('action', 'construction-qa.zone-delivery.testing-confirm',
-   'construction-qa.qa-centre', 'Zone Delivery - Confirm Testing',
-   'Confirm testing milestones and evidence', 22, TRUE),
-  ('action', 'construction-qa.zone-delivery.operations-confirm',
-   'construction-qa.qa-centre', 'Zone Delivery - Confirm Operations',
-   'Confirm port and technical-live milestones', 23, TRUE),
-  ('action', 'construction-qa.zone-delivery.zone-qa-approve',
-   'construction-qa.qa-centre', 'Zone Delivery - Approve Zone QA',
-   'Record civil and optical Zone QA decisions', 24, TRUE),
-  ('action', 'construction-qa.zone-delivery.documents-manage',
-   'construction-qa.qa-centre', 'Zone Delivery - Manage Documents',
-   'Register and supersede handover evidence', 25, TRUE)
+  BEFORE UPDATE OR DELETE ON zone_delivery_activity FOR EACH ROW
+  EXECUTE FUNCTION reject_zone_delivery_activity_mutation();
+INSERT INTO access_permissions
+  (type, key, parent_key, label, description, sort_order, is_active) VALUES
+  ('action', 'construction-qa.zone-delivery.scope-manage', 'construction-qa.qa-centre',
+   'Zone Delivery - Manage Scope', 'Approve and maintain the included PON scope', 20, TRUE),
+  ('action', 'construction-qa.zone-delivery.construction-confirm', 'construction-qa.qa-centre',
+   'Zone Delivery - Confirm Construction', 'Confirm civil and optical construction milestones', 21, TRUE),
+  ('action', 'construction-qa.zone-delivery.testing-confirm', 'construction-qa.qa-centre',
+   'Zone Delivery - Confirm Testing', 'Confirm testing milestones and evidence', 22, TRUE),
+  ('action', 'construction-qa.zone-delivery.operations-confirm', 'construction-qa.qa-centre',
+   'Zone Delivery - Confirm Operations', 'Confirm port and technical-live milestones', 23, TRUE),
+  ('action', 'construction-qa.zone-delivery.zone-qa-approve', 'construction-qa.qa-centre',
+   'Zone Delivery - Approve Zone QA', 'Record civil and optical Zone QA decisions', 24, TRUE),
+  ('action', 'construction-qa.zone-delivery.documents-manage', 'construction-qa.qa-centre',
+   'Zone Delivery - Manage Documents', 'Register and supersede handover evidence', 25, TRUE)
 ON CONFLICT (key) DO UPDATE SET
   type = EXCLUDED.type,
   parent_key = EXCLUDED.parent_key,
@@ -276,9 +279,7 @@ ON CONFLICT (key) DO UPDATE SET
   sort_order = EXCLUDED.sort_order,
   is_active = EXCLUDED.is_active;
 INSERT INTO role_permissions (role, permission_key, actions)
-SELECT
-  role_name,
-  permission_key,
+SELECT role_name, permission_key,
   '{"view": true, "create": true, "edit": true, "delete": true}'::jsonb
 FROM (VALUES ('super_admin'), ('admin')) AS roles(role_name)
 CROSS JOIN (
@@ -293,7 +294,6 @@ CROSS JOIN (
 ON CONFLICT (role, permission_key) DO UPDATE SET
   actions = EXCLUDED.actions,
   updated_at = NOW();
-INSERT INTO schema_migrations (filename, applied_at)
-VALUES ('470_zone_delivery_handover.sql', NOW())
+INSERT INTO schema_migrations (filename, applied_at) VALUES ('470_zone_delivery_handover.sql', NOW())
 ON CONFLICT (filename) DO NOTHING;
 COMMIT;

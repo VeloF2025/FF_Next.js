@@ -10,7 +10,7 @@ const fetchMock = vi.fn();
 const registerData: ZoneRegisterResult = {
   rows: [{
     projectId: 'project & one', projectName: 'Project One', zoneNo: 7,
-    status: 'ready_for_zone_qa', includedPons: 12, livePons: 8,
+    scopeApproved: true, status: 'ready_for_zone_qa', includedPons: 12, livePons: 8,
     earliestIncompleteGate: 'port_approved', blockerCount: 2,
     civilQa: 'passed', opticalQa: 'in_progress', handedOverAt: null,
   }],

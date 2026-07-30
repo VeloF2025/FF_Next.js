@@ -16,6 +16,7 @@ DROP INDEX IF EXISTS ux_snags_project_owner;
 
 DROP FUNCTION IF EXISTS reject_zone_delivery_activity_mutation();
 DROP FUNCTION IF EXISTS protect_zone_delivery_handover();
+DROP FUNCTION IF EXISTS enforce_zone_delivery_canonical_zone();
 
 DELETE FROM user_permission_overrides
 WHERE permission_key IN (

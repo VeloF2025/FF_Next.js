@@ -1,4 +1,5 @@
 import type {
+  PonDeliveryView,
   ZoneDeliveryActivity,
   ZoneDeliveryView,
 } from '../../types/zoneDelivery.types';
@@ -6,17 +7,28 @@ import type {
 export const projectId = '11111111-1111-4111-8111-111111111111';
 export const ponStageId = '22222222-2222-4222-8222-222222222222';
 export const snagId = '33333333-3333-4333-8333-333333333333';
+export const actionFixture = (completed = false): PonDeliveryView['actions'] => ({
+  civil_complete: { action: completed ? 'reopen' : 'confirm', enabled: true, blocker: null },
+  optical_complete: { action: completed ? 'reopen' : 'confirm', enabled: true, blocker: null },
+  testing_passed: { action: completed ? 'reopen' : 'confirm', enabled: true, blocker: null },
+  port_submitted: { action: completed ? 'reopen' : 'confirm', enabled: true, blocker: null },
+  port_approved: { action: completed ? 'reopen' : 'confirm', enabled: true, blocker: null },
+  technically_live: { action: completed ? 'reopen' : 'confirm', enabled: true, blocker: null },
+});
 
 export const zoneFixture: ZoneDeliveryView = {
   projectId,
   projectName: 'Etwatwa',
   zoneNo: 12,
+  scopeApproved: true,
   pons: [
     {
       ponStageId,
       ponNo: 4,
       scopeStatus: 'included',
+      scopeReason: null,
       rowVersion: 7,
+      actions: actionFixture(true),
       milestones: {
         civil_complete: {
           effectiveAt: '2026-07-01T08:00:00.000Z',
@@ -54,14 +66,18 @@ export const zoneFixture: ZoneDeliveryView = {
       ponStageId: '44444444-4444-4444-8444-444444444444',
       ponNo: 5,
       scopeStatus: 'excluded',
+      scopeReason: 'Not built',
       rowVersion: 3,
+      actions: actionFixture(),
       milestones: {},
     },
     {
       ponStageId: '55555555-5555-4555-8555-555555555555',
       ponNo: 6,
       scopeStatus: 'cancelled',
+      scopeReason: 'Removed',
       rowVersion: 2,
+      actions: actionFixture(),
       milestones: {},
     },
   ],

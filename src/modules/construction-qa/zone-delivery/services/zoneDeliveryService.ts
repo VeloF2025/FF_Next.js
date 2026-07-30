@@ -15,6 +15,8 @@ import {
 } from './zoneDeliveryErrors';
 import { getZoneDeliveryRegister } from './zoneDeliveryRegister';
 import { transaction, withClient } from './zoneDeliveryTransactions';
+import { assertCanonicalZone } from './zoneDeliveryCanonical';
+import { validateMilestoneConfirmation } from './zoneDeliveryMilestoneActions';
 export interface ZoneDeliveryService {
   getRegister(filters: ZoneRegisterFilters): Promise<ZoneRegisterResult>; getZone(key: ZoneKey): Promise<ZoneDeliveryView>;
   updateScope(input: UpdateScopeInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
@@ -32,15 +34,22 @@ const audit = (input: ZoneKey & CommandMeta, actor: DeliveryActor) => ({
 class PgZoneDeliveryService implements ZoneDeliveryService {
   constructor(private readonly pool: Pool) {}
   getZone(key: ZoneKey): Promise<ZoneDeliveryView> {
-    return withClient(this.pool, async client => buildZoneView(await read.readZoneAggregate(client, key))); }
+    return withClient(this.pool, async client => {
+      await assertCanonicalZone(client, key);
+      return buildZoneView(await read.readZoneAggregate(client, key));
+    }); }
   getActivity(key: ZoneKey): Promise<ZoneDeliveryActivity[]> {
-    return withClient(this.pool, client => read.readActivity(client, key)); }
+    return withClient(this.pool, async client => {
+      await assertCanonicalZone(client, key);
+      return read.readActivity(client, key);
+    }); }
   async getRegister(filters: ZoneRegisterFilters): Promise<ZoneRegisterResult> {
     return getZoneDeliveryRegister(this.pool, filters);
   }
   updateScope(input: UpdateScopeInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
     return transaction(this.pool, async client => {
       requirePermission(actor, 'scope-manage');
+      await assertCanonicalZone(client, input);
       const now = await read.readTransactionTime(client);
       validateMeta(input, now);
       if (input.pons.length === 0 || new Set(input.pons.map(pon => pon.ponStageId)).size !== input.pons.length) {
@@ -84,6 +93,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
     return transaction(this.pool, async client => {
       const config = milestones.find(item => item.gate === input.milestone)!;
       requirePermission(actor, input.action === 'link_maintenance' ? 'operations-confirm' : config.permission);
+      await assertCanonicalZone(client, input);
       const now = await read.readTransactionTime(client);
       validateMeta(input, now);
       const zone = await write.lockZone(client, input);
@@ -137,22 +147,15 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         return recalculateZone(client, input, actor);
       }
       validateMeta(input, now, Boolean(current));
-      const index = milestones.indexOf(config);
-      if (index > 0 && !state[milestones[index - 1]!.at])
-        deliveryError('PREREQUISITE_BLOCKED', `${milestones[index - 1]!.gate} is required first`);
-      if (input.milestone === 'civil_complete' || input.milestone === 'optical_complete') {
-        const discipline = input.milestone === 'civil_complete' ? 'civil' : 'optical';
-        if (!(await read.constructionQaIsApproved(client, input, canonical.pon_no, discipline)))
-          deliveryError('EVIDENCE_REQUIRED', `Complete approved ${discipline} QA is required`);
-      }
-      const testPack = aggregate.documents.find(document =>
-        document.document_type === 'test_pack' && document.pon_stage_id === input.ponStageId && !document.superseded_at);
-      if (input.milestone === 'testing_passed' && !testPack)
-        deliveryError('EVIDENCE_REQUIRED', 'An active same-PON test pack is required');
-      const reconfirmations = aggregate.snagLinks.filter(link =>
-        link.pon_stage_id === input.ponStageId && link.affected_gate === input.milestone && link.requires_reconfirmation);
-      if (reconfirmations.some(link => link.status !== 'closed'))
-        deliveryError('PREREQUISITE_BLOCKED', 'The affected snag must be closed first');
+      const { testPack, reconfirmations } = await validateMilestoneConfirmation(
+        client,
+        input,
+        zone,
+        state,
+        canonical,
+        aggregate,
+        current,
+      );
       const updated = await write.confirmMilestone(
         client, input.ponStageId, input.milestone, state.row_version, input.effectiveAt, actor.userId, testPack?.id,
       );
@@ -176,6 +179,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
   recordZoneQa(input: RecordZoneQaInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
     return transaction(this.pool, async client => {
       requirePermission(actor, 'zone-qa-approve');
+      await assertCanonicalZone(client, input);
       const now = await read.readTransactionTime(client);
       const zone = await write.lockZone(client, input);
       if (!zone || zone.row_version !== input.expectedRowVersion) versionConflict();
@@ -215,6 +219,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
   registerDocument(input: RegisterDocumentInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
     return transaction(this.pool, async client => {
       requirePermission(actor, 'documents-manage');
+      await assertCanonicalZone(client, input);
       const now = await read.readTransactionTime(client);
       const zone = await write.lockZone(client, input);
       if (zone?.handed_over_at) handoverLocked();

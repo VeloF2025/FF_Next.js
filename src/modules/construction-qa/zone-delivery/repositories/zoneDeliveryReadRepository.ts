@@ -31,6 +31,8 @@ export interface PonStateRow {
   pon_no: number;
   scope_status: 'included' | 'excluded' | 'cancelled';
   scope_reason: string | null;
+  civil_qa_approved: boolean;
+  optical_qa_approved: boolean;
   civil_complete_at: Timestamp;
   civil_confirmed_by: string | null;
   optical_complete_at: Timestamp;
@@ -117,6 +119,26 @@ export async function readZoneAggregate(
     client.query<PonStateRow>(`
       SELECT p.id AS pon_stage_id, p.pon_no,
         COALESCE(s.scope_status, 'included') AS scope_status, s.scope_reason,
+        EXISTS (
+          SELECT 1 FROM construction_qa_reviews q
+          WHERE q.project_id = p.project_id AND q.zone_no = p.zone_no
+            AND q.pon_no = p.pon_no AND q.discipline = 'civil'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM construction_qa_reviews q
+          WHERE q.project_id = p.project_id AND q.zone_no = p.zone_no
+            AND q.pon_no = p.pon_no AND q.discipline = 'civil'
+            AND q.workflow_status <> 'approved'
+        ) AS civil_qa_approved,
+        EXISTS (
+          SELECT 1 FROM construction_qa_reviews q
+          WHERE q.project_id = p.project_id AND q.zone_no = p.zone_no
+            AND q.pon_no = p.pon_no AND q.discipline = 'optical'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM construction_qa_reviews q
+          WHERE q.project_id = p.project_id AND q.zone_no = p.zone_no
+            AND q.pon_no = p.pon_no AND q.discipline = 'optical'
+            AND q.workflow_status <> 'approved'
+        ) AS optical_qa_approved,
         s.civil_complete_at, s.civil_confirmed_by,
         s.optical_complete_at, s.optical_confirmed_by,
         s.testing_passed_at, s.testing_confirmed_by,
@@ -170,10 +192,7 @@ export async function listZoneKeys(
   zoneNo?: number,
 ): Promise<ZoneKey[]> {
   const { rows } = await client.query<{ project_id: string; zone_no: number }>(`
-    SELECT project_id, zone_no FROM (
-      SELECT project_id, zone_no FROM pon_stage_tracking
-      UNION SELECT project_id, zone_no FROM zone_delivery_state
-    ) zones
+    SELECT DISTINCT project_id, zone_no FROM pon_stage_tracking
     WHERE ($1::uuid IS NULL OR project_id = $1)
       AND ($2::integer IS NULL OR zone_no = $2)
     ORDER BY project_id, zone_no

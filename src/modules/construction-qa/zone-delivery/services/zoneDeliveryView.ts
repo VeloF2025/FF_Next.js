@@ -12,6 +12,7 @@ import type {
   ZoneAggregate,
 } from '../repositories/zoneDeliveryReadRepository';
 import { calculateZoneDelivery } from './zoneDeliveryCalculator';
+import { calculatePonActions } from './zoneDeliveryActionCalculator';
 
 type Time = Date | string | null;
 
@@ -104,7 +105,25 @@ export function calculateAggregate(aggregate: ZoneAggregate): ZoneDeliveryCalcul
     ponStageId: pon.pon_stage_id,
     ponNo: pon.pon_no,
     scopeStatus: pon.scope_status,
+    scopeReason: pon.scope_reason,
     milestones: milestoneView(aggregate, pon),
+    actions: calculatePonActions({
+      ponStageId: pon.pon_stage_id,
+      ponNo: pon.pon_no,
+      scopeApproved: Boolean(aggregate.zone?.scope_approved_at),
+      scopeStatus: pon.scope_status,
+      handedOver: Boolean(aggregate.zone?.handed_over_at),
+      milestones: milestoneView(aggregate, pon),
+      civilQaApproved: pon.civil_qa_approved,
+      opticalQaApproved: pon.optical_qa_approved,
+      hasActiveTestPack: aggregate.documents.some(document =>
+        document.document_type === 'test_pack'
+        && document.pon_stage_id === pon.pon_stage_id
+        && !document.superseded_at),
+      reconfirmationBlockers: aggregate.snagLinks
+        .filter(link => link.pon_stage_id === pon.pon_stage_id && link.requires_reconfirmation)
+        .map(link => ({ gate: link.affected_gate as PonMilestone, status: link.status })),
+    }),
     rowVersion: pon.row_version,
   }));
   const openBlockingSnags = aggregate.snagLinks.filter(link =>
@@ -126,14 +145,34 @@ export function calculateAggregate(aggregate: ZoneAggregate): ZoneDeliveryCalcul
 
 export function buildZoneView(aggregate: ZoneAggregate): ZoneDeliveryView {
   const calculation = calculateAggregate(aggregate);
+  const scopeApproved = Boolean(aggregate.zone?.scope_approved_at);
   return {
     ...aggregate.key,
     projectName: aggregate.projectName,
+    scopeApproved,
     pons: aggregate.pons.map(pon => ({
       ponStageId: pon.pon_stage_id,
       ponNo: pon.pon_no,
       scopeStatus: pon.scope_status,
+      scopeReason: pon.scope_reason,
       milestones: milestoneView(aggregate, pon),
+      actions: calculatePonActions({
+        ponStageId: pon.pon_stage_id,
+        ponNo: pon.pon_no,
+        scopeApproved,
+        scopeStatus: pon.scope_status,
+        handedOver: Boolean(aggregate.zone?.handed_over_at),
+        milestones: milestoneView(aggregate, pon),
+        civilQaApproved: pon.civil_qa_approved,
+        opticalQaApproved: pon.optical_qa_approved,
+        hasActiveTestPack: aggregate.documents.some(document =>
+          document.document_type === 'test_pack'
+          && document.pon_stage_id === pon.pon_stage_id
+          && !document.superseded_at),
+        reconfirmationBlockers: aggregate.snagLinks
+          .filter(link => link.pon_stage_id === pon.pon_stage_id && link.requires_reconfirmation)
+          .map(link => ({ gate: link.affected_gate as PonMilestone, status: link.status })),
+      }),
       rowVersion: pon.row_version,
     })),
     civilQa: qaView(aggregate, 'civil'),

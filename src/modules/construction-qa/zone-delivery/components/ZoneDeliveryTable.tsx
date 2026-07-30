@@ -37,7 +37,9 @@ export function ZoneDeliveryTable({ rows }: ZoneDeliveryTableProps) {
             const href = `/field-ops/zone?project_id=${encodeURIComponent(row.projectId)}&zone_no=${row.zoneNo}`;
             return <tr key={`${row.projectId}-${row.zoneNo}`} className="text-[var(--ff-text-primary)]">
               <td className="px-4 py-3 font-medium"><a className="underline hover:text-blue-400" href={href}>{row.projectName} Zone {row.zoneNo}</a></td>
-              <td className="px-4 py-3">{row.livePons} / {row.includedPons}</td>
+              <td className="px-4 py-3">
+                {row.scopeApproved ? `${row.livePons} / ${row.includedPons}` : 'Scope not approved'}
+              </td>
               <td className="px-4 py-3">{row.earliestIncompleteGate ? gateLabels[row.earliestIncompleteGate] : 'Complete'}</td>
               <td className="px-4 py-3">{row.blockerCount}</td><td className="px-4 py-3"><QaBadge status={row.civilQa} /></td>
               <td className="px-4 py-3"><QaBadge status={row.opticalQa} /></td>

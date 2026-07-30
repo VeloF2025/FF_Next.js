@@ -4,7 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePermission } from '@/hooks/usePermission';
 import { useZoneDeliveryZone } from '../../hooks/useZoneDeliveryZone';
 import { ZoneDeliveryWorkspacePage } from '../ZoneDeliveryWorkspacePage';
-import { activityFixture, ponStageId, projectId, zoneFixture } from './zoneDeliveryWorkspaceFixture';
+import {
+  actionFixture,
+  activityFixture,
+  ponStageId,
+  projectId,
+  zoneFixture,
+} from './zoneDeliveryWorkspaceFixture';
 
 vi.mock('@/hooks/usePermission');
 vi.mock('../../hooks/useZoneDeliveryZone');
@@ -32,10 +38,27 @@ describe('authoritative server blockers', () => {
     setZone({
       ...zoneFixture,
       status: 'testing_in_progress',
-      pons: [{ ...zoneFixture.pons[0]!, milestones: {
-        civil_complete: zoneFixture.pons[0]!.milestones.civil_complete,
-        optical_complete: zoneFixture.pons[0]!.milestones.optical_complete,
-      } }],
+      pons: [{ ...zoneFixture.pons[0]!,
+        milestones: {
+          civil_complete: zoneFixture.pons[0]!.milestones.civil_complete,
+          optical_complete: zoneFixture.pons[0]!.milestones.optical_complete,
+        },
+        actions: {
+          ...actionFixture(),
+          civil_complete: { action: 'reopen', enabled: true, blocker: null },
+          optical_complete: { action: 'reopen', enabled: true, blocker: null },
+          port_submitted: {
+            action: 'confirm',
+            enabled: false,
+            blocker: {
+              code: 'PON_TESTING_INCOMPLETE',
+              message: 'PON 4 testing is not passed',
+              ponNo: 4,
+              entityId: ponStageId,
+            },
+          },
+        },
+      }],
       blockers: [{
         code: 'PON_TESTING_INCOMPLETE', message: 'PON 4 testing is not passed',
         ponNo: 4, entityId: ponStageId,
@@ -52,7 +75,20 @@ describe('authoritative server blockers', () => {
   it('applies the exact scope blocker to every included-PON confirmation', () => {
     setZone({
       ...zoneFixture, status: 'scope_pending',
-      pons: [{ ...zoneFixture.pons[0]!, milestones: {} }],
+      pons: [{ ...zoneFixture.pons[0]!,
+        milestones: {},
+        actions: Object.fromEntries(Object.entries(actionFixture()).map(([gate, availability]) => [
+          gate,
+          {
+            ...availability,
+            enabled: false,
+            blocker: {
+              code: 'SCOPE_NOT_APPROVED',
+              message: 'Zone scope is not approved',
+            },
+          },
+        ])) as typeof zoneFixture.pons[0]['actions'],
+      }],
       blockers: [{ code: 'SCOPE_NOT_APPROVED', message: 'Zone scope is not approved' }],
     });
     render(<ZoneDeliveryWorkspacePage zoneKey={{ projectId, zoneNo: 12 }} />);

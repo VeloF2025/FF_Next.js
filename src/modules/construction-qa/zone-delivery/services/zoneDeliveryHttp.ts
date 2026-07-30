@@ -188,6 +188,7 @@ const ERROR_STATUS = {
   EVIDENCE_REQUIRED: 422,
   VERSION_CONFLICT: 409,
   HANDOVER_LOCKED: 409,
+  ZONE_NOT_FOUND: 404,
 } as const;
 
 export function respondToZoneDeliveryError(res: NextApiResponse, error: unknown): void {

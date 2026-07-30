@@ -23,14 +23,6 @@ const milestoneLabels: Record<PonMilestone, string> = {
   testing_passed: 'Testing passed', port_submitted: 'Port submitted',
   port_approved: 'Port approved', technically_live: 'Technically live',
 };
-const blockerGate: Record<string, PonMilestone> = {
-  PON_CIVIL_INCOMPLETE: 'civil_complete',
-  PON_OPTICAL_INCOMPLETE: 'optical_complete',
-  PON_TESTING_INCOMPLETE: 'testing_passed',
-  PON_PORT_NOT_SUBMITTED: 'port_submitted',
-  PON_PORT_NOT_APPROVED: 'port_approved',
-  PON_NOT_LIVE: 'technically_live',
-};
 const gatePermission = (gate: PonMilestone, permissions: Props['permissions']) => {
   if (gate === 'civil_complete' || gate === 'optical_complete') return permissions.construction;
   if (gate === 'testing_passed') return permissions.testing;
@@ -46,16 +38,16 @@ export function PonMilestoneTable({
 }: Props) {
   const [action, setAction] = useState<Action>(null);
   const [scope, setScope] = useState(() => zone.pons.map(pon => ({
-    ponStageId: pon.ponStageId, scopeStatus: pon.scopeStatus, reason: '',
+    ponStageId: pon.ponStageId, scopeStatus: pon.scopeStatus, reason: pon.scopeReason ?? '',
   })));
   const [snagId, setSnagId] = useState('');
   const [affectedGate, setAffectedGate] = useState<PonMilestone>('civil_complete');
-  const scopeBlocker = zone.blockers.find(blocker =>
-    blocker.code === 'SCOPE_NOT_APPROVED' || blocker.code === 'EMPTY_INCLUDED_SCOPE');
   useEffect(() => {
     if (action?.type === 'scope') return;
     setScope(zone.pons.map(pon => ({
-      ponStageId: pon.ponStageId, scopeStatus: pon.scopeStatus, reason: '',
+      ponStageId: pon.ponStageId,
+      scopeStatus: pon.scopeStatus,
+      reason: pon.scopeReason ?? '',
     })));
   }, [action?.type, zone.pons]);
   const terminal = zone.status === 'handed_over';
@@ -107,11 +99,12 @@ export function PonMilestoneTable({
                   return <td key={gate} className="px-3 py-3 align-top">
                     {evidence ? <><div><ZoneDeliveryTimestamp value={evidence.effectiveAt} label={`PON ${pon.ponNo} ${milestoneLabels[gate]} effective time`} /></div><div className="text-xs">{evidence.actorEmail}</div><div className="text-xs">{evidence.source}</div>{evidence.reconfirmedAt && <div className="text-xs">Reconfirmed <ZoneDeliveryTimestamp value={evidence.reconfirmedAt} label={`PON ${pon.ponNo} ${milestoneLabels[gate]} reconfirmed time`} /></div>}</> : <span>Not confirmed</span>}
                     {!terminal && pon.scopeStatus === 'included' && gatePermission(gate, permissions) && (() => {
-                      const ponBlocker = zone.blockers.find(blocker => blocker.entityId === pon.ponStageId);
-                      const disabledReason = evidence ? undefined : scopeBlocker?.message
-                        ?? (ponBlocker && blockerGate[ponBlocker.code] !== gate ? ponBlocker.message : undefined);
+                      const availability = pon.actions[gate];
+                      const disabledReason = availability.enabled
+                        ? undefined
+                        : availability.blocker?.message;
                       const descriptionId = disabledReason ? `pon-${pon.ponStageId}-${gate}-blocker` : undefined;
-                      return <><button type="button" disabled={Boolean(disabledReason)} title={disabledReason} aria-describedby={descriptionId} onClick={() => setAction({ type: 'milestone', pon, gate, action: evidence ? 'reopen' : 'confirm' })} className="mt-2 block text-xs underline disabled:opacity-50" aria-label={`${evidence ? 'Reopen' : 'Confirm'} ${milestoneLabels[gate]} for PON ${pon.ponNo}`}>{evidence ? 'Reopen' : 'Confirm'}</button>{disabledReason && <span id={descriptionId} className="sr-only">{disabledReason}</span>}</>;
+                      return <><button type="button" disabled={Boolean(disabledReason)} title={disabledReason} aria-describedby={descriptionId} onClick={() => setAction({ type: 'milestone', pon, gate, action: availability.action })} className="mt-2 block text-xs underline disabled:opacity-50" aria-label={`${availability.action === 'reopen' ? 'Reopen' : 'Confirm'} ${milestoneLabels[gate]} for PON ${pon.ponNo}`}>{availability.action === 'reopen' ? 'Reopen' : 'Confirm'}</button>{disabledReason && <span id={descriptionId} className="sr-only">{disabledReason}</span>}</>;
                     })()}
                   </td>;
                 })}

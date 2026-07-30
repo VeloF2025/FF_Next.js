@@ -86,11 +86,19 @@ export interface MilestoneEvidence {
   reconfirmedAt?: string;
 }
 
+export interface MilestoneActionAvailability {
+  action: 'confirm' | 'reopen';
+  enabled: boolean;
+  blocker: DeliveryBlocker | null;
+}
+
 export interface PonDeliveryView {
   ponStageId: string;
   ponNo: number;
   scopeStatus: ScopeStatus;
+  scopeReason: string | null;
   milestones: Partial<Record<PonMilestone, MilestoneEvidence>>;
+  actions: Record<PonMilestone, MilestoneActionAvailability>;
   rowVersion: number;
 }
 
@@ -125,6 +133,7 @@ export interface ZoneDocumentView {
 
 export interface ZoneDeliveryView extends ZoneKey {
   projectName: string;
+  scopeApproved: boolean;
   pons: PonDeliveryView[];
   civilQa: ZoneQaView;
   opticalQa: ZoneQaView;
@@ -147,9 +156,10 @@ export interface ZoneRegisterFilters {
 
 export interface ZoneRegisterRow extends ZoneKey {
   projectName: string;
+  scopeApproved: boolean;
   status: ZoneDeliveryStatus;
-  includedPons: number;
-  livePons: number;
+  includedPons: number | null;
+  livePons: number | null;
   earliestIncompleteGate: PonMilestone | null;
   blockerCount: number;
   civilQa: ZoneQaStatus;

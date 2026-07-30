@@ -61,7 +61,11 @@ export function ZoneDeliveryWorkspacePage({ zoneKey }: { zoneKey: ZoneKey }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-[var(--ff-text-primary)]">{zone.projectName} Zone {zone.zoneNo}</h1>
-            <p className="text-sm text-[var(--ff-text-secondary)]">{live.length} / {included.length} technically live</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">
+              {zone.scopeApproved
+                ? `${live.length} / ${included.length} technically live`
+                : 'Approved scope not set'}
+            </p>
             <p className="text-sm text-[var(--ff-text-secondary)]">{zone.blockers.length} blocker(s)</p>
             <p className="text-sm">{statusLabels[zone.status]}</p>
             {zone.eligibleForZoneQaAt && <p className="text-sm">Eligible for Zone QA: <ZoneDeliveryTimestamp value={zone.eligibleForZoneQaAt} label="Eligible for Zone QA time" /></p>}
