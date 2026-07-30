@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import urllib.parse
+from types import SimpleNamespace
 
 import pytest
 
@@ -143,3 +144,96 @@ async def test_qfield_tool_is_registered_once_with_its_selection_contract(svc):
     assert schema["properties"]["section"]["default"] == "summary"
     assert schema["properties"]["page"]["default"] == 1
     assert schema["properties"]["limit"]["default"] == 50
+
+
+@pytest.mark.asyncio
+async def test_qfield_tool_logs_safe_complete_observability(
+    svc, monkeypatch
+):
+    from ff_mcp import qfield_tools
+
+    ff_secret = "ff-business-token-must-not-appear"
+    raw_body_secret = "customer-body-must-not-appear"
+    captured: dict = {}
+
+    monkeypatch.setattr(
+        qfield_tools,
+        "get_access_token",
+        lambda: SimpleNamespace(
+            client_id="oauth-client-1",
+            ff_token=ff_secret,
+            token="oauth-access-token-must-not-appear",
+        ),
+    )
+    monkeypatch.setattr(
+        qfield_tools,
+        "_qfield_project_stats_sync",
+        lambda *_args: (
+            '{"success":true,"data":{"status":"complete",'
+            f'"payload":"{raw_body_secret}"}},"meta":{{"requestId":"api-request-1"}}}}'
+        ),
+    )
+    monkeypatch.setattr(
+        qfield_tools.logger,
+        "info",
+        lambda message, *args, **kwargs: captured.update(
+            {"message": message, "args": args, "kwargs": kwargs}
+        ),
+    )
+
+    await qfield_tools.get_qfield_project_stats(
+        "secret-project-name", "poles", 1, 50
+    )
+
+    fields = captured["kwargs"]["extra"]
+    assert captured["message"] == "qfield_project_stats_invocation"
+    assert fields == {
+        "tool_name": "get_qfield_project_stats",
+        "section": "poles",
+        "oauth_client_id": "oauth-client-1",
+        "duration_ms": pytest.approx(fields["duration_ms"], abs=1000),
+        "result_category": "complete",
+        "correlation_id": "api-request-1",
+        "error_category": None,
+    }
+    logged = repr(captured)
+    assert ff_secret not in logged
+    assert raw_body_secret not in logged
+    assert "oauth-access-token-must-not-appear" not in logged
+    assert "secret-project-name" not in logged
+
+
+@pytest.mark.asyncio
+async def test_qfield_tool_logs_controlled_error_without_exception_text(
+    svc, monkeypatch
+):
+    from ff_mcp import qfield_tools
+
+    captured: dict = {}
+    secret_error = "database password and raw response body"
+
+    monkeypatch.setattr(qfield_tools, "get_access_token", lambda: None)
+    monkeypatch.setattr(
+        qfield_tools,
+        "_qfield_project_stats_sync",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError(secret_error)),
+    )
+    monkeypatch.setattr(
+        qfield_tools.logger,
+        "error",
+        lambda message, *args, **kwargs: captured.update(
+            {"message": message, "args": args, "kwargs": kwargs}
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match=secret_error):
+        await qfield_tools.get_qfield_project_stats("Mahikeng")
+
+    fields = captured["kwargs"]["extra"]
+    assert fields["tool_name"] == "get_qfield_project_stats"
+    assert fields["section"] == "summary"
+    assert fields["oauth_client_id"] is None
+    assert fields["result_category"] == "error"
+    assert fields["error_category"] == "adapter_exception"
+    assert fields["correlation_id"].startswith("local-")
+    assert secret_error not in repr(captured)

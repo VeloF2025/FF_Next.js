@@ -89,7 +89,7 @@ export async function getFibreFlowInfrastructure(
   let poleTotal = 0;
   for (const row of poleRows) {
     const count = Number(row.count);
-    poleByStatus[row.status] = count;
+    poleByStatus[row.status] = (poleByStatus[row.status] ?? 0) + count;
     poleTotal += count;
   }
 

@@ -1,16 +1,16 @@
 import type { QFieldDelta } from './qfieldDeltaRepo';
 import type { CableStats, DropStats, PoleStats, ProjectStatsAnomaly } from './types';
 import { emptyCables, emptyDrops, emptyPoles } from './featureStateDefaults';
-const PLANTING_EVENTS = new Set([
-  'Pole Planted/ All Photos',
-  'Pole Planted - Photos Incomplete',
-  'Pole Verified/ Civil Complete',
-]);
-const REMOVAL_EVENTS = new Set(['Pole Removed/Canceled', 'Pole Canceled / Removed']);
+import {
+  featureKind,
+  isKnownStatus,
+  PLANTING_EVENTS,
+  REMOVAL_EVENTS,
+  type FeatureKind,
+} from './featureStatus';
 const STUCK = new Set(['error', 'not_applied', 'conflict']);
 const DROP_INSTALLATION_STATES = new Set(['installed', 'planned', 'in progress']);
 const DROP_QC_STATES = new Set(['approved', 'pending', 'failed']);
-type FeatureKind = 'pole' | 'cable' | 'drop';
 interface FeatureHistory {
   kind: FeatureKind;
   rows: QFieldDelta[];
@@ -44,11 +44,11 @@ function ordered(rows: QFieldDelta[]): QFieldDelta[] {
   return [...rows].sort(compareRows);
 }
 function kindOf(row: QFieldDelta): FeatureKind | 'unknown' {
-  const status = statusOf(row);
-  if (normalize(row.dropNumber)) return 'drop';
-  if (normalize(row.cableId) || status?.startsWith('String ')) return 'cable';
-  if (status?.startsWith('Pole ')) return 'pole';
-  return 'unknown';
+  return featureKind(
+    statusOf(row),
+    normalize(row.dropNumber) !== null,
+    normalize(row.cableId) !== null,
+  );
 }
 function isPoleQualityEvent(status: string | null): boolean {
   return Boolean(
@@ -78,7 +78,7 @@ function groupHistories(
     else if (isPoleQualityEvent(statusOf(row))) {
       if (kinds.has('pole')) kind = 'pole';
     }
-    else if (kinds.size === 1) kind = [...kinds][0];
+    else if (kinds.size === 1 && !kinds.has('optical')) kind = [...kinds][0];
     if (!kind) {
       unassigned.push(row);
       continue;
@@ -104,20 +104,6 @@ function anomaly(
     occurredAt: row.createdAt || null,
   };
 }
-function knownStatus(status: string, kind: FeatureKind): boolean {
-  if (PLANTING_EVENTS.has(status) || REMOVAL_EVENTS.has(status)) return true;
-  if (
-    status.startsWith('Q/A ') ||
-    status.startsWith('(ADMIN) Q/A ') ||
-    status.startsWith('Photo ') ||
-    status.startsWith('WIP') ||
-    status.startsWith('Optical ')
-  ) {
-    return true;
-  }
-  if (kind === 'cable' && status.startsWith('String ')) return true;
-  return kind === 'drop' && status.startsWith('Drop ');
-}
 function inspectHistory(
   history: FeatureHistory,
   anomalies: ProjectStatsAnomaly[],
@@ -131,7 +117,7 @@ function inspectHistory(
   }
   for (const row of applied) {
     const status = statusOf(row);
-    if (status && !knownStatus(status, history.kind)) {
+    if (status && !isKnownStatus(status, history.kind)) {
       anomalies.push(anomaly('unknown_status', row));
     }
   }
@@ -175,6 +161,7 @@ export function buildQFieldInfrastructure(deltas: QFieldDelta[]): QFieldInfrastr
   const { groups, unassigned } = groupHistories(deltas);
   for (const row of unassigned) anomalies.push(anomaly('unknown_status', row));
   for (const history of groups) {
+    if (history.kind === 'optical') continue;
     const applied = inspectHistory(history, anomalies);
     const latestApplied = applied.at(-1);
     if (history.kind === 'pole') {

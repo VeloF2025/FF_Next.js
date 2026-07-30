@@ -16,6 +16,8 @@ describe('parseProjectStatsQuery', () => {
     [{}, 'project is required'],
     [{ project: 'Mahikeng', section: 'raw' }, 'section must be one of'],
     [{ project: 'Mahikeng', page: '0' }, 'page must be a positive integer'],
+    [{ project: 'Mahikeng', page: '9007199254740992' }, 'page must be a positive integer'],
+    [{ project: 'Mahikeng', page: '9'.repeat(400) }, 'page must be a positive integer'],
     [{ project: 'Mahikeng', limit: '101' }, 'limit must be between 1 and 100'],
     [{ project: 'x'.repeat(201) }, 'project must be 200 characters or fewer'],
   ])('rejects invalid query %#', (query, message) => {

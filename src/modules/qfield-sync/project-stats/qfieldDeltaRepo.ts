@@ -41,11 +41,15 @@ type DeltaRow = {
 };
 
 function mapRow(row: DeltaRow): QFieldDelta | null {
-  if (!row.feature_key) return null;
-  const length = row.cable_length_m === null ? null : Number(row.cable_length_m);
+  const featureKey = row.feature_key?.trim();
+  if (!featureKey) return null;
+  const rawLength = typeof row.cable_length_m === 'string'
+    ? row.cable_length_m.trim()
+    : row.cable_length_m;
+  const length = rawLength === null || rawLength === '' ? null : Number(rawLength);
   return {
     id: row.id,
-    featureKey: row.feature_key,
+    featureKey,
     label: row.label,
     status: row.status?.trim() || null,
     lastStatus: row.last_status,
@@ -87,10 +91,12 @@ export const qfieldDeltaRepo: QFieldDeltaRepository = {
                     d.content->'new'->'attributes'->>'Cable_No',
                     d.content->'old'->'attributes'->>'cable_id',
                     d.content->'old'->'attributes'->>'Cable_No') AS cable_id,
-           COALESCE(d.content->'new'->'attributes'->>'length',
-                    d.content->'new'->'attributes'->>'Length',
-                    d.content->'old'->'attributes'->>'length',
-                    d.content->'old'->'attributes'->>'Length') AS cable_length_m,
+           NULLIF(BTRIM(COALESCE(
+             d.content->'new'->'attributes'->>'length',
+             d.content->'new'->'attributes'->>'Length',
+             d.content->'old'->'attributes'->>'length',
+             d.content->'old'->'attributes'->>'Length'
+           )), '') AS cable_length_m,
            COALESCE(d.content->'new'->'attributes'->>'installation_status',
                     d.content->'new'->'attributes'->>'Installation Status',
                     d.content->'old'->'attributes'->>'installation_status',

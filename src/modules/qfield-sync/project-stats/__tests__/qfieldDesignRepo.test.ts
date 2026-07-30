@@ -50,6 +50,15 @@ describe('getCachedPoleDesign', () => {
     { designPons: [], poleToPon: null },
     { designPons: 'not-an-array', poleToPon: {} },
     { designPons: [], poleToPon: [] },
+    { designPons: ['1'], poleToPon: {} },
+    { designPons: [Number.NaN], poleToPon: {} },
+    { designPons: [Number.POSITIVE_INFINITY], poleToPon: {} },
+    { designPons: [], poleToPon: { '': { pon: 1, zone: 'A' } } },
+    { designPons: [], poleToPon: { '   ': { pon: 1, zone: 'A' } } },
+    { designPons: [], poleToPon: { HT_001: null } },
+    { designPons: [], poleToPon: { HT_001: { pon: '1', zone: 'A' } } },
+    { designPons: [], poleToPon: { HT_001: { pon: Number.NaN, zone: 'A' } } },
+    { designPons: [], poleToPon: { HT_001: { pon: 1, zone: 1 } } },
   ])('rejects malformed cached payload %#', async (payload) => {
     const run = vi.fn().mockResolvedValueOnce([
       { gpkg_version: 'v1', resolved_at: '2026-07-29T11:34:04Z', payload },

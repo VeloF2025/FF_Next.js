@@ -92,4 +92,22 @@ describe('getFibreFlowInfrastructure', () => {
       drops: { total: 0 },
     });
   });
+
+  it('accumulates pole rows that collide on the emitted status key', async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce([
+        { status: '<null>', count: '2' },
+        { status: '<null>', count: '3' },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const result = await getFibreFlowInfrastructure('ff-project', run);
+
+    expect(result.poles).toEqual({
+      total: 5,
+      byStatus: { '<null>': 5 },
+    });
+  });
 });

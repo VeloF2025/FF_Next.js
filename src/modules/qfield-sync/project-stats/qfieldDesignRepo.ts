@@ -29,7 +29,15 @@ function labelsFrom(payload: unknown): Set<string> {
   if (
     !isRecord(payload) ||
     !Array.isArray(payload.designPons) ||
-    !isRecord(payload.poleToPon)
+    !payload.designPons.every((pon) => typeof pon === 'number' && Number.isFinite(pon)) ||
+    !isRecord(payload.poleToPon) ||
+    !Object.entries(payload.poleToPon).every(([label, mapping]) => (
+      label.trim().length > 0 &&
+      isRecord(mapping) &&
+      typeof mapping.pon === 'number' &&
+      Number.isFinite(mapping.pon) &&
+      (mapping.zone === null || typeof mapping.zone === 'string')
+    ))
   ) {
     throw new Error('Malformed QField pole design cache payload');
   }

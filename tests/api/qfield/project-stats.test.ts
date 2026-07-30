@@ -134,6 +134,25 @@ describe('GET /api/qfield/project-stats', () => {
     expect(res._getData()).not.toContain('stack');
   });
 
+  it('rejects an unsafe page integer before calling the service', async () => {
+    const { req, res } = request('GET', {
+      project: 'Mahikeng',
+      page: '9007199254740992',
+    });
+
+    await projectStatsHandler(req, res);
+
+    expect(res._getStatusCode()).toBe(400);
+    expect(responseBody(res)).toMatchObject({
+      success: false,
+      error: {
+        code: ErrorCode.BAD_REQUEST,
+        message: 'page must be a positive integer',
+      },
+    });
+    expect(getProjectStats).not.toHaveBeenCalled();
+  });
+
   it.each([
     [ErrorCode.NOT_FOUND, 404, undefined],
     [ErrorCode.CONFLICT, 409, { candidates: [{ id: 'project-1', name: 'Mahikeng' }] }],

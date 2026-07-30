@@ -20,7 +20,11 @@ function positiveInteger(
   if (!/^[1-9]\d*$/.test(value)) {
     throw new ProjectStatsError(ErrorCode.BAD_REQUEST, `${name} must be a positive integer`);
   }
-  return Number(value);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new ProjectStatsError(ErrorCode.BAD_REQUEST, `${name} must be a positive integer`);
+  }
+  return parsed;
 }
 
 export function parseProjectStatsQuery(query: ParsedUrlQuery): ProjectStatsQuery {
