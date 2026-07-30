@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import JSZip from 'jszip';
 import { log } from '@/lib/logger';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import type { VFStorageService } from '@/services/vfStorageAdapter';
@@ -22,6 +23,18 @@ const FILE_TYPES = {
   },
 } as const;
 type UploadMime = keyof typeof FILE_TYPES;
+const OOXML_TYPES = {
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
+    mainPart: 'word/document.xml',
+    mainContentType:
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
+  },
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+    mainPart: 'xl/workbook.xml',
+    mainContentType:
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml',
+  },
+} as const;
 
 interface StorageAdapter {
   uploadFile: VFStorageService['uploadFile'];
@@ -51,6 +64,31 @@ export interface DocumentAuditMetadata {
 
 const matchesSignature = (buffer: Buffer, signature: readonly number[]): boolean =>
   signature.every((byte, index) => buffer[index] === byte);
+
+async function hasValidFileStructure(
+  buffer: Buffer,
+  mimeType: UploadMime,
+): Promise<boolean> {
+  if (!matchesSignature(buffer, FILE_TYPES[mimeType].signature)) return false;
+  if (mimeType === 'application/pdf') return true;
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const contentTypesEntry = zip.file('[Content_Types].xml');
+    const config = OOXML_TYPES[mimeType];
+    if (!contentTypesEntry || !zip.file('_rels/.rels') || !zip.file(config.mainPart)) {
+      return false;
+    }
+    const metadata = contentTypesEntry as unknown as {
+      _data?: { uncompressedSize?: number };
+    };
+    if ((metadata._data?.uncompressedSize ?? 0) > 1024 * 1024) return false;
+    const contentTypes = await contentTypesEntry.async('string');
+    return contentTypes.includes(`PartName="/${config.mainPart}"`)
+      && contentTypes.includes(`ContentType="${config.mainContentType}"`);
+  } catch {
+    return false;
+  }
+}
 
 export function sanitizeZoneDocumentFilename(original: string, mimeType: UploadMime): string {
   const extension = FILE_TYPES[mimeType].extension;
@@ -107,7 +145,7 @@ export async function storeZoneDeliveryDocument(args: {
     deliveryError('VALIDATION_ERROR', 'Document exceeds the 50 MiB limit');
   }
   const config = FILE_TYPES[file.mimeType as UploadMime];
-  if (!config || !matchesSignature(file.buffer, config.signature)
+  if (!config || !(await hasValidFileStructure(file.buffer, file.mimeType as UploadMime))
     || !file.originalFilename.toLowerCase().endsWith(config.extension)) {
     deliveryError('VALIDATION_ERROR', 'Document MIME, extension, or signature is invalid');
   }

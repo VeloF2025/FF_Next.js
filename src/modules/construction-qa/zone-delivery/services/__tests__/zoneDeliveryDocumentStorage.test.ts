@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import JSZip from 'jszip';
 import { describe, expect, it, vi } from 'vitest';
 import type { ZoneDeliveryService } from '../zoneDeliveryService';
 import type { ZoneDeliveryView } from '../../types/zoneDelivery.types';
@@ -64,30 +65,76 @@ function dependencies() {
 }
 
 describe('zone delivery document storage', () => {
+  it('accepts a valid PDF signature', async () => {
+    const deps = dependencies();
+    await storeZoneDeliveryDocument({
+      ...deps,
+      command: { ...key, documentType: 'fac' },
+      actor,
+      file: {
+        buffer: Buffer.from('%PDF-1.4 test'),
+        mimeType: 'application/pdf',
+        originalFilename: 'evidence.pdf',
+      },
+    });
+    expect(deps.storage.uploadFile).toHaveBeenCalledOnce();
+    expect(deps.service.registerDocument).toHaveBeenCalledOnce();
+  });
+
   it.each([
-    ['application/pdf', Buffer.from('%PDF-1.4 test'), 'fac', 'evidence.pdf'],
     [
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      Buffer.from([0x50, 0x4b, 0x03, 0x04, 1]),
+      'word/document.xml',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
       'cac',
       'evidence.docx',
     ],
     [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      Buffer.from([0x50, 0x4b, 0x03, 0x04, 2]),
+      'xl/workbook.xml',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml',
       'test_pack',
       'evidence.xlsx',
     ],
-  ] as const)('accepts valid %s magic bytes', async (mimeType, buffer, documentType, originalFilename) => {
+  ] as const)('accepts a structurally valid %s package', async (
+    mimeType,
+    mainPart,
+    mainContentType,
+    documentType,
+    originalFilename,
+  ) => {
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', `<Types><Override PartName="/${mainPart}" ContentType="${mainContentType}"/></Types>`);
+    zip.file('_rels/.rels', '<Relationships/>');
+    zip.file(mainPart, '<document/>');
+    const buffer = await zip.generateAsync({ type: 'nodebuffer' });
     const deps = dependencies();
     await storeZoneDeliveryDocument({
       ...deps,
-      command: { ...key, documentType, ponStageId: documentType === 'test_pack' ? actor.userId : undefined },
+      command: {
+        ...key,
+        documentType,
+        ponStageId: documentType === 'test_pack' ? actor.userId : undefined,
+      },
       actor,
       file: { buffer, mimeType, originalFilename },
     });
     expect(deps.storage.uploadFile).toHaveBeenCalledOnce();
-    expect(deps.service.registerDocument).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a ZIP signature that is not a valid OOXML package', async () => {
+    const deps = dependencies();
+    await expect(storeZoneDeliveryDocument({
+      ...deps,
+      command: { ...key, documentType: 'cac' },
+      actor,
+      file: {
+        buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04, 1]),
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        originalFilename: 'evidence.docx',
+      },
+    })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(deps.storage.uploadFile).not.toHaveBeenCalled();
   });
 
   it('rejects a mismatched magic signature before storage or metadata', async () => {
