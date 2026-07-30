@@ -25,6 +25,7 @@ def svc(tmp_path, monkeypatch):
     package = sys.modules.get("ff_mcp")
     for name in (
         "ff_mcp.server",
+        "ff_mcp.catalogue",
         "ff_mcp.tools",
         "ff_mcp.qfield_tools",
         "ff_mcp.oauth",

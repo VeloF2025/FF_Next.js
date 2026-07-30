@@ -98,3 +98,51 @@ Additional gates:
   reported as non-blocking by `ci:quick`. Task 9 contains no TypeScript changes.
 - The authenticated dev smoke remains intentionally unexecuted because no
   `FF_DEV_TOKEN` was supplied.
+
+## Fix round 1 — preserve catalogue tools across fresh test servers
+
+### Review finding
+
+The fixture evicted `server`, `tools`, and `qfield_tools`, but left
+`ff_mcp.catalogue` in both `sys.modules` and the `ff_mcp` package attributes.
+Because catalogue registration is an import side effect, its cached module stayed
+bound to the previous FastMCP instance. A later fresh server therefore exposed
+only `fibreflow_get` and `get_qfield_project_stats`, losing `list_endpoints` and
+`describe_endpoint`.
+
+### TDD evidence
+
+The regression requests two real fresh `svc` fixtures and requires the complete
+four-tool set exactly once on each.
+
+RED:
+
+```text
+.F
+1 failed, 1 passed
+```
+
+The second fresh import was missing exactly `list_endpoints` and
+`describe_endpoint`.
+
+GREEN after adding `ff_mcp.catalogue` to the existing module/package eviction
+tuple:
+
+```text
+2 passed in 0.24s
+```
+
+Focused Task 9 suite:
+
+```text
+12 passed in 0.30s
+```
+
+Complete offline MCP suite with `FF_DEV_TOKEN` explicitly removed:
+
+```text
+78 passed, 1 skipped in 0.73s
+```
+
+The skip remains the opt-in authenticated dev smoke. No live request was made.
+`python3 -m compileall -q apps/ff_mcp` and `git diff --check` also passed.

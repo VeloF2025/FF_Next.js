@@ -67,6 +67,25 @@ def test_qfield_tool_defaults_to_summary(svc, monkeypatch):
     }
 
 
+@pytest.mark.parametrize("_fresh_import", range(2))
+@pytest.mark.asyncio
+async def test_every_fresh_service_registers_the_complete_tool_set_once(
+    svc, _fresh_import
+):
+    """Leaving any side-effect tool module cached must fail on the next import."""
+    server, _ = svc
+    names = [tool.name for tool in await server.mcp.list_tools()]
+    expected = {
+        "fibreflow_get",
+        "list_endpoints",
+        "describe_endpoint",
+        "get_qfield_project_stats",
+    }
+
+    assert set(names) == expected
+    assert all(names.count(name) == 1 for name in expected)
+
+
 @pytest.mark.asyncio
 async def test_qfield_tool_runs_the_blocking_adapter_on_a_worker_thread(
     svc, monkeypatch
