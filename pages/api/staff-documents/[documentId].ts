@@ -57,8 +57,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       const [document] = await sql`
         SELECT
-          sd.id, sd.staff_id, sd.document_type, sd.document_name, sd.file_url,
-          sd.file_path, sd.file_size, sd.file_name, sd.mime_type, sd.expiry_date,
+          sd.id, sd.staff_id, sd.document_type, sd.document_name,
+          sd.file_size, sd.file_name, sd.mime_type, sd.expiry_date,
           sd.issued_date, sd.issuing_authority, sd.document_number,
           sd.verification_status, sd.verified_by, sd.verified_at, sd.verification_notes,
           sd.ocr_metadata,
@@ -123,7 +123,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           document_number = COALESCE(${documentNumber || null}, document_number),
           updated_at = NOW()
         WHERE id = ${documentId}
-        RETURNING id, staff_id, document_type, document_name, file_url, file_path,
+        RETURNING id, staff_id, document_type, document_name,
                  file_size, file_name, mime_type, expiry_date, issued_date,
                  issuing_authority, document_number, verification_status, verified_by,
                  verified_at, verification_notes, created_at, updated_at

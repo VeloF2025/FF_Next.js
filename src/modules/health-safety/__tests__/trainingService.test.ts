@@ -75,8 +75,11 @@ describe('only verified evidence counts', () => {
     ]);
     await computeContractorTrainingScore('c1');
     // Pending, rejected and revoked evidence must not reach the arithmetic at
-    // all — not be counted and then subtracted.
-    expect(emittedSql()).toMatch(/wt\.verification_status = 'verified'/);
+    // all — not be counted and then subtracted. Anchored on the preceding AND
+    // so that flipping it to OR (which would also no-op the contractor filter)
+    // fails here rather than still matching a bare substring.
+    expect(emittedSql()).toMatch(/AND wt\.verification_status = 'verified'/);
+    expect(emittedSql()).not.toMatch(/OR wt\.verification_status/);
   });
 
   it('a population of only unverified rows scores null, which does not block', async () => {

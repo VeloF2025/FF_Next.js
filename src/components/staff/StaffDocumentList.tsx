@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { TrainingCertificateUploadDialog } from '@/modules/health-safety/components/training/TrainingCertificateUploadDialog';
+import { TrainingCertificateRevokeDialog } from '@/modules/health-safety/components/training/TrainingCertificateRevokeDialog';
 import { TrainingTypeChips } from '@/modules/health-safety/components/training/TrainingTypeMultiSelect';
 import {
   FileText,
@@ -64,6 +65,11 @@ interface StaffDocumentListProps {
    * re-checks people.staff.training-certificates:create on every request.
    */
   canUploadTrainingCertificate?: boolean;
+  /**
+   * Whether the viewer may withdraw already-verified evidence. Same caveat as
+   * above: the verify route re-checks the dedicated edit permission.
+   */
+  canVerifyTrainingCertificate?: boolean;
 }
 
 // OCR status stored per document
@@ -79,8 +85,10 @@ export function StaffDocumentList({
   onVerify,
   onOcrApplied,
   canUploadTrainingCertificate = false,
+  canVerifyTrainingCertificate = false,
 }: StaffDocumentListProps) {
   const [showCertificateDialog, setShowCertificateDialog] = useState(false);
+  const [revokingDocument, setRevokingDocument] = useState<StaffDocument | null>(null);
   const [documents, setDocuments] = useState<StaffDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -473,6 +481,19 @@ export function StaffDocumentList({
         </div>
       </div>
 
+      {revokingDocument && (
+        <TrainingCertificateRevokeDialog
+          isOpen
+          documentId={revokingDocument.id}
+          documentName={revokingDocument.documentName}
+          onClose={() => setRevokingDocument(null)}
+          onRevoked={() => {
+            setRevokingDocument(null);
+            fetchDocuments();
+          }}
+        />
+      )}
+
       <TrainingCertificateUploadDialog
         isOpen={showCertificateDialog}
         staffId={staffId}
@@ -597,6 +618,21 @@ export function StaffDocumentList({
 
                 {/* Actions - stop propagation to prevent row click */}
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {/* Revocation is the only way to withdraw verified evidence:
+                      the delete endpoint refuses a verified document so the
+                      audit trail survives. */}
+                  {canVerifyTrainingCertificate &&
+                    doc.documentType === 'certification' &&
+                    doc.verificationStatus === 'verified' && (
+                      <button
+                        onClick={() => setRevokingDocument(doc)}
+                        title="Revoke this certificate"
+                        aria-label={`Revoke ${doc.documentName}`}
+                        className="p-2 text-[var(--ff-text-secondary)] hover:text-red-500"
+                      >
+                        <Ban className="h-4 w-4" />
+                      </button>
+                    )}
                   {/* OCR Extract Data button - only for eligible documents */}
                   {isOcrEligible(doc.documentType) && (
                     <>

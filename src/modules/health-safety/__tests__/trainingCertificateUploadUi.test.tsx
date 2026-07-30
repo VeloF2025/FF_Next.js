@@ -37,6 +37,7 @@ import React from 'react';
 import { TrainingCertificateUploadForm } from '../components/training/TrainingCertificateUploadForm';
 import RecordTrainingPage from '../../../../pages/health-safety/training/new';
 import { StaffDocumentList } from '@/components/staff/StaffDocumentList';
+import { TrainingCertificateRevokeDialog } from '../components/training/TrainingCertificateRevokeDialog';
 
 const STAFF_ID = '11111111-1111-1111-1111-111111111111';
 const HEIGHTS = '44444444-4444-4444-4444-444444444444';
@@ -310,5 +311,110 @@ describe('restricted viewers do not see certificate actions', () => {
     expect(
       await screen.findByRole('button', { name: /upload training certificate/i })
     ).toBeInTheDocument();
+  });
+});
+
+describe('revoking verified evidence', () => {
+  const DOC_ID = '77777777-7777-7777-7777-777777777777';
+
+  function renderDialog(onRevoked = vi.fn()) {
+    render(
+      <TrainingCertificateRevokeDialog
+        isOpen
+        documentId={DOC_ID}
+        documentName="Working at Heights certificate"
+        onClose={vi.fn()}
+        onRevoked={onRevoked}
+      />
+    );
+    return onRevoked;
+  }
+
+  it('refuses to submit without a reason', async () => {
+    const user = userEvent.setup();
+    global.fetch = vi.fn() as unknown as typeof fetch;
+    renderDialog();
+
+    await user.click(screen.getByRole('button', { name: /revoke certificate/i }));
+
+    expect(await screen.findByText(/reason is required/i)).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('posts the revocation with its reason and reports success only after the API confirms', async () => {
+    const user = userEvent.setup();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { status: 'revoked' } }),
+    }) as unknown as typeof fetch;
+    const onRevoked = renderDialog();
+
+    await user.type(screen.getByLabelText(/reason/i), 'Issued in error by the provider');
+    await user.click(screen.getByRole('button', { name: /revoke certificate/i }));
+
+    await waitFor(() => expect(onRevoked).toHaveBeenCalled());
+    const [url, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe(`/api/staff-documents/${DOC_ID}/verify`);
+    expect(JSON.parse(init.body)).toEqual({
+      status: 'revoked',
+      notes: 'Issued in error by the provider',
+    });
+  });
+
+  it('keeps the dialog open with the server error when the API refuses', async () => {
+    const user = userEvent.setup();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({
+        success: false,
+        error: { message: 'A rejected certificate cannot be marked revoked' },
+      }),
+    }) as unknown as typeof fetch;
+    const onRevoked = renderDialog();
+
+    await user.type(screen.getByLabelText(/reason/i), 'Withdrawn');
+    await user.click(screen.getByRole('button', { name: /revoke certificate/i }));
+
+    expect(await screen.findByText(/cannot be marked revoked/i)).toBeInTheDocument();
+    expect(onRevoked).not.toHaveBeenCalled();
+  });
+});
+
+describe('the revoke action is only offered where it applies', () => {
+  const VERIFIED_CERT = {
+    id: '77777777-7777-7777-7777-777777777777',
+    staffId: STAFF_ID,
+    documentType: 'certification',
+    documentName: 'Working at Heights certificate',
+    verificationStatus: 'verified',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  function renderList(props: Record<string, unknown>, doc = VERIFIED_CERT) {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, documents: [doc], count: 1 }),
+    }) as unknown as typeof fetch;
+    render(<StaffDocumentList staffId={STAFF_ID} {...props} />);
+  }
+
+  it('offers it for a verified certificate when permitted', async () => {
+    renderList({ canVerifyTrainingCertificate: true });
+    expect(await screen.findByRole('button', { name: /revoke working at heights/i })).toBeInTheDocument();
+  });
+
+  it('hides it without the permission', async () => {
+    renderList({});
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /revoke working at heights/i })).not.toBeInTheDocument()
+    );
+  });
+
+  it('hides it for a pending certificate — there is nothing verified to withdraw', async () => {
+    renderList({ canVerifyTrainingCertificate: true }, { ...VERIFIED_CERT, verificationStatus: 'pending' });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /revoke working at heights/i })).not.toBeInTheDocument()
+    );
   });
 });
