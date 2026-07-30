@@ -28,9 +28,14 @@ const USER_ID = '22222222-2222-2222-2222-222222222222';
 describe('zone delivery migration 470', () => {
   let pool: Pool;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     expect(process.env.DATABASE_URL_TEST).toBe(EXPECTED_TEST_URL);
     pool = new Pool({ connectionString: process.env.DATABASE_URL_TEST });
+    await pool.query(`
+      TRUNCATE zone_delivery_activity, zone_delivery_snag_links,
+        pon_delivery_state, zone_delivery_documents, zone_delivery_state,
+        construction_qa_reviews RESTART IDENTITY CASCADE
+    `);
   });
 
   afterAll(async () => {
