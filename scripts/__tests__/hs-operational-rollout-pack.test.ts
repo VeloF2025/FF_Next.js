@@ -126,6 +126,44 @@ describe('H&S operational rollout pack', () => {
     );
   });
 
+  it('leaves direct team/member contractor contradictions unresolved', () => {
+    const contradictory: RolloutSnapshot = {
+      ...snapshot,
+      teams: [
+        ...snapshot.teams,
+        {
+          id: 'team-c',
+          name: 'Contradiction Team',
+          contractorId: 'contractor-a',
+          isActive: true,
+        },
+      ],
+      members: [
+        ...snapshot.members,
+        {
+          id: 'member-e',
+          teamId: 'team-c',
+          contractorId: 'contractor-b',
+          firstName: 'Contradictory',
+          lastName: 'Worker',
+          role: 'Installer',
+          isActive: true,
+          isTeamLead: false,
+          userId: null,
+        },
+      ],
+    };
+
+    const csv = buildPack(contradictory)['contractor-mapping.csv'];
+
+    expect(csv).toContain(
+      'team,team-c,Contradiction Team,,,conflicting teams.contractor_id and team_members.contractor_id,NONE,pending'
+    );
+    expect(csv).toContain(
+      'team_member,member-e,Contradictory Worker,Contradiction Team,,conflicting team_members.contractor_id and teams.contractor_id,NONE,pending'
+    );
+  });
+
   it('writes the complete private review pack with escaped, minimal blocker data', () => {
     const files = buildPack(snapshot);
 

@@ -1,10 +1,5 @@
-import type {
-  MappingRow,
-  PackFiles,
-  RolloutSnapshot,
-  TeamMemberRow,
-  TeamRow,
-} from './types';
+import { buildMappingRows } from './deriveMappings';
+import type { MappingRow, PackFiles, RolloutSnapshot } from './types';
 
 function csvCell(value: string): string {
   if (!/[",\r\n]/.test(value)) return value;
@@ -13,84 +8,6 @@ function csvCell(value: string): string {
 
 function renderCsv(rows: string[][]): string {
   return `${rows.map((row) => row.map(csvCell).join(',')).join('\n')}\n`;
-}
-
-function teamMapping(team: TeamRow, members: TeamMemberRow[]): MappingRow {
-  if (team.contractorId) {
-    return {
-      entityType: 'team',
-      entityId: team.id,
-      entityName: team.name,
-      teamName: '',
-      proposedContractorId: team.contractorId,
-      evidenceSource: 'teams.contractor_id',
-      confidence: 'HIGH',
-      approvalStatus: 'pending',
-    };
-  }
-
-  const linkedContractors = new Set(
-    members
-      .filter((member) => member.isActive && member.teamId === team.id && member.contractorId)
-      .map((member) => member.contractorId as string)
-  );
-  if (linkedContractors.size === 1) {
-    return {
-      entityType: 'team',
-      entityId: team.id,
-      entityName: team.name,
-      teamName: '',
-      proposedContractorId: [...linkedContractors][0],
-      evidenceSource: 'unanimous team_members.contractor_id',
-      confidence: 'MEDIUM',
-      approvalStatus: 'pending',
-    };
-  }
-
-  return {
-    entityType: 'team',
-    entityId: team.id,
-    entityName: team.name,
-    teamName: '',
-    proposedContractorId: null,
-    evidenceSource:
-      linkedContractors.size > 1
-        ? 'conflicting team_members.contractor_id'
-        : 'no explicit contractor evidence',
-    confidence: 'NONE',
-    approvalStatus: 'pending',
-  };
-}
-
-function memberMapping(
-  member: TeamMemberRow,
-  team: TeamRow | undefined
-): MappingRow {
-  const inheritedContractorId = team?.contractorId ?? null;
-  return {
-    entityType: 'team_member',
-    entityId: member.id,
-    entityName: `${member.firstName} ${member.lastName}`.trim(),
-    teamName: team?.name ?? '',
-    proposedContractorId: member.contractorId ?? inheritedContractorId,
-    evidenceSource: member.contractorId
-      ? 'team_members.contractor_id'
-      : inheritedContractorId
-        ? 'teams.contractor_id'
-        : 'no explicit contractor evidence',
-    confidence: member.contractorId || inheritedContractorId ? 'HIGH' : 'NONE',
-    approvalStatus: 'pending',
-  };
-}
-
-function buildMappingRows(snapshot: RolloutSnapshot): MappingRow[] {
-  const activeTeams = snapshot.teams.filter((team) => team.isActive);
-  const activeMembers = snapshot.members.filter((member) => member.isActive);
-  const teamsById = new Map(activeTeams.map((team) => [team.id, team]));
-  return [
-    ...activeTeams.map((team) => teamMapping(team, activeMembers)),
-    ...activeMembers.map((member) => memberMapping(member, teamsById.get(member.teamId ?? ''))),
-  ];
 }
 
 function mappingCsv(snapshot: RolloutSnapshot): string {
