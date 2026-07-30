@@ -1,5 +1,5 @@
-import type { FormEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface AuditedActionValues {
   effectiveAt: string;
@@ -16,20 +16,78 @@ interface Props {
   onSubmit: (values: AuditedActionValues) => Promise<boolean>;
 }
 
+const FOCUSABLE = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
 export function ZoneDeliveryActionDialog({
   open, title, submitting, requireReason = false, children, onClose, onSubmit,
 }: Props) {
   const [effectiveAt, setEffectiveAt] = useState('');
   const [source, setSource] = useState('');
   const [reason, setReason] = useState('');
-  if (!open) return null;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
-  const close = () => {
+  const close = useCallback(() => {
     setEffectiveAt('');
     setSource('');
     setReason('');
     onClose();
-  };
+  }, [onClose]);
+
+  useEffect(() => {
+    let frame: number | undefined;
+    if (open) {
+      triggerRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      frame = requestAnimationFrame(() => {
+        const dialog = dialogRef.current;
+        const first = dialog?.querySelector<HTMLElement>(FOCUSABLE);
+        (first ?? dialog)?.focus();
+      });
+    } else if (triggerRef.current) {
+      const trigger = triggerRef.current;
+      triggerRef.current = null;
+      frame = requestAnimationFrame(() => trigger.focus());
+    }
+    return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
+  }, [open]);
+
+  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [],
+    ).filter(element => !element.closest('[aria-hidden="true"]'));
+    if (focusable.length === 0) {
+      event.preventDefault();
+      dialogRef.current?.focus();
+      return;
+    }
+    const first = focusable[0]!;
+    const last = focusable.at(-1)!;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }, [close]);
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const succeeded = await onSubmit({
@@ -39,9 +97,18 @@ export function ZoneDeliveryActionDialog({
     });
     if (succeeded) close();
   };
+  if (!open) return null;
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="zone-action-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="zone-action-title"
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+    >
       <form onSubmit={event => void submit(event)} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--ff-bg-primary)] p-5">
         <h2 id="zone-action-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">{title}</h2>
         {children}
