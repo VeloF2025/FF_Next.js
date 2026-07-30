@@ -155,7 +155,10 @@ describe('alert debounce', () => {
     const first = mockRes();
     await handler(req(), first);
     expect(first.body.alerted).toBe(false);
-    expect(first.body.alertProblems).toHaveLength(2);
+    expect(first.body.alertProblemCount).toBe(2);
+    expect(first.body.alertChannels).toEqual([]);
+    // Raw transport errors must not reach the response body.
+    expect(JSON.stringify(first.body)).not.toContain('down');
 
     // Next tick must try again immediately, not wait out REALERT_MS.
     const second = mockRes();
@@ -171,17 +174,20 @@ describe('alert debounce', () => {
     expect(dispatchBridgeAlert).toHaveBeenCalledTimes(1);
   });
 
-  // Keying off "verdict changed" would alert on every tick while flapping.
-  it('does not re-alert on every flap between two alerting verdicts', async () => {
+  // Keying off "verdict changed" would alert on all four ticks. Only a RISE
+  // into needs-a-human pages; the de-escalating ticks stay quiet. Two alerts
+  // across four ticks, not four — and not one, which would mean a real second
+  // escalation was being swallowed.
+  it('alerts only on the rises when flapping between two alerting verdicts', async () => {
     bridgeReturns(LOGGED_OUT);
-    await handler(req(), mockRes());          // escalates: needsHuman
+    await handler(req(), mockRes());          // rise -> alert
     bridgeReturns(DISCONNECTED);
-    await handler(req(), mockRes());
+    await handler(req(), mockRes());          // de-escalate -> quiet
     bridgeReturns(LOGGED_OUT);
-    await handler(req(), mockRes());
+    await handler(req(), mockRes());          // rise again -> alert
     bridgeReturns(DISCONNECTED);
-    await handler(req(), mockRes());
-    expect(dispatchBridgeAlert).toHaveBeenCalledTimes(1);
+    await handler(req(), mockRes());          // de-escalate -> quiet
+    expect(dispatchBridgeAlert).toHaveBeenCalledTimes(2);
   });
 
   it('alerts again once the re-alert interval has elapsed', async () => {
@@ -192,6 +198,24 @@ describe('alert debounce', () => {
 
     vi.setSystemTime(new Date(Date.now() + 31 * 60 * 1000));
     await handler(req(), mockRes());
+    expect(dispatchBridgeAlert).toHaveBeenCalledTimes(2);
+  });
+
+  // Regression (round-2 review): escalation must compare against the PREVIOUS
+  // TICK, not the last alert. Keying off the last alert made this exact
+  // sequence silent — a fresh "a human must act" state folded into the first
+  // outage's 30-minute quiet window.
+  it('alerts again when it de-escalates then re-escalates to needing a human', async () => {
+    bridgeReturns(LOGGED_OUT);
+    await handler(req(), mockRes());                    // tick 1: alert
+    expect(dispatchBridgeAlert).toHaveBeenCalledTimes(1);
+
+    bridgeReturns(DISCONNECTED);
+    await handler(req(), mockRes());                    // tick 2: de-escalate, quiet
+    expect(dispatchBridgeAlert).toHaveBeenCalledTimes(1);
+
+    bridgeReturns(LOGGED_OUT);
+    await handler(req(), mockRes());                    // tick 3: fresh escalation
     expect(dispatchBridgeAlert).toHaveBeenCalledTimes(2);
   });
 

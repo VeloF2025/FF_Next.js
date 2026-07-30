@@ -84,6 +84,49 @@ describe('dispatchBridgeAlert', () => {
     expect(problems.some((p) => p.includes('not set'))).toBe(true);
   });
 
+  // A hung SMTP socket must not stall the 5-minute cron into the next tick,
+  // where it would race the handler's module-level debounce state.
+  it('gives up on a hung SMTP send and reports it as a problem', async () => {
+    vi.useFakeTimers();
+    sendMail.mockReturnValue(new Promise(() => {})); // never settles
+
+    const pending = dispatchBridgeAlert('subj', 'body');
+    await vi.advanceTimersByTimeAsync(21_000);
+    const { delivered, problems } = await pending;
+
+    expect(delivered).toEqual(['whatsapp']);
+    expect(problems.some((p) => p.includes('timed out'))).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('gives up on a hung WhatsApp send without losing the email leg', async () => {
+    vi.useFakeTimers();
+    sendWhatsAppGroup.mockReturnValue(new Promise(() => {}));
+
+    const pending = dispatchBridgeAlert('subj', 'body');
+    await vi.advanceTimersByTimeAsync(21_000);
+    const { delivered, problems } = await pending;
+
+    expect(delivered).toEqual(['email']);
+    expect(problems.some((p) => p.includes('timed out'))).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('does not time out a send that completes in time', async () => {
+    vi.useFakeTimers();
+    sendMail.mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 1_000)),
+    );
+
+    const pending = dispatchBridgeAlert('subj', 'body');
+    await vi.advanceTimersByTimeAsync(2_000);
+    const { delivered, problems } = await pending;
+
+    expect(delivered).toEqual(['email', 'whatsapp']);
+    expect(problems).toEqual([]);
+    vi.useRealTimers();
+  });
+
   it('strips CR/LF from the subject so it cannot inject mail headers', async () => {
     await dispatchBridgeAlert('subj\r\nBcc: attacker@evil.com', 'body');
     expect(sendMail).toHaveBeenCalledWith(

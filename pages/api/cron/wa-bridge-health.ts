@@ -11,8 +11,12 @@
  * off through the whole 06:00 window and every send was lost silently.
  *
  * Schedule (velo crontab, every 5 minutes):
- *   star/5 * * * * curl -sf http://localhost:3000/api/cron/wa-bridge-health \
+ *   star/5 * * * * curl -s http://localhost:3000/api/cron/wa-bridge-health \
  *     -H "x-cron-secret: $CRON_SECRET" >> /tmp/wa-bridge-health.log 2>&1
+ *
+ * `-s`, NOT `-sf`: an alerting tick answers 503, and `curl -f` discards the
+ * body on non-2xx — so with `-f` the one log line worth having is the one that
+ * never gets written.
  *
  * Use localhost, not app.fibreflow.app: Cloudflare 403s non-browser clients.
  */
@@ -48,14 +52,21 @@ const REALERT_MS = 30 * 60 * 1000;
  */
 let lastVerdict: BridgeVerdict | null = null;
 let lastAlertAt = 0;
-let lastAlertNeedsHuman = false;
+/**
+ * The PREVIOUS TICK's needsHuman, not the last successfully-alerted one.
+ * Keying escalation off the last alert loses a real event: logged_out (alert)
+ * -> disconnected (no alert) -> logged_out again would compare true against
+ * true, see no escalation, and fold a fresh "a human must act" state into the
+ * first outage's 30-minute quiet window.
+ */
+let prevNeedsHuman = false;
 let downSince = 0;
 
 /** Exported for tests: module state must be resettable between cases. */
 export function __resetStateForTests(): void {
   lastVerdict = null;
   lastAlertAt = 0;
-  lastAlertNeedsHuman = false;
+  prevNeedsHuman = false;
   downSince = 0;
 }
 
@@ -121,6 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const wasAlerting = lastVerdict !== null && isAlerting(lastVerdict);
 
   let alerted = false;
+  let alertChannels: string[] = [];
   let alertProblems: string[] = [];
 
   if (alerting) {
@@ -130,11 +142,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // a human for the first time. Otherwise respect REALERT_MS — keying off
     // "verdict changed" would let a flap between two alerting verdicts
     // (disconnected <-> logged_out) alert on every 5-minute tick.
-    const escalated = status.needsHuman && !lastAlertNeedsHuman;
+    const escalated = status.needsHuman && !prevNeedsHuman;
     if (!wasAlerting || escalated || now - lastAlertAt >= REALERT_MS) {
       const alert = buildBridgeAlert(status);
       if (alert) {
         const { delivered, problems } = await dispatchBridgeAlert(alert.subject, alert.text);
+        alertChannels = delivered;
         alertProblems = problems;
         // Only count it as alerted — and only start the 30-minute quiet period —
         // if a channel actually accepted it. Treating a total delivery failure
@@ -142,7 +155,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // exact "nobody was told" outage this endpoint exists to prevent.
         if (delivered.length > 0) {
           lastAlertAt = now;
-          lastAlertNeedsHuman = status.needsHuman;
           alerted = true;
         }
       }
@@ -155,15 +167,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     if (alert) {
       const { delivered, problems } = await dispatchBridgeAlert(alert.subject, alert.text);
+      alertChannels = delivered;
       alertProblems = problems;
       alerted = delivered.length > 0;
     }
     lastAlertAt = 0;
-    lastAlertNeedsHuman = false;
     downSince = 0;
   }
 
   lastVerdict = status.verdict;
+  // Every tick, unconditionally — this is "what we last observed", not
+  // "what we last alerted about".
+  prevNeedsHuman = status.needsHuman;
 
   if (alerting) {
     log.warn(`WA bridge ${status.verdict}`, {
@@ -177,7 +192,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     phone: status.phone,
     needsHuman: status.needsHuman,
     alerted,
-    alertProblems,
+    // Channel names only. `problems` carries raw transport errors that can
+    // include SMTP host/port or auth text; those go to the log, not the body.
+    alertChannels,
+    alertProblemCount: alertProblems.length,
     timestamp: new Date().toISOString(),
   });
 }
