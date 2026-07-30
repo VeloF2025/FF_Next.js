@@ -83,14 +83,35 @@ describe('H&S operational rollout live loader', () => {
         ('40000000-0000-4000-8000-000000000001', '2026-07-30',
          '50000000-0000-4000-8000-000000000001', null, null,
          'Demo Lead', 'self', 'blocked',
-         ARRAY['working_at_height'], ARRAY['medical_not_current']);
+         ARRAY['working_at_height'], ARRAY['medical_not_current']),
+        ('40000000-0000-4000-8000-000000000002', '2026-07-24',
+         null, null, null, 'Seven Day Boundary', 'crew_lead', 'blocked',
+         ARRAY['plant_operation'], ARRAY['medical_not_current']),
+        ('40000000-0000-4000-8000-000000000003', '2026-07-23',
+         null, null, null, 'Eight Day Old', 'crew_lead', 'blocked',
+         ARRAY['plant_operation'], ARRAY['medical_not_current']);
     `);
     const adapter = db.adapters.createPg();
     const pool = new adapter.Pool();
+    const transactionQueries: string[] = [];
+    const recordingPool = {
+      async connect() {
+        const client = await pool.connect();
+        return {
+          async query<Row>(text: string, values?: unknown[]) {
+            transactionQueries.push(text);
+            return client.query(text, values) as Promise<{ rows: Row[] }>;
+          },
+          release() {
+            client.release();
+          },
+        };
+      },
+    };
 
     try {
       const snapshot = await loadSnapshotFromPool(
-        pool,
+        recordingPool,
         new Date('2026-07-30T04:00:00.000Z')
       );
 
@@ -121,7 +142,21 @@ describe('H&S operational rollout live loader', () => {
           declaredActivities: ['working_at_height'],
           blockedReasons: ['medical_not_current'],
         },
+        {
+          checkinId: '40000000-0000-4000-8000-000000000002',
+          checkinDate: '2026-07-24',
+          workerName: 'Seven Day Boundary',
+          staffId: null,
+          teamMemberId: null,
+          contractorId: null,
+          contractorName: null,
+          declaredActivities: ['plant_operation'],
+          blockedReasons: ['medical_not_current'],
+        },
       ]);
+      expect(transactionQueries[0]).toBe(
+        'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY'
+      );
       expect(snapshot.leadEvidence).toEqual([
         {
           candidateId: '20000000-0000-4000-8000-000000000001',

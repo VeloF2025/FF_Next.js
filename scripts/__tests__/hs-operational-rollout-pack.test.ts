@@ -192,6 +192,27 @@ describe('H&S operational rollout pack', () => {
     );
   });
 
+  it('neutralizes spreadsheet formulas in exported text cells', () => {
+    const formulaSnapshot: RolloutSnapshot = {
+      ...snapshot,
+      blockedCheckins: [
+        {
+          ...snapshot.blockedCheckins[0],
+          workerName: '=HYPERLINK("https://example.invalid","click")',
+        },
+      ],
+    };
+
+    const csv = buildPack(formulaSnapshot)['medical-blockers.csv'];
+
+    expect(csv).toContain(
+      `"'=HYPERLINK(""https://example.invalid"",""click"")"`
+    );
+    expect(csv).not.toContain(
+      `"=HYPERLINK(""https://example.invalid"",""click"")"`
+    );
+  });
+
   it('marks the announcement as unsent and includes the approved safety messages', () => {
     const draft = buildPack(snapshot)['staff-announcement-DRAFT.md'];
 

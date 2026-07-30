@@ -2,8 +2,9 @@ import { buildMappingRows } from './deriveMappings';
 import type { MappingRow, PackFiles, RolloutSnapshot } from './types';
 
 function csvCell(value: string): string {
-  if (!/[",\r\n]/.test(value)) return value;
-  return `"${value.replace(/"/g, '""')}"`;
+  const safeValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  if (!/[",\r\n]/.test(safeValue)) return safeValue;
+  return `"${safeValue.replace(/"/g, '""')}"`;
 }
 
 function renderCsv(rows: string[][]): string {

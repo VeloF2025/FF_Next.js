@@ -158,10 +158,12 @@ export async function loadSnapshotFromPool(
   now: Date = new Date()
 ): Promise<RolloutSnapshot> {
   const snapshotDate = sastDate(now);
-  const startDate = shiftDate(snapshotDate, -7);
+  const startDate = shiftDate(snapshotDate, -6);
   const client = await pool.connect();
   try {
-    await client.query('BEGIN TRANSACTION READ ONLY');
+    await client.query(
+      'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY'
+    );
     const contractors = await client.query<ContractorDbRow>(
       `SELECT id::text AS id, company_name
        FROM contractors WHERE is_active = true ORDER BY company_name, id`
