@@ -1,6 +1,6 @@
 import type { ZoneDeliveryActivity } from '../types/zoneDelivery.types';
+import { ZoneDeliveryTimestamp } from './ZoneDeliveryTimestamp';
 
-const date = (value: string) => value.slice(0, 10);
 const readableJson = (value: unknown) => JSON.stringify(value, null, 2);
 
 export function ZoneActivityTimeline({ activity }: { activity: ZoneDeliveryActivity[] }) {
@@ -14,7 +14,7 @@ export function ZoneActivityTimeline({ activity }: { activity: ZoneDeliveryActiv
           {activity.map(item => (
             <li key={item.id} aria-label={item.action} className="rounded bg-[var(--hover-bg)] p-3 text-sm text-[var(--ff-text-primary)]">
               <div className="font-medium">{item.action}</div>
-              <div>Effective: {date(item.effectiveAt)} · Recorded: {date(item.recordedAt)}</div>
+              <div>Effective: <ZoneDeliveryTimestamp value={item.effectiveAt} label={`${item.action} effective time`} /> · Recorded: <ZoneDeliveryTimestamp value={item.recordedAt} label={`${item.action} recorded time`} /></div>
               <div>{item.actorEmail} · {item.permission}</div>
               <div>Source: {item.source}</div>
               {item.reason && <div>Reason: {item.reason}</div>}

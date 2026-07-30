@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { MilestoneCommand, ScopeCommand } from '../hooks/useZoneDeliveryZone';
 import type { PonDeliveryView, PonMilestone, ScopeStatus, ZoneDeliveryView } from '../types/zoneDelivery.types';
 import { ZoneDeliveryActionDialog, type AuditedActionValues } from './ZoneDeliveryActionDialog';
+import { ZoneDeliveryTimestamp } from './ZoneDeliveryTimestamp';
 
 interface Props {
   zone: ZoneDeliveryView;
   permissions: { scope: boolean; construction: boolean; testing: boolean; operations: boolean };
   mutating: boolean;
-  onScope: (input: ScopeCommand) => Promise<void>;
-  onMilestone: (input: MilestoneCommand) => Promise<void>;
+  onScope: (input: ScopeCommand) => Promise<boolean>;
+  onMilestone: (input: MilestoneCommand) => Promise<boolean>;
 }
 type MilestoneAction = { type: 'milestone'; pon: PonDeliveryView; gate: PonMilestone; action: 'confirm' | 'reopen' };
 type MaintenanceAction = { type: 'maintenance'; pon: PonDeliveryView };
@@ -21,6 +22,14 @@ const milestoneLabels: Record<PonMilestone, string> = {
   civil_complete: 'Civil complete', optical_complete: 'Optical complete',
   testing_passed: 'Testing passed', port_submitted: 'Port submitted',
   port_approved: 'Port approved', technically_live: 'Technically live',
+};
+const blockerGate: Record<string, PonMilestone> = {
+  PON_CIVIL_INCOMPLETE: 'civil_complete',
+  PON_OPTICAL_INCOMPLETE: 'optical_complete',
+  PON_TESTING_INCOMPLETE: 'testing_passed',
+  PON_PORT_NOT_SUBMITTED: 'port_submitted',
+  PON_PORT_NOT_APPROVED: 'port_approved',
+  PON_NOT_LIVE: 'technically_live',
 };
 const gatePermission = (gate: PonMilestone, permissions: Props['permissions']) => {
   if (gate === 'civil_complete' || gate === 'optical_complete') return permissions.construction;
@@ -41,25 +50,36 @@ export function PonMilestoneTable({
   })));
   const [snagId, setSnagId] = useState('');
   const [affectedGate, setAffectedGate] = useState<PonMilestone>('civil_complete');
+  const scopeBlocker = zone.blockers.find(blocker =>
+    blocker.code === 'SCOPE_NOT_APPROVED' || blocker.code === 'EMPTY_INCLUDED_SCOPE');
+  useEffect(() => {
+    if (action?.type === 'scope') return;
+    setScope(zone.pons.map(pon => ({
+      ponStageId: pon.ponStageId, scopeStatus: pon.scopeStatus, reason: '',
+    })));
+  }, [action?.type, zone.pons]);
   const terminal = zone.status === 'handed_over';
   const submit = async (meta: AuditedActionValues) => {
-    if (!action) return;
+    if (!action) return false;
     if (action.type === 'scope') {
       const pons = scope.map(({ reason, ...pon }) => ({
         ...pon, ...(reason.trim() ? { reason: reason.trim() } : {}),
       }));
-      if (pons.length === 0) return;
-      await onScope({ ...meta, expectedRowVersion: zone.rowVersion, pons });
+      if (pons.length === 0) return false;
+      return onScope({ ...meta, expectedRowVersion: zone.rowVersion, pons });
     } else if (action.type === 'maintenance') {
-      await onMilestone({
+      return onMilestone({
         ...meta, expectedRowVersion: action.pon.rowVersion,
         ponStageId: action.pon.ponStageId, milestone: affectedGate,
         action: 'link_maintenance', snagId, affectedGate,
       });
     } else {
-      await onMilestone({
+      return onMilestone({
         ...meta, expectedRowVersion: action.pon.rowVersion,
         ponStageId: action.pon.ponStageId, milestone: action.gate, action: action.action,
+        ...(action.action === 'reopen'
+          ? { snagId, affectedGate: action.gate }
+          : {}),
       });
     }
   };
@@ -85,15 +105,21 @@ export function PonMilestoneTable({
                 {gates.map(gate => {
                   const evidence = pon.milestones[gate];
                   return <td key={gate} className="px-3 py-3 align-top">
-                    {evidence ? <><div>{evidence.effectiveAt.slice(0, 10)}</div><div className="text-xs">{evidence.actorEmail}</div><div className="text-xs">{evidence.source}</div>{evidence.reconfirmedAt && <div className="text-xs">Reconfirmed {evidence.reconfirmedAt.slice(0, 10)}</div>}</> : <span>Not confirmed</span>}
-                    {!terminal && gatePermission(gate, permissions) && <button type="button" onClick={() => setAction({ type: 'milestone', pon, gate, action: evidence ? 'reopen' : 'confirm' })} className="mt-2 block text-xs underline" aria-label={`${evidence ? 'Reopen' : 'Confirm'} ${milestoneLabels[gate]} for PON ${pon.ponNo}`}>{evidence ? 'Reopen' : 'Confirm'}</button>}
+                    {evidence ? <><div><ZoneDeliveryTimestamp value={evidence.effectiveAt} label={`PON ${pon.ponNo} ${milestoneLabels[gate]} effective time`} /></div><div className="text-xs">{evidence.actorEmail}</div><div className="text-xs">{evidence.source}</div>{evidence.reconfirmedAt && <div className="text-xs">Reconfirmed <ZoneDeliveryTimestamp value={evidence.reconfirmedAt} label={`PON ${pon.ponNo} ${milestoneLabels[gate]} reconfirmed time`} /></div>}</> : <span>Not confirmed</span>}
+                    {!terminal && pon.scopeStatus === 'included' && gatePermission(gate, permissions) && (() => {
+                      const ponBlocker = zone.blockers.find(blocker => blocker.entityId === pon.ponStageId);
+                      const disabledReason = evidence ? undefined : scopeBlocker?.message
+                        ?? (ponBlocker && blockerGate[ponBlocker.code] !== gate ? ponBlocker.message : undefined);
+                      const descriptionId = disabledReason ? `pon-${pon.ponStageId}-${gate}-blocker` : undefined;
+                      return <><button type="button" disabled={Boolean(disabledReason)} title={disabledReason} aria-describedby={descriptionId} onClick={() => setAction({ type: 'milestone', pon, gate, action: evidence ? 'reopen' : 'confirm' })} className="mt-2 block text-xs underline disabled:opacity-50" aria-label={`${evidence ? 'Reopen' : 'Confirm'} ${milestoneLabels[gate]} for PON ${pon.ponNo}`}>{evidence ? 'Reopen' : 'Confirm'}</button>{disabledReason && <span id={descriptionId} className="sr-only">{disabledReason}</span>}</>;
+                    })()}
                   </td>;
                 })}
                 <td className="px-3 py-3 align-top">
                   <a className="block underline" href={`/field-ops/works-qa?${query(zone, pon.ponNo)}`} aria-label={`PON ${pon.ponNo} Works QA`}>Works QA</a>
                   <a className="block underline" href={`/field-ops/otdr?${query(zone, pon.ponNo)}`} aria-label={`PON ${pon.ponNo} OTDR`}>OTDR</a>
                   <a className="block underline" href={`/field-ops/snags?${query(zone, pon.ponNo)}`} aria-label={`PON ${pon.ponNo} Snags`}>Snags</a>
-                  {permissions.operations && <button type="button" onClick={() => setAction({ type: 'maintenance', pon })} className="mt-2 text-xs underline" aria-label={`Link maintenance issue for PON ${pon.ponNo}`}>Link maintenance</button>}
+                  {permissions.operations && terminal && <button type="button" onClick={() => setAction({ type: 'maintenance', pon })} className="mt-2 text-xs underline" aria-label={`Link maintenance issue for PON ${pon.ponNo}`}>Link maintenance</button>}
                 </td>
               </tr>
             ))}
@@ -106,6 +132,7 @@ export function PonMilestoneTable({
           return <div key={pon.ponStageId} className="rounded bg-[var(--hover-bg)] p-3"><div className="font-medium">PON {view.ponNo}</div><label className="block text-sm">Scope status PON {view.ponNo}<select value={pon.scopeStatus} onChange={event => setScope(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, scopeStatus: event.target.value as ScopeStatus } : item))} className="mt-1 w-full rounded border bg-transparent p-2"><option value="included">Included</option><option value="excluded">Excluded</option><option value="cancelled">Cancelled</option></select></label>{pon.scopeStatus !== 'included' && <label className="mt-2 block text-sm">Scope reason PON {view.ponNo}<input required value={pon.reason} onChange={event => setScope(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, reason: event.target.value } : item))} className="mt-1 w-full rounded border bg-transparent p-2" /></label>}</div>;
         })}</div>}
         {action?.type === 'maintenance' && <><label className="block text-sm">Snag ID<input required value={snagId} onChange={event => setSnagId(event.target.value)} className="mt-1 w-full rounded border bg-transparent p-2" /></label><label className="block text-sm">Affected gate<select value={affectedGate} onChange={event => setAffectedGate(event.target.value as PonMilestone)} className="mt-1 w-full rounded border bg-transparent p-2">{gates.map(gate => <option key={gate} value={gate}>{milestoneLabels[gate]}</option>)}</select></label></>}
+        {action?.type === 'milestone' && action.action === 'reopen' && <label className="block text-sm">Snag ID<input required value={snagId} onChange={event => setSnagId(event.target.value)} className="mt-1 w-full rounded border bg-transparent p-2" /></label>}
       </ZoneDeliveryActionDialog>
     </section>
   );

@@ -30,7 +30,7 @@ const setPermissions = (allowed: string[]) => {
 };
 
 beforeEach(() => {
-  Object.values(methods).forEach(method => method.mockReset().mockResolvedValue(undefined));
+  Object.values(methods).forEach(method => method.mockReset().mockResolvedValue(true));
   hookMock.mockReturnValue({
     zone: zoneFixture, activity: activityFixture,
     loading: false, refreshing: false, mutating: false,
@@ -44,7 +44,7 @@ describe('ZoneDeliveryWorkspacePage permissions', () => {
     ['construction-qa.zone-delivery.scope-manage', 'Manage scope'],
     ['construction-qa.zone-delivery.construction-confirm', 'Reopen Civil complete for PON 4'],
     ['construction-qa.zone-delivery.testing-confirm', 'Reopen Testing passed for PON 4'],
-    ['construction-qa.zone-delivery.operations-confirm', 'Link maintenance issue for PON 4'],
+    ['construction-qa.zone-delivery.operations-confirm', 'Reopen Port submitted for PON 4'],
     ['construction-qa.zone-delivery.zone-qa-approve', 'Record Civil Zone QA'],
     ['construction-qa.zone-delivery.documents-manage', 'Upload evidence'],
   ])('shows %s controls only with its exact edit permission', (permission, actionName) => {
@@ -69,6 +69,12 @@ describe('ZoneDeliveryWorkspacePage permissions', () => {
     expect(screen.queryByRole('button', { name: 'Manage scope' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reopen Civil complete for PON 4' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Link maintenance issue for PON 4' })).toBeInTheDocument();
+  });
+
+  it('does not show maintenance linking before handover', () => {
+    setPermissions(['construction-qa.zone-delivery.operations-confirm']);
+    render(<ZoneDeliveryWorkspacePage zoneKey={{ projectId, zoneNo: 12 }} />);
+    expect(screen.queryByRole('button', { name: /Link maintenance issue/ })).not.toBeInTheDocument();
   });
 });
 
@@ -117,14 +123,40 @@ describe('ZoneDeliveryWorkspacePage audited dialogs', () => {
     });
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'Supervisor review' } });
     fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Incorrect original test' } });
+    fireEvent.change(screen.getByLabelText('Snag ID'), { target: { value: snagId } });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Submit audited action' }));
     });
     await waitFor(() => expect(methods.confirmMilestone).toHaveBeenCalledWith({
       ponStageId, milestone: 'testing_passed', action: 'reopen',
+      snagId, affectedGate: 'testing_passed',
       expectedRowVersion: 7, effectiveAt: '2026-07-30T08:00',
       source: 'Supervisor review', reason: 'Incorrect original test',
     }));
+  });
+
+  it('sends the post-handover maintenance snag, gate and PON row version', async () => {
+    setPermissions(['construction-qa.zone-delivery.operations-confirm']);
+    hookMock.mockReturnValue({
+      ...hookMock(), ...methods,
+      zone: { ...zoneFixture, status: 'handed_over', handedOverAt: '2026-07-30T10:00:00.000Z' },
+    });
+    render(<ZoneDeliveryWorkspacePage zoneKey={{ projectId, zoneNo: 12 }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Link maintenance issue for PON 4' }));
+    fireEvent.change(screen.getByLabelText('Snag ID'), { target: { value: snagId } });
+    fireEvent.change(screen.getByLabelText('Affected gate'), { target: { value: 'optical_complete' } });
+    fireEvent.change(screen.getByLabelText('Effective date and time'), { target: { value: '2026-07-30T08:00' } });
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'Maintenance inspection' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Post-handover defect' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit audited action' }));
+    });
+    expect(methods.confirmMilestone).toHaveBeenCalledWith({
+      ponStageId, milestone: 'optical_complete', action: 'link_maintenance',
+      snagId, affectedGate: 'optical_complete', expectedRowVersion: 7,
+      effectiveAt: '2026-07-30T08:00', source: 'Maintenance inspection',
+      reason: 'Post-handover defect',
+    });
   });
 
   it('requires a snag for failed QA and sends the zone row version', async () => {
@@ -157,5 +189,22 @@ describe('ZoneDeliveryWorkspacePage audited dialogs', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Zone version is stale');
     fireEvent.click(screen.getByRole('button', { name: 'Refresh current zone' }));
     expect(methods.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the dialog and audit values after a failed command', async () => {
+    methods.confirmMilestone.mockResolvedValueOnce(false);
+    setPermissions(['construction-qa.zone-delivery.testing-confirm']);
+    render(<ZoneDeliveryWorkspacePage zoneKey={{ projectId, zoneNo: 12 }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen Testing passed for PON 4' }));
+    fireEvent.change(screen.getByLabelText('Snag ID'), { target: { value: snagId } });
+    fireEvent.change(screen.getByLabelText('Effective date and time'), { target: { value: '2026-07-30T08:00' } });
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'Supervisor review' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Incorrect original test' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit audited action' }));
+    });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Source')).toHaveValue('Supervisor review');
+    expect(screen.getByLabelText('Reason')).toHaveValue('Incorrect original test');
   });
 });

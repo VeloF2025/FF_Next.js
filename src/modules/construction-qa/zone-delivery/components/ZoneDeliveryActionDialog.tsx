@@ -13,7 +13,7 @@ interface Props {
   requireReason?: boolean;
   children?: ReactNode;
   onClose: () => void;
-  onSubmit: (values: AuditedActionValues) => Promise<void>;
+  onSubmit: (values: AuditedActionValues) => Promise<boolean>;
 }
 
 export function ZoneDeliveryActionDialog({
@@ -26,12 +26,12 @@ export function ZoneDeliveryActionDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    await onSubmit({
+    const succeeded = await onSubmit({
       effectiveAt,
       source: source.trim(),
       ...(reason.trim() ? { reason: reason.trim() } : {}),
     });
-    onClose();
+    if (succeeded) onClose();
   };
 
   return (

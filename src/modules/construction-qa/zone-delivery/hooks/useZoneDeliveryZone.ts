@@ -35,10 +35,10 @@ export interface ZoneDeliveryZoneState {
   errorCode: string | null;
   lastUpdated: Date | null;
   refresh: () => Promise<void>;
-  updateScope: (input: ScopeCommand) => Promise<void>;
-  confirmMilestone: (input: MilestoneCommand) => Promise<void>;
-  recordZoneQa: (input: ZoneQaCommand) => Promise<void>;
-  uploadDocument: (input: DocumentUploadCommand) => Promise<void>;
+  updateScope: (input: ScopeCommand) => Promise<boolean>;
+  confirmMilestone: (input: MilestoneCommand) => Promise<boolean>;
+  recordZoneQa: (input: ZoneQaCommand) => Promise<boolean>;
+  uploadDocument: (input: DocumentUploadCommand) => Promise<boolean>;
 }
 
 class RequestFailure extends Error {
@@ -70,6 +70,7 @@ export function useZoneDeliveryZone(key: ZoneKey): ZoneDeliveryZoneState {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
+  const generationRef = useRef(0);
   const mountedRef = useRef(true);
 
   const showError = useCallback((failure: unknown) => {
@@ -119,12 +120,15 @@ export function useZoneDeliveryZone(key: ZoneKey): ZoneDeliveryZoneState {
   }, [projectId, showError, zoneNo]);
 
   useEffect(() => {
+    const generation = ++generationRef.current;
     mountedRef.current = true;
+    setMutating(false);
     void load(false);
     return () => {
       mountedRef.current = false;
       controllerRef.current?.abort();
       requestIdRef.current += 1;
+      if (generationRef.current === generation) generationRef.current += 1;
     };
   }, [load]);
 
@@ -132,7 +136,8 @@ export function useZoneDeliveryZone(key: ZoneKey): ZoneDeliveryZoneState {
     url: string,
     body: BodyInit,
     contentType?: string,
-  ) => {
+  ): Promise<boolean> => {
+    const generation = generationRef.current;
     setMutating(true);
     setError(null);
     setErrorCode(null);
@@ -144,11 +149,14 @@ export function useZoneDeliveryZone(key: ZoneKey): ZoneDeliveryZoneState {
         body,
       });
       await readEnvelope<unknown>(response, 'Zone delivery action failed.');
+      if (!mountedRef.current || generationRef.current !== generation) return false;
       await load(true);
+      return mountedRef.current && generationRef.current === generation;
     } catch (failure) {
-      showError(failure);
+      if (mountedRef.current && generationRef.current === generation) showError(failure);
+      return false;
     } finally {
-      if (mountedRef.current) setMutating(false);
+      if (mountedRef.current && generationRef.current === generation) setMutating(false);
     }
   }, [load, showError]);
 
@@ -157,7 +165,7 @@ export function useZoneDeliveryZone(key: ZoneKey): ZoneDeliveryZoneState {
     command, projectId, zoneNo,
   ]);
 
-  const uploadDocument = useCallback(async (input: DocumentUploadCommand) => {
+  const uploadDocument = useCallback(async (input: DocumentUploadCommand): Promise<boolean> => {
     const form = new FormData();
     form.set('file', input.file);
     form.set('projectId', projectId);
@@ -170,7 +178,7 @@ export function useZoneDeliveryZone(key: ZoneKey): ZoneDeliveryZoneState {
     if (input.documentType === 'test_pack' && input.ponStageId) {
       form.set('ponStageId', input.ponStageId);
     }
-    await command('/api/zone-delivery/document', form);
+    return command('/api/zone-delivery/document', form);
   }, [command, projectId, zoneNo]);
 
   return {

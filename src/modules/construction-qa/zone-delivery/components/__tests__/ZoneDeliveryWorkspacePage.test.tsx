@@ -54,7 +54,8 @@ describe('ZoneDeliveryWorkspacePage projection', () => {
     expect(screen.getByRole('heading', { name: 'Etwatwa Zone 12' })).toBeInTheDocument();
     expect(screen.getByText('1 / 1 technically live')).toBeInTheDocument();
     expect(screen.getByText('Handover blocked')).toBeInTheDocument();
-    expect(screen.getByText('Eligible for Zone QA: 2026-07-06')).toBeInTheDocument();
+    expect(screen.getByLabelText('Eligible for Zone QA time')).toHaveAttribute(
+      'datetime', '2026-07-06T08:00:00.000Z');
     expect(screen.getByText('1 open handover-blocking snag(s)')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open in Snags' })).toHaveAttribute(
       'href',
@@ -101,13 +102,27 @@ describe('ZoneDeliveryWorkspacePage projection', () => {
   it('shows readable audit old/new values and effective versus recorded time', () => {
     render(<ZoneDeliveryWorkspacePage zoneKey={{ projectId, zoneNo: 12 }} />);
     const item = screen.getByRole('listitem', { name: 'scope_updated' });
-    expect(item).toHaveTextContent('Effective: 2026-06-30');
-    expect(item).toHaveTextContent('Recorded: 2026-07-01');
+    const effective = screen.getByLabelText('scope_updated effective time');
+    const recorded = screen.getByLabelText('scope_updated recorded time');
+    expect(effective).toHaveAttribute('datetime', '2026-06-30T10:00:00.000Z');
+    expect(recorded).toHaveAttribute('datetime', '2026-07-01T12:00:00.000Z');
+    expect(effective.textContent).not.toBe(recorded.textContent);
     expect(item).toHaveTextContent('manager@example.com');
     expect(item).toHaveTextContent('construction-qa.zone-delivery.scope-manage');
     expect(item).toHaveTextContent('Approved construction schedule');
     expect(item).toHaveTextContent('Historical backfill');
     expect(item).toHaveTextContent('"scopeStatus": "included"');
     expect(item).toHaveTextContent('"scopeStatus": "excluded"');
+  });
+
+  it('retains exact milestone and QA timestamps while displaying timezone-aware times', () => {
+    render(<ZoneDeliveryWorkspacePage zoneKey={{ projectId, zoneNo: 12 }} />);
+    const milestone = screen.getByLabelText('PON 4 Civil complete effective time');
+    const qa = screen.getByLabelText('Civil Zone QA effective time');
+    expect(milestone).toHaveAttribute('datetime', '2026-07-01T08:00:00.000Z');
+    expect(qa).toHaveAttribute('datetime', '2026-07-07T08:00:00.000Z');
+    expect(milestone.textContent).toMatch(/08:00|10:00/);
+    expect(qa.textContent).toMatch(/08:00|10:00/);
+    expect(milestone.textContent).toMatch(/GMT|UTC|SAST/i);
   });
 });

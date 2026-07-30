@@ -10,6 +10,7 @@ import { PonMilestoneTable } from './PonMilestoneTable';
 import { ZoneActivityTimeline } from './ZoneActivityTimeline';
 import { ZoneLifecycleRail } from './ZoneLifecycleRail';
 import { ZoneQaPanels } from './ZoneQaPanels';
+import { ZoneDeliveryTimestamp } from './ZoneDeliveryTimestamp';
 
 const permissions = {
   scope: 'construction-qa.zone-delivery.scope-manage',
@@ -63,8 +64,8 @@ export function ZoneDeliveryWorkspacePage({ zoneKey }: { zoneKey: ZoneKey }) {
             <p className="text-sm text-[var(--ff-text-secondary)]">{live.length} / {included.length} technically live</p>
             <p className="text-sm text-[var(--ff-text-secondary)]">{zone.blockers.length} blocker(s)</p>
             <p className="text-sm">{statusLabels[zone.status]}</p>
-            {zone.eligibleForZoneQaAt && <p className="text-sm">Eligible for Zone QA: {zone.eligibleForZoneQaAt.slice(0, 10)}</p>}
-            {zone.handedOverAt && <p className="text-sm">Handed over: {zone.handedOverAt.slice(0, 10)}</p>}
+            {zone.eligibleForZoneQaAt && <p className="text-sm">Eligible for Zone QA: <ZoneDeliveryTimestamp value={zone.eligibleForZoneQaAt} label="Eligible for Zone QA time" /></p>}
+            {zone.handedOverAt && <p className="text-sm">Handed over: <ZoneDeliveryTimestamp value={zone.handedOverAt} label="Handover time" /></p>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {links.map(([label, href]) => <a key={label} href={href} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm">{label}</a>)}
@@ -88,7 +89,7 @@ export function ZoneDeliveryWorkspacePage({ zoneKey }: { zoneKey: ZoneKey }) {
           <ul className="space-y-2">{zone.blockers.map((blocker, index) => (
             <li key={`${blocker.code}-${blocker.entityId ?? index}`} className="text-sm">
               {blocker.message}
-              <a className="ml-2 underline" aria-label="Open in Snags" href={`/field-ops/snags?${contextQuery(zoneKey, blocker.ponNo)}`}>Open in Snags</a>
+              {blocker.code === 'OPEN_HANDOVER_SNAGS' && <a className="ml-2 underline" aria-label="Open in Snags" href={`/field-ops/snags?${contextQuery(zoneKey, blocker.ponNo)}`}>Open in Snags</a>}
             </li>
           ))}</ul>
         </section>

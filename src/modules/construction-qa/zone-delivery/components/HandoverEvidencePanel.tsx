@@ -7,7 +7,7 @@ interface Props {
   zone: ZoneDeliveryView;
   canManage: boolean;
   mutating: boolean;
-  onUpload: (input: DocumentUploadCommand) => Promise<void>;
+  onUpload: (input: DocumentUploadCommand) => Promise<boolean>;
 }
 
 const names = { test_pack: 'test pack', fac: 'FAC', cac: 'CAC' } as const;
@@ -19,8 +19,8 @@ export function HandoverEvidencePanel({ zone, canManage, mutating, onUpload }: P
   const [ponStageId, setPonStageId] = useState(zone.pons[0]?.ponStageId ?? '');
   const active = zone.documents.filter(document => document.active);
   const submit = async (meta: AuditedActionValues) => {
-    if (!file) return;
-    await onUpload({
+    if (!file) return false;
+    return onUpload({
       ...meta, file, documentType, expectedRowVersion: zone.rowVersion,
       ...(documentType === 'test_pack' ? { ponStageId } : {}),
     });

@@ -130,4 +130,55 @@ describe('useZoneDeliveryZone commands', () => {
     expect(result.current.errorCode).toBe('VERSION_CONFLICT');
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  it('does not let an old successful command refetch or mutate a new route key', async () => {
+    reads();
+    const { result, rerender } = renderHook(
+      ({ zoneNo }) => useZoneDeliveryZone({ projectId, zoneNo }),
+      { initialProps: { zoneNo: 12 } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const command = deferred<ReturnType<typeof response>>();
+    fetchMock.mockReturnValueOnce(command.promise);
+    let completion: Promise<boolean> | undefined;
+    act(() => {
+      completion = result.current.confirmMilestone({
+        ponStageId, milestone: 'technically_live', action: 'confirm',
+        expectedRowVersion: 7, effectiveAt: '2026-07-30T08:00:00.000Z', source: 'Operations',
+      });
+    });
+    fetchMock
+      .mockResolvedValueOnce(response({ ...zoneFixture, zoneNo: 13 }))
+      .mockResolvedValueOnce(response(activityFixture));
+    rerender({ zoneNo: 13 });
+    await waitFor(() => expect(result.current.zone?.zoneNo).toBe(13));
+    command.resolve(response(zoneFixture));
+    await act(async () => { expect(await completion).toBe(false); });
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(result.current.zone?.zoneNo).toBe(13);
+    expect(result.current.error).toBeNull();
+    expect(result.current.mutating).toBe(false);
+  });
+
+  it('ignores a delayed command failure after unmount', async () => {
+    reads();
+    const { result, unmount } = renderHook(() => useZoneDeliveryZone({ projectId, zoneNo: 12 }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const command = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    fetchMock.mockReturnValueOnce(command.promise);
+    let completion: Promise<boolean> | undefined;
+    act(() => {
+      completion = result.current.confirmMilestone({
+        ponStageId, milestone: 'technically_live', action: 'confirm',
+        expectedRowVersion: 7, effectiveAt: '2026-07-30T08:00:00.000Z', source: 'Operations',
+      });
+    });
+    unmount();
+    command.resolve({
+      ok: false,
+      json: async () => ({ success: false, error: { code: 'VERSION_CONFLICT', message: 'Old error' } }),
+    });
+    await act(async () => { expect(await completion).toBe(false); });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });
