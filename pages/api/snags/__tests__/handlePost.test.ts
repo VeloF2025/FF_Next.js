@@ -1,21 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const { mockSql, recalculateForSnag } = vi.hoisted(() => ({
+const { mockSql, recalculateForSnag, updateTicket } = vi.hoisted(() => ({
   mockSql: vi.fn(),
   recalculateForSnag: vi.fn(),
+  updateTicket: vi.fn(),
 }));
 
 vi.mock('@neondatabase/serverless', () => ({ neon: () => mockSql }));
 vi.mock('@/lib/db', () => ({ default: {} }));
 vi.mock('@/lib/auth', () => ({ withAuth: (h: unknown) => h, withPermission: () => (h: unknown) => h }));
 vi.mock('@/lib/logger', () => ({ log: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() } }));
-vi.mock('@/modules/noc/services/ticketService', () => ({ updateTicket: vi.fn() }));
+vi.mock('@/modules/noc/services/ticketService', () => ({ updateTicket }));
 vi.mock('@/modules/construction-qa/zone-delivery/services/zoneDeliveryService', () => ({
   createZoneDeliveryService: () => ({ recalculateForSnag }),
 }));
 
 import handler from '../index';
+import { TicketStatus } from '@/modules/noc/types/ticket';
 
 function makeRes() {
   const res: Partial<NextApiResponse> & { jsonData?: unknown; statusCode?: number } = {};
@@ -138,5 +140,24 @@ describe('PATCH /api/snags zone delivery recalculation', () => {
     const res = makeRes();
     await handler(req, res);
     expect(res.statusCode).toBe(200);
+  });
+
+  it('preserves resolved NOC sync semantics after the status-side-effect extraction', async () => {
+    mockSql
+      .mockResolvedValueOnce([{ id: 'snag-uuid', status: 'open' }])
+      .mockResolvedValueOnce([{ id: 'snag-uuid', status: 'closed', noc_ticket_id: 'ticket-uuid' }]);
+    updateTicket.mockResolvedValueOnce({ id: 'ticket-uuid' });
+    const req = {
+      method: 'PATCH',
+      body: { id: 'snag-uuid', status: 'closed' },
+      user: { id: 'user-uuid', email: 'qa@example.com' },
+    } as unknown as NextApiRequest;
+    const res = makeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(updateTicket).toHaveBeenCalledWith('ticket-uuid', {
+      status: TicketStatus.RESOLVED,
+      resolved_at: expect.any(Date),
+    });
   });
 });

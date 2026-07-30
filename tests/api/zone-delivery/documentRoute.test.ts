@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   unlink: vi.fn(),
   logError: vi.fn(),
   permissionCalls: [] as Array<[string, string]>,
+  formError: null as unknown,
   formFields: {} as Record<string, string[]>,
   formFiles: {} as Record<string, unknown>,
 }));
@@ -49,7 +50,7 @@ vi.mock('fs', () => ({
 vi.mock('formidable', () => ({
   IncomingForm: class {
     parse(_req: unknown, callback: (error: unknown, fields: unknown, files: unknown) => void) {
-      callback(null, h.formFields, h.formFiles);
+      callback(h.formError, h.formFields, h.formFiles);
     }
   },
 }));
@@ -96,6 +97,7 @@ describe('zone delivery document route', () => {
     vi.clearAllMocks();
     h.getZone.mockResolvedValue({ documents: [] });
     h.unlink.mockResolvedValue(undefined);
+    h.formError = null;
     h.formFields = {};
     h.formFiles = {};
   });
@@ -142,6 +144,28 @@ describe('zone delivery document route', () => {
         },
       },
     });
+  });
+
+  it('rejects numeric strings in JSON document commands', async () => {
+    const body = {
+      ...meta,
+      zoneNo: '7',
+      expectedRowVersion: '2',
+      documentType: 'test_pack',
+      ponStageId: '22222222-2222-4222-8222-222222222222',
+      documentSource: 'exfo_result',
+      sourceRef: 'exfo://results/job-42',
+      filename: 'job-42.json',
+      mimeType: 'application/json',
+      sizeBytes: 2048,
+      checksumSha256: 'a'.repeat(64),
+    };
+    const res = await call({
+      headers: { 'content-type': 'application/json' },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(h.registerDocument).not.toHaveBeenCalled();
   });
 
   it('parses multipart evidence and always unlinks the temporary file', async () => {
@@ -191,9 +215,60 @@ describe('zone delivery document route', () => {
     expect(h.unlink).toHaveBeenCalledWith('/tmp/failure.pdf');
   });
 
+  it('unlinks a parsed temp file when command field validation fails', async () => {
+    h.formFields = Object.fromEntries(
+      Object.entries({ ...meta, projectId: 'not-a-uuid', documentType: 'fac' })
+        .map(([key, value]) => [key, [String(value)]]),
+    );
+    h.formFiles = {
+      file: [{
+        filepath: '/tmp/invalid-fields.pdf',
+        originalFilename: 'invalid.pdf',
+        mimetype: 'application/pdf',
+        size: 13,
+      }],
+    };
+    const res = await call({ headers: { 'content-type': 'multipart/form-data; boundary=x' } });
+    expect(res.statusCode).toBe(400);
+    expect(h.unlink).toHaveBeenCalledWith('/tmp/invalid-fields.pdf');
+    expect(h.storeDocument).not.toHaveBeenCalled();
+  });
+
+  it('unlinks temp files reported alongside a Formidable parser failure', async () => {
+    h.formError = new Error('multipart ended early');
+    h.formFiles = {
+      file: [{
+        filepath: '/tmp/parser-failure.pdf',
+        originalFilename: 'partial.pdf',
+        mimetype: 'application/pdf',
+        size: 4,
+      }],
+    };
+    const res = await call({ headers: { 'content-type': 'multipart/form-data; boundary=x' } });
+    expect(res.statusCode).toBe(400);
+    expect(h.unlink).toHaveBeenCalledWith('/tmp/parser-failure.pdf');
+    expect(h.storeDocument).not.toHaveBeenCalled();
+  });
+
   it('rejects unsupported content types and methods', async () => {
     const content = await call({ headers: { 'content-type': 'text/plain' } });
     expect(content.statusCode).toBe(400);
+    const jsonp = await call({
+      headers: { 'content-type': 'application/jsonp' },
+      body: {
+        ...meta,
+        documentType: 'test_pack',
+        ponStageId: '22222222-2222-4222-8222-222222222222',
+        documentSource: 'exfo_result',
+        sourceRef: 'exfo://results/job-42',
+        filename: 'job-42.json',
+        mimeType: 'application/json',
+        sizeBytes: 2048,
+        checksumSha256: 'a'.repeat(64),
+      },
+    });
+    expect(jsonp.statusCode).toBe(400);
+    expect(h.registerDocument).not.toHaveBeenCalled();
     const method = await call({ method: 'GET' });
     expect(method.statusCode).toBe(405);
     expect(method.headers.Allow).toBe('POST');

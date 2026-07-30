@@ -203,4 +203,27 @@ describe('zone delivery document storage', () => {
       'saved.pdf',
     );
   });
+
+  it('preserves the metadata error when compensating delete also rejects', async () => {
+    const deps = dependencies();
+    const metadataError = new Error('metadata transaction failed');
+    deps.service.registerDocument = vi.fn().mockRejectedValue(metadataError);
+    deps.storage.deleteFile.mockRejectedValue(new Error('cleanup transport failed'));
+    const result = storeZoneDeliveryDocument({
+      ...deps,
+      command: { ...key, documentType: 'fac' },
+      actor,
+      file: {
+        buffer: Buffer.from('%PDF-1.4 test'),
+        mimeType: 'application/pdf',
+        originalFilename: 'evidence.pdf',
+      },
+    });
+    await expect(result).rejects.toBe(metadataError);
+    expect(deps.storage.deleteFile).toHaveBeenCalledWith(
+      'zone-delivery',
+      'documents',
+      'saved.pdf',
+    );
+  });
 });

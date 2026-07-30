@@ -155,6 +155,38 @@ describe('zone delivery command routes', () => {
     });
   });
 
+  it('rejects numeric strings for JSON zone and row-version fields across commands', async () => {
+    const commands = [
+      [scopeHandler, {
+        ...meta,
+        pons: [{ ponStageId, scopeStatus: 'included' }],
+      }],
+      [milestoneHandler, {
+        ...meta,
+        ponStageId,
+        milestone: 'civil_complete',
+        action: 'confirm',
+      }],
+      [zoneQaHandler, {
+        ...meta,
+        discipline: 'civil',
+        status: 'passed',
+        notes: '',
+        snagIds: [],
+      }],
+    ] as const;
+    for (const [route, body] of commands) {
+      for (const field of ['zoneNo', 'expectedRowVersion'] as const) {
+        const res = await call(route, 'POST', { ...body, [field]: String(body[field]) });
+        expect(res.statusCode, `${field} on ${String(route)}`).toBe(400);
+        expect(JSON.stringify(res.body)).toContain(field);
+      }
+    }
+    expect(h.updateScope).not.toHaveBeenCalled();
+    expect(h.confirmPonMilestone).not.toHaveBeenCalled();
+    expect(h.recordZoneQa).not.toHaveBeenCalled();
+  });
+
   it('maps version conflict and preserves structured blocker details', async () => {
     const conflict = Object.assign(
       new ZoneDeliveryError('VERSION_CONFLICT', 'reload'),

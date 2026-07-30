@@ -9,37 +9,14 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import pool from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { querySnagsByReport, querySnagsByProject, querySnagsByProjectAndZone } from './snags-query';
-import { updateTicket } from '@/modules/noc/services/ticketService';
-import { TicketStatus } from '@/modules/noc/types/ticket';
-import { createZoneDeliveryService } from '@/modules/construction-qa/zone-delivery/services/zoneDeliveryService';
-import type {
-  Snag,
-  SnagStatus,
-  CreateSnagRequest,
-  UpdateSnagRequest,
-} from '@/modules/construction-qa/types/snag.types';
-
-/** Map snag status → NOC ticket status for sync (returns undefined if no sync needed) */
-function mapSnagStatusToTicketStatus(snagStatus: SnagStatus): TicketStatus | undefined {
-  switch (snagStatus) {
-    case 'in_progress': return TicketStatus.IN_PROGRESS;
-    case 'pending_qa':  return TicketStatus.PENDING_QA;
-    case 'fixed':       return TicketStatus.PENDING_QA;  // legacy: treat as pending_qa
-    case 'resolved':    return TicketStatus.RESOLVED;
-    case 'verified':    return TicketStatus.VERIFIED;
-    // Migration 364: snag 'closed' maps to ticket 'resolved' (consolidated bucket).
-    case 'closed':      return TicketStatus.RESOLVED;
-    default:            return undefined;
-  }
-}
+import { runSnagStatusSideEffects } from '@/modules/construction-qa/services/snagStatusSideEffects';
+import type { Snag, CreateSnagRequest, UpdateSnagRequest } from '@/modules/construction-qa/types/snag.types';
 
 const sql = neon(process.env.DATABASE_URL!);
-const zoneDeliveryService = createZoneDeliveryService(pool);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -174,15 +151,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const body = req.body as CreateSnagRequest;
 
-  if (!body.project_id) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'project_id is required');
-  }
-  if (!body.category) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'category is required');
-  }
-  if (!body.description || !body.description.trim()) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'description is required');
-  }
+  if (!body.project_id) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'project_id is required');
+  if (!body.category) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'category is required');
+  if (!body.description?.trim()) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'description is required');
 
   // Ad-hoc works_qa snag: category=verification OR (category=quality + pole_qa_photo_id without report_id).
   // The presence of pole_qa_photo_id without report_id is the canonical signal that this row
@@ -192,12 +163,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     (!!body.pole_qa_photo_id && !body.report_id);
 
   if (!isAdHocWorksQa) {
-    if (!body.report_id) {
-      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
-    }
-    if (!body.snag_number) {
-      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'snag_number is required');
-    }
+    if (!body.report_id) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
+    if (!body.snag_number) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'snag_number is required');
   }
 
   let rows: Snag[];
@@ -251,9 +218,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     ` as Snag[];
   }
 
-  if (!rows[0]) {
-    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag');
-  }
+  if (!rows[0]) return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag');
 
   // Only update total_findings when snag belongs to a report
   if (body.report_id) {
@@ -274,17 +239,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
   const body = req.body as UpdateSnagRequest;
 
-  if (!body.id) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'id is required');
-  }
+  if (!body.id) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'id is required');
 
   const existing = await sql`
     SELECT id, status FROM snags WHERE id = ${body.id}
   ` as Array<{ id: string; status: string }>;
 
-  if (existing.length === 0) {
-    return apiResponse.notFound(res, 'Snag', body.id);
-  }
+  if (existing.length === 0) return apiResponse.notFound(res, 'Snag', body.id);
 
   // Derive timestamp fields from status transition
   const fixedAt     = (body.status === 'pending_qa' || body.status === 'fixed') ? new Date().toISOString() : null;
@@ -310,59 +271,22 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
     RETURNING *
   ` as Snag[];
 
-  if (!rows[0]) {
-    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to update snag');
-  }
+  if (!rows[0]) return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to update snag');
 
   const updatedSnag = rows[0];
 
-  // Sync status to linked NOC ticket if applicable.
-  // updateTicket does NOT auto-stamp resolved_at on status transitions —
-  // callers must pass it explicitly (same contract the works-qa snag
-  // resolve path follows). Without this, transitioning to RESOLVED leaves
-  // resolved_at NULL and breaks downstream SLA + activity-log queries.
-  if (body.status && updatedSnag.noc_ticket_id) {
-    const ticketStatus = mapSnagStatusToTicketStatus(body.status);
-    if (ticketStatus) {
-      try {
-        await updateTicket(updatedSnag.noc_ticket_id, {
-          status: ticketStatus,
-          ...(ticketStatus === TicketStatus.RESOLVED && { resolved_at: new Date() }),
-        });
-        log.info('NOC ticket status synced', {
-          snagId: body.id,
-          ticketId: updatedSnag.noc_ticket_id,
-          ticketStatus,
-        });
-      } catch (syncErr) {
-        // Non-fatal: log but don't fail the snag update
-        log.error('Failed to sync NOC ticket status', {
-          snagId: body.id,
-          ticketId: updatedSnag.noc_ticket_id,
-          syncErr,
-        });
-      }
-    }
-  }
-
-  if (body.status && body.status !== existing[0]!.status) {
-    const user = (req as AuthenticatedNextApiRequest).user;
-    try {
-      await zoneDeliveryService.recalculateForSnag(body.id, {
-        userId: user.id,
-        email: user.email,
-        permission: 'construction-qa.snags.manage',
-      });
-    } catch (recalculationError) {
-      log.error('Zone delivery snag recalculation failed', {
-        snagId: body.id,
-        userId: user.id,
-        error: recalculationError instanceof Error
-          ? recalculationError.message
-          : String(recalculationError),
-      });
-    }
-  }
+  const user = (req as AuthenticatedNextApiRequest).user;
+  await runSnagStatusSideEffects({
+    snagId: body.id,
+    previousStatus: existing[0]!.status,
+    requestedStatus: body.status,
+    nocTicketId: updatedSnag.noc_ticket_id,
+    actor: {
+      userId: user.id,
+      email: user.email,
+      permission: 'construction-qa.snags.manage',
+    },
+  });
 
   log.info('Snag updated', { snagId: body.id, status: body.status });
   return apiResponse.success(res, updatedSnag);

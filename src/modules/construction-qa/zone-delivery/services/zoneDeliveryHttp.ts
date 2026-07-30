@@ -57,11 +57,14 @@ const uuid = (value: unknown, field: string, required = true): string | undefine
   return result;
 };
 const integer = (value: unknown, field: string, positive = false): number => {
-  const result = typeof value === 'string' && value.trim() ? Number(value) : value;
-  if (!Number.isInteger(result) || (positive ? Number(result) <= 0 : Number(result) < 0)) {
+  if (!Number.isInteger(value) || (positive ? Number(value) <= 0 : Number(value) < 0)) {
     return invalid(field);
   }
-  return Number(result);
+  return Number(value);
+};
+const coercedInteger = (value: unknown, field: string, positive = false): number => {
+  const result = typeof value === 'string' && value.trim() ? Number(value) : value;
+  return integer(result, field, positive);
 };
 const member = <T extends string>(value: unknown, values: ReadonlySet<T>, field: string): T => {
   if (typeof value !== 'string' || !values.has(value as T)) return invalid(field);
@@ -72,13 +75,14 @@ const singleQuery = (value: string | string[] | undefined, field: string): strin
   return value;
 };
 
-function commandMeta(body: Record<string, unknown>) {
+function commandMeta(body: Record<string, unknown>, coerceNumbers = false) {
   const effectiveAt = string(body.effectiveAt, 'effectiveAt')!;
   if (Number.isNaN(new Date(effectiveAt).valueOf())) return invalid('effectiveAt');
+  const parseInteger = coerceNumbers ? coercedInteger : integer;
   return {
     projectId: uuid(body.projectId, 'projectId')!,
-    zoneNo: integer(body.zoneNo, 'zoneNo', true),
-    expectedRowVersion: integer(body.expectedRowVersion, 'expectedRowVersion'),
+    zoneNo: parseInteger(body.zoneNo, 'zoneNo', true),
+    expectedRowVersion: parseInteger(body.expectedRowVersion, 'expectedRowVersion'),
     effectiveAt,
     source: string(body.source, 'source')!,
     ...(body.reason === undefined ? {} : { reason: string(body.reason, 'reason')! }),
@@ -88,7 +92,7 @@ function commandMeta(body: Record<string, unknown>) {
 export function parseZoneQuery(req: NextApiRequest): ZoneKey {
   return {
     projectId: uuid(singleQuery(req.query.project_id, 'project_id'), 'project_id')!,
-    zoneNo: integer(singleQuery(req.query.zone_no, 'zone_no'), 'zone_no', true),
+    zoneNo: coercedInteger(singleQuery(req.query.zone_no, 'zone_no'), 'zone_no', true),
   };
 }
 
@@ -101,7 +105,7 @@ export function parseRegisterQuery(req: NextApiRequest): ZoneRegisterFilters {
   const search = singleQuery(req.query.search, 'search');
   return {
     ...(projectId === undefined ? {} : { projectId: uuid(projectId, 'project_id')! }),
-    ...(zoneNo === undefined ? {} : { zoneNo: integer(zoneNo, 'zone_no', true) }),
+    ...(zoneNo === undefined ? {} : { zoneNo: coercedInteger(zoneNo, 'zone_no', true) }),
     ...(status === undefined ? {} : { status: member(status, STATUSES, 'status') }),
     ...(handover === undefined
       ? {}
@@ -157,12 +161,15 @@ export function parseZoneQaBody(value: unknown): RecordZoneQaInput {
   };
 }
 
-export function parseDocumentBody(value: unknown): RegisterDocumentInput {
+export function parseDocumentBody(
+  value: unknown,
+  options: { coerceCommandNumbers?: boolean } = {},
+): RegisterDocumentInput {
   const body = objectBody(value);
   const checksum = string(body.checksumSha256, 'checksumSha256')!;
   if (!/^[0-9a-f]{64}$/i.test(checksum)) return invalid('checksumSha256');
   return {
-    ...commandMeta(body),
+    ...commandMeta(body, options.coerceCommandNumbers),
     documentType: member(body.documentType, new Set(['test_pack', 'fac', 'cac']), 'documentType'),
     ...(body.ponStageId === undefined ? {} : { ponStageId: uuid(body.ponStageId, 'ponStageId')! }),
     documentSource: member(body.documentSource, new Set(['vf_storage', 'exfo_result']), 'documentSource'),

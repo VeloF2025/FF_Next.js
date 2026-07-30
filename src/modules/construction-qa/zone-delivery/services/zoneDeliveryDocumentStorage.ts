@@ -140,12 +140,21 @@ export async function storeZoneDeliveryDocument(args: {
     return { zone, document: documentAuditMetadata(input, actor, supersededDocumentId) };
   } catch (error) {
     if (uploadedFilename) {
-      const deleted = await storage.deleteFile('zone-delivery', 'documents', uploadedFilename);
-      if (!deleted) {
+      try {
+        const deleted = await storage.deleteFile('zone-delivery', 'documents', uploadedFilename);
+        if (!deleted) {
+          log.error('Zone delivery upload cleanup failed', {
+            projectId: command.projectId,
+            zoneNo: command.zoneNo,
+            filename: uploadedFilename,
+          });
+        }
+      } catch (cleanupError) {
         log.error('Zone delivery upload cleanup failed', {
           projectId: command.projectId,
           zoneNo: command.zoneNo,
           filename: uploadedFilename,
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
         });
       }
     }

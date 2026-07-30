@@ -23,6 +23,16 @@ export const config = { api: { bodyParser: false } };
 const service = createZoneDeliveryService(pool);
 const first = <T>(value: T | T[] | undefined): T | undefined =>
   Array.isArray(value) ? value[0] : value;
+const filesFrom = (files: Record<string, FormidableFile | FormidableFile[]>): FormidableFile[] =>
+  Object.values(files).flatMap((value) => Array.isArray(value) ? value : [value]);
+async function cleanupTempFiles(paths: string[]): Promise<void> {
+  await Promise.all(paths.map(path => fs.promises.unlink(path).catch((cleanupError) => {
+    log.warn('Zone delivery temporary file cleanup failed', {
+      path,
+      error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+    });
+  })));
+}
 
 async function parseJson(req: NextApiRequest): Promise<unknown> {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -39,32 +49,46 @@ async function parseJson(req: NextApiRequest): Promise<unknown> {
 
 async function parseMultipart(req: NextApiRequest) {
   const form = new IncomingForm({ maxFileSize: 50 * 1024 * 1024, maxFiles: 1 });
-  const { fields, files } = await new Promise<{
+  const { error, fields, files } = await new Promise<{
+    error: unknown;
     fields: Record<string, string | string[]>;
     files: Record<string, FormidableFile | FormidableFile[]>;
-  }>((resolve, reject) => {
+  }>((resolve) => {
     form.parse(req, (error, parsedFields, parsedFiles) => {
-      if (error) reject(new ZoneDeliveryHttpError('Invalid multipart document'));
-      else resolve({
+      resolve({
+        error,
         fields: parsedFields as Record<string, string | string[]>,
         files: parsedFiles as Record<string, FormidableFile | FormidableFile[]>,
       });
     });
   });
+  const tempPaths = filesFrom(files).map(file => file.filepath).filter(Boolean);
+  if (error) {
+    await cleanupTempFiles(tempPaths);
+    throw new ZoneDeliveryHttpError('Invalid multipart document');
+  }
   const file = first(files.file);
-  if (!file?.filepath) throw new ZoneDeliveryHttpError('Invalid file');
-  const raw = Object.fromEntries(
-    Object.entries(fields).map(([key, value]) => [key, first(value)]),
-  );
-  return { file, command: parseDocumentBody({
-    ...raw,
-    documentSource: 'vf_storage',
-    sourceRef: 'pending-upload',
-    filename: file.originalFilename,
-    mimeType: file.mimetype,
-    sizeBytes: file.size,
-    checksumSha256: '0'.repeat(64),
-  }) };
+  try {
+    if (!file?.filepath) throw new ZoneDeliveryHttpError('Invalid file');
+    const raw = Object.fromEntries(
+      Object.entries(fields).map(([key, value]) => [key, first(value)]),
+    );
+    return { file, tempPaths, command: parseDocumentBody({
+      ...raw,
+      documentSource: 'vf_storage',
+      sourceRef: 'pending-upload',
+      filename: file.originalFilename,
+      mimeType: file.mimetype,
+      sizeBytes: file.size,
+      checksumSha256: '0'.repeat(64),
+    }, { coerceCommandNumbers: true }) };
+  } catch (validationError) {
+    await cleanupTempFiles(tempPaths);
+    log.warn('Zone delivery multipart validation failed', {
+      error: validationError instanceof Error ? validationError.message : String(validationError),
+    });
+    throw validationError;
+  }
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -72,8 +96,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return zoneDeliveryResponse(res, async () => {
     const user = (req as AuthenticatedNextApiRequest).user;
     const actor = { userId: user.id, email: user.email, permission: COMMAND_PERMISSIONS.document };
-    const contentType = req.headers['content-type'] ?? '';
-    if (contentType.startsWith('application/json')) {
+    const mediaType = (req.headers['content-type'] ?? '').split(';', 1)[0]!.trim().toLowerCase();
+    if (mediaType === 'application/json') {
       const input = parseDocumentBody(await parseJson(req));
       if (input.documentSource !== 'exfo_result') {
         throw new ZoneDeliveryHttpError('Invalid documentSource');
@@ -86,10 +110,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         document: documentAuditMetadata(input, actor, superseded),
       };
     }
-    if (!contentType.startsWith('multipart/form-data')) {
+    if (mediaType !== 'multipart/form-data') {
       throw new ZoneDeliveryHttpError('Invalid content-type');
     }
-    const { file, command } = await parseMultipart(req);
+    const { file, command, tempPaths } = await parseMultipart(req);
     try {
       const buffer = await fs.promises.readFile(file.filepath);
       return storeZoneDeliveryDocument({
@@ -103,12 +127,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         service,
       });
     } finally {
-      await fs.promises.unlink(file.filepath).catch((cleanupError) => {
-        log.warn('Zone delivery temporary file cleanup failed', {
-          path: file.filepath,
-          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-        });
-      });
+      await cleanupTempFiles(tempPaths);
     }
   });
 }
