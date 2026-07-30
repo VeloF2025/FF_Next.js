@@ -164,14 +164,14 @@ that resource permission succeeds.
 
 ## Data Sources and Ownership
 
-| Area | Authoritative source | Purpose |
-|---|---|---|
-| Project identity and link | FibreFlow PostgreSQL | Project resolution and RBAC scope |
-| Field status and freshness | QFieldCloud `core_delta` through read-only PostgreSQL | Latest QField feature state |
-| FibreFlow comparison totals | FibreFlow PostgreSQL | Sync discrepancy calculations |
-| QA | `qfield_photo_validations` and action tables | Workflow and retake statistics |
-| Sync | `qfield_sync_jobs` and conflicts | Current job, history, failures, conflicts |
-| Photo/design integrity | QField MinIO metadata and verified design cache | Missing photos and design coverage |
+| Area                        | Authoritative source                                  | Purpose                                   |
+| --------------------------- | ----------------------------------------------------- | ----------------------------------------- |
+| Project identity and link   | FibreFlow PostgreSQL                                  | Project resolution and RBAC scope         |
+| Field status and freshness  | QFieldCloud `core_delta` through read-only PostgreSQL | Latest QField feature state               |
+| FibreFlow comparison totals | FibreFlow PostgreSQL                                  | Sync discrepancy calculations             |
+| QA                          | `qfield_photo_validations` and action tables          | Workflow and retake statistics            |
+| Sync                        | `qfield_sync_jobs` and conflicts                      | Current job, history, failures, conflicts |
+| Photo/design integrity      | QField MinIO metadata and verified design cache       | Missing photos and design coverage        |
 
 New QField reads must use the established read-only QField connection. The
 aggregator must not depend on the legacy endpoints that swallow source errors or
