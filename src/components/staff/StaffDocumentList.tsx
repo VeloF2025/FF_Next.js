@@ -23,6 +23,7 @@ import {
   Scan,
   Loader2,
   Sparkles,
+  Ban,
 } from 'lucide-react';
 import {
   StaffDocument,
@@ -377,6 +378,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
       verified: 'bg-green-500/20 text-green-400',
       rejected: 'bg-red-500/20 text-red-400',
       expired: 'bg-red-500/20 text-red-400',
+      revoked: 'bg-red-500/20 text-red-400',
     };
 
     const icons: Record<VerificationStatus, React.ReactNode> = {
@@ -384,6 +386,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
       verified: <CheckCircle className="h-3 w-3" />,
       rejected: <XCircle className="h-3 w-3" />,
       expired: <AlertTriangle className="h-3 w-3" />,
+      revoked: <Ban className="h-3 w-3" />,
     };
 
     return (
