@@ -1,6 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
-import { verifyMigrationLifecycle } from './migrationLifecycle';
+import {
+  PERMISSIONS,
+  verifyCrossOwnershipRejected,
+  verifyDocumentRules,
+  verifyMigrationLifecycle,
+  verifyRestrictConstraints,
+  verifyZoneEvidencePairing,
+} from './migrationLifecycle';
 
 const EXPECTED_TEST_URL =
   'postgres://fibreflow_test:fibreflow_test@localhost:55432/fibreflow_test';
@@ -11,15 +18,6 @@ const TABLES = [
   'zone_delivery_documents',
   'zone_delivery_snag_links',
   'zone_delivery_state',
-];
-
-const PERMISSIONS = [
-  'construction-qa.zone-delivery.construction-confirm',
-  'construction-qa.zone-delivery.documents-manage',
-  'construction-qa.zone-delivery.operations-confirm',
-  'construction-qa.zone-delivery.scope-manage',
-  'construction-qa.zone-delivery.testing-confirm',
-  'construction-qa.zone-delivery.zone-qa-approve',
 ];
 
 const PROJECT_ID = '11111111-1111-1111-1111-111111111111';
@@ -119,6 +117,10 @@ describe('zone delivery migration 470', () => {
       WHERE project_id = $1 AND zone_no = 1
     `, [PROJECT_ID])).rejects.toMatchObject({ code: '23514' });
 
+    await verifyZoneEvidencePairing(pool, {
+      projectId: PROJECT_ID, ponStageId: PON_STAGE_ID, snagId: SNAG_ID, userId: USER_ID,
+    });
+
     await pool.query(`
       UPDATE zone_delivery_state
       SET handed_over_at = NOW(), handover_snapshot = '{}'::jsonb
@@ -132,61 +134,19 @@ describe('zone delivery migration 470', () => {
   });
 
   it('enforces document ownership and one active document per owner and type', async () => {
-    const baseDocument = [
-      PROJECT_ID,
-      1,
-      'vf_storage',
-      'zone-delivery/documents/test.pdf',
-      'test.pdf',
-      'application/pdf',
-      128,
-      'a'.repeat(64),
-      USER_ID,
-    ];
+    await verifyDocumentRules(pool, {
+      projectId: PROJECT_ID, ponStageId: PON_STAGE_ID, snagId: SNAG_ID, userId: USER_ID,
+    });
+  });
 
-    await expect(pool.query(`
-      INSERT INTO zone_delivery_documents (
-        project_id, zone_no, document_type, document_source, source_ref,
-        filename, mime_type, size_bytes, checksum_sha256, uploaded_by
-      ) VALUES ($1, $2, 'test_pack', $3, $4, $5, $6, $7, $8, $9)
-    `, baseDocument)).rejects.toMatchObject({ code: '23514' });
+  it('rejects cross-project and cross-zone PON and snag evidence', async () => {
+    await verifyCrossOwnershipRejected(pool, {
+      projectId: PROJECT_ID, ponStageId: PON_STAGE_ID, snagId: SNAG_ID, userId: USER_ID,
+    });
+  });
 
-    await expect(pool.query(`
-      INSERT INTO zone_delivery_documents (
-        project_id, zone_no, pon_stage_id, document_type, document_source,
-        source_ref, filename, mime_type, size_bytes, checksum_sha256, uploaded_by
-      ) VALUES ($1, $2, $3, 'fac', $4, $5, $6, $7, $8, $9, $10)
-    `, [PROJECT_ID, 1, PON_STAGE_ID, ...baseDocument.slice(2)]))
-      .rejects.toMatchObject({ code: '23514' });
-
-    await pool.query(`
-      INSERT INTO zone_delivery_documents (
-        project_id, zone_no, pon_stage_id, document_type, document_source,
-        source_ref, filename, mime_type, size_bytes, checksum_sha256, uploaded_by
-      ) VALUES ($1, $2, $3, 'test_pack', $4, $5, $6, $7, $8, $9, $10)
-    `, [PROJECT_ID, 1, PON_STAGE_ID, ...baseDocument.slice(2)]);
-
-    await expect(pool.query(`
-      INSERT INTO zone_delivery_documents (
-        project_id, zone_no, pon_stage_id, document_type, document_source,
-        source_ref, filename, mime_type, size_bytes, checksum_sha256, uploaded_by
-      ) VALUES ($1, $2, $3, 'test_pack', $4, $5, $6, $7, $8, $9, $10)
-    `, [PROJECT_ID, 1, PON_STAGE_ID, ...baseDocument.slice(2)]))
-      .rejects.toMatchObject({ code: '23505' });
-
-    await pool.query(`
-      INSERT INTO zone_delivery_documents (
-        project_id, zone_no, document_type, document_source, source_ref,
-        filename, mime_type, size_bytes, checksum_sha256, uploaded_by
-      ) VALUES ($1, $2, 'fac', $3, $4, $5, $6, $7, $8, $9)
-    `, baseDocument);
-
-    await expect(pool.query(`
-      INSERT INTO zone_delivery_documents (
-        project_id, zone_no, document_type, document_source, source_ref,
-        filename, mime_type, size_bytes, checksum_sha256, uploaded_by
-      ) VALUES ($1, $2, 'fac', $3, $4, $5, $6, $7, $8, $9)
-    `, baseDocument)).rejects.toMatchObject({ code: '23505' });
+  it('declares each evidence FK as ON DELETE RESTRICT', async () => {
+    await verifyRestrictConstraints(pool);
   });
 
   it('keeps delivery evidence referenced and activity append-only', async () => {

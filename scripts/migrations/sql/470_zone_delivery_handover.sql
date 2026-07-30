@@ -1,55 +1,9 @@
 -- Migration 470: audited Zone Delivery and Handover state.
 -- Additive and idempotent. Existing tracker, snag, user, and RBAC rows are
 -- retained as canonical evidence.
-
 BEGIN;
-
-CREATE TABLE IF NOT EXISTS pon_delivery_state (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pon_stage_id UUID NOT NULL UNIQUE
-    REFERENCES pon_stage_tracking(id) ON DELETE RESTRICT,
-  scope_status TEXT NOT NULL DEFAULT 'included',
-  scope_reason TEXT,
-  civil_complete_at TIMESTAMPTZ,
-  civil_confirmed_by UUID REFERENCES users(id) ON DELETE RESTRICT,
-  optical_complete_at TIMESTAMPTZ,
-  optical_confirmed_by UUID REFERENCES users(id) ON DELETE RESTRICT,
-  testing_passed_at TIMESTAMPTZ,
-  testing_confirmed_by UUID REFERENCES users(id) ON DELETE RESTRICT,
-  port_submitted_at TIMESTAMPTZ,
-  port_submitted_by UUID REFERENCES users(id) ON DELETE RESTRICT,
-  port_approved_at TIMESTAMPTZ,
-  port_approved_by UUID REFERENCES users(id) ON DELETE RESTRICT,
-  technically_live_at TIMESTAMPTZ,
-  technically_live_by UUID REFERENCES users(id) ON DELETE RESTRICT,
-  row_version INTEGER NOT NULL DEFAULT 1,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT pon_delivery_state_scope_status_check
-    CHECK (scope_status IN ('included', 'excluded', 'cancelled')),
-  CONSTRAINT pon_delivery_state_scope_reason_check
-    CHECK (
-      scope_status = 'included'
-      OR NULLIF(BTRIM(scope_reason), '') IS NOT NULL
-    ),
-  CONSTRAINT pon_delivery_state_row_version_check CHECK (row_version > 0),
-  CONSTRAINT pon_delivery_state_civil_actor_check
-    CHECK ((civil_complete_at IS NULL) = (civil_confirmed_by IS NULL)),
-  CONSTRAINT pon_delivery_state_optical_actor_check
-    CHECK ((optical_complete_at IS NULL) = (optical_confirmed_by IS NULL)),
-  CONSTRAINT pon_delivery_state_testing_actor_check
-    CHECK ((testing_passed_at IS NULL) = (testing_confirmed_by IS NULL)),
-  CONSTRAINT pon_delivery_state_port_submitted_actor_check
-    CHECK ((port_submitted_at IS NULL) = (port_submitted_by IS NULL)),
-  CONSTRAINT pon_delivery_state_port_approved_actor_check
-    CHECK ((port_approved_at IS NULL) = (port_approved_by IS NULL)),
-  CONSTRAINT pon_delivery_state_live_actor_check
-    CHECK ((technically_live_at IS NULL) = (technically_live_by IS NULL))
-);
-
-CREATE INDEX IF NOT EXISTS idx_pon_delivery_state_scope
-  ON pon_delivery_state(scope_status, pon_stage_id);
-
+CREATE UNIQUE INDEX IF NOT EXISTS ux_pon_stage_tracking_owner ON pon_stage_tracking(id, project_id, zone_no);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_snags_project_owner ON snags(id, project_id);
 CREATE TABLE IF NOT EXISTS zone_delivery_state (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
@@ -70,13 +24,26 @@ CREATE TABLE IF NOT EXISTS zone_delivery_state (
   row_version INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT zone_delivery_state_project_zone_key
-    UNIQUE (project_id, zone_no),
+  CONSTRAINT zone_delivery_state_project_zone_key UNIQUE (project_id, zone_no),
   CONSTRAINT zone_delivery_state_zone_no_check CHECK (zone_no > 0),
   CONSTRAINT zone_delivery_state_civil_qa_status_check
     CHECK (civil_qa_status IN ('not_started', 'in_progress', 'passed', 'failed')),
   CONSTRAINT zone_delivery_state_optical_qa_status_check
     CHECK (optical_qa_status IN ('not_started', 'in_progress', 'passed', 'failed')),
+  CONSTRAINT zone_delivery_state_scope_approval_check
+    CHECK ((scope_approved_at IS NULL) = (scope_approved_by IS NULL)),
+  CONSTRAINT zone_delivery_state_civil_qa_evidence_check CHECK (
+    (civil_qa_status = 'not_started'
+      AND civil_qa_effective_at IS NULL AND civil_qa_approved_by IS NULL)
+    OR (civil_qa_status <> 'not_started'
+      AND civil_qa_effective_at IS NOT NULL AND civil_qa_approved_by IS NOT NULL)
+  ),
+  CONSTRAINT zone_delivery_state_optical_qa_evidence_check CHECK (
+    (optical_qa_status = 'not_started'
+      AND optical_qa_effective_at IS NULL AND optical_qa_approved_by IS NULL)
+    OR (optical_qa_status <> 'not_started'
+      AND optical_qa_effective_at IS NOT NULL AND optical_qa_approved_by IS NOT NULL)
+  ),
   CONSTRAINT zone_delivery_state_row_version_check CHECK (row_version > 0),
   CONSTRAINT zone_delivery_state_handover_snapshot_check
     CHECK (
@@ -84,7 +51,6 @@ CREATE TABLE IF NOT EXISTS zone_delivery_state (
       OR (handed_over_at IS NOT NULL AND handover_snapshot IS NOT NULL)
     )
 );
-
 CREATE OR REPLACE FUNCTION protect_zone_delivery_handover()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -98,18 +64,15 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_zone_delivery_handover_immutable
-  ON zone_delivery_state;
+DROP TRIGGER IF EXISTS trg_zone_delivery_handover_immutable ON zone_delivery_state;
 CREATE TRIGGER trg_zone_delivery_handover_immutable
   BEFORE UPDATE ON zone_delivery_state
   FOR EACH ROW EXECUTE FUNCTION protect_zone_delivery_handover();
-
 CREATE TABLE IF NOT EXISTS zone_delivery_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL,
   zone_no INTEGER NOT NULL,
-  pon_stage_id UUID REFERENCES pon_stage_tracking(id) ON DELETE RESTRICT,
+  pon_stage_id UUID,
   document_type TEXT NOT NULL,
   document_source TEXT NOT NULL,
   source_ref TEXT NOT NULL,
@@ -124,6 +87,10 @@ CREATE TABLE IF NOT EXISTS zone_delivery_documents (
   CONSTRAINT zone_delivery_documents_zone_fk
     FOREIGN KEY (project_id, zone_no)
     REFERENCES zone_delivery_state(project_id, zone_no) ON DELETE RESTRICT,
+  CONSTRAINT zone_delivery_documents_pon_owner_fk
+    FOREIGN KEY (pon_stage_id, project_id, zone_no)
+    REFERENCES pon_stage_tracking(id, project_id, zone_no) ON DELETE RESTRICT,
+  CONSTRAINT zone_delivery_documents_id_pon_key UNIQUE (id, pon_stage_id),
   CONSTRAINT zone_delivery_documents_type_check
     CHECK (document_type IN ('test_pack', 'fac', 'cac')),
   CONSTRAINT zone_delivery_documents_source_check
@@ -139,29 +106,70 @@ CREATE TABLE IF NOT EXISTS zone_delivery_documents (
   CONSTRAINT zone_delivery_documents_supersession_check
     CHECK ((superseded_at IS NULL) = (superseded_by IS NULL))
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS ux_zone_delivery_documents_active_pon
   ON zone_delivery_documents(pon_stage_id, document_type)
   WHERE superseded_at IS NULL AND document_type = 'test_pack';
-
 CREATE UNIQUE INDEX IF NOT EXISTS ux_zone_delivery_documents_active_zone
   ON zone_delivery_documents(project_id, zone_no, document_type)
   WHERE superseded_at IS NULL
     AND document_type IN ('fac', 'cac');
-
-CREATE INDEX IF NOT EXISTS idx_zone_delivery_documents_zone
-  ON zone_delivery_documents(project_id, zone_no, document_type, uploaded_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_zone_delivery_documents_pon
-  ON zone_delivery_documents(pon_stage_id, uploaded_at DESC)
-  WHERE pon_stage_id IS NOT NULL;
-
+CREATE INDEX IF NOT EXISTS idx_zone_delivery_documents_zone ON zone_delivery_documents(project_id, zone_no, document_type, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_zone_delivery_documents_pon ON zone_delivery_documents(pon_stage_id, uploaded_at DESC) WHERE pon_stage_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS pon_delivery_state (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pon_stage_id UUID NOT NULL UNIQUE,
+  scope_status TEXT NOT NULL DEFAULT 'included',
+  scope_reason TEXT,
+  civil_complete_at TIMESTAMPTZ,
+  civil_confirmed_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  optical_complete_at TIMESTAMPTZ,
+  optical_confirmed_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  testing_passed_at TIMESTAMPTZ,
+  testing_confirmed_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  testing_test_pack_document_id UUID,
+  port_submitted_at TIMESTAMPTZ,
+  port_submitted_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  port_approved_at TIMESTAMPTZ,
+  port_approved_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  technically_live_at TIMESTAMPTZ,
+  technically_live_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  row_version INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT pon_delivery_state_pon_stage_fk FOREIGN KEY (pon_stage_id)
+    REFERENCES pon_stage_tracking(id) ON DELETE RESTRICT,
+  CONSTRAINT pon_delivery_state_testing_document_fk
+    FOREIGN KEY (testing_test_pack_document_id, pon_stage_id)
+    REFERENCES zone_delivery_documents(id, pon_stage_id) ON DELETE RESTRICT,
+  CONSTRAINT pon_delivery_state_scope_status_check
+    CHECK (scope_status IN ('included', 'excluded', 'cancelled')),
+  CONSTRAINT pon_delivery_state_scope_reason_check
+    CHECK (scope_status = 'included' OR NULLIF(BTRIM(scope_reason), '') IS NOT NULL),
+  CONSTRAINT pon_delivery_state_row_version_check CHECK (row_version > 0),
+  CONSTRAINT pon_delivery_state_civil_actor_check
+    CHECK ((civil_complete_at IS NULL) = (civil_confirmed_by IS NULL)),
+  CONSTRAINT pon_delivery_state_optical_actor_check
+    CHECK ((optical_complete_at IS NULL) = (optical_confirmed_by IS NULL)),
+  CONSTRAINT pon_delivery_state_testing_actor_check CHECK (
+    (testing_passed_at IS NULL AND testing_confirmed_by IS NULL
+      AND testing_test_pack_document_id IS NULL)
+    OR (testing_passed_at IS NOT NULL AND testing_confirmed_by IS NOT NULL
+      AND testing_test_pack_document_id IS NOT NULL)
+  ),
+  CONSTRAINT pon_delivery_state_port_submitted_actor_check
+    CHECK ((port_submitted_at IS NULL) = (port_submitted_by IS NULL)),
+  CONSTRAINT pon_delivery_state_port_approved_actor_check
+    CHECK ((port_approved_at IS NULL) = (port_approved_by IS NULL)),
+  CONSTRAINT pon_delivery_state_live_actor_check
+    CHECK ((technically_live_at IS NULL) = (technically_live_by IS NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_pon_delivery_state_scope ON pon_delivery_state(scope_status, pon_stage_id);
 CREATE TABLE IF NOT EXISTS zone_delivery_snag_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL,
   zone_no INTEGER NOT NULL,
-  snag_id UUID NOT NULL REFERENCES snags(id) ON DELETE RESTRICT,
-  pon_stage_id UUID REFERENCES pon_stage_tracking(id) ON DELETE RESTRICT,
+  snag_id UUID NOT NULL,
+  pon_stage_id UUID,
   affected_gate TEXT,
   handover_blocking BOOLEAN NOT NULL DEFAULT TRUE,
   requires_reconfirmation BOOLEAN NOT NULL DEFAULT FALSE,
@@ -172,6 +180,12 @@ CREATE TABLE IF NOT EXISTS zone_delivery_snag_links (
   CONSTRAINT zone_delivery_snag_links_zone_fk
     FOREIGN KEY (project_id, zone_no)
     REFERENCES zone_delivery_state(project_id, zone_no) ON DELETE RESTRICT,
+  CONSTRAINT zone_delivery_snag_links_snag_owner_fk
+    FOREIGN KEY (snag_id, project_id)
+    REFERENCES snags(id, project_id) ON DELETE RESTRICT,
+  CONSTRAINT zone_delivery_snag_links_pon_owner_fk
+    FOREIGN KEY (pon_stage_id, project_id, zone_no)
+    REFERENCES pon_stage_tracking(id, project_id, zone_no) ON DELETE RESTRICT,
   CONSTRAINT zone_delivery_snag_links_unique
     UNIQUE (snag_id, project_id, zone_no),
   CONSTRAINT zone_delivery_snag_links_gate_check
@@ -189,20 +203,16 @@ CREATE TABLE IF NOT EXISTS zone_delivery_snag_links (
   CONSTRAINT zone_delivery_snag_links_reconfirmed_check
     CHECK ((reconfirmed_at IS NULL) = (reconfirmed_by IS NULL))
 );
-
-CREATE INDEX IF NOT EXISTS idx_zone_delivery_snag_links_blocking
-  ON zone_delivery_snag_links(project_id, zone_no, snag_id)
+CREATE INDEX IF NOT EXISTS idx_zone_delivery_snag_links_blocking ON zone_delivery_snag_links(project_id, zone_no, snag_id)
   WHERE handover_blocking;
-
 CREATE INDEX IF NOT EXISTS idx_zone_delivery_snag_links_pon
   ON zone_delivery_snag_links(pon_stage_id)
   WHERE pon_stage_id IS NOT NULL;
-
 CREATE TABLE IF NOT EXISTS zone_delivery_activity (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL,
   zone_no INTEGER NOT NULL,
-  pon_stage_id UUID REFERENCES pon_stage_tracking(id) ON DELETE RESTRICT,
+  pon_stage_id UUID,
   entity_type TEXT NOT NULL,
   entity_id UUID NOT NULL,
   action TEXT NOT NULL,
@@ -217,29 +227,26 @@ CREATE TABLE IF NOT EXISTS zone_delivery_activity (
   new_value JSONB,
   CONSTRAINT zone_delivery_activity_zone_fk
     FOREIGN KEY (project_id, zone_no)
-    REFERENCES zone_delivery_state(project_id, zone_no) ON DELETE RESTRICT
+    REFERENCES zone_delivery_state(project_id, zone_no) ON DELETE RESTRICT,
+  CONSTRAINT zone_delivery_activity_pon_owner_fk
+    FOREIGN KEY (pon_stage_id, project_id, zone_no)
+    REFERENCES pon_stage_tracking(id, project_id, zone_no) ON DELETE RESTRICT
 );
-
-CREATE INDEX IF NOT EXISTS idx_zone_delivery_activity_zone_time
-  ON zone_delivery_activity(project_id, zone_no, recorded_at DESC);
-
+CREATE INDEX IF NOT EXISTS idx_zone_delivery_activity_zone_time ON zone_delivery_activity(project_id, zone_no, recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_zone_delivery_activity_pon_time
   ON zone_delivery_activity(pon_stage_id, recorded_at DESC)
   WHERE pon_stage_id IS NOT NULL;
-
 CREATE OR REPLACE FUNCTION reject_zone_delivery_activity_mutation()
 RETURNS TRIGGER AS $$
 BEGIN
   RAISE EXCEPTION 'zone_delivery_activity is append-only';
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_zone_delivery_activity_append_only
   ON zone_delivery_activity;
 CREATE TRIGGER trg_zone_delivery_activity_append_only
   BEFORE UPDATE OR DELETE ON zone_delivery_activity
   FOR EACH ROW EXECUTE FUNCTION reject_zone_delivery_activity_mutation();
-
 INSERT INTO access_permissions (
   type, key, parent_key, label, description, sort_order, is_active
 ) VALUES
@@ -268,7 +275,6 @@ ON CONFLICT (key) DO UPDATE SET
   description = EXCLUDED.description,
   sort_order = EXCLUDED.sort_order,
   is_active = EXCLUDED.is_active;
-
 INSERT INTO role_permissions (role, permission_key, actions)
 SELECT
   role_name,
@@ -287,9 +293,7 @@ CROSS JOIN (
 ON CONFLICT (role, permission_key) DO UPDATE SET
   actions = EXCLUDED.actions,
   updated_at = NOW();
-
 INSERT INTO schema_migrations (filename, applied_at)
 VALUES ('470_zone_delivery_handover.sql', NOW())
 ON CONFLICT (filename) DO NOTHING;
-
 COMMIT;

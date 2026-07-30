@@ -3,6 +3,9 @@
 
 BEGIN;
 
+INSERT INTO projects (id, project_name) VALUES
+  ('11111111-1111-1111-1111-111111111112', 'Test Project B');
+
 CREATE TABLE pon_stage_tracking (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -13,13 +16,19 @@ CREATE TABLE pon_stage_tracking (
   UNIQUE (project_id, zone_no, pon_no)
 );
 
-INSERT INTO pon_stage_tracking (id, project_id, zone_no, pon_no)
-VALUES (
-  '47000000-0000-4000-8000-000000000001',
-  '11111111-1111-1111-1111-111111111111',
-  1,
-  1
-);
+INSERT INTO pon_stage_tracking (id, project_id, zone_no, pon_no) VALUES
+  (
+    '47000000-0000-4000-8000-000000000001',
+    '11111111-1111-1111-1111-111111111111',
+    1,
+    1
+  ),
+  (
+    '47000000-0000-4000-8000-000000000003',
+    '11111111-1111-1111-1111-111111111112',
+    2,
+    1
+  );
 
 CREATE TABLE snags (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -32,14 +41,21 @@ CREATE TABLE snags (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO snags (id, project_id, snag_number, category, description)
-VALUES (
-  '47000000-0000-4000-8000-000000000002',
-  '11111111-1111-1111-1111-111111111111',
-  1,
-  'verification',
-  'Docker fixture snag'
-);
+INSERT INTO snags (id, project_id, snag_number, category, description) VALUES
+  (
+    '47000000-0000-4000-8000-000000000002',
+    '11111111-1111-1111-1111-111111111111',
+    1,
+    'verification',
+    'Docker fixture snag'
+  ),
+  (
+    '47000000-0000-4000-8000-000000000004',
+    '11111111-1111-1111-1111-111111111112',
+    2,
+    'verification',
+    'Foreign Docker fixture snag'
+  );
 
 CREATE TABLE access_permissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
