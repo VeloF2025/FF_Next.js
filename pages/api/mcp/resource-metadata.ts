@@ -1,5 +1,5 @@
 /**
- * RFC 9728 protected-resource metadata for the FibreFlow remote MCP connector.
+ * RFC 9728 protected-resource metadata for FibreFlow-hosted MCP connectors.
  *
  * Served at /.well-known/oauth-protected-resource/api/ff-remote-mcp/mcp via a rewrite
  * in next.config.js. This REPLACES the static file that used to live under public/,
@@ -10,8 +10,9 @@
  * Deliberately unauthenticated: this is discovery metadata a client reads BEFORE it has
  * any credential. It contains no secrets — only public URLs.
  *
- * The Cortex sibling (public/.well-known/.../api/cortex-remote-mcp/mcp) is left as a
- * static file: it only ever runs on production, so a fixed host is correct there.
+ * Cortex uses the same host-aware route. That is required for the isolated dev
+ * connector: a static production hostname would send dev authorization to the live
+ * Cortex OAuth service.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 
@@ -38,14 +39,21 @@ function isLocal(host: string): boolean {
   return /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host);
 }
 
-function resourceBase(req: NextApiRequest): string {
+type Connector = 'fibreflow' | 'cortex';
+
+const CONNECTORS: Record<Connector, { path: string; scope: string }> = {
+  fibreflow: { path: 'ff-remote-mcp', scope: 'fibreflow.read' },
+  cortex: { path: 'cortex-remote-mcp', scope: 'cortex.read' },
+};
+
+function resourceBase(headers: NextApiRequest['headers']): string {
   const pinned = (process.env.FF_APP_BASE ?? '').trim().replace(/\/$/, '');
   if (pinned) return pinned;
 
-  const forwarded = req.headers['x-forwarded-host'];
+  const forwarded = headers['x-forwarded-host'];
   const candidates = [
     (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim(),
-    req.headers.host,
+    headers.host,
   ];
 
   for (const host of candidates) {
@@ -57,6 +65,21 @@ function resourceBase(req: NextApiRequest): string {
   // An unrecognised host gets production, not itself: a spoofed header must not be
   // able to make this document name an arbitrary authorization server.
   return DEFAULT_BASE;
+}
+
+export function buildResourceMetadata(
+  headers: NextApiRequest['headers'],
+  connector: Connector = 'fibreflow',
+) {
+  const base = resourceBase(headers);
+  const { path, scope } = CONNECTORS[connector];
+
+  return {
+    resource: `${base}/api/${path}/mcp`,
+    authorization_servers: [`${base}/api/${path}`],
+    scopes_supported: [scope],
+    bearer_methods_supported: ['header'],
+  };
 }
 
 export default function handler(req: NextApiRequest, res: NextApiResponse): void {
@@ -71,11 +94,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse): void
   // regenerate, so there is nothing to gain by caching it.
   res.setHeader('Cache-Control', 'no-store');
 
-  const base = resourceBase(req);
-  res.status(200).json({
-    resource: `${base}/api/ff-remote-mcp/mcp`,
-    authorization_servers: [`${base}/api/ff-remote-mcp`],
-    scopes_supported: ['fibreflow.read'],
-    bearer_methods_supported: ['header'],
-  });
+  const connector = req.query?.connector === 'cortex' ? 'cortex' : 'fibreflow';
+  res.status(200).json(buildResourceMetadata(req.headers, connector));
 }

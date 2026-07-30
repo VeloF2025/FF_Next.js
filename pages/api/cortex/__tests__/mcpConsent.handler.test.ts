@@ -69,9 +69,9 @@ describe('POST /api/cortex/mcp-consent — verified consent', () => {
     const callback = await startCallbackServer((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ redirectUrl: 'https://claude.ai/callback' }));
-    }, 17414);
+    });
     const app = await startConsentHandler({
-      callbackBase: 'http://127.0.0.1:17414/',
+      callbackBase: `${callback.url}/`,
       mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
     });
 
