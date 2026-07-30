@@ -1,7 +1,7 @@
 # Classified Training Certificate Upload Design
 
 **Date:** 2026-07-30
-**Status:** Approved for specification
+**Status:** Approved for implementation
 **Scope:** Internal employee training-certificate upload, verification, secure storage, and H&S competency linkage
 
 ## Objective
