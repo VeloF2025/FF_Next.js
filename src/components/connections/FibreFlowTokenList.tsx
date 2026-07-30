@@ -3,7 +3,8 @@
 /**
  * The signed-in user's active read-only FibreFlow MCP tokens.
  *
- * Presentation-only — fetching, minting and revocation live in FibreFlowConnectPanel.
+ * Presentation-only — fetching, minting and revocation live in
+ * FibreFlowConnectionPanel.
  * Never renders credential material: the API returns metadata only, and the token
  * value itself is shown once at mint time and never again.
  */
@@ -31,7 +32,7 @@ function formatDate(iso: string | null): string {
 export function FibreFlowTokenList({ tokens, onRevoke }: FibreFlowTokenListProps) {
   if (tokens.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">You have no active read-only tokens.</p>
+      <p className="text-sm text-muted-foreground">You have no active read-only sessions.</p>
     );
   }
 

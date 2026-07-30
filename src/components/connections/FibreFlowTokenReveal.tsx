@@ -4,8 +4,8 @@
  * One-time reveal of a freshly minted read-only FibreFlow MCP token.
  *
  * Presentation-only — minting, listing and clipboard state live in
- * FibreFlowConnectPanel. The token is never persisted or logged here; it lives in the
- * parent's React state for the life of the page and is gone on reload.
+ * FibreFlowConnectionPanel. The token is never persisted or logged here; it lives in
+ * the parent's React state for the life of the page and is gone on reload.
  */
 
 interface FibreFlowTokenRevealProps {
@@ -44,6 +44,7 @@ export function FibreFlowTokenReveal({
       <div className="flex gap-2">
         <input
           type="text"
+          aria-label="FibreFlow MCP token"
           readOnly
           value={token}
           className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
