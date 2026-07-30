@@ -14,10 +14,23 @@ const STATE_ID_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
 const CALLBACK_TIMEOUT_MS = 10_000;
 const GATEWAY_MESSAGE =
   'Authorization could not be completed. Return to Claude and try connecting again.';
+const DEFAULT_SERVICE_URL = 'http://127.0.0.1:7414';
 
-const serviceUrl = (): string =>
-  (process.env.CORTEX_REMOTE_MCP_URL || 'http://127.0.0.1:7414')
-    .replace(/\/$/, '');
+function serviceUrl(): string | null {
+  const raw = process.env.CORTEX_REMOTE_MCP_URL || DEFAULT_SERVICE_URL;
+  const portText = raw.match(
+    /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):(\d{1,5})(?:\/[^\s?#]*)?$/i,
+  )?.[1];
+  const port = Number(portText);
+  if (
+    !Number.isInteger(port)
+    || port < 1
+    || port > 65_535
+  ) {
+    return null;
+  }
+  return raw.replace(/\/$/, '');
+}
 
 function isSafeRedirect(value: unknown): value is string {
   return (
@@ -70,10 +83,24 @@ export function createCortexConsentHandler(
         );
       }
 
+      const callbackBase = serviceUrl();
+      if (!callbackBase) {
+        logger.error(
+          'Cortex MCP consent rejected: callback URL is invalid',
+          { userId: req.user.id },
+          'CortexMcpConsent',
+        );
+        return apiResponse.error(
+          res,
+          ErrorCode.INTERNAL_ERROR,
+          GATEWAY_MESSAGE,
+        );
+      }
+
       const { token } = await mintToken(req.user.email, '90d');
       let redirectUrl: unknown;
       try {
-        const upstream = await fetchImpl(`${serviceUrl()}/authorize/complete`, {
+        const upstream = await fetchImpl(`${callbackBase}/authorize/complete`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
