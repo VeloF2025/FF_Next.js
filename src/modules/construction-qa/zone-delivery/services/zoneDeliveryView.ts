@@ -187,6 +187,21 @@ export function buildZoneView(aggregate: ZoneAggregate): ZoneDeliveryView {
       checksumSha256: doc.checksum_sha256,
       active: doc.superseded_at === null,
     })),
+    snags: aggregate.snagLinks.map(link => {
+      const pon = aggregate.pons.find(item => item.pon_stage_id === link.pon_stage_id);
+      return {
+        snagId: link.snag_id,
+        status: link.status,
+        closedAt: iso(link.closed_at),
+        qaDiscipline: link.qa_discipline,
+        ...(link.pon_stage_id ? { ponStageId: link.pon_stage_id } : {}),
+        ...(pon ? { ponNo: pon.pon_no } : {}),
+        affectedGate: link.affected_gate as PonMilestone | null,
+        handoverBlocking: link.handover_blocking,
+        requiresReconfirmation: link.requires_reconfirmation,
+        reconfirmedAt: iso(link.reconfirmed_at),
+      };
+    }),
     status: calculation.status,
     blockers: calculation.blockers,
     eligibleForZoneQaAt: iso(aggregate.zone?.eligible_for_zone_qa_at ?? null),

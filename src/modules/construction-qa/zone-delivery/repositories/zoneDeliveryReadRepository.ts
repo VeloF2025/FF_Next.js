@@ -68,10 +68,12 @@ export interface SnagLinkRow {
   snag_id: string;
   pon_stage_id: string | null;
   affected_gate: string | null;
+  qa_discipline: 'civil' | 'optical' | null;
   handover_blocking: boolean;
   requires_reconfirmation: boolean;
   reconfirmed_at: Timestamp;
   status: string;
+  closed_at: Timestamp;
 }
 
 export interface ActivityRow {
@@ -158,8 +160,9 @@ export async function readZoneAggregate(
       ORDER BY uploaded_at, id
     `, [key.projectId, key.zoneNo]),
     client.query<SnagLinkRow>(`
-      SELECT l.snag_id, l.pon_stage_id, l.affected_gate,
-        l.handover_blocking, l.requires_reconfirmation, l.reconfirmed_at, s.status
+      SELECT l.snag_id, l.pon_stage_id, l.affected_gate, l.qa_discipline,
+        l.handover_blocking, l.requires_reconfirmation, l.reconfirmed_at,
+        s.status, s.closed_at
       FROM zone_delivery_snag_links l
       JOIN snags s ON s.id = l.snag_id
       WHERE l.project_id = $1 AND l.zone_no = $2

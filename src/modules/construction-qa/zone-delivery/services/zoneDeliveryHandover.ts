@@ -89,7 +89,17 @@ function buildSnapshot(aggregate: ZoneAggregate) {
     documents: aggregate.documents
       .filter(doc => doc.superseded_at === null)
       .map(snapshotDocument),
-    snagIds: aggregate.snagLinks.map(link => link.snag_id).sort(),
+    snags: aggregate.snagLinks.map(link => ({
+      snagId: link.snag_id,
+      status: link.status,
+      closedAt: iso(link.closed_at),
+      qaDiscipline: link.qa_discipline,
+      ponStageId: link.pon_stage_id,
+      affectedGate: link.affected_gate,
+      handoverBlocking: link.handover_blocking,
+      requiresReconfirmation: link.requires_reconfirmation,
+      reconfirmedAt: iso(link.reconfirmed_at),
+    })).sort((left, right) => left.snagId.localeCompare(right.snagId)),
   };
 }
 

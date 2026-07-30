@@ -139,6 +139,23 @@ describe('PON delivery milestone lifecycle', () => {
     });
     expect(activity.at(-1)?.newValue).toMatchObject({ actorUserId: USER_ID });
   });
+  it('does not recreate a missing approved-scope PON projection from a stale command', async () => {
+    await approveScope();
+    await pool.query(`DELETE FROM pon_delivery_state WHERE pon_stage_id = $1`, [PON_ID]);
+    await expect(service.confirmPonMilestone({
+      ...key,
+      ponStageId: PON_ID,
+      milestone: 'civil_complete',
+      action: 'confirm',
+      expectedRowVersion: 0,
+      effectiveAt: now(),
+      source: 'stale-client',
+    }, actor('construction-confirm'))).rejects.toMatchObject({ code: 'VERSION_CONFLICT' });
+    const { rows } = await pool.query<{ count: string }>(`
+      SELECT COUNT(*)::text AS count FROM pon_delivery_state WHERE pon_stage_id = $1
+    `, [PON_ID]);
+    expect(rows[0]!.count).toBe('0');
+  });
   it('pins testing to the active same-PON test pack and supersedes documents immutably', async () => {
     let view = await approveScope();
     await Promise.all([approveReviews(1, 'civil'), approveReviews(1, 'optical')]);

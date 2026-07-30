@@ -52,6 +52,13 @@ describe('zone delivery migration 470', () => {
     `, [TABLES]);
 
     expect(rows.map(({ table_name }) => table_name)).toEqual(TABLES);
+    const { rows: discipline } = await pool.query<{ column_name: string }>(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'zone_delivery_snag_links'
+        AND column_name = 'qa_discipline'
+    `);
+    expect(discipline).toEqual([{ column_name: 'qa_discipline' }]);
   });
 
   it('enforces PON uniqueness, scope reasons, enum values, and row versions', async () => {

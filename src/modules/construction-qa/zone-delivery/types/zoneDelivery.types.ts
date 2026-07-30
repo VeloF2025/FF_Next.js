@@ -132,6 +132,19 @@ export interface ZoneDocumentView {
   active: boolean;
 }
 
+export interface ZoneSnagView {
+  snagId: string;
+  status: string;
+  closedAt: string | null;
+  qaDiscipline: ZoneQaDiscipline | null;
+  ponStageId?: string;
+  ponNo?: number;
+  affectedGate: PonMilestone | null;
+  handoverBlocking: boolean;
+  requiresReconfirmation: boolean;
+  reconfirmedAt: string | null;
+}
+
 export interface ZoneDeliveryView extends ZoneKey {
   projectName: string;
   scopeApproved: boolean;
@@ -139,6 +152,7 @@ export interface ZoneDeliveryView extends ZoneKey {
   civilQa: ZoneQaView;
   opticalQa: ZoneQaView;
   documents: ZoneDocumentView[];
+  snags: ZoneSnagView[];
   status: ZoneDeliveryStatus;
   blockers: DeliveryBlocker[];
   eligibleForZoneQaAt: string | null;

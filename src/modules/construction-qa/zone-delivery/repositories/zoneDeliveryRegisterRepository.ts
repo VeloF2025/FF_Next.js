@@ -91,8 +91,8 @@ export async function readRegisterAggregates(
     `, params),
     client.query<RegisterSnagRow>(`
       SELECT l.project_id, l.zone_no, l.snag_id, l.pon_stage_id,
-        l.affected_gate, l.handover_blocking, l.requires_reconfirmation,
-        l.reconfirmed_at, s.status
+        l.affected_gate, l.qa_discipline, l.handover_blocking,
+        l.requires_reconfirmation, l.reconfirmed_at, s.status, s.closed_at
       FROM zone_delivery_snag_links l
       JOIN snags s ON s.id = l.snag_id
       WHERE ($1::uuid IS NULL OR l.project_id = $1)

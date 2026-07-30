@@ -50,6 +50,7 @@ CREATE TABLE snags (
   category TEXT NOT NULL,
   description TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open',
+  closed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

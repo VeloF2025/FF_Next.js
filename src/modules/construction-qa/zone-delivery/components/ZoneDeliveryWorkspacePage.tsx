@@ -10,6 +10,7 @@ import { PonMilestoneTable } from './PonMilestoneTable';
 import { ZoneActivityTimeline } from './ZoneActivityTimeline';
 import { ZoneLifecycleRail } from './ZoneLifecycleRail';
 import { ZoneQaPanels } from './ZoneQaPanels';
+import { ZoneDeliverySnags } from './ZoneDeliverySnags';
 import { ZoneDeliveryTimestamp } from './ZoneDeliveryTimestamp';
 
 const permissions = {
@@ -112,6 +113,7 @@ export function ZoneDeliveryWorkspacePage({ zoneKey }: { zoneKey: ZoneKey }) {
         onMilestone={delivery.confirmMilestone}
       />
       <ZoneQaPanels zone={zone} canApprove={can(permissions.zoneQa, 'edit')} mutating={delivery.mutating} onRecord={delivery.recordZoneQa} />
+      <ZoneDeliverySnags zone={zone} />
       <HandoverEvidencePanel zone={zone} canManage={can(permissions.documents, 'edit')} mutating={delivery.mutating} onUpload={delivery.uploadDocument} />
       <ZoneActivityTimeline activity={delivery.activity} />
     </div>

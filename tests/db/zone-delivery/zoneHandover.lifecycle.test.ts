@@ -113,10 +113,23 @@ describe('zone QA and automatic handover lifecycle', () => {
       .rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
     view = await recordQa(view, 'civil', 'passed', [], 'Civil repairs verified');
     expect(view.civilQa.status).toBe('passed');
-    const { rows } = await pool.query<{ handover_blocking: boolean }>(`
-      SELECT handover_blocking FROM zone_delivery_snag_links WHERE snag_id = $1
+    const { rows } = await pool.query<{
+      handover_blocking: boolean;
+      qa_discipline: string | null;
+    }>(`
+      SELECT handover_blocking, qa_discipline
+      FROM zone_delivery_snag_links WHERE snag_id = $1
     `, [SNAG_ID]);
     expect(rows[0]!.handover_blocking).toBe(true);
+    expect(rows[0]!.qa_discipline).toBe('civil');
+    expect(view.snags).toEqual([
+      expect.objectContaining({
+        snagId: SNAG_ID,
+        status: 'open',
+        qaDiscipline: 'civil',
+        handoverBlocking: true,
+      }),
+    ]);
   });
   it('does not confirm construction while canonical QA is concurrently rejected', async () => {
     const view = await service.updateScope({
@@ -166,7 +179,7 @@ describe('zone QA and automatic handover lifecycle', () => {
         milestones: Array<Record<string, unknown>>;
         zoneQa: Record<string, unknown>;
         documents: Array<Record<string, unknown>>;
-        snagIds: string[];
+        snags: Array<Record<string, unknown>>;
       };
     }>(`
       SELECT handover_snapshot FROM zone_delivery_state
@@ -196,7 +209,12 @@ describe('zone QA and automatic handover lifecycle', () => {
       expect.objectContaining({ documentType: 'fac', checksumSha256: '2'.repeat(64) }),
       expect.objectContaining({ documentType: 'cac', checksumSha256: '3'.repeat(64) }),
     ]));
-    expect(snapshot.snagIds).toEqual([SNAG_ID]);
+    expect(snapshot.snags).toEqual([expect.objectContaining({
+      snagId: SNAG_ID,
+      status: 'closed',
+      qaDiscipline: 'civil',
+      handoverBlocking: true,
+    })]);
     const activities = await service.getActivity(key);
     expect(activities.filter(({ action }) => action === 'zone_handed_over')).toHaveLength(1);
   });

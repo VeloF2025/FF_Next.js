@@ -120,6 +120,18 @@ export const zoneFixture: ZoneDeliveryView = {
       active: true,
     },
   ],
+  snags: [{
+    snagId,
+    status: 'open',
+    closedAt: null,
+    qaDiscipline: 'optical',
+    ponStageId,
+    ponNo: 4,
+    affectedGate: null,
+    handoverBlocking: true,
+    requiresReconfirmation: false,
+    reconfirmedAt: null,
+  }],
   status: 'handover_blocked',
   blockers: [
     {

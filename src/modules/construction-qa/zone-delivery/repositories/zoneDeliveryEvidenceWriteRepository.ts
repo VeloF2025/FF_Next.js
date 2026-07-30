@@ -64,6 +64,7 @@ export async function linkSnag(
   options: {
     ponStageId?: string;
     affectedGate?: PonMilestone;
+    qaDiscipline?: 'civil' | 'optical';
     blocking: boolean;
     reconfirmation: boolean;
   },
@@ -71,18 +72,20 @@ export async function linkSnag(
   await client.query(`
     INSERT INTO zone_delivery_snag_links (
       project_id, zone_no, snag_id, pon_stage_id, affected_gate,
-      handover_blocking, requires_reconfirmation, linked_by
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      qa_discipline, handover_blocking, requires_reconfirmation, linked_by
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     ON CONFLICT (snag_id, project_id, zone_no) DO UPDATE SET
       pon_stage_id = COALESCE(zone_delivery_snag_links.pon_stage_id, EXCLUDED.pon_stage_id),
       affected_gate = COALESCE(zone_delivery_snag_links.affected_gate, EXCLUDED.affected_gate),
+      qa_discipline = COALESCE(zone_delivery_snag_links.qa_discipline, EXCLUDED.qa_discipline),
       handover_blocking = CASE WHEN NOT EXCLUDED.handover_blocking AND NOT EXCLUDED.requires_reconfirmation
         THEN FALSE ELSE zone_delivery_snag_links.handover_blocking OR EXCLUDED.handover_blocking END,
       requires_reconfirmation = CASE WHEN NOT EXCLUDED.handover_blocking AND NOT EXCLUDED.requires_reconfirmation
         THEN FALSE ELSE zone_delivery_snag_links.requires_reconfirmation OR EXCLUDED.requires_reconfirmation END
   `, [
     key.projectId, key.zoneNo, snagId, options.ponStageId ?? null,
-    options.affectedGate ?? null, options.blocking, options.reconfirmation, actorId,
+    options.affectedGate ?? null, options.qaDiscipline ?? null,
+    options.blocking, options.reconfirmation, actorId,
   ]);
 }
 

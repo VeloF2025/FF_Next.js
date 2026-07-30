@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS zone_delivery_snag_links (
   snag_id UUID NOT NULL,
   pon_stage_id UUID,
   affected_gate TEXT,
+  qa_discipline TEXT,
   handover_blocking BOOLEAN NOT NULL DEFAULT TRUE,
   requires_reconfirmation BOOLEAN NOT NULL DEFAULT FALSE,
   linked_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -198,10 +199,9 @@ CREATE TABLE IF NOT EXISTS zone_delivery_snag_links (
   CONSTRAINT zone_delivery_snag_links_pon_owner_fk
     FOREIGN KEY (pon_stage_id, project_id, zone_no)
     REFERENCES pon_stage_tracking(id, project_id, zone_no) ON DELETE RESTRICT,
-  CONSTRAINT zone_delivery_snag_links_unique
-    UNIQUE (snag_id, project_id, zone_no),
-  CONSTRAINT zone_delivery_snag_links_gate_check
-    CHECK (
+  CONSTRAINT zone_delivery_snag_links_unique UNIQUE (snag_id, project_id, zone_no),
+  CONSTRAINT zone_delivery_snag_links_qa_discipline_check CHECK (qa_discipline IS NULL OR qa_discipline IN ('civil', 'optical')),
+  CONSTRAINT zone_delivery_snag_links_gate_check CHECK (
       affected_gate IS NULL
       OR affected_gate IN (
         'civil_complete',

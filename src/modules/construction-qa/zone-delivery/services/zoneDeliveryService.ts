@@ -7,7 +7,7 @@ import type {
 import * as read from '../repositories/zoneDeliveryReadRepository';
 import * as write from '../repositories/zoneDeliveryWriteRepository';
 import {
-  buildZoneView, calculateAggregate, milestoneState, milestones, recalculateZone,
+  buildZoneView, milestoneState, milestones, recalculateZone,
 } from './zoneDeliveryHandover';
 import {
   deliveryError, handoverLocked, hasReason, requirePermission,
@@ -19,6 +19,7 @@ import { assertCanonicalZone } from './zoneDeliveryCanonical';
 import { validateMilestoneConfirmation } from './zoneDeliveryMilestoneActions';
 import { invalidateZoneEvidence } from './zoneDeliveryInvalidation';
 import { requireSupervisedDocumentSource } from './zoneDeliveryDocumentSecurity';
+import { recordZoneQaCommand } from './zoneDeliveryQaCommands';
 export interface ZoneDeliveryService {
   getRegister(filters: ZoneRegisterFilters): Promise<ZoneRegisterResult>; getZone(key: ZoneKey): Promise<ZoneDeliveryView>;
   updateScope(input: UpdateScopeInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
@@ -133,13 +134,10 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
       const aggregate = await read.readZoneAggregate(client, input);
       const canonical = aggregate.pons.find(pon => pon.pon_stage_id === input.ponStageId);
       if (!canonical) deliveryError('VALIDATION_ERROR', 'PON does not belong to the zone');
-      let pon = await write.lockPon(client, input.ponStageId);
-      const projectionExists = Boolean(pon);
-      if (!pon && input.expectedRowVersion === 0 && zone?.scope_approved_at) {
-        await write.writePonScope(client, input.ponStageId, 'included'); pon = await write.lockPon(client, input.ponStageId); }
+      const pon = await write.lockPon(client, input.ponStageId);
       if (!pon) versionConflict();
       const state = pon!;
-      if (projectionExists && state.row_version !== input.expectedRowVersion) versionConflict();
+      if (state.row_version !== input.expectedRowVersion) versionConflict();
       if (input.action === 'link_maintenance') {
         if (!zone?.handed_over_at)
           deliveryError('VALIDATION_ERROR', 'Maintenance links require a handed-over zone');
@@ -211,44 +209,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
     });
   }
   recordZoneQa(input: RecordZoneQaInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
-    return transaction(this.pool, async client => {
-      requirePermission(actor, 'zone-qa-approve');
-      await assertCanonicalZone(client, input);
-      const now = await read.readTransactionTime(client);
-      const zone = await write.lockZone(client, input);
-      if (!zone || zone.row_version !== input.expectedRowVersion) versionConflict();
-      const state = zone!;
-      if (state.handed_over_at) handoverLocked();
-      const aggregate = await read.readZoneAggregate(client, input);
-      if (!calculateAggregate(aggregate).eligibleForZoneQa)
-        deliveryError('PREREQUISITE_BLOCKED', 'Every included PON must be technically live');
-      const previousStatus = input.discipline === 'civil'
-        ? state.civil_qa_status : state.optical_qa_status;
-      validateMeta(input, now, previousStatus !== 'not_started');
-      if (input.status === 'failed' && input.snagIds.length === 0)
-        deliveryError('VALIDATION_ERROR', 'Failed Zone QA requires existing snag IDs');
-      for (const snagId of [...new Set(input.snagIds)]) {
-        if (!(await read.readSnag(client, input.projectId, snagId)))
-          deliveryError('VALIDATION_ERROR', `Snag ${snagId} does not belong to the project`);
-        await write.linkSnag(client, input, snagId, actor.userId, { blocking: true, reconfirmation: false });
-      }
-      const saved = await write.writeZoneQa(
-        client, input, input.discipline, input.status, input.notes, input.effectiveAt, actor.userId, input.expectedRowVersion,
-      );
-      if (!saved) versionConflict();
-      const prefix = input.discipline === 'civil' ? 'civil' : 'optical';
-      await write.appendActivity(client, {
-        ...audit(input, actor), entityType: 'zone', entityId: state.id,
-        action: `${input.discipline}_zone_qa_recorded`,
-        previousValue: {
-          status: previousStatus, notes: state[`${prefix}_qa_notes`],
-          effectiveAt: iso(state[`${prefix}_qa_effective_at`] as Date | string | null),
-          approverUserId: state[`${prefix}_qa_approved_by`] },
-        newValue: { status: input.status, notes: input.notes,
-          effectiveAt: input.effectiveAt, approverUserId: actor.userId },
-      });
-      return recalculateZone(client, input, actor);
-    });
+    return recordZoneQaCommand(this.pool, input, actor);
   }
   registerDocument(input: RegisterDocumentInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
     return transaction(this.pool, async client => {
