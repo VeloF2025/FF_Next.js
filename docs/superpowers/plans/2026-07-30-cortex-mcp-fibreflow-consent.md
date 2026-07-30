@@ -78,10 +78,11 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 
 | Action | File | Responsibility |
 |---|---|---|
-| Create | `apps/cortex_mcp/cortex_mcp_oauth.py` | Existing OAuth models/provider plus pending-state peek, FibreFlow redirect, callback validation, safe redirect construction |
+| Create | `apps/cortex_mcp/cortex_mcp_oauth.py` | Existing OAuth models/provider plus pending-state peek and FibreFlow redirect |
+| Create | `apps/cortex_mcp/cortex_mcp_callback.py` | Callback authentication, Bridge bearer validation and safe redirect construction |
 | Create | `tests/test_cortex_mcp_oauth.py` | Provider compatibility, redirect, callback, replay, startup, and token-redaction tests |
 | Modify | `apps/cortex_mcp/server.py` | Wire the extracted provider, register `/authorize/complete`, retain unlinked `/authorize/approve`, and enforce remote-only configuration |
-| Modify | `apps/cortex_mcp/pyproject.toml` | Package `cortex_mcp_oauth` beside the existing `server` module |
+| Modify | `apps/cortex_mcp/pyproject.toml` | Package the focused OAuth/callback modules beside `server` |
 | Modify | `tests/test_superadmin_bypass.py` | Prove Lew and an existing configured admin are full-scope while an ordinary user remains ACL-scoped |
 | Modify | `.env.example` | Document remote MCP bases/store and the blank dedicated callback secret |
 | Modify | `docs/cortex-mcp-connect.md` | Make the browser connector the normal workflow and retain local token configuration as an operator/stdio path |
@@ -374,8 +375,9 @@ git commit -m "refactor(mcp): isolate Cortex OAuth provider"
 ## Task 2: Add the authenticated Cortex callback and fail-closed remote startup
 
 **Files:**
-- Modify: `apps/cortex_mcp/cortex_mcp_oauth.py`
+- Create: `apps/cortex_mcp/cortex_mcp_callback.py`
 - Modify: `apps/cortex_mcp/server.py`
+- Modify: `apps/cortex_mcp/pyproject.toml`
 - Modify: `tests/test_cortex_mcp_oauth.py`
 
 **Interfaces:**
@@ -402,7 +404,7 @@ import sys
 
 from starlette.requests import Request
 
-from apps.cortex_mcp.cortex_mcp_oauth import complete_authorization
+from apps.cortex_mcp.cortex_mcp_callback import complete_authorization
 
 
 CALLBACK_SECRET = "test-cortex-callback-secret"
@@ -598,7 +600,8 @@ Expected: FAIL because `complete_authorization` and the remote startup guard do 
 
 - [ ] **Step 3: Implement callback authentication, validation, and safe redirect creation**
 
-Add these functions to `cortex_mcp_oauth.py`:
+Add these functions to the focused `cortex_mcp_callback.py` module so both
+production modules remain below 300 lines:
 
 ```python
 def secrets_match(provided: str, expected: str) -> bool:
@@ -699,6 +702,12 @@ async def complete_authorization(
 ```
 
 Do not log `payload`, `token`, the callback secret, request headers, or Bridge response bodies.
+Update `apps/cortex_mcp/pyproject.toml` to:
+
+```toml
+[tool.setuptools]
+py-modules = ["server", "cortex_mcp_oauth", "cortex_mcp_callback"]
+```
 
 - [ ] **Step 4: Wire the route and remote-only startup guard**
 
@@ -756,8 +765,8 @@ Expected: all Pytest and Ruff commands PASS; ty has no error-level diagnostic.
 Run:
 
 ```bash
-git add apps/cortex_mcp/cortex_mcp_oauth.py apps/cortex_mcp/server.py \
-  tests/test_cortex_mcp_oauth.py
+git add apps/cortex_mcp/cortex_mcp_callback.py apps/cortex_mcp/server.py \
+  apps/cortex_mcp/pyproject.toml tests/test_cortex_mcp_oauth.py
 git commit -m "feat(mcp): complete OAuth through FibreFlow consent"
 ```
 
