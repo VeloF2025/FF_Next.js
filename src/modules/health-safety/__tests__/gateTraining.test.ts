@@ -119,4 +119,31 @@ describe('checkContractorGate — training-driven verdict', () => {
     expect(result.can_assign).toBe(true);
     expect(result.blockers.some((b) => /training/i.test(b))).toBe(false);
   });
+
+  /**
+   * Migration 471: the rollup counts verified rows only. These two cases pin
+   * what that means at the gate — the exclusion itself is enforced in SQL and
+   * asserted in trainingService.test.ts.
+   */
+  it('unverified submissions do not raise the score', async () => {
+    primeSql();
+    // Ten pending uploads. The rollup excludes them in the WHERE, so the
+    // contractor reads as "no data" rather than as 100% compliant.
+    trainingMock.mockResolvedValueOnce(score({ total_certs: 0, current_certs: 0, training_score: null }));
+
+    const result = await checkContractorGate('c1');
+    expect(result.breakdown.training_score).toBeNull();
+    expect(result.can_assign).toBe(true);
+  });
+
+  it('revoking the only verified certificate takes the score back down', async () => {
+    primeSql();
+    // Was 2 of 2 verified; one is revoked, so only one row remains countable
+    // and the other does not become an expired failure — it is simply gone.
+    trainingMock.mockResolvedValueOnce(score({ total_certs: 1, current_certs: 0, expired_certs: 1, expired_statutory_certs: 1, training_score: 0 }));
+
+    const result = await checkContractorGate('c1');
+    expect(result.can_assign).toBe(false);
+    expect(result.breakdown.training_passed).toBe(false);
+  });
 });

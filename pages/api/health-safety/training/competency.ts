@@ -69,6 +69,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SELECT w.completed_date, w.expiry_date
         FROM hs_worker_training w
         WHERE w.project_id = ${project_id}::uuid
+          -- Only verified evidence resolves a cell. A worker whose record is
+          -- still pending reads as 'missing', which is the safe answer: nobody
+          -- has confirmed the certificate yet.
+          AND w.verification_status = 'verified'
           AND w.training_type_id = st.id
           AND w.staff_id IS NOT DISTINCT FROM pw.staff_id
           AND w.team_member_id IS NOT DISTINCT FROM pw.team_member_id

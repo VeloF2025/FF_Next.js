@@ -609,11 +609,11 @@ export async function deleteTrainingCertificateSubmission(
 ): Promise<{ staffId: string; fileName: string }>;
 ```
 
-- [ ] **Step 1: Write failing lifecycle tests**
+- [x] **Step 1: Write failing lifecycle tests**
 
 Test pending to verified, pending to rejected with mandatory reason, verified to revoked with mandatory reason, same-terminal-state idempotency, conflicting terminal transition `409`, missing linked rows failure, and immutable delete for verified/revoked submissions.
 
-- [ ] **Step 2: Run the lifecycle test and verify red**
+- [x] **Step 2: Run the lifecycle test and verify red**
 
 Run:
 
@@ -623,7 +623,7 @@ npx vitest run src/modules/health-safety/__tests__/trainingCertificateLifecycleA
 
 Expected: FAIL because lifecycle services are absent.
 
-- [ ] **Step 3: Implement locked transactional transitions**
+- [x] **Step 3: Implement locked transactional transitions**
 
 Use `SELECT ... FOR UPDATE` on the document and linked training rows. Accept only:
 
@@ -634,19 +634,19 @@ Use `SELECT ... FOR UPDATE` on the document and linked training rows. Accept onl
 
 Set the actor/timestamp/reason fields on every linked row and matching staff-document status in the same transaction. Use `actor.userId` for the new `hs_worker_training.*_by` columns, which reference `users(id)`, and `actor.staffId` for the existing `staff_documents.verified_by`, which references `staff(id)`. A user with no linked staff row leaves the staff-document actor nullable while the training rows and audit retain the authenticated user id. Reject a pending certification with zero linked records.
 
-- [ ] **Step 4: Delegate certification verification from the existing route**
+- [x] **Step 4: Delegate certification verification from the existing route**
 
 Keep non-certification OCR behavior intact. For `document_type = 'certification'`, skip OCR-to-staff synchronization, resolve the authenticated user's linked staff id once, and call `transitionTrainingCertificate` through `transaction()`. Return `409` for conflicts and a storage-safe result.
 
-- [ ] **Step 5: Implement lifecycle-aware deletion**
+- [x] **Step 5: Implement lifecycle-aware deletion**
 
 For certification documents, dedicated delete permission is required. Inside one transaction lock the document, reject verified/revoked state, delete linked pending/rejected training rows, then delete the document row. After commit delete the VF object; if the storage delete fails, record an operational cleanup error while retaining the database audit trail.
 
-- [ ] **Step 6: Add revocation audit support and contractor recomputation**
+- [x] **Step 6: Add revocation audit support and contractor recomputation**
 
 Add `document_revoked` and `logDocumentRevoked`. Emit staff and H&S audit activity only after commit. Recompute each distinct non-null contractor id after a verified or revoked transition; internal-only version one normally returns none.
 
-- [ ] **Step 7: Run lifecycle and authorization regression tests**
+- [x] **Step 7: Run lifecycle and authorization regression tests**
 
 Run:
 
@@ -659,7 +659,7 @@ npm run type-check
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit the lifecycle unit**
+- [x] **Step 8: Commit the lifecycle unit**
 
 ```bash
 git add src/modules/health-safety/services/trainingCertificateService.ts \

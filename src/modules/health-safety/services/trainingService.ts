@@ -28,6 +28,13 @@ const sql = neon(process.env.DATABASE_URL!);
 /**
  * Roll up a contractor's worker training into a single score.
  *
+ * Only `verified` rows are considered (migration 471). A pending submission has
+ * been uploaded but nobody has checked it, a rejected one was refused, and a
+ * revoked one was withdrawn — none of them is evidence, so none may raise a
+ * gate score. They are excluded in the WHERE rather than counted and subtracted,
+ * so an unverified population reads as "no data" (score null, does not block)
+ * rather than as a 0% failure.
+ *
  * score = current_certs / total_certs * 100, rounded. Here "current" is the
  * gate's broad sense — any cert not yet expired, which INCLUDES the
  * expiring-soon bucket (that is a warning, not a failure). This is deliberately
@@ -59,6 +66,7 @@ export async function computeContractorTrainingScore(
     FROM hs_worker_training wt
     JOIN hs_training_types tt ON tt.id = wt.training_type_id
     WHERE wt.contractor_id = ${contractorId}
+      AND wt.verification_status = 'verified'
   `;
 
   const total = Number(row?.total_certs ?? 0);

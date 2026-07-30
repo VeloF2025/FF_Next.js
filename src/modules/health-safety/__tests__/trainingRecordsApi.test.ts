@@ -97,3 +97,89 @@ describe('POST /api/health-safety/training/records contractor binding', () => {
     expect(trainingScoreMock).toHaveBeenCalledWith(CONTRACTOR_ID);
   });
 });
+
+describe('manual records are only for competencies that need no certificate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    trainingScoreMock.mockResolvedValue({});
+  });
+
+  const STAFF_ID = 'cccccccc-dddd-4eee-8fff-000000000000';
+
+  function manualBody(extra: Record<string, unknown> = {}) {
+    return {
+      training_type_id: TRAINING_TYPE_ID,
+      staff_id: STAFF_ID,
+      worker_name: 'Internal Worker',
+      completed_date: '2026-07-29',
+      ...extra,
+    };
+  }
+
+  it('refuses a certificate-required type and points at the upload flow', async () => {
+    sqlMock.mockResolvedValueOnce([
+      { id: TRAINING_TYPE_ID, name: 'Working at Heights', validity_months: 24, requires_certificate: true },
+    ]);
+
+    const res = await post(manualBody());
+
+    expect(res._getStatusCode()).toBe(400);
+    // The user needs to be told where to go, not just that they cannot do this.
+    expect(JSON.stringify(res._getData())).toContain('/health-safety/training/certificates/new');
+    expect(sqlMock.mock.calls.some((c) => String(c[0]).includes('INSERT INTO hs_worker_training'))).toBe(
+      false
+    );
+  });
+
+  it('accepts a no-certificate type as verified legacy evidence', async () => {
+    sqlMock.mockResolvedValueOnce([
+      { id: TRAINING_TYPE_ID, name: 'OHS Site Induction', validity_months: 12, requires_certificate: false },
+    ]);
+    sqlMock.mockResolvedValueOnce([{ id: 'rec-1', expiry_date: '2027-07-29' }]);
+
+    const res = await post(manualBody());
+
+    expect(res._getStatusCode()).toBe(201);
+    const insert = sqlMock.mock.calls.find((c) => String(c[0]).includes('INSERT INTO hs_worker_training'));
+    expect(insert).toBeDefined();
+    // Nobody verifies an induction register entry, so it is not left pending
+    // where it would silently count for nothing.
+    expect(String(insert?.[0])).toMatch(/'verified'/);
+  });
+
+  it('never writes a caller-supplied certificate_url', async () => {
+    sqlMock.mockResolvedValueOnce([
+      { id: TRAINING_TYPE_ID, name: 'OHS Site Induction', validity_months: 12, requires_certificate: false },
+    ]);
+    sqlMock.mockResolvedValueOnce([{ id: 'rec-1' }]);
+
+    await post(manualBody({ certificate_url: 'https://evil.example/free-text' }));
+
+    const insert = sqlMock.mock.calls.find((c) => String(c[0]).includes('INSERT INTO hs_worker_training'));
+    expect(String(insert?.[0])).not.toContain('certificate_url');
+    expect(insert?.slice(1)).not.toContain('https://evil.example/free-text');
+  });
+
+  it('the list response carries no storage location', async () => {
+    sqlMock.mockResolvedValueOnce([
+      {
+        id: 'rec-1',
+        worker_name: 'Internal Worker',
+        verification_status: 'verified',
+        competency_status: 'current',
+        hasCertificate: true,
+      },
+    ]);
+
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({ method: 'GET', query: {} });
+    await handler(req, res);
+
+    const select = String(sqlMock.mock.calls[0]?.[0]);
+    expect(select).not.toContain('wt.*');
+    expect(select).not.toContain('certificate_url');
+    expect(select).not.toContain('file_url');
+    expect(select).not.toContain('file_path');
+    // The reader still needs to know whether a file exists, just not where.
+    expect(select).toMatch(/staff_document_id IS NOT NULL/);
+  });
+});
