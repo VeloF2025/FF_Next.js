@@ -9,12 +9,14 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import pool from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { querySnagsByReport, querySnagsByProject, querySnagsByProjectAndZone } from './snags-query';
 import { updateTicket } from '@/modules/noc/services/ticketService';
 import { TicketStatus } from '@/modules/noc/types/ticket';
+import { createZoneDeliveryService } from '@/modules/construction-qa/zone-delivery/services/zoneDeliveryService';
 import type {
   Snag,
   SnagStatus,
@@ -37,6 +39,7 @@ function mapSnagStatusToTicketStatus(snagStatus: SnagStatus): TicketStatus | und
 }
 
 const sql = neon(process.env.DATABASE_URL!);
+const zoneDeliveryService = createZoneDeliveryService(pool);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -339,6 +342,25 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
           syncErr,
         });
       }
+    }
+  }
+
+  if (body.status && body.status !== existing[0]!.status) {
+    const user = (req as AuthenticatedNextApiRequest).user;
+    try {
+      await zoneDeliveryService.recalculateForSnag(body.id, {
+        userId: user.id,
+        email: user.email,
+        permission: 'construction-qa.snags.manage',
+      });
+    } catch (recalculationError) {
+      log.error('Zone delivery snag recalculation failed', {
+        snagId: body.id,
+        userId: user.id,
+        error: recalculationError instanceof Error
+          ? recalculationError.message
+          : String(recalculationError),
+      });
     }
   }
 

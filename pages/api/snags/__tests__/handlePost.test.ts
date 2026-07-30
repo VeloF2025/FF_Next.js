@@ -1,12 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const { mockSql } = vi.hoisted(() => ({ mockSql: vi.fn() }));
+const { mockSql, recalculateForSnag } = vi.hoisted(() => ({
+  mockSql: vi.fn(),
+  recalculateForSnag: vi.fn(),
+}));
 
 vi.mock('@neondatabase/serverless', () => ({ neon: () => mockSql }));
+vi.mock('@/lib/db', () => ({ default: {} }));
 vi.mock('@/lib/auth', () => ({ withAuth: (h: unknown) => h, withPermission: () => (h: unknown) => h }));
 vi.mock('@/lib/logger', () => ({ log: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() } }));
 vi.mock('@/modules/noc/services/ticketService', () => ({ updateTicket: vi.fn() }));
+vi.mock('@/modules/construction-qa/zone-delivery/services/zoneDeliveryService', () => ({
+  createZoneDeliveryService: () => ({ recalculateForSnag }),
+}));
 
 import handler from '../index';
 
@@ -91,5 +98,45 @@ describe('POST /api/snags', () => {
     const res = makeRes();
     await handler(req, res);
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('PATCH /api/snags zone delivery recalculation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('best-effort recalculates linked zones after a status change with authenticated actor', async () => {
+    mockSql
+      .mockResolvedValueOnce([{ id: 'snag-uuid', status: 'open' }])
+      .mockResolvedValueOnce([{ id: 'snag-uuid', status: 'closed', noc_ticket_id: null }]);
+    const req = {
+      method: 'PATCH',
+      body: { id: 'snag-uuid', status: 'closed' },
+      user: { id: 'user-uuid', email: 'qa@example.com' },
+    } as unknown as NextApiRequest;
+    const res = makeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(recalculateForSnag).toHaveBeenCalledWith('snag-uuid', {
+      userId: 'user-uuid',
+      email: 'qa@example.com',
+      permission: 'construction-qa.snags.manage',
+    });
+  });
+
+  it('preserves PATCH success when linked-zone recalculation fails', async () => {
+    mockSql
+      .mockResolvedValueOnce([{ id: 'snag-uuid', status: 'open' }])
+      .mockResolvedValueOnce([{ id: 'snag-uuid', status: 'closed', noc_ticket_id: null }]);
+    recalculateForSnag.mockRejectedValueOnce(new Error('recalculation unavailable'));
+    const req = {
+      method: 'PATCH',
+      body: { id: 'snag-uuid', status: 'closed' },
+      user: { id: 'user-uuid', email: 'qa@example.com' },
+    } as unknown as NextApiRequest;
+    const res = makeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
   });
 });
