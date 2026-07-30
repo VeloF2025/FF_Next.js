@@ -27,9 +27,9 @@ const { Pool } = pg;
 const DB_URL = process.env.DATABASE_URL;
 if (!DB_URL) throw new Error('DATABASE_URL not set');
 
-// 1Map site codes swept into onemap_properties (flat, property-keyed). LAW/MAM/MOA/ETW
-// map 1:1 to a project (so they also drive pon_stage_tracking); TEM is shared by
-// Thembisa POP1 + POP3, so it is property-only here (no unique project to attribute).
+// 1Map site codes swept into onemap_properties (flat, property-keyed). TEM is shared
+// by Thembisa POP1 + POP3, so it is property-only here (no unique project to
+// attribute).
 //
 // These are free-text `q=` searches, NOT a site filter — a code only reaches its
 // properties while 1Map's own site string still starts with it. Mohadin was `MOH`
@@ -37,6 +37,21 @@ if (!DB_URL) throw new Error('DATABASE_URL not set');
 // matching and the sweep silently fell 24,411 -> 1,613 records (all of them
 // incidental matches from unrelated sites), stranding 15,162 drops without a
 // contact number for three days. Hence the site histogram logged per sweep below.
+//
+// A code here only drives pon_stage_tracking when some project carries it in
+// `metadata.onemap_prefix` (see discoverProjects); otherwise the sweep refreshes
+// onemap_properties and skips stage tracking. So renaming a code here without
+// repointing that column does not corrupt anything — it stops stage tracking for
+// that project until the column follows. Mohadin's is already `MOA`.
+//
+// `MOH` is deliberately gone rather than kept alongside `MOA`: it now returns only
+// ~1,613 records from sites that were never in this list (NYA, KAT, IVO, SOS, …),
+// which were being mirrored purely as a side effect of the stale query. They go
+// stale rather than disappear.
+//
+// Two other maps key off the same 1Map query and must be kept in step:
+// SITE_PROJECT_MAP in src/services/onemap/oneMapClient.ts and in
+// scripts/onemap-sync/fetch-gps-from-1map.ts.
 const ALL_SITE_CODES = ['LAW', 'MAM', 'MOA', 'TEM', 'ETW'];
 
 // onemap_properties is keyed by (import_id, property_id). Recurring syncs reuse ONE
