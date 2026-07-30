@@ -26,11 +26,13 @@ const BASE_URL = 'https://www.1map.co.za';
 
 const sql = neon(DATABASE_URL);
 
-// Site to project mapping
+// Site to project mapping. The KEY is sent to 1Map as the free-text `q=` term, so
+// it only reaches a project's properties while 1Map's own `site` string still
+// starts with it — Mohadin was re-coded `MOH` -> `MOA` on 2026-07-27.
 const SITE_PROJECT_MAP: Record<string, { projectId: string; projectName: string }> = {
   'LAW': { projectId: '4eb13426-b2a1-472d-9b3c-277082ae9b55', projectName: 'Lawley' },
   'MAM': { projectId: '7003dc06-9af7-4a7c-bc6c-a177d77784f2', projectName: 'Mamelodi' },
-  'MOH': { projectId: 'bf9a90db-e758-4c05-b999-694cd63c451f', projectName: 'Mohadin' },
+  'MOA': { projectId: 'bf9a90db-e758-4c05-b999-694cd63c451f', projectName: 'Mohadin' },
 };
 
 interface OneMapRecord {
