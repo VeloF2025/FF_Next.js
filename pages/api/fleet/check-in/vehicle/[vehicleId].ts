@@ -16,10 +16,14 @@ import {
   getLatestFuelLevel,
 } from '@/modules/fleet/services/checkInService';
 import type { CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
-import { withFleetAuth } from '@/lib/auth/middleware';
+import {
+  withFleetAuth,
+  type FleetAuthenticatedRequest,
+} from '@/lib/auth/middleware';
+import { canAccessPortalVehicle } from '@/modules/fleet/portal/authorization';
 import { log } from '@/lib/logger';
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: FleetAuthenticatedRequest, res: NextApiResponse) {
   const { vehicleId, availability, stats, lastReading, limit, offset, status } = req.query;
 
   if (!vehicleId || typeof vehicleId !== 'string') {
@@ -28,6 +32,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
+  }
+
+  if (!canAccessPortalVehicle(req, vehicleId)) {
+    return apiResponse.error(
+      res,
+      ErrorCode.FORBIDDEN,
+      'Vehicle does not match the authenticated portal session'
+    );
   }
 
   try {

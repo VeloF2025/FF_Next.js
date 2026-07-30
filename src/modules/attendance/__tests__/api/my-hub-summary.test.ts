@@ -94,6 +94,7 @@ describe('GET /api/my/hub-summary check reminders', () => {
           id: 'assignment-1',
           vehicleId: 'vehicle-1',
           registration: 'ABC 123 GP',
+          checkStatusAvailable: true,
           requiredCheckType: 'weekly',
         },
       },
@@ -120,5 +121,31 @@ describe('GET /api/my/hub-summary check reminders', () => {
       data: { assignedVehicle: null },
     });
     expect(mocks.sql).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks vehicle check status unavailable when the schedule lookup fails', async () => {
+    mocks.sql.mockReset();
+    mocks.sql
+      .mockResolvedValueOnce([{ count: '3' }])
+      .mockRejectedValueOnce(new Error('schedule unavailable'));
+
+    const { res, captured } = makeRes();
+    await handler(
+      { method: 'GET', query: {}, headers: {} } as NextApiRequest,
+      res
+    );
+
+    expect(captured.status).toBe(200);
+    expect(captured.body).toMatchObject({
+      success: true,
+      data: {
+        assignedVehicle: {
+          id: 'assignment-1',
+          registration: 'ABC 123 GP',
+          checkStatusAvailable: false,
+          requiredCheckType: null,
+        },
+      },
+    });
   });
 });

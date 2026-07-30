@@ -124,6 +124,7 @@ export default defineConfig({
       { find: '@/lib/smtpConfig', replacement: path.resolve(__dirname, './src/lib/smtpConfig') },
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
       { find: '@/lib/neon', replacement: path.resolve(__dirname, './src/lib/neon') },
+      { find: '@/lib/neon-sql', replacement: path.resolve(__dirname, './src/lib/neon-sql') },
       { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
       // @/lib/db-logger lives at root ./lib/ — without this explicit entry the
       // /^@\/lib\/db/ regex below rewrites it to src/lib/db-logger (missing),
@@ -146,6 +147,7 @@ export default defineConfig({
       { find: '@/lib/email', replacement: path.resolve(__dirname, './src/lib/email') },
       { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
       { find: '@/lib/geo', replacement: path.resolve(__dirname, './src/lib/geo') },
+      { find: '@/lib/security', replacement: path.resolve(__dirname, './src/lib/security') },
       { find: '@/lib/apiResponse', replacement: path.resolve(__dirname, './src/lib/apiResponse') },
       { find: '@/lib/handleApiResponse', replacement: path.resolve(__dirname, './src/lib/handleApiResponse') },
       { find: '@/lib/authErrorHandler', replacement: path.resolve(__dirname, './src/lib/authErrorHandler') },

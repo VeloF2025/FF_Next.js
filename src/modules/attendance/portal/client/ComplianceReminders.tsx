@@ -1,25 +1,30 @@
 import { Car, ShieldCheck } from 'lucide-react';
 
 export type VehicleCheckDue = 'daily' | 'weekly';
+export type CheckNoticeStatus = 'due' | 'unavailable' | null;
+export type VehicleCheckNoticeStatus = VehicleCheckDue | 'unavailable' | null;
 
 interface ComplianceRemindersProps {
-  hsDue: boolean;
-  vehicleCheckDue: VehicleCheckDue | null;
+  hsStatus: CheckNoticeStatus;
+  vehicleCheckStatus: VehicleCheckNoticeStatus;
   vehicleRegistration: string | null;
   vehiclePending: boolean;
   onHsCheckin: () => void;
-  onVehicleCheck: (checkType: VehicleCheckDue) => void;
+  onVehicleCheck: (checkType?: VehicleCheckDue) => void;
 }
 
 export function ComplianceReminders({
-  hsDue,
-  vehicleCheckDue,
+  hsStatus,
+  vehicleCheckStatus,
   vehicleRegistration,
   vehiclePending,
   onHsCheckin,
   onVehicleCheck,
 }: ComplianceRemindersProps) {
-  if (!hsDue && !vehicleCheckDue) return null;
+  if (!hsStatus && !vehicleCheckStatus) return null;
+
+  const vehicleUnavailable = vehicleCheckStatus === 'unavailable';
+  const vehicleCheckDue = vehicleUnavailable ? null : vehicleCheckStatus;
 
   return (
     <section
@@ -34,7 +39,7 @@ export function ComplianceReminders({
       </p>
 
       <div className="mt-3 space-y-2">
-        {hsDue && (
+        {hsStatus && (
           <button
             type="button"
             onClick={onHsCheckin}
@@ -43,34 +48,50 @@ export function ComplianceReminders({
             <ShieldCheck className="h-5 w-5 shrink-0 text-orange-300" />
             <span className="flex-1">
               <span className="block text-sm font-medium text-neutral-100">
-                Daily H&amp;S check-in
+                {hsStatus === 'unavailable'
+                  ? 'H&S check status unavailable'
+                  : 'Daily H&S check-in'}
               </span>
               <span className="block text-xs text-neutral-400">
-                Confirm fitness, PPE and today&apos;s work activities.
+                {hsStatus === 'unavailable'
+                  ? 'Open the check-in to verify today’s status.'
+                  : 'Confirm fitness, PPE and today’s work activities.'}
               </span>
             </span>
-            <span className="text-xs font-semibold text-orange-300">Complete now</span>
+            <span className="text-xs font-semibold text-orange-300">
+              {hsStatus === 'unavailable' ? 'Open checks' : 'Complete now'}
+            </span>
           </button>
         )}
 
-        {vehicleCheckDue && (
+        {vehicleCheckStatus && (
           <button
             type="button"
             disabled={vehiclePending}
-            onClick={() => onVehicleCheck(vehicleCheckDue)}
+            onClick={() => onVehicleCheck(vehicleCheckDue ?? undefined)}
             className="flex w-full items-center gap-3 rounded-lg border border-orange-700/50 bg-neutral-950/50 px-3 py-3 text-left hover:bg-neutral-900 disabled:cursor-wait disabled:opacity-60"
           >
             <Car className="h-5 w-5 shrink-0 text-orange-300" />
             <span className="flex-1">
               <span className="block text-sm font-medium text-neutral-100">
-                {vehicleCheckDue === 'weekly' ? 'Weekly vehicle inspection' : 'Daily vehicle check'}
+                {vehicleUnavailable
+                  ? 'Vehicle check status unavailable'
+                  : vehicleCheckDue === 'weekly'
+                    ? 'Weekly vehicle inspection'
+                    : 'Daily vehicle check'}
               </span>
               <span className="block text-xs text-neutral-400">
-                {vehicleRegistration ?? 'Assigned vehicle'} pre-trip check is due.
+                {vehicleUnavailable
+                  ? `Open ${vehicleRegistration ?? 'your assigned vehicle'} to verify today’s status.`
+                  : `${vehicleRegistration ?? 'Assigned vehicle'} pre-trip check is due.`}
               </span>
             </span>
             <span className="text-xs font-semibold text-orange-300">
-              {vehiclePending ? 'Opening…' : 'Complete now'}
+              {vehiclePending
+                ? 'Opening…'
+                : vehicleUnavailable
+                  ? 'Open checks'
+                  : 'Complete now'}
             </span>
           </button>
         )}

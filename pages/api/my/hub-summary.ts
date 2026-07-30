@@ -32,6 +32,7 @@ export interface HubSummary {
     id: string;
     vehicleId: string | null;
     registration: string | null;
+    checkStatusAvailable: boolean;
     requiredCheckType: 'daily' | 'weekly' | null;
   } | null;
   latestPayslip: {
@@ -55,10 +56,15 @@ interface VehicleCheckReminderRow extends Record<string, unknown> {
   required_check_type: 'daily' | 'weekly' | null;
 }
 
+interface VehicleCheckReminderResult {
+  available: boolean;
+  reminder: VehicleCheckReminderRow | null;
+}
+
 async function findVehicleCheckReminder(
   registration: string | null
-): Promise<VehicleCheckReminderRow | null> {
-  if (!registration) return null;
+): Promise<VehicleCheckReminderResult> {
+  if (!registration) return { available: true, reminder: null };
 
   try {
     const rows = await sql<VehicleCheckReminderRow>`
@@ -88,13 +94,13 @@ async function findVehicleCheckReminder(
         AND v.status = 'active'
       LIMIT 1
     `;
-    return rows[0] ?? null;
+    return { available: true, reminder: rows[0] ?? null };
   } catch (error) {
     log.warn('[my/hub-summary] vehicle check reminder unavailable', {
       error,
       registration,
     });
-    return null;
+    return { available: false, reminder: null };
   }
 }
 
@@ -134,9 +140,11 @@ export default withMySession(async (req, res, session) => {
       assignedVehicle: vehicle
         ? {
             id: vehicle.id,
-            vehicleId: vehicleReminder?.vehicle_id ?? null,
+            vehicleId: vehicleReminder.reminder?.vehicle_id ?? null,
             registration: vehicle.vehicle_registration,
-            requiredCheckType: vehicleReminder?.required_check_type ?? null,
+            checkStatusAvailable: vehicleReminder.available,
+            requiredCheckType:
+              vehicleReminder.reminder?.required_check_type ?? null,
           }
         : null,
       latestPayslip,

@@ -7,8 +7,8 @@ describe('ComplianceReminders', () => {
   it('stays hidden when all checks are complete', () => {
     const { container } = render(
       <ComplianceReminders
-        hsDue={false}
-        vehicleCheckDue={null}
+        hsStatus={null}
+        vehicleCheckStatus={null}
         vehicleRegistration={null}
         vehiclePending={false}
         onHsCheckin={() => {}}
@@ -25,8 +25,8 @@ describe('ComplianceReminders', () => {
 
     render(
       <ComplianceReminders
-        hsDue
-        vehicleCheckDue="weekly"
+        hsStatus="due"
+        vehicleCheckStatus="weekly"
         vehicleRegistration="ABC 123 GP"
         vehiclePending={false}
         onHsCheckin={onHsCheckin}
@@ -49,8 +49,8 @@ describe('ComplianceReminders', () => {
   it('labels a daily vehicle check and disables it while the handoff opens', () => {
     render(
       <ComplianceReminders
-        hsDue={false}
-        vehicleCheckDue="daily"
+        hsStatus={null}
+        vehicleCheckStatus="daily"
         vehicleRegistration="XYZ 789 GP"
         vehiclePending
         onHsCheckin={() => {}}
@@ -61,5 +61,22 @@ describe('ComplianceReminders', () => {
     const vehicleAction = screen.getByRole('button', { name: /daily vehicle check/i });
     expect(vehicleAction).toBeDisabled();
     expect(screen.getByText('Opening…')).toBeInTheDocument();
+  });
+
+  it('surfaces unavailable status instead of treating unknown checks as complete', () => {
+    render(
+      <ComplianceReminders
+        hsStatus="unavailable"
+        vehicleCheckStatus="unavailable"
+        vehicleRegistration="XYZ 789 GP"
+        vehiclePending={false}
+        onHsCheckin={() => {}}
+        onVehicleCheck={() => {}}
+      />
+    );
+
+    expect(screen.getByText('H&S check status unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Vehicle check status unavailable')).toBeInTheDocument();
+    expect(screen.getAllByText('Open checks')).toHaveLength(2);
   });
 });

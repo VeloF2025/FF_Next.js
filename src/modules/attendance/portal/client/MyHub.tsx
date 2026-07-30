@@ -94,20 +94,25 @@ export function MyHub({ profile }: MyHubProps) {
   const [hsCheckin, setHsCheckin] = React.useState<
     { completed: boolean; clearance: string | null } | null
   >(null);
+  const [hsCheckinUnavailable, setHsCheckinUnavailable] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
     fetch('/api/my/hs/checkin', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error('H&S check status unavailable');
+        return r.json();
+      })
       .then((j) => {
-        if (cancelled || !j?.data) return;
+        if (cancelled) return;
+        if (!j?.data) throw new Error('H&S check status unavailable');
         setHsCheckin({
           completed: Boolean(j.data.completed),
           clearance: j.data.checkin?.clearance ?? null,
         });
       })
       .catch(() => {
-        /* tile stays in its loading state; the hub itself must still render */
+        if (!cancelled) setHsCheckinUnavailable(true);
       });
     return () => {
       cancelled = true;
@@ -189,8 +194,20 @@ export function MyHub({ profile }: MyHubProps) {
       )}
 
       <ComplianceReminders
-        hsDue={hsCheckin?.completed === false}
-        vehicleCheckDue={summary?.assignedVehicle?.requiredCheckType ?? null}
+        hsStatus={
+          hsCheckinUnavailable
+            ? 'unavailable'
+            : hsCheckin?.completed === false
+              ? 'due'
+              : null
+        }
+        vehicleCheckStatus={
+          summary?.assignedVehicle
+            ? summary.assignedVehicle.checkStatusAvailable
+              ? summary.assignedVehicle.requiredCheckType
+              : 'unavailable'
+            : null
+        }
         vehicleRegistration={summary?.assignedVehicle?.registration ?? null}
         vehiclePending={vehicleHandoffPending}
         onHsCheckin={() => router.push('/my/hs-checkin')}

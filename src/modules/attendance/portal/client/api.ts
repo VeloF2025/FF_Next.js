@@ -180,6 +180,7 @@ export interface HubSummaryResponse {
     id: string;
     vehicleId: string | null;
     registration: string | null;
+    checkStatusAvailable: boolean;
     requiredCheckType: 'daily' | 'weekly' | null;
   } | null;
   latestPayslip: {
