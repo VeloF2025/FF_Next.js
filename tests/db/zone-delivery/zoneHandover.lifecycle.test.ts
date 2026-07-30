@@ -87,10 +87,12 @@ describe('zone QA and automatic handover lifecycle', () => {
     }, actor('documents-manage'));
   }
   async function recordQa(view: ZoneDeliveryView, discipline: 'civil' | 'optical',
-    status: 'in_progress' | 'passed' | 'failed', snagIds: string[] = []): Promise<ZoneDeliveryView> {
+    status: 'in_progress' | 'passed' | 'failed', snagIds: string[] = [],
+    reason?: string): Promise<ZoneDeliveryView> {
     return service.recordZoneQa({
       ...key, discipline, status, notes: `${discipline} ${status}`, snagIds,
       expectedRowVersion: view.rowVersion, effectiveAt: now(), source: 'handover-test',
+      ...(reason ? { reason } : {}),
     }, actor('zone-qa-approve'));
   }
   it('keeps civil and optical QA independent and links failed-QA snags', async () => {
@@ -107,6 +109,10 @@ describe('zone QA and automatic handover lifecycle', () => {
     view = await recordQa(view, 'optical', 'passed');
     expect(view.civilQa.status).toBe('failed');
     expect(view.opticalQa.status).toBe('passed');
+    await expect(recordQa(view, 'civil', 'passed'))
+      .rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    view = await recordQa(view, 'civil', 'passed', [], 'Civil repairs verified');
+    expect(view.civilQa.status).toBe('passed');
     const { rows } = await pool.query<{ handover_blocking: boolean }>(`
       SELECT handover_blocking FROM zone_delivery_snag_links WHERE snag_id = $1
     `, [SNAG_ID]);
@@ -142,7 +148,7 @@ describe('zone QA and automatic handover lifecycle', () => {
       effectiveAt: now(), source: 'handover-test', reason: 'Superseded after testing',
     }, actor('documents-manage'));
     view = await recordQa(view, 'civil', 'failed', [SNAG_ID]);
-    view = await recordQa(view, 'civil', 'passed');
+    view = await recordQa(view, 'civil', 'passed', [], 'Civil snag corrected');
     view = await recordQa(view, 'optical', 'passed');
     view = await registerZoneDocument(view, 'fac', '2'.repeat(64));
     view = await registerZoneDocument(view, 'cac', '3'.repeat(64));
@@ -197,7 +203,7 @@ describe('zone QA and automatic handover lifecycle', () => {
   it('does not hand over while a linked canonical snag is concurrently reopened', async () => {
     let view = await setupLivePon();
     view = await recordQa(view, 'civil', 'failed', [SNAG_ID]);
-    view = await recordQa(view, 'civil', 'passed');
+    view = await recordQa(view, 'civil', 'passed', [], 'Civil snag corrected');
     view = await recordQa(view, 'optical', 'passed');
     view = await registerZoneDocument(view, 'fac', '8'.repeat(64));
     await registerZoneDocument(view, 'cac', '9'.repeat(64));
@@ -215,7 +221,7 @@ describe('zone QA and automatic handover lifecycle', () => {
   it('accepts only non-blocking maintenance linkage after handover without reversing dates', async () => {
     let view = await setupLivePon();
     view = await recordQa(view, 'civil', 'failed', [SNAG_ID]);
-    view = await recordQa(view, 'civil', 'passed');
+    view = await recordQa(view, 'civil', 'passed', [], 'Civil snag corrected');
     view = await recordQa(view, 'optical', 'passed');
     view = await registerZoneDocument(view, 'fac', '4'.repeat(64));
     view = await registerZoneDocument(view, 'cac', '5'.repeat(64));

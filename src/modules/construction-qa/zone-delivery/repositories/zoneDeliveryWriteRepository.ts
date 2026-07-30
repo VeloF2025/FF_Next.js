@@ -175,6 +175,29 @@ export async function touchZone(
   `, [key.projectId, key.zoneNo, expected]);
   return rows[0] ?? null;
 }
+
+export async function invalidateZoneQa(
+  client: PoolClient,
+  key: ZoneKey,
+  expected: number,
+): Promise<ZoneStateRow | null> {
+  const { rows } = await client.query<ZoneStateRow>(`
+    UPDATE zone_delivery_state SET
+      eligible_for_zone_qa_at = NULL,
+      civil_qa_status = 'not_started', civil_qa_notes = '',
+      civil_qa_effective_at = NULL, civil_qa_approved_by = NULL,
+      optical_qa_status = 'not_started', optical_qa_notes = '',
+      optical_qa_effective_at = NULL, optical_qa_approved_by = NULL,
+      row_version = row_version + 1, updated_at = NOW()
+    WHERE project_id = $1 AND zone_no = $2 AND row_version = $3
+      AND (eligible_for_zone_qa_at IS NOT NULL
+        OR civil_qa_status <> 'not_started'
+        OR optical_qa_status <> 'not_started')
+    RETURNING *
+  `, [key.projectId, key.zoneNo, expected]);
+  return rows[0] ?? null;
+}
+
 export async function stampEligibility(client: PoolClient, key: ZoneKey): Promise<void> {
   await client.query(`
     UPDATE zone_delivery_state SET eligible_for_zone_qa_at = NOW(),

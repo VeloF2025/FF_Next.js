@@ -17,6 +17,7 @@ import { getZoneDeliveryRegister } from './zoneDeliveryRegister';
 import { transaction, withClient } from './zoneDeliveryTransactions';
 import { assertCanonicalZone } from './zoneDeliveryCanonical';
 import { validateMilestoneConfirmation } from './zoneDeliveryMilestoneActions';
+import { invalidateZoneEvidence } from './zoneDeliveryInvalidation';
 export interface ZoneDeliveryService {
   getRegister(filters: ZoneRegisterFilters): Promise<ZoneRegisterResult>; getZone(key: ZoneKey): Promise<ZoneDeliveryView>;
   updateScope(input: UpdateScopeInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
@@ -60,21 +61,30 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
       if ((zone?.row_version ?? 0) !== input.expectedRowVersion) versionConflict();
       const aggregate = await read.readZoneAggregate(client, input);
       const canonical = new Map(aggregate.pons.map(pon => [pon.pon_stage_id, pon]));
-      if (input.pons.some(pon => !canonical.has(pon.ponStageId)))
-        deliveryError('VALIDATION_ERROR', 'Every scoped PON must belong to the zone');
+      if (input.pons.length !== canonical.size
+        || input.pons.some(pon => !canonical.has(pon.ponStageId))) {
+        deliveryError('SCOPE_REQUIRED', 'Scope must contain every canonical zone PON exactly once');
+      }
       for (const pon of input.pons) {
         if (pon.scopeStatus !== 'included' && !hasReason(pon.reason))
           deliveryError('VALIDATION_ERROR', 'Excluded or cancelled PONs require a reason');
       }
-      const changing = Boolean(zone?.scope_approved_at) && input.pons.some(pon => {
+      const changes = input.pons.filter(pon => {
         const previous = canonical.get(pon.ponStageId)!;
-        return previous.scope_status !== pon.scopeStatus || (previous.scope_reason ?? '') !== (pon.reason?.trim() ?? '');
+        return previous.row_version === 0
+          || previous.scope_status !== pon.scopeStatus
+          || (previous.scope_reason ?? '') !== (pon.reason?.trim() ?? '');
+      });
+      const changing = Boolean(zone?.scope_approved_at) && changes.length > 0;
+      const materialChange = Boolean(zone?.scope_approved_at) && changes.some(pon => {
+        const previous = canonical.get(pon.ponStageId)!;
+        return previous.row_version === 0 || previous.scope_status !== pon.scopeStatus;
       });
       validateMeta(input, now, changing);
       if (zone?.scope_approved_at && !changing) return buildZoneView(aggregate);
       const savedZone = await write.writeScopeApproval(client, input, input.expectedRowVersion, input.effectiveAt, actor.userId);
       if (!savedZone) versionConflict();
-      for (const pon of input.pons) {
+      for (const pon of changes) {
         const previous = canonical.get(pon.ponStageId)!;
         await write.writePonScope(client, pon.ponStageId, pon.scopeStatus, pon.reason);
         await write.appendActivity(client, {
@@ -84,6 +94,28 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
           previousValue: previous.row_version === 0 ? null
             : { scopeStatus: previous.scope_status, scopeReason: previous.scope_reason },
           newValue: { scopeStatus: pon.scopeStatus, scopeReason: pon.reason?.trim() || null },
+        });
+      }
+      await write.appendActivity(client, {
+        ...audit(input, actor),
+        entityType: 'zone',
+        entityId: savedZone!.id,
+        action: zone?.scope_approved_at ? 'zone_scope_updated' : 'zone_scope_approved',
+        previousValue: zone?.scope_approved_at ? aggregate.pons.map(pon => ({
+          ponStageId: pon.pon_stage_id,
+          scopeStatus: pon.scope_status,
+          scopeReason: pon.scope_reason,
+        })) : null,
+        newValue: input.pons.map(pon => ({
+          ponStageId: pon.ponStageId,
+          scopeStatus: pon.scopeStatus,
+          scopeReason: pon.reason?.trim() || null,
+        })),
+      });
+      if (materialChange && zone) {
+        await invalidateZoneEvidence(client, input, actor, {
+          ...zone,
+          row_version: savedZone!.row_version,
         });
       }
       return recalculateZone(client, input, actor);
@@ -136,6 +168,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         const previousValue = milestoneState(state);
         const updated = await write.reopenMilestone(client, input.ponStageId, input.milestone, state.row_version);
         if (!updated) versionConflict();
+        if (zone) await invalidateZoneEvidence(client, input, actor, zone);
         await write.linkSnag(client, input, input.snagId, actor.userId, {
           ponStageId: input.ponStageId, affectedGate: input.affectedGate, blocking: true, reconfirmation: true,
         });
@@ -190,7 +223,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         deliveryError('PREREQUISITE_BLOCKED', 'Every included PON must be technically live');
       const previousStatus = input.discipline === 'civil'
         ? state.civil_qa_status : state.optical_qa_status;
-      validateMeta(input, now, previousStatus === input.status);
+      validateMeta(input, now, previousStatus !== 'not_started');
       if (input.status === 'failed' && input.snagIds.length === 0)
         deliveryError('VALIDATION_ERROR', 'Failed Zone QA requires existing snag IDs');
       for (const snagId of [...new Set(input.snagIds)]) {

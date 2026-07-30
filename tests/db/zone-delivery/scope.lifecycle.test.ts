@@ -77,22 +77,33 @@ describe('PON delivery scope lifecycle', () => {
       expectedRowVersion: approved.rowVersion,
       effectiveAt: now(),
       source: 'scope-register',
+      reason: 'Incomplete payload attempt',
       pons: [{ ponStageId: SECOND_PON_ID, scopeStatus: 'included' }],
-    }, actor('scope-manage'))).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    }, actor('scope-manage'))).rejects.toMatchObject({ code: 'SCOPE_REQUIRED' });
     const changed = await service.updateScope({
       ...key,
       expectedRowVersion: approved.rowVersion,
       effectiveAt: now(),
       source: 'scope-register',
       reason: 'Authorized scope correction',
-      pons: [{ ponStageId: SECOND_PON_ID, scopeStatus: 'included' }],
+      pons: [
+        { ponStageId: PON_ID, scopeStatus: 'included' },
+        { ponStageId: SECOND_PON_ID, scopeStatus: 'included' },
+        { ponStageId: THIRD_PON_ID, scopeStatus: 'cancelled', reason: 'Removed' },
+      ],
     }, actor('scope-manage'));
     expect(changed.pons.find(({ ponNo }) => ponNo === 2)?.scopeStatus).toBe('included');
-    expect((await service.getActivity(key)).at(-1)).toMatchObject({
+    expect((await service.getActivity(key)).find(activity =>
+      activity.action === 'scope_updated'
+      && activity.reason === 'Authorized scope correction'
+    )).toMatchObject({
       action: 'scope_updated',
       reason: 'Authorized scope correction',
       previousValue: { scopeStatus: 'excluded', scopeReason: 'Not built' },
       newValue: { scopeStatus: 'included', scopeReason: null },
     });
+    expect((await service.getActivity(key)).some(activity =>
+      activity.action === 'zone_scope_updated'
+      && activity.reason === 'Authorized scope correction')).toBe(true);
   });
 });

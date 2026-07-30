@@ -4,8 +4,6 @@ import { createZoneDeliveryService } from '@/modules/construction-qa/zone-delive
 import type { DeliveryActor, PonMilestone, ZoneDeliveryView } from '@/modules/construction-qa/zone-delivery/types/zoneDelivery.types';
 const PROJECT_ID = '11111111-1111-1111-1111-111111111111';
 const PON_ID = '47000000-0000-4000-8000-000000000001';
-const SECOND_PON_ID = '47000000-0000-4000-8000-000000000011';
-const THIRD_PON_ID = '47000000-0000-4000-8000-000000000012';
 const SNAG_ID = '47000000-0000-4000-8000-000000000002';
 const USER_ID = '22222222-2222-2222-2222-222222222222';
 const key = { projectId: PROJECT_ID, zoneNo: 1 };
@@ -28,11 +26,6 @@ describe('PON delivery milestone lifecycle', () => {
         pon_delivery_state, zone_delivery_documents, zone_delivery_state,
         construction_qa_reviews RESTART IDENTITY CASCADE
     `);
-    await pool.query(`
-      INSERT INTO pon_stage_tracking (id, project_id, zone_no, pon_no)
-      VALUES ($1, $3, 1, 2), ($2, $3, 1, 3)
-      ON CONFLICT (id) DO NOTHING
-    `, [SECOND_PON_ID, THIRD_PON_ID, PROJECT_ID]);
   });
   afterAll(async () => {
     await pool.end();
@@ -231,7 +224,8 @@ describe('PON delivery milestone lifecycle', () => {
       reason: 'Failed retest',
     }, actor('testing-confirm'));
     expect(Object.keys(view.pons[0]!.milestones)).toEqual(['civil_complete', 'optical_complete']);
-    expect(view.eligibleForZoneQaAt).toBe(eligibleAt);
+    expect(eligibleAt).not.toBeNull();
+    expect(view.eligibleForZoneQaAt).toBeNull();
     await pool.query(`UPDATE snags SET status = 'closed' WHERE id = $1`, [SNAG_ID]);
     await service.recalculateForSnag(SNAG_ID, actor('operations-confirm'));
     expect((await service.getZone(key)).pons[0]!.milestones.testing_passed).toBeUndefined();
