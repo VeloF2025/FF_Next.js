@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import type { ZoneRegisterFilters, ZoneRegisterResult } from '../types/zoneDelivery.types';
 
 interface ZoneRegisterResponse {
@@ -30,6 +31,10 @@ function registerUrl(filters: ZoneRegisterFilters): string {
 
 export function useZoneDeliveryRegister(filters: ZoneRegisterFilters): ZoneDeliveryRegisterState {
   const { projectId, zoneNo, status, blocker, handover, search } = filters;
+  const debouncedBlocker = useDebounce(blocker, 300);
+  const debouncedSearch = useDebounce(search, 300);
+  const effectiveBlocker = blocker ? debouncedBlocker : undefined;
+  const effectiveSearch = search ? debouncedSearch : undefined;
   const [data, setData] = useState<ZoneRegisterResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,7 +55,14 @@ export function useZoneDeliveryRegister(filters: ZoneRegisterFilters): ZoneDeliv
     }
 
     try {
-      const response = await fetch(registerUrl({ projectId, zoneNo, status, blocker, handover, search }), {
+      const response = await fetch(registerUrl({
+        projectId,
+        zoneNo,
+        status,
+        blocker: effectiveBlocker,
+        handover,
+        search: effectiveSearch,
+      }), {
         credentials: 'include',
         signal: controller.signal,
       });
@@ -74,8 +86,17 @@ export function useZoneDeliveryRegister(filters: ZoneRegisterFilters): ZoneDeliv
       }
     }
   }, [
-    projectId, zoneNo, status, blocker, handover, search,
+    projectId, zoneNo, status, effectiveBlocker, handover, effectiveSearch,
   ]);
+
+  useEffect(() => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    setData(null);
+    setLastUpdated(null);
+    setError(null);
+    setLoading(true);
+  }, [blocker, search]);
 
   useEffect(() => {
     void load(false);

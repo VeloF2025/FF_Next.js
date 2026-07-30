@@ -8,6 +8,7 @@ const emptyFilters = {};
 const registerData = (projectName: string): ZoneRegisterResult => ({
   rows: [{
     projectId: projectName, projectName, zoneNo: 1, status: 'civil_construction',
+    scopeApproved: true,
     includedPons: 1, livePons: 0, earliestIncompleteGate: 'civil_complete', blockerCount: 0,
     civilQa: 'not_started', opticalQa: 'not_started', handedOverAt: null,
   }],
@@ -28,6 +29,53 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('useZoneDeliveryRegister', () => {
+  it('debounces blocker and search while applying structural filters immediately', async () => {
+    vi.useFakeTimers();
+    fetchMock.mockResolvedValue(success(registerData('Result')));
+    const { rerender } = renderHook(
+      ({ filters }) => useZoneDeliveryRegister(filters),
+      { initialProps: { filters: {} } },
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    fetchMock.mockClear();
+    rerender({ filters: { blocker: 'OPEN_SNAGS', search: 'north' } });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(299);
+      await Promise.resolve();
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    let request = new URL(String(fetchMock.mock.calls[0]?.[0]), 'http://localhost');
+    expect(request.searchParams.get('blocker')).toBe('OPEN_SNAGS');
+    expect(request.searchParams.get('search')).toBe('north');
+
+    fetchMock.mockClear();
+    await act(async () => {
+      rerender({
+        filters: {
+          blocker: 'OPEN_SNAGS',
+          search: 'north',
+          status: 'handover_blocked',
+        },
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    request = new URL(String(fetchMock.mock.calls[0]?.[0]), 'http://localhost');
+    expect(request.searchParams.get('status')).toBe('handover_blocked');
+  });
+
   it('clears committed data for a delayed or failed filter request', async () => {
     fetchMock.mockResolvedValueOnce(success(registerData('Initial')));
     const initialFilters = {};
@@ -39,6 +87,9 @@ describe('useZoneDeliveryRegister', () => {
     rerender({ filters: filteredFilters });
     expect(result.current.data).toBeNull();
     expect(result.current.loading).toBe(true);
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 300));
+    });
     filtered.resolve({ ok: false, json: async () => ({ error: { message: 'Filter unavailable' } }) });
     await waitFor(() => expect(result.current.error).toBe('Filter unavailable'));
     expect(result.current.data).toBeNull();
@@ -81,6 +132,9 @@ describe('useZoneDeliveryRegister', () => {
     first.resolve(success(registerData('Stale')));
     await act(async () => { await Promise.resolve(); });
     expect(result.current.data).toBeNull();
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 300));
+    });
     second.resolve(success(registerData('Current')));
     await waitFor(() => expect(result.current.data?.rows[0]?.projectName).toBe('Current'));
     const currentSignal = fetchMock.mock.calls[1]?.[1]?.signal as AbortSignal;

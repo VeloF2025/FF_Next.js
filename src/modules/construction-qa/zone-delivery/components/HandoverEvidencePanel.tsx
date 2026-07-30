@@ -28,6 +28,18 @@ export function HandoverEvidencePanel({ zone, canManage, mutating, onUpload }: P
   const [documentType, setDocumentType] = useState<'test_pack' | 'fac' | 'cac'>('fac');
   const [ponStageId, setPonStageId] = useState(zone.pons[0]?.ponStageId ?? '');
   const active = zone.documents.filter(document => document.active);
+  const openUpload = () => {
+    setFile(null);
+    setDocumentType('fac');
+    setPonStageId(zone.pons[0]?.ponStageId ?? '');
+    setOpen(true);
+  };
+  const closeUpload = () => {
+    setFile(null);
+    setDocumentType('fac');
+    setPonStageId(zone.pons[0]?.ponStageId ?? '');
+    setOpen(false);
+  };
   const submit = async (meta: AuditedActionValues) => {
     if (!file) return false;
     return onUpload({
@@ -41,7 +53,7 @@ export function HandoverEvidencePanel({ zone, canManage, mutating, onUpload }: P
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 id="evidence-heading" className="font-semibold text-[var(--ff-text-primary)]">Handover evidence</h2>
         {canManage && zone.status !== 'handed_over' && (
-          <button type="button" onClick={() => setOpen(true)} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm">Upload evidence</button>
+          <button type="button" onClick={openUpload} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm">Upload evidence</button>
         )}
       </div>
       <div className="grid gap-3 md:grid-cols-2">
@@ -74,7 +86,7 @@ export function HandoverEvidencePanel({ zone, canManage, mutating, onUpload }: P
           );
         })}
       </div>
-      <ZoneDeliveryActionDialog open={open} title="Upload delivery evidence" submitting={mutating} onClose={() => setOpen(false)} onSubmit={submit}>
+      <ZoneDeliveryActionDialog open={open} title="Upload delivery evidence" submitting={mutating} onClose={closeUpload} onSubmit={submit}>
         <label className="block text-sm">
           Document type
           <select value={documentType} onChange={event => setDocumentType(event.target.value as typeof documentType)} className="mt-1 w-full rounded border border-[var(--border-color)] bg-transparent px-3 py-2">

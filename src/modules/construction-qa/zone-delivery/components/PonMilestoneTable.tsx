@@ -37,11 +37,24 @@ export function PonMilestoneTable({
   zone, permissions, mutating, onScope, onMilestone,
 }: Props) {
   const [action, setAction] = useState<Action>(null);
-  const [scope, setScope] = useState(() => zone.pons.map(pon => ({
+  const freshScope = () => zone.pons.map(pon => ({
     ponStageId: pon.ponStageId, scopeStatus: pon.scopeStatus, reason: pon.scopeReason ?? '',
-  })));
+  }));
+  const [scope, setScope] = useState(freshScope);
   const [snagId, setSnagId] = useState('');
   const [affectedGate, setAffectedGate] = useState<PonMilestone>('civil_complete');
+  const openAction = (next: Exclude<Action, null>) => {
+    setScope(freshScope());
+    setSnagId('');
+    setAffectedGate('civil_complete');
+    setAction(next);
+  };
+  const closeAction = () => {
+    setScope(freshScope());
+    setSnagId('');
+    setAffectedGate('civil_complete');
+    setAction(null);
+  };
   useEffect(() => {
     if (action?.type === 'scope') return;
     setScope(zone.pons.map(pon => ({
@@ -85,7 +98,7 @@ export function PonMilestoneTable({
     <section aria-labelledby="pons-heading" className="rounded-lg border border-[var(--border-color)]">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4">
         <div><h2 id="pons-heading" className="font-semibold text-[var(--ff-text-primary)]">PON milestones</h2><p className="text-xs text-[var(--ff-text-secondary)]">Works QA and OTDR evidence is context only; milestones require supervised confirmation.</p></div>
-        {permissions.scope && !terminal && zone.pons.length > 0 && <button type="button" onClick={() => setAction({ type: 'scope' })} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm">Manage scope</button>}
+        {permissions.scope && !terminal && zone.pons.length > 0 && <button type="button" onClick={() => openAction({ type: 'scope' })} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm">Manage scope</button>}
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-[1280px] w-full text-left text-sm">
@@ -104,7 +117,7 @@ export function PonMilestoneTable({
                         ? undefined
                         : availability.blocker?.message;
                       const descriptionId = disabledReason ? `pon-${pon.ponStageId}-${gate}-blocker` : undefined;
-                      return <><button type="button" disabled={Boolean(disabledReason)} title={disabledReason} aria-describedby={descriptionId} onClick={() => setAction({ type: 'milestone', pon, gate, action: availability.action })} className="mt-2 block text-xs underline disabled:opacity-50" aria-label={`${availability.action === 'reopen' ? 'Reopen' : 'Confirm'} ${milestoneLabels[gate]} for PON ${pon.ponNo}`}>{availability.action === 'reopen' ? 'Reopen' : 'Confirm'}</button>{disabledReason && <span id={descriptionId} className="sr-only">{disabledReason}</span>}</>;
+                      return <><button type="button" disabled={Boolean(disabledReason)} title={disabledReason} aria-describedby={descriptionId} onClick={() => openAction({ type: 'milestone', pon, gate, action: availability.action })} className="mt-2 block text-xs underline disabled:opacity-50" aria-label={`${availability.action === 'reopen' ? 'Reopen' : 'Confirm'} ${milestoneLabels[gate]} for PON ${pon.ponNo}`}>{availability.action === 'reopen' ? 'Reopen' : 'Confirm'}</button>{disabledReason && <span id={descriptionId} className="sr-only">{disabledReason}</span>}</>;
                     })()}
                   </td>;
                 })}
@@ -112,14 +125,14 @@ export function PonMilestoneTable({
                   <a className="block underline" href={`/field-ops/works-qa?${query(zone, pon.ponNo)}`} aria-label={`PON ${pon.ponNo} Works QA`}>Works QA</a>
                   <a className="block underline" href={`/field-ops/otdr?${query(zone, pon.ponNo)}`} aria-label={`PON ${pon.ponNo} OTDR`}>OTDR</a>
                   <a className="block underline" href={`/field-ops/snags?${query(zone, pon.ponNo)}`} aria-label={`PON ${pon.ponNo} Snags`}>Snags</a>
-                  {permissions.operations && terminal && <button type="button" onClick={() => setAction({ type: 'maintenance', pon })} className="mt-2 text-xs underline" aria-label={`Link maintenance issue for PON ${pon.ponNo}`}>Link maintenance</button>}
+                  {permissions.operations && terminal && <button type="button" onClick={() => openAction({ type: 'maintenance', pon })} className="mt-2 text-xs underline" aria-label={`Link maintenance issue for PON ${pon.ponNo}`}>Link maintenance</button>}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <ZoneDeliveryActionDialog open={action !== null} title={title} submitting={mutating} requireReason={action?.type === 'maintenance' || action?.type === 'milestone' && action.action === 'reopen'} onClose={() => setAction(null)} onSubmit={submit}>
+      <ZoneDeliveryActionDialog open={action !== null} title={title} submitting={mutating} requireReason={action?.type === 'maintenance' || action?.type === 'milestone' && action.action === 'reopen'} onClose={closeAction} onSubmit={submit}>
         {action?.type === 'scope' && <div className="space-y-3">{scope.map((pon, index) => {
           const view = zone.pons[index]!;
           return <div key={pon.ponStageId} className="rounded bg-[var(--hover-bg)] p-3"><div className="font-medium">PON {view.ponNo}</div><label className="block text-sm">Scope status PON {view.ponNo}<select value={pon.scopeStatus} onChange={event => setScope(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, scopeStatus: event.target.value as ScopeStatus } : item))} className="mt-1 w-full rounded border bg-transparent p-2"><option value="included">Included</option><option value="excluded">Excluded</option><option value="cancelled">Cancelled</option></select></label>{pon.scopeStatus !== 'included' && <label className="mt-2 block text-sm">Scope reason PON {view.ponNo}<input required value={pon.reason} onChange={event => setScope(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, reason: event.target.value } : item))} className="mt-1 w-full rounded border bg-transparent p-2" /></label>}</div>;

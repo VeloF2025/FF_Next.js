@@ -204,6 +204,7 @@ describe('ZoneDeliveryWorkspacePage audited dialogs', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Submit audited action' }));
     });
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Snag ID')).toHaveValue(snagId);
     expect(screen.getByLabelText('Source')).toHaveValue('Supervisor review');
     expect(screen.getByLabelText('Reason')).toHaveValue('Incorrect original test');
   });

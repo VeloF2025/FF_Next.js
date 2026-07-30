@@ -24,6 +24,12 @@ export function ZoneDeliveryActionDialog({
   const [reason, setReason] = useState('');
   if (!open) return null;
 
+  const close = () => {
+    setEffectiveAt('');
+    setSource('');
+    setReason('');
+    onClose();
+  };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const succeeded = await onSubmit({
@@ -31,7 +37,7 @@ export function ZoneDeliveryActionDialog({
       source: source.trim(),
       ...(reason.trim() ? { reason: reason.trim() } : {}),
     });
-    if (succeeded) onClose();
+    if (succeeded) close();
   };
 
   return (
@@ -52,7 +58,7 @@ export function ZoneDeliveryActionDialog({
           <textarea required={requireReason} value={reason} onChange={event => setReason(event.target.value)} className="mt-1 w-full rounded border border-[var(--border-color)] bg-transparent px-3 py-2" />
         </label>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm">Cancel</button>
+          <button type="button" onClick={close} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm">Cancel</button>
           <button type="submit" disabled={submitting} className="rounded bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-60">Submit audited action</button>
         </div>
       </form>

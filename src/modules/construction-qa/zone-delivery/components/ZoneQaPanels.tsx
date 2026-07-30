@@ -23,6 +23,18 @@ export function ZoneQaPanels({ zone, canApprove, mutating, onRecord }: Props) {
   const qaActionable = zone.status === 'ready_for_zone_qa'
     || zone.status === 'zone_qa_in_progress' || zone.status === 'handover_blocked';
   const disabledReason = qaActionable ? undefined : zone.blockers[0]?.message;
+  const openQa = (nextDiscipline: ZoneQaDiscipline) => {
+    setStatus('in_progress');
+    setNotes('');
+    setSnags('');
+    setDiscipline(nextDiscipline);
+  };
+  const closeQa = () => {
+    setStatus('in_progress');
+    setNotes('');
+    setSnags('');
+    setDiscipline(null);
+  };
   const submit = async (meta: AuditedActionValues) => {
     if (!discipline) return false;
     return onRecord({
@@ -43,7 +55,7 @@ export function ZoneQaPanels({ zone, canApprove, mutating, onRecord }: Props) {
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-[var(--ff-text-primary)]">{title}</h2>
                 {canApprove && zone.status !== 'handed_over' && (
-                  <><button type="button" disabled={!qaActionable} title={disabledReason} aria-describedby={disabledReason ? `${item}-qa-blocker` : undefined} onClick={() => setDiscipline(item)} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm disabled:opacity-50" aria-label={`Record ${title}`}>Record QA</button>{disabledReason && <span id={`${item}-qa-blocker`} className="sr-only">{disabledReason}</span>}</>
+                  <><button type="button" disabled={!qaActionable} title={disabledReason} aria-describedby={disabledReason ? `${item}-qa-blocker` : undefined} onClick={() => openQa(item)} className="rounded border border-[var(--border-color)] px-3 py-2 text-sm disabled:opacity-50" aria-label={`Record ${title}`}>Record QA</button>{disabledReason && <span id={`${item}-qa-blocker`} className="sr-only">{disabledReason}</span>}</>
                 )}
               </div>
               <p className="mt-2 text-sm">{labels[value.status]}</p>
@@ -54,7 +66,7 @@ export function ZoneQaPanels({ zone, canApprove, mutating, onRecord }: Props) {
           );
         })}
       </div>
-      <ZoneDeliveryActionDialog open={discipline !== null} title={`Record ${discipline ?? ''} Zone QA`} submitting={mutating} onClose={() => setDiscipline(null)} onSubmit={submit}>
+      <ZoneDeliveryActionDialog open={discipline !== null} title={`Record ${discipline ?? ''} Zone QA`} submitting={mutating} onClose={closeQa} onSubmit={submit}>
         <label className="block text-sm">
           QA status
           <select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="mt-1 w-full rounded border border-[var(--border-color)] bg-transparent px-3 py-2">
