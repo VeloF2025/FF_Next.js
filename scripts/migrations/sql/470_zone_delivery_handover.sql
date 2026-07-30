@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS zone_delivery_documents (
   CONSTRAINT zone_delivery_documents_type_check
     CHECK (document_type IN ('test_pack', 'fac', 'cac')),
   CONSTRAINT zone_delivery_documents_source_check
-    CHECK (document_source IN ('vf_storage', 'exfo_result')),
+    CHECK (document_source = 'vf_storage'),
   CONSTRAINT zone_delivery_documents_owner_check
     CHECK (
       (document_type = 'test_pack' AND pon_stage_id IS NOT NULL)

@@ -11,6 +11,16 @@ interface Props {
 }
 
 const names = { test_pack: 'test pack', fac: 'FAC', cac: 'CAC' } as const;
+const documentReference = (
+  document: ZoneDeliveryView['documents'][number],
+  label: string,
+) => document.url ? (
+  <a href={document.url} target="_blank" rel="noreferrer" className="underline" aria-label={label}>
+    {label}
+  </a>
+) : (
+  <span className="break-all" title="Source reference is not navigable">{document.sourceRef}</span>
+);
 
 export function HandoverEvidencePanel({ zone, canManage, mutating, onUpload }: Props) {
   const [open, setOpen] = useState(false);
@@ -42,7 +52,7 @@ export function HandoverEvidencePanel({ zone, canManage, mutating, onUpload }: P
               <div className="font-medium text-[var(--ff-text-primary)]">{type.toUpperCase()}</div>
               {document ? (
                 <>
-                  <a href={document.url} target="_blank" rel="noreferrer" className="underline" aria-label={`Active ${type.toUpperCase()}`}>Active {type.toUpperCase()}</a>
+                  {documentReference(document, `Active ${type.toUpperCase()}`)}
                   <div className="break-all text-xs text-[var(--ff-text-secondary)]">SHA-256: {document.checksumSha256}</div>
                 </>
               ) : <p className="text-[var(--ff-text-secondary)]">No active {type.toUpperCase()}</p>}
@@ -55,9 +65,10 @@ export function HandoverEvidencePanel({ zone, canManage, mutating, onUpload }: P
           const pon = zone.pons.find(item => item.ponStageId === document.ponStageId);
           return (
             <div key={document.id} className="text-sm">
-              <a href={document.url} target="_blank" rel="noreferrer" className="underline" aria-label={`Active test pack for PON ${pon?.ponNo ?? 'unknown'}`}>
-                Active test pack for PON {pon?.ponNo ?? 'unknown'}
-              </a>
+              {documentReference(
+                document,
+                `Active test pack for PON ${pon?.ponNo ?? 'unknown'}`,
+              )}
               <span className="ml-2 break-all text-xs text-[var(--ff-text-secondary)]">SHA-256: {document.checksumSha256}</span>
             </div>
           );

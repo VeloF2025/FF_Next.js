@@ -7,8 +7,6 @@ import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/li
 import { log } from '@/lib/logger';
 import { createZoneDeliveryService } from '@/modules/construction-qa/zone-delivery/services/zoneDeliveryService';
 import {
-  activeDocumentId,
-  documentAuditMetadata,
   storeZoneDeliveryDocument,
 } from '@/modules/construction-qa/zone-delivery/services/zoneDeliveryDocumentStorage';
 import {
@@ -18,6 +16,7 @@ import {
   ZoneDeliveryHttpError,
   zoneDeliveryResponse,
 } from '@/modules/construction-qa/zone-delivery/services/zoneDeliveryHttp';
+import { deliveryError } from '@/modules/construction-qa/zone-delivery/services/zoneDeliveryErrors';
 
 export const config = { api: { bodyParser: false } };
 const service = createZoneDeliveryService(pool);
@@ -99,16 +98,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const mediaType = (req.headers['content-type'] ?? '').split(';', 1)[0]!.trim().toLowerCase();
     if (mediaType === 'application/json') {
       const input = parseDocumentBody(await parseJson(req));
-      if (input.documentSource !== 'exfo_result') {
+      if (input.documentSource === 'exfo_result') {
+        deliveryError(
+          'EVIDENCE_REQUIRED',
+          'EXFO evidence requires canonical project, zone and PON mapping; upload a supervised test pack instead',
+        );
+      } else {
         throw new ZoneDeliveryHttpError('Invalid documentSource');
       }
-      const before = await service.getZone(input);
-      const superseded = activeDocumentId(before, input.documentType, input.ponStageId);
-      const zone = await service.registerDocument(input, actor);
-      return {
-        zone,
-        document: documentAuditMetadata(input, actor, superseded),
-      };
     }
     if (mediaType !== 'multipart/form-data') {
       throw new ZoneDeliveryHttpError('Invalid content-type');

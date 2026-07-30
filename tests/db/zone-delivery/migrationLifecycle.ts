@@ -85,6 +85,13 @@ export async function verifyDocumentRules(
     INSERT INTO zone_delivery_documents (
       project_id, zone_no, document_type, document_source, source_ref,
       filename, mime_type, size_bytes, checksum_sha256, uploaded_by
+    ) VALUES ($1, $2, 'fac', $3, $4, $5, $6, $7, $8, $9)
+  `, [projectId, 1, 'exfo_result', ...baseDocument.slice(3)]))
+    .rejects.toMatchObject({ code: '23514' });
+  await expect(pool.query(`
+    INSERT INTO zone_delivery_documents (
+      project_id, zone_no, document_type, document_source, source_ref,
+      filename, mime_type, size_bytes, checksum_sha256, uploaded_by
     ) VALUES ($1, $2, 'test_pack', $3, $4, $5, $6, $7, $8, $9)
   `, baseDocument)).rejects.toMatchObject({ code: '23514' });
   await expect(pool.query(`

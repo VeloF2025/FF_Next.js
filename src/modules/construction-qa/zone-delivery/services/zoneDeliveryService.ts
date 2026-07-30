@@ -18,6 +18,7 @@ import { transaction, withClient } from './zoneDeliveryTransactions';
 import { assertCanonicalZone } from './zoneDeliveryCanonical';
 import { validateMilestoneConfirmation } from './zoneDeliveryMilestoneActions';
 import { invalidateZoneEvidence } from './zoneDeliveryInvalidation';
+import { requireSupervisedDocumentSource } from './zoneDeliveryDocumentSecurity';
 export interface ZoneDeliveryService {
   getRegister(filters: ZoneRegisterFilters): Promise<ZoneRegisterResult>; getZone(key: ZoneKey): Promise<ZoneDeliveryView>;
   updateScope(input: UpdateScopeInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
@@ -259,6 +260,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
       if ((zone?.row_version ?? 0) !== input.expectedRowVersion) versionConflict();
       const aggregate = await read.readZoneAggregate(client, input);
       if (!zone && aggregate.zone) versionConflict();
+      requireSupervisedDocumentSource(input.documentSource);
       const testPack = input.documentType === 'test_pack';
       if (testPack !== Boolean(input.ponStageId) || (input.ponStageId
           && !aggregate.pons.some(pon => pon.pon_stage_id === input.ponStageId))

@@ -13,6 +13,7 @@ import type {
 } from '../repositories/zoneDeliveryReadRepository';
 import { calculateZoneDelivery } from './zoneDeliveryCalculator';
 import { calculatePonActions } from './zoneDeliveryActionCalculator';
+import { safeDocumentUrl } from './zoneDeliveryDocumentSecurity';
 
 type Time = Date | string | null;
 
@@ -181,7 +182,8 @@ export function buildZoneView(aggregate: ZoneAggregate): ZoneDeliveryView {
       id: doc.id,
       documentType: doc.document_type,
       ...(doc.pon_stage_id ? { ponStageId: doc.pon_stage_id } : {}),
-      url: doc.source_ref,
+      sourceRef: doc.source_ref,
+      url: safeDocumentUrl(doc.source_ref),
       checksumSha256: doc.checksum_sha256,
       active: doc.superseded_at === null,
     })),

@@ -109,65 +109,6 @@ describe('zone delivery document route', () => {
     ]);
   });
 
-  it('registers explicit JSON exfo_result metadata without a VF upload', async () => {
-    h.registerDocument.mockResolvedValue({ rowVersion: 3 });
-    const body = {
-      ...meta,
-      documentType: 'test_pack',
-      ponStageId: '22222222-2222-4222-8222-222222222222',
-      documentSource: 'exfo_result',
-      sourceRef: 'exfo://results/job-42',
-      filename: 'job-42.json',
-      mimeType: 'application/json',
-      sizeBytes: 2048,
-      checksumSha256: 'a'.repeat(64),
-    };
-    const res = await call({
-      headers: { 'content-type': 'application/json' },
-      body,
-    });
-    expect(res.statusCode, JSON.stringify(res.body)).toBe(200);
-    expect(h.registerDocument).toHaveBeenCalledWith(body, {
-      userId: user.id,
-      email: user.email,
-      permission: 'construction-qa.zone-delivery.documents-manage',
-    });
-    expect(h.storeDocument).not.toHaveBeenCalled();
-    expect(res.body).toMatchObject({
-      success: true,
-      data: {
-        zone: { rowVersion: 3 },
-        document: {
-          source: 'exfo_result',
-          sourceRef: 'exfo://results/job-42',
-          uploader: { userId: user.id, email: user.email },
-        },
-      },
-    });
-  });
-
-  it('rejects numeric strings in JSON document commands', async () => {
-    const body = {
-      ...meta,
-      zoneNo: '7',
-      expectedRowVersion: '2',
-      documentType: 'test_pack',
-      ponStageId: '22222222-2222-4222-8222-222222222222',
-      documentSource: 'exfo_result',
-      sourceRef: 'exfo://results/job-42',
-      filename: 'job-42.json',
-      mimeType: 'application/json',
-      sizeBytes: 2048,
-      checksumSha256: 'a'.repeat(64),
-    };
-    const res = await call({
-      headers: { 'content-type': 'application/json' },
-      body,
-    });
-    expect(res.statusCode).toBe(400);
-    expect(h.registerDocument).not.toHaveBeenCalled();
-  });
-
   it('parses multipart evidence and always unlinks the temporary file', async () => {
     h.formFields = Object.fromEntries(
       Object.entries({ ...meta, documentType: 'fac' })

@@ -97,6 +97,7 @@ export const zoneFixture: ZoneDeliveryView = {
     {
       id: 'fac-1',
       documentType: 'fac',
+      sourceRef: '/storage/fac.pdf',
       url: '/storage/fac.pdf',
       checksumSha256: 'a'.repeat(64),
       active: true,
@@ -104,6 +105,7 @@ export const zoneFixture: ZoneDeliveryView = {
     {
       id: 'cac-1',
       documentType: 'cac',
+      sourceRef: '/storage/cac.pdf',
       url: '/storage/cac.pdf',
       checksumSha256: 'b'.repeat(64),
       active: true,
@@ -112,6 +114,7 @@ export const zoneFixture: ZoneDeliveryView = {
       id: 'test-1',
       documentType: 'test_pack',
       ponStageId,
+      sourceRef: '/storage/test-pack.pdf',
       url: '/storage/test-pack.pdf',
       checksumSha256: 'c'.repeat(64),
       active: true,

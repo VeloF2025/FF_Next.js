@@ -126,7 +126,8 @@ export interface ZoneDocumentView {
   id: string;
   documentType: 'test_pack' | 'fac' | 'cac';
   ponStageId?: string;
-  url: string;
+  sourceRef: string;
+  url: string | null;
   checksumSha256: string;
   active: boolean;
 }

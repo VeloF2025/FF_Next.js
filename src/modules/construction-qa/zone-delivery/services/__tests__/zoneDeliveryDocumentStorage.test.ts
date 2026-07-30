@@ -24,6 +24,7 @@ const before = {
   documents: [{
     id: 'old-document',
     documentType: 'fac',
+    sourceRef: '/storage/old.pdf',
     url: '/storage/old.pdf',
     checksumSha256: '0'.repeat(64),
     active: true,
@@ -36,6 +37,7 @@ const after = {
     {
       id: 'new-document',
       documentType: 'fac',
+      sourceRef: '/storage/zone-delivery/documents/saved.pdf',
       url: '/storage/zone-delivery/documents/saved.pdf',
       checksumSha256: '1'.repeat(64),
       active: true,
