@@ -1,4 +1,4 @@
-import { Pool, type PoolClient } from 'pg';
+import { Pool } from 'pg';
 import type {
   CommandMeta, ConfirmMilestoneInput, DeliveryActor, RecordZoneQaInput,
   RegisterDocumentInput, UpdateScopeInput, ZoneDeliveryActivity,
@@ -13,6 +13,8 @@ import {
   deliveryError, handoverLocked, hasReason, requirePermission,
   validateMeta, versionConflict,
 } from './zoneDeliveryErrors';
+import { getZoneDeliveryRegister } from './zoneDeliveryRegister';
+import { transaction, withClient } from './zoneDeliveryTransactions';
 export interface ZoneDeliveryService {
   getRegister(filters: ZoneRegisterFilters): Promise<ZoneRegisterResult>; getZone(key: ZoneKey): Promise<ZoneDeliveryView>;
   updateScope(input: UpdateScopeInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
@@ -27,19 +29,6 @@ const audit = (input: ZoneKey & CommandMeta, actor: DeliveryActor) => ({
   key: input, effectiveAt: input.effectiveAt, actor,
   source: input.source, reason: input.reason,
 });
-async function transaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN'); const result = await work(client); await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK'); throw error;
-  } finally { client.release(); }
-}
-async function withClient<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  try { return await work(client); } finally { client.release(); }
-}
 class PgZoneDeliveryService implements ZoneDeliveryService {
   constructor(private readonly pool: Pool) {}
   getZone(key: ZoneKey): Promise<ZoneDeliveryView> {
@@ -47,36 +36,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
   getActivity(key: ZoneKey): Promise<ZoneDeliveryActivity[]> {
     return withClient(this.pool, client => read.readActivity(client, key)); }
   async getRegister(filters: ZoneRegisterFilters): Promise<ZoneRegisterResult> {
-    return withClient(this.pool, async client => {
-      const rows = [];
-      for (const key of await read.listZoneKeys(client, filters.projectId, filters.zoneNo)) {
-        const aggregate = await read.readZoneAggregate(client, key);
-        const view = buildZoneView(aggregate);
-        const calculation = calculateAggregate(aggregate);
-        const text = `${view.projectName} ${view.zoneNo}`.toLowerCase();
-        if (filters.status && view.status !== filters.status) continue;
-        if (filters.handover === 'complete' && !view.handedOverAt) continue;
-        if (filters.handover === 'pending' && view.handedOverAt) continue;
-        if (filters.search && !text.includes(filters.search.toLowerCase())) continue;
-        if (filters.blocker && !view.blockers.some(blocker => `${blocker.code} ${blocker.message}`
-          .toLowerCase().includes(filters.blocker!.toLowerCase()))) continue;
-        const included = view.pons.filter(pon => pon.scopeStatus === 'included');
-        rows.push({
-          ...key, projectName: view.projectName, status: view.status,
-          includedPons: included.length, livePons: included.filter(pon => pon.milestones.technically_live).length,
-          earliestIncompleteGate: calculation.earliestIncompleteGate, blockerCount: view.blockers.length,
-          civilQa: view.civilQa.status, opticalQa: view.opticalQa.status,
-          handedOverAt: view.handedOverAt,
-        });
-      }
-      return { rows, summary: {
-          zones: rows.length,
-          includedPons: rows.reduce((sum, row) => sum + row.includedPons, 0),
-          livePons: rows.reduce((sum, row) => sum + row.livePons, 0),
-          readyForQa: rows.filter(row => row.status === 'ready_for_zone_qa').length,
-          handedOver: rows.filter(row => row.handedOverAt).length,
-        } };
-    });
+    return getZoneDeliveryRegister(this.pool, filters);
   }
   updateScope(input: UpdateScopeInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
     return transaction(this.pool, async client => {
