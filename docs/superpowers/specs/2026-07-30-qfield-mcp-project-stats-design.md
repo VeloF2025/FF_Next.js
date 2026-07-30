@@ -164,7 +164,7 @@ must not reveal inaccessible projects as candidates.
 | Area | Authoritative source | Purpose |
 |---|---|---|
 | Project identity and link | FibreFlow PostgreSQL | Project resolution and RBAC scope |
-| Field status and freshness | QFieldCloud read-only PostgreSQL | Latest QField feature state |
+| Field status and freshness | QFieldCloud `core_delta` through read-only PostgreSQL | Latest QField feature state |
 | FibreFlow comparison totals | FibreFlow PostgreSQL | Sync discrepancy calculations |
 | QA | `qfield_photo_validations` and action tables | Workflow and retake statistics |
 | Sync | `qfield_sync_jobs` and conflicts | Current job, history, failures, conflicts |
@@ -173,6 +173,10 @@ must not reveal inaccessible projects as candidates.
 New QField reads must use the established read-only QField connection. The
 aggregator must not depend on the legacy endpoints that swallow source errors or
 truncate source records.
+
+The legacy `core_layer`/`core_feature` readers are not a valid source in the
+current production QField schema. They must not be reused or treated as evidence
+of a genuine zero.
 
 ## Counting Semantics
 
@@ -248,6 +252,10 @@ available. It returns `null`, not zero, when MinIO is unavailable.
 Sync statistics include the current job, last completed job, successful and
 failed totals, processed/created/updated/failed records, unresolved conflicts,
 and the last successful completion time.
+
+Current `qfield_sync_jobs` and `qfield_sync_conflicts` rows have no project ID.
+Their response therefore includes `scope: "system"` and must never be described
+as specific to the resolved project.
 
 ## Response Contract
 
@@ -400,8 +408,11 @@ never logged.
 - relevant Vitest/API suites;
 - `npm run ci:quick`;
 - `npm run antihall`; and
-- authenticated dev smoke tests for at least Mahikeng and one ambiguous/missing
-  project case.
+- authenticated dev API smoke tests for at least Mahikeng and one
+  ambiguous/missing project case;
+- local MCP transport/tool tests against the dev API; and
+- a live connector smoke test only after an explicitly approved production
+  deployment.
 
 ## Acceptance Criteria
 
