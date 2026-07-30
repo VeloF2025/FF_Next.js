@@ -46,6 +46,18 @@ def test_catalogue_contains_no_denied_group(svc):
         assert tools._denied_group(route["group"]) is None, route["path"]
 
 
+def test_catalogue_contains_qfield_project_stats(svc):
+    from ff_mcp.catalogue import _load_routes
+
+    routes = _load_routes()
+    route = next(
+        (item for item in routes if item["path"] == "/api/qfield/project-stats"),
+        None,
+    )
+    assert route is not None
+    assert route["methods"] == ["GET"]
+
+
 def test_describe_endpoint_extracts_path_params(svc):
     _, tools = svc
     from ff_mcp import catalogue

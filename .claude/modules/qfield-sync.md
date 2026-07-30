@@ -46,8 +46,16 @@ None
 | GET | `/api/qfield-sync-poles` | QField pole data |
 | GET | `/api/qfield-sync-cables` | QField cable data |
 | GET | `/api/qfield-sync-drops` | QField drop data |
+| GET | `/api/qfield/project-stats` | Read-only QField project statistics |
 
 ## Services
+
+### Project statistics
+- `src/modules/qfield-sync/project-stats/` - Read-only project-statistics aggregation service.
+- Project statistics use QFieldCloud `core_delta` through the read-only pool.
+- Never use the legacy `core_layer`/`core_feature` readers for statistics; those relations are absent in production and their callers currently produce false zeros.
+- `poles planted` means the last applied physical-state event leaves the pole in the ground; photo and QA states do not change physical state.
+- Sync-job statistics are system-scoped until the schema contains a project ID.
 
 ### QFieldSyncService
 ```typescript
