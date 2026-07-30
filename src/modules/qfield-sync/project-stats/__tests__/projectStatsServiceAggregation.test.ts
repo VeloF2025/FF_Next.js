@@ -122,6 +122,25 @@ describe('getProjectStats aggregation', () => {
     expect(result.poles).toMatchObject({ designTotal: 2, neverCaptured: 1 });
   });
 
+  it('warns when a planted pole lacks a recognized photo state', async () => {
+    const deps = dependencies();
+    vi.mocked(deps.loadQField).mockResolvedValue({
+      lastUpdatedAt: '2026-07-29T11:34:04Z',
+      deltas: [baseDelta('pole-1', 'Pole Verified/ Civil Complete')],
+    });
+
+    const result = await getProjectStats(query, context, deps);
+
+    expect(result.poles).toMatchObject({
+      planted: 1,
+      photoComplete: 0,
+      photoIncomplete: 0,
+    });
+    expect(result.warnings).toContain(
+      '1 planted pole lacks a recognized photo state',
+    );
+  });
+
   it('paginates only sorted anomaly details while preserving the full total', async () => {
     const deps = dependencies();
     vi.mocked(deps.loadQField).mockResolvedValue({

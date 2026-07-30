@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ErrorCode } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import { ProjectStatsError } from '../errors';
 import { getProjectStats, type ProjectStatsDependencies } from '../projectStatsService';
 import { context, dependencies, project, query } from './projectStatsService.fixtures';
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('getProjectStats source orchestration', () => {
@@ -92,6 +94,7 @@ describe('getProjectStats source orchestration', () => {
   });
 
   it('returns a concise complete summary with system sync scope', async () => {
+    const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
     const result = await getProjectStats(query, context, dependencies());
 
     expect(result).toMatchObject({
@@ -105,10 +108,20 @@ describe('getProjectStats source orchestration', () => {
       anomalies: null,
     });
     expect(result.warnings).toContain('Sync statistics are system-wide');
+    expect(info).toHaveBeenCalledWith(
+      'QField project statistics generated',
+      expect.objectContaining({
+        resultStatus: 'complete',
+        totalDurationMs: expect.any(Number),
+        errorCategory: null,
+      }),
+      'qfield-project-stats',
+    );
   });
 
   it('returns partial and null for an optional failure without leaking its error', async () => {
     const deps = dependencies();
+    const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
     vi.mocked(deps.loadQa).mockRejectedValue(
       new Error('database password=secret-token raw payload'),
     );
@@ -123,6 +136,15 @@ describe('getProjectStats source orchestration', () => {
     });
     expect(result.warnings).toContain('QA statistics unavailable');
     expect(JSON.stringify(result)).not.toMatch(/secret-token|password=|raw payload/i);
+    expect(info).toHaveBeenCalledWith(
+      'QField project statistics generated',
+      expect.objectContaining({
+        resultStatus: 'partial',
+        totalDurationMs: expect.any(Number),
+        errorCategory: 'optional_source_degraded',
+      }),
+      'qfield-project-stats',
+    );
   });
 
   it('bounds an optional source timeout independently', async () => {
@@ -142,18 +164,42 @@ describe('getProjectStats source orchestration', () => {
 
   it('throws SERVICE_UNAVAILABLE when the primary QField source fails', async () => {
     const deps = dependencies();
-    vi.mocked(deps.loadQField).mockRejectedValue(new Error('qfield unavailable'));
+    const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+    vi.mocked(deps.loadQField).mockRejectedValue(
+      new Error('password=secret-token raw upstream payload'),
+    );
 
     await expect(getProjectStats(query, context, deps)).rejects.toMatchObject({
       code: ErrorCode.SERVICE_UNAVAILABLE,
       message: 'QField project statistics are currently unavailable',
       details: { requestId: 'r1' },
     });
+    expect(info).toHaveBeenCalledWith(
+      'QField project statistics unavailable',
+      expect.objectContaining({
+        requestId: 'r1',
+        userId: 'u1',
+        fibreflowProjectId: 'ff-1',
+        qfieldProjectId: 'qf-1',
+        section: 'summary',
+        resultStatus: 'unavailable',
+        sourceHealth: expect.objectContaining({
+          qfield: expect.objectContaining({ state: 'unavailable' }),
+        }),
+        totalDurationMs: expect.any(Number),
+        errorCategory: 'qfield_unavailable',
+      }),
+      'qfield-project-stats',
+    );
+    expect(JSON.stringify(info.mock.calls)).not.toMatch(
+      /secret-token|password=|raw upstream payload/i,
+    );
   });
 
   it('throws SERVICE_UNAVAILABLE when the primary QField source times out', async () => {
     vi.useFakeTimers();
     const deps = dependencies();
+    const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
     deps.loadQField = vi.fn(() => new Promise(() => undefined));
 
     const pending = getProjectStats(query, context, deps);
@@ -163,5 +209,14 @@ describe('getProjectStats source orchestration', () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     await rejection;
+    expect(info).toHaveBeenCalledWith(
+      'QField project statistics unavailable',
+      expect.objectContaining({
+        resultStatus: 'unavailable',
+        totalDurationMs: 10_000,
+        errorCategory: 'qfield_timeout',
+      }),
+      'qfield-project-stats',
+    );
   });
 });

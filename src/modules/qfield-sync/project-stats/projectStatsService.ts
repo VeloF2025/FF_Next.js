@@ -91,6 +91,7 @@ async function settleSource<T>(
 function warningsFor(
   sourceHealth: SourceHealth,
   freshness: ProjectStatsResponse['freshness'],
+  unrecognizedPhotoStates: number,
   design: CachedPoleDesign | null,
   anomalies: ProjectStatsAnomaly[],
   fibreflowWarnings: string[],
@@ -110,6 +111,13 @@ function warningsFor(
   if (freshness.state === 'unknown') warnings.push('QField freshness is unknown');
   if (freshness.state === 'stale' && !freshness.warningSuppressed) {
     warnings.push('QField data is stale');
+  }
+  if (unrecognizedPhotoStates > 0) {
+    warnings.push(
+      `${unrecognizedPhotoStates} planted ${
+        unrecognizedPhotoStates === 1 ? 'pole lacks' : 'poles lack'
+      } a recognized photo state`,
+    );
   }
   if (design && !design.available) warnings.push('Pole design data unavailable');
   const unknown = anomalies.filter((item) => item.type === 'unknown_status').length;
@@ -137,6 +145,7 @@ export async function getProjectStats(
   context: ProjectStatsContext,
   dependencies: ProjectStatsDependencies = defaultDependencies,
 ): Promise<ProjectStatsResponse> {
+  const overallStarted = Date.now();
   const project = await dependencies.resolveProject(query.project);
   const qfieldId = project.qfield.projectId;
   const [qfield, fibreflow, qa, sync, design, minio] = await Promise.all([
@@ -148,7 +157,31 @@ export async function getProjectStats(
     settleSource('minio', 10_000, () => dependencies.loadPhotoKeys(qfieldId)),
   ]);
 
+  const sourceHealth: SourceHealth = {
+    qfield: qfield.health,
+    fibreflow: fibreflow.health,
+    qa: qa.health,
+    sync: sync.health,
+    design: design.health,
+    minio: minio.health,
+  };
   if (!qfield.value) {
+    log.info(
+      'QField project statistics unavailable',
+      {
+        requestId: context.requestId,
+        userId: context.userId,
+        fibreflowProjectId: project.fibreflow.id,
+        qfieldProjectId: qfieldId,
+        section: query.section,
+        resultStatus: 'unavailable',
+        sourceHealth,
+        totalDurationMs: Date.now() - overallStarted,
+        errorCategory:
+          qfield.health.state === 'timeout' ? 'qfield_timeout' : 'qfield_unavailable',
+      },
+      'qfield-project-stats',
+    );
     throw new ProjectStatsError(
       ErrorCode.SERVICE_UNAVAILABLE,
       'QField project statistics are currently unavailable',
@@ -203,14 +236,6 @@ export async function getProjectStats(
 
   const generatedAt = dependencies.now();
   const freshness = calculateFreshness(qfield.value.lastUpdatedAt, generatedAt);
-  const sourceHealth: SourceHealth = {
-    qfield: qfield.health,
-    fibreflow: fibreflow.health,
-    qa: qa.health,
-    sync: sync.health,
-    design: design.health,
-    minio: minio.health,
-  };
   const resultStatus = [fibreflow, qa, sync, design, minio].every(
     ({ health }) => health.state === 'ok',
   )
@@ -245,6 +270,7 @@ export async function getProjectStats(
     warnings: warningsFor(
       sourceHealth,
       freshness,
+      Math.max(0, poles.planted - poles.photoComplete - poles.photoIncomplete),
       design.value,
       allAnomalies,
       fibreflow.value?.warnings ?? [],
@@ -262,6 +288,8 @@ export async function getProjectStats(
       section: query.section,
       resultStatus,
       sourceHealth,
+      totalDurationMs: Date.now() - overallStarted,
+      errorCategory: resultStatus === 'partial' ? 'optional_source_degraded' : null,
     },
     'qfield-project-stats',
   );

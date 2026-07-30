@@ -155,3 +155,96 @@ Passed: 8  Failed: 0  Warned: 1  Skipped: 2
   is clean and quick CI treats the baseline as non-blocking.
 - Vitest emits the repository's existing Vite CJS deprecation warning. All
   focused and project-stat suites exit zero.
+
+## Fix round 1 — photo-state gap and unavailable logging
+
+### Review findings addressed
+
+1. The response now reports the exact non-negative gap between planted poles and
+   recognized complete/incomplete photo states. A verified/civil-complete pole
+   remains physically planted while producing
+   `1 planted pole lacks a recognized photo state`.
+2. Overall timing starts before project resolution. Source health is assembled
+   before the required-QField guard, so QField failure and timeout log a safe
+   `unavailable` outcome before `SERVICE_UNAVAILABLE` is thrown. Generated
+   complete/partial logs now include total duration and controlled categories.
+
+The only emitted categories are `qfield_timeout`, `qfield_unavailable`,
+`optional_source_degraded`, and `null`. No raw upstream error, message, stack,
+credential, or payload is included.
+
+### TDD RED
+
+Focused command:
+
+```bash
+npx vitest run \
+  src/modules/qfield-sync/project-stats/__tests__/projectStatsService.test.ts \
+  src/modules/qfield-sync/project-stats/__tests__/projectStatsServiceAggregation.test.ts
+```
+
+Output:
+
+```text
+Test Files 2 failed (2)
+Tests 5 failed | 11 passed (16)
+```
+
+The failures were specific to the review findings: the planted/photo-state
+warning was absent; complete and partial logs lacked total duration/category;
+and QField failure/timeout produced no structured service log.
+
+### GREEN
+
+The warning was implemented first and its focused aggregation suite passed 8/8.
+After the logging control-flow change, both Task 7 suites passed:
+
+```text
+Test Files 2 passed (2)
+Tests 16 passed (16)
+```
+
+All project-stat suites:
+
+```text
+Test Files 12 passed (12)
+Tests 61 passed (61)
+```
+
+Scoped ESLint exited zero. Scoped TypeScript reported:
+
+```text
+No project-stats TypeScript diagnostics
+```
+
+`git diff --check` passed. The changed production service is 297 lines; both
+changed test files remain below 300 lines.
+
+Staged `npm run ci:quick`:
+
+```text
+✓ ESLint: 0 errors, 185 warnings
+✓ Silent catches: 78
+✓ Neon-shim SQL divergence: none
+✓ QField step detection, GPKG resolution, hierarchy mapping
+⚠ TypeScript: 58 errors (pre-existing, non-blocking)
+✓ Zero Tolerance: changed files clean
+✓ Secret scan: no new credential-like content
+✓ CI PASSED
+Passed: 8  Failed: 0  Warned: 1  Skipped: 2
+```
+
+### Self-review
+
+- The warning count is exactly
+  `max(0, planted - photoComplete - photoIncomplete)` and cannot change the
+  planted count.
+- `sourceHealth` contains all six settled sources before unavailable logging;
+  no source error object crosses into metadata.
+- Failure and timeout tests assert request/user/project IDs, section,
+  unavailable status, source health, total duration, controlled category, and
+  absence of injected secret/raw-payload text.
+- Complete and partial tests assert their total duration and controlled
+  `null`/`optional_source_degraded` categories.
+- No response contract, source timeout, identifier routing, mutation, deploy,
+  or unrelated file changed.
