@@ -22,6 +22,11 @@
 - Use the existing horizontal `ModuleNav` for `/connections/fibreflow` and `/connections/cortex`; do not add a sidebar subtree.
 - Remove connector panels from `/cortex`, retain hero/search/review, and add a permission-gated link to `/connections/cortex`.
 - Use TDD: observe the relevant test fail before adding each implementation, then rerun it green.
+- Tests exercise real production components, handlers, middleware and provider
+  behavior. Do not mock application components or assert on mock/spies/source
+  text. Use a narrow in-memory adapter or loopback test server only where an
+  external boundary such as HTTP, browser navigation, time, or a process cannot
+  be made real; assert observable output and captured wire behavior.
 - FibreFlow verification includes focused Vitest, existing MCP consent/proxy suites, `npm run ci:quick`, `npm run build`, desktop/mobile Playwright, and a real dev connector flow.
 - Cortex verification includes focused Pytest, the exact read-only tool test, Ruff, ty, package import checks, and the repository CI script.
 - Real dev OAuth uses Bridge port `17403`, Remote MCP port `17414`, a unique non-production OAuth store, and `https://dev.fibreflow.app/api/cortex-remote-mcp` as its public base. Never repoint port `7414` or the production public authorization flow.
@@ -379,14 +384,21 @@ git commit -m "refactor(mcp): isolate Cortex OAuth provider"
 
 - [ ] **Step 1: Add failing callback, replay, redaction, and startup tests**
 
-Add request helpers and cases to `tests/test_cortex_mcp_oauth.py`:
+Add a real loopback `ThreadingHTTPServer` fixture to
+`tests/test_cortex_mcp_oauth.py`. It implements Bridge `GET /api/query`,
+records the request path and Authorization header, and can return `200`, `401`,
+or a delayed response. The fixture owns its thread and shuts it down after the
+test. Do not replace `validate_cortex_token`, `asyncio.to_thread`, or
+`secrets.compare_digest` with mocks.
+
+Add request helpers and cases; the examples below use the loopback fixture as
+`bridge_server`:
 
 ```python
 import asyncio
 import os
 import subprocess
 import sys
-from unittest.mock import patch
 
 from starlette.requests import Request
 
@@ -464,15 +476,12 @@ async def test_rejected_bearer_keeps_pending_state_retryable(tmp_path: Path):
     )
     seed_pending(provider)
 
-    with patch(
-        "apps.cortex_mcp.cortex_mcp_oauth.validate_cortex_token",
-        side_effect=ValueError("rejected"),
-    ):
+    with bridge_server(status=401) as bridge:
         response = await complete_authorization(
             request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
             provider,
             CALLBACK_SECRET,
-            "http://127.0.0.1:7403",
+            bridge.url,
         )
 
     assert response.status_code == 401
@@ -489,15 +498,12 @@ async def test_success_consumes_once_and_returns_only_safe_redirect(tmp_path: Pa
     )
     seed_pending(provider)
 
-    with patch(
-        "apps.cortex_mcp.cortex_mcp_oauth.validate_cortex_token",
-        return_value=None,
-    ):
+    with bridge_server(status=200) as bridge:
         response = await complete_authorization(
             request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
             provider,
             CALLBACK_SECRET,
-            "http://127.0.0.1:7403",
+            bridge.url,
         )
 
     payload = json.loads(response.body)
@@ -510,6 +516,8 @@ async def test_success_consumes_once_and_returns_only_safe_redirect(tmp_path: Pa
     assert PENDING_ID not in provider.data["pending"]
     assert len(provider.data["codes"]) == 1
     assert BEARER not in json.dumps(payload)
+    assert bridge.authorization == f"Bearer {BEARER}"
+    assert bridge.path.startswith("/api/query?")
 
     replay = await complete_authorization(
         request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
@@ -566,14 +574,17 @@ Add:
 
 - an expired-state case by seeding `expires_at=1`;
 - an unsafe redirect case using `javascript:alert(1)` that asserts the pending
-  state remains available and `validate_cortex_token` was never called;
-- a constant-time secret case that patches `secrets.compare_digest` and asserts
-  `secrets_match()` delegates to it;
-- a worker-thread assertion that replaces `asyncio.to_thread` with an
-  `AsyncMock` and verifies it receives `validate_cortex_token`, the bearer, and
-  Bridge URL;
+  state remains available and the loopback Bridge received no request;
+- secret acceptance/rejection behavior through the real `secrets_match()` path;
+- a delayed loopback Bridge case that starts `complete_authorization()` and a
+  zero-delay coroutine together, proving the second coroutine advances before
+  Bridge responds and bearer validation therefore did not block the event loop;
 - a metadata regression asserting
   `grant_types_supported == ["authorization_code", "refresh_token"]`.
+
+Constant-time byte comparison remains a code-review invariant: the
+implementation must visibly call `secrets.compare_digest`. Do not write a test
+that merely spies on that function call.
 
 - [ ] **Step 2: Run the callback tests and observe the missing handler failures**
 
@@ -866,75 +877,69 @@ git commit -m "docs(mcp): make FibreFlow consent the primary flow"
 
 - [ ] **Step 1: Write the failing API trust-boundary suite**
 
-Use `node-mocks-http` and hoisted mocks for `withAuth`, `withPermission`, `mintMcpToken`, `fetch`, and `log`. The central success test must be:
+Do not replace application middleware modules. Existing behavioral middleware
+suites cover the real `withAuth`/`withPermission` gates, and the real dev route
+later proves their composition. Extract the smallest server-only
+`createCortexConsentHandler()` seam whose defaults are the production
+`mintMcpToken`, `fetch`, and `log`; the default export still wraps that handler
+with the real middleware. Core tests pass hand-written deterministic boundary
+adapters and invoke the handler through a loopback HTTP harness. The callback
+side is a real loopback HTTP server that records the wire request. Do not use
+`vi.mock`, `vi.fn`, or assert on a spy.
+
+The central success scenario records values in plain arrays:
 
 ```typescript
 it('uses only the verified email and returns only redirectUrl', async () => {
-  principal.email = 'lew@velocityfibre.co.za';
-  mintMcpToken.mockResolvedValue({
-    token: 'jwt-never-echo',
-    expiresAt: '2026-10-28T00:00:00.000Z',
-  });
-  fetchMock.mockResolvedValue({
-    ok: true,
-    status: 200,
-    json: async () => ({
+  const mintedFor: Array<[string, '90d']> = [];
+  const callback = await startCallbackServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({
       redirectUrl: 'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
-    }),
+    }));
+  });
+  const app = await startConsentHandler({
+    user: { id: 'user-1', email: 'lew@velocityfibre.co.za' },
+    permission: { key: 'cortex.review', action: 'view', allowed: true },
+    callbackBase: callback.url,
+    mintToken: async (email, lifetime) => {
+      mintedFor.push([email, lifetime]);
+      return {
+        token: 'jwt-never-echo',
+        expiresAt: new Date('2026-10-28T00:00:00.000Z'),
+      };
+    },
   });
 
-  const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
-    method: 'POST',
-    body: {
+  const response = await app.post('/api/cortex/mcp-consent', {
       stateId: VALID_STATE_ID,
       email: 'attacker@example.com',
       token: 'browser-token',
       redirectUrl: 'javascript:alert(1)',
-    },
   });
-  await handler(req, res);
 
-  expect(mintMcpToken).toHaveBeenCalledWith(
-    'lew@velocityfibre.co.za',
-    '90d',
-  );
-  expect(fetchMock).toHaveBeenCalledTimes(1);
-  const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-  expect(url).toBe('http://127.0.0.1:7414/authorize/complete');
-  expect(init.method).toBe('POST');
-  expect((init.headers as Record<string, string>)['X-Cortex-MCP-Secret'])
-    .toBe('test-callback-secret');
-  expect(JSON.parse(String(init.body))).toEqual({
+  expect(mintedFor).toEqual([['lew@velocityfibre.co.za', '90d']]);
+  expect(callback.requests).toHaveLength(1);
+  expect(callback.requests[0]).toMatchObject({
+    path: '/authorize/complete',
+    method: 'POST',
+    cortexSecret: 'test-callback-secret',
+  });
+  expect(callback.requests[0]?.json).toEqual({
     stateId: VALID_STATE_ID,
     token: 'jwt-never-echo',
   });
-
-  const response = res._getJSONData();
-  expect(response.data).toEqual({
+  expect(response.json.data).toEqual({
     redirectUrl: 'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
   });
-  expect(JSON.stringify(response)).not.toContain('jwt-never-echo');
-  expect(JSON.stringify(response)).not.toContain('test-callback-secret');
+  expect(JSON.stringify(response.json)).not.toContain('jwt-never-echo');
+  expect(JSON.stringify(response.json)).not.toContain('test-callback-secret');
 });
 ```
 
-Add explicit cases for:
-
-```typescript
-it.each([
-  ['missing', undefined],
-  ['blank', ''],
-  ['too short', 'short'],
-  ['whitespace', 'state id with spaces'],
-  ['non-string', { nested: true }],
-])('400s a %s state before minting', async (_label, stateId) => {
-  const { req, res } = createMocks({ method: 'POST', body: { stateId } });
-  await handler(req as NextApiRequest, res as NextApiResponse);
-  expect(res._getStatusCode()).toBe(400);
-  expect(mintMcpToken).not.toHaveBeenCalled();
-  expect(fetchMock).not.toHaveBeenCalled();
-});
-```
+Add table-driven cases for missing, blank, too-short, whitespace-containing,
+and non-string state values. Assert the real HTTP status/body, and assert the
+plain `mintedFor` and callback request arrays remain empty.
 
 Also assert:
 
@@ -1120,43 +1125,42 @@ git commit -m "feat(cortex): authorize MCP from verified FibreFlow sessions"
 
 - [ ] **Step 1: Write the failing page tests**
 
-Copy the real router/auth test harness structure into a new file, with Cortex-specific paths and assertions:
+Render the real page with Next's `RouterContext` and the real `AuthProvider`.
+Use a deterministic in-memory router and a network-boundary responder for
+`/api/auth/me` and `/api/cortex/mcp-consent`; do not replace `useRouter`,
+`useAuth`, `Head`, or the consent card module. Assert DOM and recorded HTTP or
+navigation behavior, never calls on a spy.
 
 ```typescript
 const STATE_ID = 'pZJqcS1uZH4fXo0WmXtYyRA7d2NcQk5g';
-const AUTHED = {
-  currentUser: { email: 'lew@velocityfibre.co.za' },
-  isAuthenticated: true,
-  loading: false,
-};
 
 it('preserves state through FibreFlow sign-in', async () => {
-  useAuthMock.mockReturnValue({
-    currentUser: null,
-    isAuthenticated: false,
-    loading: false,
+  const browser = renderConsentPage({
+    route: `/cortex/mcp/authorize?state_id=${STATE_ID}`,
+    authResponse: { status: 401 },
   });
-  render(<CortexMcpAuthorizePage />);
 
-  await waitFor(() => expect(routerState.replace).toHaveBeenCalled());
-  const target = routerState.replace.mock.calls[0][0] as string;
-  expect(decodeURIComponent(target.split('returnUrl=')[1])).toBe(
+  await browser.waitForPath('/sign-in');
+  expect(browser.returnUrl()).toBe(
     `/cortex/mcp/authorize?state_id=${STATE_ID}`,
   );
-  expect(fetchMock).not.toHaveBeenCalled();
+  expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([]);
 });
 
 it('posts only stateId once and follows the service redirect', async () => {
-  fetchMock.mockResolvedValue({
-    ok: true,
-    json: async () => ({
+  const browser = renderConsentPage({
+    route: `/cortex/mcp/authorize?state_id=${STATE_ID}`,
+    authResponse: authenticatedLewResponse,
+    consentResponse: {
+      status: 200,
+      body: {
       data: {
         redirectUrl:
           'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
       },
-    }),
+      },
+    },
   });
-  render(<CortexMcpAuthorizePage />);
 
   const allow = await screen.findByRole('button', { name: /^Allow$/ });
   await act(async () => {
@@ -1164,18 +1168,12 @@ it('posts only stateId once and follows the service redirect', async () => {
     allow.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 
-  expect(fetchMock).toHaveBeenCalledTimes(1);
-  expect(fetchMock).toHaveBeenCalledWith(
-    '/api/cortex/mcp-consent',
-    expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ stateId: STATE_ID }),
-    }),
-  );
-  await waitFor(() =>
-    expect(assign).toHaveBeenCalledWith(
-      'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
-    ),
+  expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([{
+    method: 'POST',
+    json: { stateId: STATE_ID },
+  }]);
+  expect(browser.externalLocation()).toBe(
+    'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
   );
 });
 ```
@@ -1289,12 +1287,8 @@ git commit -m "feat(cortex): add FibreFlow consent screen"
 Test the shared nav:
 
 ```typescript
-vi.mock('next/router', () => ({
-  useRouter: () => ({ pathname: '/connections/fibreflow' }),
-}));
-
 it('renders horizontal FibreFlow and Cortex tabs', () => {
-  render(<ConnectionsNav />);
+  renderWithRouter(<ConnectionsNav />, '/connections/fibreflow');
   expect(screen.getByRole('link', { name: 'FibreFlow' }))
     .toHaveAttribute('href', '/connections/fibreflow');
   expect(screen.getByRole('link', { name: 'Cortex' }))
@@ -1320,13 +1314,15 @@ it('shows browser consent and no token or local runtime setup', () => {
 });
 ```
 
-Test FibreFlow session/Advanced behavior with a mocked GET response:
+Test FibreFlow session/Advanced behavior using the real panel and a
+network-boundary responder that records requests:
 
 ```typescript
 it('shows active sessions and keeps manual mint collapsed', async () => {
-  fetchMock.mockResolvedValueOnce({
-    ok: true,
-    json: async () => ({
+  const network = renderWithNetwork(<FibreFlowConnectionPanel />, {
+    '/api/me/mcp-tokens': {
+      status: 200,
+      body: {
       data: {
         tokens: [{
           id: 'session-1',
@@ -1336,9 +1332,9 @@ it('shows active sessions and keeps manual mint collapsed', async () => {
           lastUsedAt: null,
         }],
       },
-    }),
+      },
+    },
   });
-  render(<FibreFlowConnectionPanel />);
 
   expect(await screen.findByText('Claude connector')).toBeInTheDocument();
   expect(screen.getByText(
@@ -1346,10 +1342,18 @@ it('shows active sessions and keeps manual mint collapsed', async () => {
   )).toBeInTheDocument();
   expect(screen.getByText('Advanced')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Generate token' })).toBeNull();
+  expect(network.recordedRequests()).toEqual([{
+    method: 'GET',
+    path: '/api/me/mcp-tokens',
+  }]);
 });
 ```
 
-Add tests that expanding `Advanced` reveals manual lifetime/label/mint controls, successful mint reveals once, revoke calls `/api/me/mcp-tokens/session-1` with `DELETE`, and the Cortex page uses `ProtectedPage permission="cortex.review" action="view"`.
+Add behavior tests that expanding `Advanced` reveals manual
+lifetime/label/mint controls, successful mint reveals once, revoke records a
+real `DELETE /api/me/mcp-tokens/session-1` boundary request, an authorized user
+sees Cortex connection content, and a user denied `cortex.review:view` sees the
+real access-denied surface.
 
 - [ ] **Step 2: Run the new component/page tests and observe missing-file failures**
 
@@ -1510,38 +1514,37 @@ git commit -m "feat(connections): add separate AI connector pages"
 
 - [ ] **Step 1: Write the failing Cortex-page regression test**
 
-Mock the four retained child surfaces and `PermissionGate`, then assert:
+Render the real `CortexPage`, `PermissionGate`, hero, cited-search and review
+components inside the same real router/auth providers used by the application.
+Provide deterministic HTTP responses only at the network boundary. Assert:
 
 ```typescript
 it('keeps knowledge features, removes panels, and links to connections', () => {
   render(<CortexPage />);
 
-  expect(screen.getByTestId('cortex-hero')).toBeInTheDocument();
-  expect(screen.getByTestId('cortex-search')).toBeInTheDocument();
-  expect(screen.getByTestId('cortex-review')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Cortex' })).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: 'Knowledge base query' }))
+    .toBeInTheDocument();
+  expect(screen.getByText('Review queue is empty.')).toBeInTheDocument();
   expect(screen.queryByText(/Generate token/i)).toBeNull();
   expect(screen.queryByText(/FibreFlow \(read-only\)/i)).toBeNull();
   expect(screen.getByRole('link', { name: /AI Connections/i }))
     .toHaveAttribute('href', '/connections/cortex');
-  expect(permissionGateMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      permission: 'cortex.review',
-      action: 'view',
-      showLoading: true,
-    }),
-    undefined,
-  );
 });
 ```
 
-Add a source-level sidebar assertion:
+Render the real sidebar with an authorized user and assert its visible links:
 
 ```typescript
-expect(cortexSection.items.map((item) => [item.label, item.to])).toEqual([
-  ['Cortex', '/cortex'],
-  ['AI Connections', '/connections/fibreflow'],
-]);
+expect(screen.getByRole('link', { name: 'Cortex' }))
+  .toHaveAttribute('href', '/cortex');
+expect(screen.getByRole('link', { name: 'AI Connections' }))
+  .toHaveAttribute('href', '/connections/fibreflow');
 ```
+
+Add an unauthorized-user case against the real permission provider that proves
+the Cortex Connections CTA is absent. Do not replace child components,
+`PermissionGate`, `usePermission`, or sidebar configuration with test doubles.
 
 - [ ] **Step 2: Run the page test and observe current connector-panel failures**
 
