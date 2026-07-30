@@ -154,6 +154,9 @@ docs/wa-digests/
 docs/weekly-dev-reports/
 # docs/schema/ contains DATABASE_SCHEMA_INDEX.md (keep tracked)
 
+# Private operational review artifacts (may contain staff names)
+/.private/hs-operational-rollout/
+
 # Claude Code local-only (session state, not team-shared)
 .claude/session/
 .claude/metrics/
