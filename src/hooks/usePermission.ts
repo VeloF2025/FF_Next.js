@@ -66,7 +66,11 @@ interface UsePermissionReturn {
 }
 
 export function usePermission(): UsePermissionReturn {
-  const { currentUser, isAuthenticated } = useAuth();
+  const {
+    currentUser,
+    isAuthenticated,
+    loading: authLoading,
+  } = useAuth();
   const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // Track whether we've successfully fetched permissions at least once
@@ -84,8 +88,11 @@ export function usePermission(): UsePermissionReturn {
 
   // Fetch permissions from API
   const fetchPermissions = useCallback(async () => {
+    if (authLoading) return;
+
     if (!isAuthenticated || !currentUser?.id) {
       setPermissions([]);
+      setHasFetched(true);
       setIsLoading(false);
       return;
     }
@@ -104,7 +111,6 @@ export function usePermission(): UsePermissionReturn {
       if (response.ok) {
         const data = await response.json();
         setPermissions(data.data || []);
-        setHasFetched(true);
       } else {
         log.error('Permissions API returned non-OK status', { status: response.status }, 'usePermission');
         setPermissions([]);
@@ -113,9 +119,10 @@ export function usePermission(): UsePermissionReturn {
       log.error('Failed to fetch permissions', { error: error }, 'usePermission');
       setPermissions([]);
     } finally {
+      setHasFetched(true);
       setIsLoading(false);
     }
-  }, [isAuthenticated, currentUser?.id, isSuperAdmin]);
+  }, [authLoading, isAuthenticated, currentUser?.id, isSuperAdmin]);
 
   useEffect(() => {
     fetchPermissions();

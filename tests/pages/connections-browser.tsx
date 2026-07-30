@@ -36,7 +36,11 @@ function response(status: number, body?: unknown): Response {
 class ConnectionsNetwork {
   private readonly user: ApiUser;
 
-  constructor(private readonly canReview: boolean) {
+  constructor(
+    private readonly canReview: boolean,
+    private readonly authenticated: boolean,
+    private readonly permissionStatus: number,
+  ) {
     this.user = {
       id: 'staff-lew',
       email: 'lew@velocityfibre.co.za',
@@ -59,9 +63,19 @@ class ConnectionsNetwork {
     const url = new URL(rawUrl, 'https://app.fibreflow.app');
 
     if (url.pathname === '/api/auth/me') {
+      if (!this.authenticated) {
+        return response(401, {
+          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+        });
+      }
       return response(200, { success: true, data: { user: this.user } });
     }
     if (url.pathname === '/api/admin/permissions/me') {
+      if (this.permissionStatus !== 200) {
+        return response(this.permissionStatus, {
+          error: { code: 'PERMISSION_CHECK_ERROR' },
+        });
+      }
       return response(200, {
         data: [{
           permissionKey: 'cortex.review',
@@ -155,8 +169,16 @@ export function renderConnectionsPage(
   page: React.ReactElement,
   pathname: string,
   canReview: boolean,
+  options: {
+    authenticated?: boolean;
+    permissionStatus?: number;
+  } = {},
 ) {
-  const network = new ConnectionsNetwork(canReview);
+  const network = new ConnectionsNetwork(
+    canReview,
+    options.authenticated ?? true,
+    options.permissionStatus ?? 200,
+  );
   globalThis.fetch = network.fetch;
   installMatchMedia();
   const queryClient = new QueryClient({

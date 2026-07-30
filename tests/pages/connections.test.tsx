@@ -62,4 +62,32 @@ describe('Connections pages', () => {
     expect(screen.queryByRole('heading', { name: 'Cortex Knowledge' }))
       .not.toBeInTheDocument();
   });
+
+  it('fails closed when the visitor is unauthenticated', async () => {
+    renderConnectionsPage(
+      <CortexConnectionsPage />,
+      '/connections/cortex',
+      false,
+      { authenticated: false },
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Access Denied' }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Cortex Knowledge' }))
+      .not.toBeInTheDocument();
+  });
+
+  it('fails closed when permission lookup fails', async () => {
+    renderConnectionsPage(
+      <CortexConnectionsPage />,
+      '/connections/cortex',
+      false,
+      { permissionStatus: 503 },
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Access Denied' }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Cortex Knowledge' }))
+      .not.toBeInTheDocument();
+  });
 });
