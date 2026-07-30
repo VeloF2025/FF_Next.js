@@ -104,7 +104,7 @@ describe('ZoneDeliveryWorkspacePage projection', () => {
     const item = screen.getByRole('listitem', { name: 'scope_updated' });
     const effective = screen.getByLabelText('scope_updated effective time');
     const recorded = screen.getByLabelText('scope_updated recorded time');
-    expect(effective).toHaveAttribute('datetime', '2026-06-30T10:00:00.000Z');
+    expect(effective).toHaveAttribute('datetime', '2026-07-01T10:00:00.000Z');
     expect(recorded).toHaveAttribute('datetime', '2026-07-01T12:00:00.000Z');
     expect(effective.textContent).not.toBe(recorded.textContent);
     expect(item).toHaveTextContent('manager@example.com');
