@@ -27,8 +27,15 @@ authoritative summary:
 
 The approved business definition is:
 
-> A planted pole is one distinct QField civil feature whose most recent
-> successfully applied status is exactly `Pole Planted`.
+> A planted pole is one distinct QField civil feature that is physically in the
+> ground. Missing photos or pending QA do not make it unplanted.
+
+Current QField statuses that prove physical planting are:
+
+- `Pole Planted/ All Photos`;
+- `Pole Planted - Photos Incomplete`; and
+- `(ADMIN) Q/A Passed`, because QA passage is a later state that implies the pole
+  was already planted.
 
 PR 2 will address connector/session diagnostics separately. It is deliberately
 outside this design.
@@ -81,8 +88,9 @@ get_qfield_project_stats(project="Mahikeng", section="summary")
 ```
 
 The answer must identify the resolved FibreFlow and QField projects, report the
-exact `Pole Planted` count, include the QField update time and freshness state,
-and surface relevant warnings. It must not call an applied-civil total "planted."
+physical planted-pole count, include the QField update time and freshness state,
+and surface relevant warnings. It must report photo completeness and QA
+separately rather than using them to exclude physically planted poles.
 
 The tool description will explicitly tell the model to use this tool for QField,
 field-build, planted-pole, cable, drop, QField QA, and QField sync-stat questions.
@@ -171,16 +179,17 @@ Feature identity remains `(kind, localPk)`, never `localPk` alone.
 
 For each civil feature:
 
-1. consider successfully applied deltas;
-2. select the most recent applied delta deterministically by timestamp and ID;
+1. consider successfully applied, status-bearing deltas;
+2. select the most recent such delta deterministically by timestamp and ID;
 3. trim surrounding whitespace from its status;
-4. count it as planted only when the canonical status is exactly
-   `Pole Planted`.
+4. count it as planted when the canonical status is one of:
+   `Pole Planted/ All Photos`, `Pole Planted - Photos Incomplete`, or
+   `(ADMIN) Q/A Passed`.
 
 A later failed or stuck duplicate does not remove an earlier successfully
 applied state. It is reported as an anomaly and cannot create an additional
-planted pole. QA approval is reported separately and is not required for the
-planted count.
+planted pole. Photo completeness and QA approval are separate quality measures
+and are not prerequisites for the planted count.
 
 The pole section returns:
 
@@ -350,7 +359,8 @@ never logged.
 
 ### Unit tests
 
-- exact `Pole Planted` status classification;
+- physical planting classification across complete-photo, incomplete-photo, and
+  QA-passed states;
 - latest-successfully-applied selection;
 - `(kind, localPk)` feature identity;
 - stuck and stale duplicate handling;
@@ -391,8 +401,8 @@ never logged.
 
 1. A natural-language Mahikeng planted-pole question selects the curated MCP tool
    without generic endpoint discovery.
-2. The returned planted count includes only distinct latest-applied
-   `Pole Planted` features.
+2. The returned planted count includes distinct latest-applied features in every
+   approved physical-planting state, regardless of photo completeness or QA.
 3. Summary and section totals agree.
 4. No hard record limit can silently undercount an aggregate.
 5. Source failure cannot appear as a zero.
