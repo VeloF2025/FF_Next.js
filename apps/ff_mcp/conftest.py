@@ -22,11 +22,18 @@ def svc(tmp_path, monkeypatch):
     import importlib
     import sys
 
-    for name in ("ff_mcp.server", "ff_mcp.tools", "ff_mcp.oauth", "ff_mcp.config"):
+    package = sys.modules.get("ff_mcp")
+    for name in (
+        "ff_mcp.server",
+        "ff_mcp.tools",
+        "ff_mcp.qfield_tools",
+        "ff_mcp.oauth",
+        "ff_mcp.config",
+    ):
         sys.modules.pop(name, None)
+        if package is not None:
+            package.__dict__.pop(name.rsplit(".", 1)[-1], None)
 
     server = importlib.import_module("ff_mcp.server")
     tools = importlib.import_module("ff_mcp.tools")
     return server, tools
-
-

@@ -194,3 +194,4 @@ async def remote_help(request: Request):
 # Tool registration lives in tools.py; importing it binds the tools to `mcp`.
 from . import catalogue as _catalogue  # noqa: E402,F401  (import for side effects)
 from . import tools as _tools  # noqa: E402,F401  (import for side effects)
+from . import qfield_tools as _qfield_tools  # noqa: E402,F401  (import for side effects)
