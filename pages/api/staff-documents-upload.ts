@@ -151,6 +151,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.forbidden(res, 'You do not have permission to upload this document');
     }
 
+    // A certification is a training certificate and has exactly one way in.
+    // Created here it would be orphaned — the lifecycle refuses to verify a
+    // submission with no linked competency rows — while still occupying the
+    // (employee, certificate number, provider) slot in the partial unique index,
+    // which would then block the real upload with a duplicate-certificate
+    // conflict. This route also validates magic bytes only against the set of
+    // known signatures, not against the type the caller claimed.
+    if (documentType === 'certification') {
+      return apiResponse.badRequest(
+        res,
+        'Training certificates are uploaded at /health-safety/training/certificates/new, so the competencies they prove are recorded with them.',
+        { uploadRoute: '/health-safety/training/certificates/new' }
+      );
+    }
+
     // Validate file type helper
     const allowedTypes = [
       'application/pdf',

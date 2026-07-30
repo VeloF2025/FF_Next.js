@@ -237,6 +237,39 @@ describe('authenticated but unauthorized callers get 403 and no data', () => {
   });
 });
 
+describe('a certification has exactly one way in', () => {
+  it('the generic upload route refuses it and names the certificate flow', async () => {
+    // Permitted caller — this is a routing rule, not an authorization one.
+    h.canUploadStaffDocument.mockResolvedValue(true);
+    h.parsedForm.current = {
+      fields: { staffId: [STAFF_ID], documentType: ['certification'], documentName: ['cert.pdf'] },
+      files: {},
+    };
+
+    const res = await callRoute('@/pages/api/staff-documents-upload', { method: 'POST' });
+
+    expect(res._getStatusCode()).toBe(400);
+    expect(JSON.stringify(res._getData())).toContain('/health-safety/training/certificates/new');
+    // An orphan here could never be verified (the lifecycle rejects a
+    // submission with no linked rows) yet would still occupy the unique
+    // (employee, number, provider) slot and block the real upload.
+    expect(h.sqlCalls.current.some((q) => q.includes('INSERT INTO staff_documents'))).toBe(false);
+  });
+
+  it('still accepts every other document type', async () => {
+    h.canUploadStaffDocument.mockResolvedValue(true);
+    h.parsedForm.current = {
+      fields: { staffId: [STAFF_ID], documentType: ['bank_details'], documentName: ['bank.pdf'] },
+      files: {},
+    };
+
+    const res = await callRoute('@/pages/api/staff-documents-upload', { method: 'POST' });
+
+    // Rejected later for having no file — but NOT by the certification guard.
+    expect(JSON.stringify(res._getData())).not.toContain('/health-safety/training/certificates/new');
+  });
+});
+
 describe('authorization is decided from the stored document, not the request', () => {
   it('download resolves the document owner and type server-side', async () => {
     h.canAccessStaffDocument.mockResolvedValue(true);

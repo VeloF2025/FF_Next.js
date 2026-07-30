@@ -995,11 +995,18 @@ export function StaffDocumentUploadWizard({
             <option value="" disabled>Select a document type</option>
             {Object.entries(DOCUMENT_CATEGORIES).map(([category, types]) => (
               <optgroup key={category} label={DOCUMENT_CATEGORY_LABELS[category]}>
-                {types.map((type) => (
-                  <option key={type} value={type}>
-                    {DOCUMENT_TYPE_LABELS[type]}
-                  </option>
-                ))}
+                {/* 'certification' is deliberately absent: a training
+                    certificate has to record the competencies it proves, so it
+                    goes through "Upload training certificate" in this same
+                    panel. The generic upload API rejects it outright, and
+                    offering it here would only lead to that error. */}
+                {types
+                  .filter((type) => type !== 'certification')
+                  .map((type) => (
+                    <option key={type} value={type}>
+                      {DOCUMENT_TYPE_LABELS[type]}
+                    </option>
+                  ))}
               </optgroup>
             ))}
           </select>
