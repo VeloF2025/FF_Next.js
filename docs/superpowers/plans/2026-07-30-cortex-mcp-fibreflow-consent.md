@@ -80,7 +80,8 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 |---|---|---|
 | Create | `apps/cortex_mcp/cortex_mcp_oauth.py` | Existing OAuth models/provider plus pending-state peek and FibreFlow redirect |
 | Create | `apps/cortex_mcp/cortex_mcp_callback.py` | Callback authentication, Bridge bearer validation and safe redirect construction |
-| Create | `tests/test_cortex_mcp_oauth.py` | Provider compatibility, redirect, callback, replay, startup, and token-redaction tests |
+| Create | `tests/test_cortex_mcp_oauth.py` | Provider/store compatibility and FibreFlow redirect tests |
+| Create | `tests/test_cortex_mcp_callback.py` | Callback, replay, startup, loopback Bridge and token-redaction tests |
 | Modify | `apps/cortex_mcp/server.py` | Wire the extracted provider, register `/authorize/complete`, retain unlinked `/authorize/approve`, and enforce remote-only configuration |
 | Modify | `apps/cortex_mcp/pyproject.toml` | Package the focused OAuth/callback modules beside `server` |
 | Modify | `tests/test_superadmin_bypass.py` | Prove Lew and an existing configured admin are full-scope while an ordinary user remains ACL-scoped |
@@ -379,6 +380,7 @@ git commit -m "refactor(mcp): isolate Cortex OAuth provider"
 - Modify: `apps/cortex_mcp/server.py`
 - Modify: `apps/cortex_mcp/pyproject.toml`
 - Modify: `tests/test_cortex_mcp_oauth.py`
+- Create: `tests/test_cortex_mcp_callback.py`
 
 **Interfaces:**
 - Consumes: `POST /authorize/complete`, `X-Cortex-MCP-Secret`, `{stateId, token}`, Bridge `GET /api/query`, and `CortexOAuthProvider.peek_pending()`.
@@ -387,7 +389,7 @@ git commit -m "refactor(mcp): isolate Cortex OAuth provider"
 - [ ] **Step 1: Add failing callback, replay, redaction, and startup tests**
 
 Add a real loopback `ThreadingHTTPServer` fixture to
-`tests/test_cortex_mcp_oauth.py`. It implements Bridge `GET /api/query`,
+`tests/test_cortex_mcp_callback.py`. It implements Bridge `GET /api/query`,
 records the request path and Authorization header, and can return `200`, `401`,
 or a delayed response. The fixture owns its thread and shuts it down after the
 test. Do not replace `validate_cortex_token`, `asyncio.to_thread`, or
@@ -593,7 +595,7 @@ that merely spies on that function call.
 Run:
 
 ```bash
-uv run pytest tests/test_cortex_mcp_oauth.py -q
+uv run pytest tests/test_cortex_mcp_callback.py -q
 ```
 
 Expected: FAIL because `complete_authorization` and the remote startup guard do not exist.
@@ -751,11 +753,13 @@ FibreFlow UI.
 Run:
 
 ```bash
-uv run pytest tests/test_cortex_mcp_oauth.py tests/test_cortex_mcp.py -q
+uv run pytest tests/test_cortex_mcp_oauth.py tests/test_cortex_mcp_callback.py \
+  tests/test_cortex_mcp.py -q
 uv run pytest tests/test_cortex_mcp.py::TestReadOnlySurface -q
-uv tool run ruff check apps/cortex_mcp tests/test_cortex_mcp_oauth.py
+uv run ruff check apps/cortex_mcp tests/test_cortex_mcp_oauth.py \
+  tests/test_cortex_mcp_callback.py
 uv tool run ty check apps/cortex_mcp tests/test_cortex_mcp_oauth.py \
-  --exit-zero-on-warning
+  tests/test_cortex_mcp_callback.py --exit-zero-on-warning
 ```
 
 Expected: all Pytest and Ruff commands PASS; ty has no error-level diagnostic.
@@ -766,7 +770,8 @@ Run:
 
 ```bash
 git add apps/cortex_mcp/cortex_mcp_callback.py apps/cortex_mcp/server.py \
-  apps/cortex_mcp/pyproject.toml tests/test_cortex_mcp_oauth.py
+  apps/cortex_mcp/pyproject.toml tests/test_cortex_mcp_oauth.py \
+  tests/test_cortex_mcp_callback.py
 git commit -m "feat(mcp): complete OAuth through FibreFlow consent"
 ```
 
@@ -855,8 +860,8 @@ Retitle the current token/`uv` material to `Operator and stdio fallback`, state 
 Run:
 
 ```bash
-uv run pytest tests/test_cortex_mcp_oauth.py tests/test_cortex_mcp.py \
-  tests/test_superadmin_bypass.py -q
+uv run pytest tests/test_cortex_mcp_oauth.py tests/test_cortex_mcp_callback.py \
+  tests/test_cortex_mcp.py tests/test_superadmin_bypass.py -q
 bash scripts/ci/run-ci.sh
 git status --short
 git diff --check
@@ -1731,8 +1736,8 @@ Run:
 
 ```bash
 cd /home/hein/Workspace/Cortex-cortex-mcp-ff-consent
-uv run pytest tests/test_cortex_mcp_oauth.py tests/test_cortex_mcp.py \
-  tests/test_superadmin_bypass.py -q
+uv run pytest tests/test_cortex_mcp_oauth.py tests/test_cortex_mcp_callback.py \
+  tests/test_cortex_mcp.py tests/test_superadmin_bypass.py -q
 uv run pytest tests/test_cortex_mcp.py::TestReadOnlySurface -q
 bash scripts/ci/run-ci.sh
 git diff --check
