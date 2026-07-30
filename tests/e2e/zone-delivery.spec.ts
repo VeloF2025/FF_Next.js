@@ -6,7 +6,9 @@ import {
   handedOverZone,
   PROJECT_ID,
   registerResult,
+  SNAG_ID,
   ZONE_PATH,
+  zoneQaZone,
 } from './zone-delivery-fixtures';
 
 test.use({
@@ -40,19 +42,19 @@ test.describe('Zone Delivery user journey @contract', () => {
       'Reports',
     ]);
     const summary = page.locator('dl');
-    await expect(summary).toContainText('Zones4');
-    await expect(summary).toContainText('Approved-scope PONs14');
-    await expect(summary).toContainText('Technically live PONs11');
-    await expect(summary).toContainText('Ready for Zone QA2');
-    await expect(summary).toContainText('Handed over1');
+    await expect(summary).toContainText('Zones1');
+    await expect(summary).toContainText('Approved-scope PONs2');
+    await expect(summary).toContainText('Technically live PONs1');
+    await expect(summary).toContainText('Ready for Zone QA0');
+    await expect(summary).toContainText('Handed over0');
     const registerRow = page.getByRole('row', { name: /Etwatwa Zone 12/ });
     await expect(registerRow.getByRole('cell')).toHaveText([
       'Etwatwa Zone 12',
-      '8 / 9',
+      '1 / 2',
       'Port approved',
-      '2',
-      'Passed',
-      'In progress',
+      '1',
+      'Not started',
+      'Not started',
       'Awaiting port approval',
     ]);
 
@@ -154,29 +156,31 @@ test.describe('Zone Delivery user journey @contract', () => {
     ]);
     const liveButton = page.getByRole('button', { name: 'Confirm Technically live for PON 9' });
     await expect(liveButton).toBeDisabled();
-    await expect(liveButton).toHaveAttribute('title', 'PON 9 is waiting for supervised port approval.');
-    await expect(page.getByRole('region', { name: 'Civil Zone QA', exact: true })).toContainText('Passed');
-    await expect(page.getByRole('region', { name: 'Optical Zone QA', exact: true })).toContainText('Failed');
+    await expect(liveButton).toHaveAttribute('title', 'PON 9 port approval is required first');
 
     await expect(page.getByRole('link', { name: 'Active test pack for PON 9' })).toHaveAttribute('href', /test-pack-pon-9/);
     await expect(page.getByRole('link', { name: 'Active FAC' })).toHaveAttribute('href', /fac-zone-12/);
     await expect(page.getByRole('link', { name: 'Active CAC' })).toHaveAttribute('href', /cac-zone-12/);
-    await expect(page.getByText('SHA-256: test-pack-checksum-009')).toBeVisible();
-    await expect(page.getByText('SHA-256: fac-checksum-zone-12')).toBeVisible();
-    await expect(page.getByText('SHA-256: cac-checksum-zone-12')).toBeVisible();
+    await expect(page.getByText(`SHA-256: ${'a'.repeat(64)}`)).toBeVisible();
+    await expect(page.getByText(`SHA-256: ${'b'.repeat(64)}`)).toBeVisible();
+    await expect(page.getByText(`SHA-256: ${'c'.repeat(64)}`)).toBeVisible();
 
-    const snagLink = page.getByRole('link', { name: 'Open in Snags' });
+    const snagLink = page.getByRole('link', { name: `Open snag ${SNAG_ID}` });
     await expect(snagLink).toHaveAttribute(
       'href',
       `/field-ops/snags?project_id=${PROJECT_ID}&zone_no=12&pon_no=9`,
     );
-    const audit = page.getByRole('listitem', { name: 'milestone_reopened' });
-    await expect(audit.getByLabel('milestone_reopened effective time')).toHaveAttribute('datetime', '2026-07-25T10:00:00.000Z');
-    await expect(audit.getByLabel('milestone_reopened recorded time')).toHaveAttribute('datetime', '2026-07-25T10:12:00.000Z');
+    const audit = page.getByRole('listitem', { name: 'port_approved_reopened' });
+    await expect(audit.getByLabel('port_approved_reopened effective time')).toHaveAttribute('datetime', '2026-07-25T10:00:00.000Z');
+    await expect(audit.getByLabel('port_approved_reopened recorded time')).toHaveAttribute('datetime', '2026-07-25T10:12:00.000Z');
     await expect(audit).toContainText('Previous:');
-    await expect(audit).toContainText('"portApproved": true');
-    await expect(audit).toContainText('"portApproved": false');
+    await expect(audit).toContainText('"port_approved":');
+    await expect(audit).toContainText('New: {}');
     await expect(audit).toContainText('Reason: Port label mismatch found during audit.');
+    contract.setZone(zoneQaZone);
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'Civil Zone QA', exact: true })).toContainText('Passed');
+    await expect(page.getByRole('region', { name: 'Optical Zone QA', exact: true })).toContainText('Failed');
     await attachScreenshot(page, testInfo, 'zone-workspace-desktop');
     expect(contract.unexpectedApiRequests).toEqual([]);
   });
@@ -229,7 +233,7 @@ test.describe('Zone Delivery user journey @contract', () => {
     await expect(page.getByRole('button', { name: /Record .* Zone QA/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Upload evidence' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Link maintenance issue for PON 8' })).toBeVisible();
-    await expect(page.getByRole('listitem', { name: 'post_handover_maintenance_linked' }))
+    await expect(page.getByRole('listitem', { name: 'maintenance_linked' }))
       .toContainText('Non-blocking maintenance observation.');
     expect(contract.unexpectedApiRequests).toEqual([]);
   });

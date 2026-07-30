@@ -74,13 +74,13 @@ interface RegisterDocumentInput extends ZoneKey, CommandMeta {
 }
 interface DeliveryBlocker { code: string; message: string; ponNo?: number; entityId?: string }
 interface MilestoneEvidence { effectiveAt: string; actorEmail: string; source: string; reconfirmedAt?: string }
-interface PonDeliveryView { ponStageId: string; ponNo: number; scopeStatus: ScopeStatus; milestones: Partial<Record<PonMilestone, MilestoneEvidence>>; rowVersion: number }
+interface PonDeliveryView { ponStageId: string; ponNo: number; scopeStatus: ScopeStatus; scopeReason: string | null; milestones: Partial<Record<PonMilestone, MilestoneEvidence>>; actions: Record<PonMilestone, MilestoneActionAvailability>; rowVersion: number }
 interface ZoneDeliveryActivity { id: string; action: string; effectiveAt: string; recordedAt: string; actorEmail: string; permission: string; source: string; reason: string | null; previousValue: unknown; newValue: unknown }
 interface ZoneQaView { status: ZoneQaStatus; effectiveAt: string | null; approverEmail: string | null; notes: string }
-interface ZoneDocumentView { id: string; documentType: 'test_pack' | 'fac' | 'cac'; ponStageId?: string; url: string; checksumSha256: string; active: boolean }
-interface ZoneDeliveryView extends ZoneKey { projectName: string; pons: PonDeliveryView[]; civilQa: ZoneQaView; opticalQa: ZoneQaView; documents: ZoneDocumentView[]; status: ZoneDeliveryStatus; blockers: DeliveryBlocker[]; eligibleForZoneQaAt: string | null; handedOverAt: string | null; rowVersion: number }
+interface ZoneDocumentView { id: string; documentType: 'test_pack' | 'fac' | 'cac'; ponStageId?: string; sourceRef: string; url: string | null; checksumSha256: string; active: boolean }
+interface ZoneDeliveryView extends ZoneKey { projectName: string; scopeApproved: boolean; pons: PonDeliveryView[]; civilQa: ZoneQaView; opticalQa: ZoneQaView; documents: ZoneDocumentView[]; snags: ZoneSnagView[]; status: ZoneDeliveryStatus; blockers: DeliveryBlocker[]; eligibleForZoneQaAt: string | null; handedOverAt: string | null; rowVersion: number }
 interface ZoneRegisterFilters { projectId?: string; zoneNo?: number; status?: ZoneDeliveryStatus; blocker?: string; handover?: 'pending' | 'complete'; search?: string }
-interface ZoneRegisterRow extends ZoneKey { projectName: string; status: ZoneDeliveryStatus; includedPons: number; livePons: number; earliestIncompleteGate: PonMilestone | null; blockerCount: number; civilQa: ZoneQaStatus; opticalQa: ZoneQaStatus; handedOverAt: string | null }
+interface ZoneRegisterRow extends ZoneKey { projectName: string; scopeApproved: boolean; status: ZoneDeliveryStatus; includedPons: number | null; livePons: number | null; earliestIncompleteGate: PonMilestone | null; blockerCount: number; civilQa: ZoneQaStatus; opticalQa: ZoneQaStatus; handedOverAt: string | null }
 interface ZoneRegisterResult { rows: ZoneRegisterRow[]; summary: { zones: number; includedPons: number; livePons: number; readyForQa: number; handedOver: number } }
 interface ZoneDeliveryInput { scopeApproved: boolean; pons: PonDeliveryView[]; civilQa: ZoneQaStatus; opticalQa: ZoneQaStatus; hasFac: boolean; hasCac: boolean; openBlockingSnags: number; handedOverAt: string | null }
 interface ZoneDeliveryCalculation { status: ZoneDeliveryStatus; earliestIncompleteGate: PonMilestone | null; blockers: DeliveryBlocker[]; eligibleForZoneQa: boolean; eligibleForHandover: boolean }
@@ -204,9 +204,9 @@ const COMMAND_PERMISSIONS = {
   document: 'construction-qa.zone-delivery.documents-manage',
 } as const;
 ```
-- [ ] Implement multipart `POST /api/zone-delivery/document` for PDF/DOCX/XLSX `test_pack|fac|cac`, plus JSON registration for an existing `exfo_result`; use `vfStorage.uploadFile(buffer, 'zone-delivery', 'documents', safeName)`.
+- [ ] Implement supervised multipart PDF/DOCX/XLSX upload; reject JSON evidence until EXFO ownership can be proved server-side, and allow-list rendered references.
 - [ ] Ensure upload response/metadata contains `source`, `sourceRef`, filename, MIME, size, checksum, effective date, uploader, and superseded document ID. Log failures without file contents.
-- [ ] On database registration failure, delete the just-uploaded VF object; after a snag PATCH, call `recalculateForSnag` with the authenticated actor without changing existing snag semantics.
+- [ ] On registration failure delete the uploaded VF object; authorize snag PATCH with `construction-qa.snags:edit`, return recalculation failure, and retry on same-status PATCH.
 - [ ] Pass `npm test -- --run tests/api/zone-delivery pages/api/snags/__tests__/handlePost.test.ts src/modules/construction-qa/zone-delivery/services/__tests__/zoneDeliveryDocumentStorage.test.ts`, then commit `feat(zone-delivery): add lifecycle APIs and evidence uploads`.
 
 ### Task 5: Replace QA Centre with the operational zone register
@@ -224,7 +224,7 @@ const COMMAND_PERMISSIONS = {
 **Interfaces:**
 - Consumes: `GET /api/zone-delivery/register` → `ZoneRegisterResult`.
 - Produces: `useZoneDeliveryRegister(filters: ZoneRegisterFilters)` and row navigation to the stable zone route.
-- [ ] Write failing component tests for loading, empty, error/retry, summary metrics, every filter, blocker counts, QA columns, handover date, and encoded row navigation.
+- [ ] Test loading, empty, error/retry, summary metrics, every filter, text-only debounce, blocker counts, QA columns, handover date, and encoded navigation.
 - [ ] Implement the typed fetch hook with query-string filters, abort cleanup, refresh, and no browser-side gate calculation.
 - [ ] Implement the dense one-row-per-zone table and summary; navigate rows to `/field-ops/zone?project_id=${encodeURIComponent(id)}&zone_no=${zoneNo}`.
 
@@ -275,7 +275,7 @@ const canConfirmTest = can('construction-qa.zone-delivery.testing-confirm', 'edi
 **Interfaces:**
 - Consumes: the public register/workspace routes and deterministic intercepted API fixtures.
 - Produces: browser evidence only; intercepted tests never claim backend gate coverage.
-- [ ] Write Playwright contract fixtures and tests for tab order, register filters, row deep link, PON gates, disabled reasons, separate QA, FAC/CAC, loading/empty/error, mobile width, and one automatic handover state. Label intercepted tests `@contract`.
+- [ ] Write calculator-validated, production-shaped Playwright fixtures for tab order, filters, row deep link, gates, QA, evidence, errors, mobile width and handover. Label them `@contract`.
 
 ```ts
 await expect(page.getByRole('tab').allTextContents()).resolves.toEqual(

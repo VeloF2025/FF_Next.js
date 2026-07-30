@@ -88,7 +88,7 @@ export async function installZoneDeliveryContract(page: Page): Promise<ZoneDeliv
         success: true,
         data: {
           user: {
-            id: 'contract-super-admin',
+            id: '66666666-6666-4666-8666-666666666666',
             email: 'contract.admin@velocityfibre.co.za',
             name: 'Contract Admin',
             role: 'super_admin',

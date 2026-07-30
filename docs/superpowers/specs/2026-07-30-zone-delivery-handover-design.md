@@ -58,8 +58,7 @@ The QA Centre label remains. No sidebar subtree is introduced.
 zone. Summary metrics show total zones, approved-scope PONs, technically-live
 PONs, zones ready for Zone QA and handed-over zones.
 
-Filters cover project, zone, current gate, blocker, handover state and text
-search. Each row shows:
+Filters cover project, zone, gate, blocker, handover and text search; text inputs debounce while structural filters remain immediate. Each row shows:
 
 - Project and zone
 - Technically-live PONs / approved-scope denominator
@@ -79,7 +78,7 @@ lifecycle rail, scope/live and blocker summary, PON milestone table, separate
 civil/optical Zone QA panels, handover snags, FAC/CAC and activity timeline.
 
 It deep-links to Works QA, OTDR and Snags with the current project/zone/PON.
-Works QA supplies discipline evidence but is not modified into another tracker.
+Works QA remains separate. Commands reset on open/success/cancel; rejects preserve state.
 
 ## 4. Architecture
 
@@ -142,8 +141,8 @@ MIME type, size, checksum, uploader and supersession. Test packs belong to PONs;
 FAC/CAC belong to zones. File bytes use VF Storage.
 
 `zone_delivery_snag_links` connects existing `snags` rows to the zone, optional
-PON, affected gate, handover-blocking flag and reconfirmation requirement. It
-does not create a second snag system.
+PON, QA origin discipline, affected gate, blocking and reconfirmation state.
+Reads and handover snapshots retain the canonical snag status/closure evidence.
 
 `zone_delivery_activity` is append-only: entity/action, effective and recorded
 timestamps, actor/permission, source, reason, and previous/new JSON. Reason is
@@ -153,10 +152,10 @@ mandatory for backdating, correction, exclusion and cancellation.
 
 ### 6.1 Scope
 
-A zone has no denominator until scope approval. Included PONs count;
-excluded/cancelled PONs remain visible but do not. Authorized changes require
-reasons and audit. Adding an included PON before handover immediately
-re-evaluates readiness; normal scope changes are locked after handover.
+A zone has no denominator until exact canonical-set scope approval. Included PONs
+count; excluded/cancelled PONs remain visible but do not. Authorized changes
+require reasons and audit. Material changes invalidate both current Zone QA
+outcomes and eligibility; normal scope changes are locked after handover.
 
 ### 6.2 PON milestones
 
@@ -178,9 +177,9 @@ technically live. Civil and optical inspections have independent pass/fail,
 snags, dates and approvers; both must pass.
 
 A material pre-handover defect preserves original events, reopens the affected
-computed gate, blocks dependants, and requires snag closure plus fresh
-role-appropriate confirmation. The timeline retains original and reconfirmation
-dates. A post-handover defect becomes a linked maintenance issue.
+computed gate, invalidates both Zone QA outcomes and eligibility, blocks
+dependants, and requires snag closure plus fresh role-appropriate confirmation.
+A post-handover defect becomes a linked maintenance issue.
 
 ### 6.4 Automatic handover
 
@@ -193,9 +192,9 @@ and requires:
 - Active FAC and CAC
 - No existing `handed_over_at`
 
-It atomically stamps handover, writes a snapshot of scope, milestones, approvals,
-document checksums and snag IDs, and appends one event. Concurrent requests are
-idempotent. There is no manual toggle.
+It atomically stamps handover, writes scope, milestones, approvals, document
+checksums and full linked-snag status/origin/closure evidence, and appends one
+event. Concurrent requests are idempotent. There is no manual toggle.
 
 ## 7. Measurement and computed status
 
@@ -234,7 +233,8 @@ permissions are:
 - `construction-qa.zone-delivery.documents-manage` — authorized project staff
 
 They use existing PostgreSQL RBAC. The API independently enforces permission,
-evidence and sequence.
+evidence and sequence. Snag status PATCH uses `construction-qa.snags:edit`;
+failed lifecycle recalculation is returned and same-status retry is supported.
 
 Flat routes:
 
@@ -250,7 +250,8 @@ Commands include expected `row_version`; stale writes return `409`. Other stable
 error codes cover permission, scope, prerequisite, evidence, blocking snags and
 already handed over. Responses include actionable blockers such as
 `PON 14 has no active test pack` rather than generic failure. A document counts
-only after VF Storage and database metadata both succeed.
+only after VF Storage and database metadata both succeed. JSON evidence is
+rejected until EXFO ownership is server-verifiable; links use an allow-list.
 
 ## 9. Historical rollout
 
@@ -277,7 +278,7 @@ validation, status codes and structured blockers.
 Playwright on port 3004 verifies the tab order, operational register, filters,
 stable zone deep link, PON evidence, disabled reasons, separate QA workflows,
 FAC/CAC states, responsive behavior and loading/empty/error states. Intercepted
-UI tests are labelled contract tests; service integration proves backend gates.
+UI fixtures are calculator-validated and production-shaped contract tests.
 Final checks include targeted Vitest, Playwright and `npm run ci:quick`.
 
 Acceptance requires FibreFlow to answer, with evidence:

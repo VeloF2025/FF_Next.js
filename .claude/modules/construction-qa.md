@@ -80,7 +80,8 @@ Zone Delivery uses seven flat routes under `pages/api/zone-delivery/`:
 `register`, `zone`, `scope`, `pon-milestone`, `zone-qa`, `document`, and
 `activity`. Reads use `construction-qa.qa-centre:view`; six action permissions
 separately gate scope, construction, testing, operations, Zone QA, and document
-management.
+management. Snag status writes use `construction-qa.snags:edit` and return
+recalculation failures so a repeated saved status can retry reconciliation.
 
 ## Database Tables
 - `qa_photo_reviews` — Photo review records with VLM results
@@ -94,8 +95,11 @@ management.
 ## Zone Delivery safety
 - PON gates and automatic handover are calculated on the server, never inferred
   from Works QA or OTDR evidence in the browser.
+- Scope approval covers the exact canonical PON set. Material scope or reopen
+  changes atomically invalidate both current Zone QA outcomes and eligibility.
 - Test packs, FACs, and CACs are stored in VF Storage with active metadata and
-  SHA-256 checksums.
+  SHA-256 checksums. JSON evidence is rejected until EXFO ownership is provable;
+  supervised uploads validate PDF/OOXML structure and URLs are allow-listed.
 - The database is shared by dev and production. Applying migration 470 requires
   Hein's explicit approval; verification must use the isolated Docker fixture.
 

@@ -14,6 +14,7 @@
 ## Zone Delivery contract
 - Canonical PON lifecycle: Civil complete → Optical complete → Testing passed (active test pack) → Port submitted → Port approved → Technically live.
 - All approved-scope included PONs must be technically live before separate Civil and Optical Zone QA.
+- Scope approval must cover the exact canonical zone PON set; there is no denominator before approval, and material scope/reopen changes atomically invalidate both current Zone QA outcomes and eligibility with append-only audit.
 - Handover is automatic only when both QA disciplines pass, all blocking snags close, and active FAC and CAC certificates exist.
 - Gates, blockers, row versions, timestamps, and handover are server-authoritative; the browser must not recalculate them.
 - Scope exclusions/cancellations, corrections, backdates, reopen/reconfirm actions, evidence checksums, and old/new values are audited.
@@ -23,6 +24,8 @@
 - Seven flat APIs: `/api/zone-delivery/register`, `/zone`, `/scope`, `/pon-milestone`, `/zone-qa`, `/document`, and `/activity`.
 - Migration 470 adds `pon_delivery_state`, `zone_delivery_state`, `zone_delivery_documents`, `zone_delivery_snag_links`, and `zone_delivery_activity`; rollback is `scripts/migrations/sql/rollback_470_zone_delivery_handover.sql`.
 - Test packs, FACs, and CACs use VF Storage; persist active document metadata and SHA-256 evidence only after upload succeeds.
+- Document JSON is rejected until EXFO ownership can be proven server-side; supervised multipart accepts validated PDF/OOXML packages, and only allow-listed references render as links.
+- Snag status PATCH uses `construction-qa.snags:edit`; a recalculation failure is returned, and repeating the saved status retries reconciliation.
 - Action permissions:
   - `construction-qa.zone-delivery.scope-manage`
   - `construction-qa.zone-delivery.construction-confirm`
