@@ -7,6 +7,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { TrainingCertificateUploadDialog } from '@/modules/health-safety/components/training/TrainingCertificateUploadDialog';
+import { TrainingTypeChips } from '@/modules/health-safety/components/training/TrainingTypeMultiSelect';
 import {
   FileText,
   Download,
@@ -24,6 +26,7 @@ import {
   Loader2,
   Sparkles,
   Ban,
+  GraduationCap,
 } from 'lucide-react';
 import {
   StaffDocument,
@@ -55,6 +58,12 @@ interface StaffDocumentListProps {
   onVerify?: (documentId: string, status: 'verified' | 'rejected', notes?: string) => void;
   /** Callback when OCR fields are applied to refresh parent data */
   onOcrApplied?: () => void;
+  /**
+   * Whether the viewer may submit a training certificate. UI visibility is a
+   * convenience, never the control: /api/staff-training-certificates-upload
+   * re-checks people.staff.training-certificates:create on every request.
+   */
+  canUploadTrainingCertificate?: boolean;
 }
 
 // OCR status stored per document
@@ -64,7 +73,14 @@ interface OcrDocumentStatus {
   extractedFieldCount?: number;
 }
 
-export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApplied }: StaffDocumentListProps) {
+export function StaffDocumentList({
+  staffId,
+  isAdmin = false,
+  onVerify,
+  onOcrApplied,
+  canUploadTrainingCertificate = false,
+}: StaffDocumentListProps) {
+  const [showCertificateDialog, setShowCertificateDialog] = useState(false);
   const [documents, setDocuments] = useState<StaffDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -437,14 +453,36 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Documents</h3>
-        <button
-          onClick={() => setShowUploadForm(true)}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Upload Document
-        </button>
+        <div className="flex items-center gap-2">
+          {canUploadTrainingCertificate && (
+            <button
+              onClick={() => setShowCertificateDialog(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm font-medium rounded-lg hover:border-blue-600"
+            >
+              <GraduationCap className="h-4 w-4" />
+              Upload training certificate
+            </button>
+          )}
+          <button
+            onClick={() => setShowUploadForm(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Upload Document
+          </button>
+        </div>
       </div>
+
+      <TrainingCertificateUploadDialog
+        isOpen={showCertificateDialog}
+        staffId={staffId}
+        onClose={() => setShowCertificateDialog(false)}
+        onUploaded={() => {
+          setShowCertificateDialog(false);
+          // Only after the API confirmed the document and its pending rows.
+          fetchDocuments();
+        }}
+      />
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 p-4 ff-bg-tertiary rounded-lg border border-[var(--ff-border-light)]">
@@ -539,6 +577,14 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
                     <p className="text-xs text-[var(--ff-text-secondary)] mt-0.5">{DOCUMENT_TYPE_LABELS[doc.documentType]}</p>
                     {doc.documentNumber && (
                       <p className="text-xs text-[var(--ff-text-secondary)] opacity-70 mt-0.5">#{doc.documentNumber}</p>
+                    )}
+                    {/* A certificate can prove several competencies at once, so
+                        the chips are what make the row meaningful — the document
+                        name alone does not say what it certifies. */}
+                    {doc.trainingTypes && doc.trainingTypes.length > 0 && (
+                      <div className="mt-1.5">
+                        <TrainingTypeChips names={doc.trainingTypes.map((t) => t.name)} />
+                      </div>
                     )}
                     {getExpiryWarning(doc.expiryDate)}
                     {doc.expiryDate && !getExpiryWarning(doc.expiryDate) && (

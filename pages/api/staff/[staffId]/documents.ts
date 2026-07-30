@@ -55,10 +55,24 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
               sd.verified_by, sd.verified_at, sd.verification_notes,
               sd.ocr_metadata, sd.created_at, sd.updated_at,
               CONCAT(s.first_name, ' ', s.last_name) as staff_name,
-              CONCAT(v.first_name, ' ', v.last_name) as verifier_name
+              CONCAT(v.first_name, ' ', v.last_name) as verifier_name,
+              linked.training_types
             FROM staff_documents sd
             LEFT JOIN staff s ON s.id = sd.staff_id
             LEFT JOIN staff v ON v.id = sd.verified_by
+            -- The competencies this certificate evidences. Names and lifecycle
+            -- state only; the join carries no storage location.
+            LEFT JOIN LATERAL (
+              SELECT json_agg(
+                       json_build_object(
+                         'id', tt.id, 'code', tt.code, 'name', tt.name,
+                         'verificationStatus', wt.verification_status
+                       ) ORDER BY tt.sort_order, tt.name
+                     ) AS training_types
+              FROM hs_worker_training wt
+              JOIN hs_training_types tt ON tt.id = wt.training_type_id
+              WHERE wt.staff_document_id = sd.id
+            ) linked ON true
             WHERE sd.staff_id = ${staffId}
             ORDER BY sd.created_at DESC
           `
@@ -70,10 +84,24 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
               sd.verified_by, sd.verified_at, sd.verification_notes,
               sd.ocr_metadata, sd.created_at, sd.updated_at,
               CONCAT(s.first_name, ' ', s.last_name) as staff_name,
-              CONCAT(v.first_name, ' ', v.last_name) as verifier_name
+              CONCAT(v.first_name, ' ', v.last_name) as verifier_name,
+              linked.training_types
             FROM staff_documents sd
             LEFT JOIN staff s ON s.id = sd.staff_id
             LEFT JOIN staff v ON v.id = sd.verified_by
+            -- The competencies this certificate evidences. Names and lifecycle
+            -- state only; the join carries no storage location.
+            LEFT JOIN LATERAL (
+              SELECT json_agg(
+                       json_build_object(
+                         'id', tt.id, 'code', tt.code, 'name', tt.name,
+                         'verificationStatus', wt.verification_status
+                       ) ORDER BY tt.sort_order, tt.name
+                     ) AS training_types
+              FROM hs_worker_training wt
+              JOIN hs_training_types tt ON tt.id = wt.training_type_id
+              WHERE wt.staff_document_id = sd.id
+            ) linked ON true
             WHERE sd.staff_id = ${staffId}
               AND sd.document_type = 'certification'
             ORDER BY sd.created_at DESC
@@ -125,6 +153,7 @@ function mapDbToDocument(row: Record<string, unknown>) {
     verificationNotes: row.verification_notes,
     // OCR-extracted metadata for document verification review
     ocrMetadata: row.ocr_metadata || undefined,
+    trainingTypes: row.training_types || undefined,
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
     staff: row.staff_name ? { id: row.staff_id, name: row.staff_name } : undefined,

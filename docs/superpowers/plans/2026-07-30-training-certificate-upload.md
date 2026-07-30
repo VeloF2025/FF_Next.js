@@ -687,7 +687,7 @@ git commit -m "feat(hs): verify and revoke training evidence"
 - Consumes: `hs_worker_training.verification_status` and linked document id.
 - Produces: verified-only score/gate queries and storage-safe training list rows; manual POST remains available only when `requires_certificate = false`.
 
-- [ ] **Step 1: Add failing verified-only query assertions**
+- [x] **Step 1: Add failing verified-only query assertions**
 
 Assert the aggregate query includes:
 
@@ -698,7 +698,7 @@ WHERE wt.contractor_id = $contractor
 
 Add fixtures proving pending/rejected/revoked rows contribute zero, verified rows contribute once, and an expired verified statutory row still counts as expired evidence.
 
-- [ ] **Step 2: Add failing manual-record API cases**
+- [x] **Step 2: Add failing manual-record API cases**
 
 Require the selected type query to load `requires_certificate`. Assert:
 
@@ -707,7 +707,7 @@ Require the selected type query to load `requires_certificate`. Assert:
 - `certificate_url` in the request is ignored/rejected and never written;
 - GET includes lifecycle status but omits `certificate_url`, `file_url`, and `file_path`.
 
-- [ ] **Step 3: Run the training tests and verify red**
+- [x] **Step 3: Run the training tests and verify red**
 
 Run:
 
@@ -720,19 +720,19 @@ npx vitest run \
 
 Expected: at least the pending/rejected/revoked exclusion cases FAIL.
 
-- [ ] **Step 4: Implement verified-only aggregate and competency reads**
+- [x] **Step 4: Implement verified-only aggregate and competency reads**
 
 Filter at SQL level, not in React. Preserve the current `NULL` score when no verified rows exist. Any project competency matrix query must apply the same verified condition.
 
-- [ ] **Step 5: Restrict manual record creation**
+- [x] **Step 5: Restrict manual record creation**
 
 Use an explicit query branch for the training type. No-certificate manual records are accepted as verified legacy evidence; certificate-required types return the upload-flow route in the error metadata.
 
-- [ ] **Step 6: Remove raw certificate locations from reads**
+- [x] **Step 6: Remove raw certificate locations from reads**
 
 Select only business metadata and return `hasCertificate: staff_document_id IS NOT NULL`. Binary access is always through the protected staff-document download route.
 
-- [ ] **Step 7: Run the H&S training regression set**
+- [x] **Step 7: Run the H&S training regression set**
 
 Run:
 
@@ -746,7 +746,7 @@ npm run type-check
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit the verified-only unit**
+- [x] **Step 8: Commit the verified-only unit**
 
 ```bash
 git add src/modules/health-safety/services/trainingService.ts \

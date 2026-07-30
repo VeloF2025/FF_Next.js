@@ -11,8 +11,9 @@ import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { projectsConfig } from '@/modules/navigation';
-import { GraduationCap, Plus, ChevronLeft, Tag, Settings, AlertTriangle } from 'lucide-react';
+import { GraduationCap, Plus, ChevronLeft, Tag, Settings, AlertTriangle, Upload } from 'lucide-react';
 import { CompetencyBadge, type CompetencyStatus } from '@/modules/health-safety/components/training/CompetencyBadge';
+import type { TrainingVerificationStatus } from '@/modules/health-safety/types/training.types';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -26,7 +27,21 @@ interface TrainingRow {
   expiry_date: string | null;
   days_to_expiry: number | null;
   competency_status: CompetencyStatus;
+  verification_status: TrainingVerificationStatus;
+  hasCertificate: boolean;
 }
+
+/**
+ * Competency status answers "is it in date"; verification answers "has anyone
+ * confirmed it is real". A pending row can look perfectly current and still
+ * count for nothing, so both are shown rather than one standing in for the other.
+ */
+const VERIFICATION_LABELS: Record<TrainingVerificationStatus, { text: string; cls: string }> = {
+  verified: { text: 'Verified', cls: 'bg-green-500/15 text-green-600' },
+  pending: { text: 'Pending', cls: 'bg-yellow-500/15 text-yellow-600' },
+  rejected: { text: 'Rejected', cls: 'bg-red-500/15 text-red-600' },
+  revoked: { text: 'Revoked', cls: 'bg-red-500/15 text-red-600' },
+};
 
 function TrainingContent() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -54,9 +69,16 @@ function TrainingContent() {
             <Settings className="w-4 h-4" />
             Training Types
           </Link>
-          <Link href="/health-safety/training/new" className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-primary-500)] hover:bg-[var(--ff-primary-600)] text-white rounded-lg transition-colors">
+          {/* Manual entry stays for competencies that need no certificate; the
+              primary action is now the certificate upload, which is the only
+              path that produces verifiable evidence. */}
+          <Link href="/health-safety/training/new" className="flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] hover:border-[var(--ff-primary-500)] text-[var(--ff-text-primary)] rounded-lg transition-colors">
             <Plus className="w-4 h-4" />
             Record Training
+          </Link>
+          <Link href="/health-safety/training/certificates/new" className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-primary-500)] hover:bg-[var(--ff-primary-600)] text-white rounded-lg transition-colors">
+            <Upload className="w-4 h-4" />
+            Upload certificate
           </Link>
         </div>
       </div>
@@ -131,7 +153,19 @@ function TrainingContent() {
                     )}
                   </td>
                   <td className="px-4 py-2">
-                    <CompetencyBadge status={r.competency_status} />
+                    <div className="flex items-center gap-1.5">
+                      <CompetencyBadge status={r.competency_status} />
+                      {r.verification_status && r.verification_status !== 'verified' && (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            VERIFICATION_LABELS[r.verification_status]?.cls ?? ''
+                          }`}
+                          title="Only verified evidence counts towards competency"
+                        >
+                          {VERIFICATION_LABELS[r.verification_status]?.text ?? r.verification_status}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
