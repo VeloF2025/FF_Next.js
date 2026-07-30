@@ -1,8 +1,15 @@
+// Lives here, NOT in pages/field-ops/__tests__/, because anything under a
+// non-API pages/ path is a real page route: `next build` collects page data for
+// it, imports vitest outside its runner, and the build dies with "Vitest failed
+// to access its internal state". Test files under pages/api/** are fine — API
+// routes are not page-data-collected, which is why every other test file under
+// pages/ lives there. The rule is the path, not the filename. Page-component
+// tests belong under src/, importing the page by relative path.
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRouter } from 'next/router';
-import ZonePage from '../zone';
+import ZonePage from '../../../../../pages/field-ops/zone';
 
 vi.mock('next/router', () => ({ useRouter: vi.fn() }));
 vi.mock('@/components/layout/AppLayout', () => ({
