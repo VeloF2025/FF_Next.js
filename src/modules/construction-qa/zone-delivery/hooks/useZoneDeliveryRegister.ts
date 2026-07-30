@@ -29,6 +29,7 @@ function registerUrl(filters: ZoneRegisterFilters): string {
 }
 
 export function useZoneDeliveryRegister(filters: ZoneRegisterFilters): ZoneDeliveryRegisterState {
+  const { projectId, zoneNo, status, blocker, handover, search } = filters;
   const [data, setData] = useState<ZoneRegisterResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,10 +43,14 @@ export function useZoneDeliveryRegister(filters: ZoneRegisterFilters): ZoneDeliv
     controllerRef.current = controller;
     setError(null);
     if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    else {
+      setData(null);
+      setLastUpdated(null);
+      setLoading(true);
+    }
 
     try {
-      const response = await fetch(registerUrl(filters), {
+      const response = await fetch(registerUrl({ projectId, zoneNo, status, blocker, handover, search }), {
         credentials: 'include',
         signal: controller.signal,
       });
@@ -58,7 +63,7 @@ export function useZoneDeliveryRegister(filters: ZoneRegisterFilters): ZoneDeliv
         setLastUpdated(new Date());
       }
     } catch (requestError) {
-      if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+      if (requestError instanceof Error && requestError.name === 'AbortError') return;
       if (controllerRef.current === controller) {
         setError(requestError instanceof Error ? requestError.message : 'Unable to load zone delivery register.');
       }
@@ -68,7 +73,9 @@ export function useZoneDeliveryRegister(filters: ZoneRegisterFilters): ZoneDeliv
         setRefreshing(false);
       }
     }
-  }, [filters]);
+  }, [
+    projectId, zoneNo, status, blocker, handover, search,
+  ]);
 
   useEffect(() => {
     void load(false);

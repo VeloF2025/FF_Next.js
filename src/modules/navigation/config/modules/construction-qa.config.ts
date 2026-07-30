@@ -2,8 +2,8 @@
  * Construction QA Module Navigation Configuration
  *
  * Provides tab-based navigation for the Construction QA module:
- * - QA Centre: Feature list for quality assurance review (civil and optical)
- * - Reports: Construction-specific analytics and reporting
+ * - QA Centre: Operational Zone Delivery register
+ * - Works QA, OTDR Testing, Snags, Reports: operational follow-up sequence
  */
 
 import { HardHat, ClipboardCheck, BarChart3, Radio, AlertTriangle, LayoutGrid, List, Table2, Camera } from 'lucide-react';

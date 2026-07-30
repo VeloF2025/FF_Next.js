@@ -22,6 +22,12 @@ const success = (data = registerData) => ({
   json: async () => ({ success: true, data }),
 });
 
+const deferred = <T,>() => {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>(resolvePromise => { resolve = resolvePromise; });
+  return { promise, resolve };
+};
+
 const renderPage = () => render(<ZoneDeliveryRegisterPage />);
 
 const settle = async () => {
@@ -112,6 +118,19 @@ describe('ZoneDeliveryRegisterPage', () => {
       expect(latest.search).toBe('');
     });
     await settle();
+  });
+
+  it('does not display prior rows while a filtered request is delayed or fails', async () => {
+    renderPage();
+    await screen.findByRole('link', { name: 'Project One Zone 7' });
+    const filtered = deferred<ReturnType<typeof success>>();
+    fetchMock.mockReturnValueOnce(filtered.promise);
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'north' } });
+    await expectFilterRequest('search', 'north');
+    expect(screen.queryByRole('link', { name: 'Project One Zone 7' })).not.toBeInTheDocument();
+    filtered.resolve({ ok: false, json: async () => ({ error: { message: 'Filter unavailable' } }) });
+    expect(await screen.findByText('Filter unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Project One Zone 7' })).not.toBeInTheDocument();
   });
 
   it('keeps rows visible while refresh is in progress and updates only after success', async () => {
