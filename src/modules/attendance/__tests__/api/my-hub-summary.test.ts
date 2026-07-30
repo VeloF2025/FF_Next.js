@@ -148,4 +148,28 @@ describe('GET /api/my/hub-summary check reminders', () => {
       },
     });
   });
+
+  it('marks status unavailable when an assignment has no active fleet vehicle', async () => {
+    mocks.sql.mockReset();
+    mocks.sql
+      .mockResolvedValueOnce([{ count: '3' }])
+      .mockResolvedValueOnce([]);
+
+    const { res, captured } = makeRes();
+    await handler(
+      { method: 'GET', query: {}, headers: {} } as NextApiRequest,
+      res
+    );
+
+    expect(captured.body).toMatchObject({
+      success: true,
+      data: {
+        assignedVehicle: {
+          id: 'assignment-1',
+          checkStatusAvailable: false,
+          requiredCheckType: null,
+        },
+      },
+    });
+  });
 });

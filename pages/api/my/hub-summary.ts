@@ -94,7 +94,10 @@ async function findVehicleCheckReminder(
         AND v.status = 'active'
       LIMIT 1
     `;
-    return { available: true, reminder: rows[0] ?? null };
+    return {
+      available: rows.length > 0,
+      reminder: rows[0] ?? null,
+    };
   } catch (error) {
     log.warn('[my/hub-summary] vehicle check reminder unavailable', {
       error,
