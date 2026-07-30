@@ -45,7 +45,16 @@ test.describe('Zone Delivery user journey @contract', () => {
     await expect(summary).toContainText('Technically live PONs11');
     await expect(summary).toContainText('Ready for Zone QA2');
     await expect(summary).toContainText('Handed over1');
-    await expect(page.getByRole('row', { name: /Etwatwa Zone 12/ })).toContainText('8 / 9');
+    const registerRow = page.getByRole('row', { name: /Etwatwa Zone 12/ });
+    await expect(registerRow.getByRole('cell')).toHaveText([
+      'Etwatwa Zone 12',
+      '8 / 9',
+      'Port approved',
+      '2',
+      'Passed',
+      'In progress',
+      'Awaiting port approval',
+    ]);
 
     const waitForQuery = (key: string, value: string) => page.waitForRequest(request => {
       const url = new URL(request.url());
@@ -113,9 +122,27 @@ test.describe('Zone Delivery user journey @contract', () => {
 
   test('navigates to authoritative PON gates, QA, evidence, snags, and audit history', async ({ page }, testInfo) => {
     const contract = await installZoneDeliveryContract(page);
+    const workspaceReads = {
+      zone: [] as string[],
+      activity: [] as string[],
+    };
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (url.pathname === '/api/zone-delivery/zone') {
+        workspaceReads.zone.push(`${request.method()} ${url.pathname}${url.search}`);
+      }
+      if (url.pathname === '/api/zone-delivery/activity') {
+        workspaceReads.activity.push(`${request.method()} ${url.pathname}${url.search}`);
+      }
+    });
     await page.goto('/field-ops');
     await page.getByRole('link', { name: 'Etwatwa Zone 12' }).click();
     await expect(page).toHaveURL(new RegExp(`${ZONE_PATH.replaceAll('?', '\\?')}$`));
+    const expectedQuery = `project_id=${PROJECT_ID}&zone_no=12`;
+    await expect.poll(() => [...new Set(workspaceReads.zone)])
+      .toEqual([`GET /api/zone-delivery/zone?${expectedQuery}`]);
+    await expect.poll(() => [...new Set(workspaceReads.activity)])
+      .toEqual([`GET /api/zone-delivery/activity?${expectedQuery}`]);
 
     await expect(page.getByTestId('lifecycle-gate')).toHaveText([
       'Civil complete',
@@ -152,6 +179,43 @@ test.describe('Zone Delivery user journey @contract', () => {
     await expect(audit).toContainText('Reason: Port label mismatch found during audit.');
     await attachScreenshot(page, testInfo, 'zone-workspace-desktop');
     expect(contract.unexpectedApiRequests).toEqual([]);
+  });
+
+  test('fails closed on malformed known read contracts', async ({ page }) => {
+    const contract = await installZoneDeliveryContract(page);
+    await page.goto('/field-ops');
+    await expect(page.getByRole('link', { name: 'Etwatwa Zone 12' })).toBeVisible();
+
+    const reads = [
+      { method: 'POST', path: '/api/zone-delivery/register' },
+      { method: 'GET', path: '/api/zone-delivery/register?unexpected=1' },
+      { method: 'POST', path: `/api/zone-delivery/zone?project_id=${PROJECT_ID}&zone_no=12` },
+      { method: 'GET', path: `/api/zone-delivery/zone?project_id=${PROJECT_ID}` },
+      { method: 'GET', path: '/api/zone-delivery/zone?project_id=wrong&zone_no=12' },
+      {
+        method: 'POST',
+        path: `/api/zone-delivery/activity?project_id=${PROJECT_ID}&zone_no=12`,
+      },
+      {
+        method: 'GET',
+        path: `/api/zone-delivery/activity?project_id=${PROJECT_ID}&zone_no=12&zone_no=12`,
+      },
+      {
+        method: 'GET',
+        path: `/api/zone-delivery/activity?project_id=${PROJECT_ID}&zone_no=12&unexpected=1`,
+      },
+    ];
+    const statuses = await page.evaluate(async candidates => Promise.all(
+      candidates.map(async candidate => {
+        const response = await fetch(candidate.path, { method: candidate.method });
+        return response.status;
+      }),
+    ), reads);
+
+    expect(statuses).toEqual(reads.map(() => 418));
+    const expectedUnexpected = reads.map(({ method, path }) => `${method} ${path}`).sort();
+    expect(contract.unexpectedApiRequests).toHaveLength(expectedUnexpected.length);
+    expect([...contract.unexpectedApiRequests].sort()).toEqual(expectedUnexpected);
   });
 
   test('renders automatic handover as terminal while preserving post-handover maintenance', async ({ page }) => {
