@@ -28,4 +28,9 @@ describe('calculateFreshness', () => {
     expect(calculateFreshness(null).state).toBe('unknown');
     expect(calculateFreshness('not-a-date').state).toBe('unknown');
   });
+
+  // Catches an invalid current time being treated as a zero-hour fresh interval.
+  it('returns unknown for an invalid current time', () => {
+    expect(calculateFreshness('2026-07-30T08:00:00Z', new Date('invalid')).state).toBe('unknown');
+  });
 });

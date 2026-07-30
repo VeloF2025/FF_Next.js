@@ -23,7 +23,7 @@ function nextSastMidnightUtc(ms: number): number {
 export function weekdayAgeHours(startIso: string, end: Date): number | null {
   const start = Date.parse(startIso);
   const endMs = end.getTime();
-  if (!Number.isFinite(start) || endMs < start) return null;
+  if (!Number.isFinite(start) || !Number.isFinite(endMs) || endMs < start) return null;
 
   let cursor = start;
   let weekdayMs = 0;
