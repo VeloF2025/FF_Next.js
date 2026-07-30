@@ -42,7 +42,8 @@ if (!DB_URL) throw new Error('DATABASE_URL not set');
 // `metadata.onemap_prefix` (see discoverProjects); otherwise the sweep refreshes
 // onemap_properties and skips stage tracking. So renaming a code here without
 // repointing that column does not corrupt anything — it stops stage tracking for
-// that project until the column follows. Mohadin's is already `MOA`.
+// that project until the column follows. Mohadin's `projects.metadata.onemap_prefix`
+// row was repointed to `MOA` in the database on 2026-07-30, so the pair is in step.
 //
 // `MOH` is deliberately gone rather than kept alongside `MOA`: it now returns only
 // ~1,613 records from sites that were never in this list (NYA, KAT, IVO, SOS, …),
