@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-30
 **Branch:** `feat/zone-handover-register`
-**Status:** Approved design → user specification review
+**Status:** Approved for implementation
 **Source:** Johan Scott, *Zone Handover & PON Submission Tracking*, 2026-07-29
 
 ## 1. Problem and goal
