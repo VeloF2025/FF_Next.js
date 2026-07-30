@@ -1,3 +1,23 @@
+> ## ⚠️ Read this first — the body below is dated 2026-07-29 12:45 and its live-state claims have moved
+>
+> Re-verified 2026-07-30 10:40 SAST. The lessons and defect write-ups below remain valid;
+> these four statements about the running system do not.
+>
+> | The body says | Verified now |
+> |---|---|
+> | "**Production is untouched**" | **False.** `ff-remote-mcp-production.service` is **active**, `ActiveEnterTimestamp` 2026-07-30 03:59:23 SAST. Prod `.env.local` carries both `FF_MCP_CALLBACK_SECRET` and `FF_REMOTE_MCP_URL`, and `apps/ff_mcp/` + `pages/api/ff-remote-mcp/[...path].ts` are deployed. The connector is **live in production**. |
+> | "1 intentional: `python3 -m ff_mcp` (PID `3640487`) — do not kill it" | **PID 3640487 no longer exists.** The real process is **PID 3148**, in cgroup `ff-remote-mcp-production.service`. The *dev* unit `ff-remote-mcp` is **inactive**. |
+> | "Dev runs `d96d677e8`; master is `865c2e75c`" | master `e49b84bb8`, production `e49b84bb8`, dev `41fe36b29`. |
+> | "Worktrees: 25 open" | 7. |
+>
+> **Do not act on a pinned PID from any handoff.** Resolve the process from its unit
+> instead — `systemctl --user status ff-remote-mcp-production` — because a recycled PID
+> makes "do not kill 3640487" point at an unrelated process while leaving the real
+> production service looking unaccounted for.
+>
+> Before trusting any SHA, count, or process fact below, re-check it:
+> `git fetch origin && git log origin/master --oneline -5`
+
 # Handoff — 2026-07-29 12:45 SAST
 
 **Project:** FF_Next.js (FibreFlow)
@@ -14,11 +34,13 @@ Two Definition-of-Done items remain, both needing a human or a second account: a
 connector through the **claude.ai UI** (the protocol flow is proven, the UI path is not),
 and the **two-user scoping check**.
 
-⚠️ **Dev is behind master.** Dev runs `d96d677e8`; master is `865c2e75c`, five commits
-ahead from *other* sessions (#2303 agent-docs, #2306 1Map contact sync, #2307 serial
-receipt batching, #2308 DR-photo resolver, #2309 deploy control script) plus this
-session's docs-only #2302. Nothing connector-related is missing from dev. Redeploying dev
-would pull in those other sessions' work — check with them before doing it.
+⚠️ **Dev is behind master.** Dev runs `d96d677e8`; master is `865c2e75c`, **eight PRs
+ahead** — seven from *other* sessions (#2303 agent-docs, #2304 1Map GPS fallback, #2305
+ambiguous pole matches, #2306 1Map contact sync, #2307 serial receipt batching, #2308
+DR-photo resolver, #2309 deploy control script) plus this session's docs-only #2302.
+Nothing connector-related is missing from dev. Redeploying dev would pull in those other
+sessions' work — check with them before doing it. Recount with
+`git log --first-parent --oneline d96d677e8..865c2e75c` rather than trusting this list.
 
 ## What got done this session
 
@@ -51,7 +73,11 @@ would pull in those other sessions' work — check with them before doing it.
    **separate** `FF_MCP_CALLBACK_SECRET` + `FF_REMOTE_MCP_URL` in the prod app env, and a
    systemd drop-in overriding `WorkingDirectory`, `FF_REMOTE_MCP_PORT`, `StateDirectory`
    **and** `EnvironmentFile`. The base unit is dev-shaped and one-instance-per-host is the
-   documented assumption. Do **not** set `FF_MCP_TOKEN_UI_ENABLED` on prod.
+   documented assumption. The connector's own env is only `FF_MCP_CALLBACK_SECRET`,
+   `FF_REMOTE_MCP_URL` and `FF_REMOTE_MCP_PUBLIC_BASE` — `FF_MCP_TOKEN_UI_ENABLED` is
+   **not** part of it (it gates the unrelated read-only MCP *token* UI in
+   `pages/api/me/mcp-tokens*` and `pages/cortex.tsx`; no connector file reads it, so decide
+   it on that feature's own merits).
 
 ## Open questions / blockers
 
