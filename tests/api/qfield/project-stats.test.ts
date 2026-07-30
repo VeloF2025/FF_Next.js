@@ -1,0 +1,129 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMocks } from 'node-mocks-http';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { ErrorCode } from '@/lib/apiResponse';
+import { ProjectStatsError } from '@/modules/qfield-sync/project-stats/errors';
+
+const { getProjectStats } = vi.hoisted(() => ({
+  getProjectStats: vi.fn(),
+}));
+
+vi.mock('@/modules/qfield-sync/project-stats/projectStatsService', () => ({
+  getProjectStats,
+}));
+
+vi.mock('@/lib/logger', () => ({
+  log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
+import { projectStatsHandler } from '@/pages/api/qfield/project-stats';
+
+function request(
+  method = 'GET',
+  query: Record<string, string> = { project: 'Mahikeng' }
+) {
+  const mocks = createMocks<NextApiRequest, NextApiResponse>({ method, query });
+  Object.assign(mocks.req, {
+    user: {
+      id: 'u1',
+      email: 'user@example.com',
+      role: 'admin',
+      permissions: ['projects.view'],
+    },
+  });
+  return mocks;
+}
+
+function responseBody(res: NextApiResponse): Record<string, unknown> {
+  return JSON.parse((res as NextApiResponse & { _getData(): string })._getData());
+}
+
+describe('GET /api/qfield/project-stats', () => {
+  beforeEach(() => getProjectStats.mockReset());
+
+  it('returns the standard success envelope with the authenticated user and request ID', async () => {
+    getProjectStats.mockResolvedValue({ status: 'complete', generatedAt: 'now' });
+    const { req, res } = request();
+
+    await projectStatsHandler(req, res);
+
+    expect(res._getStatusCode()).toBe(200);
+    expect(responseBody(res)).toMatchObject({
+      success: true,
+      data: { status: 'complete' },
+      meta: { requestId: expect.any(String) },
+    });
+    expect(res.getHeader('X-Request-Id')).toEqual(expect.any(String));
+    expect(getProjectStats).toHaveBeenCalledWith(
+      { project: 'Mahikeng', section: 'summary', page: 1, limit: 50 },
+      expect.objectContaining({ userId: 'u1', userEmail: 'user@example.com' })
+    );
+  });
+
+  it('rejects non-GET methods without calling the service', async () => {
+    const { req, res } = request('POST');
+
+    await projectStatsHandler(req, res);
+
+    expect(res._getStatusCode()).toBe(405);
+    expect(responseBody(res)).toMatchObject({
+      success: false,
+      error: { code: ErrorCode.METHOD_NOT_ALLOWED },
+    });
+    expect(getProjectStats).not.toHaveBeenCalled();
+  });
+
+  it('maps invalid real query input to BAD_REQUEST without exposing a stack trace', async () => {
+    const { req, res } = request('GET', { project: '' });
+
+    await projectStatsHandler(req, res);
+
+    expect(res._getStatusCode()).toBe(400);
+    expect(responseBody(res)).toMatchObject({
+      success: false,
+      error: { code: ErrorCode.BAD_REQUEST },
+      meta: { requestId: expect.any(String) },
+    });
+    expect(res._getData()).not.toContain('stack');
+  });
+
+  it.each([
+    [ErrorCode.NOT_FOUND, 404, undefined],
+    [ErrorCode.CONFLICT, 409, { candidates: [{ id: 'project-1', name: 'Mahikeng' }] }],
+    [ErrorCode.VALIDATION_ERROR, 422, { reason: 'No active QField link' }],
+    [ErrorCode.SERVICE_UNAVAILABLE, 503, undefined],
+  ])('maps %s to HTTP %i with only safe domain details', async (code, status, details) => {
+    getProjectStats.mockRejectedValueOnce(
+      new ProjectStatsError(code, 'Safe domain message', details)
+    );
+    const { req, res } = request();
+
+    await projectStatsHandler(req, res);
+
+    expect(res._getStatusCode()).toBe(status);
+    expect(responseBody(res)).toMatchObject({
+      success: false,
+      error: { code, message: 'Safe domain message', ...(details ? { details } : {}) },
+      meta: { requestId: expect.any(String) },
+    });
+  });
+
+  it('returns a generic 500 for unexpected errors without exposing error details', async () => {
+    getProjectStats.mockRejectedValueOnce(new Error('database password leaked'));
+    const { req, res } = request();
+
+    await projectStatsHandler(req, res);
+
+    expect(res._getStatusCode()).toBe(500);
+    expect(responseBody(res)).toMatchObject({
+      success: false,
+      error: {
+        code: ErrorCode.INTERNAL_ERROR,
+        message: 'QField project statistics request failed',
+      },
+      meta: { requestId: expect.any(String) },
+    });
+    expect(res._getData()).not.toContain('database password leaked');
+    expect(res._getData()).not.toContain('stack');
+  });
+});
