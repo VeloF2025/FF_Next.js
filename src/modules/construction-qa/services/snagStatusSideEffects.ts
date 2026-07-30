@@ -27,7 +27,7 @@ export async function runSnagStatusSideEffects(input: {
   nocTicketId?: string | null;
   actor: DeliveryActor;
 }): Promise<void> {
-  const { snagId, previousStatus, requestedStatus, nocTicketId, actor } = input;
+  const { snagId, requestedStatus, nocTicketId, actor } = input;
   if (requestedStatus && nocTicketId) {
     const ticketStatus = ticketStatusFor(requestedStatus);
     if (ticketStatus) {
@@ -46,7 +46,7 @@ export async function runSnagStatusSideEffects(input: {
       }
     }
   }
-  if (!requestedStatus || requestedStatus === previousStatus) return;
+  if (!requestedStatus) return;
   try {
     await zoneDeliveryService.recalculateForSnag(snagId, actor);
   } catch (recalculationError) {
@@ -57,5 +57,6 @@ export async function runSnagStatusSideEffects(input: {
         ? recalculationError.message
         : String(recalculationError),
     });
+    throw recalculationError;
   }
 }

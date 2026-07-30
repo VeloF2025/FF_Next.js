@@ -11,12 +11,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { querySnagsByReport, querySnagsByProject, querySnagsByProjectAndZone } from './snags-query';
 import { runSnagStatusSideEffects } from '@/modules/construction-qa/services/snagStatusSideEffects';
 import type { Snag, CreateSnagRequest, UpdateSnagRequest } from '@/modules/construction-qa/types/snag.types';
 
 const sql = neon(process.env.DATABASE_URL!);
+const SNAGS_PERMISSION = 'construction-qa.snags';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -26,7 +27,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'POST':
         return await handlePost(req, res);
       case 'PATCH':
-        return await handlePatch(req, res);
+        return await authorizedPatch(req, res);
       default:
         return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['GET', 'POST', 'PATCH']);
     }
@@ -248,9 +249,10 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
   if (existing.length === 0) return apiResponse.notFound(res, 'Snag', body.id);
 
   // Derive timestamp fields from status transition
-  const fixedAt     = (body.status === 'pending_qa' || body.status === 'fixed') ? new Date().toISOString() : null;
-  const verifiedAt  = body.status === 'verified' ? new Date().toISOString() : null;
-  const closedAt    = body.status === 'closed'   ? new Date().toISOString() : null;
+  const statusChanged = body.status !== undefined && body.status !== existing[0]!.status;
+  const fixedAt     = statusChanged && (body.status === 'pending_qa' || body.status === 'fixed') ? new Date().toISOString() : null;
+  const verifiedAt  = statusChanged && body.status === 'verified' ? new Date().toISOString() : null;
+  const closedAt    = statusChanged && body.status === 'closed'   ? new Date().toISOString() : null;
   const assignedAt  = body.assigned_to           ? new Date().toISOString() : null;
 
   const rows = await sql`
@@ -284,12 +286,14 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
     actor: {
       userId: user.id,
       email: user.email,
-      permission: 'construction-qa.snags.manage',
+      permission: SNAGS_PERMISSION,
     },
   });
 
   log.info('Snag updated', { snagId: body.id, status: body.status });
   return apiResponse.success(res, updatedSnag);
 }
+
+const authorizedPatch = withPermission(SNAGS_PERMISSION, 'edit')(handlePatch);
 
 export default withAuth(handler);
