@@ -95,6 +95,22 @@ const snapshot: RolloutSnapshot = {
       currentStaffRole: 'staff',
       linkedStaffId: 'staff-b',
     },
+    {
+      candidateId: 'member-c',
+      candidateName: 'Second Lead',
+      teamName: 'Conflict Team',
+      evidenceSource: 'team_members.is_team_lead',
+      currentStaffRole: null,
+      linkedStaffId: null,
+    },
+    {
+      candidateId: 'member-d',
+      candidateName: 'Admin Lead',
+      teamName: 'Demo Team',
+      evidenceSource: 'team_members.is_team_lead',
+      currentStaffRole: 'admin',
+      linkedStaffId: 'staff-d',
+    },
   ],
 };
 
@@ -130,6 +146,12 @@ describe('H&S operational rollout pack', () => {
     expect(files['crew-lead-candidates.csv']).toContain(
       'member-b,"First, Lead",Conflict Team,team_members.is_team_lead,staff-b,staff,supervisor,pending'
     );
+    expect(files['crew-lead-candidates.csv']).toContain(
+      'member-c,Second Lead,Conflict Team,team_members.is_team_lead,,,,identity_link_required'
+    );
+    expect(files['crew-lead-candidates.csv']).toContain(
+      'member-d,Admin Lead,Demo Team,team_members.is_team_lead,staff-d,admin,,access_already_granted'
+    );
   });
 
   it('marks the announcement as unsent and includes the approved safety messages', () => {
@@ -155,7 +177,10 @@ describe('H&S operational rollout pack', () => {
         unresolved: 1,
       },
       medicalBlockers: 1,
-      crewLeadCandidates: 1,
+      crewLeadCandidates: 3,
+      crewLeadRoleChangesReady: 1,
+      crewLeadIdentityLinksRequired: 1,
+      crewLeadAccessAlreadyGranted: 1,
     });
     expect(files['README.md']).not.toContain('Demo Worker');
     expect(files['README.md']).toContain('No production data was changed');

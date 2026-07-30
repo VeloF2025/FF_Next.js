@@ -150,6 +150,10 @@ function medicalCsv(snapshot: RolloutSnapshot): string {
   ]);
 }
 
+function hasCrewAccess(role: string | null): boolean {
+  return role === 'admin' || role === 'supervisor';
+}
+
 function leadCsv(snapshot: RolloutSnapshot): string {
   return renderCsv([
     [
@@ -169,8 +173,12 @@ function leadCsv(snapshot: RolloutSnapshot): string {
       row.evidenceSource,
       row.linkedStaffId ?? '',
       row.currentStaffRole ?? '',
-      'supervisor',
-      'pending',
+      row.linkedStaffId && !hasCrewAccess(row.currentStaffRole) ? 'supervisor' : '',
+      !row.linkedStaffId
+        ? 'identity_link_required'
+        : hasCrewAccess(row.currentStaffRole)
+          ? 'access_already_granted'
+          : 'pending',
     ]),
   ]);
 }
@@ -211,6 +219,9 @@ No production data was changed and no announcement was sent.
 - Contractor mappings unresolved: ${unresolved}
 - Blocked check-ins included for private H&S follow-up: ${snapshot.blockedCheckins.length}
 - Crew-lead candidates included for role review: ${snapshot.leadEvidence.length}
+- Crew-lead candidates linked to staff and ready for role review: ${snapshot.leadEvidence.filter((row) => row.linkedStaffId && !hasCrewAccess(row.currentStaffRole)).length}
+- Crew-lead candidates requiring an identity link first: ${snapshot.leadEvidence.filter((row) => !row.linkedStaffId).length}
+- Crew-lead candidates who already have admin/supervisor access: ${snapshot.leadEvidence.filter((row) => hasCrewAccess(row.currentStaffRole)).length}
 - Active team members linked to contractors: ${snapshot.adoption.linkedMembers}/${snapshot.adoption.activeMembers}
 - Active teams linked to contractors: ${snapshot.adoption.linkedTeams}/${snapshot.adoption.activeTeams}
 
@@ -240,6 +251,15 @@ function renderManifest(
       },
       medicalBlockers: snapshot.blockedCheckins.length,
       crewLeadCandidates: snapshot.leadEvidence.length,
+      crewLeadRoleChangesReady: snapshot.leadEvidence.filter(
+        (row) => row.linkedStaffId && !hasCrewAccess(row.currentStaffRole)
+      ).length,
+      crewLeadIdentityLinksRequired: snapshot.leadEvidence.filter(
+        (row) => !row.linkedStaffId
+      ).length,
+      crewLeadAccessAlreadyGranted: snapshot.leadEvidence.filter((row) =>
+        hasCrewAccess(row.currentStaffRole)
+      ).length,
       adoption: snapshot.adoption,
     },
     null,
