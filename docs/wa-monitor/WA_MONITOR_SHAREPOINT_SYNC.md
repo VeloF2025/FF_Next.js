@@ -21,7 +21,7 @@ WhatsApp Groups → VPS Drop Monitor → Neon Database → SharePoint Sync → E
 - **Watchdog Check**: 8:30pm SAST daily (20:30 SAST / 18:30 UTC)
 
 ## Email Notifications
-Sent to: **ai@velocityfibre.co.za**, **louisrdup@gmail.com**
+Sent to: **ai@velocityfibre.co.za**
 
 ### Email Types
 
@@ -334,7 +334,6 @@ RESEND_API_KEY=re_WpkyH4zg_9rdRJY6U1LqdJNyyPmadCMU2
 
 ### Email Recipients
 - ai@velocityfibre.co.za
-- louisrdup@gmail.com
 
 ### VPS Access
 - **Server**: 72.60.17.245
