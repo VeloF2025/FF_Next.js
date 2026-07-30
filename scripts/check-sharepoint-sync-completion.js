@@ -29,7 +29,7 @@ if (fs.existsSync(envPath)) {
 
 // Configuration
 const LOG_FILE = '/var/log/wa-monitor-sharepoint-sync.log';
-const NOTIFICATION_EMAILS = ['ai@velocityfibre.co.za', 'louisrdup@gmail.com'];
+const NOTIFICATION_EMAILS = ['ai@velocityfibre.co.za'];
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const CHECK_TIME_WINDOW = 30 * 60 * 1000; // 30 minutes
 
