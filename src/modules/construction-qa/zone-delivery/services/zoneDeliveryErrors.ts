@@ -7,6 +7,10 @@ export type ZoneDeliveryErrorCode =
   | 'ZONE_NOT_FOUND'
   | 'VALIDATION_ERROR';
 
+export const POSTGRES_INTEGER_MAX = 2_147_483_647;
+// Browser and API clocks may differ slightly; anything beyond five minutes is material.
+export const MAX_EFFECTIVE_AT_FUTURE_SKEW_MS = 5 * 60_000;
+
 export class ZoneDeliveryError extends Error {
   constructor(
     public readonly code: ZoneDeliveryErrorCode,
@@ -43,9 +47,13 @@ export function validateMeta(
   correction = false,
 ): void {
   const effectiveAt = new Date(meta.effectiveAt);
-  if (!meta.source.trim() || !Number.isInteger(meta.expectedRowVersion)
-    || meta.expectedRowVersion < 0 || Number.isNaN(effectiveAt.valueOf())) {
+  if (!meta.source.trim() || !Number.isSafeInteger(meta.expectedRowVersion)
+    || meta.expectedRowVersion < 0 || meta.expectedRowVersion > POSTGRES_INTEGER_MAX
+    || Number.isNaN(effectiveAt.valueOf())) {
     deliveryError('VALIDATION_ERROR', 'Valid source, row version and effective time are required');
+  }
+  if (effectiveAt.valueOf() - transactionTime.valueOf() > MAX_EFFECTIVE_AT_FUTURE_SKEW_MS) {
+    deliveryError('VALIDATION_ERROR', 'Effective time is too far in the future');
   }
   const backdated = transactionTime.valueOf() - effectiveAt.valueOf() > 5 * 60_000;
   if ((backdated || correction) && !hasReason(meta.reason)) {

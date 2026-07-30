@@ -95,7 +95,10 @@ describe('zone delivery command routes', () => {
 
   it.each([
     [{ ...meta, zoneNo: 0, pons: [] }, 'zoneNo'],
+    [{ ...meta, zoneNo: 2_147_483_648, pons: [] }, 'zoneNo'],
+    [{ ...meta, zoneNo: Number.MAX_SAFE_INTEGER + 1, pons: [] }, 'zoneNo'],
     [{ ...meta, expectedRowVersion: -1, pons: [] }, 'expectedRowVersion'],
+    [{ ...meta, expectedRowVersion: 2_147_483_648, pons: [] }, 'expectedRowVersion'],
     [{ ...meta, effectiveAt: 'invalid', pons: [] }, 'effectiveAt'],
     [{ ...meta, source: ' ', pons: [] }, 'source'],
     [{ ...meta, pons: [{ ponStageId, scopeStatus: 'unknown' }] }, 'scopeStatus'],
@@ -104,6 +107,34 @@ describe('zone delivery command routes', () => {
     expect(res.statusCode).toBe(400);
     expect(JSON.stringify(res.body)).toContain(field);
     expect(h.updateScope).not.toHaveBeenCalled();
+  });
+
+  it('allows five minutes of clock skew and rejects materially future timestamps', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-30T08:00:00.000Z'));
+    try {
+      h.updateScope.mockResolvedValue({ rowVersion: 3 });
+      const withinTolerance = await call(scopeHandler, 'POST', {
+        ...meta,
+        effectiveAt: '2026-07-30T08:05:00.000Z',
+        pons: [],
+      });
+      expect(withinTolerance.statusCode).toBe(200);
+
+      const beyondTolerance = await call(scopeHandler, 'POST', {
+        ...meta,
+        effectiveAt: '2026-07-30T08:05:00.001Z',
+        pons: [],
+      });
+      expect(beyondTolerance.statusCode).toBe(400);
+      expect(beyondTolerance.body).toMatchObject({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid effectiveAt' },
+      });
+      expect(h.updateScope).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([

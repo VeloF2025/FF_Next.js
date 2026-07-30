@@ -12,7 +12,11 @@ import type {
   ZoneKey,
   ZoneRegisterFilters,
 } from '../types/zoneDelivery.types';
-import { ZoneDeliveryError } from './zoneDeliveryErrors';
+import {
+  MAX_EFFECTIVE_AT_FUTURE_SKEW_MS,
+  POSTGRES_INTEGER_MAX,
+  ZoneDeliveryError,
+} from './zoneDeliveryErrors';
 
 export const READ_PERMISSION = 'construction-qa.qa-centre';
 export const COMMAND_PERMISSIONS = {
@@ -56,15 +60,26 @@ const uuid = (value: unknown, field: string, required = true): string | undefine
   if (result !== undefined && !UUID.test(result)) return invalid(field);
   return result;
 };
-const integer = (value: unknown, field: string, positive = false): number => {
-  if (!Number.isInteger(value) || (positive ? Number(value) <= 0 : Number(value) < 0)) {
+const integer = (
+  value: unknown,
+  field: string,
+  positive = false,
+  maximum = POSTGRES_INTEGER_MAX,
+): number => {
+  if (!Number.isSafeInteger(value) || Number(value) > maximum
+    || (positive ? Number(value) <= 0 : Number(value) < 0)) {
     return invalid(field);
   }
   return Number(value);
 };
-const coercedInteger = (value: unknown, field: string, positive = false): number => {
+const coercedInteger = (
+  value: unknown,
+  field: string,
+  positive = false,
+  maximum = POSTGRES_INTEGER_MAX,
+): number => {
   const result = typeof value === 'string' && value.trim() ? Number(value) : value;
-  return integer(result, field, positive);
+  return integer(result, field, positive, maximum);
 };
 const member = <T extends string>(value: unknown, values: ReadonlySet<T>, field: string): T => {
   if (typeof value !== 'string' || !values.has(value as T)) return invalid(field);
@@ -77,7 +92,11 @@ const singleQuery = (value: string | string[] | undefined, field: string): strin
 
 function commandMeta(body: Record<string, unknown>, coerceNumbers = false) {
   const effectiveAt = string(body.effectiveAt, 'effectiveAt')!;
-  if (Number.isNaN(new Date(effectiveAt).valueOf())) return invalid('effectiveAt');
+  const effectiveTime = new Date(effectiveAt).valueOf();
+  if (Number.isNaN(effectiveTime)
+    || effectiveTime - Date.now() > MAX_EFFECTIVE_AT_FUTURE_SKEW_MS) {
+    return invalid('effectiveAt');
+  }
   const parseInteger = coerceNumbers ? coercedInteger : integer;
   return {
     projectId: uuid(body.projectId, 'projectId')!,
@@ -176,7 +195,7 @@ export function parseDocumentBody(
     sourceRef: string(body.sourceRef, 'sourceRef')!,
     filename: string(body.filename, 'filename')!,
     mimeType: string(body.mimeType, 'mimeType')!,
-    sizeBytes: integer(body.sizeBytes, 'sizeBytes'),
+    sizeBytes: integer(body.sizeBytes, 'sizeBytes', false, Number.MAX_SAFE_INTEGER),
     checksumSha256: checksum,
   };
 }
