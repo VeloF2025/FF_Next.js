@@ -1,4 +1,4 @@
-import { query } from '@/lib/db-pool';
+import { query, type SqlRow } from '@/lib/db-pool';
 
 export interface ProjectCandidate {
   matchRank: number;
@@ -18,7 +18,7 @@ export interface ProjectResolverRepository {
 
 export const projectResolverRepo: ProjectResolverRepository = {
   async findCandidates(identifier) {
-    return query<ProjectCandidate>(
+    return query<ProjectCandidate & SqlRow>(
       `
       SELECT
         CASE
