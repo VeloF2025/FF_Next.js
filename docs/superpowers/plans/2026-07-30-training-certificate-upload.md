@@ -386,15 +386,15 @@ export async function canDeleteStaffDocument(
 
 `canUploadStaffDocument` remains the common upload interface: certification delegates to the dedicated `create` permission and does not allow self-upload. `canApproveDocuments(userId, documentType?)` delegates certification to dedicated `edit`, while other document types keep the existing sensitive rule.
 
-- [ ] **Step 1: Write the failing helper authorization matrix**
+- [x] **Step 1: Write the failing helper authorization matrix**
 
 Test sensitive HR access, employee self-access, training view/create/edit/delete actions, a training-only user, and a permission lookup rejection. Every lookup error must resolve to `false`.
 
-- [ ] **Step 2: Write failing direct-route tests**
+- [x] **Step 2: Write failing direct-route tests**
 
 With `node-mocks-http`, cover unauthenticated `401`, authenticated unauthorized `403`, H&S-view-only download `403`, create-only upload allowed but verify denied, edit verification allowed, and super-admin success for upload/list/detail/download/update/delete/verify/expiring routes.
 
-- [ ] **Step 3: Run the two authorization tests and verify red**
+- [x] **Step 3: Run the two authorization tests and verify red**
 
 Run:
 
@@ -406,15 +406,15 @@ npx vitest run \
 
 Expected: FAIL because the dedicated helpers are absent and current direct routes only authenticate.
 
-- [ ] **Step 4: Implement the fail-closed helpers**
+- [x] **Step 4: Implement the fail-closed helpers**
 
 Call `userHasPermission(userId, STAFF_TRAINING_CERTIFICATES_PERMISSION, action)` inside `try/catch`; log a non-sensitive error and return false. Preserve full HR and employee-self behavior for non-certification documents.
 
-- [ ] **Step 5: Guard generic upload, detail, update, delete, verify, and download**
+- [x] **Step 5: Guard generic upload, detail, update, delete, verify, and download**
 
 Each route must use `AuthenticatedNextApiRequest`, resolve the document's `staff_id` and `document_type` before the action, then call the type-aware helper. Do not authorize from request-supplied `staffId` alone.
 
-- [ ] **Step 6: Guard list and expiring queries without leaking other HR documents**
+- [x] **Step 6: Guard list and expiring queries without leaking other HR documents**
 
 Use explicit query branches:
 
@@ -424,7 +424,7 @@ Use explicit query branches:
 
 Return `downloadUrl: /api/staff-documents-download?documentId=<id>` only when the caller has binary access. Remove `file_path` and `file_url` from JSON projections in every branch.
 
-- [ ] **Step 7: Run authorization tests**
+- [x] **Step 7: Run authorization tests**
 
 Run:
 
@@ -437,7 +437,7 @@ npm run type-check
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit the authorization unit**
+- [x] **Step 8: Commit the authorization unit**
 
 ```bash
 git add src/types/staff/access.types.ts \
