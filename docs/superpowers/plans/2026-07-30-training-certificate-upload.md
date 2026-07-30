@@ -468,7 +468,7 @@ git commit -m "fix(staff): enforce document authorization"
 - Consumes: `canCreateTrainingCertificates`, `uploadStaffDocument`, `deleteStaffDocument`, `transaction`, `createTrainingCertificateSubmission`, and `logHsActivity`.
 - Produces: `POST /api/staff-training-certificates-upload` with `multipart/form-data` fields `staffId`, repeated or JSON `trainingTypeIds`, `certificateNumber`, `provider`, `completedDate`, optional `expiryDate`, and `file`.
 
-- [ ] **Step 1: Write failing route tests**
+- [x] **Step 1: Write failing route tests**
 
 Cover:
 
@@ -482,7 +482,7 @@ Cover:
 - compensating delete failure logs an orphan cleanup alert without returning its path;
 - response contains document id, training record ids, and pending status only.
 
-- [ ] **Step 2: Run the API test and verify red**
+- [x] **Step 2: Run the API test and verify red**
 
 Run:
 
@@ -492,7 +492,7 @@ npx vitest run src/modules/health-safety/__tests__/trainingCertificateUploadApi.
 
 Expected: FAIL because the route does not exist.
 
-- [ ] **Step 3: Implement multipart parsing and file validation**
+- [x] **Step 3: Implement multipart parsing and file validation**
 
 Export:
 
@@ -504,7 +504,7 @@ export const config = {
 
 Use Formidable with a 10 MB limit, read exactly one file, require the allowed MIME/extension pair, and validate PDF/JPEG/PNG/OLE/ZIP magic bytes. Accept ZIP magic only when the extension and MIME identify DOCX.
 
-- [ ] **Step 4: Implement storage plus database compensation**
+- [x] **Step 4: Implement storage plus database compensation**
 
 The handler sequence is exact:
 
@@ -539,11 +539,11 @@ try {
 
 Never include `uploaded.path` or `uploaded.url` in the response or audit details.
 
-- [ ] **Step 5: Emit audit events after commit**
+- [x] **Step 5: Emit audit events after commit**
 
 Use `logDocumentUploaded` and `logHsActivity` after the transaction succeeds. Audit details contain actor, employee, document id, selected type ids, `pending`, and timestamp; general application logs omit document number and provider.
 
-- [ ] **Step 6: Run upload tests and type-check**
+- [x] **Step 6: Run upload tests and type-check**
 
 Run:
 
@@ -554,7 +554,7 @@ npm run type-check
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the upload API unit**
+- [x] **Step 7: Commit the upload API unit**
 
 ```bash
 git add pages/api/staff-training-certificates-upload.ts \

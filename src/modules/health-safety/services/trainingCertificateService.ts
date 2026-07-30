@@ -29,6 +29,18 @@ export {
 export type { TrainingCertificateErrorCode } from './trainingCertificateValidation';
 export type { TrainingVerificationStatus } from '../types/training.types';
 
+// The lifecycle lives in its own module for the file-size limit; re-exported
+// here so callers see one training-certificate service.
+export {
+  transitionTrainingCertificate,
+  deleteTrainingCertificateSubmission,
+} from './trainingCertificateLifecycle';
+export type {
+  TrainingCertificateTransition,
+  TrainingCertificateActor,
+  TrainingCertificateTransitionResult,
+} from './trainingCertificateLifecycle';
+
 export interface CreateTrainingCertificateInput {
   staffId: string;
   trainingTypeIds: string[];

@@ -15,6 +15,9 @@ export type AuditActionType =
   | 'document_rejected'
   | 'document_deleted'
   | 'document_downloaded'
+  // Withdrawal of evidence that was previously accepted. Distinct from
+  // 'document_rejected', which was never accepted in the first place.
+  | 'document_revoked'
   // Profile actions
   | 'profile_created'
   | 'profile_updated'
@@ -206,6 +209,23 @@ export async function logDocumentRejected(
     staffId,
     actionType: 'document_rejected',
     actionDescription: `Rejected ${documentType.replace(/_/g, ' ')}: ${reason}`,
+    details: { documentType, reason },
+    performedByName,
+    ipAddress,
+  });
+}
+
+export async function logDocumentRevoked(
+  staffId: string,
+  documentType: string,
+  reason: string,
+  performedByName?: string,
+  ipAddress?: string
+): Promise<void> {
+  await recordAuditLog({
+    staffId,
+    actionType: 'document_revoked',
+    actionDescription: `Revoked ${documentType.replace(/_/g, ' ')}: ${reason}`,
     details: { documentType, reason },
     performedByName,
     ipAddress,

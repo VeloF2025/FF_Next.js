@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { canApproveDocuments } from '@/services/staff/staffAccessService';
+import { handleCertificateTransition } from '@/modules/health-safety/services/trainingCertificateRouteHandlers';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { recordOcrCorrections } from '@/modules/qa-learning';
@@ -43,13 +44,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { status, notes, ocrMetadata: editedOcrMetadata } = req.body;
 
-    // Validate status
-    if (!status || !['verified', 'rejected'].includes(status)) {
-      return res.status(400).json({
-        error: 'Invalid status. Must be "verified" or "rejected"',
-      });
-    }
-
     // Get original document to compare OCR values for HITL learning
     const [originalDoc] = await sql`
       SELECT document_type, ocr_metadata, staff_id FROM staff_documents WHERE id = ${documentId}
@@ -71,6 +65,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // create-only custodian cannot approve their own submission.
     if (!(await canApproveDocuments(userId, documentType))) {
       return apiResponse.forbidden(res, 'You do not have permission to verify this document');
+    }
+
+    if (documentType === 'certification') {
+      return handleCertificateTransition(req, res, documentId, {
+        status,
+        notes,
+        userId,
+        staffId: originalDoc.staff_id as string,
+      });
+    }
+
+    // Everything below is the pre-existing OCR-backed flow for other document
+    // types. 'revoked' is not one of its states.
+    if (!status || !['verified', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        error: 'Invalid status. Must be "verified" or "rejected"',
+      });
     }
     // If edited OCR metadata provided, update the document first
     if (editedOcrMetadata && Object.keys(editedOcrMetadata).length > 0) {

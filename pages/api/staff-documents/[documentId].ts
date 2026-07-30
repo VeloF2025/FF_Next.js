@@ -17,6 +17,7 @@ import {
 } from '@/services/staff/staffAccessService';
 import { createLogger } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { handleCertificateDeletion } from '@/modules/health-safety/services/trainingCertificateRouteHandlers';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentAPI');
@@ -166,6 +167,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       );
       if (!canDelete) {
         return apiResponse.forbidden(res, 'You do not have permission to delete this document');
+      }
+
+      // A certification is not a lone row: linked competency records reference
+      // it, and verified or revoked evidence must survive deletion.
+      if (document.document_type === 'certification') {
+        return handleCertificateDeletion(res, documentId);
       }
 
       // Delete from VF Storage
