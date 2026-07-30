@@ -112,6 +112,27 @@ export async function fetchAllRecords(cookieStr, query, onProgress) {
   return all;
 }
 
+/**
+ * Descending `site=count` histogram of a fetched batch.
+ *
+ * `fetchAllRecords` takes a free-text query, so a site code only reaches its own
+ * properties while 1Map's site string still starts with it. When that drifts the
+ * query keeps returning incidental matches from other sites, which makes the
+ * record count look merely low instead of wrong — the histogram is what
+ * distinguishes the two in the sweep log.
+ */
+export function summariseSites(records) {
+  const counts = new Map();
+  for (const r of records) {
+    const site = r.site == null || r.site === '' ? '(blank)' : String(r.site);
+    counts.set(site, (counts.get(site) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([site, n]) => `${site}=${n}`)
+    .join(' ');
+}
+
 /** Exact-DR search (mirrors oneMapApiService.searchDR): returns records where drp === drNumber. */
 export async function searchDR(cookieStr, drNumber) {
   const data = await fetchPage(cookieStr, drNumber, 1, 50);

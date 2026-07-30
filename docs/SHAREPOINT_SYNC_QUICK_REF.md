@@ -43,7 +43,6 @@ grep SHAREPOINT /var/www/fibreflow/.env.production
 ## Email Notifications
 Success/failure emails sent to:
 - ai@velocityfibre.co.za
-- louisrdup@gmail.com
 
 ## Troubleshooting
 

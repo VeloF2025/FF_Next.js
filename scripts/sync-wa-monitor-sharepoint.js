@@ -32,7 +32,7 @@ if (fs.existsSync(envPath)) {
 // Configuration
 const API_URL = 'http://localhost:3005/api/wa-monitor-sync-sharepoint';
 const LOG_PREFIX = '[WA Monitor SharePoint Sync]';
-const NOTIFICATION_EMAILS = ['ai@velocityfibre.co.za', 'louisrdup@gmail.com'];
+const NOTIFICATION_EMAILS = ['ai@velocityfibre.co.za'];
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 
 /**

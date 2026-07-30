@@ -6,7 +6,7 @@
  * Usage:
  *   node scripts/sync-stages.mjs          # Sync all projects with onemap_prefix
  *   node scripts/sync-stages.mjs MAM      # Sync single site prefix
- *   node scripts/sync-stages.mjs LAW MOH  # Sync specific prefixes
+ *   node scripts/sync-stages.mjs LAW MOA  # Sync specific prefixes
  *
  * New projects: Set metadata.onemap_prefix on the project to include it.
  *   UPDATE projects SET metadata = metadata || '{"onemap_prefix": "TEM"}' WHERE id = '...';
@@ -16,7 +16,7 @@
 
 import { config } from 'dotenv';
 import pg from 'pg';
-import { authenticate, fetchAllRecords } from './lib/onemap-client.mjs';
+import { authenticate, fetchAllRecords, summariseSites } from './lib/onemap-client.mjs';
 import { upsertProperties } from './lib/onemap-property-sync.mjs';
 // Load both: prod keeps DATABASE_URL in .env and ONEMAP_PASSWORD in .env.local
 // (.env.local wins for overlapping keys). On the workstation .env.local has both.
@@ -27,10 +27,33 @@ const { Pool } = pg;
 const DB_URL = process.env.DATABASE_URL;
 if (!DB_URL) throw new Error('DATABASE_URL not set');
 
-// 1Map site codes swept into onemap_properties (flat, property-keyed). LAW/MAM/MOH/ETW
-// map 1:1 to a project (so they also drive pon_stage_tracking); TEM is shared by
-// Thembisa POP1 + POP3, so it is property-only here (no unique project to attribute).
-const ALL_SITE_CODES = ['LAW', 'MAM', 'MOH', 'TEM', 'ETW'];
+// 1Map site codes swept into onemap_properties (flat, property-keyed). TEM is shared
+// by Thembisa POP1 + POP3, so it is property-only here (no unique project to
+// attribute).
+//
+// These are free-text `q=` searches, NOT a site filter — a code only reaches its
+// properties while 1Map's own site string still starts with it. Mohadin was `MOH`
+// until 2026-07-27, when 1Map re-coded its site value to `MOA`: `q=MOH` stopped
+// matching and the sweep silently fell 24,411 -> 1,613 records (all of them
+// incidental matches from unrelated sites), stranding 15,162 drops without a
+// contact number for three days. Hence the site histogram logged per sweep below.
+//
+// A code here only drives pon_stage_tracking when some project carries it in
+// `metadata.onemap_prefix` (see discoverProjects); otherwise the sweep refreshes
+// onemap_properties and skips stage tracking. So renaming a code here without
+// repointing that column does not corrupt anything — it stops stage tracking for
+// that project until the column follows. Mohadin's `projects.metadata.onemap_prefix`
+// row was repointed to `MOA` in the database on 2026-07-30, so the pair is in step.
+//
+// `MOH` is deliberately gone rather than kept alongside `MOA`: it now returns only
+// ~1,613 records from sites that were never in this list (NYA, KAT, IVO, SOS, …),
+// which were being mirrored purely as a side effect of the stale query. They go
+// stale rather than disappear.
+//
+// Two other maps key off the same 1Map query and must be kept in step:
+// SITE_PROJECT_MAP in src/services/onemap/oneMapClient.ts and in
+// scripts/onemap-sync/fetch-gps-from-1map.ts.
+const ALL_SITE_CODES = ['LAW', 'MAM', 'MOA', 'TEM', 'ETW'];
 
 // onemap_properties is keyed by (import_id, property_id). Recurring syncs reuse ONE
 // "live API" import row so upserts are idempotent and don't bloat the table; the old
@@ -474,6 +497,11 @@ async function main() {
         const records = await fetchAllRecords(cookieStr, site, (q, page, total, n) =>
           log(`  ${q}: page ${page}/${Math.ceil(total)} (${n} records)`));
         log(`  ${site}: fetched ${records.length} records from 1Map`);
+        // Which sites did this free-text query actually reach? A code whose own
+        // site has drifted still returns incidental matches from elsewhere, so
+        // the record count alone looks merely low rather than wrong. Printing
+        // the histogram makes that visible in the log the next time it happens.
+        log(`  ${site}: sites returned — ${summariseSites(records)}`);
         if (records.length === 0) continue;
 
         // Always: refresh the flat onemap_properties snapshot.

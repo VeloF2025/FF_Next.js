@@ -16,7 +16,7 @@ export interface OneMapRecord {
   prop_id: string;
   drp: string;           // DR number (e.g., "DR1734472")
   pole: string;          // Pole number (e.g., "LAW.P.A453")
-  site: string;          // Site code (e.g., "LAW", "MOH", "MAM")
+  site: string;          // Site code (e.g., "LAW", "MOA", "MAM")
   status: string;        // Installation status
   address: string;       // Location address
   latitude: string | number | null;
@@ -154,9 +154,17 @@ export interface OneMapClientConfig {
 }
 
 // Site code to project mapping (UUID = projects.id, code = projects.project_code)
+//
+// The KEY is sent to 1Map as the free-text `q=` search term (see executeSearch),
+// so it only reaches a project's properties while 1Map's own `site` string still
+// starts with it. Mohadin was `MOH` until 2026-07-27, when 1Map re-coded its site
+// value to `MOA`; `q=MOH` then matched only incidental records from unrelated
+// sites, which this map would have attributed to Mohadin's UUID. Keep these keys
+// in step with `ALL_SITE_CODES` in scripts/sync-stages.mjs and with
+// `projects.metadata.onemap_prefix`.
 export const SITE_PROJECT_MAP: Record<string, { name: string; code: string; uuid: string }> = {
   'LAW': { name: 'Lawley', code: 'PRJ-1761224913968', uuid: '4eb13426-b2a1-472d-9b3c-277082ae9b55' },
-  'MOH': { name: 'Mohadin', code: 'PRJ-1761242661257', uuid: 'bf9a90db-e758-4c05-b999-694cd63c451f' },
+  'MOA': { name: 'Mohadin', code: 'PRJ-1761242661257', uuid: 'bf9a90db-e758-4c05-b999-694cd63c451f' },
   'MAM': { name: 'Mamelodi', code: 'PRJ-1763722776949', uuid: '7003dc06-9af7-4a7c-bc6c-a177d77784f2' },
   'VELO': { name: 'Velo Test', code: 'VELO', uuid: '' },
 };

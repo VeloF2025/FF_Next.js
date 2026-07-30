@@ -56,7 +56,7 @@ const sampleReminders = [
 
 async function sendTestEmail() {
   console.log('📧 Sending test reminder email...');
-  console.log(`📮 To: louisrdup@gmail.com`);
+  console.log(`📮 To: ai@velocityfibre.co.za`);
   console.log(`📋 Reminders: ${sampleReminders.length}`);
   console.log('');
 
@@ -68,7 +68,7 @@ async function sendTestEmail() {
     // Domain fibreflow.app is now verified - can send to any email address!
     const result = await resend.emails.send({
       from: 'FibreFlow Reminders <reminders@fibreflow.app>',
-      to: 'louisrdup@gmail.com', // Can now send to any email!
+      to: 'ai@velocityfibre.co.za',
       subject: `[TEST] Your Daily Reminders (${sampleReminders.length} pending)`,
       html: emailHtml
     });
@@ -81,7 +81,7 @@ async function sendTestEmail() {
     console.log('✅ Test email sent successfully!');
     console.log(`📨 Email ID: ${result.data?.id}`);
     console.log('');
-    console.log('Check your inbox at louisrdup@gmail.com');
+    console.log('Check your inbox at ai@velocityfibre.co.za');
     console.log('(Check spam folder if not in inbox)');
 
   } catch (error) {

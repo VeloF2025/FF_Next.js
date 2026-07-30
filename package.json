@@ -14,6 +14,7 @@
     "analyze:bundle": "BUNDLE_ANALYZE=true next build",
     "test": "vitest",
     "test:db": "vitest --config vitest.db.config.ts run",
+    "hs:operational-pack": "tsx scripts/hs-operational-rollout/index.ts",
     "reconcile:serials": "tsx scripts/reconcile-serials.ts",
     "verify:no-direct-status-writes": "tsx scripts/verify-no-direct-status-writes.ts",
     "test:ui": "vitest --ui",

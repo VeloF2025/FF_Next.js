@@ -5,7 +5,12 @@
  * Runs as cron every 6 hours or on-demand.
  *
  * Method: POST
- * Body: { site: 'MAM' | 'LAW' | 'MOH', force?: boolean }
+ * Body: { site: 'MAM' | 'LAW' | 'MOA', force?: boolean }
+ *
+ * `site` is validated against SITE_PROJECT_MAP and then used as 1Map's free-text
+ * `q=` search term, so an out-of-date code does not fail — it silently matches
+ * unrelated sites and writes them to this project's pon_stage_tracking rows.
+ * Mohadin was re-coded `MOH` -> `MOA` on 2026-07-27; `MOH` now 400s, by design.
  *
  * Response: StageSyncResult with counts of records processed and stages updated.
  */

@@ -1,0 +1,104 @@
+{
+  "source": "fixture",
+  "generatedAt": "2026-07-30T04:00:00.000Z",
+  "adoption": {
+    "snapshotDate": "2026-07-30",
+    "activeMembers": 3,
+    "linkedMembers": 1,
+    "activeTeams": 2,
+    "linkedTeams": 1,
+    "activeSupervisors": 1,
+    "clockedInToday": 2,
+    "clockedInWithoutCheckin": 1,
+    "checkinsToday": 1,
+    "selfCheckinsToday": 1,
+    "crewCheckinsToday": 0,
+    "blockedToday": 1
+  },
+  "contractors": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "companyName": "Demo Contractor"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "companyName": "Other Contractor"
+    }
+  ],
+  "teams": [
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "name": "Demo Team",
+      "contractorId": "00000000-0000-4000-8000-000000000001",
+      "isActive": true
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "name": "Conflict Team",
+      "contractorId": null,
+      "isActive": true
+    }
+  ],
+  "members": [
+    {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "teamId": "10000000-0000-4000-8000-000000000001",
+      "contractorId": null,
+      "firstName": "Demo",
+      "lastName": "Worker",
+      "role": "Installer",
+      "isActive": true,
+      "isTeamLead": false,
+      "userId": null
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "teamId": "10000000-0000-4000-8000-000000000002",
+      "contractorId": "00000000-0000-4000-8000-000000000001",
+      "firstName": "First",
+      "lastName": "Lead",
+      "role": "Team Lead",
+      "isActive": true,
+      "isTeamLead": true,
+      "userId": "30000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000003",
+      "teamId": "10000000-0000-4000-8000-000000000002",
+      "contractorId": "00000000-0000-4000-8000-000000000002",
+      "firstName": "Second",
+      "lastName": "Lead",
+      "role": "Team Lead",
+      "isActive": true,
+      "isTeamLead": true,
+      "userId": "30000000-0000-4000-8000-000000000002"
+    }
+  ],
+  "blockedCheckins": [
+    {
+      "checkinId": "40000000-0000-4000-8000-000000000001",
+      "checkinDate": "2026-07-30",
+      "workerName": "Demo, \"Worker\"",
+      "staffId": "50000000-0000-4000-8000-000000000001",
+      "teamMemberId": null,
+      "contractorId": null,
+      "contractorName": null,
+      "declaredActivities": [
+        "working_at_height"
+      ],
+      "blockedReasons": [
+        "medical_not_current"
+      ]
+    }
+  ],
+  "leadEvidence": [
+    {
+      "candidateId": "20000000-0000-4000-8000-000000000002",
+      "candidateName": "First, Lead",
+      "teamName": "Conflict Team",
+      "evidenceSource": "team_members.is_team_lead",
+      "currentStaffRole": "staff",
+      "linkedStaffId": "50000000-0000-4000-8000-000000000002"
+    }
+  ]
+}
