@@ -118,6 +118,9 @@ export default defineConfig({
       // src-first override before the generic @/lib → ./lib fallback below.
       { find: /^@\/lib\/mcp/, replacement: path.resolve(__dirname, 'src/lib/mcp') },
       { find: /^@\/lib\/observability/, replacement: path.resolve(__dirname, 'src/lib/observability') },
+      // @/lib/wa-bridge-health/* lives at src/lib/ — without this it falls through
+      // to the generic @/lib → ./lib fallback and fails to resolve under Vitest.
+      { find: /^@\/lib\/wa-bridge-health/, replacement: path.resolve(__dirname, 'src/lib/wa-bridge-health') },
       { find: '@/lib/rateLimiter', replacement: path.resolve(__dirname, './src/lib/rateLimiter') },
       { find: '@/lib/featureFlags', replacement: path.resolve(__dirname, './src/lib/featureFlags') },
       { find: '@/lib/utils', replacement: path.resolve(__dirname, './src/lib/utils') },
