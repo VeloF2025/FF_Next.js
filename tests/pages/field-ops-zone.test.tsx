@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRouter } from 'next/router';
-import ZonePage from '../zone';
+import ZonePage from '../../pages/field-ops/zone';
 
 vi.mock('next/router', () => ({ useRouter: vi.fn() }));
 vi.mock('@/components/layout/AppLayout', () => ({
