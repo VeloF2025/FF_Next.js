@@ -37,6 +37,24 @@ export interface HSTrainingType {
   updated_at: string;
 }
 
+/**
+ * Lifecycle of the evidence behind a competency (migration 471).
+ *
+ * Only `verified` counts. A pending submission has been uploaded but nobody has
+ * looked at it; a rejected one was refused; a revoked one was accepted and then
+ * withdrawn. The last two are kept rather than deleted because "this stopped
+ * counting, and why" is the record that prevents it counting again.
+ */
+export type TrainingVerificationStatus = 'pending' | 'verified' | 'rejected' | 'revoked';
+
+/** Competency chip shown against a stored certificate. Carries no file location. */
+export interface LinkedTrainingTypeSummary {
+  id: string;
+  code: string;
+  name: string;
+  verificationStatus: TrainingVerificationStatus;
+}
+
 export interface HSWorkerTraining {
   id: string;
   training_type_id: string;
@@ -47,6 +65,11 @@ export interface HSWorkerTraining {
   project_id: string | null;
   completed_date: string;
   expiry_date: string | null;
+  /**
+   * @deprecated Legacy free-text URL, retained for rows created before 471.
+   * New records link the stored binary through `staff_document_id` and must
+   * never expose this field in a response.
+   */
   certificate_url: string | null;
   certificate_number: string | null;
   issued_by: string | null;
@@ -54,6 +77,15 @@ export interface HSWorkerTraining {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** The one stored certificate this competency is evidenced by. */
+  staff_document_id: string | null;
+  verification_status: TrainingVerificationStatus;
+  verified_by: string | null;
+  verified_at: string | null;
+  rejection_reason: string | null;
+  revoked_by: string | null;
+  revoked_at: string | null;
+  revocation_reason: string | null;
 }
 
 /** A worker training row joined with its type + derived competency status. */
@@ -63,6 +95,19 @@ export interface HSWorkerTrainingView extends HSWorkerTraining {
   is_statutory: boolean;
   competency_status: CompetencyStatus;
   days_to_expiry: number | null;
+}
+
+/**
+ * What an H&S reader is allowed to receive.
+ *
+ * `certificate_url` is dropped rather than nulled so that a handler cannot
+ * select it back in by accident, and no storage path or URL appears at all:
+ * the binary is reachable only through the permission-checked
+ * /api/staff-documents-download route. `hasCertificate` answers "is there a
+ * file behind this?" without saying where it is.
+ */
+export interface HSWorkerTrainingSafeView extends Omit<HSWorkerTrainingView, 'certificate_url'> {
+  hasCertificate: boolean;
 }
 
 /** Contractor training rollup used by the gate. */

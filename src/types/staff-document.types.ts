@@ -16,7 +16,20 @@ export type DocumentType =
   | 'tax_document'
   | 'other';
 
-export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'expired';
+/**
+ * `revoked` (migration 471) is a verified document whose standing as evidence
+ * was withdrawn. It is distinct from `rejected` — that one was never accepted —
+ * and from `expired`, which the date reached on its own.
+ */
+export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'expired' | 'revoked';
+
+/**
+ * Type-only import from the H&S module. A certification document carries the
+ * competencies it evidences, and that vocabulary is owned there; importing the
+ * type keeps one definition rather than a second union that can drift.
+ */
+export type { LinkedTrainingTypeSummary } from '@/modules/health-safety/types/training.types';
+import type { LinkedTrainingTypeSummary } from '@/modules/health-safety/types/training.types';
 
 export interface StaffDocument {
   id: string;
@@ -40,6 +53,14 @@ export interface StaffDocument {
   updatedAt: string;
   // OCR-extracted metadata (pending sync to staff table on verification)
   ocrMetadata?: OcrMetadata;
+  /**
+   * Present only when the caller has binary access. Points at the
+   * permission-checked download route — never a storage path or VF URL, which
+   * must not leave the server for a certification document.
+   */
+  downloadUrl?: string;
+  /** Competencies this certificate evidences (certification documents only). */
+  trainingTypes?: LinkedTrainingTypeSummary[];
   // Joined data
   verifier?: {
     id: string;
@@ -190,14 +211,16 @@ export const VERIFICATION_STATUS_LABELS: Record<VerificationStatus, string> = {
   pending: 'Pending Review',
   verified: 'Verified',
   rejected: 'Rejected',
-  expired: 'Expired'
+  expired: 'Expired',
+  revoked: 'Revoked'
 };
 
 export const VERIFICATION_STATUS_COLORS: Record<VerificationStatus, string> = {
   pending: 'yellow',
   verified: 'green',
   rejected: 'red',
-  expired: 'gray'
+  expired: 'gray',
+  revoked: 'red'
 };
 
 // Document categories for grouping in UI

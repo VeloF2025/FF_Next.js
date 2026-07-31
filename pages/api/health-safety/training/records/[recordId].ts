@@ -39,9 +39,41 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
+/**
+ * A certificate-linked row is not editable here, at any permission level.
+ *
+ * This endpoint is gated on projects.health-safety:edit — deliberately NOT the
+ * dedicated certificate permission — and knows nothing about the lifecycle.
+ * Left open, a broad H&S editor could extend a verified statutory competency's
+ * expiry with no certificate, no verifier and no lifecycle event, and the gate
+ * would keep counting it. Its dates and provider come from the certificate;
+ * correcting them means revoking and uploading a new submission.
+ *
+ * Returns 409 rather than 403: the caller's permission is not the problem, the
+ * record's provenance is.
+ */
+async function refuseIfCertificateLinked(
+  recordId: string,
+  res: NextApiResponse
+): Promise<boolean> {
+  const [row] = await sql`
+    SELECT staff_document_id FROM hs_worker_training WHERE id = ${recordId}
+  `;
+  if (row?.staff_document_id) {
+    apiResponse.conflict(
+      res,
+      'This competency is evidenced by an uploaded certificate and cannot be edited or removed here. Revoke the certificate instead, then upload a corrected one.'
+    );
+    return true;
+  }
+  return false;
+}
+
 async function handlePatch(recordId: string, req: NextApiRequest, res: NextApiResponse) {
   const user = getAuthUser(req);
-  const { completed_date, expiry_date, certificate_url, certificate_number, issued_by, notes, project_id } =
+  if (await refuseIfCertificateLinked(recordId, res)) return;
+
+  const { completed_date, expiry_date, certificate_number, issued_by, notes, project_id } =
     req.body;
 
   // has-key semantics for every nullable field: a field is changed only when
@@ -50,7 +82,6 @@ async function handlePatch(recordId: string, req: NextApiRequest, res: NextApiRe
   const has = (k: string) => Object.prototype.hasOwnProperty.call(req.body, k);
   const hasExpiry = has('expiry_date');
   const hasProject = has('project_id');
-  const hasCertUrl = has('certificate_url');
   const hasCertNo = has('certificate_number');
   const hasIssuedBy = has('issued_by');
   const hasNotes = has('notes');
@@ -61,7 +92,6 @@ async function handlePatch(recordId: string, req: NextApiRequest, res: NextApiRe
       completed_date = COALESCE(${completed_date ?? null}::date, completed_date),
       expiry_date = CASE WHEN ${hasExpiry} THEN ${expiry_date ?? null}::date ELSE expiry_date END,
       project_id = CASE WHEN ${hasProject} THEN ${project_id ?? null}::uuid ELSE project_id END,
-      certificate_url = CASE WHEN ${hasCertUrl} THEN ${certificate_url ?? null} ELSE certificate_url END,
       certificate_number = CASE WHEN ${hasCertNo} THEN ${certificate_number ?? null} ELSE certificate_number END,
       issued_by = CASE WHEN ${hasIssuedBy} THEN ${issued_by ?? null} ELSE issued_by END,
       notes = CASE WHEN ${hasNotes} THEN ${notes ?? null} ELSE notes END,
@@ -93,6 +123,11 @@ async function handlePatch(recordId: string, req: NextApiRequest, res: NextApiRe
 
 async function handleDelete(recordId: string, req: NextApiRequest, res: NextApiResponse) {
   const user = getAuthUser(req);
+  // Deleting the last linked row would strand the document forever: it could
+  // never be revoked (the transition refuses a submission with no linked rows)
+  // and never be deleted (verified/revoked are immutable), leaving the binary
+  // unreachable in storage.
+  if (await refuseIfCertificateLinked(recordId, res)) return;
 
   const rows = await sql`
     DELETE FROM hs_worker_training WHERE id = ${recordId}

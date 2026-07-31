@@ -26,6 +26,15 @@ vi.mock('@/lib/auth', () => ({
   withAuth: (handler: Function) => handler,
 }));
 
+// Each verb now authorizes against the STORED owner + document type before it
+// acts. Granting everything here keeps these tests about behaviour; the denial
+// matrix lives in src/services/staff/__tests__/staffDocumentApiAuthorization.
+vi.mock('@/services/staff/staffAccessService', () => ({
+  canAccessStaffDocument: vi.fn().mockResolvedValue(true),
+  canApproveDocuments: vi.fn().mockResolvedValue(true),
+  canDeleteStaffDocument: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('@/lib/logger', () => ({
   log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
   createLogger: () => ({
@@ -53,12 +62,17 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps queued one-shot values; a leftover would bleed into
+    // the next test and be consumed as the wrong query's result.
+    mockSql.mockReset();
 
     req = {
       method: 'GET',
       query: { documentId: 'doc-123' },
       body: {},
-    };
+      // withAuth injects this in production.
+      user: { id: 'user-1', name: 'Test User' },
+    } as Partial<NextApiRequest>;
 
     res = {
       status: vi.fn().mockReturnThis(),
@@ -176,7 +190,7 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
         id: 'doc-123',
         documentType: 'drivers_license',
         fileName: 'license.pdf',
-        fileUrl: 'https://example.com/license.pdf',
+        downloadUrl: '/api/staff-documents-download?documentId=doc-123',
         verificationStatus: 'pending',
         staffName: 'Patrick Sithole',
         notes: 'Needs review',
@@ -212,6 +226,8 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
         updated_at: new Date().toISOString(),
       };
 
+      // PUT resolves the stored type first, to authorize before writing.
+      mockSql.mockResolvedValueOnce([{ staff_id: 'staff-456', document_type: 'id_document' }]);
       mockSql.mockResolvedValueOnce([updatedDocument]);
 
       await handler(req as NextApiRequest, res as NextApiResponse);
@@ -249,6 +265,8 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
         updated_at: new Date().toISOString(),
       };
 
+      // PUT resolves the stored type first, to authorize before writing.
+      mockSql.mockResolvedValueOnce([{ staff_id: 'staff-456', document_type: 'id_document' }]);
       mockSql.mockResolvedValueOnce([updatedDocument]);
 
       await handler(req as NextApiRequest, res as NextApiResponse);

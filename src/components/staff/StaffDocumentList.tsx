@@ -7,6 +7,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { TrainingCertificateUploadDialog } from '@/modules/health-safety/components/training/TrainingCertificateUploadDialog';
+import { TrainingCertificateRevokeDialog } from '@/modules/health-safety/components/training/TrainingCertificateRevokeDialog';
+import { TrainingTypeChips } from '@/modules/health-safety/components/training/TrainingTypeMultiSelect';
 import {
   FileText,
   Download,
@@ -23,6 +26,8 @@ import {
   Scan,
   Loader2,
   Sparkles,
+  Ban,
+  GraduationCap,
 } from 'lucide-react';
 import {
   StaffDocument,
@@ -54,6 +59,17 @@ interface StaffDocumentListProps {
   onVerify?: (documentId: string, status: 'verified' | 'rejected', notes?: string) => void;
   /** Callback when OCR fields are applied to refresh parent data */
   onOcrApplied?: () => void;
+  /**
+   * Whether the viewer may submit a training certificate. UI visibility is a
+   * convenience, never the control: /api/staff-training-certificates-upload
+   * re-checks people.staff.training-certificates:create on every request.
+   */
+  canUploadTrainingCertificate?: boolean;
+  /**
+   * Whether the viewer may withdraw already-verified evidence. Same caveat as
+   * above: the verify route re-checks the dedicated edit permission.
+   */
+  canVerifyTrainingCertificate?: boolean;
 }
 
 // OCR status stored per document
@@ -63,7 +79,16 @@ interface OcrDocumentStatus {
   extractedFieldCount?: number;
 }
 
-export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApplied }: StaffDocumentListProps) {
+export function StaffDocumentList({
+  staffId,
+  isAdmin = false,
+  onVerify,
+  onOcrApplied,
+  canUploadTrainingCertificate = false,
+  canVerifyTrainingCertificate = false,
+}: StaffDocumentListProps) {
+  const [showCertificateDialog, setShowCertificateDialog] = useState(false);
+  const [revokingDocument, setRevokingDocument] = useState<StaffDocument | null>(null);
   const [documents, setDocuments] = useState<StaffDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -377,6 +402,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
       verified: 'bg-green-500/20 text-green-400',
       rejected: 'bg-red-500/20 text-red-400',
       expired: 'bg-red-500/20 text-red-400',
+      revoked: 'bg-red-500/20 text-red-400',
     };
 
     const icons: Record<VerificationStatus, React.ReactNode> = {
@@ -384,6 +410,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
       verified: <CheckCircle className="h-3 w-3" />,
       rejected: <XCircle className="h-3 w-3" />,
       expired: <AlertTriangle className="h-3 w-3" />,
+      revoked: <Ban className="h-3 w-3" />,
     };
 
     return (
@@ -434,14 +461,49 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Documents</h3>
-        <button
-          onClick={() => setShowUploadForm(true)}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Upload Document
-        </button>
+        <div className="flex items-center gap-2">
+          {canUploadTrainingCertificate && (
+            <button
+              onClick={() => setShowCertificateDialog(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm font-medium rounded-lg hover:border-blue-600"
+            >
+              <GraduationCap className="h-4 w-4" />
+              Upload training certificate
+            </button>
+          )}
+          <button
+            onClick={() => setShowUploadForm(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Upload Document
+          </button>
+        </div>
       </div>
+
+      {revokingDocument && (
+        <TrainingCertificateRevokeDialog
+          isOpen
+          documentId={revokingDocument.id}
+          documentName={revokingDocument.documentName}
+          onClose={() => setRevokingDocument(null)}
+          onRevoked={() => {
+            setRevokingDocument(null);
+            fetchDocuments();
+          }}
+        />
+      )}
+
+      <TrainingCertificateUploadDialog
+        isOpen={showCertificateDialog}
+        staffId={staffId}
+        onClose={() => setShowCertificateDialog(false)}
+        onUploaded={() => {
+          setShowCertificateDialog(false);
+          // Only after the API confirmed the document and its pending rows.
+          fetchDocuments();
+        }}
+      />
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 p-4 ff-bg-tertiary rounded-lg border border-[var(--ff-border-light)]">
@@ -537,6 +599,14 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
                     {doc.documentNumber && (
                       <p className="text-xs text-[var(--ff-text-secondary)] opacity-70 mt-0.5">#{doc.documentNumber}</p>
                     )}
+                    {/* A certificate can prove several competencies at once, so
+                        the chips are what make the row meaningful — the document
+                        name alone does not say what it certifies. */}
+                    {doc.trainingTypes && doc.trainingTypes.length > 0 && (
+                      <div className="mt-1.5">
+                        <TrainingTypeChips names={doc.trainingTypes.map((t) => t.name)} />
+                      </div>
+                    )}
                     {getExpiryWarning(doc.expiryDate)}
                     {doc.expiryDate && !getExpiryWarning(doc.expiryDate) && (
                       <p className="text-xs text-[var(--ff-text-secondary)] opacity-70 mt-0.5">
@@ -548,6 +618,21 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
 
                 {/* Actions - stop propagation to prevent row click */}
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {/* Revocation is the only way to withdraw verified evidence:
+                      the delete endpoint refuses a verified document so the
+                      audit trail survives. */}
+                  {canVerifyTrainingCertificate &&
+                    doc.documentType === 'certification' &&
+                    doc.verificationStatus === 'verified' && (
+                      <button
+                        onClick={() => setRevokingDocument(doc)}
+                        title="Revoke this certificate"
+                        aria-label={`Revoke ${doc.documentName}`}
+                        className="p-2 text-[var(--ff-text-secondary)] hover:text-red-500"
+                      >
+                        <Ban className="h-4 w-4" />
+                      </button>
+                    )}
                   {/* OCR Extract Data button - only for eligible documents */}
                   {isOcrEligible(doc.documentType) && (
                     <>

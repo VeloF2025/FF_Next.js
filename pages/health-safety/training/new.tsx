@@ -1,6 +1,12 @@
 /**
  * H&S Record Worker Training
  * /health-safety/training/new - Create a worker training record
+ *
+ * Manual entry for competencies whose catalogue entry has
+ * requires_certificate = false — a site induction register, for instance. Types
+ * that need a certificate go through /health-safety/training/certificates/new,
+ * which stores the file. The free-text certificate URL field is gone: a link
+ * anyone could type is not evidence, and nothing reads it any more.
  */
 
 import type { NextPage } from 'next';
@@ -36,7 +42,6 @@ function RecordTrainingContent() {
     completed_date: '',
     expiry_date: '',
     certificate_number: '',
-    certificate_url: '',
     issued_by: '',
   });
   const [saving, setSaving] = useState(false);
@@ -64,7 +69,6 @@ function RecordTrainingContent() {
       expiry_date: form.expiry_date || undefined,
       contractor_id: form.contractor_id || undefined,
       certificate_number: form.certificate_number || undefined,
-      certificate_url: form.certificate_url || undefined,
       issued_by: form.issued_by || undefined,
     };
     if (workerKind === 'staff') payload.staff_id = form.worker_id;
@@ -90,6 +94,12 @@ function RecordTrainingContent() {
   }
 
   const workers = workerKind === 'staff' ? staff : teamMembers;
+  const selectedType = types.find(
+    (t: { id: string }) => t.id === form.training_type_id
+  ) as { id: string; name: string; requires_certificate?: boolean } | undefined;
+  // A competency that needs a certificate needs the file, not a typed claim
+  // that one exists. The server enforces this too; this is the signpost.
+  const needsCertificate = selectedType?.requires_certificate === true;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -126,8 +136,8 @@ function RecordTrainingContent() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Worker *</label>
-          <select className={inputCls} value={form.worker_id} onChange={(e) => set('worker_id', e.target.value)}>
+          <label htmlFor="training-worker" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Worker *</label>
+          <select className={inputCls} id="training-worker" value={form.worker_id} onChange={(e) => set('worker_id', e.target.value)}>
             <option value="">Select worker…</option>
             {workers.map((w: { id: string; name: string }) => (
               <option key={w.id} value={w.id}>{w.name}</option>
@@ -137,10 +147,10 @@ function RecordTrainingContent() {
 
         {workerKind === 'team_member' && (
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+            <label htmlFor="training-contractor" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
               Contractor (drives the compliance gate)
             </label>
-            <select className={inputCls} value={form.contractor_id} onChange={(e) => set('contractor_id', e.target.value)}>
+            <select className={inputCls} id="training-contractor" value={form.contractor_id} onChange={(e) => set('contractor_id', e.target.value)}>
               <option value="">Select contractor…</option>
               {contractors.map((c: { id: string; company_name: string }) => (
                 <option key={c.id} value={c.id}>{c.company_name}</option>
@@ -150,8 +160,8 @@ function RecordTrainingContent() {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Training type *</label>
-          <select className={inputCls} value={form.training_type_id} onChange={(e) => set('training_type_id', e.target.value)}>
+          <label htmlFor="training-type" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Training type *</label>
+          <select className={inputCls} id="training-type" value={form.training_type_id} onChange={(e) => set('training_type_id', e.target.value)}>
             <option value="">Select training…</option>
             {types.map((t: { id: string; name: string; is_statutory: boolean }) => (
               <option key={t.id} value={t.id}>{t.name}{t.is_statutory ? ' (statutory)' : ''}</option>
@@ -159,36 +169,45 @@ function RecordTrainingContent() {
           </select>
         </div>
 
+        {needsCertificate && (
+          <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-300 space-y-2">
+            <p>
+              {selectedType?.name} requires a certificate, so it cannot be recorded by hand.
+            </p>
+            <Link
+              href="/health-safety/training/certificates/new"
+              className="inline-flex items-center font-medium underline"
+            >
+              Upload the certificate instead
+            </Link>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Completed date *</label>
-            <input type="date" className={inputCls} value={form.completed_date} onChange={(e) => set('completed_date', e.target.value)} />
+            <label htmlFor="training-completed" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Completed date *</label>
+            <input type="date" className={inputCls} id="training-completed" value={form.completed_date} onChange={(e) => set('completed_date', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Expiry (auto if blank)</label>
-            <input type="date" className={inputCls} value={form.expiry_date} onChange={(e) => set('expiry_date', e.target.value)} />
+            <label htmlFor="training-expiry" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Expiry (auto if blank)</label>
+            <input type="date" className={inputCls} id="training-expiry" value={form.expiry_date} onChange={(e) => set('expiry_date', e.target.value)} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Certificate number</label>
-            <input type="text" className={inputCls} value={form.certificate_number} onChange={(e) => set('certificate_number', e.target.value)} />
+            <label htmlFor="training-cert-number" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Certificate number</label>
+            <input type="text" className={inputCls} id="training-cert-number" value={form.certificate_number} onChange={(e) => set('certificate_number', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Issued by</label>
-            <input type="text" className={inputCls} value={form.issued_by} onChange={(e) => set('issued_by', e.target.value)} />
+            <label htmlFor="training-issued-by" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Issued by</label>
+            <input type="text" className={inputCls} id="training-issued-by" value={form.issued_by} onChange={(e) => set('issued_by', e.target.value)} />
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Certificate URL</label>
-          <input type="url" className={inputCls} placeholder="https://…" value={form.certificate_url} onChange={(e) => set('certificate_url', e.target.value)} />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Link href="/health-safety/training" className="px-4 py-2 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded-lg">Cancel</Link>
-          <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-primary-500)] hover:bg-[var(--ff-primary-600)] disabled:opacity-60 text-white rounded-lg transition-colors">
+          <button type="submit" disabled={saving || needsCertificate} className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-primary-500)] hover:bg-[var(--ff-primary-600)] disabled:opacity-60 text-white rounded-lg transition-colors">
             <Save className="w-4 h-4" />
             {saving ? 'Saving…' : 'Save record'}
           </button>

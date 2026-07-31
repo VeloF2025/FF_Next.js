@@ -51,7 +51,23 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   const records = await sql`
     SELECT
-      wt.*,
+      wt.id, wt.training_type_id, wt.staff_id, wt.team_member_id, wt.contractor_id,
+      wt.worker_name, wt.project_id, wt.notes,
+      wt.created_by, wt.created_at, wt.updated_at,
+      wt.verification_status, wt.verified_at, wt.rejection_reason,
+      wt.revoked_at, wt.revocation_reason,
+      -- Whether a file exists, never where it is: the binary is reachable only
+      -- through the permission-checked download route. The legacy free-text
+      -- location column is deliberately absent from this projection.
+      --
+      -- certificate_number and issued_by are absent too. They are the same two
+      -- values the staff-document side protects behind
+      -- people.staff.training-certificates:view (document_number /
+      -- issuing_authority); returning them to every projects.health-safety
+      -- reader would gate the identical data two different ways. The design
+      -- enumerates what a broad H&S reader may see: worker, competency,
+      -- completion and expiry dates, verification and competency status.
+      (wt.staff_document_id IS NOT NULL) AS "hasCertificate",
       tt.code AS training_code,
       tt.name AS training_name,
       tt.is_statutory,
@@ -62,10 +78,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         WHEN wt.expiry_date <= CURRENT_DATE + make_interval(days => ${EXPIRING_SOON_DAYS}) THEN 'expiring_soon'
         ELSE 'current'
       END AS competency_status,
-      -- Serialize pure date columns as plain YYYY-MM-DD text (last-column-wins
-      -- over the wt.* copies) so node-pg does not parse them into a local-TZ
-      -- Date that renders one day early on the SAST server. Display only —
-      -- the classification/arithmetic above uses the raw date columns.
+      -- Serialize the pure date columns as plain YYYY-MM-DD text so node-pg
+      -- does not parse them into a local-TZ Date that renders one day early on
+      -- the SAST server. (They used to be last-column-wins overrides of the
+      -- star projection; the projection is now explicit, so these are the only
+      -- source.) Display only — the classification above uses the raw columns.
       wt.completed_date::text AS completed_date,
       wt.expiry_date::text AS expiry_date
     FROM hs_worker_training wt
@@ -86,11 +103,18 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     ORDER BY wt.expiry_date ASC NULLS LAST, wt.completed_date DESC
   `;
 
+  // Counted over VERIFIED rows only. Competency status answers "is it in date",
+  // which a pending submission can satisfy while counting for nothing — so a
+  // headline over every row reads ten unchecked uploads as ten competencies,
+  // the exact misreading this feature exists to prevent. The unverified rows
+  // are still returned and still rendered, with their own badge.
+  const verified = records.filter((r) => r.verification_status === 'verified');
   const stats = {
-    total: records.length,
-    current: records.filter((r) => r.competency_status === 'current').length,
-    expiring_soon: records.filter((r) => r.competency_status === 'expiring_soon').length,
-    expired: records.filter((r) => r.competency_status === 'expired').length,
+    total: verified.length,
+    current: verified.filter((r) => r.competency_status === 'current').length,
+    expiring_soon: verified.filter((r) => r.competency_status === 'expiring_soon').length,
+    expired: verified.filter((r) => r.competency_status === 'expired').length,
+    awaiting_verification: records.filter((r) => r.verification_status === 'pending').length,
   };
 
   return apiResponse.success(res, { records, stats });
@@ -107,7 +131,6 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     project_id,
     completed_date,
     expiry_date,
-    certificate_url,
     certificate_number,
     issued_by,
     notes,
@@ -141,10 +164,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   // Resolve the training type — needed to snapshot statutory flag and to derive
   // expiry from validity_months when the caller does not pass an explicit date.
   const [type] = await sql`
-    SELECT id, name, validity_months FROM hs_training_types WHERE id = ${training_type_id} LIMIT 1
+    SELECT id, name, validity_months, requires_certificate
+    FROM hs_training_types WHERE id = ${training_type_id} LIMIT 1
   `;
   if (!type) {
     return apiResponse.badRequest(res, 'Unknown training_type_id');
+  }
+
+  // A competency that needs a certificate needs the certificate, not a typed
+  // claim that one exists. Those go through the upload flow, which stores the
+  // file and leaves the record pending until somebody verifies it.
+  if (type.requires_certificate) {
+    return apiResponse.badRequest(
+      res,
+      `${type.name} requires a certificate. Upload it at /health-safety/training/certificates/new instead of recording it by hand.`,
+      { uploadRoute: '/health-safety/training/certificates/new' }
+    );
   }
 
   // Derive worker_name from the source record if the caller did not supply one.
@@ -166,11 +201,16 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   // Explicit expiry wins; otherwise derive it in SQL from the type's validity
   // cadence (date math server-side avoids client TZ drift); a type with no
   // validity_months yields NULL = competency never expires.
+  // No certificate_url column: free-text certificate locations are not accepted
+  // any more, and one supplied in the request body is ignored rather than
+  // stored. verification_status is 'verified' because a no-certificate record is
+  // its own evidence — leaving it pending would mean it counted for nothing and
+  // nobody would ever be asked to approve it.
   const rows = await sql`
     INSERT INTO hs_worker_training (
       training_type_id, staff_id, team_member_id, contractor_id,
       worker_name, project_id, completed_date, expiry_date,
-      certificate_url, certificate_number, issued_by, notes, created_by
+      certificate_number, issued_by, notes, created_by, verification_status
     ) VALUES (
       ${training_type_id},
       ${hasStaff ? staff_id : null},
@@ -185,11 +225,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
           THEN (${completed_date}::date + make_interval(months => ${type.validity_months ?? 0}))::date
           ELSE NULL END
       ),
-      ${certificate_url || null},
       ${certificate_number || null},
       ${issued_by || null},
       ${notes || null},
-      ${userId}
+      ${userId},
+      'verified'
     )
     RETURNING *, completed_date::text AS completed_date, expiry_date::text AS expiry_date
   `;

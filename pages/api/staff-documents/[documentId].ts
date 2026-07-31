@@ -9,14 +9,43 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { deleteStaffDocument } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import {
+  canAccessStaffDocument,
+  canApproveDocuments,
+  canDeleteStaffDocument,
+} from '@/services/staff/staffAccessService';
 import { createLogger } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { handleCertificateDeletion } from '@/modules/health-safety/services/trainingCertificateRouteHandlers';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentAPI');
 
+/**
+ * Resolve the stored owner and type before deciding anything.
+ *
+ * Authorization must never be derived from a request-supplied staffId: the
+ * caller controls that, and the point of the check is to stop them reaching a
+ * document that is not theirs.
+ */
+async function loadOwner(
+  documentId: string
+): Promise<{ staffId: string; documentType: string } | null> {
+  const [row] = await sql`
+    SELECT staff_id, document_type FROM staff_documents WHERE id = ${documentId}
+  `;
+  if (!row) return null;
+  return {
+    staffId: row.staff_id as string,
+    documentType: row.document_type as string,
+  };
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // withAuth has already attached `user`; AuthenticatedHandler is typed against
+  // the base request, so narrow here (same idiom as ./[documentId]/verify.ts).
+  const authReq = req as AuthenticatedNextApiRequest;
   const { documentId } = req.query;
 
   if (!documentId || typeof documentId !== 'string') {
@@ -28,8 +57,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       const [document] = await sql`
         SELECT
-          sd.id, sd.staff_id, sd.document_type, sd.document_name, sd.file_url,
-          sd.file_path, sd.file_size, sd.file_name, sd.mime_type, sd.expiry_date,
+          sd.id, sd.staff_id, sd.document_type, sd.document_name,
+          sd.file_size, sd.file_name, sd.mime_type, sd.expiry_date,
           sd.issued_date, sd.issuing_authority, sd.document_number,
           sd.verification_status, sd.verified_by, sd.verified_at, sd.verification_notes,
           sd.ocr_metadata,
@@ -46,6 +75,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.notFound(res, 'Document not found');
       }
 
+      // Authorized from the STORED owner and type on the row itself — never a
+      // request-supplied staffId, and without a second round-trip.
+      const canView = await canAccessStaffDocument(
+        authReq.user.id,
+        document.staff_id as string,
+        document.document_type as string
+      );
+      if (!canView) {
+        return apiResponse.forbidden(res, 'You do not have permission to view this document');
+      }
+
       return res.status(200).json({
         success: true,
         data: mapDbToDocument(document),
@@ -60,6 +100,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // PUT - Update document metadata
   if (req.method === 'PUT') {
     try {
+      const owner = await loadOwner(documentId);
+      if (!owner) {
+        return apiResponse.notFound(res, 'Document not found');
+      }
+      // Editing metadata is the same "edit" right as verifying: for a
+      // certification that is the dedicated permission, for anything else the
+      // existing HR-sensitive rule.
+      if (!(await canApproveDocuments(authReq.user.id, owner.documentType))) {
+        return apiResponse.forbidden(res, 'You do not have permission to update this document');
+      }
+
       const { documentName, expiryDate, issuedDate, issuingAuthority, documentNumber } = req.body;
 
       const [updated] = await sql`
@@ -72,7 +123,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           document_number = COALESCE(${documentNumber || null}, document_number),
           updated_at = NOW()
         WHERE id = ${documentId}
-        RETURNING id, staff_id, document_type, document_name, file_url, file_path,
+        RETURNING id, staff_id, document_type, document_name,
                  file_size, file_name, mime_type, expiry_date, issued_date,
                  issuing_authority, document_number, verification_status, verified_by,
                  verified_at, verification_notes, created_at, updated_at
@@ -98,13 +149,30 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // DELETE - Delete document
   if (req.method === 'DELETE') {
     try {
-      // First, get the document to find the file URL
+      // One lookup, carrying both the storage path and the fields the
+      // permission check needs.
       const [document] = await sql`
-        SELECT id, file_path, file_url FROM staff_documents WHERE id = ${documentId}
+        SELECT id, staff_id, document_type, file_path, file_url
+        FROM staff_documents WHERE id = ${documentId}
       `;
 
       if (!document) {
         return apiResponse.notFound(res, 'Document not found');
+      }
+
+      const canDelete = await canDeleteStaffDocument(
+        authReq.user.id,
+        document.staff_id as string,
+        document.document_type as string
+      );
+      if (!canDelete) {
+        return apiResponse.forbidden(res, 'You do not have permission to delete this document');
+      }
+
+      // A certification is not a lone row: linked competency records reference
+      // it, and verified or revoked evidence must survive deletion.
+      if (document.document_type === 'certification') {
+        return handleCertificateDeletion(res, documentId);
       }
 
       // Delete from VF Storage
@@ -181,7 +249,9 @@ function mapDbToDocument(row: Record<string, unknown>) {
       (row.document_name as string | null) ??
       'Document',
     documentName: row.document_name,
-    fileUrl: row.file_url,
+    // Never the raw VF Storage location. Callers that reach this mapper have
+    // already passed the permission check, so they get the protected route.
+    downloadUrl: `/api/staff-documents-download?documentId=${row.id as string}`,
     fileSize: row.file_size,
     mimeType: row.mime_type,
     expiryDate: row.expiry_date ? new Date(row.expiry_date as string).toISOString() : undefined,

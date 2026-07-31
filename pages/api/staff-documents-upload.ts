@@ -16,8 +16,9 @@ import fs from 'fs';
 import { uploadStaffDocument, isVFStorageAvailable, deleteStaffDocument } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import type { DocumentType } from '@/types/staff-document.types';
+import { canUploadStaffDocument } from '@/services/staff/staffAccessService';
 import { logDocumentUploaded } from '@/services/staff/staffAuditService';
 import { apiResponse } from '@/lib/apiResponse';
 
@@ -60,6 +61,9 @@ export const config = {
 };
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // withAuth has already attached `user`; AuthenticatedHandler is typed against
+  // the base request, so narrow here (same idiom as ./[documentId]/verify.ts).
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
@@ -137,6 +141,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({
         error: `Invalid document type. Allowed: ${VALID_DOCUMENT_TYPES.join(', ')}`,
       });
+    }
+
+    // Authorize before anything is uploaded. This route previously accepted a
+    // document for any employee from any signed-in user. Certifications are
+    // routed to the dedicated create permission by the helper, so this generic
+    // endpoint cannot be used to sidestep the certificate workflow.
+    if (!(await canUploadStaffDocument(authReq.user.id, staffId, documentType))) {
+      return apiResponse.forbidden(res, 'You do not have permission to upload this document');
+    }
+
+    // A certification is a training certificate and has exactly one way in.
+    // Created here it would be orphaned — the lifecycle refuses to verify a
+    // submission with no linked competency rows — while still occupying the
+    // (employee, certificate number, provider) slot in the partial unique index,
+    // which would then block the real upload with a duplicate-certificate
+    // conflict. This route also validates magic bytes only against the set of
+    // known signatures, not against the type the caller claimed.
+    if (documentType === 'certification') {
+      return apiResponse.badRequest(
+        res,
+        'Training certificates are uploaded at /health-safety/training/certificates/new, so the competencies they prove are recorded with them.',
+        { uploadRoute: '/health-safety/training/certificates/new' }
+      );
     }
 
     // Validate file type helper
@@ -541,7 +568,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       staffId,
       documentType,
       primaryFileName,
-      (req as any).user?.name || 'System',
+      authReq.user?.name || 'System',
       req.headers['x-forwarded-for'] as string || req.socket?.remoteAddress
     );
 

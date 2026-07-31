@@ -12,9 +12,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
 import { logDocumentDownloaded } from '@/services/staff/staffAuditService';
+import { canAccessStaffDocument } from '@/services/staff/staffAccessService';
 import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
@@ -24,6 +25,9 @@ const logger = createLogger('StaffDocumentDownloadAPI');
 const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // withAuth has already attached `user`; AuthenticatedHandler is typed against
+  // the base request, so narrow here (same idiom as ./[documentId]/verify.ts).
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
@@ -43,6 +47,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (!document) {
       return apiResponse.notFound(res, 'Document not found');
+    }
+
+    // Authorize against the STORED owner and type. A caller-supplied staffId is
+    // not consulted: this route used to stream any document's bytes to any
+    // signed-in user who knew an id.
+    const canAccess = await canAccessStaffDocument(
+      authReq.user.id,
+      document.staff_id as string,
+      document.document_type as string
+    );
+    if (!canAccess) {
+      return apiResponse.forbidden(res, 'You do not have permission to download this document');
     }
 
     const filePath = (document.file_path || document.file_url) as string;
@@ -66,13 +82,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       storageUrl = `${VF_STORAGE_URL}/${filePath}`;
     }
 
-    logger.info('Fetching file from VF Storage', { documentId, storageUrl });
+    // The storage URL is deliberately not logged: a certificate's location must
+    // not be recoverable from application logs.
+    logger.info('Fetching file from VF Storage', { documentId });
 
     // Fetch file from VF Storage
     const response = await fetch(storageUrl);
 
     if (!response.ok) {
-      logger.error('VF Storage fetch failed', { status: response.status, storageUrl });
+      logger.error('VF Storage fetch failed', { documentId, status: response.status });
       return res.status(502).json({ error: 'Failed to fetch file from storage' });
     }
 
@@ -87,7 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         staffId,
         documentType,
         fileName,
-        (req as any).user?.name || 'System',
+        authReq.user?.name || 'System',
         req.headers['x-forwarded-for'] as string || req.socket?.remoteAddress
       );
     }

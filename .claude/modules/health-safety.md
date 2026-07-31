@@ -97,10 +97,151 @@ Two ticks exactly five minutes apart at `:00:01` — the scheduler invoked it, n
 
 Blockers: missing/expired/rejected/pending required docs (`safety_policy`, `liability_insurance`, `safety_plan`), critical/major/fatal incident in 12 months, overall score < 50, training score < 70 **only when training data exists** (NULL doesn't block). Weights: docs 25 / incidents 30 / training 15 / CAPA 15 / audits 15.
 
+
+## Classified training certificates (migration 471)
+
+**Design:** `docs/superpowers/specs/2026-07-30-training-certificate-upload-design.md`
+
+### Where the file and the competencies live
+
+The binary is stored **once**, in the employee's HR record:
+`staff_documents` with `document_type = 'certification'`. Each competency it
+proves is a separate `hs_worker_training` row pointing back at it through
+`staff_document_id` (`ON DELETE RESTRICT`). One rope-access certificate can
+therefore prove Working at Heights *and* Fall Arrest without duplicating the
+file, while each competency stays independently queryable and independently
+expiring — each derives its own `expiry_date` from its catalogue
+`validity_months` when the certificate carries no printed expiry.
+
+### Lifecycle — only `verified` counts
+
+`hs_worker_training.verification_status` is one of
+`pending | verified | rejected | revoked`:
+
+| state | meaning | counts? |
+|---|---|---|
+| `pending` | uploaded, nobody has checked it | no |
+| `verified` | a verifier confirmed it | **yes** |
+| `rejected` | refused, with a reason | no |
+| `revoked` | was verified, withdrawn with a reason | no |
+
+The exclusion is a `WHERE verification_status = 'verified'` in the contractor
+rollup (`trainingService.computeContractorTrainingScore`) and in the project
+competency matrix (`/api/health-safety/training/competency`), **not** a
+subtraction afterwards. That distinction matters: a contractor whose uploads are
+all pending reads as *no data* (score `NULL`, does not block) rather than as a 0%
+failure — and, more importantly, ten unverified uploads cannot present as full
+compliance.
+
+Migration 471 backfilled every pre-existing row to `verified`, because those were
+typed in by hand and were already being treated as accepted evidence. The
+backfill is guarded on the lifecycle CHECK constraint so a re-run cannot approve
+genuinely-pending submissions.
+
+### Transitions
+
+`pending -> verified`, `pending -> rejected` (reason required),
+`verified -> revoked` (reason required). Re-requesting the current state is an
+idempotent no-op; anything else is `409`. Every transition runs in ONE
+transaction covering the document and **all** its linked rows — a partial update
+would leave a worker verified for some competencies and pending for others,
+which no reader can distinguish from a genuine mixed state.
+
+A verified or revoked submission is **immutable through delete**. Correcting one
+means revoking it (the document and audit history survive) and uploading a new
+certificate. Only `pending`/`rejected` submissions can be deleted, and that
+removes the linked rows first because of the RESTRICT foreign key.
+
+Actor columns differ by table and are easy to get wrong:
+`hs_worker_training.verified_by / revoked_by` reference **`users(id)`**, while
+`staff_documents.verified_by` references **`staff(id)`**. A user with no linked
+staff row leaves the latter NULL while the training rows still record who acted.
+
+### Permission
+
+`people.staff.training-certificates` with `view / create / edit / delete`,
+parented to `people.staff`. Seeded to **`super_admin` only** — deliberately not
+to `admin`, and not implied by `projects.health-safety` or
+`people.staff.sensitive`. An H&S reader may see worker, competency, dates and
+verification state; the certificate itself needs the dedicated `view`.
+
+Named custodians are added as explicit **user overrides**, and each also needs
+view access to the `people` and `people.staff` ancestors — the RBAC service fails
+closed on a blocked ancestor.
+
+Action mapping: `create` = upload, `edit` = verify/reject/revoke *and* metadata
+edit, `delete` = remove an unverified submission, `view` = metadata + binary.
+Note a create-only custodian **cannot** approve their own submission.
+
+### Routes
+
+| Route | Purpose |
+|---|---|
+| `POST /api/staff-training-certificates-upload` | multipart upload (flattened route name) |
+| `POST /api/staff-documents/[documentId]/verify` | verify / reject / revoke (certification branch) |
+| `DELETE /api/staff-documents/[documentId]` | delete an unverified submission |
+| `GET /api/staff-documents-download?documentId=` | **the only** way to the binary |
+| `/health-safety/training/certificates/new` | H&S entry point (employee selection) |
+| Employee profile → Documents → Upload training certificate | staff entry point |
+
+**No H&S or staff-document response ever carries `file_path`, `file_url` or the
+legacy `certificate_url`.** Callers get `downloadUrl` (the protected route) when
+they have binary access, and `hasCertificate: boolean` otherwise. Storage paths
+and URLs are also kept out of application logs.
+
+The upload orders its work so failure is cheap: authorize → validate everything
+(MIME + extension + magic bytes, 10 MB cap) → upload to VF Storage → one
+`pg.Pool` transaction for the document and all pending rows. If the transaction
+fails, the stored object is deleted; if that delete also fails, the filename is
+logged for an operator and withheld from the response.
+
+### Manual entry is now narrow
+
+`/health-safety/training/new` records **only** catalogue types with
+`requires_certificate = false` (a site induction register, say). Those are their
+own evidence, so they are written `verified` — leaving them pending would mean
+they counted for nothing and nobody would ever be asked to approve them. Types
+that need a certificate are signposted to the upload flow, and the free-text
+certificate URL field is gone: a link anyone could type is not evidence.
+
+### Deploying 471 — the expand/contract window
+
+Dev and production share one database, so applying 471 through a dev deploy
+changes production's database while production is still running the old code.
+That old code inserts `hs_worker_training` rows without `verification_status`,
+which means they take the new default `'pending'` and quietly stop counting —
+and re-running the migration will not repair them, because the one-time backfill
+guard is closed for good after the first apply.
+
+Deploy production in the same session where possible. Otherwise repair after the
+production deploy, bounded to rows with no linked certificate created after the
+migration landed:
+
+```sql
+UPDATE hs_worker_training
+   SET verification_status = 'verified'
+ WHERE staff_document_id IS NULL
+   AND verification_status = 'pending'
+   AND created_at >= '<when 471 was applied>';
+```
+
+Rolling 471 back has a sharper edge than usual: re-applying afterwards does not
+merely lose the pending/rejected decisions it dropped, it **stamps them
+`verified`**, because the column is gone and every surviving row looks
+pre-existing to the backfill. Re-verify or delete anything that was unresolved
+before re-applying.
+
+### Out of scope in v1
+
+Employee self-submission, contractor-worker certificate capture (the live
+contractor roster is not authoritative), bulk import, and OCR of certificates.
+Internal `staff` only.
+
 ## History / deferred
 
 - 2026-07-24 (Phase 0 close-out): 8 stranded audits cancelled (`backfill-hs-audit-scope.ts --execute`); 3 zombie `hs_project_config` rows for deleted projects deactivated — dashboard overdue now equals the plain-SQL count (5 == 5, was 5 vs 8); reminders cron scheduled and observed firing; dashboard `total_projects_configured` fixed (counted 8 unfiltered config rows while only 5 projects are configured); 6 orphaned `hs_ticket_details` rows deleted at gate G2 (all demo residue). Gate decisions recorded: **G1 = fail-CLOSED** (block contractor assignment when the gate itself errors — reverses the previous fail-open default, wired in Phase 1); **§4.5 e-signature = typed** for toolbox/PPE registers, **drawn** for the statutory appointment letters only (Phase 5); **G3 = dev-only**, batch to production later.
 - 2026-07-23 remediation fixed: empty-wizard root cause, activity-log schema drift (phantom-write 500s), incident created_by 23502, contractor uuid/parseInt + dead `tickets` refs, all 404 pages, checklist editor, migration reproducibility, reminders cron. Dead code deleted: ContractorHSTab, InvestigationPanel/FiveWhysForm, investigate API, calculateAuditScore.
+- 2026-07-30: classified training certificate upload built (migration 471) — see the section above. Also closed a set of pre-existing staff-document authorization holes found on the way: `/api/staff-documents-download`, `/api/staff-documents/[documentId]` (GET/PUT/DELETE), `/api/staff-documents/expiring` and `/api/staff-documents-upload` authenticated but did not authorize at all.
 - 2026-07-24: Phases 4–9 **built** (training matrix, toolbox/DSTI, PPE, permit-to-work, digital safety file + appointment letters, LTIFR/DIFR, e-signatures, H&S RBAC, fail-closed gate, severity unification) — see the "Phases 4–9 build" section above. Still deferred: offline/PWA field capture, journey management.
 
 ## Related

@@ -147,6 +147,14 @@ export function DocumentVerificationPanel({
   const SYNC_TO_STAFF_TYPES: DocumentType[] = ['sa_id', 'passport', 'drivers_license', 'bank_details'];
 
   // Computed values - must be before useCallback/useEffect that use them
+  /**
+   * Always the protected route, never a raw VF Storage URL — the API stopped
+   * returning `fileUrl`, and the download endpoint re-checks permission on
+   * every request rather than trusting a link the browser already holds.
+   */
+  const documentHref =
+    document.downloadUrl ?? `/api/staff-documents-download?documentId=${document.id}&inline=true`;
+
   const isPending = document.verificationStatus === 'pending';
   const isVerified = document.verificationStatus === 'verified';
   const isRejected = document.verificationStatus === 'rejected';
@@ -307,7 +315,7 @@ export function DocumentVerificationPanel({
           <div className="border border-[var(--ff-border-light)] rounded-lg p-4 bg-[var(--ff-bg-tertiary)]">
             {isImageFile(document.mimeType) ? (
               <img
-                src={document.fileUrl}
+                src={documentHref}
                 alt={document.documentName}
                 className="max-w-full max-h-64 mx-auto rounded"
               />
@@ -319,7 +327,7 @@ export function DocumentVerificationPanel({
             )}
             <div className="mt-3 text-center">
               <a
-                href={document.fileUrl}
+                href={documentHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
