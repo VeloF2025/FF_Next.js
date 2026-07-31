@@ -46,7 +46,11 @@ case "$MODE" in
   --tree)
     # Every tracked line, formatted like diff output so the rules below apply
     # unchanged. Lockfiles and vendored trees are excluded as pure noise.
-    ADDED=$(git grep -h '' -- . \
+    # `-n` and the filename are kept so a hit names its real file:line -- an
+    # audit that cannot say WHERE is not actionable. `:/` anchors the pathspec
+    # at the repo root, so running this from a subdirectory scans everything
+    # rather than silently narrowing to the subtree. `-I` skips binaries.
+    ADDED=$(git grep -nI '' -- ':/' \
               ':(exclude)scripts/secret-scan.sh' ':(exclude)*.lock' \
               ':(exclude)*lock.json' ':(exclude)node_modules/**' 2>/dev/null \
             | sed 's/^/+/' || true)
@@ -66,12 +70,35 @@ case "$MODE" in
 esac
 
 # Lines that look like placeholders / safe references — never a real secret.
-PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|here|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|\$[A-Z]|process\.env|env\.|getenv|credentials\.local|\btest[-_]|\bmock|\bstub'
+# NOTE: this list is applied case-INSENSITIVELY, so every term must be safe
+# under -i. `\$[A-Z]` was not: it matched the `$w` inside a real password
+# ("P@ss$w0rd123") and whitelisted it. It is now anchored to the assignment,
+# which is what it was always meant to express -- "the value IS a variable
+# reference". `here` is likewise anchored so it cannot match inside a value.
+PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|\btest[-_]|\bmock|\bstub'
 
 HITS=""
-add_hits() { # $1 = grep -E pattern, $2 = label
-  local found
-  found=$(echo "$ADDED" | grep -nEi "$1" 2>/dev/null | grep -viE "$PLACEHOLDER" || true)
+add_hits() { # $1 = grep -E pattern, $2 = label, $3 = "cs" for case-SENSITIVE
+  # Rules that lean on [A-Z] MUST pass "cs": under -i, `[A-Z]` also matches
+  # lowercase, which made an uppercase-only env rule fire on JSX props like
+  # `showConfirmPassword={...}`. The placeholder filter stays case-insensitive.
+  local found iflag="-i"
+  [ "${3:-}" = "cs" ] && iflag=""
+  # The placeholder test is applied to the MATCHED text, never the whole line.
+  # Whole-line matching meant an unrelated trailing comment could whitelist a
+  # real secret earlier on the same line -- e.g.
+  #   API_TOKEN="<live value>"   # used against test-env
+  # was silently suppressed by the `test-` term.
+  # `grep -no` yields `<lineno>:<matched text>`, so the placeholder filter runs
+  # against the MATCH while the line number is retained. Done in a fixed number
+  # of passes rather than a subshell per hit -- the per-hit form was correct but
+  # spawned processes per match, which made --tree unusable on a 2M-line tree.
+  local nums
+  nums=$(echo "$ADDED" | grep -noE $iflag "$1" 2>/dev/null | grep -viE "$PLACEHOLDER" \
+         | cut -d: -f1 | sort -un | tr '\n' ' ')
+  [ -z "$nums" ] && return 0
+  found=$(echo "$ADDED" | awk -v want="$nums" \
+            'BEGIN{n=split(want,a," ");for(i=1;i<=n;i++)s[a[i]]=1} s[NR]{print NR":"$0}')
   if [ -n "$found" ]; then
     HITS="${HITS}\n  [${2}]\n$(echo "$found" | sed 's/^/    /')\n"
   fi
@@ -94,7 +121,19 @@ if [ -n "$ADDED" ]; then
   # `SUDO_PASS` -- which is exactly how the leak went unseen. The TRAILING \b
   # stays, forcing the keyword to end the identifier, which keeps enum values
   # like PASSPORT / PASSED / BYPASS_PERMISSIONS out.
-  add_hits "[A-Za-z0-9_]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|API[_-]?KEY)\b['\"]?[[:space:]]*=[[:space:]]*['\"][^'\"\$[:space:]]{6,}['\"]" "hardcoded password/secret literal"
+  #
+  # KEY is only recognised behind a credential-bearing prefix (API/SECRET/
+  # PRIVATE/...). A bare `KEY` matched React `key={...}` props and SQL
+  # `parent_key = parent.key` across the tree.
+  # `$` is rejected only as the FIRST character (a variable reference); a `$`
+  # inside the value is legitimate in a real password like "P@ss$w0rd123".
+  add_hits "[A-Za-z0-9_]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|(API|SECRET|PRIVATE|SIGNING|ENCRYPTION|MASTER|ACCESS|AUTH|CLIENT)[_-]?KEY)\b['\"]?[[:space:]]*=[[:space:]]*['\"][^'\"[:space:]\$][^'\"[:space:]]{5,}" "hardcoded password/secret literal"
+  # Unquoted shell/.env assignment: `export FOO_TOKEN=abc123`, `DB_PASS=xyz`.
+  # Deliberately narrow -- an UPPERCASE name and NO whitespace around `=`. That
+  # is the .env/export idiom, and it excludes ordinary code assignments like
+  # `const token = parse(...)` or `this.password = config.password`, which a
+  # general unquoted rule swept up by the hundreds.
+  add_hits "(^|[+:[:space:]])[A-Z0-9_]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|(API|SECRET|PRIVATE|SIGNING|ENCRYPTION|MASTER|ACCESS|AUTH|CLIENT)[_-]?KEY)=[^'\"[:space:]\$][^'\"[:space:]]{5,}" "hardcoded secret in env-style assignment" cs
   # AWS access key id
   add_hits "AKIA[0-9A-Z]{16}" "AWS access key id"
   # Private key block (placeholder lines already excluded above)
