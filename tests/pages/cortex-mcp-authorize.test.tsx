@@ -5,6 +5,7 @@ vi.unmock('@/contexts/AuthContext');
 
 import { getServerSideProps } from '../../pages/cortex/mcp/authorize';
 import {
+  ATTACKER_CONTEXT,
   CALLBACK,
   FAILURE_RESPONSES,
   ROUTE,
@@ -41,6 +42,7 @@ describe('Cortex MCP authorization page', () => {
     const browser = renderConsentPage({ authResponse: { status: 401 } });
     await browser.waitForPath('/sign-in');
     expect(browser.returnUrl()).toBe(ROUTE);
+    expect(browser.recordedRequests('/api/cortex/mcp-consent-context')).toEqual([]);
     expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([]);
   });
 
@@ -53,14 +55,175 @@ describe('Cortex MCP authorization page', () => {
     expect(screen.queryByRole('button', { name: /^Allow$/ })).not.toBeInTheDocument();
   });
 
-  it('shows the verified identity and read-only Cortex scope', async () => {
-    renderConsentPage({ authResponse: authenticatedLewResponse });
+  it('shows the attacker-provided name and exact redirect before enabling Allow', async () => {
+    const browser = renderConsentPage({ authResponse: authenticatedLewResponse });
     expect(await screen.findByText('lew@velocityfibre.co.za')).toBeInTheDocument();
     expect(screen.getByRole('heading', {
-      name: 'Allow Claude to read Cortex Knowledge as you?',
+      name: 'Allow Cortex Knowledge access?',
     })).toBeInTheDocument();
+    expect(screen.getByText(ATTACKER_CONTEXT.clientName)).toBeInTheDocument();
+    expect(screen.getByText(/provided by the connector/i)).toBeInTheDocument();
+    const redirect = screen.getByText(ATTACKER_CONTEXT.redirectUri);
+    expect(redirect).toBeInTheDocument();
+    expect(redirect.closest('a')).toBeNull();
+    expect(screen.queryByRole('link', {
+      name: ATTACKER_CONTEXT.redirectUri,
+    })).not.toBeInTheDocument();
+    expect(screen.getByText(/receives the authorization result/i)).toBeInTheDocument();
     expect(screen.getByText('· Read-only Cortex tools')).toBeInTheDocument();
     expect(screen.getByText(/never displays or asks you to paste a bearer token/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Allow$/ })).toBeEnabled();
+    expect(browser.recordedRequests('/api/cortex/mcp-consent-context')).toEqual([{
+      method: 'POST',
+      json: { stateId: STATE_ID },
+    }]);
+  });
+
+  it('renders an attacker-controlled client name only as text', async () => {
+    const payload = '<img data-attacker="true" src=x onerror=alert(1)>';
+    renderConsentPage({
+      authResponse: authenticatedLewResponse,
+      contextResponse: {
+        status: 200,
+        body: { data: { ...ATTACKER_CONTEXT, clientName: payload } },
+      },
+    });
+
+    expect(await screen.findByText(payload)).toBeInTheDocument();
+    expect(document.querySelector('[data-attacker="true"]')).toBeNull();
+  });
+
+  it('renders attacker-controlled redirect and scope values only as non-link text', async () => {
+    const redirectUri = 'https://evil.example/<img data-redirect-attacker="true">';
+    const scope = '<svg data-scope-attacker="true" onload=alert(1)>';
+    renderConsentPage({
+      authResponse: authenticatedLewResponse,
+      contextResponse: {
+        status: 200,
+        body: { data: { ...ATTACKER_CONTEXT, redirectUri, scopes: [scope] } },
+      },
+    });
+
+    const redirect = await screen.findByText(redirectUri);
+    expect(redirect.closest('a')).toBeNull();
+    expect(screen.queryByRole('link', { name: redirectUri })).not.toBeInTheDocument();
+    const renderedScope = screen.getByText(scope);
+    expect(renderedScope.closest('a')).toBeNull();
+    expect(screen.queryByRole('link', { name: scope })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-redirect-attacker="true"]')).toBeNull();
+    expect(document.querySelector('[data-scope-attacker="true"]')).toBeNull();
+  });
+
+  it('never enables state B using context verified for state A', async () => {
+    const stateB = 'L9pQM2ynWz4VhJ6Tf8RcK1sXa3DeUo7B';
+    const routeB = `/cortex/mcp/authorize?state_id=${stateB}`;
+    let releaseStateB: ((response: { status: number; body: unknown }) => void) | null = null;
+    const stateBResponse = new Promise<{ status: number; body: unknown }>((resolve) => {
+      releaseStateB = resolve;
+    });
+    const browser = renderConsentPage({
+      authResponse: authenticatedLewResponse,
+      consentResponse: { status: 200, body: { data: { redirectUrl: CALLBACK } } },
+      contextResponses: [
+        { status: 200, body: { data: ATTACKER_CONTEXT } },
+        stateBResponse,
+      ],
+    });
+    expect(await screen.findByRole('button', { name: /^Allow$/ })).toBeEnabled();
+
+    act(() => browser.changeRoute(routeB));
+
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Allow$/ })).not.toBeInTheDocument();
+    expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([]);
+
+    await act(async () => {
+      releaseStateB?.({
+        status: 200,
+        body: {
+          data: {
+            ...ATTACKER_CONTEXT,
+            redirectUri: 'https://state-b.example/callback',
+          },
+        },
+      });
+      await stateBResponse;
+    });
+    expect(await screen.findByText('https://state-b.example/callback')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Allow$/ }));
+    expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([{
+      method: 'POST',
+      json: { stateId: stateB },
+    }]);
+    await waitFor(() => expect(browser.externalLocation()).toBe(CALLBACK));
+  });
+
+  it('isolates an in-flight consent submission from a new query state', async () => {
+    const stateB = 'L9pQM2ynWz4VhJ6Tf8RcK1sXa3DeUo7B';
+    const routeB = `/cortex/mcp/authorize?state_id=${stateB}`;
+    const callbackA = 'https://state-a.example/callback?code=state-a';
+    const callbackB = 'https://state-b.example/callback?code=state-b';
+    let releaseStateA!: (response: { status: number; body: unknown }) => void;
+    const stateAResponse = new Promise<{ status: number; body: unknown }>((resolve) => {
+      releaseStateA = resolve;
+    });
+    const browser = renderConsentPage({
+      authResponse: authenticatedLewResponse,
+      contextResponses: [
+        { status: 200, body: { data: ATTACKER_CONTEXT } },
+        {
+          status: 200,
+          body: {
+            data: {
+              ...ATTACKER_CONTEXT,
+              redirectUri: 'https://state-b.example/registered-callback',
+            },
+          },
+        },
+      ],
+      consentResponses: [
+        stateAResponse,
+        { status: 200, body: { data: { redirectUrl: callbackB } } },
+      ],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Allow$/ }));
+    expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([{
+      method: 'POST',
+      json: { stateId: STATE_ID },
+    }]);
+
+    act(() => browser.changeRoute(routeB));
+    const allowStateB = await screen.findByRole('button', { name: /^Allow$/ });
+    expect(allowStateB).toBeEnabled();
+    fireEvent.click(allowStateB);
+
+    expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([
+      { method: 'POST', json: { stateId: STATE_ID } },
+      { method: 'POST', json: { stateId: stateB } },
+    ]);
+    await waitFor(() => expect(browser.externalLocation()).toBe(callbackB));
+
+    await act(async () => {
+      releaseStateA({ status: 200, body: { data: { redirectUrl: callbackA } } });
+      await stateAResponse;
+    });
+    expect(browser.externalLocation()).toBe(callbackB);
+  });
+
+  it.each([
+    ['API rejection', { status: 502, body: { error: { message: 'Context refused' } } }],
+    ['missing context', { status: 200, body: { data: {} } }],
+    ['network failure', new Error('offline')],
+  ] as const)('blocks Allow after context %s', async (_case, contextResponse) => {
+    const browser = renderConsentPage({
+      authResponse: authenticatedLewResponse,
+      contextResponse,
+    });
+
+    expect(await screen.findByText('Could not authorize')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Allow$/ })).not.toBeInTheDocument();
+    expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([]);
   });
 
   it('makes Cancel terminal without a consent request', async () => {

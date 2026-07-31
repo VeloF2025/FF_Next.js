@@ -11,6 +11,10 @@ interface RouteJson {
   success?: boolean;
   data?: {
     redirectUrl?: string;
+    clientId?: string;
+    clientName?: string | null;
+    redirectUri?: string;
+    scopes?: string[];
   };
   error?: {
     code?: string;
@@ -66,13 +70,16 @@ async function listen(server: http.Server): Promise<number> {
   });
 }
 
-export async function startRealConsentRoute(): Promise<{
+export async function startRealConsentRoute(
+  routeKind: 'complete' | 'context' = 'complete',
+): Promise<{
   database: ConsentRouteDatabase;
   callback: {
     count: number;
     stateId?: string;
     hasJwt?: boolean;
     authenticatedSecret?: boolean;
+    path?: string;
   };
   request(method: 'GET' | 'POST', authenticated: boolean): Promise<RouteResponse>;
   close(): Promise<void>;
@@ -95,6 +102,7 @@ export async function startRealConsentRoute(): Promise<{
     stateId: undefined as string | undefined,
     hasJwt: undefined as boolean | undefined,
     authenticatedSecret: undefined as boolean | undefined,
+    path: undefined as string | undefined,
   };
   const callbackServer = http.createServer((request, response) => {
     void (async () => {
@@ -103,14 +111,22 @@ export async function startRealConsentRoute(): Promise<{
         token?: string;
       };
       callback.count += 1;
+      callback.path = request.url;
       callback.stateId = body.stateId;
       callback.hasJwt = body.token?.split('.').length === 3;
       callback.authenticatedSecret =
         request.headers['x-cortex-mcp-secret'] === callbackSecret;
       response.setHeader('content-type', 'application/json');
-      response.end(JSON.stringify({
-        redirectUrl: 'https://claude.ai/mcp/callback?code=route-test',
-      }));
+      response.end(JSON.stringify(
+        routeKind === 'context'
+          ? {
+              client_id: 'route-client',
+              client_name: 'Claude',
+              redirect_uri: 'https://evil.example/route-callback',
+              scopes: ['cortex.read'],
+            }
+          : { redirectUrl: 'https://claude.ai/mcp/callback?code=route-test' },
+      ));
     })().catch((error: unknown) => {
       response.statusCode = 500;
       response.end(error instanceof Error ? error.message : String(error));
@@ -139,7 +155,12 @@ export async function startRealConsentRoute(): Promise<{
     isActive: true,
   }, 'route-session', '1h');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const handler: NextApiHandler = (await import('@/pages/api/cortex/mcp-consent')).default;
+  const handler: NextApiHandler = routeKind === 'context'
+    ? (await import('@/pages/api/cortex/mcp-consent-context')).default
+    : (await import('@/pages/api/cortex/mcp-consent')).default;
+  const routePath = routeKind === 'context'
+    ? '/api/cortex/mcp-consent-context'
+    : '/api/cortex/mcp-consent';
 
   const server = http.createServer((request, response) => {
     void (async () => {
@@ -171,7 +192,7 @@ export async function startRealConsentRoute(): Promise<{
     method: 'GET' | 'POST',
     authenticated: boolean,
   ): Promise<RouteResponse> {
-    const response = await fetch(`${url}/api/cortex/mcp-consent`, {
+    const response = await fetch(`${url}${routePath}`, {
       method,
       headers: {
         ...(authenticated ? { cookie: `ff_auth_token=${token}` } : {}),

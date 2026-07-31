@@ -10,14 +10,20 @@ import CortexMcpAuthorizePage from '../../pages/cortex/mcp/authorize';
 export const STATE_ID = 'pZJqcS1uZH4fXo0WmXtYyRA7d2NcQk5g';
 export const ROUTE = `/cortex/mcp/authorize?state_id=${STATE_ID}`;
 export const CALLBACK = 'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc';
+export const ATTACKER_CONTEXT = {
+  clientId: 'attacker-client',
+  clientName: 'Claude',
+  redirectUri: 'https://evil.example/cb',
+  scopes: ['cortex.read'],
+};
 const originalFetch = globalThis.fetch;
 const originalLocation = Object.getOwnPropertyDescriptor(window, 'location');
 const mountedHeads = new Set<React.ReactNode>();
-
 export interface StubResponse {
   status: number;
   body?: unknown;
 }
+type DeferredResponse = StubResponse | Error | Promise<StubResponse>;
 interface RecordedRequest {
   url: string;
   method: string;
@@ -28,7 +34,10 @@ interface RenderOptions {
   routerReady?: boolean;
   deferAuth?: boolean;
   authResponse: StubResponse;
-  consentResponse?: StubResponse | Error;
+  contextResponse?: DeferredResponse;
+  contextResponses?: DeferredResponse[];
+  consentResponse?: DeferredResponse;
+  consentResponses?: DeferredResponse[];
 }
 
 export const authenticatedLewResponse: StubResponse = {
@@ -64,6 +73,31 @@ function responseFrom(stub: StubResponse): Response {
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+async function resolveWithAbort(
+  pending: Promise<StubResponse>,
+  signal?: AbortSignal | null,
+): Promise<StubResponse> {
+  if (!signal) return pending;
+  if (signal.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+  return new Promise((resolve, reject) => {
+    const aborted = () => {
+      signal.removeEventListener('abort', aborted);
+      reject(new DOMException('The operation was aborted.', 'AbortError'));
+    };
+    signal.addEventListener('abort', aborted, { once: true });
+    pending.then(
+      (value) => {
+        signal.removeEventListener('abort', aborted);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', aborted);
+        reject(error);
+      },
+    );
+  });
+}
 function routeParts(route: string): { pathname: string; query: NextRouter['query'] } {
   const url = new URL(route, 'https://dev.fibreflow.app');
   return { pathname: url.pathname, query: Object.fromEntries(url.searchParams.entries()) };
@@ -96,16 +130,23 @@ export class ConsentBrowser {
   readonly router: NextRouter;
   private readonly targetRoute: string;
   private readonly authResponse: StubResponse;
-  private readonly consentResponse?: StubResponse | Error;
+  private readonly contextResponses: DeferredResponse[];
+  private readonly consentResponses: DeferredResponse[];
   private authResolver: ((response: Response) => void) | null = null;
   private authPromise: Promise<Response> | null = null;
   private rerenderPage: (() => void) | null = null;
   private externalHref: string | null = null;
-
   constructor(options: RenderOptions) {
     this.targetRoute = options.route ?? ROUTE;
     this.authResponse = options.authResponse;
-    this.consentResponse = options.consentResponse;
+    this.contextResponses = options.contextResponses ?? [
+      options.contextResponse ?? {
+        status: 200,
+        body: { data: ATTACKER_CONTEXT },
+      },
+    ];
+    this.consentResponses = options.consentResponses
+      ?? (options.consentResponse ? [options.consentResponse] : []);
     if (options.deferAuth) {
       this.authPromise = new Promise((resolve) => {
         this.authResolver = resolve;
@@ -137,7 +178,6 @@ export class ConsentBrowser {
       },
     };
   }
-
   readonly fetch: typeof fetch = async (input, init) => {
     const url = typeof input === 'string'
       ? input
@@ -151,9 +191,18 @@ export class ConsentBrowser {
     if (url === '/api/auth/me') {
       return this.authPromise ?? responseFrom(this.authResponse);
     }
+    if (url === '/api/cortex/mcp-consent-context') {
+      const pending = this.contextResponses.shift();
+      if (!pending) throw new Error('No context response remains');
+      if (pending instanceof Error) throw pending;
+      return responseFrom(await pending);
+    }
     if (url === '/api/cortex/mcp-consent') {
-      if (this.consentResponse instanceof Error) throw this.consentResponse;
-      if (this.consentResponse) return responseFrom(this.consentResponse);
+      const pending = this.consentResponses.shift();
+      if (pending instanceof Error) throw pending;
+      if (pending) {
+        return responseFrom(await resolveWithAbort(Promise.resolve(pending), init?.signal));
+      }
     }
     throw new Error(`Unexpected request: ${url}`);
   };
@@ -177,6 +226,12 @@ export class ConsentBrowser {
     this.router.query = hydrated.query;
     this.router.asPath = this.targetRoute;
     this.router.isReady = true;
+    this.rerenderPage?.();
+  }
+  changeRoute(route: string): void {
+    const changed = routeParts(route);
+    this.router.query = changed.query;
+    this.router.asPath = route;
     this.rerenderPage?.();
   }
   releaseAuth(): void {
