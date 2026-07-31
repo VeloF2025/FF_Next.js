@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save } from 'lucide-react';
 import {
   MEDICAL_OUTCOMES,
@@ -220,7 +220,7 @@ const RecordMedicalPage: NextPage = () => (
     <Head>
       <title>Record Medical Fitness | FibreFlow</title>
     </Head>
-    <ModulePage config={projectsConfig}>
+    <ModulePage config={healthSafetyConfig}>
       <RecordMedicalContent />
     </ModulePage>
   </AppLayout>

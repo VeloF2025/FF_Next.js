@@ -15,6 +15,7 @@ import {
   communicationsSection,
   activateSection,
   fieldOperationsSection,
+  healthSafetySection,
   conduitSection,
   trackerSection,
   systemSection,
@@ -33,10 +34,11 @@ export const navItems: NavSection[] = [
   fleetSection,           // 8. FLEET - Vehicles for field ops
   peopleSection,          // 9. HUMAN RESOURCES - Staff
   fieldOperationsSection, // 10. FIELD OPERATIONS - Civil QA
-  conduitSection,         // 11. CONDUIT - Project financial scoping
-  trackerSection,         // 12. PON TRACKER - Editable project tracker
-  analyticsSection,       // 13. ANALYTICS - Performance metrics
-  communicationsSection,  // 14. COMMUNICATIONS - WhatsApp, meetings
-  cortexSection,          // 15. CORTEX - AI enrichment review
-  systemSection,          // 16. SYSTEM - Admin tools (always last)
+  healthSafetySection,    // 11. HEALTH & SAFETY - moved out of Projects 2026-07-31
+  conduitSection,         // 12. CONDUIT - Project financial scoping
+  trackerSection,         // 13. PON TRACKER - Editable project tracker
+  analyticsSection,       // 14. ANALYTICS - Performance metrics
+  communicationsSection,  // 15. COMMUNICATIONS - WhatsApp, meetings
+  cortexSection,          // 16. CORTEX - AI enrichment review
+  systemSection,          // 17. SYSTEM - Admin tools (always last)
 ];

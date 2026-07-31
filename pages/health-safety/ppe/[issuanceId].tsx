@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR, { mutate } from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, CheckCircle2, Trash2, PenLine } from 'lucide-react';
 import { ReplacementBadge } from '@/modules/health-safety/components/ppe/ReplacementBadge';
 import type { PPEReplacementStatus } from '@/modules/health-safety/types/ppe.types';
@@ -108,7 +108,7 @@ const DetailPage: NextPage = () => {
   return (
     <AppLayout>
       <Head><title>PPE Issue | FibreFlow</title></Head>
-      <ModulePage config={projectsConfig}>{typeof issuanceId === 'string' ? <Detail id={issuanceId} /> : null}</ModulePage>
+      <ModulePage config={healthSafetyConfig}>{typeof issuanceId === 'string' ? <Detail id={issuanceId} /> : null}</ModulePage>
     </AppLayout>
   );
 };

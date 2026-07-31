@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ClipboardCheck, ChevronLeft } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { CHECKLIST_CATEGORIES } from '@/modules/health-safety/types/checklist.types';
@@ -152,7 +152,7 @@ const NewChecklistPage: NextPage = () => (
     <Head>
       <title>New Checklist Template | H&S | FibreFlow</title>
     </Head>
-    <ModulePage config={projectsConfig}>
+    <ModulePage config={healthSafetyConfig}>
       <NewChecklistContent />
     </ModulePage>
   </AppLayout>

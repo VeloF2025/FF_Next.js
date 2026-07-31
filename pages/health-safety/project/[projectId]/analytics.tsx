@@ -10,7 +10,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, TrendingUp } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
@@ -34,7 +34,7 @@ function ProjectAnalyticsContent() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/projects/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" /></Link>
+        <Link href="/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" /></Link>
         <div>
           <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Project Injury Rates</h1>
           <p className="text-sm text-[var(--ff-text-secondary)]">Per 200,000 hours · {Number(totals.hours_worked ?? 0).toLocaleString()} hrs</p>
@@ -88,7 +88,7 @@ function ProjectAnalyticsContent() {
 const ProjectAnalyticsPage: NextPage = () => (
   <AppLayout>
     <Head><title>Project Injury Rates | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><ProjectAnalyticsContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><ProjectAnalyticsContent /></ModulePage>
   </AppLayout>
 );
 

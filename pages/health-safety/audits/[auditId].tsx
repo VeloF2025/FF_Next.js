@@ -12,7 +12,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { AuditWizard } from '@/modules/health-safety/components/AuditWizard';
 
 function AuditPageContent() {
@@ -42,7 +42,7 @@ const AuditDetailPage: NextPage = () => {
       <Head>
         <title>H&S Audit | FibreFlow</title>
       </Head>
-      <ModulePage config={projectsConfig}>
+      <ModulePage config={healthSafetyConfig}>
         <AuditPageContent />
       </ModulePage>
     </AppLayout>

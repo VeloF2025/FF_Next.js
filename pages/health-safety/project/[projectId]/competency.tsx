@@ -10,7 +10,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, GraduationCap } from 'lucide-react';
 import { CompetencyBadge, type CompetencyStatus } from '@/modules/health-safety/components/training/CompetencyBadge';
 
@@ -43,7 +43,7 @@ function CompetencyContent() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/projects/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors">
+        <Link href="/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors">
           <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
         </Link>
         <div>
@@ -99,7 +99,7 @@ const CompetencyPage: NextPage = () => (
     <Head>
       <title>Competency Gaps | FibreFlow</title>
     </Head>
-    <ModulePage config={projectsConfig}>
+    <ModulePage config={healthSafetyConfig}>
       <CompetencyContent />
     </ModulePage>
   </AppLayout>

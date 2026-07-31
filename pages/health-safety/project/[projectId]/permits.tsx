@@ -10,7 +10,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, FileCheck, Calendar } from 'lucide-react';
 import { PermitStatusBadge } from '@/modules/health-safety/components/permits/PermitStatusBadge';
 import type { PermitStatus } from '@/modules/health-safety/types/permit.types';
@@ -32,7 +32,7 @@ function ProjectPermitsContent() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/projects/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors">
+        <Link href="/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors">
           <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
         </Link>
         <div>
@@ -84,7 +84,7 @@ function ProjectPermitsContent() {
 const ProjectPermitsPage: NextPage = () => (
   <AppLayout>
     <Head><title>Permits Register | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><ProjectPermitsContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><ProjectPermitsContent /></ModulePage>
   </AppLayout>
 );
 

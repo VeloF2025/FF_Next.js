@@ -11,6 +11,7 @@ import type { LucideIcon } from 'lucide-react';
 export type ModuleId =
   | 'main'
   | 'projects'
+  | 'health-safety'
   | 'activate'
   | 'noc'
   | 'procurement'
