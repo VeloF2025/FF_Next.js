@@ -110,8 +110,13 @@ export function getActiveSubTabByPath(
 ): TabConfig | undefined {
   if (!tab.subTabs?.length) return undefined;
 
-  const fullPath = path.split('?')[0] || '';
-  const queryString: string = path.includes('?') ? (path.split('?')[1] ?? '') : '';
+  // Same legacy-alias resolution as the two resolvers above. Dormant today
+  // (healthSafetyConfig declares no subTabs), but the moment a tab under an
+  // aliased module grows subTabs, the strip would go blank on the legacy URL —
+  // the exact bug canonicalizePath exists to prevent.
+  const canonical = canonicalizePath(path);
+  const fullPath = canonical.split('?')[0] || '';
+  const queryString: string = canonical.includes('?') ? (canonical.split('?')[1] ?? '') : '';
 
   // Check for query param matches (e.g., ?status=active)
   for (const subTab of tab.subTabs) {

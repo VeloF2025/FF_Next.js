@@ -10,7 +10,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { canonicalizePath } from '../legacyPaths';
-import { getModuleConfigByPath, getActiveTabByPath, registerModuleConfig } from '../config/registry';
+import {
+  getModuleConfigByPath,
+  getActiveTabByPath,
+  getActiveSubTabByPath,
+  registerModuleConfig,
+} from '../config/registry';
 import { healthSafetyConfig } from '../config/modules/health-safety.config';
 import { projectsConfig } from '../config/modules/projects.config';
 
@@ -83,5 +88,29 @@ describe('module resolution at the legacy H&S path', () => {
       getActiveTabByPath(healthSafetyConfig, CANONICAL)
     );
     expect(getModuleConfigByPath(LEGACY)).toEqual(getModuleConfigByPath(CANONICAL));
+  });
+});
+
+describe('sub-tab resolution at the legacy H&S path', () => {
+  // healthSafetyConfig declares no subTabs today, so this uses a synthetic tab.
+  // The point is that the resolver must not regress the moment one is added.
+  const tab = {
+    id: 'incidents',
+    label: 'Incidents',
+    path: `${CANONICAL}/incidents`,
+    subTabs: [
+      { id: 'open', label: 'Open', path: `${CANONICAL}/incidents` },
+      { id: 'closed', label: 'Closed', path: `${CANONICAL}/incidents/closed` },
+    ],
+  } as Parameters<typeof getActiveSubTabByPath>[0];
+
+  it('resolves a sub-tab from the legacy path', () => {
+    expect(getActiveSubTabByPath(tab, `${LEGACY}/incidents/closed`)?.id).toBe('closed');
+  });
+
+  it('resolves the legacy and canonical paths identically', () => {
+    expect(getActiveSubTabByPath(tab, `${LEGACY}/incidents/closed`)).toEqual(
+      getActiveSubTabByPath(tab, `${CANONICAL}/incidents/closed`)
+    );
   });
 });
