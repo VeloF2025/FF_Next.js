@@ -73,8 +73,15 @@ bash scripts/deploy-local.sh status           # Show all environments
 
 **Promotion script (exact commit between envs):**
 ```bash
+export VELO_SUDO_PASSWORD='...'              # see .claude/credentials.local.md
 bash scripts/promote.sh dev production       # After hours
 ```
+
+`promote.sh` and `deploy-gate.sh` SSH to `velo@` and need sudo on the far side.
+The `velo` account has no NOPASSWD sudo for the fibreflow services, so both
+scripts exit early with a clear error if `VELO_SUDO_PASSWORD` is unset rather
+than half-deploying. Scripts that run *on* Velocity (`deploy-local.sh`,
+`safe-deploy.sh`, `rollback.sh`) do not need it.
 
 **Legacy:** `deploy-gate.sh` auto-redirects to `deploy-local.sh` when running on Velocity (hostname detection).
 
