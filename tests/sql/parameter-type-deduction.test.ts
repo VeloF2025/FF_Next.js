@@ -74,8 +74,16 @@ export interface Offence {
  * run reads as proof. Anchoring on UPDATE cannot desync: each window is found
  * independently of every other.
  *
- * The window runs to the statement's natural end — a closing backtick, a
- * semicolon, or a hard cap for safety — which is ample for a SET list.
+ * The window runs to the statement's natural end — a closing backtick or a
+ * semicolon — with a hard cap only as a guard against pathological input.
+ *
+ * The cap is deliberately far above any real statement. Measured across the
+ * repo: 464 parameter-bearing UPDATE windows, the largest 1894 characters
+ * (pages/api/works-qa/sync-historical.ts), and that one carries its parameter
+ * in the final 160 characters. A cap close to real sizes would silently
+ * truncate a wide SET list before reaching a comparison at its end — the same
+ * shape of quiet blind spot as the backtick bug above, so it gets the same
+ * treatment rather than a comment saying it is unlikely.
  */
 function sqlBlocks(source: string): string[] {
   const blocks: string[] = [];
@@ -83,7 +91,7 @@ function sqlBlocks(source: string): string[] {
   const anchor = /\bUPDATE\s+(?:SET\b|[a-z_][a-z0-9_]*)/gi;
   let m: RegExpExecArray | null;
   while ((m = anchor.exec(source)) !== null) {
-    const rest = source.slice(m.index, m.index + 4000);
+    const rest = source.slice(m.index, m.index + 20000);
     const end = rest.search(/`|;\s*$|\n\s*`/m);
     const window = end > 0 ? rest.slice(0, end) : rest;
     if (/\$\d/.test(window)) blocks.push(window);
@@ -217,6 +225,21 @@ describe('the detector recognises the shape', () => {
       '  WHERE id = $4`;',
     ].join('\n');
     expect(findOffences(boundCast)).toEqual([]);
+  });
+
+  it('is not truncated before a comparison at the end of a long statement', () => {
+    // Real statements in this repo reach 1894 characters, and that one carries
+    // its parameter in the final 160 — so a comparison at the very end is the
+    // normal shape, not a contrived one. At the previous 4000-char cap this
+    // exact input was silently missed.
+    const filler = '  , filler_column_padding_to_make_this_statement_long = NULL\n'.repeat(120);
+    const long = [
+      'const q = `UPDATE t SET s = $1',
+      filler,
+      "  , a = CASE WHEN $1 IN ('x') THEN 1 END`;",
+    ].join('\n');
+    expect(long.length).toBeGreaterThan(4000);
+    expect(findOffences(long)).toHaveLength(1);
   });
 
   it('sees a quoted column identifier', () => {
