@@ -2,25 +2,21 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { FibreFlowTokenList, type McpTokenRow } from './FibreFlowTokenList';
-import { FibreFlowTokenReveal } from './FibreFlowTokenReveal';
 import { ConnectorSetupCard } from './ConnectorSetupCard';
+import { ManualTokenControls, type UiLifetime } from './ManualTokenControls';
 
 /**
- * Browser-consent setup plus existing self-serve session management. Manual token
- * minting remains available under Advanced for legacy clients; freshly minted
- * credentials live only in React state and are shown once.
+ * Browser-consent setup plus existing self-serve session management.
+ *
+ * `sessionsEnabled` mirrors the server's FF_MCP_TOKEN_UI_ENABLED gate. The
+ * /api/me/mcp-tokens routes 404 when that flag is off, so the sessions list and
+ * Advanced minting must stay hidden — otherwise every user on an environment
+ * without the flag sees a "could not load your tokens" error for a feature that
+ * is deliberately switched off.
  */
 
 const FIBREFLOW_MCP_ENDPOINT =
   'https://app.fibreflow.app/api/ff-remote-mcp/mcp';
-
-const LIFETIME_OPTIONS = [
-  { value: '30d', label: '30 days' },
-  { value: '90d', label: '90 days' },
-  { value: '1y', label: '1 year' },
-] as const;
-
-type UiLifetime = (typeof LIFETIME_OPTIONS)[number]['value'];
 
 interface ListResponse {
   data?: { tokens?: McpTokenRow[] };
@@ -32,96 +28,13 @@ interface MintResponse {
   error?: { message?: string };
 }
 
-const MAX_LABEL_LENGTH = 60;
-
-interface ManualTokenControlsProps {
-  copied: boolean;
-  error: string | null;
-  expiresAt: string;
-  label: string;
-  lifetime: UiLifetime;
-  loading: boolean;
-  token: string | null;
-  onCopy: () => void;
-  onGenerate: () => void;
-  onLabelChange: (label: string) => void;
-  onLifetimeChange: (lifetime: UiLifetime) => void;
+interface FibreFlowConnectionPanelProps {
+  sessionsEnabled?: boolean;
 }
 
-function ManualTokenControls({
-  copied,
-  error,
-  expiresAt,
-  label,
-  lifetime,
-  loading,
-  token,
-  onCopy,
-  onGenerate,
-  onLabelChange,
-  onLifetimeChange,
-}: ManualTokenControlsProps) {
-  return (
-    <div className="mt-4 flex flex-col gap-4">
-      <p className="text-sm text-[var(--ff-text-secondary)]">
-        For legacy clients that cannot open browser consent, create a read-only
-        bearer token manually.
-      </p>
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-sm text-[var(--ff-text-secondary)]">
-          <span className="font-medium text-[var(--ff-text-primary)]">Token lifetime</span>
-          <select
-            value={lifetime}
-            onChange={(event) => onLifetimeChange(event.target.value as UiLifetime)}
-            disabled={loading}
-            className="rounded-md border border-[var(--ff-border-primary)] bg-[var(--ff-background-primary)] px-3 py-2 text-[var(--ff-text-primary)] disabled:opacity-50"
-          >
-            {LIFETIME_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-[var(--ff-text-secondary)]">
-          <span className="font-medium text-[var(--ff-text-primary)]">Label</span>
-          <input
-            type="text"
-            value={label}
-            maxLength={MAX_LABEL_LENGTH}
-            placeholder="Claude desktop"
-            onChange={(event) => onLabelChange(event.target.value)}
-            disabled={loading}
-            className="rounded-md border border-[var(--ff-border-primary)] bg-[var(--ff-background-primary)] px-3 py-2 text-[var(--ff-text-primary)] disabled:opacity-50"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={loading}
-          className="rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-500 disabled:opacity-50"
-        >
-          {loading ? 'Generating…' : 'Generate token'}
-        </button>
-      </div>
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      {token && (
-        <FibreFlowTokenReveal
-          token={token}
-          expiresAt={expiresAt}
-          copied={copied}
-          onCopy={onCopy}
-        />
-      )}
-    </div>
-  );
-}
-
-export function FibreFlowConnectionPanel() {
+export function FibreFlowConnectionPanel({
+  sessionsEnabled = false,
+}: FibreFlowConnectionPanelProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string>('');
@@ -134,6 +47,7 @@ export function FibreFlowConnectionPanel() {
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
+    if (!sessionsEnabled) return;
     setSessionError(null);
     try {
       const res = await fetch('/api/me/mcp-tokens');
@@ -143,7 +57,7 @@ export function FibreFlowConnectionPanel() {
     } catch (e) {
       setSessionError(`Could not load your tokens: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, []);
+  }, [sessionsEnabled]);
 
   useEffect(() => {
     void refresh();
@@ -213,50 +127,54 @@ export function FibreFlowConnectionPanel() {
         consentDescription="The browser window verifies your FibreFlow identity and applies the same RBAC access you have in the app."
       />
 
-      <section className="rounded-xl border border-[var(--ff-border-primary)] bg-[var(--ff-surface-primary)] p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Active sessions</h2>
-        <p className="mt-1 text-sm text-[var(--ff-text-secondary)]">
-          Review or revoke the connector sessions associated with your account.
-        </p>
-        {sessionError && (
-          <p role="alert" className="mt-3 text-sm text-destructive">
-            {sessionError}
-          </p>
-        )}
-        <div className="mt-4">
-          <FibreFlowTokenList tokens={tokens} onRevoke={(id) => void revoke(id)} />
-        </div>
-      </section>
+      {sessionsEnabled && (
+        <>
+          <section className="rounded-xl border border-[var(--ff-border-primary)] bg-[var(--ff-surface-primary)] p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Active sessions</h2>
+            <p className="mt-1 text-sm text-[var(--ff-text-secondary)]">
+              Review or revoke the connector sessions associated with your account.
+            </p>
+            {sessionError && (
+              <p role="alert" className="mt-3 text-sm text-destructive">
+                {sessionError}
+              </p>
+            )}
+            <div className="mt-4">
+              <FibreFlowTokenList tokens={tokens} onRevoke={(id) => void revoke(id)} />
+            </div>
+          </section>
 
-      <details
-        open={advancedOpen}
-        className="rounded-xl border border-[var(--ff-border-primary)] bg-[var(--ff-surface-primary)] p-6 shadow-sm"
-      >
-        <summary
-          className="cursor-pointer font-medium text-[var(--ff-text-primary)]"
-          onClick={(event) => {
-            event.preventDefault();
-            setAdvancedOpen((open) => !open);
-          }}
-        >
-          Advanced
-        </summary>
-        {advancedOpen && (
-          <ManualTokenControls
-            copied={copied}
-            error={manualError}
-            expiresAt={expiresAt}
-            label={label}
-            lifetime={lifetime}
-            loading={loading}
-            token={token}
-            onCopy={() => void copyToken()}
-            onGenerate={() => void generate()}
-            onLabelChange={setLabel}
-            onLifetimeChange={setLifetime}
-          />
-        )}
-      </details>
+          <details
+            open={advancedOpen}
+            className="rounded-xl border border-[var(--ff-border-primary)] bg-[var(--ff-surface-primary)] p-6 shadow-sm"
+          >
+            <summary
+              className="cursor-pointer font-medium text-[var(--ff-text-primary)]"
+              onClick={(event) => {
+                event.preventDefault();
+                setAdvancedOpen((open) => !open);
+              }}
+            >
+              Advanced
+            </summary>
+            {advancedOpen && (
+              <ManualTokenControls
+                copied={copied}
+                error={manualError}
+                expiresAt={expiresAt}
+                label={label}
+                lifetime={lifetime}
+                loading={loading}
+                token={token}
+                onCopy={() => void copyToken()}
+                onGenerate={() => void generate()}
+                onLabelChange={setLabel}
+                onLifetimeChange={setLifetime}
+              />
+            )}
+          </details>
+        </>
+      )}
     </div>
   );
 }

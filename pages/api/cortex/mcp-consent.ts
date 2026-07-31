@@ -169,7 +169,16 @@ export function createCortexConsentHandler(
 
 const consentHandler = createCortexConsentHandler();
 
-const handler: NextApiHandler = withAuth(async (req, res) => {
+/**
+ * Same outermost gate as pages/api/cortex/mcp-token.ts. Both routes mint the
+ * identical Cortex bearer, so gating one and not the other would let consent
+ * hand out a credential the kill switch is supposed to have turned off.
+ */
+function cortexMcpUiEnabled(): boolean {
+  return (process.env.CORTEX_MCP_TOKEN_UI_ENABLED ?? '').trim().toLowerCase() === 'true';
+}
+
+const authedHandler: NextApiHandler = withAuth(async (req, res) => {
   const authReq = req as AuthenticatedNextApiRequest;
   if (authReq.method !== 'POST') {
     return apiResponse.methodNotAllowed(
@@ -187,5 +196,12 @@ const handler: NextApiHandler = withAuth(async (req, res) => {
     },
   )(authReq, res);
 });
+
+const handler: NextApiHandler = (req, res) => {
+  if (!cortexMcpUiEnabled()) {
+    return apiResponse.notFound(res, 'Endpoint');
+  }
+  return authedHandler(req, res);
+};
 
 export default handler;

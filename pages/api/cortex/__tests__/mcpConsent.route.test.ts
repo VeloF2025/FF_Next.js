@@ -19,8 +19,12 @@ import {
 
 let route: Awaited<ReturnType<typeof startRealConsentRoute>>;
 let database: ConsentRouteDatabase;
+const originalUiFlag = process.env.CORTEX_MCP_TOKEN_UI_ENABLED;
 
 beforeAll(async () => {
+  // The route's outermost gate 404s the endpoint when this is off, so the
+  // auth/RBAC assertions below need it on to reach the layers they test.
+  process.env.CORTEX_MCP_TOKEN_UI_ENABLED = 'true';
   route = await startRealConsentRoute();
   database = route.database;
 });
@@ -35,6 +39,7 @@ beforeEach(() => {
 
 afterAll(async () => {
   if (route) await route.close();
+  process.env.CORTEX_MCP_TOKEN_UI_ENABLED = originalUiFlag;
 });
 
 function expectError(response: RouteResponse, status: number, code: string): void {
@@ -46,6 +51,27 @@ function expectError(response: RouteResponse, status: number, code: string): voi
 }
 
 describe('default Cortex consent route — real auth and permission middleware', () => {
+  /**
+   * The sibling mint/revoke route (pages/api/cortex/mcp-token.ts) treats this
+   * flag as its outermost gate. Consent mints the same bearer, so it must hide
+   * behind the same switch — otherwise the kill switch does not kill anything.
+   */
+  it('hides the endpoint entirely when the Cortex UI flag is off', async () => {
+    process.env.CORTEX_MCP_TOKEN_UI_ENABLED = 'false';
+    try {
+      const authenticated = await route.request('POST', true, {
+        stateId: 'abcdefghijklmnopqrstuvwx',
+      });
+      expectError(authenticated, 404, 'NOT_FOUND');
+
+      // Gate is outermost: no session lookup, no RBAC query, no token minted.
+      expect(database.queries).toEqual([]);
+      expect(route.callback.count).toBe(0);
+    } finally {
+      process.env.CORTEX_MCP_TOKEN_UI_ENABLED = 'true';
+    }
+  });
+
   it('returns the real withAuth 401 before method or database access', async () => {
     const response = await route.request('GET', false);
 
