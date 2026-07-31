@@ -154,18 +154,19 @@ git commit -m "test(cortex): define MCP consent context contract"
 **Files:**
 - Create: `pages/api/cortex/mcp-consent-context.ts`
 - Create: `pages/api/cortex/__tests__/mcpConsentContext.handler.test.ts`
-- Modify: `pages/api/cortex/__tests__/mcpConsent.testHarness.ts`
+- Create: `pages/api/cortex/__tests__/mcpConsentContext.testHarness.ts`
 
 **Interfaces:**
 - Consumes: browser JSON `{ stateId: string }`, `CORTEX_REMOTE_MCP_URL`, `CORTEX_MCP_CALLBACK_SECRET`, and Cortex `POST /authorize/context`.
 - Produces: FibreFlow API success `{ data: CortexMcpConsentContext }` or a generic structured error.
 
-- [ ] **Step 1: Extend the real-HTTP harness for a context handler**
+- [ ] **Step 1: Add a focused real-HTTP harness for the context handler**
 
-Add a `startConsentContextHandler()` helper that starts the actual handler on an
-ephemeral loopback port, uses the existing callback server, and records the request
-path, method, secret header and JSON body. Do not replace `fetch`; the handler must
-perform a real HTTP request to the callback server.
+Add a `startConsentContextHandler()` helper in a separate file so the existing
+233-line consent harness remains below the 300-line repository limit. Start the
+actual handler on an ephemeral loopback port, use a real callback server, and record
+the request path, method, secret header and JSON body. Do not replace `fetch`; the
+handler must perform a real HTTP request to the callback server.
 
 - [ ] **Step 2: Write failing real-HTTP contract tests**
 
@@ -238,7 +239,7 @@ Expected: all selected files pass; the existing mint/complete behavior remains g
 git add \
   pages/api/cortex/mcp-consent-context.ts \
   pages/api/cortex/__tests__/mcpConsentContext.handler.test.ts \
-  pages/api/cortex/__tests__/mcpConsent.testHarness.ts
+  pages/api/cortex/__tests__/mcpConsentContext.testHarness.ts
 git commit -m "fix(cortex): proxy informed MCP consent context"
 ```
 
