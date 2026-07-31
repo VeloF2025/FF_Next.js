@@ -130,8 +130,11 @@ const PREREQUISITES = `    CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_r
       status varchar(50),
       -- Present on the live table and read by lockDocument(); omitting them
       -- made the scratch schema diverge from production and hid a real query.
+      -- Types mirror live exactly: file_name is varchar(255), file_path is TEXT
+      -- (migration 032). The distinction matters for this file in particular —
+      -- varchar vs text is precisely what the 42P08 below turns on.
       file_name varchar(255),
-      file_path varchar(255)
+      file_path text
     );
     CREATE TABLE hs_training_types (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
