@@ -208,7 +208,7 @@ DEPLOY_START=$(date +%s)
 # NOPASSWD sudo for the fibreflow services, so an empty value fails auth on the
 # remote -- and the `|| true` guards would swallow it, leaving the service up
 # while .next is swapped underneath it. Fail here instead, where it is legible.
-if [ -z "$VELO_SUDO_PASSWORD" ]; then
+if [ -z "${VELO_SUDO_PASSWORD//[[:space:]]/}" ]; then
   echo "ERROR: VELO_SUDO_PASSWORD is not set." >&2
   echo "  Needed for sudo on ${VELOCITY_USER}@${VELOCITY_HOST} (no NOPASSWD there)." >&2
   echo "  export VELO_SUDO_PASSWORD='...'   # see .claude/credentials.local.md" >&2
