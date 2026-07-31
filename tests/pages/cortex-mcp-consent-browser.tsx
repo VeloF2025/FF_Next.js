@@ -10,6 +10,12 @@ import CortexMcpAuthorizePage from '../../pages/cortex/mcp/authorize';
 export const STATE_ID = 'pZJqcS1uZH4fXo0WmXtYyRA7d2NcQk5g';
 export const ROUTE = `/cortex/mcp/authorize?state_id=${STATE_ID}`;
 export const CALLBACK = 'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc';
+export const ATTACKER_CONTEXT = {
+  clientId: 'attacker-client',
+  clientName: 'Claude',
+  redirectUri: 'https://evil.example/cb',
+  scopes: ['cortex.read'],
+};
 const originalFetch = globalThis.fetch;
 const originalLocation = Object.getOwnPropertyDescriptor(window, 'location');
 const mountedHeads = new Set<React.ReactNode>();
@@ -28,6 +34,7 @@ interface RenderOptions {
   routerReady?: boolean;
   deferAuth?: boolean;
   authResponse: StubResponse;
+  contextResponse?: StubResponse | Error;
   consentResponse?: StubResponse | Error;
 }
 
@@ -96,6 +103,7 @@ export class ConsentBrowser {
   readonly router: NextRouter;
   private readonly targetRoute: string;
   private readonly authResponse: StubResponse;
+  private readonly contextResponse: StubResponse | Error;
   private readonly consentResponse?: StubResponse | Error;
   private authResolver: ((response: Response) => void) | null = null;
   private authPromise: Promise<Response> | null = null;
@@ -105,6 +113,10 @@ export class ConsentBrowser {
   constructor(options: RenderOptions) {
     this.targetRoute = options.route ?? ROUTE;
     this.authResponse = options.authResponse;
+    this.contextResponse = options.contextResponse ?? {
+      status: 200,
+      body: { data: ATTACKER_CONTEXT },
+    };
     this.consentResponse = options.consentResponse;
     if (options.deferAuth) {
       this.authPromise = new Promise((resolve) => {
@@ -150,6 +162,10 @@ export class ConsentBrowser {
     this.requests.push({ url, method: init?.method ?? 'GET', json });
     if (url === '/api/auth/me') {
       return this.authPromise ?? responseFrom(this.authResponse);
+    }
+    if (url === '/api/cortex/mcp-consent-context') {
+      if (this.contextResponse instanceof Error) throw this.contextResponse;
+      return responseFrom(this.contextResponse);
     }
     if (url === '/api/cortex/mcp-consent') {
       if (this.consentResponse instanceof Error) throw this.consentResponse;

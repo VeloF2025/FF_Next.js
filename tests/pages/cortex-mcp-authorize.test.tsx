@@ -5,6 +5,7 @@ vi.unmock('@/contexts/AuthContext');
 
 import { getServerSideProps } from '../../pages/cortex/mcp/authorize';
 import {
+  ATTACKER_CONTEXT,
   CALLBACK,
   FAILURE_RESPONSES,
   ROUTE,
@@ -41,6 +42,7 @@ describe('Cortex MCP authorization page', () => {
     const browser = renderConsentPage({ authResponse: { status: 401 } });
     await browser.waitForPath('/sign-in');
     expect(browser.returnUrl()).toBe(ROUTE);
+    expect(browser.recordedRequests('/api/cortex/mcp-consent-context')).toEqual([]);
     expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([]);
   });
 
@@ -53,14 +55,52 @@ describe('Cortex MCP authorization page', () => {
     expect(screen.queryByRole('button', { name: /^Allow$/ })).not.toBeInTheDocument();
   });
 
-  it('shows the verified identity and read-only Cortex scope', async () => {
-    renderConsentPage({ authResponse: authenticatedLewResponse });
+  it('shows the attacker-provided name and exact redirect before enabling Allow', async () => {
+    const browser = renderConsentPage({ authResponse: authenticatedLewResponse });
     expect(await screen.findByText('lew@velocityfibre.co.za')).toBeInTheDocument();
     expect(screen.getByRole('heading', {
-      name: 'Allow Claude to read Cortex Knowledge as you?',
+      name: 'Allow Cortex Knowledge access?',
     })).toBeInTheDocument();
+    expect(screen.getByText(ATTACKER_CONTEXT.clientName)).toBeInTheDocument();
+    expect(screen.getByText(/provided by the connector/i)).toBeInTheDocument();
+    expect(screen.getByText(ATTACKER_CONTEXT.redirectUri)).toBeInTheDocument();
+    expect(screen.getByText(/receives the authorization result/i)).toBeInTheDocument();
     expect(screen.getByText('· Read-only Cortex tools')).toBeInTheDocument();
     expect(screen.getByText(/never displays or asks you to paste a bearer token/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Allow$/ })).toBeEnabled();
+    expect(browser.recordedRequests('/api/cortex/mcp-consent-context')).toEqual([{
+      method: 'POST',
+      json: { stateId: STATE_ID },
+    }]);
+  });
+
+  it('renders an attacker-controlled client name only as text', async () => {
+    const payload = '<img data-attacker="true" src=x onerror=alert(1)>';
+    renderConsentPage({
+      authResponse: authenticatedLewResponse,
+      contextResponse: {
+        status: 200,
+        body: { data: { ...ATTACKER_CONTEXT, clientName: payload } },
+      },
+    });
+
+    expect(await screen.findByText(payload)).toBeInTheDocument();
+    expect(document.querySelector('[data-attacker="true"]')).toBeNull();
+  });
+
+  it.each([
+    ['API rejection', { status: 502, body: { error: { message: 'Context refused' } } }],
+    ['missing context', { status: 200, body: { data: {} } }],
+    ['network failure', new Error('offline')],
+  ] as const)('blocks Allow after context %s', async (_case, contextResponse) => {
+    const browser = renderConsentPage({
+      authResponse: authenticatedLewResponse,
+      contextResponse,
+    });
+
+    expect(await screen.findByText('Could not authorize')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Allow$/ })).not.toBeInTheDocument();
+    expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([]);
   });
 
   it('makes Cancel terminal without a consent request', async () => {

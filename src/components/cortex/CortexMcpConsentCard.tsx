@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
+import type { CortexMcpConsentContext } from '@/lib/cortex/mcpConsentContext';
 
 export type CortexMcpConsentPhase =
   | 'checking'
@@ -16,6 +17,7 @@ interface CortexMcpConsentCardProps {
   phase: CortexMcpConsentPhase;
   error: string | null;
   email: string | null;
+  context: CortexMcpConsentContext | null;
   onAllow: () => void;
   onCancel: () => void;
 }
@@ -42,6 +44,7 @@ export function CortexMcpConsentCard({
   phase,
   error,
   email,
+  context,
   onAllow,
   onCancel,
 }: CortexMcpConsentCardProps) {
@@ -69,23 +72,56 @@ export function CortexMcpConsentCard({
     );
   }
 
+  if (!context) {
+    return (
+      <Notice title="Could not authorize">
+        Authorization details could not be verified. Return to Claude and try
+        connecting again.
+      </Notice>
+    );
+  }
+
   const busy = phase === 'submitting' || phase === 'redirecting';
 
   return (
     <div className={SHELL}>
       <h1 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-        Allow Claude to read Cortex Knowledge as you?
+        Allow Cortex Knowledge access?
       </h1>
       <p className="mt-3 text-sm text-[var(--ff-text-secondary)]">
-        Claude can search meetings, email, WhatsApp, SharePoint, timelines and cited
-        evidence that your Cortex access permits. It cannot add, change, approve or
-        delete anything.
+        The connector identified below can search meetings, email, WhatsApp,
+        SharePoint, timelines and cited evidence that your Cortex access permits. It
+        cannot add, change, approve or delete anything.
       </p>
       <ul className="mt-4 space-y-1.5 text-sm text-[var(--ff-text-secondary)]">
         <li>· Read-only Cortex tools</li>
         <li>· Full or limited scope is decided by your verified FibreFlow email</li>
         <li>· The connector never displays or asks you to paste a bearer token</li>
       </ul>
+      <div className="mt-5 space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-3">
+        <div>
+          <p className="text-xs text-[var(--ff-text-tertiary)]">
+            Application name — provided by the connector, not verified
+          </p>
+          <p className="break-all text-sm font-medium text-[var(--ff-text-primary)]">
+            {context.clientName || 'Unnamed connector'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-[var(--ff-text-tertiary)]">
+            Destination that receives the authorization result
+          </p>
+          <code className="block break-all text-xs text-[var(--ff-text-primary)]">
+            {context.redirectUri}
+          </code>
+        </div>
+        <div>
+          <p className="text-xs text-[var(--ff-text-tertiary)]">Requested scopes</p>
+          <code className="block break-all text-xs text-[var(--ff-text-primary)]">
+            {context.scopes.length ? context.scopes.join(', ') : 'No scopes declared'}
+          </code>
+        </div>
+      </div>
       <div className="mt-5 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] px-3 py-2">
         <p className="text-xs text-[var(--ff-text-tertiary)]">Signed in as</p>
         <p className="text-sm font-medium text-[var(--ff-text-primary)]">
@@ -94,7 +130,7 @@ export function CortexMcpConsentCard({
       </div>
       <div className="mt-6 flex items-center gap-3">
         <Button variant="primary" onClick={onAllow} loading={busy} disabled={busy}>
-          {phase === 'redirecting' ? 'Returning to Claude…' : 'Allow'}
+          {phase === 'redirecting' ? 'Returning to connector…' : 'Allow'}
         </Button>
         <Button variant="secondary" onClick={onCancel} disabled={busy}>
           Cancel
