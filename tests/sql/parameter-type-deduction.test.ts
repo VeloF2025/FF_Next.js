@@ -24,6 +24,14 @@
  * Each allowlist entry names the column and was verified against the live
  * database, not assumed. Anything new fails, which is the point: the fix is one
  * `::text` per use, and it is harmless even where it is unnecessary.
+ *
+ * KNOWN LIMITATION — the allowlist is trusted, not re-verified. This test has no
+ * database access, so an entry is believed because it is present. The claim next
+ * to each is a promise a human checked `information_schema.columns`, not
+ * something CI can confirm. Adding an entry to silence a failure without
+ * checking the column type defeats the guard entirely. The stale-entry test
+ * below catches entries that no longer match any risky shape; it cannot catch
+ * one that is simply untrue.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -71,7 +79,8 @@ export interface Offence {
  */
 function sqlBlocks(source: string): string[] {
   const blocks: string[] = [];
-  const anchor = /\bUPDATE\s+[a-z_][a-z0-9_]*/gi;
+  // Matches both `UPDATE <table>` and the `DO UPDATE SET` of an upsert.
+  const anchor = /\bUPDATE\s+(?:SET\b|[a-z_][a-z0-9_]*)/gi;
   let m: RegExpExecArray | null;
   while ((m = anchor.exec(source)) !== null) {
     const rest = source.slice(m.index, m.index + 4000);
@@ -83,9 +92,24 @@ function sqlBlocks(source: string): string[] {
 }
 
 /**
- * A placeholder is risky when it is bound to a column (`col = $N`, in a SET or
- * a WHERE — both give it the column's type) AND compared to a string literal
- * somewhere in the same statement, with neither use cast.
+ * A placeholder is risky when an UNCAST occurrence is bound to a column
+ * (`col = $N`, in a SET or a WHERE — both give it the column's type) AND it is
+ * compared to a string literal anywhere in the same statement.
+ *
+ * The comparison's own cast state is deliberately NOT part of the test. Only
+ * the bound occurrence decides whether the statement parses — verified against
+ * the database:
+ *
+ *   SET col = $1,        WHEN $1::text IN (…)   -> 42P08   (still broken)
+ *   SET col = $1::text,  WHEN $1 IN (…)         -> parses
+ *   SET col = $1::text,  WHEN $1::text IN (…)   -> parses
+ *
+ * An earlier version required the comparison to be uncast too, which made a
+ * half-fixed statement — the most likely state after a careless edit — invisible.
+ *
+ * Only param-first comparisons are matched. `'resolved' = $1` was tested and
+ * does NOT trigger 42P08; deduction is sensitive to operand order, so matching
+ * it would be a false positive.
  */
 export function findOffences(source: string): Offence[] {
   const out: Offence[] = [];
@@ -94,7 +118,7 @@ export function findOffences(source: string): Offence[] {
       Array.from(block.matchAll(/\b[a-z_]+\s*=\s*\$(\d+)(?!\s*::)/gi)).map((m) => m[1])
     );
     for (const param of bound) {
-      const compared = new RegExp(`\\$${param}(?!\\s*::)\\s*(?:=|<>|!=|\\bIN\\b)\\s*\\(?\\s*'`, 'i');
+      const compared = new RegExp(`\\$${param}(?:::\\w+)?\\s*(?:=|<>|!=|\\bIN\\b)\\s*\\(?\\s*'`, 'i');
       const m = compared.exec(block);
       if (m) {
         out.push({
@@ -107,8 +131,17 @@ export function findOffences(source: string): Offence[] {
   return out;
 }
 
+/**
+ * Every tracked file containing an UPDATE in any form.
+ *
+ * Case-insensitive and NOT requiring a lowercase table name after the keyword:
+ * the previous pattern (`UPDATE[[:space:]]+[a-z_]+`) silently skipped every
+ * `INSERT … ON CONFLICT … DO UPDATE SET` in the repo, because there the keyword
+ * is followed by `SET` and the table was named back in the INSERT. Upsert is a
+ * common idiom here, so that was a repo-wide blind spot rather than an edge case.
+ */
 function trackedFilesWithUpdates(): string[] {
-  return execFileSync('git', ['grep', '-lE', 'UPDATE[[:space:]]+[a-z_]+', '--', '*.ts', '*.tsx'], {
+  return execFileSync('git', ['grep', '-liE', '\\bUPDATE\\b', '--', '*.ts', '*.tsx'], {
     encoding: 'utf8',
     cwd: process.cwd(),
   })
@@ -156,6 +189,44 @@ describe('the detector recognises the shape', () => {
     const found = findOffences(withStrayBacktick);
     expect(found).toHaveLength(1);
     expect(found[0].param).toBe('$1');
+  });
+
+  it('still fires when only the comparison was cast (the half-fixed statement)', () => {
+    // Verified against the database: SET uncast + CASE cast is STILL 42P08.
+    // The first version of this detector required BOTH sides uncast, so the
+    // most likely state after a careless edit was the one it could not see.
+    const halfFixed = [
+      'const q = `UPDATE offline_devices',
+      '  SET mismatch_status = $1,',
+      "      mismatch_resolved_at = CASE WHEN $1::text IN ('resolved') THEN NOW() ELSE NULL END",
+      '  WHERE id = $4`;',
+    ].join('\n');
+    expect(findOffences(halfFixed)).toHaveLength(1);
+  });
+
+  it('goes quiet when the BOUND occurrence is cast, which is what actually fixes it', () => {
+    // The mirror of the case above: casting the SET side alone parses cleanly,
+    // so it must not be reported.
+    const boundCast = [
+      'const q = `UPDATE offline_devices',
+      '  SET mismatch_status = $1::text,',
+      "      mismatch_resolved_at = CASE WHEN $1 IN ('resolved') THEN NOW() ELSE NULL END",
+      '  WHERE id = $4`;',
+    ].join('\n');
+    expect(findOffences(boundCast)).toEqual([]);
+  });
+
+  it('sees an ON CONFLICT DO UPDATE SET upsert', () => {
+    // The file-selection grep used to require a lowercase table name straight
+    // after UPDATE, so every upsert in the repo was invisible — the keyword is
+    // followed by SET and the table was named back in the INSERT.
+    const upsert = [
+      'const q = `INSERT INTO offline_devices (id, mismatch_status)',
+      '  VALUES ($2, $1)',
+      '  ON CONFLICT (id) DO UPDATE SET mismatch_status = $1,',
+      "      mismatch_resolved_at = CASE WHEN $1 IN ('resolved') THEN NOW() ELSE NULL END`;",
+    ].join('\n');
+    expect(findOffences(upsert)).toHaveLength(1);
   });
 
   it('finds every statement in a file that has several', () => {
