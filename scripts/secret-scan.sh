@@ -128,7 +128,7 @@ if [ -n "$ADDED" ]; then
   # `$` is rejected only as the FIRST character (a variable reference); a `$`
   # inside the value is legitimate in a real password like "P@ss$w0rd123".
   add_hits "[A-Za-z0-9_]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|(API|SECRET|PRIVATE|SIGNING|ENCRYPTION|MASTER|ACCESS|AUTH|CLIENT)[_-]?KEY)\b['\"]?[[:space:]]*=[[:space:]]*['\"][^'\"[:space:]\$][^'\"[:space:]]{5,}" "hardcoded password/secret literal"
-  # Unquoted shell/.env assignment: `export FOO_TOKEN=abc123`, `DB_PASS=xyz`.
+  # Unquoted shell/.env assignment, e.g. an `export FOO_TOKEN=<value>` line.
   # Deliberately narrow -- an UPPERCASE name and NO whitespace around `=`. That
   # is the .env/export idiom, and it excludes ordinary code assignments like
   # `const token = parse(...)` or `this.password = config.password`, which a
