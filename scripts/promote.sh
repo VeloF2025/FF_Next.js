@@ -167,6 +167,19 @@ fi
 log "Step 3: Deploying commit $SRC_COMMIT_SHORT to $TARGET..."
 PROMOTE_START=$(date +%s)
 
+# This script SSHes to $VELOCITY_USER@$VELOCITY_HOST and needs sudo THERE. The
+# heredoc delimiter below is unquoted, so $VELO_SUDO_PASSWORD is expanded by this
+# local shell and the value travels over SSH. The velo account does NOT have
+# NOPASSWD sudo for the fibreflow services, so an empty value fails auth on the
+# remote -- and the `|| true` guards would swallow it, leaving the service up
+# while .next is swapped underneath it. Fail here instead, where it is legible.
+if [ -z "$VELO_SUDO_PASSWORD" ]; then
+  echo "ERROR: VELO_SUDO_PASSWORD is not set." >&2
+  echo "  Needed for sudo on ${VELOCITY_USER}@${VELOCITY_HOST} (no NOPASSWD there)." >&2
+  echo "  export VELO_SUDO_PASSWORD='...'   # see .claude/credentials.local.md" >&2
+  exit 1
+fi
+
 ssh ${VELOCITY_USER}@${VELOCITY_HOST} bash -s <<PROMOTE_SCRIPT
   set -e
 
