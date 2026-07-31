@@ -115,7 +115,10 @@ export function findOffences(source: string): Offence[] {
   const out: Offence[] = [];
   for (const block of sqlBlocks(source)) {
     const bound = new Set(
-      Array.from(block.matchAll(/\b[a-z_]+\s*=\s*\$(\d+)(?!\s*::)/gi)).map((m) => m[1])
+      // The optional quotes matter: a quoted identifier ("status" = $1) is
+      // ordinary SQL for a reserved or mixed-case column name, and without them
+      // the binding goes unseen while the statement still fails.
+      Array.from(block.matchAll(/"?\b[a-z_][a-z0-9_]*\b"?\s*=\s*\$(\d+)(?!\s*::)/gi)).map((m) => m[1])
     );
     for (const param of bound) {
       const compared = new RegExp(`\\$${param}(?:::\\w+)?\\s*(?:=|<>|!=|\\bIN\\b)\\s*\\(?\\s*'`, 'i');
@@ -214,6 +217,12 @@ describe('the detector recognises the shape', () => {
       '  WHERE id = $4`;',
     ].join('\n');
     expect(findOffences(boundCast)).toEqual([]);
+  });
+
+  it('sees a quoted column identifier', () => {
+    const quoted =
+      'const q = `UPDATE t SET "status" = $1, a = CASE WHEN $1 = \'x\' THEN 1 END`;';
+    expect(findOffences(quoted)).toHaveLength(1);
   });
 
   it('sees an ON CONFLICT DO UPDATE SET upsert', () => {
