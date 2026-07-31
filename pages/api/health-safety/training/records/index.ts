@@ -52,13 +52,21 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const records = await sql`
     SELECT
       wt.id, wt.training_type_id, wt.staff_id, wt.team_member_id, wt.contractor_id,
-      wt.worker_name, wt.project_id, wt.certificate_number, wt.issued_by, wt.notes,
+      wt.worker_name, wt.project_id, wt.notes,
       wt.created_by, wt.created_at, wt.updated_at,
       wt.verification_status, wt.verified_at, wt.rejection_reason,
       wt.revoked_at, wt.revocation_reason,
       -- Whether a file exists, never where it is: the binary is reachable only
       -- through the permission-checked download route. The legacy free-text
       -- location column is deliberately absent from this projection.
+      --
+      -- certificate_number and issued_by are absent too. They are the same two
+      -- values the staff-document side protects behind
+      -- people.staff.training-certificates:view (document_number /
+      -- issuing_authority); returning them to every projects.health-safety
+      -- reader would gate the identical data two different ways. The design
+      -- enumerates what a broad H&S reader may see: worker, competency,
+      -- completion and expiry dates, verification and competency status.
       (wt.staff_document_id IS NOT NULL) AS "hasCertificate",
       tt.code AS training_code,
       tt.name AS training_name,
@@ -95,11 +103,18 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     ORDER BY wt.expiry_date ASC NULLS LAST, wt.completed_date DESC
   `;
 
+  // Counted over VERIFIED rows only. Competency status answers "is it in date",
+  // which a pending submission can satisfy while counting for nothing — so a
+  // headline over every row reads ten unchecked uploads as ten competencies,
+  // the exact misreading this feature exists to prevent. The unverified rows
+  // are still returned and still rendered, with their own badge.
+  const verified = records.filter((r) => r.verification_status === 'verified');
   const stats = {
-    total: records.length,
-    current: records.filter((r) => r.competency_status === 'current').length,
-    expiring_soon: records.filter((r) => r.competency_status === 'expiring_soon').length,
-    expired: records.filter((r) => r.competency_status === 'expired').length,
+    total: verified.length,
+    current: verified.filter((r) => r.competency_status === 'current').length,
+    expiring_soon: verified.filter((r) => r.competency_status === 'expiring_soon').length,
+    expired: verified.filter((r) => r.competency_status === 'expired').length,
+    awaiting_verification: records.filter((r) => r.verification_status === 'pending').length,
   };
 
   return apiResponse.success(res, { records, stats });

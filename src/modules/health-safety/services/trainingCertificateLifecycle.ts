@@ -46,6 +46,11 @@ const ALLOWED_TRANSITIONS: Record<string, readonly string[]> = {
   verified: ['revoked'],
   rejected: [],
   revoked: [],
+  // A document the expiry sweep has aged out is still evidence that was once
+  // accepted, so discovering it was forged must still be actionable. Without
+  // this, an expired certificate can never be revoked and never be deleted —
+  // its binary is unreachable forever.
+  expired: ['revoked'],
 };
 
 /** Verified and revoked evidence is immutable through delete. */

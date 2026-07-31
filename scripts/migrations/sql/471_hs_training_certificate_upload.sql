@@ -114,7 +114,12 @@ BEGIN
   SET verification_status = 'expired',
       updated_at = NOW()
   WHERE expiry_date < CURRENT_DATE
-    AND verification_status IN ('pending', 'verified');
+    AND verification_status IN ('pending', 'verified')
+    -- A certification's expiry is derived from the earliest competency it
+    -- proves, so ageing the document out would desynchronise it from linked
+    -- rows that have not expired, and would move it to a state its own
+    -- lifecycle does not own. Certificate expiry is read from expiry_date.
+    AND document_type <> 'certification';
 END;
 $$ LANGUAGE plpgsql;
 

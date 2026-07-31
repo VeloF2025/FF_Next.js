@@ -19,6 +19,7 @@ import {
   requireText,
   requireCalendarDate,
   optionalCalendarDate,
+  requireUuid,
   resolveTrainingExpiry,
 } from './trainingCertificateValidation';
 
@@ -85,11 +86,15 @@ export async function createTrainingCertificateSubmission(
   txn: TxnClient,
   input: CreateTrainingCertificateInput
 ): Promise<TrainingCertificateSubmissionResult> {
-  const trainingTypeIds = normalizeTrainingTypeIds(input.trainingTypeIds);
+  const trainingTypeIds = normalizeTrainingTypeIds(input.trainingTypeIds).map((id, i) =>
+    requireUuid(id, `Training type ${i + 1}`)
+  );
   const certificateNumber = requireText(input.certificateNumber, 'Certificate number', 100);
   const provider = requireText(input.provider, 'Provider', 255);
   const completedDate = requireCalendarDate(input.completedDate, 'Completion date');
   const explicitExpiryDate = optionalCalendarDate(input.explicitExpiryDate, 'Expiry date');
+
+  requireUuid(input.staffId, 'Employee');
 
   const staff = await txn.queryOne<{ id: string; name: string | null }>(
     `SELECT id, name FROM staff WHERE id = $1 FOR UPDATE`,

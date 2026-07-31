@@ -13,11 +13,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { transaction } from '@/lib/db-pool';
+import { queryOne, transaction } from '@/lib/db-pool';
 import {
   transitionTrainingCertificate,
   deleteTrainingCertificateSubmission,
@@ -25,6 +25,7 @@ import {
 } from './trainingCertificateService';
 import { TrainingCertificateError } from './trainingCertificateValidation';
 import { logHsActivity } from './activityLog';
+import { computeAndPersistContractorTrainingScore } from './trainingService';
 import { deleteStaffDocument } from '@/services/vfStorageAdapter';
 import {
   logDocumentVerified,
@@ -32,7 +33,6 @@ import {
   logDocumentRevoked,
 } from '@/services/staff/staffAuditService';
 
-const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('TrainingCertificateVerify');
 
 export async function handleCertificateTransition(
@@ -59,8 +59,11 @@ export async function handleCertificateTransition(
   // reference users(id); resolve the actor's staff row once, for the former.
   let actorStaffId: string | null = null;
   try {
-    const [staffMember] = await sql`SELECT id FROM staff WHERE user_id = ${userId}`;
-    actorStaffId = (staffMember?.id as string) ?? null;
+    const staffMember = await queryOne<{ id: string }>(
+      'SELECT id FROM staff WHERE user_id = $1',
+      [userId]
+    );
+    actorStaffId = staffMember?.id ?? null;
   } catch {
     logger.warn('Could not resolve the verifier staff record', { userId });
   }
@@ -93,6 +96,19 @@ export async function handleCertificateTransition(
         },
         user: { id: userId },
       });
+    }
+
+    // The rollup counts verified rows, so verifying or revoking changes it.
+    // After commit and best-effort: a stale score must not fail a request whose
+    // write already succeeded. Internal-only v1 uploads carry no contractor, so
+    // this is normally an empty list — it exists so the day contractor capture
+    // ships, the score does not silently drift.
+    for (const contractorId of result.contractorIds) {
+      try {
+        await computeAndPersistContractorTrainingScore(contractorId);
+      } catch (error) {
+        logger.warn('Recomputing the contractor training score failed', { contractorId, error });
+      }
     }
 
     // Ids and state only — no storage path or URL.

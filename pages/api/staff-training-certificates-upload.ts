@@ -46,6 +46,7 @@ import {
   optionalCalendarDate,
   requireCalendarDate,
   requireText,
+  requireUuid,
 } from '@/modules/health-safety/services/trainingCertificateValidation';
 
 const logger = createLogger('TrainingCertificateUploadAPI');
@@ -95,7 +96,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { fields, files } = await parseForm(req);
 
-    const staffId = requireText(first(fields.staffId), 'Employee', 64);
+    // Validated before it can become a storage filename prefix.
+    const staffId = requireUuid(first(fields.staffId), 'Employee');
     const trainingTypeIds = normalizeTrainingTypeIds(
       Array.isArray(fields.trainingTypeIds) && fields.trainingTypeIds.length > 1
         ? fields.trainingTypeIds

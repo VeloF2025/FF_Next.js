@@ -173,6 +173,27 @@ export function normalizeTrainingTypeIds(raw: unknown): string[] {
   return ids;
 }
 
+// The layout Postgres accepts for a uuid column — deliberately NOT the stricter
+// RFC 4122 version/variant form, which would reject ids the database itself
+// considers valid. The job here is "can this be a uuid, and is it safe as a
+// filename component", not "which UUID version is it".
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Require a UUID.
+ *
+ * Used for ids that reach a storage filename or a uuid column before the
+ * database can reject them: `uploadStaffDocument` prefixes the object name with
+ * the staff id, and an unvalidated string would be shaped like a path segment
+ * long before Postgres ever saw it. It also turns what would be a 22P02 raised
+ * mid-transaction — surfacing as a 500 after a storage write — into a 400.
+ */
+export function requireUuid(value: unknown, field: string): string {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!UUID.test(text)) throw invalid(`${field} is not a valid identifier`);
+  return text;
+}
+
 /** Trim a required text field, rejecting a blank one. */
 export function requireText(value: unknown, field: string, maxLength: number): string {
   const text = typeof value === 'string' ? value.trim() : '';
