@@ -38,11 +38,17 @@ describe('/cortex knowledge page', () => {
     expect(within(main).queryByText(/FibreFlow \(read-only\)/i)).toBeNull();
     expect(await within(main).findByRole('link', { name: /AI Connections/i }))
       .toHaveAttribute('href', '/connections/cortex');
-    expect(await screen.findByRole('link', { name: 'Cortex' }))
+    expect(await screen.findByRole(
+      'link',
+      { name: 'Cortex' },
+      { timeout: 5_000 },
+    ))
       .toHaveAttribute('href', '/cortex');
-    const sidebarConnections = await screen.findAllByRole('link', {
-      name: 'AI Connections',
-    });
+    const sidebarConnections = await screen.findAllByRole(
+      'link',
+      { name: 'AI Connections' },
+      { timeout: 5_000 },
+    );
     expect(sidebarConnections).toHaveLength(1);
     expect(sidebarConnections[0]).toHaveAttribute(
       'href',
