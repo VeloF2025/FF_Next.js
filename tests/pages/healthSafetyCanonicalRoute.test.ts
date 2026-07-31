@@ -28,10 +28,22 @@ function pageFiles(dir: string): string[] {
   return out;
 }
 
-/** Redirect destinations declared in a page, if any. */
+/** Server-side redirect destinations declared in a page, if any. */
 function destinations(file: string): string[] {
   const src = readFileSync(file, 'utf8');
   return [...src.matchAll(/destination:\s*[`'"]([^`'"]+)/g)].map((m) => m[1] as string);
+}
+
+/**
+ * Client-side navigations (`router.replace('/x')` / `router.push('/x')`).
+ * `destinations()` only sees the getServerSideProps idiom, so on its own it
+ * would stay green while two pages bounced each other via the router -- a
+ * worse loop than the one this file exists to prevent, since it needs no
+ * stale cache and fires on every visit.
+ */
+function clientNavigations(file: string): string[] {
+  const src = readFileSync(file, 'utf8');
+  return [...src.matchAll(/router\.(?:replace|push)\(\s*[`'"]([^`'"]+)/g)].map((m) => m[1] as string);
 }
 
 describe('health & safety canonical route', () => {
@@ -69,6 +81,16 @@ describe('health & safety canonical route', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/layout/AppLayout.tsx'), 'utf8');
     const projectsBranch = src.match(/if \(path\.includes\('projects'\)[^)]*\)/);
     expect(projectsBranch?.[0]).toContain("!path.includes('health-safety')");
+  });
+
+  it('does not bounce between the two trees via client-side navigation', () => {
+    const canonical = pageFiles(CANONICAL)
+      .flatMap((f) => clientNavigations(f).map((d) => ({ f, d })))
+      .filter(({ d }) => d.startsWith('/projects/health-safety'));
+    const legacy = pageFiles(LEGACY)
+      .flatMap((f) => clientNavigations(f).map((d) => ({ f, d })))
+      .filter(({ d }) => !d.startsWith('/health-safety'));
+    expect({ canonical, legacy }).toEqual({ canonical: [], legacy: [] });
   });
 
   it('carries the id through the legacy CAPA detail redirect', () => {
