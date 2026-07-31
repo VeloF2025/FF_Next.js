@@ -31,7 +31,9 @@ vi.mock('@/components/layout/AppLayout', () => ({
 vi.mock('@/components/module-page', () => ({
   ModulePage: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
-vi.mock('@/modules/navigation', () => ({ projectsConfig: {} }));
+// H&S pages moved to `healthSafetyConfig` when the module was promoted out of
+// Projects; `projectsConfig` stays because other mocked pages still use it.
+vi.mock('@/modules/navigation', () => ({ projectsConfig: {}, healthSafetyConfig: {} }));
 
 import React from 'react';
 import { TrainingCertificateUploadForm } from '../components/training/TrainingCertificateUploadForm';
