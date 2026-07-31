@@ -23,6 +23,7 @@ export const cortexSection: NavSection = {
       icon: Cable,
       label: 'AI Connections',
       shortLabel: 'Connections',
+      rbacKey: 'cortex.review',
       permissions: [],
     },
   ],

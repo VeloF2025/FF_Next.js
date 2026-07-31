@@ -44,11 +44,50 @@ describe('CortexConnectionPanel', () => {
       .toBeInTheDocument();
     expect(screen.getByText(/read-only/i)).toBeInTheDocument();
   });
+
+  it('hides the revoke control when the server gate is off', () => {
+    render(<CortexConnectionPanel revokeEnabled={false} />);
+
+    expect(screen.queryByText('Advanced')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Revoke all Cortex tokens/i })).toBeNull();
+  });
+
+  it('revokes every Cortex token through the DELETE boundary when enabled', async () => {
+    const network = renderWithNetwork(<CortexConnectionPanel revokeEnabled />, {
+      'DELETE /api/cortex/mcp-token': {
+        status: 200,
+        body: { data: { revoked: true } },
+      },
+    });
+
+    fireEvent.click(screen.getByText('Advanced'));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke all Cortex tokens' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /All your Cortex tokens have been revoked/i,
+    );
+    expect(network.recordedRequests()).toContainEqual({
+      method: 'DELETE',
+      path: '/api/cortex/mcp-token',
+    });
+  });
+
+  it('surfaces a failed revoke instead of claiming success', async () => {
+    renderWithNetwork(<CortexConnectionPanel revokeEnabled />, {
+      'DELETE /api/cortex/mcp-token': { status: 404, body: { error: { message: 'nope' } } },
+    });
+
+    fireEvent.click(screen.getByText('Advanced'));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke all Cortex tokens' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Could not revoke.*404/i);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
 });
 
 describe('FibreFlowConnectionPanel', () => {
   it('shows active sessions and keeps manual mint collapsed', async () => {
-    const network = renderWithNetwork(<FibreFlowConnectionPanel />, {
+    const network = renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled />, {
       'GET /api/me/mcp-tokens': listResponse([{
         id: 'session-1',
         label: 'Claude connector',
@@ -72,7 +111,7 @@ describe('FibreFlowConnectionPanel', () => {
   });
 
   it('reveals manual lifetime, label and mint controls after expanding Advanced', async () => {
-    renderWithNetwork(<FibreFlowConnectionPanel />, {
+    renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled />, {
       'GET /api/me/mcp-tokens': listResponse([]),
     });
     await screen.findByText(/no active read-only sessions/i);
@@ -86,7 +125,7 @@ describe('FibreFlowConnectionPanel', () => {
 
   it('reveals a successfully minted token once and preserves the POST contract', async () => {
     const mintedToken = 'ffmcp_one_time_secret';
-    const network = renderWithNetwork(<FibreFlowConnectionPanel />, {
+    const network = renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled />, {
       'GET /api/me/mcp-tokens': [listResponse([]), listResponse([])],
       'POST /api/me/mcp-tokens': {
         status: 200,
@@ -114,8 +153,28 @@ describe('FibreFlowConnectionPanel', () => {
     });
   });
 
+  /**
+   * Regression: /api/me/mcp-tokens 404s when FF_MCP_TOKEN_UI_ENABLED is unset
+   * (production). Fetching anyway painted a "Could not load your tokens" error
+   * across the page for every authenticated user.
+   */
+  it('makes no token request and shows no error when the server gate is off', async () => {
+    const network = renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled={false} />, {
+      'GET /api/me/mcp-tokens': { status: 404, body: { error: { message: 'Endpoint not found' } } },
+    });
+
+    expect(await screen.findByText(
+      'https://app.fibreflow.app/api/ff-remote-mcp/mcp',
+    )).toBeInTheDocument();
+    expect(network.recordedRequests()).toEqual([]);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText(/Could not load your tokens/i)).toBeNull();
+    expect(screen.queryByText('Active sessions')).toBeNull();
+    expect(screen.queryByText('Advanced')).toBeNull();
+  });
+
   it('revokes an active session through the existing DELETE boundary', async () => {
-    const network = renderWithNetwork(<FibreFlowConnectionPanel />, {
+    const network = renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled />, {
       'GET /api/me/mcp-tokens': [
         listResponse([{
           id: 'session-1',

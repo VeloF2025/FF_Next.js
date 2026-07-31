@@ -54,7 +54,7 @@ afterEach(() => {
 
 describe('FibreFlow connection errors', () => {
   it('announces list failures inside Active sessions', async () => {
-    renderWithNetwork(<FibreFlowConnectionPanel />, {
+    renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled />, {
       'GET /api/me/mcp-tokens': { status: 503 },
     });
 
@@ -63,7 +63,7 @@ describe('FibreFlow connection errors', () => {
   });
 
   it('announces POST failures inside Advanced and not Active sessions', async () => {
-    renderWithNetwork(<FibreFlowConnectionPanel />, {
+    renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled />, {
       'GET /api/me/mcp-tokens': listResponse([]),
       'POST /api/me/mcp-tokens': {
         status: 400,
@@ -86,7 +86,7 @@ describe('FibreFlow connection errors', () => {
 
   it('announces clipboard rejection next to the Copy action', async () => {
     installRejectingClipboard();
-    renderWithNetwork(<FibreFlowConnectionPanel />, {
+    renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled />, {
       'GET /api/me/mcp-tokens': [listResponse([]), listResponse([])],
       'POST /api/me/mcp-tokens': {
         status: 200,
@@ -114,7 +114,7 @@ describe('FibreFlow connection errors', () => {
   it('encodes reserved characters in the DELETE session id segment', async () => {
     const sessionId = 'session/with?reserved';
     const encodedId = 'session%2Fwith%3Freserved';
-    const network = renderWithNetwork(<FibreFlowConnectionPanel />, {
+    const network = renderWithNetwork(<FibreFlowConnectionPanel sessionsEnabled />, {
       'GET /api/me/mcp-tokens': [
         listResponse([{
           id: sessionId,
