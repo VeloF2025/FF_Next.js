@@ -36,11 +36,27 @@ describe('canonicalizePath', () => {
     }
   });
 
+  it('canonicalises through a query string or hash', () => {
+    // usePathname() never carries these, but getModuleConfigByPath /
+    // getActiveTabByPath are exported and a caller passing asPath would
+    // otherwise silently get the un-canonicalised behaviour.
+    expect(canonicalizePath(`${LEGACY}?tab=incidents`)).toBe(`${CANONICAL}?tab=incidents`);
+    expect(canonicalizePath(`${LEGACY}/training?filter=expired`)).toBe(
+      `${CANONICAL}/training?filter=expired`
+    );
+    expect(canonicalizePath(`${LEGACY}#section`)).toBe(`${CANONICAL}#section`);
+  });
+
   it('does not rewrite a path that merely starts with the same characters', () => {
     // `/projects/health-safety-archive` is a different route, not a sub-path.
     expect(canonicalizePath('/projects/health-safety-archive')).toBe(
       '/projects/health-safety-archive'
     );
+    expect(canonicalizePath('/projects/health-safetyX')).toBe('/projects/health-safetyX');
+  });
+
+  it('handles an empty path without throwing', () => {
+    expect(canonicalizePath('')).toBe('');
   });
 });
 

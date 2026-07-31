@@ -23,17 +23,29 @@ const LEGACY_PREFIXES: ReadonlyArray<readonly [string, string]> = [
 
 /**
  * Rewrites a legacy path to its canonical equivalent, preserving any
- * sub-path. Returns the input unchanged when no alias applies.
+ * sub-path, query and hash. Returns the input unchanged when no alias applies.
  *
- *   /projects/health-safety          -> /health-safety
- *   /projects/health-safety/training -> /health-safety/training
- *   /projects                        -> /projects   (untouched)
+ *   /projects/health-safety           -> /health-safety
+ *   /projects/health-safety/training  -> /health-safety/training
+ *   /projects/health-safety?tab=x     -> /health-safety?tab=x
+ *   /projects/health-safety-archive   -> unchanged (different route, not a sub-path)
+ *   /projects                         -> unchanged
+ *
+ * Query and hash are split off before matching. `usePathname()` never includes
+ * them, but both registry resolvers are exported and a caller passing `asPath`
+ * would otherwise silently fall through to the un-canonicalised behaviour this
+ * function exists to prevent.
  */
 export function canonicalizePath(pathname: string): string {
+  const cut = pathname.search(/[?#]/);
+  const path = cut === -1 ? pathname : pathname.slice(0, cut);
+  const suffix = cut === -1 ? '' : pathname.slice(cut);
+
   for (const [legacy, canonical] of LEGACY_PREFIXES) {
-    if (pathname === legacy) return canonical;
-    if (pathname.startsWith(`${legacy}/`)) {
-      return canonical + pathname.slice(legacy.length);
+    if (path === legacy) return canonical + suffix;
+    // Require a `/` so a longer sibling route (…-archive) is not swallowed.
+    if (path.startsWith(`${legacy}/`)) {
+      return canonical + path.slice(legacy.length) + suffix;
     }
   }
   return pathname;
