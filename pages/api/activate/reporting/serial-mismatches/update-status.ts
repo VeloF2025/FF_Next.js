@@ -55,11 +55,16 @@ async function handler(
       return apiResponse.badRequest(res, `Resolution is required when status is 'resolved'. Must be: ${VALID_RESOLUTIONS.join(', ')}`);
     }
 
-    // Build update query
+    // $1 is cast to ::text at every use. Without the casts Postgres deduces the
+    // parameter's type twice — character varying from `mismatch_status = $1`,
+    // text from `$1 IN (...)` — and rejects the statement at parse time with
+    // 42P08 "inconsistent types deduced for parameter $1". It failed on every
+    // call; the column is varchar(50). The assignment still coerces to the
+    // column type, so the length limit is unaffected.
     const updateQuery = `
       UPDATE offline_devices
       SET
-        mismatch_status = $1,
+        mismatch_status = $1::text,
         mismatch_resolution = $2,
         mismatch_notes = COALESCE($3, mismatch_notes),
         mismatch_investigated_at = CASE
@@ -71,11 +76,11 @@ async function handler(
           ELSE mismatch_investigated_by
         END,
         mismatch_resolved_at = CASE
-          WHEN $1 IN ('resolved', 'false_positive') THEN NOW()
+          WHEN $1::text IN ('resolved', 'false_positive') THEN NOW()
           ELSE NULL
         END,
         mismatch_resolved_by = CASE
-          WHEN $1 IN ('resolved', 'false_positive') THEN 'qa_dashboard'
+          WHEN $1::text IN ('resolved', 'false_positive') THEN 'qa_dashboard'
           ELSE NULL
         END
       WHERE id = $4
