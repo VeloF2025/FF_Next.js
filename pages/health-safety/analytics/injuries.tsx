@@ -10,7 +10,7 @@ import Link from 'next/link';
 import useSWR, { mutate } from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save, Trash2 } from 'lucide-react';
 import { INJURY_CLASSIFICATIONS } from '@/modules/health-safety/types/ltifr.types';
 
@@ -105,7 +105,7 @@ function InjuriesContent() {
 const InjuriesPage: NextPage = () => (
   <AppLayout>
     <Head><title>Injury Classification | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><InjuriesContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><InjuriesContent /></ModulePage>
   </AppLayout>
 );
 

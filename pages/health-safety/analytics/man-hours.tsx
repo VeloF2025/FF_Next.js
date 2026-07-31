@@ -10,7 +10,7 @@ import Link from 'next/link';
 import useSWR, { mutate } from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save, Trash2 } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
@@ -105,7 +105,7 @@ function ManHoursContent() {
 const ManHoursPage: NextPage = () => (
   <AppLayout>
     <Head><title>Man-Hours | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><ManHoursContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><ManHoursContent /></ModulePage>
   </AppLayout>
 );
 

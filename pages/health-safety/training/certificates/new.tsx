@@ -15,7 +15,7 @@ import { useRouter } from 'next/router';
 import { ChevronLeft } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { TrainingCertificateUploadForm } from '@/modules/health-safety/components/training/TrainingCertificateUploadForm';
 
 function UploadCertificateContent() {
@@ -53,7 +53,7 @@ const UploadCertificatePage: NextPage = () => (
     <Head>
       <title>Upload Training Certificate | FibreFlow</title>
     </Head>
-    <ModulePage config={projectsConfig}>
+    <ModulePage config={healthSafetyConfig}>
       <UploadCertificateContent />
     </ModulePage>
   </AppLayout>

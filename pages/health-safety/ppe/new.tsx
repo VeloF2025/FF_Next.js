@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
@@ -166,7 +166,7 @@ function IssueContent() {
 const IssuePage: NextPage = () => (
   <AppLayout>
     <Head><title>Issue PPE | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><IssueContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><IssueContent /></ModulePage>
   </AppLayout>
 );
 

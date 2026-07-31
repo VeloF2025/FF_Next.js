@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR, { mutate } from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, UserPlus, CheckCircle2, Clock, Trash2 } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
@@ -131,7 +131,7 @@ const TalkPage: NextPage = () => {
   return (
     <AppLayout>
       <Head><title>Toolbox Talk | FibreFlow</title></Head>
-      <ModulePage config={projectsConfig}>
+      <ModulePage config={healthSafetyConfig}>
         {typeof talkId === 'string' ? <TalkContent talkId={talkId} /> : null}
       </ModulePage>
     </AppLayout>

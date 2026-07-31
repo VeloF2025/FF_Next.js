@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { AlertTriangle, ChevronLeft } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { HSIncidentType, HSSeverity, PersonInvolved } from '@/modules/health-safety/types/ticket.types';
@@ -126,7 +126,7 @@ function NewIncidentContent() {
         throw new Error(err?.error?.message || 'Failed to create incident');
       }
 
-      router.push('/projects/health-safety/incidents');
+      router.push('/health-safety/incidents');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create incident';
       log.error('Failed to create incident:', { error: err as Error });
@@ -141,7 +141,7 @@ function NewIncidentContent() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
-          href="/projects/health-safety/incidents"
+          href="/health-safety/incidents"
           className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
@@ -211,7 +211,7 @@ function NewIncidentContent() {
             {isSubmitting ? 'Submitting...' : 'Report Incident'}
           </button>
           <Link
-            href="/projects/health-safety"
+            href="/health-safety"
             className="px-6 py-2.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
           >
             Cancel
@@ -228,7 +228,7 @@ const NewIncidentPage: NextPage = () => {
       <Head>
         <title>Report Incident | H&S | FibreFlow</title>
       </Head>
-      <ModulePage config={projectsConfig}>
+      <ModulePage config={healthSafetyConfig}>
         <NewIncidentContent />
       </ModulePage>
     </AppLayout>

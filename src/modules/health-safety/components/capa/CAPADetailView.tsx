@@ -1,6 +1,6 @@
 /**
  * CAPA Detail View - full read view + status-change control
- * Used by pages/projects/health-safety/capa/[id].tsx
+ * Used by pages/health-safety/capa/[id].tsx
  */
 
 import Link from 'next/link';
@@ -68,7 +68,7 @@ export function CAPADetailView() {
 function BackLink() {
   return (
     <Link
-      href="/projects/health-safety/capa"
+      href="/health-safety/capa"
       className="inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
     >
       <ChevronLeft className="w-4 h-4" />

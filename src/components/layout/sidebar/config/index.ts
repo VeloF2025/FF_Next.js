@@ -17,6 +17,7 @@ export { analyticsSection } from './analyticsSection';
 export { communicationsSection } from './communicationsSection';
 export { activateSection } from './activateSection';
 export { fieldOperationsSection } from './fieldOperationsSection';
+export { healthSafetySection } from './healthSafetySection';
 export { conduitSection } from './conduitSection';
 export { trackerSection } from './trackerSection';
 export { cortexSection } from './cortexSection';

@@ -10,7 +10,7 @@ import Link from 'next/link';
 import useSWR, { mutate } from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Plus, Shield } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -136,7 +136,7 @@ const TypesPage: NextPage = () => (
     <Head>
       <title>Training Types | FibreFlow</title>
     </Head>
-    <ModulePage config={projectsConfig}>
+    <ModulePage config={healthSafetyConfig}>
       <TypesContent />
     </ModulePage>
   </AppLayout>

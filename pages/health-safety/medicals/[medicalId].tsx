@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save, Trash2 } from 'lucide-react';
 import { CompetencyBadge } from '@/modules/health-safety/components/training/CompetencyBadge';
 import { MedicalOutcomeBadge } from '@/modules/health-safety/components/medical/MedicalOutcomeBadge';
@@ -211,7 +211,7 @@ const MedicalPage: NextPage = () => {
       <Head>
         <title>Medical Record | FibreFlow</title>
       </Head>
-      <ModulePage config={projectsConfig}>
+      <ModulePage config={healthSafetyConfig}>
         {typeof medicalId === 'string' ? <MedicalContent medicalId={medicalId} /> : null}
       </ModulePage>
     </AppLayout>

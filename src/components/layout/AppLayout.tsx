@@ -3,6 +3,7 @@ import { usePathname } from 'next/navigation';
 // import { useTheme } from '@/contexts/ThemeContext'; // Ready for future use
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { log } from '@/lib/logger';
 // import { ConnectionStatus } from '@/components/realtime/ConnectionStatus'; // Disabled - WebSocket not configured
 import dynamic from 'next/dynamic';
 
@@ -72,7 +73,13 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ route: pathname }),
       signal: controller.signal,
-    }).catch(() => {});
+    }).catch((err: unknown) => {
+      // Fire-and-forget analytics: a failure must never surface to the user.
+      // An AbortError is the expected path when the effect cleans up on
+      // navigation, so it is not worth reporting.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      log.debug('[AppLayout] page-visit tracking failed', { err });
+    });
 
     return () => controller.abort();
   }, [pathname, currentUser]);
@@ -90,8 +97,12 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
-    // Project Management
-    if (path.includes('projects')) {
+    // Project Management.
+    // `/projects/health-safety` still SERVES the H&S dashboard (it cannot
+    // redirect — see that page's header for the cached-308 reason), so it must
+    // not be captured here and labelled "Projects". It falls through to the
+    // health-safety branch below.
+    if (path.includes('projects') && !path.includes('health-safety')) {
       if (segments.includes('create')) {
         return {
           title: 'Create Project',
@@ -323,11 +334,11 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
-    // Health & Safety
+    // Health & Safety — top-level module since 2026-07-31, no longer under Projects
     if (path.includes('health-safety')) {
       return {
         title: 'Health & Safety',
-        breadcrumbs: ['Home', 'Projects', 'Health & Safety'],
+        breadcrumbs: ['Home', 'Health & Safety'],
       };
     }
 

@@ -51,6 +51,7 @@ export {
   activateConfig,
   staffConfig,
   projectsConfig,
+  healthSafetyConfig,
   constructionQaConfig,
   analyticsConfig,
 } from './config';

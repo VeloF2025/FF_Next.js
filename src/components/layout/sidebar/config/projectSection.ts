@@ -23,7 +23,8 @@ export const projectSection: NavSection = {
       permissions: [],
       rbacKey: 'projects.list',
     },
-    // Pipeline and Health & Safety are now tabs within /projects
+    // Pipeline is a tab within /projects. Health & Safety moved to its own
+    // top-level section on 2026-07-31 (see healthSafetySection).
     {
       to: '/clients',
       icon: Building2,

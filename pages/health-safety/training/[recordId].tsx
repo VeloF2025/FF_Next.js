@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save, Trash2 } from 'lucide-react';
 import { CompetencyBadge, type CompetencyStatus } from '@/modules/health-safety/components/training/CompetencyBadge';
 
@@ -164,7 +164,7 @@ const RecordPage: NextPage = () => {
       <Head>
         <title>Training Record | FibreFlow</title>
       </Head>
-      <ModulePage config={projectsConfig}>
+      <ModulePage config={healthSafetyConfig}>
         {typeof recordId === 'string' ? <RecordContent recordId={recordId} /> : null}
       </ModulePage>
     </AppLayout>
