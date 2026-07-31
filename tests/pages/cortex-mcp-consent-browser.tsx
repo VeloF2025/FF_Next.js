@@ -19,12 +19,11 @@ export const ATTACKER_CONTEXT = {
 const originalFetch = globalThis.fetch;
 const originalLocation = Object.getOwnPropertyDescriptor(window, 'location');
 const mountedHeads = new Set<React.ReactNode>();
-
 export interface StubResponse {
   status: number;
   body?: unknown;
 }
-type ContextResponse = StubResponse | Error | Promise<StubResponse>;
+type DeferredResponse = StubResponse | Error | Promise<StubResponse>;
 interface RecordedRequest {
   url: string;
   method: string;
@@ -35,9 +34,10 @@ interface RenderOptions {
   routerReady?: boolean;
   deferAuth?: boolean;
   authResponse: StubResponse;
-  contextResponse?: ContextResponse;
-  contextResponses?: ContextResponse[];
-  consentResponse?: StubResponse | Error;
+  contextResponse?: DeferredResponse;
+  contextResponses?: DeferredResponse[];
+  consentResponse?: DeferredResponse;
+  consentResponses?: DeferredResponse[];
 }
 
 export const authenticatedLewResponse: StubResponse = {
@@ -73,6 +73,31 @@ function responseFrom(stub: StubResponse): Response {
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+async function resolveWithAbort(
+  pending: Promise<StubResponse>,
+  signal?: AbortSignal | null,
+): Promise<StubResponse> {
+  if (!signal) return pending;
+  if (signal.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+  return new Promise((resolve, reject) => {
+    const aborted = () => {
+      signal.removeEventListener('abort', aborted);
+      reject(new DOMException('The operation was aborted.', 'AbortError'));
+    };
+    signal.addEventListener('abort', aborted, { once: true });
+    pending.then(
+      (value) => {
+        signal.removeEventListener('abort', aborted);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', aborted);
+        reject(error);
+      },
+    );
+  });
+}
 function routeParts(route: string): { pathname: string; query: NextRouter['query'] } {
   const url = new URL(route, 'https://dev.fibreflow.app');
   return { pathname: url.pathname, query: Object.fromEntries(url.searchParams.entries()) };
@@ -105,13 +130,12 @@ export class ConsentBrowser {
   readonly router: NextRouter;
   private readonly targetRoute: string;
   private readonly authResponse: StubResponse;
-  private readonly contextResponses: ContextResponse[];
-  private readonly consentResponse?: StubResponse | Error;
+  private readonly contextResponses: DeferredResponse[];
+  private readonly consentResponses: DeferredResponse[];
   private authResolver: ((response: Response) => void) | null = null;
   private authPromise: Promise<Response> | null = null;
   private rerenderPage: (() => void) | null = null;
   private externalHref: string | null = null;
-
   constructor(options: RenderOptions) {
     this.targetRoute = options.route ?? ROUTE;
     this.authResponse = options.authResponse;
@@ -121,7 +145,8 @@ export class ConsentBrowser {
         body: { data: ATTACKER_CONTEXT },
       },
     ];
-    this.consentResponse = options.consentResponse;
+    this.consentResponses = options.consentResponses
+      ?? (options.consentResponse ? [options.consentResponse] : []);
     if (options.deferAuth) {
       this.authPromise = new Promise((resolve) => {
         this.authResolver = resolve;
@@ -153,7 +178,6 @@ export class ConsentBrowser {
       },
     };
   }
-
   readonly fetch: typeof fetch = async (input, init) => {
     const url = typeof input === 'string'
       ? input
@@ -174,8 +198,11 @@ export class ConsentBrowser {
       return responseFrom(await pending);
     }
     if (url === '/api/cortex/mcp-consent') {
-      if (this.consentResponse instanceof Error) throw this.consentResponse;
-      if (this.consentResponse) return responseFrom(this.consentResponse);
+      const pending = this.consentResponses.shift();
+      if (pending instanceof Error) throw pending;
+      if (pending) {
+        return responseFrom(await resolveWithAbort(Promise.resolve(pending), init?.signal));
+      }
     }
     throw new Error(`Unexpected request: ${url}`);
   };

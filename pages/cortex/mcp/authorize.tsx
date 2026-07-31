@@ -21,6 +21,11 @@ interface ConsentContextResponse {
   data?: unknown;
 }
 
+interface ConsentSubmission {
+  stateId: string;
+  controller: AbortController;
+}
+
 const RETRY_MESSAGE =
   'Authorization could not be completed. Return to Claude and try connecting again.';
 const CONTEXT_MESSAGE =
@@ -36,13 +41,23 @@ export default function CortexMcpAuthorizePage() {
     stateId: string;
     value: CortexMcpConsentContext;
   } | null>(null);
-  const inFlight = useRef(false);
   const rawStateId = router.query.state_id;
   const stateId = typeof rawStateId === 'string' ? rawStateId : '';
+  const currentStateId = useRef(stateId);
+  const inFlight = useRef<ConsentSubmission | null>(null);
+  currentStateId.current = stateId;
   const context = verifiedContext?.stateId === stateId
     ? verifiedContext.value
     : null;
   const displayedPhase = attemptedStateId === stateId ? phase : 'checking';
+
+  useEffect(() => () => {
+    const submission = inFlight.current;
+    if (submission?.stateId === stateId) {
+      submission.controller.abort();
+      inFlight.current = null;
+    }
+  }, [stateId]);
 
   useEffect(() => {
     if (!router.isReady || loading) return;
@@ -103,7 +118,11 @@ export default function CortexMcpAuthorizePage() {
       || attemptedStateId !== stateId
       || phase !== 'ready'
     ) return;
-    inFlight.current = true;
+    const submission: ConsentSubmission = {
+      stateId,
+      controller: new AbortController(),
+    };
+    inFlight.current = submission;
     setPhase('submitting');
     setError(null);
 
@@ -112,8 +131,13 @@ export default function CortexMcpAuthorizePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stateId }),
+        signal: submission.controller.signal,
       });
       const json = (await response.json().catch(() => null)) as ConsentResponse | null;
+      if (
+        inFlight.current !== submission
+        || currentStateId.current !== submission.stateId
+      ) return;
       const redirectUrl = json?.data?.redirectUrl;
 
       if (!response.ok || !redirectUrl) {
@@ -125,9 +149,16 @@ export default function CortexMcpAuthorizePage() {
       setPhase('redirecting');
       window.location.assign(redirectUrl);
     } catch (caught) {
+      if (
+        submission.controller.signal.aborted
+        || inFlight.current !== submission
+        || currentStateId.current !== submission.stateId
+      ) return;
       const reason = caught instanceof Error ? caught.message : String(caught);
       setError(`Authorization could not be completed: ${reason}`);
       setPhase('error');
+    } finally {
+      if (inFlight.current === submission) inFlight.current = null;
     }
   }, [attemptedStateId, context, phase, stateId]);
 

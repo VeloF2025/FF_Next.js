@@ -107,7 +107,9 @@ describe('Cortex MCP authorization page', () => {
     const redirect = await screen.findByText(redirectUri);
     expect(redirect.closest('a')).toBeNull();
     expect(screen.queryByRole('link', { name: redirectUri })).not.toBeInTheDocument();
-    expect(screen.getByText(scope)).toBeInTheDocument();
+    const renderedScope = screen.getByText(scope);
+    expect(renderedScope.closest('a')).toBeNull();
+    expect(screen.queryByRole('link', { name: scope })).not.toBeInTheDocument();
     expect(document.querySelector('[data-redirect-attacker="true"]')).toBeNull();
     expect(document.querySelector('[data-scope-attacker="true"]')).toBeNull();
   });
@@ -154,6 +156,59 @@ describe('Cortex MCP authorization page', () => {
       json: { stateId: stateB },
     }]);
     await waitFor(() => expect(browser.externalLocation()).toBe(CALLBACK));
+  });
+
+  it('isolates an in-flight consent submission from a new query state', async () => {
+    const stateB = 'L9pQM2ynWz4VhJ6Tf8RcK1sXa3DeUo7B';
+    const routeB = `/cortex/mcp/authorize?state_id=${stateB}`;
+    const callbackA = 'https://state-a.example/callback?code=state-a';
+    const callbackB = 'https://state-b.example/callback?code=state-b';
+    let releaseStateA!: (response: { status: number; body: unknown }) => void;
+    const stateAResponse = new Promise<{ status: number; body: unknown }>((resolve) => {
+      releaseStateA = resolve;
+    });
+    const browser = renderConsentPage({
+      authResponse: authenticatedLewResponse,
+      contextResponses: [
+        { status: 200, body: { data: ATTACKER_CONTEXT } },
+        {
+          status: 200,
+          body: {
+            data: {
+              ...ATTACKER_CONTEXT,
+              redirectUri: 'https://state-b.example/registered-callback',
+            },
+          },
+        },
+      ],
+      consentResponses: [
+        stateAResponse,
+        { status: 200, body: { data: { redirectUrl: callbackB } } },
+      ],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Allow$/ }));
+    expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([{
+      method: 'POST',
+      json: { stateId: STATE_ID },
+    }]);
+
+    act(() => browser.changeRoute(routeB));
+    const allowStateB = await screen.findByRole('button', { name: /^Allow$/ });
+    expect(allowStateB).toBeEnabled();
+    fireEvent.click(allowStateB);
+
+    expect(browser.recordedRequests('/api/cortex/mcp-consent')).toEqual([
+      { method: 'POST', json: { stateId: STATE_ID } },
+      { method: 'POST', json: { stateId: stateB } },
+    ]);
+    await waitFor(() => expect(browser.externalLocation()).toBe(callbackB));
+
+    await act(async () => {
+      releaseStateA({ status: 200, body: { data: { redirectUrl: callbackA } } });
+      await stateAResponse;
+    });
+    expect(browser.externalLocation()).toBe(callbackB);
   });
 
   it.each([
