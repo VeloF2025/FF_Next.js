@@ -43,17 +43,20 @@ async function handler(
       return apiResponse.badRequest(res, 'Invalid status. Must be: corrected_in_1map, false_positive, or pending_correction');
     }
 
-    // Update the status
+    // $1 is cast to ::text at every use — see 42P08 below. serial_swap_status
+    // is varchar(50), so assigning it while also comparing $1 against literals
+    // made Postgres deduce two types for one parameter and reject the statement
+    // at parse time, on every call.
     const updateQuery = `
       UPDATE dr_photo_unified_reviews
       SET
-        serial_swap_status = $1,
+        serial_swap_status = $1::text,
         serial_swap_corrected_at = CASE
-          WHEN $1 IN ('corrected_in_1map', 'false_positive') THEN NOW()
+          WHEN $1::text IN ('corrected_in_1map', 'false_positive') THEN NOW()
           ELSE NULL
         END,
         serial_swap_corrected_by = CASE
-          WHEN $1 IN ('corrected_in_1map', 'false_positive') THEN 'qa_dashboard'
+          WHEN $1::text IN ('corrected_in_1map', 'false_positive') THEN 'qa_dashboard'
           ELSE NULL
         END,
         updated_at = NOW()
@@ -78,13 +81,13 @@ async function handler(
     await pool.query(`
       UPDATE dr_photo_unified_reviews
       SET
-        serial_swap_status = $1,
+        serial_swap_status = $1::text,
         serial_swap_corrected_at = CASE
-          WHEN $1 IN ('corrected_in_1map', 'false_positive') THEN NOW()
+          WHEN $1::text IN ('corrected_in_1map', 'false_positive') THEN NOW()
           ELSE NULL
         END,
         serial_swap_corrected_by = CASE
-          WHEN $1 IN ('corrected_in_1map', 'false_positive') THEN 'qa_dashboard'
+          WHEN $1::text IN ('corrected_in_1map', 'false_positive') THEN 'qa_dashboard'
           ELSE NULL
         END
       WHERE drop_number = $2
