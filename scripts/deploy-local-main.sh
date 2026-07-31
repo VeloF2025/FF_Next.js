@@ -9,6 +9,13 @@
 #   bash scripts/deploy-local.sh dev [--branch master]
 #   bash scripts/deploy-local.sh production [--force]
 #   bash scripts/deploy-local.sh status
+#
+# --force overrides the business-hours window ONLY. It does NOT skip lint.
+# "Deploy outside working hours" and "deploy without checking the code" are
+# separate decisions and must be made separately, so skipping lint needs its
+# own --skip-lint. That exists for one real case: a broken toolchain (e.g. a
+# wiped node_modules) making `npm run lint` unrunnable during an incident.
+# It is not an escape hatch for code that fails the gate.
 # =============================================================================
 
 set -euo pipefail
@@ -36,12 +43,14 @@ error() { echo -e "${RED}[$(date +%H:%M:%S)] ERROR:${NC} $*"; exit 1; }
 # --- Parse arguments ---
 TARGET="${1:-dev}"
 FORCE=false
+SKIP_LINT=false
 BRANCH="master"
 
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --force|-f)  FORCE=true; shift ;;
+    --skip-lint) SKIP_LINT=true; shift ;;
     --branch|-b) BRANCH="$2"; shift 2 ;;
     *)           shift ;;
   esac
@@ -118,7 +127,8 @@ if [[ "$TARGET" != "dev" ]] && is_business_hours; then
   if [[ "$FORCE" != true ]]; then
     echo -e "\n${RED}BLOCKED: Cannot deploy to $TARGET during business hours (08:00-17:00 SAST)${NC}"
     echo "  Deploy to dev instead: bash scripts/deploy-local.sh dev"
-    echo "  Emergency override:    bash scripts/deploy-local.sh $TARGET --force"
+    echo "  Override the window:   bash scripts/deploy-local.sh $TARGET --force"
+    echo "  (--force overrides the hours only - lint gates still run)"
     exit 1
   fi
   warn "EMERGENCY OVERRIDE — Deploying to $TARGET during business hours"
@@ -370,7 +380,9 @@ if [[ -f "$NGINX_SOURCE" ]]; then
 fi
 
 # --- Step 3b: Run lint gates (Zero Tolerance) ---
-if [[ "$FORCE" != true ]]; then
+# Deliberately NOT keyed on $FORCE: an out-of-hours deploy is still a deploy
+# and still has to pass the ratchet.
+if [[ "$SKIP_LINT" != true ]]; then
   log "Running lint gates..."
   LINT_FAILED=false
   MAX_LINT_WARNINGS=3825
@@ -392,11 +404,13 @@ if [[ "$FORCE" != true ]]; then
   fi
 
   if [[ "$LINT_FAILED" == true ]]; then
-    error "Lint gates failed. Fix issues or use --force to bypass."
+    error "Lint gates failed. Fix the issues. --skip-lint is for a broken toolchain, not for code that fails the gate."
   fi
   log "Lint gates passed: ${LINT_ERRORS} errors (≤${MAX_LINT_ERRORS}), ${LINT_WARNINGS} warnings (≤${MAX_LINT_WARNINGS}) ✓"
 else
-  warn "Skipping lint gates (--force)"
+  warn "SKIPPING LINT GATES (--skip-lint) - nothing has checked this code"
+  warn "  Deploying $TARGET with no lint gate. Intended only for a broken"
+  warn "  toolchain during an incident."
 fi
 
 # --- Step 4: Stop service to free resources ---
