@@ -2,6 +2,61 @@
 
 from __future__ import annotations
 
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_public_client_registration_remains_secretless(tmp_path):
+    from mcp.shared.auth import OAuthClientInformationFull
+    from pydantic import AnyUrl
+
+    from ff_mcp.oauth import FibreFlowOAuthProvider
+
+    provider = FibreFlowOAuthProvider(tmp_path / "oauth.json")
+    client = OAuthClientInformationFull(
+        client_id="claude-public-client",
+        client_secret=None,
+        redirect_uris=[AnyUrl("http://localhost:57174/callback")],
+        token_endpoint_auth_method="none",
+        grant_types=["authorization_code", "refresh_token"],
+        response_types=["code"],
+        scope="fibreflow.read",
+    )
+
+    await provider.register_client(client)
+
+    registered = await provider.get_client("claude-public-client")
+    assert registered is not None
+    assert registered.token_endpoint_auth_method == "none"
+    assert registered.client_secret is None
+    assert registered.client_secret_expires_at is None
+
+
+@pytest.mark.asyncio
+async def test_confidential_client_registration_preserves_secret(tmp_path):
+    from mcp.shared.auth import OAuthClientInformationFull
+    from pydantic import AnyUrl
+
+    from ff_mcp.oauth import FibreFlowOAuthProvider
+
+    provider = FibreFlowOAuthProvider(tmp_path / "oauth.json")
+    client = OAuthClientInformationFull(
+        client_id="claude-confidential-client",
+        client_secret="client-secret",
+        redirect_uris=[AnyUrl("https://claude.ai/api/mcp/auth_callback")],
+        token_endpoint_auth_method="client_secret_post",
+        grant_types=["authorization_code", "refresh_token"],
+        response_types=["code"],
+        scope="fibreflow.read",
+    )
+
+    await provider.register_client(client)
+
+    registered = await provider.get_client("claude-confidential-client")
+    assert registered is not None
+    assert registered.client_secret == "client-secret"
+    assert registered.client_secret_expires_at == 0
+
 
 def test_a_corrupt_store_is_reported_and_preserved_not_silently_wiped(tmp_path, capsys):
     """Cortex swallows this with a bare `except: pass`. Starting empty is unavoidable,

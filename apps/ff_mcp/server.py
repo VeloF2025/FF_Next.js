@@ -152,10 +152,15 @@ def _oauth_metadata() -> dict:
         "scopes_supported": [SCOPE],
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code", "refresh_token"],
-        "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+        "token_endpoint_auth_methods_supported": [
+            "none",
+            "client_secret_post",
+            "client_secret_basic",
+        ],
         "service_documentation": REMOTE_PUBLIC_BASE + "/help",
         "revocation_endpoint": REMOTE_PUBLIC_BASE + "/revoke",
         "revocation_endpoint_auth_methods_supported": [
+            "none",
             "client_secret_post",
             "client_secret_basic",
         ],
@@ -186,7 +191,9 @@ async def remote_help(request: Request):
         "<p>Add this URL as a custom connector in Claude: <code>"
         + REMOTE_PUBLIC_BASE
         + "/mcp</code></p><p>Access is read-only and scoped to your own FibreFlow "
-        "permissions. Revoke it any time from the Cortex page in FibreFlow.</p>"
+        "permissions. Manage or revoke it from <a href=\""
+        + FF_APP_BASE
+        + '/connections/fibreflow">AI Connections in FibreFlow</a>.</p>'
         "</body></html>"
     )
 

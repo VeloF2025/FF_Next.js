@@ -245,6 +245,23 @@ const nextConfig = {
         source: '/.well-known/oauth-protected-resource/api/ff-remote-mcp/mcp',
         destination: '/api/mcp/resource-metadata',
       },
+      {
+        source: '/.well-known/oauth-protected-resource/api/cortex-remote-mcp/mcp',
+        destination: '/api/mcp/resource-metadata?connector=cortex',
+      },
+      // RFC 8414 discovery for an issuer with a path component lives at the
+      // origin root. Route both connectors through their loopback proxies so
+      // clients do not fall back to unrelated OIDC discovery.
+      {
+        source: '/.well-known/oauth-authorization-server/api/ff-remote-mcp',
+        destination:
+          '/api/ff-remote-mcp/.well-known/oauth-authorization-server/api/ff-remote-mcp',
+      },
+      {
+        source: '/.well-known/oauth-authorization-server/api/cortex-remote-mcp',
+        destination:
+          '/api/cortex-remote-mcp/.well-known/oauth-authorization-server/api/cortex-remote-mcp',
+      },
     ];
   },
 

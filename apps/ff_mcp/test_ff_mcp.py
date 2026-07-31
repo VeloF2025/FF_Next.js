@@ -63,6 +63,41 @@ def test_default_urls_are_https(svc):
     assert metadata["scopes_supported"] == ["fibreflow.read"]
 
 
+def test_path_metadata_advertises_public_and_confidential_clients(svc):
+    from starlette.testclient import TestClient
+
+    server, _ = svc
+    with TestClient(server.mcp.streamable_http_app()) as client:
+        response = client.get(
+            "/.well-known/oauth-authorization-server/api/ff-remote-mcp"
+        )
+
+    assert response.status_code == 200
+    metadata = response.json()
+    assert metadata["token_endpoint_auth_methods_supported"] == [
+        "none",
+        "client_secret_post",
+        "client_secret_basic",
+    ]
+    assert metadata["revocation_endpoint_auth_methods_supported"] == [
+        "none",
+        "client_secret_post",
+        "client_secret_basic",
+    ]
+
+
+def test_help_points_to_the_fibreflow_connection_page(svc):
+    from starlette.testclient import TestClient
+
+    server, _ = svc
+    with TestClient(server.mcp.streamable_http_app()) as client:
+        response = client.get("/help")
+
+    assert response.status_code == 200
+    assert "/connections/fibreflow" in response.text
+    assert "Cortex page" not in response.text
+
+
 # ------------------------------------------------------------------- consent redirect
 
 

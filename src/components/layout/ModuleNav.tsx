@@ -276,7 +276,7 @@ function FlyoutDropdown({ tab, asPath, onClose, accent }: FlyoutDropdownProps) {
  * @param getActiveTabId  Route-to-tab resolver for the owning module
  * @param accentColor     Tailwind color token used for active-state highlights
  */
-export function ModuleNav({ tabs, getActiveTabId, accentColor, navLabel: _navLabel }: ModuleNavProps) {
+export function ModuleNav({ tabs, getActiveTabId, accentColor, navLabel }: ModuleNavProps) {
   const router = useRouter();
   const [openTab, setOpenTab] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
@@ -298,7 +298,11 @@ export function ModuleNav({ tabs, getActiveTabId, accentColor, navLabel: _navLab
   const hasFlyout = (t: Tab) => t.items?.some(isFlyout) ?? false;
 
   return (
-    <nav ref={navRef} className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] relative z-30">
+    <nav
+      ref={navRef}
+      aria-label={navLabel}
+      className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] relative z-30"
+    >
       <div className="flex items-center gap-0 px-2" style={{ scrollbarWidth: 'none' }}>
         {tabs.map(t => (
           <div key={t.id} className="relative flex-shrink-0">
