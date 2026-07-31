@@ -15,6 +15,11 @@
 #   bash scripts/secret-scan.sh --staged              # pre-commit: staged changes
 #   bash scripts/secret-scan.sh --range <base> <head> # pre-push: pushed range
 #   bash scripts/secret-scan.sh --branch              # CI: diff vs origin/master
+#   bash scripts/secret-scan.sh --tree                # audit: scan ALL tracked files
+#
+# --tree is an audit, deliberately NOT wired into the hooks or CI: the repo
+# has pre-existing hits, so gating on it would block every commit until they
+# are all cleaned up. Run it when auditing, not on every push.
 #
 # Exit 0 = clean, 1 = secret(s) found.
 # Bypass (emergency only, never for real secrets): git commit/push --no-verify
@@ -38,6 +43,14 @@ case "$MODE" in
     fi
     ADDED=$(git diff "$BASE" "$HEAD" --unified=0 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' || true)
     ;;
+  --tree)
+    # Every tracked line, formatted like diff output so the rules below apply
+    # unchanged. Lockfiles and vendored trees are excluded as pure noise.
+    ADDED=$(git grep -h '' -- . \
+              ':(exclude)scripts/secret-scan.sh' ':(exclude)*.lock' \
+              ':(exclude)*lock.json' ':(exclude)node_modules/**' 2>/dev/null \
+            | sed 's/^/+/' || true)
+    ;;
   --branch)
     BASE=$(git merge-base origin/master HEAD 2>/dev/null || true)
     if [ -z "$BASE" ]; then
@@ -53,7 +66,7 @@ case "$MODE" in
 esac
 
 # Lines that look like placeholders / safe references — never a real secret.
-PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|here|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|\$[A-Z]|process\.env|env\.|getenv|credentials\.local'
+PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|here|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|\$[A-Z]|process\.env|env\.|getenv|credentials\.local|\btest[-_]|\bmock|\bstub'
 
 HITS=""
 add_hits() { # $1 = grep -E pattern, $2 = label
@@ -71,6 +84,17 @@ if [ -n "$ADDED" ]; then
   add_hits "echo +['\"][^'\"\$]{4,}['\"] *\| *sudo -S" "hardcoded sudo password"
   # Long hex secret assigned to a SECRET/PASSWORD/TOKEN/KEY
   add_hits "(SECRET|PASSWORD|PASSWD|TOKEN|API[_-]?KEY)['\"]?\s*[:=]\s*['\"]?[A-Fa-f0-9]{32,}" "hardcoded long-hex secret"
+  # Credential-named variable assigned a plaintext literal.
+  # The long-hex rule above only catches machine-generated secrets; a
+  # human-memorable password (`SUDO_PASS="..."`, `this.password = "..."`)
+  # matched none of the rules and sat in four tracked scripts for months.
+  # See PR #2332. `=` only, deliberately: allowing `:` as well pulled in
+  # hundreds of false positives from lockfiles and JSON config.
+  # No LEADING \b: `_` is a word character, so `\bPASS\b` cannot match inside
+  # `SUDO_PASS` -- which is exactly how the leak went unseen. The TRAILING \b
+  # stays, forcing the keyword to end the identifier, which keeps enum values
+  # like PASSPORT / PASSED / BYPASS_PERMISSIONS out.
+  add_hits "[A-Za-z0-9_]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|API[_-]?KEY)\b['\"]?[[:space:]]*=[[:space:]]*['\"][^'\"\$[:space:]]{6,}['\"]" "hardcoded password/secret literal"
   # AWS access key id
   add_hits "AKIA[0-9A-Z]{16}" "AWS access key id"
   # Private key block (placeholder lines already excluded above)
