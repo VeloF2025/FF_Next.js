@@ -4,6 +4,12 @@
 
 set -e  # Exit on any error
 
+# Sudo password is NEVER hardcoded. Set VELO_SUDO_PASSWORD in the
+# environment (see scripts/ops/velo/README.md) when running as a user that
+# lacks NOPASSWD sudo for the fibreflow services. Left unset, `sudo -S`
+# simply proceeds for NOPASSWD users and fails loudly for everyone else.
+VELO_SUDO_PASSWORD="${VELO_SUDO_PASSWORD:-}"
+
 LOCKFILE=/tmp/fibreflow-deploy.lock
 DEPLOY_DIR=/home/velo/fibreflow-production
 LOG_DIR=$DEPLOY_DIR/logs
@@ -108,7 +114,7 @@ fi
 
 # Step 7: Restart service
 log "Restarting service..."
-echo 'velo2026' | sudo -S systemctl restart fibreflow-production
+echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl restart fibreflow-production
 
 # Step 8: Wait and verify
 log "Waiting for service to start..."

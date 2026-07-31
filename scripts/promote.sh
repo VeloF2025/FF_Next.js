@@ -26,7 +26,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VELOCITY_HOST="100.96.203.105"
 VELOCITY_USER="velo"
-SUDO_PASS="velo2026"
+# Sudo password is NEVER hardcoded. Set VELO_SUDO_PASSWORD in the
+# environment (see scripts/ops/velo/README.md) when running as a user that
+# lacks NOPASSWD sudo for the fibreflow services. Left unset, `sudo -S`
+# simply proceeds for NOPASSWD users and fails loudly for everyone else.
+VELO_SUDO_PASSWORD="${VELO_SUDO_PASSWORD:-}"
 TIMEZONE="Africa/Johannesburg"
 
 declare -A ENV_CONFIG=(
@@ -203,7 +207,7 @@ ssh ${VELOCITY_USER}@${VELOCITY_HOST} bash -s <<PROMOTE_SCRIPT
 
   # Stop service BEFORE touching .next
   echo "[promote] Stopping $TGT_SVC..."
-  echo '$SUDO_PASS' | sudo -S systemctl stop $TGT_SVC 2>/dev/null || true
+  echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl stop $TGT_SVC 2>/dev/null || true
 
   # Backup current build
   TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
@@ -219,7 +223,7 @@ ssh ${VELOCITY_USER}@${VELOCITY_HOST} bash -s <<PROMOTE_SCRIPT
     if [ -d .next-backup-\$TIMESTAMP ]; then
       mv .next-backup-\$TIMESTAMP .next
     fi
-    echo '$SUDO_PASS' | sudo -S systemctl start $TGT_SVC 2>/dev/null || true
+    echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl start $TGT_SVC 2>/dev/null || true
     exit 1
   }
 
@@ -232,7 +236,7 @@ ssh ${VELOCITY_USER}@${VELOCITY_HOST} bash -s <<PROMOTE_SCRIPT
 
   # Start service (was stopped before build)
   echo "[promote] Starting $TGT_SVC..."
-  echo '$SUDO_PASS' | sudo -S systemctl start $TGT_SVC
+  echo "$VELO_SUDO_PASSWORD" | sudo -S systemctl start $TGT_SVC
 
   # Wait for startup
   sleep 5
