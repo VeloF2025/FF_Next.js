@@ -15,6 +15,9 @@
 - The browser sends only `stateId`; it never supplies identity, token, secret or callback decisions.
 - `CORTEX_MCP_CALLBACK_SECRET` is shared between FibreFlow's Cortex integration and Cortex Remote MCP but differs from `FF_MCP_CALLBACK_SECRET`.
 - Client name, client ID, redirect URI and scopes are attacker-controlled text.
+- Bind every resolved context to its exact `stateId`; a query change invalidates the
+  old Allow action before the replacement context resolves.
+- Cap the upstream response at 64 KiB and enforce bounded client and scope fields.
 - The exact redirect URI is visible and non-clickable before Allow is enabled.
 - Missing or invalid context fails closed with no Allow action.
 - No mocks may stand in for the context integration; API contract tests use real loopback HTTP servers.
@@ -286,6 +289,11 @@ Add an XSS fixture whose `clientName` is
 and `document.querySelector('[data-attacker="true"]')` is null. Add context rejection,
 missing-data and network-failure cases and assert no Allow button is rendered. Assert
 the context request contains only `{ stateId: STATE_ID }`.
+
+Add adversarial redirect and scope fixtures, assert the redirect has no anchor ancestor
+or link role, and mutate from state A to state B while B's context request is pending.
+The old context and Allow action must disappear immediately, and the eventual consent
+request must contain state B only.
 
 - [ ] **Step 3: Run the page test and confirm RED**
 

@@ -34,6 +34,41 @@ describe('parseCortexMcpConsentContext', () => {
   });
 
   it.each([
+    ['client ID', {
+      client_id: 'x'.repeat(257),
+      client_name: null,
+      redirect_uri: 'https://evil.example/cb',
+      scopes: [],
+    }],
+    ['client name', {
+      client_id: 'client',
+      client_name: 'x'.repeat(257),
+      redirect_uri: 'https://evil.example/cb',
+      scopes: [],
+    }],
+    ['redirect URI', {
+      client_id: 'client',
+      client_name: null,
+      redirect_uri: `https://evil.example/${'x'.repeat(2_030)}`,
+      scopes: [],
+    }],
+    ['scope count', {
+      client_id: 'client',
+      client_name: null,
+      redirect_uri: 'https://evil.example/cb',
+      scopes: Array.from({ length: 33 }, (_, index) => `scope-${index}`),
+    }],
+    ['scope value', {
+      client_id: 'client',
+      client_name: null,
+      redirect_uri: 'https://evil.example/cb',
+      scopes: ['x'.repeat(129)],
+    }],
+  ])('rejects an oversized %s', (_field, value) => {
+    expect(parseCortexMcpConsentContext(value)).toBeNull();
+  });
+
+  it.each([
     null,
     {},
     {

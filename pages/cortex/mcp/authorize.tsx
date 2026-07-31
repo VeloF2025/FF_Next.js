@@ -7,7 +7,10 @@ import {
   type CortexMcpConsentPhase,
 } from '@/components/cortex/CortexMcpConsentCard';
 import { useAuth } from '@/contexts/AuthContext';
-import type { CortexMcpConsentContext } from '@/lib/cortex/mcpConsentContext';
+import {
+  isCortexMcpConsentContext,
+  type CortexMcpConsentContext,
+} from '@/lib/cortex/mcpConsentContext';
 
 interface ConsentResponse {
   data?: { redirectUrl?: string };
@@ -23,29 +26,23 @@ const RETRY_MESSAGE =
 const CONTEXT_MESSAGE =
   'Authorization details could not be verified. Return to Claude and try connecting again.';
 
-function isConsentContext(value: unknown): value is CortexMcpConsentContext {
-  if (!value || typeof value !== 'object') return false;
-  const context = value as Record<string, unknown>;
-  return (
-    typeof context.clientId === 'string'
-    && Boolean(context.clientId.trim())
-    && (context.clientName === null || typeof context.clientName === 'string')
-    && typeof context.redirectUri === 'string'
-    && Boolean(context.redirectUri.trim())
-    && Array.isArray(context.scopes)
-    && context.scopes.every((scope) => typeof scope === 'string')
-  );
-}
-
 export default function CortexMcpAuthorizePage() {
   const router = useRouter();
   const { currentUser, isAuthenticated, loading } = useAuth();
   const [phase, setPhase] = useState<CortexMcpConsentPhase>('checking');
   const [error, setError] = useState<string | null>(null);
-  const [context, setContext] = useState<CortexMcpConsentContext | null>(null);
+  const [attemptedStateId, setAttemptedStateId] = useState('');
+  const [verifiedContext, setVerifiedContext] = useState<{
+    stateId: string;
+    value: CortexMcpConsentContext;
+  } | null>(null);
   const inFlight = useRef(false);
   const rawStateId = router.query.state_id;
   const stateId = typeof rawStateId === 'string' ? rawStateId : '';
+  const context = verifiedContext?.stateId === stateId
+    ? verifiedContext.value
+    : null;
+  const displayedPhase = attemptedStateId === stateId ? phase : 'checking';
 
   useEffect(() => {
     if (!router.isReady || loading) return;
@@ -58,6 +55,7 @@ export default function CortexMcpAuthorizePage() {
     }
 
     if (!stateId) {
+      setAttemptedStateId(stateId);
       setError(
         'This link is missing its authorization reference. Return to Claude and start the connection again.',
       );
@@ -65,6 +63,9 @@ export default function CortexMcpAuthorizePage() {
       return;
     }
 
+    setAttemptedStateId(stateId);
+    setError(null);
+    setPhase('checking');
     let active = true;
     void (async () => {
       try {
@@ -77,12 +78,12 @@ export default function CortexMcpAuthorizePage() {
           | ConsentContextResponse
           | null;
         if (!active) return;
-        if (!response.ok || !isConsentContext(json?.data)) {
+        if (!response.ok || !isCortexMcpConsentContext(json?.data)) {
           setError(CONTEXT_MESSAGE);
           setPhase('error');
           return;
         }
-        setContext(json.data);
+        setVerifiedContext({ stateId, value: json.data });
         setPhase((current) => (current === 'checking' ? 'ready' : current));
       } catch {
         if (!active) return;
@@ -96,7 +97,12 @@ export default function CortexMcpAuthorizePage() {
   }, [router, router.isReady, loading, isAuthenticated, stateId]);
 
   const allow = useCallback(async () => {
-    if (inFlight.current || !context) return;
+    if (
+      inFlight.current
+      || !context
+      || attemptedStateId !== stateId
+      || phase !== 'ready'
+    ) return;
     inFlight.current = true;
     setPhase('submitting');
     setError(null);
@@ -123,7 +129,7 @@ export default function CortexMcpAuthorizePage() {
       setError(`Authorization could not be completed: ${reason}`);
       setPhase('error');
     }
-  }, [context, stateId]);
+  }, [attemptedStateId, context, phase, stateId]);
 
   const cancel = useCallback(() => {
     setPhase('cancelled');
@@ -138,7 +144,7 @@ export default function CortexMcpAuthorizePage() {
       </Head>
       <main className="flex min-h-screen items-center justify-center bg-[var(--ff-bg-primary)] px-4 py-10">
         <CortexMcpConsentCard
-          phase={phase}
+          phase={displayedPhase}
           error={error}
           email={currentUser?.email ?? null}
           context={context}

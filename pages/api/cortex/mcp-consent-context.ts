@@ -12,6 +12,7 @@ import { log } from '@/lib/logger';
 
 const STATE_ID_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
 const CONTEXT_TIMEOUT_MS = 5_000;
+const MAX_CONTEXT_RESPONSE_BYTES = 64 * 1_024;
 const GATEWAY_MESSAGE =
   'Authorization details could not be verified. Return to Claude and try connecting again.';
 const DEFAULT_SERVICE_URL = 'http://127.0.0.1:7414';
@@ -27,6 +28,41 @@ function serviceUrl(): string | null {
 }
 
 type ConsentContextLogger = Pick<typeof log, 'error' | 'warn'>;
+
+async function readContextPayload(upstream: Response): Promise<unknown> {
+  const declaredLength = Number(upstream.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_CONTEXT_RESPONSE_BYTES) {
+    await upstream.body?.cancel();
+    return null;
+  }
+
+  const reader = upstream.body?.getReader();
+  if (!reader) return null;
+  const decoder = new TextDecoder();
+  let body = '';
+  let receivedBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      receivedBytes += chunk.value.byteLength;
+      if (receivedBytes > MAX_CONTEXT_RESPONSE_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      body += decoder.decode(chunk.value, { stream: true });
+    }
+    body += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    return null;
+  }
+}
 
 export interface CortexConsentContextDependencies {
   logger?: ConsentContextLogger;
@@ -98,7 +134,7 @@ export function createCortexConsentContextHandler(
         );
       }
 
-      const payload: unknown = await upstream.json().catch(() => null);
+      const payload = await readContextPayload(upstream);
       const context = parseCortexMcpConsentContext(payload);
       if (!context) {
         logger.warn(

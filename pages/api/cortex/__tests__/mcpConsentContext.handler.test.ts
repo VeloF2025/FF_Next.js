@@ -49,7 +49,17 @@ describe('POST /api/cortex/mcp-consent-context', () => {
     });
     expect(JSON.stringify(response.json)).not.toContain(CALLBACK_SECRET);
     expect(JSON.stringify(response.json)).not.toContain('code_challenge');
-    expect(JSON.stringify(app.logs)).not.toContain(CALLBACK_SECRET);
+    const serializedLogs = JSON.stringify(app.logs);
+    for (const sensitiveValue of [
+      CALLBACK_SECRET,
+      VALID_STATE_ID,
+      'attacker-client',
+      'Claude',
+      'https://evil.example/cb',
+      'cortex.read',
+    ]) {
+      expect(serializedLogs).not.toContain(sensitiveValue);
+    }
   });
 
   it('rejects malformed state before contacting Cortex', async () => {
@@ -143,4 +153,28 @@ describe('POST /api/cortex/mcp-consent-context', () => {
     expect(response.status).toBe(502);
     expect(Date.now() - startedAt).toBeLessThan(6_500);
   }, 8_000);
+
+  it('rejects an oversized chunked response before buffering all metadata', async () => {
+    const body = JSON.stringify({
+      client_id: 'attacker-client',
+      client_name: 'x'.repeat(70_000),
+      redirect_uri: 'https://evil.example/cb',
+      scopes: ['cortex.read'],
+    });
+    const context = await startContextService((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.write(body.slice(0, 24_000));
+      response.write(body.slice(24_000, 48_000));
+      response.end(body.slice(48_000));
+    });
+    const app = await startConsentContextHandler({ callbackBase: context.url });
+
+    const response = await app.post({ stateId: VALID_STATE_ID });
+
+    expect(response.status).toBe(502);
+    expect(response.json.error).toEqual({
+      code: 'BAD_GATEWAY',
+      message: GATEWAY_MESSAGE,
+    });
+  });
 });

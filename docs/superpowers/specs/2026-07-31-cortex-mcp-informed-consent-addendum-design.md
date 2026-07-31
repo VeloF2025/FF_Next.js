@@ -56,6 +56,12 @@ invalid JSON and invalid context all return a generic failure. Logs may include 
 verified FibreFlow user ID and upstream status, but never the callback secret,
 attacker-controlled metadata, authorization state, bearer or token.
 
+Verified context is bound to the exact `stateId` it describes. If the page query
+changes, the old context and Allow action disappear synchronously and stay unavailable
+until the new state has been resolved. The upstream response is streamed through a
+64 KiB cap. Client IDs and names are limited to 256 characters, redirect URIs to 2,048
+characters, and scopes to 32 values of at most 128 characters each.
+
 The existing `POST /api/cortex/mcp-consent` authorization path remains unchanged. It
 still derives identity only from the verified FibreFlow session and sends the minted
 bearer only across the authenticated loopback callback.
@@ -78,6 +84,9 @@ Tests must prove the real loopback request contract, fail-closed parsing, secret
 state non-disclosure, authentication/RBAC reuse, and browser rendering of an attacker
 client named `Claude` whose redirect URI is `https://evil.example/cb`. Removing the
 redirect display or changing text rendering into HTML must make a test fail.
+Tests must also mutate the page from one state to another while the second context is
+pending, stream an oversized chunked response, and prove redirect and scope payloads
+remain non-clickable inert text.
 
 Focused Vitest, `npm run ci:quick`, a production build and Playwright visual/behavior
 checks are required before the pull request is presented. A real isolated dev OAuth

@@ -24,6 +24,7 @@ export interface StubResponse {
   status: number;
   body?: unknown;
 }
+type ContextResponse = StubResponse | Error | Promise<StubResponse>;
 interface RecordedRequest {
   url: string;
   method: string;
@@ -34,7 +35,8 @@ interface RenderOptions {
   routerReady?: boolean;
   deferAuth?: boolean;
   authResponse: StubResponse;
-  contextResponse?: StubResponse | Error;
+  contextResponse?: ContextResponse;
+  contextResponses?: ContextResponse[];
   consentResponse?: StubResponse | Error;
 }
 
@@ -103,7 +105,7 @@ export class ConsentBrowser {
   readonly router: NextRouter;
   private readonly targetRoute: string;
   private readonly authResponse: StubResponse;
-  private readonly contextResponse: StubResponse | Error;
+  private readonly contextResponses: ContextResponse[];
   private readonly consentResponse?: StubResponse | Error;
   private authResolver: ((response: Response) => void) | null = null;
   private authPromise: Promise<Response> | null = null;
@@ -113,10 +115,12 @@ export class ConsentBrowser {
   constructor(options: RenderOptions) {
     this.targetRoute = options.route ?? ROUTE;
     this.authResponse = options.authResponse;
-    this.contextResponse = options.contextResponse ?? {
-      status: 200,
-      body: { data: ATTACKER_CONTEXT },
-    };
+    this.contextResponses = options.contextResponses ?? [
+      options.contextResponse ?? {
+        status: 200,
+        body: { data: ATTACKER_CONTEXT },
+      },
+    ];
     this.consentResponse = options.consentResponse;
     if (options.deferAuth) {
       this.authPromise = new Promise((resolve) => {
@@ -164,8 +168,10 @@ export class ConsentBrowser {
       return this.authPromise ?? responseFrom(this.authResponse);
     }
     if (url === '/api/cortex/mcp-consent-context') {
-      if (this.contextResponse instanceof Error) throw this.contextResponse;
-      return responseFrom(this.contextResponse);
+      const pending = this.contextResponses.shift();
+      if (!pending) throw new Error('No context response remains');
+      if (pending instanceof Error) throw pending;
+      return responseFrom(await pending);
     }
     if (url === '/api/cortex/mcp-consent') {
       if (this.consentResponse instanceof Error) throw this.consentResponse;
@@ -193,6 +199,12 @@ export class ConsentBrowser {
     this.router.query = hydrated.query;
     this.router.asPath = this.targetRoute;
     this.router.isReady = true;
+    this.rerenderPage?.();
+  }
+  changeRoute(route: string): void {
+    const changed = routeParts(route);
+    this.router.query = changed.query;
+    this.router.asPath = route;
     this.rerenderPage?.();
   }
   releaseAuth(): void {
