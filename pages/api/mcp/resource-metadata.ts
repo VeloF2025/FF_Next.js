@@ -50,18 +50,11 @@ function resourceBase(headers: NextApiRequest['headers']): string {
   const pinned = (process.env.FF_APP_BASE ?? '').trim().replace(/\/$/, '');
   if (pinned) return pinned;
 
-  const forwarded = headers['x-forwarded-host'];
-  const candidates = [
-    (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim(),
-    headers.host,
-  ];
+  const host = Array.isArray(headers.host) ? headers.host[0] : headers.host;
+  if (host && ALLOWED_HOSTS.has(host)) return `https://${host}`;
+  // Local development only — never reachable through the public edge.
+  if (host && isLocal(host)) return `http://${host}`;
 
-  for (const host of candidates) {
-    if (!host) continue;
-    if (ALLOWED_HOSTS.has(host)) return `https://${host}`;
-    // Local development only — never reachable through the public edge.
-    if (isLocal(host)) return `http://${host}`;
-  }
   // An unrecognised host gets production, not itself: a spoofed header must not be
   // able to make this document name an arbitrary authorization server.
   return DEFAULT_BASE;

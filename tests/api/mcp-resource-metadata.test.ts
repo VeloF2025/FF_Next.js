@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import handler from '../../pages/api/mcp/resource-metadata';
+import handler, {
+  buildResourceMetadata,
+} from '../../pages/api/mcp/resource-metadata';
 
 type MockRes = {
   status: ReturnType<typeof vi.fn>;
@@ -45,15 +47,19 @@ describe('/.well-known/oauth-protected-resource/api/ff-remote-mcp/mcp', () => {
     );
   });
 
-  it('honours x-forwarded-host when it names a known environment', () => {
-    const payload = body(call({ host: 'localhost:3005', 'x-forwarded-host': 'dev.fibreflow.app' }));
-    expect(payload.resource).toBe('https://dev.fibreflow.app/api/ff-remote-mcp/mcp');
-  });
-
-  it('takes the first entry of a comma-joined x-forwarded-host', () => {
-    const payload = body(call({ 'x-forwarded-host': 'dev.fibreflow.app, inner.local' }));
-    expect(payload.resource).toBe('https://dev.fibreflow.app/api/ff-remote-mcp/mcp');
-  });
+  it.each([
+    ['app.fibreflow.app', 'dev.fibreflow.app'],
+    ['dev.fibreflow.app', 'app.fibreflow.app'],
+  ])(
+    'keeps discovery on %s when x-forwarded-host names %s',
+    (host, forwardedHost) => {
+      const payload = buildResourceMetadata({
+        host,
+        'x-forwarded-host': forwardedHost,
+      });
+      expect(payload.resource).toBe(`https://${host}/api/ff-remote-mcp/mcp`);
+    },
+  );
 
   // --- the header is attacker-controlled: nginx never sets or strips it ---
 

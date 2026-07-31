@@ -191,7 +191,9 @@ async def remote_help(request: Request):
         "<p>Add this URL as a custom connector in Claude: <code>"
         + REMOTE_PUBLIC_BASE
         + "/mcp</code></p><p>Access is read-only and scoped to your own FibreFlow "
-        "permissions. Revoke it any time from the Cortex page in FibreFlow.</p>"
+        "permissions. Manage or revoke it from <a href=\""
+        + FF_APP_BASE
+        + '/connections/fibreflow">AI Connections in FibreFlow</a>.</p>'
         "</body></html>"
     )
 

@@ -86,6 +86,18 @@ def test_path_metadata_advertises_public_and_confidential_clients(svc):
     ]
 
 
+def test_help_points_to_the_fibreflow_connection_page(svc):
+    from starlette.testclient import TestClient
+
+    server, _ = svc
+    with TestClient(server.mcp.streamable_http_app()) as client:
+        response = client.get("/help")
+
+    assert response.status_code == 200
+    assert "/connections/fibreflow" in response.text
+    assert "Cortex page" not in response.text
+
+
 # ------------------------------------------------------------------- consent redirect
 
 
