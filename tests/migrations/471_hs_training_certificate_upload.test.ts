@@ -37,6 +37,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import type { SqlRow, TxnClient } from '@/lib/db-pool';
+import { transitionTrainingCertificate } from '@/modules/health-safety/services/trainingCertificateLifecycle';
 
 const SCHEMA = 'mig471_scratch';
 const FORWARD = readFileSync(
@@ -125,7 +127,11 @@ const PREREQUISITES = `    CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_r
       verification_notes text,
       created_at timestamptz DEFAULT NOW(),
       updated_at timestamptz DEFAULT NOW(),
-      status varchar(50)
+      status varchar(50),
+      -- Present on the live table and read by lockDocument(); omitting them
+      -- made the scratch schema diverge from production and hid a real query.
+      file_name varchar(255),
+      file_path varchar(255)
     );
     CREATE TABLE hs_training_types (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -341,5 +347,108 @@ describe('migration 471 applied to a scratch schema', () => {
         WHERE permission_key = 'people.staff.training-certificates'`
     );
     expect(roles).toBe('super_admin');
+  }, 60_000);
+});
+
+/**
+ * The lifecycle SQL, executed against a real Postgres.
+ *
+ * The unit tests for this module drive it through a stub TxnClient that records
+ * SQL text and never sends it anywhere, so they cannot see anything Postgres
+ * decides at parse time. They passed while the deployed endpoint returned 500
+ * on every verify: both UPDATEs used $2 as an assignment target AND in a
+ * literal comparison, so Postgres deduced two types for one parameter and
+ * rejected the statement with 42P08 "inconsistent types deduced for parameter
+ * $2". Only a real database can catch that class of bug.
+ */
+describe('the lifecycle transition executes against real Postgres', () => {
+  const SCHEMA_LC = `${SCHEMA}_lifecycle`;
+  const DOC = '55555555-5555-5555-5555-555555555555';
+  const USER = '66666666-6666-6666-6666-666666666666';
+
+  /** A real TxnClient over a pg client pinned to the scratch schema. */
+  async function withTxn<T>(fn: (txn: TxnClient) => Promise<T>): Promise<T> {
+    const client = await pool.connect();
+    try {
+      await client.query(`SET search_path = ${SCHEMA_LC}, public`);
+      await client.query('BEGIN');
+      const txn: TxnClient = {
+        client,
+        async query<R extends SqlRow = SqlRow>(text: string, params: unknown[] = []) {
+          const res = await client.query<R>(text, params);
+          return res.rows;
+        },
+        async queryOne<R extends SqlRow = SqlRow>(text: string, params: unknown[] = []) {
+          const res = await client.query<R>(text, params);
+          return res.rows[0] ?? null;
+        },
+      };
+      const out = await fn(txn);
+      await client.query('COMMIT');
+      return out;
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  beforeAll(async () => {
+    await pool.query(`DROP SCHEMA IF EXISTS ${SCHEMA_LC} CASCADE`);
+    await pool.query(`CREATE SCHEMA ${SCHEMA_LC}`);
+    await inSchema(SCHEMA_LC, PREREQUISITES);
+    await inSchema(SCHEMA_LC, FORWARD);
+    await inSchema(
+      SCHEMA_LC,
+      `INSERT INTO users (id) VALUES ('${USER}');
+       INSERT INTO staff_documents (id, staff_id, document_type, document_name, file_url,
+                                    verification_status, document_number, issuing_authority)
+       VALUES ('${DOC}', '${STAFF}', 'certification', 'cert.pdf', 'x', 'pending', 'LC-001', 'Acme');
+       INSERT INTO hs_worker_training (training_type_id, staff_id, worker_name, completed_date,
+                                       staff_document_id, verification_status)
+       SELECT t.id, '${STAFF}', 'Legacy Worker', DATE '2026-01-01', '${DOC}', 'pending'
+       FROM hs_training_types t WHERE t.code = 'working_at_heights';`
+    );
+  }, 60_000);
+
+  afterAll(async () => {
+    await pool.query(`DROP SCHEMA IF EXISTS ${SCHEMA_LC} CASCADE`);
+  }, 60_000);
+
+  it('verifies without a type-deduction error, and activates the linked rows', async () => {
+    const result = await withTxn((txn) =>
+      transitionTrainingCertificate(txn, DOC, { userId: USER, staffId: null }, { status: 'verified' })
+    );
+    expect(result.status).toBe('verified');
+
+    const rows = await scalarIn<string>(
+      SCHEMA_LC,
+      `SELECT string_agg(verification_status, ',') FROM hs_worker_training WHERE staff_document_id = '${DOC}'`
+    );
+    expect(rows).toBe('verified');
+    const doc = await scalarIn<string>(
+      SCHEMA_LC,
+      `SELECT verification_status FROM staff_documents WHERE id = '${DOC}'`
+    );
+    expect(doc).toBe('verified');
+  }, 60_000);
+
+  it('revokes without a type-deduction error, and records the reason', async () => {
+    const result = await withTxn((txn) =>
+      transitionTrainingCertificate(txn, DOC, { userId: USER, staffId: null }, {
+        status: 'revoked',
+        reason: 'Issued in error',
+      })
+    );
+    expect(result.status).toBe('revoked');
+
+    const revoked = await scalarIn<string>(
+      SCHEMA_LC,
+      `SELECT revocation_reason || '|' || (revoked_at IS NOT NULL)::text || '|' || (verified_at IS NOT NULL)::text
+         FROM hs_worker_training WHERE staff_document_id = '${DOC}'`
+    );
+    // Reason and revoker recorded, and the original verification survived.
+    expect(revoked).toBe('Issued in error|true|true');
   }, 60_000);
 });
