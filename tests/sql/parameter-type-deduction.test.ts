@@ -43,14 +43,43 @@ const VERIFIED_TEXT_COLUMNS: Record<string, string> = {
     'zone_delivery_documents.document_type is text',
 };
 
+/**
+ * This file itself, which carries the vulnerable shape on purpose as a fixture
+ * for its own unit tests. Listed separately from VERIFIED_TEXT_COLUMNS because
+ * the reason is different — it is not a safe column, it is not SQL at all.
+ */
+const SELF = 'tests/sql/parameter-type-deduction.test.ts';
+
 export interface Offence {
   param: string;
   snippet: string;
 }
 
-/** SQL template literals containing an UPDATE. */
+/**
+ * Statement-shaped windows anchored on each UPDATE keyword.
+ *
+ * Deliberately NOT "pair backticks across the file". That approach desyncs on
+ * any odd backtick appearing earlier in the source — a stray one in a comment,
+ * or a regex literal containing them (this very file has one) — after which
+ * every later block is mispaired and the scan can silently find NOTHING. A
+ * guard that quietly stops looking is worse than no guard, because the green
+ * run reads as proof. Anchoring on UPDATE cannot desync: each window is found
+ * independently of every other.
+ *
+ * The window runs to the statement's natural end — a closing backtick, a
+ * semicolon, or a hard cap for safety — which is ample for a SET list.
+ */
 function sqlBlocks(source: string): string[] {
-  return (source.match(/`[^`]*`/gs) ?? []).filter((b) => /\bUPDATE\b/i.test(b) && /\$\d/.test(b));
+  const blocks: string[] = [];
+  const anchor = /\bUPDATE\s+[a-z_][a-z0-9_]*/gi;
+  let m: RegExpExecArray | null;
+  while ((m = anchor.exec(source)) !== null) {
+    const rest = source.slice(m.index, m.index + 4000);
+    const end = rest.search(/`|;\s*$|\n\s*`/m);
+    const window = end > 0 ? rest.slice(0, end) : rest;
+    if (/\$\d/.test(window)) blocks.push(window);
+  }
+  return blocks;
 }
 
 /**
@@ -110,6 +139,36 @@ describe('the detector recognises the shape', () => {
   it('ignores a placeholder that is bound but never compared to a literal', () => {
     expect(findOffences('const q = `UPDATE t SET a = $1, b = $2 WHERE id = $3`;')).toEqual([]);
   });
+
+  it('is not blinded by a stray backtick earlier in the file', () => {
+    // The failure mode of the first version of this detector, found in review:
+    // it paired backticks left-to-right across the whole file, so ONE unmatched
+    // backtick in a comment desynced everything after it and the scan silently
+    // returned zero blocks — a green run over a file containing a live bug.
+    const withStrayBacktick = [
+      '// Note: strip a leading ` before comparing',
+      'const q = `UPDATE offline_devices',
+      '  SET mismatch_status = $1,',
+      "      mismatch_resolved_at = CASE WHEN $1 IN ('resolved') THEN NOW() ELSE NULL END",
+      '  WHERE id = $4`;',
+    ].join('\n');
+
+    const found = findOffences(withStrayBacktick);
+    expect(found).toHaveLength(1);
+    expect(found[0].param).toBe('$1');
+  });
+
+  it('finds every statement in a file that has several', () => {
+    // serial-swaps carries the same statement twice; missing the second copy
+    // would have left half the bug in place.
+    const twice = [
+      'const a = `UPDATE t1 SET s = $1',
+      "  , at = CASE WHEN $1 IN ('x') THEN NOW() END WHERE id = $2`;",
+      'const b = `UPDATE t2 SET s = $1',
+      "  , at = CASE WHEN $1 IN ('y') THEN NOW() END WHERE id = $2`;",
+    ].join('\n');
+    expect(findOffences(twice)).toHaveLength(2);
+  });
 });
 
 describe('no new 42P08-shaped statement enters the repo', () => {
@@ -117,6 +176,7 @@ describe('no new 42P08-shaped statement enters the repo', () => {
     const unexpected: string[] = [];
 
     for (const file of trackedFilesWithUpdates()) {
+      if (file === SELF) continue;
       const found = findOffences(readFileSync(file, 'utf8'));
       if (found.length === 0) continue;
       if (VERIFIED_TEXT_COLUMNS[file]) continue;
