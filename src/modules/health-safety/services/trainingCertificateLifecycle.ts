@@ -142,17 +142,23 @@ export async function transitionTrainingCertificate(
   }
 
   // One statement for every linked row, so they cannot diverge.
+  //
+  // Every use of $2 is cast to text. Without the casts Postgres deduces the
+  // parameter's type twice — varchar from `verification_status = $2`, text from
+  // `$2 = 'verified'` — and rejects the whole statement with 42P08
+  // "inconsistent types deduced for parameter $2". It fails at execution, not
+  // at compile time, and a stubbed TxnClient never sees it.
   await txn.query(
     `UPDATE hs_worker_training
-        SET verification_status = $2,
-            verified_by = CASE WHEN $2 = 'verified' THEN $3::uuid ELSE verified_by END,
-            verified_at = CASE WHEN $2 = 'verified' THEN NOW() ELSE verified_at END,
-            rejection_reason = CASE WHEN $2 = 'rejected' THEN $4 ELSE rejection_reason END,
-            revoked_by = CASE WHEN $2 = 'revoked' THEN $3::uuid ELSE revoked_by END,
-            revoked_at = CASE WHEN $2 = 'revoked' THEN NOW() ELSE revoked_at END,
-            revocation_reason = CASE WHEN $2 = 'revoked' THEN $4 ELSE revocation_reason END,
+        SET verification_status = $2::text,
+            verified_by = CASE WHEN $2::text = 'verified' THEN $3::uuid ELSE verified_by END,
+            verified_at = CASE WHEN $2::text = 'verified' THEN NOW() ELSE verified_at END,
+            rejection_reason = CASE WHEN $2::text = 'rejected' THEN $4::text ELSE rejection_reason END,
+            revoked_by = CASE WHEN $2::text = 'revoked' THEN $3::uuid ELSE revoked_by END,
+            revoked_at = CASE WHEN $2::text = 'revoked' THEN NOW() ELSE revoked_at END,
+            revocation_reason = CASE WHEN $2::text = 'revoked' THEN $4::text ELSE revocation_reason END,
             updated_at = NOW()
-      WHERE staff_document_id = $1`,
+      WHERE staff_document_id = $1::uuid`,
     [documentId, transition.status, actor.userId, reason]
   );
 
@@ -161,13 +167,13 @@ export async function transitionTrainingCertificate(
   // the authenticated user id.
   await txn.query(
     `UPDATE staff_documents
-        SET verification_status = $2,
-            status = $2,
-            verified_by = CASE WHEN $2 = 'verified' THEN $3::uuid ELSE verified_by END,
-            verified_at = CASE WHEN $2 = 'verified' THEN NOW() ELSE verified_at END,
-            verification_notes = COALESCE($4, verification_notes),
+        SET verification_status = $2::text,
+            status = $2::text,
+            verified_by = CASE WHEN $2::text = 'verified' THEN $3::uuid ELSE verified_by END,
+            verified_at = CASE WHEN $2::text = 'verified' THEN NOW() ELSE verified_at END,
+            verification_notes = COALESCE($4::text, verification_notes),
             updated_at = NOW()
-      WHERE id = $1`,
+      WHERE id = $1::uuid`,
     [documentId, transition.status, actor.staffId, reason]
   );
 

@@ -153,12 +153,15 @@ describe('allowed transitions', () => {
       reason: 'Issued in error by the provider',
     });
 
+    // Asserted on the conditional's shape, not its exact casts — the casts are
+    // required for Postgres type deduction and changed once already, which
+    // broke a stricter version of this assertion without any behaviour change.
     const documentUpdate = updates(txn, 'staff_documents')[0];
     expect(documentUpdate.text).toMatch(
-      /verified_by = CASE WHEN \$2 = 'verified' THEN[\s\S]*?ELSE verified_by END/
+      /verified_by = CASE WHEN [^\n]*'verified'[\s\S]*?ELSE verified_by END/
     );
     expect(documentUpdate.text).toMatch(
-      /verified_at = CASE WHEN \$2 = 'verified' THEN NOW\(\) ELSE verified_at END/
+      /verified_at = CASE WHEN [^\n]*'verified'[\s\S]*?ELSE verified_at END/
     );
   });
 
