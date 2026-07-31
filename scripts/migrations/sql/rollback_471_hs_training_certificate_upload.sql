@@ -18,6 +18,14 @@
 -- ⚠️ Dropping hs_worker_training.verification_status discards every pending and
 -- rejected decision. Surviving rows become indistinguishable from the manually
 -- entered legacy records that the forward migration backfilled to 'verified'.
+--
+-- ⚠️ WORSE, ON A ROUND TRIP: rolling back and then re-applying 471 does not just
+-- lose those decisions, it SILENTLY APPROVES them. The column is dropped, so on
+-- re-apply every surviving row looks pre-existing and the one-time backfill
+-- stamps it 'verified' — unchecked evidence promoted to satisfy a statutory
+-- gate, with its staff_document_id link already severed. Before re-applying
+-- after a rollback, re-verify or delete any submission that was pending or
+-- rejected at the time of the rollback.
 
 BEGIN;
 
@@ -78,9 +86,19 @@ $$ LANGUAGE plpgsql;
 -- ---------------------------------------------------------------------------
 -- 5. Remove the dedicated permission
 -- ---------------------------------------------------------------------------
--- role_permissions and user_permission_overrides both cascade from
--- access_permissions(key), but the grant is deleted explicitly so a rollback
--- against a database without that cascade still leaves nothing behind.
+-- NOTHING cascades from access_permissions: no foreign key in the database
+-- references it (verified read-only, 2026-07-31). Every dependent row must be
+-- deleted by hand, in dependency order.
+--
+-- The user overrides matter most. Named custodians are granted through exactly
+-- those rows, and an orphan left behind does not merely linger — it gets
+-- STRONGER. The RBAC service builds its ancestor chain from access_permissions,
+-- so once that row is gone the people / people.staff fail-closed ancestor check
+-- has nothing to walk and is skipped, while the override is still read ahead of
+-- the role table. rollback_470 deletes these for the same reason.
+DELETE FROM user_permission_overrides
+WHERE permission_key = 'people.staff.training-certificates';
+
 DELETE FROM role_permissions
 WHERE permission_key = 'people.staff.training-certificates';
 

@@ -127,6 +127,16 @@ describe('471 forward migration', () => {
     );
   });
 
+  it('scopes the backfill guard to its own table', () => {
+    // conname is unique per (table, name), not globally. Matching on the name
+    // alone lets an unrelated table carrying the same constraint name skip both
+    // the backfill AND the CHECK creation — the column is then unconstrained
+    // and every legacy record stays 'pending', silently counting for nothing.
+    expect(forward).toMatch(
+      /conname = 'hs_worker_training_verification_status_chk'[\s\S]*?AND conrelid = 'hs_worker_training'::regclass/
+    );
+  });
+
   it('is not self-wrapped in a transaction', () => {
     expect(forward).not.toMatch(/^\s*BEGIN;\s*$/m);
     expect(forward).not.toMatch(/^\s*COMMIT;\s*$/m);
@@ -186,6 +196,31 @@ describe('471 rollback', () => {
     expect(rollback).toMatch(
       /DELETE FROM hs_training_types[\s\S]*?NOT EXISTS \(\s*SELECT 1 FROM hs_worker_training/
     );
+  });
+
+  it('removes the permission grants that nothing cascades for', () => {
+    // No foreign key references access_permissions, so role_permissions and
+    // user_permission_overrides are NOT cleaned up automatically. An orphaned
+    // override does not merely linger: with its access_permissions row gone the
+    // RBAC ancestor chain has nothing to walk, so the fail-closed people /
+    // people.staff check is skipped while the override still outranks the role
+    // table. rollback_470 deletes them for the same reason.
+    expect(rollback).toMatch(
+      /DELETE FROM user_permission_overrides\s*\n\s*WHERE permission_key = 'people\.staff\.training-certificates'/
+    );
+    expect(rollback).toMatch(
+      /DELETE FROM role_permissions\s*\n\s*WHERE permission_key = 'people\.staff\.training-certificates'/
+    );
+    // Order matters: dependents before the row they hang off.
+    expect(rollback.indexOf('DELETE FROM user_permission_overrides')).toBeLessThan(
+      rollback.indexOf('DELETE FROM access_permissions')
+    );
+  });
+
+  it('warns that a round trip approves what it forgot', () => {
+    // Re-applying after a rollback re-runs the one-time backfill against rows
+    // whose decisions were dropped, promoting unchecked evidence to 'verified'.
+    expect(rollback).toMatch(/ROUND TRIP[\s\S]*?SILENTLY APPROVES/);
   });
 
   it('clears its own tracker row', () => {

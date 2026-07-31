@@ -204,6 +204,33 @@ they counted for nothing and nobody would ever be asked to approve them. Types
 that need a certificate are signposted to the upload flow, and the free-text
 certificate URL field is gone: a link anyone could type is not evidence.
 
+### Deploying 471 — the expand/contract window
+
+Dev and production share one database, so applying 471 through a dev deploy
+changes production's database while production is still running the old code.
+That old code inserts `hs_worker_training` rows without `verification_status`,
+which means they take the new default `'pending'` and quietly stop counting —
+and re-running the migration will not repair them, because the one-time backfill
+guard is closed for good after the first apply.
+
+Deploy production in the same session where possible. Otherwise repair after the
+production deploy, bounded to rows with no linked certificate created after the
+migration landed:
+
+```sql
+UPDATE hs_worker_training
+   SET verification_status = 'verified'
+ WHERE staff_document_id IS NULL
+   AND verification_status = 'pending'
+   AND created_at >= '<when 471 was applied>';
+```
+
+Rolling 471 back has a sharper edge than usual: re-applying afterwards does not
+merely lose the pending/rejected decisions it dropped, it **stamps them
+`verified`**, because the column is gone and every surviving row looks
+pre-existing to the backfill. Re-verify or delete anything that was unresolved
+before re-applying.
+
 ### Out of scope in v1
 
 Employee self-submission, contractor-worker certificate capture (the live

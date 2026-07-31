@@ -26,6 +26,24 @@
 --     it cannot trample a rejection or a revocation.
 --   * hs_worker_training held 0 rows, so the section 2 backfill is a no-op
 --     here; it exists for any environment that already has manual records.
+--
+-- ⚠️ EXPAND/CONTRACT WINDOW. Dev and production share this database, and the
+-- dev deploy applies this migration while production may still be running the
+-- previous code. That old code inserts hs_worker_training rows without
+-- verification_status, so they take the new column default 'pending' and stop
+-- counting towards competency — silently, because the manual-entry path that
+-- created them is the same one that now writes 'verified' directly. Re-running
+-- this migration does NOT repair them: the section 2 guard is closed for good.
+--
+-- Close the window by deploying production in the same session. If that is not
+-- possible, repair afterwards with a timestamp-bounded statement — only rows
+-- with no linked certificate, created after this migration was applied:
+--
+--   UPDATE hs_worker_training
+--      SET verification_status = 'verified'
+--    WHERE staff_document_id IS NULL
+--      AND verification_status = 'pending'
+--      AND created_at >= '<timestamp this migration was applied>';
 
 -- ---------------------------------------------------------------------------
 -- 1. Link + lifecycle columns on the per-worker training record
@@ -59,6 +77,11 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'hs_worker_training_verification_status_chk'
+      -- Scoped to the table: conname is unique per (table, name), not globally.
+      -- Matching on the name alone lets an unrelated table carrying the same
+      -- constraint name skip BOTH the backfill and the CHECK creation, leaving
+      -- the column unconstrained and every legacy record stranded 'pending'.
+      AND conrelid = 'hs_worker_training'::regclass
   ) THEN
     UPDATE hs_worker_training
       SET verification_status = 'verified';

@@ -57,6 +57,28 @@ const PENDING_ROW = '44444444-4444-4444-4444-444444444444';
 const STAFF = '11111111-1111-1111-1111-111111111111';
 const DOCUMENT = '33333333-3333-3333-3333-333333333333';
 
+/** Run inside a named scratch schema, never public. */
+async function inSchema(schema: string, sql: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`SET search_path = ${schema}, public`);
+    await client.query(sql);
+  } finally {
+    client.release();
+  }
+}
+
+async function scalarIn<T>(schema: string, sql: string): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query(`SET search_path = ${schema}, public`);
+    const res = await client.query(sql);
+    return Object.values(res.rows[0])[0] as T;
+  } finally {
+    client.release();
+  }
+}
+
 /** Run inside the scratch schema, never public. */
 async function scoped(sql: string): Promise<void> {
   const client = await pool.connect();
@@ -79,15 +101,10 @@ async function scalar<T>(sql: string): Promise<T> {
   }
 }
 
-beforeAll(async () => {
-  await pool.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
-  await pool.query(`CREATE SCHEMA ${SCHEMA}`);
-
-  // Minimal prerequisites, shaped like the live tables. staff_documents
-  // deliberately carries NO check constraints, matching the live database —
-  // that is what makes 471's constraint an ADD rather than a widen.
-  await scoped(`
-    CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+/** Minimal prerequisites, shaped like the live tables. staff_documents
+ *  deliberately carries NO check constraints, matching the live database —
+ *  that is what makes 471's constraint an ADD rather than a widen. */
+const PREREQUISITES = `    CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
     CREATE TABLE staff (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name varchar(255));
     CREATE TABLE team_members (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
     CREATE TABLE contractors (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
@@ -177,7 +194,16 @@ beforeAll(async () => {
     INSERT INTO hs_worker_training (id, training_type_id, staff_id, worker_name, completed_date)
       SELECT '${LEGACY_ROW}', t.id, '${STAFF}', 'Legacy Worker', DATE '2025-01-15'
       FROM hs_training_types t WHERE t.code = 'working_at_heights';
-  `);
+  `;
+
+beforeAll(async () => {
+  await pool.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
+  await pool.query(`CREATE SCHEMA ${SCHEMA}`);
+
+  // Minimal prerequisites, shaped like the live tables. staff_documents
+  // deliberately carries NO check constraints, matching the live database —
+  // that is what makes 471's constraint an ADD rather than a widen.
+  await scoped(PREREQUISITES);
 }, 60_000);
 
 afterAll(async () => {
@@ -222,6 +248,50 @@ describe('migration 471 applied to a scratch schema', () => {
       `SELECT verification_status FROM hs_worker_training WHERE id = '${PENDING_ROW}'`
     );
     expect(status).toBe('pending');
+  }, 60_000);
+
+  it('is not fooled by the same constraint name on an unrelated table', async () => {
+    // pg_constraint.conname is unique per (table, name), not globally. A guard
+    // matching on the name alone sees the decoy below, concludes the migration
+    // already ran, and skips BOTH the backfill and the CHECK creation — leaving
+    // the column unconstrained and every legacy record stranded 'pending'.
+    //
+    // This needs its own schema: the decoy has to exist BEFORE the migration is
+    // applied, which is not true of the shared schema by this point.
+    const decoySchema = `${SCHEMA}_decoy`;
+    await pool.query(`DROP SCHEMA IF EXISTS ${decoySchema} CASCADE`);
+    await pool.query(`CREATE SCHEMA ${decoySchema}`);
+    try {
+      await inSchema(decoySchema, PREREQUISITES);
+      await inSchema(
+        decoySchema,
+        `CREATE TABLE decoy (
+           verification_status text,
+           CONSTRAINT hs_worker_training_verification_status_chk
+             CHECK (verification_status IS NOT NULL)
+         );`
+      );
+
+      await inSchema(decoySchema, FORWARD);
+
+      // Both would be wrong if the guard matched the decoy: the constraint
+      // would be absent, and the legacy row would still be 'pending'.
+      const onRealTable = await scalarIn<number>(
+        decoySchema,
+        `SELECT COUNT(*)::int FROM pg_constraint
+          WHERE conname = 'hs_worker_training_verification_status_chk'
+            AND conrelid = '${decoySchema}.hs_worker_training'::regclass`
+      );
+      expect(onRealTable).toBe(1);
+
+      const backfilled = await scalarIn<string>(
+        decoySchema,
+        `SELECT verification_status FROM hs_worker_training WHERE id = '${LEGACY_ROW}'`
+      );
+      expect(backfilled).toBe('verified');
+    } finally {
+      await pool.query(`DROP SCHEMA IF EXISTS ${decoySchema} CASCADE`);
+    }
   }, 60_000);
 
   it('gives the lifecycle constraint teeth', async () => {
