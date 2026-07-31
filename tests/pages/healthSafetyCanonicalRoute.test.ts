@@ -61,6 +61,16 @@ describe('health & safety canonical route', () => {
     expect(destinations(join(LEGACY, 'index.tsx'))).toEqual([]);
   });
 
+  it('does not let the Projects breadcrumb capture the legacy H&S path', () => {
+    // /projects/health-safety renders the dashboard rather than redirecting, so
+    // AppLayout's breadcrumb chain DOES run for it. The `projects` branch sits
+    // above the `health-safety` branch, and without a guard it would caption the
+    // H&S dashboard "Projects".
+    const src = readFileSync(join(process.cwd(), 'src/components/layout/AppLayout.tsx'), 'utf8');
+    const projectsBranch = src.match(/if \(path\.includes\('projects'\)[^)]*\)/);
+    expect(projectsBranch?.[0]).toContain("!path.includes('health-safety')");
+  });
+
   it('carries the id through the legacy CAPA detail redirect', () => {
     const src = readFileSync(join(LEGACY, 'capa/[id].tsx'), 'utf8');
     // A bare `/health-safety/capa` would silently drop which CAPA was asked for.

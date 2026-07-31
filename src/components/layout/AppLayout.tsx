@@ -97,8 +97,12 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
-    // Project Management
-    if (path.includes('projects')) {
+    // Project Management.
+    // `/projects/health-safety` still SERVES the H&S dashboard (it cannot
+    // redirect — see that page's header for the cached-308 reason), so it must
+    // not be captured here and labelled "Projects". It falls through to the
+    // health-safety branch below.
+    if (path.includes('projects') && !path.includes('health-safety')) {
       if (segments.includes('create')) {
         return {
           title: 'Create Project',
