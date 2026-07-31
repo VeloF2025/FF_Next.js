@@ -51,8 +51,8 @@ case "$MODE" in
     # at the repo root, so running this from a subdirectory scans everything
     # rather than silently narrowing to the subtree. `-I` skips binaries.
     ADDED=$(git grep -nI '' -- ':/' \
-              ':(exclude)scripts/secret-scan.sh' ':(exclude)*.lock' \
-              ':(exclude)*lock.json' ':(exclude)node_modules/**' 2>/dev/null \
+              ':(exclude):/scripts/secret-scan.sh' ':(exclude):/*.lock' \
+              ':(exclude):/*lock.json' ':(exclude):/node_modules/**' 2>/dev/null \
             | sed 's/^/+/' || true)
     ;;
   --branch)
@@ -127,13 +127,22 @@ if [ -n "$ADDED" ]; then
   # `parent_key = parent.key` across the tree.
   # `$` is rejected only as the FIRST character (a variable reference); a `$`
   # inside the value is legitimate in a real password like "P@ss$w0rd123".
-  add_hits "[A-Za-z0-9_]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|(API|SECRET|PRIVATE|SIGNING|ENCRYPTION|MASTER|ACCESS|AUTH|CLIENT)[_-]?KEY)\b['\"]?[[:space:]]*=[[:space:]]*['\"][^'\"[:space:]\$][^'\"[:space:]]{5,}" "hardcoded password/secret literal"
+  # The prefix class includes `.` so a match starts at `process.env.DB_PASSWORD`
+  # rather than at `DB_PASSWORD`. Without it the match-scoped placeholder can no
+  # longer see the `process\.env` term, and all 47 existing
+  # `process.env.<CRED> = '<value>'` test fixtures across 18 files would block
+  # pre-commit on unrelated PRs.
+  add_hits "[A-Za-z0-9_.]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|(API|SECRET|PRIVATE|SIGNING|ENCRYPTION|MASTER|ACCESS|AUTH|CLIENT)[_-]?KEY)\b['\"]?[[:space:]]*=[[:space:]]*['\"][^'\"[:space:]\$][^'\"[:space:]]{5,}" "hardcoded password/secret literal"
   # Unquoted shell/.env assignment, e.g. an `export FOO_TOKEN=<value>` line.
   # Deliberately narrow -- an UPPERCASE name and NO whitespace around `=`. That
   # is the .env/export idiom, and it excludes ordinary code assignments like
   # `const token = parse(...)` or `this.password = config.password`, which a
   # general unquoted rule swept up by the hundreds.
-  add_hits "(^|[+:[:space:]])[A-Z0-9_]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|(API|SECRET|PRIVATE|SIGNING|ENCRYPTION|MASTER|ACCESS|AUTH|CLIENT)[_-]?KEY)=[^'\"[:space:]\$][^'\"[:space:]]{5,}" "hardcoded secret in env-style assignment" cs
+  # 12-char minimum (vs 6 when quoted): an unquoted ALL_CAPS assignment is also
+  # how prose refers to a flag, so a short English word like
+  # `CORTEX_FORWARD_TOKEN=enabled` inside a test title tripped it. Real unquoted
+  # env secrets are long; the quoted rule still catches short ones.
+  add_hits "(^|[+:[:space:]])[A-Z0-9_]*(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|(API|SECRET|PRIVATE|SIGNING|ENCRYPTION|MASTER|ACCESS|AUTH|CLIENT)[_-]?KEY)=[^'\"[:space:]\$][^'\"[:space:]]{11,}" "hardcoded secret in env-style assignment" cs
   # AWS access key id
   add_hits "AKIA[0-9A-Z]{16}" "AWS access key id"
   # Private key block (placeholder lines already excluded above)
