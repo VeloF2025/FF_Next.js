@@ -57,11 +57,7 @@ async function readContextPayload(upstream: Response): Promise<unknown> {
     reader.releaseLock();
   }
 
-  try {
-    return JSON.parse(body) as unknown;
-  } catch {
-    return null;
-  }
+  return JSON.parse(body) as unknown;
 }
 
 export interface CortexConsentContextDependencies {
