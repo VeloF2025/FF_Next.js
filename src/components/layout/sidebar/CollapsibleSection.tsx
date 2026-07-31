@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { SidebarStyles } from './types';
 import type { ThemeConfig } from '@/types/theme.types';
+import { canonicalizePath } from '@/modules/navigation/legacyPaths';
 
 interface CollapsibleSectionProps {
   sectionTitle: string;
@@ -47,7 +48,11 @@ export function CollapsibleSection({
   const showContent = isCollapsed || isExpanded || !isCollapsible;
 
   // Check if this linked section is active
-  const isLinkActive = sectionLink && pathname?.startsWith(sectionLink);
+  // Canonicalise first: a legacy alias (e.g. /projects/health-safety) renders
+  // the canonical page, so the raw pathname never matches sectionLink and the
+  // section header stays unhighlighted. See modules/navigation/legacyPaths.
+  const navPath = pathname ? canonicalizePath(pathname) : null;
+  const isLinkActive = sectionLink && navPath?.startsWith(sectionLink);
 
   // If sectionLink is provided, render as a direct navigation link (no children/dropdown)
   if (sectionLink) {

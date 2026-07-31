@@ -4,6 +4,7 @@
  */
 
 import type { ModuleId, ModuleNavigationConfig, TabConfig } from '../types';
+import { canonicalizePath } from '../legacyPaths';
 
 /** Module configuration registry */
 const moduleRegistry = new Map<ModuleId, ModuleNavigationConfig>();
@@ -34,7 +35,10 @@ export function getAllModuleConfigs(): ModuleNavigationConfig[] {
  */
 export function getModuleConfigByPath(path: string): ModuleNavigationConfig | undefined {
   // Normalize path - remove trailing slash, query params
-  const normalizedPath = path.split('?')[0]?.replace(/\/$/, '') || '/';
+  // Resolve legacy aliases first: /projects/health-safety RENDERS the H&S
+  // dashboard (it cannot redirect — see that page), so without this it matches
+  // the Projects module by basePath prefix and nothing H&S ever activates.
+  const normalizedPath = canonicalizePath(path.split('?')[0] || '/').replace(/\/$/, '') || '/';
 
   for (const config of moduleRegistry.values()) {
     // Check base path
@@ -61,7 +65,10 @@ export function getActiveTabByPath(
   config: ModuleNavigationConfig,
   path: string
 ): TabConfig | undefined {
-  const normalizedPath = path.split('?')[0]?.replace(/\/$/, '') || '/';
+  // Resolve legacy aliases first: /projects/health-safety RENDERS the H&S
+  // dashboard (it cannot redirect — see that page), so without this it matches
+  // the Projects module by basePath prefix and nothing H&S ever activates.
+  const normalizedPath = canonicalizePath(path.split('?')[0] || '/').replace(/\/$/, '') || '/';
 
   // Check exact matches first
   for (const tab of config.tabs) {
