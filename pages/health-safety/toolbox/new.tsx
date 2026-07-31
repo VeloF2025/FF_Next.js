@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save } from 'lucide-react';
 import { TOOLBOX_TALK_TYPES } from '@/modules/health-safety/types/toolbox.types';
 
@@ -122,7 +122,7 @@ function NewTalkContent() {
 const NewTalkPage: NextPage = () => (
   <AppLayout>
     <Head><title>Log Toolbox Talk | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><NewTalkContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><NewTalkContent /></ModulePage>
   </AppLayout>
 );
 

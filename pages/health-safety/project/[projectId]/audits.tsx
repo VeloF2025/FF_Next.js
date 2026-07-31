@@ -10,7 +10,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { AlertTriangle, ChevronLeft, ClipboardList, User, Calendar } from 'lucide-react';
 import { AUDIT_STATUS_CONFIG } from '@/modules/health-safety/types/audit.types';
 import type { AuditType, AuditStatus, RAGStatus } from '@/modules/health-safety/types/audit.types';
@@ -182,7 +182,7 @@ const ProjectAuditsPage: NextPage = () => (
     <Head>
       <title>H&S Audits | FibreFlow</title>
     </Head>
-    <ModulePage config={projectsConfig}>
+    <ModulePage config={healthSafetyConfig}>
       <ProjectAuditsContent />
     </ModulePage>
   </AppLayout>

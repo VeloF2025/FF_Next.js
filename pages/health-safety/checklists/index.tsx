@@ -10,7 +10,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import {
   ClipboardCheck,
   Plus,
@@ -72,7 +72,7 @@ function ChecklistsContent() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
-            href="/projects/health-safety"
+            href="/health-safety"
             className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
           >
             <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
@@ -187,7 +187,7 @@ const ChecklistsPage: NextPage = () => {
       <Head>
         <title>H&S Checklists | FibreFlow</title>
       </Head>
-      <ModulePage config={projectsConfig}>
+      <ModulePage config={healthSafetyConfig}>
         <ChecklistsContent />
       </ModulePage>
     </AppLayout>

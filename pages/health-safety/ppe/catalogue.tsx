@@ -10,7 +10,7 @@ import Link from 'next/link';
 import useSWR, { mutate } from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Plus } from 'lucide-react';
 import { PPE_CATEGORIES } from '@/modules/health-safety/types/ppe.types';
 
@@ -118,7 +118,7 @@ function CatalogueContent() {
 const CataloguePage: NextPage = () => (
   <AppLayout>
     <Head><title>PPE Catalogue | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><CatalogueContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><CatalogueContent /></ModulePage>
   </AppLayout>
 );
 

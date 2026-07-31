@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR, { mutate } from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import { PermitStatusBadge } from '@/modules/health-safety/components/permits/PermitStatusBadge';
 import { PERMIT_STATUS_TRANSITIONS, PERMIT_STATUS_CONFIG, type PermitStatus, type PermitPrecondition } from '@/modules/health-safety/types/permit.types';
@@ -128,7 +128,7 @@ const PermitDetailPage: NextPage = () => {
   return (
     <AppLayout>
       <Head><title>Permit | FibreFlow</title></Head>
-      <ModulePage config={projectsConfig}>{typeof permitId === 'string' ? <Detail id={permitId} /> : null}</ModulePage>
+      <ModulePage config={healthSafetyConfig}>{typeof permitId === 'string' ? <Detail id={permitId} /> : null}</ModulePage>
     </AppLayout>
   );
 };

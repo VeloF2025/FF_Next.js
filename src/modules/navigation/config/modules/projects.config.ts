@@ -7,7 +7,6 @@
  * - Projects: All/Active/Completed/New
  * - Pipeline: Overview/Authorities/Alerts
  * - Execution: Daily Progress/Tasks/Reports
- * - H&S: Dashboard/Incidents/Checklists
  * - Reports: Analytics
  */
 
@@ -16,7 +15,6 @@ import {
   LayoutDashboard,
   GitBranch,
   BarChart3,
-  Shield,
   ListFilter,
   Play,
   CheckCheck,
@@ -25,17 +23,6 @@ import {
   AlertTriangle,
   ListTodo,
   FileText,
-  AlertCircle,
-  ClipboardCheck,
-  GraduationCap,
-  HeartPulse,
-  BookOpen,
-  ShieldCheck,
-  Megaphone,
-  HardHat,
-  FileCheck,
-  FileSignature,
-  TrendingUp,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -139,100 +126,6 @@ export const projectsConfig: ModuleNavigationConfig = {
           label: 'Progress Reports',
           icon: FileText,
           path: '/projects/progress',
-        },
-      ],
-    },
-    {
-      id: 'health-safety',
-      label: 'Health & Safety',
-      shortLabel: 'H&S',
-      icon: Shield,
-      path: '/projects/health-safety',
-      rbacKey: 'projects.health-safety',
-      subTabs: [
-        {
-          id: 'hs-dashboard',
-          label: 'Dashboard',
-          icon: Shield,
-          path: '/projects/health-safety',
-        },
-        {
-          id: 'incidents',
-          label: 'Incidents',
-          icon: AlertCircle,
-          path: '/projects/health-safety/incidents',
-        },
-        {
-          id: 'checklists',
-          label: 'Checklists',
-          icon: ClipboardCheck,
-          path: '/projects/health-safety/checklists',
-        },
-        {
-          id: 'training',
-          label: 'Training',
-          icon: GraduationCap,
-          path: '/projects/health-safety/training',
-        },
-        {
-          id: 'checkins',
-          label: 'Daily Check-In',
-          icon: ShieldCheck,
-          path: '/projects/health-safety/checkins',
-        },
-        {
-          id: 'medicals',
-          label: 'Medical Fitness',
-          icon: HeartPulse,
-          path: '/projects/health-safety/medicals',
-        },
-        {
-          id: 'toolbox',
-          label: 'Toolbox Talks',
-          icon: Megaphone,
-          path: '/projects/health-safety/toolbox',
-        },
-        {
-          id: 'ppe',
-          label: 'PPE Register',
-          icon: HardHat,
-          path: '/projects/health-safety/ppe',
-        },
-        {
-          id: 'permits',
-          label: 'Permits',
-          icon: FileCheck,
-          path: '/projects/health-safety/permits',
-        },
-        {
-          id: 'appointments',
-          label: 'Appointments',
-          icon: FileSignature,
-          path: '/projects/health-safety/appointments',
-        },
-        {
-          id: 'analytics',
-          label: 'Injury Rates',
-          icon: TrendingUp,
-          path: '/projects/health-safety/analytics',
-        },
-        {
-          id: 'capa',
-          label: 'Corrective Actions',
-          icon: AlertCircle,
-          path: '/projects/health-safety/capa',
-        },
-        {
-          id: 'risks',
-          label: 'Risk Register',
-          icon: AlertTriangle,
-          path: '/projects/health-safety/risks',
-        },
-        {
-          id: 'safety-library',
-          label: 'Safety Library',
-          icon: BookOpen,
-          path: '/projects/health-safety/safety-library',
         },
       ],
     },

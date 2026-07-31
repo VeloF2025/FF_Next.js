@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR, { mutate } from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Trash2, CheckCircle2 } from 'lucide-react';
 import { SignaturePad } from '@/modules/health-safety/components/appointments/SignaturePad';
 import { letterTypeDef } from '@/modules/health-safety/types/appointment.types';
@@ -103,7 +103,7 @@ const LetterDetailPage: NextPage = () => {
   return (
     <AppLayout>
       <Head><title>Appointment Letter | FibreFlow</title></Head>
-      <ModulePage config={projectsConfig}>{typeof letterId === 'string' ? <Detail id={letterId} /> : null}</ModulePage>
+      <ModulePage config={healthSafetyConfig}>{typeof letterId === 'string' ? <Detail id={letterId} /> : null}</ModulePage>
     </AppLayout>
   );
 };

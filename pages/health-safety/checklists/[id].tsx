@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { AlertTriangle, ChevronLeft, Save } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { CHECKLIST_CATEGORIES } from '@/modules/health-safety/types/checklist.types';
@@ -220,7 +220,7 @@ const ChecklistEditorPage: NextPage = () => (
     <Head>
       <title>Edit Checklist Template | H&S | FibreFlow</title>
     </Head>
-    <ModulePage config={projectsConfig}>
+    <ModulePage config={healthSafetyConfig}>
       <ChecklistEditorContent />
     </ModulePage>
   </AppLayout>

@@ -10,7 +10,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { FileCheck, Plus, ChevronLeft, Calendar } from 'lucide-react';
 import { PermitStatusBadge } from '@/modules/health-safety/components/permits/PermitStatusBadge';
 import type { PermitStatus } from '@/modules/health-safety/types/permit.types';
@@ -32,7 +32,7 @@ function PermitsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
-          <Link href="/projects/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors">
+          <Link href="/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors">
             <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
           </Link>
           <div>
@@ -99,7 +99,7 @@ function PermitsContent() {
 const PermitsPage: NextPage = () => (
   <AppLayout>
     <Head><title>Permits to Work | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><PermitsContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><PermitsContent /></ModulePage>
   </AppLayout>
 );
 

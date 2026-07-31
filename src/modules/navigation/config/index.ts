@@ -11,6 +11,7 @@ import { procurementConfig } from './modules/procurement.config';
 import { activateConfig } from './modules/activate.config';
 import { staffConfig } from './modules/staff.config';
 import { projectsConfig } from './modules/projects.config';
+import { healthSafetyConfig } from './modules/health-safety.config';
 import { constructionQaConfig } from './modules/construction-qa.config';
 import { analyticsConfig } from './modules/analytics.config';
 
@@ -22,6 +23,7 @@ registerModuleConfig(procurementConfig);
 registerModuleConfig(activateConfig);
 registerModuleConfig(staffConfig);
 registerModuleConfig(projectsConfig);
+registerModuleConfig(healthSafetyConfig);
 registerModuleConfig(constructionQaConfig);
 registerModuleConfig(analyticsConfig);
 
@@ -42,5 +44,6 @@ export { procurementConfig };
 export { activateConfig };
 export { staffConfig };
 export { projectsConfig };
+export { healthSafetyConfig };
 export { constructionQaConfig };
 export { analyticsConfig } from './modules/analytics.config';

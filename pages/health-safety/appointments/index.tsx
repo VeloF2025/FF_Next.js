@@ -9,7 +9,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { FileSignature, Plus, ChevronLeft, CheckCircle2, Clock } from 'lucide-react';
 import { letterTypeDef } from '@/modules/health-safety/types/appointment.types';
 
@@ -28,7 +28,7 @@ function AppointmentsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
-          <Link href="/projects/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors">
+          <Link href="/health-safety" className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors">
             <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
           </Link>
           <div>
@@ -90,7 +90,7 @@ function AppointmentsContent() {
 const AppointmentsPage: NextPage = () => (
   <AppLayout>
     <Head><title>Appointment Letters | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><AppointmentsContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><AppointmentsContent /></ModulePage>
   </AppLayout>
 );
 

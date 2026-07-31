@@ -11,7 +11,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
-import { projectsConfig } from '@/modules/navigation';
+import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save } from 'lucide-react';
 import { APPOINTMENT_LETTER_TYPES, letterTypeDef } from '@/modules/health-safety/types/appointment.types';
 
@@ -129,7 +129,7 @@ function NewLetterContent() {
 const NewLetterPage: NextPage = () => (
   <AppLayout>
     <Head><title>New Appointment Letter | FibreFlow</title></Head>
-    <ModulePage config={projectsConfig}><NewLetterContent /></ModulePage>
+    <ModulePage config={healthSafetyConfig}><NewLetterContent /></ModulePage>
   </AppLayout>
 );
 
