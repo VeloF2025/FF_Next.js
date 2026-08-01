@@ -89,6 +89,9 @@ jobs:
       # The container is removed in the vitest teardown, but a killed or
       # timed-out run never reaches it. Sweep by label so a crashed run cannot
       # leave a container holding a port on a long-lived self-hosted runner.
-      - name: Clean up stray migration test containers
+      - name: Clean up this run's migration test container
         if: always()
-        run: docker ps -aq --filter label=ff-migration-tests | xargs -r docker rm -f
+        run: |
+          docker ps -aq \
+            --filter "label=ff-migration-run=ci-${{ github.run_id }}-${{ github.run_attempt }}" \
+            | xargs -r docker rm -f

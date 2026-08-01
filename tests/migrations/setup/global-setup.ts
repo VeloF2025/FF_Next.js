@@ -29,6 +29,18 @@ const USER = 'fibreflow_test';
 const DB = 'fibreflow_test';
 const LABEL = 'ff-migration-tests';
 
+/**
+ * Unique per invocation. Containers are labelled with it so a run only ever
+ * removes its OWN container — a blanket sweep by the shared label would let a
+ * CI run destroy a developer's container mid-test on this shared machine, or
+ * vice versa. (Only one runner serves this repo today, so CI jobs serialise,
+ * but a local `npm run test:migrations` overlapping a CI run is entirely
+ * possible, and a second runner would make CI-vs-CI possible too.)
+ */
+const RUN_ID = process.env.GITHUB_RUN_ID
+  ? `ci-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT ?? '1'}`
+  : `local-${process.pid}`;
+
 let containerId = '';
 
 function docker(args: string[]): string {
@@ -53,9 +65,11 @@ async function waitForReady(url: string, timeoutMs = 60_000): Promise<void> {
 }
 
 export async function setup() {
-  // Any container left behind by a killed run would hold a stale password.
-  // Remove by label rather than by name so a crashed run cannot wedge the next.
-  const stale = docker(['ps', '-aq', '--filter', `label=${LABEL}`]).split('\n').filter(Boolean);
+  // Only ever our own run's leftovers (e.g. a re-run of the same CI attempt).
+  // Deliberately NOT a blanket sweep of the shared label — see RUN_ID above.
+  const stale = docker(['ps', '-aq', '--filter', `label=ff-migration-run=${RUN_ID}`])
+    .split('\n')
+    .filter(Boolean);
   for (const id of stale) {
     try {
       docker(['rm', '-f', id]);
@@ -65,7 +79,7 @@ export async function setup() {
   }
 
   containerId = docker([
-    'run', '-d', '--label', LABEL,
+    'run', '-d', '--label', LABEL, '--label', `ff-migration-run=${RUN_ID}`,
     '-e', `POSTGRES_USER=${USER}`,
     '-e', `POSTGRES_PASSWORD=${USER}`,
     '-e', `POSTGRES_DB=${DB}`,
@@ -104,7 +118,9 @@ export async function teardown() {
   try {
     docker(['rm', '-f', containerId]);
   } catch {
-    // Best effort — a manual `docker rm -f` is the fallback, and the next run
-    // clears stragglers by label anyway.
+    // Best effort. A hard-killed process (SIGKILL, reboot) can still orphan one
+    // container; it is harmless because the port is ephemeral so it blocks
+    // nothing, and `docker rm -f $(docker ps -aq --filter label=ff-migration-tests)`
+    // clears any accumulation when no run is active.
   }
 }
