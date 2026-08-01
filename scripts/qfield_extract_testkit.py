@@ -34,19 +34,26 @@ SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 STEP_1 = "1. Before Photo - Mark out the ground with a circle/Square or X"
 STEP_2 = "2. During Photo - Add compaction photo if needed"
 STEP_7 = "7. After photo - Ensure you take a picture of the pole"
+# A real OPTICAL step column (OPTICAL_STEP_PATTERNS). Optical rows are written with
+# feature_type='joint' / work_type='dome_joint' instead of pole/pole_installation —
+# a mapping that had no coverage at all until a reviewer mutated it and nothing failed.
+OPTICAL_1 = "1. Dome on Pole"
 
 
 
 def load_phases():
-    """Modules besides the extractor whose namespaces resolve patched names.
+    """Import the modules the extractor's calls resolve in, so they are in sys.modules.
 
-    extract_project is a coordinator now: its I/O calls live in these modules, so
-    patching only the extractor would silently stop intercepting. qfield_gpkg_table
-    binds no patchable name today, but is listed so a stage moving there stays covered.
+    Patching itself is by object identity across every loaded scripts/ module
+    (qfield_patchkit), so this list does not gate correctness — qfield_row_ingest, for
+    one, is never named here and is still intercepted, because importing the extractor
+    imports it transitively. Importing them explicitly makes that independent of
+    import order rather than a happy accident.
     """
     import qfield_extract_phases
     import qfield_gpkg_table
-    return [qfield_extract_phases, qfield_gpkg_table]
+    import qfield_row_ingest
+    return [qfield_extract_phases, qfield_gpkg_table, qfield_row_ingest]
 
 
 def load_extractor():

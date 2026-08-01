@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from qfield_extract_testkit import (  # noqa: E402
-    PRIMARY_QF, STEP_1, STEP_2, STEP_7, Harness, config, load_extractor,
+    OPTICAL_1, PRIMARY_QF, STEP_1, STEP_2, STEP_7, Harness, config, load_extractor,
 )
 
 MOD = load_extractor()
@@ -98,6 +98,23 @@ def main():
         check(h.stub_calls.get(stub, 0) > 0,
               f"stub {stub} was actually invoked (patching intercepts), "
               f"calls={h.stub_calls.get(stub, 0)}")
+
+    # Optical rows are written as joint/dome_joint instead of pole/pole_installation.
+    # 7 registered projects have optical audits, and this mapping had NO coverage —
+    # hardcoding it to the civil values passed every suite. Note dry_run cannot reach
+    # it (the insert is short-circuited), so the golden --dry-run capture is
+    # structurally blind here too; this scenario must run non-dry.
+    found, upserted, _, h = run(
+        columns=["NAME", OPTICAL_1, STEP_1],
+        rows=[{"NAME": "P1", OPTICAL_1: "DCIM/dome.jpg", STEP_1: "DCIM/civil.jpg"}],
+        dcim={"dome.jpg": "k/dome", "civil.jpg": "k/civil"}, dry_run=False)
+    check((found, upserted) == (2, 2), f"optical + civil both ingest, got ({found},{upserted})")
+    by_key = {p[1]: (p[3], p[4]) for sql, p in h.cursor.executed
+              if "INSERT INTO qfield_photo_validations" in sql}
+    check(by_key.get("k/dome") == ("joint", "dome_joint"),
+          f"an optical photo is written as joint/dome_joint, got {by_key.get('k/dome')}")
+    check(by_key.get("k/civil") == ("pole", "pole_installation"),
+          f"a civil photo stays pole/pole_installation, got {by_key.get('k/civil')}")
 
     print("\nRow-level skips")
     found, _, _, _ = run(

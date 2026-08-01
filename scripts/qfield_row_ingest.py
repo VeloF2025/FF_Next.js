@@ -8,8 +8,10 @@ already ingested or not yet uploaded, and insert it.
 Split out of extract-gpkg-photos.py, which this brings under the 300-line limit.
 
 Two near-identical loops live here — one over numbered civil/optical step columns, one
-over extra photo columns that carry no step. They differ only in what they write for
-checklist_step/step_label/feature_type/work_type. Deliberately NOT merged in this
+over extra photo columns that carry no step. They differ in what they write for
+checklist_step/step_label/feature_type/work_type, and the extra-column loop carries a
+`col not in row.keys()` guard the step loop does not (structurally dead today: both
+column lists derive from the same table.columns). Deliberately NOT merged in this
 change: this is a move, provable byte-identical against the golden capture, and folding
 them together is a behaviour-risk refactor that deserves its own diff and its own
 review.
