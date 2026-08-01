@@ -30,7 +30,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Source of zone/PON metadata is sow_poles (FibreFlow IDs).
+    // Source of zone/PON metadata is v_pole_planning (migration 472): sow_poles
+    // (the SharePoint HLD feed — Mohadin/Lawley/Mamelodi only) COALESCE'd over
+    // public.poles (the QField GPKG import — every other project). Reading
+    // sow_poles alone left Etwatwa, Grabouw, Tonga, Themb'elihle and both
+    // Thembisa POPs with NULL zones on every pole, which the zone dropdown then
+    // hides entirely (WorksQAFiltersBar drops null zone_no).
     // pole_qa_photos may carry zone/PON copied at sync time too — merge in case sync ran
     // and added rows that aren't in the SoW (manual additions).
     // outstanding_snag_count groups open works-qa snags by the photo's
@@ -42,7 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const result = await pool.query<PonRow>(`
       WITH pole_pool AS (
         SELECT zone_no, pon_no, pole_number AS pole_label, NULL::timestamptz AS approved_at
-        FROM sow_poles
+        FROM v_pole_planning
         WHERE project_id = $1::uuid
           AND pon_no IS NOT NULL
         UNION

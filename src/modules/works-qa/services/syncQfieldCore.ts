@@ -146,7 +146,7 @@ export async function syncQfieldForProject(
         INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
         SELECT $1::uuid, $2, sp.zone_no, sp.pon_no
         FROM (SELECT 1) one
-        LEFT JOIN sow_poles sp ON sp.project_id = $1::uuid AND sp.pole_number = $2
+        LEFT JOIN v_pole_planning sp ON sp.project_id = $1::uuid AND sp.pole_number = $2
         ON CONFLICT (project_id, pole_label) DO NOTHING
       `,
       [projectId, pl],
@@ -223,14 +223,17 @@ export async function syncQfieldForProject(
       continue;
     }
 
-    // Upsert the pole row; copy zone/PON from sow_poles by pole_number match so the
-    // pole list and PON filter have something to group on.
+    // Upsert the pole row; copy zone/PON from v_pole_planning (migration 472) by
+    // pole_number match so the pole list and PON filter have something to group on.
+    // The view unions sow_poles over public.poles — sow_poles alone covers only the
+    // three SharePoint-fed projects, so every QField-only project used to land here
+    // with NULL zone/PON and fall out of the zone dropdown.
     await pool.query(
       `
         INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
         SELECT $1::uuid, $2, sp.zone_no, sp.pon_no
         FROM (SELECT 1) one
-        LEFT JOIN sow_poles sp
+        LEFT JOIN v_pole_planning sp
           ON sp.project_id = $1::uuid
          AND sp.pole_number = $2
         ON CONFLICT (project_id, pole_label) DO UPDATE
