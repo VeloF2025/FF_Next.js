@@ -160,18 +160,30 @@ PROJECTS = {
         "table_name": "civil_audit__civil_audit",
         "label_col": "NAME",
     },
+    # HT Middelburg — same double-underscore civil-audit table as Cradock, but note
+    # the label column is "Name" (mixed case, like Mahikeng), NOT Cradock's "NAME".
+    # 962 designed poles; "PON No" is 0/962 non-null and there is no Phase column, so
+    # pon_col/zone_col are omitted and poles ingest unzoned, as for Cradock.
+    # Registered AHEAD of the coverage-check threshold: pole planting started, so
+    # capture volume is about to ramp. Waiting for the >20-photo alert would mean
+    # photos sit unextracted until the first cron after the crew crosses that bar.
+    # Known upstream data-quality wart (not something this entry can fix): the QGIS
+    # project thumbnail "Middelburg EC Rev1.3_cloud_qfield.qgs.png" has been captured
+    # into 7 civil step cells across 2 poles. It is not under DCIM/, so it does not
+    # resolve in MinIO and is counted as "Skipped (no MinIO)" rather than ingested.
+    "Middelburg": {
+        "qf_project_id": "f076fad4-b2a5-40b8-bafe-35c20ce09827",
+        "ff_project_id": "de408530-76f0-4d10-bf08-cfcd3202f69e",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "civil_audit__civil_audit",
+        "label_col": "Name",
+    },
     # NOTE: "Phalaborwa - Ben Farm" (qf ef0b7147…, ff 67df5c8d…) is NOT registered
     # yet. Its civil audit is split across three team GPKGs — "Civil Audit (BF|LLK|
     # MT).gpkg" — with inconsistent QField relation-table names, and only ~7 photos
     # captured so far. It will be onboarded (with the correct per-GPKG table names)
     # once field QA ramps; until then the coverage-check (worksqa-qfield-ingest.sh)
     # flags it if its upstream photo count crosses the alert threshold.
-    # NOTE: "Middelburg" (qf f076fad4…, ff de408530…) is likewise NOT registered.
-    # It IS linked, and non-archived in the sense the coverage-check cares about
-    # (status IS DISTINCT FROM 'archived'; its actual status is 'planning'), so it
-    # is examined on every run — it just carries only 3 upstream photos, below the
-    # default --threshold 20, and so is correctly never alerted on. Same onboarding
-    # path as Cradock once QA ramps and it crosses the threshold.
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)
