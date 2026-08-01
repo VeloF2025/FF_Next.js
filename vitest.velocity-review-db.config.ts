@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['tests/db/velocity-review/repositories.test.ts'],
+    include: ['tests/db/velocity-review/*.test.ts'],
     globalSetup: ['./tests/db/velocity-review/global-setup.ts'],
     environment: 'node',
     threads: false,
