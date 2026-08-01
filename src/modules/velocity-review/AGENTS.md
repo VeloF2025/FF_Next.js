@@ -1,0 +1,16 @@
+<!-- GENERATED — do not edit. Canonical source: ./.claude.md -->
+<!-- Regenerate: node scripts/mirror-agents-md.mjs -->
+<!-- You are reading the AGENTS.md view of the Claude-facing docs. Prose
+     below may refer to ".claude.md" when describing the canonical side;
+     that is accurate — only PATH references are rewritten to AGENTS.md. -->
+# Module: Velocity review export
+
+## Safety rules
+
+- Never use technician, staff, WhatsApp JID, or group phones as customer contacts.
+- Accept consent evidence only from OneMap home signup or installation signature records.
+- Consent withdrawals always win and stop export processing.
+- Never send WhatsApp messages directly; GHL-native workflows own the send.
+- Never log raw phone numbers; use the HMAC fingerprint for diagnostics and reconciliation.
+- Calculate prior-day and scheduling boundaries in SAST, not server-local time.
+- A GHL acknowledgement confirms workflow state only; it is not proof of message delivery.

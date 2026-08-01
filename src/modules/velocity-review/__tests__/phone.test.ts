@@ -15,8 +15,13 @@ describe('normalizeSaMobileMsisdn', () => {
     expect(normalizeSaMobileMsisdn(raw)).toBeNull();
   });
 
-  it('never accepts a technician JID or group JID as a customer mobile', () => {
-    expect(normalizeSaMobileMsisdn('120363000000@g.us')).toBeNull();
+  it.each([
+    '27821234567@c.us',
+    '27821234567@s.whatsapp.net',
+    '120363000000@g.us',
+    '27821234567 @c.us',
+  ])('never accepts WhatsApp JID %s as a customer mobile', (jid) => {
+    expect(normalizeSaMobileMsisdn(jid)).toBeNull();
   });
 });
 

@@ -4,6 +4,7 @@ import { extractMsisdnFromContact } from '@/modules/communications/whatsapp/util
 const SA_MOBILE_MSISDN = /^27[6-8][0-9]{8}$/;
 
 export function normalizeSaMobileMsisdn(raw: string | null | undefined): string | null {
+  if (raw?.includes('@')) return null;
   const msisdn = extractMsisdnFromContact(raw)
     ?? (raw ? extractMsisdnFromContact(`0${raw}`) : null);
   return msisdn && SA_MOBILE_MSISDN.test(msisdn) ? msisdn : null;
