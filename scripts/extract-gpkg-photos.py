@@ -166,9 +166,12 @@ PROJECTS = {
     # captured so far. It will be onboarded (with the correct per-GPKG table names)
     # once field QA ramps; until then the coverage-check (worksqa-qfield-ingest.sh)
     # flags it if its upstream photo count crosses the alert threshold.
-    # NOTE: "Middelburg" (qf f076fad4…, ff de408530…) is likewise NOT registered —
-    # linked and active, but only 3 upstream photos, below the coverage-check's
-    # default --threshold 20. Same onboarding path as Cradock once QA ramps.
+    # NOTE: "Middelburg" (qf f076fad4…, ff de408530…) is likewise NOT registered.
+    # It IS linked, and non-archived in the sense the coverage-check cares about
+    # (status IS DISTINCT FROM 'archived'; its actual status is 'planning'), so it
+    # is examined on every run — it just carries only 3 upstream photos, below the
+    # default --threshold 20, and so is correctly never alerted on. Same onboarding
+    # path as Cradock once QA ramps and it crosses the threshold.
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)
