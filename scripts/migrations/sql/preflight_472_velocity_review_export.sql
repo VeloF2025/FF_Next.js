@@ -17,22 +17,22 @@ SELECT to_regclass('wa_subscriber_consent') IS NOT NULL AS consent_table_exists 
 
 SELECT to_regclass('velocity_review_candidates') IS NOT NULL AS candidates_table_exists \gset
 \if :candidates_table_exists
-  SELECT target_date, dr_number, COUNT(*) AS duplicate_count
+  SELECT target_date, UPPER(BTRIM(dr_number)) AS dr_number, COUNT(*) AS duplicate_count
   FROM velocity_review_candidates
-  GROUP BY target_date, dr_number
+  GROUP BY target_date, UPPER(BTRIM(dr_number))
   HAVING COUNT(*) > 1
-  ORDER BY target_date, dr_number;
+  ORDER BY target_date, UPPER(BTRIM(dr_number));
 \else
   SELECT 'velocity_review_candidates absent' AS candidate_duplicate_status;
 \endif
 
 SELECT to_regclass('velocity_review_exports') IS NOT NULL AS exports_table_exists \gset
 \if :exports_table_exists
-  SELECT dr_number, phone_fingerprint, COUNT(*) AS duplicate_count
+  SELECT UPPER(BTRIM(dr_number)) AS dr_number, phone_fingerprint, COUNT(*) AS duplicate_count
   FROM velocity_review_exports
-  GROUP BY dr_number, phone_fingerprint
+  GROUP BY UPPER(BTRIM(dr_number)), phone_fingerprint
   HAVING COUNT(*) > 1
-  ORDER BY dr_number, phone_fingerprint;
+  ORDER BY UPPER(BTRIM(dr_number)), phone_fingerprint;
 \else
   SELECT 'velocity_review_exports absent' AS export_duplicate_status;
 \endif

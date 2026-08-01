@@ -72,6 +72,33 @@ CREATE TABLE IF NOT EXISTS velocity_review_exports (
   UNIQUE (dr_number, phone_fingerprint)
 );
 
+-- Permanent dedupe is only meaningful when every writer stores the same DR
+-- spelling. Named, relation-scoped guards also add the invariant if this file
+-- is rerun after an earlier revision created the ledgers without it.
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'velocity_review_candidates_dr_number_canonical_chk'
+      AND conrelid = 'velocity_review_candidates'::regclass
+  ) THEN
+    ALTER TABLE velocity_review_candidates
+      ADD CONSTRAINT velocity_review_candidates_dr_number_canonical_chk
+      CHECK (dr_number <> '' AND dr_number = UPPER(BTRIM(dr_number)));
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'velocity_review_exports_dr_number_canonical_chk'
+      AND conrelid = 'velocity_review_exports'::regclass
+  ) THEN
+    ALTER TABLE velocity_review_exports
+      ADD CONSTRAINT velocity_review_exports_dr_number_canonical_chk
+      CHECK (dr_number <> '' AND dr_number = UPPER(BTRIM(dr_number)));
+  END IF;
+END $$;
+
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint

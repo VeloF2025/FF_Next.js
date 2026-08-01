@@ -128,8 +128,8 @@ dbDescribe('migration 472 applied to a scratch schema', () => {
     );
     expect(checks.rows.filter((row) => row.table_name.endsWith('velocity_review_control'))).toHaveLength(4);
     expect(checks.rows.filter((row) => row.table_name.endsWith('velocity_review_runs'))).toHaveLength(2);
-    expect(checks.rows.filter((row) => row.table_name.endsWith('velocity_review_candidates'))).toHaveLength(3);
-    expect(checks.rows.filter((row) => row.table_name.endsWith('velocity_review_exports'))).toHaveLength(5);
+    expect(checks.rows.filter((row) => row.table_name.endsWith('velocity_review_candidates'))).toHaveLength(4);
+    expect(checks.rows.filter((row) => row.table_name.endsWith('velocity_review_exports'))).toHaveLength(6);
 
     const indexes = await scoped<{ indexname: string; indexdef: string }>(
       `SELECT indexname, indexdef FROM pg_indexes
@@ -214,6 +214,36 @@ dbDescribe('migration 472 applied to a scratch schema', () => {
       id: '32222222-2222-4222-8222-222222222222',
       dr: 'DR-PERMANENT', phone: '+27610000001', fingerprint, state: 'ready',
     })).rejects.toThrow(/velocity_review_exports_dr_number_phone_fingerprint_key/);
+  });
+
+  it.each(['dr-lowercase', ' DR-PADDED ', ''])(
+    'rejects noncanonical candidate DR %j',
+    async (dr) => {
+      await expect(
+        scoped(
+          `INSERT INTO velocity_review_candidates
+             (run_id, target_date, dr_number, source_flags, decision)
+           VALUES ($1, DATE '2026-08-01', $2, ARRAY['dr_submitted'], 'ready')`,
+          [secondRunId, dr]
+        )
+      ).rejects.toThrow(/velocity_review_candidates_dr_number_canonical_chk/);
+    }
+  );
+
+  it.each([
+    ['dr-lowercase', '61111111-1111-4111-8111-111111111111', '+27610000004', 'd'],
+    [' DR-PADDED ', '62222222-2222-4222-8222-222222222222', '+27610000005', 'e'],
+    ['', '63333333-3333-4333-8333-333333333333', '+27610000006', 'f'],
+  ])('rejects noncanonical export DR %j', async (dr, id, phone, fingerprintChar) => {
+    await expect(insertExport({
+      id,
+      runId: secondRunId,
+      targetDate: '2026-08-01',
+      dr,
+      phone,
+      fingerprint: fingerprintChar.repeat(64),
+      state: 'ready',
+    })).rejects.toThrow(/velocity_review_exports_dr_number_canonical_chk/);
   });
 
   it('locks retryable and ambiguous claimed handshakes per phone', async () => {

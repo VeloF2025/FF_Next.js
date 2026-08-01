@@ -12,6 +12,11 @@ describe('Velocity review migration SQL contract', () => {
     expect(forward).toContain("'onemap_home_signup'");
     expect(forward).toContain("'onemap_install_signature'");
     expect(forward).toMatch(/UNIQUE \(dr_number, phone_fingerprint\)/);
+    expect(
+      forward.match(
+        /CHECK \(dr_number <> '' AND dr_number = UPPER\(BTRIM\(dr_number\)\)\)/g
+      ) ?? []
+    ).toHaveLength(2);
     expect(forward).toMatch(/'retryable_failure'.*'ambiguous'.*'ack_cleanup_pending'/s);
     expect(forward).toContain('automation_enabled BOOLEAN NOT NULL DEFAULT FALSE');
     expect(forward).toContain('go_live_date DATE');
@@ -27,6 +32,12 @@ describe('Velocity review migration SQL contract', () => {
     const rollback = sql('rollback_472_velocity_review_export.sql');
 
     expect(preflight).not.toMatch(/\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE)\b/i);
+    expect(preflight).toMatch(
+      /SELECT target_date, UPPER\(BTRIM\(dr_number\)\) AS dr_number, COUNT\(\*\).*GROUP BY target_date, UPPER\(BTRIM\(dr_number\)\)/s
+    );
+    expect(preflight).toMatch(
+      /SELECT UPPER\(BTRIM\(dr_number\)\) AS dr_number, phone_fingerprint, COUNT\(\*\).*GROUP BY UPPER\(BTRIM\(dr_number\)\), phone_fingerprint/s
+    );
     expect(rollback).toContain("SET source = 'import'");
   });
 });
