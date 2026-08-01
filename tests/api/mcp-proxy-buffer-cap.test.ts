@@ -186,9 +186,14 @@ describe('pipeUpstreamResponse', () => {
     // large response draining.
     const notCancelled = Symbol('not-cancelled');
     let cancelReason: unknown = notCancelled;
-    const endless = new ReadableStream<Uint8Array>({
-      start(controller) {
+    let emitted = 0;
+    const ongoing = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        if (cancelReason !== notCancelled) return;
         controller.enqueue(new Uint8Array(1024));
+        emitted += 1;
+        if (emitted === 64) controller.close();
       },
       cancel(reason) {
         cancelReason = reason;
@@ -199,7 +204,7 @@ describe('pipeUpstreamResponse', () => {
       sink.once('data', () => resolve());
     });
 
-    const done = pipeUpstreamResponse({ body: endless, arrayBuffer: async () => new ArrayBuffer(0) }, res);
+    const done = pipeUpstreamResponse({ body: ongoing, arrayBuffer: async () => new ArrayBuffer(0) }, res);
     await firstDownstreamByte;
     sink.destroy(); // client goes away
 
