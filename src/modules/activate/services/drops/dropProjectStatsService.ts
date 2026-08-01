@@ -9,7 +9,7 @@
 
 import pool from '@/lib/db';
 import { DropsFilters, ProjectStats } from './types';
-import { buildUnifiedConditions } from './dropStatsService';
+import { buildUnifiedConditions, UNIFIED_DATE_COLUMN } from './dropStatsService';
 
 const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
 const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
@@ -19,7 +19,10 @@ const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
  * Returns sorted descending by total drops; applies status filter shaping.
  */
 export async function getProjectStats(filters?: DropsFilters): Promise<ProjectStats[]> {
-  const unifiedCond = buildUnifiedConditions(filters, 'submitted_date', 'project');
+  // Must match calculateSummary's date expression exactly — see UNIFIED_DATE_COLUMN.
+  // Using the bare `submitted_date` here silently dropped every NULL-submitted_date
+  // row from the per-project breakdown while the summary card still counted it.
+  const unifiedCond = buildUnifiedConditions(filters, UNIFIED_DATE_COLUMN, 'project');
 
   const activatedParams: unknown[] = [
     filters?.dateFrom ?? '1900-01-01',

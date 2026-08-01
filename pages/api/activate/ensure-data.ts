@@ -97,11 +97,34 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         } as EnsureDataResponse);
       }
 
-      // Create unified record and fetch data
+      // Create unified record and fetch data.
+      //
+      // `project` is resolved from `drops` here, not left NULL. This skeleton
+      // insert was the only path that created a unified row without one, and a
+      // NULL project makes the row group under a literal "Unknown" bucket in
+      // the Activate per-project table (getProjectStats groups on this column).
+      // `drops` is the source of truth for a DR's project — oesUnifiedRecordsService
+      // resolves it the same way.
+      //
+      // Correlated scalar subquery rather than a JOIN: `drops` is UNIQUE on
+      // (project_id, drop_number), NOT on drop_number alone, so a join could
+      // legally fan out. ORDER BY + LIMIT 1 keeps this single-valued AND
+      // deterministic, so this insert and migration 473 resolve the same drop
+      // to the same project if that data shape ever occurs.
+      // An unresolvable DR still inserts NULL — same as before, no regression.
       logger.info(`Creating unified record for ${dropNumber}`);
       await pool.query(
-        `INSERT INTO dr_photo_unified_reviews (drop_number, created_at, updated_at)
-         VALUES ($1, NOW(), NOW())
+        `INSERT INTO dr_photo_unified_reviews (drop_number, project, created_at, updated_at)
+         VALUES (
+           $1,
+           (SELECT p.project_name
+              FROM drops d
+              JOIN projects p ON p.id = d.project_id
+             WHERE d.drop_number = $1
+             ORDER BY p.project_name
+             LIMIT 1),
+           NOW(), NOW()
+         )
          ON CONFLICT (drop_number) DO NOTHING`,
         [dropNumber]
       );

@@ -22,7 +22,10 @@ sufficient.
 import importlib.util
 import os
 import sqlite3
+import sys
 import tempfile
+
+from qfield_patchkit import Patcher, script_modules
 
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 
@@ -31,6 +34,26 @@ SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 STEP_1 = "1. Before Photo - Mark out the ground with a circle/Square or X"
 STEP_2 = "2. During Photo - Add compaction photo if needed"
 STEP_7 = "7. After photo - Ensure you take a picture of the pole"
+# A real OPTICAL step column (OPTICAL_STEP_PATTERNS). Optical rows are written with
+# feature_type='joint' / work_type='dome_joint' instead of pole/pole_installation —
+# a mapping that had no coverage at all until a reviewer mutated it and nothing failed.
+OPTICAL_1 = "1. Dome on Pole"
+
+
+
+def load_phases():
+    """Import the modules the extractor's calls resolve in, so they are in sys.modules.
+
+    Patching itself is by object identity across every loaded scripts/ module
+    (qfield_patchkit), so this list does not gate correctness — qfield_row_ingest, for
+    one, is never named here and is still intercepted, because importing the extractor
+    imports it transitively. Importing them explicitly makes that independent of
+    import order rather than a happy accident.
+    """
+    import qfield_extract_phases
+    import qfield_gpkg_table
+    import qfield_row_ingest
+    return [qfield_extract_phases, qfield_gpkg_table, qfield_row_ingest]
 
 
 def load_extractor():
@@ -38,6 +61,11 @@ def load_extractor():
     path = os.path.join(SCRIPTS, "extract-gpkg-photos.py")
     spec = importlib.util.spec_from_file_location("extract_gpkg_photos", path)
     mod = importlib.util.module_from_spec(spec)
+    # Register before exec, the conventional importlib pattern. Without this the module
+    # exists but is invisible to sys.modules — and _script_modules() would silently skip
+    # the very module under test, leaving its bindings unpatched. The interception guard
+    # catches that (calls=0), which is how this was found.
+    sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -129,6 +157,7 @@ class Harness:
     def __init__(self, mod, table="civil_audit", columns=None, rows=None,
                  dcim=None, state=None, existing_keys=(), existing_photo_keys=(),
                  linked=(), linked_dcim=None, hierarchy_backfill=False,
+                 download_fails=False, spatial_pon_map=None,
                  version="v20260731122829-abc12345", gpkg_path="Civil Audit.gpkg"):
         self.mod = mod
         self.tmpdir = tempfile.mkdtemp(prefix="qfield_char_")
@@ -137,22 +166,37 @@ class Harness:
         self.cursor = FakeCursor(state, existing_keys, existing_photo_keys, linked)
         self.conn = FakeConn(self.cursor)
         self._dcim = dcim if dcim is not None else {}
-        # {linked_qf_id: {filename: storage_key}} — per-project so a scenario can tell
-        # "primary wins on conflict" apart from "linked wins", which a single shared
-        # dict cannot express.
+        # {linked_qf_id: {filename: key}} — per-project, so a scenario can tell
+        # "primary wins on conflict" from "linked wins"; one shared dict cannot.
         self._linked_dcim = linked_dcim or {}
         self._hierarchy_backfill = hierarchy_backfill
+        # minio_download_latest returns (None, 0) when MinIO has no such object. Without
+        # a way to simulate it, that abort path had no coverage at all.
+        self._download_fails = download_fails
+        # Distinctive so a scenario can prove the map reaches sync_hierarchy rather than
+        # merely that the resolver was called.
+        self._spatial_pon_map = spatial_pon_map if spatial_pon_map is not None else {}
         self._version = version
         self._gpkg_path = gpkg_path
         self._linked = list(linked)
-        self._saved = {}
+        # Interception machinery lives in qfield_patchkit; see its docstring for why
+        # patching is by object identity and restore is by scan.
+        self._patcher = Patcher(always_scan=[mod])
         self.hierarchy_calls = []    # recorded so a scenario can assert the call happened
+        # {stub name: times invoked} — lets a scenario prove interception actually
+        # happened rather than assuming a green run means the stubs ran.
+        self.stub_calls = self._patcher.calls
+        # Import the modules the extractor's calls resolve in, so _script_modules()
+        # can see them. Patching itself is by object identity, not by this list.
+        load_phases()
 
     def __enter__(self):
         m = self.mod
         src = self.gpkg_file
 
         def _download(qf_id, path, dest):
+            if self._download_fails:
+                return None, 0
             with open(src, "rb") as a, open(dest, "wb") as b:
                 b.write(a.read())
             return self._version, os.path.getsize(src)
@@ -167,24 +211,19 @@ class Harness:
             self.hierarchy_calls.append((a, kw))
             return {"mapped": 0, "qa_poles": 0, "poles": 0, "reviews": 0}
 
-        self._patch("resolve_gpkg_path", lambda qf, p: self._gpkg_path)
-        self._patch("minio_download_latest", _download)
-        self._patch("minio_list_dcim_directory", _list_dcim)
-        self._patch("minio_resolve_photo_version", lambda qf, p: None)
-        self._patch("fetch_linked_qf_project_ids", lambda cur, ff, qf: list(self._linked))
-        self._patch("hierarchy_backfill_needed",
+        self._patcher.patch("resolve_gpkg_path", lambda qf, p: self._gpkg_path)
+        self._patcher.patch("minio_download_latest", _download)
+        self._patcher.patch("minio_list_dcim_directory", _list_dcim)
+        self._patcher.patch("minio_resolve_photo_version", lambda qf, p: None)
+        self._patcher.patch("fetch_linked_qf_project_ids", lambda cur, ff, qf: list(self._linked))
+        self._patcher.patch("hierarchy_backfill_needed",
                     lambda cur, ff, cfg: self._hierarchy_backfill)
-        self._patch("resolve_spatial_pon_map", lambda qf: {})
-        self._patch("sync_hierarchy", _sync_hierarchy)
+        self._patcher.patch("resolve_spatial_pon_map", lambda qf: dict(self._spatial_pon_map))
+        self._patcher.patch("sync_hierarchy", _sync_hierarchy)
         return self
 
-    def _patch(self, name, fn):
-        self._saved[name] = getattr(self.mod, name)
-        setattr(self.mod, name, fn)
-
     def __exit__(self, *exc):
-        for name, orig in self._saved.items():
-            setattr(self.mod, name, orig)
+        self._patcher.restore()
         try:
             os.unlink(self.gpkg_file)
             os.rmdir(self.tmpdir)

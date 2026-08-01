@@ -47,6 +47,7 @@ export default defineConfig({
       'tests/migrations/378_rbac_field_stock_force_correct.test.ts',
       'tests/migrations/471_hs_training_certificate_upload.test.ts',
       'tests/migrations/472_works_qa_pole_planning_view.test.ts',
+      'tests/migrations/473_backfill_unified_reviews_project.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.
       //
@@ -100,6 +101,21 @@ export default defineConfig({
       // the import is undefined before a single query runs — it cannot pass here
       // by construction, regardless of the data. Run it directly when needed.
       'tests/api/activate/pp-data-gps-backfill.test.ts',
+      // Same class, found 2026-08-01: this fires real HTTP at
+      // `process.env.VITE_API_URL || 'http://localhost:3000/api'`. On this host
+      // port 3000 is fibreflow-production.service — so these "unit tests" have
+      // been passing by making live requests against PRODUCTION, and they fail
+      // anywhere that cannot reach it. That is why they were green on the old
+      // CI runner (ran as `hein`, shared host network) and go red on the
+      // isolated runner, which is the one behaving correctly.
+      //
+      // Excluded rather than allowlisted: scripts/known-test-failures.txt says
+      // in its own header never to add a line to turn a red build green, and
+      // that is the right call here — the failure is real, the test is wrong.
+      // To reinstate, point it at a server the test itself starts, or move it
+      // to a smoke-test job that is explicitly allowed to talk to a deployed
+      // environment.
+      'src/tests/api-integration/api-health.test.ts',
     ],
     testTimeout: 10000,
     hookTimeout: 10000,

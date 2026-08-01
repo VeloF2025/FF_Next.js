@@ -63,7 +63,8 @@
     "test:no-direct-db": "vitest run src/tests/api-integration/no-direct-db.test.ts",
     "test:logger": "tsx scripts/test-logger.ts",
     "db:migrate:realtime": "node scripts/run-realtime-migration.js",
-    "embed-manual": "node scripts/embed-manual-content.js"
+    "embed-manual": "node scripts/embed-manual-content.js",
+    "test:migrations": "vitest --config vitest.migrations.config.ts run"
   },
   "keywords": [
     "react",
