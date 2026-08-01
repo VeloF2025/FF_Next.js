@@ -19,12 +19,14 @@ merging a new entry. This test deliberately does not fake that with a stale fixt
 
 Run: python3 scripts/test_qfield_project_registry.py
 """
+import ast
 import os
 import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import qfield_project_registry
 from qfield_project_registry import ALTERNATE_GPKGS, OPTICAL_GPKGS, PROJECTS
 
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -40,6 +42,36 @@ def check(condition, label):
     else:
         print(f"  FAIL  {label}")
         failures.append(label)
+
+
+def duplicate_key_literals(path, dict_names):
+    """{dict_name: [keys written more than once]} by reading the SOURCE, not the object.
+
+    A duplicate key in a dict literal collapses to last-wins at PARSE time, before the
+    module is importable — so `len(set(d)) == len(d)` on the loaded dict is a tautology
+    that can never fail, and the second entry silently overwrites the first one's config.
+    That is the most likely real mistake in this file: entries are built by copying a
+    neighbouring block and editing it, and the comments here even warn against copying a
+    neighbour's values. The AST keeps both keys, so scan that instead.
+    """
+    tree = ast.parse(open(path, encoding="utf-8").read())
+    dupes = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Dict):
+            continue
+        for target in node.targets:
+            if not (isinstance(target, ast.Name) and target.id in dict_names):
+                continue
+            seen, repeated = set(), []
+            for k in node.value.keys:
+                if not isinstance(k, ast.Constant):
+                    continue  # **spread or computed key — not a literal we can compare
+                if k.value in seen and k.value not in repeated:
+                    repeated.append(k.value)
+                seen.add(k.value)
+            if repeated:
+                dupes[target.id] = sorted(repeated)
+    return dupes
 
 
 def main():
@@ -76,17 +108,25 @@ def main():
         dupes = {v for v in vals if vals.count(v) > 1}
         check(not dupes, f"no duplicate {key} across entries (dupes: {sorted(dupes)})")
 
-    check(len(set(PROJECTS.keys())) == len(PROJECTS), "project names are unique")
+    # NOT `len(set(PROJECTS)) == len(PROJECTS)` — that is a tautology. Python has already
+    # collapsed any duplicate key by the time this module is imported, so the loaded dict
+    # can never show one, while the duplicate has silently replaced the original entry's
+    # ids/gpkg/table. Read the source instead, where both keys are still present.
+    registry_src = qfield_project_registry.__file__
+    dupes = duplicate_key_literals(
+        registry_src, {"PROJECTS", "ALTERNATE_GPKGS", "OPTICAL_GPKGS"})
+    check(not dupes,
+          f"no duplicate key literals in the registry source (found: {dupes})")
 
     # An alias keyed on a name absent from PROJECTS is dead config — it never runs,
     # and reads as though that GPKG is covered when it is not.
     for label, alias_map in (("ALTERNATE_GPKGS", ALTERNATE_GPKGS),
                              ("OPTICAL_GPKGS", OPTICAL_GPKGS)):
         for name, cfg in alias_map.items():
-            check(name in PROJECTS, f"{label}['{name}'] refers to a registered project")
+            check(name in PROJECTS, f"{label}[{name!r}] refers to a registered project")
             for key in ("gpkg_path", "table_name", "label_col"):
                 check(key in cfg and str(cfg[key]).strip() != "",
-                      f"{label}['{name}']: has non-empty '{key}'")
+                      f"{label}[{name!r}]: has non-empty '{key}'")
 
     print()
     if failures:

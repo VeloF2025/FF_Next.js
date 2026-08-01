@@ -5,8 +5,10 @@ Works-QA ⇄ QField coverage check — the "never silently miss" guarantee.
 Flags three ways QField photos fail to reach the Works-QA dashboard, for projects
 linked to an active (non-archived) FibreFlow project:
 
-  EXTRACT-GAP  photos in QFieldCloud, ZERO rows in qfield_photo_validations —
-               the project was never registered in extract-gpkg-photos.py PROJECTS.
+  EXTRACT-GAP  photos in QFieldCloud, ZERO rows in qfield_photo_validations — either
+               the project is absent from qfield_project_registry.PROJECTS, or it IS
+               registered and its GPKG params resolve nothing. Reported distinctly:
+               the two need opposite fixes.
   SYNC-GAP     rows extracted, ZERO rows in pole_qa_photos — works-qa-sync is stuck.
   STALE-GPKG   a newer file exists that we are not ingesting — either a newer
                version of the tracked GPKG, or a newer same-family sibling (a rename).
