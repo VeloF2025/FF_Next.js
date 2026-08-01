@@ -53,24 +53,46 @@ def duplicate_key_literals(path, dict_names):
     That is the most likely real mistake in this file: entries are built by copying a
     neighbouring block and editing it, and the comments here even warn against copying a
     neighbour's values. The AST keeps both keys, so scan that instead.
+
+    Scans NESTED dicts too. A key duplicated inside one project's config block
+    ("label_col" pasted twice while editing an entry) is the same bug one level down,
+    and more likely than duplicating a project name — inside the block is where the
+    editing happens. Also flags a dict assigned twice at module level, which shadows
+    just as silently.
+
+    Known limit: only literal (ast.Constant) keys are comparable. A computed or
+    f-string key is skipped rather than guessed at; the registry uses plain string
+    literals throughout, and a non-literal key there would be a far larger problem
+    than a duplicate.
     """
+    def scan(dict_node, label, out):
+        seen, repeated = set(), []
+        for k, v in zip(dict_node.keys, dict_node.values):
+            if isinstance(k, ast.Constant):
+                if k.value in seen and k.value not in repeated:
+                    repeated.append(k.value)
+                seen.add(k.value)
+                child = f"{label}[{k.value!r}]"
+            else:
+                child = f"{label}[<non-literal>]"  # ** spread has key None
+            if isinstance(v, ast.Dict):
+                scan(v, child, out)
+        if repeated:
+            out[label] = sorted(repeated)
+
     tree = ast.parse(open(path, encoding="utf-8").read())
-    dupes = {}
+    dupes, assigned = {}, {}
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Dict):
             continue
         for target in node.targets:
             if not (isinstance(target, ast.Name) and target.id in dict_names):
                 continue
-            seen, repeated = set(), []
-            for k in node.value.keys:
-                if not isinstance(k, ast.Constant):
-                    continue  # **spread or computed key — not a literal we can compare
-                if k.value in seen and k.value not in repeated:
-                    repeated.append(k.value)
-                seen.add(k.value)
-            if repeated:
-                dupes[target.id] = sorted(repeated)
+            assigned[target.id] = assigned.get(target.id, 0) + 1
+            scan(node.value, target.id, dupes)
+    for name, count in assigned.items():
+        if count > 1:
+            dupes[f"{name} assigned {count}x — the later one silently wins"] = ["*"]
     return dupes
 
 
