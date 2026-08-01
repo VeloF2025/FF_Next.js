@@ -25,6 +25,8 @@ import sqlite3
 import sys
 import tempfile
 
+from qfield_patchkit import Patcher, script_modules
+
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 
 # The real FT civil-audit column names — detect_step_columns must actually match
@@ -33,17 +35,6 @@ STEP_1 = "1. Before Photo - Mark out the ground with a circle/Square or X"
 STEP_2 = "2. During Photo - Add compaction photo if needed"
 STEP_7 = "7. After photo - Ensure you take a picture of the pole"
 
-
-def _script_modules():
-    """Every loaded module living in scripts/ — the universe a patched name can hide in.
-
-    Scanned fresh on each patch rather than captured once, so a module imported later
-    (or a module a future refactor adds) is covered without anyone remembering to
-    register it.
-    """
-    return [m for m in list(sys.modules.values())
-            if getattr(m, "__file__", None)
-            and os.path.dirname(os.path.abspath(m.__file__)) == SCRIPTS]
 
 
 def load_phases():
@@ -181,11 +172,13 @@ class Harness:
         self._version = version
         self._gpkg_path = gpkg_path
         self._linked = list(linked)
-        self._saved = {}
+        # Interception machinery lives in qfield_patchkit; see its docstring for why
+        # patching is by object identity and restore is by scan.
+        self._patcher = Patcher(always_scan=[mod])
         self.hierarchy_calls = []    # recorded so a scenario can assert the call happened
         # {stub name: times invoked} — lets a scenario prove interception actually
         # happened rather than assuming a green run means the stubs ran.
-        self.stub_calls = {}
+        self.stub_calls = self._patcher.calls
         # Import the modules the extractor's calls resolve in, so _script_modules()
         # can see them. Patching itself is by object identity, not by this list.
         load_phases()
@@ -211,64 +204,19 @@ class Harness:
             self.hierarchy_calls.append((a, kw))
             return {"mapped": 0, "qa_poles": 0, "poles": 0, "reviews": 0}
 
-        self._patch("resolve_gpkg_path", lambda qf, p: self._gpkg_path)
-        self._patch("minio_download_latest", _download)
-        self._patch("minio_list_dcim_directory", _list_dcim)
-        self._patch("minio_resolve_photo_version", lambda qf, p: None)
-        self._patch("fetch_linked_qf_project_ids", lambda cur, ff, qf: list(self._linked))
-        self._patch("hierarchy_backfill_needed",
+        self._patcher.patch("resolve_gpkg_path", lambda qf, p: self._gpkg_path)
+        self._patcher.patch("minio_download_latest", _download)
+        self._patcher.patch("minio_list_dcim_directory", _list_dcim)
+        self._patcher.patch("minio_resolve_photo_version", lambda qf, p: None)
+        self._patcher.patch("fetch_linked_qf_project_ids", lambda cur, ff, qf: list(self._linked))
+        self._patcher.patch("hierarchy_backfill_needed",
                     lambda cur, ff, cfg: self._hierarchy_backfill)
-        self._patch("resolve_spatial_pon_map", lambda qf: dict(self._spatial_pon_map))
-        self._patch("sync_hierarchy", _sync_hierarchy)
+        self._patcher.patch("resolve_spatial_pon_map", lambda qf: dict(self._spatial_pon_map))
+        self._patcher.patch("sync_hierarchy", _sync_hierarchy)
         return self
 
-    def _patch(self, name, fn):
-        """Patch every binding of the target FUNCTION OBJECT, and record invocations.
-
-        Patching by NAME in a known list of modules is not enough. CPython resolves a
-        function's globals where it is DEFINED, so when a call site moves the old
-        binding survives as a dangling import while the live call resolves elsewhere:
-        `hasattr(known_module, name)` still passes, the patch lands on the dead
-        binding, the real MinIO/Postgres function runs, and the suite still reports
-        PASS. That is the exact failure this harness exists to prevent.
-
-        Patching by object closes it — a dangling import points at the same object and
-        is patched harmlessly, a new module is covered automatically, and no list can
-        go stale. Zero bindings is an error, never a silent no-op.
-        """
-        # self.mod explicitly: load_extractor() registers under a fixed name, so a
-        # second call in one process orphans the first module — in memory, absent from
-        # sys.modules, therefore unscanned and unpatched.
-        mods = _script_modules()
-        if self.mod not in mods:
-            mods.append(self.mod)
-        bound = {id(getattr(m, name)): getattr(m, name) for m in mods if hasattr(m, name)}
-        if not bound:
-            raise AssertionError(
-                f"{name!r} is bound in no loaded scripts/ module — the harness cannot "
-                "intercept it and would silently exercise the real implementation."
-            )
-        if len(bound) > 1:
-            raise AssertionError(
-                f"{name!r} is bound to {len(bound)} DIFFERENT objects across modules; "
-                "the harness cannot tell which one the code under test will call."
-            )
-        target = next(iter(bound.values()))
-        targets = [m for m in mods if getattr(m, name, None) is target]
-
-        def recording(*a, **kw):
-            self.stub_calls.setdefault(name, 0)
-            self.stub_calls[name] += 1
-            return fn(*a, **kw)
-
-        for m in targets:
-            self._saved.setdefault(name, []).append((m, getattr(m, name)))
-            setattr(m, name, recording)
-
     def __exit__(self, *exc):
-        for name, entries in self._saved.items():
-            for mod, orig in entries:
-                setattr(mod, name, orig)
+        self._patcher.restore()
         try:
             os.unlink(self.gpkg_file)
             os.rmdir(self.tmpdir)

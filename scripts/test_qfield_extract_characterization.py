@@ -55,12 +55,18 @@ def main():
         dcim={"a.jpg": "k/a", "b.jpg": "k/b", "c.jpg": "k/c"})
     check((found, upserted) == (3, 3), f"3 resolvable photos across 2 poles -> (3,3), got ({found},{upserted})")
 
-    found, upserted, out, _ = run(
+    found, upserted, out, h = run(
         columns=["NAME", STEP_1],
         rows=[{"NAME": "P1", STEP_1: "DCIM/missing.jpg"}],
         dcim={})
     check((found, upserted) == (1, 0), f"photo absent from MinIO -> found but not upserted, got ({found},{upserted})")
     check("SKIP (not in MinIO)" in out, "absent photo is reported, not silently dropped")
+    # The other conditional stub. The interception-guard group cannot assert this one
+    # (it only fires when the DCIM index is empty), so it is asserted here, in the
+    # scenario that triggers it — mirroring what the spatial-PON scenarios do.
+    check(h.stub_calls.get("minio_resolve_photo_version", 0) > 0,
+          f"the per-photo fallback resolver was intercepted, "
+          f"calls={h.stub_calls.get('minio_resolve_photo_version', 0)}")
 
     # Extra photo columns (EXTRA_PHOTO_PATTERNS — a photo column carrying no step
     # number) go through a SECOND loop with its own dedup and skip logic. Without a
