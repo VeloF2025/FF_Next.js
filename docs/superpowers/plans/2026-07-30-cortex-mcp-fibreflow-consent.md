@@ -285,7 +285,26 @@ Expected: FAIL because `apps/cortex_mcp/cortex_mcp_oauth.py` does not exist.
 
 - [ ] **Step 4: Extract the OAuth models/provider without changing persisted fields**
 
-Create `apps/cortex_mcp/cortex_mcp_oauth.py`. Move the existing model classes and all provider methods from `server.py` into it. Keep the current bodies of `get_client`, `register_client`, `load_authorization_code`, `exchange_authorization_code`, `load_refresh_token`, `exchange_refresh_token`, `load_access_token`, `revoke_token`, and `complete_pending`; do not rename serialized keys or token prefixes.
+Create `apps/cortex_mcp/cortex_mcp_oauth.py`. Move the existing model classes and
+provider methods from `server.py` into it without renaming serialized keys or token
+prefixes. Preserve the existing protocol behavior except where the final Task 16B
+security contract supersedes the historical bodies:
+
+- `exchange_authorization_code()` must call the shared
+  `has_unverified_mcp_token_marker()` precondition before minting. An unsafe code is
+  persistently consumed and returns generic `invalid_grant` without issuing access or
+  refresh tokens.
+- `load_access_token()` and `load_refresh_token()` must reject an unsafe embedded
+  bearer and atomically invalidate only the affected grant siblings. Modern rows use
+  their shared `grant_id`; grant-less legacy rows match only the same unsafe embedded
+  bearer.
+- `exchange_refresh_token()` must repeat the marker precondition so a stale in-memory
+  object cannot mint a new access token after deployment.
+- Failed store saves restore the in-memory rows and fail closed. Errors and logs must
+  never contain the embedded bearer.
+
+Keep `get_client`, `register_client`, safe marked code/access/refresh behavior,
+revocation, and `complete_pending` compatible with the preserved fields and prefixes.
 
 Use these exact changed interfaces:
 
@@ -413,14 +432,35 @@ import os
 import subprocess
 import sys
 
+import jwt as pyjwt
 from starlette.requests import Request
 
 from apps.cortex_mcp.cortex_mcp_callback import complete_authorization
 
 
 CALLBACK_SECRET = "test-cortex-callback-secret"
+INVALID_CALLBACK_SECRET = CALLBACK_SECRET + "-invalid"
 PENDING_ID = "state_abcdefghijklmnop"
-BEARER = "jwt-never-return-this-value"
+TEST_JWT_SECRET = "test-callback-jwt-secret-at-least-32-bytes"
+MARKED_BEARER = pyjwt.encode(
+    {
+        "sub": "callback-test@velocityfibre.co.za",
+        "email": "callback-test@velocityfibre.co.za",
+        "instance_id": "velocity-fibre",
+        "token_use": "mcp",
+    },
+    TEST_JWT_SECRET,
+    algorithm="HS256",
+)
+UNMARKED_BEARER = pyjwt.encode(
+    {
+        "sub": "callback-test@velocityfibre.co.za",
+        "email": "callback-test@velocityfibre.co.za",
+        "instance_id": "velocity-fibre",
+    },
+    TEST_JWT_SECRET,
+    algorithm="HS256",
+)
 
 
 def request(body: bytes, secret: str = CALLBACK_SECRET) -> Request:
@@ -459,26 +499,33 @@ def seed_pending(provider: CortexOAuthProvider) -> None:
 
 
 @pytest.mark.asyncio
-async def test_callback_rejects_bad_secret_without_touching_state(tmp_path: Path):
+async def test_callback_rejects_bad_secret_without_touching_state(
+    tmp_path: Path,
+    bridge_server,
+):
     provider = CortexOAuthProvider(
         tmp_path / "oauth.json",
         "https://app.fibreflow.app",
     )
     seed_pending(provider)
 
-    response = await complete_authorization(
-        request(
-            json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode(),
-            secret="wrong-secret",
-        ),
-        provider,
-        CALLBACK_SECRET,
-        "http://127.0.0.1:7403",
-    )
+    with bridge_server(status=200) as bridge:
+        response = await complete_authorization(
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": MARKED_BEARER}
+                ).encode(),
+                secret=INVALID_CALLBACK_SECRET,
+            ),
+            provider,
+            CALLBACK_SECRET,
+            bridge.url,
+        )
 
     assert response.status_code == 401
+    assert bridge.path is None
     assert PENDING_ID in provider.data["pending"]
-    assert BEARER.encode() not in response.body
+    assert MARKED_BEARER.encode() not in response.body
 
 
 @pytest.mark.asyncio
@@ -491,7 +538,11 @@ async def test_rejected_bearer_keeps_pending_state_retryable(tmp_path: Path):
 
     with bridge_server(status=401) as bridge:
         response = await complete_authorization(
-            request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": MARKED_BEARER}
+                ).encode()
+            ),
             provider,
             CALLBACK_SECRET,
             bridge.url,
@@ -500,7 +551,36 @@ async def test_rejected_bearer_keeps_pending_state_retryable(tmp_path: Path):
     assert response.status_code == 401
     assert PENDING_ID in provider.data["pending"]
     assert provider.data["codes"] == {}
-    assert BEARER.encode() not in response.body
+    assert MARKED_BEARER.encode() not in response.body
+
+
+@pytest.mark.asyncio
+async def test_unmarked_bearer_fails_before_bridge_and_keeps_state(
+    tmp_path: Path,
+):
+    provider = CortexOAuthProvider(
+        tmp_path / "oauth.json",
+        "https://app.fibreflow.app",
+    )
+    seed_pending(provider)
+
+    with bridge_server(status=200) as bridge:
+        response = await complete_authorization(
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": UNMARKED_BEARER}
+                ).encode()
+            ),
+            provider,
+            CALLBACK_SECRET,
+            bridge.url,
+        )
+
+    assert response.status_code == 401
+    assert bridge.path is None
+    assert PENDING_ID in provider.data["pending"]
+    assert provider.data["codes"] == {}
+    assert UNMARKED_BEARER.encode() not in response.body
 
 
 @pytest.mark.asyncio
@@ -513,7 +593,11 @@ async def test_success_consumes_once_and_returns_only_safe_redirect(tmp_path: Pa
 
     with bridge_server(status=200) as bridge:
         response = await complete_authorization(
-            request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": MARKED_BEARER}
+                ).encode()
+            ),
             provider,
             CALLBACK_SECRET,
             bridge.url,
@@ -528,17 +612,23 @@ async def test_success_consumes_once_and_returns_only_safe_redirect(tmp_path: Pa
     assert "state=claude-state" in payload["redirectUrl"]
     assert PENDING_ID not in provider.data["pending"]
     assert len(provider.data["codes"]) == 1
-    assert BEARER not in json.dumps(payload)
-    assert bridge.authorization == f"Bearer {BEARER}"
+    assert MARKED_BEARER not in json.dumps(payload)
+    assert bridge.authorization == f"Bearer {MARKED_BEARER}"
     assert bridge.path.startswith("/api/query?")
 
-    replay = await complete_authorization(
-        request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
-        provider,
-        CALLBACK_SECRET,
-        "http://127.0.0.1:7403",
-    )
+    with bridge_server(status=200) as replay_bridge:
+        replay = await complete_authorization(
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": MARKED_BEARER}
+                ).encode()
+            ),
+            provider,
+            CALLBACK_SECRET,
+            replay_bridge.url,
+        )
     assert replay.status_code == 400
+    assert replay_bridge.path is None
     assert len(provider.data["codes"]) == 1
 
 
@@ -576,7 +666,12 @@ Also add parametrized cases for:
     [
         (b"not-json", 400),
         (b"[]", 400),
-        (json.dumps({"stateId": "short", "token": BEARER}).encode(), 400),
+        (
+            json.dumps(
+                {"stateId": "short", "token": MARKED_BEARER}
+            ).encode(),
+            400,
+        ),
         (json.dumps({"stateId": PENDING_ID}).encode(), 400),
         (json.dumps({"stateId": PENDING_ID, "token": ""}).encode(), 400),
     ],
@@ -615,6 +710,9 @@ Add these functions to the focused `cortex_mcp_callback.py` module so both
 production modules remain below 300 lines:
 
 ```python
+from apps.cortex_mcp.cortex_mcp_tokens import has_unverified_mcp_token_marker
+
+
 def secrets_match(provided: str, expected: str) -> bool:
     return secrets.compare_digest(
         provided.encode("utf-8"),
@@ -622,7 +720,22 @@ def secrets_match(provided: str, expected: str) -> bool:
     )
 
 
-def validate_cortex_token(token: str, bridge_url: str) -> None:
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirectHandler())
+BRIDGE_VALIDATION_TIMEOUT_SECONDS = 5.0
+
+
+def validate_cortex_token(
+    token: str,
+    bridge_url: str,
+    timeout: float = BRIDGE_VALIDATION_TIMEOUT_SECONDS,
+) -> None:
+    if not has_unverified_mcp_token_marker(token):
+        raise ValueError("Cortex bearer rejected")
     query = urllib.parse.urlencode(
         {"q": "cortex", "limit": 1, "include_citations": "true"}
     )
@@ -634,11 +747,13 @@ def validate_cortex_token(token: str, bridge_url: str) -> None:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as response:
+        with NO_REDIRECT_OPENER.open(req, timeout=timeout) as response:
             if response.status != 200:
                 raise ValueError("Cortex bearer rejected by Bridge")
     except urllib.error.HTTPError as exc:
         raise ValueError("Cortex bearer rejected by Bridge") from exc
+    except TimeoutError as exc:
+        raise RuntimeError("Cortex Bridge is unavailable") from exc
     except urllib.error.URLError as exc:
         raise RuntimeError("Cortex Bridge is unavailable") from exc
 
@@ -674,6 +789,7 @@ async def complete_authorization(
     provider: CortexOAuthProvider,
     callback_secret: str,
     bridge_url: str,
+    bridge_timeout: float = BRIDGE_VALIDATION_TIMEOUT_SECONDS,
 ) -> JSONResponse:
     provided_secret = request.headers.get("x-cortex-mcp-secret", "")
     if not secrets_match(provided_secret, callback_secret):
@@ -699,10 +815,16 @@ async def complete_authorization(
     except ValueError:
         return JSONResponse({"error": "Invalid authorization state"}, status_code=400)
     try:
-        await asyncio.to_thread(validate_cortex_token, token, bridge_url)
+        async with asyncio.timeout(bridge_timeout):
+            await asyncio.to_thread(
+                validate_cortex_token,
+                token,
+                bridge_url,
+                bridge_timeout,
+            )
     except ValueError:
         return JSONResponse({"error": "Bearer rejected"}, status_code=401)
-    except RuntimeError:
+    except (RuntimeError, TimeoutError):
         return JSONResponse({"error": "Authorization service unavailable"}, status_code=502)
     try:
         redirect_uri, code, pending_state = provider.complete_pending(state_id, token)
