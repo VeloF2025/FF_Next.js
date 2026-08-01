@@ -7,3 +7,5 @@ export {
   type VelocityReviewRunInput,
   type VelocityReviewRunResult,
 } from './processor';
+export { buildRunSummary, type VelocityReviewSummary } from './summary';
+export { sendVelocityReviewSummary } from './summaryEmail';

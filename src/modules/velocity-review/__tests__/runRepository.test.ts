@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  query: vi.fn(),
   queryOne: vi.fn(),
   poolConnect: vi.fn(),
 }));
 
 vi.mock('@/lib/db-pool', () => ({
+  query: mocks.query,
   queryOne: mocks.queryOne,
   pool: { connect: mocks.poolConnect },
 }));
@@ -13,6 +15,7 @@ vi.mock('@/lib/db-pool', () => ({
 import {
   createOrResumeRun,
   loadVelocityReviewControl,
+  setVelocityReviewSummaryStatus,
   selectDueDates,
   withVelocityReviewLock,
 } from '../runRepository';
@@ -74,6 +77,7 @@ describe('selectDueDates', () => {
 
 describe('run persistence and locking', () => {
   beforeEach(() => {
+    mocks.query.mockReset().mockResolvedValue([]);
     mocks.queryOne.mockReset();
     mocks.poolConnect.mockReset();
   });
@@ -115,6 +119,17 @@ describe('run persistence and locking', () => {
     const [text, params] = mocks.queryOne.mock.calls[0] as [string, unknown[]];
     expect(text).toContain('ON CONFLICT (target_date) DO UPDATE');
     expect(params).toEqual(['2026-08-01']);
+  });
+
+  it('updates only summary status for the selected completed run dates', async () => {
+    await setVelocityReviewSummaryStatus(['2026-07-30', '2026-07-31'], 'failed');
+
+    const [text, params] = mocks.query.mock.calls[0] as [string, unknown[]];
+    expect(text).toContain('UPDATE velocity_review_runs');
+    expect(text).toContain('SET summary_status = $2');
+    expect(text).not.toMatch(/\bstatus\s*=/);
+    expect(text).not.toContain('velocity_review_exports');
+    expect(params).toEqual([['2026-07-30', '2026-07-31'], 'failed']);
   });
 
   it('holds and always releases the dedicated advisory-lock connection', async () => {

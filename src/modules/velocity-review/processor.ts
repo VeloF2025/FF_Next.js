@@ -12,6 +12,7 @@ import {
 } from './ghlClient';
 import { normalizeSaMobileMsisdn, toE164 } from './phone';
 import { nextRetryAt } from './retry';
+import { sendVelocityReviewRunSummary } from './summaryEmail';
 import {
   createOrResumeRun, listCompletedRunDates, loadVelocityReviewControl, selectDueDates,
   transitionRunStatus, withVelocityReviewLock, type VelocityReviewControl,
@@ -287,9 +288,8 @@ function defaultDependencies(dry: boolean): ProcessorDependencies {
     exports: { saveCandidateDecision, createExport, claimNextExport,
       claimDueAcknowledgementCleanup, transitionExportState },
     runs: { withVelocityReviewLock, loadVelocityReviewControl, listCompletedRunDates,
-      createOrResumeRun, transitionRunStatus }, summary: { send: async () => undefined } };
+      createOrResumeRun, transitionRunStatus }, summary: { send: sendVelocityReviewRunSummary } };
 }
-
 export async function runVelocityReviewExport(input: VelocityReviewRunInput = {},
   supplied?: ProcessorDependencies): Promise<VelocityReviewRunResult> {
   const deps = supplied ?? defaultDependencies(input.dryRun === true);

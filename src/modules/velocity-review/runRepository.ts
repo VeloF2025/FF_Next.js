@@ -184,3 +184,15 @@ export async function transitionRunStatus(
   `, [id, expectedStatus, nextStatus, counts]);
   return row ? mapRun(row) : null;
 }
+
+export async function setVelocityReviewSummaryStatus(
+  targetDates: readonly string[],
+  status: Extract<VelocityReviewSummaryStatus, 'sent' | 'failed'>,
+): Promise<void> {
+  if (targetDates.length === 0) return;
+  await query(`
+    UPDATE velocity_review_runs
+    SET summary_status = $2, updated_at = NOW()
+    WHERE target_date = ANY($1::date[])
+  `, [targetDates, status]);
+}
