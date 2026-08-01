@@ -176,19 +176,18 @@ describe('pipeUpstreamResponse', () => {
   });
 
   it('cancels the upstream source when the client disconnects early', async () => {
-    // Deterministic, not timing-based. A web ReadableStream's cancel() fires the moment
-    // Readable.fromWeb tears it down, carrying the reason — so this asserts the teardown
-    // itself rather than sampling a pull counter across wall-clock windows and hoping CI
-    // load does not shift it.
+    // Wait for a real first chunk instead of sleeping and hoping CI load does not move
+    // the stream across the first-byte boundary. The security property is cancellation;
+    // Node may supply different internal destroy reasons for equivalent teardown paths.
     //
     // The property under test: with a bare .pipe() the source is NOT torn down when the
     // destination dies — measured at destroyed === false and still being pulled. On a
     // public unauthenticated proxy that is its own DoS: hang up immediately and leave a
     // large response draining.
-    let cancelReason: { code?: string } | null = null;
+    const notCancelled = Symbol('not-cancelled');
+    let cancelReason: unknown = notCancelled;
     const endless = new ReadableStream<Uint8Array>({
-      async pull(controller) {
-        await new Promise((r) => setTimeout(r, 5));
+      start(controller) {
         controller.enqueue(new Uint8Array(1024));
       },
       cancel(reason) {
@@ -196,15 +195,17 @@ describe('pipeUpstreamResponse', () => {
       },
     });
     const { res, sink } = collectingRes();
+    const firstDownstreamByte = new Promise<void>((resolve) => {
+      sink.once('data', () => resolve());
+    });
 
     const done = pipeUpstreamResponse({ body: endless, arrayBuffer: async () => new ArrayBuffer(0) }, res);
-    await new Promise((r) => setTimeout(r, 20));
+    await firstDownstreamByte;
     sink.destroy(); // client goes away
 
     // Must settle, and must not treat an ordinary hang-up as an error.
     await expect(done).resolves.toBeUndefined();
 
-    expect(cancelReason, 'upstream source was never cancelled — it is still draining').not.toBeNull();
-    expect((cancelReason as unknown as { code?: string })?.code).toBe('ERR_STREAM_PREMATURE_CLOSE');
+    expect(cancelReason, 'upstream source was never cancelled — it is still draining').not.toBe(notCancelled);
   });
 });
