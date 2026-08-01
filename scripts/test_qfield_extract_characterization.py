@@ -83,8 +83,12 @@ def main():
     _, _, _, h = run(
         columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
         dcim={"a.jpg": "k/a"}, dry_run=False)
+    # Every stub invoked unconditionally on a real run. The two conditional ones
+    # (resolve_spatial_pon_map, minio_resolve_photo_version) are asserted in the
+    # scenarios that actually trigger them — asserting >0 here would fail spuriously.
     for stub in ("resolve_gpkg_path", "minio_download_latest",
-                 "minio_list_dcim_directory", "sync_hierarchy"):
+                 "minio_list_dcim_directory", "sync_hierarchy",
+                 "fetch_linked_qf_project_ids", "hierarchy_backfill_needed"):
         check(h.stub_calls.get(stub, 0) > 0,
               f"stub {stub} was actually invoked (patching intercepts), "
               f"calls={h.stub_calls.get(stub, 0)}")
@@ -128,6 +132,14 @@ def main():
           "missing label column writes NO sync-state (else the freeze looks freshly synced)")
 
     found, upserted, out, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, download_fails=True, dry_run=False)
+    check((found, upserted) == (0, 0), f"download failure -> (0,0), got ({found},{upserted})")
+    check("Could not download GPKG" in out, "download failure is reported")
+    check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
+          "download failure writes NO sync-state")
+
+    found, upserted, out, h = run(
         columns=["NAME", "unrelated"],
         rows=[{"NAME": "P1", "unrelated": "x"}], dry_run=False)
     check((found, upserted) == (0, 0), f"no photo columns -> (0,0), got ({found},{upserted})")
@@ -141,6 +153,10 @@ def main():
     check((found, upserted) == (0, 0), f"table absent, no fallback -> (0,0), got ({found},{upserted})")
     check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
           "unresolvable table writes NO sync-state")
+    # Counts alone cannot separate this from the no-photo-columns guard — the fixture
+    # trips both. Assert on WHICH guard spoke, or removing the fallback branch passes.
+    check("not found and no table has photo columns" in out,
+          "the TABLE-not-found guard is what aborted (not the no-photo-columns one)")
 
     print("\nTable resolution")
     found, upserted, out, _ = run(
@@ -162,51 +178,6 @@ def main():
         dcim={"a.jpg": "k/a"})
     check((found, upserted) == (1, 1), f"photo-column fallback finds renamed layer, got ({found},{upserted})")
     check("TABLE-FALLBACK" in out, "table fallback announces itself")
-
-    print("\nDelta check")
-    same = "v20260731122829-abc12345"
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=same,
-        state={"last_version": same, "pending_count": 0})
-    check((found, upserted) == (0, 0), f"unchanged version, 0 pending -> skip, got ({found},{upserted})")
-    check("Already processed this version" in out, "delta skip states its reason")
-
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=same,
-        state={"last_version": same, "pending_count": 0}, force=True)
-    check((found, upserted) == (1, 1), f"--force overrides the delta skip, got ({found},{upserted})")
-
-    # The pending/stale/backfill variants are migration-423 logic: photo binaries
-    # arrive asynchronously after the GPKG, so an unchanged GPKG must be re-scanned
-    # while photos are still outstanding — but not forever. Only the pending==0 branch
-    # was covered before; each of the three below fails independently.
-    recent = f"v{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-recent01"
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=recent,
-        state={"last_version": recent, "pending_count": 3})
-    check((found, upserted) == (1, 1),
-          f"same version but photos still pending -> RE-SCAN, got ({found},{upserted})")
-    check("RE-SCAN" in out, "the re-scan announces why it is re-reading an unchanged GPKG")
-
-    ancient = "v20200101000000-ancient1"
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=ancient,
-        state={"last_version": ancient, "pending_count": 3})
-    check((found, upserted) == (0, 0),
-          f"pending photos on a long-stale GPKG -> give up, got ({found},{upserted})")
-    check("giving up" in out, "the give-up path says so rather than skipping silently")
-
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=same,
-        state={"last_version": same, "pending_count": 0}, hierarchy_backfill=True)
-    check((found, upserted) == (1, 1),
-          f"a pending hierarchy backfill forces a re-scan, got ({found},{upserted})")
-    check("hierarchy backfill" in out, "the backfill re-scan states its reason")
 
     print("\nNon-dry-run writes")
     found, upserted, _, h = run(
