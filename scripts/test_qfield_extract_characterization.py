@@ -116,6 +116,39 @@ def main():
     check(by_key.get("k/civil") == ("pole", "pole_installation"),
           f"a civil photo stays pole/pole_installation, got {by_key.get('k/civil')}")
 
+    # The extra-column loop is a near-copy of the step-column loop, and coverage had
+    # been written against the step copy only — a reviewer found the dedup checks
+    # untested, and sweeping every guard in that loop found four more. Each guard below
+    # fails independently if the extra-column copy loses it.
+    print("\nExtra-column loop guards (the second, near-identical copy)")
+    EX = "Pole Photo"
+    found, upserted, _, _ = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"}, existing_keys=["k/e"])
+    check((found, upserted) == (1, 0), f"extra: exact-key dedup, got ({found},{upserted})")
+
+    found, upserted, _, _ = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"},
+        existing_keys=["projects/x/files/DCIM/e.jpg/v20260101000000-deadbeef"])
+    check((found, upserted) == (1, 0), f"extra: versioned-filename dedup, got ({found},{upserted})")
+
+    found, upserted, _, _ = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"}, existing_photo_keys=["some/prefix/e.jpg"])
+    check((found, upserted) == (1, 0), f"extra: construction_qa_photos dedup, got ({found},{upserted})")
+
+    found, upserted, out, _ = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/gone.jpg"}], dcim={})
+    check((found, upserted) == (1, 0), f"extra: absent photo not upserted, got ({found},{upserted})")
+    check("SKIP (not in MinIO)" in out, "extra: absent photo is reported")
+
+    _, _, _, h = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"}, dry_run=True)
+    check(not h.cursor.ran("INSERT INTO qfield_photo_validations"),
+          "extra: dry-run inserts nothing")
+
     print("\nRow-level skips")
     found, _, _, _ = run(
         columns=["NAME", STEP_1],
