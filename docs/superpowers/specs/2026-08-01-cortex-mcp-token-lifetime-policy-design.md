@@ -11,9 +11,9 @@ The normal Cortex connector flow now uses FibreFlow login and consent. It mints 
 That remains the primary workflow.
 
 FibreFlow also retains an authenticated `POST /api/cortex/mcp-token` operator path
-for clients that cannot complete browser OAuth. The library already models four
-lifetimes (`30d`, `90d`, `1y`, and `never`), but the route currently blocks `never`
-and the signer rejects `1y` and `never` when the verified email is in
+for clients that cannot complete browser OAuth. At approval time, the library already
+modeled four lifetimes (`30d`, `90d`, `1y`, and `never`), but the route blocked
+`never` and the signer rejected `1y` and `never` when the verified email was in
 `CORTEX_SUPER_ADMIN_EMAILS`.
 
 Hein corrected that policy: a super admin may choose the same lifetime as any other

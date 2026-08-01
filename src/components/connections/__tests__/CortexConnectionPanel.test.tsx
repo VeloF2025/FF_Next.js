@@ -179,7 +179,7 @@ describe('CortexConnectionPanel', () => {
   });
 
   it('clears the successful revoke notice as soon as a later mint begins', async () => {
-    renderWithNetwork(<CortexConnectionPanel revokeEnabled />, {
+    const network = renderWithNetwork(<CortexConnectionPanel revokeEnabled />, {
       'DELETE /api/cortex/mcp-token': {
         status: 200,
         body: { data: { revoked: true } },
@@ -198,6 +198,17 @@ describe('CortexConnectionPanel', () => {
 
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.getByRole('button', { name: 'Generating…' })).toBeDisabled();
+    expect(network.recordedRequests()).toEqual([
+      {
+        method: 'DELETE',
+        path: '/api/cortex/mcp-token',
+      },
+      {
+        method: 'POST',
+        path: '/api/cortex/mcp-token',
+        json: { lifetime: '30d' },
+      },
+    ]);
   });
 
   it('surfaces a failed revoke instead of claiming success', async () => {
