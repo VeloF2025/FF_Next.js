@@ -45,6 +45,10 @@ Read this before writing code. Several intuitive assumptions are false.
 
 **FibreFlow already has 153 report/analytics endpoints.** These are presentation (PDF, xlsx, paginated lists), not measurement. Reuse their *SQL logic* where useful; do not proxy them as metrics.
 
+**PORT the existing definition; never re-derive it from table names that sound right.** A blind review of this plan's first draft caught `install_activation_gap` defined as `drops LEFT JOIN oes_activations`, which is wrong twice over: `drops` has no `project` column (it has `project_id uuid` → `projects.project_name`), and `drops.created_at` is the SOW-import timestamp, not the install date — June 2026 shows 3,755 rows against July's 9, which is import batching, not field activity. The metric would have parsed, returned plausible numbers, and been business-wrong. The real definition is on `dr_photo_unified_reviews` (`installation-gaps.ts:102-105`). Before registering any metric that has an existing endpoint, read that endpoint's WHERE clause and port it verbatim.
+
+**Column-type traps verified on the live DB:** `maintenance_tickets.project_id` is **text** holding uuid strings (not a uuid column), and 1,871 rows hold the empty string — `''::uuid` throws, so any join to `projects` must `NULLIF(...,'')::uuid` first. Today zero *open* tickets carry an empty string, so a naive cast happens to pass; the WHERE clause is the only thing preventing the break.
+
 ## Scope
 
 This plan delivers **the platform** — snapshot spine, conformed dimensions, registry, MCP surface — proven by three deliberately shape-diverse metrics. It does **not** deliver the PP lifecycle metrics, reconciliation, the wider catalogue, or the weekly sheet. Those become registry rows once this exists:
@@ -232,15 +236,25 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
   {
     key: 'tickets_open',
     description: 'Open maintenance tickets by status and age',
+    // ⚠️ `maintenance_tickets.project_id` is TEXT holding uuid strings, NOT a uuid
+    // column, so joining `projects.id uuid` needs an explicit cast — and `''::uuid`
+    // throws `invalid input syntax for type uuid: ""`.
+    // Measured today: 1,871 rows carry the empty string, but ZERO of them are in an
+    // open status, so a bare `t.project_id::uuid` currently succeeds. That is luck,
+    // not safety — the WHERE clause is the only thing preventing it. The first open
+    // ticket created with an empty project_id kills the whole nightly snapshot, and
+    // Task 1 Step 7 catches the error per-source, so the failure would be silent in
+    // the response body. NULLIF is free insurance; keep it.
     sql: `
       SELECT
         t.id::text AS entity_id,
-        jsonb_build_object('project_id', t.project_id) AS dims,
+        jsonb_build_object('project', p.project_name) AS dims,
         jsonb_build_object(
           'status',   t.status,
           'age_days', (CURRENT_DATE - t.created_at::date)
         ) AS measures
       FROM maintenance_tickets t
+      LEFT JOIN projects p ON p.id = NULLIF(t.project_id, '')::uuid
       WHERE t.status NOT IN ('resolved','cancelled','verified')
     `,
   },
@@ -690,18 +704,35 @@ export const METRICS: readonly MetricDefinition[] = [
     label: 'installed but not activated',
     description:
       'Drops with an install recorded but no OES activation — work done and paid for that never went live.',
+    // ⚠️ This is a PORT of the existing definition in
+    // `pages/api/activate/reporting/installation-gaps.ts:102-105`, NOT a re-derivation.
+    // Do not "simplify" it back to `drops LEFT JOIN oes_activations`. Two reasons,
+    // both verified against the live DB:
+    //   1. `drops` has no `project` column (it has `project_id uuid` -> `projects`),
+    //      so `d.project` errors with "column d.project does not exist".
+    //   2. `drops.created_at` is the SOW-import timestamp, not the install date —
+    //      June 2026 shows 3,755 and July 2026 shows 9, which is import batching,
+    //      not installation activity. The metric would be dimensionally valid and
+    //      business-wrong.
+    // The real definition lives on `dr_photo_unified_reviews`: installed = a WA
+    // submission OR a 1Map installer name; not activated = `oes_activated_at IS NULL`;
+    // the date basis is COALESCE(wa_received_at, created_at). `u.project` is free
+    // text, so canonical_project() applies directly.
+    // Verified: 2026-06 → Mohadin 154, Lawley 50, Thembisa POP 1 17, Mamelodi 12.
     from: `(
-      SELECT d.drop_number, d.project, d.created_at
-      FROM drops d
-      LEFT JOIN oes_activations a ON a.drop_number = d.drop_number
-      WHERE a.drop_number IS NULL
+      SELECT u.drop_number,
+             u.project,
+             COALESCE(u.wa_received_at, u.created_at) AS installed_at
+      FROM dr_photo_unified_reviews u
+      WHERE u.oes_activated_at IS NULL
+        AND (u.wa_received_at IS NOT NULL OR u.installer_name IS NOT NULL)
     ) src`,
     measure: 'count(*)',
-    dateColumn: 'src.created_at',
+    dateColumn: 'src.installed_at',
     grains: ['day', 'week', 'month', 'range'],
     dimensions: ['project'],
     aliases: ['installation gap', 'installed not activated', 'activation gap', 'never went live'],
-    cite: 'FibreFlow drops LEFT JOIN oes_activations (no activation row) by drops.created_at',
+    cite: 'FibreFlow dr_photo_unified_reviews (oes_activated_at IS NULL AND installed via WA or 1Map) by COALESCE(wa_received_at, created_at)',
     permission: 'analytics.reports',
   },
   {
