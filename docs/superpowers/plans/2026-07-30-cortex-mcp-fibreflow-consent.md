@@ -135,7 +135,7 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 ## Task 1: Establish the clean Cortex branch and extract the compatible OAuth provider
 
 **Files:**
-- Create: `/home/hein/Workspace/Cortex-cortex-mcp-ff-consent`
+- Use: `/home/hein/Workspace/Cortex-mcp-readonly-lifetimes`
 - Create: `apps/cortex_mcp/cortex_mcp_oauth.py`
 - Create: `tests/test_cortex_mcp_oauth.py`
 - Modify: `apps/cortex_mcp/server.py:15-155`
@@ -150,21 +150,18 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 Run:
 
 ```bash
-git -C /home/hein/Workspace/FF_Next.js-cortex-mcp-ff-consent status --short --branch
-git -C /home/hein/Workspace/FF_Next.js-cortex-mcp-ff-consent fetch origin
+git -C /home/hein/Workspace/FF_Next.js-cortex-token-lifetimes status --short --branch
+git -C /home/hein/Workspace/FF_Next.js-cortex-token-lifetimes fetch origin
 git -C /home/hein/Workspace/Cortex status --short --branch
 git -C /home/hein/Workspace/Cortex fetch origin
-git -C /home/hein/Workspace/Cortex worktree add \
-  /home/hein/Workspace/Cortex-cortex-mcp-ff-consent \
-  -b feat/cortex-mcp-ff-consent origin/main
-git -C /home/hein/Workspace/Cortex-cortex-mcp-ff-consent status --short --branch
+git -C /home/hein/Workspace/Cortex-mcp-readonly-lifetimes status --short --branch
 ```
 
 Expected:
 
 - FibreFlow reports only the already-committed spec/plan history.
 - The primary Cortex checkout may remain dirty and ahead; do not modify or clean it.
-- The new Cortex worktree reports branch `feat/cortex-mcp-ff-consent`, upstream `origin/main`, and no changed files.
+- The Cortex worktree reports branch `fix/cortex-mcp-readonly-lifetimes`, upstream `origin/main`, and no changed files.
 - Before FibreFlow implementation starts, rebase its unpushed feature branch onto the freshly fetched `origin/master` from its clean worktree; stop and ask before rewriting it if the branch has been published.
 
 - [ ] **Step 2: Write failing provider compatibility and redirect tests**
@@ -284,7 +281,7 @@ legacy authority as compatible.
 Run:
 
 ```bash
-cd /home/hein/Workspace/Cortex-cortex-mcp-ff-consent
+cd /home/hein/Workspace/Cortex-mcp-readonly-lifetimes
 uv run pytest tests/test_cortex_mcp_oauth.py -q
 ```
 
@@ -1882,7 +1879,7 @@ Expected: focused suites, quick CI, build, antihall, diff, and secret scan PASS.
 Run:
 
 ```bash
-cd /home/hein/Workspace/Cortex-cortex-mcp-ff-consent
+cd /home/hein/Workspace/Cortex-mcp-readonly-lifetimes
 uv run pytest tests/test_cortex_mcp_oauth.py tests/test_cortex_mcp_callback.py \
   tests/test_cortex_mcp.py tests/test_superadmin_bypass.py -q
 uv run pytest tests/test_cortex_mcp.py::TestReadOnlySurface -q
@@ -1951,6 +1948,34 @@ Wait for explicit approval before Task 9.
 - Consumes: reviewed branches, `https://dev.fibreflow.app/api/cortex-remote-mcp/mcp`, isolated Agent Executor `127.0.0.1:17406`, isolated Bridge `127.0.0.1:17403`, isolated Remote MCP `127.0.0.1:17414`, a unique OAuth store/public base, a real Claude custom connector, Lew, and one ordinary user.
 - Produces: evidence of no-token browser consent, tenant-vs-ACL scope, unchanged FibreFlow MCP RBAC, reconnect/revoke behavior, and responsive screenshots.
 
+- [ ] **Step -1: Freeze both reviewed revisions before touching dev**
+
+Record the exact 40-character head SHA approved by both repository reviewers and CI:
+
+```bash
+CORTEX_REVIEW_SHA=<reviewed-cortex-head-sha>
+FIBREFLOW_REVIEW_SHA=<reviewed-fibreflow-head-sha>
+FIBREFLOW_REVIEW_BRANCH=feat/cortex-mcp-token-lifetimes
+CORTEX_REVIEW_WORKTREE="/home/hein/Workspace/Cortex-consent-dev-${CORTEX_REVIEW_SHA:0:12}"
+
+git -C /home/hein/Workspace/Cortex fetch origin
+git -C /home/hein/Workspace/Cortex cat-file -e "${CORTEX_REVIEW_SHA}^{commit}"
+git -C /home/hein/Workspace/Cortex worktree add --detach \
+  "$CORTEX_REVIEW_WORKTREE" "$CORTEX_REVIEW_SHA"
+test "$(git -C "$CORTEX_REVIEW_WORKTREE" rev-parse HEAD)" = "$CORTEX_REVIEW_SHA"
+test -z "$(git -C "$CORTEX_REVIEW_WORKTREE" status --porcelain)"
+
+test "$(git -C /home/hein/Workspace/FF_Next.js-cortex-token-lifetimes rev-parse HEAD)" \
+  = "$FIBREFLOW_REVIEW_SHA"
+test "$(git -C /home/hein/Workspace/FF_Next.js-cortex-token-lifetimes \
+  ls-remote --heads origin "$FIBREFLOW_REVIEW_BRANCH" | awk '{print $1}')" \
+  = "$FIBREFLOW_REVIEW_SHA"
+```
+
+Abort if any equality or clean-worktree check fails. Every isolated Cortex process
+below uses the detached reviewed worktree, and FibreFlow acceptance is invalid unless
+the dev deploy directory reads back exactly `FIBREFLOW_REVIEW_SHA` after deployment.
+
 - [ ] **Step 0: Verify Lew's FibreFlow identity and consent permission**
 
 Use the supported read-only account/RBAC lookup to verify that the account email is
@@ -1996,7 +2021,7 @@ Never bind or call production executor port `7406` during this proof.
 
 ```bash
 systemd-run --user --unit=cortex-agent-executor-consent-dev --collect \
-  --property=WorkingDirectory=/home/hein/Workspace/Cortex-cortex-mcp-ff-consent/apps/agent_executor \
+  --property=WorkingDirectory="$CORTEX_REVIEW_WORKTREE/apps/agent_executor" \
   --property=EnvironmentFile=/home/hein/Workspace/Cortex/.env \
   --property=EnvironmentFile=/home/hein/.hermes/cortex-consent-dev.env \
   /home/hein/.bun/bin/bun run src/server.ts
@@ -2004,6 +2029,7 @@ systemd-run --user --unit=cortex-agent-executor-consent-dev --collect \
 curl --fail --silent http://127.0.0.1:17406/health
 systemctl --user is-active cortex-agent-executor-consent-dev
 systemctl --user show cortex-agent-executor.service -p MainPID -p ActiveEnterTimestamp
+test "$(git -C "$CORTEX_REVIEW_WORKTREE" rev-parse HEAD)" = "$CORTEX_REVIEW_SHA"
 ```
 
 Expected: the isolated executor is healthy on `17406`; the production executor PID
@@ -2019,7 +2045,7 @@ Start the isolated process:
 
 ```bash
 systemd-run --user --unit=cortex-bridge-consent-dev --collect \
-  --property=WorkingDirectory=/home/hein/Workspace/Cortex-cortex-mcp-ff-consent \
+  --property=WorkingDirectory="$CORTEX_REVIEW_WORKTREE" \
   --property=EnvironmentFile=/home/hein/.hermes/.env \
   --property=EnvironmentFile=/home/hein/.hermes/cortex-consent-dev.env \
   /home/hein/.local/bin/uv run uvicorn apps.bridge.main:app \
@@ -2040,16 +2066,15 @@ executor target is `http://127.0.0.1:17406`, never production `7406`.
 
 - [ ] **Step 3: Start the isolated Remote MCP process**
 
-Start it from `/home/hein/Workspace/Cortex-cortex-mcp-ff-consent` with the
-consent-dev environment:
+Start it from the detached `CORTEX_REVIEW_WORKTREE` with the consent-dev environment:
 
 ```bash
 systemd-run --user --unit=cortex-remote-mcp-consent-dev --collect \
-  --property=WorkingDirectory=/home/hein/Workspace/Cortex-cortex-mcp-ff-consent \
+  --property=WorkingDirectory="$CORTEX_REVIEW_WORKTREE" \
   --property=EnvironmentFile=/home/hein/.hermes/.env \
   --property=EnvironmentFile=/home/hein/.hermes/cortex-consent-dev.env \
   /home/hein/.local/bin/uv run \
-    --directory /home/hein/Workspace/Cortex-cortex-mcp-ff-consent \
+    --directory "$CORTEX_REVIEW_WORKTREE" \
     --package cortex-mcp cortex-mcp
 ```
 
@@ -2071,6 +2096,7 @@ After the reviewed feature branch is on GitHub, set FibreFlow dev:
 ```dotenv
 CORTEX_REMOTE_MCP_URL=http://127.0.0.1:17414
 FF_MCP_TOKEN_UI_ENABLED=true
+CORTEX_MCP_TOKEN_UI_ENABLED=true
 ```
 
 Set `CORTEX_MCP_CALLBACK_SECRET` to the same dedicated value through the
@@ -2080,7 +2106,9 @@ the previous values so cleanup can restore them.
 Deploy only the reviewed feature branch:
 
 ```bash
-bash scripts/deploy-local.sh dev --branch feat/cortex-mcp-ff-consent
+bash scripts/deploy-local.sh dev --branch "$FIBREFLOW_REVIEW_BRANCH"
+test "$(sudo -u velo git -C /home/velo/fibreflow-dev rev-parse HEAD)" \
+  = "$FIBREFLOW_REVIEW_SHA"
 ```
 
 Verify `https://dev.fibreflow.app/api/cortex-remote-mcp/.well-known/openid-configuration`, `/connections/fibreflow`, `/connections/cortex`, and `/cortex`. Do not deploy production.
@@ -2134,7 +2162,9 @@ With Hein's rollout approval covering cleanup:
 - run
   `systemctl --user stop cortex-remote-mcp-consent-dev cortex-bridge-consent-dev cortex-agent-executor-consent-dev`;
 - restore FibreFlow dev to its previously recorded branch/upstream values through the supported dev deploy path;
+- restore both dev feature flags to their exact previous values and read them back;
 - verify production Agent Executor, Bridge, and Remote MCP PIDs/start times stayed unchanged throughout;
+- after the isolated units stop, remove only the detached `CORTEX_REVIEW_WORKTREE` through `git worktree remove` and verify the reviewed source worktree remains untouched;
 - retain the isolated store only as long as review evidence requires, then remove it through an explicitly approved recoverable cleanup.
 
 - [ ] **Step 10: Fix any discovered defect through both PR gates**
@@ -2179,6 +2209,13 @@ Read the current production `FF_MCP_TOKEN_UI_ENABLED` value. The
 `true`; if it is absent or false, include that exact server-side flag change in
 Hein's production approval and verify it after deployment. Do not change it as
 an implicit side effect.
+
+Read and record the current production `CORTEX_MCP_TOKEN_UI_ENABLED` value as a
+separate kill switch. The Cortex connection page and both consent APIs require it
+to be exactly `true`. If it is absent or false, include that exact change in Hein's
+production approval, read it back from the deployed server environment before the
+first authorization, and retain the previous value for rollback. Never infer one
+flag from the other.
 
 - [ ] **Step 4: Deploy Cortex Agent Executor first**
 
@@ -2250,7 +2287,10 @@ method/auth failure behavior. The new routes are inert until a user starts autho
 
 - [ ] **Step 9: Execute rollback in this order if any acceptance gate fails**
 
-1. Remove external exposure first: revert/hide the FibreFlow consent/proxy and connection pages through a FibreFlow rollback PR and the supported production deploy script.
+1. Remove external exposure first: restore `CORTEX_MCP_TOKEN_UI_ENABLED` and
+   `FF_MCP_TOKEN_UI_ENABLED` to their exact previous production values, read both
+   back, then revert/hide the FibreFlow consent/proxy and connection pages through
+   a FibreFlow rollback PR and the supported production deploy script.
 2. Restore Cortex normal authorization to the retained `/authorize/approve` implementation through a reviewed rollback PR that keeps the marker gate and unsafe-grant invalidation, then redeploy Remote MCP.
 3. Roll back Bridge read-scope behavior only if required. Remove Lew from `CORTEX_SUPER_ADMIN_EMAILS` only if the access decision itself is being rolled back; preserve every unrelated entry, read back the complete set, and restart only Bridge.
 4. Roll back the Agent Executor last if its deployment itself is defective; never restore external FibreFlow exposure before the Cortex chain is healthy again.
