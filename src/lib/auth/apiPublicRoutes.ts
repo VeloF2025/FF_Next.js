@@ -72,9 +72,29 @@ export function isPublicApiRoute(pathname: string): boolean {
  * A cookies+headers-only check is structurally blind to all of it.
  */
 const CREDENTIAL_QUERY_PARAMS = ['vlmkey', 'secret'] as const;
+const CORTEX_REMOTE_MCP_PREFIX = '/api/cortex-remote-mcp';
 
 /** Param names whose VALUES must never reach a log line. */
 export const SECRET_QUERY_PARAMS: ReadonlySet<string> = new Set(CREDENTIAL_QUERY_PARAMS);
+
+/** Build the query field for the middleware's API Request log. */
+export function apiRequestQueryForLog(
+  pathname: string,
+  searchParams: { entries(): IterableIterator<[string, string]> },
+): Record<string, string> | undefined {
+  if (
+    pathname === CORTEX_REMOTE_MCP_PREFIX ||
+    pathname.startsWith(`${CORTEX_REMOTE_MCP_PREFIX}/`)
+  ) {
+    return undefined;
+  }
+  return Object.fromEntries(
+    [...searchParams.entries()].map(([key, value]) => [
+      key,
+      SECRET_QUERY_PARAMS.has(key) ? '[redacted]' : value,
+    ]),
+  );
+}
 
 /**
  * Whether the request presents ANY credential — session cookie, bearer token, service
