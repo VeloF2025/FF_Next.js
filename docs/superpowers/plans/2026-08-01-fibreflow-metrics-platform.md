@@ -118,49 +118,64 @@ import { writeSnapshot } from '../writer';
 
 const asOf = '2026-08-01';
 
-/** `claimWins` = whether this caller's snapshot_runs claim returns a row. */
-function fakeDeps({ claimWins = true, insertFails = false } = {}) {
+function fakeDeps({ locked = true, alreadyDone = false, insertFails = false } = {}) {
   const calls: string[] = [];
   const query = vi.fn(async (sql: string) => {
     calls.push(sql.trim().split('\n')[0]);
-    if (sql.startsWith('BEGIN') || sql.startsWith('COMMIT') || sql.startsWith('ROLLBACK')) return {};
-    if (sql.includes('INSERT INTO snapshot_runs')) {
-      if (sql.includes("'failed'")) return { rows: [] };          // failure marker
-      return { rows: claimWins ? [{ id: 1 }] : [] };              // the claim
-    }
+    if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql.trim())) return {};
+    if (sql.includes('pg_try_advisory_xact_lock')) return { rows: [{ locked }] };
+    if (sql.includes('SELECT 1 FROM snapshot_runs')) return { rows: alreadyDone ? [{ '?column?': 1 }] : [] };
     if (sql.includes('DELETE FROM metric_snapshots')) return { rowCount: 0 };
     if (sql.includes('INSERT INTO metric_snapshots')) {
       if (insertFails) throw new Error('boom');
       return { rowCount: 2 };
     }
-    if (sql.includes('UPDATE snapshot_runs')) return { rowCount: 1 };
+    if (sql.includes('INSERT INTO snapshot_runs')) return { rowCount: 1 };
     return { rows: [] };
   });
   return { query, calls };
 }
 
+const wrote = (deps: { calls: string[] }) =>
+  deps.calls.some((c) => c.includes('INSERT INTO metric_snapshots'));
+
 describe('writeSnapshot', () => {
-  it('writes rows when it wins the claim', async () => {
-    const deps = fakeDeps({ claimWins: true });
-    const result = await writeSnapshot('pp_open', asOf, deps);
-    expect(result).toEqual({ rows: 2, skipped: false });
+  it('writes rows and logs completion when it takes the lock', async () => {
+    const deps = fakeDeps();
+    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 2, skipped: false });
     expect(deps.calls).toContain('COMMIT');
+    expect(deps.calls.some((c) => c.includes('INSERT INTO snapshot_runs'))).toBe(true);
   });
 
-  it('skips without writing when another run already holds the claim', async () => {
-    const deps = fakeDeps({ claimWins: false });
-    const result = await writeSnapshot('pp_open', asOf, deps);
-    expect(result).toEqual({ rows: 0, skipped: true });
-    // Critical: it must NOT have inserted snapshot rows after losing the claim.
-    expect(deps.calls.some((c) => c.includes('INSERT INTO metric_snapshots'))).toBe(false);
+  it('skips without writing when a concurrent run holds the lock', async () => {
+    const deps = fakeDeps({ locked: false });
+    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 0, skipped: true });
+    expect(wrote(deps)).toBe(false);
     expect(deps.calls).toContain('ROLLBACK');
   });
 
-  it('rolls back and marks the run failed when the insert throws', async () => {
-    const deps = fakeDeps({ claimWins: true, insertFails: true });
+  it('skips when the day is already complete', async () => {
+    const deps = fakeDeps({ alreadyDone: true });
+    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 0, skipped: true });
+    expect(wrote(deps)).toBe(false);
+  });
+
+  it('rolls back and records nothing when the insert throws, so the day retries', async () => {
+    const deps = fakeDeps({ insertFails: true });
     await expect(writeSnapshot('pp_open', asOf, deps)).rejects.toThrow('boom');
     expect(deps.calls).toContain('ROLLBACK');
-    expect(deps.calls.some((c) => c.includes('UPDATE snapshot_runs'))).toBe(false);
+    // No completion row: absence of it is what makes the next run retry.
+    expect(deps.calls.some((c) => c.includes('INSERT INTO snapshot_runs'))).toBe(false);
+  });
+
+  it('surfaces the original error even when ROLLBACK itself fails', async () => {
+    const deps = fakeDeps({ insertFails: true });
+    const inner = deps.query;
+    deps.query = vi.fn(async (sql: string, params?: unknown[]) => {
+      if (sql.trim().startsWith('ROLLBACK')) throw new Error('rollback exploded');
+      return inner(sql, params);
+    }) as typeof inner;
+    await expect(writeSnapshot('pp_open', asOf, deps)).rejects.toThrow('boom');
   });
 
   it('rejects an unregistered source rather than silently writing nothing', async () => {
@@ -208,27 +223,35 @@ CREATE INDEX IF NOT EXISTS metric_snapshots_dims_gin
 COMMENT ON TABLE metric_snapshots IS
   'Append-only point-in-time snapshots. One row per (source, day, entity). Never updated in place.';
 
--- Completion ledger. Without this, "has this day been written?" can only be answered
--- by count(*) > 0, which cannot distinguish a COMPLETE snapshot from a PARTIAL one —
--- so a half-written day would be skipped forever and silently under-report.
+-- Completion LOG — deliberately not a lock.
+--
+-- "Has this day been written?" cannot be answered by count(*) > 0 on
+-- metric_snapshots, because that cannot distinguish COMPLETE from PARTIAL, so a
+-- half-written day would be skipped forever and silently under-report. This table
+-- answers it: a day is written iff a 'complete' row exists here.
+--
+-- Mutual exclusion is handled by a transaction-scoped ADVISORY LOCK in the writer,
+-- NOT by a claim row here. An earlier draft used a claim row with a status machine
+-- (running/failed, DO UPDATE WHERE status='failed', a failure marker written after
+-- ROLLBACK). Review found four defects in it: unbounded lock waiting on the unique
+-- index, a permanently unreclaimable 'running' state, a stale failure marker able to
+-- overwrite a later success, and a recovery path that could not occur as documented.
+-- The advisory lock has none of those: it is non-blocking, and it is released
+-- automatically on commit, rollback, crash or disconnect. Do not reintroduce a
+-- status machine here.
 CREATE TABLE IF NOT EXISTS snapshot_runs (
   id           BIGSERIAL PRIMARY KEY,
   source_key   TEXT        NOT NULL,
   as_of_date   DATE        NOT NULL,
-  status       TEXT        NOT NULL DEFAULT 'running'
-                 CHECK (status IN ('running','complete','failed')),
-  row_count    INTEGER,
-  error        TEXT,
-  started_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
+  row_count    INTEGER     NOT NULL,
+  completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- The claim lock: two concurrent crons cannot both insert this row.
 CREATE UNIQUE INDEX IF NOT EXISTS snapshot_runs_source_date_key
   ON snapshot_runs (source_key, as_of_date);
 
 COMMENT ON TABLE snapshot_runs IS
-  'One row per (source, day). Claimed atomically before writing; marked complete with the final row count. A day is written iff a complete row exists here.';
+  'Completion log. A (source, day) is written iff a row exists here. Mutual exclusion is an advisory lock in the writer, not this table.';
 ```
 
 ```sql
@@ -290,7 +313,7 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
         ) AS measures
       FROM oes_pp_data p
       WHERE p.activated_at IS NULL
-        AND p.resolution_status <> 'activated'
+        AND p.resolution_status IS DISTINCT FROM 'activated'
     `,
   },
   {
@@ -344,15 +367,24 @@ export interface SnapshotResult {
 /**
  * Write one day's snapshot for `sourceKey`, exactly once.
  *
- * Concurrency model — a pre-count is NOT sufficient and must not be reintroduced:
- *   - Two crons firing together can both observe count(*) = 0 and both proceed.
- *   - count(*) > 0 cannot distinguish a COMPLETE snapshot from a PARTIAL one, so a
- *     half-written day would be skipped forever and silently under-report.
- * Instead we claim a `snapshot_runs` row inside a transaction. The unique index on
- * (source_key, as_of_date) makes the claim the lock: the loser's INSERT conflicts,
- * returns no row, and it backs off. The claim, the data insert, and the completion
- * marker all commit together, so a crash mid-write leaves a 'running' row that a
- * later run can detect and retry rather than a partial day that looks finished.
+ * Concurrency: a transaction-scoped ADVISORY LOCK, taken with the non-blocking
+ * `pg_try_advisory_xact_lock`. Everything happens in one transaction, so:
+ *   - two concurrent runs      -> the second gets `false` IMMEDIATELY and skips
+ *                                 (non-blocking: no unbounded wait on a unique index)
+ *   - crash / disconnect       -> lock auto-released, no snapshot_runs row written,
+ *                                 so the next run simply retries. There is no stuck
+ *                                 state to reclaim and no lease to expire.
+ *   - already done             -> a snapshot_runs row exists, so it skips
+ *   - previous attempt failed  -> no snapshot_runs row exists, so it retries
+ *
+ * There is deliberately NO status machine and NO failure marker. Absence of a
+ * snapshot_runs row IS the retry signal. An earlier draft used a claim row with
+ * running/failed states; review found four defects in it (unbounded lock waiting,
+ * an unreclaimable 'running' state, a stale failure marker overwriting a later
+ * success, and an impossible documented recovery path). Do not reintroduce it.
+ *
+ * A pre-count on metric_snapshots is NOT a substitute: it cannot distinguish a
+ * COMPLETE snapshot from a PARTIAL one.
  */
 export async function writeSnapshot(
   sourceKey: string,
@@ -366,25 +398,31 @@ export async function writeSnapshot(
 
   await deps.query('BEGIN');
   try {
-    // Claim. A prior 'complete' or in-flight 'running' row conflicts and yields nothing.
-    // A previously 'failed' row is reclaimed so a bad day can be retried.
-    const claim = await deps.query(
-      `INSERT INTO snapshot_runs (source_key, as_of_date, status)
-       VALUES ($1, $2::date, 'running')
-       ON CONFLICT (source_key, as_of_date) DO UPDATE
-         SET status = 'running', started_at = NOW(), error = NULL
-         WHERE snapshot_runs.status = 'failed'
-       RETURNING id`,
+    // Non-blocking. hashtext() is stable within a major version, and a hash collision
+    // across two different sources on the same night only costs one skipped run,
+    // which the next night's run corrects — it can never corrupt data.
+    const lock = await deps.query(
+      `SELECT pg_try_advisory_xact_lock(hashtext($1 || ':' || $2)) AS locked`,
       [sourceKey, asOf],
     );
-
-    if (!claim.rows?.length) {
+    if ((lock.rows?.[0] as { locked?: boolean })?.locked !== true) {
       await deps.query('ROLLBACK');
-      log.info('Snapshot already claimed — skipping', { sourceKey, asOf });
+      log.info('Snapshot locked by a concurrent run — skipping', { sourceKey, asOf });
       return { rows: 0, skipped: true };
     }
 
-    // Clear any rows left by a failed attempt so the retry is not a partial merge.
+    const done = await deps.query(
+      `SELECT 1 FROM snapshot_runs WHERE source_key = $1 AND as_of_date = $2::date`,
+      [sourceKey, asOf],
+    );
+    if (done.rows?.length) {
+      await deps.query('ROLLBACK');
+      log.info('Snapshot already complete — skipping', { sourceKey, asOf });
+      return { rows: 0, skipped: true };
+    }
+
+    // Clear anything a previous rolled-back attempt somehow left, so this is a clean
+    // write rather than a partial merge.
     await deps.query(
       `DELETE FROM metric_snapshots WHERE source_key = $1 AND as_of_date = $2::date`,
       [sourceKey, asOf],
@@ -399,8 +437,7 @@ export async function writeSnapshot(
     const rows = inserted.rowCount ?? 0;
 
     await deps.query(
-      `UPDATE snapshot_runs SET status = 'complete', row_count = $3, completed_at = NOW()
-       WHERE source_key = $1 AND as_of_date = $2::date`,
+      `INSERT INTO snapshot_runs (source_key, as_of_date, row_count) VALUES ($1, $2::date, $3)`,
       [sourceKey, asOf, rows],
     );
 
@@ -408,17 +445,12 @@ export async function writeSnapshot(
     log.info('Snapshot written', { sourceKey, asOf, rows });
     return { rows, skipped: false };
   } catch (error) {
-    await deps.query('ROLLBACK');
-    // Record the failure OUTSIDE the rolled-back transaction so the next run can retry.
-    await deps
-      .query(
-        `INSERT INTO snapshot_runs (source_key, as_of_date, status, error)
-         VALUES ($1, $2::date, 'failed', $3)
-         ON CONFLICT (source_key, as_of_date) DO UPDATE
-           SET status = 'failed', error = EXCLUDED.error`,
-        [sourceKey, asOf, error instanceof Error ? error.message : String(error)],
-      )
-      .catch((markError) => log.error('Could not mark snapshot failed', { sourceKey, asOf, markError }));
+    // Roll back, but never let a rollback failure mask the original error.
+    try {
+      await deps.query('ROLLBACK');
+    } catch (rollbackError) {
+      log.error('Snapshot rollback failed', { sourceKey, asOf, rollbackError });
+    }
     throw error;
   }
 }
@@ -447,7 +479,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     log.error('CRON_SECRET is not configured — refusing to run snapshot');
-    return apiResponse.internalError(res, 'Cron secret not configured');
+    return apiResponse.internalError(
+      res,
+      new Error('CRON_SECRET is not set'),
+      'Cron secret not configured',
+    );
   }
   if (req.headers.authorization !== `Bearer ${secret}`) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
@@ -477,7 +513,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (failed.length) {
-    return apiResponse.internalError(res, `Snapshot sources failed: ${failed.join(', ')}`);
+    return apiResponse.internalError(
+      res,
+      new Error(`Snapshot sources failed: ${failed.join(', ')}`),
+      `Snapshot sources failed: ${failed.join(', ')}`,
+    );
   }
   return apiResponse.success(res, { asOf, results });
 }
@@ -1037,9 +1077,15 @@ export function buildMetricQuery(
   });
 
   const hasPeriod = query.grain !== 'range' && Boolean(def.dateColumn);
+  // to_char, NOT ::date. node-postgres parses a DATE column (OID 1082) into a JS
+  // Date object, and `String(thatDate).slice(0,10)` yields "Mon Jul 21" — not an
+  // ISO date. That corrupts the API's `period` field AND breaks any lexical
+  // comparison built on it (which is how the cumulative total picks its period).
+  // Returning text from SQL makes the value ISO by construction and removes the
+  // JS date-marshalling step entirely. Verified against the live DB.
   const periodExpr = hasPeriod
-    ? `date_trunc('${GRAIN_TRUNC[query.grain as Exclude<Grain, 'range'>]}', ${def.dateColumn})::date`
-    : 'NULL::date';
+    ? `to_char(date_trunc('${GRAIN_TRUNC[query.grain as Exclude<Grain, 'range'>]}', ${def.dateColumn}), 'YYYY-MM-DD')`
+    : 'NULL::text';
 
   const groupCols = [...(hasPeriod ? ['period'] : []), ...selected.map((s) => s.key)];
 
@@ -1057,7 +1103,7 @@ export function buildMetricQuery(
     // `BETWEEN '2026-07-01' AND '2026-07-31'` resolves the upper bound to
     // 2026-07-31 00:00:00 and silently discards ~24h of the final day.
     // `>= from AND < to + 1 day` is correct for both date and timestamp columns.
-    where.push(`${def.dateColumn} >= $1::date AND ${def.dateColumn} < ($2::date + INTERVAL '1 day')`);
+    where.push(`${def.dateColumn} >= $1::date AND ${def.dateColumn} < ($2::date + 1)`);
   }
   if (def.filter) where.push(`(${def.filter})`);
 
@@ -1280,13 +1326,24 @@ git commit -m "feat(metrics): add intent matching that returns candidates instea
 ```typescript
 // pages/api/__tests__/metrics-query.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import handler from '../metrics-query';
+// Import the NAMED handler, not the default export. The default is wrapped in
+// withAuth, so an unauthenticated request returns 401 before reaching any of the
+// 400/404/405 paths below — the assertions would pass against the wrong status.
+// Auth itself is covered separately in the RBAC tests.
+import { handler } from '../metrics-query';
 
 function mockRes() {
   const res: Record<string, unknown> = {};
   res.status = vi.fn().mockReturnValue(res);
   res.json = vi.fn().mockReturnValue(res);
-  return res as { status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> };
+  // methodNotAllowed sets the Allow header; without this the 405 test throws
+  // "res.setHeader is not a function" instead of asserting the status.
+  res.setHeader = vi.fn().mockReturnValue(res);
+  return res as {
+    status: ReturnType<typeof vi.fn>;
+    json: ReturnType<typeof vi.fn>;
+    setHeader: ReturnType<typeof vi.fn>;
+  };
 }
 
 const get = (query: Record<string, string>) => ({ method: 'GET', query }) as never;
@@ -1339,6 +1396,38 @@ describe('GET /api/metrics-query', () => {
     await handler(get({ key: 'zone_uptake', from: '2020-01-01', to: '2026-07-31', grain: 'week' }), res as never);
     expect(res.status).toHaveBeenCalledWith(400);
   });
+
+  it('rejects year 0000, which JS accepts but PostgreSQL cannot parse', async () => {
+    const res = mockRes();
+    await handler(get({ key: 'zone_uptake', from: '0000-01-01', to: '0000-01-02', grain: 'week' }), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects a duplicated query parameter rather than silently taking the first', async () => {
+    const res = mockRes();
+    await handler(
+      { method: 'GET', query: { key: ['zone_uptake', 'pp_open_balance'], from: '2026-07-01', to: '2026-07-31', grain: 'week' } } as never,
+      res as never,
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects an empty dimension token rather than normalising it away', async () => {
+    const res = mockRes();
+    await handler(
+      get({ key: 'zone_uptake', from: '2026-07-01', to: '2026-07-31', grain: 'week', dimensions: 'project,,zone' }),
+      res as never,
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('counts an inclusive range correctly at the boundary', async () => {
+    // 2026-01-01..2026-12-31 is exactly 366 days in a leap year — allowed.
+    // Adding one more day must be rejected, proving the +1 is present.
+    const res = mockRes();
+    await handler(get({ key: 'zone_uptake', from: '2026-01-01', to: '2027-01-01', grain: 'week' }), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
 });
 ```
 
@@ -1368,6 +1457,8 @@ export interface MetricResponse {
   grain: string;
   /** True when `total` is the latest period's running total, not a sum of the series. */
   cumulative: boolean;
+  /** For a cumulative metric, the period `total` is "as at". Null otherwise. */
+  total_period: string | null;
   as_of: string;
   total: number;
   series: MetricSeriesPoint[];
@@ -1398,6 +1489,13 @@ export async function executeMetric(
     // pooled connection. BEGIN + SET LOCAL + COMMIT is the only correct form.
     await client.query('BEGIN');
     await client.query("SET LOCAL statement_timeout = '8s'");
+    // Pin the session timezone. `date_trunc` and the date-range comparison on a
+    // TIMESTAMPTZ column both resolve against it, so leaving it at the server
+    // default (UTC) silently shifts every day/week boundary by 2 hours — a row
+    // captured at 01:00 SAST would land in the previous day. The business day is
+    // SAST, so the metric layer must say so rather than inherit whatever the
+    // connection happened to have.
+    await client.query("SET LOCAL TIME ZONE 'Africa/Johannesburg'");
     const result = await client.query(sql, params);
     rows = result.rows;
     await client.query('COMMIT');
@@ -1417,19 +1515,29 @@ export async function executeMetric(
     const dimensions: Record<string, string | null> = {};
     for (const d of query.dimensions) dimensions[d] = (r[d] as string | null) ?? null;
     return {
-      period: r.period ? String(r.period).slice(0, 10) : null,
+      // Already 'YYYY-MM-DD' text from to_char — no Date marshalling, no slicing.
+      period: (r.period as string | null) ?? null,
       dimensions,
       value: Number(r.value ?? 0),
     };
   });
 
-  // A cumulative series is a sequence of running totals — summing it is meaningless.
-  // The total is the LAST period's value (summed across dimensions within that period).
+  // A cumulative series is a sequence of running totals; summing it is meaningless.
+  // `total` is the sum across dimensions WITHIN the latest period present, and
+  // `total_period` names that period so the consumer is never guessing.
+  //
+  // Documented limitation: if one dimension value stops reporting earlier than
+  // another, it is absent from the latest period and so excluded from `total`.
+  // That is the correct reading of "as at the latest period" and is why
+  // `total_period` is returned — a caller comparing totals across requests can
+  // see the as-at date shift. Do not silently carry values forward.
   let total: number;
+  let totalPeriod: string | null = null;
   if (def.cumulative) {
     const periods = series.map((p) => p.period).filter((p): p is string => p !== null);
-    const latest = periods.length ? periods.reduce((a, b) => (a > b ? a : b)) : null;
-    total = series.filter((p) => p.period === latest).reduce((sum, p) => sum + p.value, 0);
+    // Lexical max is correct because to_char guarantees zero-padded ISO.
+    totalPeriod = periods.length ? periods.reduce((a, b) => (a > b ? a : b)) : null;
+    total = series.filter((p) => p.period === totalPeriod).reduce((sum, p) => sum + p.value, 0);
   } else {
     total = series.reduce((sum, p) => sum + p.value, 0);
   }
@@ -1441,6 +1549,7 @@ export async function executeMetric(
     label: def.label,
     grain: query.grain,
     cumulative: def.cumulative === true,
+    total_period: totalPeriod,
     as_of: asOf,
     total,
     series,
@@ -1459,11 +1568,19 @@ export async function executeMetric(
 
 ```typescript
 // pages/api/metrics-list.ts
+// GET-only and authenticated. The catalogue enumerates internal table names and
+// predicates in `cite`, which is operational detail — it does not belong on an
+// anonymous endpoint. GET-only both matches the MCP restriction and stops the
+// route answering to verbs it has no handler for.
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { METRICS } from '@/modules/metrics/registry';
 
-export default async function handler(_req: NextApiRequest, res: NextApiResponse) {
+export async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
+  }
   return apiResponse.success(
     res,
     METRICS.map((m) => ({
@@ -1480,7 +1597,11 @@ export default async function handler(_req: NextApiRequest, res: NextApiResponse
     })),
   );
 }
+
+export default withAuth(handler);
 ```
+
+**Both endpoints export the wrapped handler as default and the bare handler as a named export.** Tests import the *named* `handler` so they exercise the 400/404/405 paths directly; a test hitting the wrapped default gets 401 before reaching any of them, which is how the first draft's endpoint tests were silently asserting nothing.
 
 ```typescript
 // pages/api/metrics-query.ts
@@ -1497,12 +1618,19 @@ import { log } from '@/lib/logger';
 import { findMetric } from '@/modules/metrics/registry';
 import { executeMetric } from '@/modules/metrics/registry/execute';
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+// Year 0000 is rejected: it satisfies the JS Date round-trip but PostgreSQL has no
+// year zero and errors at parse time, which would surface as a 500 rather than a 400.
+const ISO_DATE = /^(?!0000)\d{4}-\d{2}-\d{2}$/;
 const MAX_RANGE_DAYS = 366;
 
-/** Query params arrive as string | string[] | undefined; take the first value. */
-function one(v: string | string[] | undefined): string | undefined {
-  return Array.isArray(v) ? v[0] : v;
+/**
+ * Query params arrive as string | string[] | undefined. A repeated param
+ * (`?key=a&key=b`) is REJECTED rather than silently resolved to the first value —
+ * a caller sending two values has a bug, and picking one hides it.
+ */
+function one(name: string, v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) throw new Error(`duplicate query parameter: ${name}`);
+  return v;
 }
 
 /** A real calendar date, not just the right shape — rejects 2026-02-31. */
@@ -1512,17 +1640,23 @@ function isValidDate(s: string): boolean {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     // Signature is (res, method, allowedMethods) — three args. Two throws downstream.
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
-  const key = one(req.query.key as string | string[] | undefined);
-  const from = one(req.query.from as string | string[] | undefined);
-  const to = one(req.query.to as string | string[] | undefined);
-  const grain = one(req.query.grain as string | string[] | undefined);
-  const rawDims = one(req.query.dimensions as string | string[] | undefined) ?? '';
+  let key: string | undefined, from: string | undefined, to: string | undefined;
+  let grain: string | undefined, rawDims: string;
+  try {
+    key = one('key', req.query.key as string | string[] | undefined);
+    from = one('from', req.query.from as string | string[] | undefined);
+    to = one('to', req.query.to as string | string[] | undefined);
+    grain = one('grain', req.query.grain as string | string[] | undefined);
+    rawDims = one('dimensions', req.query.dimensions as string | string[] | undefined) ?? '';
+  } catch (error) {
+    return apiResponse.badRequest(res, error instanceof Error ? error.message : 'bad query');
+  }
 
   if (!key || !from || !to || !grain) {
     return apiResponse.badRequest(res, 'key, from, to and grain are required');
@@ -1533,8 +1667,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (from > to) {
     return apiResponse.badRequest(res, `from (${from}) must not be after to (${to})`);
   }
+  // The range is INCLUSIVE of both ends, so a from==to request spans 1 day.
+  // Comparing the raw difference would allow MAX_RANGE_DAYS + 1 calendar days.
   const spanDays =
-    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
   if (spanDays > MAX_RANGE_DAYS) {
     return apiResponse.badRequest(
       res,
@@ -1542,8 +1678,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
   }
 
-  // Comma-separated, trimmed, de-duplicated, order preserved.
-  const dimensions = [...new Set(rawDims.split(',').map((d) => d.trim()).filter(Boolean))];
+  // Comma-separated, trimmed, de-duplicated, order preserved. An empty token
+  // (`dimensions=project,,pop`) is a caller bug, so reject rather than normalise.
+  const dimTokens = rawDims ? rawDims.split(',').map((d) => d.trim()) : [];
+  if (dimTokens.some((d) => d === '')) {
+    return apiResponse.badRequest(res, 'dimensions must not contain empty values');
+  }
+  const dimensions = [...new Set(dimTokens)];
 
   const def = findMetric(key);
   if (!def) return apiResponse.notFound(res, 'Metric', key);
@@ -1558,7 +1699,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.badRequest(res, message);
     }
     log.error('Metric query failed', { key, error });
-    return apiResponse.internalError(res, 'Metric execution failed');
+    return apiResponse.internalError(res, error, 'Metric execution failed');
   }
 }
 ```
@@ -1590,8 +1731,34 @@ import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
     (await userHasPermission(userId, def.permission, 'view'));
   if (!allowed) return apiResponse.forbidden(res, `Permission required: ${def.permission}`);
 
-// ...and at the bottom of the file:
+// ...and at the bottom of the file (the handler itself stays a NAMED export so
+// tests can exercise the 400/404/405 paths without authenticating):
 export default withAuth(handler);
+```
+
+Then add the RBAC tests against the **default** export, which is the wrapped one:
+
+```typescript
+// pages/api/__tests__/metrics-query.auth.test.ts
+import { describe, it, expect, vi } from 'vitest';
+import wrapped from '../metrics-query';
+
+// mockRes() as above, including setHeader.
+describe('metrics-query auth', () => {
+  it('returns 401 with no session', async () => {
+    const res = mockRes();
+    await wrapped({ method: 'GET', query: {}, headers: {}, cookies: {} } as never, res as never);
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+
+  it('returns 401 when req.user is absent even though withAuth ran', async () => {
+    // Guards the fail-open shape directly: a null user must deny, not fall through
+    // to the super_admin comparison and past it.
+    const res = mockRes();
+    await handler({ method: 'GET', query: { key: 'zone_uptake', from: '2026-07-01', to: '2026-07-31', grain: 'week' } } as never, res as never);
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+});
 ```
 
 Add tests asserting an unauthenticated request returns **401**, an authenticated-but-unpermitted one returns **403**, and — critically — that a request with **no user object at all** returns 401 rather than falling through to success.
@@ -1670,9 +1837,10 @@ git commit -m "docs(metrics): how to register a new metric"
 
 | Gate | Check |
 |---|---|
-| Snapshot spine | Rows land 3 nights running; a second same-day run changes no counts; `snapshot_runs` has one `complete` row per source per day |
-| Snapshot concurrency | Two `writeSnapshot` calls raced against the live DB → exactly one writes, the other reports `skipped`, and `metric_snapshots` count is unchanged by the loser |
-| Snapshot recovery | Kill a run mid-write → the row is `failed` or `running`, never `complete`; the next run reclaims and completes it |
+| Snapshot spine | Rows land 3 nights running; a second same-day run changes no counts; `snapshot_runs` has exactly one row per source per day |
+| Snapshot concurrency | Two `writeSnapshot` calls raced against the live DB → exactly one writes, the other returns `skipped` **without blocking**, and the loser changes no counts |
+| Snapshot recovery | Kill a run mid-write → **no** `snapshot_runs` row and **no** partial `metric_snapshots` rows survive (the transaction rolled back and the advisory lock auto-released); the next run writes the day cleanly |
+| Period type | `period` in every response matches `^\d{4}-\d{2}-\d{2}$`. A `Date`-stringified value like `Mon Jul 21` means the `to_char` was reverted |
 | Conformed dimensions | `TEM-3` and `ETW-2` appear in no metric output; SQL/TS parity test passes |
 | Registry | Every metric executes for every declared grain × dimension against the live schema |
 | **Cumulative** | `zone_uptake` for a multi-week range returns `total` = the **last** week (≈23,732), not the sum (≈91,296) |
