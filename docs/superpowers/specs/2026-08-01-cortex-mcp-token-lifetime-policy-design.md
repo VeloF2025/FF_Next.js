@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-01
 **Status:** Approved by Hein
-**Repository:** FibreFlow Next.js
+**Repositories:** FibreFlow Next.js and Cortex
 
 ## Context
 
@@ -30,6 +30,10 @@ authorized user, including one year or no expiry.
    need that allowlist for token-lifetime policy.
 5. Keep Cortex MCP read-only and preserve all existing identity, RBAC, tenant,
    revocation, signing, OAuth, and callback-secret boundaries.
+6. Treat Cortex as the authoritative read-only enforcement point. FibreFlow's proxy
+   mirrors the allowlist as defense in depth, but a marked Cortex MCP bearer must be
+   unable to reach a write-capable Cortex execution path even through direct Bridge
+   access or a framework routing near miss.
 
 ## Considered approaches
 
@@ -124,21 +128,31 @@ than mocks:
   reveals the returned token once, describes indefinite expiry accurately, and keeps
   revoke available;
 - the normal connector card remains the primary UI and contains no token-paste step;
-- focused Vitest, `npm run ci:quick`, build, and Playwright cover the change.
+- real signed-bearer Cortex tests prove the authoritative route matrix, safe answer
+  execution, full-scope-only derived stores, and immediate revocation; and
+- focused Vitest/Pytest, repository CI, build, and Playwright cover the coordinated
+  change.
 
 No live token values, cookies, retrieved Cortex content, or secrets may appear in test
 output, screenshots, commits, or PR text.
 
 ## Rollout and rollback
 
-All code changes go through a FibreFlow PR. No Cortex repository change is required.
-Deploy dev first through `scripts/deploy-local.sh`, verify the real Advanced mint and
-revoke journey on an isolated test token, then request separate approval before any
-production promotion.
+All code changes go through coordinated FibreFlow and Cortex PRs. No merge,
+configuration change, restart, or deployment is authorized until review is complete
+and Hein explicitly approves the relevant rollout step.
 
-Rollback reverts the FibreFlow PR and deploys through the same supported script.
-Existing OAuth grants and already-issued manual tokens remain governed by their JWT
-claims and the existing revocation epoch; rollback does not silently revoke users.
+When rollout is approved, Cortex's authoritative read-only enforcement deploys to dev
+first and must pass real negative mutation, routing-near-miss, safe-answer,
+full-scope-derived-store, and immediate-revocation tests. Only then may the FibreFlow
+UI/proxy deploy to dev through `scripts/deploy-local.sh` for the visibility-only
+browser flow and an isolated real connector test. Production remains a separate
+explicit approval gate, in the same Cortex-first order.
+
+Rollback removes the FibreFlow UI/proxy exposure before reverting Cortex enforcement;
+each repository uses its supported deployment path. Existing OAuth grants and
+already-issued manual tokens remain governed by their JWT claims and the existing
+revocation epoch; rollback does not silently revoke users.
 
 ## Non-goals
 

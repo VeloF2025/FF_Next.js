@@ -74,7 +74,7 @@ const handler: NextApiHandler = async (req: NextApiRequest, res: NextApiResponse
   }
 
   if (hasUnsafeDotSegment(req)) {
-    return apiResponse.notFound(res, 'Cortex Bridge route');
+    return apiResponse.forbidden(res, 'Cortex Bridge request is not permitted');
   }
 
   const parts = pathSegments(req);

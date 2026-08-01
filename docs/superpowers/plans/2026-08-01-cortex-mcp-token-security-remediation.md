@@ -16,7 +16,9 @@ Close the final-review blockers without changing the approved product behavior:
 - revoke-all cannot leave an equal-second token valid;
 - the public FibreFlow bridge proxy exposes only the exact read operations used by Cortex MCP plus self-revoke;
 - identity remains derived only from the verified FibreFlow session;
-- Cortex remains tenant-scoped, per-user ACL-filtered, and read-only.
+- Cortex remains tenant-scoped and read-only: query/timeline/meeting retrieval stays
+  per-user ACL-filtered, while derived stores without per-user provenance are
+  restricted to verified full-tenant principals.
 
 ## Enforcement contract
 
@@ -35,9 +37,33 @@ The Cortex Bridge admits marked tokens only for this exact matrix:
 | `GET` | `/api/meetings/{meeting_id}/pack` | Meeting evidence-pack retrieval |
 | `POST` | `/api/mcp-tokens/revoke` | The sole mutation: revoke the verified caller's own MCP tokens |
 
-Every other method/path pair is denied with a generic 403 before its route handler executes. The FibreFlow bridge proxy mirrors the same matrix as defense in depth; Cortex remains the authoritative enforcement point for direct bridge access.
+Every other method/path pair is denied with a generic 403 before its route handler
+executes. A deny-only Cortex pre-routing filter recognizes the marked-token policy
+only to reject disallowed framework near misses such as unknown paths, trailing-slash
+variants, and unsupported methods. It never grants access or supplies identity.
+Matched handlers still use verified `require_auth`, which remains authoritative for
+signature, issuer, tenant, session identity, revocation, and route-policy decisions.
+The FibreFlow bridge proxy mirrors the same matrix as defense in depth; Cortex remains
+the authoritative enforcement point for direct bridge access.
 
-Revocation changes from `iat < min_iat` to conservative `iat <= min_iat`. A token minted in the same second as the cutoff is rejected. A newly minted token may need the next JWT second to become usable; that is preferable to falsely reporting a still-valid indefinite bearer as revoked.
+For marked MCP tokens, `POST /api/answer` uses a dedicated read-only synthesis mode
+for every decomposition, synthesis, and critique call. That mode has no Agent SDK
+tools, MCP servers, setting sources, session persistence, permission bypass, or
+transcript sink, and is limited to one turn. The ordinary non-MCP answer behavior is
+unchanged.
+
+The facts and entity-profile stores do not retain enough source provenance to apply
+per-user ACLs safely. Marked MCP access to those derived stores therefore requires a
+verified service or configured super-admin full-tenant principal (including the
+preserved `CORTEX_SUPER_ADMIN_EMAILS` entries); ordinary/channel-scoped principals
+receive the same generic 403 before any store lookup.
+
+Revocation changes from `iat < min_iat` to conservative `iat <= min_iat`. A token
+minted in the same second as the cutoff is rejected. Repeated or out-of-order revoke
+writes are monotonic: the in-memory store retains the maximum epoch and PostgreSQL
+uses `GREATEST(existing, incoming)`. A newly minted token may need the next JWT second
+to become usable; that is preferable to falsely reporting a still-valid indefinite
+bearer as revoked.
 
 ## Task 1: Harden the FibreFlow boundary with TDD
 
@@ -46,7 +72,7 @@ Revocation changes from `iat < min_iat` to conservative `iat <= min_iat`. A toke
 - Modify `src/lib/cortex/bridgeAuth.ts` and its real-crypto tests to emit `scope: "cortex.read"`.
 - Modify `pages/api/cortex/mcp-token.ts` and its handler tests so explicit `null` is rejected while absent/`undefined` still defaults to `30d`.
 - Modify `pages/api/cortex-bridge/[...path].ts` and its tests to replace broad prefixes/methods with the exact matrix above.
-- Split `src/components/connections/__tests__/ConnectionPanels.test.tsx` into scoped FibreFlow and Cortex files so every source/test file remains below 300 lines.
+- Split the panel coverage into `src/components/connections/__tests__/FibreFlowConnectionPanel.test.tsx` and `src/components/connections/__tests__/CortexConnectionPanel.test.tsx` so every source/test file remains below 300 lines.
 
 **RED:**
 
@@ -67,26 +93,47 @@ Commit: `fix(cortex): harden manual MCP token boundary`
 
 **Files:**
 
-- Create `plugins/memory/cortex/mcp_access.py` for the exact method/path policy.
-- Modify `apps/bridge/auth.py` to enforce that policy after signature, tenant, identity, and revocation verification but before route execution.
-- Add focused policy and real signed-JWT integration tests under `tests/`.
+- Create `plugins/memory/cortex/mcp_access.py` for the exact method/path policy and
+  deny-only unverified marker detection.
+- Modify `apps/bridge/main.py` to apply the deny-only filter before framework routing,
+  while preserving verified `require_auth` as the only granting and identity source.
+- Modify the answer route/executor boundary to select isolated read-only synthesis for
+  every marked-token stage and suppress transcript persistence.
+- Add a full-tenant-scope guard before facts/entity derived-store access.
+- Add focused policy and real signed-JWT integration tests under `tests/`, plus real
+  executor-policy tests.
 
 **RED:**
 
-Use a real HS256 marked bearer against a real FastAPI route harness. Prove that the current auth layer admits at least:
+Use a real HS256 marked bearer against the real FastAPI app. Prove that framework
+near misses currently escape post-routing policy, that answer stages currently select
+write-capable Agent SDK defaults, and that ordinary principals can currently reach
+tenant-wide facts/entity stores. Include at least:
 
 - `POST /api/meetings/intake`;
 - `POST /api/meetings/{id}/process`;
 - `POST /api/meetings/{id}/classify`;
-- `POST /api/meetings/{id}/legal-hold`.
+- `POST /api/meetings/{id}/legal-hold`;
+- an unknown path, a trailing-slash variant, `DELETE /api/query`, and
+  `POST /api/facts`; and
+- a signed marked-token call through the real answer route and all three real answer
+  stage functions to a capturing executor boundary.
 
-The test harness may replace tenant/database boundaries, but must use the production JWT verifier, production auth dependency, production MCP access policy, and real token signatures. Do not mock the policy under test.
+The test may isolate external stores and services narrowly, but must use the
+production JWT verifier, production auth dependency, production MCP policy, real
+route/stage functions, and real token signatures. Do not mock the policy or answer
+mode selection under test.
 
 **GREEN:**
 
-- All listed mutations and all unlisted paths return generic 403 for marked MCP tokens.
-- The exact read matrix succeeds through the auth dependency.
-- `POST /api/answer` and `POST /api/mcp-tokens/revoke` remain allowed.
+- All listed mutations and framework near misses return generic 403 for marked MCP
+  tokens before route execution.
+- The exact read matrix succeeds only through verified `require_auth`.
+- `POST /api/answer` reaches only isolated read-only synthesis, while
+  `POST /api/mcp-tokens/revoke` remains the sole mutation.
+- Facts/entity access succeeds for verified service/super-admin full-tenant
+  principals and fails generically for ordinary/channel-scoped principals before
+  storage access.
 - Unmarked FibreFlow session JWTs keep their existing behavior.
 
 Commit: `fix(mcp): enforce read-only bearer scope`

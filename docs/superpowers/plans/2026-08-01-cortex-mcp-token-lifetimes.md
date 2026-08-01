@@ -19,7 +19,9 @@
 - Never log or persist token values. Never put tokens, secrets, cookies, or private Cortex content in screenshots, commits, PR text, or test output.
 - New policy tests use real production functions and real JWT signing. Add no module mocks or fake implementations.
 - Use npm only; do not regenerate `bun.lock`.
-- All code goes through a FibreFlow PR. Dev deploy follows merge; production needs separate explicit approval.
+- All code goes through coordinated FibreFlow and Cortex PRs. No merge or deployment
+  is authorized by this plan; dev and production each need the applicable explicit
+  approval, with Cortex enforcement always rolling out first.
 
 ## File Map
 
@@ -31,7 +33,8 @@
 - Modify `pages/api/cortex/__tests__/mcpToken.handler.test.ts`: update the existing route-boundary contract.
 - Create `src/components/connections/CortexManualTokenControls.tsx`: selector, warnings, generation, copy, and one-time reveal.
 - Modify `src/components/connections/CortexConnectionPanel.tsx`: own mint/copy/revoke state.
-- Modify `src/components/connections/__tests__/ConnectionPanels.test.tsx`: DOM and HTTP-boundary contract.
+- Modify `src/components/connections/__tests__/CortexConnectionPanel.test.tsx`: Cortex DOM and HTTP-boundary contract.
+- Verify `src/components/connections/__tests__/FibreFlowConnectionPanel.test.tsx`: split FibreFlow panel regression contract.
 - Modify `tests/e2e/ai-connections.spec.ts`: real-browser UI proof without minting a live indefinite credential.
 - Verify unchanged `pages/api/cortex/mcp-consent.ts`: normal consent still mints exactly `90d`.
 
@@ -237,7 +240,8 @@ Stage the route and route test only. Commit `feat(cortex): accept indefinite man
 **Files:**
 - Create: `src/components/connections/CortexManualTokenControls.tsx`
 - Modify: `src/components/connections/CortexConnectionPanel.tsx`
-- Modify: `src/components/connections/__tests__/ConnectionPanels.test.tsx`
+- Modify: `src/components/connections/__tests__/CortexConnectionPanel.test.tsx`
+- Verify: `src/components/connections/__tests__/FibreFlowConnectionPanel.test.tsx`
 - Modify: `tests/e2e/ai-connections.spec.ts`
 
 **Interfaces:**
@@ -281,7 +285,7 @@ Add a Cortex-only test that opens Advanced and asserts the exact four option lab
 
 - [ ] **Step 3: Verify component RED**
 
-Run `npx vitest run src/components/connections/__tests__/ConnectionPanels.test.tsx`.
+Run `npx vitest run src/components/connections/__tests__/CortexConnectionPanel.test.tsx src/components/connections/__tests__/FibreFlowConnectionPanel.test.tsx`.
 
 Expected: selector and Generate-button assertions fail because the UI does not exist.
 
@@ -304,7 +308,7 @@ Add `lifetime`, `minting`, `token`, `expiresAt`, `copied`, and `manualError` sta
 
 - [ ] **Step 6: Verify component GREEN**
 
-Run `npx vitest run src/components/connections/__tests__/ConnectionPanels.test.tsx`.
+Run `npx vitest run src/components/connections/__tests__/CortexConnectionPanel.test.tsx src/components/connections/__tests__/FibreFlowConnectionPanel.test.tsx`.
 
 Expected: all Cortex and FibreFlow panel tests pass.
 
@@ -320,7 +324,7 @@ Stage the new component, panel, component tests, and Playwright spec. Commit `fe
 
 ---
 
-### Task 4: Verify, review, and publish the FibreFlow PR
+### Task 4: Verify, review, and publish the coordinated PRs
 
 **Files:**
 - Verify all files from Tasks 1-3.
@@ -328,38 +332,56 @@ Stage the new component, panel, component tests, and Playwright spec. Commit `fe
 
 **Interfaces:**
 - Consumes the complete implementation.
-- Produces a reviewable FibreFlow PR with reproducible evidence and no deployment side effects.
+- Produces reviewable FibreFlow and Cortex PRs with reproducible evidence, reciprocal links, and no deployment side effects.
 
 - [ ] **Step 1: Run the complete focused suite**
 
-Run `npx vitest run src/lib/cortex/__tests__/mcpLifetimePolicy.test.ts src/lib/cortex/__tests__/mcpToken.test.ts pages/api/cortex/__tests__/mcpToken.handler.test.ts pages/api/cortex/__tests__/mcpConsent.handler.test.ts src/components/connections/__tests__/ConnectionPanels.test.tsx tests/pages/connections.test.tsx tests/pages/cortex-page.test.tsx`.
+Run `npx vitest run src/lib/cortex/__tests__/mcpLifetimePolicy.test.ts src/lib/cortex/__tests__/mcpToken.test.ts pages/api/cortex/__tests__/mcpToken.handler.test.ts pages/api/cortex/__tests__/mcpConsent.handler.test.ts src/components/connections/__tests__/CortexConnectionPanel.test.tsx src/components/connections/__tests__/FibreFlowConnectionPanel.test.tsx tests/pages/connections.test.tsx tests/pages/cortex-page.test.tsx`.
 
 Expected: zero failed tests.
 
 - [ ] **Step 2: Run repository gates**
 
-Run, separately, `npm run ci:quick`, `npm run antihall`, and `npm run build`. Read every exit code. Report existing non-blocking baseline errors separately; never call a failing gate clean.
+In FibreFlow, run separately `npm run ci:quick`, `npm run antihall`, and the
+environment-complete `npm run build`. In Cortex, run the focused Pytest/Bun suites
+and `bash scripts/ci/run-ci.sh`. Read every exit code. Report an existing baseline
+failure separately; never call a failing gate clean.
 
 - [ ] **Step 3: Inspect scope and cleanliness**
 
-Run `git diff origin/master...HEAD --check`, `git diff origin/master...HEAD --stat`, and `git status --short`.
+Run the FibreFlow `git diff origin/master...HEAD --check`, stat, and clean-status
+checks, plus the corresponding Cortex checks against `origin/main`.
 
-Expected: only approved design, plan, policy, signer, API, UI, and tests changed; worktree clean after final commit.
+Expected: only approved coordinated policy, enforcement, API, UI, documentation,
+and tests changed; both worktrees are clean after their final commits.
 
 - [ ] **Step 4: Request independent review**
 
-Review line by line for verified-session identity, no-expiry revocation, no super-admin cap, normal OAuth fixed at `90d`, no token logging/persistence, and `/cortex` knowledge-only. Address findings through receiving-code-review and rerun affected gates.
+Request independent FibreFlow and Cortex reviews plus a final cross-repository review.
+Review line by line for verified-session identity, no-expiry revocation, no
+super-admin cap, normal OAuth fixed at `90d`, authoritative server-side read-only
+enforcement, no token logging/persistence, and `/cortex` knowledge-only. Address
+findings through receiving-code-review and rerun affected gates.
 
-- [ ] **Step 5: Push and open a draft PR with `gh`**
+- [ ] **Step 5: Push and open coordinated draft PRs with `gh`**
 
-Write the reviewed PR body to `/tmp/cortex-mcp-token-lifetimes-pr-body.md`, run
-`git push -u origin feat/cortex-mcp-token-lifetimes`, then use
-`gh pr create --draft --base master --head feat/cortex-mcp-token-lifetimes --title "feat(cortex): allow flexible manual MCP token lifetimes" --body-file /tmp/cortex-mcp-token-lifetimes-pr-body.md`.
+After both final reviews approve, publish the reviewed FibreFlow and Cortex branches
+and use `gh pr create` to open a FibreFlow draft against `master` and a Cortex draft
+against `main`. Cross-link the two PRs and state the mandatory Cortex-first rollout
+order.
 
-The PR body states that nothing was deployed or changed in live configuration, lists exact verification results, and contains no credentials or private content.
+Both PR bodies state that nothing was deployed or changed in live configuration,
+list exact verification results, and contain no credentials or private content.
 
 - [ ] **Step 6: Hold deployment gates**
 
-Do not merge or deploy without the next scoped approval. After merge, deploy dev using `bash scripts/deploy-local.sh dev`, run authenticated Playwright against dev, visually inspect desktop/mobile, and request separate approval before `bash scripts/deploy-local.sh production`.
+Do not merge or deploy without the next scoped approval. After an approved merge,
+deploy Cortex enforcement to dev first and prove negative mutation attempts,
+framework near misses, safe answer execution, full-scope derived-store restrictions,
+and immediate revoke with a dedicated test identity. Only then deploy FibreFlow to
+dev with `bash scripts/deploy-local.sh dev`, run authenticated Playwright and the
+isolated real connector test, and visually inspect desktop/mobile. Production is a
+separate explicit approval gate and uses the same Cortex-first order; FibreFlow
+production deploys only via `bash scripts/deploy-local.sh production`.
 
 Never mint an indefinite live token for Hein or Lew only for testing: the current revoke-all design cannot invalidate just that test token without also revoking their existing Cortex MCP tokens.

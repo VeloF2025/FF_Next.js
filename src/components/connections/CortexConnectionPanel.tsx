@@ -41,6 +41,7 @@ export function CortexConnectionPanel({
   const busy = minting || revoking;
 
   const generate = useCallback(async () => {
+    setNotice(null);
     setMinting(true);
     setToken(null);
     setExpiresAt(null);

@@ -178,6 +178,28 @@ describe('CortexConnectionPanel', () => {
     });
   });
 
+  it('clears the successful revoke notice as soon as a later mint begins', async () => {
+    renderWithNetwork(<CortexConnectionPanel revokeEnabled />, {
+      'DELETE /api/cortex/mcp-token': {
+        status: 200,
+        body: { data: { revoked: true } },
+      },
+      'POST /api/cortex/mcp-token': { status: 200, pending: true },
+    });
+
+    fireEvent.click(screen.getByText('Advanced'));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke all Cortex tokens' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /All your Cortex tokens have been revoked/i,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Cortex token' }));
+
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Generating…' })).toBeDisabled();
+  });
+
   it('surfaces a failed revoke instead of claiming success', async () => {
     renderWithNetwork(<CortexConnectionPanel revokeEnabled />, {
       'DELETE /api/cortex/mcp-token': { status: 404, body: { error: { message: 'nope' } } },

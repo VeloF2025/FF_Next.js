@@ -49,7 +49,7 @@ describe('/api/cortex-bridge/[...path]', () => {
       query: { path: ['api', 'query', '..', 'admin', 'debug'] },
     });
     await done;
-    expect(res._getStatusCode()).toBe(404);
+    expect(res._getStatusCode()).toBe(403);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
