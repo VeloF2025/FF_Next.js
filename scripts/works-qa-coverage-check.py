@@ -5,8 +5,10 @@ Works-QA ⇄ QField coverage check — the "never silently miss" guarantee.
 Flags three ways QField photos fail to reach the Works-QA dashboard, for projects
 linked to an active (non-archived) FibreFlow project:
 
-  EXTRACT-GAP  photos in QFieldCloud, ZERO rows in qfield_photo_validations —
-               the project was never registered in extract-gpkg-photos.py PROJECTS.
+  EXTRACT-GAP  photos in QFieldCloud, ZERO rows in qfield_photo_validations — either
+               the project is absent from qfield_project_registry.PROJECTS, or it IS
+               registered and its GPKG params resolve nothing. Reported distinctly:
+               the two need opposite fixes.
   SYNC-GAP     rows extracted, ZERO rows in pole_qa_photos — works-qa-sync is stuck.
   STALE-GPKG   a newer file exists that we are not ingesting — either a newer
                version of the tracked GPKG, or a newer same-family sibling (a rename).
@@ -58,6 +60,13 @@ import psycopg2.extras
 # scripts/test_qfield_gpkg_resolution.py.
 from qfield_minio import minio_newest_versions, minio_sibling_newest
 from qfield_staleness import select_stale_gpkgs
+
+# The same allow-list the extractor uses. Read here so an extract-gap can name its real
+# cause: a project absent from PROJECTS needs registering, but a project that IS in
+# PROJECTS and still extracts nothing has bad GPKG params (wrong table_name, or a
+# mis-cased label_col — which the extractor rejects without raising). Telling the
+# second case to "register it" is advice that can never fix it.
+from qfield_project_registry import PROJECTS
 
 QFC_CONTAINER = "qfieldcloud-db-1"
 QFC_DB_USER = "qfieldcloud_db_admin"
@@ -207,11 +216,17 @@ def main():
     sibling_newest = minio_sibling_newest(sync_rows)
 
     # Extract gap: upstream photos in QFieldCloud but nothing in qfield_photo_validations.
+    # Split by whether the project is in the allow-list at all, because the two cases need
+    # opposite advice. A registered-but-empty project writes NO sync-state row (the
+    # extractor bails before the upsert), so sync_rows cannot tell them apart — the
+    # registry is the only reliable source of truth for "was this ever registered".
+    registered_qf_ids = {c["qf_project_id"] for c in PROJECTS.values()}
     extract_gap = []
     for r in rows:
         src = dcim.get(r["qf_uuid"], 0)
         if src >= args.threshold and int(r["ingested"]) == 0:
-            extract_gap.append((r["ff_name"], r["qf_name"], src))
+            extract_gap.append(
+                (r["ff_name"], r["qf_name"], src, r["qf_uuid"] in registered_qf_ids))
     extract_gap.sort(key=lambda x: x[2], reverse=True)
 
     # Stale gap: a newer file exists that we are not ingesting — either a newer version
@@ -228,8 +243,10 @@ def main():
           f"{len(sync_rows)} registered GPKG(s) tracked, threshold={args.threshold}, "
           f"stale-days={args.stale_days}. extract-gap={len(extract_gap)}, "
           f"sync-gap={len(stuck)}, stale-gpkg={len(stale_gap)}.")
-    for ff_name, qf_name, src in extract_gap:
-        print(f"  EXTRACT-GAP: {ff_name} ← {qf_name}: {src} photos upstream, 0 extracted")
+    for ff_name, qf_name, src, registered in extract_gap:
+        cause = "REGISTERED but resolving nothing" if registered else "not registered"
+        print(f"  EXTRACT-GAP: {ff_name} ← {qf_name}: {src} photos upstream, 0 extracted "
+              f"({cause})")
     for ff_name, ingested in stuck:
         print(f"  SYNC-GAP: {ff_name}: {ingested} photos extracted, 0 on the dashboard (pole_qa_photos empty)")
     for qf_name, path, behind, available in stale_gap:
@@ -238,8 +255,16 @@ def main():
 
     if (extract_gap or stuck or stale_gap) and not args.no_wa:
         lines = ["⚠️ Works-QA: QField photos not reaching the dashboard", ""]
-        for ff_name, qf_name, src in extract_gap:
-            lines.append(f"• {ff_name} ({qf_name}): {src} photos upstream, not extracted — register in extract-gpkg-photos.py")
+        for ff_name, qf_name, src, registered in extract_gap:
+            if registered:
+                lines.append(
+                    f"• {ff_name} ({qf_name}): {src} photos upstream, not extracted — "
+                    f"it IS registered, so its GPKG params are wrong (table_name, or a "
+                    f"mis-cased label_col). Check the extract log for 'no label column'.")
+            else:
+                lines.append(
+                    f"• {ff_name} ({qf_name}): {src} photos upstream, not extracted — "
+                    f"register in qfield_project_registry.py")
         for ff_name, ingested in stuck:
             lines.append(f"• {ff_name}: {ingested} photos extracted but sync produced 0 pole rows — check works-qa-sync")
         for qf_name, path, behind, _available in stale_gap:
