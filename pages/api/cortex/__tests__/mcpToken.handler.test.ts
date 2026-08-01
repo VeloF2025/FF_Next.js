@@ -171,6 +171,13 @@ describe('POST /api/cortex/mcp-token — auth + permission (flag on)', () => {
     expect(mintMcpToken).not.toHaveBeenCalled();
   });
 
+  it('400s when lifetime is explicitly null, and never mints', async () => {
+    const { res, done } = run('POST', { lifetime: null });
+    await done;
+    expect(res._getStatusCode()).toBe(400);
+    expect(mintMcpToken).not.toHaveBeenCalled();
+  });
+
   it('500s (generic) when the mint fails for any other reason', async () => {
     mintMcpToken.mockRejectedValueOnce(new Error('BRIDGE_JWT_SECRET is not set'));
     const { res, done } = run('POST', { lifetime: '30d' });

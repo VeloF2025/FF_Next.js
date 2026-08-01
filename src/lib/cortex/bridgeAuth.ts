@@ -157,7 +157,14 @@ export async function mintMcpToken(
   const ttl = days === null ? null : `${days}d`;
   const jti = crypto.randomUUID();
   const token = await signBridgeJwt(
-    { sub: userEmail, email: userEmail, instance_id: instanceId, token_use: MCP_TOKEN_USE, jti },
+    {
+      sub: userEmail,
+      email: userEmail,
+      instance_id: instanceId,
+      token_use: MCP_TOKEN_USE,
+      scope: 'cortex.read',
+      jti,
+    },
     ttl,
   );
   if (token === null) {

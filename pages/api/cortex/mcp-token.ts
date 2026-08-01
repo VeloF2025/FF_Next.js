@@ -37,7 +37,7 @@ function mcpTokenUiEnabled(): boolean {
 }
 
 async function postHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {
-  const raw: unknown = req.body?.lifetime ?? '30d';
+  const raw: unknown = req.body?.lifetime === undefined ? '30d' : req.body.lifetime;
   if (!isCortexMcpLifetime(raw)) {
     return apiResponse.badRequest(res, `lifetime must be one of ${CORTEX_MCP_LIFETIMES.join(', ')}`);
   }

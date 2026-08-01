@@ -45,6 +45,7 @@ describe('mintMcpToken — claim shape (mirrors scripts/mint_user_token.py)', ()
     expect(payload.email).toBe(USER);
     expect(payload.instance_id).toBe('velocity-fibre'); // default tenant
     expect(payload.token_use).toBe('mcp'); // the revocation marker the bridge keys on
+    expect(payload.scope).toBe('cortex.read'); // explicit read-only MCP metadata
     expect(typeof payload.iat).toBe('number');
     expect(typeof payload.exp).toBe('number');
   });
