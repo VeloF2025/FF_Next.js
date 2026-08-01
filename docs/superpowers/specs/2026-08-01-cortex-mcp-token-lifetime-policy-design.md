@@ -1,7 +1,7 @@
 # Cortex MCP Token Lifetime Policy Design
 
-**Date:** 2026-08-01  
-**Status:** Approved by Hein  
+**Date:** 2026-08-01
+**Status:** Approved by Hein
 **Repository:** FibreFlow Next.js
 
 ## Context
