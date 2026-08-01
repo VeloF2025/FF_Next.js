@@ -156,6 +156,11 @@ Commit: `fix(mcp): enforce read-only bearer scope`
 - `iat <= min_iat` returns 401; `iat > min_iat` succeeds.
 - Revocation still acts only on the verified caller's normalized email and tenant.
 - Unmarked session/API/channel/OIDC credentials remain outside the MCP epoch check.
+- The real-PostgreSQL gate uses a disposable `pg_temp.mcp_token_revocation` table,
+  proves out-of-order writes retain the greater cutoff, and rejects a signed token
+  whose `iat` equals that cutoff through production authentication. It must pass,
+  not skip, on the Velo development host and fail when `GREATEST` is replaced by an
+  overwrite.
 
 Commit: `fix(mcp): close equal-second revocation gap`
 
@@ -174,6 +179,9 @@ Run independently and record every exit code.
 **Cortex:**
 
 - Focused Pytest for MCP access, auth integration, revocation, revoke route, and Cortex MCP tools.
+- `python3 -m pytest tests/test_mcp_revocation_postgres.py -m integration -q -rs`
+  with the repository's normal PostgreSQL environment loaded process-only; require
+  a pass rather than a skip.
 - `bash scripts/ci/run-ci.sh`.
 - Agent-doc mirror checks if any instruction file changes (none planned).
 - `git diff origin/main...HEAD --check`, stat, and clean status.
