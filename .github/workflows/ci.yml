@@ -68,3 +68,30 @@ jobs:
         if: github.event_name != 'pull_request'
         run: bash scripts/test-ratchet.sh
         timeout-minutes: 15
+
+      # Migration execution tests — apply real SQL to a real Postgres.
+      #
+      # These exist because the unit tests above drive services through a stub
+      # TxnClient that records SQL text and never sends it, so they are blind
+      # to anything Postgres decides at parse time. A 42P08 shipped a 500 on
+      # every training-certificate verify and revoke past green CI and five
+      # blind reviewers; migration 471's test catches exactly that class — and
+      # until this step existed it ran nowhere.
+      #
+      # Blocking on purpose. It spins up its own throwaway Postgres on an
+      # ephemeral port (see tests/migrations/setup/global-setup.ts) and removes
+      # it afterwards, so it never touches the shared dev+prod database.
+      # Requires docker on the runner.
+      - name: Migration tests — real Postgres (gate)
+        run: npm run test:migrations
+        timeout-minutes: 15
+
+      # The container is removed in the vitest teardown, but a killed or
+      # timed-out run never reaches it. Sweep by label so a crashed run cannot
+      # leave a container holding a port on a long-lived self-hosted runner.
+      - name: Clean up this run's migration test container
+        if: always()
+        run: |
+          docker ps -aq \
+            --filter "label=ff-migration-run=ci-${{ github.run_id }}-${{ github.run_attempt }}" \
+            | xargs -r docker rm -f
