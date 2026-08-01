@@ -148,11 +148,19 @@ if command -v python3 >/dev/null 2>&1; then
     fail "QField project registry: malformed entry"
     grep '^  FAIL' /tmp/ci-qfield-registry.txt | head -20 | sed 's/^/    /'
   fi
+
+  if python3 scripts/test_qfield_extract_characterization.py > /tmp/ci-qfield-extract.txt 2>&1; then
+    pass "QField extract_project: behaviour unchanged"
+  else
+    fail "QField extract_project: observable behaviour changed"
+    grep '^  FAIL' /tmp/ci-qfield-extract.txt | head -20 | sed 's/^/    /'
+  fi
 else
   skip "QField step detection: python3 not available"
   skip "QField GPKG resolution: python3 not available"
   skip "QField hierarchy mapping: python3 not available"
   skip "QField project registry: python3 not available"
+  skip "QField extract_project characterization: python3 not available"
 fi
 
 # ─── Gate 3: TypeScript ──────────────────────────────────────────────────────
