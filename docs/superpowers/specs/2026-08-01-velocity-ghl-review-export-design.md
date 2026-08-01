@@ -133,6 +133,33 @@ FibreFlow may populate a customer name when GHL has no useful name. It must not
 overwrite a non-empty GHL name with lower-quality source data. The WhatsApp
 template uses a safe `there` fallback when no usable first name exists.
 
+### 4.4 OneMap consent evidence
+
+Velocity's home-signup and signed-install processes include consent for service
+communications on WhatsApp. FibreFlow therefore treats either of these
+auditable OneMap-derived events as consent evidence for this service-review
+message:
+
+- a non-null `onemap_properties.home_signup_date`; or
+- a unified-review customer-signature step where
+  `dr_photo_unified_reviews.step_10_signature = true`.
+
+Before a candidate can reach GHL, FibreFlow persists a `granted` row in
+`wa_subscriber_consent` with the evidence source, evidence date, and DR. A
+home-signup grant uses the recorded signup date. A signature-only grant uses the
+first available timestamp in this order: `whatsapp_submitted_at`,
+`photos_fetched_at`, `created_at`, then SAST midnight for `submitted_date`.
+
+An existing `withdrawn` consent row is authoritative and must never be
+automatically re-granted from historical OneMap evidence. A candidate with no
+signup or signed-install evidence is quarantined as `consent_missing` even when
+it has a valid phone.
+
+In the 2026-07-31 planning snapshot, all 149 DRs with a valid customer mobile had
+at least one approved evidence source: 142 had a home-signup date, and the other
+7 had the customer-signature installation step. These are observational counts,
+not hard-coded expectations.
+
 ## 5. Idempotency and data model
 
 ### 5.1 Sending identity
@@ -195,9 +222,10 @@ For each ready export FibreFlow:
 1. searches the Velocity GHL location by normalised phone;
 2. creates or updates one contact without overwriting authoritative GHL data;
 3. preserves all GHL DND and opt-out settings;
-4. writes the current DR metadata to dedicated custom fields;
-5. confirms the contact and field values by API readback;
-6. starts the transient trigger-tag handshake.
+4. confirms `wa_subscriber_consent.status = 'granted'` for the selected phone;
+5. writes the current DR metadata to dedicated custom fields;
+6. confirms the contact and field values by API readback;
+7. starts the transient trigger-tag handshake.
 
 Required custom fields are:
 
@@ -297,8 +325,9 @@ An ambiguous trigger or workflow acknowledgement is not retried automatically.
 One failed contact does not stop unrelated candidates in the same date batch.
 
 Permanent failures include invalid recipient data, confirmed DND/opt-out,
-unresolvable source conflicts, and rejected GHL validation. They are terminal
-for that export pair and appear in the run summary.
+missing consent evidence, an existing consent withdrawal, unresolvable source
+conflicts, and rejected GHL validation. They are terminal for that export pair
+and appear in the run summary.
 
 ## 9. Missed days and catch-up
 
@@ -345,6 +374,8 @@ separate GHL delivery event has actually been reconciled.
 - Customer phones are redacted from logs and summaries.
 - Error persistence uses safe codes and sanitised messages.
 - GHL opt-out and DND state is never weakened.
+- A OneMap signup or signed-install evidence row is required before first
+  contact, and an existing consent withdrawal is never overwritten.
 - No browser automation is used for recurring operation.
 - No direct WhatsApp API send is performed by FibreFlow.
 - No Make or Zapier dependency is introduced.
@@ -362,6 +393,7 @@ Tests must cover:
 - same DR/same phone suppression;
 - same phone/different DR eligibility and sequencing;
 - missing, invalid, and conflicting phones;
+- signup/signature consent evidence and withdrawal precedence;
 - contact-field preservation and DND handling;
 - retryable, permanent, and ambiguous GHL outcomes;
 - transient-tag acknowledgement and cleanup;
@@ -401,18 +433,20 @@ The design is complete when implementation evidence shows that:
 1. every approved source contributes target-day DRs in SAST;
 2. each DR is collapsed to one candidate with all source flags retained;
 3. only an unambiguous customer mobile can proceed;
-4. the same DR/phone pair cannot trigger twice under concurrency, retry, or
+4. every proceeding mobile has persisted OneMap signup or signed-install
+   consent evidence, with withdrawals taking precedence;
+5. the same DR/phone pair cannot trigger twice under concurrency, retry, or
    catch-up;
-5. a different DR on the same phone can trigger after the prior handshake;
-6. FibreFlow only upserts GHL contacts and applies transient workflow tags;
-7. native GHL automation sends the Velo template and routes all approved
+6. a different DR on the same phone can trigger after the prior handshake;
+7. FibreFlow only upserts GHL contacts and applies transient workflow tags;
+8. native GHL automation sends the Velo template and routes all approved
    branches;
-8. problem branches suppress reviews and notify Chantall;
-9. `issue-resolved` starts the post-resolution review workflow;
-10. missed days catch up within seven days and older gaps fail closed;
-11. the first run does not infer pre-launch dates as missed;
-12. summaries reach Chantall, Hein, and Michael without exposing phone numbers;
-13. no Make, Zapier, browser import, or FibreFlow WhatsApp sender is involved.
+9. problem branches suppress reviews and notify Chantall;
+10. `issue-resolved` starts the post-resolution review workflow;
+11. missed days catch up within seven days and older gaps fail closed;
+12. the first run does not infer pre-launch dates as missed;
+13. summaries reach Chantall, Hein, and Michael without exposing phone numbers;
+14. no Make, Zapier, browser import, or FibreFlow WhatsApp sender is involved.
 
 ## 14. Out of scope
 
