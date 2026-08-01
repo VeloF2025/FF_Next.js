@@ -4,7 +4,7 @@
 
 **Goal:** Let Claude authorize the read-only Cortex remote MCP connector through a verified FibreFlow login and consent screen, while preserving FibreFlow MCP RBAC, marked-compatible Cortex OAuth grants, ordinary-user ACL narrowing, and an unlinked manual rollback route. Unsafe unmarked grants fail closed and require re-consent.
 
-**Architecture:** Cortex remains its own OAuth authorization server and records a ten-minute pending request, but redirects the browser to FibreFlow for authentication and consent. FibreFlow mints a 90-day Cortex bearer for the verified session email and hands it to Cortex over loopback with a connector-specific shared secret; Cortex validates the bearer against Bridge before atomically converting the pending request into an OAuth code. The outer Cortex OAuth refresh grant expires after 30 days, so the user must complete browser reauthorization then even though that underlying bearer has a 90-day claim. FibreFlow connector setup moves to `/connections/*`, while `/cortex` remains the knowledge search/review surface.
+**Architecture:** Cortex remains its own OAuth authorization server and records a ten-minute pending request, but redirects the browser to FibreFlow for authentication and consent. FibreFlow mints a 90-day Cortex bearer for the verified session email and hands it to Cortex over loopback with a connector-specific shared secret; Cortex validates the bearer against Bridge before atomically converting the pending request into an OAuth code. Dynamic registration remains enabled, with a durable capped Cortex client collection and narrow FibreFlow per-IP limits on exact `POST /register` and `GET /authorize`; neither layer substitutes for the other. The outer Cortex OAuth refresh grant expires after 30 days, so the user must complete browser reauthorization then even though that underlying bearer has a 90-day claim. FibreFlow connector setup moves to `/connections/*`, while `/cortex` remains the knowledge search/review surface.
 
 **Tech Stack:** Next.js 14 Pages Router, React 18, TypeScript, FibreFlow PostgreSQL RBAC middleware, Vitest/Testing Library, Playwright, Python 3.11+, FastMCP OAuth provider APIs, Starlette, Pytest, systemd user services.
 
@@ -27,6 +27,11 @@
 - Use the existing horizontal `ModuleNav` for `/connections/fibreflow` and `/connections/cortex`; do not add a sidebar subtree.
 - Remove connector panels from `/cortex`, retain hero/search/review, and add a permission-gated link to `/connections/cortex`.
 - Use TDD: observe the relevant test fail before adding each implementation, then rerun it green.
+- Keep public OAuth flood controls layered: Cortex's persisted client cap remains the
+  invariant, while FibreFlow meters exact `POST /register` at 30/minute and exact
+  `GET /authorize` at 60/minute using only a fixed endpoint label plus
+  Nginx-overwritten `X-Real-IP` (socket fallback). Do not key or log URL/query/state,
+  code, body or `X-Forwarded-For`, and do not throttle token or MCP routes.
 - Tests exercise real production components, handlers, middleware and provider
   behavior. Do not mock application components or assert on mock/spies/source
   text. Use a narrow in-memory adapter or loopback test server only where an
@@ -121,6 +126,8 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 | Modify | `pages/cortex.tsx` | Remove panels/feature props and add the connection-page link |
 | Modify | `src/components/layout/sidebar/config/cortexSection.ts` | Retain Cortex and add one AI Connections entry |
 | Modify | `.env.example` | Document the blank dedicated secret and Cortex Remote MCP loopback URL |
+| Modify | `pages/api/cortex-remote-mcp/[...path].ts` | Apply pre-body public OAuth limits using sanitized endpoint/IP keys |
+| Create | `tests/api/cortex-mcp-oauth-rate-limit.test.ts` | Real proxy/upstream socket proof for limits, trusted-IP selection and unaffected routes |
 | Delete | `src/components/cortex/CortexConnectPanel.tsx` | Remove the token-paste/local-runtime UI from the normal surface |
 | Delete | `src/components/cortex/McpTokenReveal.tsx` | Remove its now-unreachable token/config renderer |
 | Delete | `src/components/cortex/__tests__/CortexConnectPanel.test.tsx` | Remove tests for the retired primary UI; API rollback tests remain |
@@ -1244,6 +1251,7 @@ Run:
 npx vitest run pages/api/cortex/__tests__/mcpConsent.handler.test.ts \
   pages/api/cortex/__tests__/mcpConsent.errors.test.ts \
   pages/api/mcp/__tests__/consent.test.ts \
+  tests/api/cortex-mcp-oauth-rate-limit.test.ts \
   tests/api/ff-remote-mcp-proxy.test.ts \
   tests/api/mcp-proxy-route-errors.test.ts
 ```
@@ -1857,6 +1865,7 @@ npx vitest run pages/api/cortex/__tests__/mcpConsent.handler.test.ts \
   src/components/connections/__tests__/ConnectionPanels.test.tsx \
   tests/pages/connections.test.tsx \
   tests/pages/cortex-page.test.tsx \
+  tests/api/cortex-mcp-oauth-rate-limit.test.ts \
   tests/api/ff-remote-mcp-proxy.test.ts \
   tests/api/mcp-proxy-route-errors.test.ts
 npm run ci:quick

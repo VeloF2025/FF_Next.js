@@ -139,6 +139,28 @@ agreement for FibreFlow's and Bridge's loaded `BRIDGE_JWT_SECRET`, and exact
 `BRIDGE_JWT_KID` agreement when a kid is configured. Only verdicts are recorded;
 underlying values are never printed.
 
+### 6.4 Layered dynamic-registration flood controls
+
+Dynamic client registration remains enabled for normal SDK discovery. Flood resistance
+is layered rather than attributed to the public proxy alone:
+
+- the Cortex provider owns the durable invariant: its persisted client collection is
+  capped at 512 by default, defensively configurable through
+  `CORTEX_MCP_MAX_CLIENTS`, reclaims only unreferenced clients, and refuses a new
+  registration without evicting an active grant when every slot is referenced;
+- the FibreFlow proxy meters only exact `POST /register` at 30 requests per minute and
+  exact `GET /authorize` at 60 requests per minute for each trusted edge client IP;
+- the proxy key contains only a fixed endpoint label and Nginx-overwritten
+  `X-Real-IP`, falling back to the socket address. Query parameters, OAuth state,
+  authorization codes, bodies and `X-Forwarded-For` never affect the bucket; and
+- token exchange and MCP JSON-RPC traffic are not included in these two limits.
+
+The FibreFlow limiter is intentionally in-process for the current single-service
+deployment. Its entries expire and can reset with the process, so the Cortex provider
+cap remains authoritative if the edge layer resets or is bypassed. Source implementation
+and tests are not deployment evidence: rollout must still verify the Nginx
+`X-Real-IP` overwrite and the complete coordinated Cortex/FibreFlow chain.
+
 ## 7. Cortex changes
 
 Refactor remote-only OAuth code from `apps/cortex_mcp/server.py` as needed to keep new
