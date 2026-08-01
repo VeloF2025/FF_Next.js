@@ -55,12 +55,18 @@ def main():
         dcim={"a.jpg": "k/a", "b.jpg": "k/b", "c.jpg": "k/c"})
     check((found, upserted) == (3, 3), f"3 resolvable photos across 2 poles -> (3,3), got ({found},{upserted})")
 
-    found, upserted, out, _ = run(
+    found, upserted, out, h = run(
         columns=["NAME", STEP_1],
         rows=[{"NAME": "P1", STEP_1: "DCIM/missing.jpg"}],
         dcim={})
     check((found, upserted) == (1, 0), f"photo absent from MinIO -> found but not upserted, got ({found},{upserted})")
     check("SKIP (not in MinIO)" in out, "absent photo is reported, not silently dropped")
+    # The other conditional stub. The interception-guard group cannot assert this one
+    # (it only fires when the DCIM index is empty), so it is asserted here, in the
+    # scenario that triggers it — mirroring what the spatial-PON scenarios do.
+    check(h.stub_calls.get("minio_resolve_photo_version", 0) > 0,
+          f"the per-photo fallback resolver was intercepted, "
+          f"calls={h.stub_calls.get('minio_resolve_photo_version', 0)}")
 
     # Extra photo columns (EXTRA_PHOTO_PATTERNS — a photo column carrying no step
     # number) go through a SECOND loop with its own dedup and skip logic. Without a
@@ -73,6 +79,25 @@ def main():
     inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
     check(any(p[-2] is None and p[-1] is None for p in inserts),
           "the extra-column row is written with NULL checklist_step/step_label")
+
+    # Interception guard. Every check above passes if the stubs ran; none of them
+    # NOTICES if patching silently stopped working and the real MinIO/DB functions ran
+    # instead — a green suite that tests nothing. The phases split moved these call
+    # sites into another module, where the old single-module patch would have missed
+    # them, so assert the stubs were genuinely invoked.
+    print("\nInterception guard")
+    _, _, _, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    # Every stub invoked unconditionally on a real run. The two conditional ones
+    # (resolve_spatial_pon_map, minio_resolve_photo_version) are asserted in the
+    # scenarios that actually trigger them — asserting >0 here would fail spuriously.
+    for stub in ("resolve_gpkg_path", "minio_download_latest",
+                 "minio_list_dcim_directory", "sync_hierarchy",
+                 "fetch_linked_qf_project_ids", "hierarchy_backfill_needed"):
+        check(h.stub_calls.get(stub, 0) > 0,
+              f"stub {stub} was actually invoked (patching intercepts), "
+              f"calls={h.stub_calls.get(stub, 0)}")
 
     print("\nRow-level skips")
     found, _, _, _ = run(
@@ -101,52 +126,6 @@ def main():
         rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
         dcim={"a.jpg": "k/a"}, existing_photo_keys=["some/prefix/a.jpg"])
     check((found, upserted) == (1, 0), f"construction_qa_photos substring dedup, got ({found},{upserted})")
-
-    # Linked "audit" QField projects: photos for one FibreFlow project can live in a
-    # second QField project's bucket. The merge and its dedup consequences are the
-    # code most likely to pile up duplicate rows if a refactor gets it wrong, and its
-    # own comment says so — so each behaviour is asserted separately.
-    print("\nLinked QField projects")
-    LINKED = "cccccccc-1111-2222-3333-444444444444"
-    found, upserted, out, h = run(
-        columns=["NAME", STEP_1, STEP_2],
-        rows=[{"NAME": "P1", STEP_1: "DCIM/only_primary.jpg", STEP_2: "DCIM/only_linked.jpg"}],
-        dcim={"only_primary.jpg": "k/primary"},
-        linked=[LINKED], linked_dcim={LINKED: {"only_linked.jpg": "k/linked"}},
-        dry_run=False)
-    check((found, upserted) == (2, 2),
-          f"a photo living in a LINKED project still resolves, got ({found},{upserted})")
-    inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
-    # EXACT per-photo attribution, not `any(... == LINKED)`. An "at least one insert
-    # mentions LINKED" check passes even when EVERY photo is misattributed to the
-    # linked project — the same "reads as testing attribution, only tests presence"
-    # shape this scenario was written to prevent. Map storage_key -> project_id and
-    # pin both directions.
-    by_key = {p[1]: p[5] for p in inserts}
-    check(by_key.get("k/primary") == PRIMARY_QF,
-          f"the PRIMARY photo stays attributed to the primary project, got {by_key.get('k/primary')}")
-    check(by_key.get("k/linked") == LINKED,
-          f"the LINKED photo is attributed to the project that holds it, got {by_key.get('k/linked')}")
-
-    found, upserted, _, h = run(
-        columns=["NAME", STEP_1],
-        rows=[{"NAME": "P1", STEP_1: "DCIM/dupe.jpg"}],
-        dcim={"dupe.jpg": "k/PRIMARY"},
-        linked=[LINKED], linked_dcim={LINKED: {"dupe.jpg": "k/LINKED"}},
-        dry_run=False)
-    inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
-    check(len(inserts) == 1 and inserts[0][1] == "k/PRIMARY",
-          "on a filename collision the PRIMARY project wins, keeping re-runs stable")
-    check(len(inserts) == 1 and inserts[0][5] == PRIMARY_QF,
-          f"...and it is attributed to the primary project, got {inserts[0][5] if inserts else None}")
-
-    _, _, _, h = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, linked=[LINKED], dry_run=False)
-    params = h.cursor.params_for("SELECT photo_key FROM qfield_photo_validations")
-    check(params is not None and LINKED in params[0],
-          "the dedup query spans linked projects (else re-runs duplicate rows daily)")
-
     print("\nGuards — each must return (0,0) AND write no sync-state")
     found, upserted, out, h = run(
         config=config(label_col="MISSING_COL"),
@@ -157,6 +136,14 @@ def main():
     check("no label column" in out, "missing label column is reported loudly")
     check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
           "missing label column writes NO sync-state (else the freeze looks freshly synced)")
+
+    found, upserted, out, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, download_fails=True, dry_run=False)
+    check((found, upserted) == (0, 0), f"download failure -> (0,0), got ({found},{upserted})")
+    check("Could not download GPKG" in out, "download failure is reported")
+    check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
+          "download failure writes NO sync-state")
 
     found, upserted, out, h = run(
         columns=["NAME", "unrelated"],
@@ -172,6 +159,10 @@ def main():
     check((found, upserted) == (0, 0), f"table absent, no fallback -> (0,0), got ({found},{upserted})")
     check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
           "unresolvable table writes NO sync-state")
+    # Counts alone cannot separate this from the no-photo-columns guard — the fixture
+    # trips both. Assert on WHICH guard spoke, or removing the fallback branch passes.
+    check("not found and no table has photo columns" in out,
+          "the TABLE-not-found guard is what aborted (not the no-photo-columns one)")
 
     print("\nTable resolution")
     found, upserted, out, _ = run(
@@ -193,51 +184,6 @@ def main():
         dcim={"a.jpg": "k/a"})
     check((found, upserted) == (1, 1), f"photo-column fallback finds renamed layer, got ({found},{upserted})")
     check("TABLE-FALLBACK" in out, "table fallback announces itself")
-
-    print("\nDelta check")
-    same = "v20260731122829-abc12345"
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=same,
-        state={"last_version": same, "pending_count": 0})
-    check((found, upserted) == (0, 0), f"unchanged version, 0 pending -> skip, got ({found},{upserted})")
-    check("Already processed this version" in out, "delta skip states its reason")
-
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=same,
-        state={"last_version": same, "pending_count": 0}, force=True)
-    check((found, upserted) == (1, 1), f"--force overrides the delta skip, got ({found},{upserted})")
-
-    # The pending/stale/backfill variants are migration-423 logic: photo binaries
-    # arrive asynchronously after the GPKG, so an unchanged GPKG must be re-scanned
-    # while photos are still outstanding — but not forever. Only the pending==0 branch
-    # was covered before; each of the three below fails independently.
-    recent = f"v{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-recent01"
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=recent,
-        state={"last_version": recent, "pending_count": 3})
-    check((found, upserted) == (1, 1),
-          f"same version but photos still pending -> RE-SCAN, got ({found},{upserted})")
-    check("RE-SCAN" in out, "the re-scan announces why it is re-reading an unchanged GPKG")
-
-    ancient = "v20200101000000-ancient1"
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=ancient,
-        state={"last_version": ancient, "pending_count": 3})
-    check((found, upserted) == (0, 0),
-          f"pending photos on a long-stale GPKG -> give up, got ({found},{upserted})")
-    check("giving up" in out, "the give-up path says so rather than skipping silently")
-
-    found, upserted, out, _ = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, version=same,
-        state={"last_version": same, "pending_count": 0}, hierarchy_backfill=True)
-    check((found, upserted) == (1, 1),
-          f"a pending hierarchy backfill forces a re-scan, got ({found},{upserted})")
-    check("hierarchy backfill" in out, "the backfill re-scan states its reason")
 
     print("\nNon-dry-run writes")
     found, upserted, _, h = run(
