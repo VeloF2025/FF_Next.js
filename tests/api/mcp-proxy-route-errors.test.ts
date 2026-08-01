@@ -17,7 +17,6 @@ interface HttpResult {
 
 const servers: http.Server[] = [];
 const handlerCompletions: Promise<unknown>[] = [];
-
 function listen(server: http.Server): Promise<number> {
   servers.push(server);
   return new Promise((resolve) => {
@@ -26,7 +25,6 @@ function listen(server: http.Server): Promise<number> {
     });
   });
 }
-
 async function closeServer(server: http.Server): Promise<void> {
   server.closeAllConnections?.();
   if (!server.listening) return;
@@ -183,6 +181,32 @@ describe('MCP proxy route over real sockets', () => {
     );
     expect(warning?.data).toEqual({ maxBytes: 4 * 1024 * 1024 });
     expect(log.exportLogs()).not.toContain('cap-secret');
+  });
+
+  it('returns a generic 502 when upstream fails after headers but before any body byte', async () => {
+    const upstreamPort = await listen(
+      http.createServer((_req, res) => {
+        res.writeHead(200, {
+          'content-type': 'text/plain',
+          'x-upstream-sentinel': 'must-not-survive',
+          location: '/upstream-only',
+          'www-authenticate': 'Bearer realm="upstream"',
+        });
+        res.flushHeaders();
+        setTimeout(() => res.socket?.destroy(), 20);
+      }),
+    );
+    const proxyPort = await proxyServerPointingAt(upstreamPort);
+    log.clearLogs();
+    const result = await request(
+      `http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp?state=zero-byte-secret`,
+    );
+    expectGeneric502(result);
+    expect(result.headers).not.toHaveProperty('x-upstream-sentinel');
+    expect(result.headers).not.toHaveProperty('location');
+    expect(result.headers).not.toHaveProperty('www-authenticate');
+    expect(failureLog()?.data).toEqual({ phase: 'upstream' });
+    expect(log.exportLogs()).not.toContain('zero-byte-secret');
   });
 
   it('closes the downstream socket when the upstream dies after streaming starts', async () => {

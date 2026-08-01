@@ -82,6 +82,49 @@ export async function pipeUpstreamResponse(
   }
 
   const nodeStream = Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]);
+  const iterator = nodeStream[Symbol.asyncIterator]();
+  let clientClosed = false;
+  const cancelBeforeFirstByte = () => {
+    clientClosed = true;
+    nodeStream.destroy();
+  };
+  res.once('close', cancelBeforeFirstByte);
+
+  let first: IteratorResult<unknown>;
+  try {
+    first = await iterator.next();
+  } catch (error) {
+    if (clientClosed) return;
+    throw error;
+  } finally {
+    res.off('close', cancelBeforeFirstByte);
+  }
+
+  if (clientClosed || res.destroyed) {
+    nodeStream.destroy();
+    return;
+  }
+  if (first.done) {
+    res.end();
+    return;
+  }
+
+  const stagedStream = Readable.from(
+    (async function* streamFromFirstByte() {
+      try {
+        yield first.value;
+        while (true) {
+          const next = await iterator.next();
+          if (next.done) return;
+          yield next.value;
+        }
+      } finally {
+        nodeStream.destroy();
+      }
+    })(),
+    { objectMode: false },
+  );
+  stagedStream.once('error', (error) => nodeStream.destroy(error));
 
   try {
     // pipeline(), not pipe(). A bare .pipe() does NOT tear down the source when the
@@ -90,11 +133,17 @@ export async function pipeUpstreamResponse(
     // unauthenticated proxy that is its own denial of service — open many requests, hang
     // up immediately, and each one goes on draining a large upstream response into a dead
     // socket. That would have undone most of the cap this function exists to provide.
-    await pipeline(nodeStream, res);
+    await pipeline(stagedStream, res);
   } catch (err) {
     // The client hanging up mid-response is normal traffic, not a failure: pipeline has
     // already destroyed both streams, which is the whole point of using it.
-    if ((err as NodeJS.ErrnoException)?.code === 'ERR_STREAM_PREMATURE_CLOSE') return;
+    if ((err as NodeJS.ErrnoException)?.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+      nodeStream.destroy(err as Error);
+      if (!nodeStream.closed) {
+        await new Promise<void>((resolve) => nodeStream.once('close', resolve));
+      }
+      return;
+    }
     throw err;
   }
 }

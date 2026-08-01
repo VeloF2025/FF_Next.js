@@ -139,6 +139,42 @@ describe('pipeUpstreamResponse', () => {
     ).rejects.toThrow(/upstream exploded/);
   });
 
+  it('leaves the downstream writable when upstream fails before its first body byte', async () => {
+    const failing = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error('upstream failed before body'));
+      },
+    });
+    const { res, sink } = collectingRes();
+
+    await expect(
+      pipeUpstreamResponse({ body: failing, arrayBuffer: async () => new ArrayBuffer(0) }, res),
+    ).rejects.toThrow(/before body/);
+
+    expect(sink.destroyed).toBe(false);
+    expect(sink.writableEnded).toBe(false);
+    sink.destroy();
+  });
+
+  it('cancels a stalled upstream when the client disconnects before the first byte', async () => {
+    let cancelled = false;
+    const stalled = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const { res, sink } = collectingRes();
+
+    const done = pipeUpstreamResponse(
+      { body: stalled, arrayBuffer: async () => new ArrayBuffer(0) },
+      res,
+    );
+    sink.destroy();
+
+    await expect(done).resolves.toBeUndefined();
+    expect(cancelled).toBe(true);
+  });
+
   it('cancels the upstream source when the client disconnects early', async () => {
     // Deterministic, not timing-based. A web ReadableStream's cancel() fires the moment
     // Readable.fromWeb tears it down, carrying the reason — so this asserts the teardown
