@@ -1,6 +1,6 @@
 import { listCandidateRows } from './candidateRepository';
 import { prepareCandidate } from './candidateService';
-import { processAcknowledgementCleanup } from './acknowledgementCleanup';
+import { cleanupLeaseUntil, processAcknowledgementCleanup } from './acknowledgementCleanup';
 import { recordOneMapConsent, type OneMapConsentInput } from './consentService';
 import {
   claimDueAcknowledgementCleanup, claimNextExport, createExport, saveCandidateDecision, transitionExportState,
@@ -53,7 +53,8 @@ export interface ProcessorDependencies {
     saveCandidateDecision(run: VelocityReviewRun, decision: CandidateDecision): Promise<void>;
     createExport(run: VelocityReviewRun, candidate: PreparedCandidate): Promise<{ created: boolean; export: VelocityReviewExport }>;
     claimNextExport(now: Date, eligibleExportIds: readonly string[]): Promise<VelocityReviewExport | null>;
-    claimDueAcknowledgementCleanup(now: Date, eligibleExportIds: readonly string[]): Promise<VelocityReviewExport | null>;
+    claimDueAcknowledgementCleanup(now: Date, eligibleExportIds: readonly string[],
+      leaseUntil: Date): Promise<VelocityReviewExport | null>;
     transitionExportState(id: string, expected: ExportState, next: ExportState,
       updates?: ExportTransitionUpdates): Promise<VelocityReviewExport | null>;
   };
@@ -108,7 +109,6 @@ export async function processOneExport(item: ProcessableExport,
   if (consent === 'withdrawn') {
     return result(await move(deps, row, 'permanent_failure', { errorCode: 'consent_withdrawn' }));
   }
-
   let upserted: HighLevelContact;
   try {
     upserted = await deps.ghl.upsertContact({ phoneE164: row.phoneE164,
@@ -117,7 +117,6 @@ export async function processOneExport(item: ProcessableExport,
   } catch (error) {
     return failRequest(deps, row, error, 'ghl_upsert_failed');
   }
-
   let current: HighLevelContact;
   try {
     current = await deps.ghl.getContact(upserted.id);
@@ -143,7 +142,6 @@ export async function processOneExport(item: ProcessableExport,
     return failRequest(deps, row, error, 'tag_add');
   }
   row = await move(deps, row, 'trigger_requested', { triggerRequestedAt: deps.now() });
-
   for (let elapsed = 0; elapsed < POLL_LIMIT_MS; elapsed += POLL_INTERVAL_MS) {
     await deps.sleep(POLL_INTERVAL_MS);
     try {
@@ -154,17 +152,17 @@ export async function processOneExport(item: ProcessableExport,
     const acknowledged = current.customFields[deps.exportKeyFieldId] === row.exportKey
       && current.tags.includes(ENROLLED_TAG) && !current.tags.includes(READY_TAG);
     if (!acknowledged) continue;
-    row = await move(deps, row, 'ack_cleanup_pending', { workflowAcknowledgedAt: deps.now() });
+    const acknowledgedAt = deps.now();
+    row = await move(deps, row, 'ack_cleanup_pending', { workflowAcknowledgedAt: acknowledgedAt,
+      nextAttemptAt: cleanupLeaseUntil(acknowledgedAt) });
     return processAcknowledgementCleanup(row, deps);
   }
   return result(await move(deps, row, 'ambiguous', { errorCode: 'workflow_acknowledgement_timeout' }));
 }
-
 function sastDate(now: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg', year: 'numeric',
     month: '2-digit', day: '2-digit' }).format(now);
 }
-
 function previousDate(value: string): string {
   const date = new Date(`${value}T00:00:00Z`); date.setUTCDate(date.getUTCDate() - 1);
   return date.toISOString().slice(0, 10);
@@ -251,7 +249,9 @@ async function lockedRun(deps: ProcessorDependencies): Promise<VelocityReviewRun
   for (;;) {
     const claimed = await deps.exports.claimNextExport(deps.now(), eligibleIds);
     if (!claimed) {
-      const cleanup = await deps.exports.claimDueAcknowledgementCleanup(deps.now(), eligibleIds);
+      const cleanupNow = deps.now();
+      const cleanup = await deps.exports.claimDueAcknowledgementCleanup(
+        cleanupNow, eligibleIds, cleanupLeaseUntil(cleanupNow));
       if (!cleanup) break;
       const item = contexts.get(cleanup.id);
       if (!item) throw new Error('Claimed Velocity review cleanup lacks current candidate evidence');

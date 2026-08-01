@@ -194,13 +194,14 @@ describe('Velocity review export persistence', () => {
   it('claims only due scoped acknowledgement cleanup and increments its attempt', async () => {
     const due = exportRow({ state: 'ack_cleanup_pending', attempt_count: 1,
       next_attempt_at: new Date('2026-08-02T08:59:00Z') });
-    const claimed = exportRow({ state: 'ack_cleanup_pending', attempt_count: 2, next_attempt_at: null });
+    const leaseUntil = new Date('2026-08-02T09:01:00Z');
+    const claimed = exportRow({ state: 'ack_cleanup_pending', attempt_count: 2, next_attempt_at: leaseUntil });
     const tx = { query: vi.fn(), queryOne: vi.fn().mockResolvedValueOnce(due).mockResolvedValueOnce(claimed) };
     mocks.transaction.mockImplementation(async (work) => work(tx));
     const now = new Date('2026-08-02T09:00:00Z');
 
-    await expect(claimDueAcknowledgementCleanup(now, ['export-1'])).resolves.toMatchObject({
-      id: 'export-1', state: 'ack_cleanup_pending', attemptCount: 2, nextAttemptAt: null,
+    await expect(claimDueAcknowledgementCleanup(now, ['export-1'], leaseUntil)).resolves.toMatchObject({
+      id: 'export-1', state: 'ack_cleanup_pending', attemptCount: 2, nextAttemptAt: leaseUntil,
     });
 
     const [selectText, selectParams] = tx.queryOne.mock.calls[0] as [string, unknown[]];
@@ -210,7 +211,33 @@ describe('Velocity review export persistence', () => {
     expect(selectText).toContain('e.id = ANY($2::uuid[])');
     expect(selectParams).toEqual([now, ['export-1']]);
     expect(updateText).toContain('attempt_count = attempt_count + 1');
+    expect(updateText).toContain('next_attempt_at = $4');
     expect(updateText).toContain("state = 'ack_cleanup_pending'");
-    expect(updateParams).toEqual(['export-1', ['export-1'], now]);
+    expect(updateParams).toEqual(['export-1', ['export-1'], now, leaseUntil]);
+  });
+
+  it('does not reclaim an active cleanup lease but reclaims it after expiry', async () => {
+    const activeLease = new Date('2026-08-02T09:01:00Z');
+    const restartAt = new Date('2026-08-02T09:01:01Z');
+    const restartLease = new Date('2026-08-02T09:02:01Z');
+    const beforeTx = { query: vi.fn(), queryOne: vi.fn().mockResolvedValue(null) };
+    const afterTx = { query: vi.fn(), queryOne: vi.fn()
+      .mockResolvedValueOnce(exportRow({ state: 'ack_cleanup_pending', attempt_count: 2,
+        next_attempt_at: activeLease }))
+      .mockResolvedValueOnce(exportRow({ state: 'ack_cleanup_pending', attempt_count: 3,
+        next_attempt_at: restartLease })) };
+    mocks.transaction.mockImplementationOnce(async (work) => work(beforeTx))
+      .mockImplementationOnce(async (work) => work(afterTx));
+
+    await expect(claimDueAcknowledgementCleanup(
+      new Date('2026-08-02T09:00:59Z'), ['export-1'], activeLease,
+    )).resolves.toBeNull();
+    await expect(claimDueAcknowledgementCleanup(
+      restartAt, ['export-1'], restartLease,
+    )).resolves.toMatchObject({ attemptCount: 3, nextAttemptAt: restartLease });
+
+    expect(beforeTx.queryOne).toHaveBeenCalledTimes(1);
+    expect(afterTx.queryOne).toHaveBeenCalledTimes(2);
+    expect(afterTx.queryOne.mock.calls[1]?.[1]).toEqual(['export-1', ['export-1'], restartAt, restartLease]);
   });
 });

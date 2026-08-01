@@ -309,15 +309,28 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
     const due = await createExport(run, dueCandidate);
     const later = await createExport(run, laterCandidate);
     const now = new Date('2026-08-02T08:00:00Z');
+    const leaseUntil = new Date('2026-08-02T08:01:00Z');
     await db.query(`UPDATE velocity_review_exports SET state = 'ack_cleanup_pending',
       attempt_count = 1, next_attempt_at = CASE WHEN id = $1 THEN $3::timestamptz ELSE $4::timestamptz END
       WHERE id IN ($1, $2)`,
     [due.export.id, later.export.id, new Date('2026-08-02T07:59:00Z'), new Date('2026-08-02T08:01:00Z')]);
 
-    const claimed = await claimDueAcknowledgementCleanup(now, [due.export.id, later.export.id]);
+    const claimed = await claimDueAcknowledgementCleanup(
+      now, [due.export.id, later.export.id], leaseUntil,
+    );
     expect(claimed).toMatchObject({ id: due.export.id, state: 'ack_cleanup_pending',
-      attemptCount: 2, nextAttemptAt: null });
-    await expect(claimDueAcknowledgementCleanup(now, [later.export.id])).resolves.toBeNull();
+      attemptCount: 2, nextAttemptAt: leaseUntil });
+    await expect(claimDueAcknowledgementCleanup(
+      new Date('2026-08-02T08:00:59Z'), [due.export.id], new Date('2026-08-02T08:01:59Z'),
+    )).resolves.toBeNull();
+    const restartAt = new Date('2026-08-02T08:01:01Z');
+    const restartLease = new Date('2026-08-02T08:02:01Z');
+    await expect(claimDueAcknowledgementCleanup(
+      restartAt, [due.export.id], restartLease,
+    )).resolves.toMatchObject({ id: due.export.id, attemptCount: 3, nextAttemptAt: restartLease });
+    await expect(claimDueAcknowledgementCleanup(
+      now, [later.export.id], new Date('2026-08-02T08:01:00Z'),
+    )).resolves.toBeNull();
     const notDue = await db.query<{ state: ExportState; attempt_count: number; next_attempt_at: Date }>(
       'SELECT state, attempt_count, next_attempt_at FROM velocity_review_exports WHERE id = $1', [later.export.id]);
     expect(notDue.rows[0]).toEqual({ state: 'ack_cleanup_pending', attempt_count: 1,

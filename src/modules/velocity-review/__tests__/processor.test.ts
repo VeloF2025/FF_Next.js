@@ -114,6 +114,13 @@ describe('processOneExport', () => {
     expect(result).toMatchObject({ state: 'completed', workflowAcknowledged: true });
     expect(deps.ghl.addTags).toHaveBeenCalledWith('contact-1', ['velocity-review-ready']);
     expect(deps.ghl.removeTags).toHaveBeenCalledWith('contact-1', ['velocity-review-enrolled']);
+    const cleanupHandoff = vi.mocked(deps.exports.transitionExportState).mock.calls.find((call) =>
+      call[2] === 'ack_cleanup_pending');
+    expect(cleanupHandoff?.[3]).toMatchObject({
+      workflowAcknowledgedAt: NOW, nextAttemptAt: new Date('2026-08-01T07:01:00Z'),
+    });
+    expect(vi.mocked(deps.exports.transitionExportState).mock.invocationCallOrder[2])
+      .toBeLessThan(vi.mocked(deps.ghl.removeTags).mock.invocationCallOrder[0] as number);
   });
 
   it('schedules retryable acknowledgement cleanup without retriggering', async () => {
@@ -260,10 +267,10 @@ describe('runVelocityReviewExport', () => {
       attemptCount: 1, nextAttemptAt: new Date('2026-08-01T06:59:00Z'), ghlContactId: 'contact-1' };
     deps.exports.createExport = vi.fn(async () => { rows.set(cleanup.id, cleanup); return { created: false, export: cleanup }; });
     deps.exports.claimNextExport = vi.fn(async () => null);
-    deps.exports.claimDueAcknowledgementCleanup = vi.fn(async () => {
+    deps.exports.claimDueAcknowledgementCleanup = vi.fn(async (_now, _eligible, leaseUntil) => {
       const row = rows.get(cleanup.id);
       if (!row?.nextAttemptAt || row.nextAttemptAt > NOW) return null;
-      const claimed = { ...row, attemptCount: row.attemptCount + 1, nextAttemptAt: null };
+      const claimed = { ...row, attemptCount: row.attemptCount + 1, nextAttemptAt: leaseUntil };
       rows.set(row.id, claimed); return claimed;
     });
 

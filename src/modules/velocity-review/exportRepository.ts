@@ -207,6 +207,7 @@ export async function claimNextExport(
 export async function claimDueAcknowledgementCleanup(
   now: Date,
   eligibleExportIds: readonly string[],
+  leaseUntil: Date,
 ): Promise<VelocityReviewExport | null> {
   if (eligibleExportIds.length === 0) return null;
   return transaction(async (txn) => {
@@ -223,11 +224,11 @@ export async function claimDueAcknowledgementCleanup(
 
     const claimed = await txn.queryOne<ExportRow>(`
       UPDATE velocity_review_exports
-      SET attempt_count = attempt_count + 1, next_attempt_at = NULL, updated_at = NOW()
+      SET attempt_count = attempt_count + 1, next_attempt_at = $4, updated_at = NOW()
       WHERE id = $1 AND state = 'ack_cleanup_pending'
         AND id = ANY($2::uuid[]) AND next_attempt_at <= $3
       RETURNING ${EXPORT_COLUMNS}
-    `, [candidate.id, eligibleExportIds, now]);
+    `, [candidate.id, eligibleExportIds, now, leaseUntil]);
     return claimed ? mapExport(claimed) : null;
   });
 }

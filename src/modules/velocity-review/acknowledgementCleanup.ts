@@ -3,6 +3,11 @@ import { HighLevelRequestError } from './ghlClient';
 import { nextRetryAt } from './retry';
 
 const ENROLLED_TAG = 'velocity-review-enrolled';
+const CLEANUP_LEASE_MS = 60_000;
+
+export function cleanupLeaseUntil(now: Date): Date {
+  return new Date(now.getTime() + CLEANUP_LEASE_MS);
+}
 
 interface CleanupDependencies {
   now(): Date;
