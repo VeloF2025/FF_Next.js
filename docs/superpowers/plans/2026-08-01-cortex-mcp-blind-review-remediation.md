@@ -358,4 +358,3 @@ Require fresh independent FibreFlow, Cortex, and cross-repository reviews. Inclu
 - [ ] **Step 6: Publish coordinated draft PRs only after approval**
 
 Push without force, open cross-linked draft PRs, and state Cortex executor/Bridge enforcement must merge and deploy before FibreFlow exposure. Disclose the Playwright/auth gate and unchanged `antihall` blocker exactly. Stop before merge or deployment.
-
