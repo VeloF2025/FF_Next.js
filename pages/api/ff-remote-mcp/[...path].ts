@@ -117,6 +117,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return;
     }
 
+    // Fetch headers are copied before streaming starts. If the body then fails before
+    // its first byte, none of those upstream headers belong on our generic 502.
+    for (const header of res.getHeaderNames()) res.removeHeader(header);
     return res.status(502).json({
       success: false,
       error: {
