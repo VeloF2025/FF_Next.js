@@ -13,7 +13,21 @@ export const config = {
 
 const DEFAULT_UPSTREAM = ['http:', '', '127.0.0.1:7414'].join('/');
 const UPSTREAM = (process.env.CORTEX_REMOTE_MCP_URL || DEFAULT_UPSTREAM).replace(/\/$/, '');
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
+const MIN_UPSTREAM_TIMEOUT_MS = 25;
+const MAX_UPSTREAM_TIMEOUT_MS = 120_000;
 const OAUTH_RATE_WINDOW_MS = 60 * 1000;
+
+export function parseUpstreamTimeoutMs(raw: string | undefined): number {
+  if (!raw || !/^\d+$/.test(raw)) return DEFAULT_UPSTREAM_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return DEFAULT_UPSTREAM_TIMEOUT_MS;
+  return Math.min(MAX_UPSTREAM_TIMEOUT_MS, Math.max(MIN_UPSTREAM_TIMEOUT_MS, parsed));
+}
+
+const UPSTREAM_TIMEOUT_MS = parseUpstreamTimeoutMs(
+  process.env.CORTEX_REMOTE_MCP_TIMEOUT_MS,
+);
 
 interface OAuthRateLimit {
   endpoint: 'cortex-oauth-authorize' | 'cortex-oauth-register';
@@ -111,8 +125,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let targetPath: string;
   try {
     targetPath = pathFromQuery(req);
-  } catch (error) {
-    log.warn('Rejected invalid Cortex remote MCP path', { path: req.query.path, error });
+  } catch {
+    log.warn('Rejected invalid Cortex remote MCP path');
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Invalid MCP path' } });
   }
 
@@ -124,7 +138,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const rawBody = await readCappedBody(req);
     if (rawBody === BODY_TOO_LARGE) {
-      log.warn('Cortex remote MCP request body over cap', { upstreamUrl, maxBytes: MAX_PROXY_BODY_BYTES });
+      log.warn('Cortex remote MCP request body over cap', {
+        maxBytes: MAX_PROXY_BODY_BYTES,
+      });
       return res.status(413).json({
         success: false,
         error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds the proxy limit' },
@@ -136,6 +152,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers: forwardHeaders(req),
       body: rawBody ? (rawBody as unknown as BodyInit) : undefined,
       redirect: 'manual',
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
     res.status(upstream.status);
@@ -149,8 +166,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // code and the failure would never be logged. Verified by execution: without await,
     // the catch does not run.
     return await pipeUpstreamResponse(upstream, res);
-  } catch (error) {
-    log.error('Cortex remote MCP proxy failed', { upstreamUrl, error });
+  } catch {
+    log.error('Cortex remote MCP proxy failed', {
+      phase: res.headersSent ? 'stream' : 'upstream',
+    });
 
     // Streaming the response introduced a failure mode buffering did not have: once the
     // upstream's status and first bytes are on the wire, res.status(502) throws
@@ -167,7 +186,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       error: {
         code: 'BAD_GATEWAY',
         message: 'Cortex remote MCP service is unavailable',
-        detail: error instanceof Error ? error.message : String(error),
       },
     });
   }
