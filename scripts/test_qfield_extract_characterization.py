@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from qfield_extract_testkit import (  # noqa: E402
-    STEP_1, STEP_2, STEP_7, Harness, config, load_extractor,
+    PRIMARY_QF, STEP_1, STEP_2, STEP_7, Harness, config, load_extractor,
 )
 
 MOD = load_extractor()
@@ -117,8 +117,16 @@ def main():
     check((found, upserted) == (2, 2),
           f"a photo living in a LINKED project still resolves, got ({found},{upserted})")
     inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
-    check(any(p[5] == LINKED for p in inserts),
-          "the linked-project photo is recorded against the QField project that holds it")
+    # EXACT per-photo attribution, not `any(... == LINKED)`. An "at least one insert
+    # mentions LINKED" check passes even when EVERY photo is misattributed to the
+    # linked project — the same "reads as testing attribution, only tests presence"
+    # shape this scenario was written to prevent. Map storage_key -> project_id and
+    # pin both directions.
+    by_key = {p[1]: p[5] for p in inserts}
+    check(by_key.get("k/primary") == PRIMARY_QF,
+          f"the PRIMARY photo stays attributed to the primary project, got {by_key.get('k/primary')}")
+    check(by_key.get("k/linked") == LINKED,
+          f"the LINKED photo is attributed to the project that holds it, got {by_key.get('k/linked')}")
 
     found, upserted, _, h = run(
         columns=["NAME", STEP_1],
@@ -129,6 +137,8 @@ def main():
     inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
     check(len(inserts) == 1 and inserts[0][1] == "k/PRIMARY",
           "on a filename collision the PRIMARY project wins, keeping re-runs stable")
+    check(len(inserts) == 1 and inserts[0][5] == PRIMARY_QF,
+          f"...and it is attributed to the primary project, got {inserts[0][5] if inserts else None}")
 
     _, _, _, h = run(
         columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
@@ -243,6 +253,19 @@ def main():
 
     check(len(h.hierarchy_calls) == 1,
           f"sync_hierarchy is invoked on a real run, got {len(h.hierarchy_calls)} call(s)")
+    # Count alone lets a refactor reorder the call's positional arguments silently.
+    # Pin the positions that carry meaning: (cur, conn, ff_id, rows, label_col,
+    # config, spatial_pon_map).
+    hargs = h.hierarchy_calls[0][0] if h.hierarchy_calls else ()
+    check(len(hargs) == 7, f"sync_hierarchy receives 7 positional args, got {len(hargs)}")
+    check(len(hargs) == 7 and hargs[2] == config()["ff_project_id"],
+          "sync_hierarchy arg 3 is the FibreFlow project id")
+    check(len(hargs) == 7 and isinstance(hargs[3], list),
+          "sync_hierarchy arg 4 is the GPKG rows list")
+    check(len(hargs) == 7 and hargs[4] == "NAME",
+          f"sync_hierarchy arg 5 is the label column, got {hargs[4] if len(hargs) == 7 else None}")
+    check(len(hargs) == 7 and isinstance(hargs[5], dict) and "table_name" in hargs[5],
+          "sync_hierarchy arg 6 is the project config")
 
     _, _, _, h = run(
         columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],

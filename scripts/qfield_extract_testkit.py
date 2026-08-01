@@ -196,10 +196,17 @@ class Harness:
         return self.mod.extract_project(self.conn, name, config, dry_run, force)
 
 
+# Exposed so scenarios can assert EXACT project attribution rather than "at least one
+# insert mentions the linked project" — an `any(...)` check passes even when every
+# photo is misattributed to the same project.
+PRIMARY_QF = "aaaaaaaa-1111-2222-3333-444444444444"
+PRIMARY_FF = "bbbbbbbb-1111-2222-3333-444444444444"
+
+
 def config(table="civil_audit", label_col="NAME", gpkg_path="Civil Audit.gpkg", **extra):
     cfg = {
-        "qf_project_id": "aaaaaaaa-1111-2222-3333-444444444444",
-        "ff_project_id": "bbbbbbbb-1111-2222-3333-444444444444",
+        "qf_project_id": PRIMARY_QF,
+        "ff_project_id": PRIMARY_FF,
         "gpkg_path": gpkg_path,
         "table_name": table,
         "label_col": label_col,
