@@ -30,7 +30,8 @@ scope; it does not add mutating MCP tools.
    membership/ACL-scoped.
 4. Separate connector setup from Cortex search and review in the FibreFlow UI.
 5. Keep the working FibreFlow Remote MCP flow and its RBAC/read-only behavior intact.
-6. Preserve existing Cortex OAuth grants and retain a temporary rollback route.
+6. Preserve marked-compatible Cortex OAuth grants and retain a temporary rollback
+   route; unsafe unmarked grants fail closed and require re-consent.
 
 ## 3. Non-goals
 
@@ -47,7 +48,7 @@ scope; it does not add mutating MCP tools.
 | Connector | Purpose | Identity and authorization |
 |---|---|---|
 | FibreFlow Operations | Projects, QField, fleet, procurement and other FF APIs | Verified FF user; existing FF RBAC plus server-enforced read-only MCP session |
-| Cortex Knowledge | Meetings, email, WhatsApp, SharePoint, timelines and cited evidence | Verified FF email; Cortex tenant gate plus channel membership, with a server allowlist for Lew |
+| Cortex Knowledge | Meetings, email, WhatsApp, SharePoint, timelines and cited evidence | Verified FF email; Cortex tenant gate plus channel membership, with a server allowlist for tenant-bound full read |
 
 The connectors deliberately remain separate OAuth authorization servers and use
 separate callback secrets. A flaw or secret rotation in one connector must not grant
@@ -67,7 +68,8 @@ Claude custom connector
      for req.user.email
   -> FF POSTs { stateId, token } over loopback to
      Cortex /authorize/complete with X-Cortex-MCP-Secret
-  -> Cortex validates secret, state and bearer against the Bridge
+  -> Cortex requires exact token_use="mcp", then validates secret, state and the
+     unchanged bearer against the Bridge
   -> Cortex consumes the pending request and returns redirectUrl
   -> browser returns to Claude with the authorization code
   -> Claude exchanges the code and receives access + refresh tokens
@@ -158,16 +160,21 @@ Python files below the repository size limit.
    Stdio mode remains importable without this remote-only configuration.
 6. Keep `/authorize/approve` temporarily as an unlinked operator rollback path.
    The normal authorization redirect must never point to it.
-7. Preserve the OAuth store models and token prefixes so current access and refresh
-   grants continue working.
+7. Preserve the OAuth store models and token prefixes. Existing authorization-code,
+   access and refresh grants continue only when their embedded Cortex bearer has an
+   exact `token_use="mcp"` marker. Unsafe unmarked credentials fail closed, their
+   affected grant rows are invalidated or consumed when presented, and the user must
+   re-consent. The marker is only an unverified shape precondition; Bridge remains the
+   signature, tenant, identity, expiry, membership and revocation authority.
 
 OAuth metadata remains authorization-code plus refresh-token only. Adding
 `client_credentials` would change the human identity/audit model and is out of scope.
 
 ## 8. Lew's tenant scope
 
-The bridge currently reads `CORTEX_SUPER_ADMIN_EMAILS` at module import. The live
-configuration does not currently include Lew.
+The Bridge reads `CORTEX_SUPER_ADMIN_EMAILS` at module import. This design is not
+evidence of the current live allowlist or deployment state; operators must read back
+the effective configuration at the approved rollout gate.
 
 During controlled rollout:
 
@@ -176,13 +183,24 @@ During controlled rollout:
 3. Add `lew@velocityfibre.co.za` to `CORTEX_SUPER_ADMIN_EMAILS`, preserving every
    existing entry, then independently read back the complete effective set and abort
    if Lew is absent or any prior entry was dropped.
-4. Activate Cortex Agent Executor first, then Bridge/Remote MCP, and FibreFlow last.
-5. Prove Lew receives full-tenant scope and an ordinary user remains ACL-limited.
+4. Activate Cortex Agent Executor first, then Cortex Bridge, then Cortex Remote MCP,
+   and FibreFlow last.
+5. Prove Lew receives tenant-bound full reads, including meeting detail and minutes
+   packs, while an ordinary user remains ACL-limited.
 
 Because the Bridge resolves the email in the embedded bearer on each request, adding
-Lew to the allowlist also widens an existing Lew OAuth grant after the Bridge restart;
-the user does not need a new personal token. Reconnecting is still used to prove the
-new browser flow end to end.
+Lew to the allowlist also widens a marked-compatible existing Lew OAuth grant after
+the Bridge restart; the user does not need a new personal token for that compatible
+grant. Unsafe unmarked authorization codes, access tokens and refresh tokens fail
+closed and require re-consent; rollout must not try to prove that one continues.
+Reconnecting is still used to prove the new browser flow end to end.
+
+The allowlist creates a distinct tenant-bound read capability for Lew and every
+other configured `CORTEX_SUPER_ADMIN_EMAILS` entry. It includes meeting detail and
+minutes-pack reads, including restricted meetings inside the verified tenant, but
+does not make the caller a meeting admin. Do not add Lew to
+`CORTEX_MEETING_ADMIN_EMAILS` as a shortcut: full-tenant read must not enable
+classify, legal-hold, process, intake, action, delivery or any other write path.
 
 ## 9. FibreFlow UI: AI Connections module
 
@@ -231,6 +249,9 @@ its broken local configuration must not be exposed as the normal user workflow.
 - Existing FF MCP authorization, endpoint catalogue, RBAC and read-only enforcement
   are not modified.
 - Full-tenant Lew scope is still tenant-bound to `velocity-fibre`.
+- Marked-compatible outer OAuth grants remain usable. Unsafe unmarked authorization
+  codes, access tokens and refresh tokens fail closed and require re-consent; neither
+  rollout nor rollback may preserve or re-enable them.
 
 ## 11. Verification
 
@@ -260,7 +281,9 @@ Implementation is test-driven.
   rejected bearer tokens.
 - Bearer validation failure does not consume pending state.
 - Successful callback creates one code, consumes state and returns no bearer.
-- Existing code exchange, refresh, revocation, MCP tool and read-only tests stay green.
+- Marked-compatible code exchange, refresh, revocation, MCP tool and read-only tests
+  stay green; unsafe unmarked code/access/refresh fixtures fail closed and persist
+  their narrowly scoped invalidation.
 - Super-admin tests include Lew as full scope and an ordinary user as ACL-limited.
 
 ### Live proof on dev
@@ -284,8 +307,8 @@ Use two coordinated PRs:
 1. **Cortex PR:** consent redirect/callback, fail-closed configuration and tests.
 2. **FibreFlow PR:** consent page/API, AI Connections UI and regression tests.
 
-Deploy in one direction only: Cortex Agent Executor, Cortex Bridge/Remote MCP, then
-FibreFlow. Configure secrets through untracked environment files and complete the
+Deploy in one direction only: Cortex Agent Executor, then Cortex Bridge, then Cortex
+Remote MCP, then FibreFlow. Configure secrets through untracked environment files and complete the
 isolated live proof described above. Because the current remote service is
 production-facing, real dev OAuth must use isolated executor/Bridge/Remote processes,
 a unique store, and a dev public base; do not repoint its live authorization flow at
@@ -297,12 +320,14 @@ Rollback order:
 1. Reverse exposure first by reverting/hiding the FibreFlow consent/proxy and
    connection pages.
 2. Restore Cortex's authorization redirect to the retained `/authorize/approve` and
-   roll back Bridge/Remote MCP.
-3. Remove Lew from the super-admin allowlist only if the access decision itself is
-   being rolled back; preserve and read back all unrelated entries.
+   roll back Remote MCP without removing the marker gate or unsafe-grant invalidation.
+3. Roll back Bridge read-scope behavior only if required. Remove Lew from the
+   super-admin allowlist only if the access decision itself is being rolled back;
+   preserve and read back all unrelated entries.
 4. Roll back Agent Executor last if required.
-5. Existing OAuth grants and the working FibreFlow connector remain usable because
-   their storage formats and routes were not changed.
+5. Keep the working FibreFlow connector and marked-compatible Cortex OAuth grants
+   usable. Never restore, preserve or require proof of an unsafe unmarked grant;
+   affected users re-consent after rollback through the retained safe flow.
 
 ## 13. Acceptance criteria
 
