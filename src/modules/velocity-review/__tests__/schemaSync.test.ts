@@ -39,5 +39,6 @@ describe('Velocity review migration SQL contract', () => {
       /SELECT UPPER\(BTRIM\(dr_number\)\) AS dr_number, phone_fingerprint, COUNT\(\*\).*GROUP BY UPPER\(BTRIM\(dr_number\)\), phone_fingerprint/s
     );
     expect(rollback).toContain("SET source = 'import'");
+    expect(rollback).not.toMatch(/^\s*(BEGIN|COMMIT);\s*$/gim);
   });
 });

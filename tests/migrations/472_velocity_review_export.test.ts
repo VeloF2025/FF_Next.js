@@ -10,6 +10,10 @@ const FORWARD = readFileSync(
   join(process.cwd(), 'scripts/migrations/sql/472_velocity_review_export.sql'),
   'utf8'
 );
+const ROLLBACK = readFileSync(
+  join(process.cwd(), 'scripts/migrations/sql/rollback_472_velocity_review_export.sql'),
+  'utf8'
+);
 const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl: false,
@@ -270,5 +274,76 @@ dbDescribe('migration 472 applied to a scratch schema', () => {
       runId: secondRunId, targetDate: '2026-08-01', dr: 'DR-NEXT',
       phone: '+27610000003', fingerprint, state: 'ambiguous',
     })).resolves.toBeUndefined();
+  });
+
+  it('rolls back inside the runner transaction without changing consent history', async () => {
+    const timestamps = {
+      withdrawnAt: '2026-07-30T08:00:00.000Z',
+      createdAt: '2026-07-29T07:00:00.000Z',
+      updatedAt: '2026-07-30T08:00:00.000Z',
+    };
+    await scoped(
+      `INSERT INTO wa_subscriber_consent
+         (msisdn, status, source, withdrawn_at, created_at, updated_at)
+       VALUES ($1, 'withdrawn', 'onemap_home_signup', $2, $3, $4)`,
+      ['27820000003', timestamps.withdrawnAt, timestamps.createdAt, timestamps.updatedAt]
+    );
+
+    const client = await pool.connect();
+    try {
+      await client.query(`SET search_path = ${SCHEMA}, public`);
+      await client.query('BEGIN');
+      await client.query(ROLLBACK);
+
+      const consent = await client.query<{
+        status: string;
+        source: string;
+        withdrawn_at: Date;
+        created_at: Date;
+        updated_at: Date;
+      }>(
+        `SELECT status, source, withdrawn_at, created_at, updated_at
+         FROM wa_subscriber_consent WHERE msisdn = $1`,
+        ['27820000003']
+      );
+      expect(consent.rows[0]).toMatchObject({ status: 'withdrawn', source: 'import' });
+      expect(consent.rows[0].withdrawn_at.toISOString()).toBe(timestamps.withdrawnAt);
+      expect(consent.rows[0].created_at.toISOString()).toBe(timestamps.createdAt);
+      expect(consent.rows[0].updated_at.toISOString()).toBe(timestamps.updatedAt);
+
+      const rollbackState = await client.query<{
+        control_table: string | null;
+        tracker_count: number;
+      }>(
+        `SELECT to_regclass('velocity_review_control')::text AS control_table,
+                (SELECT COUNT(*)::int FROM schema_migrations
+                 WHERE filename = '472_velocity_review_export.sql') AS tracker_count`
+      );
+      expect(rollbackState.rows[0]).toEqual({ control_table: null, tracker_count: 0 });
+
+      await client.query('ROLLBACK');
+      const restored = await client.query<{
+        control_table: string | null;
+        tracker_count: number;
+        source: string;
+        status: string;
+      }>(
+        `SELECT to_regclass('velocity_review_control')::text AS control_table,
+                (SELECT COUNT(*)::int FROM schema_migrations
+                 WHERE filename = '472_velocity_review_export.sql') AS tracker_count,
+                source, status
+         FROM wa_subscriber_consent WHERE msisdn = $1`,
+        ['27820000003']
+      );
+      expect(restored.rows[0]).toMatchObject({
+        tracker_count: 1,
+        source: 'onemap_home_signup',
+        status: 'withdrawn',
+      });
+      expect(restored.rows[0].control_table).toContain('velocity_review_control');
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
   });
 });

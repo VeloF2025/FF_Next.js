@@ -58,7 +58,7 @@ The review request action uses the separately approved active template `velocity
 
 ### Workflow: `Velocity - Installation Experience - Velo`
 
-Keep this workflow **Draft** until the Meta template is approved and the activation approval names this workflow.
+Keep this workflow **Draft** outside a separately approved internal-test publication window and an independently approved production publication. Do not finish configuring it until Meta has approved the template and the named internal-test publication approval has been recorded.
 
 1. Contact Tag trigger: tag added `velocity-review-ready`; allow multiple entries.
 2. Add `velocity-review-enrolled`.
@@ -72,7 +72,7 @@ Keep this workflow **Draft** until the Meta template is approved and the activat
 
 ### Workflow: `Velocity - Review Ask - Post Resolution`
 
-Keep this workflow **Draft** until its internal-contact test passes. Its Contact Tag trigger is tag added `issue-resolved`. It must send the approved review request only after the issue is resolved and must not run while `velocity-review-suppress` remains. Chantall is the operator who explicitly applies `issue-resolved`; no other workflow should apply it.
+Keep this workflow **Draft** outside a separately approved internal-test publication window and an independently approved production publication. Its Contact Tag trigger is tag added `issue-resolved`. It must send the approved review request only after the issue is resolved and must not run while `velocity-review-suppress` remains. Chantall is the operator who explicitly applies `issue-resolved`; no other workflow should apply it.
 
 ## Configuration snapshot (2026-08-01 SAST)
 
@@ -192,7 +192,19 @@ Verify the returned row before scheduler installation.
 
 ## Internal-contact test procedure
 
-Task execution requires separate approval and internal contacts nominated by Hein. Do not use a customer or merely assume a contact is internal.
+There is no verified supported GHL Draft test button for this workflow set. Do not assume a Draft workflow can execute. Testing therefore requires this exact controlled sequence:
+
+1. Wait until Meta shows `velocity_experience_check_v2` as approved and record the approval date.
+2. Obtain a separate named **internal-test publication approval** that identifies both workflows, the nominated internal contact(s), the permitted trigger-tag changes, and the test window. This approval is not production-publication approval.
+3. Fully configure both workflows as Draft, reopen them, and verify every trigger, action, branch, template, multiple-entry setting, suppression gate, assignee, and notification target.
+4. At the start of the approved window, publish both workflows temporarily. Apply trigger tags only to the nominated internal contact(s), and execute the tests below.
+5. On completion or any failure, immediately unpublish both workflows and read back their Draft status.
+6. Remove only the tags added by this test. Preserve all pre-existing tags, contact fields, DND/STOP state, and consent evidence.
+7. Production publication requires a new, separate approval after test reconciliation; internal-test publication never carries forward.
+
+Do not use a customer or merely assume a contact is internal.
+
+### Branch checks during the approved window
 
 For each test, first record the contact's existing name, tags, DND/STOP state, and custom fields. Confirm the upsert preserves them. Use a distinct test DR/export key per repeat-entry test.
 
@@ -207,7 +219,7 @@ For each test, first record the contact's existing name, tags, DND/STOP state, a
 9. Verify repeat entry only after the first export's acknowledgement tag is cleared. Stop if any contact-level tag represents another in-flight export.
 10. Reconcile candidate, consent evidence, contact upsert, acknowledgement, actual delivery, reply branch, assignment, and notification. Remove only test tags added by the procedure; preserve DND and consent history.
 
-Finally, trigger one summary in the approved test mode. Hein verifies that Chantall, Hein, and Michael each received one redacted aggregate summary and that it contains no phone, email, contact ID, or raw export key.
+There is no summary-only API or test mode. A `dryRun:true` request returns aggregate HTTP data and sends no summary. Verify synthetic text/HTML rendering and redaction through the focused summary unit tests. Actual SMTP delivery and Chantall/Hein/Michael mailbox receipt are verified only during the separately approved supervised pilot: the approval must name the live pilot, and the received aggregate summary must be reconciled without phone, email, contact ID, or raw export key.
 
 ## Scheduler installation
 
@@ -250,4 +262,4 @@ Rollback is destructive to the Velocity run/candidate/export tables and requires
 npm run db:migrate -- rollback 472
 ```
 
-The guarded rollback reclassifies the two OneMap evidence-source labels to `import` before removing Velocity tables and migration tracking. It does **not** delete `wa_subscriber_consent` rows: granted and withdrawn status, audit timestamps, and withdrawal evidence must survive so a rollback cannot resurrect consent or make a withdrawn recipient eligible.
+The supported runner opens one transaction, executes `rollback_472_velocity_review_export.sql`, clears legacy migration tracking, and commits only if every step succeeds; the SQL file deliberately has no top-level transaction control. The guarded rollback reclassifies the two OneMap evidence-source labels to `import` before removing Velocity tables and migration tracking. It does **not** delete `wa_subscriber_consent` rows: granted and withdrawn status, audit timestamps, and withdrawal evidence must survive so a rollback cannot resurrect consent or make a withdrawn recipient eligible.
