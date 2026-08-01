@@ -58,17 +58,18 @@ The review request action uses the separately approved active template `velocity
 
 ### Workflow: `Velocity - Installation Experience - Velo`
 
-Keep this workflow **Draft** outside a separately approved internal-test publication window and an independently approved production publication. Do not finish configuring it until Meta has approved the template and the named internal-test publication approval has been recorded.
+Keep this workflow **Draft** outside a separately approved internal-test publication window and an independently approved production publication. Its configuration may be completed and verified while Draft; neither template activation nor a saved Draft is authorization to publish, test, enroll a contact, or send a message.
 
 1. Contact Tag trigger: tag added `velocity-review-ready`; allow multiple entries.
 2. Add `velocity-review-enrolled`.
 3. Remove `velocity-review-ready`.
-4. Send WhatsApp template `velocity_experience_check_v2`.
+4. Send active WhatsApp template `velocity_experience_check_v2` with Contact → First Name mapped to `{{1}}`.
 5. Branch on the three quick replies.
 6. **Happy & connected:** add `velocity-review-happy-connected`; remove `velocity-review-suppress`, `velocity-review-installation-issue`, and `velocity-review-not-connected`; send `velocity_review_request_v1`.
-7. **Installation issue:** add `velocity-review-suppress` and `velocity-review-installation-issue`; assign the conversation to Chantall; notify Chantall immediately in GHL. Do not send a review request.
-8. **Not connected:** add `velocity-review-suppress` and `velocity-review-not-connected`; assign the conversation to Chantall; notify Chantall immediately in GHL. Do not send a review request.
+7. **Installation issue:** add `velocity-review-suppress` and `velocity-review-installation-issue`; assign the conversation to Chantall; notify Chantall immediately in GHL with Conversation redirect. Do not send a review request.
+8. **Not connected:** add `velocity-review-suppress` and `velocity-review-not-connected`; assign the conversation to Chantall; notify Chantall immediately in GHL with Conversation redirect. Do not send a review request.
 9. **Unmatched reply:** end without a review request and leave the conversation visible for manual GHL triage.
+10. **Undelivered** and **Time Out:** end without a review request.
 
 ### Workflow: `Velocity - Review Ask - Post Resolution`
 
@@ -81,8 +82,8 @@ Keep this workflow **Draft** outside a separately approved internal-test publica
 | Four custom fields | CREATED | Read back in Velocity custom fields with the types above; identifiers require approved deployment configuration. |
 | Six tags | CREATED | Read back in Velocity tag settings. |
 | Three Smart Lists | CREATED | Read back with one corresponding tag filter each. |
-| `velocity_experience_check_v2` | SUBMITTED / Pending | Exact body, `there` sample, Contact → First Name mapping for `{{1}}`, and ordered quick replies were read back. The earlier disabled Create control was caused by the missing Contact → First Name association. Meta status: Pending. Approval date: none yet. |
-| `Velocity - Installation Experience - Velo` | BLOCKED / not created | The normal WhatsApp workflow-action picker lists approved, mapped templates and omits the Pending `velocity_experience_check_v2`. Creation stopped before any incomplete workflow was created or saved. |
+| `velocity_experience_check_v2` | ACTIVE | Read back as Active, last edited 2026-08-01 06:12 PM SAST. Exact body, `there` sample, Contact → First Name mapping for `{{1}}`, and ordered quick replies were read back. No separate template-approval timestamp was visible. Active status is not publication or send approval. |
+| `Velocity - Installation Experience - Velo` | CONFIGURED / VERIFIED Draft | Created in Velocity Review System and saved. A hard-reload readback confirmed it remained Draft, Save was disabled with Saved displayed, and Allow re-entry was ON. The persisted graph uses the `velocity-review-ready` tag trigger; adds `velocity-review-enrolled`; removes `velocity-review-ready`; sends active `velocity_experience_check_v2` using Contact → First Name; branches on the three quick replies; ends Undelivered and Time Out; and applies the documented happy, installation-issue, and not-connected outcomes. No publication, test, enrollment, contact change, or send occurred. |
 | `Velocity - Review Ask - Post Resolution` | CONFIGURED / VERIFIED Draft | A hard-reload readback confirmed the `issue-resolved` trigger and a `No suppression` If/Else branch where Contact Tags does not include `velocity-review-suppress`. That branch reaches the existing active `velocity_review_request_v1` WhatsApp action and then END; the None/suppression-present branch reaches END without WhatsApp. Save and Undo were disabled after reload, proving the Draft state was persisted with no unsaved edits. |
 
 No workflow was published, tested, or enrolled during the latest verification. No contact or tag was changed, and no message was sent.
@@ -194,7 +195,7 @@ Verify the returned row before scheduler installation.
 
 There is no verified supported GHL Draft test button for this workflow set. Do not assume a Draft workflow can execute. Testing therefore requires this exact controlled sequence:
 
-1. Wait until Meta shows `velocity_experience_check_v2` as approved and record the approval date.
+1. Confirm `velocity_experience_check_v2` remains Active; record its visible status and any approval timestamp if GHL displays one.
 2. Obtain a separate named **internal-test publication approval** that identifies both workflows, the nominated internal contact(s), the permitted trigger-tag changes, and the test window. This approval is not production-publication approval.
 3. Fully configure both workflows as Draft, reopen them, and verify every trigger, action, branch, template, multiple-entry setting, suppression gate, assignee, and notification target.
 4. At the start of the approved window, publish both workflows temporarily. Apply trigger tags only to the nominated internal contact(s), and execute the tests below.
