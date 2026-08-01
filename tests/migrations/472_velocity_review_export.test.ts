@@ -144,8 +144,8 @@ dbDescribe('migration 472 applied to a scratch schema', () => {
     expect(byName.get('ux_velocity_review_one_phone_inflight')).toMatch(
       /retryable_failure.*ambiguous.*ack_cleanup_pending/
     );
-    expect(byName.get('velocity_review_exports_dr_number_phone_fingerprint_key')).toContain(
-      '(dr_number, phone_fingerprint)'
+    expect(byName.get('velocity_review_exports_dr_number_phone_e164_key')).toContain(
+      '(dr_number, phone_e164)'
     );
 
     const tracker = await scoped<{ n: number }>(
@@ -216,8 +216,8 @@ dbDescribe('migration 472 applied to a scratch schema', () => {
     });
     await expect(insertExport({
       id: '32222222-2222-4222-8222-222222222222',
-      dr: 'DR-PERMANENT', phone: '+27610000001', fingerprint, state: 'ready',
-    })).rejects.toThrow(/velocity_review_exports_dr_number_phone_fingerprint_key/);
+      dr: 'DR-PERMANENT', phone: '+27610000001', fingerprint: 'f'.repeat(64), state: 'ready',
+    })).rejects.toThrow(/velocity_review_exports_dr_number_phone_e164_key/);
   });
 
   it.each(['dr-lowercase', ' DR-PADDED ', ''])(
@@ -259,7 +259,7 @@ dbDescribe('migration 472 applied to a scratch schema', () => {
     await expect(insertExport({
       id: '42222222-2222-4222-8222-222222222222',
       runId: secondRunId, targetDate: '2026-08-01', dr: 'DR-AMBIGUOUS',
-      phone: '+27610000002', fingerprint, state: 'ambiguous',
+      phone: '+27610000002', fingerprint: 'e'.repeat(64), state: 'ambiguous',
     })).rejects.toThrow(/ux_velocity_review_one_phone_inflight/);
   });
 
@@ -272,7 +272,7 @@ dbDescribe('migration 472 applied to a scratch schema', () => {
     await expect(insertExport({
       id: '52222222-2222-4222-8222-222222222222',
       runId: secondRunId, targetDate: '2026-08-01', dr: 'DR-NEXT',
-      phone: '+27610000003', fingerprint, state: 'ambiguous',
+      phone: '+27610000003', fingerprint: 'd'.repeat(64), state: 'ambiguous',
     })).resolves.toBeUndefined();
   });
 

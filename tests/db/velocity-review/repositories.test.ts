@@ -200,7 +200,9 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
     const first = candidate('DR-100');
     await saveCandidateDecision(run, { status: 'ready', candidate: first });
     const created = await createExport(run, first);
-    const duplicate = await createExport(run, first);
+    const duplicate = await createExport(run, candidate('DR-100', {
+      phoneFingerprint: 'b'.repeat(64),
+    }));
 
     expect(created.created).toBe(true);
     expect(duplicate.created).toBe(false);
@@ -217,7 +219,7 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
   it('claims oldest per phone and lets every held state block a second claim', async () => {
     const run = await createOrResumeRun('2026-08-01');
     const firstCandidate = candidate('DR-100');
-    const secondCandidate = candidate('DR-200');
+    const secondCandidate = candidate('DR-200', { phoneFingerprint: 'b'.repeat(64) });
     await saveCandidateDecision(run, { status: 'ready', candidate: firstCandidate });
     await saveCandidateDecision(run, { status: 'ready', candidate: secondCandidate });
     const first = await createExport(run, firstCandidate);

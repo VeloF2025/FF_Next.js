@@ -16,7 +16,8 @@ source_rows AS (
   UNION ALL
   SELECT UPPER(BTRIM(s.installed_at_drop_number)), 'stock_installed'
   FROM stock_serials s, params p
-  WHERE s.installed_at_drop_number IS NOT NULL AND s.installed_date = p.target_date
+  WHERE s.installed_at_drop_number IS NOT NULL
+    AND (s.installed_date AT TIME ZONE 'Africa/Johannesburg')::date = p.target_date
   UNION ALL
   SELECT UPPER(BTRIM(o.drop_number)), 'oes_activated'
   FROM oes_activations o, params p

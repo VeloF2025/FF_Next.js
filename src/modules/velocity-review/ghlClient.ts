@@ -30,6 +30,8 @@ export interface VelocityReviewContactInput {
 export interface HighLevelContact {
   id: string;
   phone: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   tags: string[];
   customFields: Record<string, string>;
   whatsappDndBlocked: boolean;
@@ -112,6 +114,8 @@ function contactFrom(value: unknown): HighLevelContact {
   return {
     id: record.id as string,
     phone: typeof record.phone === 'string' ? record.phone : null,
+    firstName: typeof record.firstName === 'string' ? record.firstName : null,
+    lastName: typeof record.lastName === 'string' ? record.lastName : null,
     tags: Array.isArray(record.tags) ? record.tags.filter((tag): tag is string => typeof tag === 'string') : [],
     customFields,
     whatsappDndBlocked: isWhatsappDndBlocked(record),
@@ -136,11 +140,17 @@ export class HighLevelClient {
   constructor(private readonly config: VelocityReviewGhlConfig) {}
 
   async upsertContact(input: VelocityReviewContactInput): Promise<HighLevelContact> {
+    const existing = await this.findContactByPhone(input.phoneE164);
+    const nameFields = {
+      ...(!existing?.firstName?.trim() ? { firstName: input.firstName } : {}),
+      ...(!existing?.lastName?.trim() && input.lastName?.trim()
+        ? { lastName: input.lastName.trim() }
+        : {}),
+    };
     const response = await this.request('/contacts/upsert', 'POST', {
       locationId: this.config.locationId,
       phone: input.phoneE164,
-      firstName: input.firstName,
-      lastName: input.lastName,
+      ...nameFields,
       source: 'Velocity Fibre review export',
       createNewIfDuplicateAllowed: false,
       customFields: [
@@ -151,6 +161,21 @@ export class HighLevelClient {
       ],
     }, 'upsert');
     return contactFrom(response);
+  }
+
+  private async findContactByPhone(phoneE164: string): Promise<HighLevelContact | null> {
+    const params = new URLSearchParams({ locationId: this.config.locationId, number: phoneE164 });
+    try {
+      return contactFrom(await this.request(
+        `/contacts/search/duplicate?${params.toString()}`,
+        'GET',
+        undefined,
+        'read',
+      ));
+    } catch (error) {
+      if (error instanceof HighLevelRequestError && error.status === 404) return null;
+      throw error;
+    }
   }
 
   async getContact(contactId: string): Promise<HighLevelContact> {

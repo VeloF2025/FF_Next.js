@@ -69,8 +69,25 @@ CREATE TABLE IF NOT EXISTS velocity_review_exports (
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (dr_number, phone_fingerprint)
+  UNIQUE (dr_number, phone_e164)
 );
+
+-- Stable E.164 identity must survive HMAC-secret rotation. Remove the earlier
+-- fingerprint-derived key if this migration is rerun over a pre-existing schema.
+ALTER TABLE velocity_review_exports
+  DROP CONSTRAINT IF EXISTS velocity_review_exports_dr_number_phone_fingerprint_key;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'velocity_review_exports_dr_number_phone_e164_key'
+      AND conrelid = 'velocity_review_exports'::regclass
+  ) THEN
+    ALTER TABLE velocity_review_exports
+      ADD CONSTRAINT velocity_review_exports_dr_number_phone_e164_key
+      UNIQUE (dr_number, phone_e164);
+  END IF;
+END $$;
 
 -- Permanent dedupe is only meaningful when every writer stores the same DR
 -- spelling. Named, relation-scoped guards also add the invariant if this file
@@ -111,8 +128,9 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+DROP INDEX IF EXISTS ux_velocity_review_one_phone_inflight;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_velocity_review_one_phone_inflight
-  ON velocity_review_exports(phone_fingerprint)
+  ON velocity_review_exports(phone_e164)
   WHERE state IN (
     'upserting', 'contact_upserted', 'trigger_requested', 'retryable_failure',
     'ambiguous', 'ack_cleanup_pending'

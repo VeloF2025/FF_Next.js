@@ -140,15 +140,15 @@ export async function createExport(
           (first_run_id, first_target_date, dr_number, phone_e164, phone_fingerprint,
            phone_source, source_flags, state)
         VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready')
-        ON CONFLICT (dr_number, phone_fingerprint) DO NOTHING
+        ON CONFLICT (dr_number, phone_e164) DO NOTHING
         RETURNING ${EXPORT_COLUMNS}
       `, [run.id, run.targetDate, candidate.drNumber, candidate.phoneE164,
         candidate.phoneFingerprint, candidate.phoneSource, candidate.sources]);
 
       const canonical = inserted ?? await txn.queryOne<ExportRow>(`
         SELECT ${EXPORT_COLUMNS} FROM velocity_review_exports
-        WHERE dr_number = $1 AND phone_fingerprint = $2
-      `, [candidate.drNumber, candidate.phoneFingerprint]);
+        WHERE dr_number = $1 AND phone_e164 = $2
+      `, [candidate.drNumber, candidate.phoneE164]);
       if (!canonical) throw new Error('Velocity review export could not be persisted');
 
       const linked = await txn.query<{ export_id: string } & SqlRow>(`
@@ -177,13 +177,13 @@ export async function claimNextExport(
         AND e.id = ANY($2::uuid[])
         AND NOT EXISTS (
           SELECT 1 FROM velocity_review_exports older
-          WHERE older.phone_fingerprint = e.phone_fingerprint
+          WHERE older.phone_e164 = e.phone_e164
             AND older.state NOT IN ('completed', 'permanent_failure')
             AND (older.created_at, older.id) < (e.created_at, e.id)
         )
         AND NOT EXISTS (
           SELECT 1 FROM velocity_review_exports held
-          WHERE held.phone_fingerprint = e.phone_fingerprint AND held.id <> e.id
+          WHERE held.phone_e164 = e.phone_e164 AND held.id <> e.id
             AND held.state IN ('upserting', 'contact_upserted', 'trigger_requested',
               'retryable_failure', 'ambiguous', 'ack_cleanup_pending')
         )

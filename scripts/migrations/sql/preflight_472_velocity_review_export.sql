@@ -28,11 +28,15 @@ SELECT to_regclass('velocity_review_candidates') IS NOT NULL AS candidates_table
 
 SELECT to_regclass('velocity_review_exports') IS NOT NULL AS exports_table_exists \gset
 \if :exports_table_exists
-  SELECT UPPER(BTRIM(dr_number)) AS dr_number, phone_fingerprint, COUNT(*) AS duplicate_count
-  FROM velocity_review_exports
-  GROUP BY UPPER(BTRIM(dr_number)), phone_fingerprint
-  HAVING COUNT(*) > 1
-  ORDER BY UPPER(BTRIM(dr_number)), phone_fingerprint;
+  SELECT dr_number, SUM(pair_count) AS duplicate_row_count
+  FROM (
+    SELECT UPPER(BTRIM(dr_number)) AS dr_number, phone_e164, COUNT(*) AS pair_count
+    FROM velocity_review_exports
+    GROUP BY UPPER(BTRIM(dr_number)), phone_e164
+    HAVING COUNT(*) > 1
+  ) duplicate_pairs
+  GROUP BY dr_number
+  ORDER BY dr_number;
 \else
   SELECT 'velocity_review_exports absent' AS export_duplicate_status;
 \endif

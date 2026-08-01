@@ -11,7 +11,7 @@ describe('Velocity review migration SQL contract', () => {
 
     expect(forward).toContain("'onemap_home_signup'");
     expect(forward).toContain("'onemap_install_signature'");
-    expect(forward).toMatch(/UNIQUE \(dr_number, phone_fingerprint\)/);
+    expect(forward).toMatch(/UNIQUE \(dr_number, phone_e164\)/);
     expect(
       forward.match(
         /CHECK \(dr_number <> '' AND dr_number = UPPER\(BTRIM\(dr_number\)\)\)/g
@@ -36,7 +36,7 @@ describe('Velocity review migration SQL contract', () => {
       /SELECT target_date, UPPER\(BTRIM\(dr_number\)\) AS dr_number, COUNT\(\*\).*GROUP BY target_date, UPPER\(BTRIM\(dr_number\)\)/s
     );
     expect(preflight).toMatch(
-      /SELECT UPPER\(BTRIM\(dr_number\)\) AS dr_number, phone_fingerprint, COUNT\(\*\).*GROUP BY UPPER\(BTRIM\(dr_number\)\), phone_fingerprint/s
+      /SELECT dr_number, SUM\(pair_count\) AS duplicate_row_count.*GROUP BY UPPER\(BTRIM\(dr_number\)\), phone_e164/s
     );
     expect(rollback).toContain("SET source = 'import'");
     expect(rollback).not.toMatch(/^\s*(BEGIN|COMMIT);\s*$/gim);

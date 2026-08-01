@@ -10,11 +10,13 @@ export const CANDIDATE_SOURCES = [
 export type CandidateSource = typeof CANDIDATE_SOURCES[number];
 export type PhoneSource = 'onemap' | 'subscriber_cache' | 'qcontact';
 export type ConsentEvidenceSource = 'onemap_home_signup' | 'onemap_install_signature';
-export type QuarantineReason =
-  | 'no_safe_phone'
-  | 'phone_conflict'
-  | 'consent_missing'
-  | 'consent_withdrawn';
+export const QUARANTINE_REASONS = [
+  'no_safe_phone',
+  'phone_conflict',
+  'consent_missing',
+  'consent_withdrawn',
+] as const;
+export type QuarantineReason = typeof QUARANTINE_REASONS[number];
 export type ExportState =
   | 'ready'
   | 'upserting'
@@ -63,6 +65,14 @@ export type CandidateDecision =
 export interface RunSummaryCounts {
   [count: string]: number;
 }
+
+export const RUN_SUMMARY_COUNT_KEYS = [
+  'candidate_total', 'ready', 'contacts_upserted', 'duplicates', 'quarantined',
+  'completed', 'permanent_failure', 'retryable', 'ambiguous',
+  'ack_cleanup_pending', 'pilot_deferred',
+  ...CANDIDATE_SOURCES.map((source) => `source_${source}`),
+  ...QUARANTINE_REASONS.map((reason) => `quarantine_${reason}`),
+] as const;
 
 export function workflowAcknowledgedCount(counts: RunSummaryCounts): number {
   return (counts.completed ?? 0) + (counts.ack_cleanup_pending ?? 0);

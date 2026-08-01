@@ -24,12 +24,14 @@ describe('velocity-review-export cron handler', () => {
     process.env = { ...ORIGINAL_ENV, CRON_SECRET: 'cron-test-secret', NODE_ENV: 'test' };
     service.run.mockReset().mockResolvedValue({
       status: 'complete',
-      counts: { candidate_total: 6, ready: 5, duplicates: 1, quarantined: 1,
-        completed: 2, ack_cleanup_pending: 3, ambiguous: 7 },
+      counts: { candidate_total: 6, ready: 5, contacts_upserted: 2, duplicates: 1, quarantined: 1,
+        completed: 2, ack_cleanup_pending: 3, ambiguous: 7, source_dr_submitted: 4,
+        quarantine_no_safe_phone: 1 },
       dates: [{
         targetDate: '2026-07-31', status: 'complete',
-        counts: { candidate_total: 6, ready: 5, duplicates: 1, quarantined: 1,
-          completed: 2, ack_cleanup_pending: 3, ambiguous: 7 },
+        counts: { candidate_total: 6, ready: 5, contacts_upserted: 2, duplicates: 1, quarantined: 1,
+          completed: 2, ack_cleanup_pending: 3, ambiguous: 7, source_dr_submitted: 4,
+          quarantine_no_safe_phone: 1 },
       }],
       phone: '+27821234567',
       contactId: 'contact-secret-id',
@@ -86,12 +88,14 @@ describe('velocity-review-export cron handler', () => {
     expect(service.run).toHaveBeenCalledWith({});
     expect(response.data).toEqual({
       status: 'complete',
-      counts: { candidate_total: 6, ready: 5, duplicates: 1, quarantined: 1,
-        completed: 2, ack_cleanup_pending: 3, ambiguous: 7 },
+      counts: { candidate_total: 6, ready: 5, contacts_upserted: 2, duplicates: 1, quarantined: 1,
+        completed: 2, ack_cleanup_pending: 3, ambiguous: 7, source_dr_submitted: 4,
+        quarantine_no_safe_phone: 1 },
       dates: [{
         targetDate: '2026-07-31', status: 'complete',
-        counts: { candidate_total: 6, ready: 5, duplicates: 1, quarantined: 1,
-          completed: 2, ack_cleanup_pending: 3, ambiguous: 7 },
+        counts: { candidate_total: 6, ready: 5, contacts_upserted: 2, duplicates: 1, quarantined: 1,
+          completed: 2, ack_cleanup_pending: 3, ambiguous: 7, source_dr_submitted: 4,
+          quarantine_no_safe_phone: 1 },
       }],
       workflowAcknowledged: 5,
     });

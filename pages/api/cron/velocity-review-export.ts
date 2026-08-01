@@ -6,13 +6,11 @@ import {
   type VelocityReviewRunInput,
   type VelocityReviewRunResult,
 } from '@/modules/velocity-review';
-import { workflowAcknowledgedCount, type RunSummaryCounts } from '@/modules/velocity-review/types';
+import {
+  RUN_SUMMARY_COUNT_KEYS, workflowAcknowledgedCount, type RunSummaryCounts,
+} from '@/modules/velocity-review/types';
 
 const logger = createLogger('velocity-review:cron');
-const COUNT_KEYS = [
-  'candidate_total', 'ready', 'duplicates', 'quarantined', 'completed', 'permanent_failure',
-  'retryable', 'ambiguous', 'ack_cleanup_pending', 'pilot_deferred',
-] as const;
 
 function validDate(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -21,7 +19,7 @@ function validDate(value: unknown): value is string {
 }
 
 function safeCounts(counts: RunSummaryCounts): RunSummaryCounts {
-  return Object.fromEntries(COUNT_KEYS.flatMap((key) =>
+  return Object.fromEntries(RUN_SUMMARY_COUNT_KEYS.flatMap((key) =>
     typeof counts[key] === 'number' ? [[key, counts[key]]] : []));
 }
 

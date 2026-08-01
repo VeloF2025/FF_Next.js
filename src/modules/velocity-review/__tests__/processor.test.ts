@@ -194,7 +194,8 @@ function runDeps(values: PreparedCandidate[], control: Partial<{
         ({ id: `run-${date}`, targetDate: date, status: 'pending', startedAt: null, completedAt: null, counts: {}, summaryStatus: 'pending' })),
       transitionRunStatus: vi.fn(async () => null) },
     exports: { saveCandidateDecision: vi.fn(async () => undefined), createExport: vi.fn(async (_run, value) => {
-      const row = { ...exportRow(value, value.drNumber), state: 'ready' as const }; rows.set(row.id, row);
+      const row = { ...exportRow(value, value.drNumber), state: 'ready' as const, attemptCount: 0 };
+      rows.set(row.id, row);
       events.push(`create:${value.drNumber}`); return { created: true, export: row };
     }), claimNextExport: vi.fn(async () => {
       const ready = [...rows.values()].find((row) => (row.state === 'ready'
@@ -212,6 +213,111 @@ function runDeps(values: PreparedCandidate[], control: Partial<{
 }
 
 describe('runVelocityReviewExport', () => {
+  it('suppresses a completed duplicate without counting it as newly acknowledged or failed', async () => {
+    const value = candidate();
+    const { deps, rows } = runDeps([value]);
+    const completed = {
+      ...exportRow(value), state: 'completed' as const, completedAt: NOW,
+      workflowAcknowledgedAt: NOW,
+    };
+    deps.exports.createExport = vi.fn(async () => {
+      rows.set(completed.id, completed);
+      return { created: false, export: completed };
+    });
+
+    const result = await runVelocityReviewExport({}, deps);
+
+    expect(result.counts).toMatchObject({
+      duplicates: 1,
+      completed: 0,
+      permanent_failure: 0,
+      contacts_upserted: 0,
+    });
+    expect(deps.ghl.upsertContact).not.toHaveBeenCalled();
+  });
+
+  it('persists source, quarantine-reason, and actual contact-upsert totals', async () => {
+    const ready = { ...candidate('DR001'), sources: ['dr_submitted', 'drops_installed'] as const };
+    const { deps } = runDeps([ready]);
+    const rows = [
+      { dr_number: 'DR001', sources: ready.sources },
+      { dr_number: 'DR002', sources: ['stock_installed'] },
+      { dr_number: 'DR003', sources: ['stock_installed'] },
+    ] as CandidateDbRow[];
+    const decisions: CandidateDecision[] = [
+      { status: 'ready', candidate: ready },
+      { status: 'quarantined', drNumber: 'DR002', reason: 'no_safe_phone' },
+      { status: 'quarantined', drNumber: 'DR003', reason: 'consent_missing' },
+    ];
+    deps.candidates.listCandidateRows = vi.fn(async () => rows);
+    deps.candidates.prepareCandidate = vi.fn((row) => decisions.find((decision) =>
+      (decision.status === 'ready' ? decision.candidate.drNumber : decision.drNumber) === row.dr_number)!);
+
+    const output = await runVelocityReviewExport({}, deps);
+
+    expect(output.counts).toMatchObject({
+      candidate_total: 3,
+      source_dr_submitted: 1,
+      source_drops_installed: 1,
+      source_stock_installed: 2,
+      quarantine_no_safe_phone: 1,
+      quarantine_consent_missing: 1,
+      contacts_upserted: 1,
+    });
+    const persisted = vi.mocked(deps.runs.transitionRunStatus).mock.calls.at(-1)?.[3];
+    expect(persisted).toMatchObject(output.counts);
+  });
+
+  it('waits for a minute-scale retry in the same invocation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    try {
+      const { deps } = runDeps([candidate()]);
+      deps.now = () => new Date();
+      deps.sleep = vi.fn(async (ms: number) => {
+        vi.setSystemTime(new Date(Date.now() + ms));
+      });
+      let upserts = 0;
+      let exportKey = '';
+      let reads = 0;
+      deps.ghl.upsertContact = vi.fn(async (input) => {
+        upserts += 1;
+        if (upserts === 1) throw new HighLevelRequestError('busy', 503, true, false);
+        exportKey = input.exportKey;
+        reads = 0;
+        return contact(exportKey);
+      });
+      deps.ghl.getContact = vi.fn(async () =>
+        contact(exportKey, reads++ === 0 ? [] : ['velocity-review-enrolled']));
+
+      await expect(runVelocityReviewExport({}, deps)).resolves.toMatchObject({
+        status: 'complete', counts: { completed: 1, contacts_upserted: 1 },
+      });
+      expect(deps.ghl.upsertContact).toHaveBeenCalledTimes(2);
+      expect(deps.sleep).toHaveBeenCalledWith(60_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('exits with a terminal failure when retry attempts are exhausted', async () => {
+    const value = candidate();
+    const { deps, rows } = runDeps([value]);
+    const exhausted = { ...exportRow(value), state: 'ready' as const, attemptCount: 5 };
+    deps.exports.createExport = vi.fn(async () => {
+      rows.set(exhausted.id, exhausted);
+      return { created: true, export: exhausted };
+    });
+    deps.ghl.upsertContact = vi.fn(async () => {
+      throw new HighLevelRequestError('busy', 503, true, false);
+    });
+
+    await expect(runVelocityReviewExport({}, deps)).resolves.toMatchObject({
+      status: 'complete',
+      counts: { permanent_failure: 1, contacts_upserted: 0 },
+    });
+  });
+
   it('processes same-phone different-DR exports sequentially instead of collapsing them', async () => {
     const { deps, events } = runDeps([candidate('DR002'), candidate('DR001')]);
     await runVelocityReviewExport({}, deps);

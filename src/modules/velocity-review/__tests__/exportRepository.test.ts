@@ -94,7 +94,7 @@ describe('Velocity review export persistence', () => {
     expect(params).toContain('DR-100');
   });
 
-  it('returns the existing canonical export for the same DR and phone', async () => {
+  it('returns the existing canonical export for the same DR and phone across fingerprint rotation', async () => {
     const canonical = exportRow({ state: 'completed' });
     const tx = {
       query: vi.fn().mockResolvedValue([{ export_id: 'export-1' }]),
@@ -104,10 +104,15 @@ describe('Velocity review export persistence', () => {
     };
     mocks.transaction.mockImplementation(async (work) => work(tx));
 
-    await expect(createExport(run, candidate())).resolves.toMatchObject({
+    await expect(createExport(run, candidate({ phoneFingerprint: 'b'.repeat(64) }))).resolves.toMatchObject({
       created: false,
       export: { id: 'export-1', state: 'completed' },
     });
+    const [insertSql] = tx.queryOne.mock.calls[0] as [string, unknown[]];
+    const [selectSql, selectParams] = tx.queryOne.mock.calls[1] as [string, unknown[]];
+    expect(insertSql).toContain('ON CONFLICT (dr_number, phone_e164) DO NOTHING');
+    expect(selectSql).toContain('WHERE dr_number = $1 AND phone_e164 = $2');
+    expect(selectParams).toEqual(['DR-100', '+27821234567']);
   });
 
   it('creates a separate ready export for a different DR on the same phone', async () => {

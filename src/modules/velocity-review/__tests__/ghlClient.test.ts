@@ -26,8 +26,8 @@ function response(body: unknown, status = 200, headers?: HeadersInit): Response 
   });
 }
 
-function fetchOptions(): RequestInit {
-  return vi.mocked(global.fetch).mock.calls[0]?.[1] as RequestInit;
+function fetchOptions(index = 0): RequestInit {
+  return vi.mocked(global.fetch).mock.calls[index]?.[1] as RequestInit;
 }
 
 describe('HighLevelClient', () => {
@@ -40,9 +40,9 @@ describe('HighLevelClient', () => {
   });
 
   it('upserts only approved contact fields through the configured Contacts API', async () => {
-    vi.mocked(global.fetch).mockResolvedValue(response({
-      contact: { id: 'contact-1' },
-    }));
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({}, 404))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-1' } }));
     const client = new HighLevelClient(config);
 
     await expect(client.upsertContact({
@@ -55,17 +55,18 @@ describe('HighLevelClient', () => {
       exportKey: 'export-key-1',
     })).resolves.toMatchObject({ id: 'contact-1' });
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
       'https://services.leadconnectorhq.com/contacts/upsert',
       expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) }),
     );
-    expect(fetchOptions().headers).toMatchObject({
+    expect(fetchOptions(1).headers).toMatchObject({
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
       'Content-Type': 'application/json',
       Version: '2021-07-28',
     });
-    const body = JSON.parse(String(fetchOptions().body)) as Record<string, unknown>;
+    const body = JSON.parse(String(fetchOptions(1).body)) as Record<string, unknown>;
     expect(body).toMatchObject({
       locationId: 'location-id',
       phone,
@@ -83,6 +84,45 @@ describe('HighLevelClient', () => {
     expect(body).not.toHaveProperty('tags');
     expect(body).not.toHaveProperty('dnd');
     expect(body).not.toHaveProperty('dndSettings');
+  });
+
+  it('preserves populated authoritative GHL names during upsert', async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: {
+        id: 'contact-1', firstName: 'Authoritative', lastName: 'Customer',
+        tags: ['existing-tag'], dnd: true,
+      } }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-1' } }));
+
+    await new HighLevelClient(config).upsertContact({
+      phoneE164: phone, firstName: 'Source', lastName: null, drNumber: 'DR-100',
+      eventDate: '2026-07-31', sources: ['dr_submitted'], exportKey: 'export-key-1',
+    });
+
+    const body = JSON.parse(String(fetchOptions(1).body)) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('firstName');
+    expect(body).not.toHaveProperty('lastName');
+    expect(body).not.toHaveProperty('tags');
+    expect(body).not.toHaveProperty('dnd');
+    expect(body).not.toHaveProperty('dndSettings');
+  });
+
+  it('fills only missing GHL name fields from source data', async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: {
+        id: 'contact-1', firstName: ' ', lastName: 'Existing', tags: [], dnd: false,
+      } }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-1' } }));
+
+    await new HighLevelClient(config).upsertContact({
+      phoneE164: phone, firstName: 'Source', lastName: 'Surname', drNumber: 'DR-100',
+      eventDate: '2026-07-31', sources: ['dr_submitted'], exportKey: 'export-key-1',
+    });
+
+    expect(JSON.parse(String(fetchOptions(1).body))).toMatchObject({
+      firstName: 'Source',
+    });
+    expect(JSON.parse(String(fetchOptions(1).body))).not.toHaveProperty('lastName');
   });
 
   it('reads contact DND safely and uses dedicated tag endpoints', async () => {

@@ -64,10 +64,16 @@ discovered = int(counts.get("candidate_total", 0))
 duplicates = int(counts.get("duplicates", 0))
 quarantined = int(counts.get("quarantined", 0))
 deferred = int(counts.get("pilot_deferred", 0))
-imported = max(0, int(counts.get("ready", 0)) - duplicates - deferred)
+contacts_upserted = int(counts.get("contacts_upserted", 0))
 acknowledged = int(data.get("workflowAcknowledged", counts.get("completed", 0)))
 failures = sum(int(counts.get(key, 0)) for key in ("permanent_failure", "retryable", "ambiguous", "ack_cleanup_pending"))
-print(f"status={data.get('"'"'status'"'"', '"'"'unknown'"'"')} dates={dates} discovered={discovered} imported={imported} duplicates={duplicates} quarantined={quarantined} acknowledged={acknowledged} failures={failures}")
+sources = ",".join(f"{key[7:]}:{int(counts.get(key, 0))}" for key in (
+    "source_dr_submitted", "source_drops_installed", "source_stock_installed",
+    "source_oes_activated", "source_pp_activated", "source_olt_mismatch_created"))
+quarantine_reasons = ",".join(f"{key[11:]}:{int(counts.get(key, 0))}" for key in (
+    "quarantine_no_safe_phone", "quarantine_phone_conflict",
+    "quarantine_consent_missing", "quarantine_consent_withdrawn"))
+print(f"status={data.get('"'"'status'"'"', '"'"'unknown'"'"')} dates={dates} discovered={discovered} contacts_upserted={contacts_upserted} duplicates={duplicates} quarantined={quarantined} pilot_deferred={deferred} sources={sources} quarantine_reasons={quarantine_reasons} acknowledged={acknowledged} failures={failures}")
 ' 2>/dev/null)"; then
   echo "$LOG_PREFIX ERROR: Velocity review export returned an invalid aggregate response"
   exit 1

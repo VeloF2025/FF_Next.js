@@ -25,6 +25,7 @@ function result(): VelocityReviewRunResult {
     counts: {
       candidate_total: 14,
       ready: 11,
+      contacts_upserted: 4,
       duplicates: 2,
       quarantined: 3,
       completed: 5,
@@ -34,6 +35,10 @@ function result(): VelocityReviewRunResult {
       ack_cleanup_pending: 1,
       pilot_deferred: 1,
       raw_error: 99,
+      source_dr_submitted: 8,
+      source_stock_installed: 6,
+      quarantine_no_safe_phone: 2,
+      quarantine_consent_missing: 1,
     },
     dates: [{
       targetDate: '2026-07-31',
@@ -50,7 +55,9 @@ describe('buildRunSummary', () => {
 
     expect(summary.subject).toBe('Velocity review export — 2026-07-31 — partial');
     for (const expected of [
-      'Discovered: 14', 'Ready: 11', 'Duplicates: 2', 'Quarantined: 3',
+      'Discovered: 14', 'Ready: 11', 'Contacts upserted: 4', 'Duplicates: 2', 'Quarantined: 3',
+      'Source — DR submitted: 8', 'Source — stock installed: 6',
+      'Quarantine — no safe phone: 2', 'Quarantine — consent missing: 1',
       'Workflow acknowledged: 6', 'Permanent failures: 1', 'Retryable failures: 1',
       'Ambiguous: 1', 'Acknowledgement cleanup pending: 1', 'Pilot deferred: 1',
     ]) {
