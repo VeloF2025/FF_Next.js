@@ -81,11 +81,11 @@ Keep this workflow **Draft** outside a separately approved internal-test publica
 | Four custom fields | CREATED | Read back in Velocity custom fields with the types above; identifiers require approved deployment configuration. |
 | Six tags | CREATED | Read back in Velocity tag settings. |
 | Three Smart Lists | CREATED | Read back with one corresponding tag filter each. |
-| `velocity_experience_check_v2` | BLOCKED / not submitted | Exact body, `there` sample, and ordered quick replies were previewed, but GHL kept Create disabled without a validation error. Meta status: not submitted. Approval date: not applicable. |
-| `Velocity - Installation Experience - Velo` | BLOCKED / not created | Depends on a submitted template; no incomplete workflow was created. |
-| `Velocity - Review Ask - Post Resolution` | EXISTING / Draft | `issue-resolved` tag trigger and a WhatsApp action named `Review ask (post resolution)` were observed. The suppression condition and selected template still require verification before test or publication. |
+| `velocity_experience_check_v2` | SUBMITTED / Pending | Exact body, `there` sample, Contact → First Name mapping for `{{1}}`, and ordered quick replies were read back. The earlier disabled Create control was caused by the missing Contact → First Name association. Meta status: Pending. Approval date: none yet. |
+| `Velocity - Installation Experience - Velo` | BLOCKED / not created | The normal WhatsApp workflow-action picker lists approved, mapped templates and omits the Pending `velocity_experience_check_v2`. Creation stopped before any incomplete workflow was created or saved. |
+| `Velocity - Review Ask - Post Resolution` | EXISTING / Draft, incomplete | Readback confirmed the `issue-resolved` tag trigger and selected active `velocity_review_request_v1` WhatsApp action. The graph still routes directly to that action: the required `velocity-review-suppress` If/Else gate is absent. A correction attempt was cancelled before save because the normal builder did not expose a reliable `Includes` operator selection; do not publish or test this workflow until the exact gate is saved and read back. |
 
-No workflow was published, no contact was enrolled or changed, and no message was sent during draft configuration.
+No workflow was created, saved, or published during the Pending-template follow-up. No contact was enrolled or changed, and no message was sent.
 
 ## Required deployment environment variables
 
