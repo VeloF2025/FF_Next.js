@@ -45,6 +45,22 @@ for (const route of routes) {
   });
 }
 
+test('Cortex Advanced shows manual-token controls without minting @connections', async ({ page }) => {
+  await page.goto('/connections/cortex', { waitUntil: 'domcontentloaded' });
+  await page.getByText('Advanced', { exact: true }).click();
+
+  const lifetime = page.getByLabel('Cortex token lifetime');
+  await expect(lifetime).toBeVisible();
+  await expect(lifetime.locator('option')).toHaveText([
+    '30 days',
+    '90 days',
+    '1 year',
+    'Never expires',
+  ]);
+  await expect(page.getByRole('button', { name: 'Generate Cortex token' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Revoke all Cortex tokens' })).toBeVisible();
+});
+
 test('/cortex is knowledge-only @connections', async ({ page }) => {
   await page.goto('/cortex', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('main').getByRole(
