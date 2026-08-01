@@ -141,10 +141,18 @@ if command -v python3 >/dev/null 2>&1; then
     fail "QField hierarchy mapping: regression detected"
     tail -20 /tmp/ci-qfield-hierarchy.txt | sed 's/^/    /'
   fi
+
+  if python3 scripts/test_qfield_project_registry.py > /tmp/ci-qfield-registry.txt 2>&1; then
+    pass "QField project registry: all entries well-formed"
+  else
+    fail "QField project registry: malformed entry"
+    grep '^  FAIL' /tmp/ci-qfield-registry.txt | head -20 | sed 's/^/    /'
+  fi
 else
   skip "QField step detection: python3 not available"
   skip "QField GPKG resolution: python3 not available"
   skip "QField hierarchy mapping: python3 not available"
+  skip "QField project registry: python3 not available"
 fi
 
 # ─── Gate 3: TypeScript ──────────────────────────────────────────────────────
