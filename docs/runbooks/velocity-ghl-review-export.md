@@ -83,9 +83,9 @@ Keep this workflow **Draft** outside a separately approved internal-test publica
 | Three Smart Lists | CREATED | Read back with one corresponding tag filter each. |
 | `velocity_experience_check_v2` | SUBMITTED / Pending | Exact body, `there` sample, Contact → First Name mapping for `{{1}}`, and ordered quick replies were read back. The earlier disabled Create control was caused by the missing Contact → First Name association. Meta status: Pending. Approval date: none yet. |
 | `Velocity - Installation Experience - Velo` | BLOCKED / not created | The normal WhatsApp workflow-action picker lists approved, mapped templates and omits the Pending `velocity_experience_check_v2`. Creation stopped before any incomplete workflow was created or saved. |
-| `Velocity - Review Ask - Post Resolution` | EXISTING / Draft, incomplete | Readback confirmed the `issue-resolved` tag trigger and selected active `velocity_review_request_v1` WhatsApp action. The graph still routes directly to that action: the required `velocity-review-suppress` If/Else gate is absent. A correction attempt was cancelled before save because the normal builder did not expose a reliable `Includes` operator selection; do not publish or test this workflow until the exact gate is saved and read back. |
+| `Velocity - Review Ask - Post Resolution` | CONFIGURED / VERIFIED Draft | A hard-reload readback confirmed the `issue-resolved` trigger and a `No suppression` If/Else branch where Contact Tags does not include `velocity-review-suppress`. That branch reaches the existing active `velocity_review_request_v1` WhatsApp action and then END; the None/suppression-present branch reaches END without WhatsApp. Save and Undo were disabled after reload, proving the Draft state was persisted with no unsaved edits. |
 
-No workflow was created, saved, or published during the Pending-template follow-up. No contact was enrolled or changed, and no message was sent.
+No workflow was published, tested, or enrolled during the latest verification. No contact or tag was changed, and no message was sent.
 
 ## Required deployment environment variables
 
