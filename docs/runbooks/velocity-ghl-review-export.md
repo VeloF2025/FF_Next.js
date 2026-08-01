@@ -4,7 +4,7 @@
 
 This runbook operates the FibreFlow-to-GoHighLevel (GHL) Velocity installation-review export. FibreFlow discovers eligible delivery records, persists consent and export ledgers, and uses a transient tag handshake. GHL owns WhatsApp delivery, replies, assignment, and review-request messages.
 
-Do not apply migration 472, publish a workflow, install the scheduler, enable automation or pilot mode, or test with any contact without the separately named approval. Never import a CSV for this flow. Never clear GHL DND/STOP state or overwrite authoritative contact data. Workflow acknowledgement, WhatsApp delivery, and customer response are three separate states.
+Do not apply migration 474, publish a workflow, install the scheduler, enable automation or pilot mode, or test with any contact without the separately named approval. Never import a CSV for this flow. Never clear GHL DND/STOP state or overwrite authoritative contact data. Workflow acknowledgement, WhatsApp delivery, and customer response are three separate states.
 
 ## GHL location and objects
 
@@ -121,10 +121,10 @@ This is read-only. It does not authorize the migration:
 
 ```bash
 PGPASSWORD="$PGPASSWORD" psql "$DATABASE_URL" \
-  -f scripts/migrations/sql/preflight_472_velocity_review_export.sql
+  -f scripts/migrations/sql/preflight_474_velocity_review_export.sql
 ```
 
-Require migration 469, the consent table, and no conflicting Velocity-review rows. Redact connection details and any row-level identifiers from evidence. Applying migration 472 to the shared dev/production database requires explicit approval naming migration 472.
+Require migration 469, the consent table, and no conflicting Velocity-review rows. Redact connection details and any row-level identifiers from evidence. Applying migration 474 to the shared dev/production database requires explicit approval naming migration 474.
 
 ### API dry run
 
@@ -147,7 +147,7 @@ After fresh preflight and explicit shared-database approval:
 npm run db:migrate
 ```
 
-Read back migration 472 and the disabled singleton control row before continuing. Do not use the migration command as approval to deploy or activate.
+Read back migration 474 and the disabled singleton control row before continuing. Do not use the migration command as approval to deploy or activate.
 
 ### Supervised pilot
 
@@ -285,7 +285,7 @@ RETURNING automation_enabled, pilot_enabled, pilot_target_date, pilot_limit;
 Rollback is destructive to the Velocity run/candidate/export tables and requires explicit approval after evidence export and reconciliation:
 
 ```bash
-npm run db:migrate -- rollback 472
+npm run db:migrate -- rollback 474
 ```
 
-The supported runner opens one transaction, executes `rollback_472_velocity_review_export.sql`, clears legacy migration tracking, and commits only if every step succeeds; the SQL file deliberately has no top-level transaction control. The guarded rollback reclassifies the two OneMap evidence-source labels to `import` before removing Velocity tables and migration tracking. It does **not** delete `wa_subscriber_consent` rows: granted and withdrawn status, audit timestamps, and withdrawal evidence must survive so a rollback cannot resurrect consent or make a withdrawn recipient eligible.
+The supported runner opens one transaction, executes `rollback_474_velocity_review_export.sql`, clears legacy migration tracking, and commits only if every step succeeds; the SQL file deliberately has no top-level transaction control. The guarded rollback reclassifies the two OneMap evidence-source labels to `import` before removing Velocity tables and migration tracking. It does **not** delete `wa_subscriber_consent` rows: granted and withdrawn status, audit timestamps, and withdrawal evidence must survive so a rollback cannot resurrect consent or make a withdrawn recipient eligible.

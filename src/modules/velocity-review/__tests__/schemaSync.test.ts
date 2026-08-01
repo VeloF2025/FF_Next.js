@@ -7,7 +7,7 @@ const sql = (filename: string): string =>
 
 describe('Velocity review migration SQL contract', () => {
   it('keeps durable export states, controls, and uniqueness in sync', () => {
-    const forward = sql('472_velocity_review_export.sql');
+    const forward = sql('474_velocity_review_export.sql');
 
     expect(forward).toContain("'onemap_home_signup'");
     expect(forward).toContain("'onemap_install_signature'");
@@ -28,8 +28,8 @@ describe('Velocity review migration SQL contract', () => {
   });
 
   it('keeps preflight read-only and rollback consent-preserving', () => {
-    const preflight = sql('preflight_472_velocity_review_export.sql');
-    const rollback = sql('rollback_472_velocity_review_export.sql');
+    const preflight = sql('preflight_474_velocity_review_export.sql');
+    const rollback = sql('rollback_474_velocity_review_export.sql');
 
     expect(preflight).not.toMatch(/\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE)\b/i);
     expect(preflight).toMatch(

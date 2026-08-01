@@ -52,10 +52,10 @@
 - Create `pages/api/cron/velocity-review-export.ts` — fail-closed cron endpoint.
 - Create `pages/api/cron/__tests__/velocity-review-export.test.ts` — method/auth/mode/response tests.
 - Create `scripts/cron-velocity-review-export.sh` — flocked production-first 09:00 runner.
-- Create `scripts/migrations/sql/472_velocity_review_export.sql` — consent-source extension and durable ledgers.
-- Create `scripts/migrations/sql/preflight_472_velocity_review_export.sql` — read-only shared-DB checks.
-- Create `scripts/migrations/sql/rollback_472_velocity_review_export.sql` — guarded rollback preserving consent history.
-- Create `tests/migrations/472_velocity_review_export.test.ts` — scratch-schema migration integration test.
+- Create `scripts/migrations/sql/474_velocity_review_export.sql` — consent-source extension and durable ledgers.
+- Create `scripts/migrations/sql/preflight_474_velocity_review_export.sql` — read-only shared-DB checks.
+- Create `scripts/migrations/sql/rollback_474_velocity_review_export.sql` — guarded rollback preserving consent history.
+- Create `tests/migrations/474_velocity_review_export.test.ts` — scratch-schema migration integration test.
 - Create `docs/runbooks/velocity-ghl-review-export.md` — GHL objects, environment, scheduler, dry-run, pilot, and rollback procedure.
 - Modify `.env.example` — placeholders and descriptions for GHL/summary/fingerprint configuration.
 
@@ -232,11 +232,11 @@ git commit -m "feat: define Velocity review safety contract"
 
 **Files:**
 
-- Create: `scripts/migrations/sql/472_velocity_review_export.sql`
-- Create: `scripts/migrations/sql/preflight_472_velocity_review_export.sql`
-- Create: `scripts/migrations/sql/rollback_472_velocity_review_export.sql`
+- Create: `scripts/migrations/sql/474_velocity_review_export.sql`
+- Create: `scripts/migrations/sql/preflight_474_velocity_review_export.sql`
+- Create: `scripts/migrations/sql/rollback_474_velocity_review_export.sql`
 - Create: `src/modules/velocity-review/__tests__/schemaSync.test.ts`
-- Create: `tests/migrations/472_velocity_review_export.test.ts`
+- Create: `tests/migrations/474_velocity_review_export.test.ts`
 
 **Interfaces:**
 
@@ -272,7 +272,7 @@ Run: `npx vitest run src/modules/velocity-review/__tests__/schemaSync.test.ts`
 
 Expected: FAIL because migration files do not exist.
 
-- [ ] **Step 3: Write migration 472**
+- [ ] **Step 3: Write migration 474**
 
 The forward migration must be unwrapped because `scripts/run-pending-migrations.sh` supplies the transaction. Use these table contracts:
 
@@ -368,7 +368,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_velocity_review_one_phone_inflight
   );
 ```
 
-Replace the existing `wa_subscriber_consent_source_chk` constraint with the old values plus the two OneMap evidence sources. Guard constraint creation by catalog lookup so the migration is rerunnable. End by inserting `472_velocity_review_export.sql` into `schema_migrations` with `ON CONFLICT DO NOTHING`.
+Replace the existing `wa_subscriber_consent_source_chk` constraint with the old values plus the two OneMap evidence sources. Guard constraint creation by catalog lookup so the migration is rerunnable. End by inserting `474_velocity_review_export.sql` into `schema_migrations` with `ON CONFLICT DO NOTHING`.
 
 - [ ] **Step 4: Write preflight and rollback**
 
@@ -379,11 +379,11 @@ Rollback order:
 1. map `onemap_home_signup` and `onemap_install_signature` consent rows to `source='import'` without changing status or timestamps;
 2. restore the migration-469 source constraint;
 3. drop candidate FK, indexes, and Velocity review tables in dependency order;
-4. delete only the migration-472 tracker row.
+4. delete only the migration-474 tracker row.
 
 - [ ] **Step 5: Write the scratch-schema integration test**
 
-Follow `tests/migrations/471_hs_training_certificate_upload.test.ts`: create an isolated schema, install minimal stand-in source tables and migration 469's consent table, execute migration 472 twice, assert all CHECKs/indexes, prove invalid pilot-control combinations fail, prove a duplicate DR/phone export fails, prove two claimed non-terminal rows for one phone fail (including retryable and ambiguous states), prove a completed first DR permits a different DR on the same phone, and clean up the scratch schema in `afterAll`.
+Follow `tests/migrations/471_hs_training_certificate_upload.test.ts`: create an isolated schema, install minimal stand-in source tables and migration 469's consent table, execute migration 474 twice, assert all CHECKs/indexes, prove invalid pilot-control combinations fail, prove a duplicate DR/phone export fails, prove two claimed non-terminal rows for one phone fail (including retryable and ambiguous states), prove a completed first DR permits a different DR on the same phone, and clean up the scratch schema in `afterAll`.
 
 - [ ] **Step 6: Run schema tests**
 
@@ -391,7 +391,7 @@ Run:
 
 ```bash
 npx vitest run src/modules/velocity-review/__tests__/schemaSync.test.ts
-TEST_DATABASE_URL="$TEST_DATABASE_URL" npx vitest run tests/migrations/472_velocity_review_export.test.ts
+TEST_DATABASE_URL="$TEST_DATABASE_URL" npx vitest run tests/migrations/474_velocity_review_export.test.ts
 ```
 
 Expected: both PASS. If `TEST_DATABASE_URL` is unavailable, start the documented test database before claiming this task complete.
@@ -399,11 +399,11 @@ Expected: both PASS. If `TEST_DATABASE_URL` is unavailable, start the documented
 - [ ] **Step 7: Commit**
 
 ```bash
-git add scripts/migrations/sql/472_velocity_review_export.sql \
-  scripts/migrations/sql/preflight_472_velocity_review_export.sql \
-  scripts/migrations/sql/rollback_472_velocity_review_export.sql \
+git add scripts/migrations/sql/474_velocity_review_export.sql \
+  scripts/migrations/sql/preflight_474_velocity_review_export.sql \
+  scripts/migrations/sql/rollback_474_velocity_review_export.sql \
   src/modules/velocity-review/__tests__/schemaSync.test.ts \
-  tests/migrations/472_velocity_review_export.test.ts
+  tests/migrations/474_velocity_review_export.test.ts
 git commit -m "feat: add Velocity review export ledger"
 ```
 
@@ -1127,7 +1127,7 @@ git commit -m "docs: add Velocity GHL review runbook"
 
 ```bash
 npx vitest run src/modules/velocity-review pages/api/cron/__tests__/velocity-review-export.test.ts
-TEST_DATABASE_URL="$TEST_DATABASE_URL" npx vitest run tests/migrations/472_velocity_review_export.test.ts
+TEST_DATABASE_URL="$TEST_DATABASE_URL" npx vitest run tests/migrations/474_velocity_review_export.test.ts
 bash -n scripts/cron-velocity-review-export.sh
 npm run agents:check
 ```
@@ -1147,7 +1147,7 @@ Expected: quick CI exits 0. Record pre-existing non-blocking TypeScript warnings
 
 ```bash
 PGPASSWORD="$PGPASSWORD" psql "$DATABASE_URL" \
-  -f scripts/migrations/sql/preflight_472_velocity_review_export.sql
+  -f scripts/migrations/sql/preflight_474_velocity_review_export.sql
 ```
 
 Expected: migration 469 present, no conflicting existing Velocity-review rows, and no writes. Paste only aggregate output into the approval evidence; redact connection details.
@@ -1176,7 +1176,7 @@ Use the repository's required independent review workflow. Address findings, rer
 
 - [ ] **Step 6: Deploy code to dev only after review approval**
 
-Run the documented dev deploy script. Verify the dry-run endpoint against dev with automation disabled. Do not apply migration 472 to the shared DB without the separate migration approval, because dev and production share it.
+Run the documented dev deploy script. Verify the dry-run endpoint against dev with automation disabled. Do not apply migration 474 to the shared DB without the separate migration approval, because dev and production share it.
 
 - [ ] **Step 7: Commit any verification-only fixes**
 
@@ -1202,9 +1202,9 @@ Skip this commit when no fixes were needed.
 
 - [ ] **Step 1: Obtain explicit approval for shared migration and production activation**
 
-Approval must name migration 472, production deployment, publishing both GHL workflows, the supervised pilot size/date, the go-live watermark, and installation of the 09:00 cron entry.
+Approval must name migration 474, production deployment, publishing both GHL workflows, the supervised pilot size/date, the go-live watermark, and installation of the 09:00 cron entry.
 
-- [ ] **Step 2: Apply migration 472 through the approved migration process**
+- [ ] **Step 2: Apply migration 474 through the approved migration process**
 
 Run preflight again immediately before apply. Apply through the repository migration runner, then read back tables, constraints, source vocabulary, and the disabled control row. Do not enable automation yet.
 
