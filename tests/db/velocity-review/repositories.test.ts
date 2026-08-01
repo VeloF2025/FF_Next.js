@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { Pool, type PoolClient } from 'pg';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pool as repositoryPool } from '@/lib/db-pool';
+import { getConsentForMsisdn } from '@/modules/communications/whatsapp/consent/consentRepo';
 import { recordOneMapConsent } from '@/modules/velocity-review/consentService';
 import {
   claimNextExport,
@@ -16,11 +17,15 @@ import type { ExportState, PreparedCandidate } from '@/modules/velocity-review/t
 const url = process.env.DATABASE_URL_TEST;
 if (!url) throw new Error('Velocity review task-owned database URL is missing');
 
-const db = new Pool({ connectionString: url, max: 1 });
+const db = new Pool({ connectionString: url, max: 4 });
 const GRANTED_AT = new Date('2026-07-31T08:00:00.000Z');
 const FINGERPRINT = 'a'.repeat(64);
+const CLAIM_GATE_KEY = 4_724_724;
 
-function candidate(drNumber: string): PreparedCandidate {
+function candidate(
+  drNumber: string,
+  overrides: Partial<PreparedCandidate> = {},
+): PreparedCandidate {
   return {
     drNumber,
     sources: ['dr_submitted'],
@@ -31,7 +36,25 @@ function candidate(drNumber: string): PreparedCandidate {
     firstName: 'Test',
     lastName: 'Subscriber',
     consentEvidence: { source: 'onemap_home_signup', grantedAt: GRANTED_AT },
+    ...overrides,
   };
+}
+
+async function waitForBlockedClaimUpdates(expected: number): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const result = await db.query<{ blocked: number }>(`
+      SELECT COUNT(*)::integer AS blocked
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND wait_event_type = 'Lock'
+        AND query LIKE '%UPDATE velocity_review_exports%'
+    `);
+    if ((result.rows[0]?.blocked ?? 0) >= expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Expected ${expected} claim update(s) at the database gate`);
 }
 
 beforeAll(async () => {
@@ -66,6 +89,71 @@ afterAll(async () => {
 });
 
 describe('Velocity review repositories against task-owned PostgreSQL', () => {
+  it('persists and reads back an absent-row OneMap grant without logging its phone', async () => {
+    const msisdn = '27826667777';
+    const drNumber = 'DR-ABSENT';
+    const evidenceAt = new Date('2026-07-31T09:15:00.000Z');
+    const consoleSpies = [
+      vi.spyOn(console, 'log').mockImplementation(() => undefined),
+      vi.spyOn(console, 'info').mockImplementation(() => undefined),
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined),
+      vi.spyOn(console, 'error').mockImplementation(() => undefined),
+      vi.spyOn(console, 'debug').mockImplementation(() => undefined),
+    ];
+
+    try {
+      const absent = await db.query(
+        'SELECT 1 FROM wa_subscriber_consent WHERE msisdn = $1',
+        [msisdn],
+      );
+      expect(absent.rowCount).toBe(0);
+
+      const status = await recordOneMapConsent(candidate(drNumber, {
+        msisdn,
+        phoneE164: '+27826667777',
+        consentEvidence: {
+          source: 'onemap_install_signature',
+          grantedAt: evidenceAt,
+        },
+      }));
+      expect(status).toBe('granted');
+
+      const persisted = await db.query<{
+        status: string;
+        drop_number: string;
+        source: string;
+        granted_at: Date;
+      }>(`
+        SELECT status, drop_number, source, granted_at
+        FROM wa_subscriber_consent WHERE msisdn = $1
+      `, [msisdn]);
+      expect(persisted.rows).toEqual([{
+        status: 'granted',
+        drop_number: drNumber,
+        source: 'onemap_install_signature',
+        granted_at: evidenceAt,
+      }]);
+
+      const readback = await getConsentForMsisdn(msisdn);
+      expect(readback).toMatchObject({
+        status: 'granted',
+        row: {
+          status: 'granted',
+          drop_number: drNumber,
+          source: 'onemap_install_signature',
+          granted_at: evidenceAt,
+        },
+      });
+      const consoleOutput = consoleSpies
+        .flatMap((spy) => spy.mock.calls.flat())
+        .map(String)
+        .join('\n');
+      expect(consoleOutput).not.toContain(msisdn);
+    } finally {
+      for (const spy of consoleSpies) spy.mockRestore();
+    }
+  });
+
   it('never changes withdrawals or downgrades manual and FNO grants', async () => {
     const withdrawnMsisdn = '27849998888';
     await db.query(`
@@ -185,5 +273,97 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
     const secondClaim = await claimNextExport(new Date('2026-08-02T08:00:00.000Z'));
     expect(secondClaim?.id).toBe(second.export.id);
     expect(secondClaim?.attemptCount).toBe(1);
+  });
+
+  it('serializes actual concurrent claims with row locks and held-phone exclusion', async () => {
+    const run = await createOrResumeRun('2026-08-01');
+    const phoneAOldest = candidate('DR-A-OLDEST');
+    const phoneALater = candidate('DR-A-LATER');
+    const phoneB = candidate('DR-B', {
+      msisdn: '27831112222',
+      phoneE164: '+27831112222',
+      phoneFingerprint: 'b'.repeat(64),
+    });
+    for (const prepared of [phoneAOldest, phoneALater, phoneB]) {
+      await saveCandidateDecision(run, { status: 'ready', candidate: prepared });
+    }
+    const oldestExport = await createExport(run, phoneAOldest);
+    const laterExport = await createExport(run, phoneALater);
+    const otherPhoneExport = await createExport(run, phoneB);
+    await db.query(`
+      UPDATE velocity_review_exports SET created_at = CASE id
+        WHEN $1 THEN $4::timestamptz
+        WHEN $2 THEN $5::timestamptz
+        ELSE $6::timestamptz
+      END WHERE id IN ($1, $2, $3)
+    `, [oldestExport.export.id, laterExport.export.id, otherPhoneExport.export.id,
+      new Date('2026-08-01T08:00:00.000Z'), new Date('2026-08-01T08:01:00.000Z'),
+      new Date('2026-08-01T08:02:00.000Z')]);
+
+    const claims: Array<Promise<Awaited<ReturnType<typeof claimNextExport>>>> = [];
+    let gateClient: PoolClient | null = null;
+    try {
+      await db.query(`
+        CREATE FUNCTION velocity_review_claim_test_gate() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+          IF NEW.state = 'upserting'
+             AND OLD.state IN ('ready', 'retryable_failure') THEN
+            PERFORM pg_advisory_xact_lock(${CLAIM_GATE_KEY});
+          END IF;
+          RETURN NEW;
+        END $$;
+        CREATE TRIGGER velocity_review_claim_test_gate
+        BEFORE UPDATE ON velocity_review_exports
+        FOR EACH ROW EXECUTE FUNCTION velocity_review_claim_test_gate();
+      `);
+      gateClient = await db.connect();
+      await gateClient.query('SELECT pg_advisory_lock($1)', [CLAIM_GATE_KEY]);
+
+      claims.push(claimNextExport(new Date('2026-08-02T08:00:00.000Z')));
+      await waitForBlockedClaimUpdates(1);
+      claims.push(claimNextExport(new Date('2026-08-02T08:00:00.000Z')));
+      await waitForBlockedClaimUpdates(2);
+
+      await expect(
+        claimNextExport(new Date('2026-08-02T08:00:00.000Z')),
+      ).resolves.toBeNull();
+      await gateClient.query('SELECT pg_advisory_unlock($1)', [CLAIM_GATE_KEY]);
+      const concurrentResults = await Promise.all(claims);
+
+      expect(concurrentResults.map((row) => row?.id).sort()).toEqual([
+        oldestExport.export.id,
+        otherPhoneExport.export.id,
+      ].sort());
+      expect(new Set(concurrentResults.map((row) => row?.id)).size).toBe(2);
+      expect(concurrentResults.every((row) => row?.attemptCount === 1)).toBe(true);
+
+      const persisted = await db.query<{ id: string; state: ExportState; attempt_count: number }>(`
+        SELECT id, state, attempt_count FROM velocity_review_exports
+        WHERE id IN ($1, $2, $3)
+      `, [oldestExport.export.id, laterExport.export.id, otherPhoneExport.export.id]);
+      expect(new Map(persisted.rows.map((row) => [row.id, {
+        state: row.state,
+        attemptCount: row.attempt_count,
+      }]))).toEqual(new Map([
+        [oldestExport.export.id, { state: 'upserting', attemptCount: 1 }],
+        [laterExport.export.id, { state: 'ready', attemptCount: 0 }],
+        [otherPhoneExport.export.id, { state: 'upserting', attemptCount: 1 }],
+      ]));
+      await expect(
+        claimNextExport(new Date('2026-08-02T08:00:00.000Z')),
+      ).resolves.toBeNull();
+    } finally {
+      if (gateClient) {
+        await gateClient.query('SELECT pg_advisory_unlock($1)', [CLAIM_GATE_KEY])
+          .catch(() => undefined);
+        gateClient.release();
+      }
+      await Promise.allSettled(claims);
+      await db.query(`
+        DROP TRIGGER IF EXISTS velocity_review_claim_test_gate ON velocity_review_exports;
+        DROP FUNCTION IF EXISTS velocity_review_claim_test_gate();
+      `);
+    }
   });
 });
