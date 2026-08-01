@@ -128,7 +128,8 @@ class Harness:
 
     def __init__(self, mod, table="civil_audit", columns=None, rows=None,
                  dcim=None, state=None, existing_keys=(), existing_photo_keys=(),
-                 linked=(), version="v20260731122829-abc12345", gpkg_path="Civil Audit.gpkg"):
+                 linked=(), linked_dcim=None, hierarchy_backfill=False,
+                 version="v20260731122829-abc12345", gpkg_path="Civil Audit.gpkg"):
         self.mod = mod
         self.tmpdir = tempfile.mkdtemp(prefix="qfield_char_")
         self.gpkg_file = os.path.join(self.tmpdir, "fixture.gpkg")
@@ -136,10 +137,16 @@ class Harness:
         self.cursor = FakeCursor(state, existing_keys, existing_photo_keys, linked)
         self.conn = FakeConn(self.cursor)
         self._dcim = dcim if dcim is not None else {}
+        # {linked_qf_id: {filename: storage_key}} — per-project so a scenario can tell
+        # "primary wins on conflict" apart from "linked wins", which a single shared
+        # dict cannot express.
+        self._linked_dcim = linked_dcim or {}
+        self._hierarchy_backfill = hierarchy_backfill
         self._version = version
         self._gpkg_path = gpkg_path
         self._linked = list(linked)
         self._saved = {}
+        self.hierarchy_calls = []    # recorded so a scenario can assert the call happened
 
     def __enter__(self):
         m = self.mod
@@ -150,15 +157,25 @@ class Harness:
                 b.write(a.read())
             return self._version, os.path.getsize(src)
 
+        def _list_dcim(qf):
+            """Primary project gets `dcim`; each linked project gets its own slice."""
+            if qf in self._linked_dcim:
+                return dict(self._linked_dcim[qf])
+            return dict(self._dcim)
+
+        def _sync_hierarchy(*a, **kw):
+            self.hierarchy_calls.append((a, kw))
+            return {"mapped": 0, "qa_poles": 0, "poles": 0, "reviews": 0}
+
         self._patch("resolve_gpkg_path", lambda qf, p: self._gpkg_path)
         self._patch("minio_download_latest", _download)
-        self._patch("minio_list_dcim_directory", lambda qf: dict(self._dcim))
+        self._patch("minio_list_dcim_directory", _list_dcim)
         self._patch("minio_resolve_photo_version", lambda qf, p: None)
         self._patch("fetch_linked_qf_project_ids", lambda cur, ff, qf: list(self._linked))
-        self._patch("hierarchy_backfill_needed", lambda cur, ff, cfg: False)
+        self._patch("hierarchy_backfill_needed",
+                    lambda cur, ff, cfg: self._hierarchy_backfill)
         self._patch("resolve_spatial_pon_map", lambda qf: {})
-        self._patch("sync_hierarchy", lambda *a, **kw: {
-            "mapped": 0, "qa_poles": 0, "poles": 0, "reviews": 0})
+        self._patch("sync_hierarchy", _sync_hierarchy)
         return self
 
     def _patch(self, name, fn):

@@ -16,6 +16,7 @@ import io
 import os
 import sys
 from contextlib import redirect_stdout
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -101,6 +102,41 @@ def main():
         dcim={"a.jpg": "k/a"}, existing_photo_keys=["some/prefix/a.jpg"])
     check((found, upserted) == (1, 0), f"construction_qa_photos substring dedup, got ({found},{upserted})")
 
+    # Linked "audit" QField projects: photos for one FibreFlow project can live in a
+    # second QField project's bucket. The merge and its dedup consequences are the
+    # code most likely to pile up duplicate rows if a refactor gets it wrong, and its
+    # own comment says so — so each behaviour is asserted separately.
+    print("\nLinked QField projects")
+    LINKED = "cccccccc-1111-2222-3333-444444444444"
+    found, upserted, out, h = run(
+        columns=["NAME", STEP_1, STEP_2],
+        rows=[{"NAME": "P1", STEP_1: "DCIM/only_primary.jpg", STEP_2: "DCIM/only_linked.jpg"}],
+        dcim={"only_primary.jpg": "k/primary"},
+        linked=[LINKED], linked_dcim={LINKED: {"only_linked.jpg": "k/linked"}},
+        dry_run=False)
+    check((found, upserted) == (2, 2),
+          f"a photo living in a LINKED project still resolves, got ({found},{upserted})")
+    inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
+    check(any(p[5] == LINKED for p in inserts),
+          "the linked-project photo is recorded against the QField project that holds it")
+
+    found, upserted, _, h = run(
+        columns=["NAME", STEP_1],
+        rows=[{"NAME": "P1", STEP_1: "DCIM/dupe.jpg"}],
+        dcim={"dupe.jpg": "k/PRIMARY"},
+        linked=[LINKED], linked_dcim={LINKED: {"dupe.jpg": "k/LINKED"}},
+        dry_run=False)
+    inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
+    check(len(inserts) == 1 and inserts[0][1] == "k/PRIMARY",
+          "on a filename collision the PRIMARY project wins, keeping re-runs stable")
+
+    _, _, _, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, linked=[LINKED], dry_run=False)
+    params = h.cursor.params_for("SELECT photo_key FROM qfield_photo_validations")
+    check(params is not None and LINKED in params[0],
+          "the dedup query spans linked projects (else re-runs duplicate rows daily)")
+
     print("\nGuards — each must return (0,0) AND write no sync-state")
     found, upserted, out, h = run(
         config=config(label_col="MISSING_COL"),
@@ -163,6 +199,36 @@ def main():
         state={"last_version": same, "pending_count": 0}, force=True)
     check((found, upserted) == (1, 1), f"--force overrides the delta skip, got ({found},{upserted})")
 
+    # The pending/stale/backfill variants are migration-423 logic: photo binaries
+    # arrive asynchronously after the GPKG, so an unchanged GPKG must be re-scanned
+    # while photos are still outstanding — but not forever. Only the pending==0 branch
+    # was covered before; each of the three below fails independently.
+    recent = f"v{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-recent01"
+    found, upserted, out, _ = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, version=recent,
+        state={"last_version": recent, "pending_count": 3})
+    check((found, upserted) == (1, 1),
+          f"same version but photos still pending -> RE-SCAN, got ({found},{upserted})")
+    check("RE-SCAN" in out, "the re-scan announces why it is re-reading an unchanged GPKG")
+
+    ancient = "v20200101000000-ancient1"
+    found, upserted, out, _ = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, version=ancient,
+        state={"last_version": ancient, "pending_count": 3})
+    check((found, upserted) == (0, 0),
+          f"pending photos on a long-stale GPKG -> give up, got ({found},{upserted})")
+    check("giving up" in out, "the give-up path says so rather than skipping silently")
+
+    found, upserted, out, _ = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, version=same,
+        state={"last_version": same, "pending_count": 0}, hierarchy_backfill=True)
+    check((found, upserted) == (1, 1),
+          f"a pending hierarchy backfill forces a re-scan, got ({found},{upserted})")
+    check("hierarchy backfill" in out, "the backfill re-scan states its reason")
+
     print("\nNon-dry-run writes")
     found, upserted, _, h = run(
         columns=["NAME", STEP_1],
@@ -175,10 +241,14 @@ def main():
           f"pending_count records the 1 unresolved photo, got {params[-1] if params else None}")
     check(h.conn.committed, "the transaction is committed")
 
+    check(len(h.hierarchy_calls) == 1,
+          f"sync_hierarchy is invoked on a real run, got {len(h.hierarchy_calls)} call(s)")
+
     _, _, _, h = run(
         columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
         dcim={"a.jpg": "k/a"}, dry_run=True)
     check(not h.cursor.ran("INSERT INTO qfield_photo_validations"), "dry-run inserts nothing")
+    check(h.hierarchy_calls == [], "dry-run does not invoke sync_hierarchy")
     check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"), "dry-run records no sync-state")
     check(not h.conn.committed, "dry-run does not commit")
 
