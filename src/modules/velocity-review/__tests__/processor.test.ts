@@ -92,9 +92,18 @@ describe('processOneExport', () => {
   });
 
   it('holds a contact with another export transient tag as ambiguous', async () => {
-    const { deps } = oneDeps({ readbacks: [contact('older-key', ['velocity-review-ready'])] });
-    const result = await processOneExport(context(), deps);
+    const item = context();
+    const { deps } = oneDeps({ readbacks: [contact(item.export.exportKey, ['velocity-review-ready'])] });
+    const result = await processOneExport(item, deps);
     expect(result).toMatchObject({ state: 'ambiguous', errorCode: 'stale_transient_tag' });
+  });
+
+  it('reports identity failure before stale tags when both checks fail', async () => {
+    const mismatched = { ...contact('older-key', ['velocity-review-ready']), phone: '+27831112222' };
+    const { deps } = oneDeps({ readbacks: [mismatched] });
+    const result = await processOneExport(context(), deps);
+    expect(result).toMatchObject({ state: 'ambiguous', errorCode: 'contact_verification_failed' });
+    expect(deps.ghl.addTags).not.toHaveBeenCalled();
   });
 
   it('acknowledges only matching key plus enrolled plus absent ready, then cleans enrolled', async () => {
@@ -105,6 +114,34 @@ describe('processOneExport', () => {
     expect(result).toMatchObject({ state: 'completed', workflowAcknowledged: true });
     expect(deps.ghl.addTags).toHaveBeenCalledWith('contact-1', ['velocity-review-ready']);
     expect(deps.ghl.removeTags).toHaveBeenCalledWith('contact-1', ['velocity-review-enrolled']);
+  });
+
+  it('schedules retryable acknowledgement cleanup without retriggering', async () => {
+    const item = context(); const { deps } = oneDeps({ readbacks: [contact(item.export.exportKey),
+      contact(item.export.exportKey, ['velocity-review-enrolled'])] });
+    deps.ghl.removeTags = vi.fn(async () => { throw new HighLevelRequestError('busy', 503, true, false); });
+    const result = await processOneExport(item, deps);
+    expect(result).toMatchObject({ state: 'ack_cleanup_pending', errorCode: 'ack_cleanup_retryable',
+      nextAttemptAt: new Date('2026-08-01T07:01:00Z'), workflowAcknowledged: true });
+    expect(deps.ghl.addTags).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds ambiguous acknowledgement cleanup without automatic retry', async () => {
+    const item = context(); const { deps } = oneDeps({ readbacks: [contact(item.export.exportKey),
+      contact(item.export.exportKey, ['velocity-review-enrolled'])] });
+    deps.ghl.removeTags = vi.fn(async () => { throw new HighLevelRequestError('timeout', null, false, true); });
+    const result = await processOneExport(item, deps);
+    expect(result).toMatchObject({ state: 'ack_cleanup_pending', errorCode: 'ack_cleanup_ambiguous',
+      nextAttemptAt: null, workflowAcknowledged: true });
+  });
+
+  it('holds permanent acknowledgement cleanup separately without automatic retry', async () => {
+    const item = context(); const { deps } = oneDeps({ readbacks: [contact(item.export.exportKey),
+      contact(item.export.exportKey, ['velocity-review-enrolled'])] });
+    deps.ghl.removeTags = vi.fn(async () => { throw new HighLevelRequestError('rejected', 400, false, false); });
+    const result = await processOneExport(item, deps);
+    expect(result).toMatchObject({ state: 'ack_cleanup_pending', errorCode: 'ack_cleanup_permanent',
+      nextAttemptAt: null, workflowAcknowledged: true });
   });
 
   it('holds a timed-out tag addition as ambiguous without retry time', async () => {
@@ -159,11 +196,12 @@ function runDeps(values: PreparedCandidate[], control: Partial<{
         held.phoneFingerprint === row.phoneFingerprint && held.id !== row.id && !['ready', 'completed', 'permanent_failure'].includes(held.state)));
       if (!ready) return null; const claimed = { ...ready, state: 'upserting' as const, attemptCount: ready.attemptCount + 1 };
       rows.set(claimed.id, claimed); events.push(`claim:${claimed.drNumber}`); return claimed;
-    }), transitionExportState: vi.fn(async (id, _expected, state, updates = {}) => {
+    }), claimDueAcknowledgementCleanup: vi.fn(async () => null),
+    transitionExportState: vi.fn(async (id, _expected, state, updates = {}) => {
       const changed = { ...rows.get(id)!, ...updates, state }; rows.set(id, changed); events.push(`${state}:${changed.drNumber}`); return changed;
     }) }, summary: { send: vi.fn(async () => true) },
   } as unknown as ProcessorDependencies;
-  return { deps, events };
+  return { deps, events, rows };
 }
 
 describe('runVelocityReviewExport', () => {
@@ -193,6 +231,47 @@ describe('runVelocityReviewExport', () => {
     expect(deps.candidates.listCandidateRows).toHaveBeenCalledWith('2026-07-30');
     expect(deps.exports.saveCandidateDecision).toHaveBeenCalledTimes(3);
     expect(result.counts.pilot_deferred).toBe(1);
+  });
+
+  it('scopes pilot claims, leaves an older outside-date export untouched, and summarizes once', async () => {
+    const { deps, rows } = runDeps([candidate('DR001', 'a'.repeat(64))], {
+      automationEnabled: false, pilotEnabled: true, pilotTargetDate: '2026-07-30', pilotLimit: 1,
+    });
+    const outside = { ...exportRow(candidate('OUTSIDE', 'b'.repeat(64)), 'outside'), state: 'ready' as const,
+      attemptCount: 0, firstTargetDate: '2026-07-29' };
+    rows.set(outside.id, outside); const before = { ...outside };
+    deps.exports.claimNextExport = vi.fn(async (_now, eligibleIds?: readonly string[]) => {
+      const eligible = eligibleIds ?? [outside.id];
+      const row = [...rows.values()].find((value) => eligible.includes(value.id) && value.state === 'ready');
+      if (!row) return null;
+      const claimed = { ...row, state: 'upserting' as const, attemptCount: row.attemptCount + 1 };
+      rows.set(row.id, claimed); return claimed;
+    });
+
+    await expect(runVelocityReviewExport({}, deps)).resolves.toMatchObject({ status: 'pilot' });
+    expect(rows.get(outside.id)).toEqual(before);
+    expect(deps.summary.send).toHaveBeenCalledOnce();
+    expect(deps.exports.claimNextExport).toHaveBeenCalledWith(NOW, ['DR001']);
+  });
+
+  it('runs due acknowledgement cleanup only without upsert or ready-tag addition', async () => {
+    const value = candidate(); const { deps, rows } = runDeps([value]);
+    const cleanup = { ...exportRow(value), state: 'ack_cleanup_pending' as const,
+      attemptCount: 1, nextAttemptAt: new Date('2026-08-01T06:59:00Z'), ghlContactId: 'contact-1' };
+    deps.exports.createExport = vi.fn(async () => { rows.set(cleanup.id, cleanup); return { created: false, export: cleanup }; });
+    deps.exports.claimNextExport = vi.fn(async () => null);
+    deps.exports.claimDueAcknowledgementCleanup = vi.fn(async () => {
+      const row = rows.get(cleanup.id);
+      if (!row?.nextAttemptAt || row.nextAttemptAt > NOW) return null;
+      const claimed = { ...row, attemptCount: row.attemptCount + 1, nextAttemptAt: null };
+      rows.set(row.id, claimed); return claimed;
+    });
+
+    await expect(runVelocityReviewExport({}, deps)).resolves.toMatchObject({ status: 'complete' });
+    expect(deps.ghl.upsertContact).not.toHaveBeenCalled();
+    expect(deps.ghl.addTags).not.toHaveBeenCalled();
+    expect(deps.ghl.removeTags).toHaveBeenCalledWith('contact-1', ['velocity-review-enrolled']);
+    expect(deps.runs.withVelocityReviewLock).toHaveBeenCalledOnce();
   });
 
   it('leaves a second same-phone DR unclaimed for retryable, ambiguous, and cleanup states', async () => {

@@ -164,12 +164,17 @@ export async function createExport(
   }
 }
 
-export async function claimNextExport(now: Date): Promise<VelocityReviewExport | null> {
+export async function claimNextExport(
+  now: Date,
+  eligibleExportIds: readonly string[],
+): Promise<VelocityReviewExport | null> {
+  if (eligibleExportIds.length === 0) return null;
   return transaction(async (txn) => {
     const candidate = await txn.queryOne<ExportRow>(`
       SELECT ${EXPORT_COLUMNS} FROM velocity_review_exports e
       WHERE e.state IN ('ready', 'retryable_failure')
         AND (e.state = 'ready' OR e.next_attempt_at <= $1)
+        AND e.id = ANY($2::uuid[])
         AND NOT EXISTS (
           SELECT 1 FROM velocity_review_exports older
           WHERE older.phone_fingerprint = e.phone_fingerprint
@@ -185,16 +190,44 @@ export async function claimNextExport(now: Date): Promise<VelocityReviewExport |
       ORDER BY e.created_at, e.id
       FOR UPDATE SKIP LOCKED
       LIMIT 1
-    `, [now]);
+    `, [now, eligibleExportIds]);
     if (!candidate) return null;
 
     const claimed = await txn.queryOne<ExportRow>(`
       UPDATE velocity_review_exports
       SET state = 'upserting', attempt_count = attempt_count + 1,
           next_attempt_at = NULL, updated_at = NOW()
-      WHERE id = $1 AND state = $2
+      WHERE id = $1 AND state = $2 AND id = ANY($3::uuid[])
       RETURNING ${EXPORT_COLUMNS}
-    `, [candidate.id, candidate.state]);
+    `, [candidate.id, candidate.state, eligibleExportIds]);
+    return claimed ? mapExport(claimed) : null;
+  });
+}
+
+export async function claimDueAcknowledgementCleanup(
+  now: Date,
+  eligibleExportIds: readonly string[],
+): Promise<VelocityReviewExport | null> {
+  if (eligibleExportIds.length === 0) return null;
+  return transaction(async (txn) => {
+    const candidate = await txn.queryOne<ExportRow>(`
+      SELECT ${EXPORT_COLUMNS} FROM velocity_review_exports e
+      WHERE e.state = 'ack_cleanup_pending'
+        AND e.next_attempt_at <= $1
+        AND e.id = ANY($2::uuid[])
+      ORDER BY e.next_attempt_at, e.created_at, e.id
+      FOR UPDATE SKIP LOCKED
+      LIMIT 1
+    `, [now, eligibleExportIds]);
+    if (!candidate) return null;
+
+    const claimed = await txn.queryOne<ExportRow>(`
+      UPDATE velocity_review_exports
+      SET attempt_count = attempt_count + 1, next_attempt_at = NULL, updated_at = NOW()
+      WHERE id = $1 AND state = 'ack_cleanup_pending'
+        AND id = ANY($2::uuid[]) AND next_attempt_at <= $3
+      RETURNING ${EXPORT_COLUMNS}
+    `, [candidate.id, eligibleExportIds, now]);
     return claimed ? mapExport(claimed) : null;
   });
 }

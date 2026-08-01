@@ -6,6 +6,7 @@ import { pool as repositoryPool } from '@/lib/db-pool';
 import { getConsentForMsisdn } from '@/modules/communications/whatsapp/consent/consentRepo';
 import { recordOneMapConsent } from '@/modules/velocity-review/consentService';
 import {
+  claimDueAcknowledgementCleanup,
   claimNextExport,
   createExport,
   saveCandidateDecision,
@@ -228,7 +229,8 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
     `, [first.export.id, second.export.id,
       new Date('2026-08-01T08:00:00.000Z'), new Date('2026-08-01T08:01:00.000Z')]);
 
-    const firstClaim = await claimNextExport(new Date('2026-08-02T08:00:00.000Z'));
+    const eligibleIds = [first.export.id, second.export.id];
+    const firstClaim = await claimNextExport(new Date('2026-08-02T08:00:00.000Z'), eligibleIds);
     expect(firstClaim?.id).toBe(first.export.id);
     expect(firstClaim?.attemptCount).toBe(1);
     await expect(transitionExportState(
@@ -255,7 +257,7 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
         WHERE id = $1
       `, [first.export.id, state, new Date('2026-08-01T08:02:00.000Z'),
         new Date('2026-08-03T08:00:00.000Z')]);
-      await expect(claimNextExport(new Date('2026-08-02T08:00:00.000Z'))).resolves.toBeNull();
+      await expect(claimNextExport(new Date('2026-08-02T08:00:00.000Z'), eligibleIds)).resolves.toBeNull();
     }
 
     const attemptsBeforeRelease = await db.query<{ id: string; attempt_count: number }>(`
@@ -270,9 +272,56 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
       "UPDATE velocity_review_exports SET state = 'completed' WHERE id = $1",
       [first.export.id],
     );
-    const secondClaim = await claimNextExport(new Date('2026-08-02T08:00:00.000Z'));
+    const secondClaim = await claimNextExport(new Date('2026-08-02T08:00:00.000Z'), eligibleIds);
     expect(secondClaim?.id).toBe(second.export.id);
     expect(secondClaim?.attemptCount).toBe(1);
+  });
+
+  it('leaves an older out-of-scope export byte-for-byte unchanged', async () => {
+    const run = await createOrResumeRun('2026-08-01');
+    const outsideCandidate = candidate('DR-OUTSIDE');
+    const insideCandidate = candidate('DR-INSIDE', { msisdn: '27831112222',
+      phoneE164: '+27831112222', phoneFingerprint: 'b'.repeat(64) });
+    for (const prepared of [outsideCandidate, insideCandidate]) {
+      await saveCandidateDecision(run, { status: 'ready', candidate: prepared });
+    }
+    const outside = await createExport(run, outsideCandidate);
+    const inside = await createExport(run, insideCandidate);
+    await db.query('UPDATE velocity_review_exports SET created_at = $2 WHERE id = $1',
+      [outside.export.id, new Date('2026-08-01T07:00:00Z')]);
+    const before = await db.query('SELECT * FROM velocity_review_exports WHERE id = $1', [outside.export.id]);
+
+    const claimed = await claimNextExport(new Date('2026-08-02T08:00:00Z'), [inside.export.id]);
+    const after = await db.query('SELECT * FROM velocity_review_exports WHERE id = $1', [outside.export.id]);
+
+    expect(claimed?.id).toBe(inside.export.id);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it('excludes not-due cleanup and claims due scoped cleanup only', async () => {
+    const run = await createOrResumeRun('2026-08-01');
+    const dueCandidate = candidate('DR-DUE');
+    const laterCandidate = candidate('DR-LATER', { msisdn: '27831112222',
+      phoneE164: '+27831112222', phoneFingerprint: 'b'.repeat(64) });
+    for (const prepared of [dueCandidate, laterCandidate]) {
+      await saveCandidateDecision(run, { status: 'ready', candidate: prepared });
+    }
+    const due = await createExport(run, dueCandidate);
+    const later = await createExport(run, laterCandidate);
+    const now = new Date('2026-08-02T08:00:00Z');
+    await db.query(`UPDATE velocity_review_exports SET state = 'ack_cleanup_pending',
+      attempt_count = 1, next_attempt_at = CASE WHEN id = $1 THEN $3::timestamptz ELSE $4::timestamptz END
+      WHERE id IN ($1, $2)`,
+    [due.export.id, later.export.id, new Date('2026-08-02T07:59:00Z'), new Date('2026-08-02T08:01:00Z')]);
+
+    const claimed = await claimDueAcknowledgementCleanup(now, [due.export.id, later.export.id]);
+    expect(claimed).toMatchObject({ id: due.export.id, state: 'ack_cleanup_pending',
+      attemptCount: 2, nextAttemptAt: null });
+    await expect(claimDueAcknowledgementCleanup(now, [later.export.id])).resolves.toBeNull();
+    const notDue = await db.query<{ state: ExportState; attempt_count: number; next_attempt_at: Date }>(
+      'SELECT state, attempt_count, next_attempt_at FROM velocity_review_exports WHERE id = $1', [later.export.id]);
+    expect(notDue.rows[0]).toEqual({ state: 'ack_cleanup_pending', attempt_count: 1,
+      next_attempt_at: new Date('2026-08-02T08:01:00Z') });
   });
 
   it('serializes actual concurrent claims with row locks and held-phone exclusion', async () => {
@@ -290,6 +339,7 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
     const oldestExport = await createExport(run, phoneAOldest);
     const laterExport = await createExport(run, phoneALater);
     const otherPhoneExport = await createExport(run, phoneB);
+    const eligibleIds = [oldestExport.export.id, laterExport.export.id, otherPhoneExport.export.id];
     await db.query(`
       UPDATE velocity_review_exports SET created_at = CASE id
         WHEN $1 THEN $4::timestamptz
@@ -320,13 +370,13 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
       gateClient = await db.connect();
       await gateClient.query('SELECT pg_advisory_lock($1)', [CLAIM_GATE_KEY]);
 
-      claims.push(claimNextExport(new Date('2026-08-02T08:00:00.000Z')));
+      claims.push(claimNextExport(new Date('2026-08-02T08:00:00.000Z'), eligibleIds));
       await waitForBlockedClaimUpdates(1);
-      claims.push(claimNextExport(new Date('2026-08-02T08:00:00.000Z')));
+      claims.push(claimNextExport(new Date('2026-08-02T08:00:00.000Z'), eligibleIds));
       await waitForBlockedClaimUpdates(2);
 
       await expect(
-        claimNextExport(new Date('2026-08-02T08:00:00.000Z')),
+        claimNextExport(new Date('2026-08-02T08:00:00.000Z'), eligibleIds),
       ).resolves.toBeNull();
       await gateClient.query('SELECT pg_advisory_unlock($1)', [CLAIM_GATE_KEY]);
       const concurrentResults = await Promise.all(claims);
@@ -351,7 +401,7 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
         [otherPhoneExport.export.id, { state: 'upserting', attemptCount: 1 }],
       ]));
       await expect(
-        claimNextExport(new Date('2026-08-02T08:00:00.000Z')),
+        claimNextExport(new Date('2026-08-02T08:00:00.000Z'), eligibleIds),
       ).resolves.toBeNull();
     } finally {
       if (gateClient) {

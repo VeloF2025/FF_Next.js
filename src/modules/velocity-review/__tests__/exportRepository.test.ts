@@ -12,6 +12,7 @@ vi.mock('@/lib/db-pool', () => ({
 }));
 
 import {
+  claimDueAcknowledgementCleanup,
   claimNextExport,
   createExport,
   saveCandidateDecision,
@@ -172,17 +173,44 @@ describe('Velocity review export persistence', () => {
     };
     mocks.transaction.mockImplementation(async (work) => work(tx));
 
-    await expect(claimNextExport(new Date('2026-08-02T09:00:00Z'))).resolves.toMatchObject({
+    const now = new Date('2026-08-02T09:00:00Z');
+    await expect(claimNextExport(now, ['export-1'])).resolves.toMatchObject({
       id: 'export-1',
       state: 'upserting',
       attemptCount: 1,
     });
 
-    const [selectText] = tx.queryOne.mock.calls[0] as [string];
+    const [selectText, selectParams] = tx.queryOne.mock.calls[0] as [string, unknown[]];
     const [updateText, updateParams] = tx.queryOne.mock.calls[1] as [string, unknown[]];
     expect(selectText).toContain('FOR UPDATE SKIP LOCKED');
     expect(selectText).toContain("state IN ('ready', 'retryable_failure')");
+    expect(selectText).toContain('e.id = ANY($2::uuid[])');
+    expect(selectParams).toEqual([now, ['export-1']]);
     expect(updateText).toContain('WHERE id = $1 AND state = $2');
-    expect(updateParams).toEqual(['export-1', 'ready']);
+    expect(updateText).toContain('id = ANY($3::uuid[])');
+    expect(updateParams).toEqual(['export-1', 'ready', ['export-1']]);
+  });
+
+  it('claims only due scoped acknowledgement cleanup and increments its attempt', async () => {
+    const due = exportRow({ state: 'ack_cleanup_pending', attempt_count: 1,
+      next_attempt_at: new Date('2026-08-02T08:59:00Z') });
+    const claimed = exportRow({ state: 'ack_cleanup_pending', attempt_count: 2, next_attempt_at: null });
+    const tx = { query: vi.fn(), queryOne: vi.fn().mockResolvedValueOnce(due).mockResolvedValueOnce(claimed) };
+    mocks.transaction.mockImplementation(async (work) => work(tx));
+    const now = new Date('2026-08-02T09:00:00Z');
+
+    await expect(claimDueAcknowledgementCleanup(now, ['export-1'])).resolves.toMatchObject({
+      id: 'export-1', state: 'ack_cleanup_pending', attemptCount: 2, nextAttemptAt: null,
+    });
+
+    const [selectText, selectParams] = tx.queryOne.mock.calls[0] as [string, unknown[]];
+    const [updateText, updateParams] = tx.queryOne.mock.calls[1] as [string, unknown[]];
+    expect(selectText).toContain("e.state = 'ack_cleanup_pending'");
+    expect(selectText).toContain('e.next_attempt_at <= $1');
+    expect(selectText).toContain('e.id = ANY($2::uuid[])');
+    expect(selectParams).toEqual([now, ['export-1']]);
+    expect(updateText).toContain('attempt_count = attempt_count + 1');
+    expect(updateText).toContain("state = 'ack_cleanup_pending'");
+    expect(updateParams).toEqual(['export-1', ['export-1'], now]);
   });
 });

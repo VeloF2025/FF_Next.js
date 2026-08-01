@@ -1,8 +1,9 @@
 import { listCandidateRows } from './candidateRepository';
 import { prepareCandidate } from './candidateService';
+import { processAcknowledgementCleanup } from './acknowledgementCleanup';
 import { recordOneMapConsent, type OneMapConsentInput } from './consentService';
 import {
-  claimNextExport, createExport, saveCandidateDecision, transitionExportState,
+  claimDueAcknowledgementCleanup, claimNextExport, createExport, saveCandidateDecision, transitionExportState,
   type ExportTransitionUpdates, type VelocityReviewExport,
 } from './exportRepository';
 import {
@@ -17,7 +18,6 @@ import {
   type VelocityReviewRun, type VelocityReviewRunStatus,
 } from './runRepository';
 import type { CandidateDbRow, CandidateDecision, ExportState, PreparedCandidate, RunSummaryCounts } from './types';
-
 const READY_TAG = 'velocity-review-ready';
 const ENROLLED_TAG = 'velocity-review-enrolled';
 const POLL_INTERVAL_MS = 5_000;
@@ -52,7 +52,8 @@ export interface ProcessorDependencies {
   exports: {
     saveCandidateDecision(run: VelocityReviewRun, decision: CandidateDecision): Promise<void>;
     createExport(run: VelocityReviewRun, candidate: PreparedCandidate): Promise<{ created: boolean; export: VelocityReviewExport }>;
-    claimNextExport(now: Date): Promise<VelocityReviewExport | null>;
+    claimNextExport(now: Date, eligibleExportIds: readonly string[]): Promise<VelocityReviewExport | null>;
+    claimDueAcknowledgementCleanup(now: Date, eligibleExportIds: readonly string[]): Promise<VelocityReviewExport | null>;
     transitionExportState(id: string, expected: ExportState, next: ExportState,
       updates?: ExportTransitionUpdates): Promise<VelocityReviewExport | null>;
   };
@@ -77,7 +78,6 @@ async function move(deps: ProcessorDependencies, row: VelocityReviewExport, next
   if (!changed) throw new Error('Velocity review export state changed concurrently');
   return changed;
 }
-
 async function failRequest(deps: ProcessorDependencies, row: VelocityReviewExport,
   error: unknown, code: string): Promise<ExportProcessResult> {
   if (error instanceof HighLevelRequestError && error.ambiguousMutation) {
@@ -89,12 +89,10 @@ async function failRequest(deps: ProcessorDependencies, row: VelocityReviewExpor
   }
   return result(await move(deps, row, 'permanent_failure', { errorCode: code, nextAttemptAt: null }));
 }
-
 function verifiedPhone(contact: HighLevelContact, expected: string): boolean {
   const normalized = normalizeSaMobileMsisdn(contact.phone);
   return normalized !== null && toE164(normalized) === expected;
 }
-
 export async function processOneExport(item: ProcessableExport,
   deps: ProcessorDependencies): Promise<ExportProcessResult> {
   let row = item.export;
@@ -130,13 +128,13 @@ export async function processOneExport(item: ProcessableExport,
     return result(await move(deps, row, 'permanent_failure', { ghlContactId: current.id,
       errorCode: 'ghl_whatsapp_dnd' }));
   }
-  const hasTransientTag = current.tags.includes(READY_TAG) || current.tags.includes(ENROLLED_TAG);
-  if (hasTransientTag) {
-    return result(await move(deps, row, 'ambiguous', { ghlContactId: current.id, errorCode: 'stale_transient_tag' }));
-  }
   if (!verifiedPhone(current, row.phoneE164) || current.customFields[deps.exportKeyFieldId] !== row.exportKey) {
     return result(await move(deps, row, 'ambiguous', { ghlContactId: current.id,
       errorCode: 'contact_verification_failed' }));
+  }
+  const hasTransientTag = current.tags.includes(READY_TAG) || current.tags.includes(ENROLLED_TAG);
+  if (hasTransientTag) {
+    return result(await move(deps, row, 'ambiguous', { ghlContactId: current.id, errorCode: 'stale_transient_tag' }));
   }
   row = await move(deps, row, 'contact_upserted', { ghlContactId: current.id, upsertedAt: deps.now() });
   try {
@@ -157,14 +155,7 @@ export async function processOneExport(item: ProcessableExport,
       && current.tags.includes(ENROLLED_TAG) && !current.tags.includes(READY_TAG);
     if (!acknowledged) continue;
     row = await move(deps, row, 'ack_cleanup_pending', { workflowAcknowledgedAt: deps.now() });
-    try {
-      await deps.ghl.removeTags(current.id, [ENROLLED_TAG]);
-    } catch {
-      row = await move(deps, row, 'ack_cleanup_pending', { errorCode: 'ack_cleanup_failed' });
-      return result(row, true);
-    }
-    row = await move(deps, row, 'completed', { completedAt: deps.now(), errorCode: null });
-    return result(row, true);
+    return processAcknowledgementCleanup(row, deps);
   }
   return result(await move(deps, row, 'ambiguous', { errorCode: 'workflow_acknowledgement_timeout' }));
 }
@@ -182,7 +173,6 @@ function previousDate(value: string): string {
 function addCounts(target: RunSummaryCounts, source: RunSummaryCounts): void {
   for (const [key, value] of Object.entries(source)) target[key] = (target[key] ?? 0) + value;
 }
-
 async function discover(date: string, deps: ProcessorDependencies): Promise<CandidateDecision[]> {
   const rows = await deps.candidates.listCandidateRows(date);
   return rows.map((row) => deps.candidates.prepareCandidate(row));
@@ -257,14 +247,24 @@ async function lockedRun(deps: ProcessorDependencies): Promise<VelocityReviewRun
   for (const date of due.dates) {
     work.push(await prepareDate(date, due.status === 'pilot' ? due.limit : null, deps, contexts));
   }
-  let claimed = await deps.exports.claimNextExport(deps.now());
-  while (claimed !== null) {
+  const eligibleIds = [...contexts.keys()];
+  for (;;) {
+    const claimed = await deps.exports.claimNextExport(deps.now(), eligibleIds);
+    if (!claimed) {
+      const cleanup = await deps.exports.claimDueAcknowledgementCleanup(deps.now(), eligibleIds);
+      if (!cleanup) break;
+      const item = contexts.get(cleanup.id);
+      if (!item) throw new Error('Claimed Velocity review cleanup lacks current candidate evidence');
+      const outcome = await processAcknowledgementCleanup(cleanup, deps);
+      item.export = { ...item.export, state: outcome.state, errorCode: outcome.errorCode,
+        nextAttemptAt: outcome.nextAttemptAt };
+      continue;
+    }
     const item = contexts.get(claimed.id);
     if (!item) throw new Error('Claimed Velocity review export lacks current candidate evidence');
     const outcome = await processOneExport({ ...item, export: claimed }, deps);
     item.export = { ...item.export, state: outcome.state, errorCode: outcome.errorCode,
       nextAttemptAt: outcome.nextAttemptAt };
-    claimed = await deps.exports.claimNextExport(deps.now());
   }
   const dates: VelocityReviewDateResult[] = []; const counts: RunSummaryCounts = {};
   for (const item of work) { const date = await finishDate(item, contexts, deps);
@@ -284,7 +284,8 @@ function defaultDependencies(dry: boolean): ProcessorDependencies {
     exportKeyFieldId: config?.fieldExportKeyId ?? '',
     candidates: { listCandidateRows, prepareCandidate: (row) => prepareCandidate(row, secret) },
     consent: { recordOneMapConsent }, ghl: config ? new HighLevelClient(config) : unavailable,
-    exports: { saveCandidateDecision, createExport, claimNextExport, transitionExportState },
+    exports: { saveCandidateDecision, createExport, claimNextExport,
+      claimDueAcknowledgementCleanup, transitionExportState },
     runs: { withVelocityReviewLock, loadVelocityReviewControl, listCompletedRunDates,
       createOrResumeRun, transitionRunStatus }, summary: { send: async () => undefined } };
 }

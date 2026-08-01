@@ -180,9 +180,11 @@ export class HighLevelClient {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch {
-      const ambiguousMutation = kind === 'tag-add';
+      const ambiguousMutation = kind === 'tag-add' || kind === 'tag-remove';
+      const ambiguity = kind === 'tag-remove' ? 'HighLevel tag removal was not acknowledged'
+        : 'HighLevel tag addition was not acknowledged';
       throw new HighLevelRequestError(
-        ambiguousMutation ? 'HighLevel tag addition was not acknowledged' : 'HighLevel request failed before a response',
+        ambiguousMutation ? ambiguity : 'HighLevel request failed before a response',
         null,
         !ambiguousMutation,
         ambiguousMutation,
@@ -201,6 +203,9 @@ export class HighLevelClient {
       );
     }
     if (response.status === 204) return undefined;
-    return response.json().catch(() => ({}));
+    return response.json().catch(() => {
+      // Some successful tag responses have no JSON body; callers do not consume it.
+      return {};
+    });
   }
 }

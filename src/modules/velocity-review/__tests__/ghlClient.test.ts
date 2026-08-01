@@ -160,6 +160,18 @@ describe('HighLevelClient', () => {
     expect((error as Error).message).not.toContain(token);
   });
 
+  it('marks an unacknowledged acknowledgement-tag removal as ambiguous', async () => {
+    vi.mocked(global.fetch).mockRejectedValue(new Error('timeout'));
+    const error = await new HighLevelClient(config).removeTags(
+      'contact-1', ['velocity-review-enrolled'],
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject<Partial<HighLevelRequestError>>({
+      status: null, retryable: false, ambiguousMutation: true,
+    });
+    expect((error as Error).message).toContain('removal');
+  });
+
   it('redacts phones and tokens returned by the API', async () => {
     vi.mocked(global.fetch).mockResolvedValue(response({
       message: `bad phone ${phone}; token ${token}`,
