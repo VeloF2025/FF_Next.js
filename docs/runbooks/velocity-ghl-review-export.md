@@ -226,12 +226,37 @@ There is no summary-only API or test mode. A `dryRun:true` request returns aggre
 Only after both workflows are published under activation approval and the control row readback is correct:
 
 ```bash
-(crontab -l 2>/dev/null; \
-  echo '0 9 * * * /home/velo/fibreflow-dev/scripts/cron-velocity-review-export.sh >> /home/velo/logs/velocity-review-export.log 2>&1') | crontab -
-crontab -l
+(
+  set -eu
+  umask 077
+
+  velocity_cron_entry='0 9 * * * /home/velo/fibreflow-dev/scripts/cron-velocity-review-export.sh >> /home/velo/logs/velocity-review-export.log 2>&1'
+  velocity_crontab_tmp="$(mktemp)"
+  trap 'rm -f "$velocity_crontab_tmp"' EXIT
+
+  crontab -l 2>/dev/null |
+    awk -v entry="$velocity_cron_entry" '$0 != entry' > "$velocity_crontab_tmp"
+  printf '%s\n' "$velocity_cron_entry" >> "$velocity_crontab_tmp"
+  crontab "$velocity_crontab_tmp"
+
+  velocity_cron_count="$(
+    crontab -l |
+      awk -v entry="$velocity_cron_entry" '
+        $0 == entry { count++ }
+        END { print count + 0 }
+      '
+  )"
+  if [ "$velocity_cron_count" -ne 1 ]; then
+    printf 'Velocity cron verification failed: expected 1 exact entry, found %s\n' \
+      "$velocity_cron_count" >&2
+    exit 1
+  fi
+
+  printf 'Verified exactly one Velocity cron entry:\n%s\n' "$velocity_cron_entry"
+)
 ```
 
-The readback must contain exactly one Velocity entry. Observe the next 09:00 SAST run and reconcile its aggregate summary; HTTP success alone is not acceptance.
+This replaces every existing exact copy of the desired Velocity entry while preserving unrelated crontab lines, installs the complete result from a private temporary file, and verifies exactly one match without printing unrelated entries that may contain sensitive values. Observe the next 09:00 SAST run and reconcile its aggregate summary; HTTP success alone is not acceptance.
 
 ## Pause and rollback
 
