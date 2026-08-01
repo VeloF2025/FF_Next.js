@@ -69,7 +69,7 @@ export interface RunSummaryCounts {
 export const RUN_SUMMARY_COUNT_KEYS = [
   'candidate_total', 'ready', 'contacts_upserted', 'duplicates', 'quarantined',
   'completed', 'permanent_failure', 'retryable', 'ambiguous',
-  'ack_cleanup_pending', 'pilot_deferred',
+  'ack_cleanup_pending', 'pilot_deferred', 'deadline_deferred',
   ...CANDIDATE_SOURCES.map((source) => `source_${source}`),
   ...QUARANTINE_REASONS.map((reason) => `quarantine_${reason}`),
 ] as const;

@@ -27,7 +27,11 @@ const READY_TAG = 'velocity-review-ready';
 const ENROLLED_TAG = 'velocity-review-enrolled';
 const POLL_INTERVAL_MS = 5_000;
 const POLL_LIMIT_MS = 30_000;
-const MAX_RETRY_RECONCILIATION_MS = 15 * 60_000;
+// The scheduler wrapper allows 30 minutes. Stop starting contact work after 22 minutes,
+// leaving three minutes to drain in-flight contacts and a further five-minute transport margin.
+const RUN_BUDGET_MS = 25 * 60_000;
+const CONTACT_DRAIN_MS = 3 * 60_000;
+const MAX_CONCURRENT_EXPORTS = 4;
 interface GhlOperations {
   upsertContact(input: VelocityReviewContactInput): Promise<HighLevelContact>;
   getContact(contactId: string): Promise<HighLevelContact>;
@@ -44,6 +48,10 @@ export interface VelocityReviewDateResult { targetDate: string; status: Velocity
 export interface VelocityReviewRunResult {
   status: 'disabled' | 'busy' | 'dry_run' | 'blocked' | 'complete' | 'partial' | 'pilot';
   counts: RunSummaryCounts; dates: VelocityReviewDateResult[]; reason?: string;
+}
+export interface ProcessorLimits {
+  runBudgetMs: number;
+  contactDrainMs: number;
 }
 export interface ProcessorDependencies {
   now(): Date;
@@ -73,6 +81,7 @@ export interface ProcessorDependencies {
       counts: RunSummaryCounts): Promise<VelocityReviewRun | null>;
   };
   summary: { send(result: VelocityReviewRunResult): Promise<boolean | void> };
+  limits?: Readonly<ProcessorLimits>;
 }
 function result(row: VelocityReviewExport, workflowAcknowledged = false,
   contactUpserted = false): ExportProcessResult {
@@ -256,6 +265,7 @@ async function prepareDate(targetDate: string, pilotLimit: number | null, deps: 
 }
 
 async function finishDate(work: DateWork, contexts: Map<string, ProcessingContext>,
+  deadlineDeferredIds: ReadonlySet<string>,
   deps: ProcessorDependencies): Promise<VelocityReviewDateResult> {
   const states = work.exportIds.map((id) => contexts.get(id)?.export.state ?? 'ambiguous');
   const processed = work.exportIds.flatMap((id) => {
@@ -266,22 +276,81 @@ async function finishDate(work: DateWork, contexts: Map<string, ProcessingContex
   const retryable = processedStates.filter((state) => state === 'retryable_failure').length;
   const ambiguous = processedStates.filter((state) => state === 'ambiguous').length;
   const cleanupPending = processedStates.filter((state) => state === 'ack_cleanup_pending').length;
+  const deadlineDeferred = work.exportIds.filter((id) => deadlineDeferredIds.has(id)).length;
   const counts: RunSummaryCounts = { ...work.discoveryCounts,
     contacts_upserted: processed.filter((item) => item.contactUpserted).length,
     completed: processedStates.filter((state) => state === 'completed').length,
     permanent_failure: processedStates.filter((state) => state === 'permanent_failure').length,
     retryable, ambiguous, ack_cleanup_pending: cleanupPending, pilot_deferred: work.pilotDeferred,
+    deadline_deferred: deadlineDeferred,
     duplicates: work.duplicates };
   const incomplete = work.pilotDeferred > 0 || retryable > 0 || ambiguous > 0
-    || cleanupPending > 0 || states.some((state) => state === 'ready' || state === 'upserting'
+    || cleanupPending > 0 || deadlineDeferred > 0
+    || states.some((state) => state === 'ready' || state === 'upserting'
       || state === 'contact_upserted' || state === 'trigger_requested');
   const status: VelocityReviewRunStatus = incomplete ? 'partial' : 'complete';
   await deps.runs.transitionRunStatus(work.run.id, 'running', status, counts);
   return { targetDate: work.targetDate, status, counts };
 }
 
+type ClaimedWork = { kind: 'export' | 'cleanup'; row: VelocityReviewExport };
+
+function effectiveLimits(deps: ProcessorDependencies): ProcessorLimits {
+  const supplied = deps.limits;
+  const runBudgetMs = Math.max(1, supplied?.runBudgetMs ?? RUN_BUDGET_MS);
+  return {
+    runBudgetMs,
+    contactDrainMs: Math.min(runBudgetMs, Math.max(0, supplied?.contactDrainMs ?? CONTACT_DRAIN_MS)),
+  };
+}
+
+async function claimOneWork(deps: ProcessorDependencies,
+  eligibleIds: readonly string[]): Promise<ClaimedWork | null> {
+  const claimed = await deps.exports.claimNextExport(deps.now(), eligibleIds);
+  if (claimed) return { kind: 'export', row: claimed };
+  const cleanupNow = deps.now();
+  const cleanup = await deps.exports.claimDueAcknowledgementCleanup(
+    cleanupNow, eligibleIds, cleanupLeaseUntil(cleanupNow));
+  return cleanup ? { kind: 'cleanup', row: cleanup } : null;
+}
+
+async function processClaimedWork(claimed: ClaimedWork, contexts: Map<string, ProcessingContext>,
+  deps: ProcessorDependencies): Promise<void> {
+  const item = contexts.get(claimed.row.id);
+  if (!item) throw new Error('Claimed Velocity review export lacks current candidate evidence');
+  let outcome;
+  if (claimed.kind === 'cleanup') {
+    outcome = await processAcknowledgementCleanup(claimed.row, deps);
+  } else {
+    outcome = await processOneExport({ ...item, export: claimed.row }, deps);
+    item.contactUpserted ||= outcome.contactUpserted;
+  }
+  item.processed = true;
+  item.export = { ...item.export, state: outcome.state, errorCode: outcome.errorCode,
+    nextAttemptAt: outcome.nextAttemptAt };
+}
+
+function nextRetryWake(contexts: Map<string, ProcessingContext>, now: number): number | undefined {
+  return [...contexts.values()].flatMap((item) =>
+    (item.export.state === 'retryable_failure' || item.export.state === 'ack_cleanup_pending')
+      && item.export.nextAttemptAt && item.export.nextAttemptAt.getTime() > now
+      ? [item.export.nextAttemptAt.getTime()] : [])
+    .sort((left, right) => left - right)[0];
+}
+
+function markDeadlineDeferred(contexts: Map<string, ProcessingContext>,
+  deferredIds: Set<string>): void {
+  for (const item of contexts.values()) {
+    const scheduledRetry = (item.export.state === 'retryable_failure'
+      || item.export.state === 'ack_cleanup_pending') && item.export.nextAttemptAt !== null;
+    if (item.export.state === 'ready' || scheduledRetry) deferredIds.add(item.export.id);
+  }
+}
+
 async function lockedRun(deps: ProcessorDependencies): Promise<VelocityReviewRunResult> {
-  const retryDeadline = deps.now().getTime() + MAX_RETRY_RECONCILIATION_MS;
+  const limits = effectiveLimits(deps);
+  const runDeadline = deps.now().getTime() + limits.runBudgetMs;
+  const claimCutoff = runDeadline - limits.contactDrainMs;
   const control = await deps.runs.loadVelocityReviewControl();
   if (!control.automationEnabled && !control.pilotEnabled) return { status: 'disabled', counts: {}, dates: [] };
   const completed = await deps.runs.listCompletedRunDates();
@@ -296,42 +365,36 @@ async function lockedRun(deps: ProcessorDependencies): Promise<VelocityReviewRun
     work.push(await prepareDate(date, due.status === 'pilot' ? due.limit : null, deps, contexts));
   }
   const eligibleIds = [...contexts.keys()];
+  const deadlineDeferredIds = new Set<string>();
   for (;;) {
-    const claimed = await deps.exports.claimNextExport(deps.now(), eligibleIds);
-    if (!claimed) {
-      const cleanupNow = deps.now();
-      const cleanup = await deps.exports.claimDueAcknowledgementCleanup(
-        cleanupNow, eligibleIds, cleanupLeaseUntil(cleanupNow));
-      if (cleanup) {
-        const item = contexts.get(cleanup.id);
-        if (!item) throw new Error('Claimed Velocity review cleanup lacks current candidate evidence');
-        const outcome = await processAcknowledgementCleanup(cleanup, deps);
-        item.processed = true;
-        item.export = { ...item.export, state: outcome.state, errorCode: outcome.errorCode,
-          nextAttemptAt: outcome.nextAttemptAt };
-        continue;
-      }
-      const now = deps.now().getTime();
-      const wakeAt = [...contexts.values()].flatMap((item) =>
-        (item.export.state === 'retryable_failure' || item.export.state === 'ack_cleanup_pending')
-          && item.export.nextAttemptAt && item.export.nextAttemptAt.getTime() > now
-          ? [item.export.nextAttemptAt.getTime()] : [])
-        .sort((left, right) => left - right)[0];
-      if (wakeAt === undefined || wakeAt > retryDeadline) break;
-      await deps.sleep(wakeAt - now);
-      if (deps.now().getTime() < wakeAt) break;
+    if (deps.now().getTime() >= claimCutoff) {
+      markDeadlineDeferred(contexts, deadlineDeferredIds);
+      break;
+    }
+    const claimed = (await Promise.all(Array.from({ length: MAX_CONCURRENT_EXPORTS },
+      () => claimOneWork(deps, eligibleIds))))
+      .flatMap((item) => item ? [item] : []);
+    const unique = claimed.filter((item, index) =>
+      claimed.findIndex((other) => other.row.id === item.row.id) === index);
+    if (unique.length > 0) {
+      await Promise.all(unique.map((item) => processClaimedWork(item, contexts, deps)));
       continue;
     }
-    const item = contexts.get(claimed.id);
-    if (!item) throw new Error('Claimed Velocity review export lacks current candidate evidence');
-    const outcome = await processOneExport({ ...item, export: claimed }, deps);
-    item.processed = true;
-    item.contactUpserted ||= outcome.contactUpserted;
-    item.export = { ...item.export, state: outcome.state, errorCode: outcome.errorCode,
-      nextAttemptAt: outcome.nextAttemptAt };
+    const now = deps.now().getTime();
+    const wakeAt = nextRetryWake(contexts, now);
+    if (wakeAt === undefined) break;
+    if (wakeAt > claimCutoff) {
+      markDeadlineDeferred(contexts, deadlineDeferredIds);
+      break;
+    }
+    await deps.sleep(wakeAt - now);
+    if (deps.now().getTime() < wakeAt) {
+      markDeadlineDeferred(contexts, deadlineDeferredIds);
+      break;
+    }
   }
   const dates: VelocityReviewDateResult[] = []; const counts: RunSummaryCounts = {};
-  for (const item of work) { const date = await finishDate(item, contexts, deps);
+  for (const item of work) { const date = await finishDate(item, contexts, deadlineDeferredIds, deps);
     dates.push(date); addCounts(counts, date.counts); }
   const status = due.status === 'pilot' ? 'pilot' : dates.some((item) => item.status === 'partial') ? 'partial' : 'complete';
   const output: VelocityReviewRunResult = { status, counts, dates };

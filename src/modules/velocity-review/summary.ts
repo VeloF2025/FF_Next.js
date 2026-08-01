@@ -29,6 +29,7 @@ const COUNT_ROWS = [
   ['ambiguous', 'Ambiguous'],
   ['ack_cleanup_pending', 'Acknowledgement cleanup pending'],
   ['pilot_deferred', 'Pilot deferred'],
+  ['deadline_deferred', 'Deadline deferred'],
 ] as const;
 
 function sastToday(): string {

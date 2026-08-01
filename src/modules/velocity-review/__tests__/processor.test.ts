@@ -15,6 +15,14 @@ const candidate = (drNumber = 'DR001', fingerprint = 'a'.repeat(64)): PreparedCa
   phoneFingerprint: fingerprint, phoneSource: 'onemap', firstName: 'Ada', lastName: 'Lovelace',
   consentEvidence: { source: 'onemap_home_signup', grantedAt: new Date('2026-07-31T08:00:00Z') },
 });
+const distinctCandidate = (index: number): PreparedCandidate => {
+  const msisdn = `278${String(10_000_000 + index)}`;
+  return {
+    ...candidate(`DR${String(index + 1).padStart(4, '0')}`, index.toString(16).padStart(64, '0')),
+    msisdn,
+    phoneE164: `+${msisdn}`,
+  };
+};
 const exportRow = (value = candidate(), id = value.drNumber): VelocityReviewExport => ({
   id, firstRunId: 'run-1', firstTargetDate: '2026-07-31', drNumber: value.drNumber,
   phoneE164: value.phoneE164, phoneFingerprint: value.phoneFingerprint, phoneSource: value.phoneSource,
@@ -300,6 +308,104 @@ describe('runVelocityReviewExport', () => {
     }
   });
 
+  it('bounds a large slow wave, preserves unclaimed exports, and never processes one export twice', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    try {
+      const values = Array.from({ length: 60 }, (_, index) => distinctCandidate(index));
+      const { deps, rows } = runDeps(values);
+      deps.now = () => new Date();
+      // This short fake-time budget exercises the same cutoff arithmetic as the
+      // production 25-minute budget and three-minute drain reserve.
+      deps.limits = { runBudgetMs: 60_000, contactDrainMs: 10_000 };
+
+      let activeSleeps = 0;
+      let maxActiveSleeps = 0;
+      deps.sleep = vi.fn((ms: number) => new Promise<void>((resolve) => {
+        activeSleeps += 1;
+        maxActiveSleeps = Math.max(maxActiveSleeps, activeSleeps);
+        setTimeout(() => {
+          activeSleeps -= 1;
+          resolve();
+        }, ms);
+      }));
+
+      const readCounts = new Map<string, number>();
+      const upsertedKeys: string[] = [];
+      deps.ghl.upsertContact = vi.fn(async (input) => {
+        upsertedKeys.push(input.exportKey);
+        readCounts.set(input.exportKey, 0);
+        return { ...contact(input.exportKey), id: `contact-${input.exportKey}`, phone: input.phoneE164 };
+      });
+      deps.ghl.getContact = vi.fn(async (contactId: string) => {
+        const exportKey = contactId.replace(/^contact-/, '');
+        const value = values.find((item) => `key-${item.drNumber}` === exportKey)!;
+        const reads = readCounts.get(exportKey) ?? 0;
+        readCounts.set(exportKey, reads + 1);
+        return {
+          ...contact(exportKey, reads === 0 ? [] : ['velocity-review-enrolled']),
+          id: contactId,
+          phone: value.phoneE164,
+        };
+      });
+
+      const pending = runVelocityReviewExport({}, deps);
+      await vi.runAllTimersAsync();
+      const result = await pending;
+
+      expect(result).toMatchObject({
+        status: 'partial',
+        counts: { completed: 40, deadline_deferred: 20, permanent_failure: 0 },
+      });
+      expect(maxActiveSleeps).toBe(4);
+      expect(upsertedKeys).toHaveLength(40);
+      expect(new Set(upsertedKeys).size).toBe(upsertedKeys.length);
+      expect([...rows.values()].filter((row) => row.state === 'ready')).toHaveLength(20);
+      expect((result.counts.completed ?? 0) + (result.counts.deadline_deferred ?? 0))
+        .toBe(result.counts.candidate_total);
+      expect(Date.now()).toBe(NOW.getTime() + 50_000);
+
+      const laterClaims = await Promise.all(Array.from({ length: 4 },
+        () => deps.exports.claimNextExport(deps.now(), [...rows.keys()])));
+      const laterIds = laterClaims.flatMap((row) => row ? [row.id] : []);
+      expect(laterIds).toHaveLength(4);
+      expect(new Set(laterIds).size).toBe(laterIds.length);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('defers a retry beyond the claim cutoff without sleeping or spinning', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    try {
+      const { deps, rows } = runDeps([candidate()]);
+      deps.now = () => new Date();
+      deps.limits = { runBudgetMs: 30_000, contactDrainMs: 10_000 };
+      deps.sleep = vi.fn(async (ms: number) => {
+        vi.setSystemTime(new Date(Date.now() + ms));
+      });
+      deps.ghl.upsertContact = vi.fn(async () => {
+        throw new HighLevelRequestError('busy', 503, true, false);
+      });
+
+      const result = await runVelocityReviewExport({}, deps);
+
+      expect(result).toMatchObject({
+        status: 'partial',
+        counts: { completed: 0, retryable: 1, deadline_deferred: 1 },
+      });
+      expect(deps.ghl.upsertContact).toHaveBeenCalledOnce();
+      expect(deps.sleep).not.toHaveBeenCalled();
+      expect(rows.get('DR001')).toMatchObject({
+        state: 'retryable_failure', nextAttemptAt: new Date('2026-08-01T07:01:00Z'),
+      });
+      expect(Date.now()).toBe(NOW.getTime());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('exits with a terminal failure when retry attempts are exhausted', async () => {
     const value = candidate();
     const { deps, rows } = runDeps([value]);
@@ -424,6 +530,9 @@ describe('runVelocityReviewExport', () => {
     });
     deps.ghl.getContact = vi.fn(async () => contact(activeKey, reads++ === 0 ? [] : ['velocity-review-enrolled']));
     await expect(runVelocityReviewExport({}, deps)).resolves.toMatchObject({ status: 'complete' });
-    expect(events.filter((event) => event.startsWith('claim:'))).toEqual(['claim:DR001', 'claim:DR001', 'claim:DR002']);
+    const claims = events.filter((event) => event.startsWith('claim:'));
+    expect(claims[0]).toBe('claim:DR001');
+    expect(claims.filter((event) => event === 'claim:DR001')).toHaveLength(2);
+    expect(claims.filter((event) => event === 'claim:DR002')).toHaveLength(1);
   });
 });

@@ -34,6 +34,7 @@ function result(): VelocityReviewRunResult {
       ambiguous: 1,
       ack_cleanup_pending: 1,
       pilot_deferred: 1,
+      deadline_deferred: 4,
       raw_error: 99,
       source_dr_submitted: 8,
       source_stock_installed: 6,
@@ -60,6 +61,7 @@ describe('buildRunSummary', () => {
       'Quarantine — no safe phone: 2', 'Quarantine — consent missing: 1',
       'Workflow acknowledged: 6', 'Permanent failures: 1', 'Retryable failures: 1',
       'Ambiguous: 1', 'Acknowledgement cleanup pending: 1', 'Pilot deferred: 1',
+      'Deadline deferred: 4',
     ]) {
       expect(summary.text).toContain(expected);
       expect(summary.html).toContain(expected.replace(': ', '</th><td>'));
