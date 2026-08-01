@@ -47,12 +47,18 @@
 --   never submitted via WhatsApp, so NULL is the correct value; the stats
 --   queries handle it via COALESCE(submitted_date, created_at::DATE) (PR #2345).
 
+-- ORDER BY makes the pick deterministic rather than merely single-valued, so
+-- this migration and the ensure-data.ts insert resolve the same drop to the
+-- same project if a drop_number ever does span two project_ids. `projects.
+-- project_name` is schema-enforced NOT NULL, so the subquery cannot write NULL
+-- into a row the EXISTS guard just matched.
 UPDATE dr_photo_unified_reviews u
    SET project = (
          SELECT p.project_name
            FROM drops d
            JOIN projects p ON p.id = d.project_id
           WHERE d.drop_number = u.drop_number
+          ORDER BY p.project_name
           LIMIT 1
        ),
        updated_at = NOW()
@@ -62,5 +68,4 @@ UPDATE dr_photo_unified_reviews u
            FROM drops d
            JOIN projects p ON p.id = d.project_id
           WHERE d.drop_number = u.drop_number
-            AND p.project_name IS NOT NULL
        );

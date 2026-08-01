@@ -108,7 +108,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       //
       // Correlated scalar subquery rather than a JOIN: `drops` is UNIQUE on
       // (project_id, drop_number), NOT on drop_number alone, so a join could
-      // legally fan out. LIMIT 1 keeps this single-valued regardless.
+      // legally fan out. ORDER BY + LIMIT 1 keeps this single-valued AND
+      // deterministic, so this insert and migration 473 resolve the same drop
+      // to the same project if that data shape ever occurs.
       // An unresolvable DR still inserts NULL — same as before, no regression.
       logger.info(`Creating unified record for ${dropNumber}`);
       await pool.query(
@@ -119,6 +121,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
               FROM drops d
               JOIN projects p ON p.id = d.project_id
              WHERE d.drop_number = $1
+             ORDER BY p.project_name
              LIMIT 1),
            NOW(), NOW()
          )
