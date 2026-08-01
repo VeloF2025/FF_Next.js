@@ -176,10 +176,10 @@ export async function transitionRunStatus(
 ): Promise<VelocityReviewRun | null> {
   const row = await queryOne<RunRow>(`
     UPDATE velocity_review_runs SET
-      status = $3, counts = $4, updated_at = NOW(),
-      started_at = CASE WHEN $3 = 'running' THEN COALESCE(started_at, NOW()) ELSE started_at END,
-      completed_at = CASE WHEN $3 IN ('complete','partial','blocked') THEN NOW() ELSE completed_at END
-    WHERE id = $1 AND status = $2
+      status = $3::text, counts = $4, updated_at = NOW(),
+      started_at = CASE WHEN $3::text = 'running' THEN COALESCE(started_at, NOW()) ELSE started_at END,
+      completed_at = CASE WHEN $3::text IN ('complete','partial','blocked') THEN NOW() ELSE completed_at END
+    WHERE id = $1 AND status = $2::text
     RETURNING id, target_date, status, started_at, completed_at, counts, summary_status
   `, [id, expectedStatus, nextStatus, counts]);
   return row ? mapRun(row) : null;

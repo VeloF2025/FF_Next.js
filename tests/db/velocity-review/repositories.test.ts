@@ -252,9 +252,9 @@ describe('Velocity review repositories against task-owned PostgreSQL', () => {
     for (const state of heldStates) {
       await db.query(`
         UPDATE velocity_review_exports
-        SET state = $2, created_at = $3,
+        SET state = $2::text, created_at = $3,
           next_attempt_at = CASE
-            WHEN $2 = 'retryable_failure' THEN $4::timestamptz ELSE NULL
+            WHEN $2::text = 'retryable_failure' THEN $4::timestamptz ELSE NULL
           END
         WHERE id = $1
       `, [first.export.id, state, new Date('2026-08-01T08:02:00.000Z'),
