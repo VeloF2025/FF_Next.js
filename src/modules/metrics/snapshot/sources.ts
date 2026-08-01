@@ -40,10 +40,24 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
   {
     key: 'tickets_open',
     description: 'Open maintenance tickets by status and age',
-    // maintenance_tickets.project_id is TEXT holding uuid strings, and 1,871 rows
-    // hold the empty string. `''::uuid` throws, so NULLIF before casting. Today no
-    // open ticket carries an empty string, so a bare cast happens to pass — that is
-    // the WHERE clause protecting it, not safety.
+    // `maintenance_tickets.project_id` is TEXT and holds THREE kinds of value:
+    // uuid strings, the empty string (1,871 rows), and free-text project NAMES —
+    // two open tickets currently carry 'Mohadin' and 'Lawley'.
+    //
+    // So we must never cast it to uuid. `'Mohadin'::uuid` raises
+    // "invalid input syntax for type uuid", which would abort the whole nightly
+    // snapshot. A cast survives today only because of the plan PostgreSQL happens
+    // to choose — a different plan, or one more bad row, and the job dies. Compare
+    // as text instead: it cannot throw, whatever the column contains.
+    //
+    // The name arm of the join resolves those free-text rows rather than leaving
+    // them dimensionless, which is the point of a conformed project dimension.
+    //
+    // `status IS NULL OR ...` because `NULL NOT IN (...)` evaluates to NULL, which
+    // silently DROPS the row — an undercount recorded as a complete day. No NULL
+    // statuses exist today (7 distinct values, none null); this is the guard, not
+    // a fix. Note 'closed' is deliberately absent from the terminal list: it is not
+    // a status this table uses.
     sql: `
       SELECT
         t.id::text AS entity_id,
@@ -53,8 +67,11 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
           'age_days', ($2::date - (t.created_at AT TIME ZONE 'Africa/Johannesburg')::date)
         ) AS measures
       FROM maintenance_tickets t
-      LEFT JOIN projects p ON p.id = NULLIF(t.project_id, '')::uuid
-      WHERE t.status NOT IN ('resolved', 'cancelled', 'verified')
+      LEFT JOIN projects p
+        ON p.id::text = t.project_id
+        OR p.project_name = t.project_id
+      WHERE t.status IS NULL
+         OR t.status NOT IN ('resolved', 'cancelled', 'verified')
     `,
   },
 ] as const;
