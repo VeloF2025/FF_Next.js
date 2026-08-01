@@ -23,39 +23,21 @@
  * server-side session, never a client-supplied header.
  */
 import { SignJWT, decodeJwt } from 'jose';
+import {
+  CORTEX_MCP_LIFETIME_DAYS,
+  type CortexMcpLifetime,
+} from './mcpLifetimePolicy';
 
 /** Short-lived: the token only needs to outlive a single review request. */
 const TOKEN_TTL = '5m';
 
 /**
- * User-selectable self-serve MCP token lifetime (Phase 7 UI, Phase 9 widens the
- * endpoint's allow-list to include `never`). `null` days means no `exp` claim at
- * all — the bridge's revocation marker (`token_use:"mcp"` + min_iat epoch) is then
+ * Aliases retained for existing Cortex MCP callers. `null` days means no `exp` claim
+ * at all — the bridge's revocation marker (`token_use:"mcp"` + min_iat epoch) is then
  * the ONLY way to invalidate the token.
  */
-export type Lifetime = '30d' | '90d' | '1y' | 'never';
-
-export const LIFETIME_DAYS: Record<Lifetime, number | null> = {
-  '30d': 30,
-  '90d': 90,
-  '1y': 365,
-  never: null,
-};
-
-/**
- * Super-admin MCP tokens see the whole tenant, so their blast radius on loss/leak is
- * capped at 90 days — `1y` and `never` are rejected for these emails. Same csv env
- * as the bridge's own super-admin set. Read at CALL time (not module load) so it can
- * be rotated / toggled without a process restart, matching this file's existing
- * env-read convention (see `oidcForwardEnabled`).
- */
-function isSuperAdmin(email: string): boolean {
-  const emails = (process.env.CORTEX_SUPER_ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return emails.includes(email.trim().toLowerCase());
-}
+export type Lifetime = CortexMcpLifetime;
+export const LIFETIME_DAYS = CORTEX_MCP_LIFETIME_DAYS;
 
 /** Marks a revocable MCP bearer token — the bridge applies per-user revocation
  *  (the min_iat epoch) ONLY to tokens carrying this claim, never to the 5-minute
@@ -141,16 +123,6 @@ export async function bridgeBearer(
   return token;
 }
 
-/** Thrown when a super-admin requests a lifetime beyond the 90-day cap. A distinct
- *  class so the route can map it to a 400 (the UI offers `1y` to everyone, so this is
- *  a normal user action, not a server fault) while every other mint failure stays 500. */
-export class McpLifetimeCapError extends Error {
-  constructor() {
-    super('Super-admin tokens are capped at 90 days — choose 30 or 90 days.');
-    this.name = 'McpLifetimeCapError';
-  }
-}
-
 /** A minted MCP bearer token plus its expiry, for display in the connect UI. */
 export interface McpToken {
   /** The HS256 JWT to paste into an MCP client config as CORTEX_USER_TOKEN. */
@@ -173,19 +145,13 @@ export interface McpToken {
  * @param userEmail the server-verified FibreFlow session email — NEVER a
  *   client-supplied value (the route reads it from `req.user.email`).
  * @param lifetime how long the token is valid for. `never` omits `exp` entirely.
- *   Super-admin emails (`CORTEX_SUPER_ADMIN_EMAILS`) are capped at `90d` — their
- *   tokens see the whole tenant, so `1y`/`never` are rejected to bound blast radius.
  * @throws if `BRIDGE_JWT_SECRET` is unset — fail LOUD rather than silently issuing a
- *   broad service credential or an empty bearer. Throws `McpLifetimeCapError` when a
- *   super-admin requests a lifetime beyond the 90-day cap.
+ *   broad service credential or an empty bearer.
  */
 export async function mintMcpToken(
   userEmail: string,
   lifetime: Lifetime = '30d',
 ): Promise<McpToken> {
-  if (isSuperAdmin(userEmail) && (lifetime === '1y' || lifetime === 'never')) {
-    throw new McpLifetimeCapError();
-  }
   const instanceId = process.env.CORTEX_INSTANCE_ID ?? 'velocity-fibre';
   const days = LIFETIME_DAYS[lifetime];
   const ttl = days === null ? null : `${days}d`;

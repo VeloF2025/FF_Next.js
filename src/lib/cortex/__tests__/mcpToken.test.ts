@@ -9,7 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { decodeProtectedHeader, decodeJwt, jwtVerify } from 'jose';
-import { LIFETIME_DAYS, McpLifetimeCapError, mintMcpToken } from '@/lib/cortex/bridgeAuth';
+import { LIFETIME_DAYS, mintMcpToken } from '@/lib/cortex/bridgeAuth';
 
 const SECRET = 'test-bridge-secret-value-0123456789';
 const USER = 'bob@velocityfibre.co.za';
@@ -146,7 +146,7 @@ describe('mintMcpToken — user-selectable lifetime', () => {
   });
 });
 
-describe('mintMcpToken — super-admin cap', () => {
+describe('mintMcpToken — configured super-admin lifetime', () => {
   const ADMIN = 'admin@velocityfibre.co.za';
   let savedAdmins: string | undefined;
 
@@ -161,28 +161,19 @@ describe('mintMcpToken — super-admin cap', () => {
     else process.env.CORTEX_SUPER_ADMIN_EMAILS = savedAdmins;
   });
 
-  it('rejects "1y" for a super-admin email with the typed cap error (route maps it to 400)', async () => {
-    await expect(mintMcpToken(ADMIN, '1y')).rejects.toThrow(/capped at 90 days/);
-    await expect(mintMcpToken(ADMIN, '1y')).rejects.toBeInstanceOf(McpLifetimeCapError);
-  });
-
-  it('rejects "never" for a super-admin email', async () => {
-    await expect(mintMcpToken(ADMIN, 'never')).rejects.toThrow(/capped at 90 days/);
-  });
-
-  it('allows "90d" for a super-admin email', async () => {
-    const { token } = await mintMcpToken(ADMIN, '90d');
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
-    expect(payload.exp! - payload.iat!).toBe(90 * 24 * 60 * 60);
-  });
-
-  it('is case-insensitive on the super-admin match', async () => {
-    await expect(mintMcpToken(ADMIN.toUpperCase(), '1y')).rejects.toThrow(/capped at 90 days/);
-  });
-
-  it('does not cap a non-super-admin email', async () => {
-    const { token } = await mintMcpToken('regular@velocityfibre.co.za', '1y');
+  it('signs a one-year token for a configured super-admin', async () => {
+    const { token, expiresAt } = await mintMcpToken(ADMIN, '1y');
     const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
     expect(payload.exp! - payload.iat!).toBe(365 * 24 * 60 * 60);
+    expect(expiresAt).not.toBeNull();
+  });
+
+  it('signs a revocable no-expiry token for a configured super-admin', async () => {
+    const { token, expiresAt } = await mintMcpToken(ADMIN, 'never');
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
+    expect(payload.exp).toBeUndefined();
+    expect(payload.token_use).toBe('mcp');
+    expect(typeof payload.jti).toBe('string');
+    expect(expiresAt).toBeNull();
   });
 });
