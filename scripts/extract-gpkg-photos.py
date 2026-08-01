@@ -15,7 +15,6 @@ import argparse
 import os
 import re
 import sqlite3
-import subprocess
 import sys
 import tempfile
 import uuid
@@ -37,31 +36,30 @@ from qfield_hierarchy_sync import (
 # Pure GPKG family resolution (no MinIO/DB deps) — unit-tested/CI-gated by
 # scripts/test_qfield_gpkg_resolution.py. Lets a project survive the crew renaming
 # its audit GPKG ("Civil audit.gpkg" → "Civil audit updated_27_07.gpkg").
-from qfield_gpkg_resolution import (
-    is_family_member,
-    parse_mc_gpkg_names,
-    pick_latest_gpkg,
-    pick_photo_table,
-)
+from qfield_gpkg_resolution import pick_photo_table
 
 # The ingestion allow-list. Lives in its own module so works-qa-coverage-check.py can
 # read the SAME source of truth and tell "never registered" apart from "registered but
 # resolving nothing". Add new projects THERE, not here.
 from qfield_project_registry import ALTERNATE_GPKGS, OPTICAL_GPKGS, PROJECTS
 
-# Upper bound on how many same-family GPKGs we will version-list in one run. Each costs
-# an `mc ls` subprocess, and a project collaborator can create arbitrarily many
-# same-prefixed copies. Truncation is LOGGED, never silent — a quiet cap would be the
-# same class of invisible failure this module exists to remove.
-MAX_FAMILY_CANDIDATES = 25
+# Storage I/O. Imported BY NAME, not module-qualified: the characterization harness
+# monkeypatches these via setattr() on this module, which only works for names bound
+# in this namespace. `qfield_gpkg_storage.minio_download_latest(...)` would bypass the
+# patch and silently blind the test suite.
+# Only the four names this file actually CALLS are imported. The lower-level helpers
+# (minio_list_gpkg_versions/_family, qfc_list_dcim_files) are reached from inside the
+# storage modules' own namespaces, so importing them here would be dead — and worse
+# than dead: it would imply they are patchable from this module, which they are not.
+from qfield_gpkg_storage import minio_download_latest, resolve_gpkg_path
+from qfield_photo_storage import minio_list_dcim_directory, minio_resolve_photo_version
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
 DB_URL = os.environ.get("DATABASE_URL")
-MINIO_BUCKET = "qfieldcloud-prod"
 
 # PROJECTS / ALTERNATE_GPKGS / OPTICAL_GPKGS are imported at the top of this file
-# from qfield_project_registry.
+# from qfield_project_registry. MINIO_BUCKET moved to the storage modules.
 
 
 # ── Step column detection ─────────────────────────────────────────────────────
@@ -93,120 +91,6 @@ def _gpkg_version_age_days(version):
     return (datetime.now(timezone.utc) - ts).days
 
 
-# ── QFieldCloud API + MinIO helpers ──────────────────────────────────────────
-
-QFIELD_API_URL = os.environ.get('QFIELD_API_URL', 'https://qfield.fibreflow.app/api/v1/')
-QFIELD_USERNAME = os.environ.get('QFIELD_USERNAME')
-QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD')
-
-_qfc_session = None
-
-def _get_qfc_session():
-    """Get authenticated QFieldCloud API session (cached)."""
-    global _qfc_session
-    if _qfc_session is not None:
-        return _qfc_session
-    if not QFIELD_USERNAME or not QFIELD_PASSWORD:
-        print("    WARN: QFIELD_USERNAME / QFIELD_PASSWORD env vars not set, skipping QFC API")
-        return None
-    import requests as _requests
-    _qfc_session = _requests.Session()
-    resp = _qfc_session.post(f'{QFIELD_API_URL}auth/login/', json={
-        'username': QFIELD_USERNAME,
-        'password': QFIELD_PASSWORD,
-    })
-    if resp.status_code != 200:
-        print(f"    WARN: QFieldCloud auth failed: {resp.status_code}")
-        _qfc_session = None
-        return None
-    token = resp.json().get('token')
-    _qfc_session.headers['Authorization'] = f'Token {token}'
-    return _qfc_session
-
-
-def qfc_list_dcim_files(qf_project_id):
-    """List DCIM photos via QFieldCloud REST API.
-
-    Returns a dict mapping filename → API download path.
-    The API sees all files including those stored in deltas/packages
-    that are invisible to direct MinIO mc ls.
-    """
-    session = _get_qfc_session()
-    if not session:
-        return {}
-    try:
-        resp = session.get(f'{QFIELD_API_URL}files/{qf_project_id}/')
-        if resp.status_code != 200:
-            print(f"    WARN: QFieldCloud files list failed: {resp.status_code}")
-            return {}
-        files = resp.json()
-        dcim_files = {}
-        for f in files:
-            name = f.get('name', '')
-            if not name.startswith('DCIM/'):
-                continue
-            lower = name.lower()
-            if not any(lower.endswith(ext) for ext in ('.jpg', '.jpeg', '.png', '.heic')):
-                continue
-            filename = name[len('DCIM/'):]
-            # Build a storage key compatible with existing DB records
-            dcim_files[filename] = f"projects/{qf_project_id}/files/{name}"
-        return dcim_files
-    except Exception as e:
-        print(f"    WARN: qfc_list_dcim_files error: {e}")
-        return {}
-
-
-def minio_list_dcim_directory(qf_project_id):
-    """Batch-list the entire DCIM directory for a QFieldCloud project.
-
-    First tries the QFieldCloud REST API (sees all files including deltas).
-    Falls back to direct MinIO mc ls if the API is unavailable.
-
-    Returns a dict mapping filename → storage key.
-    """
-    # Try API first — it sees delta-merged files that mc ls misses
-    api_files = qfc_list_dcim_files(qf_project_id)
-    if api_files:
-        return api_files
-
-    # Fallback: direct MinIO listing (only sees flat files/ directory)
-    print(f"    Falling back to direct MinIO ls...")
-    dcim_prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/DCIM/"
-    try:
-        result = subprocess.run(
-            ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", "--recursive", dcim_prefix],
-            capture_output=True, text=True, timeout=60,
-        )
-        if result.returncode != 0:
-            print(f"    WARN: mc ls DCIM failed for {qf_project_id}: {result.stderr.strip()[:120]}")
-            return {}
-
-        dcim_files = {}
-        for line in result.stdout.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            std_idx = line.find(" STANDARD ")
-            if std_idx == -1:
-                continue
-            rel_path = line[std_idx + len(" STANDARD "):].rstrip("/")
-            if rel_path.startswith("DCIM/"):
-                rel_path = rel_path[len("DCIM/"):]
-            ver_match = re.search(r'/v(\d{14}-[a-fA-F0-9]+)$', rel_path)
-            if not ver_match:
-                continue
-            version_seg = "v" + ver_match.group(1)
-            filename = rel_path[:ver_match.start()]
-            existing_ver = dcim_files.get(filename)
-            if existing_ver is None or version_seg > existing_ver.rsplit("/", 1)[-1]:
-                dcim_files[filename] = (
-                    f"projects/{qf_project_id}/files/DCIM/{filename}/{version_seg}"
-                )
-        return dcim_files
-    except Exception as e:
-        print(f"    WARN: minio_list_dcim_directory error: {e}")
-        return {}
 
 
 def sqlite_ident(name):
@@ -218,167 +102,6 @@ def sqlite_ident(name):
     escapes a double quote inside a quoted identifier by doubling it.
     """
     return '"' + str(name).replace('"', '""') + '"'
-
-
-def minio_list_gpkg_versions(qf_project_id, gpkg_path):
-    """Sorted version ids for one GPKG in MinIO ([] on any failure)."""
-    prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/"
-    try:
-        result = subprocess.run(
-            ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", prefix],
-            capture_output=True, text=True, timeout=15,
-        )
-        if result.returncode != 0 or not result.stdout.strip():
-            return []
-        # Use STANDARD-marker parsing to handle filenames containing spaces.
-        versions = []
-        for line in result.stdout.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            std_idx = line.find(" STANDARD ")
-            if std_idx == -1:
-                continue
-            ver = line[std_idx + len(" STANDARD "):].strip().rstrip("/")
-            if ver:
-                versions.append(ver)
-        versions.sort()
-        return versions
-    except Exception as e:
-        print(f"    MinIO error listing versions of {gpkg_path}: {e}")
-        return []
-
-
-def minio_list_gpkg_family(qf_project_id, configured_path):
-    """{gpkg_filename: latest_version} for every GPKG in the project's files/ dir.
-
-    One `mc ls` of files/ plus one per GPKG found — a handful of small calls, unlike
-    DCIM which holds thousands of objects and is never walked here. Returns {} on any
-    failure so the caller falls back to the configured filename (fail OPEN: a MinIO
-    hiccup must not skip the project or redirect it somewhere unexpected).
-    """
-    prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/"
-    try:
-        result = subprocess.run(
-            ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", prefix],
-            capture_output=True, text=True, timeout=30,
-        )
-        if result.returncode != 0:
-            print(f"    WARN: mc ls files/ failed for {qf_project_id}: {result.stderr.strip()[:120]}")
-            return {}
-    except Exception as e:
-        print(f"    WARN: mc ls files/ error for {qf_project_id}: {e}")
-        return {}
-
-    # Only version-list the family members — the whole point is to avoid touching
-    # unrelated GPKGs (a project can carry a dozen: poles, optical, boundaries…, and
-    # the FT projects each hold ~90 dated "OES FF DDMMYYYY.gpkg" exports).
-    candidates = sorted(n for n in parse_mc_gpkg_names(result.stdout)
-                        if is_family_member(configured_path, n))
-    if len(candidates) > MAX_FAMILY_CANDIDATES:
-        # Keep the configured file whatever else goes: without it pick_latest_gpkg
-        # refuses to redirect at all, so dropping it would turn a cap into a silent
-        # loss of the whole feature. Descending order keeps the newest date-stamped
-        # names, which are the plausible rename targets.
-        keep = [configured_path] if configured_path in candidates else []
-        keep += [n for n in sorted(candidates, reverse=True) if n != configured_path]
-        dropped = sorted(set(candidates) - set(keep[:MAX_FAMILY_CANDIDATES]))
-        print(f"    WARN: {len(candidates)} family candidates for '{configured_path}' exceeds "
-              f"cap {MAX_FAMILY_CANDIDATES}; NOT version-listing {len(dropped)}: {dropped}")
-        candidates = keep[:MAX_FAMILY_CANDIDATES]
-
-    family = {}
-    for name in candidates:
-        versions = minio_list_gpkg_versions(qf_project_id, name)
-        if versions:
-            family[name] = versions[-1]
-    return family
-
-
-def resolve_gpkg_path(qf_project_id, configured_path):
-    """Follow a crew rename: the newest GPKG in configured_path's family.
-
-    Returns the filename to actually read. Falls back to configured_path whenever
-    the family cannot be listed or the configured file is still the newest.
-    """
-    family = minio_list_gpkg_family(qf_project_id, configured_path)
-    chosen, chosen_version = pick_latest_gpkg(configured_path, family)
-
-    if not chosen:
-        # pick_latest_gpkg refuses to redirect when the configured file itself is
-        # missing. Say so out loud — that is a real misconfiguration (the download
-        # below will fail), just not one this function is allowed to guess its way out of.
-        if family and configured_path not in family:
-            print(f"  WARN: configured '{configured_path}' is not in MinIO. Same-family "
-                  f"files exist ({sorted(family)}) but auto-redirect requires the "
-                  f"configured file to exist — fix PROJECTS/ALTERNATE_GPKGS instead.")
-        return configured_path
-
-    if chosen == configured_path:
-        return configured_path
-
-    print(f"  REDIRECT: configured '{configured_path}' ({family.get(configured_path)}) is "
-          f"no longer the newest in its family — reading '{chosen}' ({chosen_version}) "
-          f"instead. Family: {sorted(family)}")
-    return chosen
-
-
-def minio_download_latest(qf_project_id, gpkg_path, dest_path):
-    """Download the latest version of a GPKG from MinIO."""
-    try:
-        versions = minio_list_gpkg_versions(qf_project_id, gpkg_path)
-        if not versions:
-            return None, None
-        latest = versions[-1]
-
-        # Download
-        src = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/{latest}"
-        dl = subprocess.run(
-            ["docker", "exec", "qfieldcloud-minio-1", "mc", "cat", src],
-            capture_output=True, timeout=30,
-        )
-        if dl.returncode != 0 or len(dl.stdout) < 1000:
-            return None, None
-
-        with open(dest_path, "wb") as f:
-            f.write(dl.stdout)
-        return latest, len(dl.stdout)
-
-    except Exception as e:
-        print(f"    MinIO error: {e}")
-        return None, None
-
-
-def minio_resolve_photo_version(qf_project_id, dcim_path):
-    """Resolve DCIM/filename.jpg to its latest versioned MinIO path."""
-    prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{dcim_path}/"
-    try:
-        result = subprocess.run(
-            ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", prefix],
-            capture_output=True, text=True, timeout=10,
-        )
-        if result.returncode != 0 or not result.stdout.strip():
-            return None
-
-        # Use STANDARD-marker parsing to handle filenames containing spaces.
-        versions = []
-        for line in result.stdout.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            std_idx = line.find(" STANDARD ")
-            if std_idx == -1:
-                continue
-            ver = line[std_idx + len(" STANDARD "):].strip().rstrip("/")
-            if ver:
-                versions.append(ver)
-        if not versions:
-            return None
-
-        versions.sort()
-        return f"projects/{qf_project_id}/files/{dcim_path}/{versions[-1]}"
-    except Exception:
-        return None
 
 
 # ── Main extraction ───────────────────────────────────────────────────────────
