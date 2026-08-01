@@ -207,11 +207,37 @@ describe('migration 472 — v_pole_planning', () => {
       expect(Number(rows[0]!.n)).toBe(1);
     });
 
-    it('picks the duplicate deterministically (lowest zone/PON, non-NULL preferred)', async () => {
+    it('resolves the duplicate deterministically', async () => {
       const [row] = await q<{ zone_no: number; pon_no: number }>(
         `SELECT zone_no, pon_no FROM ${SCHEMA}.v_pole_planning WHERE pole_number = 'BOTH.AGREE'`
       );
       expect(row).toEqual({ zone_no: 7, pon_no: 64 });
+    });
+
+    it('merges a SPLIT duplicate per column rather than picking one whole row', async () => {
+      // The reason the dedup is `GROUP BY ... min(col)` and not
+      // `DISTINCT ON (...) ORDER BY ...`. DISTINCT ON selects one entire row, so
+      // a duplicate whose non-NULL values are split across columns loses one of
+      // them: given (zone 3, pon NULL) and (zone NULL, pon 5) it returns
+      // (3, NULL) and silently discards pon 5 — which the dashboard's
+      // `pon_no IS NOT NULL` filter would then drop from its zone counts.
+      // min() ignores NULLs per column and keeps both. This test fails on a
+      // DISTINCT ON implementation.
+      await q(
+        `INSERT INTO ${SCHEMA}.sow_poles (project_id, pole_number, zone_no, pon_no) VALUES
+           ($1,'SPLIT.DUP', 3,    NULL),
+           ($1,'SPLIT.DUP', NULL, 5)`,
+        [PA]
+      );
+      try {
+        const rows = await q<{ zone_no: number; pon_no: number }>(
+          `SELECT zone_no, pon_no FROM ${SCHEMA}.v_pole_planning WHERE pole_number = 'SPLIT.DUP'`
+        );
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toEqual({ zone_no: 3, pon_no: 5 });
+      } finally {
+        await q(`DELETE FROM ${SCHEMA}.sow_poles WHERE pole_number='SPLIT.DUP'`);
+      }
     });
 
     it('does not break INSERT ... ON CONFLICT DO UPDATE — the real call-site shape', async () => {
