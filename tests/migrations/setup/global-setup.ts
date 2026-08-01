@@ -51,13 +51,21 @@ async function waitForReady(url: string, timeoutMs = 60_000): Promise<void> {
   const start = Date.now();
   let lastErr: unknown;
   while (Date.now() - start < timeoutMs) {
+    let pool: Pool | undefined;
     try {
-      const pool = new Pool({ connectionString: url, connectionTimeoutMillis: 1000 });
+      pool = new Pool({ connectionString: url, connectionTimeoutMillis: 1000 });
       await pool.query('SELECT 1');
       await pool.end();
       return;
     } catch (e) {
       lastErr = e;
+      // Close the failed pool before retrying; otherwise a slow start leaves
+      // ~120 short-lived pools for GC to deal with.
+      try {
+        await pool?.end();
+      } catch {
+        // Already unusable — nothing to release.
+      }
       await new Promise((r) => setTimeout(r, 500));
     }
   }
@@ -65,11 +73,18 @@ async function waitForReady(url: string, timeoutMs = 60_000): Promise<void> {
 }
 
 export async function setup() {
-  // Only ever our own run's leftovers (e.g. a re-run of the same CI attempt).
-  // Deliberately NOT a blanket sweep of the shared label — see RUN_ID above.
-  const stale = docker(['ps', '-aq', '--filter', `label=ff-migration-run=${RUN_ID}`])
-    .split('\n')
-    .filter(Boolean);
+  // Two sweeps, both safe under concurrency:
+  //   1. Our own run's leftovers (e.g. a re-run of the same CI attempt).
+  //   2. Any EXITED container from any run. A stopped container is by
+  //      construction not in use by a live sibling, so this cannot resurrect
+  //      the bug that a blanket label sweep caused — while still reaping
+  //      orphans left by a hard kill (SIGKILL/OOM/reboot), which this host has
+  //      a history of accumulating.
+  // Deliberately NOT a blanket sweep of running containers — see RUN_ID above.
+  const stale = [
+    ...docker(['ps', '-aq', '--filter', `label=ff-migration-run=${RUN_ID}`]).split('\n'),
+    ...docker(['ps', '-aq', '--filter', `label=${LABEL}`, '--filter', 'status=exited']).split('\n'),
+  ].filter(Boolean);
   for (const id of stale) {
     try {
       docker(['rm', '-f', id]);
