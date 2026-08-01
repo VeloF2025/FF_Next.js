@@ -33,6 +33,18 @@ STEP_2 = "2. During Photo - Add compaction photo if needed"
 STEP_7 = "7. After photo - Ensure you take a picture of the pole"
 
 
+def load_phases():
+    """Modules besides the extractor whose namespaces resolve patched names.
+
+    extract_project is a coordinator now: its I/O calls live in these modules, so
+    patching only the extractor would silently stop intercepting. qfield_gpkg_table
+    binds no patchable name today, but is listed so a stage moving there stays covered.
+    """
+    import qfield_extract_phases
+    import qfield_gpkg_table
+    return [qfield_extract_phases, qfield_gpkg_table]
+
+
 def load_extractor():
     """Import extract-gpkg-photos.py despite the hyphen (not a valid module name)."""
     path = os.path.join(SCRIPTS, "extract-gpkg-photos.py")
@@ -147,6 +159,12 @@ class Harness:
         self._linked = list(linked)
         self._saved = {}
         self.hierarchy_calls = []    # recorded so a scenario can assert the call happened
+        # {stub name: times invoked} — lets a scenario prove interception actually
+        # happened rather than assuming a green run means the stubs ran.
+        self.stub_calls = {}
+        # Every module whose namespace may resolve a patched name. extract_project is
+        # a coordinator now; its I/O calls resolve inside qfield_extract_phases.
+        self._patch_targets = [mod] + load_phases()
 
     def __enter__(self):
         m = self.mod
@@ -179,12 +197,40 @@ class Harness:
         return self
 
     def _patch(self, name, fn):
-        self._saved[name] = getattr(self.mod, name)
-        setattr(self.mod, name, fn)
+        """Patch `name` in EVERY module that binds it, and record each invocation.
+
+        CPython resolves a function's globals in the module where that function is
+        DEFINED, so patching only the extractor stops intercepting the moment a call
+        site moves into qfield_extract_phases (or any future module). Patch wherever
+        the name is bound.
+
+        Patching nothing is treated as an error, not a no-op: a silently unpatched
+        I/O call means the suite quietly starts hitting real MinIO and stops testing
+        what it claims to. `getattr` without a default would already raise here, but
+        that is luck rather than intent — this makes it explicit.
+        """
+        targets = [m for m in self._patch_targets if hasattr(m, name)]
+        if not targets:
+            raise AssertionError(
+                f"{name!r} is bound in none of "
+                f"{[getattr(m, '__name__', '?') for m in self._patch_targets]} — "
+                "the harness would silently fail to intercept it. If the call site "
+                "moved to a new module, add that module to _patch_targets."
+            )
+
+        def recording(*a, **kw):
+            self.stub_calls.setdefault(name, 0)
+            self.stub_calls[name] += 1
+            return fn(*a, **kw)
+
+        for m in targets:
+            self._saved.setdefault(name, []).append((m, getattr(m, name)))
+            setattr(m, name, recording)
 
     def __exit__(self, *exc):
-        for name, orig in self._saved.items():
-            setattr(self.mod, name, orig)
+        for name, entries in self._saved.items():
+            for mod, orig in entries:
+                setattr(mod, name, orig)
         try:
             os.unlink(self.gpkg_file)
             os.rmdir(self.tmpdir)

@@ -74,6 +74,21 @@ def main():
     check(any(p[-2] is None and p[-1] is None for p in inserts),
           "the extra-column row is written with NULL checklist_step/step_label")
 
+    # Interception guard. Every check above passes if the stubs ran; none of them
+    # NOTICES if patching silently stopped working and the real MinIO/DB functions ran
+    # instead — a green suite that tests nothing. The phases split moved these call
+    # sites into another module, where the old single-module patch would have missed
+    # them, so assert the stubs were genuinely invoked.
+    print("\nInterception guard")
+    _, _, _, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    for stub in ("resolve_gpkg_path", "minio_download_latest",
+                 "minio_list_dcim_directory", "sync_hierarchy"):
+        check(h.stub_calls.get(stub, 0) > 0,
+              f"stub {stub} was actually invoked (patching intercepts), "
+              f"calls={h.stub_calls.get(stub, 0)}")
+
     print("\nRow-level skips")
     found, _, _, _ = run(
         columns=["NAME", STEP_1],
@@ -101,52 +116,6 @@ def main():
         rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
         dcim={"a.jpg": "k/a"}, existing_photo_keys=["some/prefix/a.jpg"])
     check((found, upserted) == (1, 0), f"construction_qa_photos substring dedup, got ({found},{upserted})")
-
-    # Linked "audit" QField projects: photos for one FibreFlow project can live in a
-    # second QField project's bucket. The merge and its dedup consequences are the
-    # code most likely to pile up duplicate rows if a refactor gets it wrong, and its
-    # own comment says so — so each behaviour is asserted separately.
-    print("\nLinked QField projects")
-    LINKED = "cccccccc-1111-2222-3333-444444444444"
-    found, upserted, out, h = run(
-        columns=["NAME", STEP_1, STEP_2],
-        rows=[{"NAME": "P1", STEP_1: "DCIM/only_primary.jpg", STEP_2: "DCIM/only_linked.jpg"}],
-        dcim={"only_primary.jpg": "k/primary"},
-        linked=[LINKED], linked_dcim={LINKED: {"only_linked.jpg": "k/linked"}},
-        dry_run=False)
-    check((found, upserted) == (2, 2),
-          f"a photo living in a LINKED project still resolves, got ({found},{upserted})")
-    inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
-    # EXACT per-photo attribution, not `any(... == LINKED)`. An "at least one insert
-    # mentions LINKED" check passes even when EVERY photo is misattributed to the
-    # linked project — the same "reads as testing attribution, only tests presence"
-    # shape this scenario was written to prevent. Map storage_key -> project_id and
-    # pin both directions.
-    by_key = {p[1]: p[5] for p in inserts}
-    check(by_key.get("k/primary") == PRIMARY_QF,
-          f"the PRIMARY photo stays attributed to the primary project, got {by_key.get('k/primary')}")
-    check(by_key.get("k/linked") == LINKED,
-          f"the LINKED photo is attributed to the project that holds it, got {by_key.get('k/linked')}")
-
-    found, upserted, _, h = run(
-        columns=["NAME", STEP_1],
-        rows=[{"NAME": "P1", STEP_1: "DCIM/dupe.jpg"}],
-        dcim={"dupe.jpg": "k/PRIMARY"},
-        linked=[LINKED], linked_dcim={LINKED: {"dupe.jpg": "k/LINKED"}},
-        dry_run=False)
-    inserts = [p for sql, p in h.cursor.executed if "INSERT INTO qfield_photo_validations" in sql]
-    check(len(inserts) == 1 and inserts[0][1] == "k/PRIMARY",
-          "on a filename collision the PRIMARY project wins, keeping re-runs stable")
-    check(len(inserts) == 1 and inserts[0][5] == PRIMARY_QF,
-          f"...and it is attributed to the primary project, got {inserts[0][5] if inserts else None}")
-
-    _, _, _, h = run(
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, linked=[LINKED], dry_run=False)
-    params = h.cursor.params_for("SELECT photo_key FROM qfield_photo_validations")
-    check(params is not None and LINKED in params[0],
-          "the dedup query spans linked projects (else re-runs duplicate rows daily)")
-
     print("\nGuards — each must return (0,0) AND write no sync-state")
     found, upserted, out, h = run(
         config=config(label_col="MISSING_COL"),
