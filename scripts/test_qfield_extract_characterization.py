@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from qfield_extract_testkit import (  # noqa: E402
-    PRIMARY_QF, STEP_1, STEP_2, STEP_7, Harness, config, load_extractor,
+    OPTICAL_1, PRIMARY_QF, STEP_1, STEP_2, STEP_7, Harness, config, load_extractor,
 )
 
 MOD = load_extractor()
@@ -98,6 +98,56 @@ def main():
         check(h.stub_calls.get(stub, 0) > 0,
               f"stub {stub} was actually invoked (patching intercepts), "
               f"calls={h.stub_calls.get(stub, 0)}")
+
+    # Optical rows are written as joint/dome_joint instead of pole/pole_installation.
+    # 7 registered projects have optical audits, and this mapping had NO coverage —
+    # hardcoding it to the civil values passed every suite. Note dry_run cannot reach
+    # it (the insert is short-circuited), so the golden --dry-run capture is
+    # structurally blind here too; this scenario must run non-dry.
+    found, upserted, _, h = run(
+        columns=["NAME", OPTICAL_1, STEP_1],
+        rows=[{"NAME": "P1", OPTICAL_1: "DCIM/dome.jpg", STEP_1: "DCIM/civil.jpg"}],
+        dcim={"dome.jpg": "k/dome", "civil.jpg": "k/civil"}, dry_run=False)
+    check((found, upserted) == (2, 2), f"optical + civil both ingest, got ({found},{upserted})")
+    by_key = {p[1]: (p[3], p[4]) for sql, p in h.cursor.executed
+              if "INSERT INTO qfield_photo_validations" in sql}
+    check(by_key.get("k/dome") == ("joint", "dome_joint"),
+          f"an optical photo is written as joint/dome_joint, got {by_key.get('k/dome')}")
+    check(by_key.get("k/civil") == ("pole", "pole_installation"),
+          f"a civil photo stays pole/pole_installation, got {by_key.get('k/civil')}")
+
+    # The extra-column loop is a near-copy of the step-column loop, and coverage had
+    # been written against the step copy only — a reviewer found the dedup checks
+    # untested, and sweeping every guard in that loop found four more. Each guard below
+    # fails independently if the extra-column copy loses it.
+    print("\nExtra-column loop guards (the second, near-identical copy)")
+    EX = "Pole Photo"
+    found, upserted, _, _ = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"}, existing_keys=["k/e"])
+    check((found, upserted) == (1, 0), f"extra: exact-key dedup, got ({found},{upserted})")
+
+    found, upserted, _, _ = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"},
+        existing_keys=["projects/x/files/DCIM/e.jpg/v20260101000000-deadbeef"])
+    check((found, upserted) == (1, 0), f"extra: versioned-filename dedup, got ({found},{upserted})")
+
+    found, upserted, _, _ = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"}, existing_photo_keys=["some/prefix/e.jpg"])
+    check((found, upserted) == (1, 0), f"extra: construction_qa_photos dedup, got ({found},{upserted})")
+
+    found, upserted, out, _ = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/gone.jpg"}], dcim={})
+    check((found, upserted) == (1, 0), f"extra: absent photo not upserted, got ({found},{upserted})")
+    check("SKIP (not in MinIO)" in out, "extra: absent photo is reported")
+
+    _, _, _, h = run(
+        columns=["NAME", EX], rows=[{"NAME": "P1", EX: "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"}, dry_run=True)
+    check(not h.cursor.ran("INSERT INTO qfield_photo_validations"),
+          "extra: dry-run inserts nothing")
 
     print("\nRow-level skips")
     found, _, _, _ = run(
