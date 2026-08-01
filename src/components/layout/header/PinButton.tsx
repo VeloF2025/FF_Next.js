@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { Pin, X, Calendar, Loader2 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { cn } from '@/utils/cn';
+import { canonicalizePath } from '@/modules/navigation/legacyPaths';
 
 interface PinButtonProps {
   className?: string;
@@ -26,7 +27,13 @@ export function PinButton({ className }: PinButtonProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const search = searchParams?.toString();
-  const currentRoute = search ? `${pathname}?${search}` : (pathname || '/');
+  // Canonicalise so a legacy alias pins as the page it actually is. Without
+  // this, pinning from /projects/health-safety stores a route that reads as
+  // "not pinned" from /health-safety, letting one page collect two pins. Safe
+  // because canonicalizePath only rewrites known aliases that render the same
+  // page — it is not a general URL normaliser.
+  const rawRoute = search ? `${pathname}?${search}` : (pathname || '/');
+  const currentRoute = canonicalizePath(rawRoute);
   const isDashboard = currentRoute === '/dashboard' || currentRoute === '/';
 
   // Check if current route is pinned

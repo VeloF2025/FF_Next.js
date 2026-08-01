@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 // import { ConnectionStatus } from '@/components/realtime/ConnectionStatus'; // Disabled - WebSocket not configured
 import dynamic from 'next/dynamic';
+import { canonicalizePath } from '@/modules/navigation/legacyPaths';
 
 // Dynamically import components that use router to avoid SSR issues
 const Sidebar = dynamic(() => import('./Sidebar').then(mod => ({ default: mod.Sidebar })), { ssr: false });
@@ -86,7 +87,11 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
 
   // Get page metadata based on current route
   const getPageMeta = (): PageMeta => {
-    const path = pathname || '/';
+    // Canonicalise so a legacy alias resolves to the module it actually renders.
+    // Previously this chain carried its own ad-hoc `!path.includes(...)` guard,
+    // a second uncoordinated place holding legacy-alias knowledge; whoever adds
+    // the next alias would have had to know to update it too.
+    const path = canonicalizePath(pathname || '/');
     const segments = path.split('/').filter(Boolean);
 
     // Dashboard
@@ -97,12 +102,9 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
-    // Project Management.
-    // `/projects/health-safety` still SERVES the H&S dashboard (it cannot
-    // redirect — see that page's header for the cached-308 reason), so it must
-    // not be captured here and labelled "Projects". It falls through to the
-    // health-safety branch below.
-    if (path.includes('projects') && !path.includes('health-safety')) {
+    // Project Management. `/projects/health-safety` renders the H&S dashboard
+    // but is canonicalised above, so it never reaches here.
+    if (path.includes('projects')) {
       if (segments.includes('create')) {
         return {
           title: 'Create Project',

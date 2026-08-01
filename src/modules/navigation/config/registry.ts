@@ -4,6 +4,7 @@
  */
 
 import type { ModuleId, ModuleNavigationConfig, TabConfig } from '../types';
+import { canonicalizePath } from '../legacyPaths';
 
 /** Module configuration registry */
 const moduleRegistry = new Map<ModuleId, ModuleNavigationConfig>();
@@ -34,7 +35,10 @@ export function getAllModuleConfigs(): ModuleNavigationConfig[] {
  */
 export function getModuleConfigByPath(path: string): ModuleNavigationConfig | undefined {
   // Normalize path - remove trailing slash, query params
-  const normalizedPath = path.split('?')[0]?.replace(/\/$/, '') || '/';
+  // Resolve legacy aliases first: /projects/health-safety RENDERS the H&S
+  // dashboard (it cannot redirect — see that page), so without this it matches
+  // the Projects module by basePath prefix and nothing H&S ever activates.
+  const normalizedPath = canonicalizePath(path.split('?')[0] || '/').replace(/\/$/, '') || '/';
 
   for (const config of moduleRegistry.values()) {
     // Check base path
@@ -61,7 +65,10 @@ export function getActiveTabByPath(
   config: ModuleNavigationConfig,
   path: string
 ): TabConfig | undefined {
-  const normalizedPath = path.split('?')[0]?.replace(/\/$/, '') || '/';
+  // Resolve legacy aliases first: /projects/health-safety RENDERS the H&S
+  // dashboard (it cannot redirect — see that page), so without this it matches
+  // the Projects module by basePath prefix and nothing H&S ever activates.
+  const normalizedPath = canonicalizePath(path.split('?')[0] || '/').replace(/\/$/, '') || '/';
 
   // Check exact matches first
   for (const tab of config.tabs) {
@@ -103,8 +110,13 @@ export function getActiveSubTabByPath(
 ): TabConfig | undefined {
   if (!tab.subTabs?.length) return undefined;
 
-  const fullPath = path.split('?')[0] || '';
-  const queryString: string = path.includes('?') ? (path.split('?')[1] ?? '') : '';
+  // Same legacy-alias resolution as the two resolvers above. Dormant today
+  // (healthSafetyConfig declares no subTabs), but the moment a tab under an
+  // aliased module grows subTabs, the strip would go blank on the legacy URL —
+  // the exact bug canonicalizePath exists to prevent.
+  const canonical = canonicalizePath(path);
+  const fullPath = canonical.split('?')[0] || '';
+  const queryString: string = canonical.includes('?') ? (canonical.split('?')[1] ?? '') : '';
 
   // Check for query param matches (e.g., ?status=active)
   for (const subTab of tab.subTabs) {

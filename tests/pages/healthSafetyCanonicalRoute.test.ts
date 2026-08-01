@@ -75,12 +75,13 @@ describe('health & safety canonical route', () => {
 
   it('does not let the Projects breadcrumb capture the legacy H&S path', () => {
     // /projects/health-safety renders the dashboard rather than redirecting, so
-    // AppLayout's breadcrumb chain DOES run for it. The `projects` branch sits
-    // above the `health-safety` branch, and without a guard it would caption the
-    // H&S dashboard "Projects".
+    // AppLayout's breadcrumb chain DOES run for it. Its `projects` branch sits
+    // above the `health-safety` branch and would otherwise caption the H&S
+    // dashboard "Projects". Resolved by canonicalising the path once up front
+    // rather than by an ad-hoc guard on that branch — see
+    // src/modules/navigation/legacyPaths.ts.
     const src = readFileSync(join(process.cwd(), 'src/components/layout/AppLayout.tsx'), 'utf8');
-    const projectsBranch = src.match(/if \(path\.includes\('projects'\)[^)]*\)/);
-    expect(projectsBranch?.[0]).toContain("!path.includes('health-safety')");
+    expect(src).toMatch(/const path = canonicalizePath\(/);
   });
 
   it('does not bounce between the two trees via client-side navigation', () => {

@@ -9,6 +9,7 @@ import type { ThemeConfig } from '@/types/theme.types';
 import { CollapsibleSection } from './CollapsibleSection';
 import { useSectionCollapse } from './hooks/useSectionCollapse';
 import { useGroupCollapse } from './hooks/useGroupCollapse';
+import { canonicalizePath } from '@/modules/navigation/legacyPaths';
 
 interface NavigationMenuProps {
   visibleNavItems: NavSection[];
@@ -38,10 +39,13 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
   // Find active section for scrolling
   const activeSectionId = useMemo(() => {
     if (!pathname) return null;
+    // Legacy aliases render canonical pages; match the canonical path or the
+    // wrong section lights up. See modules/navigation/legacyPaths.
+    const navPath = canonicalizePath(pathname);
     for (const section of visibleNavItems) {
       for (const item of section.items) {
         if (!item.to) continue;
-        if (pathname === item.to || pathname.startsWith(item.to + '/')) {
+        if (navPath === item.to || navPath.startsWith(item.to + '/')) {
           return section.sectionId;
         }
       }
@@ -84,6 +88,8 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
       return result;
     }
 
+    const navPath = canonicalizePath(pathname);
+
     for (const section of visibleNavItems) {
       let bestMatch: string | null = null;
       let bestMatchLength = 0;
@@ -95,7 +101,7 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
             checkItem(subItem);
           }
         } else if (item.to) {
-          if (pathname === item.to || pathname.startsWith(item.to + '/')) {
+          if (navPath === item.to || navPath.startsWith(item.to + '/')) {
             // Prefer longer (more specific) matches
             if (item.to.length > bestMatchLength) {
               bestMatch = item.to;
@@ -235,7 +241,7 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
               if (item.isGroup && item.subItems) {
                 const groupExpanded = isGroupExpanded(item.label);
                 const hasActiveSubItem = item.subItems.some(
-                  sub => sub.to === activeItemPath || (sub.to && pathname?.startsWith(sub.to + '/'))
+                  sub => sub.to === activeItemPath || (sub.to && canonicalizePath(pathname ?? '').startsWith(sub.to + '/'))
                 );
 
                 // In collapsed sidebar mode, don't show groups - show subItems directly
