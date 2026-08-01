@@ -53,6 +53,49 @@ describe('/api/cortex-bridge/[...path]', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['literal dot', '.'],
+    ['literal dotdot', '..'],
+    ['decoded backslash', '\\evil'],
+    ['encoded dot', '%2e'],
+    ['double-encoded dot', '%252e'],
+    ['double-encoded slash', 'a%252fb'],
+  ])('rejects noncanonical fact child %s before fetching the bridge', async (_name, factId) => {
+    const { res, done } = run({
+      method: 'GET',
+      headers: { authorization: 'Bearer user-token' },
+      query: { path: ['api', 'facts', factId] },
+    });
+    await done;
+    expect(res._getStatusCode()).toBe(403);
+    expect(res._getJSONData()).toMatchObject({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Cortex Bridge request is not permitted',
+      },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('proxies a canonical hyphenated fact child', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    const { res, done } = run({
+      method: 'GET',
+      headers: { authorization: 'Bearer user-token' },
+      query: { path: ['api', 'facts', 'ops-fact-1'] },
+    });
+    await done;
+    expect(res._getStatusCode()).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${bridgeBase}/api/facts/ops-fact-1`,
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Authorization: 'Bearer user-token' }),
+      }),
+    );
+  });
+
   it('proxies allowed GET requests with bearer auth and query params intact', async () => {
     fetchMock.mockResolvedValueOnce(new Response('{"ok":true}', {
       status: 200,

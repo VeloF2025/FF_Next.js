@@ -30,15 +30,29 @@ function hasUnsafeDotSegment(req: NextApiRequest): boolean {
   return parts.some((part) => part === '.' || part === '..');
 }
 
+function isSafeSegment(segment: string | undefined): segment is string {
+  return typeof segment === 'string'
+    && segment.length > 0
+    && segment !== '.'
+    && segment !== '..'
+    && !segment.includes('/')
+    && !segment.includes('\\')
+    && !segment.includes('%');
+}
+
 function isAllowedRequest(method: string, parts: string[]): boolean {
   const path = `/${parts.join('/')}`;
   const meetingId = parts[2];
   const isMeetingId = typeof meetingId === 'string' && /^mtg_[A-Za-z0-9_-]+$/.test(meetingId);
+  const isFactChild = parts.length === 3
+    && parts[0] === 'api'
+    && parts[1] === 'facts'
+    && isSafeSegment(parts[2]);
   if (method === 'GET') {
     return path === '/api/query'
       || path === '/api/timeline'
       || path === '/api/facts'
-      || /^\/api\/facts\/[^/]+$/.test(path)
+      || isFactChild
       || path === '/api/entity-profile'
       || (parts.length === 3 && parts[0] === 'api' && parts[1] === 'meetings' && isMeetingId)
       || (parts.length === 4 && parts[0] === 'api' && parts[1] === 'meetings' && isMeetingId && parts[3] === 'pack');
