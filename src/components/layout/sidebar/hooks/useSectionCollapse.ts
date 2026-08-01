@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import type { NavSection } from '../types';
+import { canonicalizePath } from '@/modules/navigation/legacyPaths';
 
 const STORAGE_KEY = 'ff-sidebar-expanded-sections';
 
@@ -145,7 +146,8 @@ function findSectionByPath(sections: NavSection[], pathname: string | null): str
 
     for (const item of section.items) {
       if (!item.to) continue; // Skip items without a path
-      if (pathname === item.to || pathname.startsWith(item.to + '/')) {
+      const navPath = canonicalizePath(pathname);
+      if (navPath === item.to || navPath.startsWith(item.to + '/')) {
         return section.sectionId;
       }
     }

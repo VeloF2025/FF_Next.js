@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import type { NavItem } from '../types';
+import { canonicalizePath } from '@/modules/navigation/legacyPaths';
 
 const STORAGE_KEY = 'ff-sidebar-expanded-groups';
 
@@ -93,7 +94,8 @@ export function useGroupCollapse({ items, sectionId }: UseGroupCollapseOptions):
     for (const item of currentItems) {
       if (item.isGroup && item.subItems) {
         for (const subItem of item.subItems) {
-          if (subItem.to && (pathname === subItem.to || pathname.startsWith(subItem.to + '/'))) {
+          const navPath = canonicalizePath(pathname);
+          if (subItem.to && (navPath === subItem.to || navPath.startsWith(subItem.to + '/'))) {
             const groupKey = `${sectionId}:${item.label}`;
             setExpandedGroups(prev => {
               if (prev.has(groupKey)) return prev;
