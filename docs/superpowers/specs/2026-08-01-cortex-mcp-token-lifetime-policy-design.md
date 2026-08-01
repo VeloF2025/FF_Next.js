@@ -8,7 +8,10 @@
 
 The normal Cortex connector flow now uses FibreFlow login and consent. It mints a
 90-day, read-only Cortex bearer server-side and never asks the user to paste a token.
-That remains the primary workflow.
+That remains the primary workflow. This is the underlying bearer lifetime, not the
+outer OAuth grant lifetime: the Cortex refresh grant expires after 30 days, at which
+point the user must complete browser reauthorization even though the bearer claim is
+90 days.
 
 FibreFlow also retains an authenticated `POST /api/cortex/mcp-token` operator path
 for clients that cannot complete browser OAuth. At approval time, the library already
@@ -21,7 +24,8 @@ authorized user, including one year or no expiry.
 
 ## Decision
 
-1. Keep normal Cortex browser OAuth fixed at 90 days.
+1. Keep the underlying bearer for normal Cortex browser OAuth fixed at 90 days and
+   the outer refresh grant fixed at 30 days with browser reauthorization on expiry.
 2. Add collapsed Advanced manual-token controls to `/connections/cortex`.
 3. Offer `30 days`, `90 days`, `1 year`, and `Never expires` to every user who
    already passes FibreFlow authentication and `cortex.review:view`.
@@ -142,22 +146,35 @@ All code changes go through coordinated FibreFlow and Cortex PRs. No merge,
 configuration change, restart, or deployment is authorized until review is complete
 and Hein explicitly approves the relevant rollout step.
 
-When rollout is approved, Cortex's authoritative read-only enforcement deploys to dev
-first and must pass real negative mutation, routing-near-miss, safe-answer,
-full-scope-derived-store, and immediate-revocation tests. Only then may the FibreFlow
-UI/proxy deploy to dev through `scripts/deploy-local.sh` for the visibility-only
-browser flow and an isolated real connector test. Production remains a separate
-explicit approval gate, in the same Cortex-first order.
+When rollout is approved, an isolated Agent Executor on `17406` deploys to dev proof
+first. The isolated Bridge must use `EXECUTOR_URL=http://127.0.0.1:17406`, never
+production `7406`; isolated Remote MCP uses its own process, unique OAuth store, and
+dev public base. Then Cortex's authoritative Bridge/Remote enforcement must pass real
+negative mutation, routing-near-miss, safe-answer, full-scope-derived-store, and
+immediate-revocation tests. Only then may the FibreFlow UI/proxy deploy to dev through
+`scripts/deploy-local.sh` for the visibility-only browser flow. Production remains a
+separate explicit approval gate in the same Executor → Bridge/Remote MCP → FibreFlow
+order.
 
-Rollback removes the FibreFlow UI/proxy exposure before reverting Cortex enforcement;
-each repository uses its supported deployment path. Existing OAuth grants and
-already-issued manual tokens remain governed by their JWT claims and the existing
-revocation epoch; rollback does not silently revoke users.
+Before either rollout, compare callback secrets by non-reversible hash: FibreFlow and
+Remote MCP must match, while `CORTEX_MCP_CALLBACK_SECRET` and
+`FF_MCP_CALLBACK_SECRET` must differ. Require hash agreement for FibreFlow/Bridge
+`BRIDGE_JWT_SECRET` and exact `BRIDGE_JWT_KID` agreement when configured. Read back
+the complete effective `CORTEX_SUPER_ADMIN_EMAILS` set, prove it includes
+`lew@velocityfibre.co.za`, and abort if any previous entry was dropped. Record only
+verdicts, never secret or key values.
+
+Rollback reverses exposure first: remove the FibreFlow UI/proxy, then unwind
+Bridge/Remote MCP, and roll back Agent Executor last if needed. Each repository uses
+its supported deployment path. Existing OAuth grants and already-issued manual tokens
+remain governed by their JWT claims and the existing revocation epoch; rollback does
+not silently revoke users.
 
 ## Non-goals
 
 - Changing Lew's full-tenant Cortex scope.
-- Changing normal OAuth lifetime from 90 days.
+- Changing the normal underlying bearer from 90 days or the outer refresh grant from
+  its 30-day browser-reauthorization boundary.
 - Adding write-capable MCP tools.
 - Persisting or listing Cortex JWT values in FibreFlow.
 - Changing FibreFlow Operations MCP token lifetimes.

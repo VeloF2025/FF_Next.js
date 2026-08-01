@@ -4,7 +4,7 @@
 
 **Goal:** Let Claude authorize the read-only Cortex remote MCP connector through a verified FibreFlow login and consent screen, while preserving FibreFlow MCP RBAC, current Cortex OAuth grants, ordinary-user ACL narrowing, and an unlinked manual rollback route.
 
-**Architecture:** Cortex remains its own OAuth authorization server and records a ten-minute pending request, but redirects the browser to FibreFlow for authentication and consent. FibreFlow mints a 90-day Cortex bearer for the verified session email and hands it to Cortex over loopback with a connector-specific shared secret; Cortex validates the bearer against Bridge before atomically converting the pending request into an OAuth code. FibreFlow connector setup moves to `/connections/*`, while `/cortex` remains the knowledge search/review surface.
+**Architecture:** Cortex remains its own OAuth authorization server and records a ten-minute pending request, but redirects the browser to FibreFlow for authentication and consent. FibreFlow mints a 90-day Cortex bearer for the verified session email and hands it to Cortex over loopback with a connector-specific shared secret; Cortex validates the bearer against Bridge before atomically converting the pending request into an OAuth code. The outer Cortex OAuth refresh grant expires after 30 days, so the user must complete browser reauthorization then even though that underlying bearer has a 90-day claim. FibreFlow connector setup moves to `/connections/*`, while `/cortex` remains the knowledge search/review surface.
 
 **Tech Stack:** Next.js 14 Pages Router, React 18, TypeScript, FibreFlow PostgreSQL RBAC middleware, Vitest/Testing Library, Playwright, Python 3.11+, FastMCP OAuth provider APIs, Starlette, Pytest, systemd user services.
 
@@ -29,7 +29,7 @@
   be made real; assert observable output and captured wire behavior.
 - FibreFlow verification includes focused Vitest, existing MCP consent/proxy suites, `npm run ci:quick`, `npm run build`, desktop/mobile Playwright, and a real dev connector flow.
 - Cortex verification includes focused Pytest, the exact read-only tool test, Ruff, ty, package import checks, and the repository CI script.
-- Real dev OAuth uses Bridge port `17403`, Remote MCP port `17414`, a unique non-production OAuth store, and `https://dev.fibreflow.app/api/cortex-remote-mcp` as its public base. Never repoint port `7414` or the production public authorization flow.
+- Real dev OAuth uses an isolated Agent Executor on `17406`, an isolated Bridge on `17403` with `EXECUTOR_URL=http://127.0.0.1:17406`, Remote MCP on `17414`, a unique non-production OAuth store, and `https://dev.fibreflow.app/api/cortex-remote-mcp` as its public base. The isolated Bridge must never call the production executor on `7406`; never repoint production port `7414`, its OAuth store, or its public authorization flow.
 - Do not modify live environment files, restart services, deploy production, or change Lew's live access until both PRs are reviewed and Hein explicitly approves that rollout gate.
 - FibreFlow production deployment is after hours only and always uses `bash scripts/deploy-local.sh production`; Cortex production deployment uses its supported `scripts/deploy_bridge.sh` path.
 - All source changes go through the coordinated FibreFlow and Cortex PRs.
@@ -1794,7 +1794,7 @@ Report:
 
 - both PR URLs and review status;
 - exact test/build results;
-- isolated ports `17403`/`17414`;
+- isolated ports `17406`/`17403`/`17414` for Executor/Bridge/Remote MCP;
 - proposed untracked dev env file locations;
 - confirmation that production port `7414`, production OAuth store, live environment files, services, and Lew's live allowlist are unchanged.
 
@@ -1806,10 +1806,11 @@ Wait for explicit approval before Task 9.
 - Untracked after approval: `~/.hermes/cortex-consent-dev.env` with mode `0600`
 - Untracked after approval: a unique OAuth store under `~/.hermes/`
 - Dev-only after approval: FibreFlow dev environment values for the callback secret and isolated upstream
+- Transient after approval: isolated Agent Executor, Bridge, and Remote MCP user units
 - No tracked source changes unless the proof finds a defect
 
 **Interfaces:**
-- Consumes: reviewed branches, `https://dev.fibreflow.app/api/cortex-remote-mcp/mcp`, isolated Bridge `127.0.0.1:17403`, isolated Remote MCP `127.0.0.1:17414`, a real Claude custom connector, Lew, and one ordinary user.
+- Consumes: reviewed branches, `https://dev.fibreflow.app/api/cortex-remote-mcp/mcp`, isolated Agent Executor `127.0.0.1:17406`, isolated Bridge `127.0.0.1:17403`, isolated Remote MCP `127.0.0.1:17414`, a unique OAuth store/public base, a real Claude custom connector, Lew, and one ordinary user.
 - Produces: evidence of no-token browser consent, tenant-vs-ACL scope, unchanged FibreFlow MCP RBAC, reconnect/revoke behavior, and responsive screenshots.
 
 - [ ] **Step 0: Verify Lew's FibreFlow identity and consent permission**
@@ -1837,19 +1838,44 @@ CORTEX_REMOTE_MCP_PUBLIC_BASE=https://dev.fibreflow.app/api/cortex-remote-mcp
 CORTEX_FF_APP_BASE=https://dev.fibreflow.app
 CORTEX_REMOTE_MCP_STORE=/home/hein/.hermes/cortex-remote-mcp-oauth-consent-dev.json
 CORTEX_BRIDGE_URL=http://127.0.0.1:17403
+EXECUTOR_PORT=17406
+EXECUTOR_URL=http://127.0.0.1:17406
+BRIDGE_URL=http://127.0.0.1:17403
 ```
 
-Set mode `0600`. Confirm the value differs from `FF_MCP_CALLBACK_SECRET` by comparing hashes, not printing either value.
+Set mode `0600`. Compare non-reversible hashes of the callback secret loaded by FibreFlow dev and isolated Remote MCP and require equality. Separately compare it with `FF_MCP_CALLBACK_SECRET` and require inequality. Record only the equality/inequality verdicts; never print either secret.
 Before either isolated service starts, also compare non-reversible hashes for
 FibreFlow dev's `BRIDGE_JWT_SECRET` and the isolated Bridge's loaded
 `BRIDGE_JWT_SECRET`, and compare `BRIDGE_JWT_KID` when configured. Abort on
 either mismatch; never print the underlying values.
 
-- [ ] **Step 2: Start an isolated read-only Bridge process**
+- [ ] **Step 2: Start an isolated Agent Executor, then the read-only Bridge**
+
+Start a transient executor from the clean Cortex worktree before Bridge. Load only
+the approved untracked executor environment followed by the consent-dev overrides;
+the latter fixes `EXECUTOR_PORT=17406` and `BRIDGE_URL=http://127.0.0.1:17403`.
+Never bind or call production executor port `7406` during this proof.
+
+```bash
+systemd-run --user --unit=cortex-agent-executor-consent-dev --collect \
+  --property=WorkingDirectory=/home/hein/Workspace/Cortex-cortex-mcp-ff-consent/apps/agent_executor \
+  --property=EnvironmentFile=/home/hein/Workspace/Cortex/.env \
+  --property=EnvironmentFile=/home/hein/.hermes/cortex-consent-dev.env \
+  /home/hein/.bun/bin/bun run src/server.ts
+
+curl --fail --silent http://127.0.0.1:17406/health
+systemctl --user is-active cortex-agent-executor-consent-dev
+systemctl --user show cortex-agent-executor.service -p MainPID -p ActiveEnterTimestamp
+```
+
+Expected: the isolated executor is healthy on `17406`; the production executor PID
+and start time are unchanged.
 
 Use a transient user unit from the clean Cortex worktree, loading the existing untracked Bridge environment first and the consent-dev overrides second. The override's `CORTEX_SUPER_ADMIN_EMAILS` is the complete existing list plus `lew@velocityfibre.co.za`; verify the complete list before starting. Do not edit `~/.hermes/.env` and do not restart `cortex-bridge`.
 Verify that the isolated process loads `CORTEX_INSTANCE_ID=velocity-fibre`;
-abort before testing if it does not.
+abort before testing if it does not. Independently read back the complete effective
+`CORTEX_SUPER_ADMIN_EMAILS` set, confirm `lew@velocityfibre.co.za` is present, and
+abort if any pre-existing entry was dropped.
 
 Start the isolated process:
 
@@ -1871,6 +1897,8 @@ systemctl --user is-active cortex-bridge
 ```
 
 Expected: isolated and live Bridge units are both active; live Bridge PID/start time is unchanged.
+Prove from the isolated Bridge environment and a representative request that its
+executor target is `http://127.0.0.1:17406`, never production `7406`.
 
 - [ ] **Step 3: Start the isolated Remote MCP process**
 
@@ -1961,14 +1989,14 @@ Run the existing FibreFlow MCP consent/proxy tests again after the live proof.
 - Revoke a FibreFlow Operations MCP session from `/connections/fibreflow` and prove that session stops authorizing.
 - Confirm no bearer appears in browser history, page source, network response bodies, Next.js logs, Remote MCP logs, or screenshots.
 
-- [ ] **Step 9: Stop only the two isolated transient units and restore dev**
+- [ ] **Step 9: Stop only the three isolated transient units and restore dev**
 
 With Hein's rollout approval covering cleanup:
 
 - run
-  `systemctl --user stop cortex-remote-mcp-consent-dev cortex-bridge-consent-dev`;
+  `systemctl --user stop cortex-remote-mcp-consent-dev cortex-bridge-consent-dev cortex-agent-executor-consent-dev`;
 - restore FibreFlow dev to its previously recorded branch/upstream values through the supported dev deploy path;
-- verify production Remote MCP and Bridge PIDs/start times stayed unchanged throughout;
+- verify production Agent Executor, Bridge, and Remote MCP PIDs/start times stayed unchanged throughout;
 - retain the isolated store only as long as review evidence requires, then remove it through an explicitly approved recoverable cleanup.
 
 - [ ] **Step 10: Fix any discovered defect through both PR gates**
@@ -1981,7 +2009,7 @@ If live proof exposes a defect, reproduce it in Vitest/Pytest/Playwright first, 
 - Merge: coordinated Cortex and FibreFlow PRs
 - Approved untracked production envs: add the shared dedicated callback secret
 - Approved Cortex allowlist: append Lew while retaining all current entries
-- Services: FibreFlow production, Cortex Remote MCP, then Cortex Bridge for allowlist activation
+- Services: Cortex Agent Executor, Cortex Bridge/Remote MCP, then FibreFlow production
 
 **Interfaces:**
 - Consumes: reviewed/green PRs, successful isolated proof, after-hours window, and Hein's explicit production approval.
@@ -2006,7 +2034,7 @@ Use `gh pr merge` with the repository-approved merge method. Re-read `origin/mas
 
 - [ ] **Step 3: Configure the dedicated production callback secret before code restarts**
 
-Place the same newly generated `CORTEX_MCP_CALLBACK_SECRET` in the FibreFlow production server env and Cortex Remote MCP's loaded untracked env. Verify it differs from `FF_MCP_CALLBACK_SECRET` by hash comparison. Do not print or log the value.
+Place the same newly generated `CORTEX_MCP_CALLBACK_SECRET` in the FibreFlow production server env and Cortex Remote MCP's loaded untracked env. Compare non-reversible hashes and require equality between those two loaded values; separately require inequality with `FF_MCP_CALLBACK_SECRET`. Record only the two verdicts. Also require hash agreement for FibreFlow's and Bridge's loaded `BRIDGE_JWT_SECRET`, plus exact `BRIDGE_JWT_KID` agreement when configured. Abort on any mismatch; do not print or log underlying values.
 
 Read the current production `FF_MCP_TOKEN_UI_ENABLED` value. The
 `/connections/fibreflow` session list/revoke/Advanced controls require it to be
@@ -2014,22 +2042,24 @@ Read the current production `FF_MCP_TOKEN_UI_ENABLED` value. The
 Hein's production approval and verify it after deployment. Do not change it as
 an implicit side effect.
 
-- [ ] **Step 4: Deploy FibreFlow production first**
+- [ ] **Step 4: Deploy Cortex Agent Executor first**
 
 After hours and with explicit approval:
 
 ```bash
-bash scripts/deploy-local.sh production
+bash scripts/deploy_bridge.sh --units cortex-agent-executor
 ```
 
-Verify production health, `/connections/*`, `/cortex`, and `/api/cortex/mcp-consent` method/auth failure behavior. The new routes are inert until a user starts authorization.
+The supported script must load the executor unit from the `Cortex-bridge` deploy
+clone, restart only the selected user unit, prove its deploy-clone working directory,
+fresh/stable PID, and `GET http://127.0.0.1:7406/health` success.
 
-- [ ] **Step 5: Deploy Cortex Remote MCP through the supported script**
+- [ ] **Step 5: Deploy Cortex Bridge and Remote MCP through the supported script**
 
 From merged Cortex `main`:
 
 ```bash
-bash scripts/deploy_bridge.sh --units cortex-remote-mcp
+bash scripts/deploy_bridge.sh --units cortex-bridge,cortex-remote-mcp
 ```
 
 Use `--force-hein-ok` only when Hein explicitly approved a daytime rollout. Verify metadata, service PID stability, loopback binding, public proxy reachability, existing OAuth access/refresh grant exchange, and the retained unlinked `/authorize/approve`.
@@ -2038,16 +2068,27 @@ Use `--force-hein-ok` only when Hein explicitly approved a daytime rollout. Veri
 
 Read the current `CORTEX_SUPER_ADMIN_EMAILS`, normalize/deduplicate it, append `lew@velocityfibre.co.za`, and independently read back the complete resulting set before restart. Abort if any prior entry is missing or `CORTEX_INSTANCE_ID` is not `velocity-fibre`.
 
-Restart only:
+Activate the allowlist through the supported Bridge path only:
 
 ```bash
-systemctl --user restart cortex-bridge
+bash scripts/deploy_bridge.sh --units cortex-bridge
 bash scripts/deploy_bridge.sh --verify-only --units cortex-bridge
 ```
 
 Do not restart unrelated Cortex units for the allowlist change.
 
-- [ ] **Step 7: Run production acceptance proof**
+- [ ] **Step 7: Deploy FibreFlow production last**
+
+After Cortex Executor, Bridge, Remote MCP, allowlist readback, and health gates pass:
+
+```bash
+bash scripts/deploy-local.sh production
+```
+
+Verify production health, `/connections/*`, `/cortex`, and `/api/cortex/mcp-consent`
+method/auth failure behavior. The new routes are inert until a user starts authorization.
+
+- [ ] **Step 8: Run production acceptance proof**
 
 - Lew connects via the published Cortex endpoint, signs into FibreFlow, consents, and retrieves cited full-tenant evidence without copying a token.
 - An ordinary employee follows the same flow and remains ACL-limited.
@@ -2056,13 +2097,14 @@ Do not restart unrelated Cortex units for the allowlist change.
 - Neither primary UI contains `/path/to/Cortex`, a local runtime command, or a Cortex bearer.
 - Disconnect/reconnect and FibreFlow session revoke behave as proven on dev.
 
-- [ ] **Step 8: Execute rollback in this order if any acceptance gate fails**
+- [ ] **Step 9: Execute rollback in this order if any acceptance gate fails**
 
-1. Restore Cortex normal authorization to the retained `/authorize/approve` implementation by reverting the Cortex PR and redeploying only `cortex-remote-mcp`.
-2. Revert/hide the FibreFlow consent and connections pages through a FibreFlow rollback PR and the supported production deploy script.
-3. Remove Lew from `CORTEX_SUPER_ADMIN_EMAILS` only if the access decision itself is being rolled back; preserve every unrelated entry and restart only Bridge.
-4. Leave existing OAuth store formats/grants and the FibreFlow MCP connector intact.
+1. Remove external exposure first: revert/hide the FibreFlow consent/proxy and connection pages through a FibreFlow rollback PR and the supported production deploy script.
+2. Restore Cortex normal authorization to the retained `/authorize/approve` implementation by reverting the Cortex PR and redeploying Bridge/Remote MCP.
+3. Remove Lew from `CORTEX_SUPER_ADMIN_EMAILS` only if the access decision itself is being rolled back; preserve every unrelated entry, read back the complete set, and restart only Bridge.
+4. Roll back the Agent Executor last if its deployment itself is defective; never restore external FibreFlow exposure before the Cortex chain is healthy again.
+5. Leave existing OAuth store formats/grants and the FibreFlow MCP connector intact.
 
-- [ ] **Step 9: Record final evidence**
+- [ ] **Step 10: Record final evidence**
 
 Record PRs/merge SHAs, deployments, service start times, health responses, test commands, screenshot locations, Lew-vs-ordinary scope proof, and whether rollback was exercised or only held ready. Never record token values, callback secrets, auth cookies, or credential-file contents.

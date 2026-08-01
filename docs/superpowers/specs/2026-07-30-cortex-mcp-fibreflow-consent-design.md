@@ -75,6 +75,9 @@ Claude custom connector
 
 The Cortex bearer travels only on the server-to-server loopback request. It is never
 returned by the FibreFlow API, placed in a redirect URL, rendered in HTML, or logged.
+The outer Cortex OAuth refresh grant expires after 30 days and then requires a new
+browser authorization. That 30-day reauthorization boundary still applies even
+though FibreFlow minted the underlying normal Cortex bearer with a 90-day claim.
 
 ## 6. FibreFlow changes
 
@@ -127,6 +130,13 @@ process memory/the failed loopback request and must not be echoed with the error
 The callback secret is stored only in the relevant server environment files. It is
 not the existing `FF_MCP_CALLBACK_SECRET`.
 
+Before activation, operators compare non-reversible hashes of the callback secret
+loaded by FibreFlow and Remote MCP: those hashes must be equal. A separate hash
+comparison against `FF_MCP_CALLBACK_SECRET` must be unequal. They also require hash
+agreement for FibreFlow's and Bridge's loaded `BRIDGE_JWT_SECRET`, and exact
+`BRIDGE_JWT_KID` agreement when a kid is configured. Only verdicts are recorded;
+underlying values are never printed.
+
 ## 7. Cortex changes
 
 Refactor remote-only OAuth code from `apps/cortex_mcp/server.py` as needed to keep new
@@ -164,9 +174,9 @@ During controlled rollout:
 1. Verify Lew's FibreFlow account and `cortex.review:view` permission.
 2. If absent, grant it through the supported FF RBAC path authorized by the owner.
 3. Add `lew@velocityfibre.co.za` to `CORTEX_SUPER_ADMIN_EMAILS`, preserving every
-   existing entry.
-4. Restart only Cortex Bridge for the allowlist activation. Restart Remote MCP
-   separately only when deploying its changed code/callback configuration.
+   existing entry, then independently read back the complete effective set and abort
+   if Lew is absent or any prior entry was dropped.
+4. Activate Cortex Agent Executor first, then Bridge/Remote MCP, and FibreFlow last.
 5. Prove Lew receives full-tenant scope and an ordinary user remains ACL-limited.
 
 Because the Bridge resolves the email in the embedded bearer on each request, adding
@@ -255,13 +265,17 @@ Implementation is test-driven.
 
 ### Live proof on dev
 
-1. Connect both custom connector URLs from a real Claude client.
-2. Complete Cortex authorization through FibreFlow login and consent without copying
+1. Start an isolated executor on `127.0.0.1:17406`, then an isolated Bridge on
+   `127.0.0.1:17403` with `EXECUTOR_URL=http://127.0.0.1:17406`, then isolated Remote
+   MCP on `127.0.0.1:17414`. Use a unique OAuth store and the dev public base; the
+   isolated Bridge must never call production executor port `7406`.
+2. Connect both custom connector URLs from a real Claude client.
+3. Complete Cortex authorization through FibreFlow login and consent without copying
    a token.
-3. Run cited Cortex queries as Lew and as an ordinary user; compare scope.
-4. Run FibreFlow project/QField queries and confirm its RBAC behavior is unchanged.
-5. Exercise revoke/disconnect and reconnect.
-6. Capture desktop and mobile screenshots of both connection pages.
+4. Run cited Cortex queries as Lew and as an ordinary user; compare scope.
+5. Run FibreFlow project/QField queries and confirm its RBAC behavior is unchanged.
+6. Exercise revoke/disconnect and reconnect.
+7. Capture desktop and mobile screenshots of both connection pages.
 
 ## 12. Delivery and rollback
 
@@ -270,19 +284,24 @@ Use two coordinated PRs:
 1. **Cortex PR:** consent redirect/callback, fail-closed configuration and tests.
 2. **FibreFlow PR:** consent page/API, AI Connections UI and regression tests.
 
-Deploy Cortex and FibreFlow to dev, configure the shared secret through untracked
-environment files, and complete the live proof. Because the current remote service
-is production-facing, real dev OAuth must use an isolated port, store and public base;
-do not repoint its live authorization flow at dev. Production promotion uses each
-repository's supported procedure, only after hours and with Hein's explicit approval.
+Deploy in one direction only: Cortex Agent Executor, Cortex Bridge/Remote MCP, then
+FibreFlow. Configure secrets through untracked environment files and complete the
+isolated live proof described above. Because the current remote service is
+production-facing, real dev OAuth must use isolated executor/Bridge/Remote processes,
+a unique store, and a dev public base; do not repoint its live authorization flow at
+dev. Production promotion uses each repository's supported procedure, only after
+hours and with Hein's explicit approval.
 
 Rollback order:
 
-1. Restore Cortex's authorization redirect to the retained `/authorize/approve`.
-2. Revert/hide the new FibreFlow consent and connection pages.
+1. Reverse exposure first by reverting/hiding the FibreFlow consent/proxy and
+   connection pages.
+2. Restore Cortex's authorization redirect to the retained `/authorize/approve` and
+   roll back Bridge/Remote MCP.
 3. Remove Lew from the super-admin allowlist only if the access decision itself is
-   being rolled back; preserve all unrelated entries.
-4. Existing OAuth grants and the working FibreFlow connector remain usable because
+   being rolled back; preserve and read back all unrelated entries.
+4. Roll back Agent Executor last if required.
+5. Existing OAuth grants and the working FibreFlow connector remain usable because
    their storage formats and routes were not changed.
 
 ## 13. Acceptance criteria

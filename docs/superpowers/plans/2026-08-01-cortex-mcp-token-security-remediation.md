@@ -4,13 +4,14 @@
 >
 > **Repositories:** FibreFlow and Cortex
 >
-> **Deployment:** Out of scope. No live configuration, restart, merge, or deployment is authorized by this plan.
+> **Deployment:** Out of scope. No live configuration, restart, merge, or deployment is authorized by this plan. A separately approved rollout must follow Agent Executor → Bridge/Remote MCP → FibreFlow, with rollback removing FibreFlow exposure first.
 
 ## Objective
 
 Close the final-review blockers without changing the approved product behavior:
 
-- normal Cortex browser OAuth remains fixed at 90 days;
+- the underlying normal Cortex browser bearer remains fixed at 90 days, while the
+  outer refresh grant expires after 30 days and then requires browser reauthorization;
 - Advanced manual tokens may be 30 days, 90 days, 1 year, or indefinite;
 - every marked Cortex MCP bearer is server-enforced read-only;
 - revoke-all cannot leave an equal-second token valid;
@@ -194,8 +195,20 @@ Only after both final reviews approve:
 
 1. Push the FibreFlow branch and open a draft PR against `master`.
 2. Push the Cortex branch and open a draft PR against `main`.
-3. Cross-link the PRs and state the safe rollout order: Cortex enforcement first, then FibreFlow manual-token UI.
+3. Cross-link the PRs and state the safe rollout order: Cortex Agent Executor first,
+   Bridge/Remote MCP second, and FibreFlow manual-token UI/proxy last.
 4. State exact verification results and the known `antihall` baseline failure.
 5. State explicitly that nothing was deployed and no live configuration changed.
 
-Do not merge or deploy. After review and explicit rollout approval, deploy Cortex enforcement to dev first, prove negative mutation attempts and immediate revoke with a dedicated test identity, then deploy FibreFlow to dev and run the visibility-only Playwright flow. Production remains a separate explicit approval gate.
+Do not merge or deploy. After review and explicit rollout approval, start an isolated
+executor on `17406`; the isolated Bridge must set
+`EXECUTOR_URL=http://127.0.0.1:17406` and must never call production `7406`. Start
+Bridge/Remote MCP next with a unique OAuth store and dev public base, prove negative
+mutation attempts and immediate revoke with a dedicated test identity, then deploy
+FibreFlow to dev and run the visibility-only Playwright flow. Before activation,
+hash-only checks must prove callback-secret equality across FibreFlow/Remote MCP,
+inequality from `FF_MCP_CALLBACK_SECRET`, FibreFlow/Bridge signing-key equality, and
+signing `kid` agreement. Independently read back the complete
+`CORTEX_SUPER_ADMIN_EMAILS` set, including `lew@velocityfibre.co.za`, without dropping
+entries. Production remains a separate explicit approval gate in the same order;
+rollback removes FibreFlow exposure, then Bridge/Remote MCP, and Executor last.
