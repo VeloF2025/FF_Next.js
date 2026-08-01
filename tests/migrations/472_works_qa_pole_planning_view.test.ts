@@ -15,9 +15,25 @@
  * Sibling of 358_snag_reports_scope / 378_rbac_field_stock_force_correct /
  * 471_hs_training_certificate_upload: requires TEST_DATABASE_URL, and is
  * excluded from the unit vitest config (vitest.config.ts) because it throws at
- * module load without one. Run with:
+ * module load without one.
  *
- *   TEST_DATABASE_URL=postgres://... npx vitest run tests/migrations/472_*.test.ts
+ * Being in that exclude list also means `npx vitest run <this file>` reports
+ * "No test files found" — the exclusion wins over an explicit path argument,
+ * and vitest 0.34 has no `--exclude` CLI override. To run it, point vitest at a
+ * throwaway config (kept OUT of the repo) that reuses this project's aliases:
+ *
+ *   cat > vitest.tmp.config.ts <<'EOF'
+ *   import base from './vitest.config';
+ *   import { defineConfig } from 'vitest/config';
+ *   export default defineConfig({ ...base, test: { ...(base as any).test,
+ *     include: ['tests/migrations/472_works_qa_pole_planning_view.test.ts'],
+ *     exclude: ['node_modules', '.next', 'dist'] } });
+ *   EOF
+ *   TEST_DATABASE_URL=postgres://... npx vitest run --config vitest.tmp.config.ts
+ *   rm vitest.tmp.config.ts
+ *
+ * The config must sit inside the repo — from /tmp, Node cannot resolve
+ * 'vitest/config'.
  *
  * SAFETY: everything happens in a scratch schema dropped unconditionally in
  * afterAll. The forward file hard-qualifies public.sow_poles / public.poles on
@@ -94,10 +110,7 @@ beforeAll(async () => {
   );
 
   await pool.query(
-    FORWARD.replace(/public\./g, `${SCHEMA}.`).replace(
-      /CREATE OR REPLACE VIEW v_pole_planning/,
-      `CREATE OR REPLACE VIEW ${SCHEMA}.v_pole_planning`
-    ).replace(/COMMENT ON VIEW v_pole_planning/, `COMMENT ON VIEW ${SCHEMA}.v_pole_planning`)
+    FORWARD.replace(/public\./g, `${SCHEMA}.`)
   );
 });
 
@@ -107,6 +120,9 @@ afterAll(async () => {
 });
 
 describe('migration 472 — v_pole_planning', () => {
+  // Structurally 1:1, not incidentally: the view DISTINCT ON's the sow side and
+  // public.poles is unique-constrained on the same key, so neither input can
+  // contribute two rows for one (project_id, pole_number).
   it('is 1:1 — every (project_id, pole_number) appears exactly once', async () => {
     const rows = await q<{ pole_number: string; n: string }>(
       `SELECT pole_number, COUNT(*) AS n
@@ -165,21 +181,67 @@ describe('migration 472 — v_pole_planning', () => {
     expect(rows).toHaveLength(5);
   });
 
-  it('DOCUMENTS A LIMITATION: a duplicate pole_number in sow_poles fans out', async () => {
-    // sow_poles is a view over sharepoint_hld_pole and carries no unique
-    // constraint, so nothing at the DB level prevents this. public.poles does
-    // have one. Verified 2026-08-01 that neither side has duplicates live — if
-    // this ever changes, "planned" counts inflate silently, so the behaviour is
-    // pinned rather than left to be rediscovered.
-    await q(
-      `INSERT INTO ${SCHEMA}.sow_poles (project_id, pole_number, zone_no, pon_no)
-       VALUES ($1,'BOTH.AGREE', 8, 65)`,
-      [PA]
-    );
-    const rows = await q<{ n: string }>(
-      `SELECT COUNT(*) AS n FROM ${SCHEMA}.v_pole_planning WHERE pole_number = 'BOTH.AGREE'`
-    );
-    expect(Number(rows[0]!.n)).toBe(2);
-    await q(`DELETE FROM ${SCHEMA}.sow_poles WHERE pole_number='BOTH.AGREE' AND zone_no=8`);
+  // ── The fan-out that the DISTINCT ON exists to prevent ────────────────────
+  // sow_poles is a view over sharepoint_hld_pole (a raw external feed) and has
+  // no unique constraint, so a duplicate there is possible. Two call sites feed
+  // this view into INSERT ... ON CONFLICT DO UPDATE, which Postgres aborts
+  // outright when one arbiter key gets two candidate rows. These two tests are
+  // the regression guard: the first proves the view collapses the duplicate,
+  // the second proves the real consuming statement survives it.
+  describe('with a duplicate (project_id, pole_number) in sow_poles', () => {
+    beforeAll(async () => {
+      await q(
+        `INSERT INTO ${SCHEMA}.sow_poles (project_id, pole_number, zone_no, pon_no)
+         VALUES ($1,'BOTH.AGREE', 8, 65)`,
+        [PA]
+      );
+    });
+    afterAll(async () => {
+      await q(`DELETE FROM ${SCHEMA}.sow_poles WHERE pole_number='BOTH.AGREE' AND zone_no=8`);
+    });
+
+    it('collapses to one row instead of fanning out', async () => {
+      const rows = await q<{ n: string }>(
+        `SELECT COUNT(*) AS n FROM ${SCHEMA}.v_pole_planning WHERE pole_number = 'BOTH.AGREE'`
+      );
+      expect(Number(rows[0]!.n)).toBe(1);
+    });
+
+    it('picks the duplicate deterministically (lowest zone/PON, non-NULL preferred)', async () => {
+      const [row] = await q<{ zone_no: number; pon_no: number }>(
+        `SELECT zone_no, pon_no FROM ${SCHEMA}.v_pole_planning WHERE pole_number = 'BOTH.AGREE'`
+      );
+      expect(row).toEqual({ zone_no: 7, pon_no: 64 });
+    });
+
+    it('does not break INSERT ... ON CONFLICT DO UPDATE — the real call-site shape', async () => {
+      // Mirrors works-qa/sync-historical.ts and syncQfieldCore.ts's second
+      // upsert. Before the DISTINCT ON this raised
+      // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+      // (reproduced against the live server 2026-08-01), 500ing the sync.
+      await q(
+        `CREATE TABLE IF NOT EXISTS ${SCHEMA}.pole_qa_photos (
+           project_id uuid, pole_label varchar(255), zone_no integer, pon_no integer,
+           PRIMARY KEY (project_id, pole_label))`
+      );
+      await expect(
+        q(
+          `INSERT INTO ${SCHEMA}.pole_qa_photos (project_id, pole_label, zone_no, pon_no)
+           SELECT $1::uuid, $2, sp.zone_no, sp.pon_no
+           FROM (SELECT 1) one
+           LEFT JOIN ${SCHEMA}.v_pole_planning sp
+             ON sp.project_id = $1::uuid AND sp.pole_number = $2
+           ON CONFLICT (project_id, pole_label) DO UPDATE
+           SET zone_no = COALESCE(${SCHEMA}.pole_qa_photos.zone_no, EXCLUDED.zone_no),
+               pon_no  = COALESCE(${SCHEMA}.pole_qa_photos.pon_no,  EXCLUDED.pon_no)`,
+          [PA, 'BOTH.AGREE']
+        )
+      ).resolves.not.toThrow();
+
+      const [row] = await q<{ zone_no: number; pon_no: number }>(
+        `SELECT zone_no, pon_no FROM ${SCHEMA}.pole_qa_photos WHERE pole_label = 'BOTH.AGREE'`
+      );
+      expect(row).toEqual({ zone_no: 7, pon_no: 64 });
+    });
   });
 });

@@ -26,7 +26,7 @@
 -- No data is lost: 472 created a view only. sow_poles and public.poles are
 -- untouched by both the forward migration and this rollback.
 
-DROP VIEW IF EXISTS v_pole_planning;
+DROP VIEW IF EXISTS public.v_pole_planning;
 
 DELETE FROM schema_migrations
  WHERE filename = '472_works_qa_pole_planning_view.sql';
