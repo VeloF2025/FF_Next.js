@@ -49,6 +49,14 @@ Read this before writing code. Several intuitive assumptions are false.
 
 **Column-type traps verified on the live DB:** `maintenance_tickets.project_id` is **text** holding uuid strings (not a uuid column), and 1,871 rows hold the empty string — `''::uuid` throws, so any join to `projects` must `NULLIF(...,'')::uuid` first. Today zero *open* tickets carry an empty string, so a naive cast happens to pass; the WHERE clause is the only thing preventing the break.
 
+🚨 **MCP tokens can only issue GET / HEAD / OPTIONS.** `src/lib/auth/readOnly.ts:13` defines `SAFE_METHODS = {GET, HEAD, OPTIONS}`, and `isReadOnlyViolation()` rejects anything else when `user.sessionKind === 'mcp'`. The gate lives inside `withAuth`/`requireAuth`, so **every** route inherits it and no route can opt out. **Both metric endpoints must therefore be GET.** A POST endpoint is unreachable by an MCP token regardless of how it authenticates — the request is rejected in middleware before the handler runs. The first draft of this plan specified `POST /api/metrics-query`, which would have shipped an endpoint Cortex could not call.
+
+🚨 **`project_weekly_zone_pon_uptake.installed` is CUMULATIVE, not per-period.** `scripts/migrations/sql/276_project_weekly_zone_uptake.sql:4` — the source PDFs "contain **cumulative** completion metrics"; the table comment reads "Cumulative zone-level installation uptake snapshot per billing week". Live weekly values run 21,666 → 22,556 → 23,342 → 23,732, which is a running total. Summing across weeks inflates roughly 4× over a month. **Never `SUM` a cumulative measure across periods** — take the latest observation. Its project column is `project_name`, not `project`. This class of error parses cleanly, returns plausible numbers, and is silently wrong; no SQL-execution test catches it. Reading the source migration's comment is the only defence.
+
+**`oes_pp_data.serial_number` is not unique** — 3,483 rows against 3,482 distinct serials (`ALCLB48F4CCD` appears twice). Snapshot entity keys must use `oes_pp_data.id`; keying on serial silently drops a row under `ON CONFLICT DO NOTHING`.
+
+**Import alias:** `tsconfig.json` maps `@/*` → `./src/*`. So `@/modules/metrics/...` is correct and **`@/src/modules/...` resolves to `src/src/...` and fails**. Note `@/lib/*` maps to `./src/lib/*`, while a separate top-level `lib/` also exists — check which one a helper actually lives in before importing.
+
 ## Scope
 
 This plan delivers **the platform** — snapshot spine, conformed dimensions, registry, MCP surface — proven by three deliberately shape-diverse metrics. It does **not** deliver the PP lifecycle metrics, reconciliation, the wider catalogue, or the weekly sheet. Those become registry rows once this exists:
@@ -110,30 +118,53 @@ import { writeSnapshot } from '../writer';
 
 const asOf = '2026-08-01';
 
-function fakeDeps(existingCount = 0) {
+/** `claimWins` = whether this caller's snapshot_runs claim returns a row. */
+function fakeDeps({ claimWins = true, insertFails = false } = {}) {
+  const calls: string[] = [];
   const query = vi.fn(async (sql: string) => {
-    if (sql.includes('SELECT count(*)')) return { rows: [{ count: existingCount }] };
-    if (sql.includes('INSERT INTO metric_snapshots')) return { rowCount: 2 };
+    calls.push(sql.trim().split('\n')[0]);
+    if (sql.startsWith('BEGIN') || sql.startsWith('COMMIT') || sql.startsWith('ROLLBACK')) return {};
+    if (sql.includes('INSERT INTO snapshot_runs')) {
+      if (sql.includes("'failed'")) return { rows: [] };          // failure marker
+      return { rows: claimWins ? [{ id: 1 }] : [] };              // the claim
+    }
+    if (sql.includes('DELETE FROM metric_snapshots')) return { rowCount: 0 };
+    if (sql.includes('INSERT INTO metric_snapshots')) {
+      if (insertFails) throw new Error('boom');
+      return { rowCount: 2 };
+    }
+    if (sql.includes('UPDATE snapshot_runs')) return { rowCount: 1 };
     return { rows: [] };
   });
-  return { query };
+  return { query, calls };
 }
 
 describe('writeSnapshot', () => {
-  it('writes rows for a known source', async () => {
-    const result = await writeSnapshot('pp_open', asOf, fakeDeps(0));
-    expect(result.skipped).toBe(false);
-    expect(result.rows).toBe(2);
+  it('writes rows when it wins the claim', async () => {
+    const deps = fakeDeps({ claimWins: true });
+    const result = await writeSnapshot('pp_open', asOf, deps);
+    expect(result).toEqual({ rows: 2, skipped: false });
+    expect(deps.calls).toContain('COMMIT');
   });
 
-  it('is idempotent — a second run for the same as_of writes nothing', async () => {
-    const result = await writeSnapshot('pp_open', asOf, fakeDeps(5));
-    expect(result.skipped).toBe(true);
-    expect(result.rows).toBe(0);
+  it('skips without writing when another run already holds the claim', async () => {
+    const deps = fakeDeps({ claimWins: false });
+    const result = await writeSnapshot('pp_open', asOf, deps);
+    expect(result).toEqual({ rows: 0, skipped: true });
+    // Critical: it must NOT have inserted snapshot rows after losing the claim.
+    expect(deps.calls.some((c) => c.includes('INSERT INTO metric_snapshots'))).toBe(false);
+    expect(deps.calls).toContain('ROLLBACK');
+  });
+
+  it('rolls back and marks the run failed when the insert throws', async () => {
+    const deps = fakeDeps({ claimWins: true, insertFails: true });
+    await expect(writeSnapshot('pp_open', asOf, deps)).rejects.toThrow('boom');
+    expect(deps.calls).toContain('ROLLBACK');
+    expect(deps.calls.some((c) => c.includes('UPDATE snapshot_runs'))).toBe(false);
   });
 
   it('rejects an unregistered source rather than silently writing nothing', async () => {
-    await expect(writeSnapshot('not_a_source', asOf, fakeDeps(0))).rejects.toThrow(
+    await expect(writeSnapshot('not_a_source', asOf, fakeDeps())).rejects.toThrow(
       /unknown snapshot source/i,
     );
   });
@@ -176,11 +207,36 @@ CREATE INDEX IF NOT EXISTS metric_snapshots_dims_gin
 
 COMMENT ON TABLE metric_snapshots IS
   'Append-only point-in-time snapshots. One row per (source, day, entity). Never updated in place.';
+
+-- Completion ledger. Without this, "has this day been written?" can only be answered
+-- by count(*) > 0, which cannot distinguish a COMPLETE snapshot from a PARTIAL one —
+-- so a half-written day would be skipped forever and silently under-report.
+CREATE TABLE IF NOT EXISTS snapshot_runs (
+  id           BIGSERIAL PRIMARY KEY,
+  source_key   TEXT        NOT NULL,
+  as_of_date   DATE        NOT NULL,
+  status       TEXT        NOT NULL DEFAULT 'running'
+                 CHECK (status IN ('running','complete','failed')),
+  row_count    INTEGER,
+  error        TEXT,
+  started_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+-- The claim lock: two concurrent crons cannot both insert this row.
+CREATE UNIQUE INDEX IF NOT EXISTS snapshot_runs_source_date_key
+  ON snapshot_runs (source_key, as_of_date);
+
+COMMENT ON TABLE snapshot_runs IS
+  'One row per (source, day). Claimed atomically before writing; marked complete with the final row count. A day is written iff a complete row exists here.';
 ```
 
 ```sql
 -- scripts/migrations/sql/rollback_<N>_metrics_snapshot_spine.sql
 -- Re-runnable. Guards every statement. Clears its own schema_migrations row.
+
+DROP INDEX IF EXISTS snapshot_runs_source_date_key;
+DROP TABLE IF EXISTS snapshot_runs;
 
 DROP INDEX IF EXISTS metric_snapshots_dims_gin;
 DROP INDEX IF EXISTS metric_snapshots_source_date_idx;
@@ -215,13 +271,17 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
   {
     key: 'pp_open',
     description: 'Open pre-provisions — on the list, not yet activated',
+    // ⚠️ entity_id is `p.id`, NOT `p.serial_number`. Verified: 3,483 rows but only
+    // 3,482 distinct serials (ALCLB48F4CCD appears twice). Keying on serial would
+    // silently drop a row via ON CONFLICT DO NOTHING and under-report the balance.
     sql: `
       SELECT
-        p.serial_number AS entity_id,
+        p.id::text AS entity_id,
         jsonb_build_object(
           'project',  p.project,
           'olt_name', p.olt_name,
-          'olt_pon',  p.olt_pon
+          'olt_pon',  p.olt_pon,
+          'serial',   p.serial_number
         ) AS dims,
         jsonb_build_object(
           'age_days',          (CURRENT_DATE - p.date_registered),
@@ -282,9 +342,17 @@ export interface SnapshotResult {
 }
 
 /**
- * Write one day's snapshot for `sourceKey`. Idempotent: if rows already exist for
- * (source_key, as_of_date) it writes nothing and reports skipped, so a re-run or a
- * double-fired cron cannot double-count.
+ * Write one day's snapshot for `sourceKey`, exactly once.
+ *
+ * Concurrency model — a pre-count is NOT sufficient and must not be reintroduced:
+ *   - Two crons firing together can both observe count(*) = 0 and both proceed.
+ *   - count(*) > 0 cannot distinguish a COMPLETE snapshot from a PARTIAL one, so a
+ *     half-written day would be skipped forever and silently under-report.
+ * Instead we claim a `snapshot_runs` row inside a transaction. The unique index on
+ * (source_key, as_of_date) makes the claim the lock: the loser's INSERT conflicts,
+ * returns no row, and it backs off. The claim, the data insert, and the completion
+ * marker all commit together, so a crash mid-write leaves a 'running' row that a
+ * later run can detect and retry rather than a partial day that looks finished.
  */
 export async function writeSnapshot(
   sourceKey: string,
@@ -296,26 +364,63 @@ export async function writeSnapshot(
     throw new Error(`unknown snapshot source: ${sourceKey}`);
   }
 
-  const existing = await deps.query(
-    `SELECT count(*)::int AS count FROM metric_snapshots WHERE source_key = $1 AND as_of_date = $2`,
-    [sourceKey, asOf],
-  );
-  const alreadyWritten = Number((existing.rows?.[0] as { count?: number })?.count ?? 0);
-  if (alreadyWritten > 0) {
-    log.info('Snapshot already written — skipping', { sourceKey, asOf, alreadyWritten });
-    return { rows: 0, skipped: true };
+  await deps.query('BEGIN');
+  try {
+    // Claim. A prior 'complete' or in-flight 'running' row conflicts and yields nothing.
+    // A previously 'failed' row is reclaimed so a bad day can be retried.
+    const claim = await deps.query(
+      `INSERT INTO snapshot_runs (source_key, as_of_date, status)
+       VALUES ($1, $2::date, 'running')
+       ON CONFLICT (source_key, as_of_date) DO UPDATE
+         SET status = 'running', started_at = NOW(), error = NULL
+         WHERE snapshot_runs.status = 'failed'
+       RETURNING id`,
+      [sourceKey, asOf],
+    );
+
+    if (!claim.rows?.length) {
+      await deps.query('ROLLBACK');
+      log.info('Snapshot already claimed — skipping', { sourceKey, asOf });
+      return { rows: 0, skipped: true };
+    }
+
+    // Clear any rows left by a failed attempt so the retry is not a partial merge.
+    await deps.query(
+      `DELETE FROM metric_snapshots WHERE source_key = $1 AND as_of_date = $2::date`,
+      [sourceKey, asOf],
+    );
+
+    const inserted = await deps.query(
+      `INSERT INTO metric_snapshots (source_key, as_of_date, entity_id, dims, measures)
+       SELECT $1, $2::date, s.entity_id, s.dims, s.measures FROM (${source.sql}) s
+       ON CONFLICT (source_key, as_of_date, entity_id) DO NOTHING`,
+      [sourceKey, asOf],
+    );
+    const rows = inserted.rowCount ?? 0;
+
+    await deps.query(
+      `UPDATE snapshot_runs SET status = 'complete', row_count = $3, completed_at = NOW()
+       WHERE source_key = $1 AND as_of_date = $2::date`,
+      [sourceKey, asOf, rows],
+    );
+
+    await deps.query('COMMIT');
+    log.info('Snapshot written', { sourceKey, asOf, rows });
+    return { rows, skipped: false };
+  } catch (error) {
+    await deps.query('ROLLBACK');
+    // Record the failure OUTSIDE the rolled-back transaction so the next run can retry.
+    await deps
+      .query(
+        `INSERT INTO snapshot_runs (source_key, as_of_date, status, error)
+         VALUES ($1, $2::date, 'failed', $3)
+         ON CONFLICT (source_key, as_of_date) DO UPDATE
+           SET status = 'failed', error = EXCLUDED.error`,
+        [sourceKey, asOf, error instanceof Error ? error.message : String(error)],
+      )
+      .catch((markError) => log.error('Could not mark snapshot failed', { sourceKey, asOf, markError }));
+    throw error;
   }
-
-  const inserted = await deps.query(
-    `INSERT INTO metric_snapshots (source_key, as_of_date, entity_id, dims, measures)
-     SELECT $1, $2::date, s.entity_id, s.dims, s.measures FROM (${source.sql}) s
-     ON CONFLICT (source_key, as_of_date, entity_id) DO NOTHING`,
-    [sourceKey, asOf],
-  );
-
-  const rows = inserted.rowCount ?? 0;
-  log.info('Snapshot written', { sourceKey, asOf, rows });
-  return { rows, skipped: false };
 }
 ```
 
@@ -332,11 +437,19 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { SNAPSHOT_SOURCES } from '@/src/modules/metrics/snapshot/sources';
-import { writeSnapshot } from '@/src/modules/metrics/snapshot/writer';
+import { SNAPSHOT_SOURCES } from '@/modules/metrics/snapshot/sources';
+import { writeSnapshot } from '@/modules/metrics/snapshot/writer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  // An unset CRON_SECRET must NOT authenticate. Without this guard the comparison
+  // becomes `Bearer undefined === Bearer undefined`, so anyone who sends the literal
+  // string "Bearer undefined" is authorised on any environment missing the variable.
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    log.error('CRON_SECRET is not configured — refusing to run snapshot');
+    return apiResponse.internalError(res, 'Cron secret not configured');
+  }
+  if (req.headers.authorization !== `Bearer ${secret}`) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
   }
 
@@ -345,18 +458,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const client = await pool.connect();
   const results: Record<string, unknown> = {};
+  const failed: string[] = [];
   try {
     for (const source of SNAPSHOT_SOURCES) {
       try {
         results[source.key] = await writeSnapshot(source.key, asOf, client);
       } catch (error) {
         // One bad source must not stop the others — a skipped day is unrecoverable.
+        // But the RESPONSE must not be 200, or a failed snapshot looks like a success
+        // to whatever is monitoring the cron.
         log.error('Snapshot source failed', { sourceKey: source.key, asOf, error });
         results[source.key] = { error: error instanceof Error ? error.message : String(error) };
+        failed.push(source.key);
       }
     }
   } finally {
     client.release();
+  }
+
+  if (failed.length) {
+    return apiResponse.internalError(res, `Snapshot sources failed: ${failed.join(', ')}`);
   }
   return apiResponse.success(res, { asOf, results });
 }
@@ -483,7 +604,11 @@ export interface DimensionSpec {
 }
 
 export const DIMENSIONS: readonly DimensionSpec[] = [
-  { key: 'project', label: 'Project',   expression: 'canonical_project(src.project)' },
+  // ::text is explicit because source columns vary — project_weekly_zone_pon_uptake
+  // .project_name is VARCHAR(100) while oes_pp_data.project is text. Relying on
+  // implicit varchar->text resolution works but fails opaquely if a source ever
+  // supplies a different string type.
+  { key: 'project', label: 'Project',   expression: 'canonical_project(src.project::text)' },
   { key: 'pop',     label: 'POP / OLT', expression: 'src.olt_name' },
   { key: 'zone',    label: 'Zone',      expression: 'src.zone_no' },
 ] as const;
@@ -545,7 +670,7 @@ A stub test cannot catch the two implementations drifting, nor a parse-time SQL 
 // tests/migrations/canonical-project-parity.test.ts
 import { describe, it, expect } from 'vitest';
 import pool from '@/lib/db';
-import { canonicalProject } from '@/src/modules/metrics/dimensions/canonical';
+import { canonicalProject } from '@/modules/metrics/dimensions/canonical';
 
 const SAMPLES = ['TEM-3', 'ETW-2', 'MOH', 'MOA', 'Lawley', '  lawley ', '', 'Brand New Site'];
 
@@ -663,6 +788,15 @@ export interface MetricDefinition {
   dateColumn: string | null;
   /** Extra always-on predicate, without the WHERE keyword. */
   filter?: string;
+  /**
+   * True when `measure` is a RUNNING TOTAL rather than a per-period value.
+   * A cumulative series must never be summed across periods — the total is the
+   * LAST period's value, not the sum of all of them. Getting this wrong inflates
+   * silently: `project_weekly_zone_pon_uptake.installed` runs 21,666 → 22,556 →
+   * 23,342 → 23,732, so summing a month reports ~91k against a true ~23.7k.
+   * Nothing in the SQL reveals this — only the source table's documentation does.
+   */
+  cumulative?: boolean;
   grains: readonly Grain[];
   dimensions: readonly string[];
   aliases: readonly string[];
@@ -689,14 +823,29 @@ export const METRICS: readonly MetricDefinition[] = [
   {
     key: 'zone_uptake',
     label: 'zone uptake',
-    description: 'Planned vs installed drops per zone and PON, from the weekly uptake sheet.',
-    from: 'project_weekly_zone_pon_uptake src',
+    description:
+      'Cumulative installed drops per zone and PON, as at each billing week. A running total, not a weekly delta.',
+    // ⚠️ `installed` is CUMULATIVE (migration 276 line 4 and the table comment).
+    // Summing across weeks inflates ~4x over a month. `cumulative: true` makes
+    // executeMetric report the LAST period's value as the total instead of a sum.
+    // Within a single week_ending, summing across zones IS correct — that is what
+    // the per-period aggregate does. Grains are therefore restricted to week/range;
+    // 'month' is deliberately absent because a month is several running totals.
+    // The project column here is `project_name`, NOT `project`.
+    from: `(
+      SELECT src0.week_ending,
+             src0.project_name AS project,
+             src0.zone_no,
+             src0.installed
+      FROM project_weekly_zone_pon_uptake src0
+    ) src`,
     measure: 'sum(src.installed)',
     dateColumn: 'src.week_ending',
-    grains: ['week', 'month', 'range'],
+    cumulative: true,
+    grains: ['week'],
     dimensions: ['project', 'zone'],
     aliases: ['zone uptake', 'uptake', 'installed per zone', 'homes installed'],
-    cite: 'FibreFlow project_weekly_zone_pon_uptake (sum of installed) by week_ending',
+    cite: 'FibreFlow project_weekly_zone_pon_uptake (cumulative installed, latest week in range) by week_ending',
     permission: 'analytics.reports',
   },
   {
@@ -866,6 +1015,15 @@ export function buildMetricQuery(
     );
   }
 
+  // A cumulative measure collapsed to a single bucket would sum several running
+  // totals into a meaningless number. Refuse rather than return it.
+  if (def.cumulative && query.grain === 'range') {
+    throw new Error(
+      `unsupported grain 'range' for cumulative metric '${def.key}' — ` +
+        `a range would sum running totals. Request a periodic grain and read the final period.`,
+    );
+  }
+
   const selected = query.dimensions.map((name) => {
     if (!def.dimensions.includes(name)) {
       throw new Error(
@@ -895,7 +1053,11 @@ export function buildMetricQuery(
   const params: unknown[] = [];
   if (def.dateColumn) {
     params.push(query.from, query.to);
-    where.push(`${def.dateColumn} BETWEEN $1 AND $2`);
+    // HALF-OPEN, not BETWEEN. `to` arrives as a date; on a TIMESTAMP column
+    // `BETWEEN '2026-07-01' AND '2026-07-31'` resolves the upper bound to
+    // 2026-07-31 00:00:00 and silently discards ~24h of the final day.
+    // `>= from AND < to + 1 day` is correct for both date and timestamp columns.
+    where.push(`${def.dateColumn} >= $1::date AND ${def.dateColumn} < ($2::date + INTERVAL '1 day')`);
   }
   if (def.filter) where.push(`(${def.filter})`);
 
@@ -926,8 +1088,8 @@ Every metric's SQL must actually parse against the live schema, for every grain 
 // tests/migrations/metric-sql-executes.test.ts
 import { describe, it, expect } from 'vitest';
 import pool from '@/lib/db';
-import { METRICS } from '@/src/modules/metrics/registry';
-import { buildMetricQuery } from '@/src/modules/metrics/registry/queryBuilder';
+import { METRICS } from '@/modules/metrics/registry';
+import { buildMetricQuery } from '@/modules/metrics/registry/queryBuilder';
 
 describe('every registered metric executes against the live schema', () => {
   for (const def of METRICS) {
@@ -983,6 +1145,15 @@ git commit -m "feat(metrics): add query builder with grain/dimension validation 
 // src/modules/metrics/registry/__tests__/intent.test.ts
 import { describe, it, expect } from 'vitest';
 import { matchMetric } from '../intent';
+import type { MetricDefinition } from '../types';
+
+/** Minimal valid definition; each test overrides only key + aliases. */
+const stub: MetricDefinition = {
+  key: 'stub', label: 'stub', description: 'stub',
+  from: 'x src', measure: 'count(*)', dateColumn: null,
+  grains: ['range'], dimensions: [], aliases: [],
+  cite: 'stub', permission: 'analytics.reports',
+};
 
 describe('matchMetric', () => {
   it('matches an unambiguous question exactly', () => {
@@ -991,9 +1162,30 @@ describe('matchMetric', () => {
     if (r.kind === 'exact') expect(r.metric.key).toBe('pp_open_balance');
   });
 
+  // ⚠️ Do NOT weaken this to `expect(['ambiguous','exact']).toContain(r.kind)`.
+  // That assertion passes whatever happens and proves nothing — a fake test, and a
+  // DGTS violation. Ambiguity reporting is the whole point of this module, so it
+  // gets a real test: inject two metrics that genuinely tie.
   it('returns candidates rather than guessing when two metrics tie', () => {
-    const r = matchMetric('how many uptake');
-    expect(['ambiguous', 'exact']).toContain(r.kind);
+    const tied = [
+      { ...stub, key: 'metric_a', aliases: ['backlog'] },
+      { ...stub, key: 'metric_b', aliases: ['backlog'] },
+    ];
+    const r = matchMetric('how many backlog', tied);
+    expect(r.kind).toBe('ambiguous');
+    if (r.kind === 'ambiguous') {
+      expect(r.candidates.map((c) => c.key).sort()).toEqual(['metric_a', 'metric_b']);
+    }
+  });
+
+  it('prefers the longer, more specific alias over a generic one', () => {
+    const metrics = [
+      { ...stub, key: 'generic',  aliases: ['pre-provisions'] },
+      { ...stub, key: 'specific', aliases: ['open pre-provisions'] },
+    ];
+    const r = matchMetric('how many open pre-provisions', metrics);
+    expect(r.kind).toBe('exact');
+    if (r.kind === 'exact') expect(r.metric.key).toBe('specific');
   });
 
   it('returns none for an unrelated question so the caller can fall back to RAG', () => {
@@ -1028,11 +1220,18 @@ function score(question: string, alias: string): number {
  * Match a question to exactly one metric, or report ambiguity.
  * Never guesses: when two metrics tie, the caller receives the candidate list
  * so it can ask which was meant rather than returning a confident wrong number.
+ *
+ * `metrics` is injectable so the tie path can be tested with a controlled pair.
+ * With only three registered metrics no natural tie exists, and a test that
+ * cannot reach the branch it claims to cover is not a test.
  */
-export function matchMetric(question: string): MatchResult {
+export function matchMetric(
+  question: string,
+  metrics: readonly MetricDefinition[] = METRICS,
+): MatchResult {
   const q = question.toLowerCase();
 
-  const scored = METRICS.map((metric) => ({
+  const scored = metrics.map((metric) => ({
     metric,
     score: Math.max(0, ...metric.aliases.map((a) => score(q, a))),
   })).filter((s) => s.score > 0);
@@ -1072,7 +1271,7 @@ git commit -m "feat(metrics): add intent matching that returns candidates instea
 
 **Interfaces:**
 - Consumes: everything above.
-- Produces: `MetricSeriesPoint`, `MetricResponse`, `executeMetric(def, query)`, and the HTTP contract `GET /api/metrics-list` / `POST /api/metrics-query { key, from, to, grain, dimensions }`.
+- Produces: `MetricSeriesPoint`, `MetricResponse`, `executeMetric(def, query)`, and the HTTP contract `GET /api/metrics-list` / `GET /api/metrics-query?key=&from=&to=&grain=&dimensions=` (GET is mandatory — MCP tokens cannot POST).
 
 **Response contract:** every response states `as_of` and the `grain` it was computed at, and carries the same 5-field citation envelope Cortex already emits (`source`, `source_id`, `channel`, `timestamp`, `snippet`).
 
@@ -1090,28 +1289,54 @@ function mockRes() {
   return res as { status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> };
 }
 
-describe('POST /api/metrics-query', () => {
+const get = (query: Record<string, string>) => ({ method: 'GET', query }) as never;
+
+describe('GET /api/metrics-query', () => {
+  it('rejects POST — MCP tokens are GET-only, so POST must never be accepted', async () => {
+    const res = mockRes();
+    await handler({ method: 'POST', query: {} } as never, res as never);
+    expect(res.status).toHaveBeenCalledWith(405);
+  });
+
   it('rejects an unknown metric key with 404, not a zero', async () => {
     const res = mockRes();
-    await handler(
-      { method: 'POST', body: { key: 'nope', from: '2026-07-01', to: '2026-07-31', grain: 'week' } } as never,
-      res as never,
-    );
+    await handler(get({ key: 'nope', from: '2026-07-01', to: '2026-07-31', grain: 'week' }), res as never);
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
   it('rejects an unsupported grain with 400 rather than silently downgrading it', async () => {
     const res = mockRes();
-    await handler(
-      { method: 'POST', body: { key: 'zone_uptake', from: '2026-07-01', to: '2026-07-31', grain: 'day' } } as never,
-      res as never,
-    );
+    await handler(get({ key: 'zone_uptake', from: '2026-07-01', to: '2026-07-31', grain: 'day' }), res as never);
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
   it('rejects a missing required field with 400', async () => {
     const res = mockRes();
-    await handler({ method: 'POST', body: { key: 'zone_uptake' } } as never, res as never);
+    await handler(get({ key: 'zone_uptake' }), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects a malformed date with 400', async () => {
+    const res = mockRes();
+    await handler(get({ key: 'zone_uptake', from: '01-07-2026', to: '2026-07-31', grain: 'week' }), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects a real-looking but non-existent date with 400', async () => {
+    const res = mockRes();
+    await handler(get({ key: 'zone_uptake', from: '2026-02-31', to: '2026-07-31', grain: 'week' }), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects an inverted range with 400', async () => {
+    const res = mockRes();
+    await handler(get({ key: 'zone_uptake', from: '2026-07-31', to: '2026-07-01', grain: 'week' }), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects a range beyond the maximum with 400', async () => {
+    const res = mockRes();
+    await handler(get({ key: 'zone_uptake', from: '2020-01-01', to: '2026-07-31', grain: 'week' }), res as never);
     expect(res.status).toHaveBeenCalledWith(400);
   });
 });
@@ -1141,6 +1366,8 @@ export interface MetricResponse {
   key: string;
   label: string;
   grain: string;
+  /** True when `total` is the latest period's running total, not a sum of the series. */
+  cumulative: boolean;
   as_of: string;
   total: number;
   series: MetricSeriesPoint[];
@@ -1164,10 +1391,22 @@ export async function executeMetric(
   const client = await pool.connect();
   let rows: Record<string, unknown>[];
   try {
-    await client.query('SET LOCAL statement_timeout = 8000');
+    // SET LOCAL requires a transaction block. Outside one it emits
+    // "SET LOCAL can only be used in transaction blocks" and is DISCARDED — the
+    // query would then run with no timeout at all against the shared production DB.
+    // Plain SET would work but leaks the setting to the next borrower of this
+    // pooled connection. BEGIN + SET LOCAL + COMMIT is the only correct form.
+    await client.query('BEGIN');
+    await client.query("SET LOCAL statement_timeout = '8s'");
     const result = await client.query(sql, params);
     rows = result.rows;
+    await client.query('COMMIT');
   } catch (error) {
+    // Must roll back before release, or the connection returns to the pool
+    // inside a failed transaction and poisons the next caller.
+    await client.query('ROLLBACK').catch((rollbackError) =>
+      log.error('Metric rollback failed', { key: def.key, rollbackError }),
+    );
     log.error('Metric execution failed', { key: def.key, error });
     throw error;
   } finally {
@@ -1184,13 +1423,24 @@ export async function executeMetric(
     };
   });
 
-  const total = series.reduce((sum, p) => sum + p.value, 0);
+  // A cumulative series is a sequence of running totals — summing it is meaningless.
+  // The total is the LAST period's value (summed across dimensions within that period).
+  let total: number;
+  if (def.cumulative) {
+    const periods = series.map((p) => p.period).filter((p): p is string => p !== null);
+    const latest = periods.length ? periods.reduce((a, b) => (a > b ? a : b)) : null;
+    total = series.filter((p) => p.period === latest).reduce((sum, p) => sum + p.value, 0);
+  } else {
+    total = series.reduce((sum, p) => sum + p.value, 0);
+  }
+
   const periodLabel = query.from === query.to ? query.from : `${query.from}..${query.to}`;
 
   return {
     key: def.key,
     label: def.label,
     grain: query.grain,
+    cumulative: def.cumulative === true,
     as_of: asOf,
     total,
     series,
@@ -1211,7 +1461,7 @@ export async function executeMetric(
 // pages/api/metrics-list.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
-import { METRICS } from '@/src/modules/metrics/registry';
+import { METRICS } from '@/modules/metrics/registry';
 
 export default async function handler(_req: NextApiRequest, res: NextApiResponse) {
   return apiResponse.success(
@@ -1223,6 +1473,9 @@ export default async function handler(_req: NextApiRequest, res: NextApiResponse
       grains: m.grains,
       dimensions: m.dimensions,
       aliases: m.aliases,
+      // Consumers must know this to interpret `total` — for a cumulative metric it
+      // is the latest period's running total, not a sum of the series.
+      cumulative: m.cumulative === true,
       source: m.cite,
     })),
   );
@@ -1231,30 +1484,72 @@ export default async function handler(_req: NextApiRequest, res: NextApiResponse
 
 ```typescript
 // pages/api/metrics-query.ts
+//
+// ⚠️ MUST BE GET. MCP tokens are restricted to GET/HEAD/OPTIONS by
+// src/lib/auth/readOnly.ts:13, enforced inside withAuth. A POST route is
+// unreachable by Cortex no matter how it authenticates. Do not "modernise"
+// this to POST for a cleaner body — it would silently break the only consumer.
+//
+// Contract: /api/metrics-query?key=..&from=YYYY-MM-DD&to=YYYY-MM-DD&grain=day&dimensions=project,pop
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { findMetric } from '@/src/modules/metrics/registry';
-import { executeMetric } from '@/src/modules/metrics/registry/execute';
+import { findMetric } from '@/modules/metrics/registry';
+import { executeMetric } from '@/modules/metrics/registry/execute';
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_RANGE_DAYS = 366;
+
+/** Query params arrive as string | string[] | undefined; take the first value. */
+function one(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+/** A real calendar date, not just the right shape — rejects 2026-02-31. */
+function isValidDate(s: string): boolean {
+  if (!ISO_DATE.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, ['POST']);
+  if (req.method !== 'GET') {
+    // Signature is (res, method, allowedMethods) — three args. Two throws downstream.
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
+  }
 
-  const { key, from, to, grain, dimensions } = (req.body ?? {}) as {
-    key?: string; from?: string; to?: string; grain?: string; dimensions?: string[];
-  };
+  const key = one(req.query.key as string | string[] | undefined);
+  const from = one(req.query.from as string | string[] | undefined);
+  const to = one(req.query.to as string | string[] | undefined);
+  const grain = one(req.query.grain as string | string[] | undefined);
+  const rawDims = one(req.query.dimensions as string | string[] | undefined) ?? '';
 
   if (!key || !from || !to || !grain) {
     return apiResponse.badRequest(res, 'key, from, to and grain are required');
   }
+  if (!isValidDate(from) || !isValidDate(to)) {
+    return apiResponse.badRequest(res, 'from and to must be valid YYYY-MM-DD dates');
+  }
+  if (from > to) {
+    return apiResponse.badRequest(res, `from (${from}) must not be after to (${to})`);
+  }
+  const spanDays =
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
+  if (spanDays > MAX_RANGE_DAYS) {
+    return apiResponse.badRequest(
+      res,
+      `range of ${spanDays} days exceeds the ${MAX_RANGE_DAYS}-day maximum`,
+    );
+  }
+
+  // Comma-separated, trimmed, de-duplicated, order preserved.
+  const dimensions = [...new Set(rawDims.split(',').map((d) => d.trim()).filter(Boolean))];
 
   const def = findMetric(key);
   if (!def) return apiResponse.notFound(res, 'Metric', key);
 
   try {
-    const result = await executeMetric(def, {
-      from, to, grain: grain as never, dimensions: dimensions ?? [],
-    });
+    const result = await executeMetric(def, { from, to, grain: grain as never, dimensions });
     return apiResponse.success(res, result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1281,7 +1576,7 @@ The repo's usual composition is static — `export default withAuth(withPermissi
 // pages/api/metrics-query.ts — replace the bare export
 import { withAuth } from '@/lib/auth';
 import { userHasPermission } from '@/lib/permissions';
-import type { AuthenticatedNextApiRequest } from '@/src/lib/auth/middleware';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 // ...inside the handler, after `const def = findMetric(key)` succeeds:
   const authReq = req as AuthenticatedNextApiRequest;
@@ -1305,13 +1600,24 @@ Add tests asserting an unauthenticated request returns **401**, an authenticated
 
 ```bash
 PORT=3004 npm run dev   # in this worktree
+
 curl -s localhost:3004/api/metrics-list | head -40
-curl -s -X POST localhost:3004/api/metrics-query \
-  -H 'content-type: application/json' \
-  -d '{"key":"pp_open_balance","from":"2026-07-25","to":"2026-08-01","grain":"day","dimensions":["project"]}'
+
+curl -s 'localhost:3004/api/metrics-query?key=pp_open_balance&from=2026-07-25&to=2026-08-01&grain=day&dimensions=project'
+
+# Must be 405 — MCP tokens cannot POST, so POST must never be a working alternative:
+curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:3004/api/metrics-query
 ```
 
-Expected: a daily series plus a total, with `as_of`, `grain` and the citation envelope present. Mohadin should dominate the open balance (≈708 of ≈1,061). **A zero total means the snapshot cron has not run yet, not that the metric is broken** — check `metric_snapshots` first.
+Expected: a daily series plus a total, with `as_of`, `grain`, `cumulative:false` and the citation envelope present. Mohadin should dominate the open balance (≈708 of ≈1,061). **A zero total means the snapshot cron has not run yet, not that the metric is broken** — check `snapshot_runs` for a `complete` row before debugging the metric.
+
+Also verify the cumulative path explicitly, because this is the one that fails silently:
+
+```bash
+curl -s 'localhost:3004/api/metrics-query?key=zone_uptake&from=2026-07-01&to=2026-07-31&grain=week'
+```
+
+Expected: `cumulative:true`, a rising weekly series (≈21,666 → 22,556 → 23,342 → 23,732), and a `total` equal to the **last** week (≈23,732) — **not** their sum (≈91,296). If the total is ~91k the cumulative handling is broken; the numbers look plausible, so only this comparison catches it.
 
 - [ ] **Step 8: Commit**
 
@@ -1330,7 +1636,7 @@ git commit -m "feat(metrics): expose metrics.list and metrics.query with RBAC an
 - Modify: `/home/hein/Workspace/Cortex/apps/bridge/brain/metrics_db.py`
 
 **Interfaces:**
-- Consumes: `GET /api/metrics-list`, `POST /api/metrics-query`.
+- Consumes: `GET /api/metrics-list`, `GET /api/metrics-query`.
 
 **The Cortex change is a separate PR in a separate repo.** Do not merge it before the FibreFlow side is deployed to dev and verified.
 
@@ -1364,12 +1670,20 @@ git commit -m "docs(metrics): how to register a new metric"
 
 | Gate | Check |
 |---|---|
-| Snapshot spine | Rows land 3 nights running; a second same-day run changes no counts |
+| Snapshot spine | Rows land 3 nights running; a second same-day run changes no counts; `snapshot_runs` has one `complete` row per source per day |
+| Snapshot concurrency | Two `writeSnapshot` calls raced against the live DB → exactly one writes, the other reports `skipped`, and `metric_snapshots` count is unchanged by the loser |
+| Snapshot recovery | Kill a run mid-write → the row is `failed` or `running`, never `complete`; the next run reclaims and completes it |
 | Conformed dimensions | `TEM-3` and `ETW-2` appear in no metric output; SQL/TS parity test passes |
 | Registry | Every metric executes for every declared grain × dimension against the live schema |
-| Intent | An ambiguous question returns candidates, never a number |
-| Contract | Every response carries `as_of`, `grain`, and the 5-field citation envelope |
+| **Cumulative** | `zone_uptake` for a multi-week range returns `total` = the **last** week (≈23,732), not the sum (≈91,296) |
+| **Transport** | `GET /api/metrics-query` succeeds; `POST` returns 405. An MCP-kind session can reach both endpoints |
+| Date bounds | A metric on a timestamp column returns rows dated on the `to` date itself (half-open bound, not `BETWEEN`) |
+| Input validation | Malformed date, impossible date (`2026-02-31`), inverted range, and >366-day range each return 400 |
+| Intent | An ambiguous question returns candidates, never a number — proven against an injected tied pair, not a tautological assertion |
+| Contract | Every response carries `as_of`, `grain`, `cumulative`, and the 5-field citation envelope |
 | RBAC | Unauthenticated → 401; unpermitted → 403; null session denies rather than fails open |
+| Cron auth | Unset `CRON_SECRET` returns 500, not success; a failed source returns non-2xx |
+| Timeout | `statement_timeout` demonstrably applies — a deliberately slow query aborts at 8s rather than running unbounded |
 | Compatibility | `metric:preprovisions` response byte-identical to today's |
 | CI | `npm run ci:quick` passes; `bash scripts/test-ratchet.sh --changed origin/master` passes; `next build` verified manually |
 
