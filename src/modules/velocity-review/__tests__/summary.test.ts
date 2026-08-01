@@ -15,7 +15,7 @@ import { sendVelocityReviewRunSummary, sendVelocityReviewSummary } from '../summ
 
 const ORIGINAL_ENV = { ...process.env };
 const PHONE = '+27821234567';
-const TOKEN = 'ghl-private-token-value';
+const SENSITIVE_VALUE = 'redaction-fixture-value';
 const CONTACT_ID = 'contact-sensitive-123';
 const RAW_ERROR = 'HighLevel rejected contact-sensitive-123 for +27821234567';
 
@@ -40,7 +40,7 @@ function result(): VelocityReviewRunResult {
       status: 'partial',
       counts: { candidate_total: 14, completed: 5 },
     }],
-    ...({ phone: PHONE, token: TOKEN, contactId: CONTACT_ID, rawError: RAW_ERROR } as object),
+    ...({ phone: PHONE, token: SENSITIVE_VALUE, contactId: CONTACT_ID, rawError: RAW_ERROR } as object),
   };
 }
 
@@ -51,14 +51,14 @@ describe('buildRunSummary', () => {
     expect(summary.subject).toBe('Velocity review export — 2026-07-31 — partial');
     for (const expected of [
       'Discovered: 14', 'Ready: 11', 'Duplicates: 2', 'Quarantined: 3',
-      'Workflow acknowledged: 5', 'Permanent failures: 1', 'Retryable failures: 1',
+      'Workflow acknowledged: 6', 'Permanent failures: 1', 'Retryable failures: 1',
       'Ambiguous: 1', 'Acknowledgement cleanup pending: 1', 'Pilot deferred: 1',
     ]) {
       expect(summary.text).toContain(expected);
       expect(summary.html).toContain(expected.replace(': ', '</th><td>'));
     }
     const rendered = JSON.stringify(summary);
-    for (const sensitive of [PHONE, TOKEN, CONTACT_ID, RAW_ERROR, 'raw_error']) {
+    for (const sensitive of [PHONE, SENSITIVE_VALUE, CONTACT_ID, RAW_ERROR, 'raw_error']) {
       expect(rendered).not.toContain(sensitive);
     }
   });
@@ -68,6 +68,18 @@ describe('buildRunSummary', () => {
       status: 'dry_run', counts: { candidate_total: 2 },
       dates: [{ targetDate: '2026-07-30', status: 'complete', counts: { candidate_total: 2 } }],
     }).subject).toBe('Velocity review export — 2026-07-30 — dry run');
+  });
+
+  it('counts cleanup-pending acknowledgements without counting ambiguous rows', () => {
+    const summary = buildRunSummary({
+      status: 'partial',
+      counts: { completed: 2, ack_cleanup_pending: 3, ambiguous: 7 },
+      dates: [{ targetDate: '2026-07-31', status: 'partial', counts: {} }],
+    });
+
+    expect(summary.text).toContain('Workflow acknowledged: 5');
+    expect(summary.text).toContain('Acknowledgement cleanup pending: 3');
+    expect(summary.text).toContain('Ambiguous: 7');
   });
 });
 

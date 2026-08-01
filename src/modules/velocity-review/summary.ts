@@ -1,4 +1,5 @@
 import type { VelocityReviewRunResult } from './processor';
+import { workflowAcknowledgedCount } from './types';
 
 export interface VelocityReviewSummary {
   subject: string;
@@ -33,7 +34,10 @@ function subjectStatus(status: VelocityReviewRunResult['status']): string {
 
 export function buildRunSummary(result: VelocityReviewRunResult): VelocityReviewSummary {
   const targetDate = result.dates.at(-1)?.targetDate ?? sastToday();
-  const rows = COUNT_ROWS.map(([key, label]) => ({ label, value: result.counts[key] ?? 0 }));
+  const rows = COUNT_ROWS.map(([key, label]) => ({
+    label,
+    value: key === 'completed' ? workflowAcknowledgedCount(result.counts) : result.counts[key] ?? 0,
+  }));
   const dates = result.dates.map((item) => `${item.targetDate} (${item.status})`);
   const reason = result.reason === 'invalid_control' || result.reason === 'gap_older_than_7_days'
     ? result.reason : null;

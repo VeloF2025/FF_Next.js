@@ -6,7 +6,7 @@ import {
   type VelocityReviewRunInput,
   type VelocityReviewRunResult,
 } from '@/modules/velocity-review';
-import type { RunSummaryCounts } from '@/modules/velocity-review/types';
+import { workflowAcknowledgedCount, type RunSummaryCounts } from '@/modules/velocity-review/types';
 
 const logger = createLogger('velocity-review:cron');
 const COUNT_KEYS = [
@@ -36,7 +36,7 @@ function aggregateResult(result: VelocityReviewRunResult) {
     status: result.status,
     counts,
     dates,
-    workflowAcknowledged: counts.completed ?? 0,
+    workflowAcknowledged: workflowAcknowledgedCount(counts),
     ...(result.reason === 'invalid_control' || result.reason === 'gap_older_than_7_days'
       ? { reason: result.reason } : {}),
   };

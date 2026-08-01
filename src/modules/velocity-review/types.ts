@@ -63,3 +63,7 @@ export type CandidateDecision =
 export interface RunSummaryCounts {
   [count: string]: number;
 }
+
+export function workflowAcknowledgedCount(counts: RunSummaryCounts): number {
+  return (counts.completed ?? 0) + (counts.ack_cleanup_pending ?? 0);
+}
