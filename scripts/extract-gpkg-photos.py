@@ -143,12 +143,32 @@ PROJECTS = {
         "pon_col": "PON",
         "zone_col": "Phase",
     },
+    # HT Cradock uses the standard FT civil-audit form (8 steps, "1. Before Photo" —
+    # no Permission Slip prefix, so no step shift). Its QField relation table is
+    # "civil_audit__civil_audit" (DOUBLE underscore) — do NOT copy Mahikeng's
+    # "civil_audit" here; the single-underscore name matches nothing and would
+    # re-open the silent gap this entry closes.
+    # No zone/PON: "PON" and "PON No" are 100% NULL (0/1667 rows) and there is no
+    # Phase column, so pon_col/zone_col are deliberately omitted. spatial_pon is
+    # also omitted — resolve_pon_poles.py reports available=false for this project,
+    # so enabling it would cost a subprocess per run and still resolve nothing.
+    # Poles therefore ingest unzoned until the design layers land.
+    "Cradock": {
+        "qf_project_id": "a7464d75-88e7-4e1a-ba3d-7978844b9ab7",
+        "ff_project_id": "d14b5632-8803-4be6-b567-fb091e9e8a7e",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "civil_audit__civil_audit",
+        "label_col": "NAME",
+    },
     # NOTE: "Phalaborwa - Ben Farm" (qf ef0b7147…, ff 67df5c8d…) is NOT registered
     # yet. Its civil audit is split across three team GPKGs — "Civil Audit (BF|LLK|
     # MT).gpkg" — with inconsistent QField relation-table names, and only ~7 photos
     # captured so far. It will be onboarded (with the correct per-GPKG table names)
     # once field QA ramps; until then the coverage-check (worksqa-qfield-ingest.sh)
     # flags it if its upstream photo count crosses the alert threshold.
+    # NOTE: "Middelburg" (qf f076fad4…, ff de408530…) is likewise NOT registered —
+    # linked and active, but only 3 upstream photos, below the coverage-check's
+    # default --threshold 20. Same onboarding path as Cradock once QA ramps.
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)
