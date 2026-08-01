@@ -13,6 +13,20 @@ import { DropsFilters, Summary } from './types';
 const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
 const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
 
+/**
+ * Date expression for filtering dr_photo_unified_reviews.
+ *
+ * `submitted_date` is nullable — roughly 10% of rows on a normal day, and 125 of
+ * 170 rows on 2026-07-29. Filtering on the bare column makes `submitted_date >= $1`
+ * evaluate to NULL for those rows, so they are silently dropped from the result.
+ *
+ * MUST be shared by every consumer that filters this table by date. The summary
+ * card and the per-project table previously diverged here (summary used the
+ * COALESCE, per-project used the bare column), which under-reported the per-project
+ * breakdown by exactly the number of NULL-submitted_date rows in range.
+ */
+export const UNIFIED_DATE_COLUMN = 'COALESCE(submitted_date, created_at::DATE)';
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -77,11 +91,7 @@ export function buildUnifiedConditions(
  * Activated count uses a separate query against oes_activations.
  */
 export async function calculateSummary(filters?: DropsFilters): Promise<Summary> {
-  const unifiedCond = buildUnifiedConditions(
-    filters,
-    'COALESCE(submitted_date, created_at::DATE)',
-    'project'
-  );
+  const unifiedCond = buildUnifiedConditions(filters, UNIFIED_DATE_COLUMN, 'project');
 
   // Build oes_activations params — uses fixed $1/$2 for date range
   const activatedParams: unknown[] = [

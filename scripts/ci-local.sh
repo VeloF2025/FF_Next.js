@@ -155,12 +155,28 @@ if command -v python3 >/dev/null 2>&1; then
     fail "QField extract_project: observable behaviour changed"
     grep '^  FAIL' /tmp/ci-qfield-extract.txt | head -20 | sed 's/^/    /'
   fi
+
+  if python3 scripts/test_qfield_extract_linked_projects.py > /tmp/ci-qfield-linked.txt 2>&1; then
+    pass "QField linked-project paths: behaviour unchanged"
+  else
+    fail "QField linked-project paths: observable behaviour changed"
+    grep '^  FAIL' /tmp/ci-qfield-linked.txt | head -20 | sed 's/^/    /'
+  fi
+
+  if python3 scripts/test_qfield_extract_run_decisions.py > /tmp/ci-qfield-rundec.txt 2>&1; then
+    pass "QField run decisions (delta/spatial-PON): behaviour unchanged"
+  else
+    fail "QField run decisions (delta/spatial-PON): observable behaviour changed"
+    grep '^  FAIL' /tmp/ci-qfield-rundec.txt | head -20 | sed 's/^/    /'
+  fi
 else
   skip "QField step detection: python3 not available"
   skip "QField GPKG resolution: python3 not available"
   skip "QField hierarchy mapping: python3 not available"
   skip "QField project registry: python3 not available"
   skip "QField extract_project characterization: python3 not available"
+  skip "QField linked-project characterization: python3 not available"
+  skip "QField run-decision characterization: python3 not available"
 fi
 
 # ─── Gate 3: TypeScript ──────────────────────────────────────────────────────
