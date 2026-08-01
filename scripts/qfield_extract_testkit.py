@@ -168,9 +168,8 @@ class Harness:
         self.cursor = FakeCursor(state, existing_keys, existing_photo_keys, linked)
         self.conn = FakeConn(self.cursor)
         self._dcim = dcim if dcim is not None else {}
-        # {linked_qf_id: {filename: storage_key}} — per-project so a scenario can tell
-        # "primary wins on conflict" apart from "linked wins", which a single shared
-        # dict cannot express.
+        # {linked_qf_id: {filename: key}} — per-project, so a scenario can tell
+        # "primary wins on conflict" from "linked wins"; one shared dict cannot.
         self._linked_dcim = linked_dcim or {}
         self._hierarchy_backfill = hierarchy_backfill
         # minio_download_latest returns (None, 0) when MinIO has no such object. Without
@@ -226,21 +225,23 @@ class Harness:
     def _patch(self, name, fn):
         """Patch every binding of the target FUNCTION OBJECT, and record invocations.
 
-        Patching by name in a fixed list of modules is not enough, for a reason worth
-        stating: CPython resolves a function's globals in the module where it is
-        DEFINED, so when a call site moves to a new module the old binding keeps
-        existing (as a now-dangling import) while the live call resolves elsewhere.
-        A `hasattr(known_module, name)` check still passes, no error is raised, the
-        patch lands on the dead binding, and the real MinIO/Postgres function runs —
-        with the suite still reporting PASS. That is the precise failure this harness
-        exists to prevent, and a name-based check cannot see it.
+        Patching by NAME in a known list of modules is not enough. CPython resolves a
+        function's globals where it is DEFINED, so when a call site moves the old
+        binding survives as a dangling import while the live call resolves elsewhere:
+        `hasattr(known_module, name)` still passes, the patch lands on the dead
+        binding, the real MinIO/Postgres function runs, and the suite still reports
+        PASS. That is the exact failure this harness exists to prevent.
 
-        So resolve the object and patch every module that binds THAT OBJECT. A
-        dangling import points at the same object and is patched harmlessly; a new
-        module that imported it is patched automatically, with no list to keep in
-        sync. Zero bindings is an error, never a silent no-op.
+        Patching by object closes it — a dangling import points at the same object and
+        is patched harmlessly, a new module is covered automatically, and no list can
+        go stale. Zero bindings is an error, never a silent no-op.
         """
+        # self.mod explicitly: load_extractor() registers under a fixed name, so a
+        # second call in one process orphans the first module — in memory, absent from
+        # sys.modules, therefore unscanned and unpatched.
         mods = _script_modules()
+        if self.mod not in mods:
+            mods.append(self.mod)
         bound = {id(getattr(m, name)): getattr(m, name) for m in mods if hasattr(m, name)}
         if not bound:
             raise AssertionError(
