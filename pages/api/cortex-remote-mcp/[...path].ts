@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { isIP } from 'node:net';
 import { log } from '@/lib/logger';
 import { BODY_TOO_LARGE, MAX_PROXY_BODY_BYTES, pipeUpstreamResponse, readCappedBody } from '@/lib/mcp/proxyStream';
+import rateLimiter from '@/lib/rateLimiter';
 
 export const config = {
   api: {
@@ -11,6 +13,12 @@ export const config = {
 
 const DEFAULT_UPSTREAM = ['http:', '', '127.0.0.1:7414'].join('/');
 const UPSTREAM = (process.env.CORTEX_REMOTE_MCP_URL || DEFAULT_UPSTREAM).replace(/\/$/, '');
+const OAUTH_RATE_WINDOW_MS = 60 * 1000;
+
+interface OAuthRateLimit {
+  endpoint: 'cortex-oauth-authorize' | 'cortex-oauth-register';
+  limit: number;
+}
 
 const HOP_BY_HOP = new Set([
   'connection',
@@ -49,6 +57,56 @@ function forwardHeaders(req: NextApiRequest): Headers {
   return headers;
 }
 
+function oauthRateLimit(req: NextApiRequest, targetPath: string): OAuthRateLimit | null {
+  if (req.method === 'POST' && targetPath === '/register') {
+    return { endpoint: 'cortex-oauth-register', limit: 30 };
+  }
+  if (req.method === 'GET' && targetPath === '/authorize') {
+    return { endpoint: 'cortex-oauth-authorize', limit: 60 };
+  }
+  return null;
+}
+
+function trustedClientIp(req: NextApiRequest): string {
+  const realIp = req.headers['x-real-ip'];
+  if (typeof realIp === 'string') {
+    const candidate = realIp.trim();
+    if (isIP(candidate)) return candidate;
+  }
+
+  const socketIp = req.socket.remoteAddress?.trim();
+  return socketIp && isIP(socketIp) ? socketIp : 'unknown';
+}
+
+function applyOAuthRateLimit(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  targetPath: string,
+): boolean {
+  const policy = oauthRateLimit(req, targetPath);
+  if (!policy) return true;
+
+  const clientIp = trustedClientIp(req);
+  const result = rateLimiter.check(
+    `${policy.endpoint}:${clientIp}`,
+    policy.limit,
+    OAUTH_RATE_WINDOW_MS,
+  );
+  if (result.success) return true;
+
+  const retryAfter = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000));
+  log.warn('Cortex OAuth edge rate limit exceeded', {
+    endpoint: policy.endpoint,
+    clientIp,
+  });
+  res.setHeader('Retry-After', retryAfter);
+  res.status(429).json({
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many OAuth requests' },
+  });
+  return false;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   let targetPath: string;
   try {
@@ -57,6 +115,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     log.warn('Rejected invalid Cortex remote MCP path', { path: req.query.path, error });
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Invalid MCP path' } });
   }
+
+  if (!applyOAuthRateLimit(req, res, targetPath)) return;
 
   const query = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   const upstreamUrl = `${UPSTREAM}${targetPath}${query}`;
