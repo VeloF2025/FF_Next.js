@@ -371,15 +371,23 @@ async function lockedRun(deps: ProcessorDependencies): Promise<VelocityReviewRun
       markDeadlineDeferred(contexts, deadlineDeferredIds);
       break;
     }
-    const claimed = (await Promise.all(Array.from({ length: MAX_CONCURRENT_EXPORTS },
-      () => claimOneWork(deps, eligibleIds))))
-      .flatMap((item) => item ? [item] : []);
+    const claimResults = await Promise.allSettled(Array.from({ length: MAX_CONCURRENT_EXPORTS },
+      () => claimOneWork(deps, eligibleIds)));
+    const claimFailure = claimResults.find((item): item is PromiseRejectedResult => item.status === 'rejected');
+    const claimed = claimResults.flatMap((item) =>
+      item.status === 'fulfilled' && item.value ? [item.value] : []);
     const unique = claimed.filter((item, index) =>
       claimed.findIndex((other) => other.row.id === item.row.id) === index);
     if (unique.length > 0) {
-      await Promise.all(unique.map((item) => processClaimedWork(item, contexts, deps)));
+      const processingResults = await Promise.allSettled(
+        unique.map((item) => processClaimedWork(item, contexts, deps)));
+      const processingFailure = processingResults.find(
+        (item): item is PromiseRejectedResult => item.status === 'rejected');
+      if (claimFailure) throw claimFailure.reason;
+      if (processingFailure) throw processingFailure.reason;
       continue;
     }
+    if (claimFailure) throw claimFailure.reason;
     const now = deps.now().getTime();
     const wakeAt = nextRetryWake(contexts, now);
     if (wakeAt === undefined) break;

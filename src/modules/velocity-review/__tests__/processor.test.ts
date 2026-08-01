@@ -406,6 +406,110 @@ describe('runVelocityReviewExport', () => {
     }
   });
 
+  it('drains claim attempts and processes a successful delayed claim before propagating a claim error', async () => {
+    const claimError = new Error('claim failed');
+    const { deps, rows, events } = runDeps([candidate()]);
+    let releaseClaim!: () => void;
+    const claimGate = new Promise<void>((resolve) => { releaseClaim = resolve; });
+    let markDelayedClaimFinished!: () => void;
+    const delayedClaimFinished = new Promise<void>((resolve) => { markDelayedClaimFinished = resolve; });
+    let claimCalls = 0;
+    deps.exports.claimNextExport = vi.fn(async () => {
+      const call = claimCalls++;
+      if (call === 0) throw claimError;
+      if (call !== 1) return null;
+      await claimGate;
+      const ready = rows.get('DR001')!;
+      const claimed = { ...ready, state: 'upserting' as const, attemptCount: ready.attemptCount + 1 };
+      rows.set(claimed.id, claimed);
+      events.push(`claim:${claimed.drNumber}`);
+      markDelayedClaimFinished();
+      return claimed;
+    });
+
+    let eventsAtSettlement = -1;
+    const outcome = runVelocityReviewExport({}, deps).then(
+      () => ({ status: 'resolved' as const, error: null }),
+      (error: unknown) => {
+        eventsAtSettlement = events.length;
+        return { status: 'rejected' as const, error };
+      },
+    );
+    await vi.waitFor(() => expect(deps.exports.claimNextExport).toHaveBeenCalledTimes(4));
+    const beforeRelease = await Promise.race([
+      outcome.then(() => 'settled' as const),
+      new Promise<'waiting'>((resolve) => setTimeout(() => resolve('waiting'), 0)),
+    ]);
+    releaseClaim();
+    await delayedClaimFinished;
+    const final = await outcome;
+
+    expect(beforeRelease).toBe('waiting');
+    expect(final).toEqual({ status: 'rejected', error: claimError });
+    expect(rows.get('DR001')).toMatchObject({ state: 'completed' });
+    expect(deps.ghl.upsertContact).toHaveBeenCalledOnce();
+    expect(events.length).toBe(eventsAtSettlement);
+  });
+
+  it('settles a delayed successful worker before propagating a sibling processing error', async () => {
+    const workerError = new Error('worker transition failed');
+    const values = [distinctCandidate(0), distinctCandidate(1)];
+    const { deps, rows, events } = runDeps(values);
+    const delayedKey = `key-${values[1].drNumber}`;
+    let releaseWorker!: () => void;
+    const workerGate = new Promise<void>((resolve) => { releaseWorker = resolve; });
+    let markWorkerStarted!: () => void;
+    const workerStarted = new Promise<void>((resolve) => { markWorkerStarted = resolve; });
+    const readCounts = new Map<string, number>();
+    const phones = new Map<string, string>();
+    deps.ghl.upsertContact = vi.fn(async (input) => {
+      phones.set(input.exportKey, input.phoneE164);
+      readCounts.set(input.exportKey, 0);
+      if (input.exportKey === delayedKey) {
+        markWorkerStarted();
+        await workerGate;
+      }
+      return { ...contact(input.exportKey), id: `contact-${input.exportKey}`, phone: input.phoneE164 };
+    });
+    deps.ghl.getContact = vi.fn(async (contactId: string) => {
+      const exportKey = contactId.replace(/^contact-/, '');
+      const reads = readCounts.get(exportKey) ?? 0;
+      readCounts.set(exportKey, reads + 1);
+      return {
+        ...contact(exportKey, reads === 0 ? [] : ['velocity-review-enrolled']),
+        id: contactId,
+        phone: phones.get(exportKey)!,
+      };
+    });
+    const transition = deps.exports.transitionExportState;
+    deps.exports.transitionExportState = vi.fn(async (...args) => {
+      if (args[0] === values[0].drNumber && args[2] === 'contact_upserted') throw workerError;
+      return transition(...args);
+    });
+
+    let eventsAtSettlement = -1;
+    const outcome = runVelocityReviewExport({}, deps).then(
+      () => ({ status: 'resolved' as const, error: null }),
+      (error: unknown) => {
+        eventsAtSettlement = events.length;
+        return { status: 'rejected' as const, error };
+      },
+    );
+    await workerStarted;
+    const beforeRelease = await Promise.race([
+      outcome.then(() => 'settled' as const),
+      new Promise<'waiting'>((resolve) => setTimeout(() => resolve('waiting'), 0)),
+    ]);
+    releaseWorker();
+    const final = await outcome;
+
+    expect(beforeRelease).toBe('waiting');
+    expect(final).toEqual({ status: 'rejected', error: workerError });
+    expect(rows.get(values[1].drNumber)).toMatchObject({ state: 'completed' });
+    expect(deps.ghl.upsertContact).toHaveBeenCalledTimes(2);
+    expect(events.length).toBe(eventsAtSettlement);
+  });
+
   it('exits with a terminal failure when retry attempts are exhausted', async () => {
     const value = candidate();
     const { deps, rows } = runDeps([value]);
