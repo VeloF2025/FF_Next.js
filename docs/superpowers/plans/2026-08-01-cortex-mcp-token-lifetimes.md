@@ -210,7 +210,7 @@ Expected: the `never` case gets `400` and never calls the signer.
 Remove the route-local phase gate and cap-specific catch. Validate and mint:
 
 ```typescript
-const raw: unknown = req.body?.lifetime ?? '30d';
+const raw: unknown = req.body?.lifetime === undefined ? '30d' : req.body.lifetime;
 if (!isCortexMcpLifetime(raw)) {
   return apiResponse.badRequest(
     res,
