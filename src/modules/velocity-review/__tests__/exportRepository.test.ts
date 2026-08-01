@@ -123,6 +123,30 @@ describe('Velocity review export persistence', () => {
     });
   });
 
+  it('redacts transaction errors that contain the candidate phone', async () => {
+    const input = candidate();
+    mocks.transaction.mockRejectedValue(
+      new Error(`failing row contains ${input.phoneE164}`),
+    );
+
+    let caught: unknown;
+    try {
+      await createExport(run, input);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toMatchObject({
+      name: 'VelocityReviewRepositoryError',
+      code: 'velocity_review_export_persistence_failed',
+      message: 'Velocity review export persistence failed',
+    });
+    const exposed = caught instanceof Error
+      ? `${caught.message}\n${caught.stack ?? ''}\n${String(caught.cause ?? '')}`
+      : String(caught);
+    expect(exposed).not.toContain(input.phoneE164);
+  });
+
   it('rejects a stale expected state with a conditional transition', async () => {
     mocks.queryOne.mockResolvedValue(null);
 

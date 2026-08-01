@@ -58,6 +58,15 @@ export interface ExportTransitionUpdates {
   completedAt?: Date | null;
 }
 
+export class VelocityReviewRepositoryError extends Error {
+  readonly code = 'velocity_review_export_persistence_failed';
+
+  constructor() {
+    super('Velocity review export persistence failed');
+    this.name = 'VelocityReviewRepositoryError';
+  }
+}
+
 const EXPORT_COLUMNS = `id, first_run_id, first_target_date, dr_number, phone_e164,
   phone_fingerprint, phone_source, source_flags, export_key, ghl_contact_id, state,
   attempt_count, next_attempt_at, error_code, upserted_at, trigger_requested_at,
@@ -124,31 +133,35 @@ export async function createExport(
   run: VelocityReviewRun,
   candidate: PreparedCandidate,
 ): Promise<{ created: boolean; export: VelocityReviewExport }> {
-  return transaction(async (txn) => {
-    const inserted = await txn.queryOne<ExportRow>(`
-      INSERT INTO velocity_review_exports
-        (first_run_id, first_target_date, dr_number, phone_e164, phone_fingerprint,
-         phone_source, source_flags, state)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready')
-      ON CONFLICT (dr_number, phone_fingerprint) DO NOTHING
-      RETURNING ${EXPORT_COLUMNS}
-    `, [run.id, run.targetDate, candidate.drNumber, candidate.phoneE164,
-      candidate.phoneFingerprint, candidate.phoneSource, candidate.sources]);
+  try {
+    return await transaction(async (txn) => {
+      const inserted = await txn.queryOne<ExportRow>(`
+        INSERT INTO velocity_review_exports
+          (first_run_id, first_target_date, dr_number, phone_e164, phone_fingerprint,
+           phone_source, source_flags, state)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready')
+        ON CONFLICT (dr_number, phone_fingerprint) DO NOTHING
+        RETURNING ${EXPORT_COLUMNS}
+      `, [run.id, run.targetDate, candidate.drNumber, candidate.phoneE164,
+        candidate.phoneFingerprint, candidate.phoneSource, candidate.sources]);
 
-    const canonical = inserted ?? await txn.queryOne<ExportRow>(`
-      SELECT ${EXPORT_COLUMNS} FROM velocity_review_exports
-      WHERE dr_number = $1 AND phone_fingerprint = $2
-    `, [candidate.drNumber, candidate.phoneFingerprint]);
-    if (!canonical) throw new Error('Velocity review export could not be persisted');
+      const canonical = inserted ?? await txn.queryOne<ExportRow>(`
+        SELECT ${EXPORT_COLUMNS} FROM velocity_review_exports
+        WHERE dr_number = $1 AND phone_fingerprint = $2
+      `, [candidate.drNumber, candidate.phoneFingerprint]);
+      if (!canonical) throw new Error('Velocity review export could not be persisted');
 
-    const linked = await txn.query<{ export_id: string } & SqlRow>(`
-      UPDATE velocity_review_candidates SET export_id = $3, updated_at = NOW()
-      WHERE target_date = $1 AND dr_number = $2
-      RETURNING export_id
-    `, [run.targetDate, candidate.drNumber, canonical.id]);
-    if (!linked[0]) throw new Error('Velocity review candidate export could not be linked');
-    return { created: inserted !== null, export: mapExport(canonical) };
-  });
+      const linked = await txn.query<{ export_id: string } & SqlRow>(`
+        UPDATE velocity_review_candidates SET export_id = $3, updated_at = NOW()
+        WHERE target_date = $1 AND dr_number = $2
+        RETURNING export_id
+      `, [run.targetDate, candidate.drNumber, canonical.id]);
+      if (!linked[0]) throw new Error('Velocity review candidate export could not be linked');
+      return { created: inserted !== null, export: mapExport(canonical) };
+    });
+  } catch {
+    throw new VelocityReviewRepositoryError();
+  }
 }
 
 export async function claimNextExport(now: Date): Promise<VelocityReviewExport | null> {
