@@ -20,6 +20,25 @@ unrelated later scenario, or leaks silently if nothing else touches that name.
 
 Zero bindings is an error, never a silent no-op: an unpatched I/O call means the suite
 quietly exercises production infrastructure while still reporting green.
+
+WHAT THIS CANNOT CLOSE — read before adding a patched name. Attribute patching only
+finds bindings literally named `name`. Any capture-by-value that ALSO renames the call
+site escapes it entirely and silently:
+
+    resolve_with_retry = functools.partial(minio_resolve_photo_version)   # captured
+    ...
+    wrapper_mod.resolve_with_retry(qf, path)     # never resolves the patched name
+
+(Also default-arg capture, decorators, and closures.) Verified: the bare name is
+patched while the partial still wraps the real function. No identity scan can fix this
+— the object was copied before patching happened.
+
+The backstop is not structural, it is a convention: EVERY patched name has an explicit
+`stub_calls[name] > 0` assertion somewhere in the suite — 6 in the interception-guard
+group, and the 2 conditional ones (resolve_spatial_pon_map,
+minio_resolve_photo_version) in the scenarios that trigger them. That convention is
+what actually catches the case above. If you add a 9th patched name, add its assertion
+too; the machinery here will not save you.
 """
 import os
 import sys
