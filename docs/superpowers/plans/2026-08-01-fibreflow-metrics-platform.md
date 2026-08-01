@@ -142,21 +142,22 @@ const wrote = (deps: { calls: string[] }) =>
 describe('writeSnapshot', () => {
   it('writes rows and logs completion when it takes the lock', async () => {
     const deps = fakeDeps();
-    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 2, skipped: false });
+    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 2, skipped: false, written: true });
     expect(deps.calls).toContain('COMMIT');
     expect(deps.calls.some((c) => c.includes('INSERT INTO snapshot_runs'))).toBe(true);
   });
 
-  it('skips without writing when a concurrent run holds the lock', async () => {
+  it('reports NOT written when a concurrent run holds the lock', async () => {
     const deps = fakeDeps({ locked: false });
-    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 0, skipped: true });
+    // written:false is the point — the caller must not treat this as a success.
+    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 0, skipped: true, written: false });
     expect(wrote(deps)).toBe(false);
     expect(deps.calls).toContain('ROLLBACK');
   });
 
-  it('skips when the day is already complete', async () => {
+  it('reports written when the day is already complete', async () => {
     const deps = fakeDeps({ alreadyDone: true });
-    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 0, skipped: true });
+    expect(await writeSnapshot('pp_open', asOf, deps)).toEqual({ rows: 0, skipped: true, written: true });
     expect(wrote(deps)).toBe(false);
   });
 
@@ -281,6 +282,19 @@ export interface SnapshotSource {
   /**
    * SELECT returning exactly: entity_id TEXT, dims JSONB, measures JSONB.
    * Must be a pure read and must NOT reference metric_snapshots.
+   *
+   * It is embedded in the writer's INSERT, where two parameters are already bound:
+   *   $1 = source_key, $2 = as_of date.
+   * Use `$2::date` for anything date-relative — **never `CURRENT_DATE` or `NOW()`**.
+   * A snapshot is an immutable record of a specific day; deriving an age from the
+   * clock instead of from `as_of` makes a backfilled or retried run produce
+   * different measures than the original, and makes a run between 00:00 and 02:00
+   * SAST record the previous UTC day. Cast TIMESTAMPTZ columns explicitly with
+   * `AT TIME ZONE 'Africa/Johannesburg'` rather than relying on the session default.
+   *
+   * `entity_id` MUST be unique within the source. There is no ON CONFLICT clause —
+   * a duplicate aborts the transaction so the day is retried rather than silently
+   * undercounted.
    */
   sql: string;
 }
@@ -307,7 +321,7 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
           'serial',   p.serial_number
         ) AS dims,
         jsonb_build_object(
-          'age_days',          (CURRENT_DATE - p.date_registered),
+          'age_days',          ($2::date - p.date_registered),
           'resolution_status', p.resolution_status,
           'registered_on',     p.date_registered
         ) AS measures
@@ -334,7 +348,7 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
         jsonb_build_object('project', p.project_name) AS dims,
         jsonb_build_object(
           'status',   t.status,
-          'age_days', (CURRENT_DATE - t.created_at::date)
+          'age_days', ($2::date - (t.created_at AT TIME ZONE 'Africa/Johannesburg')::date)
         ) AS measures
       FROM maintenance_tickets t
       LEFT JOIN projects p ON p.id = NULLIF(t.project_id, '')::uuid
@@ -361,7 +375,15 @@ interface QueryDeps {
 
 export interface SnapshotResult {
   rows: number;
+  /** True when this call did not write (already done, or lock held elsewhere). */
   skipped: boolean;
+  /**
+   * True only when a completion row for (source, day) is known to exist — either
+   * this call wrote it, or it was already there. False means the day is NOT
+   * recorded and must be re-run. `skipped` alone cannot express that difference:
+   * "someone else is doing it" and "it is done" are not the same outcome.
+   */
+  written: boolean;
 }
 
 /**
@@ -406,9 +428,14 @@ export async function writeSnapshot(
       [sourceKey, asOf],
     );
     if ((lock.rows?.[0] as { locked?: boolean })?.locked !== true) {
+      // Losing the lock is NOT success. The winner may still fail and roll back,
+      // and a hashtext collision means the holder might be a different source
+      // entirely. Reporting `skipped` here would let the caller return 200 for a
+      // night that never got written. Signal not-done so the cron reports non-2xx
+      // and the day can be re-run.
       await deps.query('ROLLBACK');
-      log.info('Snapshot locked by a concurrent run — skipping', { sourceKey, asOf });
-      return { rows: 0, skipped: true };
+      log.warn('Snapshot lock held by a concurrent run — not written', { sourceKey, asOf });
+      return { rows: 0, skipped: true, written: false };
     }
 
     const done = await deps.query(
@@ -418,7 +445,7 @@ export async function writeSnapshot(
     if (done.rows?.length) {
       await deps.query('ROLLBACK');
       log.info('Snapshot already complete — skipping', { sourceKey, asOf });
-      return { rows: 0, skipped: true };
+      return { rows: 0, skipped: true, written: true };
     }
 
     // Clear anything a previous rolled-back attempt somehow left, so this is a clean
@@ -430,8 +457,13 @@ export async function writeSnapshot(
 
     const inserted = await deps.query(
       `INSERT INTO metric_snapshots (source_key, as_of_date, entity_id, dims, measures)
-       SELECT $1, $2::date, s.entity_id, s.dims, s.measures FROM (${source.sql}) s
-       ON CONFLICT (source_key, as_of_date, entity_id) DO NOTHING`,
+       SELECT $1, $2::date, s.entity_id, s.dims, s.measures FROM (${source.sql}) s`,
+      // Deliberately NO "ON CONFLICT DO NOTHING". A duplicate entity_id means the
+      // source's key is not unique; silently dropping the row and then recording
+      // the day complete would bake in an undercount permanently. Let the unique
+      // index raise, abort the transaction, and leave the day to be retried.
+      // (This is how oes_pp_data.serial_number would have failed loudly rather
+      // than silently, had it still been used as the key.)
       [sourceKey, asOf],
     );
     const rows = inserted.rowCount ?? 0;
@@ -443,7 +475,7 @@ export async function writeSnapshot(
 
     await deps.query('COMMIT');
     log.info('Snapshot written', { sourceKey, asOf, rows });
-    return { rows, skipped: false };
+    return { rows, skipped: false, written: true };
   } catch (error) {
     // Roll back, but never let a rollback failure mask the original error.
     try {
@@ -490,7 +522,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // SAST date — the server runs UTC, and a UTC date would roll the snapshot at 02:00 local.
-  const asOf = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // An explicit ?date= makes a missed or failed night re-runnable. Without it,
+  // "absence of a completion row is the retry signal" has no consumer: the route
+  // would only ever address today, so any night lost to a crash stays lost.
+  const requested = req.query.date;
+  if (requested !== undefined && (typeof requested !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(requested))) {
+    return apiResponse.badRequest(res, 'date must be YYYY-MM-DD');
+  }
+  const asOf = requested ?? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const client = await pool.connect();
   const results: Record<string, unknown> = {};
@@ -498,7 +537,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     for (const source of SNAPSHOT_SOURCES) {
       try {
-        results[source.key] = await writeSnapshot(source.key, asOf, client);
+        const result = await writeSnapshot(source.key, asOf, client);
+        results[source.key] = result;
+        // Not written = the day is not recorded. Treat it as a failure so the
+        // cron reports non-2xx rather than a green run over a missing snapshot.
+        if (!result.written) failed.push(source.key);
       } catch (error) {
         // One bad source must not stop the others — a skipped day is unrecoverable.
         // But the RESPONSE must not be 200, or a failed snapshot looks like a success
@@ -829,14 +872,34 @@ export interface MetricDefinition {
   /** Extra always-on predicate, without the WHERE keyword. */
   filter?: string;
   /**
-   * True when `measure` is a RUNNING TOTAL rather than a per-period value.
-   * A cumulative series must never be summed across periods — the total is the
-   * LAST period's value, not the sum of all of them. Getting this wrong inflates
-   * silently: `project_weekly_zone_pon_uptake.installed` runs 21,666 → 22,556 →
-   * 23,342 → 23,732, so summing a month reports ~91k against a true ~23.7k.
-   * Nothing in the SQL reveals this — only the source table's documentation does.
+   * How this measure may be aggregated. **The single most important field here.**
+   *
+   * Three review rounds each found a different instance of the same error —
+   * summing something that cannot be summed over time — so this is a required
+   * three-way choice, not an optional boolean. There is no default: every metric
+   * must state its additivity explicitly, because guessing is what caused the bug.
+   *
+   *  'additive'      Sum freely across time AND dimensions. An event count.
+   *                  e.g. install_activation_gap — each row is a distinct event.
+   *
+   *  'semi-additive' Sum across DIMENSIONS but NEVER across time. A level, a
+   *                  balance, a running total, or a point-in-time stock. The
+   *                  value for a span is the LATEST period's value.
+   *                  e.g. zone_uptake (a running total: 21,666 → 22,556 → 23,342
+   *                  → 23,732, so summing July reports ~91k against a true ~23.7k)
+   *                  and pp_open_balance (a nightly stock: an entity open for
+   *                  eight nights appears in eight snapshots and would be counted
+   *                  eight times).
+   *
+   *  'non-additive'  Cannot be summed at all — ratios, percentages, averages.
+   *                  Must be recomputed from components at each grain. No metric
+   *                  uses this yet; it exists so nobody reaches for 'additive'
+   *                  when registering a rate.
+   *
+   * Nothing in the SQL reveals which applies. Read the source table's
+   * documentation before choosing, and record why in the definition's comment.
    */
-  cumulative?: boolean;
+  additivity: 'additive' | 'semi-additive' | 'non-additive';
   grains: readonly Grain[];
   dimensions: readonly string[];
   aliases: readonly string[];
@@ -866,7 +929,7 @@ export const METRICS: readonly MetricDefinition[] = [
     description:
       'Cumulative installed drops per zone and PON, as at each billing week. A running total, not a weekly delta.',
     // ⚠️ `installed` is CUMULATIVE (migration 276 line 4 and the table comment).
-    // Summing across weeks inflates ~4x over a month. `cumulative: true` makes
+    // Summing across weeks inflates ~4x over a month. 'semi-additive' makes
     // executeMetric report the LAST period's value as the total instead of a sum.
     // Within a single week_ending, summing across zones IS correct — that is what
     // the per-period aggregate does. Grains are therefore restricted to week/range;
@@ -881,7 +944,7 @@ export const METRICS: readonly MetricDefinition[] = [
     ) src`,
     measure: 'sum(src.installed)',
     dateColumn: 'src.week_ending',
-    cumulative: true,
+    additivity: 'semi-additive',
     grains: ['week'],
     dimensions: ['project', 'zone'],
     aliases: ['zone uptake', 'uptake', 'installed per zone', 'homes installed'],
@@ -918,6 +981,9 @@ export const METRICS: readonly MetricDefinition[] = [
     ) src`,
     measure: 'count(*)',
     dateColumn: 'src.installed_at',
+    // Each row is one drop installed-but-not-activated on a given date: a
+    // distinct event, so summing across days and projects is correct.
+    additivity: 'additive',
     grains: ['day', 'week', 'month', 'range'],
     dimensions: ['project'],
     aliases: ['installation gap', 'installed not activated', 'activation gap', 'never went live'],
@@ -939,7 +1005,13 @@ export const METRICS: readonly MetricDefinition[] = [
     ) src`,
     measure: 'count(*)',
     dateColumn: 'src.as_of_date',
-    grains: ['day', 'range'],
+    // A nightly STOCK, not an event count. The same DR appears in every night's
+    // snapshot while it stays open, so summing across days counts one entity once
+    // per night it was open — 1,061 open PPs over a week would report ~7,400.
+    // 'semi-additive' makes the builder reject 'range' and the executor report the
+    // latest night. Summing across project/POP within one night is still correct.
+    additivity: 'semi-additive',
+    grains: ['day'],
     dimensions: ['project', 'pop'],
     aliases: ['open pre-provisions', 'pp balance', 'pre-provision backlog', 'pp open'],
     cite: 'FibreFlow metric_snapshots (source_key=pp_open) by as_of_date',
@@ -1057,10 +1129,11 @@ export function buildMetricQuery(
 
   // A cumulative measure collapsed to a single bucket would sum several running
   // totals into a meaningless number. Refuse rather than return it.
-  if (def.cumulative && query.grain === 'range') {
+  if (def.additivity !== 'additive' && query.grain === 'range') {
     throw new Error(
-      `unsupported grain 'range' for cumulative metric '${def.key}' — ` +
-        `a range would sum running totals. Request a periodic grain and read the final period.`,
+      `unsupported grain 'range' for ${def.additivity} metric '${def.key}' — ` +
+        `collapsing the period would sum values that are not summable over time. ` +
+        `Request a periodic grain and read the final period.`,
     );
   }
 
@@ -1422,11 +1495,16 @@ describe('GET /api/metrics-query', () => {
   });
 
   it('counts an inclusive range correctly at the boundary', async () => {
-    // 2026-01-01..2026-12-31 is exactly 366 days in a leap year — allowed.
-    // Adding one more day must be rejected, proving the +1 is present.
-    const res = mockRes();
-    await handler(get({ key: 'zone_uptake', from: '2026-01-01', to: '2027-01-01', grain: 'week' }), res as never);
-    expect(res.status).toHaveBeenCalledWith(400);
+    // 2026-01-01..2027-01-01 is exactly 366 inclusive days — the limit, allowed.
+    // 2027-01-02 is 367 and must be rejected. Asserting only the reject side would
+    // also pass if the +1 were missing, so both sides are checked.
+    const ok = mockRes();
+    await handler(get({ key: 'zone_uptake', from: '2026-01-01', to: '2027-01-01', grain: 'week' }), ok as never);
+    expect(ok.status).not.toHaveBeenCalledWith(400);
+
+    const tooLong = mockRes();
+    await handler(get({ key: 'zone_uptake', from: '2026-01-01', to: '2027-01-02', grain: 'week' }), tooLong as never);
+    expect(tooLong.status).toHaveBeenCalledWith(400);
   });
 });
 ```
@@ -1455,9 +1533,9 @@ export interface MetricResponse {
   key: string;
   label: string;
   grain: string;
-  /** True when `total` is the latest period's running total, not a sum of the series. */
-  cumulative: boolean;
-  /** For a cumulative metric, the period `total` is "as at". Null otherwise. */
+  /** How `total` was derived: 'additive' sums the series; anything else takes the latest period. */
+  additivity: 'additive' | 'semi-additive' | 'non-additive';
+  /** For a non-additive/semi-additive metric, the period `total` is "as at". Null otherwise. */
   total_period: string | null;
   as_of: string;
   total: number;
@@ -1533,7 +1611,7 @@ export async function executeMetric(
   // see the as-at date shift. Do not silently carry values forward.
   let total: number;
   let totalPeriod: string | null = null;
-  if (def.cumulative) {
+  if (def.additivity !== 'additive') {
     const periods = series.map((p) => p.period).filter((p): p is string => p !== null);
     // Lexical max is correct because to_char guarantees zero-padded ISO.
     totalPeriod = periods.length ? periods.reduce((a, b) => (a > b ? a : b)) : null;
@@ -1548,7 +1626,7 @@ export async function executeMetric(
     key: def.key,
     label: def.label,
     grain: query.grain,
-    cumulative: def.cumulative === true,
+    additivity: def.additivity,
     total_period: totalPeriod,
     as_of: asOf,
     total,
@@ -1592,7 +1670,7 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
       aliases: m.aliases,
       // Consumers must know this to interpret `total` — for a cumulative metric it
       // is the latest period's running total, not a sum of the series.
-      cumulative: m.cumulative === true,
+      additivity: m.additivity,
       source: m.cite,
     })),
   );
@@ -1601,7 +1679,72 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
 export default withAuth(handler);
 ```
 
-**Both endpoints export the wrapped handler as default and the bare handler as a named export.** Tests import the *named* `handler` so they exercise the 400/404/405 paths directly; a test hitting the wrapped default gets 401 before reaching any of them, which is how the first draft's endpoint tests were silently asserting nothing.
+**All three endpoints export the wrapped handler as default and the bare handler as a named export.** Tests import the *named* `handler` so they exercise the 400/404/405 paths directly; a test hitting the wrapped default gets 401 before reaching any of them, which is how the first draft's endpoint tests were silently asserting nothing.
+
+`metrics-list` also filters by caller permission — authentication alone is not authorisation, and the catalogue exposes internal table names and predicates in `cite`:
+
+```typescript
+// inside the metrics-list handler, after auth:
+const authReq = req as AuthenticatedNextApiRequest;
+const visible = await Promise.all(
+  METRICS.map(async (m) =>
+    authReq.user.role === 'super_admin' ||
+    (await userHasPermission(authReq.user.id, m.permission, 'view'))
+      ? m
+      : null,
+  ),
+);
+// ...then map over visible.filter(Boolean) instead of METRICS.
+```
+
+- [ ] **Step 4a: Add the match endpoint — otherwise `matchMetric` is dead code**
+
+`matchMetric()` is TypeScript inside FibreFlow. Cortex is a separate Python process, and `metrics-list`/`metrics-query` only expose *query by key*. Without an endpoint, nothing can reach the matcher, its unit test proves only that local dead code works, and Cortex has no way to return candidates for an ambiguous question — which was the whole point of building it.
+
+Exposing it here (rather than reimplementing the matcher in Python) keeps the aliases in exactly one place: the registry. Cortex stays a thin client, which is the architectural decision this plan rests on.
+
+```typescript
+// pages/api/metrics-match.ts
+// GET /api/metrics-match?q=how+many+open+pre-provisions
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
+import { matchMetric } from '@/modules/metrics/registry/intent';
+
+export async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
+  }
+  const q = req.query.q;
+  if (typeof q !== 'string' || !q.trim()) {
+    return apiResponse.badRequest(res, 'q is required');
+  }
+
+  const match = matchMetric(q);
+  // The shape is deliberately explicit about which case occurred, so the caller
+  // cannot mistake "ambiguous" for "no match" and quietly pick one.
+  if (match.kind === 'none') return apiResponse.success(res, { kind: 'none' });
+  if (match.kind === 'ambiguous') {
+    return apiResponse.success(res, {
+      kind: 'ambiguous',
+      candidates: match.candidates.map((m) => ({
+        key: m.key, label: m.label, description: m.description,
+      })),
+    });
+  }
+  return apiResponse.success(res, {
+    kind: 'exact',
+    metric: {
+      key: match.metric.key,
+      label: match.metric.label,
+      grains: match.metric.grains,
+      dimensions: match.metric.dimensions,
+    },
+  });
+}
+
+export default withAuth(handler);
+```
 
 ```typescript
 // pages/api/metrics-query.ts
@@ -1776,15 +1919,15 @@ curl -s 'localhost:3004/api/metrics-query?key=pp_open_balance&from=2026-07-25&to
 curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:3004/api/metrics-query
 ```
 
-Expected: a daily series plus a total, with `as_of`, `grain`, `cumulative:false` and the citation envelope present. Mohadin should dominate the open balance (≈708 of ≈1,061). **A zero total means the snapshot cron has not run yet, not that the metric is broken** — check `snapshot_runs` for a `complete` row before debugging the metric.
+Expected: a daily series plus a total, with `as_of`, `grain`, `additivity:'semi-additive'`, `total_period` and the citation envelope present. Mohadin should dominate the open balance (≈708 of ≈1,061). **A zero total means the snapshot cron has not run yet, not that the metric is broken** — check `snapshot_runs` for a `complete` row before debugging the metric.
 
-Also verify the cumulative path explicitly, because this is the one that fails silently:
+Also verify the semi-additive path explicitly, because this is the one that fails silently:
 
 ```bash
 curl -s 'localhost:3004/api/metrics-query?key=zone_uptake&from=2026-07-01&to=2026-07-31&grain=week'
 ```
 
-Expected: `cumulative:true`, a rising weekly series (≈21,666 → 22,556 → 23,342 → 23,732), and a `total` equal to the **last** week (≈23,732) — **not** their sum (≈91,296). If the total is ~91k the cumulative handling is broken; the numbers look plausible, so only this comparison catches it.
+Expected: `additivity:'semi-additive'`, a `total_period` naming the final week, a rising weekly series (≈21,666 → 22,556 → 23,342 → 23,732), and a `total` equal to the **last** week (≈23,732) — **not** their sum (≈91,296). If the total is ~91k the semi-additive handling is broken; the numbers look plausible, so only this comparison catches it.
 
 - [ ] **Step 8: Commit**
 
@@ -1811,9 +1954,25 @@ git commit -m "feat(metrics): expose metrics.list and metrics.query with RBAC an
 
 The constraint is explicit: do not change the existing response shape until `pp_new` is registered and verified equivalent. `pp_new` lands in **Plan 2**, not here. So `preprovisions` stays exactly as it is, still reading `dr_activity_log`. Only the three new metrics route through the registry.
 
-- [ ] **Step 2: Replace the silent-None fallback for registry-backed metrics**
+- [ ] **Step 2: Remove the silent-RAG fallback for registry-backed metrics entirely**
 
-`run_metric` currently returns `None` on any failure, so the caller silently falls back to RAG prose. For registry metrics: a **4xx** must surface as an answer explaining the problem (unknown metric, ambiguous question, unsupported grain); only a **5xx or timeout** should fall back to RAG. Add a test asserting an ambiguous question returns the candidate list rather than a number.
+`run_metric` currently returns `None` on any failure, so the caller silently falls back to RAG prose.
+
+An earlier draft of this step kept that fallback for 5xx and timeouts. That was self-contradictory: this plan exists because a confidently wrong answer is worse than no answer, and a 5xx is *precisely* the case where authoritative measurement is unavailable. Falling back to uncited prose there preserves the exact failure mode being fixed, at the worst possible moment.
+
+So: once a question has matched a registry metric, **every** outcome is reported as itself.
+
+| Outcome | Response |
+|---|---|
+| `kind: 'exact'` + 200 | the number, with its citation |
+| `kind: 'ambiguous'` | the candidate list — "did you mean X or Y?" |
+| `kind: 'none'` | fall through to RAG (it was never a metric question) |
+| 4xx | explain the problem (unknown metric, unsupported grain, bad range) |
+| **5xx / timeout / unreachable** | **"the metrics service is unavailable" — never prose** |
+
+Only `kind: 'none'` reaches RAG, and that is correct: the question was not a metric question in the first place.
+
+Cortex calls `/api/metrics-match` first, then `/api/metrics-query` with the resolved key. Add tests asserting (a) an ambiguous question returns candidates rather than a number, and (b) a simulated 500 from the metrics service returns an unavailability message rather than a RAG answer.
 
 - [ ] **Step 3: Write the README**
 
@@ -1843,12 +2002,12 @@ git commit -m "docs(metrics): how to register a new metric"
 | Period type | `period` in every response matches `^\d{4}-\d{2}-\d{2}$`. A `Date`-stringified value like `Mon Jul 21` means the `to_char` was reverted |
 | Conformed dimensions | `TEM-3` and `ETW-2` appear in no metric output; SQL/TS parity test passes |
 | Registry | Every metric executes for every declared grain × dimension against the live schema |
-| **Cumulative** | `zone_uptake` for a multi-week range returns `total` = the **last** week (≈23,732), not the sum (≈91,296) |
+| **Additivity** | `zone_uptake` over multiple weeks returns `total` = the **last** week (≈23,732), not the sum (≈91,296). `pp_open_balance` rejects `range` grain. Every registered metric declares `additivity` explicitly |
 | **Transport** | `GET /api/metrics-query` succeeds; `POST` returns 405. An MCP-kind session can reach both endpoints |
 | Date bounds | A metric on a timestamp column returns rows dated on the `to` date itself (half-open bound, not `BETWEEN`) |
 | Input validation | Malformed date, impossible date (`2026-02-31`), inverted range, and >366-day range each return 400 |
 | Intent | An ambiguous question returns candidates, never a number — proven against an injected tied pair, not a tautological assertion |
-| Contract | Every response carries `as_of`, `grain`, `cumulative`, and the 5-field citation envelope |
+| Contract | Every response carries `as_of`, `grain`, `additivity`, `total_period`, and the 5-field citation envelope |
 | RBAC | Unauthenticated → 401; unpermitted → 403; null session denies rather than fails open |
 | Cron auth | Unset `CRON_SECRET` returns 500, not success; a failed source returns non-2xx |
 | Timeout | `statement_timeout` demonstrably applies — a deliberately slow query aborts at 8s rather than running unbounded |
