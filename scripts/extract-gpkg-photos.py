@@ -47,17 +47,12 @@ from qfield_project_registry import ALTERNATE_GPKGS, OPTICAL_GPKGS, PROJECTS
 # monkeypatches these via setattr() on this module, which only works for names bound
 # in this namespace. `qfield_gpkg_storage.minio_download_latest(...)` would bypass the
 # patch and silently blind the test suite.
-from qfield_gpkg_storage import (
-    minio_download_latest,
-    minio_list_gpkg_family,
-    minio_list_gpkg_versions,
-    resolve_gpkg_path,
-)
-from qfield_photo_storage import (
-    minio_list_dcim_directory,
-    minio_resolve_photo_version,
-    qfc_list_dcim_files,
-)
+# Only the four names this file actually CALLS are imported. The lower-level helpers
+# (minio_list_gpkg_versions/_family, qfc_list_dcim_files) are reached from inside the
+# storage modules' own namespaces, so importing them here would be dead — and worse
+# than dead: it would imply they are patchable from this module, which they are not.
+from qfield_gpkg_storage import minio_download_latest, resolve_gpkg_path
+from qfield_photo_storage import minio_list_dcim_directory, minio_resolve_photo_version
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
