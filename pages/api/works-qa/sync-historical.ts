@@ -114,12 +114,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         source: row.source,
       });
 
-      // Insert if missing (zone/PON from review or sow_poles fallback)
+      // Insert if missing (zone/PON from review, else v_pole_planning fallback —
+      // migration 472: sow_poles COALESCE'd over public.poles)
       await pool.query(`
         INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
         SELECT $1::uuid, $2, COALESCE($3::int, sp.zone_no), COALESCE($4::int, sp.pon_no)
         FROM (SELECT 1) one
-        LEFT JOIN sow_poles sp ON sp.project_id = $1::uuid AND sp.pole_number = $2
+        LEFT JOIN v_pole_planning sp ON sp.project_id = $1::uuid AND sp.pole_number = $2
         ON CONFLICT (project_id, pole_label) DO UPDATE
         SET zone_no = COALESCE(pole_qa_photos.zone_no, EXCLUDED.zone_no),
             pon_no  = COALESCE(pole_qa_photos.pon_no,  EXCLUDED.pon_no)

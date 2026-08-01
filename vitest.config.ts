@@ -46,6 +46,7 @@ export default defineConfig({
       'tests/migrations/358_snag_reports_scope.test.ts',
       'tests/migrations/378_rbac_field_stock_force_correct.test.ts',
       'tests/migrations/471_hs_training_certificate_upload.test.ts',
+      'tests/migrations/472_works_qa_pole_planning_view.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.
       //
