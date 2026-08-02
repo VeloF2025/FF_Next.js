@@ -51,7 +51,7 @@ export const TABS: Tab[] = [
   },
   {
     id: 'corrections',
-    label: 'Corrections',
+    label: 'Actions',
     href: '/staff/attendance/corrections',
   },
   {

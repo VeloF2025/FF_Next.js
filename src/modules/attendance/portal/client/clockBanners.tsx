@@ -58,3 +58,12 @@ export function PendingQueueBanner({
     </div>
   );
 }
+
+export function QueueSyncIssuesBanner({ failureCount }: { failureCount: number }) {
+  return (
+    <div className="rounded-lg bg-amber-950/40 border border-amber-800 px-3 py-2 text-sm text-amber-200 mb-3">
+      {failureCount} other queued event{failureCount === 1 ? '' : 's'}{' '}
+      {failureCount === 1 ? 'was' : 'were'} not submitted.
+    </div>
+  );
+}

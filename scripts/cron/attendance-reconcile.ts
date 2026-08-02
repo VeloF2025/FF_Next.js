@@ -2,13 +2,12 @@
 /**
  * Attendance reconcile cron — Phase 1b.
  *
- * Runs nightly. Two duties:
- *   1. Auto-close `status='open'` entries older than 16h (missing_clock_out).
- *   2. Compute + upsert attendance_daily_summaries for closed entries within
- *      the last 14 days that don't yet have a summary row.
+ * Runs nightly over the previous SAST work date by default. It operationally
+ * closes stale sessions without manufacturing clock-out evidence, then writes
+ * schedule-policy projections, idempotent exceptions and durable run health.
  *
  * Usage:
- *   # standard nightly run (previous 14 days through today)
+ *   # standard nightly run (previous 14 days through yesterday in SAST)
  *   npx tsx scripts/cron/attendance-reconcile.ts
  *
  *   # explicit range (e.g., month-end retro)
@@ -28,10 +27,8 @@
  *   - Fine-grained events inside reconcile.ts still go to the in-memory
  *     logger — visible via the usual /api/system/logs path in the app.
  *
- * Exits non-zero ONLY on unrecoverable errors (missing DATABASE_URL, no
- * default rule seeded, top-level throw). Per-entry failures are counted
- * in the report and logged, but do not fail the run — a single bad row
- * must not block payroll for the rest of the company.
+ * Exits non-zero on an unrecoverable error. Day failures remain visible in the
+ * persisted run and report without blocking successful worker/date projections.
  *
  * Imports ordering matters: dotenv MUST run before we import modules that
  * instantiate the pg.Pool (db-pool.ts constructs the pool at module load).
@@ -89,18 +86,17 @@ function parseArg(name: string): string | undefined {
     stderr(
       `[attendance-reconcile] done ` +
         `scanned=${report.scannedFrom}..${report.scannedTo} ` +
-        `autoClosed=${report.autoClosed} ` +
-        `summaries=${report.summariesUpserted} ` +
-        `skippedIncomplete=${report.summariesSkippedIncomplete} ` +
-        `capViolations=${report.weeklyCapViolations} ` +
-        `perEntryErrors=${report.errorsPerEntry.length} ` +
+        `systemClosed=${report.systemClosed} ` +
+        `projectedDays=${report.projectedDays} ` +
+        `unchangedDays=${report.unchangedDays} ` +
+        `missingClockOut=${report.missingClockOutExceptions} ` +
+        `missingClockIn=${report.missingClockInExceptions} skippedLocked=${report.skippedLockedDays} ` +
+        `failedDays=${report.failedDayKeys.length} ` +
         `durationMs=${Date.now() - startedAt}`
     );
-    if (report.errorsPerEntry.length > 0) {
+    if (report.failedDayKeys.length > 0) {
       stderr(
-        `[attendance-reconcile] failed entryIds=${report.errorsPerEntry
-          .map((e) => e.entryId)
-          .join(',')}`
+        `[attendance-reconcile] failedDayKeys=${report.failedDayKeys.join(',')}`
       );
     }
     process.exit(0);

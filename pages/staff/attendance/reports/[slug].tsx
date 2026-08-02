@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, Download, FileText } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AttendanceNav } from '@/components/attendance/AttendanceNav';
 import { log } from '@/lib/logger';
@@ -27,17 +27,16 @@ import {
   type ReportSlug,
 } from '@/services/attendance/reports/types';
 import { ReportFilterBar } from '@/components/attendance/reports/ReportFilterBar';
-import { ReportTable } from '@/components/attendance/reports/ReportTable';
+import { ReportExportButtons } from '@/components/attendance/reports/ReportExportButtons';
+import {
+  ReportResultPanel,
+  type ScopeNote,
+} from '@/components/attendance/reports/ReportResultPanel';
 import {
   buildQuery,
   lastCompletedMonthSast,
   type ReportFormState,
 } from '@/components/attendance/reports/reportFormatters';
-
-type ScopeNote =
-  | { kind: 'orgwide' }
-  | { kind: 'scoped'; staffCount: number }
-  | { kind: 'no_scope'; reason: string };
 
 interface ReportResponse {
   slug: ReportSlug;
@@ -72,7 +71,6 @@ export default function ReportSlugPage() {
   const [data, setData] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
 
   // Initialise group_by + dateRange from the catalogue defaults once we know the slug.
   useEffect(() => {
@@ -139,42 +137,6 @@ export default function ReportSlugPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, def?.slug]);
 
-  const onExport = async (format: 'csv' | 'xlsx') => {
-    if (!def) return;
-    setExporting(format);
-    try {
-      const q = buildQuery(def.slug, def, form);
-      q.set('format', format);
-      const res = await fetch(`/api/staff/attendance-report-export?${q.toString()}`, { credentials: 'include' });
-      if (!res.ok) {
-        const body = await res.text();
-        let msg = 'Export failed.';
-        try {
-          const parsed = JSON.parse(body) as { error?: { message?: string } };
-          if (parsed.error?.message) msg = parsed.error.message;
-        } catch { /* keep generic */ }
-        setError(msg);
-        return;
-      }
-      const blob = await res.blob();
-      const dispo = res.headers.get('Content-Disposition') ?? '';
-      const m = dispo.match(/filename="?([^"]+)"?/);
-      const filename = m?.[1] ?? `pulse-${def.slug}.${format}`;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(a.href);
-    } catch (err) {
-      log.error('PulseReport export failed', err instanceof Error ? { message: err.message } : { err });
-      setError('Network error during export.');
-    } finally {
-      setExporting(null);
-    }
-  };
-
   if (!def) {
     return (
       <AppLayout>
@@ -211,54 +173,24 @@ export default function ReportSlugPage() {
             <h1 className="text-2xl font-semibold">{def.title}</h1>
             <p className="text-sm text-neutral-400">{def.blurb}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onExport('xlsx')}
-              disabled={exporting !== null || rows.length === 0}
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
-            >
-              <Download className="h-4 w-4" />
-              {exporting === 'xlsx' ? 'Exporting…' : 'XLSX'}
-            </button>
-            <button
-              type="button"
-              onClick={() => onExport('csv')}
-              disabled={exporting !== null || rows.length === 0}
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-emerald-700 text-emerald-300 text-sm hover:bg-emerald-900/30 disabled:opacity-50"
-            >
-              <FileText className="h-4 w-4" />
-              {exporting === 'csv' ? 'Exporting…' : 'CSV'}
-            </button>
-          </div>
+          <ReportExportButtons
+            def={def}
+            form={form}
+            enabled={data !== null && !loading && error === null}
+            onError={setError}
+          />
         </header>
 
         <ReportFilterBar def={def} form={form} setForm={setForm} onRun={runFetch} loading={loading} />
 
-        {error && (
-          <div role="alert" className="mt-4 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
-            <div>{error}</div>
-          </div>
-        )}
-
-        {data && data.notes.length > 0 && (
-          <div className="mt-3 rounded border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200 space-y-1">
-            {data.notes.map((n, i) => <div key={i}>• {n}</div>)}
-          </div>
-        )}
-
-        <div className="mt-4">
-          <ReportTable columns={columns} rows={rows} loading={loading} />
-        </div>
-
-        {data?.scopeNote && (
-          <div className="mt-3 text-xs text-neutral-500">
-            {data.scopeNote.kind === 'orgwide' && 'Scope: org-wide.'}
-            {data.scopeNote.kind === 'scoped' && `Scope: ${data.scopeNote.staffCount.toLocaleString('en-ZA')} staff in your supervisor chain.`}
-            {data.scopeNote.kind === 'no_scope' && data.scopeNote.reason}
-          </div>
-        )}
+        <ReportResultPanel
+          columns={columns}
+          rows={rows}
+          notes={data?.notes ?? []}
+          scopeNote={data?.scopeNote}
+          loading={loading}
+          error={error}
+        />
       </div>
     </AppLayout>
   );

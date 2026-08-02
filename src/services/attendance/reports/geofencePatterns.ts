@@ -16,7 +16,7 @@
 
 import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
-import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
+import { employmentEffectivePredicate } from '@/services/attendance/employmentUniverse';
 import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
 import { makeParamBuilder } from './sqlHelpers';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
@@ -90,8 +90,10 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
         ae.clock_in_lon,
         ST_SetSRID(ST_MakePoint(ae.clock_in_lon::float8, ae.clock_in_lat::float8), 4326) AS pt
       FROM attendance_entries ae
+      JOIN staff attendance_staff ON attendance_staff.id = ae.staff_id
       WHERE ae.work_date >= ${dateFromP}::date
         AND ae.work_date <= ${dateToP}::date
+        AND ${employmentEffectivePredicate('attendance_staff', 'ae.work_date')}
         AND ae.clock_in_lat IS NOT NULL
         AND ae.clock_in_lon IS NOT NULL
     ),
@@ -182,8 +184,12 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
     FROM staff s
     LEFT JOIN per_staff_aggregates psa ON psa.staff_id = s.id
     LEFT JOIN active_assignments aa ON aa.staff_id = s.id
-    WHERE s.status = 'active'
-      AND ${approvedAccountPredicate('s')}
+    WHERE EXISTS (
+      SELECT 1
+      FROM generate_series(${dateFromP}::date, ${dateToP}::date, INTERVAL '1 day')
+        AS effective_day(work_date)
+      WHERE ${employmentEffectivePredicate('s', 'effective_day.work_date')}
+    )
       ${deptClause}
       ${staffScopeClause}
     ORDER BY full_name ASC

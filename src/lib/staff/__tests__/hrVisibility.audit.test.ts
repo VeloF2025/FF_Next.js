@@ -24,12 +24,15 @@ const ROOT = process.cwd();
 
 // ── 1. Surface coverage ────────────────────────────────────────────────────
 // Each surface must reference a shared helper (directly, or via the
-// `accountStatusRef` arg threaded into reports/sqlHelpers.buildBaseWhere).
+// `accountStatusRef` arg threaded into reports/sqlHelpers.buildBaseWhere, or
+// the canonical employmentEffectivePredicate which includes Rule P).
 const HELPER_MARKERS = [
   'hrEmployeePredicate',
   'approvedAccountPredicate',
   'approvedAccountPredicateRef',
   'accountStatusRef',
+  'employmentEffectivePredicate',
+  'employmentStaffAlias',
 ];
 
 const RULE_H_SURFACES = [
@@ -58,9 +61,14 @@ const RULE_P_SURFACES = [
   'src/services/attendance/reports/geofencePatterns.ts',
   'pages/api/staff/attendance-roster.ts',
   'pages/api/staff/attendance-pulse-signals.ts',
-  'pages/api/staff/attendance-export.ts',
   'pages/api/staff/attendance-week.ts',
 ];
+
+const RULE_P_DELEGATED_SURFACES = [{
+  surface: 'pages/api/staff/attendance-export.ts',
+  delegation: 'preparePayrollExport',
+  authority: 'src/modules/attendance/workflow/payrollLockSnapshot.ts',
+}];
 
 describe('Slice B surface coverage', () => {
   it.each([...RULE_H_SURFACES, ...RULE_P_SURFACES])(
@@ -70,6 +78,19 @@ describe('Slice B surface coverage', () => {
       const hit = HELPER_MARKERS.some((m) => src.includes(m));
       expect(hit, `${rel} does not reference any visibility helper`).toBe(true);
     }
+  );
+
+  it.each(RULE_P_DELEGATED_SURFACES)(
+    '$surface delegates to a Rule P-filtered authority',
+    ({ surface, delegation, authority }) => {
+      const surfaceSource = fs.readFileSync(path.join(ROOT, surface), 'utf8');
+      const authoritySource = fs.readFileSync(path.join(ROOT, authority), 'utf8');
+      expect(surfaceSource).toContain(delegation);
+      expect(
+        HELPER_MARKERS.some((marker) => authoritySource.includes(marker)),
+        `${authority} does not reference any visibility helper`,
+      ).toBe(true);
+    },
   );
 });
 

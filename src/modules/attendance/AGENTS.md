@@ -11,18 +11,21 @@ Staff time-and-attendance: geofenced clock-in/out (selfie), corrections workflow
 
 ## Critical Rules
 - NEVER project DATE columns without `to_char(col, 'YYYY-MM-DD')` — pg returns JS Date at server-local midnight which JSON-shifts in SAST
-- ALWAYS gate correction approvals through `attendance_adjustments` status machine (`pending → approved/rejected`) — never update `attendance_entries` directly from a staff-facing route
+- ALWAYS use `corrections/guardedApproval.ts` for approval mutations — the canonical period guard and status/entry/projection writes must share one transaction
 - NEVER remove geofence checks in `portal/geofenceUtils.ts` — geofence is the legal record of presence
+- Migrations 475/476, shared-DB probes, cron, pilot flags, payroll enablement and deploys remain separately approval-gated; follow `docs/operations/attendance-workforce-phase1.md`
 
 ## Key Files
 | File | Purpose |
 |------|---------|
-| `corrections/queries.ts` | `attendance_adjustments` CRUD + supervisor joins |
+| `corrections/queries.ts` | Stable non-approval query/mutation barrel |
+| `corrections/guardedApproval.ts` | Sole correction-approval authority |
 | `corrections/lockQueries.ts` | Weekly lock read/write |
 | `portal/authMiddleware.ts` | /my session validation (separate from main FF auth) |
 | `portal/geofenceUtils.ts` | Haversine geofence check against `site_geofences` |
 | `portal/clockUtils.ts` | Clock entry creation + overlap detection |
 | `alerts/cartrackWaAlert.ts` | Cartrack discrepancy WA alert |
+| `scripts/audit/attendance-policy-shadow.ts` | Read-only legacy/policy variance audit |
 
 ## API Endpoints (subset)
 | Method | Endpoint | Purpose |

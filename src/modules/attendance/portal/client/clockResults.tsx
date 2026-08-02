@@ -71,6 +71,36 @@ export function QueuedView({
   );
 }
 
+export function DrainedQueuedView({
+  message,
+  onDone,
+}: {
+  message: string;
+  onDone: () => void;
+}) {
+  return (
+    <div className="text-center py-10">
+      <div className="mx-auto w-16 h-16 rounded-full bg-red-900/40 text-red-300 flex items-center justify-center mb-4">
+        <XCircle className="w-8 h-8" />
+      </div>
+      <h2 className="text-xl font-semibold mb-2 text-red-200">
+        Queued event not submitted
+      </h2>
+      <p className="text-sm text-neutral-300 mb-2 px-4">{message}</p>
+      <p className="text-xs text-neutral-400 mb-6 px-4">
+        The local copy was removed after the server response.
+      </p>
+      <button
+        type="button"
+        onClick={onDone}
+        className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold shadow-lg shadow-red-600/20"
+      >
+        Review attendance
+      </button>
+    </div>
+  );
+}
+
 export function NotSavedView({
   message,
   onBack,

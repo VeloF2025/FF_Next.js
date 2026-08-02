@@ -1,8 +1,8 @@
 /**
  * Handler tests for /api/staff/attendance-weekly-locks.
  *
- * Covers Monday enforcement, unlock-reason length requirement, and list/upsert
- * routing.
+ * Covers Monday enforcement, immutable history visibility, readiness-gated
+ * lock routing, permissions, conflicts and audited unlock.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -11,6 +11,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   sql: vi.fn(),
   userHasPermission: vi.fn(async () => true), // tests default to allow; opt-out tests override
+  lockReadyWeek: vi.fn(),
+  unlockWeekWithHistory: vi.fn(),
 }));
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -23,6 +25,13 @@ vi.mock('@/lib/auth/middleware', () => ({
 vi.mock('@/lib/permissions', () => ({
   userHasPermission: mocks.userHasPermission,
 }));
+vi.mock('@/modules/attendance/workflow/periodQueries', () => ({
+  lockReadyWeek: mocks.lockReadyWeek,
+  unlockWeekWithHistory: mocks.unlockWeekWithHistory,
+  AttendancePeriodError: class AttendancePeriodError extends Error {
+    constructor(public code: string, message: string) { super(message); }
+  },
+}));
 
 import handler from '../../../../../pages/api/staff/attendance-weekly-locks';
 
@@ -30,15 +39,16 @@ function makeReq(
   body: Record<string, unknown> = {},
   method: string = 'POST',
   query: Record<string, string> = {},
-  userId: string | null = 'admin-1'
+  userId: string | null = 'admin-1',
+  role = 'admin',
 ): NextApiRequest {
-  const r: Partial<NextApiRequest> & { user?: { id: string } } = {
+  const r: Partial<NextApiRequest> & { user?: { id: string; role: string } } = {
     method,
     query,
     headers: {},
     body,
   };
-  if (userId) r.user = { id: userId };
+  if (userId) r.user = { id: userId, role };
   return r as NextApiRequest;
 }
 
@@ -59,9 +69,55 @@ function makeRes() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.lockReadyWeek.mockResolvedValue({
+    weekStartDate: '2026-04-20', version: 1, active: true,
+  });
+  mocks.unlockWeekWithHistory.mockResolvedValue({
+    weekStartDate: '2026-04-20', version: 1, active: false,
+  });
 });
 
 describe('GET /api/staff/attendance-weekly-locks', () => {
+  it('returns the exact Monday lock with immutable latest-history fields', async () => {
+    const exact = {
+      week_start_date: '2026-04-20',
+      locked_at: '2026-04-21T09:00:00Z',
+      locked_by: 'admin-1',
+      lock_reason: 'payroll close',
+      unlocked_at: '2026-04-22T09:00:00Z',
+      unlocked_by: 'admin-2',
+      unlock_reason: 'approved correction',
+      lock_version: 7,
+      latest_action: 'unlock',
+      latest_actor_user_id: 'admin-2',
+      latest_reason: 'approved correction',
+      latest_recorded_at: '2026-04-22T09:00:00Z',
+    };
+    mocks.sql.mockResolvedValueOnce([exact]);
+    const { res, captured } = makeRes();
+
+    await handler(makeReq({}, 'GET', { week_start_date: '2026-04-20' }), res);
+
+    expect(captured.statusCode).toBe(200);
+    expect(captured.body).toMatchObject({ data: { lock: exact } });
+    const sqlText = (mocks.sql.mock.calls[0]?.[0] as readonly string[]).join(' ');
+    expect(sqlText).toMatch(/WHERE\s+wl\.week_start_date\s*=/i);
+    expect(sqlText).toMatch(/attendance_weekly_lock_history/i);
+    expect(sqlText).toMatch(/latest_actor_user_id/i);
+    expect(sqlText).toMatch(/LIMIT\s+1/i);
+    expect(mocks.sql.mock.calls[0]?.slice(1)).toEqual(['2026-04-20']);
+  });
+
+  it.each(['2026-04-22', '2026-02-30', '04-20-2026'])(
+    'rejects exact-week read %s because it is not a real ISO Monday', async (weekStart) => {
+    const { res, captured } = makeRes();
+
+    await handler(makeReq({}, 'GET', { week_start_date: weekStart }), res);
+
+    expect(captured.statusCode).toBe(400);
+    expect(mocks.sql).not.toHaveBeenCalled();
+  });
+
   it('returns locks list', async () => {
     mocks.sql.mockResolvedValueOnce([
       {
@@ -72,13 +128,18 @@ describe('GET /api/staff/attendance-weekly-locks', () => {
         unlocked_at: null,
         unlocked_by: null,
         unlock_reason: null,
+        lock_version: 1,
+        latest_action: 'lock',
       },
     ]);
     const { res, captured } = makeRes();
     await handler(makeReq({}, 'GET'), res);
     expect(captured.statusCode).toBe(200);
-    const body = captured.body as { data: { locks: { week_start_date: string }[] } };
+    const body = captured.body as { data: { locks: { week_start_date: string; lock_version: number }[] } };
     expect(body.data.locks[0]?.week_start_date).toBe('2026-04-20');
+    expect(body.data.locks[0]?.lock_version).toBe(1);
+    const sqlText = (mocks.sql.mock.calls[0]?.[0] as readonly string[]).join(' ');
+    expect(sqlText).toMatch(/attendance_weekly_lock_history/i);
   });
 });
 
@@ -107,26 +168,14 @@ describe('POST /api/staff/attendance-weekly-locks', () => {
     expect(captured.statusCode).toBe(400);
   });
 
-  it('re-lock after unlock clears the unlocked_at/by/reason audit fields in the UPSERT SQL', async () => {
-    // Regression: lookupActiveLock filters WHERE unlocked_at IS NULL. If the
-    // re-lock upsert ever stops clearing unlocked_*, a week that was
-    // unlocked then re-locked would still return null from lookupActiveLock
-    // — UI + APIs would silently treat a locked week as unlocked.
-    mocks.sql.mockResolvedValueOnce([
-      {
-        week_start_date: '2026-04-20', locked_at: 'x', locked_by: 'admin-1',
-        lock_reason: 'manual', unlocked_at: null, unlocked_by: null, unlock_reason: null,
-      },
-    ]);
+  it('routes lock through readiness-gated immutable history service', async () => {
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start_date: '2026-04-20', action: 'lock', lock_reason: 'relock' }), res);
     expect(captured.statusCode).toBe(200);
-    const call = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
-    const sqlText = call[0].join(' ');
-    expect(sqlText).toMatch(/ON\s+CONFLICT\s*\(week_start_date\)\s+DO\s+UPDATE/i);
-    expect(sqlText).toMatch(/unlocked_at\s*=\s*NULL/i);
-    expect(sqlText).toMatch(/unlocked_by\s*=\s*NULL/i);
-    expect(sqlText).toMatch(/unlock_reason\s*=\s*NULL/i);
+    expect(mocks.lockReadyWeek).toHaveBeenCalledWith({
+      weekStartDate: '2026-04-20', actorUserId: 'admin-1', reason: 'relock',
+    });
+    expect(mocks.sql).not.toHaveBeenCalled();
   });
 
   it('site_supervisor (create:false) receives 403 when attempting to lock', async () => {
@@ -136,6 +185,17 @@ describe('POST /api/staff/attendance-weekly-locks', () => {
     expect(captured.statusCode).toBe(403);
     // The lock upsert MUST NOT have been reached.
     expect(mocks.sql).not.toHaveBeenCalled();
+  });
+
+  it('manager receives 403 even if a stale permission row still grants create', async () => {
+    const { res, captured } = makeRes();
+    await handler(makeReq(
+      { week_start_date: '2026-04-20', action: 'lock', lock_reason: 'payroll ready' },
+      'POST', {}, 'manager-1', 'manager',
+    ), res);
+    expect(captured.statusCode).toBe(403);
+    expect(mocks.userHasPermission).not.toHaveBeenCalled();
+    expect(mocks.lockReadyWeek).not.toHaveBeenCalled();
   });
 
   it('site_supervisor (edit:false) receives 403 when attempting to unlock', async () => {
@@ -154,23 +214,22 @@ describe('POST /api/staff/attendance-weekly-locks', () => {
   });
 
   it('lock happy path — upserts', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      {
-        week_start_date: '2026-04-20',
-        locked_at: '2026-04-22T10:00:00Z',
-        locked_by: 'admin-1',
-        lock_reason: 'manual',
-        unlocked_at: null,
-        unlocked_by: null,
-        unlock_reason: null,
-      },
-    ]);
     const { res, captured } = makeRes();
     await handler(
       makeReq({ week_start_date: '2026-04-20', action: 'lock', lock_reason: 'manual' }),
       res
     );
     expect(captured.statusCode).toBe(200);
+  });
+
+  it('uses the authenticated actor and ignores a body-supplied user id', async () => {
+    const { res, captured } = makeRes();
+    await handler(makeReq({
+      week_start_date: '2026-04-20', action: 'lock', lock_reason: 'manual',
+      actor_user_id: 'attacker-controlled-id',
+    }), res);
+    expect(captured.statusCode).toBe(200);
+    expect(mocks.lockReadyWeek).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: 'admin-1' }));
   });
 
   it('unlock requires reason ≥ 10 chars', async () => {
@@ -183,7 +242,9 @@ describe('POST /api/staff/attendance-weekly-locks', () => {
   });
 
   it('unlock 404 when no active lock exists', async () => {
-    mocks.sql.mockResolvedValueOnce([]); // unlockWeek returns empty
+    mocks.unlockWeekWithHistory.mockRejectedValueOnce(
+      Object.assign(new Error('No active lock'), { code: 'active_lock_required' })
+    );
     const { res, captured } = makeRes();
     await handler(
       makeReq({
@@ -197,17 +258,6 @@ describe('POST /api/staff/attendance-weekly-locks', () => {
   });
 
   it('unlock happy path — returns updated lock row', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      {
-        week_start_date: '2026-04-20',
-        locked_at: '2026-04-21T09:00:00Z',
-        locked_by: 'admin-1',
-        lock_reason: 'export:csv',
-        unlocked_at: '2026-04-22T10:00:00Z',
-        unlocked_by: 'hr-1',
-        unlock_reason: 'correction needed — HR approved',
-      },
-    ]);
     const { res, captured } = makeRes();
     await handler(
       makeReq({
@@ -218,7 +268,21 @@ describe('POST /api/staff/attendance-weekly-locks', () => {
       res
     );
     expect(captured.statusCode).toBe(200);
-    const body = captured.body as { data: { lock: { unlocked_at: string } } };
-    expect(body.data.lock.unlocked_at).toBe('2026-04-22T10:00:00Z');
+    const body = captured.body as { data: { lock: { active: boolean } } };
+    expect(body.data.lock.active).toBe(false);
+    expect(mocks.unlockWeekWithHistory).toHaveBeenCalledWith({
+      weekStartDate: '2026-04-20', actorUserId: 'admin-1',
+      reason: 'correction needed — HR approved',
+    });
+  });
+
+  it('returns 409 with stable reason when readiness changes before lock', async () => {
+    mocks.lockReadyWeek.mockRejectedValueOnce(
+      Object.assign(new Error('Attendance period has blockers'), { code: 'period_has_blockers' })
+    );
+    const { res, captured } = makeRes();
+    await handler(makeReq({ week_start_date: '2026-04-20', action: 'lock', lock_reason: 'payroll ready' }), res);
+    expect(captured.statusCode).toBe(409);
+    expect(captured.body).toMatchObject({ error: { details: { reason: 'period_has_blockers' } } });
   });
 });

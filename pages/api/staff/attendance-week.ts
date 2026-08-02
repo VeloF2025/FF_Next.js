@@ -12,9 +12,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
-import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
-import { lookupActiveLock } from '@/modules/attendance/corrections/lockQueries';
+import { employmentEffectivePredicate } from '@/services/attendance/employmentUniverse';
+import { loadWeeklyPayrollSnapshot } from '@/services/attendance/payroll/weeklySnapshot';
 
 interface WeekRow extends Record<string, unknown> {
   staff_id: string;
@@ -24,6 +24,9 @@ interface WeekRow extends Record<string, unknown> {
   regular_hrs: string;
   overtime_hrs: string;
   sunday_hrs: string;
+  result_status: string; approved_regular_hrs: string | null;
+  approved_overtime_hrs: string | null; approved_sunday_hrs: string | null;
+  approved_holiday_hrs: string | null; leave_hrs: string | null; unpaid_hrs: string | null;
   holiday_hrs: string;
   night_hrs: string;
   exceptions_count: number;
@@ -162,6 +165,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ds.regular_hrs::text,
         ds.overtime_hrs::text,
         ds.sunday_hrs::text,
+        ds.result_status, ds.approved_regular_hrs::text,
+        ds.approved_overtime_hrs::text, ds.approved_sunday_hrs::text,
+        ds.approved_holiday_hrs::text, ds.leave_hrs::text, ds.unpaid_hrs::text,
         ds.holiday_hrs::text,
         ds.night_hrs::text,
         COALESCE(wx.exceptions_count, 0) AS exceptions_count,
@@ -174,9 +180,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ON wv.staff_id = ds.staff_id AND wv.work_date = ds.work_date
       WHERE ds.work_date >= ${weekStart}::date
         AND ds.work_date <= ${weekEnd}::date
-        -- #2010: constant column predicate (hardcoded alias, no user input);
-        -- sql.unsafe is db-pool's sanctioned fragment API, safe by construction.
-        ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
+        ${sql.unsafe('AND ' + employmentEffectivePredicate('s', 'ds.work_date'))}
       ORDER BY full_name ASC, ds.work_date ASC
     `;
 
@@ -185,6 +189,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // would silently double-count week totals. Fail loud instead.
     const seen = new Set<string>();
     const byStaff = new Map<string, StaffWeekRow>();
+    const mutablePayrollTotals = {
+      regularHrs: 0, overtimeHrs: 0, sundayHrs: 0,
+      holidayHrs: 0, leaveHrs: 0, unpaidHrs: 0,
+    };
     for (const r of rows) {
       const dedupeKey = `${r.staff_id}|${r.work_date}`;
       if (seen.has(dedupeKey)) {
@@ -198,6 +206,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         );
       }
       seen.add(dedupeKey);
+      if (r.result_status === 'approved' || r.result_status === 'locked') {
+        mutablePayrollTotals.regularHrs += Number(r.approved_regular_hrs) || 0;
+        mutablePayrollTotals.overtimeHrs += Number(r.approved_overtime_hrs) || 0;
+        mutablePayrollTotals.sundayHrs += Number(r.approved_sunday_hrs) || 0;
+        mutablePayrollTotals.holidayHrs += Number(r.approved_holiday_hrs) || 0;
+        mutablePayrollTotals.leaveHrs += Number(r.leave_hrs) || 0;
+        mutablePayrollTotals.unpaidHrs += Number(r.unpaid_hrs) || 0;
+      }
       const day: DayTotals = {
         workDate: r.work_date,
         regularHrs: Number(r.regular_hrs),
@@ -260,16 +276,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     );
 
-    // Surface the lock state so the UI can paint a banner + block edits.
-    const activeLock = await lookupActiveLock(weekStart);
-    const lock = activeLock
-      ? {
-          lockedAt: activeLock.locked_at,
-          lockedBy: activeLock.locked_by,
-          reason: activeLock.lock_reason,
-        }
-      : null;
-    return apiResponse.success(res, { weekStart, weekEnd, staff, totals, lock });
+    // A locked week must display the exact immutable snapshot/version used by export.
+    // The reader rejects orphaned, mixed-version or drifted live lock rows.
+    const frozen = await loadWeeklyPayrollSnapshot(weekStart, weekEnd);
+    const lock = frozen?.lock ?? null;
+    const payrollTotals = frozen?.totals ?? mutablePayrollTotals;
+    return apiResponse.success(res, { weekStart, weekEnd, staff, totals, payrollTotals, lock });
   } catch (err) {
     log.error('[staff-attendance-week] unexpected error', {
       weekStart,
