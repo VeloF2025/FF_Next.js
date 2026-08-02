@@ -65,7 +65,7 @@ beforeAll(async () => {
       applied_at TIMESTAMPTZ NOT NULL
     )
   `);
-  for (const filename of ['469_wa_subscriber_consent.sql', '476_velocity_review_export.sql']) {
+  for (const filename of ['469_wa_subscriber_consent.sql', '478_velocity_review_export.sql']) {
     const migration = await readFile(
       path.join(process.cwd(), 'scripts/migrations/sql', filename),
       'utf8',

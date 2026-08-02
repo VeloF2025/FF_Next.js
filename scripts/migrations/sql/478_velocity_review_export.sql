@@ -165,5 +165,5 @@ DO $$ BEGIN
 END $$;
 
 INSERT INTO schema_migrations (filename, applied_at)
-VALUES ('476_velocity_review_export.sql', NOW())
+VALUES ('478_velocity_review_export.sql', NOW())
 ON CONFLICT (filename) DO NOTHING;

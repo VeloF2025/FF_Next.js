@@ -5,13 +5,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const DATABASE_URL = process.env.TEST_DATABASE_URL;
 const dbDescribe = DATABASE_URL ? describe : describe.skip;
-const SCHEMA = 'mig476_scratch';
+const SCHEMA = 'mig478_scratch';
 const FORWARD = readFileSync(
-  join(process.cwd(), 'scripts/migrations/sql/476_velocity_review_export.sql'),
+  join(process.cwd(), 'scripts/migrations/sql/478_velocity_review_export.sql'),
   'utf8'
 );
 const ROLLBACK = readFileSync(
-  join(process.cwd(), 'scripts/migrations/sql/rollback_476_velocity_review_export.sql'),
+  join(process.cwd(), 'scripts/migrations/sql/rollback_478_velocity_review_export.sql'),
   'utf8'
 );
 const pool = new Pool({
@@ -82,7 +82,7 @@ async function insertExport(input: {
   );
 }
 
-dbDescribe('migration 476 applied to a scratch schema', () => {
+dbDescribe('migration 478 applied to a scratch schema', () => {
   beforeAll(async () => {
     await pool.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
     await pool.query(`CREATE SCHEMA ${SCHEMA}`);
@@ -150,7 +150,7 @@ dbDescribe('migration 476 applied to a scratch schema', () => {
 
     const tracker = await scoped<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM schema_migrations WHERE filename = $1`,
-      ['476_velocity_review_export.sql']
+      ['478_velocity_review_export.sql']
     );
     expect(tracker.rows[0].n).toBe(1);
   });
@@ -317,7 +317,7 @@ dbDescribe('migration 476 applied to a scratch schema', () => {
       }>(
         `SELECT to_regclass('velocity_review_control')::text AS control_table,
                 (SELECT COUNT(*)::int FROM schema_migrations
-                 WHERE filename = '476_velocity_review_export.sql') AS tracker_count`
+                 WHERE filename = '478_velocity_review_export.sql') AS tracker_count`
       );
       expect(rollbackState.rows[0]).toEqual({ control_table: null, tracker_count: 0 });
 
@@ -330,7 +330,7 @@ dbDescribe('migration 476 applied to a scratch schema', () => {
       }>(
         `SELECT to_regclass('velocity_review_control')::text AS control_table,
                 (SELECT COUNT(*)::int FROM schema_migrations
-                 WHERE filename = '476_velocity_review_export.sql') AS tracker_count,
+                 WHERE filename = '478_velocity_review_export.sql') AS tracker_count,
                 source, status
          FROM wa_subscriber_consent WHERE msisdn = $1`,
         ['27820000003']

@@ -23,7 +23,7 @@ export default defineConfig({
       'tests/db/services/field-stock/pickingProcess.lifecycle.test.ts',
       // Task 2.3 (Track 2) — requires mig 387 triggers (Sprint E container only)
       'tests/db/services/field-stock/returnsAccept.lifecycle.test.ts',
-      // Runs in a dedicated random-port container with migrations 469 + 476.
+      // Runs in a dedicated random-port container with migrations 469 + 478.
       'tests/db/velocity-review/repositories.test.ts',
       // Task 2.4 (Track 2) — requires mig 387 triggers (Sprint E container only)
       'tests/db/services/activate/cascadePpResolution.lifecycle.test.ts',
