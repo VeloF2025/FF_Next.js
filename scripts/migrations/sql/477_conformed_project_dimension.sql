@@ -3,9 +3,11 @@
 -- `project` is free text in every source table, so one site appears under several
 -- spellings. Grouping happens in the database, so the alias map needs a SQL twin of
 -- src/modules/metrics/dimensions/canonical.ts. tests/migrations/477_conformed_
--- project_dimension.test.ts asserts the two produce identical output for every
--- sample and for every project name actually present in the database — if they ever
--- drift, that test fails.
+-- project_dimension.test.ts asserts the two produce identical output for an explicit
+-- sample list, for every mapping parsed out of THIS file, and for every alias and
+-- canonical name the TypeScript knows about — both directions, so adding an entry to
+-- one side alone fails. It does NOT sweep the live database: the migration-test
+-- container is seeded with one project row, so such a sweep would prove little.
 --
 -- IMMUTABLE so it can be indexed and grouped efficiently. That is also why the
 -- vocabulary is inlined rather than read from `projects`: an IMMUTABLE function may
@@ -30,7 +32,14 @@ RETURNS text
 LANGUAGE sql
 IMMUTABLE
 AS $fn$
-  SELECT CASE lower(btrim(coalesce(raw, '')))
+  -- Trim an EXPLICIT character set, not bare btrim(). Single-argument btrim strips
+  -- only U+0020 spaces, while JavaScript's .trim() strips every Unicode whitespace
+  -- character. Measured: btrim(E'\tTEM\t') leaves the tabs, so '\tTEM\t' would fold
+  -- to 'Thembisa POP 1' in TypeScript and stay '\tTEM\t' here -- a silent parity
+  -- break on anything arriving from an Excel or CSV import. This set (space, tab,
+  -- LF, CR, form feed, vertical tab, NBSP) is mirrored by TRIM_CHARS in
+  -- src/modules/metrics/dimensions/canonical.ts.
+  SELECT CASE lower(btrim(coalesce(raw, ''), E' \t\n\r\f\v' || U&'\00a0'))
     WHEN ''      THEN 'Unknown'
 
     -- Verified aliases.
@@ -62,7 +71,7 @@ AS $fn$
     -- Unmapped values pass through TRIMMED but otherwise unchanged. Dropping them
     -- or bucketing them into 'Unknown' would silently shrink totals; an unfamiliar
     -- label in the output is visible and fixable.
-    ELSE btrim(raw)
+    ELSE btrim(raw, E' \t\n\r\f\v' || U&'\00a0')
   END;
 $fn$;
 

@@ -36,12 +36,20 @@
  *   WHERE project NOT IN (SELECT btrim(project_name) FROM projects);
  */
 
-/** Alias (lowercased, trimmed) -> canonical `projects.project_name`. */
-export const PROJECT_ALIASES: Readonly<Record<string, string>> = {
-  'tem': 'Thembisa POP 1',
-  'tem-3': 'Thembisa POP 3',
-  'etw-2': 'Etwatwa',
-};
+/**
+ * Alias (lowercased, trimmed) -> canonical `projects.project_name`.
+ *
+ * A Map, not an object literal. A plain object inherits from Object.prototype, so
+ * `obj['__proto__']` returns the prototype and `obj['constructor']` returns a
+ * function — both truthy, so `?? ` never fires and canonicalProject() would return
+ * a non-string, diverging from SQL (which just passes those strings through) and
+ * violating its own declared return type. A Map has no such keys.
+ */
+export const PROJECT_ALIASES: ReadonlyMap<string, string> = new Map([
+  ['tem', 'Thembisa POP 1'],
+  ['tem-3', 'Thembisa POP 3'],
+  ['etw-2', 'Etwatwa'],
+]);
 
 /**
  * The canonical vocabulary, from `SELECT project_name FROM projects` on 2026-08-02.
@@ -57,18 +65,35 @@ export const PROJECT_ALIASES: Readonly<Record<string, string>> = {
  * trim), and `'Phalaborwa - Ben Farm'` / `'Phalabrowa - Namakgale'` spell the town
  * two different ways. They are separate projects, so neither folds into the other.
  */
-const CANONICAL_NAMES: readonly string[] = [
+export const CANONICAL_NAMES: readonly string[] = [
   'Botshabelo', 'Cradock', 'Etwatwa', 'General / Equipment', 'Grabouw', 'Lawley',
   'Mahikeng', 'Mamelodi', 'Middelburg', 'Mohadin', 'Phalaborwa - Ben Farm',
   'Phalabrowa - Namakgale', "Themb'elihle", 'Thembisa POP 1', 'Thembisa POP 2',
   'Thembisa POP 3', 'Tonga',
 ] as const;
 
-const CANONICAL_BY_LOWER: Readonly<Record<string, string>> = Object.fromEntries(
+/** Map, not an object — same prototype-key hazard as PROJECT_ALIASES. */
+const CANONICAL_BY_LOWER: ReadonlyMap<string, string> = new Map(
   CANONICAL_NAMES.map((n) => [n.toLowerCase(), n]),
 );
 
 export const UNKNOWN_PROJECT = 'Unknown';
+
+/**
+ * The exact characters trimmed from both ends, kept identical to the SQL side.
+ *
+ * JS `trim()` and Postgres `btrim(x)` are NOT equivalent: `trim()` strips every
+ * Unicode whitespace character, while single-argument `btrim` strips **only**
+ * U+0020 spaces. Measured: `btrim(E'\tTEM\t')` returns the tabs untouched, so
+ * `'\tTEM\t'` would fold to 'Thembisa POP 1' in TypeScript and stay '\tTEM\t' in
+ * SQL — a silent parity break on any value arriving from an Excel or CSV import.
+ *
+ * So both sides name the set explicitly: space, tab, LF, CR, form feed, vertical
+ * tab, and NBSP (U+00A0, common in spreadsheet exports). Change one side and
+ * 477_conformed_project_dimension.test.ts fails.
+ */
+const TRIM_CHARS = ' \t\n\r\f\v ';
+const TRIM_RE = new RegExp(`^[${TRIM_CHARS}]+|[${TRIM_CHARS}]+$`, 'g');
 
 /**
  * Fold a free-text project string to its canonical name.
@@ -82,11 +107,12 @@ export const UNKNOWN_PROJECT = 'Unknown';
  * `'Middelburg '` with a trailing space.
  */
 export function canonicalProject(raw: string | null | undefined): string {
-  const trimmed = (raw ?? '').trim();
+  // Explicit character set, NOT .trim() — see TRIM_CHARS.
+  const trimmed = (raw ?? '').replace(TRIM_RE, '');
   if (!trimmed) return UNKNOWN_PROJECT;
   const lower = trimmed.toLowerCase();
   // Aliases first: an alias must win over a same-spelled canonical name.
-  return PROJECT_ALIASES[lower] ?? CANONICAL_BY_LOWER[lower] ?? trimmed;
+  return PROJECT_ALIASES.get(lower) ?? CANONICAL_BY_LOWER.get(lower) ?? trimmed;
 }
 
 export interface DimensionSpec {

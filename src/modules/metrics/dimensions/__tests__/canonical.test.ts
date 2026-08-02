@@ -20,9 +20,30 @@ describe('canonicalProject', () => {
     expect(canonicalProject('ETW-2')).toBe('Etwatwa');
   });
 
-  it('is case- and whitespace-insensitive', () => {
+  it('is case-insensitive and trims spaces', () => {
     expect(canonicalProject('  tem-3 ')).toBe('Thembisa POP 3');
     expect(canonicalProject(' lawley')).toBe('Lawley');
+  });
+
+  it('trims tabs, newlines and NBSP — not just spaces', () => {
+    // .trim() would pass these for free, but the SQL twin uses btrim with an
+    // explicit character set, and single-argument btrim strips ONLY U+0020.
+    // Both sides therefore name the set, and these pin it.
+    expect(canonicalProject('\tTEM\t')).toBe('Thembisa POP 1');
+    expect(canonicalProject('\nTEM\r\n')).toBe('Thembisa POP 1');
+    expect(canonicalProject('\u00a0TEM\u00a0')).toBe('Thembisa POP 1');
+    expect(canonicalProject('\u00a0')).toBe(UNKNOWN_PROJECT);
+  });
+
+  it('returns a string for prototype-shaped keys, not an inherited object', () => {
+    // A plain object literal inherits Object.prototype, so obj['__proto__'] is the
+    // prototype and obj['constructor'] is a function — both truthy, so `??` never
+    // fires and a non-string escapes. SQL just passes these through, so the object
+    // form was also a parity break. Map has no inherited keys.
+    expect(canonicalProject('__proto__')).toBe('__proto__');
+    expect(canonicalProject('constructor')).toBe('constructor');
+    expect(canonicalProject('toString')).toBe('toString');
+    expect(typeof canonicalProject('__proto__')).toBe('string');
   });
 
   it('trims the canonical name itself — projects.project_name holds "Middelburg " with a trailing space', () => {
@@ -48,19 +69,19 @@ describe('canonicalProject', () => {
     // Guards against speculative entries. An earlier draft mapped MOH/MOA to
     // Mohadin; neither string occurs as a project value anywhere in the database
     // (that memory was about 1Map *site codes*, a different field entirely).
-    expect(Object.keys(PROJECT_ALIASES).sort()).toEqual(['etw-2', 'tem', 'tem-3']);
+    expect([...PROJECT_ALIASES.keys()].sort()).toEqual(['etw-2', 'tem', 'tem-3']);
   });
 
   it('never maps two different aliases onto each other', () => {
     // A canonical target must not itself be an alias key, or folding becomes
     // order-dependent and one application is not idempotent.
-    for (const target of Object.values(PROJECT_ALIASES)) {
-      expect(PROJECT_ALIASES[target.toLowerCase()]).toBeUndefined();
+    for (const target of PROJECT_ALIASES.values()) {
+      expect(PROJECT_ALIASES.get(target.toLowerCase())).toBeUndefined();
     }
   });
 
   it('is idempotent — folding an already-canonical name changes nothing', () => {
-    for (const target of Object.values(PROJECT_ALIASES)) {
+    for (const target of PROJECT_ALIASES.values()) {
       expect(canonicalProject(target)).toBe(target);
     }
   });

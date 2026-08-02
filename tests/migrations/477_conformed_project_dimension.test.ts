@@ -13,9 +13,10 @@
  *     against the TypeScript.
  * Adding an entry to either side alone fails this test.
  *
- * A data-driven sweep over `projects` is deliberately NOT the primary check: the
+ * A data-driven sweep over `projects` is deliberately NOT performed: the
  * migration-test container is seeded with a single row ('Test Project A'), so it
- * would prove almost nothing while looking thorough.
+ * would prove almost nothing while looking thorough. Coverage comes from the
+ * explicit sample list plus both parity directions above.
  *
  * SAFETY: the function is created in a scratch schema dropped in afterAll.
  */
@@ -35,6 +36,7 @@ import { join } from 'path';
 import {
   canonicalProject,
   PROJECT_ALIASES,
+  CANONICAL_NAMES,
   UNKNOWN_PROJECT,
 } from '@/modules/metrics/dimensions/canonical';
 
@@ -119,23 +121,66 @@ describe('canonical_project — parity with TypeScript', () => {
     expect(await sqlCanonical(null)).toBe(UNKNOWN_PROJECT);
   });
 
-  it('every mapping in the shipped SQL matches the TypeScript', async () => {
+  it('every mapping in the shipped SQL matches BOTH the TypeScript and real SQL', async () => {
     const mappings = parseSqlMappings(FORWARD);
-    // Guard the parser itself: a regex that silently matches nothing would make
-    // this test vacuous while reporting success.
-    expect(mappings.length).toBeGreaterThan(15);
+    // EXACT count, not a floor. A `> 15` threshold would let several of the 21
+    // branches go missing while still reporting success — the parser could
+    // silently stop matching and the test would stay green.
+    //   1 empty-string case + 3 aliases + 17 canonical names = 21
+    expect(mappings.length).toBe(21);
+
     for (const [input, expected] of mappings) {
-      expect(canonicalProject(input), `SQL maps ${JSON.stringify(input)} -> ${expected}`).toBe(
+      // Checking the parsed pair against TypeScript alone proves nothing about
+      // the deployed function, so execute it too.
+      expect(canonicalProject(input), `TS for SQL mapping ${JSON.stringify(input)}`).toBe(expected);
+      expect(await sqlCanonical(input), `SQL for its own mapping ${JSON.stringify(input)}`).toBe(
         expected
       );
     }
   });
 
   it('every TypeScript alias matches the SQL', async () => {
-    for (const [alias, expected] of Object.entries(PROJECT_ALIASES)) {
+    for (const [alias, expected] of PROJECT_ALIASES) {
       expect(await sqlCanonical(alias), `alias ${alias}`).toBe(expected);
       expect(canonicalProject(alias)).toBe(expected);
     }
+  });
+
+  it('every canonical name in the TypeScript vocabulary matches the SQL', async () => {
+    // The reverse direction the alias loop misses: a name present in TS but absent
+    // from the SQL CASE would fold in one place and pass through in the other.
+    for (const name of CANONICAL_NAMES) {
+      expect(await sqlCanonical(name), `canonical ${name}`).toBe(name);
+      expect(await sqlCanonical(name.toUpperCase()), `upper ${name}`).toBe(canonicalProject(name.toUpperCase()));
+    }
+  });
+
+  it('SQL and TypeScript trim the SAME whitespace characters', async () => {
+    // Single-argument btrim strips only U+0020 while JS .trim() strips all Unicode
+    // whitespace, so this pairing silently diverged until both sides named the set.
+    for (const s of ['\tTEM\t', '\nTEM\r\n', '\u00a0TEM\u00a0', '\u00a0', '\t', ' \t TEM \t ']) {
+      expect(await sqlCanonical(s), `whitespace ${JSON.stringify(s)}`).toBe(canonicalProject(s));
+    }
+  });
+
+  it('SQL and TypeScript agree on prototype-shaped keys', async () => {
+    // An object-literal lookup returned Object.prototype for '__proto__' and a
+    // function for 'constructor'; SQL passes both through as plain strings.
+    for (const s of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) {
+      expect(await sqlCanonical(s), `prototype key ${s}`).toBe(canonicalProject(s));
+      expect(typeof canonicalProject(s)).toBe('string');
+    }
+  });
+
+  it('the database collation lowercases ASCII the way TypeScript does', async () => {
+    // lower() follows the database collation. Under a Turkish collation
+    // lower('MIDDELBURG') yields a dotless i and the mapping would miss, while JS
+    // is locale-independent. This DB is en_US.UTF-8; pinned so a collation change
+    // surfaces here rather than as quietly unmatched projects.
+    const rows = await scoped<{ ok: boolean }>(
+      `SELECT lower('MIDDELBURG') = 'middelburg' AS ok`
+    );
+    expect(rows[0]?.ok).toBe(true);
   });
 });
 
