@@ -169,7 +169,11 @@ scripts/__pycache__/
 # Local uploads and test artifacts
 public/uploads/qa-photos/
 tests/e2e-results/
-metrics/
+# Anchored to the repo root. Unanchored, `metrics/` matches a directory of that
+# name at ANY depth, which silently excluded src/modules/metrics/ and would
+# swallow any new file under pages/api/procurement/metrics/ (its existing
+# aggregate.ts survives only because already-tracked files ignore .gitignore).
+/metrics/
 .next-backup*
 
 # auto-improve-loop iteration log
