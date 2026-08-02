@@ -103,9 +103,20 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Explicit null check FIRST — see metrics-list for why optional chaining alone
   // fails open here.
   if (!userId) return apiResponse.unauthorized(res, 'Authentication required');
-  const allowed =
-    authReq.user.role === 'super_admin' ||
-    (await userHasPermission(userId, def.permission, 'view'));
+  let allowed: boolean;
+  try {
+    allowed =
+      authReq.user.role === 'super_admin' ||
+      (await userHasPermission(userId, def.permission, 'view'));
+  } catch (error) {
+    // The RBAC lookup is a database call, and it sits outside the execution
+    // try/catch below. Without this it rejects past the handler into the
+    // framework, which answers with an unstructured 500 and no log line —
+    // withAuth returns the handler promise rather than awaiting it, so its own
+    // catch never sees this either.
+    log.error('Metric permission check failed', { key, error });
+    return apiResponse.internalError(res, error, 'Permission check failed');
+  }
   if (!allowed) return apiResponse.forbidden(res, `Permission required: ${def.permission}`);
 
   try {

@@ -20,8 +20,6 @@ export interface MetricDefinition {
   measure: string;
   /** Column used for period filtering. Null means current-state-only. */
   dateColumn: string | null;
-  /** Extra always-on predicate, without the WHERE keyword. */
-  filter?: string;
   /**
    * How this measure may be aggregated. **The single most important field here.**
    *

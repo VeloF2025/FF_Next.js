@@ -121,7 +121,6 @@ export function buildMetricQuery(
     // `>= from AND < to + 1 day` is correct for both date and timestamp columns.
     where.push(`${def.dateColumn} >= $1::date AND ${def.dateColumn} < ($2::date + 1)`);
   }
-  if (def.filter) where.push(`(${def.filter})`);
 
   const sql = [
     `SELECT ${selectParts.join(', ')}`,

@@ -88,15 +88,31 @@ export const METRICS: readonly MetricDefinition[] = [
     label: 'open pre-provisions',
     description:
       'Point-in-time count of pre-provisions on the list and not yet activated, from the nightly snapshot.',
+    // ⚠️ Driven from snapshot_runs, LEFT JOINed to the rows — not from
+    // metric_snapshots alone. Reading the rows directly makes "this night was
+    // never captured" indistinguishable from "this night had nothing open":
+    // both produce an empty series, and the API would answer a confident 0. For
+    // a machine consumer that is the exact failure this platform exists to stop.
+    //
+    // With the run table as the driving side:
+    //   night captured, 3 open   -> one row per entity           -> 3
+    //   night captured, 0 open   -> one row, snapshot_id IS NULL -> 0
+    //   night never captured     -> no rows at all               -> absent from
+    //                               the series, so total_period does not name it
+    // The measure counts snapshot_id, NOT (*), because the LEFT JOIN's
+    // no-match row is still a row and count(*) would report it as 1.
     from: `(
-      SELECT s.as_of_date,
+      SELECT r.as_of_date,
+             s.id                AS snapshot_id,
              s.dims->>'project'  AS project,
-             s.dims->>'olt_name' AS olt_name,
-             (s.measures->>'age_days')::int AS age_days
-      FROM metric_snapshots s
-      WHERE s.source_key = 'pp_open'
+             s.dims->>'olt_name' AS olt_name
+      FROM snapshot_runs r
+      LEFT JOIN metric_snapshots s
+             ON s.source_key = r.source_key
+            AND s.as_of_date = r.as_of_date
+      WHERE r.source_key = 'pp_open'
     ) src`,
-    measure: 'count(*)',
+    measure: 'count(src.snapshot_id)',
     dateColumn: 'src.as_of_date',
     // A nightly STOCK, not an event count. The same DR appears in every night's
     // snapshot while it stays open, so summing across days counts one entity once

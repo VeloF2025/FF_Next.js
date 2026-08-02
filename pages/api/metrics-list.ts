@@ -14,6 +14,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
 import { userHasPermission } from '@/lib/permissions';
 import { METRICS } from '@/modules/metrics/registry';
 
@@ -31,16 +32,26 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!userId) return apiResponse.unauthorized(res, 'Authentication required');
 
   const isSuperAdmin = authReq.user.role === 'super_admin';
-  const visible = await Promise.all(
-    METRICS.map(async (m) =>
-      isSuperAdmin || (await userHasPermission(userId, m.permission, 'view')) ? m : null,
-    ),
-  );
+  let visible: (typeof METRICS)[number][];
+  try {
+    const checked = await Promise.all(
+      METRICS.map(async (m) =>
+        isSuperAdmin || (await userHasPermission(userId, m.permission, 'view')) ? m : null,
+      ),
+    );
+    visible = checked.filter((m): m is (typeof METRICS)[number] => m !== null);
+  } catch (error) {
+    // The RBAC lookup is a database call. Without this it rejects past the
+    // handler into the framework, which answers with an unstructured 500 and no
+    // log line — withAuth returns the handler promise rather than awaiting it,
+    // so its own catch never sees this.
+    log.error('Metric list permission check failed', { error });
+    return apiResponse.internalError(res, error, 'Permission check failed');
+  }
 
   return apiResponse.success(
     res,
     visible
-      .filter((m): m is (typeof METRICS)[number] => m !== null)
       .map((m) => ({
         key: m.key,
         label: m.label,

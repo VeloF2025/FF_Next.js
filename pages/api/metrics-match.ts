@@ -13,7 +13,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
+import { userHasPermission } from '@/lib/permissions';
+import { METRICS } from '@/modules/metrics/registry';
 import { matchMetric } from '@/modules/metrics/registry/intent';
+import type { MetricDefinition } from '@/modules/metrics/registry/types';
 
 export async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -30,14 +35,37 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'q is required');
   }
 
-  const match = matchMetric(q);
+  const authReq = req as AuthenticatedNextApiRequest;
+  const userId = authReq.user?.id;
+  // Explicit null check FIRST — an optional-chained role comparison evaluates
+  // false on a null user and reads as "not super admin" rather than "deny".
+  if (!userId) return apiResponse.unauthorized(res, 'Authentication required');
+
+  // Match only over metrics this caller may actually read. Matching the full
+  // registry and filtering afterwards would still advertise a hidden metric's
+  // existence — and letting a hidden metric win the alias contest would turn a
+  // question the caller IS allowed to have answered into a dead end.
+  let visible: MetricDefinition[];
+  try {
+    const isSuperAdmin = authReq.user.role === 'super_admin';
+    const checked = await Promise.all(
+      METRICS.map(async (m) =>
+        isSuperAdmin || (await userHasPermission(userId, m.permission, 'view')) ? m : null,
+      ),
+    );
+    visible = checked.filter((m): m is MetricDefinition => m !== null);
+  } catch (error) {
+    // The RBAC lookup is a database call. Without this it rejects past the
+    // handler into the framework, which answers with an unstructured 500 and no
+    // log line — withAuth returns the handler promise rather than awaiting it,
+    // so its own catch never sees this.
+    log.error('Metric match permission check failed', { error });
+    return apiResponse.internalError(res, error, 'Permission check failed');
+  }
+
+  const match = matchMetric(q, visible);
   // The shape is deliberately explicit about which case occurred, so the caller
   // cannot mistake "ambiguous" for "no match" and quietly pick one.
-  //
-  // No permission filter here: the response carries only keys and labels, never
-  // `cite` (which names internal tables and predicates). metrics-query still
-  // enforces the per-metric permission before any data is returned, so a caller
-  // who matches a metric they may not read gets a 403 there, not a number.
   if (match.kind === 'none') return apiResponse.success(res, { kind: 'none' });
   if (match.kind === 'ambiguous') {
     return apiResponse.success(res, {
