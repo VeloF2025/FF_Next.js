@@ -1,4 +1,4 @@
--- Rollback migration 474 while preserving consent status and audit timestamps.
+-- Rollback migration 476 while preserving consent status and audit timestamps.
 -- scripts/migrations/run.ts owns the surrounding transaction.
 
 UPDATE wa_subscriber_consent
@@ -32,4 +32,4 @@ DROP TABLE IF EXISTS velocity_review_runs;
 DROP TABLE IF EXISTS velocity_review_control;
 
 DELETE FROM schema_migrations
-WHERE filename = '474_velocity_review_export.sql';
+WHERE filename = '476_velocity_review_export.sql';

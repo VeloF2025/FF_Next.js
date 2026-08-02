@@ -1,4 +1,4 @@
--- Read-only readiness report for Velocity review export migration 474.
+-- Read-only readiness report for Velocity review export migration 476.
 
 SELECT EXISTS (
   SELECT 1 FROM schema_migrations
