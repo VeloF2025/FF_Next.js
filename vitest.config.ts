@@ -50,6 +50,7 @@ export default defineConfig({
       'tests/migrations/473_backfill_unified_reviews_project.test.ts',
       'tests/migrations/474_metrics_snapshot_spine.test.ts',
       'tests/migrations/477_conformed_project_dimension.test.ts',
+      'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.
       //
