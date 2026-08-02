@@ -1,3 +1,22 @@
+/**
+ * Applying an approved attendance adjustment, under the payroll-week lock.
+ *
+ * NO SEGREGATION OF DUTIES — knowingly accepted, 2026-08-02.
+ * `reviewerId` and `requestedBy` are carried separately here but never compared, and
+ * `createAndApproveAdjustmentTxn` mints an already-approved adjustment in one transaction.
+ * So an approver who is also the subject can approve their own correction, on data that
+ * feeds pay, with no second pair of eyes.
+ *
+ * A field worker cannot: they hold only an `ff_my_session` portal session, while approval
+ * needs a main-app session plus `people.staff.attendance.corrections:edit`. The exposure is
+ * an admin or manager who is also a staff member approving their own row.
+ *
+ * Accepted at Velocity's current size. Note the check is not merely omitted — it is not
+ * cheaply available: `reviewerId` is a `users.id` while the subject is a `staff.id`, and
+ * no user→staff mapping exists on this path. Adding one is the prerequisite for enforcing
+ * requester ≠ approver, should that become required (an auditor asking who approved what,
+ * or the first disputed correction, are the likely triggers).
+ */
 import { transaction, type TxnClient } from '@/lib/db-pool';
 import {
   assertDailyProjectionUnlocked,
