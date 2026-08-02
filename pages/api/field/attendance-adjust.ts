@@ -2,9 +2,8 @@
  * POST /api/field/attendance-adjust
  *
  * Admin-initiated time correction for a field-worker attendance entry.
- * Inserts an attendance_adjustments row and immediately applies it through
- * the existing audited transaction (applyApprovedAdjustmentTxn) — never a
- * raw UPDATE of attendance_entries.
+ * Creates and applies an audited adjustment in one guarded transaction —
+ * never a raw UPDATE of attendance_entries.
  *
  * Body: {
  *   entry_id:             string   — UUID of the attendance_entries row
@@ -29,20 +28,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import {
-  withAuth,
-  withPermission,
-  type AuthenticatedNextApiRequest,
-} from '@/lib/auth/middleware';
-import {
-  insertAdjustment,
-  applyApprovedAdjustmentTxn,
-  type AdjustmentKind,
-} from '@/modules/attendance/corrections/queries';
-import {
-  isoWeekMonday,
-  lookupActiveLock,
-} from '@/modules/attendance/corrections/lockQueries';
+import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import type { AdjustmentKind } from '@/modules/attendance/corrections/queries';
+import { createAndApproveAdjustmentTxn } from '@/modules/attendance/corrections/guardedApproval';
+import { isoWeekMonday } from '@/modules/attendance/corrections/lockQueries';
 import { sql } from '@/lib/db-pool';
 
 /**
@@ -50,10 +39,7 @@ import { sql } from '@/lib/db-pool';
  * When BOTH times are corrected, records 'wrong_clock_in_time' as the kind —
  * this is a label only; the txn still applies both adjusted timestamps to the entry.
  */
-function deriveAdjustmentKind(
-  cin: Date | null,
-  _cout: Date | null
-): AdjustmentKind {
+function deriveAdjustmentKind(cin: Date | null, _cout: Date | null): AdjustmentKind {
   if (cin) return 'wrong_clock_in_time';
   return 'wrong_clock_out_time';
 }
@@ -81,6 +67,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const coutRaw = b.adjusted_clock_out_at;
   const cin = cinRaw ? new Date(cinRaw as string) : null;
   const cout = coutRaw ? new Date(coutRaw as string) : null;
+  let targetWeek: string | null = null;
 
   // ── Input validation ──────────────────────────────────────────────────────
 
@@ -111,6 +98,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   }
 
   try {
+    // attendance_adjustments.requested_by references staff(id), while
+    // reviewed_by records the authenticated users(id) decision actor.
+    const actorStaffRows = await sql<{ id: string }>`
+      SELECT id FROM staff WHERE user_id = ${actor} ORDER BY id LIMIT 2
+    `;
+    const actorStaffId = actorStaffRows[0]?.id;
+    if (actorStaffRows.length !== 1 || !actorStaffId) {
+      log.warn('[field-attendance-adjust] actor staff link is missing or ambiguous', {
+        userId: actor, linkedStaffCount: actorStaffRows.length,
+      });
+      apiResponse.conflict(res, 'Your user account must link to exactly one staff record');
+      return;
+    }
+
     // ── Entry lookup ────────────────────────────────────────────────────────
 
     const rows = await sql<{
@@ -131,43 +132,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       return;
     }
 
-    // ── Payroll-week lock check ─────────────────────────────────────────────
-    // Mirrors the check in pages/api/staff/attendance-manual-entry.ts:109–116.
-    // A locked week must not receive new adjustments — the payroll has already
-    // been exported and any mutation would silently diverge from the export.
-
-    const weekMonday = isoWeekMonday(entry.work_date);
-    const activeLock = await lookupActiveLock(weekMonday);
-    if (activeLock) {
-      apiResponse.conflict(
-        res,
-        `Week ${weekMonday} is locked; unlock first before adjusting this entry`
-      );
-      return;
-    }
-
-    // ── Insert adjustment (pending) ─────────────────────────────────────────
-
+    targetWeek = isoWeekMonday(entry.work_date);
     const adjustmentKind = deriveAdjustmentKind(cin, cout);
 
-    const adjustment = await insertAdjustment({
-      entryId,
-      requestedBy: actor,
-      adjustmentKind,
-      adjustedClockInAt: cin,
-      adjustedClockOutAt: cout,
-      adjustedSiteGeofenceId: entry.site_geofence_id,
-      reason,
-    });
-
-    // ── Apply atomically through the audited transaction ────────────────────
-    // The txn transitions the adjustment → 'approved', applies the corrected
-    // timestamps to the entry using optimistic-lock on entry.updated_at, and
-    // deletes the daily summary so the reconcile cron recomputes. If the
-    // optimistic lock loses the race, result.ok is 'conflict'.
-
-    const result = await applyApprovedAdjustmentTxn({
-      adjustmentId: adjustment.id,
+    // Guard, pending insert, approval, entry update, and projection
+    // invalidation share one transaction. A lock race therefore cannot leave
+    // an orphan pending adjustment behind.
+    const result = await createAndApproveAdjustmentTxn({
+      requestedBy: actorStaffId,
       reviewerId: actor,
       reviewNote: 'Admin direct adjust (Field Workers page)',
       entryId,
@@ -177,6 +149,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       adjustedClockInAt: cin,
       adjustedClockOutAt: cout,
       adjustedSiteGeofenceId: entry.site_geofence_id,
+      adjustmentKind,
+      reason,
     });
 
     if (result.ok !== true) {
@@ -186,12 +160,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     apiResponse.success(res, { adjustment: result.adjustment });
   } catch (err) {
+    if (isPeriodLockedError(err)) {
+      apiResponse.conflict(
+        res,
+        `Week ${targetWeek ?? 'unknown'} is locked; unlock first before adjusting this entry`
+      );
+      return;
+    }
     log.error('[field-attendance-adjust] failed', {
       entryId,
       error: err instanceof Error ? err.message : String(err),
     });
     apiResponse.internalError(res, err);
   }
+}
+
+function isPeriodLockedError(error: unknown): boolean {
+  return !!error && typeof error === 'object' && 'code' in error && error.code === 'period_locked';
 }
 
 export default withAuth(withPermission('people.staff.attendance.corrections', 'edit')(handler));

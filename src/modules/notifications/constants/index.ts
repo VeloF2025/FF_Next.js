@@ -46,6 +46,12 @@ export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
   'compliance.hs_incident':         { in_app: true, email: true,  whatsapp: true  },
   'fleet.license_expiring':         { in_app: true, email: true,  whatsapp: false },
 
+  // -- Attendance --
+  'attendance.clockout_due':        { in_app: true, email: false, whatsapp: false },
+  'attendance.correction_required': { in_app: true, email: false, whatsapp: false },
+  'attendance.supervisor_digest':   { in_app: true, email: false, whatsapp: false },
+  'attendance.hr_readiness':        { in_app: true, email: false, whatsapp: false },
+
   // Fallback for unregistered event types
   _fallback:                        { in_app: true, email: false, whatsapp: false },
 };
@@ -84,6 +90,10 @@ export const EVENT_ICONS: Record<string, string> = {
   'compliance.document_expiring':   'file-warning',
   'compliance.hs_incident':         'shield-alert',
   'fleet.license_expiring':         'car',
+  'attendance.clockout_due':        'clock',
+  'attendance.correction_required': 'alert-circle',
+  'attendance.supervisor_digest':   'clipboard-list',
+  'attendance.hr_readiness':        'calendar-check',
 };
 
 // =============================================================================
@@ -120,6 +130,10 @@ export const EVENT_SEVERITY: Record<string, NotificationSeverity> = {
   'compliance.document_expiring':   'warning',
   'compliance.hs_incident':         'error',
   'fleet.license_expiring':         'warning',
+  'attendance.clockout_due':        'warning',
+  'attendance.correction_required': 'warning',
+  'attendance.supervisor_digest':   'warning',
+  'attendance.hr_readiness':        'info',
 };
 
 // =============================================================================
@@ -156,6 +170,10 @@ export const EVENT_LABELS: Record<string, string> = {
   'compliance.document_expiring':   'Document Expiring',
   'compliance.hs_incident':         'H&S Incident Reported',
   'fleet.license_expiring':         'Vehicle License Expiring',
+  'attendance.clockout_due':        'Clock-out Required',
+  'attendance.correction_required': 'Attendance Correction Required',
+  'attendance.supervisor_digest':   'Supervisor Attendance Digest',
+  'attendance.hr_readiness':        'HR Attendance Readiness',
 };
 
 // =============================================================================
@@ -192,6 +210,10 @@ export const EVENT_GROUPS: Record<string, string> = {
   'compliance.document_expiring':   'Compliance',
   'compliance.hs_incident':         'Compliance',
   'fleet.license_expiring':         'Fleet',
+  'attendance.clockout_due':        'Attendance',
+  'attendance.correction_required': 'Attendance',
+  'attendance.supervisor_digest':   'Attendance',
+  'attendance.hr_readiness':        'Attendance',
 };
 
 /** Get all registered event types (excluding _fallback) */

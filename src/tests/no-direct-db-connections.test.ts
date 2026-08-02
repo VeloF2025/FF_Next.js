@@ -43,6 +43,9 @@ describe('No Direct Database Connections', () => {
     //   reached only from pages/api/** and the WA send clients; no component
     //   imports it, and it appears in no client chunk.
     'modules/communications/whatsapp/config/waProviderConfig.ts',
+    // Server-only metrics snapshot source registry. Imported by the cron API
+    // and snapshot writer only; no component or client entry point imports it.
+    'modules/metrics/snapshot/sources.ts',
     //   five files reference it, all in type position and therefore erased at
     //   compile time — StatusPill.tsx, SummaryBar.tsx, FilterBar.tsx and
     //   filters.ts via `import type`, and types.ts via a type-position

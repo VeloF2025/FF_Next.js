@@ -66,9 +66,21 @@ const VALID_BODY = {
   clock_out_at: '2026-04-20T14:00:00Z',
   notes: 'phone battery died; supervisor attests shift',
 };
+let activePeriodLock = false;
+let dailyResultStatus = 'approved';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  activePeriodLock = false;
+  dailyResultStatus = 'approved';
+  mocks.txnQuery.mockImplementation(async (text: string) =>
+    /pg_advisory_xact_lock/i.test(text) ? [{ acquired: '' }] : []);
+  mocks.txnQueryOne.mockImplementation(async (text: string) => {
+    if (/attendance_weekly_locks/i.test(text)) return { active_period_lock: activePeriodLock };
+    if (/SELECT result_status/i.test(text)) return { result_status: dailyResultStatus };
+    if (/INSERT\s+INTO\s+attendance_entries/i.test(text)) return { id: 'new-entry' };
+    return null;
+  });
   // transaction(cb) runs the callback with a fake txn whose query/queryOne
   // are the per-test mocks, then "commits" by returning the callback result.
   mocks.transaction.mockImplementation(
@@ -122,29 +134,30 @@ describe('POST /api/staff/attendance-manual-entry', () => {
   });
 
   it('409 when target week is locked', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      {
-        week_start_date: '2026-04-20',
-        locked_at: '2026-04-21T09:00:00Z',
-        locked_by: 'admin-1',
-        lock_reason: 'export:csv',
-        unlocked_at: null,
-        unlocked_by: null,
-        unlock_reason: null,
-      },
-    ]);
+    activePeriodLock = true;
     const { res, captured } = makeRes();
     await handler(makeReq(VALID_BODY), res);
     expect(captured.statusCode).toBe(409);
-    // No writes attempted on a locked week.
-    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.txnQueryOne.mock.calls.some((call) =>
+      /INSERT\s+INTO\s+attendance_entries/i.test(String(call[0])))).toBe(false);
+  });
+
+  it('fails closed on an orphan locked daily row before transaction writes', async () => {
+    dailyResultStatus = 'locked';
+
+    const { res, captured } = makeRes();
+    await handler(makeReq(VALID_BODY), res);
+
+    expect(captured.statusCode).toBe(409);
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.txnQueryOne.mock.calls.some((call) =>
+      /INSERT\s+INTO\s+attendance_entries/i.test(String(call[0])))).toBe(false);
+    expect(mocks.txnQuery.mock.calls.some((call) =>
+      /DELETE\s+FROM\s+attendance_daily_summaries/i.test(String(call[0])))).toBe(false);
   });
 
   it('happy path — atomically inserts entry, raises manual_override exception (binds supervisor_user_id), deletes existing summary', async () => {
-    mocks.sql.mockResolvedValueOnce([]); // no lock
-    mocks.txnQueryOne.mockResolvedValueOnce({ id: 'new-entry' }); // INSERT entry RETURNING id
-    mocks.txnQuery.mockResolvedValue([]); // exception insert + summary delete
-
     const { res, captured } = makeRes();
     await handler(makeReq(VALID_BODY), res);
     expect(captured.statusCode).toBe(200);

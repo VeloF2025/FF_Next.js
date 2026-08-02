@@ -11,8 +11,11 @@
 // /offline.html) so an already-installed SW reinstalls and the activate handler
 // purges the stale copy — otherwise /my keeps serving the old cached shell.
 // (Update lands via the /my UpdatePrompt "Reload" — this SW deliberately waits.)
-const CACHE_NAME = 'my-portal-v2';
+const CACHE_NAME = 'my-portal-v5';
 const OFFLINE_CACHE = 'my-offline-v1';
+const AUTH_CACHE_MAX_AGE_MS = 15 * 60 * 1000;
+const AUTH_CACHE_PATHS = new Set(['/api/my/session', '/api/auth/me']);
+const CACHED_AT_HEADER = 'x-ff-cached-at';
 
 const STATIC_ASSETS = [
   '/my',
@@ -26,7 +29,6 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  console.log('[SW-my] Installing');
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
@@ -40,7 +42,6 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW-my] Activating');
   event.waitUntil(
     caches.keys().then((cacheNames) =>
       Promise.all(
@@ -67,21 +68,53 @@ self.addEventListener('fetch', (event) => {
     url.pathname === '/offline.html' ||
     url.pathname === '/assets/vf/vf-logo.svg';
 
-  // Runtime-cache /api/my/session with a short TTL so a returning user on a
-  // flaky connection doesn't get bounced to the login screen during the
-  // network round-trip. The cached copy is served as a fallback; a fresh
-  // network response always wins when one arrives.
-  if (url.pathname === '/api/my/session') {
+  // A controlled /my page still loads its executable shell from
+  // /_next/static/*. Those requests are outside the registration scope path,
+  // but they are dispatched to this worker because the requesting page is
+  // controlled. Serve the locally cached copies before the /my-only guard so
+  // a cold offline navigation can hydrate instead of rendering blank HTML.
+  const isPortalStaticAsset =
+    url.origin === self.location.origin && url.pathname.startsWith('/_next/static/');
+
+  if (isPortalStaticAsset) {
+    event.respondWith(
+      caches.match(request).then(
+        (cached) =>
+          cached ||
+          fetch(request).then((response) => {
+            if (response.ok) {
+              const responseClone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            }
+            return response;
+          })
+      )
+    );
+    return;
+  }
+
+  // The portal needs both auth contracts to boot offline. Keep them for the
+  // same short window as attendance eligibility; a stale identity response
+  // must never extend offline clock authority.
+  if (AUTH_CACHE_PATHS.has(url.pathname)) {
+    if (self.navigator.onLine === false) {
+      event.respondWith(freshCachedAuthResponse(request));
+      return;
+    }
     event.respondWith(
       fetch(request)
-        .then((response) => {
+        .then(async (response) => {
           if (response.ok) {
-            const responseClone = response.clone();
-            caches.open(OFFLINE_CACHE).then((cache) => cache.put(request, responseClone));
+            await cacheAuthResponse(request, response);
+            return response;
+          }
+          if (response.status >= 500) {
+            const cached = await freshCachedAuthResponse(request);
+            if (cached.type !== 'error') return cached;
           }
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || Response.error()))
+        .catch(() => freshCachedAuthResponse(request))
     );
     return;
   }
@@ -133,16 +166,48 @@ self.addEventListener('message', (event) => {
   }
 
   if (event.data?.type === 'CLEAR_SESSION_CACHE') {
-    // Called from logout: drop the cached /api/my/session response so an
-    // offline reload can't serve a stale "you're logged in" payload.
-    caches.open(OFFLINE_CACHE).then((cache) => {
-      cache.keys().then((keys) => {
-        keys
-          .filter((req) => new URL(req.url).pathname === '/api/my/session')
-          .forEach((req) => cache.delete(req));
-      });
-    });
+    // Called from logout: drop both identity contracts so an offline reload
+    // cannot serve the previous worker's authenticated portal.
+    event.waitUntil(clearAuthCache().then(() => {
+      event.ports[0]?.postMessage({ type: 'SESSION_CACHE_CLEARED' });
+    }));
   }
 });
 
-console.log('[SW-my] Loaded');
+async function clearAuthCache() {
+  const cache = await caches.open(OFFLINE_CACHE);
+  const keys = await cache.keys();
+  await Promise.all(keys
+    .filter((request) => AUTH_CACHE_PATHS.has(new URL(request.url).pathname))
+    .map((request) => cache.delete(request)));
+}
+
+async function cacheAuthResponse(request, response) {
+  const headers = new Headers(response.headers);
+  headers.set(CACHED_AT_HEADER, String(Date.now()));
+  const cached = new Response(await response.clone().blob(), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+  const cache = await caches.open(OFFLINE_CACHE);
+  await cache.put(authCacheKey(request), cached);
+}
+
+async function freshCachedAuthResponse(request) {
+  const cache = await caches.open(OFFLINE_CACHE);
+  const key = authCacheKey(request);
+  const cached = await cache.match(key);
+  const cachedAt = Number(cached?.headers.get(CACHED_AT_HEADER));
+  const age = Date.now() - cachedAt;
+  if (!cached || !Number.isFinite(age) || age < 0 || age > AUTH_CACHE_MAX_AGE_MS) {
+    if (cached) await cache.delete(key);
+    return Response.error();
+  }
+  return cached;
+}
+
+function authCacheKey(request) {
+  const url = new URL(request.url);
+  return new Request(`${url.origin}${url.pathname}`, { method: 'GET' });
+}

@@ -55,8 +55,13 @@ beforeEach(() => {
 describe('submitClockEventWithOfflineFallback', () => {
   it('enqueues when offline (no network call)', async () => {
     const result = await submitClockEventWithOfflineFallback('in', payload, { online: false });
-    expect(result).toEqual({ kind: 'queued' });
+    expect(result).toEqual({ kind: 'queued', eventId: expect.any(String) });
     expect(mocks.enqueueClockEvent).toHaveBeenCalledTimes(1);
+    if (result.kind === 'queued') {
+      expect(mocks.enqueueClockEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: result.eventId })
+      );
+    }
     expect(mocks.clockIn).not.toHaveBeenCalled();
   });
 
@@ -100,7 +105,7 @@ describe('submitClockEventWithOfflineFallback', () => {
       new mocks.ApiErrorClass(0, 'NETWORK_ERROR', 'Unreachable')
     );
     const result = await submitClockEventWithOfflineFallback('in', payload, { online: true });
-    expect(result).toEqual({ kind: 'queued' });
+    expect(result).toEqual({ kind: 'queued', eventId: expect.any(String) });
     expect(mocks.enqueueClockEvent).toHaveBeenCalledTimes(1);
   });
 

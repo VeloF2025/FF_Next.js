@@ -9,8 +9,9 @@
  * effects all-or-nothing) belong in a queries-layer test.
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { EXISTING, makeReq, makeRes } from './staff-attendance-corrections-review.testUtils';
 
 const mocks = vi.hoisted(() => ({
   sql: vi.fn(),
@@ -35,9 +36,11 @@ vi.mock('@/lib/auth/middleware', () => ({
   withPermission: () => (h: unknown) => h,
 }));
 vi.mock('@/modules/attendance/corrections/queries', () => ({
-  applyApprovedAdjustmentTxn: mocks.applyApprovedAdjustmentTxn,
   transitionAdjustmentStatus: mocks.transitionAdjustmentStatus,
   loadAdjustmentWithEntry: mocks.loadAdjustmentWithEntry,
+}));
+vi.mock('@/modules/attendance/corrections/guardedApproval', () => ({
+  applyApprovedAdjustmentTxn: mocks.applyApprovedAdjustmentTxn,
 }));
 vi.mock('@/modules/attendance/corrections/lockQueries', () => ({
   lookupActiveLock: mocks.lookupActiveLock,
@@ -52,63 +55,6 @@ vi.mock('@/modules/attendance/corrections/lockQueries', () => ({
 }));
 
 import handler from '../../../../../pages/api/staff/attendance-corrections-review';
-
-function makeReq(
-  body: Record<string, unknown> = {},
-  method: string = 'POST',
-  userId: string | null = 'reviewer-1'
-): NextApiRequest {
-  const r: Partial<NextApiRequest> & { user?: { id: string } } = {
-    method,
-    query: {},
-    headers: {},
-    body,
-  };
-  if (userId) r.user = { id: userId };
-  return r as NextApiRequest;
-}
-
-function makeRes() {
-  const captured: { statusCode: number; body?: unknown; headers: Record<string, string> } = {
-    statusCode: 200,
-    headers: {},
-  };
-  const res = {
-    status(c: number) { captured.statusCode = c; return this; },
-    json(d: unknown) { captured.body = d; return this; },
-    send(d: unknown) { captured.body = d; return this; },
-    setHeader(name: string, value: string) { captured.headers[name.toLowerCase()] = value; },
-    getHeader() { return undefined; },
-  };
-  return { res: res as unknown as NextApiResponse, captured };
-}
-
-const EXISTING = {
-  adjustment: {
-    id: 'adj-1',
-    entry_id: 'e-1',
-    requested_by: 'staff-1',
-    adjustment_kind: 'forgot_clock_out' as const,
-    adjusted_clock_in_at: null,
-    adjusted_clock_out_at: '2026-04-20T14:00:00+00:00',
-    adjusted_site_geofence_id: null,
-    reason: 'forgot to clock out',
-    status: 'pending' as const,
-    reviewed_by: null,
-    reviewed_at: null,
-    review_note: null,
-    created_at: '2026-04-20T15:00:00Z',
-    updated_at: '2026-04-20T15:00:00Z',
-  },
-  entry: {
-    id: 'e-1',
-    staff_id: 'staff-1',
-    work_date: '2026-04-20',
-    clock_in_at: '2026-04-20T06:00:00+00:00',
-    clock_out_at: null,
-    status: 'open',
-  },
-};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -170,21 +116,37 @@ describe('POST /api/staff/attendance-corrections-review', () => {
     expect(mocks.applyApprovedAdjustmentTxn).not.toHaveBeenCalled();
   });
 
+  it.each(['approve', 'reject'] as const)(
+    '409 when a linked day exception attempts legacy %s review', async (action) => {
+      mocks.loadAdjustmentWithEntry.mockResolvedValueOnce({
+        ...EXISTING,
+        dayExceptionId: 'day-exception-1',
+      });
+      const { res, captured } = makeRes();
+      await handler(makeReq({
+        adjustment_id: 'adj-1', action,
+        review_note: action === 'reject' ? 'use the canonical queue instead' : undefined,
+      }), res);
+
+      expect(captured.statusCode).toBe(409);
+      expect(captured.body).toMatchObject({
+        error: { message: expect.stringMatching(/action queue.*day exception/i) },
+      });
+      expect(mocks.applyApprovedAdjustmentTxn).not.toHaveBeenCalled();
+      expect(mocks.transitionAdjustmentStatus).not.toHaveBeenCalled();
+    },
+  );
+
   it("409 when the entry's week is locked (approve path)", async () => {
     mocks.loadAdjustmentWithEntry.mockResolvedValueOnce(EXISTING);
-    mocks.lookupActiveLock.mockResolvedValueOnce({
-      week_start_date: '2026-04-20',
-      locked_at: 'x',
-      locked_by: 'admin-1',
-      lock_reason: 'export:csv',
-      unlocked_at: null,
-      unlocked_by: null,
-      unlock_reason: null,
-    });
+    mocks.sql.mockResolvedValueOnce([{ updated_at: '2026-04-20T15:00:00+00:00' }]);
+    mocks.applyApprovedAdjustmentTxn.mockRejectedValueOnce(
+      Object.assign(new Error('The payroll week is locked'), { code: 'period_locked' }));
     const { res, captured } = makeRes();
     await handler(makeReq({ adjustment_id: 'adj-1', action: 'approve' }), res);
     expect(captured.statusCode).toBe(409);
-    expect(mocks.applyApprovedAdjustmentTxn).not.toHaveBeenCalled();
+    expect(mocks.lookupActiveLock).not.toHaveBeenCalled();
+    expect(mocks.applyApprovedAdjustmentTxn).toHaveBeenCalledTimes(1);
   });
 
   it("409 when the entry's week is locked (reject path)", async () => {

@@ -17,7 +17,10 @@ export type ReportSlug =
   | 'ot-trend'
   | 'dept-rollup'
   | 'wage-cost'
-  | 'bcea-premium';
+  | 'bcea-premium'
+  | 'exception-ageing'
+  | 'payroll-readiness'
+  | 'evidence-quality';
 
 export const ALL_REPORT_SLUGS: ReadonlyArray<ReportSlug> = [
   'monthly-totals',
@@ -27,6 +30,9 @@ export const ALL_REPORT_SLUGS: ReadonlyArray<ReportSlug> = [
   'dept-rollup',
   'wage-cost',
   'bcea-premium',
+  'exception-ageing',
+  'payroll-readiness',
+  'evidence-quality',
 ];
 
 /** Catalogue entry — drives the index tile grid and the per-slug page. */
@@ -121,6 +127,33 @@ export const REPORT_CATALOGUE: ReadonlyArray<ReportDef> = [
       { kind: 'date_range', defaultPreset: 'last_30d' },
       { kind: 'departments_text' },
       { kind: 'sites_text' },
+    ],
+  },
+  {
+    slug: 'exception-ageing',
+    title: 'Exception ageing',
+    blurb: 'Unresolved exceptions with exact owner, age and action.',
+    inputs: [
+      { kind: 'date_range', defaultPreset: 'last_30d' },
+      { kind: 'departments_text' },
+    ],
+  },
+  {
+    slug: 'payroll-readiness',
+    title: 'Payroll readiness',
+    blurb: 'Expected, approved and blocked days with approved locked hour categories.',
+    inputs: [
+      { kind: 'date_range', defaultPreset: 'last_30d' },
+      { kind: 'departments_text' },
+    ],
+  },
+  {
+    slug: 'evidence-quality',
+    title: 'Evidence quality',
+    blurb: 'GPS, selfie, geofence and Cartrack availability and reliability coverage.',
+    inputs: [
+      { kind: 'date_range', defaultPreset: 'last_30d' },
+      { kind: 'departments_text' },
     ],
   },
 ];

@@ -12,12 +12,15 @@ const mocks = vi.hoisted(() => {
   const sql = vi.fn();
   // Faithful to the real client: `sql.unsafe(raw)` inlines a trusted fragment.
   (sql as unknown as { unsafe: (raw: string) => string }).unsafe = (raw: string) => raw;
-  return { sql };
+  return { sql, loadWeeklyPayrollSnapshot: vi.fn() };
 });
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
+vi.mock('@/services/attendance/payroll/weeklySnapshot', () => ({
+  loadWeeklyPayrollSnapshot: mocks.loadWeeklyPayrollSnapshot,
+}));
 vi.mock('@/lib/auth/middleware', () => ({
   withAuth: (h: unknown) => h,
   withPermission: () => (h: unknown) => h,
@@ -56,6 +59,10 @@ function row(overrides: Partial<Record<string, unknown>> = {}) {
     sunday_hrs: overrides.sunday_hrs ?? '0',
     holiday_hrs: overrides.holiday_hrs ?? '0',
     night_hrs: overrides.night_hrs ?? '0',
+    result_status: overrides.result_status ?? 'approved',
+    approved_regular_hrs: overrides.approved_regular_hrs ?? '8',
+    approved_overtime_hrs: overrides.approved_overtime_hrs ?? '0',
+    approved_sunday_hrs: overrides.approved_sunday_hrs ?? '0',
     exceptions_count: overrides.exceptions_count ?? 0,
     ...overrides,
   };
@@ -63,6 +70,9 @@ function row(overrides: Partial<Record<string, unknown>> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.sql.mockReset();
+  mocks.loadWeeklyPayrollSnapshot.mockReset();
+  mocks.loadWeeklyPayrollSnapshot.mockResolvedValue(null);
 });
 
 describe('GET /api/staff/attendance-week', () => {
@@ -115,6 +125,37 @@ describe('GET /api/staff/attendance-week', () => {
     expect(body.data.totals.regularHrs).toBe(24);
     expect(body.data.totals.overtimeHrs).toBe(2);
     expect(body.data.totals.staffCount).toBe(2);
+  });
+
+  it('returns payroll totals from approved snapshots rather than differing legacy proposals', async () => {
+    mocks.sql.mockResolvedValueOnce([
+      row({ result_status: 'approved', regular_hrs: '8', overtime_hrs: '3', sunday_hrs: '5',
+        approved_regular_hrs: '6.5', approved_overtime_hrs: '1', approved_sunday_hrs: '0' }),
+      row({ work_date: '2026-04-21', result_status: 'locked', regular_hrs: '9', overtime_hrs: '4',
+        approved_regular_hrs: '7', approved_overtime_hrs: '0.5', approved_sunday_hrs: '2' }),
+      row({ work_date: '2026-04-22', result_status: 'awaiting_supervisor', regular_hrs: '10',
+        approved_regular_hrs: '10', approved_overtime_hrs: '10', approved_sunday_hrs: '10' }),
+    ]).mockResolvedValueOnce([]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({ week_start: '2026-04-20' }), res);
+    const body = captured.body as { data: { payrollTotals: {
+      regularHrs: number; overtimeHrs: number; sundayHrs: number;
+    } } };
+
+    expect(body.data.payrollTotals).toEqual({
+      regularHrs: 13.5, overtimeHrs: 1.5, sundayHrs: 2,
+      holidayHrs: 0, leaveHrs: 0, unpaidHrs: 0,
+    });
+    const sqlCall = mocks.sql.mock.calls[0] ?? [];
+    const sqlText = [
+      ...((sqlCall[0] as readonly string[]) ?? []),
+      ...sqlCall.slice(1).map(String),
+    ].join(' ');
+    expect(sqlText).toMatch(/ds\.approved_regular_hrs::text/i);
+    expect(sqlText).toContain('s.join_date::date <= ds.work_date');
+    expect(sqlText).toContain('s.end_date::date >= ds.work_date');
+    expect(sqlText).toMatch(/ds\.approved_overtime_hrs::text/i);
+    expect(sqlText).toMatch(/ds\.approved_sunday_hrs::text/i);
   });
 
   it('staff returned sorted alphabetically by full_name', async () => {
@@ -205,29 +246,33 @@ describe('GET /api/staff/attendance-week', () => {
   });
 
   it('exposes active lock metadata in payload.lock when the week is locked', async () => {
-    mocks.sql
-      .mockResolvedValueOnce([]) // data
-      .mockResolvedValueOnce([
-        {
-          week_start_date: '2026-04-20',
-          locked_at: '2026-04-21T09:00:00Z',
-          locked_by: 'admin-1',
-          lock_reason: 'export:csv',
-          unlocked_at: null,
-          unlocked_by: null,
-          unlock_reason: null,
-        },
-      ]);
+    mocks.sql.mockResolvedValueOnce([]);
+    mocks.loadWeeklyPayrollSnapshot.mockResolvedValueOnce({
+      lock: {
+        version: 4, lockedAt: '2026-04-21T09:00:00Z',
+        lockedBy: 'admin-1', reason: 'export:csv',
+      },
+      totals: {
+        regularHrs: 32, overtimeHrs: 4, sundayHrs: 2,
+        holidayHrs: 8, leaveHrs: 8, unpaidHrs: 1,
+      },
+    });
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20' }), res);
     expect(captured.statusCode).toBe(200);
     const body = captured.body as {
       data: {
-        lock: { lockedAt: string; lockedBy: string; reason: string | null } | null;
+        lock: { version: number; lockedAt: string; lockedBy: string; reason: string | null } | null;
+        payrollTotals: Record<string, number>;
       };
     };
     expect(body.data.lock).not.toBeNull();
     expect(body.data.lock!.lockedBy).toBe('admin-1');
     expect(body.data.lock!.reason).toBe('export:csv');
+    expect(body.data.lock!.version).toBe(4);
+    expect(body.data.payrollTotals).toEqual({
+      regularHrs: 32, overtimeHrs: 4, sundayHrs: 2,
+      holidayHrs: 8, leaveHrs: 8, unpaidHrs: 1,
+    });
   });
 });

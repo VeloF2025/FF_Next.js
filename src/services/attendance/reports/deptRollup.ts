@@ -49,8 +49,7 @@ export async function runDeptRollup(input: ReportInput): Promise<ReportRunResult
     dateTo: input.dateTo,
     departments: input.departments,
     deptRef: 's.department',
-    activeStaffRefs: { isActive: 's.is_active', endDate: 's.end_date' },
-    accountStatusRef: 's.account_status',
+    employmentStaffAlias: 's',
   });
   // Pre-aggregate unresolved exceptions per (staff_id, work_date) to eliminate
   // the correlated per-row subquery. Date-range bound mirrors outer WHERE.

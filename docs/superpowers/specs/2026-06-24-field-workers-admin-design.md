@@ -58,7 +58,8 @@ Self-registered field workers (role `technician` or `casual`, `source='self_regi
   - Reuses the existing attendance query/aggregation helpers where practical, minus the Rule-P predicate.
 - **Actions per entry** — all through existing, audit-preserving paths (no raw edit of clock rows):
   - **Add missing entry** → existing `POST /api/staff/attendance-manual-entry` (`status='manual'`, min-10-char note, blocked if week locked).
-  - **Fix/adjust a wrong time** → **one thin NEW endpoint** `POST /api/field/attendance-adjust` that inserts an `attendance_adjustments` row and applies it atomically via the existing `applyApprovedAdjustmentTxn` (optimistic concurrency on `entry.updated_at`, deletes daily_summary for recompute). This reuses the audited transaction — it does not introduce a new write path to `attendance_entries`.
+  - **Fix/adjust a wrong time** → **one thin NEW endpoint** `POST /api/field/attendance-adjust` that calls `createAndApproveAdjustmentTxn` from `corrections/guardedApproval`. The canonical lock guard, pending adjustment insert, approval, optimistic entry update, and projection invalidation share one transaction.
+    - Resolve the authenticated `users.id` through `staff.user_id`: store the unique `staff.id` in `requested_by` and retain `users.id` in `reviewed_by`. Reject a missing or ambiguous link rather than inventing a staff requester.
   - **Approve/reject worker-submitted corrections** → existing `POST /api/staff/attendance-corrections-review`.
 
 ## Data flow
@@ -81,14 +82,14 @@ Self-registered field workers (role `technician` or `casual`, `source='self_regi
 |--------------|-----|
 | `/api/field/users/approve`, `/suspend` | `/field` page + components (replace old content) |
 | `/api/staff/attendance-manual-entry` | `GET /api/field/attendance` (Rule-P-exempt, field-worker scoped) |
-| `/api/staff/attendance-corrections-review` | `POST /api/field/attendance-adjust` (thin; wraps `applyApprovedAdjustmentTxn`) |
-| `applyApprovedAdjustmentTxn`, adjustments status-machine, `clockUtils` | `source`+project added to `GET /api/field/users` response |
+| `/api/staff/attendance-corrections-review` | `POST /api/field/attendance-adjust` (thin; calls guarded create+approve) |
+| guarded approval services, adjustments status-machine, `clockUtils` | `source`+project added to `GET /api/field/users` response |
 | HR-visibility rules (unchanged everywhere else) | "Field Workers" nav entry |
 
 ## Testing
 
 - **Unit:** `GET /api/field/attendance` returns pending + active field workers (asserts the Rule-P exemption is intentional and scoped to `technician`/`casual`); excludes non-field roles.
-- **Unit:** `attendance-adjust` inserts + applies via the txn; 409 on stale `updated_at`; 409 on locked week.
+- **Unit:** `attendance-adjust` guards + inserts + applies in one transaction; 409 on stale `updated_at`; 409 on active or orphan locked state without a persisted insert.
 - **RBAC:** approve/suspend reject non-admin (403); time read allowed for attendance-permission holders; edits require `attendance.corrections`.
 - **Approvals list:** returns `source`/project; existing `/api/field/users` callers unaffected by the additive columns.
 

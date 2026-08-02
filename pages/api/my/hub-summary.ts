@@ -13,10 +13,15 @@ import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import {
   findOpenEntry,
   findActiveVehicleAssignment,
+  sastWorkDate,
 } from '@/modules/attendance/portal/clockUtils';
 import { countOwnAdjustmentsByStatus } from '@/modules/attendance/corrections/queries';
 import { findLatestPayslipForStaff } from '@/modules/payslips/queries';
 import { findLatestReceiptForStaff } from '@/modules/receipts/queries';
+import {
+  findRequiredAttendanceAction,
+  type RequiredAttendanceAction,
+} from '@/modules/attendance/workflow/requiredActionQueries';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4kb' } },
@@ -49,6 +54,7 @@ export interface HubSummary {
   } | null;
   pendingCorrectionsCount: number;
   recentEntryCount: number;
+  requiredAttendanceAction: RequiredAttendanceAction | null;
 }
 
 interface VehicleCheckReminderRow extends Record<string, unknown> {
@@ -113,7 +119,16 @@ export default withMySession(async (req, res, session) => {
   }
 
   try {
-    const [openEntry, vehicle, correctionCounts, recentRows, latestPayslip, latestReceipt] = await Promise.all([
+    const today = sastWorkDate(new Date());
+    const [
+      openEntry,
+      vehicle,
+      correctionCounts,
+      recentRows,
+      latestPayslip,
+      latestReceipt,
+      requiredAttendanceAction,
+    ] = await Promise.all([
       findOpenEntry(session.staffId),
       findActiveVehicleAssignment(session.staffId),
       countOwnAdjustmentsByStatus(session.staffId),
@@ -125,6 +140,7 @@ export default withMySession(async (req, res, session) => {
       `,
       findLatestPayslipForStaff(session.staffId),
       findLatestReceiptForStaff(session.staffId),
+      findRequiredAttendanceAction(session.staffId, today),
     ]);
     const vehicleReminder = await findVehicleCheckReminder(
       vehicle?.vehicle_registration ?? null
@@ -154,6 +170,7 @@ export default withMySession(async (req, res, session) => {
       latestReceipt,
       pendingCorrectionsCount: correctionCounts.pending,
       recentEntryCount: Number(recentRows[0]?.count ?? '0'),
+      requiredAttendanceAction,
     };
 
     return apiResponse.success(res, summary);

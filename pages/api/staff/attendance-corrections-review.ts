@@ -3,17 +3,15 @@
  *
  * Body: { adjustment_id, action: 'approve' | 'reject', review_note?: string }
  *
- * Transitions a pending adjustment to approved or rejected. Approve runs
- * all three state mutations inside a single DB transaction:
- *   1. adjustment status pending → approved
- *   2. apply adjusted_* fields to attendance_entries (with optimistic
- *      concurrency on updated_at — if the reconcile cron auto-closed the
- *      entry between our load and apply, we 409 instead of silently
- *      overwriting with COALESCE)
- *   3. DELETE the affected (staff, work_date) daily_summary so the
- *      reconcile cron recomputes it
+ * Legacy authority for unlinked adjustments only. Adjustments linked to the
+ * day-exception workflow are rejected here and must be decided through the
+ * canonical attendance action endpoint.
  *
- * Any step throwing rolls all three back.
+ * Approval transitions the adjustment and invalidates its derived daily
+ * projection in one transaction. Raw attendance_entries punch/site evidence
+ * is immutable; reconciliation reads approved corrections as an effective-
+ * evidence overlay. Optimistic concurrency returns 409 if the raw entry has
+ * changed since review loaded it.
  *
  * RBAC: people.staff.attendance.corrections, edit.
  *
@@ -36,8 +34,8 @@ import {
 import {
   loadAdjustmentWithEntry,
   transitionAdjustmentStatus,
-  applyApprovedAdjustmentTxn,
 } from '@/modules/attendance/corrections/queries';
+import { applyApprovedAdjustmentTxn } from '@/modules/attendance/corrections/guardedApproval';
 import {
   isoWeekMonday,
   lookupActiveLock,
@@ -76,6 +74,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     return;
   }
   const noteForDb = reviewNote.length > 0 ? reviewNote : null;
+  let targetWeek: string | null = null;
 
   try {
     const existing = await loadAdjustmentWithEntry(adjustmentId);
@@ -83,6 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       apiResponse.notFound(res, 'Adjustment', adjustmentId);
       return;
     }
+    targetWeek = isoWeekMonday(existing.entry.work_date);
     // Scope gate: a reviewer with the RBAC permission may still only
     // act on staff they supervise (reports_to ancestor OR same-dept
     // manager). Super_admin / admin bypass this check.
@@ -105,17 +105,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       );
       return;
     }
-    const weekMonday = isoWeekMonday(existing.entry.work_date);
-    const activeLock = await lookupActiveLock(weekMonday);
-    if (activeLock) {
+    if (existing.dayExceptionId) {
       apiResponse.conflict(
         res,
-        `Week ${weekMonday} is locked; unlock first via /api/staff/attendance-weekly-locks`
+        'This correction belongs to the attendance action queue; decide its day exception instead'
       );
       return;
     }
-
     if (action === 'reject') {
+      if (await lookupActiveLock(targetWeek)) {
+        apiResponse.conflict(res,
+          `Week ${targetWeek} is locked; unlock first via /api/staff/attendance-weekly-locks`);
+        return;
+      }
       const rejected = await transitionAdjustmentStatus({
         adjustmentId,
         reviewerId,
@@ -130,8 +132,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       return;
     }
 
-    // Approve path — transactional with optimistic concurrency on the
-    // underlying entry's updated_at.
+    // Approve path — transactional derived-state invalidation with optimistic
+    // concurrency on the immutable raw entry evidence.
     const adjustedIn = existing.adjustment.adjusted_clock_in_at
       ? new Date(existing.adjustment.adjusted_clock_in_at)
       : null;
@@ -168,6 +170,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     }
     apiResponse.success(res, { adjustment: result.adjustment });
   } catch (err) {
+    if (isPeriodLockedError(err)) {
+      apiResponse.conflict(res,
+        `Week ${targetWeek ?? 'unknown'} is locked; unlock first via /api/staff/attendance-weekly-locks`);
+      return;
+    }
     log.error('[staff-corrections-review] failed', {
       adjustmentId,
       action,
@@ -175,6 +182,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     });
     apiResponse.internalError(res, err);
   }
+}
+
+function isPeriodLockedError(error: unknown): boolean {
+  return !!error && typeof error === 'object' && 'code' in error && error.code === 'period_locked';
 }
 
 async function fetchEntryUpdatedAt(entryId: string): Promise<string> {

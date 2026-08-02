@@ -1,280 +1,144 @@
-/**
- * /staff/attendance/week — weekly attendance totals + payroll export.
- *
- * Per-staff weekly hour buckets (regular/OT/Sun/holiday/night) with a CSV
- * or XLSX download. Week picker enforces Monday-start; friendly auto-snap
- * redirects other days to the Monday of that ISO week.
- *
- * Backed by `GET /api/staff/attendance-week` (daily_summaries aggregation).
- * Download button hits `/api/staff/attendance-export`.
- *
- * Rendering is split into `src/components/attendance/WeekSummaryTable.tsx`
- * so this page stays under the 200-line component cap.
- */
-
-import { useEffect, useMemo, useState } from 'react';
-import { Download, Calendar, AlertTriangle, Lock } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Calendar, Download, Lock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AttendanceNav } from '@/components/attendance/AttendanceNav';
-import {
-  Metric,
-  WeekSummaryTable,
-  type StaffWeekRow,
-} from '@/components/attendance/WeekSummaryTable';
+import { Metric, WeekSummaryTable, type StaffWeekRow } from '@/components/attendance/WeekSummaryTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { todayInSast } from '@/components/attendance/dateUtils';
+import { usePeriodReadiness } from '@/components/attendance/readiness/usePeriodReadiness';
+import { positiveLockVersion } from '@/components/attendance/readiness/lockReadback';
 
 interface WeekPayload {
-  weekStart: string;
-  weekEnd: string;
-  staff: StaffWeekRow[];
-  totals: {
-    regularHrs: number;
-    overtimeHrs: number;
-    sundayHrs: number;
-    holidayHrs: number;
-    nightHrs: number;
-    exceptionsCount: number;
-    staffCount: number;
-  };
-  // Payroll-week lock state (#1993). Non-null when the week is locked; the
-  // page paints an informational banner. Edits are enforced server-side on
-  // the corrections / manual-entry APIs, not here.
-  lock: {
-    lockedAt: string;
-    reason: string | null;
-  } | null;
+  weekStart: string; weekEnd: string; staff: StaffWeekRow[];
+  totals: { regularHrs: number; overtimeHrs: number; sundayHrs: number; holidayHrs: number;
+    nightHrs: number; exceptionsCount: number; staffCount: number };
+  payrollTotals: { regularHrs: number; overtimeHrs: number; sundayHrs: number;
+    holidayHrs: number; leaveHrs: number; unpaidHrs: number };
+  lock: { version: number; lockedAt: string; lockedBy: string; reason: string | null } | null;
 }
 
 function thisWeekMonday(): string {
-  const today = todayInSast();
-  const d = new Date(`${today}T00:00:00Z`);
-  const dow = d.getUTCDay();
-  const deltaToMon = dow === 0 ? -6 : 1 - dow;
-  d.setUTCDate(d.getUTCDate() + deltaToMon);
-  return d.toISOString().slice(0, 10);
+  const date = new Date(`${todayInSast()}T00:00:00Z`);
+  const day = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() + (day === 0 ? -6 : 1 - day));
+  return date.toISOString().slice(0, 10);
 }
 
-function parseApiError(body: unknown, status: number): string {
-  // apiResponse serialises errors as { error: { code, message, details } }.
-  // A naïve `body.error` stringifies to '[object Object]' on the banner;
-  // dig into `.message`, fall back to the status code.
-  const e = (body as { error?: { message?: string } | string } | null)?.error;
-  if (typeof e === 'string') return e;
-  return e?.message ?? `HTTP ${status}`;
+function apiMessage(body: unknown, status: number): string {
+  const value = (body as { error?: { message?: string } | string } | null)?.error;
+  return typeof value === 'string' ? value : value?.message ?? `HTTP ${status}`;
 }
 
-function formatLockDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('en-ZA', {
-    timeZone: 'Africa/Johannesburg',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+async function responseBody(response: Response): Promise<unknown> {
+  try { return await response.json(); } catch { return null; }
 }
 
 export default function StaffAttendanceWeekPage() {
-  const [weekStart, setWeekStart] = useState<string>(thisWeekMonday());
+  const [weekStart, setWeekStart] = useState(thisWeekMonday());
   const [payload, setPayload] = useState<WeekPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [exportBusy, setExportBusy] = useState<'csv' | 'xlsx' | null>(null);
+  const weekRequestRef = useRef(0);
+  const downloadRef = useRef(0);
+  const selectedWeekRef = useRef(weekStart);
+  selectedWeekRef.current = weekStart;
 
   useEffect(() => {
+    const requestId = ++weekRequestRef.current;
     let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(
-          `/api/staff/attendance-week?week_start=${encodeURIComponent(weekStart)}`,
-          { credentials: 'same-origin' }
-        );
-        if (!res.ok) {
-          let body: unknown = {};
-          try {
-            body = await res.json();
-          } catch (parseErr) {
-            log.warn('[staff-attendance-week] non-JSON error body', {
-              status: res.status,
-              err: parseErr instanceof Error ? parseErr.message : String(parseErr),
-            });
-          }
-          throw new Error(parseApiError(body, res.status));
-        }
-        const body = (await res.json()) as { success: true; data: WeekPayload };
-        if (!cancelled) setPayload(body.data);
-      } catch (err) {
-        if (!cancelled) {
-          const message = err instanceof Error ? err.message : String(err);
-          setError(message);
-          log.error('[staff-attendance-week] load failed', { weekStart, error: message });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
+    const current = () => !cancelled && requestId === weekRequestRef.current;
+    setLoading(true); setError(null); setPayload(null);
+    void fetch(`/api/staff/attendance-week?week_start=${encodeURIComponent(weekStart)}`, { credentials: 'same-origin' })
+      .then(async (response) => {
+        const parsed = await responseBody(response);
+        if (!response.ok) throw new Error(apiMessage(parsed, response.status));
+        if (current()) setPayload((parsed as { success: true; data: WeekPayload }).data);
+      })
+      .catch((caught) => {
+        if (!current()) return;
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message); log.error('[staff-attendance-week] load failed', { weekStart, error: message });
+      })
+      .finally(() => { if (current()) setLoading(false); });
+    return () => { cancelled = true; };
   }, [weekStart]);
 
-  const days: string[] = useMemo(() => {
-    const out: string[] = [];
-    const d = new Date(`${weekStart}T00:00:00Z`);
-    for (let i = 0; i < 7; i++) {
-      out.push(d.toISOString().slice(0, 10));
-      d.setUTCDate(d.getUTCDate() + 1);
-    }
-    return out;
-  }, [weekStart]);
+  const period = usePeriodReadiness(weekStart);
+  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(`${weekStart}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + index);
+    return date.toISOString().slice(0, 10);
+  }), [weekStart]);
+  const candidateLock = payload?.lock ?? null;
+  const lockVersion = positiveLockVersion(candidateLock?.version);
+  const activeLock = lockVersion === null ? null : candidateLock;
+  const hoursState = activeLock ? 'Locked' : 'Approved';
 
-  async function handleDownload(format: 'csv' | 'xlsx') {
-    setExportBusy(format);
-    try {
-      const res = await fetch(
-        `/api/staff/attendance-export?week_start=${encodeURIComponent(
-          weekStart
-        )}&format=${format}`,
-        { credentials: 'same-origin' }
-      );
-      if (!res.ok) {
-        let body: unknown = {};
-        try {
-          body = await res.json();
-        } catch (parseErr) {
-          log.warn('[staff-attendance-week] non-JSON export error body', {
-            status: res.status,
-            err: parseErr instanceof Error ? parseErr.message : String(parseErr),
-          });
-        }
-        throw new Error(parseApiError(body, res.status));
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `attendance-week-${weekStart}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(`Export failed: ${message}`);
-      log.error('[staff-attendance-week] export failed', { format, weekStart, error: message });
-    } finally {
-      setExportBusy(null);
-    }
+  function changeWeek(value: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return;
+    const date = new Date(`${value}T00:00:00Z`);
+    const day = date.getUTCDay();
+    date.setUTCDate(date.getUTCDate() + (day === 0 ? -6 : 1 - day));
+    ++downloadRef.current; setExportBusy(null);
+    setWeekStart(date.toISOString().slice(0, 10));
   }
 
-  function handleWeekChange(ymd: string) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return;
-    const dow = new Date(`${ymd}T00:00:00Z`).getUTCDay();
-    if (dow !== 1) {
-      // Snap to Monday silently — friendlier than a validation error when
-      // the picker yields Wednesday.
-      const d = new Date(`${ymd}T00:00:00Z`);
-      const delta = dow === 0 ? -6 : 1 - dow;
-      d.setUTCDate(d.getUTCDate() + delta);
-      setWeekStart(d.toISOString().slice(0, 10));
-      return;
-    }
-    setWeekStart(ymd);
+  async function download(format: 'csv' | 'xlsx') {
+    if (!activeLock || lockVersion === null) return;
+    const requestId = ++downloadRef.current;
+    const requestedWeek = weekStart;
+    const current = () => requestId === downloadRef.current && selectedWeekRef.current === requestedWeek;
+    setExportBusy(format); setError(null);
+    try {
+      const response = await fetch(`/api/staff/attendance-export?week_start=${encodeURIComponent(weekStart)}&format=${format}&lock_version=${lockVersion}`, { credentials: 'same-origin' });
+      if (!current()) return;
+      if (!response.ok) throw new Error(apiMessage(await responseBody(response), response.status));
+      const url = URL.createObjectURL(await response.blob());
+      if (!current()) { URL.revokeObjectURL(url); return; }
+      const anchor = document.createElement('a');
+      anchor.href = url; anchor.download = `attendance-week-${weekStart}.${format}`;
+      document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
+    } catch (caught) {
+      if (!current()) return;
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(`Export failed: ${message}`); log.error('[staff-attendance-week] export failed', { format, weekStart, error: message });
+    } finally { if (current()) setExportBusy(null); }
   }
 
   return (
     <AppLayout>
       <AttendanceNav />
-      <div className="p-6 space-y-4">
-        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold">Weekly Attendance</h1>
-            <p className="text-sm text-neutral-400">
-              Payroll week {weekStart} — {days[6]}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-sm text-neutral-300">
-              <Calendar className="w-4 h-4" />
-              <input
-                type="date"
-                value={weekStart}
-                onChange={(e) => handleWeekChange(e.target.value)}
-                className="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-sm"
-                aria-label="Week-start (auto-snaps to Monday)"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => handleDownload('csv')}
-              disabled={exportBusy !== null}
-              className="flex items-center gap-2 px-3 py-1 rounded border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-sm"
-            >
-              <Download className="w-4 h-4" />
-              {exportBusy === 'csv' ? 'Generating…' : 'CSV'}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDownload('xlsx')}
-              disabled={exportBusy !== null}
-              className="flex items-center gap-2 px-3 py-1 rounded border border-emerald-700 bg-emerald-900/40 hover:bg-emerald-800/60 disabled:opacity-50 text-sm"
-            >
-              <Download className="w-4 h-4" />
-              {exportBusy === 'xlsx' ? 'Generating…' : 'XLSX'}
-            </button>
+      <main className="space-y-4 p-4 lg:p-6">
+        <header className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div><h1 className="text-2xl font-semibold">Weekly Attendance</h1><p className="text-sm text-neutral-400">Payroll week {weekStart} — {days[6]}</p></div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex min-h-[44px] items-center gap-2 text-sm text-neutral-300"><Calendar className="h-4 w-4" /><input type="date" value={weekStart} onChange={(event) => changeWeek(event.target.value)} className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1" aria-label="Week-start (auto-snaps to Monday)" /></label>
+            {activeLock && lockVersion !== null && <div aria-label="Locked export navigation" className="flex items-center gap-2">
+              <span className="text-xs text-amber-300">Lock version {lockVersion}</span>
+              <button type="button" onClick={() => { void download('csv'); }} disabled={exportBusy !== null} className="inline-flex min-h-[44px] items-center gap-2 rounded border border-neutral-700 bg-neutral-900 px-3 text-sm disabled:opacity-50"><Download className="h-4 w-4" />{exportBusy === 'csv' ? 'Generating…' : 'CSV'}</button>
+              <button type="button" onClick={() => { void download('xlsx'); }} disabled={exportBusy !== null} className="inline-flex min-h-[44px] items-center gap-2 rounded border border-emerald-700 bg-emerald-900/40 px-3 text-sm disabled:opacity-50"><Download className="h-4 w-4" />{exportBusy === 'xlsx' ? 'Generating…' : 'XLSX'}</button>
+            </div>}
           </div>
         </header>
-
-        {error && (
-          <div className="rounded border border-red-800 bg-red-950/30 p-3 text-sm text-red-200 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 mt-0.5" />
-            <div>{error}</div>
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center gap-2 text-neutral-400 text-sm">
-            <LoadingSpinner /> Loading week totals…
-          </div>
-        )}
-
-        {!loading && payload && (
-          <>
-            {payload.lock && (
-              <div className="rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200 flex items-start gap-2">
-                <Lock className="w-4 h-4 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-medium">This payroll week is locked.</span>{' '}
-                  Corrections and manual entries are blocked until it is unlocked.
-                  {payload.lock.reason ? ` Reason: ${payload.lock.reason}.` : ''}
-                  {payload.lock.lockedAt ? ` Locked ${formatLockDate(payload.lock.lockedAt)}.` : ''}
-                </div>
-              </div>
-            )}
-            <section className="grid grid-cols-2 md:grid-cols-6 gap-2 text-sm">
-              <Metric label="Staff" value={String(payload.totals.staffCount)} />
-              <Metric label="Regular" value={`${payload.totals.regularHrs.toFixed(1)}h`} />
-              <Metric label="Overtime" value={`${payload.totals.overtimeHrs.toFixed(1)}h`} />
-              <Metric label="Sunday" value={`${payload.totals.sundayHrs.toFixed(1)}h`} />
-              <Metric label="Holiday" value={`${payload.totals.holidayHrs.toFixed(1)}h`} />
-              <Metric
-                label="Exceptions"
-                value={String(payload.totals.exceptionsCount)}
-                flag={payload.totals.exceptionsCount > 0}
-              />
-            </section>
-
-            <WeekSummaryTable staff={payload.staff} days={days} />
-          </>
-        )}
-      </div>
+        {(error || period.error) && <div role="alert" className="flex items-start gap-2 rounded border border-red-800 bg-red-950/30 p-3 text-sm text-red-200"><AlertTriangle className="mt-0.5 h-4 w-4" />{error ?? period.error}</div>}
+        {(loading || (period.loading && !period.readiness)) && <div className="flex items-center gap-2 text-sm text-neutral-400"><LoadingSpinner /> Loading week totals…</div>}
+        {!loading && payload && <>
+          {activeLock && <div className="flex items-start gap-2 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200"><Lock className="mt-0.5 h-4 w-4" /><span><strong>This payroll week is locked at version {lockVersion}.</strong> Corrections and manual entries remain blocked.{activeLock.reason ? ` Reason: ${activeLock.reason}.` : ''}</span></div>}
+          <section className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4 lg:grid-cols-8">
+            <Metric label="Staff" value={String(payload.totals.staffCount)} />
+            <Metric label={`${hoursState} regular`} value={`${payload.payrollTotals.regularHrs.toFixed(1)}h`} />
+            <Metric label={`${hoursState} overtime`} value={`${payload.payrollTotals.overtimeHrs.toFixed(1)}h`} />
+            <Metric label={`${hoursState} Sunday`} value={`${payload.payrollTotals.sundayHrs.toFixed(1)}h`} />
+            <Metric label={`${hoursState} holiday`} value={`${payload.payrollTotals.holidayHrs.toFixed(1)}h`} />
+            <Metric label={`${hoursState} leave`} value={`${payload.payrollTotals.leaveHrs.toFixed(1)}h`} />
+            <Metric label={`${hoursState} unpaid`} value={`${payload.payrollTotals.unpaidHrs.toFixed(1)}h`} />
+            <Metric label="Exceptions" value={String(payload.totals.exceptionsCount)} flag={payload.totals.exceptionsCount > 0} />
+          </section>
+          <WeekSummaryTable staff={payload.staff} days={days} />
+        </>}
+      </main>
     </AppLayout>
   );
 }

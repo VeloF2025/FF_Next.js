@@ -24,6 +24,10 @@ describe('geofencePatterns SQL shape', () => {
     expect(text).toMatch(/ST_Contains\s*\(\s*zb\.geom/i);
     expect(text).toMatch(/location_type\s*=\s*'office'/);
     expect(text).toMatch(/sp\.is_active\s*=\s*true/);
+    expect(text).toContain('attendance_staff.join_date::date <= ae.work_date');
+    expect(text).toContain('attendance_staff.end_date::date >= ae.work_date');
+    expect(text).toContain('s.join_date::date <= effective_day.work_date');
+    expect(text).toContain('s.end_date::date >= effective_day.work_date');
   });
 
   it('parameterises departments and date range', () => {

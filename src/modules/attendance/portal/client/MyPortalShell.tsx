@@ -13,6 +13,8 @@ import { useRouter } from 'next/router';
 import { Clock, Home, History, LogOut, RefreshCw, Receipt } from 'lucide-react';
 
 import { logout } from './api';
+import { clearAttendanceEligibilitySnapshots } from './clock/attendanceEligibilitySnapshot';
+import { clearMyPortalSessionCache } from './serviceWorkerSessionCache';
 import { useMyServiceWorker } from './useServiceWorker';
 
 export interface MyPortalShellProps {
@@ -83,9 +85,8 @@ export function MyPortalShell({
     // the SW could otherwise serve a stale "logged in" payload from
     // OFFLINE_CACHE. Best-effort — the navigator might not be available.
     try {
-      if (navigator.serviceWorker?.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_SESSION_CACHE' });
-      }
+      clearAttendanceEligibilitySnapshots();
+      await clearMyPortalSessionCache();
     } catch {
       // No SW yet, or postMessage rejected — fall through to the reload.
     }

@@ -34,6 +34,9 @@ import { runOtTrend } from './otTrend';
 import { runDeptRollup } from './deptRollup';
 import { runWageCost } from './wageCost';
 import { runBceaPremium } from './bceaPremium';
+import { runExceptionAgeing } from './exceptionAgeing';
+import { runPayrollReadiness } from './payrollReadiness';
+import { runEvidenceQuality } from './evidenceQuality';
 
 export const REPORT_ROW_CAP = 50_000;
 
@@ -219,6 +222,9 @@ const DISPATCH: Record<ReportSlug, (input: ReportInput) => Promise<ReportRunResu
   'dept-rollup':       runDeptRollup,
   'wage-cost':         runWageCost,
   'bcea-premium':      runBceaPremium,
+  'exception-ageing':  runExceptionAgeing,
+  'payroll-readiness': runPayrollReadiness,
+  'evidence-quality':  runEvidenceQuality,
 };
 
 /**
@@ -238,7 +244,11 @@ export async function runReport(
   let errorMsg: string | null = null;
   try {
     if (!input.hasAnyStaff) {
-      const empty = { rows: [], columns: [], notes: ['No staff in scope.'] };
+      const keepsStableColumns = slug === 'exception-ageing' || slug === 'payroll-readiness' || slug === 'evidence-quality';
+      const schema = keepsStableColumns
+        ? await DISPATCH[slug](input)
+        : { rows: [], columns: [], notes: [] };
+      const empty = { ...schema, rows: [], notes: [...schema.notes, 'No staff in scope.'] };
       rowCount = 0;
       return empty;
     }

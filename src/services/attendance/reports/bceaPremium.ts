@@ -69,8 +69,7 @@ export async function runBceaPremium(input: ReportInput): Promise<ReportRunResul
     dateTo: input.dateTo,
     departments: input.departments,
     deptRef: 's.department',
-    activeStaffRefs: { isActive: 's.is_active', endDate: 's.end_date' },
-    accountStatusRef: 's.account_status',
+    employmentStaffAlias: 's',
   });
   const onlyPremiumDays = `(ds.sunday_hrs > 0 OR ds.holiday_hrs > 0)`;
   const siteFilterSql = input.siteIds.length > 0
