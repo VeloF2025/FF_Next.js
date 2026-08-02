@@ -49,6 +49,8 @@ export default defineConfig({
       'tests/migrations/472_works_qa_pole_planning_view.test.ts',
       'tests/migrations/473_backfill_unified_reviews_project.test.ts',
       'tests/migrations/474_metrics_snapshot_spine.test.ts',
+      'tests/migrations/475_attendance_policy_workflow.test.ts',
+      'tests/migrations/476_attendance_lock_hr_authority.test.ts',
       'tests/migrations/477_conformed_project_dimension.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.
