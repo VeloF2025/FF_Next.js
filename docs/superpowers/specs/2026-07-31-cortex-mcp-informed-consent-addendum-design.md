@@ -71,12 +71,18 @@ bearer only across the authenticated loopback callback.
 - `CORTEX_MCP_CALLBACK_SECRET` is identical only between FibreFlow's Cortex callback
   integration and Cortex Remote MCP. It remains distinct from
   `FF_MCP_CALLBACK_SECRET`.
+- Rollout proves that boundary using hashes only: FibreFlow and Remote MCP callback
+  secret hashes must be equal, while the callback and `FF_MCP_CALLBACK_SECRET`
+  hashes must be unequal. FibreFlow and Bridge `BRIDGE_JWT_SECRET` hashes and the
+  configured `BRIDGE_JWT_KID` must also agree. Never print the underlying values.
 - The context endpoint is loopback-only from FibreFlow and refuses redirects.
 - No redirect allowlist is added; informed consent remains compatible with legitimate
   dynamically registered MCP clients.
 - No Cortex write tools, identity changes, OAuth-store migrations or live
   configuration changes are included.
-- Production rollout remains separately approval-gated.
+- Production rollout remains separately approval-gated and executor-first. Activate
+  Agent Executor, then Bridge/Remote MCP, then FibreFlow; rollback removes FibreFlow
+  exposure first and unwinds toward Executor last.
 
 ## Verification
 
@@ -90,4 +96,11 @@ remain non-clickable inert text.
 
 Focused Vitest, `npm run ci:quick`, a production build and Playwright visual/behavior
 checks are required before the pull request is presented. A real isolated dev OAuth
-connector test remains required after review and before production rollout.
+connector test remains required after review and before production rollout. It uses
+an isolated executor on `17406`, an isolated Bridge whose
+`EXECUTOR_URL=http://127.0.0.1:17406` (never production `7406`), isolated Remote MCP,
+a unique OAuth store, and a dev public base. Read back the complete effective
+`CORTEX_SUPER_ADMIN_EMAILS` list, including `lew@velocityfibre.co.za`, without
+dropping any existing entry. The proof must also explain that the outer OAuth refresh
+grant expires after 30 days and requires browser reauthorization even though the
+underlying normal Cortex bearer has a 90-day claim.

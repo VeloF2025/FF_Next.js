@@ -1,74 +1,215 @@
-/**
- * Route-level tests for the MCP edge proxy, driven over a REAL http.Server.
- *
- * Two bugs shipped at this exact call site because the unit tests only exercised the
- * helpers directly:
- *   1. `req.destroy()` on cap-exceeded killed the socket shared with the response, so the
- *      413 never reached the client.
- *   2. `return pipeUpstreamResponse(...)` without `await` let a rejection escape the
- *      route's try/catch, making the `res.headersSent` guard dead code and silencing the
- *      error log.
- *
- * Neither is visible when you call the helpers in isolation — both need the handler, a
- * real socket, and a real upstream. Hence this file. Mock fidelity is the thing that
- * failed, so these tests use as little mocking as possible.
- */
+/** Real-socket contracts for the public Cortex MCP edge proxy. */
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { log } = vi.hoisted(() => ({
-  log: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
-}));
-vi.mock('@/lib/logger', () => ({ log }));
+vi.unmock('@/lib/logger');
+
+import { log } from '@/lib/logger';
+
+type ProxyHandler = (request: never, response: never) => Promise<unknown>;
+
+interface HttpResult {
+  body: string;
+  headers: http.IncomingHttpHeaders;
+  status: number;
+}
 
 const servers: http.Server[] = [];
-
+const handlerCompletions: Promise<unknown>[] = [];
 function listen(server: http.Server): Promise<number> {
   servers.push(server);
-  return new Promise((resolve) => server.listen(0, () => resolve((server.address() as AddressInfo).port)));
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      resolve((server.address() as AddressInfo).port);
+    });
+  });
+}
+async function closeServer(server: http.Server): Promise<void> {
+  server.closeAllConnections?.();
+  if (!server.listening) return;
+  await new Promise<void>((resolve) => server.close(() => resolve()));
 }
 
-afterEach(() => {
-  servers.splice(0).forEach((s) => s.close());
-  vi.clearAllMocks();
+afterEach(async () => {
   delete process.env.CORTEX_REMOTE_MCP_URL;
+  delete process.env.CORTEX_REMOTE_MCP_TIMEOUT_MS;
+  log.clearLogs();
+  handlerCompletions.length = 0;
+  await Promise.all(servers.splice(0).map(closeServer));
+  vi.resetModules();
 });
 
-/**
- * The route reads CORTEX_REMOTE_MCP_URL at MODULE LOAD, so the env var must be set
- * BEFORE importing it and the module registry reset between tests.
- *
- * Not a stylistic nicety: with a static import the default upstream (127.0.0.1:7414)
- * wins, and a real Cortex MCP service is listening there on dev machines — the first
- * version of this file was unknowingly proxying to live local infrastructure and
- * asserting against its 401.
- */
-async function loadHandler(upstreamPort: number) {
+async function loadRoute(upstreamPort: number, timeout = '100') {
   process.env.CORTEX_REMOTE_MCP_URL = `http://127.0.0.1:${upstreamPort}`;
+  process.env.CORTEX_REMOTE_MCP_TIMEOUT_MS = timeout;
   vi.resetModules();
-  const mod = await import('@/pages/api/cortex-remote-mcp/[...path]');
-  return mod.default;
+  return import('@/pages/api/cortex-remote-mcp/[...path]');
 }
 
-/** Runs the real handler behind a real socket, adding the Next helpers it uses. */
-async function proxyServerPointingAt(upstreamPort: number): Promise<number> {
-  const handler = await loadHandler(upstreamPort);
-  return listen(
-    http.createServer((req, res) => {
-      const nextRes = Object.assign(res, {
-        status(code: number) { res.statusCode = code; return nextRes; },
-        json(payload: unknown) { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(payload)); return nextRes; },
-        send(body: Buffer | string) { res.end(body); return nextRes; },
+function nextServer(handler: ProxyHandler, path: string[] = ['mcp']): http.Server {
+  return http.createServer((req, res) => {
+    const nextRes = Object.assign(res, {
+      json(payload: unknown) {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify(payload));
+        return nextRes;
+      },
+      send(body: Buffer | string) {
+        res.end(body);
+        return nextRes;
+      },
+      status(code: number) {
+        res.statusCode = code;
+        return nextRes;
+      },
+    });
+    const nextReq = Object.assign(req, { query: { path } });
+    const completion = handler(nextReq as never, nextRes as never);
+    handlerCompletions.push(completion);
+    void completion.catch(() => undefined);
+  });
+}
+
+async function proxyServerPointingAt(
+  upstreamPort: number,
+  timeout = '100',
+  path: string[] = ['mcp'],
+): Promise<number> {
+  const route = await loadRoute(upstreamPort, timeout);
+  return listen(nextServer(route.default as ProxyHandler, path));
+}
+
+async function request(path: string, init: RequestInit = {}): Promise<HttpResult> {
+  const response = await fetch(path, init);
+  return {
+    body: await response.text(),
+    headers: Object.fromEntries(response.headers.entries()),
+    status: response.status,
+  };
+}
+
+function expectGeneric502(result: HttpResult): void {
+  expect(result.status).toBe(502);
+  expect(JSON.parse(result.body)).toEqual({
+    success: false,
+    error: {
+      code: 'BAD_GATEWAY',
+      message: 'Cortex remote MCP service is unavailable',
+    },
+  });
+}
+
+function failureLog() {
+  return log.getLogs().find((entry) => entry.message === 'Cortex remote MCP proxy failed');
+}
+
+describe('MCP proxy route over real sockets', () => {
+  it('bounds and defensively parses the upstream timeout override', async () => {
+    const upstreamPort = await listen(http.createServer((_req, res) => res.end('ok')));
+    const route = (await loadRoute(upstreamPort)) as unknown as {
+      parseUpstreamTimeoutMs(raw: string | undefined): number;
+    };
+
+    expect(route.parseUpstreamTimeoutMs('250')).toBe(250);
+    expect(route.parseUpstreamTimeoutMs('1')).toBe(25);
+    expect(route.parseUpstreamTimeoutMs('999999')).toBe(120_000);
+    for (const malformed of [undefined, '', '0', '-1', '12.5', 'not-a-number']) {
+      expect(route.parseUpstreamTimeoutMs(malformed)).toBe(30_000);
+    }
+  });
+
+  it('returns a generic 502 within the configured deadline when upstream stalls', async () => {
+    const upstreamPort = await listen(http.createServer((req) => req.resume()));
+    const proxyPort = await proxyServerPointingAt(upstreamPort, '50');
+    log.clearLogs();
+    const started = Date.now();
+
+    const result = await request(
+      `http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp?state=stall-secret`,
+      { signal: AbortSignal.timeout(1_000) },
+    );
+
+    expectGeneric502(result);
+    expect(Date.now() - started).toBeLessThan(900);
+    expect(failureLog()?.data).toEqual({ phase: 'upstream' });
+    expect(log.exportLogs()).not.toContain('stall-secret');
+  });
+
+  it('returns a redacted 502 when the upstream is not listening', async () => {
+    const throwaway = http.createServer();
+    const deadPort = await new Promise<number>((resolve) => {
+      throwaway.listen(0, '127.0.0.1', () => {
+        resolve((throwaway.address() as AddressInfo).port);
       });
-      const nextReq = Object.assign(req, { query: { path: ['mcp'] } });
-      void handler(nextReq as never, nextRes as never);
-    }),
-  );
-}
+    });
+    await new Promise<void>((resolve) => throwaway.close(() => resolve()));
+    const proxyPort = await proxyServerPointingAt(deadPort);
+    log.clearLogs();
 
-describe('MCP proxy route — failure paths over a real socket', () => {
-  it('logs and truncates when the upstream dies mid-body, instead of silently 200-ing', async () => {
+    const result = await request(
+      `http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp?state=dead-secret&code=dead-code`,
+    );
+
+    expectGeneric502(result);
+    expect(failureLog()?.data).toEqual({ phase: 'upstream' });
+    expect(log.exportLogs()).not.toMatch(/dead-secret|dead-code/);
+  });
+
+  it('delivers a generic 413 without logging the request query or body', async () => {
+    const upstreamPort = await listen(
+      http.createServer((_req, res) => res.end('should not be reached')),
+    );
+    const proxyPort = await proxyServerPointingAt(upstreamPort);
+    log.clearLogs();
+
+    const result = await request(
+      `http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp?state=cap-secret`,
+      { method: 'POST', body: Buffer.alloc(6 * 1024 * 1024, 0x61) },
+    );
+
+    expect(result.status).toBe(413);
+    expect(JSON.parse(result.body)).toEqual({
+      success: false,
+      error: {
+        code: 'PAYLOAD_TOO_LARGE',
+        message: 'Request body exceeds the proxy limit',
+      },
+    });
+    const warning = log.getLogs().find(
+      (entry) => entry.message === 'Cortex remote MCP request body over cap',
+    );
+    expect(warning?.data).toEqual({ maxBytes: 4 * 1024 * 1024 });
+    expect(log.exportLogs()).not.toContain('cap-secret');
+  });
+
+  it('returns a generic 502 when upstream fails after headers but before any body byte', async () => {
+    const upstreamPort = await listen(
+      http.createServer((_req, res) => {
+        res.writeHead(200, {
+          'content-type': 'text/plain',
+          'x-upstream-sentinel': 'must-not-survive',
+          location: '/upstream-only',
+          'www-authenticate': 'Bearer realm="upstream"',
+        });
+        res.flushHeaders();
+        setTimeout(() => res.socket?.destroy(), 20);
+      }),
+    );
+    const proxyPort = await proxyServerPointingAt(upstreamPort);
+    log.clearLogs();
+    const result = await request(
+      `http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp?state=zero-byte-secret`,
+    );
+    expectGeneric502(result);
+    expect(result.headers).not.toHaveProperty('x-upstream-sentinel');
+    expect(result.headers).not.toHaveProperty('location');
+    expect(result.headers).not.toHaveProperty('www-authenticate');
+    expect(failureLog()?.data).toEqual({ phase: 'upstream' });
+    expect(log.exportLogs()).not.toContain('zero-byte-secret');
+  });
+
+  it('closes the downstream socket when the upstream dies after streaming starts', async () => {
     const upstreamPort = await listen(
       http.createServer((_req, res) => {
         res.writeHead(200, { 'content-type': 'application/json' });
@@ -77,68 +218,82 @@ describe('MCP proxy route — failure paths over a real socket', () => {
       }),
     );
     const proxyPort = await proxyServerPointingAt(upstreamPort);
+    log.clearLogs();
 
-    let clientSawError = false;
-    let body = '';
-    try {
-      const r = await fetch(`http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp`);
-      body = await r.text();
-    } catch {
-      clientSawError = true;
-    }
-
-    // The client must NOT receive a complete-looking response.
-    expect(clientSawError || body === '{"partial":').toBe(true);
-
-    // And the failure must be observable. Without `return await` this never fired —
-    // the rejection escaped the handler's catch entirely.
-    await vi.waitFor(() => expect(log.error).toHaveBeenCalled(), { timeout: 2000 });
-    expect(log.error.mock.calls[0]![0]).toMatch(/proxy failed/i);
-  });
-
-  it('delivers a real 413 to the client when the body exceeds the cap', async () => {
-    // Upstream should never be reached; if the cap works the proxy answers first.
-    const upstreamPort = await listen(http.createServer((_req, res) => res.end('should not be reached')));
-    const proxyPort = await proxyServerPointingAt(upstreamPort);
-
-    const res = await fetch(`http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp`, {
-      method: 'POST',
-      body: Buffer.alloc(6 * 1024 * 1024, 0x61), // over the 4 MiB cap
+    const result = await new Promise<{ aborted: boolean; body: string }>((resolve, reject) => {
+      http.get(
+        `http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp?code=stream-secret`,
+        (res) => {
+          let body = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => { body += chunk; });
+          res.on('aborted', () => resolve({ aborted: true, body }));
+          res.on('end', () => resolve({ aborted: false, body }));
+          res.on('error', () => resolve({ aborted: true, body }));
+        },
+      ).on('error', reject);
     });
 
-    // The whole point: the caller learns WHY, rather than getting ECONNRESET.
-    expect(res.status).toBe(413);
-    expect((await res.json()).error.code).toBe('PAYLOAD_TOO_LARGE');
+    expect(result).toEqual({ aborted: true, body: '{"partial":' });
+    await vi.waitFor(() => expect(failureLog()).toBeDefined());
+    expect(await Promise.allSettled(handlerCompletions)).toEqual([
+      expect.objectContaining({ status: 'fulfilled' }),
+    ]);
+    expect(failureLog()?.data).toEqual({ phase: 'stream' });
+    expect(log.exportLogs()).not.toContain('stream-secret');
   });
 
-  it('passes a normal upstream response straight through', async () => {
+  it('does not expose an invalid path or query in its warning', async () => {
+    const upstreamPort = await listen(http.createServer((_req, res) => res.end('unused')));
+    const proxyPort = await proxyServerPointingAt(upstreamPort, '100', ['..']);
+    log.clearLogs();
+
+    const result = await request(
+      `http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/invalid?state=path-secret`,
+    );
+
+    expect(result.status).toBe(404);
+    const warning = log.getLogs().find(
+      (entry) => entry.message === 'Rejected invalid Cortex remote MCP path',
+    );
+    expect(warning?.data).toBeUndefined();
+    expect(log.exportLogs()).not.toContain('path-secret');
+  });
+
+  it('streams a normal upstream status, header, and body unchanged', async () => {
     const upstreamPort = await listen(
       http.createServer((_req, res) => {
-        res.writeHead(200, { 'content-type': 'application/json' });
+        res.writeHead(201, {
+          'content-type': 'application/json',
+          'x-cortex-proof': 'streamed',
+        });
         res.end('{"jsonrpc":"2.0","result":"ok"}');
       }),
     );
     const proxyPort = await proxyServerPointingAt(upstreamPort);
 
-    const res = await fetch(`http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp`);
+    const result = await request(`http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp`);
 
-    expect(res.status).toBe(200);
-    expect(await res.text()).toBe('{"jsonrpc":"2.0","result":"ok"}');
+    expect(result.status).toBe(201);
+    expect(result.headers['x-cortex-proof']).toBe('streamed');
+    expect(result.body).toBe('{"jsonrpc":"2.0","result":"ok"}');
   });
 
-  it('502s when the upstream is not listening at all — headers not yet sent', async () => {
-    // Bind a port, learn it, then release it so nothing is listening there.
-    const throwaway = http.createServer();
-    const deadPort = await new Promise<number>((r) =>
-      throwaway.listen(0, () => r((throwaway.address() as AddressInfo).port)),
+  it('preserves upstream redirects without following them', async () => {
+    const upstreamPort = await listen(
+      http.createServer((_req, res) => {
+        res.writeHead(302, { location: '/consent?state=redirect-proof' });
+        res.end();
+      }),
     );
-    await new Promise<void>((r) => throwaway.close(() => r()));
-    const proxyPort = await proxyServerPointingAt(deadPort);
+    const proxyPort = await proxyServerPointingAt(upstreamPort);
 
-    const res = await fetch(`http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/mcp`);
+    const result = await request(
+      `http://127.0.0.1:${proxyPort}/api/cortex-remote-mcp/authorize`,
+      { redirect: 'manual' },
+    );
 
-    // Nothing written yet, so the real 502 is reachable here.
-    expect(res.status).toBe(502);
-    expect((await res.json()).error.code).toBe('BAD_GATEWAY');
+    expect(result.status).toBe(302);
+    expect(result.headers.location).toBe('/consent?state=redirect-proof');
   });
 });

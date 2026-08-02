@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let Claude authorize the read-only Cortex remote MCP connector through a verified FibreFlow login and consent screen, while preserving FibreFlow MCP RBAC, current Cortex OAuth grants, ordinary-user ACL narrowing, and an unlinked manual rollback route.
+**Goal:** Let Claude authorize the read-only Cortex remote MCP connector through a verified FibreFlow login and consent screen, while preserving FibreFlow MCP RBAC, marked-compatible Cortex OAuth grants, ordinary-user ACL narrowing, and an unlinked manual rollback route. Unsafe unmarked grants fail closed and require re-consent.
 
-**Architecture:** Cortex remains its own OAuth authorization server and records a ten-minute pending request, but redirects the browser to FibreFlow for authentication and consent. FibreFlow mints a 90-day Cortex bearer for the verified session email and hands it to Cortex over loopback with a connector-specific shared secret; Cortex validates the bearer against Bridge before atomically converting the pending request into an OAuth code. FibreFlow connector setup moves to `/connections/*`, while `/cortex` remains the knowledge search/review surface.
+**Architecture:** Cortex remains its own OAuth authorization server and records a ten-minute pending request, but redirects the browser to FibreFlow for authentication and consent. FibreFlow mints a 90-day Cortex bearer for the verified session email and hands it to Cortex over loopback with a connector-specific shared secret; Cortex validates the bearer against Bridge before atomically converting the pending request into an OAuth code. Dynamic registration remains enabled, with a durable capped Cortex client collection and narrow FibreFlow per-IP limits on exact `POST /register` and `GET /authorize`; neither layer substitutes for the other. The outer Cortex OAuth refresh grant expires after 30 days, so the user must complete browser reauthorization then even though that underlying bearer has a 90-day claim. FibreFlow connector setup moves to `/connections/*`, while `/cortex` remains the knowledge search/review surface.
 
 **Tech Stack:** Next.js 14 Pages Router, React 18, TypeScript, FibreFlow PostgreSQL RBAC middleware, Vitest/Testing Library, Playwright, Python 3.11+, FastMCP OAuth provider APIs, Starlette, Pytest, systemd user services.
 
@@ -14,14 +14,24 @@
 - Preserve the existing FibreFlow MCP authorization route, endpoint catalogue, session storage, OAuth/RBAC behavior, and server-enforced read-only policy.
 - Cortex must use FibreFlow login and consent in the normal remote workflow; the browser sends only `{ stateId }` and never supplies an email, role, token, callback URL, or redirect URL.
 - Identity comes only from the verified FibreFlow session: `req.user.email`.
-- `lew@velocityfibre.co.za` is authorized for full Velocity Fibre Cortex tenant read scope; preserve every existing `CORTEX_SUPER_ADMIN_EMAILS` entry.
+- Preserve every existing `CORTEX_SUPER_ADMIN_EMAILS` entry. The exact
+  `lew@velocityfibre.co.za` address and every configured entry must receive
+  tenant-bound full Cortex reads, including meeting detail and minutes packs. This
+  is a distinct read capability: do not add Lew to `CORTEX_MEETING_ADMIN_EMAILS`,
+  and do not enable classify, legal-hold, process, intake, action, delivery, or any
+  other write.
 - Cortex MCP remains read-only; its exact existing tool set must not gain write, approve, ingest, administration, or mutation tools.
 - Use `CORTEX_MCP_CALLBACK_SECRET`; do not reuse `FF_MCP_CALLBACK_SECRET`, and never put either secret in tracked files, URLs, browser responses, logs, commits, or PR text.
 - Keep Cortex `/authorize/approve` temporarily as an unlinked operator rollback path; normal `authorize()` must never return that route.
-- Preserve Cortex OAuth store keys, serialized model fields, and `ctxc_`/`ctxa_`/`ctxr_` token prefixes so current code, access tokens, and refresh tokens remain valid.
+- Preserve Cortex OAuth store keys, serialized model fields, and `ctxc_`/`ctxa_`/`ctxr_` token prefixes. Existing authorization codes, access tokens, and refresh tokens remain valid only when the embedded Cortex bearer has exact `token_use="mcp"`. Unsafe unmarked credentials fail closed, are narrowly invalidated or consumed when presented, and require re-consent; do not grandfather them.
 - Use the existing horizontal `ModuleNav` for `/connections/fibreflow` and `/connections/cortex`; do not add a sidebar subtree.
 - Remove connector panels from `/cortex`, retain hero/search/review, and add a permission-gated link to `/connections/cortex`.
 - Use TDD: observe the relevant test fail before adding each implementation, then rerun it green.
+- Keep public OAuth flood controls layered: Cortex's persisted client cap remains the
+  invariant, while FibreFlow meters exact `POST /register` at 30/minute and exact
+  `GET /authorize` at 60/minute using only a fixed endpoint label plus
+  Nginx-overwritten `X-Real-IP` (socket fallback). Do not key or log URL/query/state,
+  code, body or `X-Forwarded-For`, and do not throttle token or MCP routes.
 - Tests exercise real production components, handlers, middleware and provider
   behavior. Do not mock application components or assert on mock/spies/source
   text. Use a narrow in-memory adapter or loopback test server only where an
@@ -29,7 +39,7 @@
   be made real; assert observable output and captured wire behavior.
 - FibreFlow verification includes focused Vitest, existing MCP consent/proxy suites, `npm run ci:quick`, `npm run build`, desktop/mobile Playwright, and a real dev connector flow.
 - Cortex verification includes focused Pytest, the exact read-only tool test, Ruff, ty, package import checks, and the repository CI script.
-- Real dev OAuth uses Bridge port `17403`, Remote MCP port `17414`, a unique non-production OAuth store, and `https://dev.fibreflow.app/api/cortex-remote-mcp` as its public base. Never repoint port `7414` or the production public authorization flow.
+- Real dev OAuth uses an isolated Agent Executor on `17406`, an isolated Bridge on `17403` with `EXECUTOR_URL=http://127.0.0.1:17406`, Remote MCP on `17414`, a unique non-production OAuth store, and `https://dev.fibreflow.app/api/cortex-remote-mcp` as its public base. The isolated Bridge must never call the production executor on `7406`; never repoint production port `7414`, its OAuth store, or its public authorization flow.
 - Do not modify live environment files, restart services, deploy production, or change Lew's live access until both PRs are reviewed and Hein explicitly approves that rollout gate.
 - FibreFlow production deployment is after hours only and always uses `bash scripts/deploy-local.sh production`; Cortex production deployment uses its supported `scripts/deploy_bridge.sh` path.
 - All source changes go through the coordinated FibreFlow and Cortex PRs.
@@ -116,6 +126,8 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 | Modify | `pages/cortex.tsx` | Remove panels/feature props and add the connection-page link |
 | Modify | `src/components/layout/sidebar/config/cortexSection.ts` | Retain Cortex and add one AI Connections entry |
 | Modify | `.env.example` | Document the blank dedicated secret and Cortex Remote MCP loopback URL |
+| Modify | `pages/api/cortex-remote-mcp/[...path].ts` | Apply pre-body public OAuth limits using sanitized endpoint/IP keys |
+| Create | `tests/api/cortex-mcp-oauth-rate-limit.test.ts` | Real proxy/upstream socket proof for limits, trusted-IP selection and unaffected routes |
 | Delete | `src/components/cortex/CortexConnectPanel.tsx` | Remove the token-paste/local-runtime UI from the normal surface |
 | Delete | `src/components/cortex/McpTokenReveal.tsx` | Remove its now-unreachable token/config renderer |
 | Delete | `src/components/cortex/__tests__/CortexConnectPanel.test.tsx` | Remove tests for the retired primary UI; API rollback tests remain |
@@ -123,7 +135,7 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 ## Task 1: Establish the clean Cortex branch and extract the compatible OAuth provider
 
 **Files:**
-- Create: `/home/hein/Workspace/Cortex-cortex-mcp-ff-consent`
+- Use: `/home/hein/Workspace/Cortex-mcp-readonly-lifetimes`
 - Create: `apps/cortex_mcp/cortex_mcp_oauth.py`
 - Create: `tests/test_cortex_mcp_oauth.py`
 - Modify: `apps/cortex_mcp/server.py:15-155`
@@ -138,21 +150,18 @@ Neither response contains the Cortex bearer or callback secret. Cortex validates
 Run:
 
 ```bash
-git -C /home/hein/Workspace/FF_Next.js-cortex-mcp-ff-consent status --short --branch
-git -C /home/hein/Workspace/FF_Next.js-cortex-mcp-ff-consent fetch origin
+git -C /home/hein/Workspace/FF_Next.js-cortex-token-lifetimes status --short --branch
+git -C /home/hein/Workspace/FF_Next.js-cortex-token-lifetimes fetch origin
 git -C /home/hein/Workspace/Cortex status --short --branch
 git -C /home/hein/Workspace/Cortex fetch origin
-git -C /home/hein/Workspace/Cortex worktree add \
-  /home/hein/Workspace/Cortex-cortex-mcp-ff-consent \
-  -b feat/cortex-mcp-ff-consent origin/main
-git -C /home/hein/Workspace/Cortex-cortex-mcp-ff-consent status --short --branch
+git -C /home/hein/Workspace/Cortex-mcp-readonly-lifetimes status --short --branch
 ```
 
 Expected:
 
 - FibreFlow reports only the already-committed spec/plan history.
 - The primary Cortex checkout may remain dirty and ahead; do not modify or clean it.
-- The new Cortex worktree reports branch `feat/cortex-mcp-ff-consent`, upstream `origin/main`, and no changed files.
+- The Cortex worktree reports branch `fix/cortex-mcp-readonly-lifetimes`, upstream `origin/main`, and no changed files.
 - Before FibreFlow implementation starts, rebase its unpushed feature branch onto the freshly fetched `origin/master` from its clean worktree; stop and ask before rewriting it if the branch has been published.
 
 - [ ] **Step 2: Write failing provider compatibility and redirect tests**
@@ -259,18 +268,20 @@ def test_existing_store_shape_loads_without_migration(tmp_path: Path):
 ```
 
 Add one non-empty compatibility case that writes the current serialized shapes
-for `ctxa_existing` and `ctxr_existing`, reloads the provider, and asserts that
+for `ctxa_existing` and `ctxr_existing` with a real signed test bearer carrying
+exact `token_use="mcp"`, reloads the provider, and asserts that
 `load_access_token()`/`load_refresh_token()` preserve `client_id`, `scopes`,
-`expires_at`, `resource`, and `cortex_token`. This test must use the current
-token prefixes and field names so extraction cannot silently invalidate
-production grants.
+`expires_at`, `resource`, and `cortex_token`. Add the complementary unmarked case:
+it must fail closed, remove only the affected grant rows, and require re-consent.
+The tests retain current token prefixes and field names without treating unsafe
+legacy authority as compatible.
 
 - [ ] **Step 3: Run the provider tests and observe the expected import failure**
 
 Run:
 
 ```bash
-cd /home/hein/Workspace/Cortex-cortex-mcp-ff-consent
+cd /home/hein/Workspace/Cortex-mcp-readonly-lifetimes
 uv run pytest tests/test_cortex_mcp_oauth.py -q
 ```
 
@@ -278,7 +289,26 @@ Expected: FAIL because `apps/cortex_mcp/cortex_mcp_oauth.py` does not exist.
 
 - [ ] **Step 4: Extract the OAuth models/provider without changing persisted fields**
 
-Create `apps/cortex_mcp/cortex_mcp_oauth.py`. Move the existing model classes and all provider methods from `server.py` into it. Keep the current bodies of `get_client`, `register_client`, `load_authorization_code`, `exchange_authorization_code`, `load_refresh_token`, `exchange_refresh_token`, `load_access_token`, `revoke_token`, and `complete_pending`; do not rename serialized keys or token prefixes.
+Create `apps/cortex_mcp/cortex_mcp_oauth.py`. Move the existing model classes and
+provider methods from `server.py` into it without renaming serialized keys or token
+prefixes. Preserve the existing protocol behavior except where the final Task 16B
+security contract supersedes the historical bodies:
+
+- `exchange_authorization_code()` must call the shared
+  `has_unverified_mcp_token_marker()` precondition before minting. An unsafe code is
+  persistently consumed and returns generic `invalid_grant` without issuing access or
+  refresh tokens.
+- `load_access_token()` and `load_refresh_token()` must reject an unsafe embedded
+  bearer and atomically invalidate only the affected grant siblings. Modern rows use
+  their shared `grant_id`; grant-less legacy rows match only the same unsafe embedded
+  bearer.
+- `exchange_refresh_token()` must repeat the marker precondition so a stale in-memory
+  object cannot mint a new access token after deployment.
+- Failed store saves restore the in-memory rows and fail closed. Errors and logs must
+  never contain the embedded bearer.
+
+Keep `get_client`, `register_client`, safe marked code/access/refresh behavior,
+revocation, and `complete_pending` compatible with the preserved fields and prefixes.
 
 Use these exact changed interfaces:
 
@@ -406,14 +436,35 @@ import os
 import subprocess
 import sys
 
+import jwt as pyjwt
 from starlette.requests import Request
 
 from apps.cortex_mcp.cortex_mcp_callback import complete_authorization
 
 
 CALLBACK_SECRET = "test-cortex-callback-secret"
+INVALID_CALLBACK_SECRET = CALLBACK_SECRET + "-invalid"
 PENDING_ID = "state_abcdefghijklmnop"
-BEARER = "jwt-never-return-this-value"
+TEST_JWT_SECRET = "test-callback-jwt-secret-at-least-32-bytes"
+MARKED_BEARER = pyjwt.encode(
+    {
+        "sub": "callback-test@velocityfibre.co.za",
+        "email": "callback-test@velocityfibre.co.za",
+        "instance_id": "velocity-fibre",
+        "token_use": "mcp",
+    },
+    TEST_JWT_SECRET,
+    algorithm="HS256",
+)
+UNMARKED_BEARER = pyjwt.encode(
+    {
+        "sub": "callback-test@velocityfibre.co.za",
+        "email": "callback-test@velocityfibre.co.za",
+        "instance_id": "velocity-fibre",
+    },
+    TEST_JWT_SECRET,
+    algorithm="HS256",
+)
 
 
 def request(body: bytes, secret: str = CALLBACK_SECRET) -> Request:
@@ -452,26 +503,33 @@ def seed_pending(provider: CortexOAuthProvider) -> None:
 
 
 @pytest.mark.asyncio
-async def test_callback_rejects_bad_secret_without_touching_state(tmp_path: Path):
+async def test_callback_rejects_bad_secret_without_touching_state(
+    tmp_path: Path,
+    bridge_server,
+):
     provider = CortexOAuthProvider(
         tmp_path / "oauth.json",
         "https://app.fibreflow.app",
     )
     seed_pending(provider)
 
-    response = await complete_authorization(
-        request(
-            json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode(),
-            secret="wrong-secret",
-        ),
-        provider,
-        CALLBACK_SECRET,
-        "http://127.0.0.1:7403",
-    )
+    with bridge_server(status=200) as bridge:
+        response = await complete_authorization(
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": MARKED_BEARER}
+                ).encode(),
+                secret=INVALID_CALLBACK_SECRET,
+            ),
+            provider,
+            CALLBACK_SECRET,
+            bridge.url,
+        )
 
     assert response.status_code == 401
+    assert bridge.path is None
     assert PENDING_ID in provider.data["pending"]
-    assert BEARER.encode() not in response.body
+    assert MARKED_BEARER.encode() not in response.body
 
 
 @pytest.mark.asyncio
@@ -484,7 +542,11 @@ async def test_rejected_bearer_keeps_pending_state_retryable(tmp_path: Path):
 
     with bridge_server(status=401) as bridge:
         response = await complete_authorization(
-            request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": MARKED_BEARER}
+                ).encode()
+            ),
             provider,
             CALLBACK_SECRET,
             bridge.url,
@@ -493,7 +555,36 @@ async def test_rejected_bearer_keeps_pending_state_retryable(tmp_path: Path):
     assert response.status_code == 401
     assert PENDING_ID in provider.data["pending"]
     assert provider.data["codes"] == {}
-    assert BEARER.encode() not in response.body
+    assert MARKED_BEARER.encode() not in response.body
+
+
+@pytest.mark.asyncio
+async def test_unmarked_bearer_fails_before_bridge_and_keeps_state(
+    tmp_path: Path,
+):
+    provider = CortexOAuthProvider(
+        tmp_path / "oauth.json",
+        "https://app.fibreflow.app",
+    )
+    seed_pending(provider)
+
+    with bridge_server(status=200) as bridge:
+        response = await complete_authorization(
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": UNMARKED_BEARER}
+                ).encode()
+            ),
+            provider,
+            CALLBACK_SECRET,
+            bridge.url,
+        )
+
+    assert response.status_code == 401
+    assert bridge.path is None
+    assert PENDING_ID in provider.data["pending"]
+    assert provider.data["codes"] == {}
+    assert UNMARKED_BEARER.encode() not in response.body
 
 
 @pytest.mark.asyncio
@@ -506,7 +597,11 @@ async def test_success_consumes_once_and_returns_only_safe_redirect(tmp_path: Pa
 
     with bridge_server(status=200) as bridge:
         response = await complete_authorization(
-            request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": MARKED_BEARER}
+                ).encode()
+            ),
             provider,
             CALLBACK_SECRET,
             bridge.url,
@@ -521,17 +616,23 @@ async def test_success_consumes_once_and_returns_only_safe_redirect(tmp_path: Pa
     assert "state=claude-state" in payload["redirectUrl"]
     assert PENDING_ID not in provider.data["pending"]
     assert len(provider.data["codes"]) == 1
-    assert BEARER not in json.dumps(payload)
-    assert bridge.authorization == f"Bearer {BEARER}"
+    assert MARKED_BEARER not in json.dumps(payload)
+    assert bridge.authorization == f"Bearer {MARKED_BEARER}"
     assert bridge.path.startswith("/api/query?")
 
-    replay = await complete_authorization(
-        request(json.dumps({"stateId": PENDING_ID, "token": BEARER}).encode()),
-        provider,
-        CALLBACK_SECRET,
-        "http://127.0.0.1:7403",
-    )
+    with bridge_server(status=200) as replay_bridge:
+        replay = await complete_authorization(
+            request(
+                json.dumps(
+                    {"stateId": PENDING_ID, "token": MARKED_BEARER}
+                ).encode()
+            ),
+            provider,
+            CALLBACK_SECRET,
+            replay_bridge.url,
+        )
     assert replay.status_code == 400
+    assert replay_bridge.path is None
     assert len(provider.data["codes"]) == 1
 
 
@@ -569,7 +670,12 @@ Also add parametrized cases for:
     [
         (b"not-json", 400),
         (b"[]", 400),
-        (json.dumps({"stateId": "short", "token": BEARER}).encode(), 400),
+        (
+            json.dumps(
+                {"stateId": "short", "token": MARKED_BEARER}
+            ).encode(),
+            400,
+        ),
         (json.dumps({"stateId": PENDING_ID}).encode(), 400),
         (json.dumps({"stateId": PENDING_ID, "token": ""}).encode(), 400),
     ],
@@ -608,6 +714,9 @@ Add these functions to the focused `cortex_mcp_callback.py` module so both
 production modules remain below 300 lines:
 
 ```python
+from apps.cortex_mcp.cortex_mcp_tokens import has_unverified_mcp_token_marker
+
+
 def secrets_match(provided: str, expected: str) -> bool:
     return secrets.compare_digest(
         provided.encode("utf-8"),
@@ -615,7 +724,22 @@ def secrets_match(provided: str, expected: str) -> bool:
     )
 
 
-def validate_cortex_token(token: str, bridge_url: str) -> None:
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirectHandler())
+BRIDGE_VALIDATION_TIMEOUT_SECONDS = 5.0
+
+
+def validate_cortex_token(
+    token: str,
+    bridge_url: str,
+    timeout: float = BRIDGE_VALIDATION_TIMEOUT_SECONDS,
+) -> None:
+    if not has_unverified_mcp_token_marker(token):
+        raise ValueError("Cortex bearer rejected")
     query = urllib.parse.urlencode(
         {"q": "cortex", "limit": 1, "include_citations": "true"}
     )
@@ -627,11 +751,13 @@ def validate_cortex_token(token: str, bridge_url: str) -> None:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as response:
+        with NO_REDIRECT_OPENER.open(req, timeout=timeout) as response:
             if response.status != 200:
                 raise ValueError("Cortex bearer rejected by Bridge")
     except urllib.error.HTTPError as exc:
         raise ValueError("Cortex bearer rejected by Bridge") from exc
+    except TimeoutError as exc:
+        raise RuntimeError("Cortex Bridge is unavailable") from exc
     except urllib.error.URLError as exc:
         raise RuntimeError("Cortex Bridge is unavailable") from exc
 
@@ -667,6 +793,7 @@ async def complete_authorization(
     provider: CortexOAuthProvider,
     callback_secret: str,
     bridge_url: str,
+    bridge_timeout: float = BRIDGE_VALIDATION_TIMEOUT_SECONDS,
 ) -> JSONResponse:
     provided_secret = request.headers.get("x-cortex-mcp-secret", "")
     if not secrets_match(provided_secret, callback_secret):
@@ -692,10 +819,16 @@ async def complete_authorization(
     except ValueError:
         return JSONResponse({"error": "Invalid authorization state"}, status_code=400)
     try:
-        await asyncio.to_thread(validate_cortex_token, token, bridge_url)
+        async with asyncio.timeout(bridge_timeout):
+            await asyncio.to_thread(
+                validate_cortex_token,
+                token,
+                bridge_url,
+                bridge_timeout,
+            )
     except ValueError:
         return JSONResponse({"error": "Bearer rejected"}, status_code=401)
-    except RuntimeError:
+    except (RuntimeError, TimeoutError):
         return JSONResponse({"error": "Authorization service unavailable"}, status_code=502)
     try:
         redirect_uri, code, pending_state = provider.complete_pending(state_id, token)
@@ -1115,6 +1248,7 @@ Run:
 npx vitest run pages/api/cortex/__tests__/mcpConsent.handler.test.ts \
   pages/api/cortex/__tests__/mcpConsent.errors.test.ts \
   pages/api/mcp/__tests__/consent.test.ts \
+  tests/api/cortex-mcp-oauth-rate-limit.test.ts \
   tests/api/ff-remote-mcp-proxy.test.ts \
   tests/api/mcp-proxy-route-errors.test.ts
 ```
@@ -1728,6 +1862,7 @@ npx vitest run pages/api/cortex/__tests__/mcpConsent.handler.test.ts \
   src/components/connections/__tests__/ConnectionPanels.test.tsx \
   tests/pages/connections.test.tsx \
   tests/pages/cortex-page.test.tsx \
+  tests/api/cortex-mcp-oauth-rate-limit.test.ts \
   tests/api/ff-remote-mcp-proxy.test.ts \
   tests/api/mcp-proxy-route-errors.test.ts
 npm run ci:quick
@@ -1744,7 +1879,7 @@ Expected: focused suites, quick CI, build, antihall, diff, and secret scan PASS.
 Run:
 
 ```bash
-cd /home/hein/Workspace/Cortex-cortex-mcp-ff-consent
+cd /home/hein/Workspace/Cortex-mcp-readonly-lifetimes
 uv run pytest tests/test_cortex_mcp_oauth.py tests/test_cortex_mcp_callback.py \
   tests/test_cortex_mcp.py tests/test_superadmin_bypass.py -q
 uv run pytest tests/test_cortex_mcp.py::TestReadOnlySurface -q
@@ -1794,7 +1929,7 @@ Report:
 
 - both PR URLs and review status;
 - exact test/build results;
-- isolated ports `17403`/`17414`;
+- isolated ports `17406`/`17403`/`17414` for Executor/Bridge/Remote MCP;
 - proposed untracked dev env file locations;
 - confirmation that production port `7414`, production OAuth store, live environment files, services, and Lew's live allowlist are unchanged.
 
@@ -1806,11 +1941,40 @@ Wait for explicit approval before Task 9.
 - Untracked after approval: `~/.hermes/cortex-consent-dev.env` with mode `0600`
 - Untracked after approval: a unique OAuth store under `~/.hermes/`
 - Dev-only after approval: FibreFlow dev environment values for the callback secret and isolated upstream
+- Transient after approval: isolated Agent Executor, Bridge, and Remote MCP user units
 - No tracked source changes unless the proof finds a defect
 
 **Interfaces:**
-- Consumes: reviewed branches, `https://dev.fibreflow.app/api/cortex-remote-mcp/mcp`, isolated Bridge `127.0.0.1:17403`, isolated Remote MCP `127.0.0.1:17414`, a real Claude custom connector, Lew, and one ordinary user.
+- Consumes: reviewed branches, `https://dev.fibreflow.app/api/cortex-remote-mcp/mcp`, isolated Agent Executor `127.0.0.1:17406`, isolated Bridge `127.0.0.1:17403`, isolated Remote MCP `127.0.0.1:17414`, a unique OAuth store/public base, a real Claude custom connector, Lew, and one ordinary user.
 - Produces: evidence of no-token browser consent, tenant-vs-ACL scope, unchanged FibreFlow MCP RBAC, reconnect/revoke behavior, and responsive screenshots.
+
+- [ ] **Step -1: Freeze both reviewed revisions before touching dev**
+
+Record the exact 40-character head SHA approved by both repository reviewers and CI:
+
+```bash
+CORTEX_REVIEW_SHA=<reviewed-cortex-head-sha>
+FIBREFLOW_REVIEW_SHA=<reviewed-fibreflow-head-sha>
+FIBREFLOW_REVIEW_BRANCH=feat/cortex-mcp-token-lifetimes
+CORTEX_REVIEW_WORKTREE="/home/hein/Workspace/Cortex-consent-dev-${CORTEX_REVIEW_SHA:0:12}"
+
+git -C /home/hein/Workspace/Cortex fetch origin
+git -C /home/hein/Workspace/Cortex cat-file -e "${CORTEX_REVIEW_SHA}^{commit}"
+git -C /home/hein/Workspace/Cortex worktree add --detach \
+  "$CORTEX_REVIEW_WORKTREE" "$CORTEX_REVIEW_SHA"
+test "$(git -C "$CORTEX_REVIEW_WORKTREE" rev-parse HEAD)" = "$CORTEX_REVIEW_SHA"
+test -z "$(git -C "$CORTEX_REVIEW_WORKTREE" status --porcelain)"
+
+test "$(git -C /home/hein/Workspace/FF_Next.js-cortex-token-lifetimes rev-parse HEAD)" \
+  = "$FIBREFLOW_REVIEW_SHA"
+test "$(git -C /home/hein/Workspace/FF_Next.js-cortex-token-lifetimes \
+  ls-remote --heads origin "$FIBREFLOW_REVIEW_BRANCH" | awk '{print $1}')" \
+  = "$FIBREFLOW_REVIEW_SHA"
+```
+
+Abort if any equality or clean-worktree check fails. Every isolated Cortex process
+below uses the detached reviewed worktree, and FibreFlow acceptance is invalid unless
+the dev deploy directory reads back exactly `FIBREFLOW_REVIEW_SHA` after deployment.
 
 - [ ] **Step 0: Verify Lew's FibreFlow identity and consent permission**
 
@@ -1837,25 +2001,51 @@ CORTEX_REMOTE_MCP_PUBLIC_BASE=https://dev.fibreflow.app/api/cortex-remote-mcp
 CORTEX_FF_APP_BASE=https://dev.fibreflow.app
 CORTEX_REMOTE_MCP_STORE=/home/hein/.hermes/cortex-remote-mcp-oauth-consent-dev.json
 CORTEX_BRIDGE_URL=http://127.0.0.1:17403
+EXECUTOR_PORT=17406
+EXECUTOR_URL=http://127.0.0.1:17406
+BRIDGE_URL=http://127.0.0.1:17403
 ```
 
-Set mode `0600`. Confirm the value differs from `FF_MCP_CALLBACK_SECRET` by comparing hashes, not printing either value.
+Set mode `0600`. Compare non-reversible hashes of the callback secret loaded by FibreFlow dev and isolated Remote MCP and require equality. Separately compare it with `FF_MCP_CALLBACK_SECRET` and require inequality. Record only the equality/inequality verdicts; never print either secret.
 Before either isolated service starts, also compare non-reversible hashes for
 FibreFlow dev's `BRIDGE_JWT_SECRET` and the isolated Bridge's loaded
 `BRIDGE_JWT_SECRET`, and compare `BRIDGE_JWT_KID` when configured. Abort on
 either mismatch; never print the underlying values.
 
-- [ ] **Step 2: Start an isolated read-only Bridge process**
+- [ ] **Step 2: Start an isolated Agent Executor, then the read-only Bridge**
+
+Start a transient executor from the clean Cortex worktree before Bridge. Load only
+the approved untracked executor environment followed by the consent-dev overrides;
+the latter fixes `EXECUTOR_PORT=17406` and `BRIDGE_URL=http://127.0.0.1:17403`.
+Never bind or call production executor port `7406` during this proof.
+
+```bash
+systemd-run --user --unit=cortex-agent-executor-consent-dev --collect \
+  --property=WorkingDirectory="$CORTEX_REVIEW_WORKTREE/apps/agent_executor" \
+  --property=EnvironmentFile=/home/hein/Workspace/Cortex/.env \
+  --property=EnvironmentFile=/home/hein/.hermes/cortex-consent-dev.env \
+  /home/hein/.bun/bin/bun run src/server.ts
+
+curl --fail --silent http://127.0.0.1:17406/health
+systemctl --user is-active cortex-agent-executor-consent-dev
+systemctl --user show cortex-agent-executor.service -p MainPID -p ActiveEnterTimestamp
+test "$(git -C "$CORTEX_REVIEW_WORKTREE" rev-parse HEAD)" = "$CORTEX_REVIEW_SHA"
+```
+
+Expected: the isolated executor is healthy on `17406`; the production executor PID
+and start time are unchanged.
 
 Use a transient user unit from the clean Cortex worktree, loading the existing untracked Bridge environment first and the consent-dev overrides second. The override's `CORTEX_SUPER_ADMIN_EMAILS` is the complete existing list plus `lew@velocityfibre.co.za`; verify the complete list before starting. Do not edit `~/.hermes/.env` and do not restart `cortex-bridge`.
 Verify that the isolated process loads `CORTEX_INSTANCE_ID=velocity-fibre`;
-abort before testing if it does not.
+abort before testing if it does not. Independently read back the complete effective
+`CORTEX_SUPER_ADMIN_EMAILS` set, confirm `lew@velocityfibre.co.za` is present, and
+abort if any pre-existing entry was dropped.
 
 Start the isolated process:
 
 ```bash
 systemd-run --user --unit=cortex-bridge-consent-dev --collect \
-  --property=WorkingDirectory=/home/hein/Workspace/Cortex-cortex-mcp-ff-consent \
+  --property=WorkingDirectory="$CORTEX_REVIEW_WORKTREE" \
   --property=EnvironmentFile=/home/hein/.hermes/.env \
   --property=EnvironmentFile=/home/hein/.hermes/cortex-consent-dev.env \
   /home/hein/.local/bin/uv run uvicorn apps.bridge.main:app \
@@ -1871,19 +2061,20 @@ systemctl --user is-active cortex-bridge
 ```
 
 Expected: isolated and live Bridge units are both active; live Bridge PID/start time is unchanged.
+Prove from the isolated Bridge environment and a representative request that its
+executor target is `http://127.0.0.1:17406`, never production `7406`.
 
 - [ ] **Step 3: Start the isolated Remote MCP process**
 
-Start it from `/home/hein/Workspace/Cortex-cortex-mcp-ff-consent` with the
-consent-dev environment:
+Start it from the detached `CORTEX_REVIEW_WORKTREE` with the consent-dev environment:
 
 ```bash
 systemd-run --user --unit=cortex-remote-mcp-consent-dev --collect \
-  --property=WorkingDirectory=/home/hein/Workspace/Cortex-cortex-mcp-ff-consent \
+  --property=WorkingDirectory="$CORTEX_REVIEW_WORKTREE" \
   --property=EnvironmentFile=/home/hein/.hermes/.env \
   --property=EnvironmentFile=/home/hein/.hermes/cortex-consent-dev.env \
   /home/hein/.local/bin/uv run \
-    --directory /home/hein/Workspace/Cortex-cortex-mcp-ff-consent \
+    --directory "$CORTEX_REVIEW_WORKTREE" \
     --package cortex-mcp cortex-mcp
 ```
 
@@ -1905,6 +2096,7 @@ After the reviewed feature branch is on GitHub, set FibreFlow dev:
 ```dotenv
 CORTEX_REMOTE_MCP_URL=http://127.0.0.1:17414
 FF_MCP_TOKEN_UI_ENABLED=true
+CORTEX_MCP_TOKEN_UI_ENABLED=true
 ```
 
 Set `CORTEX_MCP_CALLBACK_SECRET` to the same dedicated value through the
@@ -1914,7 +2106,9 @@ the previous values so cleanup can restore them.
 Deploy only the reviewed feature branch:
 
 ```bash
-bash scripts/deploy-local.sh dev --branch feat/cortex-mcp-ff-consent
+bash scripts/deploy-local.sh dev --branch "$FIBREFLOW_REVIEW_BRANCH"
+test "$(sudo -u velo git -C /home/velo/fibreflow-dev rev-parse HEAD)" \
+  = "$FIBREFLOW_REVIEW_SHA"
 ```
 
 Verify `https://dev.fibreflow.app/api/cortex-remote-mcp/.well-known/openid-configuration`, `/connections/fibreflow`, `/connections/cortex`, and `/cortex`. Do not deploy production.
@@ -1961,14 +2155,16 @@ Run the existing FibreFlow MCP consent/proxy tests again after the live proof.
 - Revoke a FibreFlow Operations MCP session from `/connections/fibreflow` and prove that session stops authorizing.
 - Confirm no bearer appears in browser history, page source, network response bodies, Next.js logs, Remote MCP logs, or screenshots.
 
-- [ ] **Step 9: Stop only the two isolated transient units and restore dev**
+- [ ] **Step 9: Stop only the three isolated transient units and restore dev**
 
 With Hein's rollout approval covering cleanup:
 
 - run
-  `systemctl --user stop cortex-remote-mcp-consent-dev cortex-bridge-consent-dev`;
+  `systemctl --user stop cortex-remote-mcp-consent-dev cortex-bridge-consent-dev cortex-agent-executor-consent-dev`;
 - restore FibreFlow dev to its previously recorded branch/upstream values through the supported dev deploy path;
-- verify production Remote MCP and Bridge PIDs/start times stayed unchanged throughout;
+- restore both dev feature flags to their exact previous values and read them back;
+- verify production Agent Executor, Bridge, and Remote MCP PIDs/start times stayed unchanged throughout;
+- after the isolated units stop, remove only the detached `CORTEX_REVIEW_WORKTREE` through `git worktree remove` and verify the reviewed source worktree remains untouched;
 - retain the isolated store only as long as review evidence requires, then remove it through an explicitly approved recoverable cleanup.
 
 - [ ] **Step 10: Fix any discovered defect through both PR gates**
@@ -1981,7 +2177,7 @@ If live proof exposes a defect, reproduce it in Vitest/Pytest/Playwright first, 
 - Merge: coordinated Cortex and FibreFlow PRs
 - Approved untracked production envs: add the shared dedicated callback secret
 - Approved Cortex allowlist: append Lew while retaining all current entries
-- Services: FibreFlow production, Cortex Remote MCP, then Cortex Bridge for allowlist activation
+- Services: Cortex Agent Executor, then Cortex Bridge, then Cortex Remote MCP, then FibreFlow production
 
 **Interfaces:**
 - Consumes: reviewed/green PRs, successful isolated proof, after-hours window, and Hein's explicit production approval.
@@ -1995,7 +2191,7 @@ Include:
 - CI, build, Playwright, and isolated Claude proof;
 - current production health and deployment SHAs;
 - exact services to restart;
-- statement that adding Lew immediately widens any existing Lew bearer after Bridge restart;
+- statement that adding Lew widens only a marked-compatible existing Lew grant after Bridge restart, while unsafe unmarked grants fail closed and require re-consent;
 - rollback order below.
 
 Do not infer approval from approval of Task 9.
@@ -2006,7 +2202,7 @@ Use `gh pr merge` with the repository-approved merge method. Re-read `origin/mas
 
 - [ ] **Step 3: Configure the dedicated production callback secret before code restarts**
 
-Place the same newly generated `CORTEX_MCP_CALLBACK_SECRET` in the FibreFlow production server env and Cortex Remote MCP's loaded untracked env. Verify it differs from `FF_MCP_CALLBACK_SECRET` by hash comparison. Do not print or log the value.
+Place the same newly generated `CORTEX_MCP_CALLBACK_SECRET` in the FibreFlow production server env and Cortex Remote MCP's loaded untracked env. Compare non-reversible hashes and require equality between those two loaded values; separately require inequality with `FF_MCP_CALLBACK_SECRET`. Record only the two verdicts. Also require hash agreement for FibreFlow's and Bridge's loaded `BRIDGE_JWT_SECRET`, plus exact `BRIDGE_JWT_KID` agreement when configured. Abort on any mismatch; do not print or log underlying values.
 
 Read the current production `FF_MCP_TOKEN_UI_ENABLED` value. The
 `/connections/fibreflow` session list/revoke/Advanced controls require it to be
@@ -2014,55 +2210,92 @@ Read the current production `FF_MCP_TOKEN_UI_ENABLED` value. The
 Hein's production approval and verify it after deployment. Do not change it as
 an implicit side effect.
 
-- [ ] **Step 4: Deploy FibreFlow production first**
+Read and record the current production `CORTEX_MCP_TOKEN_UI_ENABLED` value as a
+separate kill switch. The Cortex connection page and both consent APIs require it
+to be exactly `true`. If it is absent or false, include that exact change in Hein's
+production approval, read it back from the deployed server environment before the
+first authorization, and retain the previous value for rollback. Never infer one
+flag from the other.
+
+- [ ] **Step 4: Deploy Cortex Agent Executor first**
 
 After hours and with explicit approval:
 
 ```bash
-bash scripts/deploy-local.sh production
+bash scripts/deploy_bridge.sh --units cortex-agent-executor
 ```
 
-Verify production health, `/connections/*`, `/cortex`, and `/api/cortex/mcp-consent` method/auth failure behavior. The new routes are inert until a user starts authorization.
+The supported script must load the executor unit from the `Cortex-bridge` deploy
+clone, restart only the selected user unit, prove its deploy-clone working directory,
+fresh/stable PID, and `GET http://127.0.0.1:7406/health` success.
 
-- [ ] **Step 5: Deploy Cortex Remote MCP through the supported script**
+- [ ] **Step 5: Deploy Cortex Bridge, then Remote MCP, through the supported script**
 
 From merged Cortex `main`:
 
 ```bash
+bash scripts/deploy_bridge.sh --units cortex-bridge
+bash scripts/deploy_bridge.sh --verify-only --units cortex-bridge
 bash scripts/deploy_bridge.sh --units cortex-remote-mcp
 ```
 
-Use `--force-hein-ok` only when Hein explicitly approved a daytime rollout. Verify metadata, service PID stability, loopback binding, public proxy reachability, existing OAuth access/refresh grant exchange, and the retained unlinked `/authorize/approve`.
+Use `--force-hein-ok` only when Hein explicitly approved a daytime rollout. Verify
+metadata, service PID stability, loopback binding, public proxy reachability, one
+marked-compatible OAuth access/refresh exchange, and the retained unlinked
+`/authorize/approve`. Also prove an isolated unsafe unmarked authorization code,
+access token, and refresh token fail closed and require re-consent; never require or
+accept evidence that an unsafe grant continues working.
 
 - [ ] **Step 6: Append Lew to the live allowlist without replacing entries**
 
 Read the current `CORTEX_SUPER_ADMIN_EMAILS`, normalize/deduplicate it, append `lew@velocityfibre.co.za`, and independently read back the complete resulting set before restart. Abort if any prior entry is missing or `CORTEX_INSTANCE_ID` is not `velocity-fibre`.
 
-Restart only:
+Verify that Lew and every configured super-admin receive the distinct tenant-bound
+full-read capability, including meeting detail and minutes packs, without becoming
+meeting admins. `CORTEX_MEETING_ADMIN_EMAILS` is unchanged, and classify, legal-hold,
+process, intake, action, delivery, and other write paths remain denied unless their
+separate existing authority allows them.
+
+Activate the allowlist through the supported Bridge path only:
 
 ```bash
-systemctl --user restart cortex-bridge
+bash scripts/deploy_bridge.sh --units cortex-bridge
 bash scripts/deploy_bridge.sh --verify-only --units cortex-bridge
 ```
 
 Do not restart unrelated Cortex units for the allowlist change.
 
-- [ ] **Step 7: Run production acceptance proof**
+- [ ] **Step 7: Deploy FibreFlow production last**
 
-- Lew connects via the published Cortex endpoint, signs into FibreFlow, consents, and retrieves cited full-tenant evidence without copying a token.
+After Cortex Executor, Bridge, Remote MCP, allowlist readback, and health gates pass:
+
+```bash
+bash scripts/deploy-local.sh production
+```
+
+Verify production health, `/connections/*`, `/cortex`, and `/api/cortex/mcp-consent`
+method/auth failure behavior. The new routes are inert until a user starts authorization.
+
+- [ ] **Step 8: Run production acceptance proof**
+
+- Lew connects via the published Cortex endpoint, signs into FibreFlow, consents, and retrieves cited tenant-bound full evidence, including meeting detail and a minutes pack, without copying a token.
 - An ordinary employee follows the same flow and remains ACL-limited.
 - FibreFlow Operations connector authentication, RBAC, and read-only enforcement remain unchanged.
 - `/cortex` contains hero/search/review and the link; `/connections/*` contains setup.
 - Neither primary UI contains `/path/to/Cortex`, a local runtime command, or a Cortex bearer.
 - Disconnect/reconnect and FibreFlow session revoke behave as proven on dev.
 
-- [ ] **Step 8: Execute rollback in this order if any acceptance gate fails**
+- [ ] **Step 9: Execute rollback in this order if any acceptance gate fails**
 
-1. Restore Cortex normal authorization to the retained `/authorize/approve` implementation by reverting the Cortex PR and redeploying only `cortex-remote-mcp`.
-2. Revert/hide the FibreFlow consent and connections pages through a FibreFlow rollback PR and the supported production deploy script.
-3. Remove Lew from `CORTEX_SUPER_ADMIN_EMAILS` only if the access decision itself is being rolled back; preserve every unrelated entry and restart only Bridge.
-4. Leave existing OAuth store formats/grants and the FibreFlow MCP connector intact.
+1. Remove external exposure first: restore `CORTEX_MCP_TOKEN_UI_ENABLED` and
+   `FF_MCP_TOKEN_UI_ENABLED` to their exact previous production values, read both
+   back, then revert/hide the FibreFlow consent/proxy and connection pages through
+   a FibreFlow rollback PR and the supported production deploy script.
+2. Restore Cortex normal authorization to the retained `/authorize/approve` implementation through a reviewed rollback PR that keeps the marker gate and unsafe-grant invalidation, then redeploy Remote MCP.
+3. Roll back Bridge read-scope behavior only if required. Remove Lew from `CORTEX_SUPER_ADMIN_EMAILS` only if the access decision itself is being rolled back; preserve every unrelated entry, read back the complete set, and restart only Bridge.
+4. Roll back the Agent Executor last if its deployment itself is defective; never restore external FibreFlow exposure before the Cortex chain is healthy again.
+5. Keep the FibreFlow MCP connector and marked-compatible Cortex OAuth grants usable. Never preserve, re-enable, or require proof of an unsafe unmarked grant; affected users re-consent through the retained safe flow.
 
-- [ ] **Step 9: Record final evidence**
+- [ ] **Step 10: Record final evidence**
 
 Record PRs/merge SHAs, deployments, service start times, health responses, test commands, screenshot locations, Lew-vs-ordinary scope proof, and whether rollback was exercised or only held ready. Never record token values, callback secrets, auth cookies, or credential-file contents.

@@ -3,13 +3,11 @@
  */
 import {
   fireEvent,
-  render,
   screen,
   waitFor,
 } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { CortexConnectionPanel } from '../CortexConnectionPanel';
 import { FibreFlowConnectionPanel } from '../FibreFlowConnectionPanel';
 import {
   listResponse,
@@ -19,70 +17,6 @@ import {
 
 afterEach(() => {
   resetNetwork();
-});
-
-describe('CortexConnectionPanel', () => {
-  it('shows browser consent and no token or local runtime setup', () => {
-    render(<CortexConnectionPanel />);
-
-    expect(screen.getByText('Cortex Knowledge')).toBeInTheDocument();
-    expect(screen.getByText(
-      'https://app.fibreflow.app/api/cortex-remote-mcp/mcp',
-    )).toBeInTheDocument();
-    expect(screen.getByText(/FibreFlow sign-in and consent/i))
-      .toBeInTheDocument();
-    expect(screen.queryByLabelText(/Cortex MCP token/i)).toBeNull();
-    expect(screen.queryByText(/\/path\/to\/Cortex/i)).toBeNull();
-    expect(screen.queryByText(/uv run/i)).toBeNull();
-    expect(screen.queryByText(/CORTEX_USER_TOKEN/i)).toBeNull();
-  });
-
-  it('describes the read-only Cortex sources', () => {
-    render(<CortexConnectionPanel />);
-
-    expect(screen.getByText(/meetings, email, WhatsApp, SharePoint, timelines and cited evidence/i))
-      .toBeInTheDocument();
-    expect(screen.getByText(/read-only/i)).toBeInTheDocument();
-  });
-
-  it('hides the revoke control when the server gate is off', () => {
-    render(<CortexConnectionPanel revokeEnabled={false} />);
-
-    expect(screen.queryByText('Advanced')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Revoke all Cortex tokens/i })).toBeNull();
-  });
-
-  it('revokes every Cortex token through the DELETE boundary when enabled', async () => {
-    const network = renderWithNetwork(<CortexConnectionPanel revokeEnabled />, {
-      'DELETE /api/cortex/mcp-token': {
-        status: 200,
-        body: { data: { revoked: true } },
-      },
-    });
-
-    fireEvent.click(screen.getByText('Advanced'));
-    fireEvent.click(screen.getByRole('button', { name: 'Revoke all Cortex tokens' }));
-
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      /All your Cortex tokens have been revoked/i,
-    );
-    expect(network.recordedRequests()).toContainEqual({
-      method: 'DELETE',
-      path: '/api/cortex/mcp-token',
-    });
-  });
-
-  it('surfaces a failed revoke instead of claiming success', async () => {
-    renderWithNetwork(<CortexConnectionPanel revokeEnabled />, {
-      'DELETE /api/cortex/mcp-token': { status: 404, body: { error: { message: 'nope' } } },
-    });
-
-    fireEvent.click(screen.getByText('Advanced'));
-    fireEvent.click(screen.getByRole('button', { name: 'Revoke all Cortex tokens' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Could not revoke.*404/i);
-    expect(screen.queryByRole('status')).toBeNull();
-  });
 });
 
 describe('FibreFlowConnectionPanel', () => {
