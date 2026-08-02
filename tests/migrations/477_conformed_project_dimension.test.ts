@@ -163,6 +163,40 @@ describe('canonical_project — parity with TypeScript', () => {
     }
   });
 
+  it('SQL and TypeScript trim EXACTLY the same character set', async () => {
+    // Names any character one side trims and the other does not, rather than
+    // trusting that two hand-written lists match. Sweeps every C0 control plus the
+    // Unicode space characters most likely to arrive from a spreadsheet export.
+    const candidates = [
+      // From 0x01: PostgreSQL text cannot represent U+0000 at all ("invalid byte
+      // sequence for encoding UTF8: 0x00"), so no project name can ever carry one
+      // through a column and parity on it is unreachable, not merely untested.
+      ...Array.from({ length: 0x1f }, (_, i) => String.fromCharCode(i + 1)), // C0 controls
+      '\u0020', '\u00a0', '\u1680', '\u2000', '\u2001', '\u2002', '\u2003',
+      '\u2007', '\u2008', '\u2009', '\u200a', '\u2028', '\u2029', '\u202f',
+      '\u205f', '\u3000', '\ufeff',
+    ];
+    const divergent: string[] = [];
+    for (const c of candidates) {
+      const probe = `${c}TEM${c}`;
+      const [fromSql, fromTs] = [await sqlCanonical(probe), canonicalProject(probe)];
+      if (fromSql !== fromTs) divergent.push(`U+${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+    }
+    expect(divergent, `characters trimmed by only one side: ${divergent.join(', ')}`).toEqual([]);
+  });
+
+  it('does not eat a leading or trailing letter v (the E\'\\v\' trap)', async () => {
+    // PostgreSQL's E'' does not implement \v, so E'\v' is the LITERAL letter 'v'.
+    // Writing the trim set as E' \t\n\r\f\v' therefore put 'v' in it and made
+    // btrim('velo', ...) return 'elo'. 'Velo Test' is a real project value in this
+    // database, so this was live data corruption. Vertical tab must be \013.
+    expect(await sqlCanonical('velo')).toBe('velo');
+    expect(await sqlCanonical('Velo Test v')).toBe('Velo Test v');
+    expect(await sqlCanonical('velo')).toBe(canonicalProject('velo'));
+    // ...while the real vertical tab is still trimmed.
+    expect(await sqlCanonical('\u000bTEM\u000b')).toBe('Thembisa POP 1');
+  });
+
   it('SQL and TypeScript agree on prototype-shaped keys', async () => {
     // An object-literal lookup returned Object.prototype for '__proto__' and a
     // function for 'constructor'; SQL passes both through as plain strings.

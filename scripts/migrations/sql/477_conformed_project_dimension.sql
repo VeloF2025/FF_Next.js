@@ -39,7 +39,13 @@ AS $fn$
   -- break on anything arriving from an Excel or CSV import. This set (space, tab,
   -- LF, CR, form feed, vertical tab, NBSP) is mirrored by TRIM_CHARS in
   -- src/modules/metrics/dimensions/canonical.ts.
-  SELECT CASE lower(btrim(coalesce(raw, ''), E' \t\n\r\f\v' || U&'\00a0'))
+  --
+  -- ⚠️ Vertical tab is \013 (octal), NOT \v. PostgreSQL's E'' does not implement
+  -- \v, so E'\v' is the LITERAL LETTER 'v' -- which put 'v' in the trim set and
+  -- made btrim('velo', ...) return 'elo'. 'Velo Test' is a real project value in
+  -- this database, so that was live data corruption, not a theoretical edge. The
+  -- exhaustive character sweep in the migration test is what caught it; keep it.
+  SELECT CASE lower(btrim(coalesce(raw, ''), E' \t\n\r\f\013' || U&'\00a0'))
     WHEN ''      THEN 'Unknown'
 
     -- Verified aliases.
@@ -71,7 +77,7 @@ AS $fn$
     -- Unmapped values pass through TRIMMED but otherwise unchanged. Dropping them
     -- or bucketing them into 'Unknown' would silently shrink totals; an unfamiliar
     -- label in the output is visible and fixable.
-    ELSE btrim(raw, E' \t\n\r\f\v' || U&'\00a0')
+    ELSE btrim(raw, E' \t\n\r\f\013' || U&'\00a0')
   END;
 $fn$;
 
