@@ -50,6 +50,7 @@ export const PUBLIC_API_PREFIXES: ReadonlyArray<{ prefix: string; why: string }>
   { prefix: '/api/noc/webhooks', why: 'inbound provider callbacks (QContact) — no session to present' },
   { prefix: '/api/communications/whatsapp/cloud-webhook', why: 'Meta WhatsApp Cloud webhook — signature-verified, not session-verified' },
   { prefix: '/api/cortex-remote-mcp', why: 'MCP transport; the upstream OAuth server must issue its own 401 challenge' },
+  { prefix: '/api/ff-remote-mcp', why: 'MCP transport for the claude.ai connector; same as cortex-remote-mcp, the upstream OAuth server issues its own 401 challenge' },
   { prefix: '/api/snags/shared', why: 'public subcontractor snag links; the URL share token IS the credential (pages/api/snags/shared/[token].ts)' },
 ];
 
@@ -73,8 +74,43 @@ export function isPublicApiRoute(pathname: string): boolean {
  */
 const CREDENTIAL_QUERY_PARAMS = ['vlmkey', 'secret'] as const;
 
+/**
+ * Routes whose query string is dropped from the log WHOLESALE — names as well as values.
+ *
+ * These proxy an OAuth 2.1 authorization server, so the query carries `state`, `code`,
+ * `redirect_uri`, `client_id` and `code_challenge`. Those are per-attempt secrets that no
+ * fixed redaction list can enumerate, so the only safe treatment is to log none of it.
+ *
+ * BOTH remote-MCP proxies belong here. They run the same flow on the same public,
+ * unauthenticated basis; listing only one is how ff-remote-mcp spent a release logging the
+ * parameters its twin was busy suppressing.
+ */
+const OAUTH_QUERY_SUPPRESSED_PREFIXES = [
+  '/api/cortex-remote-mcp',
+  '/api/ff-remote-mcp',
+] as const;
+
 /** Param names whose VALUES must never reach a log line. */
 export const SECRET_QUERY_PARAMS: ReadonlySet<string> = new Set(CREDENTIAL_QUERY_PARAMS);
+
+/** Build the query field for the middleware's API Request log. */
+export function apiRequestQueryForLog(
+  pathname: string,
+  searchParams: { entries(): IterableIterator<[string, string]> },
+): Record<string, string> | undefined {
+  const suppressed = OAUTH_QUERY_SUPPRESSED_PREFIXES.some(
+    // The trailing slash matters: a bare startsWith would also swallow a sibling route
+    // such as /api/ff-remote-mcp-admin, hiding its query from the audit log.
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  if (suppressed) return undefined;
+  return Object.fromEntries(
+    [...searchParams.entries()].map(([key, value]) => [
+      key,
+      SECRET_QUERY_PARAMS.has(key) ? '[redacted]' : value,
+    ]),
+  );
+}
 
 /**
  * Whether the request presents ANY credential — session cookie, bearer token, service

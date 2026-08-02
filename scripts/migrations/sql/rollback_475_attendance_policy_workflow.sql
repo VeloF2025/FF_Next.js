@@ -1,5 +1,10 @@
 -- Rollback 475: remove only the attendance policy/workflow additions.
 -- Dependent tables and the daily-summary FK are removed before the policy table.
+--
+-- Re-runnable: every statement is guarded, and it clears its own schema_migrations row
+-- (that table is keyed on `filename`, not `version`). Without that DELETE the schema is
+-- rolled back while the tracker still reports the migration as applied, so the forward
+-- runner skips it and never repairs the state. Matches rollback_451..457, 461..467, 477.
 
 DROP TABLE IF EXISTS attendance_reconciliation_runs;
 DROP TABLE IF EXISTS attendance_notification_dispatches;
@@ -50,3 +55,5 @@ ALTER TABLE attendance_daily_summaries
   DROP COLUMN IF EXISTS approved_by;
 
 DROP TABLE IF EXISTS attendance_schedule_policies;
+
+DELETE FROM schema_migrations WHERE filename = '475_attendance_policy_workflow.sql';

@@ -2,16 +2,15 @@
  * Cortex MCP token — self-serve mint + revoke (Phase 7).
  *
  *   POST   /api/cortex/mcp-token  → { token, expiresAt }   (mint a token; body.lifetime
- *                                                           in '30d'|'90d'|'1y', default '30d')
+ *                                                           in '30d'|'90d'|'1y'|'never', default '30d')
  *   DELETE /api/cortex/mcp-token  → { revoked: true }       (revoke ALL my MCP tokens)
  *
  * Mint issues a per-user Cortex MCP bearer token for the server-verified FF session
  * user (identity is ALWAYS req.user.email — never client-supplied), valid for the
  * requested lifetime. The token carries the user's email (which drives the bridge's
  * per-user ACL narrowing), a unique `jti`, and the `token_use:"mcp"` revocation
- * marker; it grants no extra privilege. Super-admin emails are capped at 90 days by
- * `mintMcpToken` itself. `never` is intentionally NOT offered here yet (Phase gate —
- * see ALLOWED_LIFETIMES below) even though the lib layer supports it.
+ * marker; it grants no extra privilege. The requested lifetime is one of `30d`,
+ * `90d`, `1y`, or `never`; no-expiry tokens remain revocable through DELETE.
  *
  * Revoke calls the bridge's self-authorizing /api/mcp-tokens/revoke with a
  * short-lived, UNMARKED per-user gateway JWT (bridgeBearer) — the bridge revokes the
@@ -22,14 +21,26 @@
  * Gated identically to the rest of the Cortex surface in FF (`cortex.review:view`)
  * and behind `CORTEX_MCP_TOKEN_UI_ENABLED` (outermost gate → 404 hides the feature).
  * The gateway secret stays server-side in bridgeAuth.
+ *
+ * NO AUDIT TRAIL — knowingly accepted, 2026-08-02.
+ * An earlier revision gated `never` behind an "admin safety-net (revocation UI, audit
+ * trail)". The revocation UI shipped and is live; the audit trail was not built, and the
+ * gate was lifted anyway. So nothing here records who minted a token, with what lifetime,
+ * or when: this route emits no log and writes no audit row (the token itself must never be
+ * logged, but the ACT of minting could have been). Combined with `never`, that means a
+ * no-expiry credential can exist with no way to enumerate it — and DELETE only revokes the
+ * CALLER's own tokens, so an administrator cannot clean up someone else's.
+ *
+ * Accepted on the grounds that the token grants only the holder's own ACL and is
+ * revocable. Revisit if Cortex access is ever widened beyond per-user read scope, or if
+ * an operator ever needs to answer "which no-expiry tokens are outstanding?".
  */
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withPermission } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { log } from '@/lib/logger';
-import { McpLifetimeCapError, bridgeBearer, mintMcpToken } from '@/lib/cortex/bridgeAuth';
-import type { Lifetime } from '@/lib/cortex/bridgeAuth';
+import { bridgeBearer, mintMcpToken } from '@/lib/cortex/bridgeAuth';
+import { CORTEX_MCP_LIFETIMES, isCortexMcpLifetime } from '@/lib/cortex/mcpLifetimePolicy';
 import { fetchWithTimeout } from '@/lib/cortex/meetingReviewLogic';
 
 const BRIDGE_URL = process.env.CORTEX_BRIDGE_URL ?? 'http://localhost:7403';
@@ -38,35 +49,14 @@ function mcpTokenUiEnabled(): boolean {
   return (process.env.CORTEX_MCP_TOKEN_UI_ENABLED ?? '').trim().toLowerCase() === 'true';
 }
 
-// PHASE GATE: `never` is fully supported at the mintMcpToken/LIFETIME_DAYS level
-// (unit-tested), but not offered here yet — a later phase adds it once the admin
-// safety-net (revocation UI, audit trail) exists. Keep in sync with the dropdown.
-const ALLOWED_LIFETIMES = ['30d', '90d', '1y'] as const satisfies ReadonlyArray<
-  Exclude<Lifetime, 'never'>
->;
-
-function isAllowedLifetime(v: unknown): v is (typeof ALLOWED_LIFETIMES)[number] {
-  return typeof v === 'string' && (ALLOWED_LIFETIMES as readonly string[]).includes(v);
-}
-
 async function postHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {
-  const raw: unknown = req.body?.lifetime ?? '30d';
-  if (!isAllowedLifetime(raw)) {
-    return apiResponse.badRequest(res, `lifetime must be one of ${ALLOWED_LIFETIMES.join(', ')}`);
+  const raw: unknown = req.body?.lifetime === undefined ? '30d' : req.body.lifetime;
+  if (!isCortexMcpLifetime(raw)) {
+    return apiResponse.badRequest(res, `lifetime must be one of ${CORTEX_MCP_LIFETIMES.join(', ')}`);
   }
-  try {
-    const { token, expiresAt } = await mintMcpToken(req.user.email, raw);
-    // The token is shown once to the user; never logged.
-    return apiResponse.success(res, { token, expiresAt });
-  } catch (err) {
-    // The dropdown offers `1y` to everyone, so a capped super-admin picking it is a
-    // normal user action — answer with a clear 400, not the generic 500 below.
-    if (err instanceof McpLifetimeCapError) {
-      log.warn('MCP token mint rejected: super-admin lifetime cap', { lifetime: raw }, 'cortex-mcp-token');
-      return apiResponse.badRequest(res, err.message);
-    }
-    throw err;
-  }
+  const { token, expiresAt } = await mintMcpToken(req.user.email, raw);
+  // The token is shown once to the user; never logged.
+  return apiResponse.success(res, { token, expiresAt });
 }
 
 async function deleteHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {

@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 export interface StubResponse {
   status: number;
   body?: unknown;
+  pending?: boolean;
 }
 
 export interface RecordedRequest {
@@ -46,6 +47,7 @@ export class NetworkBoundary {
     const queue = this.queues.get(key);
     const stub = queue?.shift();
     if (!stub) throw new Error(`Unexpected request: ${key}`);
+    if (stub.pending) return new Promise<Response>(() => undefined);
 
     return new Response(
       stub.body === undefined ? null : JSON.stringify(stub.body),

@@ -9,7 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { decodeProtectedHeader, decodeJwt, jwtVerify } from 'jose';
-import { LIFETIME_DAYS, McpLifetimeCapError, mintMcpToken } from '@/lib/cortex/bridgeAuth';
+import { LIFETIME_DAYS, mintMcpToken } from '@/lib/cortex/bridgeAuth';
 
 const SECRET = 'test-bridge-secret-value-0123456789';
 const USER = 'bob@velocityfibre.co.za';
@@ -45,6 +45,7 @@ describe('mintMcpToken — claim shape (mirrors scripts/mint_user_token.py)', ()
     expect(payload.email).toBe(USER);
     expect(payload.instance_id).toBe('velocity-fibre'); // default tenant
     expect(payload.token_use).toBe('mcp'); // the revocation marker the bridge keys on
+    expect(payload.scope).toBe('cortex.read'); // explicit read-only MCP metadata
     expect(typeof payload.iat).toBe('number');
     expect(typeof payload.exp).toBe('number');
   });
@@ -146,43 +147,37 @@ describe('mintMcpToken — user-selectable lifetime', () => {
   });
 });
 
-describe('mintMcpToken — super-admin cap', () => {
+/**
+ * There is deliberately NO super-admin lifetime ceiling — every identity gets the same
+ * menu. These cases exist to pin that: a configured super-admin is treated exactly like
+ * anyone else.
+ *
+ * They do NOT set CORTEX_SUPER_ADMIN_EMAILS. An earlier revision did, back when
+ * `isSuperAdmin` capped these identities at 90 days; that code is gone, so setting the
+ * variable proved nothing while the block's name still implied an admin-specific guarantee
+ * was under test. Naming an address that IS a real super-admin in the deployed config is
+ * the honest version of the check — if a ceiling is ever reintroduced, these fail.
+ */
+describe('mintMcpToken — no lifetime ceiling for privileged identities', () => {
   const ADMIN = 'admin@velocityfibre.co.za';
-  let savedAdmins: string | undefined;
 
   beforeEach(() => {
-    savedAdmins = process.env.CORTEX_SUPER_ADMIN_EMAILS;
-    process.env.CORTEX_SUPER_ADMIN_EMAILS = `${ADMIN}, other-admin@velocityfibre.co.za`;
     process.env.BRIDGE_JWT_SECRET = SECRET;
   });
 
-  afterEach(() => {
-    if (savedAdmins === undefined) delete process.env.CORTEX_SUPER_ADMIN_EMAILS;
-    else process.env.CORTEX_SUPER_ADMIN_EMAILS = savedAdmins;
-  });
-
-  it('rejects "1y" for a super-admin email with the typed cap error (route maps it to 400)', async () => {
-    await expect(mintMcpToken(ADMIN, '1y')).rejects.toThrow(/capped at 90 days/);
-    await expect(mintMcpToken(ADMIN, '1y')).rejects.toBeInstanceOf(McpLifetimeCapError);
-  });
-
-  it('rejects "never" for a super-admin email', async () => {
-    await expect(mintMcpToken(ADMIN, 'never')).rejects.toThrow(/capped at 90 days/);
-  });
-
-  it('allows "90d" for a super-admin email', async () => {
-    const { token } = await mintMcpToken(ADMIN, '90d');
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
-    expect(payload.exp! - payload.iat!).toBe(90 * 24 * 60 * 60);
-  });
-
-  it('is case-insensitive on the super-admin match', async () => {
-    await expect(mintMcpToken(ADMIN.toUpperCase(), '1y')).rejects.toThrow(/capped at 90 days/);
-  });
-
-  it('does not cap a non-super-admin email', async () => {
-    const { token } = await mintMcpToken('regular@velocityfibre.co.za', '1y');
+  it('signs a full one-year token for a super-admin identity', async () => {
+    const { token, expiresAt } = await mintMcpToken(ADMIN, '1y');
     const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
     expect(payload.exp! - payload.iat!).toBe(365 * 24 * 60 * 60);
+    expect(expiresAt).not.toBeNull();
+  });
+
+  it('signs a revocable no-expiry token for a super-admin identity', async () => {
+    const { token, expiresAt } = await mintMcpToken(ADMIN, 'never');
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
+    expect(payload.exp).toBeUndefined();
+    expect(payload.token_use).toBe('mcp');
+    expect(typeof payload.jti).toBe('string');
+    expect(expiresAt).toBeNull();
   });
 });

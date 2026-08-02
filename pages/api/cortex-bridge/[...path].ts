@@ -7,7 +7,7 @@
  *
  * Security model:
  * - Requires Authorization: Bearer credential; no FibreFlow cookie fallback.
- * - Forwards only whitelisted Cortex API prefixes.
+ * - Forwards only the exact read-only Cortex API method/path matrix.
  * - Does not inject CORTEX_API_KEY or any service credential.
  * - Upstream bridge remains the real auth/ACL enforcement point.
  */
@@ -16,31 +16,49 @@ import { apiResponse } from '@/lib/apiResponse';
 
 const DEFAULT_BRIDGE_URL = ['http:', '', 'localhost:7403'].join('/');
 const BRIDGE_URL = (process.env.CORTEX_BRIDGE_URL ?? DEFAULT_BRIDGE_URL).replace(/\/+$/, '');
-const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
-const ALLOWED_PREFIXES = [
-  '/api/query',
-  '/api/answer',
-  '/api/timeline',
-  '/api/facts',
-  '/api/entity-profile',
-  '/api/meetings',
-  '/api/mcp-tokens/revoke',
-];
-
-function requestedPath(req: NextApiRequest): string {
+function pathSegments(req: NextApiRequest): string[] {
   const raw = req.query.path;
-  const parts = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return Array.isArray(raw) ? raw : raw ? [raw] : [];
+}
+
+function requestedPath(parts: string[]): string {
   return `/${parts.map((part) => encodeURIComponent(part)).join('/')}`;
 }
 
 function hasUnsafeDotSegment(req: NextApiRequest): boolean {
-  const raw = req.query.path;
-  const parts = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const parts = pathSegments(req);
   return parts.some((part) => part === '.' || part === '..');
 }
 
-function hasAllowedPrefix(path: string): boolean {
-  return ALLOWED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+function isSafeSegment(segment: string | undefined): segment is string {
+  return typeof segment === 'string'
+    && segment.length > 0
+    && segment !== '.'
+    && segment !== '..'
+    && !segment.includes('/')
+    && !segment.includes('\\')
+    && !segment.includes('%');
+}
+
+function isAllowedRequest(method: string, parts: string[]): boolean {
+  const path = `/${parts.join('/')}`;
+  const meetingId = parts[2];
+  const isMeetingId = typeof meetingId === 'string' && /^mtg_[A-Za-z0-9_-]+$/.test(meetingId);
+  const isFactChild = parts.length === 3
+    && parts[0] === 'api'
+    && parts[1] === 'facts'
+    && isSafeSegment(parts[2]);
+  if (method === 'GET') {
+    return path === '/api/query'
+      || path === '/api/timeline'
+      || path === '/api/facts'
+      || isFactChild
+      || path === '/api/entity-profile'
+      || (parts.length === 3 && parts[0] === 'api' && parts[1] === 'meetings' && isMeetingId)
+      || (parts.length === 4 && parts[0] === 'api' && parts[1] === 'meetings' && isMeetingId && parts[3] === 'pack');
+  }
+  return (method === 'POST' && path === '/api/answer')
+    || (method === 'POST' && path === '/api/mcp-tokens/revoke');
 }
 
 function buildUpstreamUrl(req: NextApiRequest, path: string): string {
@@ -57,35 +75,27 @@ function buildUpstreamUrl(req: NextApiRequest, path: string): string {
 }
 
 function bodyFor(req: NextApiRequest): BodyInit | undefined {
-  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return undefined;
+  if (req.method === 'GET') return undefined;
   if (req.body === undefined || req.body === null) return undefined;
   return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
 }
 
 const handler: NextApiHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const method = req.method ?? 'UNKNOWN';
-  if (method === 'OPTIONS') {
-    res.setHeader('Allow', ALLOWED_METHODS.join(', '));
-    res.status(204).end();
-    return;
-  }
-  if (!ALLOWED_METHODS.includes(method)) {
-    return apiResponse.methodNotAllowed(res, method, ALLOWED_METHODS.filter((m) => m !== 'OPTIONS'));
-  }
-
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) {
     return apiResponse.unauthorized(res, 'Cortex Bridge proxy requires a per-user bearer token');
   }
 
   if (hasUnsafeDotSegment(req)) {
-    return apiResponse.notFound(res, 'Cortex Bridge route');
+    return apiResponse.forbidden(res, 'Cortex Bridge request is not permitted');
   }
 
-  const path = requestedPath(req);
-  if (!hasAllowedPrefix(path)) {
-    return apiResponse.notFound(res, 'Cortex Bridge route', path);
+  const parts = pathSegments(req);
+  if (!isAllowedRequest(method, parts)) {
+    return apiResponse.forbidden(res, 'Cortex Bridge request is not permitted');
   }
+  const path = requestedPath(parts);
 
   try {
     const upstream = await fetch(buildUpstreamUrl(req, path), {
