@@ -8,6 +8,17 @@ const USER = 'velocity_review_test';
 const PASSWORD = randomBytes(18).toString('hex');
 const SCHEMA = 'velocity_review_task4';
 
+/**
+ * Unique per invocation, mirroring tests/migrations/setup/global-setup.ts.
+ * The CI cleanup step sweeps by this label so a run killed before teardown
+ * cannot leave a container holding a port on the long-lived self-hosted
+ * runner. Scoped to the run rather than a blanket label sweep, so concurrent
+ * runs never reap each other's container.
+ */
+const RUN_ID = process.env.GITHUB_RUN_ID
+  ? `ci-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT ?? '1'}`
+  : `local-${process.pid}`;
+
 let started = false;
 
 function removeContainer(): void {
@@ -38,6 +49,8 @@ export async function setup(): Promise<void> {
   try {
     execFileSync('docker', [
       'run', '--rm', '-d', '--name', CONTAINER,
+      '--label', 'ff-velocity-review-tests',
+      '--label', `ff-velocity-review-run=${RUN_ID}`,
       '-e', `POSTGRES_USER=${USER}`,
       '-e', `POSTGRES_PASSWORD=${PASSWORD}`,
       '-e', `POSTGRES_DB=${DATABASE}`,
