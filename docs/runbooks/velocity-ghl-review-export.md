@@ -282,10 +282,24 @@ RETURNING automation_enabled, pilot_enabled, pilot_target_date, pilot_limit;
 
 ### Migration rollback
 
-Rollback is destructive to the Velocity run/candidate/export tables and requires explicit approval after evidence export and reconciliation:
+Rollback removes the feature and requires explicit approval after evidence export and reconciliation:
 
 ```bash
 npm run db:migrate -- rollback 478
 ```
 
-The supported runner opens one transaction, executes `rollback_478_velocity_review_export.sql`, clears legacy migration tracking, and commits only if every step succeeds; the SQL file deliberately has no top-level transaction control. The guarded rollback reclassifies the two OneMap evidence-source labels to `import` before removing Velocity tables and migration tracking. It does **not** delete `wa_subscriber_consent` rows: granted and withdrawn status, audit timestamps, and withdrawal evidence must survive so a rollback cannot resurrect consent or make a withdrawn recipient eligible.
+The supported runner opens one transaction, executes `rollback_478_velocity_review_export.sql`, and commits only if every step succeeds; the SQL file deliberately has no top-level transaction control.
+
+**The rollback is deliberately asymmetric.** It removes the feature, not the record of what the feature already did. Anything that is safety evidence survives, because destroying it would let a later re-apply contact people who have already been contacted.
+
+| Object | Rollback | Why |
+|---|---|---|
+| `velocity_review_exports` | **kept** | The permanent `(dr_number, phone_e164)` ledger — the entire "never contact the same person about the same DR twice" guarantee. Dropping it and re-applying makes every previously contacted customer eligible again, silently. The forward file uses `CREATE TABLE IF NOT EXISTS`, so a re-apply adopts the surviving table. |
+| `velocity_review_runs` | **kept** | `exports.first_run_id` references it, and it is the per-date audit trail. |
+| `wa_subscriber_consent` | **untouched** | Status, timestamps, withdrawal evidence *and* `source` all survive. The two OneMap labels are no longer collapsed to `import` — that rewrite destroyed which consent event was captured, irreversibly, on a table shared with the WhatsApp stack. The widened `CHECK` vocabulary is left in place: widening is additive, and pre-478 writers still satisfy it. |
+| `velocity_review_control` | **dropped** | Must go. It carries `automation_enabled` / `pilot_enabled`; keeping it would let a re-apply resume in whatever state an operator last set instead of the disabled-by-default the forward file recreates. |
+| `velocity_review_candidates` | **dropped** | Per-run discovery rows, no safety value. |
+
+In-flight exports are parked at `permanent_failure` with `error_code = 'migration_rolled_back'`. Without that they would hold `ux_velocity_review_one_phone_inflight` forever — permanently blocking those phones from any future DR, with no code left to advance them. The permanent uniqueness constraint still bars a repeat contact for the same DR.
+
+Consequence to plan for: **a rollback followed by a re-apply resumes with history intact and automation disabled.** It is not a clean slate, by design. `tests/migrations/478_velocity_review_export.test.ts` exercises the full cycle and asserts the already-contacted pair is still rejected afterwards.

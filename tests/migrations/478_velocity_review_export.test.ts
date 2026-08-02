@@ -306,7 +306,13 @@ dbDescribe('migration 478 applied to a scratch schema', () => {
          FROM wa_subscriber_consent WHERE msisdn = $1`,
         ['27820000003']
       );
-      expect(consent.rows[0]).toMatchObject({ status: 'withdrawn', source: 'import' });
+      // Provenance survives: the rollback must not collapse which consent event
+      // was captured. 'onemap_home_signup' and 'onemap_install_signature' are
+      // separately captured POPIA evidence, and rewriting them is irreversible.
+      expect(consent.rows[0]).toMatchObject({
+        status: 'withdrawn',
+        source: 'onemap_home_signup',
+      });
       expect(consent.rows[0].withdrawn_at.toISOString()).toBe(timestamps.withdrawnAt);
       expect(consent.rows[0].created_at.toISOString()).toBe(timestamps.createdAt);
       expect(consent.rows[0].updated_at.toISOString()).toBe(timestamps.updatedAt);
@@ -341,6 +347,77 @@ dbDescribe('migration 478 applied to a scratch schema', () => {
         status: 'withdrawn',
       });
       expect(restored.rows[0].control_table).toContain('velocity_review_control');
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
+  });
+
+  it('survives a rollback and re-apply without re-contacting anyone', async () => {
+    // The safety property: rolling back and re-applying must not make an
+    // already-contacted customer eligible again. That holds only because the
+    // rollback keeps velocity_review_exports; a DROP here would silently reopen
+    // every past contact for a second message.
+    const fingerprint = 'd'.repeat(64);
+    await insertExport({
+      id: '4d111111-1111-4111-8111-111111111111',
+      dr: 'DR-CYCLE',
+      phone: '+27670000009',
+      fingerprint,
+      state: 'completed',
+    });
+    // An in-flight row too: it holds the partial unique index, and nothing will
+    // exist to advance it once the code is gone.
+    await insertExport({
+      id: '4d222222-2222-4222-8222-222222222222',
+      dr: 'DR-CYCLE-INFLIGHT',
+      phone: '+27670000010',
+      fingerprint,
+      state: 'trigger_requested',
+    });
+
+    const client = await pool.connect();
+    try {
+      await client.query(`SET search_path = ${SCHEMA}, public`);
+      await client.query('BEGIN');
+      await client.query(ROLLBACK);
+
+      const ledger = await client.query<{ dr_number: string; state: string; error_code: string | null }>(
+        `SELECT dr_number, state, error_code FROM velocity_review_exports
+         WHERE dr_number LIKE 'DR-CYCLE%' ORDER BY dr_number`
+      );
+      // Ledger survived the rollback.
+      expect(ledger.rows.map((r) => r.dr_number)).toEqual(['DR-CYCLE', 'DR-CYCLE-INFLIGHT']);
+      // The completed row is untouched; the in-flight row is parked terminally so
+      // it cannot hold ux_velocity_review_one_phone_inflight forever.
+      expect(ledger.rows[0]).toMatchObject({ state: 'completed', error_code: null });
+      expect(ledger.rows[1]).toMatchObject({
+        state: 'permanent_failure',
+        error_code: 'migration_rolled_back',
+      });
+
+      // Re-apply over the surviving schema.
+      await client.query(FORWARD);
+
+      // Control comes back disabled — it was dropped, so a re-apply cannot
+      // resume whatever an operator had last enabled.
+      const control = await client.query<{ automation_enabled: boolean; pilot_enabled: boolean }>(
+        `SELECT automation_enabled, pilot_enabled FROM velocity_review_control`
+      );
+      expect(control.rows[0]).toEqual({ automation_enabled: false, pilot_enabled: false });
+
+      // The permanent guarantee still bites: the same DR/phone pair cannot be
+      // re-inserted, so that customer cannot be contacted a second time.
+      await expect(
+        client.query(
+          `INSERT INTO velocity_review_exports
+             (id, first_run_id, first_target_date, dr_number, phone_e164,
+              phone_fingerprint, phone_source, source_flags, state)
+           VALUES ($1, $2, DATE '2026-08-05', 'DR-CYCLE', '+27670000009',
+                   $3, 'onemap', ARRAY['dr_submitted'], 'ready')`,
+          ['4d333333-3333-4333-8333-333333333333', runId, fingerprint]
+        )
+      ).rejects.toThrow(/dr_number_phone_e164/);
     } finally {
       await client.query('ROLLBACK').catch(() => undefined);
       client.release();

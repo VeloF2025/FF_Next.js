@@ -38,7 +38,22 @@ describe('Velocity review migration SQL contract', () => {
     expect(preflight).toMatch(
       /SELECT dr_number, SUM\(pair_count\) AS duplicate_row_count.*GROUP BY UPPER\(BTRIM\(dr_number\)\), phone_e164/s
     );
-    expect(rollback).toContain("SET source = 'import'");
+    // The rollback must NOT collapse the two OneMap evidence sources back to
+    // 'import'. That is POPIA evidence of which consent event was captured, on a
+    // table shared with the WhatsApp stack, and the rewrite is irreversible.
+    expect(rollback).not.toContain("SET source = 'import'");
+    // Nor may it narrow migration 469's CHECK back — that is what forced the
+    // rewrite. Widening a vocabulary is additive; pre-478 writers still satisfy it.
+    expect(rollback).not.toMatch(/ADD CONSTRAINT wa_subscriber_consent_source_chk/);
+
+    // The permanent contact ledger must survive rollback. Dropping it and
+    // re-applying would make every already-contacted customer eligible again.
+    expect(rollback).not.toMatch(/DROP TABLE IF EXISTS velocity_review_exports/);
+    expect(rollback).not.toMatch(/DROP TABLE IF EXISTS velocity_review_runs/);
+    // But the control row must go, so a re-apply comes back disabled-by-default
+    // rather than resuming whatever an operator last enabled.
+    expect(rollback).toMatch(/DROP TABLE IF EXISTS velocity_review_control/);
+
     expect(rollback).not.toMatch(/^\s*(BEGIN|COMMIT);\s*$/gim);
   });
 });
