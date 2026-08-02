@@ -4,7 +4,7 @@ import type { SnapshotSource } from './types';
  * Registered snapshot sources. Adding one is a row here — no migration, because
  * metric_snapshots stores dims and measures as JSONB.
  *
- * Every `sql` must return exactly (entity_id, dims, measures) and must derive dates
+ * Every query must return exactly (entity_id, dims, measures) and must derive dates
  * from the bound `$2::date`, never from CURRENT_DATE. See SnapshotSource in types.ts.
  */
 export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
