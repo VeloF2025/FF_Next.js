@@ -3,18 +3,14 @@ import type { ExportTransitionUpdates, VelocityReviewExport } from './exportRepo
 import { HighLevelRequestError, type HighLevelContact } from './ghlClient';
 import { normalizeSaMobileMsisdn, toE164 } from './phone';
 import { nextRetryAt } from './retry';
-import type { ExportState } from './types';
+import { ENROLLED_TAG, READY_TAG, type ExportState } from './types';
 import type {
   ExportProcessResult, ProcessableExport, ProcessorDependencies,
 } from './dependencies';
 
-// The transient tag handshake: FibreFlow never sends WhatsApp itself. Adding
-// READY_TAG is what triggers the GHL workflow; ENROLLED_TAG is that workflow
-// acknowledging it. Seeing either already present on readback means someone or
-// something else is mid-handshake, so the export parks as `ambiguous` rather
-// than risking a second message.
-export const READY_TAG = 'velocity-review-ready';
-export const ENROLLED_TAG = 'velocity-review-enrolled';
+// Seeing either tag already present on readback means someone or something else
+// is mid-handshake, so the export parks as `ambiguous` rather than risking a
+// second message. The literals live in types.ts — see the note there.
 const POLL_INTERVAL_MS = 5_000;
 const POLL_LIMIT_MS = 30_000;
 

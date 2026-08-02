@@ -1,3 +1,19 @@
+/**
+ * The transient tag handshake. FibreFlow never sends WhatsApp itself: adding
+ * READY_TAG is what triggers the GHL workflow, and ENROLLED_TAG is that workflow
+ * acknowledging it.
+ *
+ * They live here, in a leaf module, because both contactExport.ts (which adds
+ * and polls them) and acknowledgementCleanup.ts (which removes them) need the
+ * same literals. Declaring them twice let the two drift apart, which would break
+ * the handshake silently — cleanup would stop recognising the tag it is meant to
+ * clear. contactExport.ts cannot own them: acknowledgementCleanup.ts would then
+ * have to import from it, and contactExport.ts already imports the cleanup, so
+ * that is a cycle.
+ */
+export const READY_TAG = 'velocity-review-ready';
+export const ENROLLED_TAG = 'velocity-review-enrolled';
+
 export const CANDIDATE_SOURCES = [
   'dr_submitted',
   'drops_installed',

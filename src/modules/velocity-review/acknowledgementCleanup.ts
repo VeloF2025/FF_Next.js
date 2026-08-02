@@ -1,8 +1,8 @@
 import type { ExportTransitionUpdates, VelocityReviewExport } from './exportRepository';
 import { HighLevelRequestError } from './ghlClient';
 import { nextRetryAt } from './retry';
+import { ENROLLED_TAG } from './types';
 
-const ENROLLED_TAG = 'velocity-review-enrolled';
 const CLEANUP_LEASE_MS = 60_000;
 
 export function cleanupLeaseUntil(now: Date): Date {
