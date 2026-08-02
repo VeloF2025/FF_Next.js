@@ -95,3 +95,28 @@ jobs:
           docker ps -aq \
             --filter "label=ff-migration-run=ci-${{ github.run_id }}-${{ github.run_attempt }}" \
             | xargs -r docker rm -f
+
+      # Velocity review repository tests — same reasoning as the migration gate
+      # above, one layer up. These drive the real repository functions against a
+      # real Postgres: the concurrent-claim race (two connections contending for
+      # one row), consent-withdrawal precedence, and CANDIDATE_QUERY, which is
+      # the seven-table join that selects every customer the pipeline contacts.
+      #
+      # Their unit counterparts mock @/lib/db-pool and regex-match SQL text, so
+      # they cannot catch a parse-time error or a column that no longer exists.
+      # tests/db/** is excluded from the unit config (it throws at module load
+      # without a database), so until this step existed these ran nowhere.
+      #
+      # Blocking, and spins its own throwaway Postgres on an ephemeral port
+      # (tests/db/velocity-review/global-setup.ts) — never the shared dev+prod
+      # database. Requires docker on the runner.
+      - name: Velocity review DB tests — real Postgres (gate)
+        run: npm run test:db:velocity-review
+        timeout-minutes: 15
+
+      - name: Clean up this run's velocity review test container
+        if: always()
+        run: |
+          docker ps -aq \
+            --filter "label=ff-velocity-review-run=ci-${{ github.run_id }}-${{ github.run_attempt }}" \
+            | xargs -r docker rm -f
