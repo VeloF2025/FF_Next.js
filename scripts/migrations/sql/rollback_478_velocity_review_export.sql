@@ -33,11 +33,18 @@
 -- released, while UNIQUE (dr_number, phone_e164) still bars a repeat contact for
 -- the same DR. error_code records why, so the state stays auditable rather than
 -- indistinguishable from a genuine delivery failure.
-UPDATE velocity_review_exports
-SET state = 'permanent_failure',
-    error_code = 'migration_rolled_back',
-    updated_at = NOW()
-WHERE state NOT IN ('completed', 'permanent_failure');
+-- Guarded on the relation existing: every other statement here is IF EXISTS, and
+-- a bare UPDATE would make the whole file error on a database where 478 was
+-- never applied — or on any re-run after the ledger was archived away by hand.
+DO $$ BEGIN
+  IF to_regclass('velocity_review_exports') IS NOT NULL THEN
+    UPDATE velocity_review_exports
+    SET state = 'permanent_failure',
+        error_code = 'migration_rolled_back',
+        updated_at = NOW()
+    WHERE state NOT IN ('completed', 'permanent_failure');
+  END IF;
+END $$;
 
 -- Consent is deliberately untouched.
 --

@@ -353,6 +353,33 @@ dbDescribe('migration 478 applied to a scratch schema', () => {
     }
   });
 
+  it('is re-runnable and safe on a schema where the migration never applied', async () => {
+    // Every statement must be guarded. A bare UPDATE on the ledger errors the
+    // whole file on a database that never applied 478 — an operator running the
+    // rollback by mistake gets a hard failure instead of a no-op — and breaks
+    // re-running it after a partially completed teardown.
+    const client = await pool.connect();
+    const bare = `${SCHEMA}_bare`;
+    try {
+      await client.query('BEGIN');
+      await client.query(`CREATE SCHEMA ${bare}`);
+      await client.query(`SET search_path = ${bare}`);
+      await client.query(
+        `CREATE TABLE schema_migrations (
+           filename TEXT PRIMARY KEY,
+           applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+         )`
+      );
+      // Never applied: none of the velocity tables exist here.
+      await expect(client.query(ROLLBACK)).resolves.toBeDefined();
+      // And again — re-runnable.
+      await expect(client.query(ROLLBACK)).resolves.toBeDefined();
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
+  });
+
   it('survives a rollback and re-apply without re-contacting anyone', async () => {
     // The safety property: rolling back and re-applying must not make an
     // already-contacted customer eligible again. That holds only because the
