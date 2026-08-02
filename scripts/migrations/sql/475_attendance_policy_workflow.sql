@@ -54,6 +54,13 @@ ALTER TABLE attendance_daily_summaries
   ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES users(id);
 
+-- Postgres has no ADD CONSTRAINT IF NOT EXISTS, so a bare ADD makes this whole migration
+-- fail on a second application ("constraint already exists"). Drop-then-add is the
+-- idempotent form, and it is the same shape used for attendance_adjustments below.
+ALTER TABLE attendance_daily_summaries
+  DROP CONSTRAINT IF EXISTS attendance_daily_summaries_result_status_check,
+  DROP CONSTRAINT IF EXISTS attendance_daily_summaries_classification_check;
+
 ALTER TABLE attendance_daily_summaries
   ADD CONSTRAINT attendance_daily_summaries_result_status_check CHECK (
     result_status IS NULL OR result_status IN (
