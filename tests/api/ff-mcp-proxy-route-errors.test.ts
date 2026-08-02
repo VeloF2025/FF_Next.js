@@ -42,6 +42,53 @@ async function proxyPort(upstreamPort: number): Promise<number> {
   }));
 }
 
+/** A port that was bound then released, so connecting to it fails before any byte moves. */
+async function deadUpstreamPort(): Promise<number> {
+  const server = http.createServer();
+  const port = await new Promise<number>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve((server.address() as AddressInfo).port));
+  });
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  return port;
+}
+
+it('leaks neither the upstream error nor the OAuth query on a pre-stream 502', async () => {
+  // This route is deliberately unauthenticated and fronts an OAuth 2.1 server, so anything
+  // it echoes goes to anyone on the internet and anything it logs is a live OAuth
+  // parameter. It previously did both: `detail: error.message` in the body, and
+  // `{ upstreamUrl, error }` in the log while its twin cortex-remote-mcp suppressed both.
+  const chunks: string[] = [];
+  const realWrite = process.stdout.write;
+  process.stdout.write = function capture(chunk: Uint8Array | string, ...args: unknown[]) {
+    chunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+    return realWrite.call(process.stdout, chunk, ...args as []);
+  } as typeof process.stdout.write;
+
+  let response: Response;
+  try {
+    const port = await proxyPort(await deadUpstreamPort());
+    response = await fetch(
+      `http://127.0.0.1:${port}/api/ff-remote-mcp/authorize`
+        + '?state=oauth-state-secret&code=oauth-code-secret&client_id=oauth-client-secret',
+    );
+  } finally {
+    process.stdout.write = realWrite;
+  }
+
+  expect(response.status).toBe(502);
+  const body = await response.json();
+  expect(body.error.code).toBe('BAD_GATEWAY');
+  expect(body.error, 'the 502 must not echo the upstream error message').not.toHaveProperty('detail');
+
+  const secrets = ['oauth-state-secret', 'oauth-code-secret', 'oauth-client-secret'];
+  const serializedBody = JSON.stringify(body);
+  const logged = chunks.join('');
+  for (const secret of secrets) {
+    expect(serializedBody, `response body leaked ${secret}`).not.toContain(secret);
+    expect(logged, `log leaked ${secret}`).not.toContain(secret);
+  }
+});
+
 it('removes upstream headers from a generic pre-body 502', async () => {
   const upstreamPort = await listen(http.createServer((_req, res) => {
     res.writeHead(200, {

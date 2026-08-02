@@ -147,29 +147,32 @@ describe('mintMcpToken — user-selectable lifetime', () => {
   });
 });
 
-describe('mintMcpToken — configured super-admin lifetime', () => {
+/**
+ * There is deliberately NO super-admin lifetime ceiling — every identity gets the same
+ * menu. These cases exist to pin that: a configured super-admin is treated exactly like
+ * anyone else.
+ *
+ * They do NOT set CORTEX_SUPER_ADMIN_EMAILS. An earlier revision did, back when
+ * `isSuperAdmin` capped these identities at 90 days; that code is gone, so setting the
+ * variable proved nothing while the block's name still implied an admin-specific guarantee
+ * was under test. Naming an address that IS a real super-admin in the deployed config is
+ * the honest version of the check — if a ceiling is ever reintroduced, these fail.
+ */
+describe('mintMcpToken — no lifetime ceiling for privileged identities', () => {
   const ADMIN = 'admin@velocityfibre.co.za';
-  let savedAdmins: string | undefined;
 
   beforeEach(() => {
-    savedAdmins = process.env.CORTEX_SUPER_ADMIN_EMAILS;
-    process.env.CORTEX_SUPER_ADMIN_EMAILS = `${ADMIN}, other-admin@velocityfibre.co.za`;
     process.env.BRIDGE_JWT_SECRET = SECRET;
   });
 
-  afterEach(() => {
-    if (savedAdmins === undefined) delete process.env.CORTEX_SUPER_ADMIN_EMAILS;
-    else process.env.CORTEX_SUPER_ADMIN_EMAILS = savedAdmins;
-  });
-
-  it('signs a one-year token for a configured super-admin', async () => {
+  it('signs a full one-year token for a super-admin identity', async () => {
     const { token, expiresAt } = await mintMcpToken(ADMIN, '1y');
     const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
     expect(payload.exp! - payload.iat!).toBe(365 * 24 * 60 * 60);
     expect(expiresAt).not.toBeNull();
   });
 
-  it('signs a revocable no-expiry token for a configured super-admin', async () => {
+  it('signs a revocable no-expiry token for a super-admin identity', async () => {
     const { token, expiresAt } = await mintMcpToken(ADMIN, 'never');
     const { payload } = await jwtVerify(token, new TextEncoder().encode(SECRET));
     expect(payload.exp).toBeUndefined();
