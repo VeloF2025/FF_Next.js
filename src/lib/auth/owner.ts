@@ -2,11 +2,14 @@
  * Owner identity — the unrestricted-access bypass used by the meeting endpoints.
  *
  * Historically inlined as a string literal in four route handlers. Centralised here so
- * there is exactly one place to audit, one place to rotate, and one place for the
- * MCP-token lifetime cap to consult (see src/lib/auth/mcpToken.ts).
+ * there is exactly one place to audit and one place to rotate.
+ *
+ * No longer consulted for any MCP-token lifetime cap. Both token systems dropped their
+ * privileged-identity ceiling deliberately — see the rationale in src/lib/auth/mcpToken.ts
+ * for FibreFlow tokens and in src/lib/cortex/bridgeAuth.ts for Cortex ones.
  *
  * Read at CALL time, not module load, so the value can be rotated without a restart —
- * matching the convention in src/lib/cortex/bridgeAuth.ts::isSuperAdmin.
+ * matching the convention in src/lib/cortex/bridgeAuth.ts.
  */
 
 /** Historical owner, kept as the default so behaviour is unchanged when the env var is unset. */

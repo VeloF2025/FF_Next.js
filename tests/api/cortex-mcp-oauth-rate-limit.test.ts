@@ -144,6 +144,9 @@ afterAll(async () => {
     'cortex-oauth-authorize:198.51.100.40',
     'cortex-oauth-authorize:127.0.0.1',
     'cortex-oauth-authorize:::ffff:127.0.0.1',
+    // Socket-fallback buckets used by the malformed-X-Real-IP case.
+    'cortex-oauth-register:127.0.0.1',
+    'cortex-oauth-register:::ffff:127.0.0.1',
   ]) {
     rateLimiter.reset(key);
   }
@@ -222,6 +225,52 @@ describe('Cortex public OAuth rate limits over real HTTP', () => {
     expect(logs).toContain('cortex-oauth-authorize');
     expect(logs).not.toContain('authorize-secret-61');
     expect(logs).not.toContain('code-secret-61');
+  });
+
+  it('falls back to the socket when X-Real-IP is malformed, so it cannot be used to pick a bucket', async () => {
+    // The whole point of validating X-Real-IP with isIP() is that the header is
+    // caller-controllable. Without that check a caller supplies a fresh bogus value per
+    // request, every one becomes its own bucket key, and the limit never fires — the same
+    // evasion XFF rotation gives. Each request below carries a DIFFERENT malformed header,
+    // including a comma-joined list; all must collapse onto the one socket bucket.
+    const malformed = [
+      'not-an-ip',
+      '1.2.3.4, 5.6.7.8',
+      '999.999.999.999',
+      '',
+      '   ',
+      '127.0.0.1:8080',
+      '<script>',
+      'localhost',
+    ];
+    for (let attempt = 1; attempt <= 30; attempt += 1) {
+      const result = await request(`/api/cortex-remote-mcp/register?state=spoof-${attempt}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-real-ip': malformed[attempt % malformed.length],
+        },
+        body: '{}',
+      });
+      expect(result.status).toBe(200);
+    }
+
+    const blocked = await request('/api/cortex-remote-mcp/register?state=spoof-secret-31', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-real-ip': 'yet-another-bogus-value' },
+      body: '{}',
+    });
+
+    expect(blocked.status).toBe(429);
+    expect(JSON.parse(blocked.body)).toEqual({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many OAuth requests' },
+    });
+
+    const logs = log.exportLogs();
+    // The bogus header value must not be echoed into the log as if it were an address.
+    expect(logs).not.toContain('yet-another-bogus-value');
+    expect(logs).not.toContain('spoof-secret-31');
   });
 
   it('does not apply OAuth buckets to other methods or token and MCP routes', async () => {

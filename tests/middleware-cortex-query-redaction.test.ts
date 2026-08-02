@@ -44,12 +44,17 @@ const QUERY = new URLSearchParams({
   authorization: 'Bearer bearer-like-query-value',
 });
 
-describe('middleware Cortex MCP query logging', () => {
+describe('middleware remote-MCP query logging', () => {
   it('omits every query name and value for the exact route and all child paths', async () => {
     for (const path of [
       '/api/cortex-remote-mcp',
       '/api/cortex-remote-mcp/authorize',
       '/api/cortex-remote-mcp/.well-known/oauth-authorization-server',
+      // ff-remote-mcp runs the same OAuth 2.1 flow on the same public, unauthenticated
+      // basis, so it needs the identical treatment. It was omitted here once already.
+      '/api/ff-remote-mcp',
+      '/api/ff-remote-mcp/authorize',
+      '/api/ff-remote-mcp/.well-known/oauth-authorization-server',
     ]) {
       const entry = apiRequestLog(
         await captureMiddlewareOutput(`https://app.fibreflow.app${path}?${QUERY}`),
@@ -66,6 +71,21 @@ describe('middleware Cortex MCP query logging', () => {
         }
       }
       expect(entry).toMatchObject({ method: 'GET', path });
+    }
+  });
+
+  it('suppresses only the MCP routes themselves, not name-prefixed siblings', async () => {
+    // The suppression matches the exact path or a `/`-delimited child. Dropping that
+    // trailing-slash requirement would silently hide the query of any future route whose
+    // name merely STARTS with an MCP prefix — removing it from the audit log without
+    // anyone asking. These siblings must keep logging normally.
+    for (const path of ['/api/cortex-remote-mcp-admin/list', '/api/ff-remote-mcp-admin/list']) {
+      const entry = apiRequestLog(
+        await captureMiddlewareOutput(`https://app.fibreflow.app${path}?project=visible-project`),
+      );
+      expect(entry.query, `${path} should still log its query`).toEqual({
+        project: 'visible-project',
+      });
     }
   });
 

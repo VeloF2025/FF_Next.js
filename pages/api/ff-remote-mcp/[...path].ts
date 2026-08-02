@@ -18,6 +18,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
+import { applyOAuthRateLimit } from '@/lib/mcp/oauthRateLimit';
 import { BODY_TOO_LARGE, MAX_PROXY_BODY_BYTES, pipeUpstreamResponse, readCappedBody } from '@/lib/mcp/proxyStream';
 
 export const config = {
@@ -29,6 +30,8 @@ export const config = {
 
 const DEFAULT_UPSTREAM = ['http:', '', '127.0.0.1:7416'].join('/');
 const UPSTREAM = (process.env.FF_REMOTE_MCP_URL || DEFAULT_UPSTREAM).replace(/\/$/, '');
+/** Bucket namespace for this proxy's OAuth limiter; keeps it separate from cortex-remote-mcp. */
+const OAUTH_BUCKET_PREFIX = 'ff';
 
 const HOP_BY_HOP = new Set([
   'connection',
@@ -71,10 +74,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let targetPath: string;
   try {
     targetPath = pathFromQuery(req);
-  } catch (error) {
-    log.warn('Rejected invalid FibreFlow remote MCP path', { path: req.query.path, error });
+  } catch {
+    // Nothing request-derived is logged here. This route serves the OAuth 2.1 flow, so the
+    // path and query carry `state`, `code`, `redirect_uri` and friends — see the redaction
+    // contract in tests/middleware-cortex-query-redaction.test.ts.
+    log.warn('Rejected invalid FibreFlow remote MCP path');
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Invalid MCP path' } });
   }
+
+  if (!applyOAuthRateLimit(req, res, targetPath, OAUTH_BUCKET_PREFIX)) return;
 
   const query = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   const upstreamUrl = `${UPSTREAM}${targetPath}${query}`;
@@ -82,7 +90,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const rawBody = await readCappedBody(req);
     if (rawBody === BODY_TOO_LARGE) {
-      log.warn('FibreFlow remote MCP request body over cap', { upstreamUrl, maxBytes: MAX_PROXY_BODY_BYTES });
+      // `upstreamUrl` embeds the caller's query string — never log it.
+      log.warn('FibreFlow remote MCP request body over cap', { maxBytes: MAX_PROXY_BODY_BYTES });
       return res.status(413).json({
         success: false,
         error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds the proxy limit' },
@@ -105,8 +114,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // the promise settles, so a later rejection escapes THIS catch — the headersSent
     // guard becomes dead code and the failure is never logged. See PR #2262.
     return await pipeUpstreamResponse(upstream, res);
-  } catch (error) {
-    log.error('FibreFlow remote MCP proxy failed', { upstreamUrl, error });
+  } catch {
+    // Neither `upstreamUrl` (which embeds the OAuth query string) nor the error object
+    // (whose message can quote the failing URL) may be logged. `phase` is enough to tell
+    // an upstream-connect failure from a mid-stream one.
+    log.error('FibreFlow remote MCP proxy failed', {
+      phase: res.headersSent ? 'stream' : 'upstream',
+    });
 
     // Streaming can fail AFTER the upstream status and first bytes are on the wire, and
     // res.status(502) then throws ERR_HTTP_HEADERS_SENT. Destroying is the only honest
@@ -120,12 +134,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch headers are copied before streaming starts. If the body then fails before
     // its first byte, none of those upstream headers belong on our generic 502.
     for (const header of res.getHeaderNames()) res.removeHeader(header);
+    // No `detail`: this route is unauthenticated, so an error message echoed here goes to
+    // anyone on the internet. Every other route reaches apiResponse.internalError, which
+    // withholds details outside development; this one hand-rolls its 502 and must do the
+    // same by construction.
     return res.status(502).json({
       success: false,
       error: {
         code: 'BAD_GATEWAY',
         message: 'FibreFlow remote MCP service is unavailable',
-        detail: error instanceof Error ? error.message : String(error),
       },
     });
   }

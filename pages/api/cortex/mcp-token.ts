@@ -21,6 +21,19 @@
  * Gated identically to the rest of the Cortex surface in FF (`cortex.review:view`)
  * and behind `CORTEX_MCP_TOKEN_UI_ENABLED` (outermost gate → 404 hides the feature).
  * The gateway secret stays server-side in bridgeAuth.
+ *
+ * NO AUDIT TRAIL — knowingly accepted, 2026-08-02.
+ * An earlier revision gated `never` behind an "admin safety-net (revocation UI, audit
+ * trail)". The revocation UI shipped and is live; the audit trail was not built, and the
+ * gate was lifted anyway. So nothing here records who minted a token, with what lifetime,
+ * or when: this route emits no log and writes no audit row (the token itself must never be
+ * logged, but the ACT of minting could have been). Combined with `never`, that means a
+ * no-expiry credential can exist with no way to enumerate it — and DELETE only revokes the
+ * CALLER's own tokens, so an administrator cannot clean up someone else's.
+ *
+ * Accepted on the grounds that the token grants only the holder's own ACL and is
+ * revocable. Revisit if Cortex access is ever widened beyond per-user read scope, or if
+ * an operator ever needs to answer "which no-expiry tokens are outstanding?".
  */
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withPermission } from '@/lib/auth';
