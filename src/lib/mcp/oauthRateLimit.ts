@@ -42,7 +42,12 @@ export function trustedClientIp(req: NextApiRequest): string {
     if (isIP(candidate)) return candidate;
   }
 
-  const socketIp = req.socket.remoteAddress?.trim();
+  // `socket` is optional-chained deliberately. Node always provides one in production, but
+  // this helper is now shared by two routes and reached from test harnesses with lighter
+  // request mocks — and a throw here would 500 the whole proxy from inside its rate
+  // limiter. Falling back to the shared 'unknown' bucket still limits the caller; it fails
+  // closed rather than open.
+  const socketIp = req.socket?.remoteAddress?.trim();
   return socketIp && isIP(socketIp) ? socketIp : 'unknown';
 }
 
