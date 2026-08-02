@@ -87,7 +87,13 @@ export const METRICS: readonly MetricDefinition[] = [
     key: 'pp_open_balance',
     label: 'open pre-provisions',
     description:
-      'Point-in-time count of pre-provisions on the list and not yet activated, from the nightly snapshot.',
+      'Point-in-time count of pre-provisions on the list and not yet activated, from the nightly ' +
+      'snapshot. A night that was never captured, or whose rows no longer match its recorded ' +
+      'row_count, is absent from the series rather than reported as zero — so a zero total with a ' +
+      'null total_period means "no data", not "nothing open". Caveat: on a night that WAS captured ' +
+      'and was genuinely empty, a dimensioned request returns one placeholder row (project ' +
+      '"Unknown", pop null) carrying value 0; the total is still correct, but that member is an ' +
+      'artifact of the coverage row, not a real project.',
     // ⚠️ Driven from snapshot_runs, LEFT JOINed to the rows — not from
     // metric_snapshots alone. Reading the rows directly makes "this night was
     // never captured" indistinguishable from "this night had nothing open":
@@ -99,8 +105,23 @@ export const METRICS: readonly MetricDefinition[] = [
     //   night captured, 0 open   -> one row, snapshot_id IS NULL -> 0
     //   night never captured     -> no rows at all               -> absent from
     //                               the series, so total_period does not name it
-    // The measure counts snapshot_id, NOT (*), because the LEFT JOIN's
-    // no-match row is still a row and count(*) would report it as 1.
+    //   night captured, rows since damaged -> also absent (see row_count below)
+    //
+    // The measure counts snapshot_id, NOT (*), because the LEFT JOIN's no-match
+    // row is still a row and count(*) would report it as 1.
+    //
+    // ⚠️ The row_count equality is not decoration. Without it the join trusts
+    // whatever rows survive: delete some of a completed night's snapshots and the
+    // metric reports the remainder as fact, and delete ALL of them and it reports
+    // a confident 0 *with that date as total_period* — strictly worse than
+    // reading metric_snapshots directly, which at least returned absence. A run
+    // whose recorded row_count no longer matches the rows present is damaged, and
+    // damaged must read as unknown, never as a measured number.
+    //
+    // ⚠️ Depends on `snapshot_runs_source_date_key` being UNIQUE on
+    // (source_key, as_of_date). The primary key is on `id`, so that index is the
+    // only thing preventing two run rows for one night from fanning the join out
+    // and double-counting every entity.
     from: `(
       SELECT r.as_of_date,
              s.id                AS snapshot_id,
@@ -111,6 +132,10 @@ export const METRICS: readonly MetricDefinition[] = [
              ON s.source_key = r.source_key
             AND s.as_of_date = r.as_of_date
       WHERE r.source_key = 'pp_open'
+        AND r.row_count = (
+          SELECT count(*) FROM metric_snapshots m
+          WHERE m.source_key = r.source_key AND m.as_of_date = r.as_of_date
+        )
     ) src`,
     measure: 'count(src.snapshot_id)',
     dateColumn: 'src.as_of_date',

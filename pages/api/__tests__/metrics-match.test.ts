@@ -6,6 +6,19 @@ vi.mock('@/lib/permissions', () => ({
   userHasPermission: vi.fn(),
 }));
 
+// Give pp_open_balance a permission of its own. All three real metrics declare
+// `analytics.reports`, so without this no allow/deny combination could separate
+// "filtered before matching" from "matched then discarded".
+vi.mock('@/modules/metrics/registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/metrics/registry')>();
+  return {
+    ...actual,
+    METRICS: actual.METRICS.map((m) =>
+      m.key === 'pp_open_balance' ? { ...m, permission: 'hidden.permission' } : m,
+    ),
+  };
+});
+
 function mockRes() {
   const res: Record<string, unknown> = {};
   res.status = vi.fn().mockReturnValue(res);
@@ -77,13 +90,32 @@ describe('GET /api/metrics-match', () => {
   });
 
   it('does not match a metric the caller may not read', async () => {
-    // Matching over the full registry and filtering afterwards would still
-    // advertise a hidden metric's existence. The same question that resolves
-    // above must come back as no-match here.
     vi.mocked(userHasPermission).mockResolvedValue(false);
     const res = mockRes();
     await handler(req({ q: PP_QUESTION }, { id: 'u1', role: 'viewer' }), res as never);
     expect((payload(res) as { kind: string }).kind).toBe('none');
+  });
+
+  it('filters BEFORE matching, so a hidden metric cannot mask a permitted one', async () => {
+    // ⚠️ Denying everything and expecting 'none' does NOT distinguish the two
+    // orderings — match-then-discard produces 'none' too. This question contains
+    // both 'open pre-provisions' (19 chars) and 'zone uptake' (11), so the
+    // longest-alias rule makes the DENIED metric win outright:
+    //   filter first        -> zone_uptake, an answer the caller may have
+    //   match then discard  -> 'none', a false dead end
+    // The registry is mocked because all three real metrics share one permission
+    // key, so no combination of allow/deny on the real registry could separate them.
+    vi.mocked(userHasPermission).mockImplementation(
+      async (_userId: string, permission: string) => permission !== 'hidden.permission',
+    );
+    const res = mockRes();
+    await handler(
+      req({ q: 'zone uptake versus open pre-provisions' }, AS_MANAGER),
+      res as never,
+    );
+    const data = payload(res) as { kind: string; metric?: { key: string } };
+    expect(data.kind).toBe('exact');
+    expect(data.metric?.key).toBe('zone_uptake');
   });
 
   it('skips the permission lookup entirely for a super admin', async () => {
@@ -101,6 +133,17 @@ describe('GET /api/metrics-match', () => {
     const res = mockRes();
     await handler(req({ q: PP_QUESTION }, AS_MANAGER), res as never);
     expect(res.status).toHaveBeenCalledWith(500);
+    // The status alone would still pass against a bare `res.status(500)` with no
+    // body, which is exactly the framework-level failure this guards against — so
+    // assert the envelope the repo's contract promises.
+    const body = res.json.mock.calls.at(-1)?.[0] as {
+      success?: boolean;
+      error?: { code?: string; message?: string };
+    };
+    expect(body?.success).toBe(false);
+    expect(body?.error?.code).toBeTruthy();
+    // ...and it must not leak the underlying database error to the caller.
+    expect(JSON.stringify(body)).not.toContain('db down');
   });
 
   it('reports no match so the caller can fall back to RAG', async () => {

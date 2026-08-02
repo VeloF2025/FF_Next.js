@@ -173,9 +173,41 @@ describe('a missing snapshot is absence, not zero', () => {
     expect(summarise(def(), series).totalPeriod).toBeNull();
   });
 
-  it('distinguishes the two within one range', async () => {
-    const series = await forRange('2026-07-28', '2026-07-31');
-    // 07-28 absent (never captured); 07-29 present as a real 0.
+  it('emits a placeholder dimension member on a captured-but-empty night', async () => {
+    // Documented artifact, pinned so it cannot change unnoticed. The coverage row
+    // that lets an empty night report 0 has no entity, so a dimensioned request
+    // groups its NULLs: canonical_project(NULL) is 'Unknown' and olt_name stays
+    // null. The TOTAL is still correct (0) — but 'Unknown' is an artifact of the
+    // coverage row, not a project that had open pre-provisions. The metric's
+    // description says so. A future `coverage` field on the response would let
+    // this row be dropped entirely; that belongs with the exceptions work.
+    const { sql, params } = buildMetricQuery(def(), {
+      from: '2026-07-29',
+      to: '2026-07-29',
+      grain: 'day',
+      dimensions: ['project', 'pop'],
+    });
+    const series = toSeries(await run(sql, params), ['project', 'pop']);
+    expect(series).toEqual([
+      { period: '2026-07-29', dimensions: { project: 'Unknown', pop: null }, value: 0 },
+    ]);
+    expect(summarise(def(), series).total).toBe(0);
+  });
+
+  it('omits a night whose rows no longer match its recorded row_count', async () => {
+    // ⚠️ 2026-07-27's run recorded 2 rows and only 1 survives. Trusting the
+    // surviving rows would report 1 as fact; had BOTH been lost it would report a
+    // confident 0 naming that date — strictly worse than reading metric_snapshots
+    // directly, which at least returned absence. Damaged must read as unknown.
+    const series = await forRange('2026-07-27', '2026-07-27');
+    expect(series).toHaveLength(0);
+    expect(summarise(def(), series).totalPeriod).toBeNull();
+  });
+
+  it('distinguishes all four states within one range', async () => {
+    const series = await forRange('2026-07-27', '2026-07-31');
+    // 07-27 damaged -> absent; 07-28 never captured -> absent;
+    // 07-29 captured and empty -> a real 0.
     expect(series.map((p) => [p.period, p.value])).toEqual([
       ['2026-07-29', 0],
       ['2026-07-30', 1],
@@ -183,14 +215,19 @@ describe('a missing snapshot is absence, not zero', () => {
     ]);
   });
 
-  it('does not borrow another source\'s run', async () => {
-    // tickets_open has a run on 2026-07-28. Keying the join on source_key as well
-    // as date is what stops it manufacturing a pp_open night.
+  it("does not borrow another source's rows on a shared date", async () => {
+    // tickets_open has BOTH a run and a snapshot row on 2026-07-31 — a date
+    // pp_open also captured. Keying the join on source_key as well as date is the
+    // only thing keeping T-1 out of the count; putting the foreign rows on a date
+    // pp_open never captured would make this test unfalsifiable, because the
+    // WHERE clause alone would already exclude them.
     const rows = await run<{ c: string }>(
-      `SELECT count(*)::text c FROM snapshot_runs WHERE as_of_date = '2026-07-28'`,
+      `SELECT count(*)::text c FROM metric_snapshots
+       WHERE as_of_date = '2026-07-31' AND source_key = 'tickets_open'`,
     );
-    expect(Number(rows[0]!.c)).toBe(1); // it exists...
-    expect(await forRange('2026-07-28', '2026-07-28')).toHaveLength(0); // ...but not for pp_open
+    expect(Number(rows[0]!.c)).toBe(1); // the foreign row is really there...
+    const series = await forRange('2026-07-31', '2026-07-31');
+    expect(series[0]!.value).toBe(2); // ...and pp_open still counts only its own 2
   });
 });
 
