@@ -8,7 +8,6 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import * as XLSX from 'xlsx';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import {
@@ -25,47 +24,12 @@ import {
   REPORT_ROW_CAP,
 } from '@/services/attendance/reports/runner';
 import type { RawQuery } from '@/services/attendance/searchQueries';
-import type { ReportColumn } from '@/services/attendance/reports/types';
+import {
+  serializeReportCsv,
+  serializeReportXlsx,
+} from '@/services/attendance/reports/exportSerializers';
 
 type ExportFormat = 'xlsx' | 'csv';
-
-function fmtCellValue(v: unknown, col: ReportColumn): string | number {
-  if (v === undefined || v === null) return '';
-  if (col.format === 'currency_rand' && typeof v === 'number') return Number(v.toFixed(2));
-  if (col.format === 'integer' && typeof v === 'number') return Math.trunc(v);
-  if (col.format === 'number' && typeof v === 'number') return Number(v.toFixed(2));
-  if (typeof v === 'number') return v;
-  return String(v);
-}
-
-function buildCsv(rows: Array<Record<string, unknown>>, columns: ReadonlyArray<ReportColumn>): string {
-  const header = columns.map((c) => c.label).join(',');
-  const lines = [header];
-  for (const r of rows) {
-    const cells = columns.map((c) => {
-      const raw = fmtCellValue(r[c.key], c);
-      const s = String(raw);
-      // RFC4180 quoting
-      if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    });
-    lines.push(cells.join(','));
-  }
-  return lines.join('\r\n');
-}
-
-function buildSheetData(
-  rows: Array<Record<string, unknown>>,
-  columns: ReadonlyArray<ReportColumn>
-): Record<string, string | number>[] {
-  return rows.map((r) => {
-    const obj: Record<string, string | number> = {};
-    for (const c of columns) obj[c.label] = fmtCellValue(r[c.key], c);
-    return obj;
-  });
-}
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -102,19 +66,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.status(200).send(buildCsv(result.rows, result.columns));
+      res.status(200).send(serializeReportCsv(result.rows, result.columns));
       return;
     }
 
-    const sheetData = buildSheetData(result.rows, result.columns);
-    // json_to_sheet's `header` ensures column order even when rows are
-    // empty (keeps the export schema stable for payroll consumers).
-    const worksheet = XLSX.utils.json_to_sheet(sheetData, {
-      header: result.columns.map((c) => c.label),
-    });
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, slug.slice(0, 31)); // sheet name 31-char cap
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    const buffer = serializeReportXlsx(result.rows, result.columns, slug);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.status(200).send(buffer);

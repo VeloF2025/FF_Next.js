@@ -3,7 +3,7 @@
  *
  * Unified behaviour:
  *   - If the browser is offline OR the fetch fails with NETWORK_ERROR,
- *     enqueue the event locally and resolve with `{ kind: 'queued' }`.
+ *     enqueue the event locally and resolve with its queue event ID.
  *   - On 2xx, resolve with `{ kind: 'submitted', ... }` carrying the detail
  *     the UI shows on the success screen.
  *   - Everything else routes through `mapSubmitError` so the caller can
@@ -30,7 +30,7 @@ export interface ClockSubmitPayload {
 export type ClockSubmitResult =
   | { kind: 'submitted_in'; response: ClockInResponse }
   | { kind: 'submitted_out'; response: ClockOutResponse }
-  | { kind: 'queued' }
+  | { kind: 'queued'; eventId: string }
   | { kind: 'consent_required' }
   /** Event NOT saved — neither to the server nor to the offline queue.
    *  UI MUST render this as a failure, not a green check. */
@@ -62,7 +62,7 @@ async function enqueue(
   };
   try {
     await enqueueClockEvent(event);
-    return { kind: 'queued' };
+    return { kind: 'queued', eventId: event.id };
   } catch (err) {
     // Distinguish "queue is full" from "IDB is broken" from "unknown". Both
     // end states mean the event was NOT saved, and the UI copy must be

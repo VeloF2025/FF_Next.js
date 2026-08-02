@@ -1,501 +1,118 @@
-/**
- * Handler tests for GET /api/staff/attendance-export.
- *
- * Validation only — auth middleware is bypassed in the vi.mock. The real
- * withAuth/withPermission chain is covered by the existing staff-attendance
- * handler tests; no need to re-test identical wiring here.
- */
-
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as XLSX from 'xlsx';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => {
-  const sql = vi.fn();
-  // Faithful to the real client: `sql.unsafe(raw)` inlines a trusted fragment.
-  (sql as unknown as { unsafe: (raw: string) => string }).unsafe = (raw: string) => raw;
-  return { sql };
-});
+import { AttendancePayrollExportError } from '@/services/attendance/payroll/types';
+
+const mocks = vi.hoisted(() => ({ prepare: vi.fn() }));
+
+vi.mock('@/services/attendance/payroll/exportService', () => ({
+  preparePayrollExport: mocks.prepare,
+}));
+vi.mock('@/lib/auth/middleware', () => ({
+  withAuth: (handler: unknown) => handler,
+  withPermission: () => (handler: unknown) => handler,
+}));
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
-}));
-vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
-vi.mock('@/lib/auth/middleware', () => ({
-  withAuth: (h: unknown) => h,
-  withPermission: () => (h: unknown) => h,
 }));
 
 import handler from '../../../../../pages/api/staff/attendance-export';
 
-function makeReq(
-  query: Record<string, string> = {},
-  method: string = 'GET',
-  userId: string | null = 'actor-1'
-): NextApiRequest {
-  const r: Partial<NextApiRequest> & {
-    user?: { id: string };
-    socket?: NextApiRequest['socket'];
-  } = {
-    method,
-    query,
-    headers: {},
-    socket: {} as unknown as NextApiRequest['socket'],
-  };
-  if (userId) r.user = { id: userId };
-  return r as NextApiRequest;
-}
-
-/**
- * Every success-path export test now needs TWO `sql` mock responses: the
- * main data query first, then the weekly-lock UPSERT (hardened: lock runs
- * BEFORE streaming so a failure 500s rather than silently shipping an
- * unfrozen week).
- */
-function mockSqlForSuccessfulExport(dataRows: unknown[]) {
-  mocks.sql
-    .mockResolvedValueOnce(dataRows)
-    .mockResolvedValueOnce([{ week_start_date: '2026-04-20', locked_at: 'x', locked_by: 'actor-1', lock_reason: 'export', unlocked_at: null, unlocked_by: null, unlock_reason: null }]);
-}
-
-function makeRes() {
-  const captured: {
-    statusCode: number;
-    body?: unknown;
-    headers: Record<string, string>;
-  } = { statusCode: 200, headers: {} };
-  const res = {
-    status(c: number) { captured.statusCode = c; return this; },
-    json(d: unknown) { captured.body = d; return this; },
-    send(d: unknown) { captured.body = d; return this; },
-    setHeader(name: string, value: string) { captured.headers[name.toLowerCase()] = value; },
-    getHeader() { return undefined; },
-  };
-  return { res: res as unknown as NextApiResponse, captured };
-}
-
-const SAMPLE_ROW = {
-  staff_id: 's1',
-  employee_id: 'EMP001',
-  full_name: 'Alice Example',
-  work_date: '2026-04-20',
-  clock_in_at: '2026-04-20T06:00:00+00:00',
-  clock_out_at: '2026-04-20T14:00:00+00:00',
-  regular_hrs: '8.00',
-  overtime_hrs: '0.00',
-  sunday_hrs: '0.00',
-  holiday_hrs: '0.00',
-  night_hrs: '0.00',
-  wage_amount_cents: null as string | null,
-  hourly_rate_snapshot_cents: null as string | null,
-  exceptions_count: 0,
+const ROW = {
+  staff_id: 'staff-1', employee_id: 'EMP001', full_name: 'Alice Example',
+  work_date: '2026-08-03', ordinary_hours: '8.00', overtime_hours: '0.00',
+  sunday_hours: '0.00', public_holiday_hours: '0.00', approved_leave_hours: '0.00',
+  sick_leave_hours: '0.00', unpaid_hours: '0.00', project_id: '', site_id: '',
+  lock_version: '3', audit_reference: 'attendance:staff-1:2026-08-03:result-v8:lock-v3',
+};
+const TOTALS = {
+  ordinary_hours: '8.00', overtime_hours: '0.00', sunday_hours: '0.00',
+  public_holiday_hours: '0.00', approved_leave_hours: '0.00',
+  sick_leave_hours: '0.00', unpaid_hours: '0.00',
 };
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+function request(query: Record<string, string> = {}, role = 'admin', method = 'GET') {
+  return { method, query, body: {}, headers: {}, cookies: {}, user: {
+    id: 'admin-1', userId: 'admin-1', email: 'admin@example.com', firstName: 'HR',
+    lastName: 'Admin', name: 'HR Admin', role, permissions: [], isActive: true,
+  } } as unknown as NextApiRequest;
+}
+
+function response() {
+  const capture: { status: number; body?: unknown; headers: Record<string, string> } =
+    { status: 200, headers: {} };
+  const res = {
+    status(code: number) { capture.status = code; return this; },
+    json(body: unknown) { capture.body = body; return this; },
+    send(body: unknown) { capture.body = body; return this; },
+    setHeader(name: string, value: string) { capture.headers[name.toLowerCase()] = value; },
+    getHeader() { return undefined; },
+  } as unknown as NextApiResponse;
+  return { res, capture };
+}
+
+beforeEach(() => vi.clearAllMocks());
 
 describe('GET /api/staff/attendance-export', () => {
-  it('405 on non-GET', async () => {
-    const { res, captured } = makeRes();
-    await handler(makeReq({}, 'POST'), res);
-    expect(captured.statusCode).toBe(405);
-  });
-
-  it('400 when week_start is missing / malformed', async () => {
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: 'not-a-date', format: 'csv' }), res);
-    expect(captured.statusCode).toBe(400);
-  });
-
-  it('400 when week_start is not a Monday (ISO-week enforcement)', async () => {
-    const { res, captured } = makeRes();
-    // 2026-04-21 is a Tuesday
-    await handler(makeReq({ week_start: '2026-04-21', format: 'csv' }), res);
-    expect(captured.statusCode).toBe(400);
-  });
-
-  it('400 when format is neither csv nor xlsx', async () => {
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'pdf' }), res);
-    expect(captured.statusCode).toBe(400);
-  });
-
-  it('defaults format to csv when omitted', async () => {
-    mockSqlForSuccessfulExport([SAMPLE_ROW]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20' }), res);
-    expect(captured.statusCode).toBe(200);
-    expect(captured.headers['content-type']).toContain('text/csv');
-    expect(captured.headers['content-disposition']).toContain(
-      'filename="attendance-week-2026-04-20.csv"'
-    );
-  });
-
-  it('CSV body starts with the expected header row', async () => {
-    mockSqlForSuccessfulExport([SAMPLE_ROW]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    const body = String(captured.body);
-    const firstLine = body.split('\r\n')[0];
-    expect(firstLine).toBe(
-      'staff_id,employee_id,full_name,work_date,clock_in_at,clock_out_at,' +
-        'regular_hrs,overtime_hrs,sunday_hrs,holiday_hrs,night_hrs,wage_amount,hourly_rate,exceptions_count'
-    );
-    expect(body).toContain('Alice Example');
-    expect(body).toContain('EMP001');
-  });
-
-  it('CSV escapes values containing commas + double-quotes', async () => {
-    mockSqlForSuccessfulExport([
-      {
-        ...SAMPLE_ROW,
-        full_name: 'Smith, Jr. "Bob"',
-      },
-    ]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    const body = String(captured.body);
-    expect(body).toContain('"Smith, Jr. ""Bob"""');
-  });
-
-  it('xlsx returns a non-empty Buffer parseable back into rows', async () => {
-    mockSqlForSuccessfulExport([SAMPLE_ROW, { ...SAMPLE_ROW, staff_id: 's2' }]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'xlsx' }), res);
-    expect(captured.statusCode).toBe(200);
-    expect(captured.headers['content-type']).toContain(
-      'officedocument.spreadsheetml.sheet'
-    );
-    expect(captured.headers['content-disposition']).toContain(
-      'filename="attendance-week-2026-04-20.xlsx"'
-    );
-    const buffer = captured.body as Buffer;
-    expect(Buffer.isBuffer(buffer)).toBe(true);
-    expect(buffer.length).toBeGreaterThan(0);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const sheet = wb.Sheets[wb.SheetNames[0]!];
-    expect(sheet).toBeDefined();
-    const rows = XLSX.utils.sheet_to_json(sheet!);
-    expect(rows.length).toBe(2);
-  });
-
-  it('empty result still emits the header row (CSV)', async () => {
-    mockSqlForSuccessfulExport([]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    expect(captured.statusCode).toBe(200);
-    const body = String(captured.body);
-    expect(body.split('\r\n')).toHaveLength(1); // header only, no data rows
-    expect(body.startsWith('staff_id,')).toBe(true);
-  });
-
-  it('wage_amount_cents formatted as decimal rands (cents → R)', async () => {
-    mockSqlForSuccessfulExport([
-      { ...SAMPLE_ROW, wage_amount_cents: '123456' },
-    ]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    const body = String(captured.body);
-    expect(body).toContain(',1234.56,');
-  });
-
-  it('DB error returns 500', async () => {
-    mocks.sql.mockRejectedValueOnce(new Error('connection reset'));
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    expect(captured.statusCode).toBe(500);
-  });
-
-  it('rejects Sunday as week_start (ISO-week boundary guard)', async () => {
-    const { res, captured } = makeRes();
-    // 2026-04-19 is Sunday
-    await handler(makeReq({ week_start: '2026-04-19', format: 'csv' }), res);
-    expect(captured.statusCode).toBe(400);
-  });
-
-  it('CSV empty-week header matches populated-week header exactly (column order parity)', async () => {
-    mockSqlForSuccessfulExport([]);
-    const { res: r1, captured: c1 } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), r1);
-    mockSqlForSuccessfulExport([SAMPLE_ROW]);
-    const { res: r2, captured: c2 } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), r2);
-
-    const emptyHeader = String(c1.body).split('\r\n')[0];
-    const fullHeader = String(c2.body).split('\r\n')[0];
-    expect(emptyHeader).toBe(fullHeader);
-  });
-
-  it('xlsx column order matches the canonical schema', async () => {
-    mockSqlForSuccessfulExport([SAMPLE_ROW]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'xlsx' }), res);
-    const buffer = captured.body as Buffer;
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const sheet = wb.Sheets[wb.SheetNames[0]!]!;
-    // header: 1 returns an array-of-arrays so column order is preserved.
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as string[][];
-    expect(rows[0]).toEqual([
-      'staff_id',
-      'employee_id',
-      'full_name',
-      'work_date',
-      'clock_in_at',
-      'clock_out_at',
-      'regular_hrs',
-      'overtime_hrs',
-      'sunday_hrs',
-      'holiday_hrs',
-      'night_hrs',
-      'wage_amount',
-      'hourly_rate',
-      'exceptions_count',
-    ]);
-  });
-
-  it('CSV escapes fields containing embedded carriage returns and line feeds', async () => {
-    // RFC 4180: any field containing CR, LF, or " must be quoted, with "
-    // doubled. We already test comma+quote; lock CR and LF explicitly.
-    mockSqlForSuccessfulExport([
-      { ...SAMPLE_ROW, full_name: 'Line1\rLine2' },
-    ]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    const body = String(captured.body);
-    expect(body).toMatch(/"Line1\rLine2"/);
-  });
-
-  it('NaN-valued hours render as blank (not silently 0.00)', async () => {
-    // If the DB ever returns a corrupt numeric, rendering 0.00 looks like
-    // "worked nothing" to payroll. Blank + server log is the audit signal.
-    mockSqlForSuccessfulExport([
-      { ...SAMPLE_ROW, regular_hrs: 'not-a-number' },
-    ]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    const body = String(captured.body);
-    // Find the row for Alice; the regular_hrs column is 7th (0-indexed 6)
-    const dataRow = body.split('\r\n').find((l) => l.includes('Alice Example'))!;
-    const cells = dataRow.split(',');
-    expect(cells[6]).toBe('');
-  });
-
-  it('successful export writes a weekly lock owned by the caller (freeze-on-export contract)', async () => {
-    mockSqlForSuccessfulExport([SAMPLE_ROW]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    expect(captured.statusCode).toBe(200);
-    const calls = mocks.sql.mock.calls as [readonly string[], ...unknown[]][];
-    const lockCall = calls.find((c) =>
-      /INSERT\s+INTO\s+attendance_weekly_locks/i.test(c[0].join(' '))
-    );
-    expect(lockCall).toBeDefined();
-    const params = lockCall![0].join(' ');
-    // The lock SQL must include ON CONFLICT DO UPDATE semantics — export is
-    // idempotent on an already-locked week.
-    expect(params).toMatch(/ON\s+CONFLICT/i);
-    // Caller user id and lock reason flow through as params.
-    expect(lockCall!.slice(1)).toContain('2026-04-20');
-    expect(lockCall!.slice(1)).toContain('actor-1');
-    expect(lockCall!.slice(1)).toContain('export:csv');
-  });
-
-  it('500 when lock write fails (refuses to ship an unfrozen export)', async () => {
-    mocks.sql
-      .mockResolvedValueOnce([SAMPLE_ROW]) // data query
-      .mockRejectedValueOnce(new Error('lock write failed')); // upsert throws
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    expect(captured.statusCode).toBe(500);
-  });
-
-  it('401 when no authenticated user on the request (defence-in-depth)', async () => {
-    // Mock the main data query so the 401 check (which runs after it) is
-    // reached cleanly. withAuth middleware normally blocks this before the
-    // handler; the guard here is for the case that wrapper ever bypasses
-    // (mocked to identity in these tests).
-    mocks.sql.mockResolvedValueOnce([SAMPLE_ROW]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }, 'GET', null), res);
-    expect(captured.statusCode).toBe(401);
-  });
-
-  it('wage=0 cents renders as "0.00", null wage renders as "" — audit-signal preserved', async () => {
-    mockSqlForSuccessfulExport([
-      { ...SAMPLE_ROW, staff_id: 's-zero', wage_amount_cents: '0' },
-      { ...SAMPLE_ROW, staff_id: 's-null', wage_amount_cents: null },
-    ]);
-    const { res, captured } = makeRes();
-    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
-    const lines = String(captured.body).split('\r\n');
-    const zeroLine = lines.find((l) => l.startsWith('s-zero,'))!;
-    const nullLine = lines.find((l) => l.startsWith('s-null,'))!;
-    // The wage_amount column is the 12th (0-indexed 11).
-    expect(zeroLine.split(',')[11]).toBe('0.00');
-    expect(nullLine.split(',')[11]).toBe('');
-  });
-});
-
-describe('GET /api/staff/attendance-export (dry_run=true preview)', () => {
-  it('returns JSON summary without writing a lock or streaming bytes', async () => {
-    // Only ONE sql call expected (the SELECT). Lock UPSERT must NOT run.
-    // Second mock call answers lookupActiveLock → null (no existing lock).
-    mocks.sql
-      .mockResolvedValueOnce([
-        {
-          ...SAMPLE_ROW,
-          staff_id: 's1',
-          regular_hrs: '8.00',
-          overtime_hrs: '2.00',
-          sunday_hrs: '0.00',
-          holiday_hrs: '0.00',
-          night_hrs: '1.50',
-          wage_amount_cents: '96000',
-          hourly_rate_snapshot_cents: '12000',
-          exceptions_count: 1,
-        },
-        {
-          ...SAMPLE_ROW,
-          staff_id: 's2',
-          regular_hrs: '9.00',
-          overtime_hrs: '0.00',
-          sunday_hrs: '0.00',
-          holiday_hrs: '0.00',
-          night_hrs: '0.00',
-          wage_amount_cents: '108000',
-          hourly_rate_snapshot_cents: '12000',
-          exceptions_count: 0,
-        },
-      ])
-      .mockResolvedValueOnce([]); // lookupActiveLock → no rows
-
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({ week_start: '2026-04-20', format: 'csv', dry_run: 'true' }),
-      res
-    );
-    expect(captured.statusCode).toBe(200);
-
-    // Lock was NOT written: only two sql calls (SELECT + lookupActiveLock),
-    // not three (SELECT + UPSERT + lookup).
-    expect(mocks.sql.mock.calls.length).toBe(2);
-    for (const call of mocks.sql.mock.calls) {
-      expect(call[0].join(' ')).not.toMatch(
-        /INSERT\s+INTO\s+attendance_weekly_locks/i
-      );
+  it('validates method, Monday, format and positive lock version before service work', async () => {
+    for (const [query, method] of [
+      [{ week_start: '2026-08-03', format: 'csv', lock_version: '3' }, 'POST'],
+      [{ week_start: '2026-08-04', format: 'csv', lock_version: '3' }, 'GET'],
+      [{ week_start: '2026-08-03', format: 'pdf', lock_version: '3' }, 'GET'],
+      [{ week_start: '2026-08-03', format: 'csv', lock_version: '0' }, 'GET'],
+    ] as const) {
+      const { res, capture } = response();
+      await handler(request(query, 'admin', method), res);
+      expect(capture.status).toBe(method === 'POST' ? 405 : 400);
     }
-
-    const body = captured.body as {
-      data: {
-        dryRun: boolean;
-        weekStart: string;
-        weekEnd: string;
-        rowCount: number;
-        staffCount: number;
-        totals: Record<string, string | number>;
-        alreadyLocked: boolean;
-      };
-    };
-    expect(body.data.dryRun).toBe(true);
-    expect(body.data.weekStart).toBe('2026-04-20');
-    expect(body.data.weekEnd).toBe('2026-04-26');
-    expect(body.data.rowCount).toBe(2);
-    expect(body.data.staffCount).toBe(2);
-    expect(body.data.totals.regular_hrs).toBe('17.00');
-    expect(body.data.totals.overtime_hrs).toBe('2.00');
-    expect(body.data.totals.night_hrs).toBe('1.50');
-    expect(body.data.totals.wage_amount).toBe('2040.00'); // 96000 + 108000 cents → R2040
-    expect(body.data.totals.wage_amount_cents).toBe(204000);
-    expect(body.data.totals.exceptions_count).toBe(1);
-    expect(body.data.alreadyLocked).toBe(false);
+    expect(mocks.prepare).not.toHaveBeenCalled();
   });
 
-  it('surfaces an existing lock when ops re-previews an already-exported week', async () => {
-    mocks.sql
-      .mockResolvedValueOnce([]) // empty export — week has no rows (edge case)
-      .mockResolvedValueOnce([
-        {
-          week_start_date: '2026-04-20',
-          locked_at: '2026-04-27T08:00:00Z',
-          locked_by: 'payroll-1',
-          lock_reason: 'export:csv',
-          unlocked_at: null,
-          unlocked_by: null,
-          unlock_reason: null,
-        },
-      ]);
-
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({ week_start: '2026-04-20', format: 'xlsx', dry_run: 'true' }),
-      res
-    );
-    expect(captured.statusCode).toBe(200);
-    const body = captured.body as {
-      data: {
-        alreadyLocked: boolean;
-        existingLock: { lockedBy: string; lockReason: string } | null;
-      };
-    };
-    expect(body.data.alreadyLocked).toBe(true);
-    expect(body.data.existingLock?.lockedBy).toBe('payroll-1');
-    expect(body.data.existingLock?.lockReason).toBe('export:csv');
+  it.each(['manager', 'site_supervisor', 'viewer'])('denies %s even if stale permission middleware admits it', async (role) => {
+    const { res, capture } = response();
+    await handler(request({ week_start: '2026-08-03', format: 'csv', lock_version: '3' }, role), res);
+    expect(capture.status).toBe(403);
+    expect(mocks.prepare).not.toHaveBeenCalled();
   });
 
-  it('accepts truthy aliases (1, yes) for dry_run', async () => {
-    for (const v of ['1', 'yes', 'TRUE']) {
-      mocks.sql.mockReset();
-      mocks.sql.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      const { res, captured } = makeRes();
-      await handler(
-        makeReq({ week_start: '2026-04-20', format: 'csv', dry_run: v }),
-        res
-      );
-      expect(captured.statusCode).toBe(200);
-      const body = captured.body as { data: { dryRun: boolean } };
-      expect(body.data.dryRun).toBe(true);
-    }
+  it('returns exact guarded rows and totals for dry-run without attachment bytes', async () => {
+    mocks.prepare.mockResolvedValue({ dryRun: true, format: 'csv', lockVersion: 3,
+      rowCount: 1, rows: [ROW], totals: TOTALS });
+    const { res, capture } = response();
+    await handler(request({ week_start: '2026-08-03', format: 'csv', lock_version: '3', dry_run: 'true' }), res);
+
+    expect(mocks.prepare).toHaveBeenCalledWith({ weekStartDate: '2026-08-03', format: 'csv',
+      actorUserId: 'admin-1', expectedLockVersion: 3, dryRun: true });
+    expect(capture.body).toMatchObject({ data: { dryRun: true, rows: [ROW], totals: TOTALS } });
+    expect(capture.headers['content-disposition']).toBeUndefined();
   });
 
-  it('dry_run=false still locks + streams (control: falsy value is the default path)', async () => {
-    // Guards against an over-eager match (e.g. any truthy string). dry_run=false
-    // should behave like the flag isn't present.
-    mockSqlForSuccessfulExport([SAMPLE_ROW]);
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({ week_start: '2026-04-20', format: 'csv', dry_run: 'false' }),
-      res
-    );
-    expect(captured.statusCode).toBe(200);
-    // Body is CSV text, not JSON — proves we took the streaming path.
-    expect(typeof captured.body).toBe('string');
-    expect(String(captured.body).startsWith('staff_id,')).toBe(true);
-    // Lock INSERT ran:
-    const hadLockCall = mocks.sql.mock.calls.some((c) =>
-      /INSERT\s+INTO\s+attendance_weekly_locks/i.test(c[0].join(' '))
-    );
-    expect(hadLockCall).toBe(true);
+  it('streams no success bytes before service persisted readback completes', async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.prepare.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const { res, capture } = response();
+    const pending = handler(request({ week_start: '2026-08-03', format: 'csv', lock_version: '3' }), res);
+    await Promise.resolve();
+    expect(capture.body).toBeUndefined();
+
+    resolve({ dryRun: false, exportId: 'export-1', format: 'csv', lockVersion: 3,
+      rowCount: 1, rows: [ROW], totals: TOTALS, sha256: 'a'.repeat(64),
+      bytes: Buffer.from('locked-bytes'), filename: 'attendance-week-2026-08-03-v3.csv',
+      storagePath: 'attendance/payroll-exports/file.csv' });
+    await pending;
+    expect(capture.status).toBe(200);
+    expect(capture.body).toEqual(Buffer.from('locked-bytes'));
+    expect(capture.headers['x-attendance-export-sha256']).toBe('a'.repeat(64));
   });
 
-  it('skips the lock write even when a NULL row would cause NaN if not guarded (safeNum defends the totals)', async () => {
-    // Regression guard for the safeNum helper — a null/NaN shouldn't
-    // bleed into the sum. This is a realistic path: wage_amount_cents
-    // can be NULL when staff.hourly_rate is unset (migration 324's
-    // paired-null invariant).
-    mocks.sql
-      .mockResolvedValueOnce([
-        { ...SAMPLE_ROW, wage_amount_cents: null, regular_hrs: '8.00' },
-        { ...SAMPLE_ROW, staff_id: 's2', wage_amount_cents: '5000', regular_hrs: '5.00' },
-      ])
-      .mockResolvedValueOnce([]);
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({ week_start: '2026-04-20', format: 'csv', dry_run: 'true' }),
-      res
-    );
-    const body = captured.body as { data: { totals: Record<string, string | number> } };
-    expect(body.data.totals.wage_amount_cents).toBe(5000);
-    expect(body.data.totals.wage_amount).toBe('50.00');
-    expect(body.data.totals.regular_hrs).toBe('13.00'); // 8 + 5 — no NaN corruption
+  it.each([
+    ['period_locked', 409], ['export_version_conflict', 409],
+    ['empty_period', 409], ['forbidden', 403], ['storage_failed', 500],
+  ] as const)('maps %s failure and streams no attachment', async (code, status) => {
+    mocks.prepare.mockRejectedValue(new AttendancePayrollExportError(code, `failed:${code}`));
+    const { res, capture } = response();
+    await handler(request({ week_start: '2026-08-03', format: 'csv', lock_version: '3' }), res);
+    expect(capture.status).toBe(status);
+    expect(capture.headers['content-disposition']).toBeUndefined();
   });
 });

@@ -20,6 +20,7 @@ import {
   countOwnAdjustmentsByStatus,
   countSupervisedAdjustmentsByStatus,
   cancelOwnAdjustment,
+  transitionAdjustmentStatus,
 } from '../queries';
 
 const S = '00000000-0000-0000-0000-000000000001';
@@ -129,12 +130,19 @@ describe('cancelOwnAdjustment', () => {
     // after tag interpolation. Assert the structural SQL and that the
     // staff-id parameter lands in the params list (verified in the
     // parameterisation test below).
-    expect(template).toMatch(/FROM\s+attendance_entries\s+e/i);
+    expect(template).toMatch(/JOIN\s+attendance_entries\s+e/i);
     expect(template).toMatch(/e\.staff_id\s*=/i);
     // Pending-only precondition in the same statement:
     expect(template).toMatch(/a\.status\s*=\s*'pending'/i);
     // Writes the self-cancelled audit note:
     expect(template).toMatch(/review_note\s*=\s*'self-cancelled by staff'/i);
+    expect(template).toMatch(/reviewed_by\s*=\s*NULL/i);
+    expect(template).toMatch(/cancelled_by_staff_id\s*=/i);
+    expect(template).toMatch(/reviewed_at\s*=\s*NOW\(\)/i);
+    expect(template).toMatch(/pg_advisory_xact_lock/i);
+    expect(template).toMatch(/attendance_weekly_locks/i);
+    expect(template).toMatch(/UPDATE\s+attendance_day_exceptions/i);
+    expect(template).toMatch(/UPDATE\s+attendance_daily_summaries/i);
   });
 
   it('parameterises the adjustment_id and staff_id positionally', async () => {
@@ -143,6 +151,28 @@ describe('cancelOwnAdjustment', () => {
     const params = mocks.sql.mock.calls[0]!.slice(1);
     expect(params).toContain('a-1');
     expect(params).toContain(S);
+  });
+});
+
+describe('transitionAdjustmentStatus authority', () => {
+  it('rejects approved at runtime even when a caller bypasses TypeScript', async () => {
+    await expect(transitionAdjustmentStatus({
+      adjustmentId: 'a-1', reviewerId: 'u-1', reviewNote: null,
+      newStatus: 'approved' as never,
+    })).rejects.toThrow(/approval.*guarded/i);
+    expect(mocks.sql).not.toHaveBeenCalled();
+  });
+
+  it('serializes rejection with the weekly lock and rechecks the active lock', async () => {
+    mocks.sql.mockResolvedValueOnce([]);
+    await transitionAdjustmentStatus({
+      adjustmentId: 'a-1', reviewerId: 'u-1', reviewNote: 'not supported',
+      newStatus: 'rejected',
+    });
+    const template = mocks.sql.mock.calls[0]![0].join(' ');
+    expect(template).toMatch(/pg_advisory_xact_lock/i);
+    expect(template).toMatch(/attendance_weekly_locks/i);
+    expect(template).toMatch(/a\.status\s*=\s*'pending'/i);
   });
 });
 

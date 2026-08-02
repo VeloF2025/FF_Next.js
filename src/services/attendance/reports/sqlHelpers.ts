@@ -8,6 +8,7 @@
  */
 
 import { approvedAccountPredicateRef } from '@/lib/staff/hrVisibilityFilters';
+import { employmentEffectivePredicate } from '@/services/attendance/employmentUniverse';
 
 export interface ParamBuilder {
   params: unknown[];
@@ -41,8 +42,8 @@ export interface BaseFilterArgs {
   siteIds?: string[];
   /** Reference for site_geofence_id on attendance_entries. */
   siteRef?: string;
-  /** Reference for the staff active flag — when set, only-active is enforced. */
-  activeStaffRefs?: { isActive: string; endDate: string };
+  /** Staff alias for the canonical worker/day employment predicate. */
+  employmentStaffAlias?: string;
   /**
    * Full column reference for staff.account_status (e.g. `s.account_status`).
    * When set, Rule P (hide unapproved/pending field workers) is enforced.
@@ -72,9 +73,9 @@ export function buildBaseWhere(args: BaseFilterArgs): string {
   if (args.deptRef && args.departments && args.departments.length > 0) {
     parts.push(`${args.deptRef} = ANY(${pb.next(args.departments)}::text[])`);
   }
-  if (args.activeStaffRefs) {
-    const { isActive, endDate } = args.activeStaffRefs;
-    parts.push(`(${isActive} = true OR ${isActive} IS NULL) AND ${endDate} IS NULL`);
+  if (args.employmentStaffAlias) {
+    if (!args.workDateRef) throw new Error('workDateRef is required for employment filtering');
+    parts.push(employmentEffectivePredicate(args.employmentStaffAlias, args.workDateRef));
   }
   if (args.accountStatusRef) {
     // Rule P — hide unapproved (pending) field workers from reports.

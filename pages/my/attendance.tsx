@@ -1,23 +1,9 @@
-/**
- * /my/attendance — portal home.
- *
- * Shows whichever CTA is appropriate given server state:
- *   - If there is an open entry (status='open' in the most recent history row)
- *     → "Clock out" with elapsed time.
- *   - Otherwise → "Clock in".
- *
- * We don't compute "today's hours" from open-entry arithmetic on the client —
- * that's done server-side and will surface via the daily summary API in PR1b.
- * For now the weekly total is a todo placeholder.
- *
- * Session check happens on mount: if /api/my/session returns `session: null`,
- * we redirect back to /my. Any other error surfaces as an inline banner.
- */
+/** /my/attendance — server-derived clock action and recent shifts. */
 
 import React from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { Clock, Edit3, History as HistoryIcon, MapPin } from 'lucide-react';
+import { Edit3, History as HistoryIcon, MapPin } from 'lucide-react';
 
 import {
   ApiError,
@@ -26,6 +12,13 @@ import {
   getSession,
   SessionResponse,
 } from '@/modules/attendance/portal/client/api';
+import { AttendanceRequiredActionCard } from '@/modules/attendance/portal/client/AttendanceRequiredActionCard';
+import { AttendanceClockActionCard } from '@/modules/attendance/portal/client/AttendanceClockActionCard';
+import {
+  getCurrentAttendance,
+  isDailyResultStatus,
+  type CurrentAttendanceResponse,
+} from '@/modules/attendance/portal/client/attendanceStateApi';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 
 const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactElement } = () => {
@@ -33,6 +26,7 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
 
   const [session, setSession] = React.useState<SessionResponse | null>(null);
   const [entries, setEntries] = React.useState<ClockEntry[] | null>(null);
+  const [current, setCurrent] = React.useState<CurrentAttendanceResponse | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -46,10 +40,17 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
           return;
         }
         setSession(sess);
-        // Fetch just the last handful — enough to see "today's entry" status.
-        const hist = await getHistory(5);
+        const [hist, currentAttendance] = await Promise.all([
+          getHistory(5),
+          getCurrentAttendance(),
+        ]);
         if (cancelled) return;
+        if (!isDailyResultStatus(currentAttendance?.result?.status)) {
+          setLoadError('Attendance status unavailable. Clock actions are paused.');
+          return;
+        }
         setEntries(hist.entries);
+        setCurrent(currentAttendance);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -64,7 +65,8 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
     };
   }, [router]);
 
-  const openEntry = entries?.find((e) => e.status === 'open') ?? null;
+  const openEntry = current?.open ?? null;
+  const requiredAction = current?.requiredAttendanceAction ?? null;
 
   return (
     <MyPortalShell
@@ -97,18 +99,25 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
             </p>
           </div>
 
-          <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-5 mb-4">
-            {openEntry ? (
-              <OpenEntryCard
-                entry={openEntry}
-                onClockOut={() => router.push('/my/attendance/clock?action=out')}
-              />
-            ) : (
-              <ClosedEntryCard
-                onClockIn={() => router.push('/my/attendance/clock?action=in')}
-              />
-            )}
-          </div>
+          {requiredAction ? (
+            <AttendanceRequiredActionCard
+              action={requiredAction}
+              onCorrect={() => router.push(
+                `/my/attendance/corrections/new?entry_id=${encodeURIComponent(requiredAction.entryId)}` +
+                `&exception_id=${encodeURIComponent(requiredAction.exceptionId)}`
+              )}
+            />
+          ) : current ? (
+            <AttendanceClockActionCard
+              open={openEntry}
+              onClockOut={() => router.push('/my/attendance/clock?action=out')}
+              onClockIn={() => router.push('/my/attendance/clock?action=in')}
+            />
+          ) : !loadError ? (
+            <div className="mb-4 rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-neutral-400">
+              Loading attendance…
+            </div>
+          ) : null}
 
           <RecentList entries={entries ?? []} />
 
@@ -144,69 +153,6 @@ function firstName(fullName: string): string {
   const trimmed = fullName.trim();
   if (!trimmed) return 'there';
   return trimmed.split(/\s+/)[0] ?? 'there';
-}
-
-function OpenEntryCard({
-  entry,
-  onClockOut,
-}: {
-  entry: ClockEntry;
-  onClockOut: () => void;
-}) {
-  const [elapsed, setElapsed] = React.useState(() => Date.now() - new Date(entry.clockInAt).getTime());
-
-  React.useEffect(() => {
-    const id = window.setInterval(() => {
-      setElapsed(Date.now() - new Date(entry.clockInAt).getTime());
-    }, 30_000);
-    return () => window.clearInterval(id);
-  }, [entry.clockInAt]);
-
-  return (
-    <>
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-emerald-900/50 text-emerald-300 flex items-center justify-center">
-          <Clock className="w-5 h-5" />
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wide text-emerald-300 font-semibold">On shift</div>
-          <div className="text-sm text-neutral-300">
-            Since {formatTime(entry.clockInAt)} · {formatDuration(elapsed)}
-          </div>
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onClockOut}
-        className="w-full py-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-lg font-bold shadow-lg shadow-orange-600/20"
-      >
-        Clock out
-      </button>
-    </>
-  );
-}
-
-function ClosedEntryCard({ onClockIn }: { onClockIn: () => void }) {
-  return (
-    <>
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-blue-900/50 text-blue-300 flex items-center justify-center">
-          <Clock className="w-5 h-5" />
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wide text-blue-300 font-semibold">Off shift</div>
-          <div className="text-sm text-neutral-300">No active entry</div>
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onClockIn}
-        className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-lg font-bold shadow-lg shadow-blue-600/20"
-      >
-        Clock in
-      </button>
-    </>
-  );
 }
 
 function RecentList({ entries }: { entries: ClockEntry[] }) {

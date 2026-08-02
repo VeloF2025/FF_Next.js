@@ -5,9 +5,11 @@ const mocks = vi.hoisted(() => ({
   sql: vi.fn(),
   findOpenEntry: vi.fn(),
   findActiveVehicleAssignment: vi.fn(),
+  sastWorkDate: vi.fn(() => '2026-08-01'),
   countOwnAdjustmentsByStatus: vi.fn(),
   findLatestPayslipForStaff: vi.fn(),
   findLatestReceiptForStaff: vi.fn(),
+  findRequiredAttendanceAction: vi.fn(),
 }));
 
 vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
@@ -29,6 +31,7 @@ vi.mock('@/modules/attendance/portal/authMiddleware', () => ({
 vi.mock('@/modules/attendance/portal/clockUtils', () => ({
   findOpenEntry: mocks.findOpenEntry,
   findActiveVehicleAssignment: mocks.findActiveVehicleAssignment,
+  sastWorkDate: mocks.sastWorkDate,
 }));
 vi.mock('@/modules/attendance/corrections/queries', () => ({
   countOwnAdjustmentsByStatus: mocks.countOwnAdjustmentsByStatus,
@@ -38,6 +41,9 @@ vi.mock('@/modules/payslips/queries', () => ({
 }));
 vi.mock('@/modules/receipts/queries', () => ({
   findLatestReceiptForStaff: mocks.findLatestReceiptForStaff,
+}));
+vi.mock('@/modules/attendance/workflow/requiredActionQueries', () => ({
+  findRequiredAttendanceAction: mocks.findRequiredAttendanceAction,
 }));
 
 import handler from '../../../../../pages/api/my/hub-summary';
@@ -71,6 +77,7 @@ beforeEach(() => {
   mocks.countOwnAdjustmentsByStatus.mockResolvedValue({ pending: 0 });
   mocks.findLatestPayslipForStaff.mockResolvedValue(null);
   mocks.findLatestReceiptForStaff.mockResolvedValue(null);
+  mocks.findRequiredAttendanceAction.mockResolvedValue(null);
   mocks.sql
     .mockResolvedValueOnce([{ count: '3' }])
     .mockResolvedValueOnce([
@@ -79,6 +86,34 @@ beforeEach(() => {
 });
 
 describe('GET /api/my/hub-summary check reminders', () => {
+  it('returns the persisted required attendance action', async () => {
+    mocks.findRequiredAttendanceAction.mockResolvedValue({
+      exceptionId: 'exception-1',
+      entryId: 'entry-1',
+      workDate: '2026-07-31',
+      kind: 'missing_clock_out',
+      provisionalPaidHours: 8,
+      clockInAt: '2026-07-31T06:00:00.000Z',
+    });
+    const { res, captured } = makeRes();
+
+    await handler(
+      { method: 'GET', query: {}, headers: {} } as NextApiRequest,
+      res
+    );
+
+    expect(captured.body).toMatchObject({
+      success: true,
+      data: {
+        requiredAttendanceAction: {
+          exceptionId: 'exception-1',
+          kind: 'missing_clock_out',
+          provisionalPaidHours: 8,
+        },
+      },
+    });
+  });
+
   it('returns the assigned vehicle and its due weekly check', async () => {
     const { res, captured } = makeRes();
     await handler(
@@ -108,6 +143,7 @@ describe('GET /api/my/hub-summary check reminders', () => {
     mocks.countOwnAdjustmentsByStatus.mockResolvedValue({ pending: 0 });
     mocks.findLatestPayslipForStaff.mockResolvedValue(null);
     mocks.findLatestReceiptForStaff.mockResolvedValue(null);
+    mocks.findRequiredAttendanceAction.mockResolvedValue(null);
     mocks.sql.mockResolvedValueOnce([{ count: '0' }]);
 
     const { res, captured } = makeRes();

@@ -8,11 +8,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ sql: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  sql: vi.fn(),
+  submitMissingClockOutCorrection: vi.fn(),
+}));
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
+vi.mock('@/modules/attendance/workflow/requiredActionQueries', () => ({
+  AttendanceCorrectionError: class AttendanceCorrectionError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+      this.name = 'AttendanceCorrectionError';
+    }
+  },
+  submitMissingClockOutCorrection: mocks.submitMissingClockOutCorrection,
+}));
 vi.mock('@/modules/attendance/portal/authMiddleware', () => ({
   // Bypass session verification. Set staffId via makeReq.session below.
   withMySession: (h: (r: NextApiRequest, s: NextApiResponse, sess: { staffId: string; sessionId: string; loginMethod: 'pin' }) => unknown) =>
@@ -21,6 +33,7 @@ vi.mock('@/modules/attendance/portal/authMiddleware', () => ({
 }));
 
 import handler from '../../../../../pages/api/my/attendance-corrections';
+import { AttendanceCorrectionError } from '@/modules/attendance/workflow/requiredActionQueries';
 
 function makeReq(
   body: Record<string, unknown> = {},
@@ -57,147 +70,106 @@ beforeEach(() => {
 });
 
 describe('POST /api/my/attendance-corrections', () => {
-  it('400 when entry_id missing', async () => {
+  it('persists a missing-clock-out exception correction and returns the workflow IDs', async () => {
+    mocks.submitMissingClockOutCorrection.mockResolvedValue({
+      adjustmentId: 'adj-required',
+      exceptionId: 'exception-required',
+      exceptionStatus: 'awaiting_supervisor',
+    });
     const { res, captured } = makeRes();
+
     await handler(
       makeReq({
-        adjustment_kind: 'forgot_clock_out',
+        exception_id: 'exception-required',
         adjusted_clock_out_at: '2026-04-20T14:00:00Z',
-        reason: 'real reason with length',
+        reason: 'forgot during the site handover',
       }),
       res
     );
-    expect(captured.statusCode).toBe(400);
-  });
 
-  it('400 when adjustment_kind invalid', async () => {
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({
-        entry_id: 'e-1',
-        adjustment_kind: 'bogus',
-        adjusted_clock_out_at: '2026-04-20T14:00:00Z',
-        reason: 'real reason with length',
-      }),
-      res
-    );
-    expect(captured.statusCode).toBe(400);
-  });
-
-  it('400 when reason < 10 chars', async () => {
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({
-        entry_id: 'e-1',
-        adjustment_kind: 'forgot_clock_out',
-        adjusted_clock_out_at: '2026-04-20T14:00:00Z',
-        reason: 'too short',
-      }),
-      res
-    );
-    expect(captured.statusCode).toBe(400);
-  });
-
-  it('400 when no adjusted_* field is provided (at-least-one-change rule)', async () => {
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({
-        entry_id: 'e-1',
-        adjustment_kind: 'other',
-        reason: 'trying to submit an empty correction',
-      }),
-      res
-    );
-    expect(captured.statusCode).toBe(400);
-  });
-
-  it('404 when entry not owned by session staff (IDOR guard) — and INSERT is NOT reached', async () => {
-    mocks.sql.mockResolvedValueOnce([{ staff_id: 'someone-else', work_date: '2026-04-20' }]);
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({
-        entry_id: 'e-1',
-        adjustment_kind: 'forgot_clock_out',
-        adjusted_clock_out_at: '2026-04-20T14:00:00Z',
-        reason: 'real reason with length',
-      }),
-      res
-    );
-    expect(captured.statusCode).toBe(404);
-    // Defence-in-depth: an IDOR check that returns 404 but still runs the
-    // INSERT would leak data across staff. Assert no insert happened.
-    const calls = mocks.sql.mock.calls as [readonly string[], ...unknown[]][];
-    const insertCall = calls.find((c) =>
-      /INSERT\s+INTO\s+attendance_adjustments/i.test(c[0].join(' '))
-    );
-    expect(insertCall).toBeUndefined();
-  });
-
-  it('400 when the entry’s week is locked', async () => {
-    mocks.sql
-      .mockResolvedValueOnce([{ staff_id: 'staff-1', work_date: '2026-04-22' }]) // entry owned; week Mon = 2026-04-20
-      .mockResolvedValueOnce([
-        {
-          week_start_date: '2026-04-20',
-          locked_at: '2026-04-21T09:00:00Z',
-          locked_by: 'admin-1',
-          lock_reason: 'export:csv',
-          unlocked_at: null,
-          unlocked_by: null,
-          unlock_reason: null,
-        },
-      ]);
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({
-        entry_id: 'e-1',
-        adjustment_kind: 'forgot_clock_out',
-        adjusted_clock_out_at: '2026-04-22T14:00:00Z',
-        reason: 'forgot to clock out this evening',
-      }),
-      res
-    );
-    expect(captured.statusCode).toBe(400);
-    const body = captured.body as { error: { message: string } };
-    expect(body.error.message).toMatch(/locked/i);
-  });
-
-  it('happy path — inserts adjustment and returns the row', async () => {
-    mocks.sql
-      .mockResolvedValueOnce([{ staff_id: 'staff-1', work_date: '2026-04-20' }])
-      .mockResolvedValueOnce([]) // no lock
-      .mockResolvedValueOnce([
-        {
-          id: 'adj-1',
-          entry_id: 'e-1',
-          requested_by: 'staff-1',
-          adjustment_kind: 'forgot_clock_out',
-          adjusted_clock_in_at: null,
-          adjusted_clock_out_at: '2026-04-20T14:00:00+00:00',
-          adjusted_site_geofence_id: null,
-          reason: 'forgot to clock out after shift',
-          status: 'pending',
-          reviewed_by: null,
-          reviewed_at: null,
-          review_note: null,
-          created_at: '2026-04-22T10:00:00Z',
-          updated_at: '2026-04-22T10:00:00Z',
-        },
-      ]);
-    const { res, captured } = makeRes();
-    await handler(
-      makeReq({
-        entry_id: 'e-1',
-        adjustment_kind: 'forgot_clock_out',
-        adjusted_clock_out_at: '2026-04-20T14:00:00Z',
-        reason: 'forgot to clock out after shift',
-      }),
-      res
-    );
     expect(captured.statusCode).toBe(200);
-    const body = captured.body as { data: { adjustment: { id: string; status: string } } };
-    expect(body.data.adjustment.id).toBe('adj-1');
-    expect(body.data.adjustment.status).toBe('pending');
+    expect(captured.body).toMatchObject({
+      success: true,
+      data: {
+        adjustmentId: 'adj-required',
+        exceptionId: 'exception-required',
+        exceptionStatus: 'awaiting_supervisor',
+      },
+    });
+    expect(mocks.submitMissingClockOutCorrection).toHaveBeenCalledWith({
+      staffId: 'staff-1',
+      exceptionId: 'exception-required',
+      adjustedClockOutAt: new Date('2026-04-20T14:00:00Z'),
+      reason: 'forgot during the site handover',
+    });
+  });
+
+  it('returns an IDOR-safe 404 for a foreign exception', async () => {
+    mocks.submitMissingClockOutCorrection.mockRejectedValue(
+      new AttendanceCorrectionError('not_found', 'Attendance exception not found')
+    );
+    const { res, captured } = makeRes();
+
+    await handler(makeReq({
+      exception_id: 'exception-foreign',
+      adjusted_clock_out_at: '2026-04-20T14:00:00Z',
+      reason: 'forgot during the site handover',
+    }), res);
+
+    expect(captured.statusCode).toBe(404);
+    expect(captured.body).toMatchObject({ error: { code: 'NOT_FOUND' } });
+  });
+
+  it('returns 409 period_locked for a correction in a locked week', async () => {
+    mocks.submitMissingClockOutCorrection.mockRejectedValue(
+      new AttendanceCorrectionError('period_locked', 'The attendance period is locked')
+    );
+    const { res, captured } = makeRes();
+
+    await handler(makeReq({
+      exception_id: 'exception-locked',
+      adjusted_clock_out_at: '2026-04-20T14:00:00Z',
+      reason: 'forgot during the site handover',
+    }), res);
+
+    expect(captured.statusCode).toBe(409);
+    expect(captured.body).toMatchObject({
+      error: { details: { reason: 'period_locked' } },
+    });
+  });
+
+  it('returns 409 when a different correction is already pending', async () => {
+    mocks.submitMissingClockOutCorrection.mockRejectedValue(
+      new AttendanceCorrectionError('already_submitted', 'A different correction is already pending')
+    );
+    const { res, captured } = makeRes();
+
+    await handler(makeReq({
+      exception_id: 'exception-submitted',
+      adjusted_clock_out_at: '2026-04-20T14:00:00Z',
+      reason: 'a different clock out claim',
+    }), res);
+
+    expect(captured.statusCode).toBe(409);
+    expect(captured.body).toMatchObject({
+      error: { details: { reason: 'correction_already_submitted' } },
+    });
+  });
+
+  it('retires generic entry corrections without reading or writing attendance data', async () => {
+    const { res, captured } = makeRes();
+    await handler(makeReq({
+      entry_id: 'e-1',
+      adjustment_kind: 'forgot_clock_out',
+      adjusted_clock_out_at: '2026-04-20T14:00:00Z',
+      reason: 'forgot to clock out after shift',
+    }), res);
+
+    expect(captured.statusCode).toBe(409);
+    expect(captured.body).toMatchObject({
+      error: { message: expect.stringMatching(/generic.*retired.*day exception/i) },
+    });
+    expect(mocks.sql).not.toHaveBeenCalled();
   });
 });
 
@@ -294,5 +266,15 @@ describe('DELETE /api/my/attendance-corrections', () => {
     const { res, captured } = makeRes();
     await handler(makeReq({}, 'DELETE', { adjustment_id: 'adj-approved' }), res);
     expect(captured.statusCode).toBe(409);
+  });
+
+  it('409 period_locked when own pending cancellation loses to a weekly lock', async () => {
+    mocks.sql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ status: 'pending', staff_id: 'staff-1', period_locked: true }]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({}, 'DELETE', { adjustment_id: 'adj-pending' }), res);
+    expect(captured.statusCode).toBe(409);
+    expect(captured.body).toMatchObject({ error: { details: { reason: 'period_locked' } } });
   });
 });

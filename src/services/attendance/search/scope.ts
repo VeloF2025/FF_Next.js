@@ -12,7 +12,6 @@
 
 import { staffIdsSupervisedBy } from '../supervisorScope';
 import { getStaffIdForUser } from '@/services/staff/staffAccessService';
-import type { AuthUser } from '@/lib/auth/types';
 import type { ResolvedScope, SearchFilters } from './types';
 
 export type { ResolvedScope };
@@ -25,7 +24,12 @@ export type { ResolvedScope };
  * gets `no_scope` — empty result, distinct from "your filters matched
  * nothing" so the UI can show the right empty state (FR-SEARCH-12).
  */
-export async function resolveScope(user: AuthUser): Promise<ResolvedScope> {
+export interface ScopePrincipal {
+  id: string;
+  role: string;
+}
+
+export async function resolveScope(user: ScopePrincipal): Promise<ResolvedScope> {
   if (user.role === 'super_admin' || user.role === 'admin') {
     return { allowedStaffIds: null, note: { kind: 'orgwide' } };
   }

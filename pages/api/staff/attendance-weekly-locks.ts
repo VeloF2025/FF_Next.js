@@ -1,9 +1,10 @@
 /**
  * GET    /api/staff/attendance-weekly-locks
  *   list recent locks (default 50)
+ *   or read one authoritative row with ?week_start_date=YYYY-MM-DD
  *
  * POST   /api/staff/attendance-weekly-locks
- *   body: { week_start_date, lock_reason?, action: 'lock' | 'unlock', unlock_reason? }
+ *   body: { week_start_date, lock_reason, action: 'lock' | 'unlock', unlock_reason? }
  *   lock/unlock a specific ISO-week Monday.
  *
  * RBAC: people.staff.attendance.locks. Lock requires create; unlock
@@ -20,10 +21,11 @@ import {
 } from '@/lib/auth/middleware';
 import { userHasPermission } from '@/lib/permissions';
 import {
-  listLocks,
-  upsertWeeklyLock,
-  unlockWeek,
+  listLocks, readWeeklyLock,
 } from '@/modules/attendance/corrections/lockQueries';
+import {
+  AttendancePeriodError, lockReadyWeek, unlockWeekWithHistory,
+} from '@/modules/attendance/workflow/periodQueries';
 
 function isMondayYmd(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
@@ -34,6 +36,23 @@ function isMondayYmd(s: string): boolean {
 }
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+  const weekStart = req.query.week_start_date;
+  if (weekStart !== undefined) {
+    if (typeof weekStart !== 'string' || !isMondayYmd(weekStart)) {
+      apiResponse.badRequest(res, 'week_start_date must be a Monday YYYY-MM-DD');
+      return;
+    }
+    try {
+      const lock = await readWeeklyLock(weekStart);
+      apiResponse.success(res, { lock });
+    } catch (err) {
+      log.error('[staff-weekly-locks] exact read failed', {
+        weekStart, error: err instanceof Error ? err.message : String(err),
+      });
+      apiResponse.internalError(res, err);
+    }
+    return;
+  }
   const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : 50;
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.trunc(limitRaw) : 50;
   try {
@@ -76,6 +95,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
   // grants site_supervisor view:true, create:false, edit:false — so
   // supervisor reaches here but bounces at 403.
   const requiredAction = action === 'lock' ? 'create' : 'edit';
+  if (authed.user.role !== 'super_admin' && authed.user.role !== 'admin') {
+    apiResponse.forbidden(res, 'Attendance lock authority is restricted to HR administrators');
+    return;
+  }
   if (authed.user.role !== 'super_admin') {
     const allowed = await userHasPermission(
       actor,
@@ -94,10 +117,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
   try {
     if (action === 'lock') {
-      const row = await upsertWeeklyLock({
+      const row = await lockReadyWeek({
         weekStartDate: weekStart,
-        lockedBy: actor,
-        lockReason: lockReason && lockReason.length > 0 ? lockReason : null,
+        actorUserId: actor,
+        reason: lockReason ?? '',
       });
       apiResponse.success(res, { lock: row });
       return;
@@ -106,17 +129,30 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       apiResponse.badRequest(res, 'unlock_reason must be at least 10 characters (audit requirement)');
       return;
     }
-    const row = await unlockWeek({
+    const row = await unlockWeekWithHistory({
       weekStartDate: weekStart,
-      unlockedBy: actor,
-      unlockReason,
+      actorUserId: actor,
+      reason: unlockReason,
     });
-    if (!row) {
+    apiResponse.success(res, { lock: row });
+  } catch (err) {
+    const code = periodErrorCode(err);
+    if (code === 'invalid_reason') {
+      apiResponse.badRequest(res, err instanceof Error ? err.message : 'Invalid lock reason', { reason: code });
+      return;
+    }
+    if (code === 'forbidden') {
+      apiResponse.forbidden(res, 'Attendance lock permission denied');
+      return;
+    }
+    if (code === 'active_lock_required') {
       apiResponse.notFound(res, 'ActiveLock', weekStart);
       return;
     }
-    apiResponse.success(res, { lock: row });
-  } catch (err) {
+    if (code === 'period_locked' || code === 'period_has_blockers' || code === 'reconciliation_stale') {
+      apiResponse.conflict(res, err instanceof Error ? err.message : 'Attendance lock conflict', { reason: code });
+      return;
+    }
     log.error('[staff-weekly-locks] action failed', {
       weekStart,
       action,
@@ -124,6 +160,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     });
     apiResponse.internalError(res, err);
   }
+}
+
+function periodErrorCode(error: unknown): string | null {
+  if (error instanceof AttendancePeriodError) return error.code;
+  if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') return error.code;
+  return null;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {

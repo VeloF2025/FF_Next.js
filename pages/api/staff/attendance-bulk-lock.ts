@@ -28,6 +28,7 @@ import {
   type AuthenticatedNextApiRequest,
 } from '@/lib/auth/middleware';
 import {
+  BulkAuthorityError,
   BulkConflict,
   BulkScopeViolation,
   BulkValidationError,
@@ -50,6 +51,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const user = (req as AuthenticatedNextApiRequest).user;
   if (!user?.id) {
     apiResponse.unauthorized(res);
+    return;
+  }
+  if (user.role !== 'super_admin' && user.role !== 'admin') {
+    apiResponse.forbidden(res, 'Attendance lock authority is restricted to HR administrators');
     return;
   }
   const body = (req.body ?? {}) as Record<string, unknown>;
@@ -99,6 +104,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       staff_audited: result.staffAudited,
     });
   } catch (err) {
+    if (err instanceof BulkAuthorityError) {
+      apiResponse.forbidden(res, err.message);
+      return;
+    }
     if (err instanceof BulkValidationError) {
       apiResponse.badRequest(res, err.message);
       return;
@@ -113,7 +122,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       return;
     }
     if (err instanceof BulkConflict) {
-      apiResponse.error(res, ErrorCode.CONFLICT, err.message);
+      apiResponse.error(res, ErrorCode.CONFLICT, err.message, { reason: err.reason });
       return;
     }
     log.error('[bulk-lock] failed', {

@@ -4,7 +4,7 @@
 
 **Goal:** Replace the orphan `/field` page with a Field Workers admin page that approves pending self-registered workers and lets admins/supervisors view & manage their clock-in/out time (including pending workers, who are otherwise hidden).
 
-**Architecture:** Reuse the existing approve/suspend, manual-entry, and corrections-review endpoints + the audited `applyApprovedAdjustmentTxn`. Add one Rule-P-exempt read endpoint and one thin admin-adjust endpoint. The page is a tabbed client view (Approvals + Time) rendered inside `AppLayout` (client-side auth, same as other `/staff/*` pages); all writes are server-gated by permission.
+**Architecture:** Reuse the existing approve/suspend, manual-entry, and corrections-review endpoints plus the guarded correction-approval services. Add one Rule-P-exempt read endpoint and one thin admin-adjust endpoint. The page is a tabbed client view (Approvals + Time) rendered inside `AppLayout` (client-side auth, same as other `/staff/*` pages); all writes are server-gated by permission.
 
 **Tech Stack:** Next.js 14 Pages Router, TypeScript, `pg` via `@/lib/db-pool` (`sql` tagged template), `@/lib/apiResponse`, `@/lib/auth/middleware` (`withAuth`/`withPermission`/`withRole`), vitest, Tailwind, lucide-react.
 
@@ -13,7 +13,7 @@
 - Files < 300 lines; React components < 200 lines.
 - No `console.log` — use `log` from `@/lib/logger`. No empty catch.
 - API routes: `import { apiResponse } from '@/lib/apiResponse'`; flattened routes (no nested `[id]/sub.ts`).
-- Never raw-`UPDATE attendance_entries` from a handler — go through `applyApprovedAdjustmentTxn` (insert adjustment → apply) or `attendance-manual-entry` (insert new `status='manual'`).
+- Never raw-`UPDATE attendance_entries` from a handler — use `createAndApproveAdjustmentTxn` from `corrections/guardedApproval` (guard + insert + apply in one transaction) or `attendance-manual-entry` (insert new `status='manual'`).
 - Rule P / Rule H (`src/lib/staff/hrVisibilityFilters.ts`) stay unchanged everywhere except the new `/api/field/attendance`, which deliberately omits the `approvedAccountPredicate`.
 - "Field worker" = `staff.role IN ('technician','casual')`.
 - Run `npm run ci:quick` before every PR; `npx vitest run <file>` per task.
@@ -156,87 +156,23 @@ export default withAuth(withPermission('people.staff.attendance.search', 'view')
 - Test: `src/modules/field-workers/__tests__/field-attendance-adjust.test.ts`
 
 **Interfaces:**
-- Consumes: `insertAdjustment`, `applyApprovedAdjustmentTxn`, `ApproveResult` from `@/modules/attendance/corrections/queries`.
+- Consumes: `createAndApproveAdjustmentTxn` and `ApproveResult` from `@/modules/attendance/corrections/guardedApproval`.
 - Produces: `POST /api/field/attendance-adjust` body `{ entry_id: string; adjusted_clock_in_at?: string|null; adjusted_clock_out_at?: string|null; reason: string; entry_updated_at: string }` → `{ success, data: { adjustment } }`; `409` on `entry_changed`/`adjustment_not_pending`/locked week.
 - Auth: `withAuth(withPermission('people.staff.attendance.corrections', 'edit')(handler))`.
 
 - [ ] **Step 1: Confirm bounded unknowns (read, don't guess):**
-  - `AdjustmentKind` allowed values: `grep -n "AdjustmentKind" src/modules/attendance/corrections/queries.ts` and use the value the `/my` correction-request flow uses for a time edit (e.g. a `'both'`/`'clock_in'`/`'clock_out'` kind). Pick the kind matching which times are present.
-  - Payroll-week lock helper used by `attendance-manual-entry.ts:111` — `grep -n "lock" pages/api/staff/attendance-manual-entry.ts` and reuse the same check (return `apiResponse.conflict` if locked).
+  - `AdjustmentKind` allowed values: inspect `src/modules/attendance/corrections/types.ts` and use the value the `/my` correction-request flow uses for a time edit.
+  - Reuse the canonical in-transaction guard through `createAndApproveAdjustmentTxn`; a pre-transaction lock lookup is not mutation authority.
 
-- [ ] **Step 2: Write the failing test** — (a) happy path inserts an adjustment and calls `applyApprovedAdjustmentTxn`, returns the adjustment; (b) stale `entry_updated_at` → txn returns `{ok:'conflict', reason:'entry_changed'}` → handler 409; (c) `reason` < 10 chars → 400. Mock the two queries functions.
+- [ ] **Step 2: Write the failing test** — (a) happy path calls `createAndApproveAdjustmentTxn` and returns the adjustment; (b) stale `entry_updated_at` → txn returns `{ok:'conflict', reason:'entry_changed'}` → handler 409; (c) `reason` < 10 chars → 400; (d) active/orphan locks return 409 without a persisted insert.
 
 - [ ] **Step 3: Run — expect FAIL.**
 
-- [ ] **Step 4: Implement:**
-
-```ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, withPermission } from '@/lib/auth/middleware';
-import type { AuthenticatedRequest } from '@/lib/auth/middleware';
-import { insertAdjustment, applyApprovedAdjustmentTxn } from '@/modules/attendance/corrections/queries';
-import { sql } from '@/lib/db-pool';
-import { log } from '@/lib/logger';
-
-async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
-  const b = req.body ?? {};
-  const entryId = typeof b.entry_id === 'string' ? b.entry_id : '';
-  const reason = typeof b.reason === 'string' ? b.reason.trim() : '';
-  const entryUpdatedAt = typeof b.entry_updated_at === 'string' ? b.entry_updated_at : '';
-  const cin = b.adjusted_clock_in_at ? new Date(b.adjusted_clock_in_at) : null;
-  const cout = b.adjusted_clock_out_at ? new Date(b.adjusted_clock_out_at) : null;
-  if (!entryId || !entryUpdatedAt) return apiResponse.badRequest(res, 'entry_id and entry_updated_at are required');
-  if (reason.length < 10) return apiResponse.badRequest(res, 'reason must be at least 10 characters (audit requirement)');
-  if (!cin && !cout) return apiResponse.badRequest(res, 'at least one of adjusted_clock_in_at / adjusted_clock_out_at is required');
-
-  try {
-    // Look up entry → staff_id, work_date, site_geofence_id (need them for the txn).
-    const rows = await sql<{ staff_id: string; work_date: string; site_geofence_id: string | null }>`
-      SELECT staff_id, to_char(work_date,'YYYY-MM-DD') AS work_date, site_geofence_id
-      FROM attendance_entries WHERE id = ${entryId} LIMIT 1`;
-    const entry = rows[0];
-    if (!entry) return apiResponse.notFound(res, 'Attendance entry', entryId);
-
-    // TODO(implementer): reuse the SAME payroll-week lock check as attendance-manual-entry.ts:111
-    // → if locked, return apiResponse.conflict(res, 'Week is locked').
-
-    const adjustment = await insertAdjustment({
-      entryId,
-      requestedBy: req.user.id,
-      adjustmentKind: /* value confirmed in Step 1 */ 'time_edit' as never,
-      adjustedClockInAt: cin,
-      adjustedClockOutAt: cout,
-      adjustedSiteGeofenceId: entry.site_geofence_id,
-      reason,
-    });
-
-    const result = await applyApprovedAdjustmentTxn({
-      adjustmentId: adjustment.id,
-      reviewerId: req.user.id,
-      reviewNote: 'Admin direct adjust (Field Workers page)',
-      entryId,
-      entryUpdatedAt,
-      staffId: entry.staff_id,
-      workDate: entry.work_date,
-      adjustedClockInAt: cin,
-      adjustedClockOutAt: cout,
-      adjustedSiteGeofenceId: entry.site_geofence_id,
-    });
-
-    if (result.ok !== true) return apiResponse.conflict(res, `Adjust conflict: ${result.reason}`);
-    return apiResponse.success(res, { adjustment: result.adjustment });
-  } catch (err) {
-    log.error('[field-attendance-adjust] failed', { entryId, error: err instanceof Error ? err.message : String(err) });
-    return apiResponse.internalError(res, err);
-  }
-}
-
-export default withAuth(withPermission('people.staff.attendance.corrections', 'edit')(handler));
-```
-
-> Replace `'time_edit' as never` with the real `AdjustmentKind` from Step 1, and add the lock check. The `as never` is a placeholder ONLY to be removed in Step 1's confirmed value.
+- [ ] **Step 4: Implement the bounded route contract:**
+  1. Validate IDs, reason, and optional timestamps before DB work.
+  2. Resolve `req.user.id` to exactly one `staff.id` through `staff.user_id`; return 409 if the link is missing or ambiguous. `requested_by` references `staff(id)`.
+  3. Load the target entry and call `createAndApproveAdjustmentTxn` with `requestedBy=staff.id` and `reviewerId=req.user.id`. `reviewed_by` references `users(id)`.
+  4. Map guarded `period_locked` errors and optimistic conflicts to 409. Do not add a pre-transaction lock lookup.
 
 - [ ] **Step 5: Run test — expect PASS.**
 - [ ] **Step 6: Commit** — `git commit -m "feat(field): admin-initiated attendance adjust via audited txn"`
@@ -316,5 +252,5 @@ Confirm the nav renders absolute `path: '/field'` correctly even though `basePat
 
 - **Spec coverage:** Approvals (Task 1 data + Task 4 UI), time view incl. pending/Rule-P-exempt (Task 2 + Task 5), add missing entry (Task 5 manual-entry reuse), fix/adjust (Task 3 + Task 5), approve worker corrections (Task 5 reuse), RBAC admin+supervisors w/ admin-only approve (Tasks 2/3/4 auth + nav rbacKey), nav (Task 6). All covered.
 - **Placeholders:** Two deliberate bounded lookups in Task 3 Step 1 (the exact `AdjustmentKind` value and the lock-check helper) are explicit read-then-use steps, not vague TODOs — the `'time_edit' as never` token MUST be replaced in that step. The conditional-`sql` shim caveat in Task 2 is flagged with the `pg.Pool` alternative.
-- **Type consistency:** `FieldAttendanceRow` defined in Task 2 is reused verbatim in Task 4 `api.ts` and Task 5. `entry_updated_at` flows Task 2 → row → Task 5 dialog → Task 3 `entry_updated_at` param → `applyApprovedAdjustmentTxn.entryUpdatedAt`. `insertAdjustment`/`applyApprovedAdjustmentTxn` params match the verified signatures.
+- **Type consistency:** `FieldAttendanceRow` defined in Task 2 is reused verbatim in Task 4 `api.ts` and Task 5. `entry_updated_at` flows Task 2 → row → Task 5 dialog → Task 3 `entry_updated_at` param → `createAndApproveAdjustmentTxn.entryUpdatedAt`.
 - **Risks:** manual-entry's `authorizedToSuperviseStaff` scope gate may reject a manager who doesn't "supervise" a given field worker in the supervisor chain — verify during Task 5; admins bypass. Confirm in implementation.

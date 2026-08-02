@@ -1,273 +1,258 @@
-/**
- * Nightly attendance reconciliation.
- *
- * Orchestrates two side effects against attendance_entries + attendance_daily_summaries:
- *
- *   1. Auto-close dangling `status='open'` entries older than the configured
- *      threshold (default 16h) → `status='auto_closed'` + a `missing_clock_out`
- *      exception. Preserves the original clock_in_at; writes `clock_out_at =
- *      clock_in_at + autoCloseCapHrs` so the calculator gets a bounded
- *      duration (calculator itself refuses >24h shifts as `incomplete`).
- *
- *   2. Compute daily summaries for closed entries that don't yet have a row
- *      in attendance_daily_summaries. Summaries are upserted ON CONFLICT
- *      (staff_id, work_date) DO UPDATE so a manual correction → re-run
- *      produces the latest numbers without duplicating rows.
- *
- * Chronological contract:
- *   The calculator's weekly-cap detection only works if summaries within a
- *   payroll week are computed STRICTLY IN ORDER. This module groups pending
- *   entries per (staff, ISO-week Monday), iterates chronologically within
- *   each group, and seeds `runningWeeklyOt` from summaries persisted STRICTLY
- *   BEFORE the first recomputing date of the group. Anything recomputed in
- *   this pass (or persisted on/after the first recomputing date) is NOT
- *   counted in the seed — those values are produced in-pass in order.
- *
- * Queries live in reconcileQueries.ts; writes in reconcileWriters.ts.
- */
-
+import { randomUUID } from 'crypto';
 import { log } from '@/lib/logger';
-import {
-  calculateDailySummary,
-  type AttendanceEntryInput,
-} from './overtimeCalculator';
-import { loadObservedHolidays } from './saPublicHolidays';
+import { calculateDailySummary } from './overtimeCalculator';
+import type { OvertimeRuleInput } from './overtimeCalculator';
+import { calculateDailyResult } from './policy/calculateDailyResult';
+import { persistCalculatedDay } from './policy/projectionRepository';
+import type { AttendanceSchedulePolicy, CalculatedDailyResult } from './policy/types';
 import {
   loadDefaultRule,
-  loadOpenEntriesOlderThan,
-  loadClosedEntriesMissingSummary,
+  loadEffectivePolicy,
+  loadExpectedAttendanceDays,
+  loadOpenEntriesForReconciliation,
   loadPersistedWeeklyOtBefore,
-  type ClosedEntryRow,
+  loadReconciliationEntries,
 } from './reconcileQueries';
 import {
-  autoCloseOneEntry,
+  finishReconciliationRun,
+  startReconciliationRun,
+  systemCloseEntry,
   upsertSummary,
-  raiseCapViolation,
 } from './reconcileWriters';
-import {
-  computeWageCents,
-  hourlyRateCentsFromDbValue,
-} from './wageCalculator';
-
-export interface ReconcileOptions {
-  /** If set, only reconcile entries whose work_date is >= this ISO date. Default: last 14 days. */
-  fromDate?: string;
-  /** If set, only reconcile entries whose work_date is <= this ISO date. Default: today (SAST). */
-  toDate?: string;
-  /** Hours after which an `open` entry is auto-closed. Default 16. */
-  autoCloseAfterHrs?: number;
-  /**
-   * Duration (hours) booked on an auto-closed entry. We don't know when the
-   * staff actually left, so we book `autoCloseCapHrs` as the total so the
-   * calculator (which refuses >24h) still produces a daily summary, and the
-   * `missing_clock_out` exception carries the original clock_in. Default 9
-   * (BCEA `dailyOrdinaryHrs` — conservative for payroll).
-   */
-  autoCloseCapHrs?: number;
-}
-
-export interface ReconcileReport {
-  scannedFrom: string;
-  scannedTo: string;
-  autoClosed: number;
-  summariesUpserted: number;
-  summariesSkippedIncomplete: number;
-  weeklyCapViolations: number;
-  errorsPerEntry: Array<{ entryId: string; error: string }>;
-  startedAt: string;
-  finishedAt: string;
-}
-
-const DEFAULT_WINDOW_DAYS = 14;
-const DEFAULT_AUTO_CLOSE_HRS = 16;
-const DEFAULT_AUTO_CLOSE_CAP_HRS = 9;
-const SAST_TZ = 'Africa/Johannesburg';
-
-function todayInSast(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: SAST_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
-
-function addDays(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-// Re-export so existing importers (including tests) that reach for
-// `isoWeekMonday` from this module keep working. The canonical
-// implementation lives in ./isoWeek.
+import { countsFrom, emptyReport, runStatus, type ReconcileReport } from './reconcileReport';
+import { loadObservedHolidays } from './saPublicHolidays';
+import { computeWageCents, hourlyRateCentsFromDbValue } from './wageCalculator';
 import { isoWeekMonday } from './isoWeek';
+import {
+  buildCandidates,
+  dayKey,
+  evidenceFor,
+  type DayCandidate,
+} from './reconcileCandidates';
 export { isoWeekMonday };
-
-async function runAutoClose(
-  autoCloseAfterHrs: number,
-  autoCloseCapHrs: number
-): Promise<number> {
-  const rows = await loadOpenEntriesOlderThan(autoCloseAfterHrs);
-  if (rows.length === 0) return 0;
-  let closed = 0;
-  for (const row of rows) {
-    const ok = await autoCloseOneEntry(row, autoCloseAfterHrs, autoCloseCapHrs);
-    if (ok) closed += 1;
-  }
-  return closed;
+export interface ReconcileOptions { fromDate?: string; toDate?: string }
+export type { ReconcileReport } from './reconcileReport';
+interface LegacyContext {
+  rule: OvertimeRuleInput;
+  publicHolidays: Set<string>;
+  weeklyOvertime: Map<string, number>;
 }
-
+const DEFAULT_WINDOW_DAYS = 14;
+const SAST_TZ = 'Africa/Johannesburg';
 export async function reconcile(options: ReconcileOptions = {}): Promise<ReconcileReport> {
   const startedAt = new Date();
-  const toDate = options.toDate ?? todayInSast();
-  const fromDate = options.fromDate ?? addDays(toDate, -DEFAULT_WINDOW_DAYS);
-  const autoCloseAfterHrs = options.autoCloseAfterHrs ?? DEFAULT_AUTO_CLOSE_HRS;
-  const autoCloseCapHrs = options.autoCloseCapHrs ?? DEFAULT_AUTO_CLOSE_CAP_HRS;
-
-  if (fromDate > toDate) {
-    throw new Error(`reconcile: fromDate (${fromDate}) > toDate (${toDate})`);
+  const defaultTo = addDays(todayInSast(), -1);
+  const requestedTo = options.toDate ?? defaultTo;
+  const toDate = requestedTo > defaultTo ? defaultTo : requestedTo;
+  const fromDate = options.fromDate ?? addDays(toDate, -(DEFAULT_WINDOW_DAYS - 1));
+  if (fromDate > defaultTo) {
+    throw new Error(`reconcile: fromDate (${fromDate}) must not be current or future in SAST`);
   }
+  if (fromDate > toDate) throw new Error(`reconcile: fromDate (${fromDate}) > toDate (${toDate})`);
 
-  const autoClosed = await runAutoClose(autoCloseAfterHrs, autoCloseCapHrs);
-
-  const rule = await loadDefaultRule();
-  const publicHolidays = await loadObservedHolidays(fromDate, toDate);
-  const pending = await loadClosedEntriesMissingSummary(fromDate, toDate);
-
-  // Group by (staff_id, iso-week Monday) so we can thread the running
-  // weeklyOvertimeHrsBefore chronologically within each week.
-  const groups = new Map<string, ClosedEntryRow[]>();
-  for (const row of pending) {
-    const weekMon = isoWeekMonday(row.work_date);
-    const key = `${row.staff_id}|${weekMon}`;
-    const bucket = groups.get(key) ?? [];
-    bucket.push(row);
-    groups.set(key, bucket);
-  }
-
-  const report: ReconcileReport = {
-    scannedFrom: fromDate,
-    scannedTo: toDate,
-    autoClosed,
-    summariesUpserted: 0,
-    summariesSkippedIncomplete: 0,
-    weeklyCapViolations: 0,
-    errorsPerEntry: [],
-    startedAt: startedAt.toISOString(),
-    finishedAt: '',
-  };
-
-  for (const [key, entries] of groups) {
-    const [staffId, weekMon] = key.split('|') as [string, string];
-    // Defence-in-depth chronological sort. The DB query ORDER BY already
-    // delivers entries in (staff, work_date, clock_in_at) order, but we
-    // re-sort in-memory so a future refactor that drops the ORDER BY or a
-    // reordering group-by step cannot silently misattribute cap violations
-    // to the wrong entry.
-    entries.sort(
-      (a, b) =>
-        a.work_date.localeCompare(b.work_date) ||
-        a.clock_in_at.localeCompare(b.clock_in_at)
-    );
-    // The first recomputing date bounds the "strictly before" seed. This
-    // preserves the calculator's chronological-before contract and prevents
-    // Sat/Sun OT from being credited as "before" Mon-Fri on a mid-week retro.
-    const firstRecomputeDate = entries[0]!.work_date;
-    let runningWeeklyOt = await loadPersistedWeeklyOtBefore(
-      staffId,
-      weekMon,
-      firstRecomputeDate
-    );
-
-    for (const row of entries) {
+  const runId = `attendance-reconcile:${startedAt.toISOString()}:${randomUUID()}`;
+  const report = emptyReport(fromDate, toDate, startedAt.toISOString());
+  await startReconciliationRun({ runId, scannedFrom: fromDate, scannedTo: toDate, startedAt: report.startedAt });
+  const policyIds = new Set<string>();
+  const failed = new Set<string>();
+  const skippedLocked = new Set<string>();
+  const pendingClosed = new Set<string>();
+  try {
+    const [primaryPolicy, openEntries, expectedDays, rule, publicHolidays] = await Promise.all([
+      loadEffectivePolicy(toDate),
+      loadOpenEntriesForReconciliation(fromDate, toDate),
+      loadExpectedAttendanceDays(fromDate, toDate),
+      loadDefaultRule(),
+      loadObservedHolidays(fromDate, toDate),
+    ]);
+    policyIds.add(primaryPolicy.id);
+    const policyCache = new Map<string, AttendanceSchedulePolicy>([[toDate, primaryPolicy]]);
+    for (const row of openEntries) {
+      const key = dayKey(row.staff_id, row.work_date);
       try {
-        const entry: AttendanceEntryInput = {
-          workDate: row.work_date,
-          clockInAt: new Date(row.clock_in_at),
-          clockOutAt: new Date(row.clock_out_at),
-        };
-        const summary = calculateDailySummary({
-          entry,
-          rule,
-          publicHolidays,
-          staffBceaApplicable: row.bcea_applicable,
-          weeklyOvertimeHrsBefore: runningWeeklyOt,
+        const policy = await policyForDate(row.work_date, policyCache);
+        policyIds.add(policy.id);
+        const result = calculateDailyResult({
+          policy,
+          evidence: {
+            workDate: row.work_date,
+            clockInAt: new Date(row.clock_in_at),
+            clockOutAt: null,
+            clockOutSource: 'system',
+          },
+          isPublicHoliday: publicHolidays.has(row.work_date),
         });
-        if (summary.incomplete) {
-          report.summariesSkippedIncomplete += 1;
-          log.warn(
-            '[attendance-reconcile] entry returned incomplete — skipping summary',
-            { entryId: row.id, staffId, workDate: row.work_date }
-          );
-          continue;
+        if (await systemCloseEntry(row, policy.id, result)) {
+          report.systemClosed += 1;
+          pendingClosed.add(key);
         }
-
-        // Wage snapshot. Captured at reconcile time per the Phase 1b+
-        // policy; historical rate changes between clock-in and reconcile
-        // favour the newer rate. Null-rate staff (salaried / not yet
-        // hourly-converted) get wage_amount_cents=NULL, which the
-        // migration-324 CHECK pairs with a NULL snapshot.
-        const hourlyRateCents = hourlyRateCentsFromDbValue(row.hourly_rate);
-        const wageAmountCents =
-          hourlyRateCents !== null
-            ? computeWageCents({
-                summary,
-                rule,
-                hourlyRateCents,
-                ordinarilyWorksSundays: row.ordinarily_works_sundays,
-              })
-            : null;
-
-        await upsertSummary(staffId, row.work_date, summary, {
-          wageAmountCents,
-          hourlyRateSnapshotCents: wageAmountCents === null ? null : hourlyRateCents,
-        });
-        report.summariesUpserted += 1;
-
-        // Advance the running counter AS SOON AS the summary is persisted,
-        // regardless of whether the subsequent cap-violation exception
-        // insert succeeds. If we advanced only after raiseCapViolation,
-        // a transient DB failure on that insert would leave the counter
-        // stale — subsequent days in the same week would then miss their
-        // own cap detections. The persisted summary is the source of truth;
-        // the exception row is bookkeeping.
-        runningWeeklyOt += summary.overtimeHrs;
-
-        if (summary.weeklyOvertimeOverCap) {
-          try {
-            await raiseCapViolation(row.id, runningWeeklyOt, rule.weeklyOtCapHrs);
-            report.weeklyCapViolations += 1;
-          } catch (capErr) {
-            // Explicit: the summary IS persisted; we just failed to write
-            // the audit row. Log loud, record the error, keep going. The
-            // next reconcile run will NOT re-detect this because the cap
-            // check is per-day in-pass, not persistent — callers must scan
-            // exceptionsPerEntry and re-raise manually.
-            const msg = capErr instanceof Error ? capErr.message : String(capErr);
-            report.errorsPerEntry.push({
-              entryId: row.id,
-              error: `raiseCapViolation failed: ${msg}`,
-            });
-            log.error(
-              '[attendance-reconcile] summary persisted but cap-violation exception failed — manual audit required',
-              { entryId: row.id, staffId, workDate: row.work_date, error: msg }
-            );
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        report.errorsPerEntry.push({ entryId: row.id, error: message });
-        log.error('[attendance-reconcile] failed to compute/upsert summary', {
-          entryId: row.id,
-          staffId,
-          workDate: row.work_date,
-          error: message,
-        });
+      } catch (error) {
+        if (isPeriodLockedError(error)) recordLockedSkip(skippedLocked, key, 'system closure');
+        else { failed.add(key); logDayFailure(key, 'system closure', error); }
       }
     }
+    const entries = await loadReconciliationEntries(fromDate, toDate);
+    const { candidates, duplicateKeys } = buildCandidates(expectedDays, entries, publicHolidays);
+    for (const key of duplicateKeys) {
+      failed.add(key);
+      log.error('[attendance-reconcile] multiple entries cannot be projected as one policy day', { dayKey: key });
+    }
+    const legacy: LegacyContext = { rule, publicHolidays, weeklyOvertime: new Map() };
+    for (const candidate of candidates) {
+      const key = dayKey(candidate.staffId, candidate.workDate);
+      if (failed.has(key)) continue;
+      try {
+        const policy = await policyForDate(candidate.workDate, policyCache);
+        policyIds.add(policy.id);
+        await reconcileDay(candidate, policy, legacy, report);
+        skippedLocked.delete(key);
+        pendingClosed.delete(key);
+      } catch (error) {
+        if (isPeriodLockedError(error)) {
+          recordLockedSkip(skippedLocked, key, 'day projection');
+          pendingClosed.delete(key);
+        } else {
+          failed.add(key);
+          logDayFailure(key, 'day projection', error);
+        }
+        legacy.weeklyOvertime.delete(`${candidate.staffId}:${isoWeekMonday(candidate.workDate)}`);
+      }
+    }
+    report.skippedLockedDays = skippedLocked.size;
+    report.failedDayKeys = [...new Set([...failed, ...pendingClosed])].sort();
+  } catch (error) {
+    report.skippedLockedDays = skippedLocked.size;
+    report.failedDayKeys = [...new Set([...failed, ...pendingClosed])].sort();
+    report.finishedAt = new Date().toISOString();
+    await finishReconciliationRun({
+      runId,
+      schedulePolicyId: onePolicyId(policyIds),
+      status: 'failed',
+      counts: countsFrom(report),
+      failedDayKeys: report.failedDayKeys,
+      errorMessage: errorMessage(error),
+      finishedAt: report.finishedAt,
+    });
+    throw error;
   }
-
   report.finishedAt = new Date().toISOString();
+  await finishReconciliationRun({
+    runId,
+    schedulePolicyId: onePolicyId(policyIds),
+    status: runStatus(report),
+    counts: countsFrom(report),
+    failedDayKeys: report.failedDayKeys,
+    finishedAt: report.finishedAt,
+  });
   return report;
+}
+async function reconcileDay(
+  day: DayCandidate,
+  policy: AttendanceSchedulePolicy,
+  legacy: LegacyContext,
+  report: ReconcileReport,
+): Promise<void> {
+  const result = calculateDailyResult({
+    policy,
+    evidence: evidenceFor(day),
+    isPublicHoliday: day.isPublicHoliday,
+  });
+  const persisted = await persistCalculatedDay({
+    staffId: day.staffId,
+    entryId: day.entry?.id ?? null,
+    policyId: policy.id,
+    result,
+  });
+  assertPersistenceReadback(result, persisted);
+  await persistLegacyShadow(day, legacy, result);
+
+  if (day.calculationFingerprint === result.calculationFingerprint && day.resultVersion !== null) {
+    report.unchangedDays += 1;
+  } else {
+    report.projectedDays += 1;
+  }
+  if (result.exceptionKinds.includes('missing_clock_out')) report.missingClockOutExceptions += 1;
+  if (result.exceptionKinds.includes('missing_clock_in')) report.missingClockInExceptions += 1;
+}
+async function persistLegacyShadow(
+  day: DayCandidate,
+  context: LegacyContext,
+  result: CalculatedDailyResult,
+): Promise<void> {
+  const row = day.entry;
+  if (!row?.clock_out_at || result.exceptionKinds.includes('evidence_unreliable')) return;
+  const week = isoWeekMonday(row.work_date);
+  const weeklyKey = `${row.staff_id}:${week}`;
+  let running = context.weeklyOvertime.get(weeklyKey);
+  if (running === undefined) {
+    running = await loadPersistedWeeklyOtBefore(row.staff_id, week, row.work_date);
+  }
+  const summary = calculateDailySummary({
+    entry: { workDate: row.work_date, clockInAt: new Date(row.clock_in_at), clockOutAt: new Date(row.clock_out_at) },
+    rule: context.rule,
+    publicHolidays: context.publicHolidays,
+    staffBceaApplicable: row.bcea_applicable,
+    weeklyOvertimeHrsBefore: running,
+  });
+  if (summary.incomplete) return;
+  const hourlyRateCents = hourlyRateCentsFromDbValue(row.hourly_rate);
+  const wageAmountCents = hourlyRateCents === null ? null : computeWageCents({
+    summary,
+    rule: context.rule,
+    hourlyRateCents,
+    ordinarilyWorksSundays: row.ordinarily_works_sundays,
+  });
+  await upsertSummary(row.staff_id, row.work_date, summary, {
+    wageAmountCents,
+    hourlyRateSnapshotCents: wageAmountCents === null ? null : hourlyRateCents,
+  });
+  context.weeklyOvertime.set(weeklyKey, running + summary.overtimeHrs);
+}
+async function policyForDate(
+  workDate: string,
+  cache: Map<string, AttendanceSchedulePolicy>,
+): Promise<AttendanceSchedulePolicy> {
+  const cached = cache.get(workDate);
+  if (cached) return cached;
+  const policy = await loadEffectivePolicy(workDate);
+  cache.set(workDate, policy);
+  return policy;
+}
+function assertPersistenceReadback(
+  result: CalculatedDailyResult,
+  persisted: { resultVersion: number; exceptionIds: string[] },
+): void {
+  if (!Number.isInteger(persisted.resultVersion) || persisted.resultVersion < 1) {
+    throw new Error('Daily projection did not return a valid result version');
+  }
+  const expectedExceptions = new Set(result.exceptionKinds).size;
+  if (persisted.exceptionIds.length !== expectedExceptions) {
+    throw new Error(`Daily projection read back ${persisted.exceptionIds.length}/${expectedExceptions} exceptions`);
+  }
+}
+function onePolicyId(ids: Set<string>): string | null {
+  return ids.size === 1 ? [...ids][0]! : null;
+}
+function errorMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).slice(0, 2_000);
+}
+function logDayFailure(key: string, operation: string, error: unknown): void {
+  log.error(`[attendance-reconcile] ${operation} failed`, { dayKey: key, error: errorMessage(error) });
+}
+function isPeriodLockedError(error: unknown): boolean {
+  return !!error && typeof error === 'object' && 'code' in error && error.code === 'period_locked';
+}
+function recordLockedSkip(skipped: Set<string>, key: string, operation: string): void {
+  skipped.add(key);
+  log.info('[attendance-reconcile] locked day skipped', { dayKey: key, operation });
+}
+function todayInSast(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: SAST_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+}
+function addDays(ymd: string, days: number): string {
+  const date = new Date(`${ymd}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }

@@ -7,10 +7,11 @@
  * commits; every staff scope-checked before any write) in one place.
  */
 
-import { sql, transaction, type TxnClient } from '@/lib/db-pool';
+import { sql, type TxnClient } from '@/lib/db-pool';
 import { staffIdsSupervisedBy } from './supervisorScope';
 import { getStaffIdForUser } from '@/services/staff/staffAccessService';
 import type { AuthUser } from '@/lib/auth/types';
+import { lockReadyWeeks } from '@/modules/attendance/workflow/periodQueries';
 
 export type BulkActionKind = 'bulk_lock' | 'bulk_correction_request';
 
@@ -33,9 +34,16 @@ export class BulkScopeViolation extends Error {
 }
 
 export class BulkConflict extends Error {
-  constructor(message: string) {
+  constructor(message: string, public readonly reason = 'bulk_conflict') {
     super(message);
     this.name = 'BulkConflict';
+  }
+}
+
+export class BulkAuthorityError extends Error {
+  constructor(message = 'Attendance lock authority is restricted to HR administrators') {
+    super(message);
+    this.name = 'BulkAuthorityError';
   }
 }
 
@@ -96,14 +104,6 @@ export interface BulkLockResult {
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    (err as { code?: string }).code === '23505'
-  );
-}
-
 /** Validate that a date is YYYY-MM-DD AND falls on a Monday (ISO payroll convention). */
 function assertIsoMonday(s: string): void {
   if (!YMD_RE.test(s)) {
@@ -137,6 +137,9 @@ export async function runBulkLock(
   user: AuthUser,
   input: BulkLockInput
 ): Promise<BulkLockResult> {
+  if (user.role !== 'super_admin' && user.role !== 'admin') {
+    throw new BulkAuthorityError();
+  }
   if (input.weekStartDates.length === 0) {
     throw new BulkValidationError('At least one week is required');
   }
@@ -160,62 +163,41 @@ export async function runBulkLock(
   }
   await assertScopeOver(user, allStaffIds);
 
-  return transaction(async (txn) => {
-    const batchId = (
-      await txn.queryOne<{ id: string }>(`SELECT gen_random_uuid()::text AS id`)
-    )?.id;
-    if (!batchId) throw new Error('Failed to allocate batch_id');
-
-    let locksCreated = 0;
-    let staffAudited = 0;
-    for (const { week, staffIds } of perWeekStaff) {
-      const existing = await txn.queryOne<{ unlocked_at: string | null }>(
-        `SELECT unlocked_at FROM attendance_weekly_locks WHERE week_start_date = $1`,
-        [week]
-      );
-      if (existing && existing.unlocked_at === null) {
-        throw new BulkConflict(
-          `Week ${week} is already locked. Unlock first via /staff/attendance/locks if a re-lock is required.`
-        );
+  try {
+    const authority = await lockReadyWeeks({
+      weekStartDates: weeks, actorUserId: user.id, reason: input.reason,
+    }, async (txn) => {
+      const batchId = (await txn.queryOne<{ id: string }>(
+        'SELECT gen_random_uuid()::text AS id',
+      ))?.id;
+      if (!batchId) throw new Error('Failed to allocate batch_id');
+      let staffAudited = 0;
+      for (const { week, staffIds } of perWeekStaff) {
+        staffAudited += await writeAuditRows(txn, {
+          batchId, actorUserId: user.id, action: 'bulk_lock', reason: input.reason,
+          rows: staffIds.map((staffId) => ({ staffId, targetDate: week })),
+        });
       }
-      // INSERT ... ON CONFLICT DO UPDATE so a previously-unlocked week
-      // (existing row with unlocked_at set) gets re-locked rather than
-      // duplicate-keying. Catch the rare 23505 anyway — two admins can
-      // race on a week-list intersection, and surfacing 409 (CONFLICT) is
-      // friendlier than the default 500 the unique-violation would yield.
-      try {
-        await txn.query(
-          `INSERT INTO attendance_weekly_locks (week_start_date, locked_by, lock_reason)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (week_start_date) DO UPDATE
-             SET locked_at     = NOW(),
-                 locked_by     = EXCLUDED.locked_by,
-                 lock_reason   = EXCLUDED.lock_reason,
-                 unlocked_at   = NULL,
-                 unlocked_by   = NULL,
-                 unlock_reason = NULL`,
-          [week, user.id, input.reason]
-        );
-      } catch (err) {
-        if (isUniqueViolation(err)) {
-          throw new BulkConflict(
-            `Week ${week} was concurrently locked by another administrator. Re-load and retry.`
-          );
-        }
-        throw err;
-      }
-      locksCreated += 1;
-      staffAudited += await writeAuditRows(txn, {
-        batchId,
-        actorUserId: user.id,
-        action: 'bulk_lock',
-        reason: input.reason,
-        rows: staffIds.map((staffId) => ({ staffId, targetDate: week })),
-      });
+      return { batchId, staffAudited };
+    });
+    if (!authority.value) throw new Error('Bulk lock audit finalizer returned no result');
+    return { batchId: authority.value.batchId, weeks,
+      staffAudited: authority.value.staffAudited, locksCreated: authority.locks.length };
+  } catch (error) {
+    const reason = periodErrorCode(error);
+    if (reason === 'invalid_week' || reason === 'invalid_reason') {
+      throw new BulkValidationError(error instanceof Error ? error.message : 'Invalid bulk lock');
     }
+    if (reason) throw new BulkConflict(
+      error instanceof Error ? error.message : 'Attendance period cannot be locked', reason,
+    );
+    throw error;
+  }
+}
 
-    return { batchId, weeks, staffAudited, locksCreated };
-  });
+function periodErrorCode(error: unknown): string | null {
+  return error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+    ? error.code : null;
 }
 
 /**

@@ -31,9 +31,9 @@ import {
 import { sastWorkDate } from '@/modules/attendance/portal/clockUtils';
 import {
   isoWeekMonday,
-  lookupActiveLock,
 } from '@/modules/attendance/corrections/lockQueries';
 import { authorizedToSuperviseStaff } from '@/services/attendance/supervisorScope';
+import { assertDailyProjectionUnlocked, guardProjectionDay } from '@/services/attendance/policy/projectionLockGuard';
 
 // Strict UUID format. A malformed staff_id otherwise reaches a parameterized
 // query and surfaces as an unlogged 500 ("invalid input syntax for type
@@ -107,21 +107,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const workDate = sastWorkDate(clockInAt);
   const weekMonday = isoWeekMonday(workDate);
-  const activeLock = await lookupActiveLock(weekMonday);
-  if (activeLock) {
-    apiResponse.conflict(
-      res,
-      `Week ${weekMonday} is locked; unlock first before creating a manual entry`
-    );
-    return;
-  }
-
   try {
     // All three writes (entry insert, manual_override audit-exception
     // insert, summary invalidation) must be atomic — a partial failure
     // previously left a 'manual' entry with no audit row, breaking the
     // attestation trail. (#1997)
     const entryId = await transaction(async (txn) => {
+      await guardProjectionDay(txn, staffId, workDate);
+      const daily = await txn.queryOne<{ result_status: string }>(`
+        SELECT result_status FROM attendance_daily_summaries
+        WHERE staff_id = $1::uuid AND work_date = $2::date
+        FOR UPDATE`, [staffId, workDate]);
+      assertDailyProjectionUnlocked(daily?.result_status);
       const inserted = await txn.queryOne<{ id: string }>(
         `INSERT INTO attendance_entries (
            staff_id, work_date,
@@ -171,6 +168,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     });
     apiResponse.success(res, { entry_id: entryId, work_date: workDate });
   } catch (err) {
+    if (isPeriodLockedError(err)) {
+      apiResponse.conflict(res, `Week ${weekMonday} is locked; unlock first before creating a manual entry`);
+      return;
+    }
     log.error('[staff-manual-entry] insert failed', {
       staffId,
       workDate,
@@ -179,6 +180,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     });
     apiResponse.internalError(res, err);
   }
+}
+
+function isPeriodLockedError(error: unknown): boolean {
+  return !!error && typeof error === 'object' && 'code' in error && error.code === 'period_locked';
 }
 
 export default withAuth(

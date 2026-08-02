@@ -1,10 +1,8 @@
 /**
  * /staff/attendance/reports — Pulse · Reports tile grid (PRD-061 §7.3).
  *
- * Lists the 6 P1 reports with a one-line description and a drill-through
- * to the per-slug page. Late-arrivals (the 7th P1 in the PRD) is deferred
- * to Phase C2 because the underlying shift schedule isn't in the DB yet —
- * surfacing it here as a "coming soon" tile would be misleading.
+ * Lists the policy-backed reports with a one-line description and a
+ * drill-through to the existing per-slug page and export route.
  */
 
 import Link from 'next/link';
@@ -42,8 +40,7 @@ export default function ReportsIndexPage() {
             </div>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {REPORT_CATALOGUE.map((r) => (
                 <Link
                   key={r.slug}
@@ -64,13 +61,7 @@ export default function ReportsIndexPage() {
                   </div>
                 </Link>
               ))}
-            </div>
-
-            <p className="mt-6 text-xs text-neutral-500">
-              Looking for late-arrivals? It&apos;s deferred to a follow-up release — the underlying shift
-              schedule isn&apos;t recorded in attendance entries yet, so we can&apos;t compute lateness deterministically.
-            </p>
-          </>
+          </div>
         )}
       </div>
     </AppLayout>
