@@ -402,6 +402,20 @@ dbDescribe('migration 478 applied to a scratch schema', () => {
       fingerprint,
       state: 'trigger_requested',
     });
+    // A row that was already stuck for a known reason AND had the tag applied,
+    // so the customer was very likely messaged before the rollback.
+    await insertExport({
+      id: '4d444444-4444-4444-8444-444444444444',
+      dr: 'DR-CYCLE-DIAG',
+      phone: '+27670000011',
+      fingerprint,
+      state: 'ambiguous',
+    });
+    await scoped(
+      `UPDATE velocity_review_exports
+       SET error_code = 'stale_transient_tag', trigger_requested_at = NOW()
+       WHERE dr_number = 'DR-CYCLE-DIAG'`
+    );
 
     const client = await pool.connect();
     try {
@@ -414,14 +428,30 @@ dbDescribe('migration 478 applied to a scratch schema', () => {
          WHERE dr_number LIKE 'DR-CYCLE%' ORDER BY dr_number`
       );
       // Ledger survived the rollback.
-      expect(ledger.rows.map((r) => r.dr_number)).toEqual(['DR-CYCLE', 'DR-CYCLE-INFLIGHT']);
+      const byDr = new Map(ledger.rows.map((r) => [r.dr_number, r]));
+      expect([...byDr.keys()].sort()).toEqual([
+        'DR-CYCLE', 'DR-CYCLE-DIAG', 'DR-CYCLE-INFLIGHT',
+      ]);
       // The completed row is untouched; the in-flight row is parked terminally so
       // it cannot hold ux_velocity_review_one_phone_inflight forever.
-      expect(ledger.rows[0]).toMatchObject({ state: 'completed', error_code: null });
-      expect(ledger.rows[1]).toMatchObject({
+      expect(byDr.get('DR-CYCLE')).toMatchObject({ state: 'completed', error_code: null });
+      expect(byDr.get('DR-CYCLE-INFLIGHT')).toMatchObject({
         state: 'permanent_failure',
         error_code: 'migration_rolled_back',
       });
+
+      // Parking must not erase why a row was already stuck, nor the evidence of
+      // whether the customer was actually messaged. 'permanent_failure' alone
+      // under-counts contacts — trigger_requested_at is the real signal.
+      const preserved = await client.query<{
+        error_code: string;
+        trigger_requested_at: Date | null;
+      }>(
+        `SELECT error_code, trigger_requested_at FROM velocity_review_exports
+         WHERE dr_number = 'DR-CYCLE-DIAG'`
+      );
+      expect(preserved.rows[0].error_code).toBe('migration_rolled_back:stale_transient_tag');
+      expect(preserved.rows[0].trigger_requested_at).toBeInstanceOf(Date);
 
       // Re-apply over the surviving schema.
       await client.query(FORWARD);

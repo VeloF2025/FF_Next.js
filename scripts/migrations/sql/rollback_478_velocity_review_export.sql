@@ -31,8 +31,18 @@
 -- forever, permanently blocking those phones from any future DR while no code
 -- exists to advance them. Park them terminally instead: the partial index is
 -- released, while UNIQUE (dr_number, phone_e164) still bars a repeat contact for
--- the same DR. error_code records why, so the state stays auditable rather than
--- indistinguishable from a genuine delivery failure.
+-- the same DR.
+--
+-- READ THIS BEFORE INTERPRETING A PARKED ROW: 'permanent_failure' here does NOT
+-- mean the customer was never messaged. Rows parked out of 'trigger_requested'
+-- or 'ack_cleanup_pending' had READY_TAG applied, so the GHL workflow had
+-- already fired and the message very likely went out. The state column is
+-- coarsened by this UPDATE; the timestamps are not. Use those to tell what
+-- actually happened:
+--   upserted_at            — contact written to GHL
+--   trigger_requested_at   — READY_TAG added, workflow fired, assume messaged
+--   workflow_acknowledged_at — workflow confirmed enrolment
+-- Judging "was this person contacted?" from state alone will under-count.
 -- Guarded on the relation existing: every other statement here is IF EXISTS, and
 -- a bare UPDATE would make the whole file error on a database where 478 was
 -- never applied — or on any re-run after the ledger was archived away by hand.
@@ -40,7 +50,10 @@ DO $$ BEGIN
   IF to_regclass('velocity_review_exports') IS NOT NULL THEN
     UPDATE velocity_review_exports
     SET state = 'permanent_failure',
-        error_code = 'migration_rolled_back',
+        -- Prefix rather than overwrite. A row parked out of 'ambiguous' already
+        -- carries why it was stuck (e.g. stale_transient_tag); replacing that
+        -- with the rollback reason alone would destroy the only record of it.
+        error_code = 'migration_rolled_back' || COALESCE(':' || error_code, ''),
         updated_at = NOW()
     WHERE state NOT IN ('completed', 'permanent_failure');
   END IF;
