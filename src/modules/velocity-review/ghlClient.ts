@@ -1,7 +1,37 @@
+import {
+  isAbsentDuplicate, isWhatsappDndBlocked, retryAfterSeconds, safeErrorText,
+} from './ghlResponse';
+import { GhlRateLimiter } from './ghlRateLimiter';
+
+// Re-exported so './ghlClient' stays the module's entry point for callers and tests.
+export { GhlRateLimiter } from './ghlRateLimiter';
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 const GHL_API_VERSION = '2021-07-28';
 const REQUEST_TIMEOUT_MS = 15_000;
-const MAX_ERROR_TEXT_LENGTH = 160;
+
+// Measured against the live Velocity location on 2026-08-03:
+//   x-ratelimit-max: 25   x-ratelimit-interval-milliseconds: 10000
+//   x-ratelimit-limit-daily: 10000
+// i.e. 25 requests / 10s (2.5/sec), not the far higher ceiling the 4-way export
+// concurrency was written against. Start below the observed burst ceiling and leave
+// headroom for anything else using the same token; observeLimits() re-reads the real
+// numbers from every response, so this is only the value used before the first reply.
+// A 429 means the request was rejected, never executed, so replaying it cannot
+// duplicate a mutation. Retry in place rather than failing the export out to a later
+// run — a deferred export holds its phone's in-flight slot and blocks other DRs.
+const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+const MAX_RATE_LIMIT_RETRIES = 4;
+// Ceiling on a single in-place replay wait, and on the cumulative wait across all
+// replays of one request. Beyond either, the 429 is rethrown as the retryable error
+// it already is, so processor.ts defers it through nextRetryAt/claimCutoff — the
+// deadline-aware path. Replaying in place is only worth it while the wait is short:
+// this sleep happens inside Promise.allSettled and, unbounded, one worker sitting on
+// a large Retry-After could burn the 3-minute drain margin and push the run past its
+// 30-minute cron wrapper, turning an orderly defer into an ungraceful kill.
+const MAX_RATE_LIMIT_WAIT_MS = 30_000;
+const MAX_RATE_LIMIT_TOTAL_WAIT_MS = 60_000;
+const RATE_LIMIT_FALLBACK_WAIT_MS = 2_000;
 
 type Environment = Record<string, string | undefined>;
 type RequestKind = 'read' | 'upsert' | 'tag-add' | 'tag-remove';
@@ -81,21 +111,6 @@ export function loadVelocityReviewGhlConfig(env: Environment): VelocityReviewGhl
   };
 }
 
-function retryAfterSeconds(response: Response): number | undefined {
-  const value = response.headers.get('Retry-After')?.trim();
-  return value && /^(0|[1-9]\d*)$/.test(value) ? Number(value) : undefined;
-}
-
-function isWhatsappDndBlocked(contact: Record<string, unknown>): boolean {
-  if (contact.dnd === true) return true;
-  const dndSettings = contact.dndSettings;
-  if (!dndSettings || typeof dndSettings !== 'object') return false;
-  const whatsapp = (dndSettings as Record<string, unknown>).WhatsApp;
-  if (!whatsapp || typeof whatsapp !== 'object') return false;
-  const status = (whatsapp as Record<string, unknown>).status;
-  return status === 'active' || status === 'permanent';
-}
-
 function contactFrom(value: unknown): HighLevelContact {
   const contact = value && typeof value === 'object' && 'contact' in value
     ? (value as Record<string, unknown>).contact
@@ -122,22 +137,14 @@ function contactFrom(value: unknown): HighLevelContact {
   };
 }
 
-function safeErrorText(raw: string, token: string): string {
-  let text = raw.slice(0, MAX_ERROR_TEXT_LENGTH);
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const message = parsed.message ?? parsed.error;
-    text = Array.isArray(message) ? message.join(', ') : String(message ?? text);
-  } catch {
-    // A non-JSON error body is bounded below and never required for correctness.
-  }
-  return text.slice(0, MAX_ERROR_TEXT_LENGTH)
-    .replaceAll(token, '[redacted]')
-    .replace(/\+?\d[\d\s().-]{7,}\d/g, '[redacted]');
-}
-
 export class HighLevelClient {
-  constructor(private readonly config: VelocityReviewGhlConfig) {}
+  constructor(
+    private readonly config: VelocityReviewGhlConfig,
+    // One limiter per client instance. defaultDependencies() builds a single client per
+    // run, so all MAX_CONCURRENT_EXPORTS workers share this window.
+    private readonly limiter: GhlRateLimiter = new GhlRateLimiter(),
+    private readonly sleep: (ms: number) => Promise<void> = defaultSleep,
+  ) {}
 
   async upsertContact(input: VelocityReviewContactInput): Promise<HighLevelContact> {
     const existing = await this.findContactByPhone(input.phoneE164);
@@ -166,12 +173,21 @@ export class HighLevelClient {
   private async findContactByPhone(phoneE164: string): Promise<HighLevelContact | null> {
     const params = new URLSearchParams({ locationId: this.config.locationId, number: phoneE164 });
     try {
-      return contactFrom(await this.request(
+      const response = await this.request(
         `/contacts/search/duplicate?${params.toString()}`,
         'GET',
         undefined,
         'read',
-      ));
+      );
+      // "No duplicate" is HTTP 200 with an explicit {"contact": null} body, NOT a 404.
+      // Passing that to contactFrom() throws a non-retryable error, which failRequest
+      // turns into permanent_failure — and the permanent UNIQUE (dr_number, phone_e164)
+      // then bars the pair from ever being exported again. Because this fires for every
+      // contact that does not already exist in GHL, it barred every genuinely new
+      // customer on first contact. Verified live 2026-08-03: GET /contacts/search/duplicate
+      // for an unknown number returns 200 {"contact":null}.
+      if (isAbsentDuplicate(response)) return null;
+      return contactFrom(response);
     } catch (error) {
       if (error instanceof HighLevelRequestError && error.status === 404) return null;
       throw error;
@@ -191,6 +207,33 @@ export class HighLevelClient {
   }
 
   private async request(path: string, method: 'GET' | 'POST' | 'DELETE', body: unknown, kind: RequestKind): Promise<unknown> {
+    let waited = 0;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await this.sendOnce(path, method, body, kind);
+      } catch (error) {
+        // Only a 429 is replayed here. It is the one status the API guarantees was
+        // rejected without being executed, so replaying cannot duplicate a tag write.
+        const rateLimited = error instanceof HighLevelRequestError && error.status === 429;
+        if (!rateLimited || attempt >= MAX_RATE_LIMIT_RETRIES) throw error;
+        const retryAfter = (error as HighLevelRequestError).retryAfterSeconds;
+        const waitMs = retryAfter !== undefined
+          ? retryAfter * 1_000
+          : RATE_LIMIT_FALLBACK_WAIT_MS * (attempt + 1);
+        // Too long to hold a worker: defer instead. The error is already retryable,
+        // so the export parks with nextRetryAt and is reclaimed on a later run.
+        if (waitMs > MAX_RATE_LIMIT_WAIT_MS
+          || waited + waitMs > MAX_RATE_LIMIT_TOTAL_WAIT_MS) throw error;
+        waited += waitMs;
+        // Hold every worker off, not just this one — the window is full, not empty.
+        this.limiter.penaliseFor(waitMs);
+        await this.sleep(waitMs);
+      }
+    }
+  }
+
+  private async sendOnce(path: string, method: 'GET' | 'POST' | 'DELETE', body: unknown, kind: RequestKind): Promise<unknown> {
+    await this.limiter.acquire();
     let response: Response;
     try {
       response = await fetch(`${GHL_BASE_URL}${path}`, {
@@ -215,6 +258,7 @@ export class HighLevelClient {
         ambiguousMutation,
       );
     }
+    this.limiter.observeLimits(response.headers);
     if (!response.ok) {
       const text = await response.text().catch(() => '');
       const retryable = response.status === 429 || response.status >= 500;

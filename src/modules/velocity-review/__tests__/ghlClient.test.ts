@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  GhlRateLimiter,
   HighLevelClient,
   HighLevelRequestError,
   loadVelocityReviewGhlConfig,
   type VelocityReviewGhlConfig,
 } from '../ghlClient';
+
+const noSleep = async (): Promise<void> => undefined;
 
 const token = 'test-private-token';
 const phone = '+27821234567';
@@ -173,8 +176,10 @@ describe('HighLevelClient', () => {
     [422, false],
   ])('classifies HTTP %i correctly', async (status, retryable) => {
     vi.mocked(global.fetch).mockResolvedValue(response({ message: 'request rejected' }, status,
-      status === 429 ? { 'Retry-After': '120' } : undefined));
-    const client = new HighLevelClient(config);
+      status === 429 ? { 'Retry-After': '5' } : undefined));
+    // A 429 is now replayed in place before it surfaces, so the backoff sleep must be
+    // stubbed or this test waits out the real Retry-After.
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
 
     const error = await client.getContact('contact-1').catch((caught: unknown) => caught);
 
@@ -182,8 +187,46 @@ describe('HighLevelClient', () => {
       name: 'HighLevelRequestError', status, retryable, ambiguousMutation: false,
     });
     if (status === 429) {
-      expect((error as HighLevelRequestError).retryAfterSeconds).toBe(120);
+      expect((error as HighLevelRequestError).retryAfterSeconds).toBe(5);
+      // Initial attempt + MAX_RATE_LIMIT_RETRIES replays, then the error surfaces.
+      expect(global.fetch).toHaveBeenCalledTimes(5);
+    } else {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it('defers rather than replaying when Retry-After exceeds the in-place wait ceiling', async () => {
+    // Replaying in place is only worth it while the wait is short. This sleep happens
+    // inside Promise.allSettled with no view of the run deadline, so an unbounded wait
+    // could burn the drain margin and push the run past its cron wrapper — an
+    // ungraceful kill instead of the orderly defer the processor already implements.
+    // 120s is over the ceiling, so the error must surface on the FIRST attempt, still
+    // retryable, letting nextRetryAt/claimCutoff park it for a later run.
+    vi.mocked(global.fetch).mockResolvedValue(
+      response({ message: 'rate limited' }, 429, { 'Retry-After': '120' }),
+    );
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    const error = await client.getContact('contact-1').catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject<Partial<HighLevelRequestError>>({
+      name: 'HighLevelRequestError', status: 429, retryable: true,
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops replaying once the cumulative wait would exceed the total budget', async () => {
+    // Individually under the 30s ceiling, but four of them exceed the 60s total, so the
+    // replays stop early rather than compounding into a minute-plus stall.
+    vi.mocked(global.fetch).mockResolvedValue(
+      response({ message: 'rate limited' }, 429, { 'Retry-After': '25' }),
+    );
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    await client.getContact('contact-1').catch(() => undefined);
+
+    // 25s + 25s = 50s spent; a third would reach 75s > 60s budget, so it stops at 3 calls.
+    expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
   it('marks an unacknowledged tag addition as ambiguous without leaking secrets', async () => {
@@ -231,6 +274,38 @@ describe('HighLevelClient', () => {
     expect((error as Error).message).not.toContain(phone);
     expect((error as Error).message).not.toContain(token);
   });
+
+  // Regression: the 2026-08-03 live run put 225 exports into permanent_failure. The
+  // duplicate search answers "no duplicate" with HTTP 200 {"contact":null}, not 404, so
+  // contactFrom() threw a non-retryable error for every contact that did not already
+  // exist in GHL — i.e. every genuinely new customer — and the permanent
+  // UNIQUE (dr_number, phone_e164) then barred the pair for good.
+  it('treats a 200 {"contact":null} duplicate search as "no existing contact"', async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: null }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-new' } }));
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    await expect(client.upsertContact({
+      phoneE164: phone,
+      firstName: 'Ada',
+      lastName: null,
+      drNumber: 'DR-200',
+      eventDate: '2026-08-01',
+      sources: ['dr_submitted'],
+      exportKey: 'export-key-new',
+    })).resolves.toMatchObject({ id: 'contact-new' });
+
+    // The upsert must still have been attempted — the null search is not a failure.
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('still rejects a malformed contact body that is not an absent duplicate', async () => {
+    vi.mocked(global.fetch).mockResolvedValue(response({ contact: { noId: true } }));
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    await expect(client.getContact('contact-1')).rejects.toThrow(/invalid contact response/);
+  });
 });
 
 describe('loadVelocityReviewGhlConfig', () => {
@@ -265,5 +340,110 @@ describe('loadVelocityReviewGhlConfig', () => {
     expect(error.message).toContain('VELOCITY_GHL_LOCATION_ID');
     expect(error.message).toContain('VELOCITY_GHL_FIELD_DR_NUMBER_ID');
     expect(error.message).not.toContain(token);
+  });
+});
+
+describe('GhlRateLimiter', () => {
+  it('serialises genuinely concurrent acquisitions instead of admitting a burst', async () => {
+    // The sequential tests below cannot see the property this limiter exists for: four
+    // workers calling acquire() at the SAME instant must queue for tokens, not all
+    // observe "window has space" together. That simultaneous-observation burst is the
+    // shape that tripped the live 25-req/10s ceiling.
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(1, 10_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    // All three start before any completes — no awaiting in between.
+    await Promise.all([limiter.acquire(), limiter.acquire(), limiter.acquire()]);
+
+    // One token per window, so the second and third each had to wait for it to roll.
+    // If acquisition were not serialised they would all have observed the same empty
+    // window at t=0, taken the one token together, and slept zero times.
+    expect(slept).toEqual([10_001, 10_001]);
+  });
+
+  it('clamps absurd ceilings and tiny windows adopted from response headers', async () => {
+    // The header is first-party and normally sane, but an untrusted value is adopted
+    // verbatim without a clamp: a huge max silently defangs the limiter, and a tiny
+    // window lets it permit a burst. Both degrade to "slightly wrong" instead of "off".
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(1, 60_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    limiter.observeLimits({ get: (name: string) => (
+      name === 'x-ratelimit-max' ? '2000'
+        : name === 'x-ratelimit-interval-milliseconds' ? '1'
+          : null) } as Pick<Headers, 'get'>);
+
+    // Window floored to 1000ms, not the advertised 1ms.
+    for (let i = 0; i < 1_000; i += 1) await limiter.acquire();
+    expect(slept).toEqual([]);
+
+    // Max ceilinged to 1000, so the 1001st waits a full floored window rather than
+    // sailing through on an adopted ceiling of 1999.
+    await limiter.acquire();
+    expect(slept).toEqual([1_001]);
+  });
+
+  it('penalises every caller after a 429, not just the one that hit it', async () => {
+    // An earlier revision cleared the window on 429. Because the limiter is shared by
+    // all concurrent exports, that let the other workers burst at the exact moment the
+    // server said it was overloaded. A 429 means the window is FULL, not empty.
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(50, 10_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    // Worker A is told to back off for 5s.
+    limiter.penaliseFor(5_000);
+
+    // Worker B, which never saw the 429, must still wait it out.
+    await limiter.acquire();
+
+    expect(slept).toEqual([5_000]);
+  });
+
+  it('holds requests to the window ceiling instead of letting them burst', async () => {
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(3, 10_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    for (let i = 0; i < 4; i += 1) await limiter.acquire();
+
+    // The first three fit the window; the fourth must wait for the window to roll.
+    expect(slept).toEqual([10_001]);
+  });
+
+  it('adopts the ceiling advertised by the live response headers', async () => {
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(50, 60_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    // Measured live on the Velocity location: max 25 per 10s. One token of headroom is
+    // kept back, so the limiter should admit 24 before pausing.
+    limiter.observeLimits({ get: (name: string) => (
+      name === 'x-ratelimit-max' ? '25'
+        : name === 'x-ratelimit-interval-milliseconds' ? '10000'
+          : null) } as Pick<Headers, 'get'>);
+
+    for (let i = 0; i < 24; i += 1) await limiter.acquire();
+    expect(slept).toEqual([]);
+
+    await limiter.acquire();
+    expect(slept).toEqual([10_001]);
   });
 });
