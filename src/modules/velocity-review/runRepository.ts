@@ -54,9 +54,19 @@ function parseDate(value: string): Date | null {
   return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? null : date;
 }
 
+// Every `date` column MUST be selected as `col::text`. node-postgres parses a bare
+// `date` (OID 1082) into a JS Date at *server-local* midnight; on this SAST (UTC+2)
+// host `toISOString()` then renders the previous calendar day. Silently shifting a
+// go-live or run date by one day changes which customers get contacted, so a Date
+// arriving here is a missing cast — fail loudly rather than corrupt the date.
 function dbDate(value: Date | string | null): string | null {
   if (value === null) return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    throw new Error(
+      'Velocity review date column was read without a ::text cast; '
+      + 'node-postgres would shift it by one day in a non-UTC server timezone',
+    );
+  }
   return value.slice(0, 10);
 }
 
@@ -93,7 +103,8 @@ export async function withVelocityReviewLock<T>(
 
 export async function loadVelocityReviewControl(): Promise<VelocityReviewControl> {
   const row = await queryOne<ControlRow>(`
-    SELECT automation_enabled, go_live_date, pilot_enabled, pilot_target_date, pilot_limit
+    SELECT automation_enabled, go_live_date::text, pilot_enabled,
+           pilot_target_date::text, pilot_limit
     FROM velocity_review_control WHERE singleton = TRUE
   `);
   if (!row) {
@@ -155,7 +166,7 @@ export async function createOrResumeRun(targetDate: string): Promise<VelocityRev
     VALUES ($1, 'pending')
     ON CONFLICT (target_date) DO UPDATE
       SET target_date = EXCLUDED.target_date
-    RETURNING id, target_date, status, started_at, completed_at, counts, summary_status
+    RETURNING id, target_date::text, status, started_at, completed_at, counts, summary_status
   `, [targetDate]);
   if (!row) throw new Error('Velocity review run could not be persisted');
   return mapRun(row);
@@ -163,7 +174,7 @@ export async function createOrResumeRun(targetDate: string): Promise<VelocityRev
 
 export async function listCompletedRunDates(): Promise<Set<string>> {
   const rows = await query<{ target_date: Date | string } & SqlRow>(
-    "SELECT target_date FROM velocity_review_runs WHERE status = 'complete' ORDER BY target_date",
+    "SELECT target_date::text FROM velocity_review_runs WHERE status = 'complete' ORDER BY target_date",
   );
   return new Set(rows.map((row) => dbDate(row.target_date) as string));
 }
@@ -180,7 +191,7 @@ export async function transitionRunStatus(
       started_at = CASE WHEN $3::text = 'running' THEN COALESCE(started_at, NOW()) ELSE started_at END,
       completed_at = CASE WHEN $3::text IN ('complete','partial','blocked') THEN NOW() ELSE completed_at END
     WHERE id = $1 AND status = $2::text
-    RETURNING id, target_date, status, started_at, completed_at, counts, summary_status
+    RETURNING id, target_date::text, status, started_at, completed_at, counts, summary_status
   `, [id, expectedStatus, nextStatus, counts]);
   return row ? mapRun(row) : null;
 }

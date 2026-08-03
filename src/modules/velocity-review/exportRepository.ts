@@ -67,18 +67,29 @@ export class VelocityReviewRepositoryError extends Error {
   }
 }
 
-const EXPORT_COLUMNS = `id, first_run_id, first_target_date, dr_number, phone_e164,
+const EXPORT_COLUMNS = `id, first_run_id, first_target_date::text, dr_number, phone_e164,
   phone_fingerprint, phone_source, source_flags, export_key, ghl_contact_id, state,
   attempt_count, next_attempt_at, error_code, upserted_at, trigger_requested_at,
   workflow_acknowledged_at, completed_at, created_at, updated_at`;
+
+function exportDate(value: Date | string): string {
+  if (value instanceof Date) {
+    throw new Error(
+      'Velocity review export date column was read without a ::text cast; '
+      + 'node-postgres would shift it by one day in a non-UTC server timezone',
+    );
+  }
+  return value.slice(0, 10);
+}
 
 function mapExport(row: ExportRow): VelocityReviewExport {
   return {
     id: row.id,
     firstRunId: row.first_run_id,
-    firstTargetDate: row.first_target_date instanceof Date
-      ? row.first_target_date.toISOString().slice(0, 10)
-      : row.first_target_date.slice(0, 10),
+    // See dbDate() in runRepository: a bare `date` (OID 1082) arrives as a JS Date at
+    // server-local midnight, which toISOString() then renders one day early on a SAST
+    // host. EXPORT_COLUMNS casts this to ::text, so a Date here means the cast was lost.
+    firstTargetDate: exportDate(row.first_target_date),
     drNumber: row.dr_number,
     phoneE164: row.phone_e164,
     phoneFingerprint: row.phone_fingerprint,
