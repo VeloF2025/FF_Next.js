@@ -121,7 +121,7 @@ if (MODES.length > 1) {
     out(`eligible fabricated closures : ${plan.candidates.length}`);
     out(`staff affected               : ${plan.staffCount}`);
     out(`date range                   : ${plan.firstDate ?? '-'} .. ${plan.lastDate ?? '-'}`);
-    out(`fabricated hours (all 5 cols): ${plan.fabricatedHours.toFixed(2)}`);
+    out(`fabricated paid hours        : ${plan.fabricatedHours.toFixed(2)} (regular + overtime)`);
     if (plan.withoutSummary > 0) {
       out(`  of which with no summary row: ${plan.withoutSummary} (clock-out cleared, nothing to zero)`);
     }
@@ -165,12 +165,20 @@ if (MODES.length > 1) {
     out(`\nbacked up : ${result.entriesBackedUp} entries, ${result.summariesBackedUp} summaries`);
     out(`cleared   : ${result.entriesCleared} entries`);
     out(`zeroed    : ${result.summariesZeroed} summaries`);
+    if (result.summariesZeroed < result.entriesCleared) {
+      out(`NOTE ${result.entriesCleared - result.summariesZeroed} entries were cleared without ` +
+        'their summary being zeroed — those rows no longer hold the backed-up values ' +
+        '(a stale backup from an earlier run, or hours recomputed since). Nothing was ' +
+        'destroyed; inspect them before assuming the remediation is complete.');
+    }
     out('\nThe policy has NOT been backdated. History stays invisible to the reconciler');
     out('until you run --backdate-policy=<YYYY-MM-DD> as a separate, deliberate step.');
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch { /* the transaction may not be open */ }
-    process.stderr.write(`[autoclose-reset] failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+    // Set before the write: if stderr is a dead pipe the write throws, and a
+    // failed apply must never fall through to exit 0.
     exitCode = 1;
+    process.stderr.write(`[autoclose-reset] failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
   } finally {
     client.release();
     await pool.end();

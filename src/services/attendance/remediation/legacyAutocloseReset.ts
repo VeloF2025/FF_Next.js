@@ -31,7 +31,7 @@ export interface Candidate {
   staffId: string;
   workDate: string;
   clockOutAt: string;
-  /** Sum of all five legacy hour columns this apply will zero, not just regular. */
+  /** regular + overtime. The other three columns overlap these; see the SQL. */
   fabricatedHrs: number;
 }
 
@@ -67,8 +67,12 @@ const CANDIDATE_SQL = `
          TO_CHAR(e.work_date, 'YYYY-MM-DD') AS work_date,
          e.clock_out_at::text AS clock_out_at,
          (ds.staff_id IS NULL) AS without_summary,
-         COALESCE(ds.regular_hrs + ds.overtime_hrs + ds.sunday_hrs
-                  + ds.holiday_hrs + ds.night_hrs, 0)::float AS fabricated_hrs,
+         -- regular + overtime ONLY. Migration 319 is explicit that sunday_hrs,
+         -- holiday_hrs and night_hrs OVERLAP these two — they are premium
+         -- overlays a payroll vendor picks multipliers from, not additional
+         -- hours. Summing all five double-counts; summing regular alone
+         -- under-counts the overtime that is also fabricated.
+         COALESCE(ds.regular_hrs + ds.overtime_hrs, 0)::float AS fabricated_hrs,
          CASE
            WHEN ds.result_status = 'locked' THEN 'daily_result_locked'
            WHEN ds.wage_amount_cents IS NOT NULL THEN 'wage_already_computed'
