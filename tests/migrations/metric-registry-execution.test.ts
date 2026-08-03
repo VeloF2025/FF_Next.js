@@ -311,16 +311,26 @@ describe('metrics restored from the deleted Cortex catalogue', () => {
     expect(total).toBe(3);
   });
 
-  it('counts a NULL status as open rather than silently dropping it', async () => {
-    // `NULL NOT IN ('closed',...)` is unknown, not true, so a bare NOT IN discards the
-    // row — under-reporting the very thing the metric counts. Neither column has a NOT
+  it('counts a NULL status as open — and the IS NULL clause is load-bearing', async () => {
+    // `NULL NOT IN ('closed',...)` is unknown, not true, so a bare NOT IN DISCARDS the
+    // row, under-reporting the very thing the metric counts. Neither column has a NOT
     // NULL constraint, so this is one bad insert away from being live.
+    //
+    // Asserting the metric returns 3 is not enough on its own — it would also pass if the
+    // fixture happened to hold 3 non-terminal rows for some other reason. So run the
+    // metric's OWN generated SQL, then run it again with the IS NULL clause stripped, and
+    // require the two to DIFFER. That fails if the clause is ever removed.
     const def = findMetric('open_snags')!;
-    const { sql } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
-    expect(sql).toContain('IS NULL');
-    const [row] = await run(
-      `SELECT count(*)::int AS n FROM snags WHERE status IS NULL`, [],
-    );
-    expect((row as { n: number }).n).toBe(1); // the fixture seeds exactly one
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+
+    const withClause = summarise(def, toSeries(await run(sql, params), [])).total;
+
+    const strippedSql = sql.replace('src0.status IS NULL OR ', '');
+    expect(strippedSql, 'the IS NULL clause was not found to strip').not.toBe(sql);
+    const withoutClause = summarise(def, toSeries(await run(strippedSql, params), [])).total;
+
+    expect(withClause).toBe(3); // open + in_progress + NULL
+    expect(withoutClause).toBe(2); // the NULL row silently vanishes
+    expect(withClause).toBeGreaterThan(withoutClause);
   });
 });
