@@ -51,9 +51,9 @@ describe('metric registry', () => {
 });
 
 describe('metrics restored from the deleted Cortex catalogue', () => {
-  const RESTORED = ['preprovisions', 'activations', 'open_snags', 'open_tickets'];
+  const RESTORED = ['activations', 'open_snags', 'open_tickets'];
 
-  it('registers all four, so numeric questions stop falling through to prose', () => {
+  it('registers all three, so numeric questions stop falling through to prose', () => {
     // These answered precisely until Cortex #164 deleted its in-code catalogue. The
     // regression was silent: the question still parsed as numeric, matched nothing,
     // and was answered from RAG.
@@ -76,14 +76,16 @@ describe('metrics restored from the deleted Cortex catalogue', () => {
     }
   });
 
-  it('keeps pre-provision EVENTS separate from the open BALANCE', () => {
-    // The two are different questions against different tables, and conflating them
-    // is the easiest mistake to make here: one counts things that happened in a
-    // window, the other counts things currently open.
-    const events = findMetric('preprovisions')!;
-    const balance = findMetric('pp_open_balance')!;
-    expect(events.additivity).toBe('additive');
-    expect(balance.additivity).toBe('semi-additive');
-    expect(events.aliases).not.toEqual(expect.arrayContaining(balance.aliases));
+  it('does NOT register a pre-provision event count', () => {
+    // dr_activity_log re-logs an unresolved item ~daily rather than once: for July it
+    // yields 1,107 against 219 first-ever additions, a ~5x overcount. Restoring that SQL
+    // would ship a confidently wrong number where today the question honestly falls
+    // through to prose. A correct version needs a first-occurrence or DISTINCT basis and
+    // a business decision about which number is meant — scheduled as `pp_new` in Plan 2.
+    expect(findMetric('preprovisions')).toBeUndefined();
+    // And no metric may claim the bare alias, or backlog questions misroute to it.
+    for (const m of METRICS) {
+      expect(m.aliases, `${m.key} claims the ambiguous bare alias`).not.toContain('pre-provisions');
+    }
   });
 });

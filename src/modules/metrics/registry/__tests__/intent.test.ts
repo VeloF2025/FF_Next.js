@@ -68,20 +68,25 @@ describe('matchMetric', () => {
   });
 });
 
-describe('alias disambiguation between the two pre-provision metrics', () => {
-  // 'pre-provisions' (events) and 'open pre-provisions' (balance) overlap. Longest
-  // alias wins, so the qualifier decides — but nothing enforces that except this test,
-  // and getting it wrong silently answers a backlog question with an event count.
-  it('routes "open pre-provisions" to the balance', () => {
-    const r = matchMetric('how many open pre-provisions are there');
-    expect(r.kind).toBe('exact');
-    if (r.kind === 'exact') expect(r.metric.key).toBe('pp_open_balance');
-  });
-
-  it('routes bare "pre-provisions" to the event count', () => {
-    const r = matchMetric('how many pre-provisions did we have yesterday');
-    expect(r.kind).toBe('exact');
-    if (r.kind === 'exact') expect(r.metric.key).toBe('preprovisions');
+describe('pre-provision questions never reach an event count', () => {
+  // A bare 'pre-provisions' alias would outrank 'pre-provision backlog' (which only
+  // matches that exact singular phrase) and steal backlog questions — answering a
+  // stock question with an inflated event count. Registering no such alias is what
+  // prevents it; these pin the phrasings that would have misrouted.
+  it('routes backlog phrasings to the open balance, not an event count', () => {
+    for (const q of [
+      'how many open pre-provisions are there',
+      'how many pre-provisions are in the backlog',
+      'what is our current pre-provision backlog',
+    ]) {
+      const r = matchMetric(q);
+      if (r.kind === 'exact') {
+        expect(r.metric.key, `"${q}" misrouted`).toBe('pp_open_balance');
+      } else {
+        // 'none' is acceptable — it falls through to prose rather than answering wrongly.
+        expect(r.kind, `"${q}" must never resolve to an event count`).toBe('none');
+      }
+    }
   });
 
   it('routes snags and tickets to their own metrics', () => {

@@ -154,7 +154,7 @@ export const METRICS: readonly MetricDefinition[] = [
 
   // ─── Restored from Cortex's deleted in-code catalogue ────────────────────────
   //
-  // These four answered precisely until Cortex PR #164 deleted `metrics_db.py`
+  // These three answered precisely until Cortex PR #164 deleted `metrics_db.py`
   // wholesale. That was contrary to this plan's Task 7 Step 1 ("preprovisions stays
   // exactly as it is"), and the effect was silent: the questions still parsed as
   // numeric, found no registry metric, and fell through to RAG — so a numeric
@@ -164,36 +164,26 @@ export const METRICS: readonly MetricDefinition[] = [
   // Registering them here rather than restoring the direct-SQL path keeps every read
   // behind FibreFlow's per-metric RBAC. Predicates live in `from` because
   // MetricDefinition has no `filter` field (deliberately removed — no metric used it).
-  {
-    key: 'preprovisions',
-    label: 'pre-provisions',
-    description:
-      'Pre-provision events recorded in the DR activity log — additions plus re-entries. An EVENT count over a period, not the open backlog; for the backlog use pp_open_balance.',
-    from: `(
-      SELECT src0.created_at
-      FROM dr_activity_log src0
-      WHERE src0.event_type IN ('pre_prov_added', 'pre_prov_reentered')
-    ) src`,
-    measure: 'count(*)',
-    dateColumn: 'src.created_at',
-    // Each row is a distinct event, so these sum freely across time and dimensions.
-    // Deliberately NOT the same thing as pp_open_balance: this counts things that
-    // happened in a window, that counts things currently open.
-    additivity: 'additive',
-    grains: ['day', 'week', 'month', 'range'],
-    dimensions: [],
-    // 'open pre-provisions' belongs to pp_open_balance. Longest-alias-wins keeps the
-    // two apart: "how many open pre-provisions" matches that 19-char alias, while
-    // "how many pre-provisions yesterday" matches the 15-char one here.
-    aliases: ['pre-provisions', 'preprovisions', 'pre provisions', 'pre-provs'],
-    cite: "FibreFlow dr_activity_log (pre_prov_added + pre_prov_reentered) by created_at",
-    permission: 'analytics.reports',
-  },
+  // ⚠️ `preprovisions` is DELIBERATELY NOT RESTORED. The old definition counted rows in
+  // dr_activity_log where event_type IN ('pre_prov_added','pre_prov_reentered'), but that
+  // table RE-LOGS an unresolved item roughly daily rather than once: measured 2026-08-03,
+  // three drops carry 141 rows each spanning 2026-04-30..2026-07-12. For July that SQL
+  // returns 1,107 against 264 distinct drops touched and 219 first-ever additions — a ~5x
+  // overcount, the same "summing something that cannot be summed over time" failure as
+  // zone_uptake, reached by re-logging instead of cumulative snapshotting.
+  //
+  // It is not restored because which number is meant (219 new / 264 touched / 1,107 events)
+  // is a business decision, and the plan already schedules `pp_new` for Plan 2 to make it.
+  // Until then the question falls through to prose, which is honest; a confident 1,107 is
+  // not. Do not re-add it without a first-occurrence or DISTINCT basis and a value test.
   {
     key: 'activations',
     label: 'activations',
     description:
-      'Drops activated on the OES, by activation date. Counts the activation event, so a drop activated twice counts twice.',
+      'Drops activated on the OES, by activation date. ⚠️ Not a stable historical series: ' +
+      'oes_activations is UNIQUE on drop_number and the importer upserts activation_date ' +
+      'unconditionally, so a re-import can move a drop into a different day and re-running ' +
+      'the same past range can return a different number.',
     from: `(
       SELECT src0.activation_date
       FROM oes_activations src0
@@ -216,7 +206,7 @@ export const METRICS: readonly MetricDefinition[] = [
     from: `(
       SELECT src0.id
       FROM snags src0
-      WHERE src0.status NOT IN ('closed', 'fixed', 'verified')
+      WHERE src0.status IS NULL OR src0.status NOT IN ('closed', 'fixed', 'verified')
     ) src`,
     measure: 'count(*)',
     // NULL: current-state-only. buildMetricQuery emits no WHERE date filter and no
@@ -244,7 +234,7 @@ export const METRICS: readonly MetricDefinition[] = [
     from: `(
       SELECT src0.id
       FROM maintenance_tickets src0
-      WHERE src0.status NOT IN ('resolved', 'cancelled', 'verified')
+      WHERE src0.status IS NULL OR src0.status NOT IN ('resolved', 'cancelled', 'verified')
     ) src`,
     measure: 'count(*)',
     dateColumn: null,

@@ -26,7 +26,21 @@ client read it over HTTP and hold no SQL of their own.
 There is no `filter` field. It was removed because no metric used it — every predicate
 belongs in `from`.
 
-## The four decisions that are easy to get wrong
+## The five decisions that are easy to get wrong
+
+### 0. Confirm the source is what you think it is
+
+Before choosing `additivity`, check whether the source table records each thing **once** or
+**repeatedly**. Two tables in this database look like event logs and are not:
+
+- `project_weekly_zone_pon_uptake.installed` is a **running total**; summing July reports
+  91,296 against a true 23,732.
+- `dr_activity_log` **re-logs** an unresolved pre-provision roughly daily; one drop carries
+  141 rows over 104 days, so counting rows for July returns 1,107 against 219 genuinely new.
+
+Both produce a plausible number that is several times too large, with no error. Run
+`SELECT <entity>, count(*) ... GROUP BY 1 ORDER BY 2 DESC LIMIT 5` on any candidate source
+before writing the definition — if the top entity has many rows, it is not an event log.
 
 ### 1. `additivity` is required and is not cosmetic
 
@@ -62,10 +76,23 @@ but `validateMetricQuery` rejects `'range'` for any non-additive measure, so dec
 Intent matching is alias-based, so a metric without at least one alias can never be asked for.
 `registry.test.ts` fails if you forget.
 
-**Longest alias wins.** That is what keeps near-neighbours apart: `pre-provisions` (the event
-count) and `open pre-provisions` (the open balance) are different metrics against different
-tables, and the qualifier decides which one a question reaches. When you add a metric whose
-name contains an existing alias, add a test to `intent.test.ts` pinning both directions.
+**Longest alias wins, and matching is plain substring** — so a SHORT alias that is contained
+in a longer one silently steals its questions.
+
+This is not hypothetical. A `pre-provisions` alias was proposed for an event-count metric
+alongside `pp_open_balance`'s existing `pre-provision backlog`. Because the backlog alias only
+matches that exact singular phrase, *"how many pre-provisions are in the backlog"* would have
+matched the 14-character `pre-provisions` and answered a **stock** question with an **event
+count**. Before the alias existed the question matched nothing and fell through to prose —
+so adding it would have replaced an honest non-answer with a confident wrong one.
+
+Rules that follow:
+
+- Never register an alias that is a substring of another metric's alias unless you have
+  tested every phrasing that contains both.
+- When adding a metric near an existing one, add an `intent.test.ts` case for the phrasings a
+  user would actually type — including the ones that *should* stay `none`.
+- `none` is a good outcome. Falling through to prose beats answering the wrong question.
 
 ### 4. Adding a project alias means editing **two** places
 
@@ -108,6 +135,7 @@ A metric that reads a nightly snapshot needs a source, which is a row in
 
 ## Checklist
 
+- [ ] Source checked for repeat-logging (`GROUP BY entity ORDER BY count DESC`) before choosing additivity
 - [ ] Row added to `registry/index.ts` with an explicit `additivity` and a `cite`
 - [ ] At least one alias; a test in `intent.test.ts` if it neighbours an existing one
 - [ ] Source table present in `metric-registry-fixture.ts` with live column types

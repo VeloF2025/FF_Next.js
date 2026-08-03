@@ -271,15 +271,6 @@ describe('metrics restored from the deleted Cortex catalogue', () => {
   // SQL validity is already covered — every registered metric is enrolled above. These
   // pin the VALUES, because a predicate silently dropped from `from` still executes.
 
-  it('counts only pre-provision events, not every activity-log row', async () => {
-    const def = findMetric('preprovisions')!;
-    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
-    const { total } = summarise(def, toSeries(await run(sql, params), []));
-    // Seeded: pre_prov_added + pre_prov_reentered + dr_photo_uploaded. The third must
-    // not be counted — a 3 here means the event_type predicate was lost.
-    expect(total).toBe(2);
-  });
-
   it('counts only Active activations', async () => {
     const def = findMetric('activations')!;
     const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
@@ -296,7 +287,7 @@ describe('metrics restored from the deleted Cortex catalogue', () => {
     expect(series).toHaveLength(1);
     expect(series[0]!.period).toBeNull(); // NULL::text — drives the "(current)" wording
     const { total, totalPeriod } = summarise(def, series);
-    expect(total).toBe(2); // open + in_progress; closed/fixed/verified excluded
+    expect(total).toBe(3); // open + in_progress + the NULL-status row
     expect(totalPeriod).toBeNull();
   });
 
@@ -305,7 +296,7 @@ describe('metrics restored from the deleted Cortex catalogue', () => {
     const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
     const series = toSeries(await run(sql, params), []);
     const { total, totalPeriod } = summarise(def, series);
-    expect(total).toBe(2); // open + assigned
+    expect(total).toBe(3); // open + assigned + NULL
     expect(totalPeriod).toBeNull();
   });
 
@@ -317,6 +308,19 @@ describe('metrics restored from the deleted Cortex catalogue', () => {
       from: '2020-01-01', to: '2020-01-02', grain: 'day', dimensions: [],
     });
     const { total } = summarise(def, toSeries(await run(sql, params), []));
-    expect(total).toBe(2);
+    expect(total).toBe(3);
+  });
+
+  it('counts a NULL status as open rather than silently dropping it', async () => {
+    // `NULL NOT IN ('closed',...)` is unknown, not true, so a bare NOT IN discards the
+    // row — under-reporting the very thing the metric counts. Neither column has a NOT
+    // NULL constraint, so this is one bad insert away from being live.
+    const def = findMetric('open_snags')!;
+    const { sql } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+    expect(sql).toContain('IS NULL');
+    const [row] = await run(
+      `SELECT count(*)::int AS n FROM snags WHERE status IS NULL`, [],
+    );
+    expect((row as { n: number }).n).toBe(1); // the fixture seeds exactly one
   });
 });
