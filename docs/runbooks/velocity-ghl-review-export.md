@@ -25,12 +25,23 @@ of them is already open, so writing them is the go-live moment. `loadVelocityRev
 in `defaultDependencies` before the run lock is taken, so a live request today creates no run row and
 cannot advance the watermark — that is the only thing currently preventing a send.
 
-**Publish the GHL workflows before writing credentials, never after.** `velocity_review_exports`
-carries a permanent `UNIQUE (dr_number, phone_e164)` and the row is inserted in state `ready` at
-export creation, before the tag handshake, with `ON CONFLICT DO NOTHING`. A run against Draft
-workflows would upsert every contact, apply `velocity-review-ready`, and burn the permanent ledger
-row while no message is ever sent — permanently barring those customers from re-contact for that DR
-without a manual database edit.
+**Once publication and credentials are both separately approved, publish the GHL workflows before
+writing credentials, never after.** This is an ordering rule, not authorisation to publish — the
+approval gate at the top of this document still applies.
+
+`velocity_review_exports` carries a permanent `UNIQUE (dr_number, phone_e164)` and the row is
+inserted in state `ready` at export creation, before the tag handshake, with `ON CONFLICT DO
+NOTHING`. A run against Draft workflows would upsert every contact, apply `velocity-review-ready`,
+and burn the permanent ledger row while no message is ever sent.
+
+**The damage is not limited to that DR.** The stranded row lands in `ambiguous`, and no code path in
+`src/modules/velocity-review/` transitions a row out of that state: `claimNextExport` only claims
+`state IN ('ready', 'retryable_failure')`, so it is never reprocessed. Worse, its claim query
+excludes any export whose phone already has a row in `('upserting', 'contact_upserted',
+'trigger_requested', 'retryable_failure', 'ambiguous', 'ack_cleanup_pending')` — so that phone number
+is barred from **every future DR**, not just this one, for as long as the row sits there. Clearing
+the tag in GHL does not release it, because the row is never re-read. A manual database edit is the
+only remedy.
 
 **Discovery currently runs on four of six sources.** `drops_installed` and `stock_installed` cannot
 contribute: `drops.installed_at` is NULL in all 180,274 rows and `installation_date` is set in 2 rows
@@ -174,6 +185,11 @@ disabled afterwards.
 
 ## Required deployment environment variables
 
+> **Do not write these until all three GHL workflows are Published.** These eight variables are the
+> last gate before the system can contact a customer; writing them against Draft workflows strands
+> ledger rows and bars those phone numbers from every future DR. See the ordering rule in *Current
+> position*.
+
 Names only; values belong in the approved deployment environment:
 
 ```text
@@ -280,10 +296,10 @@ Verify the returned row before scheduler installation.
 There is no verified supported GHL Draft test button for this workflow set. Do not assume a Draft workflow can execute. Testing therefore requires this exact controlled sequence:
 
 1. Confirm `velocity_experience_check_v2` remains Active; record its visible status and any approval timestamp if GHL displays one.
-2. Obtain a separate named **internal-test publication approval** that identifies both workflows, the nominated internal contact(s), the permitted trigger-tag changes, and the test window. This approval is not production-publication approval.
-3. Fully configure both workflows as Draft, reopen them, and verify every trigger, action, branch, template, multiple-entry setting, suppression gate, assignee, and notification target.
-4. At the start of the approved window, publish both workflows temporarily. Apply trigger tags only to the nominated internal contact(s), and execute the tests below.
-5. On completion or any failure, immediately unpublish both workflows and read back their Draft status.
+2. Obtain a separate named **internal-test publication approval** that identifies all three workflows, the nominated internal contact(s), the permitted trigger-tag changes, and the test window. This approval is not production-publication approval.
+3. Fully configure all three workflows as Draft, reopen them, and verify every trigger, action, branch, template, multiple-entry setting, suppression gate, assignee, and notification target.
+4. At the start of the approved window, publish all three workflows temporarily. Apply trigger tags only to the nominated internal contact(s), and execute the tests below.
+5. On completion or any failure, immediately unpublish all three workflows and read back their Draft status.
 6. Remove only the tags added by this test. Preserve all pre-existing tags, contact fields, DND/STOP state, and consent evidence.
 7. Production publication requires a new, separate approval after test reconciliation; internal-test publication never carries forward.
 
@@ -300,7 +316,12 @@ For each test, first record the contact's existing name, tags, DND/STOP state, a
 5. **Installation issue branch:** press `Installation issue`; verify suppression and issue tags, Chantall assignment, immediate GHL notification, the Installation Issue Smart List, and no review request.
 6. **Not connected branch:** press `Not connected`; verify suppression and not-connected tags, Chantall assignment, immediate GHL notification, the Not Connected Smart List, and no review request.
 7. **Unmatched branch:** send a non-button reply; verify no review request and visibility for manual triage.
-8. **Resolution path:** after Chantall resolves the internal test issue, have Chantall apply `issue-resolved`; verify the Draft post-resolution workflow removes or gates suppression as designed and sends the approved review request only once.
+8. **Resolution path:** after Chantall resolves the internal test issue, have Chantall move the test
+   opportunity to `Resolved` in the `Service Issues` pipeline — do not apply `issue-resolved` by
+   hand, that mechanism was retired. Verify `Velocity - Service Issue Resolved - tag` applies
+   `issue-resolved`, then that the post-resolution workflow removes or gates suppression as designed
+   and sends the approved review request only once. If no opportunity exists for the test contact,
+   create it first: no workflow contains a Create Opportunity action.
 9. Verify repeat entry only after the first export's acknowledgement tag is cleared. Stop if any contact-level tag represents another in-flight export.
 10. Reconcile candidate, consent evidence, contact upsert, acknowledgement, actual delivery, reply branch, assignment, and notification. Remove only test tags added by the procedure; preserve DND and consent history.
 
@@ -308,7 +329,17 @@ There is no summary-only API or test mode. A `dryRun:true` request returns aggre
 
 ## Scheduler installation
 
-Only after both workflows are published under activation approval and the control row readback is correct:
+Only after **all three** workflows are published under activation approval and the control row
+readback is correct. All three must be Published, not two:
+
+- `Velocity - Installation Experience - Velo`
+- `Velocity - Review Ask - Post Resolution`
+- `Velocity - Service Issue Resolved - tag`
+
+Publishing only the first two satisfies no gate: `issue-resolved` is applied by exactly one
+automation, so with `Service Issue Resolved - tag` left Draft every genuinely resolved
+installation-issue customer silently never receives the post-resolution review request, and nothing
+reports a failure.
 
 ```bash
 (
@@ -347,7 +378,9 @@ This replaces every existing exact copy of the desired Velocity entry while pres
 
 ### Immediate pause
 
-1. Unpublish `Velocity - Installation Experience - Velo` and `Velocity - Review Ask - Post Resolution` in GHL.
+1. Unpublish all three workflows in GHL — `Velocity - Installation Experience - Velo`,
+   `Velocity - Review Ask - Post Resolution`, and `Velocity - Service Issue Resolved - tag`.
+   Leaving the third published keeps the resolution path live during the pause.
 2. Disable autonomous and pilot execution without deleting ledgers:
 
 ```sql
