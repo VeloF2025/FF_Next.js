@@ -6,6 +6,38 @@ This runbook operates the FibreFlow-to-GoHighLevel (GHL) Velocity installation-r
 
 Do not apply migration 478, publish a workflow, install the scheduler, enable automation or pilot mode, or test with any contact without the separately named approval. Never import a CSV for this flow. Never clear GHL DND/STOP state or overwrite authoritative contact data. Workflow acknowledgement, WhatsApp delivery, and customer response are three separate states.
 
+### Current position (2026-08-03 SAST)
+
+Several gates in this runbook are already open. Read this before assuming the system is inert.
+
+| Gate | State |
+| --- | --- |
+| Migration 478 | **Applied** 2026-08-02 21:19 SAST to the shared dev/production database |
+| Deployment | **dev and production both on `d288a14c9`** — production deployed 08:36 SAST with `--force`, approved by Hein |
+| `velocity_review_control` | **`automation_enabled=TRUE`, `go_live_date=2026-08-01`**, set 07:54 SAST, approved by Hein after per-date volume disclosure |
+| Ledgers | runs `0`, candidates `0`, exports `0` — nothing has ever run |
+| GHL credentials | **0 of 8 set** on dev and production |
+| Scheduler | not installed |
+| GHL workflows | all three **Draft**, 0 enrolled |
+
+**The eight environment variables are the last gate, not a configuration step.** Everything upstream
+of them is already open, so writing them is the go-live moment. `loadVelocityReviewGhlConfig` throws
+in `defaultDependencies` before the run lock is taken, so a live request today creates no run row and
+cannot advance the watermark — that is the only thing currently preventing a send.
+
+**Publish the GHL workflows before writing credentials, never after.** `velocity_review_exports`
+carries a permanent `UNIQUE (dr_number, phone_e164)` and the row is inserted in state `ready` at
+export creation, before the tag handshake, with `ON CONFLICT DO NOTHING`. A run against Draft
+workflows would upsert every contact, apply `velocity-review-ready`, and burn the permanent ledger
+row while no message is ever sent — permanently barring those customers from re-contact for that DR
+without a manual database edit.
+
+**Discovery currently runs on four of six sources.** `drops_installed` and `stock_installed` cannot
+contribute: `drops.installed_at` is NULL in all 180,274 rows and `installation_date` is set in 2 rows
+(both 2025-11-17), while `stock_serials.installed_date` stops at 2026-06-17. Candidates come only
+from `dr_submitted`, `oes_activated`, `pp_activated` and `olt_mismatch_created`. This is a coverage
+gap, not an over-contact risk, but do not read a per-source zero as a query defect.
+
 ## GHL location and objects
 
 Before every change, use the GHL account switcher and confirm the visible sub-account is **Velocity Fibre** in Gqeberha, Eastern Cape. Do not rely on a remembered location identifier.
@@ -31,6 +63,22 @@ All are Contact fields in `Additional Info`:
 - `velocity-review-installation-issue`
 - `velocity-review-not-connected`
 - `velocity-review-suppress`
+
+Plus `issue-resolved`, which gates the post-resolution review ask.
+
+**Verify a tag exists by searching, never by reading the paginated list.** On 2026-08-03 the
+unfiltered Tags settings list displayed only three of the six tags and reported a total of 24;
+searching `velocity-review` returned all six (`1 - 6 of 6`). The unfiltered list silently omits rows
+and its total is unreliable, so reading it will produce false "tag missing" conclusions.
+
+### Pipelines
+
+| Pipeline | Stages |
+| --- | --- |
+| `Service Issues` | New Issue, Diagnosing, Awaiting ISP / Network, Site Visit Scheduled, **Resolved** |
+
+Moving an opportunity into `Resolved` is what applies `issue-resolved`. See the
+`Velocity - Service Issue Resolved - tag` workflow below and the manual step it depends on.
 
 ### Smart Lists
 
@@ -73,20 +121,56 @@ Keep this workflow **Draft** outside a separately approved internal-test publica
 
 ### Workflow: `Velocity - Review Ask - Post Resolution`
 
-Keep this workflow **Draft** outside a separately approved internal-test publication window and an independently approved production publication. Its Contact Tag trigger is tag added `issue-resolved`. It must send the approved review request only after the issue is resolved and must not run while `velocity-review-suppress` remains. Chantall is the operator who explicitly applies `issue-resolved`; no other workflow should apply it.
+Keep this workflow **Draft** outside a separately approved internal-test publication window and an independently approved production publication. Its Contact Tag trigger is tag added `issue-resolved`. It must send the approved review request only after the issue is resolved and must not run while `velocity-review-suppress` remains.
 
-## Configuration snapshot (2026-08-01 SAST)
+`issue-resolved` is applied by exactly one automation — `Velocity - Service Issue Resolved - tag`
+below — driven by Chantall moving the opportunity to `Resolved`. No other workflow may apply it, and
+nothing may apply it on a timer or in bulk.
+
+### Workflow: `Velocity - Service Issue Resolved - tag`
+
+Keep this workflow **Draft** under the same conditions as the other two. It is the bridge between a
+reported problem and the post-resolution review ask:
+
+1. Pipeline Stage Changed trigger: pipeline is `Service Issues`, stage is `Resolved`.
+2. Add `issue-resolved`.
+3. END.
+
+**This workflow is the reason a review ask is not automatic.** It fires only on a pipeline stage
+move, which is a deliberate human judgement that the issue is genuinely fixed. Two consequences that
+must be honoured:
+
+- **Nothing may move opportunities into `Resolved` in bulk or automatically.** A bulk stage move
+  would apply `issue-resolved` to every affected contact at once and send review requests to
+  customers whose problems are still open. Treat the `Resolved` stage as a one-at-a-time human action.
+- **There is a manual step with no system prompt behind it.** Neither issue branch of
+  `Velocity - Installation Experience - Velo` contains a Create Opportunity action, so nothing places
+  a contact into the `Service Issues` pipeline. Chantall must create the opportunity herself when she
+  receives the GHL notification, then work it to `Resolved`. If she does not, the customer is tagged,
+  assigned and suppressed, but never receives a follow-up review ask. Brief her on this explicitly
+  before go-live, or add a Create Opportunity action to both issue branches under separate approval.
+
+## Configuration snapshot (2026-08-01 SAST, re-verified read-only 2026-08-03)
 
 | Object | State | Evidence / remaining gate |
 | --- | --- | --- |
 | Four custom fields | CREATED | Read back in Velocity custom fields with the types above; identifiers require approved deployment configuration. |
-| Six tags | CREATED | Read back in Velocity tag settings. |
-| Three Smart Lists | CREATED | Read back with one corresponding tag filter each. |
+| Six tags | CREATED | Confirmed 2026-08-03 by **searching** `velocity-review` in Velocity tag settings (`1 - 6 of 6`). The unfiltered list showed only three — do not use it. Audit Logs record all six created 2026-08-01 17:09–17:11 SAST by Hein Van Vuuren, with no deletion entries. |
+| Three Smart Lists | CREATED | Read back with one corresponding tag filter each; all three re-confirmed present 2026-08-03. |
+| `Service Issues` pipeline | CREATED | Read back 2026-08-03 with the five stages above, 0 opportunities in every stage. Created 2026-08-01 12:06 AM SAST. |
 | `velocity_experience_check_v2` | ACTIVE | Read back as Active, last edited 2026-08-01 06:12 PM SAST. Exact body, `there` sample, Contact → First Name mapping for `{{1}}`, and ordered quick replies were read back. No separate template-approval timestamp was visible. Active status is not publication or send approval. |
 | `Velocity - Installation Experience - Velo` | CONFIGURED / VERIFIED Draft | Created in Velocity Review System and saved. A hard-reload readback confirmed it remained Draft, Save was disabled with Saved displayed, and Allow re-entry was ON. The persisted graph uses the `velocity-review-ready` tag trigger; adds `velocity-review-enrolled`; removes `velocity-review-ready`; sends active `velocity_experience_check_v2` using Contact → First Name; branches on the three quick replies; ends Undelivered and Time Out; and applies the documented happy, installation-issue, and not-connected outcomes. No publication, test, enrollment, contact change, or send occurred. |
-| `Velocity - Review Ask - Post Resolution` | CONFIGURED / VERIFIED Draft | A hard-reload readback confirmed the `issue-resolved` trigger and a `No suppression` If/Else branch where Contact Tags does not include `velocity-review-suppress`. That branch reaches the existing active `velocity_review_request_v1` WhatsApp action and then END; the None/suppression-present branch reaches END without WhatsApp. Save and Undo were disabled after reload, proving the Draft state was persisted with no unsaved edits. |
+| `Velocity - Review Ask - Post Resolution` | CONFIGURED / VERIFIED Draft | A hard-reload readback confirmed the `issue-resolved` trigger and a `No suppression` If/Else branch where Contact Tags does not include `velocity-review-suppress`. That branch reaches the existing active `velocity_review_request_v1` WhatsApp action and then END; the None/suppression-present branch reaches END without WhatsApp. Save and Undo were disabled after reload, proving the Draft state was persisted with no unsaved edits. Re-confirmed unchanged 2026-08-03. |
+| `Velocity - Service Issue Resolved - tag` | CONFIGURED / VERIFIED Draft | Read back 2026-08-03: Pipeline Stage Changed trigger on `Service Issues` / `Resolved`, single `Add tag: issue-resolved` action, then END. Draft with Save disabled and Saved displayed. **Was absent from this runbook until 2026-08-03** — the earlier snapshot documented only two workflows. |
+| All six WhatsApp templates | ACTIVE | Read back 2026-08-03: `velocity_experience_check_v1`, `velocity_experience_check_previous_install_v1`, `velocity_sorry_feedback_v1`, `velocity_review_request_v1`, `velocity_review_reminder_v1`, `velocity_experience_check_v2`. Note `velocity_review_request_v1` and `velocity_review_reminder_v1` are category **Marketing**, not Utility, and are therefore subject to Meta marketing-message limits and opt-out handling. |
+| Enrollment | NONE | All three workflows show 0 total enrolled and 0 active enrolled. The location holds 6 contacts, all `(Example)` demo records plus a WhatsApp Business entry — no real customer has been exported. |
 
 No workflow was published, tested, or enrolled during the latest verification. No contact or tag was changed, and no message was sent.
+
+The 2026-08-03 re-verification was read-only throughout: navigation, snapshots, one tag search, one
+pipeline-selector change and two canvas fit-to-screen clicks. No workflow was saved (`Ctrl+S` was
+never pressed), no publish toggle was touched, and every workflow still reported Saved with Undo
+disabled afterwards.
 
 ## Required deployment environment variables
 
