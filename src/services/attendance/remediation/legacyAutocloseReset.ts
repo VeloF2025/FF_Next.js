@@ -31,7 +31,8 @@ export interface Candidate {
   staffId: string;
   workDate: string;
   clockOutAt: string;
-  regularHrs: number;
+  /** Sum of all five legacy hour columns this apply will zero, not just regular. */
+  fabricatedHrs: number;
 }
 
 export interface Blocker {
@@ -44,6 +45,8 @@ export interface Blocker {
 export interface RemediationPlan {
   candidates: Candidate[];
   blockers: Blocker[];
+  /** Eligible entries with no summary row at all — nothing to zero for them. */
+  withoutSummary: number;
   staffCount: number;
   firstDate: string | null;
   lastDate: string | null;
@@ -63,7 +66,9 @@ const CANDIDATE_SQL = `
   SELECT e.id AS entry_id, e.staff_id::text AS staff_id,
          TO_CHAR(e.work_date, 'YYYY-MM-DD') AS work_date,
          e.clock_out_at::text AS clock_out_at,
-         COALESCE(ds.regular_hrs, 0)::float AS regular_hrs,
+         (ds.staff_id IS NULL) AS without_summary,
+         COALESCE(ds.regular_hrs + ds.overtime_hrs + ds.sunday_hrs
+                  + ds.holiday_hrs + ds.night_hrs, 0)::float AS fabricated_hrs,
          CASE
            WHEN ds.result_status = 'locked' THEN 'daily_result_locked'
            WHEN ds.wage_amount_cents IS NOT NULL THEN 'wage_already_computed'
@@ -82,7 +87,12 @@ const CANDIDATE_SQL = `
            ELSE NULL
          END AS blocker
   FROM attendance_entries e
-  JOIN attendance_daily_summaries ds
+  -- LEFT, not INNER: the legacy auto-close path had no date bound while
+  -- summaries were only written over a trailing window, so an entry can carry
+  -- a fabricated clock-out with no summary row at all. An inner join would
+  -- drop those from BOTH candidates and blockers — silently invisible to the
+  -- operator and to --expect.
+  LEFT JOIN attendance_daily_summaries ds
     ON ds.staff_id = e.staff_id AND ds.work_date = e.work_date
   WHERE e.status = 'auto_closed'
     AND e.clock_out_at IS NOT NULL
@@ -91,36 +101,53 @@ const CANDIDATE_SQL = `
       SELECT 1 FROM attendance_exceptions x
       WHERE x.entry_id = e.id AND x.exception_kind = 'missing_clock_out'
     )
+    -- Keyed on the day, not the entry: attendance_day_exceptions.entry_id is
+    -- nullable (ON DELETE SET NULL, and insertExceptionWithoutEntry writes
+    -- NULL), so an entry-keyed guard would miss a day that is already flagged.
     AND NOT EXISTS (
       SELECT 1 FROM attendance_day_exceptions dx
-      WHERE dx.entry_id = e.id AND dx.kind = 'missing_clock_out'
+      WHERE dx.staff_id = e.staff_id AND dx.work_date = e.work_date
+        AND dx.kind = 'missing_clock_out'
     )
+    AND ($1::uuid[] IS NULL OR e.id = ANY($1::uuid[]))
   ORDER BY e.work_date, e.staff_id`;
 
-export async function planRemediation(client: RemediationClient): Promise<RemediationPlan> {
-  const { rows } = await client.query<{
-    entry_id: string; staff_id: string; work_date: string;
-    clock_out_at: string; regular_hrs: number; blocker: string | null;
-  }>(CANDIDATE_SQL);
+interface CandidateRow extends Record<string, unknown> {
+  entry_id: string; staff_id: string; work_date: string; clock_out_at: string;
+  fabricated_hrs: number; without_summary: boolean; blocker: string | null;
+}
 
+async function selectCandidates(
+  client: RemediationClient,
+  ids: readonly string[] | null,
+): Promise<{ candidates: Candidate[]; blockers: Blocker[]; withoutSummary: number }> {
+  const { rows } = await client.query<CandidateRow>(CANDIDATE_SQL, [ids]);
   const candidates: Candidate[] = [];
   const blockers: Blocker[] = [];
+  let withoutSummary = 0;
   for (const row of rows) {
-    const base = {
-      entryId: row.entry_id, staffId: row.staff_id, workDate: row.work_date,
-    };
-    if (row.blocker) blockers.push({ ...base, reason: row.blocker });
-    else candidates.push({ ...base, clockOutAt: row.clock_out_at, regularHrs: Number(row.regular_hrs) });
+    const base = { entryId: row.entry_id, staffId: row.staff_id, workDate: row.work_date };
+    if (row.blocker) { blockers.push({ ...base, reason: row.blocker }); continue; }
+    if (row.without_summary) withoutSummary += 1;
+    candidates.push({
+      ...base, clockOutAt: row.clock_out_at, fabricatedHrs: Number(row.fabricated_hrs),
+    });
   }
+  return { candidates, blockers, withoutSummary };
+}
+
+export async function planRemediation(client: RemediationClient): Promise<RemediationPlan> {
+  const { candidates, blockers, withoutSummary } = await selectCandidates(client, null);
   const staff = new Set(candidates.map((c) => c.staffId));
   const dates = candidates.map((c) => c.workDate).sort();
   return {
     candidates,
     blockers,
+    withoutSummary,
     staffCount: staff.size,
     firstDate: dates[0] ?? null,
     lastDate: dates[dates.length - 1] ?? null,
-    fabricatedHours: candidates.reduce((sum, c) => sum + c.regularHrs, 0),
+    fabricatedHours: candidates.reduce((sum, c) => sum + c.fabricatedHrs, 0),
   };
 }
 
@@ -178,6 +205,20 @@ export async function applyRemediation(
   await client.query(BACKUP_DDL);
   const ids = candidates.map((c) => c.entryId);
 
+  // The plan was built in an earlier, separate transaction. A weekly lock, a
+  // wage, or a nightly reprojection can land in between, so eligibility is
+  // re-asserted here, inside the caller's transaction, against the same
+  // predicate. Anything that moved aborts the whole apply rather than being
+  // quietly mutated.
+  const recheck = await selectCandidates(client, ids);
+  if (recheck.candidates.length !== ids.length || recheck.blockers.length > 0) {
+    const reasons = [...new Set(recheck.blockers.map((b) => b.reason))].sort().join(', ');
+    throw new Error(
+      `Eligibility changed since the dry run: ${recheck.candidates.length}/${ids.length} still eligible` +
+      (reasons ? ` (now blocked by: ${reasons})` : '') + '. Re-run the dry run.',
+    );
+  }
+
   const entriesBackedUp = await affected(client, `
     INSERT INTO attendance_legacy_autoclose_backup (
       entry_id, staff_id, work_date, clock_out_at, received_at_out, notes
@@ -201,20 +242,26 @@ export async function applyRemediation(
   // Zero only while the row still holds exactly what was backed up. A re-run
   // after a legitimate reprojection or an approved correction therefore does
   // nothing, instead of destroying the corrected hours and leaving the backup
-  // holding only the fabricated originals.
+  // holding only the fabricated originals. Also scoped to THIS run's entries. Joining the whole backup table would let a
+  // later apply re-zero every summary any earlier run ever backed up —
+  // including days that a rollback has since restored and that are now
+  // payroll-locked and reported as blockers in the very same run.
   const summariesZeroed = await affected(client, `
     UPDATE attendance_daily_summaries ds
     SET regular_hrs = 0, overtime_hrs = 0, sunday_hrs = 0,
         holiday_hrs = 0, night_hrs = 0, computed_at = NOW()
     FROM attendance_legacy_autoclose_summary_backup b
+    JOIN attendance_entries e
+      ON e.staff_id = b.staff_id AND e.work_date = b.work_date
     WHERE ds.staff_id = b.staff_id AND ds.work_date = b.work_date
+      AND e.id = ANY($1::uuid[])
       AND ds.regular_hrs IS NOT DISTINCT FROM b.regular_hrs
       AND ds.overtime_hrs IS NOT DISTINCT FROM b.overtime_hrs
       AND ds.sunday_hrs IS NOT DISTINCT FROM b.sunday_hrs
       AND ds.holiday_hrs IS NOT DISTINCT FROM b.holiday_hrs
       AND ds.night_hrs IS NOT DISTINCT FROM b.night_hrs
       AND (ds.regular_hrs <> 0 OR ds.overtime_hrs <> 0 OR ds.sunday_hrs <> 0
-           OR ds.holiday_hrs <> 0 OR ds.night_hrs <> 0)`);
+           OR ds.holiday_hrs <> 0 OR ds.night_hrs <> 0)`, [ids]);
 
   const entriesCleared = await affected(client, `
     UPDATE attendance_entries e

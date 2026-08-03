@@ -1,4 +1,4 @@
-import { Pool, type QueryResult, type QueryResultRow } from 'pg';
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -13,18 +13,16 @@ const dbDescribe = DATABASE_URL ? describe : describe.skip;
 const SCHEMA = 'autoclose_reset_scratch';
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: false, max: 2, connectionTimeoutMillis: 10_000 });
 
-/** Pins every statement to the scratch schema, so nothing can reach public. */
+// ONE connection for the whole suite, not one per statement: a pooled
+// connection per query would silently run each statement in its own
+// autocommit transaction, so BEGIN/COMMIT/ROLLBACK — and whether a partial
+// mutation can commit — would have no coverage at all.
+let conn: PoolClient;
 const client: RemediationClient = {
   async query<T extends QueryResultRow = QueryResultRow>(
     text: string, values: readonly unknown[] = [],
   ): Promise<QueryResult<T>> {
-    const conn = await pool.connect();
-    try {
-      await conn.query(`SET search_path = ${SCHEMA}`);
-      return await conn.query<T>(text, values as unknown[]);
-    } finally {
-      conn.release();
-    }
+    return conn.query<T>(text, values as unknown[]);
   },
 };
 
@@ -46,8 +44,12 @@ const PREREQ = `
   );
   CREATE TABLE attendance_exceptions (
     id BIGSERIAL PRIMARY KEY, entry_id UUID NOT NULL, exception_kind TEXT NOT NULL);
+  -- entry_id is nullable in production (ON DELETE SET NULL, and
+  -- insertExceptionWithoutEntry writes NULL), which is why the guard keys on
+  -- the day rather than the entry.
   CREATE TABLE attendance_day_exceptions (
-    id BIGSERIAL PRIMARY KEY, entry_id UUID, kind TEXT NOT NULL);
+    id BIGSERIAL PRIMARY KEY, entry_id UUID, staff_id UUID NOT NULL,
+    work_date DATE NOT NULL, kind TEXT NOT NULL);
   CREATE TABLE attendance_weekly_locks (
     week_start_date DATE PRIMARY KEY, unlocked_at TIMESTAMPTZ);
   CREATE TABLE attendance_schedule_policies (
@@ -95,10 +97,13 @@ dbDescribe('legacy auto-close remediation', () => {
   beforeAll(async () => {
     await pool.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
     await pool.query(`CREATE SCHEMA ${SCHEMA}`);
+    conn = await pool.connect();
+    await conn.query(`SET search_path = ${SCHEMA}`);
     await client.query(PREREQ);
   }, 60_000);
 
   afterAll(async () => {
+    conn.release();
     await pool.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
     const leaked = await pool.query(
       `SELECT COUNT(*)::int AS n FROM pg_namespace WHERE nspname = $1`, [SCHEMA]);
@@ -113,7 +118,7 @@ dbDescribe('legacy auto-close remediation', () => {
     const plan = await planRemediation(client);
     expect(plan.candidates).toHaveLength(1);
     expect(plan.blockers).toHaveLength(0);
-    expect(plan.fabricatedHours).toBe(9);
+    expect(plan.fabricatedHours).toBeCloseTo(9.55); // all five columns, not regular alone
 
     await applyRemediation(client, plan.candidates);
 
@@ -158,13 +163,16 @@ dbDescribe('legacy auto-close remediation', () => {
     expect(rows[0].clock_out_at).not.toBeNull();
   });
 
-  it('skips an entry already carrying a missing_clock_out in either exception table', async () => {
+  // The second case deliberately uses a NULL entry_id: that is what
+  // insertExceptionWithoutEntry writes, and an entry-keyed guard would miss it.
+  it('skips a day already carrying a missing_clock_out in either exception table', async () => {
     await seedFabricated(E(1), S(1), '2026-05-04');
     await seedFabricated(E(2), S(2), '2026-05-05');
     await client.query(
       `INSERT INTO attendance_exceptions (entry_id, exception_kind) VALUES ($1::uuid, 'missing_clock_out')`, [E(1)]);
     await client.query(
-      `INSERT INTO attendance_day_exceptions (entry_id, kind) VALUES ($1::uuid, 'missing_clock_out')`, [E(2)]);
+      `INSERT INTO attendance_day_exceptions (entry_id, staff_id, work_date, kind)
+       VALUES (NULL, $1::uuid, DATE '2026-05-05', 'missing_clock_out')`, [S(2)]);
 
     const plan = await planRemediation(client);
 
@@ -180,16 +188,25 @@ dbDescribe('legacy auto-close remediation', () => {
     await client.query(
       `UPDATE attendance_daily_summaries SET regular_hrs = 8.00 WHERE staff_id = $1::uuid`, [S(1)]);
 
-    await applyRemediation(client, first.candidates);
+    // Re-running the tool re-plans, and the cleared entry is no longer a
+    // candidate, so there is nothing to apply.
+    const second = await planRemediation(client);
+    expect(second.candidates).toHaveLength(0);
+    await applyRemediation(client, second.candidates);
 
+    expect(await hours(S(1), '2026-05-04')).toBe(8);
+    // Replaying the STALE list aborts rather than mutating anything.
+    await expect(applyRemediation(client, first.candidates))
+      .rejects.toThrow('Eligibility changed since the dry run');
     expect(await hours(S(1), '2026-05-04')).toBe(8);
   });
 
-  it('does not re-append its note on a second apply', async () => {
+  it('does not re-append its note when the tool is run twice', async () => {
     await seedFabricated(E(1), S(1), '2026-05-04');
     const plan = await planRemediation(client);
     await applyRemediation(client, plan.candidates);
-    await applyRemediation(client, plan.candidates);
+    const second = await planRemediation(client);
+    await applyRemediation(client, second.candidates);
 
     const { rows } = await client.query<{ notes: string }>(
       `SELECT notes FROM attendance_entries WHERE id = $1::uuid`, [E(1)]);
@@ -225,6 +242,94 @@ dbDescribe('legacy auto-close remediation', () => {
     expect(result.skippedChangedSummaries).toBe(1);
     expect(result.summariesRestored).toBe(0);
     expect(await hours(S(1), '2026-05-04')).toBe(8);
+  });
+
+  // The zeroing UPDATE must be scoped to THIS run's entries. Joining the whole
+  // backup table would let a later apply re-zero every summary any earlier run
+  // ever backed up — including days a rollback restored that are now locked.
+  it('does not re-zero a previously restored day when a later apply runs', async () => {
+    await seedFabricated(E(1), S(1), '2026-05-04');
+    const first = await planRemediation(client);
+    await applyRemediation(client, first.candidates);
+    await rollbackRemediation(client);
+    expect(await hours(S(1), '2026-05-04')).toBe(9);
+
+    // A different entry becomes eligible later; the restored day must be untouched.
+    await seedFabricated(E(2), S(2), '2026-05-06');
+    const second = await planRemediation(client);
+    expect(second.candidates.map((c) => c.entryId)).toContain(E(2));
+    await applyRemediation(client, second.candidates.filter((c) => c.entryId === E(2)));
+
+    expect(await hours(S(1), '2026-05-04')).toBe(9);
+    expect(await hours(S(2), '2026-05-06')).toBe(0);
+  });
+
+  // The plan is built in an earlier transaction, so eligibility is re-asserted
+  // inside the apply. A lock landing in between must abort, not be mutated.
+  it('aborts the apply when a candidate became blocked since the plan', async () => {
+    await seedFabricated(E(1), S(1), '2026-05-04');
+    const plan = await planRemediation(client);
+    expect(plan.candidates).toHaveLength(1);
+    await client.query(
+      `INSERT INTO attendance_weekly_locks (week_start_date) VALUES (DATE '2026-05-04')`);
+
+    await expect(applyRemediation(client, plan.candidates))
+      .rejects.toThrow('Eligibility changed since the dry run');
+
+    const { rows } = await client.query<{ clock_out_at: Date | null }>(
+      `SELECT clock_out_at FROM attendance_entries WHERE id = $1::uuid`, [E(1)]);
+    expect(rows[0].clock_out_at).not.toBeNull();
+    expect(await hours(S(1), '2026-05-04')).toBe(9);
+  });
+
+  it('commits nothing when the apply throws mid-transaction', async () => {
+    await seedFabricated(E(1), S(1), '2026-05-04');
+    const plan = await planRemediation(client);
+    await client.query('BEGIN');
+    await applyRemediation(client, plan.candidates);
+    await client.query('ROLLBACK');
+
+    const { rows } = await client.query<{ clock_out_at: Date | null }>(
+      `SELECT clock_out_at FROM attendance_entries WHERE id = $1::uuid`, [E(1)]);
+    expect(rows[0].clock_out_at).not.toBeNull();
+    expect(await hours(S(1), '2026-05-04')).toBe(9);
+    // The backup DDL is transactional too, so it rolls back with everything else.
+    const { rows: t } = await client.query<{ present: boolean }>(
+      `SELECT to_regclass('attendance_legacy_autoclose_backup') IS NOT NULL AS present`);
+    expect(t[0].present).toBe(false);
+  });
+
+  // An entry auto-closed outside the window that ever wrote summaries has no
+  // summary row at all. An INNER join would drop it from candidates AND
+  // blockers, hiding it from the operator and from --expect.
+  it('still remediates a fabricated entry that has no summary row', async () => {
+    await seedFabricated(E(1), S(1), '2026-05-04');
+    await client.query(`DELETE FROM attendance_daily_summaries`);
+
+    const plan = await planRemediation(client);
+
+    expect(plan.candidates).toHaveLength(1);
+    expect(plan.withoutSummary).toBe(1);
+    await applyRemediation(client, plan.candidates);
+    const { rows } = await client.query<{ clock_out_at: Date | null }>(
+      `SELECT clock_out_at FROM attendance_entries WHERE id = $1::uuid`, [E(1)]);
+    expect(rows[0].clock_out_at).toBeNull();
+  });
+
+  it('strips its note and restores an entry whose notes were empty at apply time', async () => {
+    await seedFabricated(E(1), S(1), '2026-05-04');
+    await client.query(`UPDATE attendance_entries SET notes = NULL WHERE id = $1::uuid`, [E(1)]);
+    const plan = await planRemediation(client);
+    await applyRemediation(client, plan.candidates);
+    await client.query(
+      `UPDATE attendance_entries SET notes = notes || E'\nlater note' WHERE id = $1::uuid`, [E(1)]);
+
+    await rollbackRemediation(client);
+
+    const { rows } = await client.query<{ notes: string | null; clock_out_at: Date | null }>(
+      `SELECT notes, clock_out_at FROM attendance_entries WHERE id = $1::uuid`, [E(1)]);
+    expect(rows[0].notes).toBe('later note');
+    expect(rows[0].clock_out_at).not.toBeNull();
   });
 
   it('rollback reports it did nothing when the remediation was never applied', async () => {

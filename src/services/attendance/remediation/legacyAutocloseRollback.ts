@@ -75,17 +75,17 @@ export async function rollbackRemediation(client: RemediationClient): Promise<Ro
     SET clock_out_at = b.clock_out_at, received_at_out = b.received_at_out,
         updated_at = NOW()
     FROM attendance_legacy_autoclose_backup b
-    WHERE b.entry_id = e.id AND e.clock_out_at IS NULL`, []);
+    WHERE b.entry_id = e.id AND e.clock_out_at IS NULL
+      AND strpos(COALESCE(e.notes, ''), $1::text) > 0`, [RESET_NOTE]);
 
   // Strip only the line this remediation appended. Restoring notes wholesale
   // from the backup would delete anything written since.
   const notesStripped = await affected(client, `
     UPDATE attendance_entries e
     SET notes = NULLIF(
-          CASE WHEN e.notes = $1::text THEN ''
-               ELSE REPLACE(e.notes, E'\n' || $1::text, '') END, '')
+          btrim(REPLACE(REPLACE(e.notes, E'\n' || $1::text, ''), $1::text, ''), E'\n'), '')
     FROM attendance_legacy_autoclose_backup b
-    WHERE b.entry_id = e.id AND e.notes LIKE '%' || $1::text || '%'`, [RESET_NOTE]);
+    WHERE b.entry_id = e.id AND strpos(COALESCE(e.notes, ''), $1::text) > 0`, [RESET_NOTE]);
 
   return {
     applied: true,
@@ -157,7 +157,8 @@ export async function restorePolicy(client: RemediationClient): Promise<PolicyBa
   if (!(await backupExists(client, 'attendance_legacy_autoclose_policy_backup'))) return null;
   const { rows } = await client.query<{ policy_id: string; active_from: string }>(`
     SELECT policy_id::text, TO_CHAR(active_from, 'YYYY-MM-DD') AS active_from
-    FROM attendance_legacy_autoclose_policy_backup`);
+    FROM attendance_legacy_autoclose_policy_backup
+    ORDER BY backed_up_at ASC LIMIT 1`);
   const backup = rows[0];
   if (!backup) return null;
   const current = await client.query<{ active_from: string }>(`
