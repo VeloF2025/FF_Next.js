@@ -266,3 +266,71 @@ describe('date bounds and period rendering', () => {
     for (const point of series) expect(point.dimensions.zone).toBe('1');
   });
 });
+
+describe('metrics restored from the deleted Cortex catalogue', () => {
+  // SQL validity is already covered — every registered metric is enrolled above. These
+  // pin the VALUES, because a predicate silently dropped from `from` still executes.
+
+  it('counts only Active activations', async () => {
+    const def = findMetric('activations')!;
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+    const { total } = summarise(def, toSeries(await run(sql, params), []));
+    expect(total).toBe(2); // 3 would mean the Cancelled row leaked in
+  });
+
+  it('reports open snags as a current-state count with no period', async () => {
+    const def = findMetric('open_snags')!;
+    // Deliberately request a window: a current-state metric must IGNORE it. If a date
+    // filter ever appears in `from`, this assertion changes and the test fails.
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+    const series = toSeries(await run(sql, params), []);
+    expect(series).toHaveLength(1);
+    expect(series[0]!.period).toBeNull(); // NULL::text — drives the "(current)" wording
+    const { total, totalPeriod } = summarise(def, series);
+    expect(total).toBe(3); // open + in_progress + the NULL-status row
+    expect(totalPeriod).toBeNull();
+  });
+
+  it('reports open tickets the same way', async () => {
+    const def = findMetric('open_tickets')!;
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+    const series = toSeries(await run(sql, params), []);
+    const { total, totalPeriod } = summarise(def, series);
+    expect(total).toBe(3); // open + assigned + NULL
+    expect(totalPeriod).toBeNull();
+  });
+
+  it('ignores the requested window entirely for a current-state metric', async () => {
+    // Same metric, a window that shares no days with the seeded data. A date-filtered
+    // metric would return 0; a current-state one must still report the live count.
+    const def = findMetric('open_snags')!;
+    const { sql, params } = buildMetricQuery(def, {
+      from: '2020-01-01', to: '2020-01-02', grain: 'day', dimensions: [],
+    });
+    const { total } = summarise(def, toSeries(await run(sql, params), []));
+    expect(total).toBe(3);
+  });
+
+  it('counts a NULL status as open — and the IS NULL clause is load-bearing', async () => {
+    // `NULL NOT IN ('closed',...)` is unknown, not true, so a bare NOT IN DISCARDS the
+    // row, under-reporting the very thing the metric counts. Neither column has a NOT
+    // NULL constraint, so this is one bad insert away from being live.
+    //
+    // Asserting the metric returns 3 is not enough on its own — it would also pass if the
+    // fixture happened to hold 3 non-terminal rows for some other reason. So run the
+    // metric's OWN generated SQL, then run it again with the IS NULL clause stripped, and
+    // require the two to DIFFER. That fails if the clause is ever removed.
+    const def = findMetric('open_snags')!;
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+
+    const withClause = summarise(def, toSeries(await run(sql, params), [])).total;
+
+    const strippedSql = sql.replace('src0.status IS NULL OR ', '');
+    expect(strippedSql, 'the IS NULL clause was not found to strip').not.toBe(sql);
+    const withoutClause = summarise(def, toSeries(await run(strippedSql, params), [])).total;
+
+    expect(withClause).toBe(3); // open + in_progress + NULL
+    expect(withoutClause).toBe(2); // the NULL row silently vanishes
+    expect(withClause).toBeGreaterThan(withoutClause);
+  });
+});

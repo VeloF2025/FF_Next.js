@@ -67,3 +67,37 @@ describe('matchMetric', () => {
     expect(matchMetric('anything at all', [stub]).kind).toBe('none');
   });
 });
+
+describe('pre-provision questions never reach an event count', () => {
+  // A bare 'pre-provisions' alias would outrank 'pre-provision backlog' (which only
+  // matches that exact singular phrase) and steal backlog questions — answering a
+  // stock question with an inflated event count. Registering no such alias is what
+  // prevents it; these pin the phrasings that would have misrouted.
+  it('routes backlog phrasings to the open balance, not an event count', () => {
+    for (const q of [
+      'how many open pre-provisions are there',
+      'how many pre-provisions are in the backlog',
+      'what is our current pre-provision backlog',
+    ]) {
+      const r = matchMetric(q);
+      if (r.kind === 'exact') {
+        expect(r.metric.key, `"${q}" misrouted`).toBe('pp_open_balance');
+      } else {
+        // 'none' is acceptable — it falls through to prose rather than answering wrongly.
+        expect(r.kind, `"${q}" must never resolve to an event count`).toBe('none');
+      }
+    }
+  });
+
+  it('routes snags and tickets to their own metrics', () => {
+    for (const [q, key] of [
+      ['how many open snags are there', 'open_snags'],
+      ['how many open tickets', 'open_tickets'],
+      ['how many activations last week', 'activations'],
+    ] as const) {
+      const r = matchMetric(q);
+      expect(r.kind, `"${q}" did not match exactly`).toBe('exact');
+      if (r.kind === 'exact') expect(r.metric.key, `"${q}"`).toBe(key);
+    }
+  });
+});

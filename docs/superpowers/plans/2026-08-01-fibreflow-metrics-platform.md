@@ -1950,9 +1950,28 @@ git commit -m "feat(metrics): expose metrics.list and metrics.query with RBAC an
 
 **The Cortex change is a separate PR in a separate repo.** Do not merge it before the FibreFlow side is deployed to dev and verified.
 
-- [ ] **Step 1: Leave `metric:preprovisions` byte-identical**
+- [x] ~~**Step 1: Leave `metric:preprovisions` byte-identical**~~ — **WITHDRAWN 2026-08-03. Do not execute this step.**
 
-The constraint is explicit: do not change the existing response shape until `pp_new` is registered and verified equivalent. `pp_new` lands in **Plan 2**, not here. So `preprovisions` stays exactly as it is, still reading `dr_activity_log`. Only the three new metrics route through the registry.
+> ⚠️ **The number this step told you to preserve is wrong by ~5x.** Measured on the live DB
+> 2026-08-03: `dr_activity_log` does not log a pre-provision once, it **re-logs an unresolved
+> one roughly daily** — three drops carry 141 rows each spanning 2026-04-30..2026-07-12. For
+> July the original SQL returns **1,107** against **264** distinct drops touched and **219**
+> first-ever additions. It is the same "summing something that cannot be summed over time"
+> failure as `zone_uptake`, reached by re-logging rather than cumulative snapshotting.
+>
+> Cortex #164 deleted the metric; FF #2363 deliberately did **not** restore it, and a registry
+> test now asserts it stays absent along with its `pre-provisions` alias (which also stole
+> backlog questions from `pp_open_balance`). The question falls through to prose, which is
+> honest — a confident 1,107 is not.
+>
+> **Do not restore it to satisfy "byte-identical".** Doing so re-implements a proven defect.
+> Which number is meant — 219 new / 264 touched / 1,107 events — is a business decision, and
+> belongs with `pp_new` in Plan 2. A correct definition needs a first-occurrence or DISTINCT
+> basis and a value-assertion test.
+
+The original intent — do not change a response shape until an equivalent replacement is
+verified — was sound. It failed only because it assumed the existing number was correct.
+Verify that assumption before preserving any legacy metric.
 
 - [ ] **Step 2: Remove the silent-RAG fallback for registry-backed metrics entirely**
 
@@ -2011,7 +2030,7 @@ git commit -m "docs(metrics): how to register a new metric"
 | RBAC | Unauthenticated → 401; unpermitted → 403; null session denies rather than fails open |
 | Cron auth | Unset `CRON_SECRET` returns 500, not success; a failed source returns non-2xx |
 | Timeout | `statement_timeout` demonstrably applies — a deliberately slow query aborts at 8s rather than running unbounded |
-| Compatibility | `metric:preprovisions` response byte-identical to today's |
+| ~~Compatibility~~ | ~~`metric:preprovisions` response byte-identical to today's~~ — **gate withdrawn**, see Task 7 Step 1. The metric was proven ~5x wrong and deliberately not restored (FF #2363); there is no response to be compatible with. |
 | CI | `npm run ci:quick` passes; `bash scripts/test-ratchet.sh --changed origin/master` passes; `next build` verified manually |
 
 ## Known follow-ups (not in this plan)
