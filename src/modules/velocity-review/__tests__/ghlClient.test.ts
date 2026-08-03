@@ -176,7 +176,7 @@ describe('HighLevelClient', () => {
     [422, false],
   ])('classifies HTTP %i correctly', async (status, retryable) => {
     vi.mocked(global.fetch).mockResolvedValue(response({ message: 'request rejected' }, status,
-      status === 429 ? { 'Retry-After': '120' } : undefined));
+      status === 429 ? { 'Retry-After': '5' } : undefined));
     // A 429 is now replayed in place before it surfaces, so the backoff sleep must be
     // stubbed or this test waits out the real Retry-After.
     const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
@@ -187,12 +187,46 @@ describe('HighLevelClient', () => {
       name: 'HighLevelRequestError', status, retryable, ambiguousMutation: false,
     });
     if (status === 429) {
-      expect((error as HighLevelRequestError).retryAfterSeconds).toBe(120);
+      expect((error as HighLevelRequestError).retryAfterSeconds).toBe(5);
       // Initial attempt + MAX_RATE_LIMIT_RETRIES replays, then the error surfaces.
       expect(global.fetch).toHaveBeenCalledTimes(5);
     } else {
       expect(global.fetch).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it('defers rather than replaying when Retry-After exceeds the in-place wait ceiling', async () => {
+    // Replaying in place is only worth it while the wait is short. This sleep happens
+    // inside Promise.allSettled with no view of the run deadline, so an unbounded wait
+    // could burn the drain margin and push the run past its cron wrapper — an
+    // ungraceful kill instead of the orderly defer the processor already implements.
+    // 120s is over the ceiling, so the error must surface on the FIRST attempt, still
+    // retryable, letting nextRetryAt/claimCutoff park it for a later run.
+    vi.mocked(global.fetch).mockResolvedValue(
+      response({ message: 'rate limited' }, 429, { 'Retry-After': '120' }),
+    );
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    const error = await client.getContact('contact-1').catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject<Partial<HighLevelRequestError>>({
+      name: 'HighLevelRequestError', status: 429, retryable: true,
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops replaying once the cumulative wait would exceed the total budget', async () => {
+    // Individually under the 30s ceiling, but four of them exceed the 60s total, so the
+    // replays stop early rather than compounding into a minute-plus stall.
+    vi.mocked(global.fetch).mockResolvedValue(
+      response({ message: 'rate limited' }, 429, { 'Retry-After': '25' }),
+    );
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    await client.getContact('contact-1').catch(() => undefined);
+
+    // 25s + 25s = 50s spent; a third would reach 75s > 60s budget, so it stops at 3 calls.
+    expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
   it('marks an unacknowledged tag addition as ambiguous without leaking secrets', async () => {
@@ -310,6 +344,73 @@ describe('loadVelocityReviewGhlConfig', () => {
 });
 
 describe('GhlRateLimiter', () => {
+  it('serialises genuinely concurrent acquisitions instead of admitting a burst', async () => {
+    // The sequential tests below cannot see the property this limiter exists for: four
+    // workers calling acquire() at the SAME instant must queue for tokens, not all
+    // observe "window has space" together. That simultaneous-observation burst is the
+    // shape that tripped the live 25-req/10s ceiling.
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(1, 10_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    // All three start before any completes — no awaiting in between.
+    await Promise.all([limiter.acquire(), limiter.acquire(), limiter.acquire()]);
+
+    // One token per window, so the second and third each had to wait for it to roll.
+    // If acquisition were not serialised they would all have observed the same empty
+    // window at t=0, taken the one token together, and slept zero times.
+    expect(slept).toEqual([10_001, 10_001]);
+  });
+
+  it('clamps absurd ceilings and tiny windows adopted from response headers', async () => {
+    // The header is first-party and normally sane, but an untrusted value is adopted
+    // verbatim without a clamp: a huge max silently defangs the limiter, and a tiny
+    // window lets it permit a burst. Both degrade to "slightly wrong" instead of "off".
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(1, 60_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    limiter.observeLimits({ get: (name: string) => (
+      name === 'x-ratelimit-max' ? '2000'
+        : name === 'x-ratelimit-interval-milliseconds' ? '1'
+          : null) } as Pick<Headers, 'get'>);
+
+    // Window floored to 1000ms, not the advertised 1ms.
+    for (let i = 0; i < 1_000; i += 1) await limiter.acquire();
+    expect(slept).toEqual([]);
+
+    // Max ceilinged to 1000, so the 1001st waits a full floored window rather than
+    // sailing through on an adopted ceiling of 1999.
+    await limiter.acquire();
+    expect(slept).toEqual([1_001]);
+  });
+
+  it('penalises every caller after a 429, not just the one that hit it', async () => {
+    // An earlier revision cleared the window on 429. Because the limiter is shared by
+    // all concurrent exports, that let the other workers burst at the exact moment the
+    // server said it was overloaded. A 429 means the window is FULL, not empty.
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(50, 10_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    // Worker A is told to back off for 5s.
+    limiter.penaliseFor(5_000);
+
+    // Worker B, which never saw the 429, must still wait it out.
+    await limiter.acquire();
+
+    expect(slept).toEqual([5_000]);
+  });
+
   it('holds requests to the window ceiling instead of letting them burst', async () => {
     let now = 0;
     const slept: number[] = [];

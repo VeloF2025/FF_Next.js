@@ -1,7 +1,13 @@
+import {
+  isAbsentDuplicate, isWhatsappDndBlocked, retryAfterSeconds, safeErrorText,
+} from './ghlResponse';
+import { GhlRateLimiter } from './ghlRateLimiter';
+
+// Re-exported so './ghlClient' stays the module's entry point for callers and tests.
+export { GhlRateLimiter } from './ghlRateLimiter';
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 const GHL_API_VERSION = '2021-07-28';
 const REQUEST_TIMEOUT_MS = 15_000;
-const MAX_ERROR_TEXT_LENGTH = 160;
 
 // Measured against the live Velocity location on 2026-08-03:
 //   x-ratelimit-max: 25   x-ratelimit-interval-milliseconds: 10000
@@ -10,73 +16,22 @@ const MAX_ERROR_TEXT_LENGTH = 160;
 // concurrency was written against. Start below the observed burst ceiling and leave
 // headroom for anything else using the same token; observeLimits() re-reads the real
 // numbers from every response, so this is only the value used before the first reply.
-const DEFAULT_RATE_LIMIT_MAX = 20;
-const DEFAULT_RATE_LIMIT_WINDOW_MS = 10_000;
 // A 429 means the request was rejected, never executed, so replaying it cannot
 // duplicate a mutation. Retry in place rather than failing the export out to a later
 // run — a deferred export holds its phone's in-flight slot and blocks other DRs.
-const MAX_RATE_LIMIT_RETRIES = 4;
-const RATE_LIMIT_FALLBACK_WAIT_MS = 2_000;
-
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-function positiveInt(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const parsed = Number(value.trim());
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
-/**
- * Sliding-window limiter shared by every request from one client instance.
- *
- * Acquisition is serialised through a promise chain so that concurrent exports queue
- * for tokens instead of all observing "window has space" at the same instant.
- */
-export class GhlRateLimiter {
-  private hits: number[] = [];
-  private chain: Promise<void> = Promise.resolve();
-
-  constructor(
-    private max: number = DEFAULT_RATE_LIMIT_MAX,
-    private windowMs: number = DEFAULT_RATE_LIMIT_WINDOW_MS,
-    private readonly now: () => number = () => Date.now(),
-    private readonly sleep: (ms: number) => Promise<void> = defaultSleep,
-  ) {}
-
-  /** Re-read the authoritative ceiling from a live response. */
-  observeLimits(headers: Pick<Headers, 'get'>): void {
-    const max = positiveInt(headers.get('x-ratelimit-max'));
-    const windowMs = positiveInt(headers.get('x-ratelimit-interval-milliseconds'));
-    // Stay a token under the advertised ceiling: the window is server-side and its
-    // boundary does not line up with ours, so spending the last token invites a 429.
-    if (max !== null) this.max = Math.max(1, max - 1);
-    if (windowMs !== null) this.windowMs = windowMs;
-  }
-
-  async acquire(): Promise<void> {
-    const next = this.chain.then(() => this.reserve());
-    this.chain = next.then(() => undefined, () => undefined);
-    return next;
-  }
-
-  private async reserve(): Promise<void> {
-    for (;;) {
-      const at = this.now();
-      this.hits = this.hits.filter((hit) => at - hit < this.windowMs);
-      if (this.hits.length < this.max) {
-        this.hits.push(at);
-        return;
-      }
-      const oldest = this.hits[0] ?? at;
-      await this.sleep(Math.max(1, this.windowMs - (at - oldest) + 1));
-    }
-  }
-
-  /** Drop recorded hits so a post-429 backoff is not double-counted. */
-  reset(): void {
-    this.hits = [];
-  }
-}
+const MAX_RATE_LIMIT_RETRIES = 4;
+// Ceiling on a single in-place replay wait, and on the cumulative wait across all
+// replays of one request. Beyond either, the 429 is rethrown as the retryable error
+// it already is, so processor.ts defers it through nextRetryAt/claimCutoff — the
+// deadline-aware path. Replaying in place is only worth it while the wait is short:
+// this sleep happens inside Promise.allSettled and, unbounded, one worker sitting on
+// a large Retry-After could burn the 3-minute drain margin and push the run past its
+// 30-minute cron wrapper, turning an orderly defer into an ungraceful kill.
+const MAX_RATE_LIMIT_WAIT_MS = 30_000;
+const MAX_RATE_LIMIT_TOTAL_WAIT_MS = 60_000;
+const RATE_LIMIT_FALLBACK_WAIT_MS = 2_000;
 
 type Environment = Record<string, string | undefined>;
 type RequestKind = 'read' | 'upsert' | 'tag-add' | 'tag-remove';
@@ -156,30 +111,6 @@ export function loadVelocityReviewGhlConfig(env: Environment): VelocityReviewGhl
   };
 }
 
-function retryAfterSeconds(response: Response): number | undefined {
-  const value = response.headers.get('Retry-After')?.trim();
-  return value && /^(0|[1-9]\d*)$/.test(value) ? Number(value) : undefined;
-}
-
-function isWhatsappDndBlocked(contact: Record<string, unknown>): boolean {
-  if (contact.dnd === true) return true;
-  const dndSettings = contact.dndSettings;
-  if (!dndSettings || typeof dndSettings !== 'object') return false;
-  const whatsapp = (dndSettings as Record<string, unknown>).WhatsApp;
-  if (!whatsapp || typeof whatsapp !== 'object') return false;
-  const status = (whatsapp as Record<string, unknown>).status;
-  return status === 'active' || status === 'permanent';
-}
-
-// Narrow: only an object carrying an explicit null/absent `contact` counts as "no
-// duplicate". Anything else (a malformed body, a contact without an id) still reaches
-// contactFrom and throws, so genuine protocol errors are not silently swallowed here.
-function isAbsentDuplicate(value: unknown): boolean {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (!('contact' in value)) return false;
-  return (value as Record<string, unknown>).contact == null;
-}
-
 function contactFrom(value: unknown): HighLevelContact {
   const contact = value && typeof value === 'object' && 'contact' in value
     ? (value as Record<string, unknown>).contact
@@ -204,20 +135,6 @@ function contactFrom(value: unknown): HighLevelContact {
     customFields,
     whatsappDndBlocked: isWhatsappDndBlocked(record),
   };
-}
-
-function safeErrorText(raw: string, token: string): string {
-  let text = raw.slice(0, MAX_ERROR_TEXT_LENGTH);
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const message = parsed.message ?? parsed.error;
-    text = Array.isArray(message) ? message.join(', ') : String(message ?? text);
-  } catch {
-    // A non-JSON error body is bounded below and never required for correctness.
-  }
-  return text.slice(0, MAX_ERROR_TEXT_LENGTH)
-    .replaceAll(token, '[redacted]')
-    .replace(/\+?\d[\d\s().-]{7,}\d/g, '[redacted]');
 }
 
 export class HighLevelClient {
@@ -290,6 +207,7 @@ export class HighLevelClient {
   }
 
   private async request(path: string, method: 'GET' | 'POST' | 'DELETE', body: unknown, kind: RequestKind): Promise<unknown> {
+    let waited = 0;
     for (let attempt = 0; ; attempt += 1) {
       try {
         return await this.sendOnce(path, method, body, kind);
@@ -298,10 +216,17 @@ export class HighLevelClient {
         // rejected without being executed, so replaying cannot duplicate a tag write.
         const rateLimited = error instanceof HighLevelRequestError && error.status === 429;
         if (!rateLimited || attempt >= MAX_RATE_LIMIT_RETRIES) throw error;
-        const waitMs = (error as HighLevelRequestError).retryAfterSeconds !== undefined
-          ? (error as HighLevelRequestError).retryAfterSeconds! * 1_000
+        const retryAfter = (error as HighLevelRequestError).retryAfterSeconds;
+        const waitMs = retryAfter !== undefined
+          ? retryAfter * 1_000
           : RATE_LIMIT_FALLBACK_WAIT_MS * (attempt + 1);
-        this.limiter.reset();
+        // Too long to hold a worker: defer instead. The error is already retryable,
+        // so the export parks with nextRetryAt and is reclaimed on a later run.
+        if (waitMs > MAX_RATE_LIMIT_WAIT_MS
+          || waited + waitMs > MAX_RATE_LIMIT_TOTAL_WAIT_MS) throw error;
+        waited += waitMs;
+        // Hold every worker off, not just this one — the window is full, not empty.
+        this.limiter.penaliseFor(waitMs);
         await this.sleep(waitMs);
       }
     }
