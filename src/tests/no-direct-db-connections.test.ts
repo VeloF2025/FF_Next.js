@@ -16,7 +16,7 @@ describe('No Direct Database Connections', () => {
   // Patterns that indicate direct database usage
   const dbPatterns = [
     /createNeonClient\s*\(/,
-    /sql\s*`/,
+    /(?<!`)sql\s*`/,
     /neon\s*\(/,
     /import.*from\s*['"]@neondatabase\/serverless['"]/,
     /import.*from\s*['"]@\/lib\/neon-sql['"]/,
@@ -43,9 +43,6 @@ describe('No Direct Database Connections', () => {
     //   reached only from pages/api/** and the WA send clients; no component
     //   imports it, and it appears in no client chunk.
     'modules/communications/whatsapp/config/waProviderConfig.ts',
-    // Server-only metrics snapshot source registry. Imported by the cron API
-    // and snapshot writer only; no component or client entry point imports it.
-    'modules/metrics/snapshot/sources.ts',
     //   five files reference it, all in type position and therefore erased at
     //   compile time — StatusPill.tsx, SummaryBar.tsx, FilterBar.tsx and
     //   filters.ts via `import type`, and types.ts via a type-position
@@ -77,6 +74,19 @@ describe('No Direct Database Connections', () => {
       allowed.includes('/') ? relative === allowed : fileName === allowed
     );
   }
+
+  it.each([
+    ['a direct tagged template', 'const rows = sql`SELECT 1`;', true],
+    ['a spaced direct tagged template', 'const rows = sql   `SELECT 1`;', true],
+    ['Markdown inline code', 'Every `sql` must return three columns.', false],
+  ])('classifies %s correctly', (_name, source, expected) => {
+    expect(dbPatterns.some((pattern) => pattern.test(source))).toBe(expected);
+  });
+
+  it('scans the metrics snapshot source instead of allowlisting it', () => {
+    const metricsSource = join(srcDir, 'modules/metrics/snapshot/sources.ts');
+    expect(isExcluded(metricsSource)).toBe(false);
+  });
 
   function scanDirectory(dir: string): string[] {
     const violations: string[] = [];
