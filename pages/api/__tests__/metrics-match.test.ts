@@ -6,15 +6,20 @@ vi.mock('@/lib/permissions', () => ({
   userHasPermission: vi.fn(),
 }));
 
-// Give pp_open_balance a permission of its own. All three real metrics declare
+// Give zone_uptake a permission of its own. Every real metric declares
 // `analytics.reports`, so without this no allow/deny combination could separate
 // "filtered before matching" from "matched then discarded".
+//
+// zone_uptake rather than pp_open_balance: the hidden metric's alias must outrank a
+// permitted one, and 'open pre-provisions' cannot serve because 'pre-provisions' (the
+// event-count metric) is a substring of it — a question carrying the long alias always
+// carries the short one too, so neither ordering can be isolated.
 vi.mock('@/modules/metrics/registry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/metrics/registry')>();
   return {
     ...actual,
     METRICS: actual.METRICS.map((m) =>
-      m.key === 'pp_open_balance' ? { ...m, permission: 'hidden.permission' } : m,
+      m.key === 'zone_uptake' ? { ...m, permission: 'hidden.permission' } : m,
     ),
   };
 });
@@ -120,24 +125,30 @@ describe('GET /api/metrics-match', () => {
 
   it('filters BEFORE matching, so a hidden metric cannot mask a permitted one', async () => {
     // ⚠️ Denying everything and expecting 'none' does NOT distinguish the two
-    // orderings — match-then-discard produces 'none' too. This question contains
-    // both 'open pre-provisions' (19 chars) and 'zone uptake' (11), so the
-    // longest-alias rule makes the DENIED metric win outright:
-    //   filter first        -> zone_uptake, an answer the caller may have
+    // orderings — match-then-discard produces 'none' too. The question must contain a
+    // DENIED alias that outranks a PERMITTED one, so that only filter-first can return
+    // an answer:
+    //   filter first        -> open_snags, an answer the caller may have
     //   match then discard  -> 'none', a false dead end
-    // The registry is mocked because all three real metrics share one permission
-    // key, so no combination of allow/deny on the real registry could separate them.
+    // The registry is mocked because the real metrics share one permission key, so no
+    // allow/deny combination on the real registry could separate them.
+    //
+    // The pair is deliberately NOT the pre-provision one used elsewhere in this file.
+    // 'pre-provisions' (the event count) is a substring of 'open pre-provisions' (the
+    // balance), so hiding one and asking about the other cannot isolate the ordering —
+    // any question containing the longer alias contains the shorter one too. 'zone
+    // uptake' (11) and 'open snags' (10) share no stem, so the ranking is unambiguous.
     vi.mocked(userHasPermission).mockImplementation(
       async (_userId: string, permission: string) => permission !== 'hidden.permission',
     );
     const res = mockRes();
     await handler(
-      req({ q: 'zone uptake versus open pre-provisions' }, AS_MANAGER),
+      req({ q: 'zone uptake versus open snags' }, AS_MANAGER),
       res as never,
     );
     const data = payload(res) as { kind: string; metric?: { key: string } };
     expect(data.kind).toBe('exact');
-    expect(data.metric?.key).toBe('zone_uptake');
+    expect(data.metric?.key).toBe('open_snags');
   });
 
   it('skips the permission lookup entirely for a super admin', async () => {

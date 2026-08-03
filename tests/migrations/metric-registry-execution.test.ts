@@ -266,3 +266,57 @@ describe('date bounds and period rendering', () => {
     for (const point of series) expect(point.dimensions.zone).toBe('1');
   });
 });
+
+describe('metrics restored from the deleted Cortex catalogue', () => {
+  // SQL validity is already covered — every registered metric is enrolled above. These
+  // pin the VALUES, because a predicate silently dropped from `from` still executes.
+
+  it('counts only pre-provision events, not every activity-log row', async () => {
+    const def = findMetric('preprovisions')!;
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+    const { total } = summarise(def, toSeries(await run(sql, params), []));
+    // Seeded: pre_prov_added + pre_prov_reentered + dr_photo_uploaded. The third must
+    // not be counted — a 3 here means the event_type predicate was lost.
+    expect(total).toBe(2);
+  });
+
+  it('counts only Active activations', async () => {
+    const def = findMetric('activations')!;
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+    const { total } = summarise(def, toSeries(await run(sql, params), []));
+    expect(total).toBe(2); // 3 would mean the Cancelled row leaked in
+  });
+
+  it('reports open snags as a current-state count with no period', async () => {
+    const def = findMetric('open_snags')!;
+    // Deliberately request a window: a current-state metric must IGNORE it. If a date
+    // filter ever appears in `from`, this assertion changes and the test fails.
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+    const series = toSeries(await run(sql, params), []);
+    expect(series).toHaveLength(1);
+    expect(series[0]!.period).toBeNull(); // NULL::text — drives the "(current)" wording
+    const { total, totalPeriod } = summarise(def, series);
+    expect(total).toBe(2); // open + in_progress; closed/fixed/verified excluded
+    expect(totalPeriod).toBeNull();
+  });
+
+  it('reports open tickets the same way', async () => {
+    const def = findMetric('open_tickets')!;
+    const { sql, params } = buildMetricQuery(def, { ...RANGE, grain: 'day', dimensions: [] });
+    const series = toSeries(await run(sql, params), []);
+    const { total, totalPeriod } = summarise(def, series);
+    expect(total).toBe(2); // open + assigned
+    expect(totalPeriod).toBeNull();
+  });
+
+  it('ignores the requested window entirely for a current-state metric', async () => {
+    // Same metric, a window that shares no days with the seeded data. A date-filtered
+    // metric would return 0; a current-state one must still report the live count.
+    const def = findMetric('open_snags')!;
+    const { sql, params } = buildMetricQuery(def, {
+      from: '2020-01-01', to: '2020-01-02', grain: 'day', dimensions: [],
+    });
+    const { total } = summarise(def, toSeries(await run(sql, params), []));
+    expect(total).toBe(2);
+  });
+});

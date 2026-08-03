@@ -49,3 +49,41 @@ describe('metric registry', () => {
     expect(findMetric('nope')).toBeUndefined();
   });
 });
+
+describe('metrics restored from the deleted Cortex catalogue', () => {
+  const RESTORED = ['preprovisions', 'activations', 'open_snags', 'open_tickets'];
+
+  it('registers all four, so numeric questions stop falling through to prose', () => {
+    // These answered precisely until Cortex #164 deleted its in-code catalogue. The
+    // regression was silent: the question still parsed as numeric, matched nothing,
+    // and was answered from RAG.
+    for (const key of RESTORED) {
+      expect(findMetric(key), `${key} is not registered`).toBeDefined();
+    }
+  });
+
+  it('gives current-state metrics a null dateColumn and a periodic grain', () => {
+    // dateColumn null makes buildMetricQuery emit no WHERE date filter and
+    // `NULL::text AS period`, so the requested window is ignored — which is correct
+    // for "how many are open right now". But 'range' is rejected for any non-additive
+    // measure, so an unused periodic grain must still be declared or every query 400s.
+    for (const key of ['open_snags', 'open_tickets']) {
+      const m = findMetric(key)!;
+      expect(m.dateColumn, `${key} must be current-state`).toBeNull();
+      expect(m.additivity, `${key} is a stock`).toBe('semi-additive');
+      expect(m.grains, `${key} needs a periodic grain`).not.toEqual([]);
+      expect(m.grains, `${key} must not offer range`).not.toContain('range');
+    }
+  });
+
+  it('keeps pre-provision EVENTS separate from the open BALANCE', () => {
+    // The two are different questions against different tables, and conflating them
+    // is the easiest mistake to make here: one counts things that happened in a
+    // window, the other counts things currently open.
+    const events = findMetric('preprovisions')!;
+    const balance = findMetric('pp_open_balance')!;
+    expect(events.additivity).toBe('additive');
+    expect(balance.additivity).toBe('semi-additive');
+    expect(events.aliases).not.toEqual(expect.arrayContaining(balance.aliases));
+  });
+});

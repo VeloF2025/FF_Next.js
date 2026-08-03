@@ -67,3 +67,32 @@ describe('matchMetric', () => {
     expect(matchMetric('anything at all', [stub]).kind).toBe('none');
   });
 });
+
+describe('alias disambiguation between the two pre-provision metrics', () => {
+  // 'pre-provisions' (events) and 'open pre-provisions' (balance) overlap. Longest
+  // alias wins, so the qualifier decides — but nothing enforces that except this test,
+  // and getting it wrong silently answers a backlog question with an event count.
+  it('routes "open pre-provisions" to the balance', () => {
+    const r = matchMetric('how many open pre-provisions are there');
+    expect(r.kind).toBe('exact');
+    if (r.kind === 'exact') expect(r.metric.key).toBe('pp_open_balance');
+  });
+
+  it('routes bare "pre-provisions" to the event count', () => {
+    const r = matchMetric('how many pre-provisions did we have yesterday');
+    expect(r.kind).toBe('exact');
+    if (r.kind === 'exact') expect(r.metric.key).toBe('preprovisions');
+  });
+
+  it('routes snags and tickets to their own metrics', () => {
+    for (const [q, key] of [
+      ['how many open snags are there', 'open_snags'],
+      ['how many open tickets', 'open_tickets'],
+      ['how many activations last week', 'activations'],
+    ] as const) {
+      const r = matchMetric(q);
+      expect(r.kind, `"${q}" did not match exactly`).toBe('exact');
+      if (r.kind === 'exact') expect(r.metric.key, `"${q}"`).toBe(key);
+    }
+  });
+});

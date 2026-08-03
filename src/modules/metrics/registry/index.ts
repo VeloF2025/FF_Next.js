@@ -151,6 +151,110 @@ export const METRICS: readonly MetricDefinition[] = [
     cite: 'FibreFlow metric_snapshots (source_key=pp_open) by as_of_date',
     permission: 'analytics.reports',
   },
+
+  // ─── Restored from Cortex's deleted in-code catalogue ────────────────────────
+  //
+  // These four answered precisely until Cortex PR #164 deleted `metrics_db.py`
+  // wholesale. That was contrary to this plan's Task 7 Step 1 ("preprovisions stays
+  // exactly as it is"), and the effect was silent: the questions still parsed as
+  // numeric, found no registry metric, and fell through to RAG — so a numeric
+  // question started getting a prose answer, which is the precise failure this
+  // platform exists to remove.
+  //
+  // Registering them here rather than restoring the direct-SQL path keeps every read
+  // behind FibreFlow's per-metric RBAC. Predicates live in `from` because
+  // MetricDefinition has no `filter` field (deliberately removed — no metric used it).
+  {
+    key: 'preprovisions',
+    label: 'pre-provisions',
+    description:
+      'Pre-provision events recorded in the DR activity log — additions plus re-entries. An EVENT count over a period, not the open backlog; for the backlog use pp_open_balance.',
+    from: `(
+      SELECT src0.created_at
+      FROM dr_activity_log src0
+      WHERE src0.event_type IN ('pre_prov_added', 'pre_prov_reentered')
+    ) src`,
+    measure: 'count(*)',
+    dateColumn: 'src.created_at',
+    // Each row is a distinct event, so these sum freely across time and dimensions.
+    // Deliberately NOT the same thing as pp_open_balance: this counts things that
+    // happened in a window, that counts things currently open.
+    additivity: 'additive',
+    grains: ['day', 'week', 'month', 'range'],
+    dimensions: [],
+    // 'open pre-provisions' belongs to pp_open_balance. Longest-alias-wins keeps the
+    // two apart: "how many open pre-provisions" matches that 19-char alias, while
+    // "how many pre-provisions yesterday" matches the 15-char one here.
+    aliases: ['pre-provisions', 'preprovisions', 'pre provisions', 'pre-provs'],
+    cite: "FibreFlow dr_activity_log (pre_prov_added + pre_prov_reentered) by created_at",
+    permission: 'analytics.reports',
+  },
+  {
+    key: 'activations',
+    label: 'activations',
+    description:
+      'Drops activated on the OES, by activation date. Counts the activation event, so a drop activated twice counts twice.',
+    from: `(
+      SELECT src0.activation_date
+      FROM oes_activations src0
+      WHERE src0.status = 'Active'
+    ) src`,
+    measure: 'count(*)',
+    dateColumn: 'src.activation_date',
+    additivity: 'additive',
+    grains: ['day', 'week', 'month', 'range'],
+    dimensions: [],
+    aliases: ['activations', 'activated', 'went live', 'oes activations'],
+    cite: 'FibreFlow oes_activations (status=Active) by activation_date',
+    permission: 'analytics.reports',
+  },
+  {
+    key: 'open_snags',
+    label: 'open snags',
+    description:
+      'Snags not yet closed, fixed or verified. A current-state count with no date dimension — it answers "right now", not "during a period".',
+    from: `(
+      SELECT src0.id
+      FROM snags src0
+      WHERE src0.status NOT IN ('closed', 'fixed', 'verified')
+    ) src`,
+    measure: 'count(*)',
+    // NULL: current-state-only. buildMetricQuery emits no WHERE date filter and no
+    // period expression, so the requested window is ignored entirely and every row
+    // lands in one undated bucket. summarise() then returns total_period=null, which
+    // the client renders as "(current)" rather than stamping it with a date range.
+    dateColumn: null,
+    // A stock, not an event stream: the same snag is open on many days, so this could
+    // never be summed over time even if it had a date column.
+    additivity: 'semi-additive',
+    // A periodic grain is required even though it is unused — validateMetricQuery
+    // rejects 'range' for any non-additive measure, so 'day' is the only safe
+    // declaration. It has no effect on the SQL because dateColumn is null.
+    grains: ['day'],
+    dimensions: [],
+    aliases: ['open snags', 'snags', 'outstanding snags', 'unresolved snags'],
+    cite: 'FibreFlow snags (open = not closed/fixed/verified), current state',
+    permission: 'analytics.reports',
+  },
+  {
+    key: 'open_tickets',
+    label: 'open tickets',
+    description:
+      'Maintenance tickets not yet resolved, cancelled or verified. Current-state count, same shape as open_snags.',
+    from: `(
+      SELECT src0.id
+      FROM maintenance_tickets src0
+      WHERE src0.status NOT IN ('resolved', 'cancelled', 'verified')
+    ) src`,
+    measure: 'count(*)',
+    dateColumn: null,
+    additivity: 'semi-additive',
+    grains: ['day'],
+    dimensions: [],
+    aliases: ['open tickets', 'tickets', 'outstanding tickets', 'maintenance tickets'],
+    cite: 'FibreFlow maintenance_tickets (open = not resolved/cancelled/verified), current state',
+    permission: 'analytics.reports',
+  },
 ] as const;
 
 export function findMetric(key: string): MetricDefinition | undefined {

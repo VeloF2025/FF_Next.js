@@ -109,6 +109,53 @@ export async function setupFixture(pool: Pool): Promise<void> {
     `CREATE UNIQUE INDEX snapshot_runs_source_date_key ON snapshot_runs (source_key, as_of_date)`,
   );
 
+  // ── restored legacy metrics ───────────────────────────────────────────────
+  // `metric-registry-execution.test.ts` enrols EVERY registered metric automatically,
+  // so a metric whose source table is missing here fails with "relation does not
+  // exist" rather than being skipped. Column types are copied from the live schema
+  // (checked 2026-08-03), not guessed: `status` is varchar on oes_activations and
+  // maintenance_tickets but text on snags, and a fixture that got that wrong would
+  // pass while the real query broke on a collation or cast difference.
+  await run(`
+    CREATE TABLE dr_activity_log (
+      id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      event_type character varying NOT NULL,
+      created_at timestamptz
+    )`);
+  await run(`
+    CREATE TABLE oes_activations (
+      id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      status          character varying,
+      activation_date date
+    )`);
+  await run(`
+    CREATE TABLE snags (
+      id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      status text
+    )`);
+  await run(`
+    CREATE TABLE maintenance_tickets (
+      id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      status character varying
+    )`);
+
+  // Two counted events plus one that must NOT be counted, so a predicate dropped from
+  // `from` shows up as a wrong number rather than passing on an all-matching table.
+  await run(`
+    INSERT INTO dr_activity_log (event_type, created_at)
+    VALUES ('pre_prov_added',     '2026-07-10T09:00:00Z'),
+           ('pre_prov_reentered', '2026-07-10T10:00:00Z'),
+           ('dr_photo_uploaded',  '2026-07-10T11:00:00Z')`);
+  await run(`
+    INSERT INTO oes_activations (status, activation_date)
+    VALUES ('Active','2026-07-10'), ('Active','2026-07-11'), ('Cancelled','2026-07-12')`);
+  await run(`
+    INSERT INTO snags (status)
+    VALUES ('open'), ('in_progress'), ('closed'), ('fixed'), ('verified')`);
+  await run(`
+    INSERT INTO maintenance_tickets (status)
+    VALUES ('open'), ('assigned'), ('resolved'), ('cancelled'), ('verified')`);
+
   // ── zone_uptake ───────────────────────────────────────────────────────────
   // `installed` is CUMULATIVE. These four weekly figures are the REAL July 2026
   // totals measured on production: 21,666 -> 22,556 -> 23,342 -> 23,732. They sum
