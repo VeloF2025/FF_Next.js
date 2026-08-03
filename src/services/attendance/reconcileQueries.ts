@@ -116,6 +116,26 @@ export async function findEffectivePolicy(
   };
 }
 
+/**
+ * True when at least one policy covers at least one day in [fromDate, toDate].
+ * Distinguishes "the window end happens to be uncovered" — normal, and safe to
+ * continue past — from "nothing in this window is covered at all", which is a
+ * misconfiguration that must fail loudly rather than report a zero-count success.
+ */
+export async function policyCoversAnyDayInRange(
+  fromDate: string,
+  toDate: string,
+  reader: AttendancePolicyReader = query,
+): Promise<boolean> {
+  const rows = await reader<{ covered: boolean }>(`
+    SELECT EXISTS (
+      SELECT 1 FROM attendance_schedule_policies
+      WHERE active_from <= $2::date
+        AND (active_to IS NULL OR active_to >= $1::date)
+    ) AS covered`, [fromDate, toDate]);
+  return rows[0]?.covered === true;
+}
+
 export async function loadOpenEntriesForReconciliation(
   fromDate: string,
   toDate: string,
