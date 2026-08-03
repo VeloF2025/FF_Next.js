@@ -84,6 +84,14 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
       label: match.metric.label,
       grains: match.metric.grains,
       dimensions: match.metric.dimensions,
+      // Returned so a client can choose its date window BEFORE spending a query.
+      // A semi-additive measure is a level — the useful default is "as at the latest
+      // observation", which needs a lookback window sized to the metric's cadence.
+      // An additive measure is an event count with no "as at": its value IS the window,
+      // so a client must state the period it chose rather than imply a point in time.
+      // Without this field a client cannot tell the two apart until after it queries,
+      // and would have to guess the window it already committed to.
+      additivity: match.metric.additivity,
     },
   });
 }

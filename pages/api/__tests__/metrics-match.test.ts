@@ -89,6 +89,16 @@ describe('GET /api/metrics-match', () => {
     expect(data.metric?.key).toBe('pp_open_balance');
   });
 
+  it('returns additivity, so a client can size its date window before querying', async () => {
+    // Without this a caller cannot tell a level from an event count until AFTER it has
+    // committed to a window — by which point the window is what produced the number.
+    // pp_open_balance is a nightly stock, so it must report as semi-additive.
+    const res = mockRes();
+    await handler(req({ q: PP_QUESTION }, AS_MANAGER), res as never);
+    const data = payload(res) as { metric?: { additivity?: string } };
+    expect(data.metric?.additivity).toBe('semi-additive');
+  });
+
   it('does not match a metric the caller may not read', async () => {
     vi.mocked(userHasPermission).mockResolvedValue(false);
     const res = mockRes();
