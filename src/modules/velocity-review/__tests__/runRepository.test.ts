@@ -100,6 +100,36 @@ describe('run persistence and locking', () => {
     });
   });
 
+  // Regression: 2026-08-03 live run. `go_live_date` was read without a ::text cast, so
+  // node-postgres handed back a JS Date at server-local (SAST) midnight and toISOString()
+  // rendered 2026-08-01 as '2026-07-31'. selectDueDates then looped from a day too early
+  // and pulled an extra 157 customers into the run.
+  it('rejects a control date read without a ::text cast instead of shifting it a day', async () => {
+    mocks.queryOne.mockResolvedValue({
+      automation_enabled: true,
+      go_live_date: new Date('2026-08-01T00:00:00+02:00'),
+      pilot_enabled: false,
+      pilot_target_date: null,
+      pilot_limit: null,
+    });
+
+    await expect(loadVelocityReviewControl()).rejects.toThrow(/::text cast/);
+  });
+
+  it('rejects a run target_date read without a ::text cast', async () => {
+    mocks.queryOne.mockResolvedValue({
+      id: 'run-1',
+      target_date: new Date('2026-08-01T00:00:00+02:00'),
+      status: 'pending',
+      started_at: null,
+      completed_at: null,
+      counts: {},
+      summary_status: 'pending',
+    });
+
+    await expect(createOrResumeRun('2026-08-01')).rejects.toThrow(/::text cast/);
+  });
+
   it('returns the canonical run when the target date already exists', async () => {
     mocks.queryOne.mockResolvedValue({
       id: 'run-1',

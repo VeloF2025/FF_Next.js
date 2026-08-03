@@ -39,8 +39,17 @@ async function failRequest(deps: ProcessorDependencies, row: VelocityReviewExpor
       errorCode: code, nextAttemptAt: retryAt,
     }), false, contactUpserted);
   }
+  // A permanent_failure is terminal: claimNextExport only claims 'ready' and
+  // 'retryable_failure', and the permanent UNIQUE (dr_number, phone_e164) means the pair
+  // can never be re-exported. Record WHY, so a terminal row can be triaged from the
+  // ledger alone. On 2026-08-03, 225 rows landed here as bare 'ghl_upsert_failed' and the
+  // responsible HTTP status could not be recovered afterwards — the per-export status is
+  // not logged anywhere else. Suffix convention matches rollback_478's 'prefix:detail'.
   return result(await move(deps, row, 'permanent_failure', {
-    errorCode: code, nextAttemptAt: null,
+    errorCode: error instanceof HighLevelRequestError && error.status !== null
+      ? `${code}:${error.status}`
+      : code,
+    nextAttemptAt: null,
   }), false, contactUpserted);
 }
 function verifiedPhone(contact: HighLevelContact, expected: string): boolean {
