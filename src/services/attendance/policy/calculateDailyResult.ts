@@ -28,7 +28,15 @@ export function calculateDailyResult(input: CalculateDailyResultInput): Calculat
     });
   }
 
-  if (!evidence.clockInAt && !evidence.clockOutAt) {
+  // A system clock-out is an operational closure, not evidence that the worker
+  // clocked out. The reconciler leaves clock_out_at NULL when it closes a
+  // dangling entry, but pre-#2351 runs stamped clock-in + cap as if it were a
+  // real departure. Treat both as absent so the day is flagged
+  // missing_clock_out at the policy cap rather than scored — and silently
+  // believed — against a manufactured time.
+  const clockOutAt = evidence.clockOutSource === 'system' ? null : evidence.clockOutAt;
+
+  if (!evidence.clockInAt && !clockOutAt) {
     if (approvedLeave) {
       return finish(base, input, {
         leaveHours: validateLeaveHours(approvedLeave.hours),
@@ -56,9 +64,9 @@ export function calculateDailyResult(input: CalculateDailyResultInput): Calculat
     });
   }
 
-  if (!evidence.clockOutAt) return missingClockOut(base, input, schedule);
+  if (!clockOutAt) return missingClockOut(base, input, schedule);
 
-  const elapsedMinutes = toMinutes(evidence.clockOutAt.getTime() - evidence.clockInAt.getTime());
+  const elapsedMinutes = toMinutes(clockOutAt.getTime() - evidence.clockInAt.getTime());
   if (elapsedMinutes <= 0) {
     return finish(base, input, {
       status: 'awaiting_supervisor',
@@ -85,7 +93,7 @@ export function calculateDailyResult(input: CalculateDailyResultInput): Calculat
     });
   }
 
-  return completeScheduledDay(base, input, schedule, elapsedMinutes);
+  return completeScheduledDay(base, input, schedule, elapsedMinutes, clockOutAt);
 }
 
 function completeScheduledDay(
@@ -93,8 +101,9 @@ function completeScheduledDay(
   input: CalculateDailyResultInput,
   schedule: DaySchedule,
   elapsedMinutes: number,
+  clockOutAt: Date | null,
 ): CalculatedDailyResult {
-  const { clockInAt, clockOutAt } = input.evidence;
+  const { clockInAt } = input.evidence;
   if (!clockInAt || !clockOutAt || !schedule.start || !schedule.end) {
     throw new Error('Scheduled calculation requires complete clock evidence and a schedule');
   }

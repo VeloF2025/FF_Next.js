@@ -67,6 +67,20 @@ export async function loadEffectivePolicy(
   workDate: string,
   reader: AttendancePolicyReader = query,
 ): Promise<AttendanceSchedulePolicy> {
+  const policy = await findEffectivePolicy(workDate, reader);
+  if (!policy) throw new Error(`No effective attendance schedule policy for ${workDate}`);
+  return policy;
+}
+
+/**
+ * Same lookup as loadEffectivePolicy, but absence of a policy is a return
+ * value rather than a throw. A misconfigured policy (wrong timezone) still
+ * throws — that is a configuration error, not an uncovered date.
+ */
+export async function findEffectivePolicy(
+  workDate: string,
+  reader: AttendancePolicyReader = query,
+): Promise<AttendanceSchedulePolicy | null> {
   const rows = await reader<EffectivePolicyRow>(`
     SELECT id, timezone,
            TO_CHAR(weekday_start, 'HH24:MI') AS weekday_start,
@@ -82,7 +96,7 @@ export async function loadEffectivePolicy(
     ORDER BY active_from DESC
     LIMIT 1`, [workDate, workDate]);
   const policy = rows[0];
-  if (!policy) throw new Error(`No effective attendance schedule policy for ${workDate}`);
+  if (!policy) return null;
   if (policy.timezone !== 'Africa/Johannesburg') {
     throw new Error(`Attendance policy timezone must be Africa/Johannesburg; got ${policy.timezone}`);
   }

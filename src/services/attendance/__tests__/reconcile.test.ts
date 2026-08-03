@@ -3,6 +3,7 @@ import { ENTRY_ID, POLICY, RULE, STAFF_ID, entry, expectedDay } from './reconcil
 
 const mocks = vi.hoisted(() => ({
   finishRun: vi.fn(),
+  findEffectivePolicy: vi.fn(),
   loadDefaultRule: vi.fn(),
   loadEffectivePolicy: vi.fn(),
   loadEntries: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('../saPublicHolidays', () => ({
   isSunday: (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay() === 0,
 }));
 vi.mock('../reconcileQueries', () => ({
+  findEffectivePolicy: mocks.findEffectivePolicy,
   loadDefaultRule: mocks.loadDefaultRule,
   loadEffectivePolicy: mocks.loadEffectivePolicy,
   loadReconciliationEntries: mocks.loadEntries,
@@ -50,6 +52,7 @@ describe('schedule-aware attendance reconciliation', () => {
     mocks.startRun.mockResolvedValue(undefined);
     mocks.finishRun.mockResolvedValue(undefined);
     mocks.loadEffectivePolicy.mockResolvedValue(POLICY);
+    mocks.findEffectivePolicy.mockResolvedValue(POLICY);
     mocks.loadDefaultRule.mockResolvedValue(RULE);
     mocks.loadOpenEntries.mockResolvedValue([]);
     mocks.loadEntries.mockResolvedValue([]);
@@ -94,10 +97,61 @@ describe('schedule-aware attendance reconciliation', () => {
     expect(mocks.finishRun).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
   });
 
+  it('reclassifies a legacy auto-closed entry carrying a fabricated clock-out', async () => {
+    // Pre-#2351 runs stamped clock-in + 9h onto auto-closed entries. Replaying
+    // those days must raise missing_clock_out at the policy cap, not score the
+    // manufactured 15:00 departure as a real early_departure.
+    mocks.loadEntries.mockResolvedValue([entry({
+      clock_out_at: '2026-08-03T13:00:00.000Z', // 15:00 SAST, fabricated
+    })]);
+    mocks.loadExpectedDays.mockResolvedValue([expectedDay()]);
+    mocks.persistDay.mockResolvedValue({ resultVersion: 1, exceptionIds: ['exception-1'] });
+
+    const report = await reconcile({ fromDate: '2026-08-03', toDate: '2026-08-03' });
+
+    expect(report.missingClockOutExceptions).toBe(1);
+    expect(mocks.persistDay).toHaveBeenCalledWith(expect.objectContaining({
+      result: expect.objectContaining({
+        status: 'awaiting_worker',
+        exceptionKinds: ['missing_clock_out'],
+        proposedRegularHours: 8,
+        recordedElapsedHours: null,
+      }),
+    }));
+  });
+
+  it('records an uncovered window as a no-op run instead of aborting', async () => {
+    mocks.findEffectivePolicy.mockResolvedValue(null);
+
+    const report = await reconcile({ fromDate: '2026-08-02', toDate: '2026-08-02' });
+
+    expect(report).toMatchObject({ projectedDays: 0, systemClosed: 0, failedDayKeys: [] });
+    expect(mocks.finishRun).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'succeeded',
+      schedulePolicyId: null,
+      errorMessage: 'No attendance schedule policy covers 2026-08-02..2026-08-02; nothing was projected',
+    }));
+  });
+
+  it('still projects covered days when the window end has no policy', async () => {
+    mocks.findEffectivePolicy.mockResolvedValue(null);
+    mocks.loadEntries.mockResolvedValue([entry()]);
+    mocks.loadExpectedDays.mockResolvedValue([expectedDay()]);
+    mocks.persistDay.mockResolvedValue({ resultVersion: 1, exceptionIds: ['exception-1'] });
+
+    const report = await reconcile({ fromDate: '2026-08-03', toDate: '2026-08-04' });
+
+    expect(report.projectedDays).toBe(1);
+    expect(mocks.finishRun).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'succeeded',
+      errorMessage: null,
+    }));
+  });
+
   it('skips a locked prior week without poisoning an overlapping unlocked target week', async () => {
     mocks.loadEntries.mockResolvedValue([entry({ id: 'locked-entry', work_date: '2026-07-31',
-      clock_in_at: '2026-07-31T06:00:00.000Z', clock_out_at: '2026-07-31T15:00:00.000Z' }),
-    entry({ clock_out_at: '2026-08-03T15:00:00.000Z' })]);
+      status: 'closed', clock_in_at: '2026-07-31T06:00:00.000Z', clock_out_at: '2026-07-31T15:00:00.000Z' }),
+    entry({ status: 'closed', clock_out_at: '2026-08-03T15:00:00.000Z' })]);
     mocks.persistDay.mockRejectedValueOnce(Object.assign(new Error('locked'), { code: 'period_locked' }));
     const report = await reconcile({ fromDate: '2026-07-31', toDate: '2026-08-03' });
     expect(report).toMatchObject({ failedDayKeys: [], skippedLockedDays: 1, projectedDays: 1 });
@@ -157,10 +211,12 @@ describe('schedule-aware attendance reconciliation', () => {
     mocks.loadEntries.mockResolvedValue([
       entry({
         work_date: '2026-08-04',
+        status: 'closed',
         clock_in_at: '2026-08-04T06:00:00.000Z',
         clock_out_at: '2026-08-04T15:00:00.000Z',
       }),
-      entry({ id: 'entry-earlier', work_date: '2026-08-03', clock_out_at: '2026-08-03T15:00:00.000Z' }),
+      entry({ id: 'entry-earlier', work_date: '2026-08-03', status: 'closed',
+        clock_out_at: '2026-08-03T15:00:00.000Z' }),
     ]);
     mocks.persistDay.mockResolvedValue({ resultVersion: 1, exceptionIds: [] });
 
@@ -176,13 +232,13 @@ describe('schedule-aware attendance reconciliation', () => {
 
   it('reloads the legacy weekly seed after a failed middle day', async () => {
     mocks.loadEntries.mockResolvedValue([
-      entry({ clock_out_at: '2026-08-03T15:00:00.000Z' }),
+      entry({ status: 'closed', clock_out_at: '2026-08-03T15:00:00.000Z' }),
       entry({
-        id: 'entry-tuesday', work_date: '2026-08-04',
+        id: 'entry-tuesday', work_date: '2026-08-04', status: 'closed',
         clock_in_at: '2026-08-04T06:00:00.000Z', clock_out_at: '2026-08-04T15:00:00.000Z',
       }),
       entry({
-        id: 'entry-wednesday', work_date: '2026-08-05',
+        id: 'entry-wednesday', work_date: '2026-08-05', status: 'closed',
         clock_in_at: '2026-08-05T06:00:00.000Z', clock_out_at: '2026-08-05T15:00:00.000Z',
       }),
     ]);

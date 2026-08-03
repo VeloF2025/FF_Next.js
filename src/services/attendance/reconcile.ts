@@ -6,6 +6,7 @@ import { calculateDailyResult } from './policy/calculateDailyResult';
 import { persistCalculatedDay } from './policy/projectionRepository';
 import type { AttendanceSchedulePolicy, CalculatedDailyResult } from './policy/types';
 import {
+  findEffectivePolicy,
   loadDefaultRule,
   loadEffectivePolicy,
   loadExpectedAttendanceDays,
@@ -57,16 +58,30 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
   const failed = new Set<string>();
   const skippedLocked = new Set<string>();
   const pendingClosed = new Set<string>();
+  let uncoveredToDate = false;
   try {
     const [primaryPolicy, openEntries, expectedDays, rule, publicHolidays] = await Promise.all([
-      loadEffectivePolicy(toDate),
+      findEffectivePolicy(toDate),
       loadOpenEntriesForReconciliation(fromDate, toDate),
       loadExpectedAttendanceDays(fromDate, toDate),
       loadDefaultRule(),
       loadObservedHolidays(fromDate, toDate),
     ]);
-    policyIds.add(primaryPolicy.id);
-    const policyCache = new Map<string, AttendanceSchedulePolicy>([[toDate, primaryPolicy]]);
+    // Seeding the cache from toDate is an optimisation, not a precondition:
+    // every loader above already excludes dates no policy covers, and
+    // policyForDate resolves the rest lazily. An uncovered toDate must not
+    // abort a window whose earlier days are covered, nor a retro --from/--to
+    // run over a range that predates the first policy.
+    const policyCache = new Map<string, AttendanceSchedulePolicy>();
+    if (primaryPolicy) {
+      policyIds.add(primaryPolicy.id);
+      policyCache.set(toDate, primaryPolicy);
+    } else {
+      uncoveredToDate = true;
+      log.warn('[attendance-reconcile] no effective schedule policy for the window end', {
+        toDate, fromDate,
+      });
+    }
     for (const row of openEntries) {
       const key = dayKey(row.staff_id, row.work_date);
       try {
@@ -142,6 +157,11 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
     status: runStatus(report),
     counts: countsFrom(report),
     failedDayKeys: report.failedDayKeys,
+    // Without this note a policy-less window is indistinguishable from a
+    // window with genuinely nothing to do — both record all-zero counts.
+    errorMessage: uncoveredToDate && policyIds.size === 0
+      ? `No attendance schedule policy covers ${fromDate}..${toDate}; nothing was projected`
+      : null,
     finishedAt: report.finishedAt,
   });
   return report;
