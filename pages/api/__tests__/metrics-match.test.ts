@@ -99,6 +99,18 @@ describe('GET /api/metrics-match', () => {
     expect(data.metric?.additivity).toBe('semi-additive');
   });
 
+  it('reports the additive class too, not just the semi-additive one', async () => {
+    // Asserting only one class would pass against a handler that hard-coded it. The two
+    // classes are the whole point of the field — a client picks opposite date windows for
+    // them — so both must be shown to round-trip from the registry.
+    const res = mockRes();
+    await handler(req({ q: 'how many installed not activated' }, AS_MANAGER), res as never);
+    const data = payload(res) as { kind: string; metric?: { key: string; additivity?: string } };
+    expect(data.kind).toBe('exact');
+    expect(data.metric?.key).toBe('install_activation_gap');
+    expect(data.metric?.additivity).toBe('additive');
+  });
+
   it('does not match a metric the caller may not read', async () => {
     vi.mocked(userHasPermission).mockResolvedValue(false);
     const res = mockRes();
