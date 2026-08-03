@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  GhlRateLimiter,
   HighLevelClient,
   HighLevelRequestError,
   loadVelocityReviewGhlConfig,
   type VelocityReviewGhlConfig,
 } from '../ghlClient';
+
+const noSleep = async (): Promise<void> => undefined;
 
 const token = 'test-private-token';
 const phone = '+27821234567';
@@ -174,7 +177,9 @@ describe('HighLevelClient', () => {
   ])('classifies HTTP %i correctly', async (status, retryable) => {
     vi.mocked(global.fetch).mockResolvedValue(response({ message: 'request rejected' }, status,
       status === 429 ? { 'Retry-After': '120' } : undefined));
-    const client = new HighLevelClient(config);
+    // A 429 is now replayed in place before it surfaces, so the backoff sleep must be
+    // stubbed or this test waits out the real Retry-After.
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
 
     const error = await client.getContact('contact-1').catch((caught: unknown) => caught);
 
@@ -183,6 +188,10 @@ describe('HighLevelClient', () => {
     });
     if (status === 429) {
       expect((error as HighLevelRequestError).retryAfterSeconds).toBe(120);
+      // Initial attempt + MAX_RATE_LIMIT_RETRIES replays, then the error surfaces.
+      expect(global.fetch).toHaveBeenCalledTimes(5);
+    } else {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     }
   });
 
@@ -231,6 +240,38 @@ describe('HighLevelClient', () => {
     expect((error as Error).message).not.toContain(phone);
     expect((error as Error).message).not.toContain(token);
   });
+
+  // Regression: the 2026-08-03 live run put 225 exports into permanent_failure. The
+  // duplicate search answers "no duplicate" with HTTP 200 {"contact":null}, not 404, so
+  // contactFrom() threw a non-retryable error for every contact that did not already
+  // exist in GHL — i.e. every genuinely new customer — and the permanent
+  // UNIQUE (dr_number, phone_e164) then barred the pair for good.
+  it('treats a 200 {"contact":null} duplicate search as "no existing contact"', async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: null }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-new' } }));
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    await expect(client.upsertContact({
+      phoneE164: phone,
+      firstName: 'Ada',
+      lastName: null,
+      drNumber: 'DR-200',
+      eventDate: '2026-08-01',
+      sources: ['dr_submitted'],
+      exportKey: 'export-key-new',
+    })).resolves.toMatchObject({ id: 'contact-new' });
+
+    // The upsert must still have been attempted — the null search is not a failure.
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('still rejects a malformed contact body that is not an absent duplicate', async () => {
+    vi.mocked(global.fetch).mockResolvedValue(response({ contact: { noId: true } }));
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    await expect(client.getContact('contact-1')).rejects.toThrow(/invalid contact response/);
+  });
 });
 
 describe('loadVelocityReviewGhlConfig', () => {
@@ -265,5 +306,43 @@ describe('loadVelocityReviewGhlConfig', () => {
     expect(error.message).toContain('VELOCITY_GHL_LOCATION_ID');
     expect(error.message).toContain('VELOCITY_GHL_FIELD_DR_NUMBER_ID');
     expect(error.message).not.toContain(token);
+  });
+});
+
+describe('GhlRateLimiter', () => {
+  it('holds requests to the window ceiling instead of letting them burst', async () => {
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(3, 10_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    for (let i = 0; i < 4; i += 1) await limiter.acquire();
+
+    // The first three fit the window; the fourth must wait for the window to roll.
+    expect(slept).toEqual([10_001]);
+  });
+
+  it('adopts the ceiling advertised by the live response headers', async () => {
+    let now = 0;
+    const slept: number[] = [];
+    const limiter = new GhlRateLimiter(50, 60_000, () => now, async (ms) => {
+      slept.push(ms);
+      now += ms;
+    });
+
+    // Measured live on the Velocity location: max 25 per 10s. One token of headroom is
+    // kept back, so the limiter should admit 24 before pausing.
+    limiter.observeLimits({ get: (name: string) => (
+      name === 'x-ratelimit-max' ? '25'
+        : name === 'x-ratelimit-interval-milliseconds' ? '10000'
+          : null) } as Pick<Headers, 'get'>);
+
+    for (let i = 0; i < 24; i += 1) await limiter.acquire();
+    expect(slept).toEqual([]);
+
+    await limiter.acquire();
+    expect(slept).toEqual([10_001]);
   });
 });
