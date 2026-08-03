@@ -17,12 +17,20 @@ interface DaySchedule {
 
 export function calculateDailyResult(input: CalculateDailyResultInput): CalculatedDailyResult {
   const approvedLeave = input.approvedLeave ?? null;
-  const { evidence, isPublicHoliday, policy } = input;
+  const { isPublicHoliday, policy } = input;
+  // Normalise before ANYTHING reads the evidence — including the fingerprint.
+  // The fingerprint hashes the evidence it was given, and upsertDailyProjection
+  // only rewrites a projection when the fingerprint changes. Normalising after
+  // the hash would leave a replay of an already-projected legacy day matching
+  // its stored fingerprint, so it would refresh computed_at and never correct
+  // result_status, blocking_reasons or the proposed hours.
+  const evidence = effectiveEvidence(input.evidence);
+  const effective: CalculateDailyResultInput = { ...input, evidence };
   const schedule = getDaySchedule(evidence.workDate, policy);
-  const base = createBaseResult(evidence.workDate, schedule.paidHours, input);
+  const base = createBaseResult(evidence.workDate, schedule.paidHours, effective);
 
   if (hasInvalidTimestamp(evidence.clockInAt, evidence.clockOutAt)) {
-    return finish(base, input, {
+    return finish(base, effective, {
       status: 'awaiting_supervisor',
       exceptionKinds: ['evidence_unreliable'],
     });
@@ -30,44 +38,44 @@ export function calculateDailyResult(input: CalculateDailyResultInput): Calculat
 
   if (!evidence.clockInAt && !evidence.clockOutAt) {
     if (approvedLeave) {
-      return finish(base, input, {
+      return finish(base, effective, {
         leaveHours: validateLeaveHours(approvedLeave.hours),
         attendanceClassification: approvedLeave.classification,
         status: 'approved',
       });
     }
     if (isPublicHoliday) {
-      return finish(base, input, {
+      return finish(base, effective, {
         attendanceClassification: 'public_holiday',
         status: 'approved',
       });
     }
-    if (schedule.isSunday) return finish(base, input, { status: 'expected' });
-    return finish(base, input, {
+    if (schedule.isSunday) return finish(base, effective, { status: 'expected' });
+    return finish(base, effective, {
       status: 'absence_review',
       exceptionKinds: ['missing_clock_in'],
     });
   }
 
   if (!evidence.clockInAt) {
-    return finish(base, input, {
+    return finish(base, effective, {
       status: 'absence_review',
       exceptionKinds: ['missing_clock_in'],
     });
   }
 
-  if (!evidence.clockOutAt) return missingClockOut(base, input, schedule);
+  if (!evidence.clockOutAt) return missingClockOut(base, effective, schedule);
 
   const elapsedMinutes = toMinutes(evidence.clockOutAt.getTime() - evidence.clockInAt.getTime());
   if (elapsedMinutes <= 0) {
-    return finish(base, input, {
+    return finish(base, effective, {
       status: 'awaiting_supervisor',
       exceptionKinds: ['evidence_unreliable'],
     });
   }
 
   if (isPublicHoliday) {
-    return finish(base, input, {
+    return finish(base, effective, {
       recordedElapsedHours: toHours(elapsedMinutes),
       proposedHolidayHours: toHours(elapsedMinutes),
       attendanceClassification: 'public_holiday',
@@ -77,7 +85,7 @@ export function calculateDailyResult(input: CalculateDailyResultInput): Calculat
   }
 
   if (schedule.isSunday) {
-    return finish(base, input, {
+    return finish(base, effective, {
       recordedElapsedHours: toHours(elapsedMinutes),
       proposedSundayHours: toHours(elapsedMinutes),
       status: 'awaiting_supervisor',
@@ -85,7 +93,24 @@ export function calculateDailyResult(input: CalculateDailyResultInput): Calculat
     });
   }
 
-  return completeScheduledDay(base, input, schedule, elapsedMinutes);
+  return completeScheduledDay(base, effective, schedule, elapsedMinutes);
+}
+
+/**
+ * A system clock-out is an operational closure, not evidence that the worker
+ * clocked out. The reconciler leaves clock_out_at NULL when it closes a
+ * dangling entry, but pre-#2351 runs stamped clock-in + a 9h cap as if it were
+ * a real departure. Treating that as evidence turns a missing clock-out into a
+ * believable early_departure a supervisor would approve.
+ *
+ * Returns the original object when nothing needs normalising, so the common
+ * path hashes byte-identically to before.
+ */
+function effectiveEvidence(
+  evidence: CalculateDailyResultInput['evidence'],
+): CalculateDailyResultInput['evidence'] {
+  if (evidence.clockOutSource !== 'system' || evidence.clockOutAt === null) return evidence;
+  return { ...evidence, clockOutAt: null };
 }
 
 function completeScheduledDay(

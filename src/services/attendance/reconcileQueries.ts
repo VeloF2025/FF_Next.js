@@ -67,6 +67,20 @@ export async function loadEffectivePolicy(
   workDate: string,
   reader: AttendancePolicyReader = query,
 ): Promise<AttendanceSchedulePolicy> {
+  const policy = await findEffectivePolicy(workDate, reader);
+  if (!policy) throw new Error(`No effective attendance schedule policy for ${workDate}`);
+  return policy;
+}
+
+/**
+ * Same lookup as loadEffectivePolicy, but absence of a policy is a return
+ * value rather than a throw. A misconfigured policy (wrong timezone) still
+ * throws — that is a configuration error, not an uncovered date.
+ */
+export async function findEffectivePolicy(
+  workDate: string,
+  reader: AttendancePolicyReader = query,
+): Promise<AttendanceSchedulePolicy | null> {
   const rows = await reader<EffectivePolicyRow>(`
     SELECT id, timezone,
            TO_CHAR(weekday_start, 'HH24:MI') AS weekday_start,
@@ -82,7 +96,7 @@ export async function loadEffectivePolicy(
     ORDER BY active_from DESC
     LIMIT 1`, [workDate, workDate]);
   const policy = rows[0];
-  if (!policy) throw new Error(`No effective attendance schedule policy for ${workDate}`);
+  if (!policy) return null;
   if (policy.timezone !== 'Africa/Johannesburg') {
     throw new Error(`Attendance policy timezone must be Africa/Johannesburg; got ${policy.timezone}`);
   }
@@ -100,6 +114,26 @@ export async function loadEffectivePolicy(
     sundayMissingOutCapHours: fixed(Number(policy.sunday_missing_out_cap_hrs), 5, 'sunday_missing_out_cap_hrs'),
     lateAlertMinutes: fixed(policy.late_alert_minutes, 15, 'late_alert_minutes'),
   };
+}
+
+/**
+ * True when at least one policy covers at least one day in [fromDate, toDate].
+ * Distinguishes "the window end happens to be uncovered" — normal, and safe to
+ * continue past — from "nothing in this window is covered at all", which is a
+ * misconfiguration that must fail loudly rather than report a zero-count success.
+ */
+export async function policyCoversAnyDayInRange(
+  fromDate: string,
+  toDate: string,
+  reader: AttendancePolicyReader = query,
+): Promise<boolean> {
+  const rows = await reader<{ covered: boolean }>(`
+    SELECT EXISTS (
+      SELECT 1 FROM attendance_schedule_policies
+      WHERE active_from <= $2::date
+        AND (active_to IS NULL OR active_to >= $1::date)
+    ) AS covered`, [fromDate, toDate]);
+  return rows[0]?.covered === true;
 }
 
 export async function loadOpenEntriesForReconciliation(

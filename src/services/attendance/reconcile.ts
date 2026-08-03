@@ -6,12 +6,14 @@ import { calculateDailyResult } from './policy/calculateDailyResult';
 import { persistCalculatedDay } from './policy/projectionRepository';
 import type { AttendanceSchedulePolicy, CalculatedDailyResult } from './policy/types';
 import {
+  findEffectivePolicy,
   loadDefaultRule,
   loadEffectivePolicy,
   loadExpectedAttendanceDays,
   loadOpenEntriesForReconciliation,
   loadPersistedWeeklyOtBefore,
   loadReconciliationEntries,
+  policyCoversAnyDayInRange,
 } from './reconcileQueries';
 import {
   finishReconciliationRun,
@@ -59,14 +61,35 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
   const pendingClosed = new Set<string>();
   try {
     const [primaryPolicy, openEntries, expectedDays, rule, publicHolidays] = await Promise.all([
-      loadEffectivePolicy(toDate),
+      findEffectivePolicy(toDate),
       loadOpenEntriesForReconciliation(fromDate, toDate),
       loadExpectedAttendanceDays(fromDate, toDate),
       loadDefaultRule(),
       loadObservedHolidays(fromDate, toDate),
     ]);
-    policyIds.add(primaryPolicy.id);
-    const policyCache = new Map<string, AttendanceSchedulePolicy>([[toDate, primaryPolicy]]);
+    // Seeding the cache from toDate is an optimisation, not a precondition:
+    // every loader above already excludes dates no policy covers, and
+    // policyForDate resolves the rest lazily. An uncovered toDate must not
+    // abort a window whose earlier days are covered, nor a retro --from/--to
+    // run over a range that predates the first policy.
+    const policyCache = new Map<string, AttendanceSchedulePolicy>();
+    if (primaryPolicy) {
+      policyIds.add(primaryPolicy.id);
+      policyCache.set(toDate, primaryPolicy);
+    } else if (await policyCoversAnyDayInRange(fromDate, toDate)) {
+      log.warn('[attendance-reconcile] no effective schedule policy for the window end', {
+        toDate, fromDate,
+      });
+    } else {
+      // Nothing in the window is covered, so every loader returned empty and
+      // the run would otherwise report a zero-count success. The cron only
+      // inspects failedDayKeys and always exits 0, and nothing reads
+      // attendance_reconciliation_runs.error_message, so a succeeded status
+      // here would make a policy misconfiguration that halts all projection
+      // completely silent. Fail loudly instead — the catch below records the
+      // run as failed and the cron exits non-zero.
+      throw new Error(`No attendance schedule policy covers ${fromDate}..${toDate}`);
+    }
     for (const row of openEntries) {
       const key = dayKey(row.staff_id, row.work_date);
       try {
@@ -181,6 +204,13 @@ async function persistLegacyShadow(
 ): Promise<void> {
   const row = day.entry;
   if (!row?.clock_out_at || result.exceptionKinds.includes('evidence_unreliable')) return;
+  // This path writes regular_hrs / overtime_hrs / wage_amount_cents straight
+  // from row.clock_out_at, bypassing calculateDailyResult entirely. On an
+  // auto-closed entry that timestamp is a system closure, not a departure —
+  // feeding it here is how pre-#2351 runs put fabricated hours into
+  // attendance_daily_summaries. The projection columns carry the honest
+  // reading for these days.
+  if (row.status === 'auto_closed') return;
   const week = isoWeekMonday(row.work_date);
   const weeklyKey = `${row.staff_id}:${week}`;
   let running = context.weeklyOvertime.get(weeklyKey);
