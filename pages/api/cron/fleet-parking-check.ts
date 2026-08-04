@@ -32,6 +32,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.success(res, report);
   } catch (error) {
     log.error('[fleet-parking-check] run failed', { error });
-    return apiResponse.internalError(res, 'Parking check failed');
+    return apiResponse.internalError(res, error, 'Parking check failed');
   }
 }

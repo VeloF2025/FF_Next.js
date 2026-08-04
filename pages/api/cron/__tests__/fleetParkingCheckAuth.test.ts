@@ -86,4 +86,14 @@ describe('fleet-parking-check cron auth', () => {
     expect(runParkingCheck).toHaveBeenCalledTimes(1);
     expect(res.statusCode).toBe(200);
   });
+
+  it('returns 500 when runParkingCheck throws', async () => {
+    runParkingCheck.mockRejectedValue(new Error('Database connection failed'));
+    const res = mockRes();
+    await handler(
+      { method: 'GET', headers: { 'x-cron-secret': 'test-secret' } } as unknown as NextApiRequest,
+      res
+    );
+    expect(res.statusCode).toBe(500);
+  });
 });
