@@ -75,7 +75,8 @@ export async function processOneExport(item: ProcessableExport,
   try {
     upserted = await deps.ghl.upsertContact({ phoneE164: row.phoneE164,
       firstName: item.candidate.firstName, lastName: item.candidate.lastName,
-      drNumber: row.drNumber, eventDate: row.firstTargetDate, sources: row.sourceFlags, exportKey: row.exportKey });
+      drNumber: row.drNumber, eventDate: row.firstTargetDate, sources: row.sourceFlags,
+      exportKey: row.exportKey, installContext: item.candidate.installContext });
   } catch (error) {
     return failRequest(deps, row, error, 'ghl_upsert_failed');
   }

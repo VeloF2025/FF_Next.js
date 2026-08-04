@@ -18,6 +18,11 @@ function row(overrides: Partial<CandidateDbRow> = {}): CandidateDbRow {
     home_signup_date: null,
     signature_present: false,
     signature_evidence_at: null,
+    installer_name: null,
+    install_address: null,
+    install_gps: null,
+    pole_number: null,
+    ont_barcode: null,
     ...overrides,
   };
 }
@@ -234,6 +239,43 @@ describe('prepareCandidate', () => {
       ...named, contact_name: null, contact_surname: null, qcontact_name: 'Lerato Dlamini',
     }), SECRET)).toMatchObject({
       candidate: { firstName: 'Lerato', lastName: 'Dlamini' },
+    });
+  });
+
+  it('carries install context through to the prepared candidate', () => {
+    expect(prepareCandidate(row({
+      ...named,
+      installer_name: ' Sipho Ndlovu ',
+      install_address: ' 12 Main Road, Gqeberha ',
+      install_gps: '-33.96,25.61',
+      pole_number: 'P-1234',
+      ont_barcode: 'ONT-9876',
+    }), SECRET)).toMatchObject({
+      candidate: {
+        installContext: {
+          installerName: 'Sipho Ndlovu',
+          installAddress: '12 Main Road, Gqeberha',
+          installGps: '-33.96,25.61',
+          poleNumber: 'P-1234',
+          ontBarcode: 'ONT-9876',
+        },
+      },
+    });
+  });
+
+  it('nulls each install-context field independently when its source is absent', () => {
+    expect(prepareCandidate(row({
+      ...named, install_gps: '-33.96,25.61',
+    }), SECRET)).toMatchObject({
+      candidate: {
+        installContext: {
+          installGps: '-33.96,25.61',
+          installerName: null,
+          installAddress: null,
+          poleNumber: null,
+          ontBarcode: null,
+        },
+      },
     });
   });
 

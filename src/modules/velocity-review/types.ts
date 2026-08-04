@@ -64,6 +64,14 @@ export interface CandidateDbRow {
   home_signup_date: Date | string | null;
   signature_present: boolean;
   signature_evidence_at: Date | string | null;
+  // Install context surfaced on the GHL contact so whoever picks up a reply can see
+  // where the job was and who did it without opening FibreFlow. install_gps is a
+  // pre-joined "lat,lng" pair from a single onemap row, not two separate values.
+  installer_name: string | null;
+  install_address: string | null;
+  install_gps: string | null;
+  pole_number: string | null;
+  ont_barcode: string | null;
 }
 
 export interface PreparedCandidate {
@@ -76,6 +84,20 @@ export interface PreparedCandidate {
   firstName: string;
   lastName: string | null;
   consentEvidence: ConsentEvidence;
+  installContext: VelocityInstallContext;
+}
+
+/**
+ * Optional install detail written to GHL alongside the DR number. Every field is
+ * nullable and a null is simply omitted from the upsert, so a drop missing any of
+ * them still exports normally — these are context, never gating data.
+ */
+export interface VelocityInstallContext {
+  installerName: string | null;
+  installAddress: string | null;
+  installGps: string | null;
+  poleNumber: string | null;
+  ontBarcode: string | null;
 }
 
 export type CandidateDecision =

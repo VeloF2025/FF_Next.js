@@ -2,6 +2,8 @@ import {
   isAbsentDuplicate, isWhatsappDndBlocked, retryAfterSeconds, safeErrorText,
 } from './ghlResponse';
 import { GhlRateLimiter } from './ghlRateLimiter';
+import { installContextFields } from './ghlCustomFields';
+import type { VelocityInstallContext } from './types';
 
 // Re-exported so './ghlClient' stays the module's entry point for callers and tests.
 export { GhlRateLimiter } from './ghlRateLimiter';
@@ -55,7 +57,9 @@ export interface VelocityReviewContactInput {
   eventDate: string;
   sources: readonly string[];
   exportKey: string;
+  installContext?: VelocityInstallContext;
 }
+
 
 export interface HighLevelContact {
   id: string;
@@ -165,6 +169,7 @@ export class HighLevelClient {
         { id: this.config.fieldEventDateId, fieldValue: input.eventDate },
         { id: this.config.fieldSourcesId, fieldValue: input.sources.join(',') },
         { id: this.config.fieldExportKeyId, fieldValue: input.exportKey },
+        ...installContextFields(input.installContext),
       ],
     }, 'upsert');
     return contactFrom(response);
