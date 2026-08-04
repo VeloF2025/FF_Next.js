@@ -59,7 +59,17 @@ export default function FleetMapPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col h-[calc(100vh-280px)] min-h-[500px]">
+      {/*
+       * Chrome above and below AppLayout's <main> measures 165px at lg and up
+       * (header 89 + FleetNav 43 + footer 33) and 157–173px below it, where the
+       * header shrinks and the footer wraps to two lines. Subtracting the larger
+       * 173px below lg keeps the panel inside <main> at every width — it can
+       * only ever leave a few px unused, never overflow into a scrollbar that
+       * would fight the map's own pan. The previous 280px was inherited from
+       * KanbanBoard/ChatTab, which sit under a taller page header than this
+       * page has; here it left 115px of dead space above the footer.
+       */}
+      <div className="flex flex-col h-[calc(100vh-173px)] lg:h-[calc(100vh-165px)] min-h-[500px]">
         <header className="px-4 py-3 border-b">
           <h1 className="text-lg font-semibold">Fleet map</h1>
           <p className="text-sm text-gray-500">
