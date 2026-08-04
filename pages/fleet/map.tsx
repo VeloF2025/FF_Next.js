@@ -59,7 +59,31 @@ export default function FleetMapPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col h-[calc(100vh-280px)] min-h-[500px]">
+      {/*
+       * AppLayout's <main> is already exactly the viewport minus the header,
+       * module nav and footer, so the panel fills it by pinning to its edges
+       * rather than subtracting that chrome from 100vh a second time. The old
+       * `h-[calc(100vh-280px)]` (inherited from KanbanBoard/ChatTab, which sit
+       * under a taller page header than this page has) left 115px dead above
+       * the footer, and no constant fixes it properly: measured across
+       * breakpoints the chrome is 157–173px because the header shrinks and the
+       * footer wraps, and <main> additionally gains 40px of padding while an
+       * admin impersonates — which a 100vh constant cannot see, so it overflows
+       * into a scrollbar that fights the map's own pan.
+       *
+       * Pinning spans <main>'s border box, which ignores its padding, so the
+       * safe-area inset it reserves at the bottom for the home indicator has to
+       * be reapplied here — otherwise the map and the "not on the map" list sit
+       * in the gesture strip on a notched phone. It resolves to 0 elsewhere.
+       * <main>'s impersonation-only top padding is deliberately not mirrored:
+       * <main> already starts below the header and module nav, well clear of
+       * the fixed banner that padding exists to avoid.
+       *
+       * This relies on <main> keeping `relative` (AppLayout.tsx). If that is
+       * dropped the panel resolves against the viewport and covers the app —
+       * loud rather than silent, but it is why the two belong together.
+       */}
+      <div className="absolute inset-x-0 top-0 bottom-[env(safe-area-inset-bottom)] flex flex-col min-h-[500px]">
         <header className="px-4 py-3 border-b">
           <h1 className="text-lg font-semibold">Fleet map</h1>
           <p className="text-sm text-gray-500">
