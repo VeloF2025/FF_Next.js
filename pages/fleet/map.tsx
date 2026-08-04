@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { AppLayout } from '@/components/layout/AppLayout';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 import { log } from '@/lib/logger';
 import { notPlottedReason, partitionVehicles } from '@/modules/fleet/utils/liveMapHelpers';
@@ -57,26 +58,28 @@ export default function FleetMapPage() {
   const { plotted, notPlotted } = partitionVehicles(vehicles);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <header className="px-4 py-3 border-b">
-        <h1 className="text-lg font-semibold">Fleet map</h1>
-        <p className="text-sm text-gray-500">
-          Showing {plotted.length} of {vehicles.length} active vehicles.
-          {notPlotted.length > 0 && ` ${notPlotted.length} not on the map.`}
-          {' '}
-          Positions refresh every 30 seconds and are typically 1–5 minutes behind.
-        </p>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </header>
-      <div className="flex-1 min-h-0">
-        <FleetMap vehicles={vehicles} />
+    <AppLayout>
+      <div className="flex flex-col h-[calc(100vh-280px)] min-h-[500px]">
+        <header className="px-4 py-3 border-b">
+          <h1 className="text-lg font-semibold">Fleet map</h1>
+          <p className="text-sm text-gray-500">
+            Showing {plotted.length} of {vehicles.length} active vehicles.
+            {notPlotted.length > 0 && ` ${notPlotted.length} not on the map.`}
+            {' '}
+            Positions refresh every 30 seconds and are typically 1–5 minutes behind.
+          </p>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </header>
+        <div className="flex-1 min-h-0">
+          <FleetMap vehicles={vehicles} />
+        </div>
+        {notPlotted.length > 0 && (
+          <aside className="px-4 py-2 border-t text-sm">
+            <strong>Not on the map:</strong>{' '}
+            {notPlotted.map((v) => `${v.registration} (${notPlottedReason(v)})`).join(', ')}
+          </aside>
+        )}
       </div>
-      {notPlotted.length > 0 && (
-        <aside className="px-4 py-2 border-t text-sm">
-          <strong>Not on the map:</strong>{' '}
-          {notPlotted.map((v) => `${v.registration} (${notPlottedReason(v)})`).join(', ')}
-        </aside>
-      )}
-    </div>
+    </AppLayout>
   );
 }
