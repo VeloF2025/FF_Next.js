@@ -185,6 +185,38 @@ describe('listCandidateRows against a real schema', () => {
     expect(rows[0].contact_name).toBe('Fresh');
   });
 
+  it('recombines a name and phone split across two OneMap rows', async () => {
+    // The root cause of the 2026-08-04 incident. DISTINCT ON kept ONE WHOLE ROW and
+    // discarded its siblings, so when the newest row carried the phone and an older
+    // one carried the name, the name was silently lost. Drops average 1.49 onemap
+    // rows, so this split is common, not exotic.
+    //
+    // Without the per-column aggregation this test fails: DISTINCT ON would pick the
+    // newest row and return a null contact_name.
+    await db.query(
+      `INSERT INTO drops (drop_number, installation_date) VALUES ($1, $2)`,
+      ['DR8000001', TARGET],
+    );
+    await db.query(
+      `INSERT INTO onemap_properties
+         (drop_number, contact_number, contact_name, contact_surname, updated_at)
+       VALUES ($1, NULL, 'Nomsa', 'Dlamini', $2),
+              ($3, '0829876543', NULL, NULL, $4)`,
+      [
+        'DR8000001', `${TARGET}T01:00:00`,
+        'DR8000001', `${TARGET}T09:00:00`,
+      ],
+    );
+
+    const rows = await listCandidateRows(TARGET);
+    const row = rows.find((item) => item.dr_number === 'DR8000001');
+
+    // Phone from the newest row, name recovered from the older sibling.
+    expect(row?.onemap_phone).toBe('0829876543');
+    expect(row?.contact_name).toBe('Nomsa');
+    expect(row?.contact_surname).toBe('Dlamini');
+  });
+
   it('recovers a customer name from the review row when OneMap has none', async () => {
     // The 2026-08-04 incident: 262 customers were greeted "Hi There" because the
     // query never selected the review name columns at all, even though it already
