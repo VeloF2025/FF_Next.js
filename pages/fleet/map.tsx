@@ -60,16 +60,22 @@ export default function FleetMapPage() {
   return (
     <AppLayout>
       {/*
-       * Chrome above and below AppLayout's <main> measures 165px at lg and up
-       * (header 89 + FleetNav 43 + footer 33) and 157–173px below it, where the
-       * header shrinks and the footer wraps to two lines. Subtracting the larger
-       * 173px below lg keeps the panel inside <main> at every width — it can
-       * only ever leave a few px unused, never overflow into a scrollbar that
-       * would fight the map's own pan. The previous 280px was inherited from
-       * KanbanBoard/ChatTab, which sit under a taller page header than this
-       * page has; here it left 115px of dead space above the footer.
+       * AppLayout's <main> is already exactly the viewport minus the header,
+       * module nav and footer, so the panel fills it by pinning to its edges
+       * rather than subtracting that chrome from 100vh a second time. The old
+       * `h-[calc(100vh-280px)]` (inherited from KanbanBoard/ChatTab, which sit
+       * under a taller page header than this page has) left 115px dead above
+       * the footer, and no constant fixes it properly: measured across
+       * breakpoints the chrome is 157–173px because the header shrinks and the
+       * footer wraps, and <main> additionally gains 40px of padding while an
+       * admin impersonates — which a 100vh constant cannot see, so it overflows
+       * into a scrollbar that fights the map's own pan.
+       *
+       * This relies on <main> keeping `relative` (AppLayout.tsx). If that is
+       * dropped the panel resolves against the viewport and covers the app —
+       * loud rather than silent, but it is why the two belong together.
        */}
-      <div className="flex flex-col h-[calc(100vh-173px)] lg:h-[calc(100vh-165px)] min-h-[500px]">
+      <div className="absolute inset-0 flex flex-col min-h-[500px]">
         <header className="px-4 py-3 border-b">
           <h1 className="text-lg font-semibold">Fleet map</h1>
           <p className="text-sm text-gray-500">
