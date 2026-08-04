@@ -27,6 +27,35 @@ function resolvePhone(row: CandidateDbRow): ResolvedPhone | 'conflict' | null {
   return phones[0] ?? null;
 }
 
+// Rendered into the WhatsApp greeting when no source carries a name. It is also
+// persisted as the GHL contact's first name, because the workflow maps {{1}} from
+// Contact -> First Name and has nowhere else to read a fallback from.
+export const MISSING_NAME_PLACEHOLDER = 'there';
+
+/**
+ * Prefer onemap's already-split given/family pair; otherwise take a full name from the
+ * review record and split it. Falls back to the placeholder only when no source has one.
+ *
+ * Everything here is a greeting, not an identity record: a one-word full name yields no
+ * surname rather than duplicating the given name, and a multi-word family name is kept
+ * whole ("Van Der Merwe"), since truncating someone's surname is worse than omitting it.
+ */
+function resolveName(row: CandidateDbRow): { firstName: string; lastName: string | null } {
+  const onemapFirst = row.contact_name?.trim();
+  if (onemapFirst) {
+    return { firstName: onemapFirst, lastName: row.contact_surname?.trim() || null };
+  }
+  const full = row.subscriber_name?.trim() || row.qcontact_name?.trim() || '';
+  if (full) {
+    const [given, ...rest] = full.split(/\s+/);
+    if (given) return { firstName: given, lastName: rest.length > 0 ? rest.join(' ') : null };
+  }
+  return {
+    firstName: MISSING_NAME_PLACEHOLDER,
+    lastName: row.contact_surname?.trim() || null,
+  };
+}
+
 function resolveConsent(row: CandidateDbRow): ConsentEvidence | null {
   if (row.home_signup_date !== null) {
     return {
@@ -62,8 +91,7 @@ export function prepareCandidate(
     return { status: 'quarantined', drNumber: row.dr_number, reason: 'consent_missing' };
   }
 
-  const firstName = row.contact_name?.trim() || 'there';
-  const lastName = row.contact_surname?.trim() || null;
+  const { firstName, lastName } = resolveName(row);
 
   return {
     status: 'ready',
