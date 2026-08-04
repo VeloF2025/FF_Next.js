@@ -195,7 +195,21 @@ describe('prepareCandidate', () => {
     expect(prepareCandidate(row({
       ...named, contact_name: null, contact_surname: null, subscriber_name: 'Anna van der Merwe',
     }), SECRET)).toMatchObject({
-      candidate: { firstName: 'Anna', lastName: 'van der Merwe' },
+      // Standalone surname field: leading particle is capitalised, inner ones are not.
+      candidate: { firstName: 'Anna', lastName: 'Van der Merwe' },
+    });
+  });
+
+  it('normalises source casing but keeps Afrikaans particles lowercase', () => {
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null, subscriber_name: 'betty MOKWENA',
+    }), SECRET)).toMatchObject({
+      candidate: { firstName: 'Betty', lastName: 'Mokwena' },
+    });
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null, subscriber_name: 'JOHAN VAN DER MERWE',
+    }), SECRET)).toMatchObject({
+      candidate: { firstName: 'Johan', lastName: 'Van der Merwe' },
     });
   });
 
