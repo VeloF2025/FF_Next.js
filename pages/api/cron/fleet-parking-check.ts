@@ -3,6 +3,9 @@
  * velo's crontab — NOT vercel.json, because Vercel crons do not fire for
  * this systemd-hosted app.
  *
+ * Cron (Velocity crontab — the secret is read from the env file, never inlined):
+ *   0 20 * * * SECRET=$(grep "^CRON_SECRET=" /home/velo/fibreflow-dev/.env.local | cut -d= -f2) && curl -sf -m 120 -H "x-cron-secret: $SECRET" http://localhost:3005/api/cron/fleet-parking-check >> /home/velo/logs/fleet-parking-check.log 2>&1
+ *
  * Thin by design: auth and HTTP only. All logic lives in
  * src/modules/fleet/parking/ so it can be tested without a server.
  */
@@ -28,7 +31,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const report = await runParkingCheck(new Date());
-    log.info('[fleet-parking-check] completed', { ...report });
+    // Log only the summary — `results` is one entry per vehicle (~22/night)
+    // and would otherwise flood the log every run.
+    log.info('[fleet-parking-check] completed', {
+      checkDate: report.checkDate,
+      evaluated: report.evaluated,
+      counts: report.counts,
+      errors: report.errors,
+    });
     return apiResponse.success(res, report);
   } catch (error) {
     log.error('[fleet-parking-check] run failed', { error });

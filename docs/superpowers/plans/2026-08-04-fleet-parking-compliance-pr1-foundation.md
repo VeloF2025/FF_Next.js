@@ -1213,6 +1213,8 @@ curl -s -H "x-cron-secret: $CRON_SECRET" \
 
 Expected: `success: true` with `evaluated` equal to the number of active vehicles (22 at time of writing) and `counts.no_address` equal to the same number, because no parking addresses exist yet. **That is the correct result for PR 1** — it proves the pipeline end-to-end.
 
+This smoke test is now safe to run at any time of day: `insertComplianceCheck` uses `ON CONFLICT ... DO UPDATE`, so a daytime probe is simply overwritten by the genuine 20:00 SAST run rather than permanently occupying that day's row.
+
 Then confirm idempotency by running it a second time and checking the row count did not change:
 
 ```sql

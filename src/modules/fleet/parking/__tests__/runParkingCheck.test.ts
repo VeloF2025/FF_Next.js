@@ -27,7 +27,7 @@ function candidate(over: Partial<ParkingCandidate> = {}): ParkingCandidate {
 beforeEach(() => {
   loadParkingCheckCandidates.mockReset();
   insertComplianceCheck.mockReset();
-  insertComplianceCheck.mockResolvedValue(undefined);
+  insertComplianceCheck.mockResolvedValue(true);
 });
 
 describe('sastDateString', () => {
@@ -74,13 +74,57 @@ describe('runParkingCheck', () => {
     ]);
     insertComplianceCheck
       .mockRejectedValueOnce(new Error('constraint violation'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce(true);
 
     const report = await runParkingCheck(CHECK_AT);
 
     expect(report.errors).toBe(1);
     expect(report.evaluated).toBe(2);
     expect(insertComplianceCheck).toHaveBeenCalledTimes(2);
+  });
+
+  it('records one results entry per successfully-inserted vehicle', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([
+      candidate({ vehicleId: 'veh-1', registration: 'MW67LFGP' }),
+      candidate({ vehicleId: 'veh-2', registration: 'MW68LFGP', location: null }),
+    ]);
+    insertComplianceCheck.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    expect(report.results).toHaveLength(2);
+    expect(report.results[0]).toEqual({
+      vehicleId: 'veh-1',
+      registration: 'MW67LFGP',
+      result: 'compliant',
+      distanceM: 0,
+      lastFixAgeSeconds: 3600,
+      inserted: true,
+    });
+    expect(report.results[1]).toEqual({
+      vehicleId: 'veh-2',
+      registration: 'MW68LFGP',
+      result: 'no_address',
+      distanceM: null,
+      lastFixAgeSeconds: null,
+      inserted: false,
+    });
+  });
+
+  it('omits a vehicle from results when its insert throws, but still counts the error', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([
+      candidate({ vehicleId: 'veh-1', registration: 'MW67LFGP' }),
+      candidate({ vehicleId: 'veh-2', registration: 'MW68LFGP' }),
+    ]);
+    insertComplianceCheck
+      .mockRejectedValueOnce(new Error('constraint violation'))
+      .mockResolvedValueOnce(true);
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    expect(report.errors).toBe(1);
+    expect(report.results).toHaveLength(1);
+    expect(report.results.map((r) => r.vehicleId)).toEqual(['veh-2']);
   });
 
   it('records the deciding fix as evidence on the row', async () => {
@@ -101,6 +145,7 @@ describe('runParkingCheck', () => {
     const report = await runParkingCheck(CHECK_AT);
     expect(report.evaluated).toBe(0);
     expect(report.errors).toBe(0);
+    expect(report.results).toEqual([]);
   });
 
   it('maintains the invariant sum(counts) + errors === evaluated', async () => {
@@ -110,9 +155,9 @@ describe('runParkingCheck', () => {
       candidate({ vehicleId: 'veh-3', hasTracker: false }),
     ]);
     insertComplianceCheck
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(true)
       .mockRejectedValueOnce(new Error('constraint violation'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce(true);
 
     const report = await runParkingCheck(CHECK_AT);
 

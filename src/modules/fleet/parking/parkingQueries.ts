@@ -89,7 +89,7 @@ export async function loadParkingCheckCandidates(checkAt: Date): Promise<Parking
             id: r.location_id,
             lat: Number(r.location_lat),
             lon: Number(r.location_lon),
-            radiusM: Number(r.radius_m ?? 200),
+            radiusM: Number(r.radius_m),
           },
     lastFix:
       r.fix_at === null || r.fix_lat === null || r.fix_lon === null
@@ -102,13 +102,28 @@ export async function loadParkingCheckCandidates(checkAt: Date): Promise<Parking
   }));
 }
 
+interface InsertResultRow extends Record<string, unknown> {
+  inserted: boolean;
+}
+
 /**
- * Idempotent by design: the unique index on (vehicle_id, check_date)
- * makes a re-run or a double cron fire a no-op rather than a duplicate
- * record — and therefore, later, a duplicate alert.
+ * One row per vehicle per day: the unique index on (vehicle_id, check_date)
+ * makes a re-run or a double cron fire converge on the same row instead of
+ * a duplicate record. It is deliberately DO UPDATE, not DO NOTHING — a
+ * manual smoke-test probe earlier in the day must not permanently poison
+ * the slot and hide the genuine 20:00 SAST result. Last writer wins.
+ *
+ * Returns whether this call inserted a brand-new row (true) or updated an
+ * existing one (false), using the standard Postgres `xmax = 0` idiom:
+ * `xmax` is the transaction id that deleted/updated a row version, so it
+ * is exactly 0 only on a version nobody has touched yet — i.e. one this
+ * very INSERT just created. On an ON CONFLICT ... DO UPDATE, `xmax = 0`
+ * is false, because the update itself stamps a new xmax on the new row
+ * version. Callers (e.g. violation notifications) use this to avoid
+ * re-alerting on a re-run that only updated an existing row.
  */
-export async function insertComplianceCheck(row: ComplianceCheckRow): Promise<void> {
-  await sql`
+export async function insertComplianceCheck(row: ComplianceCheckRow): Promise<boolean> {
+  const rows = await sql<InsertResultRow>`
     INSERT INTO fleet_parking_compliance_checks (
       vehicle_id, check_date, evaluated_at, parking_location_id,
       last_fix_at, last_fix_lat, last_fix_lon, last_fix_age_seconds,
@@ -118,6 +133,16 @@ export async function insertComplianceCheck(row: ComplianceCheckRow): Promise<vo
       ${row.lastFixAt}, ${row.lastFixLat}, ${row.lastFixLon}, ${row.lastFixAgeSeconds},
       ${row.distanceM}, ${row.result}
     )
-    ON CONFLICT (vehicle_id, check_date) DO NOTHING
+    ON CONFLICT (vehicle_id, check_date) DO UPDATE SET
+      evaluated_at = EXCLUDED.evaluated_at,
+      parking_location_id = EXCLUDED.parking_location_id,
+      last_fix_at = EXCLUDED.last_fix_at,
+      last_fix_lat = EXCLUDED.last_fix_lat,
+      last_fix_lon = EXCLUDED.last_fix_lon,
+      last_fix_age_seconds = EXCLUDED.last_fix_age_seconds,
+      distance_m = EXCLUDED.distance_m,
+      result = EXCLUDED.result
+    RETURNING (xmax = 0) AS inserted
   `;
+  return rows[0]?.inserted === true;
 }

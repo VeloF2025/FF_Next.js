@@ -6,7 +6,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS fleet_vehicle_parking_locations (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  vehicle_id           UUID NOT NULL REFERENCES fleet_vehicles(id),
+  vehicle_id           UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
   declared_by_staff_id UUID NOT NULL REFERENCES staff(id),
   lat                  NUMERIC(10,7) NOT NULL,
   lon                  NUMERIC(10,7) NOT NULL,
@@ -40,10 +40,12 @@ CREATE INDEX IF NOT EXISTS ix_parking_vehicle_status
 
 CREATE TABLE IF NOT EXISTS fleet_parking_compliance_checks (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  vehicle_id           UUID NOT NULL REFERENCES fleet_vehicles(id),
+  vehicle_id           UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
   check_date           DATE NOT NULL,
   evaluated_at         TIMESTAMPTZ NOT NULL,
-  parking_location_id  UUID REFERENCES fleet_vehicle_parking_locations(id),
+  -- SET NULL, not CASCADE: compliance history is evidence and must survive
+  -- the deletion of the parking-location row it was checked against.
+  parking_location_id  UUID REFERENCES fleet_vehicle_parking_locations(id) ON DELETE SET NULL,
   last_fix_at          TIMESTAMPTZ,
   last_fix_lat         NUMERIC(10,7),
   last_fix_lon         NUMERIC(10,7),
@@ -63,12 +65,17 @@ CREATE INDEX IF NOT EXISTS ix_parking_check_date_result
 
 -- Authorization here is page/route based (access_permissions), not
 -- role-capability based. These rows are what "fleet manager" means.
-INSERT INTO access_permissions (type, key, label, description, route, is_active)
+-- parent_key = 'fleet' so these appear under the Fleet module in the
+-- admin permissions tree (see pages/api/admin/permissions/module-access.ts,
+-- which filters children by parent_key). sort_order 20/21 is clear of the
+-- highest known sibling under 'fleet' (fleet.mileage at 15, see
+-- scripts/migrations/sql/271_rbac_missing_pages.sql).
+INSERT INTO access_permissions (type, key, parent_key, label, description, route, sort_order, is_active)
 VALUES
-  ('page', 'fleet.parking', 'Parking Compliance',
-   'View overnight parking compliance results', '/fleet/parking', true),
-  ('page', 'fleet.parking-requests', 'Parking Requests',
-   'Approve or reject driver parking address changes', '/fleet/parking/requests', true)
+  ('page', 'fleet.parking', 'fleet', 'Parking Compliance',
+   'View overnight parking compliance results', '/fleet/parking', 20, true),
+  ('page', 'fleet.parking-requests', 'fleet', 'Parking Requests',
+   'Approve or reject driver parking address changes', '/fleet/parking/requests', 21, true)
 ON CONFLICT (key) DO NOTHING;
 
 COMMIT;

@@ -18,11 +18,23 @@ import { classifyParkingCompliance } from './classifyParkingCompliance';
 import { insertComplianceCheck, loadParkingCheckCandidates } from './parkingQueries';
 import type { ParkingCheckResult } from './types';
 
+/** Per-vehicle outcome, for callers (e.g. later violation notifications) that need more than the aggregate counts. Only present for vehicles whose insert succeeded. */
+export interface ParkingCheckVehicleResult {
+  vehicleId: string;
+  registration: string;
+  result: ParkingCheckResult;
+  distanceM: number | null;
+  lastFixAgeSeconds: number | null;
+  /** True when this was a new row for the day, false when it overwrote an earlier run's row (see insertComplianceCheck). */
+  inserted: boolean;
+}
+
 export interface ParkingCheckReport {
   checkDate: string;
   evaluated: number;
   counts: Record<ParkingCheckResult, number>;
   errors: number;
+  results: ParkingCheckVehicleResult[];
 }
 
 /**
@@ -53,18 +65,19 @@ export async function runParkingCheck(checkAt: Date): Promise<ParkingCheckReport
     evaluated: candidates.length,
     counts: emptyCounts(),
     errors: 0,
+    results: [],
   };
 
   for (const c of candidates) {
-    const outcome = classifyParkingCompliance({
-      location: c.location,
-      hasTracker: c.hasTracker,
-      lastFix: c.lastFix,
-      checkAt,
-    });
-
     try {
-      await insertComplianceCheck({
+      const outcome = classifyParkingCompliance({
+        location: c.location,
+        hasTracker: c.hasTracker,
+        lastFix: c.lastFix,
+        checkAt,
+      });
+
+      const inserted = await insertComplianceCheck({
         vehicleId: c.vehicleId,
         checkDate,
         evaluatedAt: checkAt,
@@ -77,6 +90,14 @@ export async function runParkingCheck(checkAt: Date): Promise<ParkingCheckReport
         result: outcome.result,
       });
       report.counts[outcome.result] += 1;
+      report.results.push({
+        vehicleId: c.vehicleId,
+        registration: c.registration,
+        result: outcome.result,
+        distanceM: outcome.distanceM,
+        lastFixAgeSeconds: outcome.lastFixAgeSeconds,
+        inserted,
+      });
     } catch (error) {
       report.errors += 1;
       log.error('[fleet-parking-check] failed to record result', {
