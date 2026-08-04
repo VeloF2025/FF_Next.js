@@ -27,6 +27,60 @@ function resolvePhone(row: CandidateDbRow): ResolvedPhone | 'conflict' | null {
   return phones[0] ?? null;
 }
 
+// Rendered into the WhatsApp greeting when no source carries a name. It is also
+// persisted as the GHL contact's first name, because the workflow maps {{1}} from
+// Contact -> First Name and has nowhere else to read a fallback from.
+export const MISSING_NAME_PLACEHOLDER = 'there';
+
+// Source names arrive in mixed case — across the 2026-08-01..03 window, 49 started
+// lowercase and 4 were ALLCAPS. The value is greeted with ("Hi {{1}}") and shown in
+// the GHL inbox, so normalise it. Dutch/Afrikaans particles stay lowercase, which is
+// how these surnames are actually written in South Africa.
+const NAME_PARTICLES = new Set(['van', 'der', 'den', 'de', 'du', 'le', 'la', 'von', 'ter']);
+
+function titleCaseName(value: string): string {
+  return value.split(/(\s+|-)/).map((part, index) => {
+    if (!part.trim() || part === '-') return part;
+    const lower = part.toLowerCase();
+    if (index > 0 && NAME_PARTICLES.has(lower)) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join('');
+}
+
+/**
+ * Prefer onemap's already-split given/family pair; otherwise take a full name from the
+ * review record and split it. Falls back to the placeholder only when no source has one.
+ *
+ * Everything here is a greeting, not an identity record: a one-word full name yields no
+ * surname rather than duplicating the given name, and a multi-word family name is kept
+ * whole ("Van Der Merwe"), since truncating someone's surname is worse than omitting it.
+ */
+function resolveName(row: CandidateDbRow): { firstName: string; lastName: string | null } {
+  const onemapFirst = row.contact_name?.trim();
+  const onemapLast = row.contact_surname?.trim();
+  if (onemapFirst) {
+    return {
+      firstName: titleCaseName(onemapFirst),
+      lastName: onemapLast ? titleCaseName(onemapLast) : null,
+    };
+  }
+  const full = row.subscriber_name?.trim() || row.qcontact_name?.trim() || '';
+  if (full) {
+    const [given, ...rest] = full.split(/\s+/);
+    if (given) {
+      return {
+        firstName: titleCaseName(given),
+        lastName: rest.length > 0 ? titleCaseName(rest.join(' ')) : null,
+      };
+    }
+  }
+  // The placeholder is deliberately left lowercase: it reads as "Hi there", not a name.
+  return {
+    firstName: MISSING_NAME_PLACEHOLDER,
+    lastName: onemapLast ? titleCaseName(onemapLast) : null,
+  };
+}
+
 function resolveConsent(row: CandidateDbRow): ConsentEvidence | null {
   if (row.home_signup_date !== null) {
     return {
@@ -62,8 +116,7 @@ export function prepareCandidate(
     return { status: 'quarantined', drNumber: row.dr_number, reason: 'consent_missing' };
   }
 
-  const firstName = row.contact_name?.trim() || 'there';
-  const lastName = row.contact_surname?.trim() || null;
+  const { firstName, lastName } = resolveName(row);
 
   return {
     status: 'ready',

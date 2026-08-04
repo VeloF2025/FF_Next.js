@@ -13,6 +13,8 @@ function row(overrides: Partial<CandidateDbRow> = {}): CandidateDbRow {
     qcontact_phone: null,
     contact_name: 'Ada',
     contact_surname: 'Lovelace',
+    subscriber_name: null,
+    qcontact_name: null,
     home_signup_date: null,
     signature_present: false,
     signature_evidence_at: null,
@@ -173,5 +175,73 @@ describe('prepareCandidate', () => {
       onemap_phone: rawPhone,
       home_signup_date: '2026-07-01',
     }), '')).toThrowError(expect.not.stringContaining(rawPhone));
+  });
+
+  // Regression: the 2026-08-04 run greeted all 262 customers as "Hi There". onemap
+  // carried a name for only 27 of them, but dr_photo_unified_reviews.subscriber_name
+  // had one for 207 — and nothing read that column.
+  const named = { onemap_phone: '0821234567', home_signup_date: '2026-07-01' };
+
+  it('splits a full subscriber name when onemap has none', () => {
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null, subscriber_name: 'Thabo Mokoena',
+    }), SECRET)).toMatchObject({
+      status: 'ready',
+      candidate: { firstName: 'Thabo', lastName: 'Mokoena' },
+    });
+  });
+
+  it('keeps a multi-word family name whole rather than truncating it', () => {
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null, subscriber_name: 'Anna van der Merwe',
+    }), SECRET)).toMatchObject({
+      // Standalone surname field: leading particle is capitalised, inner ones are not.
+      candidate: { firstName: 'Anna', lastName: 'Van der Merwe' },
+    });
+  });
+
+  it('normalises source casing but keeps Afrikaans particles lowercase', () => {
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null, subscriber_name: 'betty MOKWENA',
+    }), SECRET)).toMatchObject({
+      candidate: { firstName: 'Betty', lastName: 'Mokwena' },
+    });
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null, subscriber_name: 'JOHAN VAN DER MERWE',
+    }), SECRET)).toMatchObject({
+      candidate: { firstName: 'Johan', lastName: 'Van der Merwe' },
+    });
+  });
+
+  it('yields no surname for a one-word name instead of duplicating it', () => {
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null, subscriber_name: 'Sipho',
+    }), SECRET)).toMatchObject({
+      candidate: { firstName: 'Sipho', lastName: null },
+    });
+  });
+
+  it('prefers onemap over the review full name', () => {
+    expect(prepareCandidate(row({
+      ...named, subscriber_name: 'Wrong Person',
+    }), SECRET)).toMatchObject({
+      candidate: { firstName: 'Ada', lastName: 'Lovelace' },
+    });
+  });
+
+  it('falls back to qcontact_name before the placeholder', () => {
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null, qcontact_name: 'Lerato Dlamini',
+    }), SECRET)).toMatchObject({
+      candidate: { firstName: 'Lerato', lastName: 'Dlamini' },
+    });
+  });
+
+  it('uses the placeholder only when no source carries a name', () => {
+    expect(prepareCandidate(row({
+      ...named, contact_name: null, contact_surname: null,
+    }), SECRET)).toMatchObject({
+      candidate: { firstName: 'there', lastName: null },
+    });
   });
 });

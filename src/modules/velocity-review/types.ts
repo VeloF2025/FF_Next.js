@@ -57,6 +57,10 @@ export interface CandidateDbRow {
   qcontact_phone: string | null;
   contact_name: string | null;
   contact_surname: string | null;
+  // Full names ("Given Family") from dr_photo_unified_reviews; onemap's pair above is
+  // already split. Used as fallbacks when onemap has no name for the drop.
+  subscriber_name: string | null;
+  qcontact_name: string | null;
   home_signup_date: Date | string | null;
   signature_present: boolean;
   signature_evidence_at: Date | string | null;

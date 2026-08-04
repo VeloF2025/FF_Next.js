@@ -21,7 +21,9 @@ const SOURCE_TABLES = `
     drop_number VARCHAR,
     submitted_date DATE,
     subscriber_phone VARCHAR,
+    subscriber_name VARCHAR,
     qcontact_phone VARCHAR,
+    qcontact_name VARCHAR,
     step_10_signature BOOLEAN,
     whatsapp_submitted_at TIMESTAMPTZ,
     photos_fetched_at TIMESTAMPTZ,
@@ -181,6 +183,63 @@ describe('listCandidateRows against a real schema', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].onemap_phone).toBe('0822222222');
     expect(rows[0].contact_name).toBe('Fresh');
+  });
+
+  it('recombines a name and phone split across two OneMap rows', async () => {
+    // The root cause of the 2026-08-04 incident. DISTINCT ON kept ONE WHOLE ROW and
+    // discarded its siblings, so when the newest row carried the phone and an older
+    // one carried the name, the name was silently lost. Drops average 1.49 onemap
+    // rows, so this split is common, not exotic.
+    //
+    // Without the per-column aggregation this test fails: DISTINCT ON would pick the
+    // newest row and return a null contact_name.
+    await db.query(
+      `INSERT INTO drops (drop_number, installation_date) VALUES ($1, $2)`,
+      ['DR8000001', TARGET],
+    );
+    await db.query(
+      `INSERT INTO onemap_properties
+         (drop_number, contact_number, contact_name, contact_surname, updated_at)
+       VALUES ($1, NULL, 'Nomsa', 'Dlamini', $2),
+              ($3, '0829876543', NULL, NULL, $4)`,
+      [
+        'DR8000001', `${TARGET}T01:00:00`,
+        'DR8000001', `${TARGET}T09:00:00`,
+      ],
+    );
+
+    const rows = await listCandidateRows(TARGET);
+    const row = rows.find((item) => item.dr_number === 'DR8000001');
+
+    // Phone from the newest row, name recovered from the older sibling.
+    expect(row?.onemap_phone).toBe('0829876543');
+    expect(row?.contact_name).toBe('Nomsa');
+    expect(row?.contact_surname).toBe('Dlamini');
+  });
+
+  it('recovers a customer name from the review row when OneMap has none', async () => {
+    // The 2026-08-04 incident: 262 customers were greeted "Hi There" because the
+    // query never selected the review name columns at all, even though it already
+    // joined that table for the phones. Names existed — they were simply not read.
+    await db.query(
+      `INSERT INTO dr_photo_unified_reviews
+         (drop_number, submitted_date, subscriber_phone, subscriber_name, qcontact_name)
+       VALUES ($1, $2, '0821234567', 'Thabo Mokoena', 'Ignored Qcontact')`,
+      ['DR7000001', TARGET],
+    );
+    // OneMap knows the drop but carries no name, so the review name must win over
+    // the placeholder rather than being silently discarded.
+    await db.query(
+      `INSERT INTO onemap_properties (drop_number, contact_number, updated_at)
+       VALUES ($1, '0821234567', $2)`,
+      ['DR7000001', `${TARGET}T09:00:00`],
+    );
+
+    const rows = await listCandidateRows(TARGET);
+    const row = rows.find((item) => item.dr_number === 'DR7000001');
+
+    expect(row).toBeDefined();
+    expect(row?.subscriber_name).toBe('Thabo Mokoena');
   });
 
   it('takes the most recent non-blank subscriber and qcontact phones', async () => {

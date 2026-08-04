@@ -41,17 +41,32 @@ candidates AS (
   SELECT dr_number, array_agg(DISTINCT source ORDER BY source) AS sources
   FROM source_rows WHERE dr_number <> '' GROUP BY dr_number
 ),
+-- Per-column "newest non-null wins", NOT DISTINCT ON.
+--
+-- DISTINCT ON keeps one whole row and discards the rest, so when a drop has several
+-- onemap rows -- 1.49 on average -- and the newest carries the phone while an older
+-- one carries the name, the name is silently thrown away. That is exactly what
+-- happened on 2026-08-04: all 262 exported contacts fell back to the 'there'
+-- placeholder even though 27 had a real name on a sibling row.
+-- See postgresql-gotchas SS53.
 latest_onemap AS (
-  SELECT DISTINCT ON (UPPER(BTRIM(op.drop_number)))
+  SELECT
     UPPER(BTRIM(op.drop_number)) AS dr_number,
-    op.contact_number AS onemap_phone,
-    op.contact_name,
-    op.contact_surname,
-    op.home_signup_date
+    (array_agg(NULLIF(BTRIM(op.contact_number), '') ORDER BY op.updated_at DESC NULLS LAST,
+      op.import_id DESC NULLS LAST, op.id DESC)
+      FILTER (WHERE NULLIF(BTRIM(op.contact_number), '') IS NOT NULL))[1] AS onemap_phone,
+    (array_agg(NULLIF(BTRIM(op.contact_name), '') ORDER BY op.updated_at DESC NULLS LAST,
+      op.import_id DESC NULLS LAST, op.id DESC)
+      FILTER (WHERE NULLIF(BTRIM(op.contact_name), '') IS NOT NULL))[1] AS contact_name,
+    (array_agg(NULLIF(BTRIM(op.contact_surname), '') ORDER BY op.updated_at DESC NULLS LAST,
+      op.import_id DESC NULLS LAST, op.id DESC)
+      FILTER (WHERE NULLIF(BTRIM(op.contact_surname), '') IS NOT NULL))[1] AS contact_surname,
+    (array_agg(op.home_signup_date ORDER BY op.updated_at DESC NULLS LAST,
+      op.import_id DESC NULLS LAST, op.id DESC)
+      FILTER (WHERE op.home_signup_date IS NOT NULL))[1] AS home_signup_date
   FROM onemap_properties op
   JOIN candidates c ON c.dr_number = UPPER(BTRIM(op.drop_number))
-  ORDER BY UPPER(BTRIM(op.drop_number)), op.updated_at DESC NULLS LAST,
-           op.import_id DESC NULLS LAST, op.id DESC
+  GROUP BY UPPER(BTRIM(op.drop_number))
 ),
 reviews AS (
   SELECT UPPER(BTRIM(r.drop_number)) AS dr_number,
@@ -61,6 +76,16 @@ reviews AS (
     (array_agg(NULLIF(BTRIM(r.qcontact_phone), '')
       ORDER BY r.submitted_date DESC NULLS LAST, r.updated_at DESC NULLS LAST)
       FILTER (WHERE NULLIF(BTRIM(r.qcontact_phone), '') IS NOT NULL))[1] AS qcontact_phone,
+    -- Names live here too, and for far more drops than onemap carries them (207 vs 27
+    -- across the 2026-08-01..03 window). Same newest-non-null pattern as the phones
+    -- directly above. subscriber_name/qcontact_name are full names, so the split into
+    -- given/family happens in candidateService.
+    (array_agg(NULLIF(BTRIM(r.subscriber_name), '')
+      ORDER BY r.submitted_date DESC NULLS LAST, r.updated_at DESC NULLS LAST)
+      FILTER (WHERE NULLIF(BTRIM(r.subscriber_name), '') IS NOT NULL))[1] AS subscriber_name,
+    (array_agg(NULLIF(BTRIM(r.qcontact_name), '')
+      ORDER BY r.submitted_date DESC NULLS LAST, r.updated_at DESC NULLS LAST)
+      FILTER (WHERE NULLIF(BTRIM(r.qcontact_name), '') IS NOT NULL))[1] AS qcontact_name,
     BOOL_OR(COALESCE(r.step_10_signature, FALSE)) AS signature_present,
     MAX(COALESCE(
       r.whatsapp_submitted_at,
@@ -75,6 +100,7 @@ reviews AS (
 SELECT c.dr_number, c.sources,
   o.onemap_phone, rv.subscriber_phone, rv.qcontact_phone,
   o.contact_name, o.contact_surname, o.home_signup_date,
+  rv.subscriber_name, rv.qcontact_name,
   COALESCE(rv.signature_present, FALSE) AS signature_present,
   rv.signature_evidence_at
 FROM candidates c
