@@ -24,6 +24,7 @@ const SOURCE_TABLES = `
     subscriber_name VARCHAR,
     qcontact_phone VARCHAR,
     qcontact_name VARCHAR,
+    installer_name VARCHAR,
     step_10_signature BOOLEAN,
     whatsapp_submitted_at TIMESTAMPTZ,
     photos_fetched_at TIMESTAMPTZ,
@@ -68,7 +69,12 @@ const SOURCE_TABLES = `
     contact_surname VARCHAR,
     home_signup_date TIMESTAMP,
     import_id INTEGER,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP,
+    location_address TEXT,
+    latitude NUMERIC,
+    longitude NUMERIC,
+    pole_number VARCHAR,
+    ont_barcode VARCHAR
   );
 `;
 
@@ -183,6 +189,64 @@ describe('listCandidateRows against a real schema', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].onemap_phone).toBe('0822222222');
     expect(rows[0].contact_name).toBe('Fresh');
+  });
+
+  it('never assembles a GPS pair from two different OneMap rows', async () => {
+    // Coordinates must come from ONE row. The newest row here has a latitude but no
+    // longitude, and a different row has a longitude — per-column aggregation of the
+    // two values independently would splice them into "-33.90,25.99", a point that
+    // describes neither property. Only the older row has a complete pair, so that is
+    // the one that must win.
+    await db.query(
+      `INSERT INTO drops (drop_number, installation_date) VALUES ($1, $2)`,
+      ['DR9100001', TARGET],
+    );
+    await db.query(
+      `INSERT INTO onemap_properties
+         (drop_number, contact_number, latitude, longitude, updated_at)
+       VALUES ($1, '0821234567', -33.80, 25.10, $2),
+              ($3, NULL, -33.90, NULL, $4),
+              ($5, NULL, NULL, 25.99, $6)`,
+      [
+        'DR9100001', `${TARGET}T01:00:00`,
+        'DR9100001', `${TARGET}T09:00:00`,
+        'DR9100001', `${TARGET}T08:00:00`,
+      ],
+    );
+
+    const rows = await listCandidateRows(TARGET);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].install_gps).toBe('-33.80,25.10');
+    expect(rows[0].install_gps).not.toContain('25.99');
+  });
+
+  it('carries address, pole, ONT and installer through to the candidate row', async () => {
+    await db.query(
+      `INSERT INTO drops (drop_number, installation_date) VALUES ($1, $2)`,
+      ['DR9200001', TARGET],
+    );
+    await db.query(
+      `INSERT INTO onemap_properties
+         (drop_number, contact_number, location_address, pole_number, ont_barcode, updated_at)
+       VALUES ($1, '0821234567', '12 Main Road, Gqeberha', 'P-1234', 'ONT-9876', $2)`,
+      ['DR9200001', `${TARGET}T09:00:00`],
+    );
+    await db.query(
+      `INSERT INTO dr_photo_unified_reviews (drop_number, submitted_date, installer_name)
+       VALUES ($1, $2, 'Sipho Ndlovu')`,
+      ['DR9200001', TARGET],
+    );
+
+    const rows = await listCandidateRows(TARGET);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      install_address: '12 Main Road, Gqeberha',
+      pole_number: 'P-1234',
+      ont_barcode: 'ONT-9876',
+      installer_name: 'Sipho Ndlovu',
+    });
   });
 
   it('recombines a name and phone split across two OneMap rows', async () => {
