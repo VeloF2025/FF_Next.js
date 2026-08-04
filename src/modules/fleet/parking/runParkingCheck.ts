@@ -5,6 +5,9 @@
  * insert must not cost us the other twenty-one results, so each vehicle
  * is wrapped individually and failures are counted rather than thrown.
  *
+ * Invariant: sum(counts) + errors === evaluated
+ * Only rows that are successfully written are counted in `counts`.
+ *
  * No advisory lock is taken. The unique index on
  * (vehicle_id, check_date) already makes concurrent or repeated runs
  * converge on the same single row per vehicle per day, so a lock would
@@ -60,8 +63,6 @@ export async function runParkingCheck(checkAt: Date): Promise<ParkingCheckReport
       checkAt,
     });
 
-    report.counts[outcome.result] += 1;
-
     try {
       await insertComplianceCheck({
         vehicleId: c.vehicleId,
@@ -75,6 +76,7 @@ export async function runParkingCheck(checkAt: Date): Promise<ParkingCheckReport
         distanceM: outcome.distanceM,
         result: outcome.result,
       });
+      report.counts[outcome.result] += 1;
     } catch (error) {
       report.errors += 1;
       log.error('[fleet-parking-check] failed to record result', {

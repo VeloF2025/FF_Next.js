@@ -102,4 +102,37 @@ describe('runParkingCheck', () => {
     expect(report.evaluated).toBe(0);
     expect(report.errors).toBe(0);
   });
+
+  it('maintains the invariant sum(counts) + errors === evaluated', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([
+      candidate(),
+      candidate({ vehicleId: 'veh-2', location: null }),
+      candidate({ vehicleId: 'veh-3', hasTracker: false }),
+    ]);
+    insertComplianceCheck
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('constraint violation'))
+      .mockResolvedValueOnce(undefined);
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    const countSum =
+      report.counts.compliant +
+      report.counts.violation +
+      report.counts.unknown +
+      report.counts.not_verifiable +
+      report.counts.no_address;
+
+    expect(countSum + report.errors).toBe(report.evaluated);
+  });
+
+  it('does not increment result bucket when insert fails', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([candidate()]);
+    insertComplianceCheck.mockRejectedValueOnce(new Error('constraint violation'));
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    expect(report.counts.compliant).toBe(0);
+    expect(report.errors).toBe(1);
+  });
 });
