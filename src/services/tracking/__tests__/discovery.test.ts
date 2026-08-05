@@ -11,6 +11,7 @@ function deps(overrides = {}) {
     loadActiveFleet: async () => fleet,
     assignTracker: vi.fn(async () => {}),
     deactivateMissing: vi.fn(async () => 0),
+    countActiveTrackers: vi.fn(async () => 0),
     ...overrides,
   };
 }
@@ -82,5 +83,81 @@ describe('reconcileTrackers', () => {
     expect(r.deactivated).toBe(0);
     expect(r.portalOnly).toEqual([]);
     expect(r.fleetOnly).toEqual(fleet);
+    expect(r.deactivationSuppressed).toBe(false);
+  });
+
+  describe('wholesale unmapping is never a legitimate outcome of one poll', () => {
+    // A ten-vehicle account, so "more than half" has room to be a real number
+    // rather than an artefact of a two-row fixture.
+    const tenFleet = Array.from({ length: 10 }, (_, i) => ({
+      id: `v${i}`, registration: `LN4${i}MGGP`,
+    }));
+    const tenPortal = tenFleet.map((f, i) => ({
+      externalId: `e${i}`, registration: f.registration,
+    }));
+
+    it('deactivates nothing when a NON-EMPTY portal list matches no fleet vehicle', async () => {
+      // The report tree returning client/group folder nodes instead of
+      // vehicles: well-formed {id, name} objects that match no registration.
+      const d = deps({
+        loadActiveFleet: async () => tenFleet,
+        countActiveTrackers: vi.fn(async () => 10),
+        deactivateMissing: vi.fn(async () => 10),
+      });
+      const folders = [
+        { externalId: '900', registration: 'Europcar Gauteng' },
+        { externalId: '901', registration: 'Europcar Western Cape' },
+      ];
+      const r = await reconcileTrackers('netstar', 'europcar', folders, d);
+      expect(d.deactivateMissing).not.toHaveBeenCalled();
+      expect(d.assignTracker).not.toHaveBeenCalled();
+      expect(r.upserted).toBe(0);
+      expect(r.deactivated).toBe(0);
+      expect(r.portalOnly).toEqual(folders);
+      expect(r.fleetOnly).toEqual(tenFleet);
+    });
+
+    it('deactivates nothing and flags the run when a partial match would unmap more than half', async () => {
+      const d = deps({
+        loadActiveFleet: async () => tenFleet,
+        countActiveTrackers: vi.fn(async () => 10),
+        deactivateMissing: vi.fn(async () => 8),
+      });
+      const r = await reconcileTrackers('netstar', 'europcar', tenPortal.slice(0, 2), d);
+      expect(d.deactivateMissing).not.toHaveBeenCalled();
+      expect(r.deactivated).toBe(0);
+      expect(r.deactivationSuppressed).toBe(true);
+      // The two that DID match are still mapped — the brake stops removals,
+      // not the coverage this poll actually established.
+      expect(d.assignTracker).toHaveBeenCalledTimes(2);
+      expect(r.upserted).toBe(2);
+    });
+
+    it('proceeds normally when a partial match removes only one of ten', async () => {
+      const d = deps({
+        loadActiveFleet: async () => tenFleet,
+        countActiveTrackers: vi.fn(async () => 10),
+        deactivateMissing: vi.fn(async () => 1),
+      });
+      const r = await reconcileTrackers('netstar', 'europcar', tenPortal.slice(0, 9), d);
+      expect(d.deactivateMissing).toHaveBeenCalledWith(
+        'netstar', 'europcar', tenPortal.slice(0, 9).map((p) => p.externalId)
+      );
+      expect(r.deactivated).toBe(1);
+      expect(r.deactivationSuppressed).toBe(false);
+    });
+
+    it('counts active trackers before writing anything, so the denominator is the pre-run state', async () => {
+      const calls: string[] = [];
+      const d = deps({
+        loadActiveFleet: async () => tenFleet,
+        countActiveTrackers: vi.fn(async () => { calls.push('count'); return 10; }),
+        assignTracker: vi.fn(async () => { calls.push('assign'); }),
+        deactivateMissing: vi.fn(async () => { calls.push('deactivate'); return 1; }),
+      });
+      await reconcileTrackers('netstar', 'europcar', tenPortal.slice(0, 9), d);
+      expect(calls[0]).toBe('count');
+      expect(calls[calls.length - 1]).toBe('deactivate');
+    });
   });
 });
