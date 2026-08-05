@@ -68,11 +68,19 @@ def has_field_evidence(row, has_qa_photo=False):
     """Did a crew physically attend this pole?
 
     `has_qa_photo` is passed in rather than derived here: a QA photo row is the most
-    direct evidence of attendance there is, and none of the columns on `poles` imply
-    it. No live pole is currently deletable-yet-photographed (verified 0 DB-wide), so
-    this is defence in depth — that 0 holds by the shape of today's data, not by
-    construction, and a pole photographed before any status sync would otherwise be
-    eligible for deletion.
+    direct evidence of attendance there is, and none of the columns on `poles` imply it.
+
+    ⚠️ This rule is LOAD-BEARING, not defence in depth. Measured 2026-08-05 by
+    transcribing PLANNING_STATUSES + FIELD_EVIDENCE_COLUMNS into SQL: **2,188 live
+    poles** have a QA photo and no other evidence — Tonga 932, Themb'elihle 770,
+    Mamelodi 230, Mohadin 201, Lawley 24, Thembisa POP 1 15, Thembisa POP 3 9,
+    Etwatwa 7. Without this check every one of them is eligible for deletion, and
+    deleting them orphans the very photos this module exists to keep attached.
+
+    An earlier comment here claimed "verified 0 DB-wide". That was wrong: the query
+    behind it tested `images IS NULL`, and `images` is non-NULL on all 31,050 live
+    poles — it holds `'[]'`, which this function correctly treats as no evidence. The
+    SQL must mirror the emptiness test below, not just the NULL test.
     """
     if has_qa_photo:
         return True
@@ -93,6 +101,10 @@ def layer_names(path):
     db = sqlite3.connect(path)
     try:
         return [r[0] for r in db.execute("SELECT table_name FROM gpkg_contents ORDER BY table_name")]
+    except sqlite3.OperationalError as e:
+        # No gpkg_contents means this is not a GeoPackage — most likely the wrong file
+        # was named. Say that, rather than surfacing "no such table: gpkg_contents".
+        raise ValueError(f"{path} is not a GeoPackage (no gpkg_contents table): {e}") from e
     finally:
         db.close()
 

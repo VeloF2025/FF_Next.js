@@ -155,6 +155,16 @@ if command -v python3 >/dev/null 2>&1; then
     tail -25 /tmp/ci-replan-import-db.txt | sed 's/^/    /'
   fi
 
+  # The guards that decide whether the write is allowed at all. Separate from the
+  # write path above because a guard that computes the right answer and never acts
+  # on it fails differently from a broken write.
+  if python3 scripts/test_replan_guards.py > /tmp/ci-replan-guards.txt 2>&1; then
+    pass "Replan pre-write guards: all checks pass"
+  else
+    fail "Replan pre-write guards: regression detected"
+    tail -25 /tmp/ci-replan-guards.txt | sed 's/^/    /'
+  fi
+
   if python3 scripts/test_qfield_hierarchy.py > /tmp/ci-qfield-hierarchy.txt 2>&1; then
     pass "QField hierarchy mapping: all checks pass"
   else

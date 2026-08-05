@@ -48,6 +48,16 @@ ALTER TABLE public.pole_qa_photos
     ADD COLUMN IF NOT EXISTS superseded_run_id uuid,
     ADD COLUMN IF NOT EXISTS superseded_reason text;
 
+-- The mark is part of the pre-image, so migration 479's photo backup has to carry it
+-- too. Without these, a run that CLEARS a mark an earlier run set cannot put it back:
+-- rolling that run back would restore the label and zone that made the photo
+-- unplaceable while leaving it unmarked — losing the record rather than stranding it,
+-- which is the failure this file's rollback explicitly warns about.
+ALTER TABLE public.pole_qa_photo_plan_backup
+    ADD COLUMN IF NOT EXISTS superseded_at     timestamptz,
+    ADD COLUMN IF NOT EXISTS superseded_run_id uuid,
+    ADD COLUMN IF NOT EXISTS superseded_reason text;
+
 -- Partial: the marked rows are a small minority and are always queried as "show me the
 -- ones needing attention", never as "is this one row marked".
 CREATE INDEX IF NOT EXISTS pole_qa_photos_superseded_idx

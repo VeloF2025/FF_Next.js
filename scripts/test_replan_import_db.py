@@ -142,8 +142,24 @@ def main():
         check("a later plan that can place the photo clears the stale mark", row[0] is None)
         check("  ...and rezones it", row[1] == 9)
 
-        # Unwind newest-first so the ordering guard does not fire on the next section.
+        # Rolling back the run that UNMARKED a photo must put the mark BACK, not merely
+        # decline to set one. Otherwise the label/zone returns to the state that made
+        # the photo unplaceable while it reads as live QA — losing the record instead
+        # of stranding it.
+        cur.execute("SELECT superseded_at IS NOT NULL FROM pole_qa_photos WHERE pole_label='KEEP2'")
+        check("precondition: the photo is unmarked after the placing run",
+              cur.fetchone()[0] is False)
         do_rollback(conn, run_m3)
+        conn.commit()
+        # The label reverts to whatever run_m3's pre-image held, which is the renamed
+        # 'KEEP2' — the rename happened before that run, so it is not what is being
+        # undone here. The mark is.
+        cur.execute("SELECT superseded_at IS NOT NULL, superseded_run_id "
+                    "FROM pole_qa_photos WHERE pole_label='KEEP2'")
+        row = cur.fetchone()
+        check("rolling back a run that cleared a mark RESTORES the mark", row[0] is True)
+        check("  ...and attributes it to the run that originally set it", row[1] == run_m2)
+
         do_rollback(conn, run_m2)
         conn.commit()
 
@@ -177,7 +193,10 @@ def main():
             check("rolling back out of order is refused", True)
         do_rollback(conn, run_b)
         conn.commit()
-        check("newest-first rollback is allowed", True)
+        cur.execute("SELECT status FROM pole_plan_import_runs WHERE id=%s", (run_b,))
+        check("newest-first rollback is allowed", cur.fetchone()[0] == "rolled_back")
+        cur.execute("SELECT pole_number FROM poles WHERE project_id=%s", (PROJECT,))
+        check("  ...and restores that run's pre-image", cur.fetchone()[0] == "N1")
 
         print("\nschema drift:")
         seed_poles(conn, [("S1", -25.98, 28.23, {})])
@@ -196,102 +215,10 @@ def main():
             check("restoring across schema drift is refused by default", True)
         cur.execute("ALTER TABLE poles DROP COLUMN new_col")
         conn.commit()
-        # ── guards ───────────────────────────────────────────────────────────────
-        print("\nsoft-reference guard:")
-        seed_poles(conn, [("G1", -25.98, 28.23, {})])
-        cur.execute("SELECT id FROM poles WHERE pole_number='G1'")
-        pid = cur.fetchone()[0]
-        check("clean when nothing references the poles",
-              replan_db.dangling(conn, PROJECT)[0] == [])
-        cur.execute("INSERT INTO snags (pole_ids) VALUES (ARRAY[%s]::uuid[])", (pid,))
-        conn.commit()
-        found, _ = replan_db.dangling(conn, PROJECT)
-        check("a snag referencing a pole by uuid[] is caught",
-              any(f["table"] == "snags" and f["column"] == "pole_ids" for f in found))
-        cur.execute("DELETE FROM snags")
-        cur.execute("INSERT INTO snags (pole_references) VALUES (ARRAY['G1'])")
-        conn.commit()
-        found, _ = replan_db.dangling(conn, PROJECT)
-        check("a snag referencing a pole by LABEL is caught",
-              any(f["column"] == "pole_references" for f in found))
-        cur.execute("DELETE FROM snags")
-        conn.commit()
-        absent = replan_db.dangling(conn, PROJECT)[1]
-        check("tables absent from this schema are reported, not silently skipped",
-              "maintenance_tickets.pole_id" in absent)
 
-        print("\ncross-project label collision:")
-        cur.execute("INSERT INTO poles (pole_number, project_id) VALUES ('SHARED', %s)",
-                    (OTHER_PROJECT,))
-        conn.commit()
-        hits = replan_db.cross_project_label_collisions(conn, PROJECT, ["SHARED", "MINE"])
-        check("a label owned by another project is reported before the write",
-              [h["label"] for h in hits] == ["SHARED"])
-        check("labels owned by nobody are not reported",
-              replan_db.cross_project_label_collisions(conn, PROJECT, ["MINE"]) == [])
-
-        print("\nproject identity:")
-        check("a real project resolves to its name",
-              replan_db.project_name(conn, PROJECT) == "Test Project")
-        check("an unknown project id resolves to None",
-              replan_db.project_name(conn, str(uuid.uuid4())) is None)
-
-        # ── run()'s abort gate ───────────────────────────────────────────────────
-        # The guards above are only useful if run() actually stops on them. Testing
-        # that the values are computed is NOT testing that they block the write — an
-        # inverted condition here would ship data corruption with every guard "passing".
-        # Only the MinIO calls are stubbed; the gate itself is the real code.
-        print("\nrun() abort gate (the wiring, not the inputs):")
-        import import_replan_poles as imp
-        cur.execute("DELETE FROM poles WHERE project_id=%s",
-                    (OTHER_PROJECT,))
-        conn.commit()
-        real = (imp.newest_version, imp.fetch_gpkg, imp.load_plan)
-        imp.newest_version = lambda *a, **k: "v-stub"
-        imp.fetch_gpkg = lambda *a, **k: "obj-stub"
-
-        def gate(plan, dups=None, apply_=False, expect=None):
-            imp.load_plan = lambda *a, **k: (plan, 0, dups or {})
-            a = args_for(qfield_project_id="q", gpkg="g", apply=apply_, expect_version=expect,
-                         allow_dangling=False, allow_duplicate_labels=False)
-            try:
-                imp.run(conn, a)
-                return None
-            except SystemExit as e:
-                conn.rollback()
-                return str(e)
-
-        try:
-            seed_poles(conn, [("G1", -25.98, 28.23, {})])
-            good = {"N1": {"pon": 1, "zone": 1, "lon": 28.23, "lat": -25.98}}
-            check("a clean dry-run does not abort", gate(good) is None)
-
-            cur.execute("INSERT INTO snags (pole_references) VALUES (ARRAY['G1'])")
-            conn.commit()
-            check("dangling soft-refs abort the run",
-                  "dangling" in (gate(good) or "").lower())
-            cur.execute("DELETE FROM snags")
-            conn.commit()
-
-            check("duplicate GeoPackage labels abort the run",
-                  "duplicate" in (gate(good, dups={"N1": [1, 2]}) or "").lower())
-
-            cur.execute("INSERT INTO poles (pole_number, project_id) VALUES ('SHARED2', %s)",
-                        (OTHER_PROJECT,))
-            conn.commit()
-            shared = dict(good, **{"SHARED2": {"pon": 1, "zone": 1, "lon": 28.23, "lat": -25.98}})
-            check("a cross-project label collision aborts the run",
-                  "globally unique" in (gate(shared) or ""))
-
-            msg = gate(good, apply_=True, expect="v-WRONG")
-            check("--apply with a stale --expect-version aborts",
-                  "expect-version" in (msg or ""))
-            check("  ...and names the version actually resolved", "v-stub" in (msg or ""))
-        finally:
-            imp.newest_version, imp.fetch_gpkg, imp.load_plan = real
     finally:
         teardown(conn)
-    finish("replan-import DB")
+    finish("replan-import write-path")
 
 
 if __name__ == "__main__":

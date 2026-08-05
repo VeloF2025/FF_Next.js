@@ -45,8 +45,14 @@ def finish(name):
 def start_pg():
     """Throwaway Postgres on an ephemeral port; returns a connection URL."""
     global _container
+    # Labelled so a cancelled CI run (concurrency: cancel-in-progress) can be swept by
+    # an `if: always()` step — teardown() never runs when the process is killed, and an
+    # orphaned Postgres holds a port on a long-lived self-hosted runner. RUN_ID scopes
+    # the sweep to this run so it cannot kill a developer's container.
+    run_id = os.environ.get("GITHUB_RUN_ID", f"local-{os.getpid()}")
     _container = subprocess.check_output([
         "docker", "run", "-d", "--rm", "-P",
+        "--label", "ff-replan-test=1", "--label", f"ff-replan-run={run_id}",
         "-e", "POSTGRES_PASSWORD=test", "-e", "POSTGRES_DB=test",
         "postgres:15-alpine"], text=True).strip()
     port = subprocess.check_output(
@@ -62,8 +68,18 @@ def start_pg():
 
 
 def connect():
-    """A connection scoped to the scratch schema. Uses an existing DB when offered."""
-    url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL") or start_pg()
+    """A connection scoped to the scratch schema.
+
+    ⚠️ TEST_DATABASE_URL ONLY — deliberately does NOT fall back to DATABASE_URL.
+    `fixture()` issues DROP SCHEMA … CASCADE and DDL, and this suite runs inside
+    `npm run ci:quick`. DATABASE_URL is the variable import_replan_poles.py tells
+    operators to export and it points at the shared dev+prod Postgres, so honouring it
+    would run schema DDL against production every time someone ran CI with their
+    importer environment loaded — while this file's own docstring promises it never
+    touches that database. Two agents running concurrently would also drop each
+    other's schema mid-test.
+    """
+    url = os.environ.get("TEST_DATABASE_URL") or start_pg()
     conn = psycopg2.connect(url)
     conn.cursor().execute(f"SET search_path TO {SCHEMA}")
     return conn

@@ -116,7 +116,18 @@ jobs:
         run: |
           python3 scripts/test_replan_match.py
           python3 scripts/test_replan_import_db.py
+          python3 scripts/test_replan_guards.py
         timeout-minutes: 15
+
+      # The container is removed in the suite's teardown, but a cancelled or timed-out
+      # run never reaches it. Sweep by label so a crashed run cannot leave a Postgres
+      # holding a port on the self-hosted runner. Scoped to THIS run's label so it
+      # cannot destroy a developer's container mid-test.
+      - name: Clean up this run's replan test container
+        if: always()
+        run: |
+          docker ps -aq --filter "label=ff-replan-run=${{ github.run_id }}" \
+            | xargs -r docker rm -f
 
       # Velocity review repository tests — same reasoning as the migration gate
       # above, one layer up. These drive the real repository functions against a

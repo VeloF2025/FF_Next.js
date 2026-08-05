@@ -37,6 +37,12 @@ const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
 
 /** Same narrow rewrite as the 479 test — the shipped file is public-qualified on purpose. */
 const scopeSql = (s: string) => s.replace(/\bpublic\./g, `${SCHEMA}.`);
+/**
+ * 480 widens pole_qa_photo_plan_backup, which 479 creates — so 479 is applied first
+ * here, in the same order the deploy runner applies them. Declaring that table by hand
+ * instead would let this test keep passing after 479 stopped creating it.
+ */
+const DEP_479 = scopeSql(readFileSync(join(SQL_DIR, '479_pole_plan_replan_backup.sql'), 'utf8'));
 const FORWARD = scopeSql(readFileSync(join(SQL_DIR, '480_pole_qa_photo_superseded.sql'), 'utf8'));
 const ROLLBACK = scopeSql(
   readFileSync(join(SQL_DIR, 'rollback_480_pole_qa_photo_superseded.sql'), 'utf8')
@@ -90,6 +96,7 @@ beforeAll(async () => {
     `INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
      VALUES (gen_random_uuid(), 'TEM.P.J950', 69, 821)`
   );
+  await scoped(DEP_479);
   await scoped(FORWARD);
 });
 

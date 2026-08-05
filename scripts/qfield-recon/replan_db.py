@@ -29,11 +29,16 @@ SOFT_REFS = (
     ("snag_reports", "scope_poles", "label_array"),
 )
 
+# Scoped to the rows actually about to break, not to the whole project. A pole that is
+# RETAINED keeps its id, and a label the replan REISSUES keeps its name — references to
+# either survive the import untouched. Checking the whole project flags them anyway,
+# which on Thembisa POP 3 makes --allow-dangling mandatory and, since that one flag
+# disables all five checks at once, silently gives up the guard for references that
+# genuinely would break.
 _PREDICATE = {
-    "uuid": "{col} IN (SELECT id FROM poles WHERE project_id = %s)",
-    "uuid_array": "{col} && (SELECT array_agg(id) FROM poles WHERE project_id = %s)",
-    "label_array": ("{col}::text[] && "
-                    "(SELECT array_agg(pole_number::text) FROM poles WHERE project_id = %s)"),
+    "uuid": "{col} = ANY(%s::uuid[])",
+    "uuid_array": "{col} && %s::uuid[]",
+    "label_array": "{col}::text[] && %s::text[]",
 }
 
 
@@ -58,7 +63,21 @@ def read_current(conn, project_id, carry_columns):
     return old, photos
 
 
-def dangling(conn, project_id):
+def breaking_references(old, retain, plan):
+    """(ids that disappear, labels that disappear) — what a reference could dangle on.
+
+    An id survives if its pole is retained; a label survives if the replan reissues it
+    OR its pole is retained under that label. Everything else stops existing.
+    """
+    kept_ids = {str(o["id"]) for o in retain}
+    kept_labels = {o["pole_number"] for o in retain} | set(plan)
+    gone_ids = [str(o["id"]) for o in old if str(o["id"]) not in kept_ids]
+    gone_labels = [o["pole_number"] for o in old
+                   if o["pole_number"] and o["pole_number"] not in kept_labels]
+    return gone_ids, gone_labels
+
+
+def dangling(conn, gone_ids, gone_labels):
     """Rows that would be orphaned by the replace. Returns (found, absent).
 
     A table missing from the search_path is reported as absent rather than raised on:
@@ -73,8 +92,11 @@ def dangling(conn, project_id):
         if cur.fetchone()[0] is None:
             absent.append(f"{table}.{col}")
             continue
+        target = gone_labels if kind == "label_array" else gone_ids
+        if not target:
+            continue
         cur.execute(f"SELECT count(*) FROM {table} WHERE " + _PREDICATE[kind].format(col=col),
-                    (project_id,))
+                    (target,))
         n = cur.fetchone()[0]
         if n:
             found.append({"table": table, "column": col, "kind": kind, "rows": n})
@@ -96,9 +118,15 @@ def cross_project_label_collisions(conn, project_id, labels):
     cur.execute(
         "SELECT p.pole_number, pr.project_name FROM poles p "
         "JOIN projects pr ON pr.id = p.project_id "
-        "WHERE p.project_id <> %s AND p.pole_number = ANY(%s::text[]) ORDER BY 1 LIMIT 25",
+        "WHERE p.project_id <> %s AND p.pole_number = ANY(%s::text[]) ORDER BY 1",
         (project_id, list(labels)))
-    return [{"label": r[0], "owned_by": r[1]} for r in cur.fetchall()]
+    rows = cur.fetchall()
+    # Capped for readability, but the TOTAL is reported — "listed above" must not imply
+    # the list is exhaustive when it is truncated.
+    out = [{"label": r[0], "owned_by": r[1]} for r in rows[:25]]
+    if len(rows) > 25:
+        out.append({"label": f"... and {len(rows) - 25} more", "owned_by": ""})
+    return out
 
 
 def later_completed_runs(conn, run_id, project_id):

@@ -122,7 +122,8 @@ def run(conn, args):
 
     old, photos = replan_db.read_current(conn, args.project_id, CARRY_COLUMNS)
     s = decide(old, photos, plan, args.match_radius, args.coverage_radius)
-    refs, absent_refs = replan_db.dangling(conn, args.project_id)
+    gone_ids, gone_labels = replan_db.breaking_references(s["old"], s["retain"], plan)
+    refs, absent_refs = replan_db.dangling(conn, gone_ids, gone_labels)
     cross = replan_db.cross_project_label_collisions(conn, args.project_id, plan.keys())
     deleting = len(s["old"]) - len(s["retain"])
 
@@ -141,6 +142,7 @@ def run(conn, args):
         "relabel_collisions": s["collisions"],
         "cross_project_label_collisions": cross,
         "dangling_soft_refs": refs, "soft_ref_tables_absent": absent_refs,
+        "ids_disappearing": len(gone_ids), "labels_disappearing": len(gone_labels),
         "mode": "apply" if args.apply else "dry-run",
     }, indent=2, default=str))
 
