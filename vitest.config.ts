@@ -52,6 +52,7 @@ export default defineConfig({
       'tests/migrations/475_attendance_policy_workflow.test.ts',
       'tests/migrations/476_attendance_lock_hr_authority.test.ts',
       'tests/migrations/477_conformed_project_dimension.test.ts',
+      'tests/migrations/479_pole_plan_replan_backup.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.
