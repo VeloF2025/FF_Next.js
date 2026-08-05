@@ -1,18 +1,30 @@
 /**
  * Integration test for migration 479 — the pole-plan replan backup spine.
  *
- * These three tables exist for exactly one reason: to make a destructive re-import
- * reversible. scripts/qfield-recon/import_replan_poles.py deletes and reinserts a
- * whole project's poles, and the ONLY route back is the pre-image stored here. So
- * what is asserted is the reversibility contract, not the presence of columns:
+ * SCOPE — read this before adding a case here.
+ *
+ * This file tests the SCHEMA and the jsonb MECHANISM the backup spine relies on. It
+ * does NOT test import_replan_poles.py's restore, and must not be read as doing so:
+ * the SQL below is written here, so it can only ever prove that Postgres behaves as
+ * expected, never that the shipped `do_rollback` query is correct. An earlier version
+ * of this file described itself as asserting "the reversibility contract", which
+ * overstated it — a wrong table, a missing WHERE or a bad column order in the real
+ * function would have passed every case here.
+ *
+ * The real functions are covered by scripts/test_replan_import_db.py, which calls
+ * do_import() and do_rollback() against a throwaway Postgres. What is asserted here:
  *
  *   1. to_jsonb(row) -> jsonb_populate_record(NULL::row, ...) is LOSSLESS for the
  *      column types public.poles actually uses. This is the load-bearing mechanism.
  *      A silent numeric/date/jsonb coercion here means a rollback that "succeeds"
  *      and quietly changes data — the worst possible failure for a safety net.
- *   2. The status CHECK really constrains, so a run cannot sit in an
+ *   2. A column ADDED after the pre-image was taken restores as NULL, not as its
+ *      default. This is the one drift the JSONB-over-LIKE-clone design does NOT
+ *      absorb, and the reason do_rollback refuses it rather than discovering it
+ *      mid-restore.
+ *   3. The status CHECK really constrains, so a run cannot sit in an
  *      unrecognised state that --rollback then refuses to touch.
- *   3. ON DELETE CASCADE reaches both backup tables, so pruning old runs cannot
+ *   4. ON DELETE CASCADE reaches both backup tables, so pruning old runs cannot
  *      strand orphan pre-image rows.
  *
  * `public.poles` is NOT available here — tests/db/setup/seed.sql does not create it
@@ -159,6 +171,42 @@ describe('migration 479 — reversibility contract', () => {
     expect(row!.latitude).toBe('-25.97627205');
     expect(row!.inspection_data).toEqual({ steps: [1, 2], ok: true });
 
+    await scoped(`DELETE FROM poles_fixture`);
+    await scoped(`DELETE FROM pole_plan_import_runs WHERE id = $1`, [runId]);
+  });
+
+  it('a column added after the pre-image restores as NULL, not its default', async () => {
+    await scoped(`INSERT INTO poles_fixture (id, pole_number) VALUES
+      ('33333333-3333-3333-3333-333333333333', 'TEM.P.J950')`);
+    const runId = await newRun();
+    await scoped(
+      `INSERT INTO pole_plan_backup (run_id, pole_id, row_data)
+       SELECT $1, id, to_jsonb(poles_fixture) FROM poles_fixture`,
+      [runId]
+    );
+    // Schema moves on after the backup is taken.
+    await scoped(`ALTER TABLE poles_fixture ADD COLUMN added_later text DEFAULT 'the-default'`);
+
+    const [restored] = await scoped<{ added_later: string | null }>(
+      `SELECT (jsonb_populate_record(NULL::poles_fixture, row_data)).added_later
+       FROM pole_plan_backup WHERE run_id = $1`,
+      [runId]
+    );
+    // NOT 'the-default' — this is the drift do_rollback has to refuse.
+    expect(restored!.added_later).toBeNull();
+
+    // And with NOT NULL the restore does not merely lose a value, it fails outright.
+    await scoped(`ALTER TABLE poles_fixture ALTER COLUMN added_later SET NOT NULL`);
+    await expect(
+      scoped(
+        `INSERT INTO poles_fixture
+         SELECT (jsonb_populate_record(NULL::poles_fixture, row_data)).*
+         FROM pole_plan_backup WHERE run_id = $1`,
+        [runId]
+      )
+    ).rejects.toThrow(/not-null constraint/);
+
+    await scoped(`ALTER TABLE poles_fixture DROP COLUMN added_later`);
     await scoped(`DELETE FROM poles_fixture`);
     await scoped(`DELETE FROM pole_plan_import_runs WHERE id = $1`, [runId]);
   });

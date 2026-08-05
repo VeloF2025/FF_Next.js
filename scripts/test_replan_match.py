@@ -25,7 +25,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "qfield-sync"))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "qfield-recon"))
 from replan_match import (  # noqa: E402
-    CARRY_COLUMNS, decide, has_field_evidence, metres, nearest,
+    CARRY_COLUMNS, decide, has_field_evidence, load_plan, metres, nearest,
 )
 
 _FAILURES = []
@@ -71,6 +71,26 @@ def main():
           has_field_evidence(pole("p", "A", BASE_LAT, audit_complete="2026-02-11")))
     check("an empty list is not evidence",
           not has_field_evidence(pole("p", "A", BASE_LAT, images=[])))
+
+    print("\nstatus is a PLANNING value, not evidence:")
+    # poles.status DEFAULT is 'pending', not 'planned'. Treating 'pending' as evidence
+    # made every unmatched pole retain, leaving both plans in the table at once.
+    # 1,820 live rows sit in 'pending'; Themb'elihle alone is 1,808 of them.
+    check("'pending' (the column DEFAULT) is not evidence",
+          not has_field_evidence(pole("p", "A", BASE_LAT, status="pending")))
+    check("'planned' is not evidence",
+          not has_field_evidence(pole("p", "A", BASE_LAT, status="planned")))
+    check("'installed' IS evidence",
+          has_field_evidence(pole("p", "A", BASE_LAT, status="installed")))
+    check("'failed_qa' IS evidence",
+          has_field_evidence(pole("p", "A", BASE_LAT, status="failed_qa")))
+    check("an explicit QA photo overrides a planning status",
+          has_field_evidence(pole("p", "A", BASE_LAT, status="pending"), has_qa_photo=True))
+
+    print("\nimport provenance is carried, but is NOT field evidence:")
+    check("raw_data is in CARRY_COLUMNS", "raw_data" in CARRY_COLUMNS)
+    check("raw_data alone does not make a pole look surveyed",
+          not has_field_evidence(pole("p", "A", BASE_LAT, raw_data={"label (Pole)": "X"})))
 
     print("\nnearest:")
     items = [("N1", plan_pole(north(0)))]
@@ -149,24 +169,100 @@ def main():
     check("counted as kept", [p["id"] for p in s["kept"]] == ["ph1"])
     check("not counted as superseded", s["superseded"] == [])
 
+    print("\na QA photo is itself evidence a crew attended:")
+    # Pole in the 5..50 m gap with every evidence COLUMN empty, but a QA photo row.
+    # Before this rule it was deleted and its photo left pointing at nothing — which
+    # re-creates the orphaned-photo defect this whole module exists to fix.
+    old = [pole("g", "GONE", north(20))]
+    plan1 = {"N1": plan_pole(north(0))}
+    check("without a photo it is deletable",
+          decide(old, [], plan1, 5, 50)["retain"] == [])
+    s = decide(old, [photo("ph1", "GONE")], plan1, 5, 50)
+    check("with a photo it is retained",
+          [o["id"] for o in s["retain"]] == ["g"])
+    check("  ...and the photo is kept, not superseded",
+          [p["id"] for p in s["kept"]] == ["ph1"] and s["superseded"] == [])
+
+    print("\ninvariant: a photo whose label matches a real pole is never superseded:")
+    for lat, name in [(north(0), "pole on the plan spot"), (north(20), "pole in the gap"),
+                      (north(500), "pole outside coverage"), (None, "pole with no coords")]:
+        s = decide([pole("x", "P", lat)], [photo("ph", "P")], plan1, 5, 50)
+        check(f"  {name}", s["superseded"] == [])
+
     print("\nrelabel collision is reported, never applied:")
-    # Both old poles sit on NEW; each already has a photo. Relabelling OLD2's photo
-    # onto 'NEW' would violate the UNIQUE (project_id, pole_label) index.
-    old = [pole("o1", "NEW", north(0)), pole("o2", "OLD2", north(1))]
-    s = decide(old, [photo("p1", "NEW"), photo("p2", "OLD2")],
-               {"NEW": plan_pole(north(0))}, radius=5, coverage=50)
-    check("the colliding pair is surfaced", s["collisions"] == [("OLD2", "NEW")])
-    check("and no relabel is emitted for it",
-          all(r[0] != "p2" for r in s["relabel"]))
+    # A CARRIED pole is not retained (its state moves to its successor), so its photo
+    # takes the relabel path. Here A's state moves to plan label X, so photo-on-A wants
+    # to become X — but photo-on-X already occupies that label. UNIQUE
+    # (project_id, pole_label) would abort the statement; this must be caught first.
+    s = decide([pole("a", "A", north(0))], [photo("px", "X"), photo("pa", "A")],
+               {"X": plan_pole(north(0))}, radius=5, coverage=50)
+    check("the colliding pair is surfaced", s["collisions"] == [("A", "X")])
+    check("and no relabel is emitted for it", all(r[0] != "pa" for r in s["relabel"]))
 
     print("\nsuperseded:")
-    old = [pole("g", "GONE", north(20))]
-    s = decide(old, [photo("ph1", "GONE")], {"N1": plan_pole(north(0))}, radius=5, coverage=50)
-    check("a photo whose pole is in the gap with no evidence is superseded",
+    s = decide([], [photo("ph1", "Drop Pole")], plan1, 5, 50)
+    check("a photo whose label matches no pole at all is superseded",
           [p["id"] for p in s["superseded"]] == ["ph1"])
-    s = decide([], [photo("ph1", "Drop Pole")], {"N1": plan_pole(north(0))}, 5, 50)
-    check("a photo whose label exists in neither plan is superseded",
-          [p["id"] for p in s["superseded"]] == ["ph1"])
+
+    print("\nload_plan — GeoPackage ingestion boundary:")
+    import sqlite3, struct, tempfile, os as _os
+
+    def make_gpkg(rows):
+        """Minimal GeoPackage: gpkg_contents + one point layer. Rows are (label, pon, zone, lon, lat)."""
+        fd, p = tempfile.mkstemp(suffix=".gpkg"); _os.close(fd)
+        db = sqlite3.connect(p)
+        db.execute("CREATE TABLE gpkg_contents (table_name TEXT, data_type TEXT)")
+        db.execute("INSERT INTO gpkg_contents VALUES ('Poles HLD','features')")
+        db.execute('CREATE TABLE "Poles HLD" (label TEXT, pon_no, zone_no, geom BLOB)')
+        for lab, pon, zone, lon, lat in rows:
+            blob = None
+            if lon is not None:
+                # GP magic, version 0, flags=1 (little-endian, no envelope), srid, then WKB point.
+                blob = b"GP" + bytes([0, 1]) + struct.pack("<i", 4326) \
+                    + b"\x01" + struct.pack("<I", 1) + struct.pack("<dd", lon, lat)
+            db.execute('INSERT INTO "Poles HLD" VALUES (?,?,?,?)', (lab, pon, zone, blob))
+        db.commit(); db.close()
+        return p
+
+    p = make_gpkg([("A", 821, 69, 28.23, -25.98), ("B", "822", "69", 28.24, -25.99)])
+    try:
+        plan, skipped, dups = load_plan(p, "Poles HLD")
+        check("parses labels and coordinates from geom", sorted(plan) == ["A", "B"])
+        check("coerces numeric-looking text to int", plan["B"]["pon"] == 822 and plan["B"]["zone"] == 69)
+        check("no false duplicates", dups == {})
+        try:
+            load_plan(p, 'Poles HLD" UNION SELECT sql,1,1,1 FROM sqlite_master --')
+            check("rejects a layer name that escapes the identifier", False)
+        except ValueError:
+            check("rejects a layer name that escapes the identifier", True)
+        try:
+            load_plan(p, "No Such Layer")
+            check("rejects an unknown layer", False)
+        except ValueError:
+            check("rejects an unknown layer", True)
+    finally:
+        _os.unlink(p)
+
+    # The live replan really does this: TEM.P.M102 twice, ~28 m apart.
+    p = make_gpkg([("A", 1, 1, 28.23, -25.98), ("A", 1, 1, 28.2303, -25.98),
+                   ("C", 1, 1, 28.25, -25.98), (None, 1, 1, 28.26, -25.98),
+                   ("D", 1, 1, None, None)])
+    try:
+        plan, skipped, dups = load_plan(p, "Poles HLD")
+        check("a disagreeing duplicate label is REPORTED, not silently dropped", list(dups) == ["A"])
+        check("  ...keeping the FIRST occurrence deterministically",
+              abs(plan["A"]["lon"] - 28.23) < 1e-9)
+        check("rows with no label or no geom are counted as skipped", skipped == 2)
+        check("skipped rows do not reach the plan", sorted(plan) == ["A", "C"])
+    finally:
+        _os.unlink(p)
+
+    p = make_gpkg([("A", 1, 1, 28.23, -25.98), ("A", 1, 1, 28.23, -25.98)])
+    try:
+        _, _, dups = load_plan(p, "Poles HLD")
+        check("an IDENTICAL repeat is not reported as a conflict", dups == {})
+    finally:
+        _os.unlink(p)
 
     print()
     if _FAILURES:

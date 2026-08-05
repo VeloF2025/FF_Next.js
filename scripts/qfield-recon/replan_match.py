@@ -30,7 +30,22 @@ CARRY_COLUMNS = (
     "dome_joint", "type_of_join", "splitter", "slack_on_pole", "field_agent",
     "pole_planted", "audit_complete", "field_status", "field_status_synced_at",
     "created_by",
+    # Import provenance (the original source row: label, pon, zone, planned lat/lon).
+    # Empty on Thembisa POP 3, but populated on 11,822 poles across Mohadin (5,393),
+    # Lawley (4,471) and Mamelodi (1,958) — the projects this tool is meant to serve
+    # next. Carried, but deliberately NOT field evidence below: it proves a row was
+    # imported, not that a crew stood at the pole. Treating it as evidence would
+    # retain almost every Mohadin pole and defeat the replan entirely.
+    "raw_data",
 )
+
+# A pole's status alone never proves a crew attended. `poles.status` DEFAULT is
+# 'pending' (not 'planned'), so a project seeded straight from an import sits entirely
+# in 'pending' — 1,820 rows live, of which Themb'elihle is 1,808. Treating 'pending' as
+# evidence made every unmatched pole "retain", which fails safe for deletion but leaves
+# both plans in the table at once: duplicate physical poles under two labels, QA split
+# across them. That is the exact ambiguity a replan exists to remove.
+PLANNING_STATUSES = (None, "planned", "pending")
 
 # Evidence that a crew has physically been to this pole. A pole carrying any of these
 # is never deleted unless its state was carried to a successor — see retain_reason().
@@ -43,8 +58,19 @@ FIELD_EVIDENCE_COLUMNS = (
 )
 
 
-def has_field_evidence(row):
-    if row.get("status") not in (None, "planned"):
+def has_field_evidence(row, has_qa_photo=False):
+    """Did a crew physically attend this pole?
+
+    `has_qa_photo` is passed in rather than derived here: a QA photo row is the most
+    direct evidence of attendance there is, and none of the columns on `poles` imply
+    it. No live pole is currently deletable-yet-photographed (verified 0 DB-wide), so
+    this is defence in depth — that 0 holds by the shape of today's data, not by
+    construction, and a pole photographed before any status sync would otherwise be
+    eligible for deletion.
+    """
+    if has_qa_photo:
+        return True
+    if row.get("status") not in PLANNING_STATUSES:
         return True
     return any(row.get(c) not in (None, "", [], {}) for c in FIELD_EVIDENCE_COLUMNS)
 
@@ -56,24 +82,57 @@ def _int(v):
         return None
 
 
+def layer_names(path):
+    """Layers the GeoPackage declares, per the spec's own registry."""
+    db = sqlite3.connect(path)
+    try:
+        return [r[0] for r in db.execute("SELECT table_name FROM gpkg_contents ORDER BY table_name")]
+    finally:
+        db.close()
+
+
 def load_plan(path, layer):
-    """label -> {pon, zone, lat, lon}. Coordinates come from geom, never from the
-    latitude/longitude attribute columns — those are unreliable in these exports."""
+    """(plan, skipped, duplicates) where plan is label -> {pon, zone, lat, lon}.
+
+    Coordinates come from geom, never from the latitude/longitude attribute columns —
+    those are unreliable in these exports.
+
+    `layer` is validated against gpkg_contents rather than interpolated blind: it lands
+    inside a quoted SQL identifier, and a value containing a double-quote escapes the
+    identifier. sqlite3 refuses stacked statements, so this was never RCE, but a
+    crafted name could still UNION arbitrary rows out of the file — and the layer name
+    is exactly the kind of value a future caller derives from an upload rather than
+    typing by hand.
+
+    Duplicate labels are RETURNED, not silently collapsed. A plain `plan[label] = ...`
+    keeps whichever row SQLite happened to return last and reports a pole count that
+    conceals the loss. The current live replan contains one such pair — TEM.P.M102
+    twice, ~28 m apart — which is far enough to change which old pole matches it.
+    """
+    valid = layer_names(path)
+    if layer not in valid:
+        raise ValueError(f"layer {layer!r} not in this GeoPackage. Available: {', '.join(valid)}")
     db = sqlite3.connect(path)
     try:
         rows = db.execute(f'SELECT label, pon_no, zone_no, geom FROM "{layer}"').fetchall()
     finally:
         db.close()
-    plan, skipped = {}, 0
+    plan, skipped, duplicates = {}, 0, {}
     for label, pon, zone, blob in rows:
         geom = decode_gpkg_geometry(blob) if blob else None
         coords = (geom or {}).get("coordinates")
         if not label or not coords:
             skipped += 1
             continue
-        plan[label.strip()] = {"pon": _int(pon), "zone": _int(zone),
-                               "lon": coords[0], "lat": coords[1]}
-    return plan, skipped
+        key = label.strip()
+        entry = {"pon": _int(pon), "zone": _int(zone), "lon": coords[0], "lat": coords[1]}
+        if key in plan:
+            # Only a real disagreement matters; a byte-identical repeat is harmless.
+            if plan[key] != entry:
+                duplicates.setdefault(key, [plan[key]]).append(entry)
+            continue          # keep the FIRST, deterministically
+        plan[key] = entry
+    return plan, skipped, duplicates
 
 
 def metres(lon1, lat1, lon2, lat2):
@@ -106,7 +165,7 @@ def coords_of(row):
     return lon, lat
 
 
-def retain_reason(o, plan, carried_ids, dist_by_id, coverage):
+def retain_reason(o, plan, carried_ids, dist_by_id, coverage, photo_labels=frozenset()):
     """Why this old pole must survive the replace, or None if it may be deleted.
 
     Deleting is only safe when the replan demonstrably supersedes the pole. It does
@@ -130,7 +189,7 @@ def retain_reason(o, plan, carried_ids, dist_by_id, coverage):
     dist = dist_by_id.get(o["id"])
     if dist is None or dist > coverage:
         return "outside_replan_area"
-    if has_field_evidence(o):
+    if has_field_evidence(o, o["pole_number"] in photo_labels):
         return "unmatched_with_field_evidence"
     return None
 
@@ -168,7 +227,9 @@ def decide(old, photos, plan, radius, coverage):
 
     # Pass 2: decide what NOT to delete.
     carried_ids = {o["id"] for o in carry.values()}
-    reasons = {o["id"]: retain_reason(o, plan, carried_ids, dist_by_id, coverage) for o in old}
+    photo_labels = {p["label"] for p in photos if p["label"]}
+    reasons = {o["id"]: retain_reason(o, plan, carried_ids, dist_by_id, coverage, photo_labels)
+               for o in old}
     retain = [o for o in old if reasons[o["id"]]]
     breakdown = {}
     for r in reasons.values():

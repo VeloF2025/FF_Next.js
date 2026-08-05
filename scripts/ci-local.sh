@@ -145,6 +145,16 @@ if command -v python3 >/dev/null 2>&1; then
     tail -20 /tmp/ci-replan-match.txt | sed 's/^/    /'
   fi
 
+  # The write path: do_import/do_rollback against a throwaway Postgres. Separate from
+  # the matching tests above because it needs docker; skipping it silently would leave
+  # the two functions that actually delete production data untested.
+  if python3 scripts/test_replan_import_db.py > /tmp/ci-replan-import-db.txt 2>&1; then
+    pass "Replan import write path: all checks pass"
+  else
+    fail "Replan import write path: regression detected"
+    tail -25 /tmp/ci-replan-import-db.txt | sed 's/^/    /'
+  fi
+
   if python3 scripts/test_qfield_hierarchy.py > /tmp/ci-qfield-hierarchy.txt 2>&1; then
     pass "QField hierarchy mapping: all checks pass"
   else
