@@ -14,9 +14,15 @@ nothing near this pole" has two very different causes (retired vs never exported
 and only one of them justifies deleting field work. See retain_reason().
 """
 import math
+import os
 import sqlite3
+import sys
 
-from read_gpkg import decode_gpkg_geometry
+# Resolved here rather than left to the caller: this module is imported by the CLI, by
+# replan_write and by two test suites, and relying on whichever of them happens to set
+# sys.path first makes the import order load-bearing.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "qfield-sync"))
+from read_gpkg import decode_gpkg_geometry  # noqa: E402
 
 # Written from the GeoPackage on every run. Everything else on a new row keeps its
 # column default.

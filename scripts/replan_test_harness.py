@@ -102,9 +102,12 @@ def fixture(conn):
         UNIQUE (project_id, pole_label))""")
     cur.execute("CREATE TABLE snags (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), "
                 "pole_ids uuid[], pole_references text[])")
+    # The migrations are APPLIED, not hand-mirrored: a fixture that declares the
+    # columns itself would keep passing after the migration stopped creating them.
     sql_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations", "sql")
-    with open(os.path.join(sql_dir, "479_pole_plan_replan_backup.sql")) as fh:
-        cur.execute(fh.read().replace("public.", f"{SCHEMA}."))
+    for mig in ("479_pole_plan_replan_backup.sql", "480_pole_qa_photo_superseded.sql"):
+        with open(os.path.join(sql_dir, mig)) as fh:
+            cur.execute(fh.read().replace("public.", f"{SCHEMA}."))
     cur.execute("INSERT INTO projects VALUES (%s,'Test Project'),(%s,'Other Project')",
                 (PROJECT, OTHER_PROJECT))
     conn.commit()
