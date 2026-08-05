@@ -25,10 +25,7 @@ export interface AlertInput {
 }
 
 export interface AlertDecision {
-  event: 'fleet.tracking_pull_failed' | 'fleet.tracking_data_gap';
-  channels: { in_app: boolean; email: boolean; whatsapp: boolean };
-  /** Non-null when WhatsApp is warranted but should wait until working hours. */
-  deferWhatsappUntil: Date | null;
+  event: 'fleet.tracking_pull_failed' | 'fleet.tracking_data_gap' | 'fleet.tracking_pull_degraded';
 }
 
 /** Transient errors must repeat this many times before anyone is told. */
@@ -41,42 +38,42 @@ function sastHour(d: Date): number {
   return new Date(d.getTime() + SAST_OFFSET_MS).getUTCHours();
 }
 
-/** 07:00 SAST on the next calendar day that has not passed it yet. */
-function nextSevenAm(d: Date): Date {
-  const sast = new Date(d.getTime() + SAST_OFFSET_MS);
-  const target = new Date(sast);
-  target.setUTCHours(QUIET_UNTIL_HOUR, 0, 0, 0);
-  if (target <= sast) target.setUTCDate(target.getUTCDate() + 1);
-  return new Date(target.getTime() - SAST_OFFSET_MS);
-}
-
+/**
+ * Decide which event to raise, if any.
+ *
+ * The notification bus (`notify()`) resolves delivery channels itself, from
+ * `DEFAULT_CHANNEL_PREFERENCES[event_type]` — it has no per-call channel
+ * override. So the channel policy (WhatsApp yes/no, immediate vs deferred)
+ * has to be encoded in WHICH event type we choose, not in a field on the
+ * decision: `fleet.tracking_pull_failed` is registered with whatsapp: true,
+ * `fleet.tracking_pull_degraded` and `fleet.tracking_data_gap` with
+ * whatsapp: false.
+ *
+ * Overnight auth failures deliberately do NOT schedule a delayed WhatsApp.
+ * There is no scheduler here to fire one. Instead: an auth failure does not
+ * self-heal, and this job polls every 2 hours, so if it's still broken at
+ * the next daytime tick, that tick's `nowSast` will fall inside working
+ * hours and emit `fleet.tracking_pull_failed` (whatsapp: true) then. The
+ * "deferral" falls out of the polling cadence for free — no timer needed —
+ * at the cost of coarser granularity: up to one tick (~2h) after 07:00
+ * rather than exactly at 07:00.
+ */
 export function decideAlert(input: AlertInput): AlertDecision | null {
   if (input.kind === 'gap') {
-    return {
-      event: 'fleet.tracking_data_gap',
-      channels: { in_app: true, email: true, whatsapp: false },
-      deferWhatsappUntil: null,
-    };
+    return { event: 'fleet.tracking_data_gap' };
   }
 
   if (input.kind === 'transient') {
     if (input.consecutiveFailures < TRANSIENT_THRESHOLD) return null;
-    return {
-      event: 'fleet.tracking_pull_failed',
-      channels: { in_app: true, email: true, whatsapp: false },
-      deferWhatsappUntil: null,
-    };
+    return { event: 'fleet.tracking_pull_degraded' };
   }
 
-  // Auth failure: will not self-heal, so WhatsApp is warranted — but a 02:00
-  // failure cannot be acted on until morning, so the message waits.
+  // Auth failure: will not self-heal, so WhatsApp is warranted during
+  // working hours. Overnight, downgrade to the no-WhatsApp event — see the
+  // polling-cadence comment above for why no scheduler is needed.
   const hour = sastHour(input.nowSast);
-  const overnight = hour < QUIET_UNTIL_HOUR || hour >= QUIET_FROM_HOUR;
-  return {
-    event: 'fleet.tracking_pull_failed',
-    channels: { in_app: true, email: true, whatsapp: true },
-    deferWhatsappUntil: overnight ? nextSevenAm(input.nowSast) : null,
-  };
+  const workingHours = hour >= QUIET_UNTIL_HOUR && hour < QUIET_FROM_HOUR;
+  return { event: workingHours ? 'fleet.tracking_pull_failed' : 'fleet.tracking_pull_degraded' };
 }
 
 export interface RaiseAlertInput extends AlertInput {
@@ -146,7 +143,6 @@ export async function raiseTrackingAlert(
         provider: input.provider,
         accountRef: input.accountRef,
         consecutiveFailures: input.consecutiveFailures,
-        deferWhatsappUntil: decision.deferWhatsappUntil?.toISOString() ?? null,
       },
     });
   } catch (err) {

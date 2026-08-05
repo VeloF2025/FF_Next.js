@@ -1,6 +1,6 @@
 /**
  * Tracking notification event types registration.
- * Ensures both tracking pull-failure and data-gap events are registered
+ * Ensures tracking pull-failure, data-gap, and degraded events are registered
  * in all five constant maps (channel preferences, icons, severity, labels, groups).
  */
 
@@ -13,7 +13,11 @@ import {
   EVENT_ICONS,
 } from '../constants';
 
-const EVENTS = ['fleet.tracking_pull_failed', 'fleet.tracking_data_gap'] as const;
+const EVENTS = [
+  'fleet.tracking_pull_failed',
+  'fleet.tracking_data_gap',
+  'fleet.tracking_pull_degraded',
+] as const;
 
 describe('tracking notification events', () => {
   it.each(EVENTS)('%s is registered in every constant map', (key) => {
@@ -33,5 +37,9 @@ describe('tracking notification events', () => {
 
   it('keeps the data-gap event off WhatsApp', () => {
     expect(DEFAULT_CHANNEL_PREFERENCES['fleet.tracking_data_gap']?.whatsapp).toBe(false);
+  });
+
+  it('keeps the degraded event off WhatsApp', () => {
+    expect(DEFAULT_CHANNEL_PREFERENCES['fleet.tracking_pull_degraded']?.whatsapp).toBe(false);
   });
 });

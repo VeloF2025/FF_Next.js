@@ -5,11 +5,11 @@ const noon = new Date('2026-08-05T12:00:00+02:00');
 const twoAm = new Date('2026-08-05T02:00:00+02:00');
 
 describe('decideAlert', () => {
-  it('alerts immediately on an auth failure', () => {
+  it('alerts immediately on an auth failure with WhatsApp (working hours)', () => {
     const d = decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: noon });
+    // fleet.tracking_pull_failed is registered with whatsapp: true — see
+    // src/modules/notifications/constants/index.ts
     expect(d?.event).toBe('fleet.tracking_pull_failed');
-    expect(d?.channels.email).toBe(true);
-    expect(d?.channels.whatsapp).toBe(true);
   });
 
   it('stays silent on the first two transient failures', () => {
@@ -19,27 +19,26 @@ describe('decideAlert', () => {
 
   it('alerts on the third consecutive transient failure, without WhatsApp', () => {
     const d = decideAlert({ kind: 'transient', consecutiveFailures: 3, nowSast: noon });
-    expect(d?.channels.email).toBe(true);
-    expect(d?.channels.whatsapp).toBe(false);
+    // fleet.tracking_pull_degraded is registered with whatsapp: false
+    expect(d?.event).toBe('fleet.tracking_pull_degraded');
   });
 
   it('raises a data gap immediately and never on WhatsApp', () => {
     const d = decideAlert({ kind: 'gap', consecutiveFailures: 0, nowSast: noon });
+    // fleet.tracking_data_gap is registered with whatsapp: false
     expect(d?.event).toBe('fleet.tracking_data_gap');
-    expect(d?.channels.whatsapp).toBe(false);
   });
 
-  it('defers an overnight WhatsApp to 07:00 but sends email immediately', () => {
+  it('downgrades an overnight auth failure to the no-WhatsApp event', () => {
     const d = decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: twoAm });
-    expect(d?.channels.email).toBe(true);
-    expect(d?.deferWhatsappUntil?.toISOString()).toBe(
-      new Date('2026-08-05T07:00:00+02:00').toISOString()
-    );
+    // No scheduler here: the next daytime tick (job polls every 2h) will see
+    // the same still-broken auth and emit fleet.tracking_pull_failed then.
+    expect(d?.event).toBe('fleet.tracking_pull_degraded');
   });
 
-  it('does not defer WhatsApp during working hours', () => {
-    expect(decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: noon })?.deferWhatsappUntil)
-      .toBeNull();
+  it('does not downgrade an auth failure during working hours', () => {
+    const d = decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: noon });
+    expect(d?.event).toBe('fleet.tracking_pull_failed');
   });
 });
 
