@@ -160,19 +160,37 @@ const remoteWaiters: Array<() => void> = [];
  * Acquire a transcription slot. Returns a release function that is safe to call
  * more than once. Callers MUST acquire before reading the WAV into memory, so
  * queued work holds only a file path rather than ~115 MB per hour of audio.
+ *
+ * Exported for testing — FIFO ordering is only observable for a caller that
+ * arrives AFTER a release, which cannot be driven through transcribeWithWhisper.
  */
-async function acquireRemoteSlot(): Promise<() => void> {
-  // Re-read the cap each loop: it is env-driven and a waiter may resume much later.
-  while (remoteActive >= resolveMaxConcurrentRemote(process.env.WHISPER_MAX_CONCURRENT)) {
+export async function acquireRemoteSlot(): Promise<() => void> {
+  if (remoteActive < resolveMaxConcurrentRemote(process.env.WHISPER_MAX_CONCURRENT)) {
+    // Check and increment with no await between them, so the cap can never be exceeded.
+    remoteActive++;
+  } else {
+    // Queue, then wait for a slot to be handed over directly. On resume we already
+    // OWN the slot (remoteActive was never decremented for it) and must not re-check
+    // the cap: re-checking is what allowed a newly-arriving caller to barge in during
+    // the microtask gap, pushing an early waiter to the back of the queue repeatedly.
     await new Promise<void>((resolve) => remoteWaiters.push(resolve));
   }
-  remoteActive++;
+
   let released = false;
   return () => {
     if (released) return; // idempotent — finally blocks can run more than once
     released = true;
-    remoteActive--;
-    remoteWaiters.shift()?.();
+    const cap = resolveMaxConcurrentRemote(process.env.WHISPER_MAX_CONCURRENT);
+    const next = remoteWaiters.shift();
+    if (next && remoteActive <= cap) {
+      // Hand the slot straight to the longest-waiting caller: remoteActive stays put
+      // because one holder leaves as another enters. FIFO, and no window for barging.
+      next();
+    } else {
+      // No waiters, or the cap was lowered at runtime and we must shrink to fit.
+      if (next) remoteWaiters.unshift(next);
+      remoteActive--;
+    }
   };
 }
 

@@ -40,6 +40,7 @@ vi.mock('fs', () => {
 });
 
 import {
+  acquireRemoteSlot,
   resolveMaxConcurrentRemote,
   resolveRemoteTimeoutMs,
   transcribeWithWhisper,
@@ -188,6 +189,56 @@ describe('transcribeWithWhisper — backend selection', () => {
     expect(allDone).toBe(true);
     expect(peak).toBeGreaterThan(0);
     expect(peak).toBeLessThanOrEqual(2);
+  });
+
+  it('hands a released slot to the longest-waiting caller, not a later arrival', async () => {
+    // FIFO. The previous implementation decremented the counter and then woke the
+    // head waiter, which only re-checks a microtask later — so a caller arriving in
+    // that gap grabbed the slot synchronously and pushed the queued waiter to the
+    // back, repeatedly, under sustained arrivals.
+    process.env.WHISPER_MAX_CONCURRENT = '1';
+    const order: string[] = [];
+
+    const releaseFirst = await acquireRemoteSlot();          // holds the only slot
+
+    const pB = acquireRemoteSlot().then((r) => { order.push('B'); return r; });
+    await new Promise((r) => setTimeout(r, 0));              // B is now queued
+    expect(order).toEqual([]);
+
+    releaseFirst();
+    // D arrives immediately after the release — exactly the barging window.
+    const pD = acquireRemoteSlot().then((r) => { order.push('D'); return r; });
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(order).toEqual(['B']);                            // B first, D did not barge
+
+    (await pB)();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(order).toEqual(['B', 'D']);
+    (await pD)();
+  });
+
+  it('releases the slot to a waiter even after the cap is lowered at runtime', async () => {
+    // The lowered-cap path shrinks by decrementing instead of handing over; it must
+    // still converge rather than strand the waiter forever.
+    process.env.WHISPER_MAX_CONCURRENT = '2';
+    const a = await acquireRemoteSlot();
+    const b = await acquireRemoteSlot();
+
+    let granted = false;
+    const pC = acquireRemoteSlot().then((r) => { granted = true; return r; });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(granted).toBe(false);
+
+    process.env.WHISPER_MAX_CONCURRENT = '1';                // shrink while C waits
+    a();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(granted).toBe(false);                             // still over the new cap
+
+    b();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(granted).toBe(true);                              // converges, no deadlock
+    (await pC)();
   });
 
   it('rejects when the remote returns a shape with no segments array', async () => {
