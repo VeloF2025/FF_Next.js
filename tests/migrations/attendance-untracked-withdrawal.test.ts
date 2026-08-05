@@ -426,6 +426,54 @@ dbDescribe('untracked-expectation withdrawal', () => {
     expect(Number((await h.summaryJson(STAFF(1), DAY))?.scheduled_paid_hrs)).toBe(9.99);
   });
 
+  /**
+   * The spec above proves the divergence guard THROWS. It does not prove the
+   * writes already made get undone — that comes from the caller's transaction,
+   * and `applyWithdrawal` deliberately does not open one of its own.
+   *
+   * This asserts the property the guard actually exists for: after a divergence
+   * inside a real BEGIN/ROLLBACK, nothing survives. Most importantly no rows
+   * remain in attendance_decision_events, whose immutability trigger means a
+   * false record written there could never be corrected.
+   */
+  it('leaves no trace, audit rows included, when a divergent apply is rolled back', async () => {
+    await h.seedStaff(STAFF(1), false);
+    await h.seedPhantom(EXC(1), STAFF(1), DAY);
+    await h.seedStaff(STAFF(2), false);
+    await h.seedPhantom(EXC(2), STAFF(2), DAY);
+    const plan = await planWithdrawal(client);
+    const summaryBefore = await h.summaryJson(STAFF(1), DAY);
+
+    await client.query(`
+      CREATE FUNCTION atomicity_probe() RETURNS TRIGGER AS $fn$
+      BEGIN
+        UPDATE attendance_daily_summaries SET result_status = NULL
+        WHERE staff_id = NEW.staff_id AND work_date = NEW.work_date
+          AND NEW.staff_id = '${STAFF(2)}'::uuid;
+        RETURN NEW;
+      END;
+      $fn$ LANGUAGE plpgsql;
+      CREATE TRIGGER atomicity_probe_trg
+        BEFORE UPDATE ON attendance_day_exceptions
+        FOR EACH ROW EXECUTE FUNCTION atomicity_probe();`);
+    try {
+      await client.query('BEGIN');
+      await expect(applyWithdrawal(client, plan.candidates))
+        .rejects.toThrow(/left the pair inconsistent/);
+      await client.query('ROLLBACK');
+
+      // Every write is gone: the audit events, the cancellation, the deletion.
+      expect(await h.events('day_exception')).toHaveLength(0);
+      expect(await h.events('daily_result')).toHaveLength(0);
+      expect((await h.exception(EXC(1)))?.status).toBe('awaiting_supervisor');
+      expect((await h.exception(EXC(2)))?.status).toBe('awaiting_supervisor');
+      expect(await h.summaryJson(STAFF(1), DAY)).toEqual(summaryBefore);
+    } finally {
+      await client.query(`DROP TRIGGER atomicity_probe_trg ON attendance_day_exceptions`);
+      await client.query(`DROP FUNCTION atomicity_probe()`);
+    }
+  });
+
   it('reports nothing to restore for an unknown run, instead of false schema drift', async () => {
     // The schema-drift guard compares the stored payload's keys against the live
     // table. An unknown run has no payload at all, so a naive EXCEPT would
