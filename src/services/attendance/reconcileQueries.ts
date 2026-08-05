@@ -1,7 +1,7 @@
 import { query } from '@/lib/db-pool';
 import type { OvertimeRuleInput } from './overtimeCalculator';
 import type { AttendanceSchedulePolicy } from './policy/types';
-import { employmentEffectivePredicate } from './employmentUniverse';
+import { employmentEffectivePredicate, expectedAttendanceDayPredicate } from './employmentUniverse';
 
 export interface OpenEntryRow extends Record<string, unknown> {
   id: string;
@@ -218,16 +218,9 @@ export async function loadReconciliationEntries(
 /**
  * The set of (staff, day) pairs a worker was EXPECTED to clock in on.
  *
- * `s.attendance_tracked` is filtered here and DELIBERATELY NOWHERE ELSE. The
- * flag governs expectation, not processing: the entry-driven readers
- * (loadReconciliationEntries / loadOpenEntriesForReconciliation) must stay
- * unfiltered so an untracked staff member who does clock in is still
- * reconciled and still paid. buildCandidates() layers entry-driven days over
- * these expected days, so dropping someone here only stops a *missing* day
- * from being raised as an absence — it never drops a worked one.
- *
- * Moving this predicate into employmentEffectivePredicate() would silently
- * apply it to those entry readers too and strip real hours from payroll.
+ * Uses the shared `expectedAttendanceDayPredicate`, as every expectation CTE
+ * must; the entry-driven readers above keep `employmentEffectivePredicate`
+ * alone. See that helper for why the two must not be merged.
  */
 export async function loadExpectedAttendanceDays(
   fromDate: string,
@@ -248,8 +241,7 @@ export async function loadExpectedAttendanceDays(
     LEFT JOIN public_holidays ph ON ph.date = w.work_date
     LEFT JOIN attendance_daily_summaries ds
       ON ds.staff_id = s.id AND ds.work_date = w.work_date
-    WHERE s.attendance_tracked = true
-      AND ${employmentEffectivePredicate('s', 'w.work_date')}
+    WHERE ${expectedAttendanceDayPredicate('s', 'w.work_date')}
       AND EXISTS (
         SELECT 1 FROM attendance_schedule_policies policy
         WHERE policy.active_from <= w.work_date
