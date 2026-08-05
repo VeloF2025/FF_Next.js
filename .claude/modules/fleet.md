@@ -44,6 +44,58 @@ src/modules/fleet/
 | `fleet_gps_jobs` | GPS investigation jobs |
 | `fleet_gps_trips` | Analyzed GPS trips |
 
+## Tracking (Live GPS)
+
+Vehicle position history lands in `fleet_vehicle_positions` via two provider-blind ingestion
+paths, both funneling through `src/services/tracking/ingest.ts`:
+
+| Path | Cadence | Endpoint | Providers |
+|---|---|---|---|
+| REST API | 2 min | `/api/cron/poll-tracking` | Cartrack (Velocity account) |
+| Portal scrape | 2 hours | `/api/cron/poll-portal-tracking` | Netstar |
+
+Full reference for the tracking services: `src/services/tracking/.claude.md`. Design spec:
+`docs/superpowers/specs/2026-08-05-portal-tracker-ingestion-design.md`.
+
+### Tracking Tables
+| Table | Purpose |
+|-------|---------|
+| `fleet_vehicle_trackers` | Which tracker (provider + account_ref + external_id) reports for which vehicle. One active row per vehicle. |
+| `fleet_vehicle_positions` | Position history. Deduped per (provider, account_ref, provider_event_id). |
+| `fleet_tracking_watermarks` | Per (provider, account_ref) high-water mark, last run, last error, consecutive failure count. |
+
+### Discovery / Reconciliation
+`reconcileTrackers()` (`src/services/tracking/discovery.ts`) runs before every portal poll and
+matches the portal's vehicle list against active `fleet_vehicles` by registration. It is
+bidirectional: vehicles active in FibreFlow but absent from the portal (`fleetOnly`), and portal
+vehicles matching no active fleet vehicle (`portalOnly`), are both surfaced in the poll response
+under `coverage`. A tracker row is only written on a confident match — an empty portal vehicle
+list is treated as a fetch failure and reconciliation is skipped entirely, rather than
+deactivating every tracker on the account.
+
+### Backfill
+One-off historical backfill for a portal provider, walking backwards from now in provider-max
+chunks (Netstar: 31 days) until retention is discovered by two consecutive empty chunks:
+
+```bash
+npx tsx scripts/backfill-tracking.ts --provider=netstar --floor=2024-08-01
+```
+
+Idempotent — safe to interrupt and re-run, and safe to run alongside the 2-hourly poll, because
+every write goes through the same `ingestPositions()` dedup.
+
+### Notification Events
+Registered in `src/modules/notifications/constants/index.ts`:
+
+| Event | Trigger | WhatsApp |
+|-------|---------|----------|
+| `fleet.tracking_pull_failed` | Auth failure during working hours (07:00–20:00 SAST) | Yes |
+| `fleet.tracking_pull_degraded` | 3+ consecutive transient failures, or an auth failure overnight | No |
+| `fleet.tracking_data_gap` | Portal authenticated but returned no usable data while trackers remain mapped | No |
+
+Recipients come from `FLEET_ALERT_USER_IDS` (env var, comma-separated `users.id`, not
+`staff.id`) rather than a role lookup, since the fleet manager's `staff.position` is "Staff".
+
 ## API Endpoints
 
 ### Vehicle Portal
