@@ -529,7 +529,7 @@ export interface FibreFlowEnrichment {
 
   /** From the daily OES report — independent of the SOW/1Map design lineage. */
   oes_gps: GPSEnrichmentData | null;
-  /** Metres between oes_gps and fibreflow_gps; null unless both exist. */
+  /** Metres between oes_gps and the design coordinate actually ranked second (sow_drops, else 1Map). */
   gps_divergence_m: number | null;
 
   // Project info (from DR number lookup or pattern matching)

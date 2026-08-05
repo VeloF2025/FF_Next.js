@@ -10,6 +10,8 @@
  * it so server-side callers are unaffected.
  */
 
+import { TicketSource } from '@/modules/noc/types/ticket';
+
 export interface GpsPoint {
   latitude: number;
   longitude: number;
@@ -134,10 +136,14 @@ export function isDisplayPoint(p: unknown): p is DisplayPoint {
  * law5, a Lawley drop) is pinned 94.7km away near Brits. Applying the OES
  * ranking everywhere moved the pin on 447 open out-of-scope tickets.
  */
-export const OES_RANKED_TICKET_SOURCES = ['olt_mismatch', 'wa_no_oes', 'pp_data'] as const;
+export const OES_RANKED_TICKET_SOURCES: readonly string[] = [
+  TicketSource.OLT_MISMATCH,
+  TicketSource.WA_NO_OES,
+  TicketSource.PP_DATA,
+];
 
 export function ranksOesFirst(source: string | null | undefined): boolean {
-  return !!source && (OES_RANKED_TICKET_SOURCES as readonly string[]).includes(source);
+  return !!source && OES_RANKED_TICKET_SOURCES.includes(source);
 }
 
 /**
@@ -149,15 +155,27 @@ export function ranksOesFirst(source: string | null | undefined): boolean {
  * form, so the stored tier silently never fired.
  */
 export function parseStoredGps(value: unknown): DisplayPoint | null {
-  if (isDisplayPoint(value)) return value;
-  if (typeof value !== 'string') return null;
-  const parts = value.split(',');
-  if (parts.length !== 2) return null;
-  const latitude = Number.parseFloat(parts[0] as string);
-  const longitude = Number.parseFloat(parts[1] as string);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-  if (latitude === 0 && longitude === 0) return null;
-  return { latitude, longitude };
+  let point: DisplayPoint | null = null;
+
+  if (isDisplayPoint(value)) {
+    point = value;
+  } else if (typeof value === 'string') {
+    const parts = value.split(',');
+    if (parts.length !== 2) return null;
+    const latitude = Number.parseFloat(parts[0] as string);
+    const longitude = Number.parseFloat(parts[1] as string);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    point = { latitude, longitude };
+  }
+
+  if (!point) return null;
+
+  // Bounds-check the stored value like any other source. 19 open tickets hold
+  // their pair the wrong way round (lng,lat — e.g. 27.81,-26.38), which plots
+  // in the Atlantic. They don't surface today only because they all have a NULL
+  // dr_number and the panel never opens; that is incidental, not a guarantee.
+  if (!isPlausibleSaCoordinate(point.latitude, point.longitude)) return null;
+  return point;
 }
 
 export interface TicketGpsDisplayInput {

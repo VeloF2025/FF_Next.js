@@ -349,6 +349,37 @@ describe('enrichTicketData — OES coordinate and divergence', () => {
     expect(r.gps_divergence_m).toBeNull();
   });
 
+  it('measures divergence against 1Map when sow_drops has no row', async () => {
+    // The gap this closes: divergence used to be computed only against
+    // sow_drops, but the UI ranks 1Map second when sow_drops misses. 244 open
+    // tickets sit in that configuration — 76 of them more than 50m apart, worst
+    // 10.5km — and every one rendered as a single confident pin with no warning.
+    queryOneMock.mockImplementation((sql: string) =>
+      Promise.resolve(
+        String(sql).includes('onemap_properties')
+          ? {
+              drop_number: 'DR1735912',
+              latitude: -26.7295508,
+              longitude: 27.0179814,
+              address: '1 Main Rd',
+              customer_name: null,
+              contact_number: null,
+              property_id: null,
+              status: null,
+            }
+          : null // sow_drops misses
+      )
+    );
+    oesGpsMock.mockResolvedValue({ latitude: -26.7387387, longitude: 27.0148998 });
+
+    const r = await enrichTicketData('DR1735912');
+
+    expect(r.fibreflow_gps).toBeNull();
+    expect(r.onemap_gps).not.toBeNull();
+    expect(r.gps_divergence_m).toBeGreaterThan(1060);
+    expect(r.gps_divergence_m).toBeLessThan(1072);
+  });
+
   it('leaves oes_gps and divergence null when the OES report has no row', async () => {
     queryOneMock.mockImplementation((sql: string) =>
       Promise.resolve(String(sql).includes('sow_drops') ? SOW_ROW : null)

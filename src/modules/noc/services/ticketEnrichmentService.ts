@@ -106,7 +106,10 @@ export interface EnrichedTicketData {
    */
   oes_gps: GPSData | null;
 
-  /** Metres between `oes_gps` and `fibreflow_gps`; null unless both exist. */
+  /**
+   * Metres between `oes_gps` and the design coordinate the UI ranks second —
+   * `fibreflow_gps` when present, else `onemap_gps`. Null unless both exist.
+   */
   gps_divergence_m: number | null;
 
   // Project info (from DR number lookup or pattern matching)

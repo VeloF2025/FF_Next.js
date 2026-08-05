@@ -207,6 +207,25 @@ describe('parseStoredGps — gps_coordinates arrives as TEXT, not an object', ()
     expect(parseStoredGps(42)).toBeNull();
   });
 
+  it('rejects a swapped pair rather than plotting it in the Atlantic', () => {
+    // 19 open tickets store lng,lat. They don't surface today only because they
+    // all have a NULL dr_number and the enrichment panel never opens — that is
+    // incidental, not a guarantee.
+    expect(parseStoredGps('27.81385770,-26.38319318')).toBeNull();
+  });
+
+  it('rejects a stored coordinate outside South Africa', () => {
+    expect(parseStoredGps('26.6458226,87.7349221')).toBeNull(); // Nepal
+    expect(parseStoredGps('1e5,2')).toBeNull();
+  });
+
+  it('still accepts a legitimate stored coordinate', () => {
+    expect(parseStoredGps('-26.38318537404762,27.80789118854532')).toEqual({
+      latitude: -26.38318537404762,
+      longitude: 27.80789118854532,
+    });
+  });
+
   it('tolerates surrounding whitespace', () => {
     expect(parseStoredGps(' -26.7387387 , 27.0148998 ')).toEqual({
       latitude: -26.7387387,
