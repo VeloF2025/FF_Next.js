@@ -319,5 +319,9 @@ None block starting work; all three are settled before the code paths they affec
 ## Security note
 
 The Netstar portal password was exposed on 2026-08-05 when Playwright's `fill()` error log
-echoed the value into a session transcript. It has been flagged for rotation. The recon
-tooling was fixed to scrub secrets from all output before this document was written.
+echoed the value into a session transcript. The recon tooling was fixed to scrub secrets from
+all output before this document was written.
+
+**Rotation was considered and declined by Hein on 2026-08-05.** The credential remains in use
+unchanged. Recorded here as an accepted risk: the value persists in that transcript, so
+anyone with access to it holds the Netstar login. Revisit if transcript access widens.
