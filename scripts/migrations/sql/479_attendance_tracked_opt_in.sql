@@ -27,11 +27,15 @@
 
 DO $$
 BEGIN
+  -- to_regclass() resolves `staff` through search_path, so this guard agrees
+  -- with the ALTER below in whatever schema the migration is applied to. A
+  -- hard-coded table_schema='public' would inspect one table and alter
+  -- another under a non-default search_path (as the migration tests use).
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'staff'
-      AND column_name = 'attendance_tracked'
+    SELECT 1 FROM pg_attribute
+    WHERE attrelid = to_regclass('staff')
+      AND attname = 'attendance_tracked'
+      AND NOT attisdropped
   ) THEN
     ALTER TABLE staff
       ADD COLUMN attendance_tracked boolean NOT NULL DEFAULT false;
