@@ -3,6 +3,8 @@ import { graphFetch } from './auth';
 import { log } from '@/lib/logger';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
@@ -90,11 +92,30 @@ export async function downloadRecordingToDisk(
     throw new Error(`Failed to download recording: ${response.status}`);
   }
 
-  // Buffer the entire response in memory then write atomically
-  const buffer = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(filePath, buffer);
+  // Stream to disk. `arrayBuffer()` held the ENTIRE recording in memory first
+  // (~100 MB+ each): on 2026-08-05, 75 concurrent downloads stalled against a slow
+  // Graph endpoint and exhausted production's 16 GB cgroup. Streaming keeps memory
+  // proportional to one chunk regardless of recording length.
+  //
+  // Write to a .part file and rename, so a failed or interrupted download can never
+  // leave a truncated .mp4 at the final path. (The previous code wrote straight to
+  // filePath despite claiming to be atomic.)
+  if (!response.body) {
+    throw new Error('Failed to download recording: response had no body');
+  }
+  const partPath = `${filePath}.part`;
+  try {
+    await pipeline(
+      Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]),
+      fs.createWriteStream(partPath),
+    );
+    fs.renameSync(partPath, filePath);
+  } catch (err) {
+    try { fs.unlinkSync(partPath); } catch { /* nothing to clean up */ }
+    throw err;
+  }
 
-  const sizeBytes = buffer.length;
+  const sizeBytes = fs.statSync(filePath).size;
   log.info(
     'Recording downloaded',
     { filePath, sizeBytes, dbMeetingId },

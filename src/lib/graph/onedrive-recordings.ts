@@ -5,6 +5,8 @@ import { getInternalUsers } from './auto-recording';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const LOGGER = 'OneDriveRecordings';
@@ -132,12 +134,32 @@ export async function downloadDriveItem(
     throw new Error(`Download failed: ${response.status}`);
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
+  // Stream to disk. `arrayBuffer()` held the ENTIRE recording in memory first —
+  // one observed download was 138.9 MB, and concurrent downloads against a slow
+  // endpoint exhausted production's 16 GB cgroup on 2026-08-05. Streaming keeps
+  // memory proportional to one chunk regardless of recording length.
+  //
+  // Write to a .part file and rename so an interrupted download can never leave a
+  // truncated .mp4 at destPath (which a later run would treat as complete).
+  if (!response.body) {
+    throw new Error('Download failed: response had no body');
+  }
   const dir = path.dirname(destPath);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(destPath, buffer);
 
-  return buffer.length;
+  const partPath = `${destPath}.part`;
+  try {
+    await pipeline(
+      Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]),
+      fs.createWriteStream(partPath),
+    );
+    fs.renameSync(partPath, destPath);
+  } catch (err) {
+    try { fs.unlinkSync(partPath); } catch { /* nothing to clean up */ }
+    throw err;
+  }
+
+  return fs.statSync(destPath).size;
 }
 
 /**
