@@ -22,12 +22,13 @@
  *   # 1. Look. Writes nothing. Always start here.
  *   npx tsx scripts/audit/attendance-untracked-withdrawal.ts
  *
- *   # 2. Withdraw. Requires --expect to match the count the dry run reported,
- *   #    so drift since you looked aborts the run.
- *   npx tsx scripts/audit/attendance-untracked-withdrawal.ts --apply --expect=53
+ *   # 2. Withdraw. --expect pins how many rows the dry run showed; --digest pins
+ *   #    WHICH ones, so a same-size different-membership swap aborts too.
+ *   npx tsx scripts/audit/attendance-untracked-withdrawal.ts --apply --expect=53 --digest=1a2b3c4d5e6f
  *
- *   # Reverse it — restores the summaries and reopens the exceptions.
- *   npx tsx scripts/audit/attendance-untracked-withdrawal.ts --rollback
+ *   # Reverse ONE run — restores its summaries and reopens its exceptions.
+ *   # --run defaults to the most recent apply; pass it explicitly to be sure.
+ *   npx tsx scripts/audit/attendance-untracked-withdrawal.ts --rollback --run=<uuid>
  *
  * Exits non-zero on refusal or error so a wrapper cannot mistake a blocked run
  * for a clean one.
@@ -45,7 +46,12 @@ if (isProd && !fs.existsSync('.env.production')) {
   process.stderr.write('[untracked-withdrawal] NODE_ENV=production but .env.production missing — refusing\n');
   process.exit(2);
 }
-dotenv.config({ path: '.env.production' });
+// .env.production is loaded ONLY under NODE_ENV=production. Loading it
+// unconditionally (and first, ahead of .env.local) means a stray .env.production
+// in the checkout silently decides which database a "local" dry run targets.
+// That is masked today because dev and prod share one physical database, but
+// nothing enforces that and this tool deletes payroll-adjacent rows.
+if (isProd) dotenv.config({ path: '.env.production' });
 dotenv.config({ path: '.env.local', override: false });
 if (!process.env.DATABASE_URL) {
   process.stderr.write('[untracked-withdrawal] DATABASE_URL not set — aborting\n');
@@ -67,8 +73,11 @@ if (flag('apply') && flag('rollback')) {
 (async () => {
   const { Pool } = await import('pg');
   const {
-    planWithdrawal, applyWithdrawal, rollbackWithdrawal,
+    planWithdrawal, applyWithdrawal,
   } = await import('../../src/services/attendance/remediation/untrackedExpectationWithdrawal');
+  const {
+    rollbackWithdrawal,
+  } = await import('../../src/services/attendance/remediation/untrackedExpectationWithdrawalRollback');
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
   const client = await pool.connect();
@@ -76,21 +85,24 @@ if (flag('apply') && flag('rollback')) {
   try {
     if (flag('rollback')) {
       await client.query('BEGIN');
-      const result = await rollbackWithdrawal(client);
+      const result = await rollbackWithdrawal(client, value('run'));
       await client.query('COMMIT');
+      out(`run      : ${result.runId ?? '(none found)'}`);
       out(`restored : ${result.summariesRestored} summaries`);
       out(`reopened : ${result.exceptionsReopened} exceptions`);
       if (result.summariesRestored === 0 && result.exceptionsReopened === 0) {
         exitCode = 1;
-        out('nothing was restored — no withdrawal has been applied against this database');
+        out('nothing was restored — no matching withdrawal run found in this database');
       }
       return;
     }
 
     const plan = await planWithdrawal(client);
     out(`withdrawable phantoms : ${plan.candidates.length}`);
+    out(`distinct staff-days   : ${plan.summaryCount}`);
     out(`staff affected        : ${plan.staffCount}`);
     out(`date range            : ${plan.firstDate ?? '-'} .. ${plan.lastDate ?? '-'}`);
+    out(`candidate set digest  : ${plan.digest}`);
     if (plan.blockers.length > 0) {
       out(`\nBLOCKED (${plan.blockers.length}) — not eligible, and --apply will refuse:`);
       const byReason = new Map<string, number>();
@@ -124,19 +136,48 @@ if (flag('apply') && flag('rollback')) {
         'rows are eligible now. The data changed since you looked — re-run the dry run.\n');
       return;
     }
+    // A count alone cannot detect a same-size, different-membership swap: three
+    // candidates resolved by supervisors while three new ones are raised still
+    // totals the same, and the operator would be applying to a set they never
+    // reviewed. The digest pins WHICH rows, so the documented promise that
+    // "drift since you looked aborts the run" is actually true.
+    const digest = value('digest');
+    if (digest === undefined) {
+      exitCode = 2;
+      process.stderr.write('\n[untracked-withdrawal] --apply requires --digest=<value> from the ' +
+        'dry run. --expect pins how many rows; only the digest pins which ones.\n');
+      return;
+    }
+    if (digest !== plan.digest) {
+      exitCode = 2;
+      process.stderr.write(`\n[untracked-withdrawal] --digest=${digest} but the eligible set now ` +
+        `hashes to ${plan.digest}. Same count, different rows — re-run the dry run.\n`);
+      return;
+    }
 
     await client.query('BEGIN');
     const result = await applyWithdrawal(client, plan.candidates);
     await client.query('COMMIT');
-    out(`\naudited   : ${result.exceptionEventsWritten} exception events, ` +
+    out(`\nrun id    : ${result.runId}`);
+    out(`audited   : ${result.exceptionEventsWritten} exception events, ` +
       `${result.summaryEventsWritten} summary events`);
     out(`cancelled : ${result.exceptionsCancelled} exceptions`);
     out(`deleted   : ${result.summariesDeleted} phantom summaries`);
-    out('\nThe deleted summaries are recoverable with --rollback: each one is held ' +
-      "verbatim in its decision event's before_value, in a table whose trigger " +
-      'forbids UPDATE, DELETE and TRUNCATE.');
+    out(`\nReverse THIS run with:  --rollback --run=${result.runId}`);
+    out('The deleted summaries are held verbatim in their decision events\' ' +
+      'before_value, in a table whose trigger forbids UPDATE, DELETE and TRUNCATE.');
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    // A failed ROLLBACK is reported, never swallowed: it means the transaction
+    // may still be open or the connection is gone, and the operator has to know
+    // that before assuming the database is untouched.
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      process.stderr.write(
+        `[untracked-withdrawal] ROLLBACK ALSO FAILED: ${(rollbackError as Error).message}\n` +
+        '[untracked-withdrawal] The transaction may not have been undone — inspect the ' +
+        'database before re-running.\n');
+    }
     exitCode = 1;
     process.stderr.write(`[untracked-withdrawal] ${(error as Error).message}\n`);
   } finally {

@@ -25,6 +25,8 @@ export interface WithdrawalHarness {
   seedStaff(staffId: string, tracked: boolean): Promise<void>;
   seedPhantom(exceptionId: string, staffId: string, day: string): Promise<void>;
   exception(exceptionId: string): Promise<ExceptionRow | undefined>;
+  /** Reproduces the pre-runId one-off SQL that cleared the original 53. */
+  withdrawWithoutRunId(exceptionId: string, staffId: string, day: string): Promise<void>;
   summaryJson(staffId: string, day: string): Promise<Record<string, unknown> | undefined>;
   events(entityType: string): Promise<EventRow[]>;
 }
@@ -191,6 +193,29 @@ export function createHarness(schema: string, databaseUrl: string | undefined): 
            (staff_id, work_date, scheduled_paid_hrs, result_status)
          VALUES ($1::uuid, $2::date, 8.00, 'absence_review')
          ON CONFLICT (staff_id, work_date) DO NOTHING`, [staffId, day]);
+    },
+    async withdrawWithoutRunId(exceptionId: string, staffId: string, day: string) {
+      await client.query(
+        `INSERT INTO attendance_decision_events (entity_type, entity_key, action,
+           actor_staff_id, reason, before_value, after_value)
+         SELECT 'day_exception', x.id::text, 'system_withdrawn', x.staff_id, 'legacy one-off',
+                jsonb_build_object('status', x.status), jsonb_build_object('status','cancelled')
+         FROM attendance_day_exceptions x WHERE x.id = $1::uuid`, [exceptionId]);
+      await client.query(
+        `INSERT INTO attendance_decision_events (entity_type, entity_key, action,
+           actor_staff_id, reason, before_value, after_value)
+         SELECT 'daily_result', ds.staff_id::text || ':' || TO_CHAR(ds.work_date,'YYYY-MM-DD'),
+                'system_withdrawn', ds.staff_id, 'legacy one-off',
+                to_jsonb(ds), jsonb_build_object('deleted', true)
+         FROM attendance_daily_summaries ds
+         WHERE ds.staff_id = $1::uuid AND ds.work_date = $2::date`, [staffId, day]);
+      await client.query(
+        `UPDATE attendance_day_exceptions SET status='cancelled', resolved_at=NOW(),
+           resolution_reason=$2::text, updated_at=NOW() WHERE id = $1::uuid`,
+        [exceptionId, 'Withdrawn: staff member is not attendance_tracked (migration 479).']);
+      await client.query(
+        `DELETE FROM attendance_daily_summaries WHERE staff_id=$1::uuid AND work_date=$2::date`,
+        [staffId, day]);
     },
     async exception(exceptionId: string) {
       const { rows } = await client.query<ExceptionRow>(
