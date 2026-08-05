@@ -59,6 +59,29 @@ describe('attendance policy reconcile readers', () => {
     expect(db.calls[0]?.text).toContain('s.join_date::date <= w.work_date');
     expect(db.calls[0]?.text).toContain('s.end_date::date >= w.work_date');
     expect(db.calls[0]?.text).toContain("LOWER(s.account_status) <> 'pending'");
+    expect(db.calls[0]?.text).toContain('s.attendance_tracked = true');
+  });
+
+  it('restricts the expectation universe to attendance_tracked staff only', async () => {
+    const db = reader([]);
+
+    await loadExpectedAttendanceDays('2026-08-03', '2026-08-04', db);
+
+    expect(db.calls[0]?.text).toContain('s.attendance_tracked = true');
+  });
+
+  it('does NOT filter entry-driven readers by attendance_tracked', async () => {
+    // The flag governs expectation, not processing. An untracked staff member
+    // who clocks in must still be reconciled and paid — filtering here would
+    // strip their real hours out of payroll.
+    queryMock.mockResolvedValue([]);
+
+    await loadReconciliationEntries('2026-08-03', '2026-08-04');
+    await loadOpenEntriesForReconciliation('2026-08-03', '2026-08-04');
+
+    for (const [text] of queryMock.mock.calls as [string, unknown[]][]) {
+      expect(text).not.toContain('attendance_tracked');
+    }
   });
 
   it('selects only prior-day open sessions covered by an effective policy', async () => {

@@ -135,6 +135,36 @@ if command -v python3 >/dev/null 2>&1; then
     tail -20 /tmp/ci-qfield-gpkgresolve.txt | sed 's/^/    /'
   fi
 
+  # Which old pole is which new pole after a replan, and — the part that actually
+  # costs data — which poles may be deleted. Every rule here was a measured loss
+  # (36 planted statuses, 70 audits, 15 more) before it existed.
+  if python3 scripts/test_replan_match.py > /tmp/ci-replan-match.txt 2>&1; then
+    pass "Replan pole matching: all checks pass"
+  else
+    fail "Replan pole matching: regression detected"
+    tail -20 /tmp/ci-replan-match.txt | sed 's/^/    /'
+  fi
+
+  # The write path: do_import/do_rollback against a throwaway Postgres. Separate from
+  # the matching tests above because it needs docker; skipping it silently would leave
+  # the two functions that actually delete production data untested.
+  if python3 scripts/test_replan_import_db.py > /tmp/ci-replan-import-db.txt 2>&1; then
+    pass "Replan import write path: all checks pass"
+  else
+    fail "Replan import write path: regression detected"
+    tail -25 /tmp/ci-replan-import-db.txt | sed 's/^/    /'
+  fi
+
+  # The guards that decide whether the write is allowed at all. Separate from the
+  # write path above because a guard that computes the right answer and never acts
+  # on it fails differently from a broken write.
+  if python3 scripts/test_replan_guards.py > /tmp/ci-replan-guards.txt 2>&1; then
+    pass "Replan pre-write guards: all checks pass"
+  else
+    fail "Replan pre-write guards: regression detected"
+    tail -25 /tmp/ci-replan-guards.txt | sed 's/^/    /'
+  fi
+
   if python3 scripts/test_qfield_hierarchy.py > /tmp/ci-qfield-hierarchy.txt 2>&1; then
     pass "QField hierarchy mapping: all checks pass"
   else

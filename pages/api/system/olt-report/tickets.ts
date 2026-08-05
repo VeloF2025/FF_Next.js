@@ -13,7 +13,12 @@ import { createTicket } from '@/modules/noc/services/ticketService';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
-import { normalizeOltTicketBatches, type OltTicketBatchInput } from '@/modules/activate/services/ticketBatchService';
+import {
+  normalizeOltTicketBatches,
+  buildGpsDescriptionSuffix,
+  type OltTicketBatchInput,
+} from '@/modules/activate/services/ticketBatchService';
+import { lookupOesGps, resolveTicketGps } from '@/modules/noc/services/ticketGpsService';
 
 const logger = createLogger('olt-report:tickets');
 
@@ -99,13 +104,35 @@ async function handler(
       const eligibleStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'serial_other_dr'];
       const allowExistingTicket = ticket_type === 'home_installation_status';
 
+      // d.latitude/longitude is the SOW/1Map *design* position — kept only as a
+      // fallback for records the OES report has never seen.
+      //
+      // LATERAL ... LIMIT 1, not a plain LEFT JOIN. `drops` is UNIQUE on
+      // (project_id, drop_number), NOT on drop_number alone, so the same DR
+      // under two project_ids is schema-legal. Zero such rows exist today
+      // (checked), but a plain join would return one record per drops row and
+      // the loop below creates a ticket per returned row — a single mismatch
+      // would silently become two tickets, the second UPDATE overwriting
+      // maintenance_ticket_id and orphaning the first. Defensive, and it keeps
+      // this query consistent with migration 479, which guards the same join
+      // with DISTINCT ON.
       const eligible = await pool.query(
-        `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
-                investigation_context
-         FROM olt_mismatch_records
-         WHERE id = ANY($1::uuid[])
-           AND fix_status = ANY($2)
-           ${allowExistingTicket ? '' : 'AND maintenance_ticket_id IS NULL'}`,
+        `SELECT r.id, r.drop_number, r.olt_serial, r.wrong_onemap_serial, r.fix_status,
+                r.investigation_context,
+                d.design_lat,
+                d.design_lng
+         FROM olt_mismatch_records r
+         LEFT JOIN LATERAL (
+           SELECT dd.latitude::text AS design_lat, dd.longitude::text AS design_lng
+             FROM drops dd
+            WHERE dd.drop_number = r.drop_number
+              AND dd.latitude IS NOT NULL AND dd.longitude IS NOT NULL
+            ORDER BY dd.updated_at DESC NULLS LAST, dd.id DESC
+            LIMIT 1
+         ) d ON TRUE
+         WHERE r.id = ANY($1::uuid[])
+           AND r.fix_status = ANY($2)
+           ${allowExistingTicket ? '' : 'AND r.maintenance_ticket_id IS NULL'}`,
         [record_ids, eligibleStatuses]
       );
 
@@ -190,6 +217,20 @@ async function handler(
           description = notes || `OLT report flagged ${dr} with ONT serial ${oltSerial} for investigation. Current status: ${status}.`;
         }
 
+        // These tickets carried NO location at all until now — 594 of them, all
+        // invisible to /api/noc/nearby-tickets. The OES activation coordinate
+        // leads: for a serial mismatch the DR link is precisely what is in
+        // doubt, so a DR-derived position inherits the error being
+        // investigated, while the OES coordinate is anchored to the serial.
+        const oesGps = await lookupOesGps(dr, oltSerial);
+        const designGps =
+          record.design_lat && record.design_lng
+            ? { latitude: Number(record.design_lat), longitude: Number(record.design_lng) }
+            : null;
+        const resolved = resolveTicketGps(oesGps, designGps);
+
+        description += buildGpsDescriptionSuffix(resolved, designGps);
+
         const ticket = await createTicket({
           source: TicketSource.OLT_MISMATCH,
           title,
@@ -199,6 +240,7 @@ async function handler(
           description,
           dr_number: dr,
           ont_serial: oltSerial,
+          gps_coordinates: resolved?.point,
           created_by: req.user.id,
           assigned_team_id: assigned_team_id || undefined,
           status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
