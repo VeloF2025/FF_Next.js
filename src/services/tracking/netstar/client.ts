@@ -29,6 +29,15 @@ const TIMEZONE = 'South Africa Standard Time';
 /** Generation is async; poll the export until it stops reporting "not ready". */
 const EXPORT_ATTEMPTS = 10;
 const EXPORT_DELAY_MS = 3_000;
+/**
+ * Breathing room between one vehicle's report and the next.
+ *
+ * Same reasoning as the backfill script's pause: this is a partner-owned
+ * account, one report job is generated PER VEHICLE, and a burst of them
+ * back-to-back is what a scraper looks like. The cost is bounded — a handful
+ * of vehicles, a couple of seconds each — and it is paid once every two hours.
+ */
+const REQUEST_PACE_MS = 2_000;
 
 export interface NetstarClientOptions {
   baseUrl: string;
@@ -187,8 +196,12 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
     listVehicles,
     async fetchPositions(from, to, vehicles) {
       const all: ProviderPosition[] = [];
+      // Paced, not parallel: one report at a time, with a gap between them.
+      let first = true;
       for (const chunk of chunkWindow(from, to, MAX_REPORT_MS)) {
         for (const v of vehicles) {
+          if (!first) await sleep(REQUEST_PACE_MS);
+          first = false;
           all.push(...(await fetchChunk(chunk.from, chunk.to, [v])));
         }
       }

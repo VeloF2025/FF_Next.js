@@ -40,7 +40,10 @@ export function netstarProvider(opts: NetstarProviderOptions): TrackingProvider 
     key: 'netstar',
     accountRef: opts.accountRef,
     // The portal poller sizes its window by the 31-day report cap, not by an
-    // event budget, so resolveWindow() is not used for this provider.
+    // event budget, so resolveWindow() is not used for this provider. Opting
+    // out of that clamp is only safe because poll-portal-tracking.ts applies
+    // its own floor (MAX_POLL_WINDOW_MS) — without it a stale watermark would
+    // fan out into one report job per vehicle per 31-day chunk.
     maxEventsPerFetch: Number.MAX_SAFE_INTEGER,
     async fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]> {
       const vehicles = await load();
