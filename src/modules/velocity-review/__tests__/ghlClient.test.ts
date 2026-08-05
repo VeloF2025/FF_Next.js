@@ -300,6 +300,53 @@ describe('HighLevelClient', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('sends install context by fieldKey alongside the id-mapped fields', async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: null }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-1' } }));
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    await client.upsertContact({
+      phoneE164: phone, firstName: 'Ada', lastName: null, drNumber: 'DR-100',
+      eventDate: '2026-08-04', sources: ['dr_submitted'], exportKey: 'export-key-1',
+      installContext: {
+        installerName: 'Sipho Ndlovu',
+        installAddress: '12 Main Road',
+        installGps: '-33.96,25.61',
+        poleNumber: 'P-1234',
+        ontBarcode: null,
+      },
+    });
+
+    const body = JSON.parse(String(fetchOptions(1).body)) as { customFields: unknown[] };
+    // The four configured fields still go by id; context rides along keyed.
+    expect(body.customFields).toEqual(expect.arrayContaining([
+      { id: 'field-dr', fieldValue: 'DR-100' },
+      { key: 'velocity_installer', field_value: 'Sipho Ndlovu' },
+      { key: 'velocity_install_address', field_value: '12 Main Road' },
+      { key: 'velocity_install_gps', field_value: '-33.96,25.61' },
+      { key: 'velocity_pole_number', field_value: 'P-1234' },
+    ]));
+    // A null field is omitted entirely rather than sent as '', so it cannot blank
+    // out a value a human typed onto the contact.
+    expect(JSON.stringify(body.customFields)).not.toContain('velocity_ont_barcode');
+  });
+
+  it('omits the install-context block entirely when none is supplied', async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: null }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-1' } }));
+    const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);
+
+    await client.upsertContact({
+      phoneE164: phone, firstName: 'Ada', lastName: null, drNumber: 'DR-100',
+      eventDate: '2026-08-04', sources: ['dr_submitted'], exportKey: 'export-key-1',
+    });
+
+    const body = JSON.parse(String(fetchOptions(1).body)) as { customFields: unknown[] };
+    expect(body.customFields).toHaveLength(4);
+  });
+
   it('still rejects a malformed contact body that is not an absent duplicate', async () => {
     vi.mocked(global.fetch).mockResolvedValue(response({ contact: { noId: true } }));
     const client = new HighLevelClient(config, new GhlRateLimiter(50, 10_000, () => 0, noSleep), noSleep);

@@ -130,6 +130,13 @@ export function prepareCandidate(
       firstName,
       lastName,
       consentEvidence,
+      installContext: {
+        installerName: row.installer_name?.trim() || null,
+        installAddress: row.install_address?.trim() || null,
+        installGps: row.install_gps?.trim() || null,
+        poleNumber: row.pole_number?.trim() || null,
+        ontBarcode: row.ont_barcode?.trim() || null,
+      },
     },
   };
 }
