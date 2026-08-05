@@ -46,6 +46,9 @@ export interface WaNoOesCandidate extends Record<string, unknown> {
   wa_submitted_at: string | null;
   wa_serial: string | null;
   wa_serial_source: string | null;
+  /** SOW/1Map design position for the DR, as ::text from pg numeric. */
+  design_lat?: string | null;
+  design_lng?: string | null;
 }
 
 export interface WaNoOesScope {
@@ -91,8 +94,22 @@ export function buildWaNoOesDescription(c: WaNoOesCandidate): string {
   return lines.join('\n');
 }
 
-export function buildWaNoOesPayload(c: WaNoOesCandidate): CreateTicketPayload {
+/**
+ * @param oesGps the activation coordinate when one exists. For wa_no_oes it
+ *   usually does not — the class *means* "no OES activation record" — so this is
+ *   populated only via the serial fallback, when the ONT activated under a
+ *   different DR. That case is exactly the one worth pinning to a real location.
+ */
+export function buildWaNoOesPayload(
+  c: WaNoOesCandidate,
+  oesGps?: { latitude: number; longitude: number } | null
+): CreateTicketPayload {
   const assigned = c.activations_team_id ?? undefined;
+  const designGps =
+    c.design_lat != null && c.design_lng != null
+      ? { latitude: Number(c.design_lat), longitude: Number(c.design_lng) }
+      : null;
+  const gps = oesGps ?? designGps ?? undefined;
   return {
     source: TicketSource.WA_NO_OES,
     source_type: 'wa_no_oes',
@@ -102,6 +119,7 @@ export function buildWaNoOesPayload(c: WaNoOesCandidate): CreateTicketPayload {
     priority: TicketPriority.NORMAL,
     dr_number: c.drop_number,
     project_id: c.project_id,
+    gps_coordinates: gps && Number.isFinite(gps.latitude) && Number.isFinite(gps.longitude) ? gps : undefined,
     created_by: SYSTEM_USER_ID,
     assigned_team_id: assigned,
     status: assigned ? TicketStatus.ASSIGNED : undefined,

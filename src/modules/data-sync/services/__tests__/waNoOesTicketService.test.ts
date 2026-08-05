@@ -21,8 +21,21 @@ vi.mock('@/modules/noc/services/ticketService', () => ({
   logTicketActivity: vi.fn(async () => {}),
 }));
 
+// runWaNoOesTickets calls lookupOesGps per candidate. Without an explicit mock
+// it resolves through the global @/lib/db auto-mock, whose `pool.query` is a
+// bare vi.fn() returning undefined — reading `.rows` off that throws, the
+// service's own catch swallows it, and the result is always null. Every test
+// below would then exercise only the no-GPS path while appearing to cover the
+// feature. Mock it deliberately so both paths are reachable and asserted.
+const { oesGpsMock } = vi.hoisted(() => ({ oesGpsMock: vi.fn() }));
+vi.mock('@/modules/noc/services/ticketGpsService', () => ({
+  lookupOesGps: (...a: unknown[]) => oesGpsMock(...a),
+}));
+
 beforeEach(() => {
   vi.mocked(logTicketActivity).mockClear();
+  oesGpsMock.mockReset();
+  oesGpsMock.mockResolvedValue(null); // default: no OES row, the usual wa_no_oes case
 });
 
 function candidate(over: Partial<WaNoOesCandidate> = {}): WaNoOesCandidate {
@@ -98,6 +111,55 @@ describe('buildWaNoOesPayload', () => {
     const p = buildWaNoOesPayload(candidate({ activations_team_id: null }));
     expect(p.assigned_team_id).toBeUndefined();
     expect(p.status).toBeUndefined();
+  });
+
+  // These tickets shipped with no location at all — createTicket could not carry
+  // one. The GPS branch below is the fix, and none of it was reachable from a
+  // test until now: every call above passes a single argument.
+  describe('GPS', () => {
+    const designCandidate = candidate({ design_lat: '-26.9', design_lng: '27.9' });
+
+    it('carries no coordinate when neither source has one', () => {
+      expect(buildWaNoOesPayload(candidate()).gps_coordinates).toBeUndefined();
+    });
+
+    it('uses the design position when that is all there is', () => {
+      // wa_no_oes means "no OES activation row for this DR" by definition, so
+      // this is the normal case — coverage, not accuracy.
+      expect(buildWaNoOesPayload(designCandidate).gps_coordinates).toEqual({
+        latitude: -26.9,
+        longitude: 27.9,
+      });
+    });
+
+    it('prefers an OES coordinate over the design position', () => {
+      expect(
+        buildWaNoOesPayload(designCandidate, { latitude: -26.5, longitude: 27.5 })
+          .gps_coordinates
+      ).toEqual({ latitude: -26.5, longitude: 27.5 });
+    });
+
+    it('accepts an OES coordinate when there is no design position', () => {
+      expect(
+        buildWaNoOesPayload(candidate(), { latitude: -26.5, longitude: 27.5 }).gps_coordinates
+      ).toEqual({ latitude: -26.5, longitude: 27.5 });
+    });
+
+    it('drops a non-finite pair rather than writing NaN into the column', () => {
+      expect(
+        buildWaNoOesPayload(candidate({ design_lat: 'not-a-number', design_lng: '27.9' }))
+          .gps_coordinates
+      ).toBeUndefined();
+    });
+
+    it('ignores a half pair — a lone axis is not a location', () => {
+      expect(
+        buildWaNoOesPayload(candidate({ design_lat: '-26.9', design_lng: null })).gps_coordinates
+      ).toBeUndefined();
+      expect(
+        buildWaNoOesPayload(candidate({ design_lat: null, design_lng: '27.9' })).gps_coordinates
+      ).toBeUndefined();
+    });
   });
 });
 
@@ -235,5 +297,55 @@ describe('autoResolveWaNoOesTickets', () => {
     expect(logTicketActivity).toHaveBeenCalledWith(
       expect.objectContaining({ activityType: 'status_change' }),
     );
+  });
+});
+
+describe('runWaNoOesTickets — GPS on created tickets', () => {
+  it('looks the coordinate up by DR and by serial', async () => {
+    await runWaNoOesTickets({
+      db: makeDb([candidate({ drop_number: 'A', wa_serial: 'SN-A' })], []),
+      createTicketFn: vi.fn() as never,
+    });
+    expect(oesGpsMock).toHaveBeenCalledWith('A', 'SN-A');
+  });
+
+  it('puts the OES coordinate on the ticket when one exists', async () => {
+    // The serial fallback inside lookupOesGps is what finds this: a wa_no_oes DR
+    // has no OES row by definition, but its ONT may have activated elsewhere.
+    oesGpsMock.mockResolvedValue({ latitude: -26.5, longitude: 27.5 });
+    const create = vi.fn();
+
+    await runWaNoOesTickets({
+      db: makeDb([candidate({ drop_number: 'A' })], []),
+      createTicketFn: create as never,
+    });
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[0]?.gps_coordinates).toEqual({
+      latitude: -26.5,
+      longitude: 27.5,
+    });
+  });
+
+  it('falls back to the design position when the OES report has nothing', async () => {
+    const create = vi.fn();
+    await runWaNoOesTickets({
+      db: makeDb([candidate({ drop_number: 'A', design_lat: '-26.9', design_lng: '27.9' })], []),
+      createTicketFn: create as never,
+    });
+    expect(create.mock.calls[0]?.[0]?.gps_coordinates).toEqual({
+      latitude: -26.9,
+      longitude: 27.9,
+    });
+  });
+
+  it('creates the ticket with no coordinate rather than failing when neither source has one', async () => {
+    const create = vi.fn();
+    await runWaNoOesTickets({
+      db: makeDb([candidate({ drop_number: 'A' })], []),
+      createTicketFn: create as never,
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[0]?.gps_coordinates).toBeUndefined();
   });
 });

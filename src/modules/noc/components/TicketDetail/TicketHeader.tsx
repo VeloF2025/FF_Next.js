@@ -38,6 +38,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ClickableStatusBadge } from './ClickableStatusBadge';
 import { ClickablePriorityBadge } from './ClickablePriorityBadge';
 import type { EnrichedTicket } from '../../types/ticket';
+import { selectTicketGpsDisplay } from '../../utils/gps';
 
 interface TicketHeaderProps {
   /** Ticket data */
@@ -103,12 +104,22 @@ function getGoogleMapsUrl(lat: number, lng: number): string {
 export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange, onPriorityChange }: TicketHeaderProps) {
   const { currentUser: authUser } = useAuth();
 
-  // Get GPS coordinates from enrichment or ticket — validate lat/lng are numeric
-  const rawGps = ticket.fibreflow_enrichment?.fibreflow_gps
-    || ticket.fibreflow_enrichment?.onemap_gps
-    || ticket.gps_coordinates
-    || null;
-  const gps = rawGps && typeof rawGps.latitude === 'number' && typeof rawGps.longitude === 'number' ? rawGps : null;
+  // Ranking lives in utils/gps so it can be tested without React, and so the
+  // divergence threshold has one definition rather than a literal here and a
+  // constant server-side.
+  const enrichment = ticket.fibreflow_enrichment;
+  const gpsDisplay = selectTicketGpsDisplay({
+    oesGps: enrichment?.oes_gps,
+    fibreflowGps: enrichment?.fibreflow_gps,
+    onemapGps: enrichment?.onemap_gps,
+    ticketSource: ticket.source,
+    ticketGps: ticket.gps_coordinates,
+    divergenceM: enrichment?.gps_divergence_m,
+  });
+  const gps = gpsDisplay.primary;
+  const designGps = gpsDisplay.secondary;
+  const showBothGps = !!designGps;
+  const divergence = gpsDisplay.divergenceM;
 
   return (
     <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
@@ -358,61 +369,69 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
       </div>
 
       {/* FibreFlow Cross-Reference Info */}
-      {ticket.fibreflow_enrichment && (ticket.fibreflow_enrichment.sow_match_found || ticket.fibreflow_enrichment.onemap_match_found) && (
+      {/* An OES coordinate alone is enough to render this panel: 65 open OLT
+          mismatch tickets have no sow_drops row at all, so gating purely on the
+          design-lineage match flags hid the only location they had. */}
+      {enrichment && (enrichment.sow_match_found || enrichment.onemap_match_found || !!enrichment.oes_gps) && (
         <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
           <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] mb-3 tracking-wide flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-green-400" />
             FibreFlow Cross-Reference
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {ticket.fibreflow_enrichment.fibreflow_pole_number && (
+            {enrichment.fibreflow_pole_number && (
               <div>
                 <div className="text-xs text-[var(--ff-text-secondary)] mb-1">Pole Number</div>
                 <p className="text-sm text-[var(--ff-text-primary)] font-mono">
-                  {ticket.fibreflow_enrichment.fibreflow_pole_number}
+                  {enrichment.fibreflow_pole_number}
                 </p>
               </div>
             )}
 
-            {ticket.fibreflow_enrichment.fibreflow_zone && (
+            {enrichment.fibreflow_zone && (
               <div>
                 <div className="text-xs text-[var(--ff-text-secondary)] mb-1">Zone</div>
                 <p className="text-sm text-[var(--ff-text-primary)]">
-                  {ticket.fibreflow_enrichment.fibreflow_zone}
+                  {enrichment.fibreflow_zone}
                 </p>
               </div>
             )}
 
-            {ticket.fibreflow_enrichment.fibreflow_pon && (
+            {enrichment.fibreflow_pon && (
               <div>
                 <div className="text-xs text-[var(--ff-text-secondary)] mb-1">PON</div>
                 <p className="text-sm text-[var(--ff-text-primary)]">
-                  {ticket.fibreflow_enrichment.fibreflow_pon}
+                  {enrichment.fibreflow_pon}
                 </p>
               </div>
             )}
 
-            {ticket.fibreflow_enrichment.fibreflow_municipality && (
+            {enrichment.fibreflow_municipality && (
               <div>
                 <div className="text-xs text-[var(--ff-text-secondary)] mb-1">Municipality</div>
                 <p className="text-sm text-[var(--ff-text-primary)]">
-                  {ticket.fibreflow_enrichment.fibreflow_municipality}
+                  {enrichment.fibreflow_municipality}
                 </p>
               </div>
             )}
 
-            {ticket.fibreflow_enrichment.fibreflow_contractor && (
+            {enrichment.fibreflow_contractor && (
               <div>
                 <div className="text-xs text-[var(--ff-text-secondary)] mb-1">Contractor</div>
                 <p className="text-sm text-[var(--ff-text-primary)]">
-                  {ticket.fibreflow_enrichment.fibreflow_contractor}
+                  {enrichment.fibreflow_contractor}
                 </p>
               </div>
             )}
 
             {gps && (
               <div className="sm:col-span-2">
-                <div className="text-xs text-[var(--ff-text-secondary)] mb-1">GPS Coordinates</div>
+                <div className="text-xs text-[var(--ff-text-secondary)] mb-1">
+                  GPS Coordinates
+                  {gpsDisplay.primaryIsOes && (
+                    <span className="ml-2 text-[var(--ff-text-primary)]">· OES report</span>
+                  )}
+                </div>
                 <a
                   href={getGoogleMapsUrl(gps.latitude, gps.longitude)}
                   target="_blank"
@@ -423,6 +442,24 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
                   {gps.latitude.toFixed(6)}, {gps.longitude.toFixed(6)}
                   <ExternalLink className="w-3 h-3" />
                 </a>
+
+                {showBothGps && designGps && (
+                  <div className="mt-2 pt-2 border-t border-[var(--ff-border-light)]">
+                    <div className="text-xs text-amber-500 mb-1">
+                      Planned (SOW/1Map) location is {divergence}m away — verify on site
+                    </div>
+                    <a
+                      href={getGoogleMapsUrl(designGps.latitude, designGps.longitude)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      {designGps.latitude.toFixed(6)}, {designGps.longitude.toFixed(6)}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </div>

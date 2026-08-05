@@ -21,7 +21,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { queryOneMock } = vi.hoisted(() => ({ queryOneMock: vi.fn() }));
+const { queryOneMock, oesGpsMock } = vi.hoisted(() => ({
+  queryOneMock: vi.fn(),
+  oesGpsMock: vi.fn(),
+}));
 
 vi.mock('../../utils/db', () => ({
   query: vi.fn(),
@@ -30,8 +33,14 @@ vi.mock('../../utils/db', () => ({
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
+// Only the DB-touching lookup is stubbed; haversineMeters stays real so the
+// divergence figure below is genuinely computed, not asserted against itself.
+vi.mock('../../services/ticketGpsService', async (orig) => ({
+  ...(await orig<Record<string, unknown>>()),
+  lookupOesGpsByDr: (...a: unknown[]) => oesGpsMock(...a),
+}));
 
-import { lookupOneMapDrop, lookupSOWDrop } from '../../services/ticketEnrichmentService';
+import { lookupOneMapDrop, lookupSOWDrop, enrichTicketData } from '../../services/ticketEnrichmentService';
 
 /** SQL text of every query the service issued, whitespace-collapsed. */
 function sqlIssued(): string[] {
@@ -265,5 +274,129 @@ describe('lookupSOWDrop', () => {
     queryOneMock.mockImplementation(() => Promise.reject(new Error('db down')));
 
     await expect(lookupSOWDrop('DR1735912')).resolves.toBeNull();
+  });
+});
+
+/**
+ * enrichTicketData composes the lookups the tests above pin individually. It had
+ * no coverage at all, so the OES coordinate it now returns — and the divergence
+ * figure the ticket UI uses to decide whether to show both locations — shipped
+ * unverified.
+ *
+ * lookupOesGpsByDr is mocked rather than driven through the pool: its own SQL is
+ * pinned in ticketGpsLookup.test.ts, and what matters here is the composition —
+ * that oes_gps is surfaced SEPARATELY from fibreflow_gps rather than collapsed
+ * into it, because collapsing would hide exactly the disagreement this is for.
+ */
+describe('enrichTicketData — OES coordinate and divergence', () => {
+  const SOW_ROW = {
+    drop_number: 'DR1735912',
+    pole_number: 'P1',
+    latitude: -26.7295508,
+    longitude: 27.0179814,
+    address: '1 Main Rd',
+    municipality: 'M',
+    pon_no: 1,
+    zone_no: 2,
+    contractor: 'C',
+    status: 'active',
+  };
+
+  beforeEach(() => {
+    oesGpsMock.mockReset();
+    queryOneMock.mockReset();
+  });
+
+  it('returns the OES coordinate alongside the design one, not instead of it', async () => {
+    queryOneMock.mockImplementation((sql: string) =>
+      Promise.resolve(String(sql).includes('sow_drops') ? SOW_ROW : null)
+    );
+    oesGpsMock.mockResolvedValue({ latitude: -26.7387387, longitude: 27.0148998 });
+
+    const r = await enrichTicketData('DR1735912');
+
+    expect(r.oes_gps).toEqual({
+      latitude: -26.7387387,
+      longitude: 27.0148998,
+      address: null,
+    });
+    // The design coordinate must survive — the UI shows both when they disagree.
+    expect(r.fibreflow_gps).toMatchObject({ latitude: -26.7295508, longitude: 27.0179814 });
+  });
+
+  it('reports the separation in whole metres', async () => {
+    queryOneMock.mockImplementation((sql: string) =>
+      Promise.resolve(String(sql).includes('sow_drops') ? SOW_ROW : null)
+    );
+    oesGpsMock.mockResolvedValue({ latitude: -26.7387387, longitude: 27.0148998 });
+
+    const r = await enrichTicketData('DR1735912');
+
+    // Same pair measured at 1,066 m in Postgres.
+    expect(r.gps_divergence_m).toBeGreaterThan(1060);
+    expect(r.gps_divergence_m).toBeLessThan(1072);
+    expect(Number.isInteger(r.gps_divergence_m)).toBe(true);
+  });
+
+  it('leaves divergence null when there is nothing to compare against', async () => {
+    queryOneMock.mockResolvedValue(null); // no SOW row
+    oesGpsMock.mockResolvedValue({ latitude: -26.7387387, longitude: 27.0148998 });
+
+    const r = await enrichTicketData('DR1735912');
+
+    expect(r.oes_gps).not.toBeNull();
+    expect(r.fibreflow_gps).toBeNull();
+    expect(r.gps_divergence_m).toBeNull();
+  });
+
+  it('measures divergence against 1Map when sow_drops has no row', async () => {
+    // The gap this closes: divergence used to be computed only against
+    // sow_drops, but the UI ranks 1Map second when sow_drops misses. 244 open
+    // tickets sit in that configuration — 76 of them more than 50m apart, worst
+    // 10.5km — and every one rendered as a single confident pin with no warning.
+    queryOneMock.mockImplementation((sql: string) =>
+      Promise.resolve(
+        String(sql).includes('onemap_properties')
+          ? {
+              drop_number: 'DR1735912',
+              latitude: -26.7295508,
+              longitude: 27.0179814,
+              address: '1 Main Rd',
+              customer_name: null,
+              contact_number: null,
+              property_id: null,
+              status: null,
+            }
+          : null // sow_drops misses
+      )
+    );
+    oesGpsMock.mockResolvedValue({ latitude: -26.7387387, longitude: 27.0148998 });
+
+    const r = await enrichTicketData('DR1735912');
+
+    expect(r.fibreflow_gps).toBeNull();
+    expect(r.onemap_gps).not.toBeNull();
+    expect(r.gps_divergence_m).toBeGreaterThan(1060);
+    expect(r.gps_divergence_m).toBeLessThan(1072);
+  });
+
+  it('leaves oes_gps and divergence null when the OES report has no row', async () => {
+    queryOneMock.mockImplementation((sql: string) =>
+      Promise.resolve(String(sql).includes('sow_drops') ? SOW_ROW : null)
+    );
+    oesGpsMock.mockResolvedValue(null);
+
+    const r = await enrichTicketData('DR1735912');
+
+    expect(r.oes_gps).toBeNull();
+    expect(r.gps_divergence_m).toBeNull();
+    expect(r.fibreflow_gps).not.toBeNull();
+  });
+
+  it('does not look anything up without a DR', async () => {
+    const r = await enrichTicketData(null);
+    expect(r.oes_gps).toBeNull();
+    expect(r.gps_divergence_m).toBeNull();
+    expect(oesGpsMock).not.toHaveBeenCalled();
   });
 });
