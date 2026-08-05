@@ -17,6 +17,7 @@
  */
 import { netstarClient, netstarProvider, MAX_REPORT_MS } from '@/services/tracking/netstar';
 import { ingestPositions } from '@/services/tracking/ingest';
+import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 
 const PAUSE_MS = 5_000;
@@ -47,6 +48,29 @@ async function main(): Promise<void> {
     accountRef,
   };
   const provider = netstarProvider({ ...opts, client: netstarClient(opts) });
+
+  // Discovery has to have run at least once, and this script does not run it.
+  // netstarProvider.fetchPositions() returns [] when no vehicle is mapped, so
+  // without this check the walk would collect two empty chunks, stop, and log
+  // "stopped at retention edge, totalInserted: 0" — a success message for a
+  // complete no-op. That is the most likely first-live-run sequence: creds set,
+  // backfill started, poll cron not yet run.
+  const mapped = await sql<{ n: number }>`
+    SELECT count(*)::int AS n FROM fleet_vehicle_trackers
+    WHERE provider = ${providerKey} AND account_ref = ${accountRef} AND is_active
+  `;
+  const activeTrackers = mapped[0]?.n ?? 0;
+  if (activeTrackers === 0) {
+    log.error('[backfill-tracking] no active trackers mapped — nothing to backfill', {
+      provider: providerKey, accountRef,
+      hint: 'run GET /api/cron/poll-portal-tracking once so discovery populates '
+        + 'fleet_vehicle_trackers, then re-run this script',
+    });
+    process.exitCode = 1;
+    return;
+  }
+  log.info('[backfill-tracking] starting', {
+    provider: providerKey, accountRef, activeTrackers, floor: floor.toISOString() });
 
   let to = new Date();
   let dryChunks = 0;
