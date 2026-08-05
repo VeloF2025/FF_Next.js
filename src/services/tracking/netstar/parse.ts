@@ -50,6 +50,10 @@ export function parseNetstarTs(raw: string | undefined): Date | null {
   );
   if (!m) return null;
   const [, dd, mm, yyyy, hh, mi, ss] = m;
+  // noUncheckedIndexedAccess types every capture group as `string | undefined`
+  // even though a successful match guarantees all six are present. Narrow
+  // explicitly rather than asserting it away.
+  if (!dd || !mm || !yyyy || !hh || !mi || !ss) return null;
   const asUtc = Date.UTC(+yyyy, +mm - 1, +dd, +hh, +mi, +ss);
   const d = new Date(asUtc - SAST_OFFSET_MS);
   return Number.isNaN(d.getTime()) ? null : d;
