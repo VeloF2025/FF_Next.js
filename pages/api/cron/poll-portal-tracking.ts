@@ -97,6 +97,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const recon = await reconcileTrackers(
           provider.key, provider.accountRef, portalVehicles);
 
+        // Independent of this tick's upsert count: reconcileTrackers()
+        // short-circuits on an empty portal list (by design — see
+        // discovery.ts), so recon.upserted is 0 both on a genuinely fresh
+        // account AND on a dying session that never got as far as a real
+        // vehicle list. Only the current count of already-mapped trackers
+        // can tell those two apart, which is what makes the gap check below
+        // fire on a total outage instead of staying silent forever.
+        const trackerRows = await sql<{ n: number }>`
+          SELECT count(*)::int AS n FROM fleet_vehicle_trackers
+          WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef} AND is_active
+        `;
+        const activeTrackers = trackerRows[0]?.n ?? 0;
+
         const wm = await sql<{ last_event_ts: Date | null; consecutive_failures: number }>`
           SELECT last_event_ts, consecutive_failures FROM fleet_tracking_watermarks
           WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
@@ -127,24 +140,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Authenticating cleanly and returning nothing is the failure mode that
         // otherwise hides for weeks — it looks exactly like a healthy tick.
-        if (positions.length === 0 && recon.upserted > 0) {
-          log.warn('[poll-portal-tracking] no positions returned for mapped vehicles', {
+        // Gated on activeTrackers (mapped NOW), not recon.upserted (mapped BY
+        // THIS TICK): a dying session that returns [] from listVehicles never
+        // throws and never upserts anything, so recon.upserted alone would
+        // stay 0 forever on a total outage while existing mappings (correctly
+        // left alone by reconcileTrackers) sit untouched — total silence. An
+        // empty portal list against an account known to have vehicles is
+        // itself the signal, so it fires even if positions still came back.
+        if (activeTrackers > 0 && (portalVehicles.length === 0 || positions.length === 0)) {
+          const detail = portalVehicles.length === 0
+            ? `portal returned an empty vehicle list while ${activeTrackers} trackers remain mapped`
+            : `${activeTrackers} vehicles mapped but the report returned no positions`;
+          log.warn('[poll-portal-tracking] gap: mapped vehicles but no usable portal data', {
             provider: provider.key, accountRef: provider.accountRef,
-            mappedVehicles: recon.upserted });
+            activeTrackers, portalVehicleCount: portalVehicles.length, positionCount: positions.length });
           await raiseTrackingAlert({
             kind: 'gap',
             consecutiveFailures: 0,
             nowSast: now,
             provider: provider.key,
             accountRef: provider.accountRef,
-            detail: `${recon.upserted} vehicles mapped but the report returned no positions`,
+            detail,
           });
         }
 
         log.info('[poll-portal-tracking] polled', {
           provider: provider.key, accountRef: provider.accountRef,
           fetched: positions.length, inserted, skippedUnmapped,
-          mapped: recon.upserted, deactivated: recon.deactivated,
+          mapped: recon.upserted, activeTrackers, deactivated: recon.deactivated,
           fleetOnly: recon.fleetOnly.length, portalOnly: recon.portalOnly.length });
 
         results.push({
@@ -152,6 +175,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           inserted, skippedUnmapped,
           coverage: {
             mapped: recon.upserted,
+            activeTrackers,
             notOnPortal: recon.fleetOnly.map((f) => f.registration),
             unknownOnPortal: recon.portalOnly.map((p) => p.externalId),
           },
