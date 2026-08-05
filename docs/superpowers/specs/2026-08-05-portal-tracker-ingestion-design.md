@@ -244,12 +244,15 @@ vehicles.
 
 Recipient: **Lizelle Mouton** (fleet manager), via the existing notification system.
 
-Two new event types registered in `src/modules/notifications/constants/index.ts` alongside the
-existing `fleet.*` entries:
+**Three** event types are registered in `src/modules/notifications/constants/index.ts` alongside
+the existing `fleet.*` entries. Three rather than two because `notify()` resolves delivery
+channels from `DEFAULT_CHANNEL_PREFERENCES[event_type]` and takes no per-call channel override —
+so "same alert, quieter channels" has to be a *different event type*, not a flag:
 
 | Event | Severity | in-app | email | WhatsApp |
 |---|---|---|---|---|
-| `fleet.tracking_pull_failed` | warning | yes | yes | auth failures only |
+| `fleet.tracking_pull_failed` | warning | yes | yes | **yes** |
+| `fleet.tracking_pull_degraded` | warning | yes | yes | no |
 | `fleet.tracking_data_gap` | warning | yes | yes | no |
 
 Behaviour:
@@ -257,20 +260,33 @@ Behaviour:
 | Condition | Response |
 |---|---|
 | Session killed mid-run | Re-authenticate once, continue silently |
-| Authentication rejected | Alert immediately — will not self-heal |
-| Transient error | Retry next tick; alert after 3 consecutive failures |
-| Zero rows for a vehicle that reported in the previous run | Alert — `fleet.tracking_data_gap` |
+| Authentication rejected, 07:00–20:00 SAST | `fleet.tracking_pull_failed` — immediate, with WhatsApp |
+| Authentication rejected, outside those hours | Downgraded to `fleet.tracking_pull_degraded` — no WhatsApp |
+| Transient error | Retry next tick; `fleet.tracking_pull_degraded` after 3 consecutive failures |
+| Portal authenticates but returns no vehicles or no positions, while trackers are mapped | `fleet.tracking_data_gap` on the first tick, then suppressed until every 12th consecutive gap tick (~daily at a 2-hourly cadence) |
 
 The last row is the important one. A portal that authenticates cleanly and returns an empty
-report is the failure mode that would otherwise go unnoticed for weeks.
+report is the failure mode that would otherwise go unnoticed for weeks. The gap streak is
+counted in the existing `fleet_tracking_watermarks.consecutive_failures` column: a gap tick
+increments it, a tick that produces data resets it to 0. No new state.
 
 **Recipients are configurable, not a hardcoded UUID.** Lizelle's `staff.position` currently
 reads "Staff" rather than a fleet-manager role, so role-based routing would not find her; and
 hardcoding an individual means alerts silently stop if she changes role.
 
-**Overnight handling (assumption, pending confirmation):** email and in-app fire immediately at
-any hour; WhatsApp is reserved for auth failures and held until 07:00 SAST if raised overnight.
-The job runs at 02:00 and 04:00, and a transient blip that self-heals should not wake anyone.
+**Overnight handling — decided, and it is a downgrade, not a hold.** Email and in-app fire
+immediately at any hour. There is no scheduler in this feature, so nothing holds a WhatsApp
+message until 07:00; instead an auth failure raised outside 07:00–20:00 SAST is emitted as
+`fleet.tracking_pull_degraded`, which is registered with `whatsapp: false`. The reasoning is
+that an auth failure does not self-heal, so the next daytime tick (the job polls every 2 hours)
+sees the same failure and emits `fleet.tracking_pull_failed` then — the deferral falls out of
+the polling cadence for free, at the cost of up to ~2h of granularity after 07:00.
+
+**The consequence, stated plainly:** an auth failure that *does* resolve itself overnight — a
+portal-side outage, a session collision with a colleague, a maintenance window — sends **no
+WhatsApp at all**. In-app and email still record it. That is the accepted trade: the alternative
+is waking someone for something already fixed by morning. If a WhatsApp trail for every auth
+failure is ever required, it needs a real scheduler, not a change to this policy.
 
 ---
 
@@ -311,7 +327,9 @@ dedicated session.
 ## Open questions
 
 1. **Backfill floor** — 24 months (assumed) or unbounded until retention runs out?
-2. **Overnight WhatsApp** — hold until 07:00 (assumed) or send regardless of hour?
+2. ~~**Overnight WhatsApp** — hold until 07:00 (assumed) or send regardless of hour?~~
+   **Settled:** neither. The event type is downgraded overnight so no WhatsApp is sent, and the
+   next daytime tick re-raises it. See "Overnight handling" above, including what this costs.
 3. **Cartrack login mode** — Admin tab or Sub-user tab?
 
 None block starting work; all three are settled before the code paths they affect are written.
