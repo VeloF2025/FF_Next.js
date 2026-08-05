@@ -7,7 +7,7 @@ that touches the database, which was previously untested end to end:
 
   * do_import()   — DELETE + re-INSERT of a project's poles, the pre-image write, and
                     the QA-photo relabel/rezone.
-  * do_rollback() — the restore the whole migration-479 backup spine exists for, plus
+  * do_rollback() — the restore the whole migration-480 backup spine exists for, plus
                     the two things it must REFUSE: out-of-order runs, and schema drift.
   * the pre-write guards, and run()'s abort gate — that those guards actually STOP the
     write. Computing a guard value is not the same as acting on it; an inverted

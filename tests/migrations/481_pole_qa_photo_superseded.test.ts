@@ -1,5 +1,5 @@
 /**
- * Integration test for migration 480 — superseded marks on pole_qa_photos.
+ * Integration test for migration 481 — superseded marks on pole_qa_photos.
  *
  * SCOPE: the migration's own contract only. The BEHAVIOUR that sets and clears these
  * marks (import_replan_poles.py / replan_write.py) is covered by
@@ -32,20 +32,20 @@ import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const SCHEMA = 'mig480_scratch';
+const SCHEMA = 'mig481_scratch';
 const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
 
-/** Same narrow rewrite as the 479 test — the shipped file is public-qualified on purpose. */
+/** Same narrow rewrite as the 480 test — the shipped file is public-qualified on purpose. */
 const scopeSql = (s: string) => s.replace(/\bpublic\./g, `${SCHEMA}.`);
 /**
- * 480 widens pole_qa_photo_plan_backup, which 479 creates — so 479 is applied first
+ * 481 widens pole_qa_photo_plan_backup, which 480 creates — so 480 is applied first
  * here, in the same order the deploy runner applies them. Declaring that table by hand
- * instead would let this test keep passing after 479 stopped creating it.
+ * instead would let this test keep passing after 480 stopped creating it.
  */
-const DEP_479 = scopeSql(readFileSync(join(SQL_DIR, '479_pole_plan_replan_backup.sql'), 'utf8'));
-const FORWARD = scopeSql(readFileSync(join(SQL_DIR, '480_pole_qa_photo_superseded.sql'), 'utf8'));
+const DEP_480 = scopeSql(readFileSync(join(SQL_DIR, '480_pole_plan_replan_backup.sql'), 'utf8'));
+const FORWARD = scopeSql(readFileSync(join(SQL_DIR, '481_pole_qa_photo_superseded.sql'), 'utf8'));
 const ROLLBACK = scopeSql(
-  readFileSync(join(SQL_DIR, 'rollback_480_pole_qa_photo_superseded.sql'), 'utf8')
+  readFileSync(join(SQL_DIR, 'rollback_481_pole_qa_photo_superseded.sql'), 'utf8')
 );
 
 const pool = new Pool({
@@ -96,7 +96,7 @@ beforeAll(async () => {
     `INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
      VALUES (gen_random_uuid(), 'TEM.P.J950', 69, 821)`
   );
-  await scoped(DEP_479);
+  await scoped(DEP_480);
   await scoped(FORWARD);
 });
 
@@ -105,7 +105,7 @@ afterAll(async () => {
   await pool.end();
 });
 
-describe('migration 480 — additive and reversible', () => {
+describe('migration 481 — additive and reversible', () => {
   it('adds all three columns', async () => {
     expect(await presentColumns()).toEqual(COLUMNS);
   });
@@ -154,7 +154,7 @@ describe('migration 480 — additive and reversible', () => {
 
   it('rollback drops the columns, keeps the photos, and clears its tracker row', async () => {
     await scoped(
-      `INSERT INTO schema_migrations (filename) VALUES ('480_pole_qa_photo_superseded.sql')`
+      `INSERT INTO schema_migrations (filename) VALUES ('481_pole_qa_photo_superseded.sql')`
     );
     await scoped(ROLLBACK);
 
@@ -165,7 +165,7 @@ describe('migration 480 — additive and reversible', () => {
     );
     expect(n).toBe('1');
     const tracked = await scoped(
-      `SELECT filename FROM schema_migrations WHERE filename = '480_pole_qa_photo_superseded.sql'`
+      `SELECT filename FROM schema_migrations WHERE filename = '481_pole_qa_photo_superseded.sql'`
     );
     expect(tracked).toEqual([]);
 

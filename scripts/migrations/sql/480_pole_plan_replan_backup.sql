@@ -1,4 +1,4 @@
--- Migration 479: backup spine for pole-plan (replan) re-imports.
+-- Migration 480: backup spine for pole-plan (replan) re-imports.
 --
 -- Additive and idempotent: creates three new tables, touches no existing object
 -- and no existing row. Safe to re-run.
@@ -110,12 +110,12 @@ CREATE TABLE IF NOT EXISTS public.pole_qa_photo_plan_backup (
 
 COMMENT ON TABLE public.pole_plan_import_runs IS
     'One row per pole-plan (replan) re-import attempt. Written by '
-    'scripts/qfield-recon/import_replan_poles.py — see migration 479.';
+    'scripts/qfield-recon/import_replan_poles.py — see migration 480.';
 
 COMMENT ON TABLE public.pole_plan_backup IS
     'Pre-import snapshot of public.poles rows, as JSONB, keyed by import run. '
-    'Restored by import_replan_poles.py --rollback. See migration 479.';
+    'Restored by import_replan_poles.py --rollback. See migration 480.';
 
 COMMENT ON TABLE public.pole_qa_photo_plan_backup IS
     'Pre-import snapshot of the pole_qa_photos columns a replan rewrites '
-    '(pole_label, zone_no, pon_no), keyed by import run. See migration 479.';
+    '(pole_label, zone_no, pon_no), keyed by import run. See migration 480.';

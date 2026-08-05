@@ -121,7 +121,7 @@ def fixture(conn):
     # The migrations are APPLIED, not hand-mirrored: a fixture that declares the
     # columns itself would keep passing after the migration stopped creating them.
     sql_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations", "sql")
-    for mig in ("479_pole_plan_replan_backup.sql", "480_pole_qa_photo_superseded.sql"):
+    for mig in ("480_pole_plan_replan_backup.sql", "481_pole_qa_photo_superseded.sql"):
         with open(os.path.join(sql_dir, mig)) as fh:
             cur.execute(fh.read().replace("public.", f"{SCHEMA}."))
     cur.execute("INSERT INTO projects VALUES (%s,'Test Project'),(%s,'Other Project')",

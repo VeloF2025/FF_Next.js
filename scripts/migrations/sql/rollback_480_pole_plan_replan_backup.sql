@@ -1,4 +1,4 @@
--- Rollback for 479_pole_plan_replan_backup.sql
+-- Rollback for 480_pole_plan_replan_backup.sql
 -- Re-runnable: every statement guarded, and clears its own schema_migrations row
 -- (that table is keyed on `filename`, not `version`).
 --
@@ -21,4 +21,4 @@ DROP TABLE IF EXISTS public.pole_qa_photo_plan_backup;
 DROP TABLE IF EXISTS public.pole_plan_backup;
 DROP TABLE IF EXISTS public.pole_plan_import_runs;
 
-DELETE FROM schema_migrations WHERE filename = '479_pole_plan_replan_backup.sql';
+DELETE FROM schema_migrations WHERE filename = '480_pole_plan_replan_backup.sql';

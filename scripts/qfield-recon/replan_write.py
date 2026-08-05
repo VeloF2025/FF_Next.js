@@ -97,7 +97,7 @@ def do_import(conn, args, plan, obj, version, s):
     # label is left exactly as the crew entered it: the unplaceable ones are typos
     # (TEM.J.960 for TEM.P.J960, TEM.P.MO84 with a letter O), and correcting a label by
     # similarity files a crew's photo against a different physical pole. See
-    # migration 480.
+    # migration 481.
     if s["superseded"]:
         cur.execute("UPDATE pole_qa_photos SET superseded_at = now(), superseded_run_id = %s, "
                     "superseded_reason = %s WHERE id = ANY(%s::uuid[])",

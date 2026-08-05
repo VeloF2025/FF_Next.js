@@ -1,4 +1,4 @@
--- Rollback for 480_pole_qa_photo_superseded.sql
+-- Rollback for 481_pole_qa_photo_superseded.sql
 -- Re-runnable: every statement guarded, and clears its own schema_migrations row
 -- (that table is keyed on `filename`, not `version`).
 --
@@ -24,11 +24,11 @@ ALTER TABLE public.pole_qa_photos
     DROP COLUMN IF EXISTS superseded_run_id,
     DROP COLUMN IF EXISTS superseded_at;
 
--- Guarded with IF EXISTS on the TABLE too: rolling 479 back first removes this table
+-- Guarded with IF EXISTS on the TABLE too: rolling 480 back first removes this table
 -- entirely, and this file must stay re-runnable in either order.
 ALTER TABLE IF EXISTS public.pole_qa_photo_plan_backup
     DROP COLUMN IF EXISTS superseded_reason,
     DROP COLUMN IF EXISTS superseded_run_id,
     DROP COLUMN IF EXISTS superseded_at;
 
-DELETE FROM schema_migrations WHERE filename = '480_pole_qa_photo_superseded.sql';
+DELETE FROM schema_migrations WHERE filename = '481_pole_qa_photo_superseded.sql';

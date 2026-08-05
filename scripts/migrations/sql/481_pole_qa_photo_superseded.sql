@@ -1,10 +1,10 @@
--- Migration 480: mark QA photos a replan supersedes, instead of leaving them silent.
+-- Migration 481: mark QA photos a replan supersedes, instead of leaving them silent.
 --
 -- Additive and idempotent: three nullable columns and one partial index on an existing
 -- table. No existing row is written. Safe to re-run.
 --
 -- NOT wrapped in BEGIN;/COMMIT; on purpose — scripts/run-pending-migrations.sh applies
--- the file inside its own transaction (`psql -1`). Matches 467, 469, 471, 472 and 479.
+-- the file inside its own transaction (`psql -1`). Matches 467, 469, 471, 472 and 480.
 --
 -- ── Why ────────────────────────────────────────────────────────────────────
 -- A replan re-issues a project under new pole labels. Most QA photos follow their pole
@@ -23,7 +23,7 @@
 -- Those 5 are a crew's actual work. The importer already never deletes them, but until
 -- now nothing distinguished them from live QA: they simply sat there with a label
 -- pointing at no pole, indistinguishable from a photo whose zone had not synced yet.
--- That ambiguity is the same one migration 479's tool exists to remove.
+-- That ambiguity is the same one migration 480's tool exists to remove.
 --
 -- ── Marked, not moved ──────────────────────────────────────────────────────
 -- Deliberately NOT auto-corrected to the nearest matching label. `TEM.J.960` looks like
@@ -48,7 +48,7 @@ ALTER TABLE public.pole_qa_photos
     ADD COLUMN IF NOT EXISTS superseded_run_id uuid,
     ADD COLUMN IF NOT EXISTS superseded_reason text;
 
--- The mark is part of the pre-image, so migration 479's photo backup has to carry it
+-- The mark is part of the pre-image, so migration 480's photo backup has to carry it
 -- too. Without these, a run that CLEARS a mark an earlier run set cannot put it back:
 -- rolling that run back would restore the label and zone that made the photo
 -- unplaceable while leaving it unmarked — losing the record rather than stranding it,
@@ -66,7 +66,7 @@ CREATE INDEX IF NOT EXISTS pole_qa_photos_superseded_idx
 
 COMMENT ON COLUMN public.pole_qa_photos.superseded_at IS
     'When a pole-plan replan left this photo with no matching pole. The row is kept '
-    'and its label untouched — see migration 480.';
+    'and its label untouched — see migration 481.';
 COMMENT ON COLUMN public.pole_qa_photos.superseded_run_id IS
     'The pole_plan_import_runs row that set this mark; --rollback clears only its own.';
 COMMENT ON COLUMN public.pole_qa_photos.superseded_reason IS

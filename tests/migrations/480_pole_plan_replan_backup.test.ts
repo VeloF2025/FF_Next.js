@@ -1,5 +1,5 @@
 /**
- * Integration test for migration 479 — the pole-plan replan backup spine.
+ * Integration test for migration 480 — the pole-plan replan backup spine.
  *
  * SCOPE — read this before adding a case here.
  *
@@ -49,7 +49,7 @@ import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const SCHEMA = 'mig479_scratch';
+const SCHEMA = 'mig480_scratch';
 const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
 
 /**
@@ -60,9 +60,9 @@ const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
  * files, so what runs below is otherwise byte-identical to what deploys.
  */
 const scopeSql = (s: string) => s.replace(/\bpublic\./g, `${SCHEMA}.`);
-const FORWARD = scopeSql(readFileSync(join(SQL_DIR, '479_pole_plan_replan_backup.sql'), 'utf8'));
+const FORWARD = scopeSql(readFileSync(join(SQL_DIR, '480_pole_plan_replan_backup.sql'), 'utf8'));
 const ROLLBACK = scopeSql(
-  readFileSync(join(SQL_DIR, 'rollback_479_pole_plan_replan_backup.sql'), 'utf8')
+  readFileSync(join(SQL_DIR, 'rollback_480_pole_plan_replan_backup.sql'), 'utf8')
 );
 
 const pool = new Pool({
@@ -122,7 +122,7 @@ afterAll(async () => {
   await pool.end();
 });
 
-describe('migration 479 — reversibility contract', () => {
+describe('migration 480 — reversibility contract', () => {
   it('jsonb round-trip restores every column exactly, including NULLs', async () => {
     await scoped(`INSERT INTO poles_fixture VALUES
       ('11111111-1111-1111-1111-111111111111', 'TEM.P.J950',
@@ -258,9 +258,9 @@ describe('migration 479 — reversibility contract', () => {
   });
 });
 
-describe('migration 479 — rollback', () => {
+describe('migration 480 — rollback', () => {
   it('drops all three tables and clears its own schema_migrations row', async () => {
-    await scoped(`INSERT INTO schema_migrations (filename) VALUES ('479_pole_plan_replan_backup.sql')`);
+    await scoped(`INSERT INTO schema_migrations (filename) VALUES ('480_pole_plan_replan_backup.sql')`);
     await scoped(ROLLBACK);
 
     const present = await scoped<{ table_name: string }>(
@@ -272,7 +272,7 @@ describe('migration 479 — rollback', () => {
     expect(present).toEqual([]);
 
     const tracked = await scoped<{ filename: string }>(
-      `SELECT filename FROM schema_migrations WHERE filename = '479_pole_plan_replan_backup.sql'`
+      `SELECT filename FROM schema_migrations WHERE filename = '480_pole_plan_replan_backup.sql'`
     );
     expect(tracked).toEqual([]);
 
