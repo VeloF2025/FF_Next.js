@@ -99,10 +99,25 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
       body: JSON.stringify({ reportTree: 'Vehicles' }),
     });
     if (!res.ok) throw new Error(`[netstar] vehicle list: HTTP ${res.status}`);
-    const body = (await res.json()) as Array<{ id?: number | string; name?: string }>;
-    return (Array.isArray(body) ? body : [])
-      .filter((v) => v.id !== undefined && v.id !== null)
-      .map((v) => ({ externalId: String(v.id), registration: v.name ?? null }));
+    const body: unknown = await res.json();
+    if (!Array.isArray(body)) {
+      throw new Error(`[netstar] vehicle list: expected an array, got ${typeof body}`);
+    }
+
+    // Validated at runtime rather than cast: an untrusted response that is
+    // silently trusted here would surface downstream as "no vehicles on this
+    // account" instead of "we failed to parse the response" — exactly the
+    // kind of silent coverage loss this feature exists to prevent. A single
+    // malformed element is skipped rather than failing the whole list.
+    const out: PortalVehicle[] = [];
+    for (const item of body) {
+      if (typeof item !== 'object' || item === null || !('id' in item)) continue;
+      const id = item.id;
+      if (typeof id !== 'string' && typeof id !== 'number') continue;
+      const name = 'name' in item ? item.name : undefined;
+      out.push({ externalId: String(id), registration: typeof name === 'string' ? name : null });
+    }
+    return out;
   }
 
   async function fetchChunk(
@@ -149,9 +164,11 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
       });
       if (exp.ok) {
         const positions = parseAllActivityCsv(await exp.text());
-        // Netstar reports one vehicle at a time in practice; stamp the id so
-        // ingest can map it. When several are requested the CSV carries a
-        // registration column and the provider re-splits on it.
+        // The export carries no vehicle identifier at all (no registration or
+        // id column — see __tests__/fixtures/README.md), so a report covering
+        // several vehicles would produce rows nobody could attribute. That is
+        // why fetchPositions requests exactly one vehicle per report and this
+        // stamps its externalId onto every row it returns.
         return positions.map((p) => ({
           ...p,
           externalId: p.externalId || (vehicles[0]?.externalId ?? ''),
