@@ -16,6 +16,7 @@
  */
 import { sql, query } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
+import { setVehicleTracker } from './trackerQueries';
 import {
   matchVehicles,
   type FleetVehicleRow,
@@ -32,12 +33,17 @@ export interface ReconcileReport {
 
 export interface ReconcileDeps {
   loadActiveFleet: () => Promise<FleetVehicleRow[]>;
-  /** Enforces one-active-tracker-per-vehicle. Must run before upsertTracker. */
-  deactivateOthersForVehicle: (
+  /**
+   * Deactivates the vehicle's other active tracker and activates this one in
+   * a single transaction. Must stay atomic: uq_fleet_trackers_one_active_per_vehicle
+   * permits exactly one active row per vehicle, and if a deactivate and a
+   * separate upsert were split across two statements, a failure between them
+   * could leave the vehicle with zero active trackers until the next
+   * successful reconcile — during which ingest.ts silently discards every
+   * position for it. Do not split this back into two calls.
+   */
+  assignTracker: (
     vehicleId: string, provider: ProviderKey, accountRef: string, externalId: string
-  ) => Promise<void>;
-  upsertTracker: (
-    provider: ProviderKey, accountRef: string, externalId: string, vehicleId: string
   ) => Promise<void>;
   deactivateMissing: (
     provider: ProviderKey, accountRef: string, keepExternalIds: string[]
@@ -56,32 +62,17 @@ const dbDeps: ReconcileDeps = {
 
   /**
    * The DB enforces uq_fleet_trackers_one_active_per_vehicle — a UNIQUE index
-   * on (vehicle_id) WHERE is_active. Activating a second tracker for a vehicle
-   * that already has one violates it and throws, taking the whole poll down.
+   * on (vehicle_id) WHERE is_active. Delegates to setVehicleTracker (see
+   * trackerQueries.ts), which runs the deactivate-then-upsert sequence inside
+   * one transaction so a failure between the two statements cannot leave the
+   * vehicle with zero active trackers.
    *
-   * Newest wins: a vehicle moving between rental partners gets a new device and
-   * the old one stops reporting, so the freshly discovered tracker is the
-   * truthful one. This must run BEFORE the upsert — the reverse order trips the
-   * very index it exists to respect.
+   * Newest wins: a vehicle moving between rental partners gets a new device
+   * and the old one stops reporting, so the freshly discovered tracker is the
+   * truthful one.
    */
-  deactivateOthersForVehicle: async (vehicleId, provider, accountRef, externalId) => {
-    await sql`
-      UPDATE fleet_vehicle_trackers
-      SET is_active = false, updated_at = now()
-      WHERE vehicle_id = ${vehicleId}
-        AND is_active
-        AND NOT (provider = ${provider} AND account_ref = ${accountRef} AND external_id = ${externalId})
-    `;
-  },
-
-  upsertTracker: async (provider, accountRef, externalId, vehicleId) => {
-    await sql`
-      INSERT INTO fleet_vehicle_trackers
-        (vehicle_id, provider, account_ref, external_id, is_active, created_at, updated_at)
-      VALUES (${vehicleId}, ${provider}, ${accountRef}, ${externalId}, true, now(), now())
-      ON CONFLICT (provider, account_ref, external_id) DO UPDATE
-        SET vehicle_id = EXCLUDED.vehicle_id, is_active = true, updated_at = now()
-    `;
+  assignTracker: async (vehicleId, provider, accountRef, externalId) => {
+    await setVehicleTracker({ vehicleId, provider, accountRef, externalId });
   },
 
   deactivateMissing: async (provider, accountRef, keep) => {
@@ -107,12 +98,25 @@ export async function reconcileTrackers(
   deps: ReconcileDeps = dbDeps
 ): Promise<ReconcileReport> {
   const fleet = await deps.loadActiveFleet();
+
+  // An empty portal list is treated as a fetch failure, not as truth about the
+  // account. listVehicles() can return [] for reasons that have nothing to do
+  // with the account genuinely having no vehicles — a dead session, a shape
+  // change, an auth redirect parsed as an empty body — and reconciling against
+  // that would deactivate every active tracker on the account in one call,
+  // silently blacking out ingestion for the whole fleet. Bail out before
+  // touching any tracker row.
+  if (portal.length === 0) {
+    log.warn('[tracking-discovery] empty portal vehicle list — treating as fetch failure, not reconciling', {
+      provider, accountRef,
+    });
+    return { upserted: 0, deactivated: 0, portalOnly: [], fleetOnly: fleet };
+  }
+
   const { matched, portalOnly, fleetOnly } = matchVehicles(portal, fleet);
 
   for (const m of matched) {
-    // Order is load-bearing: see deactivateOthersForVehicle.
-    await deps.deactivateOthersForVehicle(m.vehicleId, provider, accountRef, m.externalId);
-    await deps.upsertTracker(provider, accountRef, m.externalId, m.vehicleId);
+    await deps.assignTracker(m.vehicleId, provider, accountRef, m.externalId);
   }
   const deactivated = await deps.deactivateMissing(
     provider, accountRef, matched.map((m) => m.externalId)
