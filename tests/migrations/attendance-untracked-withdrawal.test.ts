@@ -364,6 +364,68 @@ dbDescribe('untracked-expectation withdrawal', () => {
     }
   });
 
+  /**
+   * Two open exceptions can legitimately share one (staff, day) — different
+   * `kind`s — and they share ONE summary row. The summary-side counts must
+   * therefore compare against distinct staff-days, not the exception count, and
+   * both the audit INSERT and the rollback restore must dedupe. Without the
+   * DISTINCTs this either trips the consistency guard spuriously or hits
+   * "ON CONFLICT DO NOTHING cannot affect row a second time".
+   */
+  it('handles two exceptions sharing one summary day, in both directions', async () => {
+    await h.seedStaff(STAFF(1), false);
+    await h.seedPhantom(EXC(1), STAFF(1), DAY);
+    await h.seedPhantom(EXC(4), STAFF(1), DAY); // same day: summary INSERT is a no-op
+
+    const plan = await planWithdrawal(client);
+    expect(plan.candidates).toHaveLength(2);
+    expect(plan.summaryCount).toBe(1);
+
+    const result = await applyWithdrawal(client, plan.candidates);
+    expect(result).toMatchObject({
+      exceptionEventsWritten: 2, summaryEventsWritten: 1,
+      exceptionsCancelled: 2, summariesDeleted: 1,
+    });
+    expect(await h.summaryJson(STAFF(1), DAY)).toBeUndefined();
+
+    const rolled = await rollbackWithdrawal(client, result.runId);
+    expect(rolled).toMatchObject({ summariesRestored: 1, exceptionsReopened: 2 });
+    expect((await h.exception(EXC(1)))?.status).toBe('awaiting_supervisor');
+    expect((await h.exception(EXC(4)))?.status).toBe('awaiting_supervisor');
+  });
+
+  /**
+   * The apply path dedupes summary events, so within one run a key appears
+   * once. The LEGACY bucket has no such guarantee: the original one-off SQL
+   * wrote one summary event per exception row, so two co-dated exceptions left
+   * two events under the same entity_key, all sharing the single `legacy` run
+   * id. ON CONFLICT DO NOTHING tolerates that (it is DO UPDATE that errors), so
+   * the risk is not a crash but an arbitrary winner — the rollback must restore
+   * the NEWEST recorded state, deterministically.
+   */
+  it('restores the newest event when the legacy bucket holds duplicates for one day', async () => {
+    await h.seedStaff(STAFF(1), false);
+    await h.seedPhantom(EXC(1), STAFF(1), DAY);
+    await h.withdrawWithoutRunId(EXC(1), STAFF(1), DAY);
+
+    // A second, LATER event for the same key holding a different payload —
+    // the shape a co-dated exception would have produced.
+    await client.query(
+      `INSERT INTO attendance_decision_events (entity_type, entity_key, action,
+         actor_staff_id, reason, before_value, after_value, recorded_at)
+       SELECT entity_type, entity_key, action, actor_staff_id, reason,
+              jsonb_set(before_value, '{scheduled_paid_hrs}', '"9.99"'),
+              after_value, recorded_at + INTERVAL '1 minute'
+       FROM attendance_decision_events WHERE entity_type = 'daily_result'`);
+    expect(await h.events('daily_result')).toHaveLength(2);
+
+    const rolled = await rollbackWithdrawal(client, LEGACY_RUN_ID);
+    expect(rolled).toMatchObject({ summariesRestored: 1, exceptionsReopened: 1 });
+    // Exactly one row back, carrying the newer payload — not the older one.
+    // to_jsonb renders NUMERIC as a JSON number, so this comes back unquoted.
+    expect(Number((await h.summaryJson(STAFF(1), DAY))?.scheduled_paid_hrs)).toBe(9.99);
+  });
+
   it('reports nothing to restore for an unknown run, instead of false schema drift', async () => {
     // The schema-drift guard compares the stored payload's keys against the live
     // table. An unknown run has no payload at all, so a naive EXCEPT would

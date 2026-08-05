@@ -95,9 +95,17 @@ export async function rollbackWithdrawal(
   if (!runId) return { runId: null, summariesRestored: 0, exceptionsReopened: 0 };
   await assertRestorable(client, runId);
 
-  // DISTINCT ON guards the case where one (staff, day) carries two events:
-  // ON CONFLICT DO NOTHING cannot affect the same row twice in one statement and
-  // would abort the whole rollback rather than skip the duplicate.
+  // DISTINCT ON picks exactly one event per (staff, day), the newest.
+  //
+  // Not for error avoidance: ON CONFLICT DO NOTHING tolerates duplicate keys
+  // within a single statement and simply skips them — verified against
+  // Postgres 15; it is DO UPDATE that raises "cannot affect row a second time".
+  // The reason is determinism. The LEGACY bucket can hold two events for one
+  // key (the original one-off SQL wrote one summary event per exception row, so
+  // two co-dated exceptions produced two), and with DO NOTHING whichever row the
+  // executor reaches first wins. A subquery ORDER BY does not bind the outer
+  // INSERT, so DISTINCT ON is what actually guarantees the newest before_value
+  // is the one restored rather than an arbitrary one.
   //
   // RETURNING the keys actually inserted is what correlates the two halves. A
   // day whose summary was NOT restored — because the staff member was opted back
