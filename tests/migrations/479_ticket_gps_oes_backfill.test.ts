@@ -253,6 +253,46 @@ dbDescribe('migration 479 — GPS backfill (needs TEST_DATABASE_URL)', () => {
         [TICKETS.oesByDr, TICKETS.oesBySerial, TICKETS.designOnlyEmpty].sort()
       );
     });
+
+    // The invariant that makes rollback trustworthy, asserted directly against
+    // the pre-migration state rather than against a hand-listed expectation.
+    //
+    // An earlier draft built the snapshot in a separate INSERT that read a
+    // previously-captured `old_gps`, while the UPDATE re-read the live column.
+    // Under READ COMMITTED those two statements see different snapshots, so a
+    // concurrent edit desynchronised them in both directions — a row
+    // snapshotted but not changed (rollback would clobber the edit) and a row
+    // changed but not snapshotted (rollback could not restore it). Both were
+    // reproduced on PG 15. The snapshot is now the UPDATE's own RETURNING, which
+    // makes the two sets identical by construction; this test is the guard.
+    it('snapshot set is exactly the changed set, with the true replaced values', async () => {
+      const before = await q<{ id: string; gps_coordinates: string | null }>(
+        `SELECT id::text AS id, gps_coordinates FROM maintenance_tickets`
+      );
+      const priorById = new Map(before.map((r) => [r.id, r.gps_coordinates]));
+
+      await client.query(FORWARD);
+
+      const after = await q<{ id: string; gps_coordinates: string | null }>(
+        `SELECT id::text AS id, gps_coordinates FROM maintenance_tickets`
+      );
+      const changedIds = after
+        .filter((r) => r.gps_coordinates !== (priorById.get(r.id) ?? null))
+        .map((r) => r.id)
+        .sort();
+
+      const snap = await q<{ ticket_id: string; gps_coordinates: string | null }>(
+        `SELECT ticket_id::text AS ticket_id, gps_coordinates FROM maintenance_tickets_gps_backup_479`
+      );
+
+      // Same rows — no row changed without a snapshot, none snapshotted without changing.
+      expect(snap.map((r) => r.ticket_id).sort()).toEqual(changedIds);
+      // And each snapshot holds the value that was actually replaced.
+      for (const row of snap) {
+        expect(row.gps_coordinates).toBe(priorById.get(row.ticket_id) ?? null);
+      }
+      expect(changedIds.length).toBeGreaterThan(0);
+    });
   });
 
   dbDescribe('rollback 479', () => {

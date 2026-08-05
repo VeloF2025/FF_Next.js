@@ -91,53 +91,81 @@ design AS (
 )
 SELECT
   t.id AS ticket_id,
-  t.gps_coordinates AS old_gps,
   CASE
     WHEN od.ticket_id IS NOT NULL THEN 'oes_dr'
     WHEN os.ticket_id IS NOT NULL THEN 'oes_serial'
     WHEN dz.ticket_id IS NOT NULL THEN 'design'
   END AS gps_source,
   COALESCE(od.latitude,  os.latitude,  dz.latitude)  AS latitude,
-  COALESCE(od.longitude, os.longitude, dz.longitude) AS longitude
+  COALESCE(od.longitude, os.longitude, dz.longitude) AS longitude,
+  COALESCE(od.latitude,  os.latitude,  dz.latitude)::text || ','
+    || COALESCE(od.longitude, os.longitude, dz.longitude)::text AS new_gps
 FROM targets t
 LEFT JOIN oes_by_dr     od ON od.ticket_id = t.id
 LEFT JOIN oes_by_serial os ON os.ticket_id = t.id
 LEFT JOIN design        dz ON dz.ticket_id = t.id
 WHERE COALESCE(od.ticket_id, os.ticket_id, dz.ticket_id) IS NOT NULL;
 
+-- Deliberately NOT captured here: the ticket's current gps_coordinates. Reading
+-- it now and writing it later is a read-then-write across two statements, and
+-- under READ COMMITTED each statement takes a fresh snapshot — so a technician
+-- editing a targeted ticket in between would make the captured value stale. That
+-- desynchronises the snapshot from the rows actually updated, in BOTH
+-- directions: a row snapshotted but not updated (rollback then overwrites the
+-- technician's edit with the stale value), and a row updated but not
+-- snapshotted (rollback cannot restore it at all). Reproduced on PG 15 before
+-- this was rewritten. The previous value is now taken from the UPDATE itself
+-- in step 3, which cannot drift from what the UPDATE actually changed.
+
 -- COALESCE across three sources resolves each axis independently, so a source
--- with exactly one NULL axis could contribute half a pair. Every source above
+-- with exactly one NULL axis could contribute half a pair — and `new_gps` would
+-- silently become NULL (|| propagates), writing nothing. Every source above
 -- already requires BOTH axes non-null, which makes that impossible — assert it
 -- rather than trusting the reasoning.
 DO $$
 DECLARE bad int;
 BEGIN
   SELECT count(*) INTO bad FROM tmp_479_resolved
-   WHERE latitude IS NULL OR longitude IS NULL OR gps_source IS NULL;
+   WHERE latitude IS NULL OR longitude IS NULL OR gps_source IS NULL OR new_gps IS NULL;
   IF bad > 0 THEN
     RAISE EXCEPTION 'migration 479: % rows resolved to a partial coordinate', bad;
   END IF;
 END $$;
 
 -- --------------------------------------------------------------------------
--- 3. Snapshot, then write.
+-- 3. Write, snapshotting exactly what the write replaced.
+--
+--    ONE statement, not two. The snapshot is the UPDATE's own RETURNING, so the
+--    set of snapshotted rows and the set of changed rows are identical by
+--    construction — they cannot drift the way a separate SELECT-then-UPDATE can
+--    (see the note in step 2).
+--
+--    `maintenance_tickets cur` in the FROM clause is a second scan of the target
+--    table on the statement's snapshot, so `cur.gps_coordinates` is the value as
+--    it stood BEFORE this UPDATE — that is what gets snapshotted, and it is the
+--    same value the guards below test. Verified on PG 15: within one statement
+--    `cur.gps_coordinates` returns the old value while `mt.gps_coordinates`
+--    returns the new one.
+--
 --    The design coordinate is fill-empty-only: it is no better than what a
 --    ticket already had (it IS what it already had), so overwriting with it
 --    would churn rows for nothing. An OES coordinate always wins.
 -- --------------------------------------------------------------------------
+WITH updated AS (
+  UPDATE maintenance_tickets mt
+     SET gps_coordinates = r.new_gps,
+         updated_at = NOW()
+    FROM tmp_479_resolved r, maintenance_tickets cur
+   WHERE mt.id = r.ticket_id
+     AND cur.id = mt.id
+     AND (r.gps_source LIKE 'oes_%' OR cur.gps_coordinates IS NULL OR cur.gps_coordinates = '')
+     AND cur.gps_coordinates IS DISTINCT FROM r.new_gps
+  RETURNING mt.id AS ticket_id, cur.gps_coordinates AS prev_gps
+)
 INSERT INTO maintenance_tickets_gps_backup_479 (ticket_id, gps_coordinates)
-SELECT r.ticket_id, r.old_gps
-  FROM tmp_479_resolved r
- WHERE (r.gps_source LIKE 'oes_%' OR r.old_gps IS NULL OR r.old_gps = '')
-   AND r.old_gps IS DISTINCT FROM (r.latitude::text || ',' || r.longitude::text)
+SELECT ticket_id, prev_gps FROM updated
+-- Only on a re-run, which changes nothing: keep the ORIGINAL pre-migration
+-- value so rollback still targets it rather than an intermediate.
 ON CONFLICT (ticket_id) DO NOTHING;
-
-UPDATE maintenance_tickets mt
-   SET gps_coordinates = r.latitude::text || ',' || r.longitude::text,
-       updated_at = NOW()
-  FROM tmp_479_resolved r
- WHERE mt.id = r.ticket_id
-   AND (r.gps_source LIKE 'oes_%' OR mt.gps_coordinates IS NULL OR mt.gps_coordinates = '')
-   AND mt.gps_coordinates IS DISTINCT FROM (r.latitude::text || ',' || r.longitude::text);
 
 DROP TABLE IF EXISTS tmp_479_resolved;
