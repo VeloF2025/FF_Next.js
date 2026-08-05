@@ -1,0 +1,143 @@
+-- Migration 479: backfill NOC ticket GPS from the daily OES report
+--
+-- Field techs reported the coordinates on mismatch / no-entry / pre-provision
+-- tickets do not match where the ONT actually is, and that the daily OES report
+-- is right. They are: every location FibreFlow held came from ONE lineage — the
+-- SOW/HLD design import mirrored into `drops`, `sow_drops` and
+-- `onemap_properties` (they agree to a metre because they ARE each other), i.e.
+-- where the drop was *planned*. `oes_activations.latitude/longitude` are
+-- explicit columns in Fibertime's activation sheet, recorded at activation and
+-- keyed to the ONT serial — an independent second opinion we never read.
+--
+-- Measured before writing this (25,285 DRs present in both sources):
+--   p50 22.6 m · p90 268 m · 6,295 >=50 m · 3,065 >=200 m · 384 >=1 km
+-- On the OLT-mismatch records that generate these tickets: p50 30.8 m, p90
+-- 278 m, worst live open ticket 6.1 km out.
+--
+-- Why these categories specifically: a mismatch / no-entry / PP ticket exists
+-- BECAUSE the DR<->serial link is in doubt. Deriving the location from the DR is
+-- circular — it inherits the very error under investigation. The OES coordinate
+-- is anchored to the serial, which is the fact not in dispute.
+--
+-- Ranking (PAIR-WISE — a pair always comes from ONE source; mixing a latitude
+-- from one with a longitude from another yields a plausible point that is
+-- nowhere):
+--   1. OES activation matched on drop_number
+--   2. OES activation matched on ONT serial  (the DR may be the wrong one)
+--   3. `drops` design position                (fill-empty only, never overwrite)
+--
+-- 13 of 25,414 OES rows (0.05%) carry coordinates from Nepal, Indonesia and
+-- Iraq — a few activation devices report a bogus fix. The SA bounding box below
+-- rejects them so they fall through to the design coordinate instead of
+-- replacing a merely-imprecise point with a continent-scale error. `drops` has
+-- zero out-of-bounds rows.
+--
+-- Open tickets only. Resolved/closed/cancelled tickets are history and are left
+-- exactly as they were.
+--
+-- NOT wrapped in BEGIN/COMMIT: the runner manages the transaction, and a forward
+-- file that opens its own leaves the tracker INSERT outside it.
+
+-- --------------------------------------------------------------------------
+-- 1. Snapshot every value this migration is about to change.
+--    A GPS backfill overwrites data, so the rollback needs the prior value to
+--    restore — without this table rollback_479 could only null the column out.
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS maintenance_tickets_gps_backup_479 (
+  ticket_id        uuid PRIMARY KEY,
+  gps_coordinates  text,
+  captured_at      timestamptz NOT NULL DEFAULT NOW()
+);
+
+-- --------------------------------------------------------------------------
+-- 2. Resolve the best coordinate per open ticket.
+-- --------------------------------------------------------------------------
+CREATE TEMP TABLE tmp_479_resolved AS
+WITH targets AS (
+  SELECT id, dr_number, ont_serial, gps_coordinates
+    FROM maintenance_tickets
+   WHERE source IN ('olt_mismatch', 'wa_no_oes', 'pp_data')
+     AND status NOT IN ('resolved', 'closed', 'cancelled', 'verified')
+),
+oes_by_dr AS (
+  SELECT DISTINCT ON (t.id) t.id AS ticket_id, o.latitude, o.longitude
+    FROM targets t
+    JOIN oes_activations o
+      ON UPPER(o.drop_number) = UPPER(t.dr_number)
+     AND o.latitude IS NOT NULL AND o.longitude IS NOT NULL
+     AND o.latitude BETWEEN -35 AND -22
+     AND o.longitude BETWEEN 16 AND 33
+   ORDER BY t.id, o.activation_date DESC NULLS LAST, o.imported_at DESC
+),
+oes_by_serial AS (
+  SELECT DISTINCT ON (t.id) t.id AS ticket_id, o.latitude, o.longitude
+    FROM targets t
+    JOIN oes_activations o
+      ON LOWER(o.serial_number) = LOWER(t.ont_serial)
+     AND o.latitude IS NOT NULL AND o.longitude IS NOT NULL
+     AND o.latitude BETWEEN -35 AND -22
+     AND o.longitude BETWEEN 16 AND 33
+   ORDER BY t.id, o.activation_date DESC NULLS LAST, o.imported_at DESC
+),
+design AS (
+  -- DISTINCT ON: a DR can appear more than once in `drops` (qfield + sow rows).
+  -- Pick deterministically rather than letting the planner choose.
+  SELECT DISTINCT ON (t.id) t.id AS ticket_id, d.latitude, d.longitude
+    FROM targets t
+    JOIN drops d
+      ON UPPER(d.drop_number) = UPPER(t.dr_number)
+     AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
+   ORDER BY t.id, d.updated_at DESC NULLS LAST, d.id DESC
+)
+SELECT
+  t.id AS ticket_id,
+  t.gps_coordinates AS old_gps,
+  CASE
+    WHEN od.ticket_id IS NOT NULL THEN 'oes_dr'
+    WHEN os.ticket_id IS NOT NULL THEN 'oes_serial'
+    WHEN dz.ticket_id IS NOT NULL THEN 'design'
+  END AS gps_source,
+  COALESCE(od.latitude,  os.latitude,  dz.latitude)  AS latitude,
+  COALESCE(od.longitude, os.longitude, dz.longitude) AS longitude
+FROM targets t
+LEFT JOIN oes_by_dr     od ON od.ticket_id = t.id
+LEFT JOIN oes_by_serial os ON os.ticket_id = t.id
+LEFT JOIN design        dz ON dz.ticket_id = t.id
+WHERE COALESCE(od.ticket_id, os.ticket_id, dz.ticket_id) IS NOT NULL;
+
+-- COALESCE across three sources resolves each axis independently, so a source
+-- with exactly one NULL axis could contribute half a pair. Every source above
+-- already requires BOTH axes non-null, which makes that impossible — assert it
+-- rather than trusting the reasoning.
+DO $$
+DECLARE bad int;
+BEGIN
+  SELECT count(*) INTO bad FROM tmp_479_resolved
+   WHERE latitude IS NULL OR longitude IS NULL OR gps_source IS NULL;
+  IF bad > 0 THEN
+    RAISE EXCEPTION 'migration 479: % rows resolved to a partial coordinate', bad;
+  END IF;
+END $$;
+
+-- --------------------------------------------------------------------------
+-- 3. Snapshot, then write.
+--    The design coordinate is fill-empty-only: it is no better than what a
+--    ticket already had (it IS what it already had), so overwriting with it
+--    would churn rows for nothing. An OES coordinate always wins.
+-- --------------------------------------------------------------------------
+INSERT INTO maintenance_tickets_gps_backup_479 (ticket_id, gps_coordinates)
+SELECT r.ticket_id, r.old_gps
+  FROM tmp_479_resolved r
+ WHERE (r.gps_source LIKE 'oes_%' OR r.old_gps IS NULL OR r.old_gps = '')
+   AND r.old_gps IS DISTINCT FROM (r.latitude::text || ',' || r.longitude::text)
+ON CONFLICT (ticket_id) DO NOTHING;
+
+UPDATE maintenance_tickets mt
+   SET gps_coordinates = r.latitude::text || ',' || r.longitude::text,
+       updated_at = NOW()
+  FROM tmp_479_resolved r
+ WHERE mt.id = r.ticket_id
+   AND (r.gps_source LIKE 'oes_%' OR mt.gps_coordinates IS NULL OR mt.gps_coordinates = '')
+   AND mt.gps_coordinates IS DISTINCT FROM (r.latitude::text || ',' || r.longitude::text);
+
+DROP TABLE IF EXISTS tmp_479_resolved;

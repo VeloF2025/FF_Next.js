@@ -24,6 +24,7 @@
 import { pool as defaultPool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { createTicket, logTicketActivity } from '@/modules/noc/services/ticketService';
+import { lookupOesGps } from '@/modules/noc/services/ticketGpsService';
 import {
   CLOSED_STATUSES,
   DEFAULT_LIMIT,
@@ -69,9 +70,15 @@ export async function fetchCandidates(
         act.team_id::text       AS activations_team_id,
         l.wa_submitted_at::text AS wa_submitted_at,
         l.wa_serial,
-        l.wa_serial_source
+        l.wa_serial_source,
+        d.latitude::text        AS design_lat,
+        d.longitude::text       AS design_lng
        FROM v_dr_reconciliation_ledger l
        JOIN projects p ON LOWER(p.project_name) = LOWER(l.project)
+       -- Design (SOW/1Map) position. wa_no_oes means the OES report has no row
+       -- for this DR by definition, so this is normally the only coordinate
+       -- available — these tickets previously shipped with none at all.
+       LEFT JOIN drops d ON d.drop_number = l.drop_number
        LEFT JOIN LATERAL (
          SELECT pta.team_id
            FROM project_team_assignments pta
@@ -194,7 +201,10 @@ export async function runWaNoOesTickets(
   let raceSkipped = 0;
   for (const c of toCreate) {
     try {
-      await create(buildWaNoOesPayload(c));
+      // DR lookup is near-certain to miss (wa_no_oes = no OES row for this DR);
+      // the serial fallback is what earns its keep here.
+      const oesGps = await lookupOesGps(c.drop_number, c.wa_serial);
+      await create(buildWaNoOesPayload(c, oesGps));
       created++;
       if (!c.activations_team_id) unassigned++;
     } catch (err) {

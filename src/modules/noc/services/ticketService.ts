@@ -357,9 +357,10 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
         client_contact,
         client_email,
         ticket_category,
-        resolution_path
+        resolution_path,
+        gps_coordinates
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
       )
       RETURNING *
     `;
@@ -453,6 +454,15 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       payload.client_email || null,
       payload.ticket_category || null,
       payload.resolution_path || null,
+      // Stored as "lat,lng" text. Until now createTicket could not carry a
+      // location at all — UpdateTicketPayload declared gps_coordinates but
+      // CreateTicketPayload did not, so the only way to set one was a follow-up
+      // UPDATE. pp-data-tickets did that; olt-report and wa_no_oes never did,
+      // which is why 594 + 959 tickets have no location and never appear in
+      // /api/noc/nearby-tickets.
+      payload.gps_coordinates
+        ? `${payload.gps_coordinates.latitude},${payload.gps_coordinates.longitude}`
+        : null,
     ];
 
     const ticket = await queryOne<Ticket>(sql, values);

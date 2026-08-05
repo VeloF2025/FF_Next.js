@@ -17,6 +17,7 @@ import { log } from '@/lib/logger';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { normalizePPTicketBatches, resolvePpTicketGps } from '@/modules/activate/services/ticketBatchService';
+import { lookupOesGps } from '@/modules/noc/services/ticketGpsService';
 import { createTicket } from '@/modules/noc/services/ticketService';
 import { findDuplicateTickets, linkSourceToTicket } from '@/modules/noc/services/duplicateTicketService';
 import { classifyResolutionPath } from '@/modules/noc/services/resolutionPathClassifier';
@@ -258,10 +259,18 @@ async function handleCreate(
           ? await getEnrichmentForDR(dr, project)
           : await getProjectId(project);
 
-        // GPS: DR enrichment first; falls back to the PP row's own coordinates
-        // (Fibertime sheet Address link / resolve backfill) — the only location
-        // we have for not_found serials.
-        const gps = resolvePpTicketGps(enrichment.lat, enrichment.lng, record.latitude, record.longitude);
+        // GPS: the OES activation coordinate leads (see resolvePpTicketGps).
+        // Looked up by DR, then by serial — a not_found PP row has no DR at all,
+        // and the serial is the only handle left.
+        const oesGps = await lookupOesGps(dr, serial);
+        const gps = resolvePpTicketGps(
+          enrichment.lat,
+          enrichment.lng,
+          record.latitude,
+          record.longitude,
+          oesGps?.latitude,
+          oesGps?.longitude
+        );
 
         // Build enriched title
         const locationParts: string[] = [];
@@ -526,12 +535,29 @@ async function handleBackfill(
       upsertField('client_contact', enrichment.client_contact, ticket.client_contact);
       upsertField('client_email', enrichment.client_email, ticket.client_email);
 
-      // GPS: DR enrichment first, then the PP row's own coordinates
-      const gps = resolvePpTicketGps(enrichment.lat, enrichment.lng, ticket.pp_lat, ticket.pp_lng);
-      if (gps && !ticket.gps_coordinates) {
-        updates.push(`gps_coordinates = $${paramIdx}`);
-        values.push(`${gps.lat},${gps.lng}`);
-        paramIdx++;
+      // GPS: the OES activation coordinate leads (see resolvePpTicketGps).
+      const oesGps = await lookupOesGps(effectiveDR, ticket.ont_serial);
+      const gps = resolvePpTicketGps(
+        enrichment.lat,
+        enrichment.lng,
+        ticket.pp_lat,
+        ticket.pp_lng,
+        oesGps?.latitude,
+        oesGps?.longitude
+      );
+      // Unlike the other fields this one OVERWRITES when an OES coordinate
+      // exists: the stored value was written by this same automated path from
+      // design data, never typed by a human, so replacing it with the
+      // independent activation coordinate is an upgrade rather than a
+      // clobber. Without an OES row the fill-empty-only rule still applies.
+      const gpsIsUpgrade = !!oesGps && gps !== null;
+      if (gps && (gpsIsUpgrade || !ticket.gps_coordinates)) {
+        const next = `${gps.lat},${gps.lng}`;
+        if (next !== ticket.gps_coordinates) {
+          updates.push(`gps_coordinates = $${paramIdx}`);
+          values.push(next);
+          paramIdx++;
+        }
       }
 
       // Build enrichment block for description

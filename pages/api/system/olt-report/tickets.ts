@@ -14,6 +14,13 @@ import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/module
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
 import { normalizeOltTicketBatches, type OltTicketBatchInput } from '@/modules/activate/services/ticketBatchService';
+import {
+  lookupOesGps,
+  resolveTicketGps,
+  formatGpsColumn,
+  haversineMeters,
+  GPS_DIVERGENCE_THRESHOLD_M,
+} from '@/modules/noc/services/ticketGpsService';
 
 const logger = createLogger('olt-report:tickets');
 
@@ -99,13 +106,18 @@ async function handler(
       const eligibleStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'serial_other_dr'];
       const allowExistingTicket = ticket_type === 'home_installation_status';
 
+      // d.latitude/longitude is the SOW/1Map *design* position — kept only as a
+      // fallback for records the OES report has never seen.
       const eligible = await pool.query(
-        `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
-                investigation_context
-         FROM olt_mismatch_records
-         WHERE id = ANY($1::uuid[])
-           AND fix_status = ANY($2)
-           ${allowExistingTicket ? '' : 'AND maintenance_ticket_id IS NULL'}`,
+        `SELECT r.id, r.drop_number, r.olt_serial, r.wrong_onemap_serial, r.fix_status,
+                r.investigation_context,
+                d.latitude::text  AS design_lat,
+                d.longitude::text AS design_lng
+         FROM olt_mismatch_records r
+         LEFT JOIN drops d ON d.drop_number = r.drop_number
+         WHERE r.id = ANY($1::uuid[])
+           AND r.fix_status = ANY($2)
+           ${allowExistingTicket ? '' : 'AND r.maintenance_ticket_id IS NULL'}`,
         [record_ids, eligibleStatuses]
       );
 
@@ -190,6 +202,31 @@ async function handler(
           description = notes || `OLT report flagged ${dr} with ONT serial ${oltSerial} for investigation. Current status: ${status}.`;
         }
 
+        // These tickets carried NO location at all until now — 594 of them, all
+        // invisible to /api/noc/nearby-tickets. The OES activation coordinate
+        // leads: for a serial mismatch the DR link is precisely what is in
+        // doubt, so a DR-derived position inherits the error being
+        // investigated, while the OES coordinate is anchored to the serial.
+        const oesGps = await lookupOesGps(dr, oltSerial);
+        const designGps =
+          record.design_lat && record.design_lng
+            ? { latitude: Number(record.design_lat), longitude: Number(record.design_lng) }
+            : null;
+        const resolved = resolveTicketGps(oesGps, designGps);
+
+        if (resolved) {
+          description += `\nGPS (${resolved.source === 'oes_report' ? 'OES report' : 'planned SOW/1Map'}): `
+            + `${formatGpsColumn(resolved.point)} — `
+            + `https://maps.google.com/?q=${formatGpsColumn(resolved.point)}`;
+          if (resolved.source === 'oes_report' && designGps) {
+            const apart = Math.round(haversineMeters(resolved.point, designGps));
+            if (apart > GPS_DIVERGENCE_THRESHOLD_M) {
+              description += `\nNote: the planned SOW/1Map location is ${apart}m away `
+                + `(${formatGpsColumn(designGps)}) — verify on site.`;
+            }
+          }
+        }
+
         const ticket = await createTicket({
           source: TicketSource.OLT_MISMATCH,
           title,
@@ -199,6 +236,7 @@ async function handler(
           description,
           dr_number: dr,
           ont_serial: oltSerial,
+          gps_coordinates: resolved?.point,
           created_by: req.user.id,
           assigned_team_id: assigned_team_id || undefined,
           status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,

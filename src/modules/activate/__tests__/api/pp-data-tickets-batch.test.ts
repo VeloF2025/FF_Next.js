@@ -92,4 +92,27 @@ describe('resolvePpTicketGps', () => {
     expect(resolvePpTicketGps(undefined, '27.9', '-26.7', '27.0'))
       .toEqual({ lat: '-26.7', lng: '27.0' });
   });
+
+  it('prefers the OES activation coordinate over both design sources', () => {
+    expect(
+      resolvePpTicketGps('-26.1', '27.9', '-26.7236', '27.0195', -26.5, 27.5)
+    ).toEqual({ lat: '-26.5', lng: '27.5' });
+  });
+
+  it('accepts an OES pair when neither design source has one', () => {
+    expect(resolvePpTicketGps(undefined, undefined, null, null, -26.5, 27.5))
+      .toEqual({ lat: '-26.5', lng: '27.5' });
+  });
+
+  it('falls through to enrichment when the OES pair is incomplete', () => {
+    expect(resolvePpTicketGps('-26.1', '27.9', null, null, -26.5, undefined))
+      .toEqual({ lat: '-26.1', lng: '27.9' });
+    expect(resolvePpTicketGps('-26.1', '27.9', null, null, undefined, 27.5))
+      .toEqual({ lat: '-26.1', lng: '27.9' });
+  });
+
+  it('keeps the old ranking when no OES coordinate is supplied', () => {
+    expect(resolvePpTicketGps('-26.1', '27.9', '-26.7236', '27.0195'))
+      .toEqual({ lat: '-26.1', lng: '27.9' });
+  });
 });

@@ -63,18 +63,32 @@ export function resolveTeamForProject(
 }
 
 /**
- * GPS for a PP ticket: DR enrichment (drops/1Map, already ::text strings)
- * wins; falls back to the PP row's own coordinates (pg numeric — arrives as
- * string). PAIR-WISE: a coordinate pair always comes from ONE source —
- * mixing a latitude from drops with a longitude from the PP sheet would
- * produce a plausible-looking but geographically wrong point.
+ * GPS for a PP ticket, in accuracy order:
+ *
+ *   1. the daily OES report (`oes_activations`) — recorded at activation,
+ *      keyed to the ONT serial, independent of the design lineage;
+ *   2. DR enrichment (drops/1Map, already ::text strings) — the *planned* drop
+ *      position from the SOW/HLD import;
+ *   3. the PP row's own coordinates (pg numeric — arrives as string).
+ *
+ * (2) and (3) are not independent of each other: measured across 830 open PP
+ * tickets the PP sheet's Address-link coordinate matches `drops` to a median of
+ * 0.0 m, because Fibertime populates it from the same design data we do. Only
+ * (1) is a genuine second opinion, which is why it now leads.
+ *
+ * PAIR-WISE: a coordinate pair always comes from ONE source — mixing a latitude
+ * from drops with a longitude from the PP sheet would produce a
+ * plausible-looking but geographically wrong point.
  */
 export function resolvePpTicketGps(
   enrichLat: string | undefined,
   enrichLng: string | undefined,
   ppLat: string | number | null | undefined,
-  ppLng: string | number | null | undefined
+  ppLng: string | number | null | undefined,
+  oesLat?: string | number | null | undefined,
+  oesLng?: string | number | null | undefined
 ): { lat: string; lng: string } | null {
+  if (oesLat != null && oesLng != null) return { lat: String(oesLat), lng: String(oesLng) };
   if (enrichLat && enrichLng) return { lat: enrichLat, lng: enrichLng };
   if (ppLat != null && ppLng != null) return { lat: String(ppLat), lng: String(ppLng) };
   return null;
