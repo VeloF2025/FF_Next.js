@@ -42,7 +42,11 @@ import { join } from 'path';
 
 const DATABASE_URL = process.env.TEST_DATABASE_URL;
 const dbDescribe = DATABASE_URL ? describe : describe.skip;
-const SCHEMA = 'mig479_scratch';
+// Distinct from 479_attendance_tracked_opt_in.test.ts, which also numbers itself 479
+// and also used 'mig479_scratch'. Both run in the same vitest pass, so they raced on
+// CREATE SCHEMA and each failed with 'already exists' / 'relation schema_migrations
+// already exists' — master's migration gate has been red on this since both landed.
+const SCHEMA = 'mig479gps_scratch';
 const sqlFile = (name: string) =>
   readFileSync(join(process.cwd(), 'scripts/migrations/sql', name), 'utf8');
 const FORWARD = sqlFile('479_ticket_gps_oes_backfill.sql');
