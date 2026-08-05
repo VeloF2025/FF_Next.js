@@ -20,78 +20,16 @@
 
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
+import { SA_BOUNDS, type GpsPoint } from '@/modules/noc/utils/gps';
+
+// Re-exported so server-side callers keep a single import site. Client
+// components must import from '@/modules/noc/utils/gps' directly — this module
+// pulls in `pg` via @/lib/db and would land a Postgres driver in the browser
+// bundle (it did: `next build` failed on Can't resolve 'fs' through
+// ticketBatchService -> CreatePPTicketsModal).
+export * from '@/modules/noc/utils/gps';
 
 const logger = createLogger('noc:ticket-gps');
-
-export interface GpsPoint {
-  latitude: number;
-  longitude: number;
-}
-
-/**
- * South African bounding box. 13 of 25,414 OES rows (0.05%) carry coordinates
- * from Nepal, Indonesia and Iraq — a handful of activation devices report a
- * bogus fix. `drops` has zero out-of-bounds rows, so this guard applies to the
- * OES side only and a rejected OES point falls through to the design coordinate
- * rather than replacing it with garbage.
- */
-const SA_BOUNDS = { minLat: -35, maxLat: -22, minLng: 16, maxLng: 33 } as const;
-
-/** Metres beyond which the two sources are shown side by side instead of one winning silently. */
-export const GPS_DIVERGENCE_THRESHOLD_M = 50;
-
-export function isPlausibleSaCoordinate(
-  lat: number | string | null | undefined,
-  lng: number | string | null | undefined
-): boolean {
-  if (lat == null || lng == null) return false;
-  const latNum = typeof lat === 'number' ? lat : parseFloat(lat);
-  const lngNum = typeof lng === 'number' ? lng : parseFloat(lng);
-  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return false;
-  if (latNum === 0 && lngNum === 0) return false;
-  return (
-    latNum >= SA_BOUNDS.minLat && latNum <= SA_BOUNDS.maxLat &&
-    lngNum >= SA_BOUNDS.minLng && lngNum <= SA_BOUNDS.maxLng
-  );
-}
-
-/** Great-circle distance in metres. */
-export function haversineMeters(a: GpsPoint, b: GpsPoint): number {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLng = toRad(b.longitude - a.longitude);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-/**
- * Rank candidate coordinates: OES activation first, then the design lineage.
- *
- * PAIR-WISE: a returned pair always comes from ONE source. Resolving latitude
- * and longitude independently would mix a latitude from the OES report with a
- * longitude from the design import and produce a plausible-looking point that
- * is nowhere.
- */
-export function resolveTicketGps(
-  oes: GpsPoint | null | undefined,
-  design: GpsPoint | null | undefined
-): { point: GpsPoint; source: 'oes_report' | 'design' } | null {
-  if (oes && isPlausibleSaCoordinate(oes.latitude, oes.longitude)) {
-    return { point: oes, source: 'oes_report' };
-  }
-  if (design && Number.isFinite(design.latitude) && Number.isFinite(design.longitude)) {
-    return { point: design, source: 'design' };
-  }
-  return null;
-}
-
-/** Serialize for the `maintenance_tickets.gps_coordinates` text column ("lat,lng"). */
-export function formatGpsColumn(point: GpsPoint): string {
-  return `${point.latitude},${point.longitude}`;
-}
 
 /**
  * OES activation coordinate for a DR. Latest activation wins — the OES sheet is

@@ -4,6 +4,12 @@
  */
 
 import type { ProjectTeamAssignment } from '@/modules/noc/types/team';
+import {
+  formatGpsColumn,
+  haversineMeters,
+  GPS_DIVERGENCE_THRESHOLD_M,
+  type GpsPoint,
+} from '@/modules/noc/utils/gps';
 
 export interface TicketBatchInput {
   ids: number[];
@@ -92,4 +98,38 @@ export function resolvePpTicketGps(
   if (enrichLat && enrichLng) return { lat: enrichLat, lng: enrichLng };
   if (ppLat != null && ppLng != null) return { lat: String(ppLat), lng: String(ppLng) };
   return null;
+}
+
+/**
+ * The GPS block appended to an OLT-mismatch ticket description.
+ *
+ * Extracted from the route handler so it is testable without standing up a
+ * Pages Router request: the route had no test file at all, and this composition
+ * — which coordinate wins, whether the technician is warned that the planned
+ * location disagrees — is the part worth pinning.
+ *
+ * Returns '' when there is no coordinate, so the caller can append
+ * unconditionally.
+ */
+export function buildGpsDescriptionSuffix(
+  resolved: { point: GpsPoint; source: 'oes_report' | 'design' } | null,
+  designGps: GpsPoint | null
+): string {
+  if (!resolved) return '';
+
+  const coords = formatGpsColumn(resolved.point);
+  const label = resolved.source === 'oes_report' ? 'OES report' : 'planned SOW/1Map';
+  let out = `\nGPS (${label}): ${coords} — https://maps.google.com/?q=${coords}`;
+
+  // Only meaningful when the OES coordinate won AND a design position exists to
+  // disagree with it. When the design position IS what we're showing, there is
+  // no second opinion to report.
+  if (resolved.source === 'oes_report' && designGps) {
+    const apart = Math.round(haversineMeters(resolved.point, designGps));
+    if (apart > GPS_DIVERGENCE_THRESHOLD_M) {
+      out += `\nNote: the planned SOW/1Map location is ${apart}m away `
+        + `(${formatGpsColumn(designGps)}) — verify on site.`;
+    }
+  }
+  return out;
 }

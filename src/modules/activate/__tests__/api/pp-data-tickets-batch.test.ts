@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePPTicketBatches, normalizeOltTicketBatches, groupRecordsByProject, resolveTeamForProject, resolvePpTicketGps } from '@/modules/activate/services/ticketBatchService';
+import { normalizePPTicketBatches, normalizeOltTicketBatches, groupRecordsByProject, resolveTeamForProject, resolvePpTicketGps, buildGpsDescriptionSuffix } from '@/modules/activate/services/ticketBatchService';
 import type { ProjectTeamAssignment } from '@/modules/noc/types/team';
 
 describe('normalizePPTicketBatches', () => {
@@ -114,5 +114,56 @@ describe('resolvePpTicketGps', () => {
   it('keeps the old ranking when no OES coordinate is supplied', () => {
     expect(resolvePpTicketGps('-26.1', '27.9', '-26.7236', '27.0195'))
       .toEqual({ lat: '-26.1', lng: '27.9' });
+  });
+});
+
+describe('buildGpsDescriptionSuffix', () => {
+  const oes = { latitude: -26.7387387, longitude: 27.0148998 };
+  const design = { latitude: -26.7295508, longitude: 27.0179814 }; // ~1,066m away
+  const nearby = { latitude: -26.7387, longitude: 27.0149 };       // a few metres away
+
+  it('returns nothing when no coordinate resolved, so the caller can append blindly', () => {
+    expect(buildGpsDescriptionSuffix(null, design)).toBe('');
+    expect(buildGpsDescriptionSuffix(null, null)).toBe('');
+  });
+
+  it('labels an OES coordinate as such and links it', () => {
+    const s = buildGpsDescriptionSuffix({ point: oes, source: 'oes_report' }, null);
+    expect(s).toContain('GPS (OES report): -26.7387387,27.0148998');
+    expect(s).toContain('https://maps.google.com/?q=-26.7387387,27.0148998');
+  });
+
+  it('labels a design coordinate honestly rather than passing it off as OES', () => {
+    const s = buildGpsDescriptionSuffix({ point: design, source: 'design' }, design);
+    expect(s).toContain('GPS (planned SOW/1Map):');
+    expect(s).not.toContain('OES report');
+  });
+
+  it('warns, with the distance, when the planned location materially disagrees', () => {
+    const s = buildGpsDescriptionSuffix({ point: oes, source: 'oes_report' }, design);
+    expect(s).toMatch(/planned SOW\/1Map location is 10[0-9][0-9]m away/);
+    expect(s).toContain('-26.7295508,27.0179814');
+    expect(s).toContain('verify on site');
+  });
+
+  it('stays quiet when the two sources agree within the threshold', () => {
+    const s = buildGpsDescriptionSuffix({ point: oes, source: 'oes_report' }, nearby);
+    expect(s).not.toContain('verify on site');
+    expect(s).not.toContain('away');
+  });
+
+  it('never warns when the design coordinate IS the one being shown', () => {
+    // There is no second opinion to report against itself.
+    const s = buildGpsDescriptionSuffix({ point: design, source: 'design' }, oes);
+    expect(s).not.toContain('verify on site');
+  });
+
+  it('omits the warning when there is no design position to compare', () => {
+    const s = buildGpsDescriptionSuffix({ point: oes, source: 'oes_report' }, null);
+    expect(s).not.toContain('verify on site');
+  });
+
+  it('starts with a newline so it appends cleanly to an existing description', () => {
+    expect(buildGpsDescriptionSuffix({ point: oes, source: 'oes_report' }, null)).toMatch(/^\n/);
   });
 });

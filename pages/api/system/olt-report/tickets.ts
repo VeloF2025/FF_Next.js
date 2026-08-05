@@ -13,14 +13,12 @@ import { createTicket } from '@/modules/noc/services/ticketService';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
-import { normalizeOltTicketBatches, type OltTicketBatchInput } from '@/modules/activate/services/ticketBatchService';
 import {
-  lookupOesGps,
-  resolveTicketGps,
-  formatGpsColumn,
-  haversineMeters,
-  GPS_DIVERGENCE_THRESHOLD_M,
-} from '@/modules/noc/services/ticketGpsService';
+  normalizeOltTicketBatches,
+  buildGpsDescriptionSuffix,
+  type OltTicketBatchInput,
+} from '@/modules/activate/services/ticketBatchService';
+import { lookupOesGps, resolveTicketGps } from '@/modules/noc/services/ticketGpsService';
 
 const logger = createLogger('olt-report:tickets');
 
@@ -214,18 +212,7 @@ async function handler(
             : null;
         const resolved = resolveTicketGps(oesGps, designGps);
 
-        if (resolved) {
-          description += `\nGPS (${resolved.source === 'oes_report' ? 'OES report' : 'planned SOW/1Map'}): `
-            + `${formatGpsColumn(resolved.point)} — `
-            + `https://maps.google.com/?q=${formatGpsColumn(resolved.point)}`;
-          if (resolved.source === 'oes_report' && designGps) {
-            const apart = Math.round(haversineMeters(resolved.point, designGps));
-            if (apart > GPS_DIVERGENCE_THRESHOLD_M) {
-              description += `\nNote: the planned SOW/1Map location is ${apart}m away `
-                + `(${formatGpsColumn(designGps)}) — verify on site.`;
-            }
-          }
-        }
+        description += buildGpsDescriptionSuffix(resolved, designGps);
 
         const ticket = await createTicket({
           source: TicketSource.OLT_MISMATCH,

@@ -35,6 +35,22 @@ describe('isPlausibleSaCoordinate', () => {
     // -26.72,27.01 is valid; swapping puts latitude at 27 (northern hemisphere).
     expect(isPlausibleSaCoordinate(27.0195, -26.7236)).toBe(false);
   });
+
+  // Without these, mutating any bound operator (>= to >, <= to <) leaves the
+  // suite green — the other cases all sit far inside or far outside the box.
+  it('treats the bounds as inclusive', () => {
+    expect(isPlausibleSaCoordinate(-35, 16)).toBe(true); // SW corner
+    expect(isPlausibleSaCoordinate(-22, 33)).toBe(true); // NE corner
+    expect(isPlausibleSaCoordinate(-35, 33)).toBe(true);
+    expect(isPlausibleSaCoordinate(-22, 16)).toBe(true);
+  });
+
+  it('rejects one ulp outside each bound', () => {
+    expect(isPlausibleSaCoordinate(-35.00001, 27)).toBe(false); // south
+    expect(isPlausibleSaCoordinate(-21.99999, 27)).toBe(false); // north
+    expect(isPlausibleSaCoordinate(-26, 15.99999)).toBe(false); // west
+    expect(isPlausibleSaCoordinate(-26, 33.00001)).toBe(false); // east
+  });
 });
 
 describe('haversineMeters', () => {

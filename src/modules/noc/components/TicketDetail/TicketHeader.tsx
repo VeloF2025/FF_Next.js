@@ -38,6 +38,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ClickableStatusBadge } from './ClickableStatusBadge';
 import { ClickablePriorityBadge } from './ClickablePriorityBadge';
 import type { EnrichedTicket } from '../../types/ticket';
+import { selectTicketGpsDisplay } from '../../utils/gps';
 
 interface TicketHeaderProps {
   /** Ticket data */
@@ -103,25 +104,21 @@ function getGoogleMapsUrl(lat: number, lng: number): string {
 export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange, onPriorityChange }: TicketHeaderProps) {
   const { currentUser: authUser } = useAuth();
 
-  // GPS priority: the OES activation coordinate first, then the SOW/1Map design
-  // lineage, then whatever was stored on the ticket. The OES coordinate is
-  // recorded at activation against the ONT serial; the design coordinate is
-  // where the drop was *planned*. On mismatch / no-entry / pre-provision tickets
-  // the DR link is the thing under investigation, so a DR-derived location
-  // inherits the error being investigated.
+  // Ranking lives in utils/gps so it can be tested without React, and so the
+  // divergence threshold has one definition rather than a literal here and a
+  // constant server-side.
   const enrichment = ticket.fibreflow_enrichment;
-  const designGps = enrichment?.fibreflow_gps || enrichment?.onemap_gps || null;
-  const isPoint = (p: { latitude?: unknown; longitude?: unknown } | null | undefined) =>
-    !!p && typeof p.latitude === 'number' && typeof p.longitude === 'number';
-
-  const rawGps = enrichment?.oes_gps || designGps || ticket.gps_coordinates || null;
-  const gps = isPoint(rawGps) ? rawGps : null;
-
-  // Show the design coordinate alongside the OES one when they disagree by more
-  // than a house-width — the tech decides which to drive to, we don't guess.
-  const divergence = enrichment?.gps_divergence_m ?? null;
-  const showBothGps =
-    isPoint(enrichment?.oes_gps) && isPoint(designGps) && divergence !== null && divergence > 50;
+  const gpsDisplay = selectTicketGpsDisplay({
+    oesGps: enrichment?.oes_gps,
+    fibreflowGps: enrichment?.fibreflow_gps,
+    onemapGps: enrichment?.onemap_gps,
+    ticketGps: ticket.gps_coordinates,
+    divergenceM: enrichment?.gps_divergence_m,
+  });
+  const gps = gpsDisplay.primary;
+  const designGps = gpsDisplay.secondary;
+  const showBothGps = !!designGps;
+  const divergence = gpsDisplay.divergenceM;
 
   return (
     <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
@@ -430,7 +427,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
               <div className="sm:col-span-2">
                 <div className="text-xs text-[var(--ff-text-secondary)] mb-1">
                   GPS Coordinates
-                  {enrichment?.oes_gps && (
+                  {gpsDisplay.primaryIsOes && (
                     <span className="ml-2 text-[var(--ff-text-primary)]">· OES report</span>
                   )}
                 </div>
