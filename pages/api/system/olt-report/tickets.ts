@@ -106,13 +106,30 @@ async function handler(
 
       // d.latitude/longitude is the SOW/1Map *design* position — kept only as a
       // fallback for records the OES report has never seen.
+      //
+      // LATERAL ... LIMIT 1, not a plain LEFT JOIN. `drops` is UNIQUE on
+      // (project_id, drop_number), NOT on drop_number alone, so the same DR
+      // under two project_ids is schema-legal. Zero such rows exist today
+      // (checked), but a plain join would return one record per drops row and
+      // the loop below creates a ticket per returned row — a single mismatch
+      // would silently become two tickets, the second UPDATE overwriting
+      // maintenance_ticket_id and orphaning the first. Defensive, and it keeps
+      // this query consistent with migration 479, which guards the same join
+      // with DISTINCT ON.
       const eligible = await pool.query(
         `SELECT r.id, r.drop_number, r.olt_serial, r.wrong_onemap_serial, r.fix_status,
                 r.investigation_context,
-                d.latitude::text  AS design_lat,
-                d.longitude::text AS design_lng
+                d.design_lat,
+                d.design_lng
          FROM olt_mismatch_records r
-         LEFT JOIN drops d ON d.drop_number = r.drop_number
+         LEFT JOIN LATERAL (
+           SELECT dd.latitude::text AS design_lat, dd.longitude::text AS design_lng
+             FROM drops dd
+            WHERE dd.drop_number = r.drop_number
+              AND dd.latitude IS NOT NULL AND dd.longitude IS NOT NULL
+            ORDER BY dd.updated_at DESC NULLS LAST, dd.id DESC
+            LIMIT 1
+         ) d ON TRUE
          WHERE r.id = ANY($1::uuid[])
            AND r.fix_status = ANY($2)
            ${allowExistingTicket ? '' : 'AND r.maintenance_ticket_id IS NULL'}`,

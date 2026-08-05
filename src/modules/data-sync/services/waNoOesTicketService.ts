@@ -71,14 +71,27 @@ export async function fetchCandidates(
         l.wa_submitted_at::text AS wa_submitted_at,
         l.wa_serial,
         l.wa_serial_source,
-        d.latitude::text        AS design_lat,
-        d.longitude::text       AS design_lng
+        d.design_lat,
+        d.design_lng
        FROM v_dr_reconciliation_ledger l
        JOIN projects p ON LOWER(p.project_name) = LOWER(l.project)
        -- Design (SOW/1Map) position. wa_no_oes means the OES report has no row
        -- for this DR by definition, so this is normally the only coordinate
        -- available — these tickets previously shipped with none at all.
-       LEFT JOIN drops d ON d.drop_number = l.drop_number
+       --
+       -- LATERAL ... LIMIT 1, not a plain LEFT JOIN. drops is UNIQUE on
+       -- (project_id, drop_number), not drop_number alone, so the same DR under
+       -- two project_ids is schema-legal. None exist today (checked), but a
+       -- plain join would emit one candidate per drops row and inflate both the
+       -- scanned count and the create attempts for that DR.
+       LEFT JOIN LATERAL (
+         SELECT dd.latitude::text AS design_lat, dd.longitude::text AS design_lng
+           FROM drops dd
+          WHERE dd.drop_number = l.drop_number
+            AND dd.latitude IS NOT NULL AND dd.longitude IS NOT NULL
+          ORDER BY dd.updated_at DESC NULLS LAST, dd.id DESC
+          LIMIT 1
+       ) d ON TRUE
        LEFT JOIN LATERAL (
          SELECT pta.team_id
            FROM project_team_assignments pta
