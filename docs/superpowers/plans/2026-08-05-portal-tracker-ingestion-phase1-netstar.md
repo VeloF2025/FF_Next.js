@@ -103,8 +103,12 @@ git commit -m "test(fleet): capture Netstar All Activity CSV fixture"
 - Test: `src/services/tracking/netstar/__tests__/parse.test.ts`
 
 **Interfaces:**
-- Consumes: the fixture and column mapping from Task 1.
-- Produces: `parseAllActivityCsv(csv: string): ProviderPosition[]` — used by Task 5.
+- Consumes: the fixture and column mapping from Task 1 — **already committed**. Read
+  `src/services/tracking/netstar/__tests__/fixtures/README.md` before writing any code: it
+  documents a decimal-comma convention that makes the obvious numeric parser silently wrong.
+- Produces: `parseAllActivityCsv(csv: string): ProviderPosition[]`, plus
+  `parseDecimalComma(v: string | undefined): number | null` and
+  `parseNetstarTs(raw: string | undefined): Date | null` — used by Task 5.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -119,10 +123,46 @@ const fixture = readFileSync(
   'utf8'
 );
 
+import { parseDecimalComma, parseNetstarTs } from '../parse';
+
+describe('parseDecimalComma', () => {
+  // Netstar writes numbers with a COMMA decimal separator inside quoted
+  // fields. Stripping non-digits turns -26,08975 into -2608975 — a number
+  // that still looks like a number and is nowhere on Earth.
+  it('reads a comma as the decimal point', () => {
+    expect(parseDecimalComma('-26,08975')).toBeCloseTo(-26.08975, 5);
+    expect(parseDecimalComma('28,35431')).toBeCloseTo(28.35431, 5);
+    expect(parseDecimalComma('0,0')).toBe(0);
+  });
+  it('still reads plain integers', () => {
+    expect(parseDecimalComma('54302')).toBe(54302);
+  });
+  it('returns null for blank or unparseable input', () => {
+    expect(parseDecimalComma('')).toBeNull();
+    expect(parseDecimalComma(undefined)).toBeNull();
+    expect(parseDecimalComma('  ')).toBeNull();
+  });
+});
+
+describe('parseNetstarTs', () => {
+  // DD/MM/YYYY, no zone marker, meaning SAST (UTC+02:00).
+  it('reads DD/MM/YYYY HH:mm:ss as SAST', () => {
+    expect(parseNetstarTs('04/08/2026 07:26:38')?.toISOString())
+      .toBe('2026-08-04T05:26:38.000Z');
+  });
+  it('does not read it as MM/DD/YYYY', () => {
+    // 13 cannot be a month; if this parses, the day/month order is wrong.
+    expect(parseNetstarTs('13/08/2026 07:26:38')?.toISOString())
+      .toBe('2026-08-13T05:26:38.000Z');
+  });
+  it('returns null for junk', () => {
+    expect(parseNetstarTs('not a date')).toBeNull();
+  });
+});
+
 describe('parseAllActivityCsv', () => {
   it('returns one position per data row', () => {
-    const rows = parseAllActivityCsv(fixture);
-    expect(rows.length).toBeGreaterThan(0);
+    expect(parseAllActivityCsv(fixture).length).toBe(50);
   });
 
   it('produces coordinates inside South Africa', () => {
@@ -134,26 +174,47 @@ describe('parseAllActivityCsv', () => {
     }
   });
 
-  it('parses timestamps as valid Dates', () => {
+  it('parses the first row exactly', () => {
+    const p = parseAllActivityCsv(fixture)[0];
+    expect(p.lat).toBeCloseTo(-26.08975, 5);
+    expect(p.lon).toBeCloseTo(28.35431, 5);
+    expect(p.speedKph).toBe(0);
+    expect(p.odometerKm).toBe(54302);
+    expect(p.roadSpeedKph).toBe(60);
+    expect(p.recordedAt.toISOString()).toBe('2026-08-04T05:26:38.000Z');
+  });
+
+  it('reports ignition only on transition rows, null otherwise', () => {
+    const rows = parseAllActivityCsv(fixture);
+    // Row 1 is "Ignition on"; the "Timed Event" rows that follow say nothing
+    // about ignition and must not claim to.
+    expect(rows[0].ignition).toBe(true);
+    expect(rows[1].ignition).toBeNull();
+  });
+
+  it('never infers isSpeeding for non-speeding rows', () => {
     for (const p of parseAllActivityCsv(fixture)) {
-      expect(Number.isNaN(p.recordedAt.getTime())).toBe(false);
+      expect(p.isSpeeding === true || p.isSpeeding === null).toBe(true);
     }
   });
 
-  it('leaves unsupplied fields null rather than zero', () => {
+  it('leaves fields Netstar does not supply as null, never zero', () => {
     const p = parseAllActivityCsv(fixture)[0];
     expect(p.linearG).toBeNull();
     expect(p.lateralG).toBeNull();
+    expect(p.bearing).toBeNull();
+    expect(p.altitudeM).toBeNull();
+    expect(p.providerEventId).toBeNull();
   });
 
-  it('drops rows with no GPS fix instead of emitting 0,0', () => {
-    const csv = fixture.split('\n').slice(0, 2).join('\n') + '\n' +
-      fixture.split('\n')[1].replace(/-2[56]\.\d+/, '').replace(/2[78]\.\d+/, '');
-    expect(parseAllActivityCsv(csv).length).toBeLessThanOrEqual(1);
+  it('drops rows whose Gps column is false', () => {
+    const lines = fixture.split('\r\n');
+    const bad = lines[1].replace(',true,', ',false,');
+    expect(parseAllActivityCsv(`${lines[0]}\r\n${bad}`)).toEqual([]);
   });
 
   it('returns an empty array for a header-only export', () => {
-    expect(parseAllActivityCsv(fixture.split('\n')[0])).toEqual([]);
+    expect(parseAllActivityCsv(fixture.split('\r\n')[0])).toEqual([]);
   });
 });
 ```
@@ -183,44 +244,61 @@ Replace the `COLUMNS` values with the real header names recorded in Task 1's REA
 import Papa from 'papaparse';
 import type { ProviderPosition } from '../types';
 
-/** Real header names from the Netstar export. See fixtures/README.md. */
+/** Real header names, verbatim from a captured export. See fixtures/README.md. */
 const COLUMNS = {
-  timestamp: 'Date Time',
+  timestamp: 'Time',
+  speed: 'Speed',
+  status: 'Status',
+  gps: 'Gps',
+  speedLimit: 'Speed Limit',
   latitude: 'Latitude',
   longitude: 'Longitude',
-  speed: 'Speed',
-  ignition: 'Ignition',
   odometer: 'Odometer',
-  heading: 'Heading',
-  event: 'Event',
 } as const;
 
-/** Netstar renders local time; the request pins the zone to SAST (UTC+02:00). */
-const SAST_OFFSET = '+02:00';
+/** South Africa has no DST, so the offset is a constant +02:00 year-round. */
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
 
-function num(v: string | undefined): number | null {
-  if (v === undefined) return null;
-  const t = v.trim().replace(/[^\d.\-]/g, '');
-  if (t === '' || t === '-') return null;
-  const n = Number(t);
+/**
+ * Netstar writes decimals with a COMMA: "-26,08975" is -26.08975.
+ *
+ * This is the single most dangerous field in the export. A generic
+ * `replace(/[^\d.-]/g,'')` yields -2608975 — still a finite number, so nothing
+ * throws, and every vehicle silently lands off the map.
+ */
+export function parseDecimalComma(v: string | undefined): number | null {
+  if (v === undefined || v === null) return null;
+  const t = v.trim();
+  if (t === '') return null;
+  const n = Number(t.replace(',', '.'));
   return Number.isFinite(n) ? n : null;
 }
 
-function bool(v: string | undefined): boolean | null {
-  if (v === undefined) return null;
-  const t = v.trim().toLowerCase();
-  if (['on', 'true', 'yes', '1'].includes(t)) return true;
-  if (['off', 'false', 'no', '0'].includes(t)) return false;
-  return null;
+/** `04/08/2026 07:26:38` — DD/MM/YYYY, no zone marker, meaning SAST. */
+export function parseNetstarTs(raw: string | undefined): Date | null {
+  const m = (raw ?? '').trim().match(
+    /^(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2}):(\d{2})$/
+  );
+  if (!m) return null;
+  const [, dd, mm, yyyy, hh, mi, ss] = m;
+  const asUtc = Date.UTC(+yyyy, +mm - 1, +dd, +hh, +mi, +ss);
+  const d = new Date(asUtc - SAST_OFFSET_MS);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** `2026-08-05 14:35:31` with no zone — Netstar means SAST, so state it. */
-export function parseNetstarTs(raw: string): Date | null {
-  if (!raw) return null;
-  const t = raw.trim().replace(' ', 'T');
-  const iso = /[Zz]|[+-]\d{2}:?\d{2}$/.test(t) ? t : `${t}${SAST_OFFSET}`;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
+/**
+ * Ignition, where the row actually states it.
+ *
+ * `Status` is an event type, not a per-row state: only the two transition
+ * events say anything about ignition. "Moving" strongly implies the engine is
+ * running, but implying is not reporting — types.ts requires null for what the
+ * provider did not supply.
+ */
+function ignitionFrom(status: string | undefined): boolean | null {
+  const s = (status ?? '').trim().toLowerCase();
+  if (s === 'ignition on') return true;
+  if (s === 'ignition off') return false;
+  return null;
 }
 
 export function parseAllActivityCsv(csv: string): ProviderPosition[] {
@@ -232,26 +310,34 @@ export function parseAllActivityCsv(csv: string): ProviderPosition[] {
 
   const out: ProviderPosition[] = [];
   for (const row of parsed.data) {
-    const lat = num(row[COLUMNS.latitude]);
-    const lon = num(row[COLUMNS.longitude]);
-    const recordedAt = parseNetstarTs(row[COLUMNS.timestamp] ?? '');
+    // Gps=false means the row carries a stale or absent fix. Keeping it would
+    // draw the vehicle at its last known point as though that were current.
+    if ((row[COLUMNS.gps] ?? '').trim().toLowerCase() === 'false') continue;
+
+    const lat = parseDecimalComma(row[COLUMNS.latitude]);
+    const lon = parseDecimalComma(row[COLUMNS.longitude]);
+    const recordedAt = parseNetstarTs(row[COLUMNS.timestamp]);
     if (lat === null || lon === null || recordedAt === null) continue;
     if (lat === 0 && lon === 0) continue;
 
+    const status = (row[COLUMNS.status] ?? '').trim();
+
     out.push({
-      externalId: '',            // set by the provider, which knows the vehicle
+      externalId: '',            // stamped by the provider, which knows the vehicle
       providerEventId: null,     // Netstar supplies none; ingest synthesises one
       recordedAt,
       lat,
       lon,
-      speedKph: num(row[COLUMNS.speed]),
-      roadSpeedKph: null,
-      isSpeeding: null,
-      ignition: bool(row[COLUMNS.ignition]),
-      odometerKm: num(row[COLUMNS.odometer]),
+      speedKph: parseDecimalComma(row[COLUMNS.speed]),
+      roadSpeedKph: parseDecimalComma(row[COLUMNS.speedLimit]),
+      // Only the Speeding event asserts speeding. Other rows are silent on it,
+      // not evidence of compliance.
+      isSpeeding: status.toLowerCase() === 'speeding' ? true : null,
+      ignition: ignitionFrom(status),
+      odometerKm: parseDecimalComma(row[COLUMNS.odometer]),
       linearG: null,
       lateralG: null,
-      bearing: num(row[COLUMNS.heading]),
+      bearing: null,             // no heading column in this export
       altitudeM: null,
       gpsFixType: null,
     });
@@ -263,7 +349,7 @@ export function parseAllActivityCsv(csv: string): ProviderPosition[] {
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/services/tracking/netstar/__tests__/parse.test.ts`
-Expected: PASS (6 tests)
+Expected: PASS (17 tests)
 
 If a test fails on a column name, fix `COLUMNS` to match the fixture — never loosen the test.
 
@@ -1551,7 +1637,7 @@ export function decideAlert(input: AlertInput): AlertDecision | null {
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/services/tracking/__tests__/alerts.test.ts`
-Expected: PASS (6 tests)
+Expected: PASS (17 tests)
 
 - [ ] **Step 5: Write the failing test for the dispatcher**
 
