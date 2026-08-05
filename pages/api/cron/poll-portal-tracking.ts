@@ -30,6 +30,18 @@ const LOCK_KEY = 4417302;
 const COLD_START_MS = 24 * 60 * 60 * 1000;
 /** Re-poll this far behind the watermark; dedup absorbs the overlap. */
 const OVERLAP_MS = 60 * 60 * 1000;
+/**
+ * Hard floor on how far back one tick may reach, regardless of the watermark.
+ *
+ * The window is not free: the client splits it into 31-day chunks and issues
+ * one report job PER VEHICLE PER CHUNK, each polling the export up to ten
+ * times. A watermark left stale by a long outage would therefore turn a single
+ * tick into hundreds of back-to-back requests against a partner-owned account
+ * — which is how an account gets suspended, and the poller is not the tool for
+ * that job anyway. `scripts/backfill-tracking.ts` is: it walks the same history
+ * deliberately, paced, and is safe to interrupt and resume.
+ */
+const MAX_POLL_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
 
 interface ConfiguredProvider {
   provider: TrackingProvider;
@@ -50,6 +62,23 @@ function configured(): ConfiguredProvider[] {
     out.push({
       provider: netstarProvider({ ...opts, client }),
       listVehicles: () => client.listVehicles(),
+    });
+  } else {
+    // Say so, loudly and by name. A provider that is simply absent from the
+    // loop produces a 200 with an empty result set — indistinguishable from a
+    // healthy tick — so a typo in a variable name (or an env file that never
+    // reached the service) would stay invisible for as long as nobody thought
+    // to ask why no positions were arriving.
+    const missing = (
+      [
+        ['NETSTAR_PORTAL_URL', NETSTAR_PORTAL_URL],
+        ['NETSTAR_PORTAL_USER', NETSTAR_PORTAL_USER],
+        ['NETSTAR_PORTAL_PASS', NETSTAR_PORTAL_PASS],
+      ] as const
+    ).filter(([, value]) => !value).map(([name]) => name);
+    log.warn('[poll-portal-tracking] netstar not configured — skipping provider entirely', {
+      missing,
+      hint: 'set these in the service env file; until then this cron does nothing',
     });
   }
   return out;
@@ -89,8 +118,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.success(res, { skipped: 'already-running' });
     }
 
+    const providers = configured();
     const results: unknown[] = [];
-    for (const { provider, listVehicles } of configured()) {
+    for (const { provider, listVehicles } of providers) {
       // One provider failing must never block the others.
       try {
         const portalVehicles = await listVehicles();
@@ -116,9 +146,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `;
         const now = new Date();
         const last = wm[0]?.last_event_ts ? new Date(wm[0].last_event_ts) : null;
-        const from = last
+        const wanted = last
           ? new Date(last.getTime() - OVERLAP_MS)
           : new Date(now.getTime() - COLD_START_MS);
+        // Clamped, and the clamp is logged: history older than the floor is
+        // NOT fetched by this tick and will not be picked up by a later one
+        // either, because the watermark advances past it. Silent truncation
+        // here would be a data loss nobody could see.
+        const floor = new Date(now.getTime() - MAX_POLL_WINDOW_MS);
+        const clamped = wanted.getTime() < floor.getTime();
+        const from = clamped ? floor : wanted;
+        if (clamped) {
+          log.warn('[poll-portal-tracking] poll window clamped — older history skipped', {
+            provider: provider.key, accountRef: provider.accountRef,
+            requestedFrom: wanted.toISOString(), clampedFrom: from.toISOString(),
+            hint: 'run scripts/backfill-tracking.ts to recover the skipped range',
+          });
+        }
 
         const positions = await provider.fetchPositions(from, now);
         // The watermark advances from maxIngestedAt — what ingestPositions
@@ -129,15 +173,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { inserted, skippedUnmapped, maxIngestedAt } = await ingestPositions(
           provider.key, provider.accountRef, positions);
 
-        await sql`
-          INSERT INTO fleet_tracking_watermarks
-            (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures)
-          VALUES (${provider.key}, ${provider.accountRef}, ${maxIngestedAt ?? last}, now(), NULL, 0)
-          ON CONFLICT (provider, account_ref) DO UPDATE
-            SET last_event_ts = COALESCE(EXCLUDED.last_event_ts, fleet_tracking_watermarks.last_event_ts),
-                last_run_at = now(), last_error = NULL, consecutive_failures = 0
-        `;
-
         // Authenticating cleanly and returning nothing is the failure mode that
         // otherwise hides for weeks — it looks exactly like a healthy tick.
         // Gated on activeTrackers (mapped NOW), not recon.upserted (mapped BY
@@ -147,20 +182,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // left alone by reconcileTrackers) sit untouched — total silence. An
         // empty portal list against an account known to have vehicles is
         // itself the signal, so it fires even if positions still came back.
-        if (activeTrackers > 0 && (portalVehicles.length === 0 || positions.length === 0)) {
-          const detail = portalVehicles.length === 0
-            ? `portal returned an empty vehicle list while ${activeTrackers} trackers remain mapped`
-            : `${activeTrackers} vehicles mapped but the report returned no positions`;
+        const gap = activeTrackers > 0 && (portalVehicles.length === 0 || positions.length === 0);
+        const gapDetail = portalVehicles.length === 0
+          ? `portal returned an empty vehicle list while ${activeTrackers} trackers remain mapped`
+          : `${activeTrackers} vehicles mapped but the report returned no positions`;
+
+        // Two explicit statements rather than one with a conditional fragment:
+        // this repo's SQL tag cannot carry `${cond ? sql`..` : sql``}`.
+        //
+        // The gap branch INCREMENTS consecutive_failures instead of resetting
+        // it, which is what lets decideAlert() suppress a sustained outage
+        // after the first notice. The counter still means "consecutive ticks
+        // that produced no data", and a genuinely healthy tick below resets it
+        // to 0 — so no new column is needed to carry the gap streak.
+        let gapTicks = 0;
+        if (gap) {
+          const bumped = await sql<{ consecutive_failures: number }>`
+            INSERT INTO fleet_tracking_watermarks
+              (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures)
+            VALUES (${provider.key}, ${provider.accountRef}, ${maxIngestedAt ?? last}, now(), ${gapDetail}, 1)
+            ON CONFLICT (provider, account_ref) DO UPDATE
+              SET last_event_ts = COALESCE(EXCLUDED.last_event_ts, fleet_tracking_watermarks.last_event_ts),
+                  last_run_at = now(), last_error = ${gapDetail},
+                  consecutive_failures = fleet_tracking_watermarks.consecutive_failures + 1
+            RETURNING consecutive_failures
+          `;
+          gapTicks = bumped[0]?.consecutive_failures ?? 1;
+        } else {
+          await sql`
+            INSERT INTO fleet_tracking_watermarks
+              (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures)
+            VALUES (${provider.key}, ${provider.accountRef}, ${maxIngestedAt ?? last}, now(), NULL, 0)
+            ON CONFLICT (provider, account_ref) DO UPDATE
+              SET last_event_ts = COALESCE(EXCLUDED.last_event_ts, fleet_tracking_watermarks.last_event_ts),
+                  last_run_at = now(), last_error = NULL, consecutive_failures = 0
+          `;
+        }
+
+        if (gap) {
           log.warn('[poll-portal-tracking] gap: mapped vehicles but no usable portal data', {
             provider: provider.key, accountRef: provider.accountRef,
-            activeTrackers, portalVehicleCount: portalVehicles.length, positionCount: positions.length });
+            activeTrackers, portalVehicleCount: portalVehicles.length,
+            positionCount: positions.length, gapTicks });
           await raiseTrackingAlert({
             kind: 'gap',
-            consecutiveFailures: 0,
+            consecutiveFailures: gapTicks,
             nowSast: now,
             provider: provider.key,
             accountRef: provider.accountRef,
-            detail,
+            detail: gapDetail,
           });
         }
 
@@ -168,6 +238,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           provider: provider.key, accountRef: provider.accountRef,
           fetched: positions.length, inserted, skippedUnmapped,
           mapped: recon.upserted, activeTrackers, deactivated: recon.deactivated,
+          deactivationSuppressed: recon.deactivationSuppressed,
           fleetOnly: recon.fleetOnly.length, portalOnly: recon.portalOnly.length });
 
         results.push({
@@ -211,7 +282,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           error: message, authFailure: auth });
       }
     }
-    return apiResponse.success(res, { results });
+    // providersConfigured makes "nothing to do" distinguishable from "nothing
+    // happened": a 0 here is the visible half of the log.warn in configured().
+    return apiResponse.success(res, { providersConfigured: providers.length, results });
   } finally {
     let unlockFailed = false;
     if (lockHeld) {

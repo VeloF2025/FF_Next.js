@@ -29,6 +29,32 @@ describe('decideAlert', () => {
     expect(d?.event).toBe('fleet.tracking_data_gap');
   });
 
+  describe('a sustained gap must not alert twelve times a day', () => {
+    const gap = (n: number) =>
+      decideAlert({ kind: 'gap', consecutiveFailures: n, nowSast: noon });
+
+    it('alerts on the first gap tick', () => {
+      expect(gap(1)?.event).toBe('fleet.tracking_data_gap');
+    });
+
+    it('stays silent on the second through eleventh consecutive gap ticks', () => {
+      for (let n = 2; n <= 11; n++) {
+        expect(gap(n), `gap tick ${n} should be suppressed`).toBeNull();
+      }
+    });
+
+    it('re-alerts on the twelfth tick — roughly daily at a 2-hourly cadence', () => {
+      expect(gap(12)?.event).toBe('fleet.tracking_data_gap');
+    });
+
+    it('keeps the reminder to once per twelve ticks while the outage persists', () => {
+      for (let n = 13; n <= 23; n++) {
+        expect(gap(n), `gap tick ${n} should be suppressed`).toBeNull();
+      }
+      expect(gap(24)?.event).toBe('fleet.tracking_data_gap');
+    });
+  });
+
   it('downgrades an overnight auth failure to the no-WhatsApp event', () => {
     const d = decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: twoAm });
     // No scheduler here: the next daytime tick (job polls every 2h) will see

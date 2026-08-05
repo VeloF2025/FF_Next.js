@@ -19,6 +19,15 @@ export type AlertKind = 'auth' | 'transient' | 'gap';
 
 export interface AlertInput {
   kind: AlertKind;
+  /**
+   * How many consecutive unhealthy ticks this provider/account has had,
+   * counted by `fleet_tracking_watermarks.consecutive_failures`.
+   *
+   * For `transient` it is the failure streak. For `gap` it is the streak of
+   * consecutive gap ticks — the same column carries it, because a gap tick
+   * deliberately does not reset the counter to 0 and a healthy tick does.
+   * One column, one meaning: consecutive ticks that did not produce data.
+   */
   consecutiveFailures: number;
   /** Current time expressed in SAST. South Africa has no DST. */
   nowSast: Date;
@@ -30,6 +39,14 @@ export interface AlertDecision {
 
 /** Transient errors must repeat this many times before anyone is told. */
 const TRANSIENT_THRESHOLD = 3;
+/**
+ * A sustained gap re-alerts once every this many gap ticks. The job runs every
+ * 2 hours, so 12 ticks is roughly one reminder a day — enough to keep an
+ * unresolved outage visible, few enough that the alert still means something.
+ * Without this, a portal that stays dark sends 12 in-app and 12 emails a day
+ * forever, and the recipient learns to ignore the channel.
+ */
+const GAP_REPEAT_TICKS = 12;
 const QUIET_UNTIL_HOUR = 7;
 const QUIET_FROM_HOUR = 20;
 const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
@@ -60,7 +77,16 @@ function sastHour(d: Date): number {
  */
 export function decideAlert(input: AlertInput): AlertDecision | null {
   if (input.kind === 'gap') {
-    return { event: 'fleet.tracking_data_gap' };
+    // Alert on the FIRST gap — that one is news and must never be delayed —
+    // then go quiet while it stays broken, surfacing again once per
+    // GAP_REPEAT_TICKS. A count of 0 means the caller could not read the
+    // streak; treat that as a first occurrence and alert, because failing
+    // loud is the whole point of this alert.
+    const gapTicks = input.consecutiveFailures;
+    if (gapTicks <= 1 || gapTicks % GAP_REPEAT_TICKS === 0) {
+      return { event: 'fleet.tracking_data_gap' };
+    }
+    return null;
   }
 
   if (input.kind === 'transient') {

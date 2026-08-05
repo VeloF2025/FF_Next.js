@@ -372,6 +372,113 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     expect(reconcileTrackersMock).not.toHaveBeenCalled();
   });
 
+  describe('missing credentials must not look like a healthy tick', () => {
+    it('names the missing variables in a warning instead of returning a silent 200', async () => {
+      delete process.env.NETSTAR_PORTAL_URL;
+      delete process.env.NETSTAR_PORTAL_PASS;
+      await run(AUTH);
+      expect(logMock.warn).toHaveBeenCalledWith(
+        expect.stringContaining('netstar not configured'),
+        expect.objectContaining({ missing: ['NETSTAR_PORTAL_URL', 'NETSTAR_PORTAL_PASS'] })
+      );
+    });
+
+    it('reports providersConfigured: 0 in the response body', async () => {
+      delete process.env.NETSTAR_PORTAL_USER;
+      const res = await run(AUTH);
+      expect(res._getJSONData().data).toMatchObject({ providersConfigured: 0, results: [] });
+    });
+
+    it('reports providersConfigured: 1 when the credentials are present', async () => {
+      const res = await run(AUTH);
+      expect(res._getJSONData().data.providersConfigured).toBe(1);
+    });
+  });
+
+  describe('poll window is floored so a stale watermark cannot burst the partner account', () => {
+    it('clamps a months-old watermark to 31 days and says so', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-07-15T09:00:00.000Z'));
+        stubSql({ watermarkRow: { last_event_ts: '2026-01-01T00:00:00.000Z' } });
+        const fetchPositions = vi.fn().mockResolvedValue([]);
+        netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions }));
+        await run(AUTH);
+        const [from, to] = fetchPositions.mock.calls[0] as [Date, Date];
+        expect(to.getTime() - from.getTime()).toBe(31 * 24 * 60 * 60 * 1000);
+        expect(logMock.warn).toHaveBeenCalledWith(
+          expect.stringContaining('poll window clamped'),
+          // watermark minus the 60-minute overlap, before the floor applies
+          expect.objectContaining({
+            requestedFrom: '2025-12-31T23:00:00.000Z',
+            clampedFrom: '2026-06-14T09:00:00.000Z',
+          })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('leaves a normal warm-start window untouched and logs no clamp', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-07-15T09:05:00.000Z'));
+        stubSql({ watermarkRow: { last_event_ts: '2026-07-15T07:00:00.000Z' } });
+        netstarProviderMock.mockReturnValue(
+          makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([{ externalId: '1' }]) })
+        );
+        await run(AUTH);
+        expect(logMock.warn).not.toHaveBeenCalledWith(
+          expect.stringContaining('poll window clamped'), expect.anything()
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('gap streak is carried by consecutive_failures, so a sustained outage can be suppressed', () => {
+    function gapWatermarkQuery() {
+      return sqlMock.mock.calls.find((c) => {
+        const text = (c[0] as TemplateStringsArray).join('');
+        return text.includes('INSERT INTO fleet_tracking_watermarks')
+          && text.includes('RETURNING consecutive_failures');
+      });
+    }
+
+    it('increments rather than resets the counter on a gap tick', async () => {
+      stubSql({ activeTrackers: 3, failureConsecutive: 4 });
+      netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
+      await run(AUTH);
+      const q = gapWatermarkQuery();
+      expect(q).toBeDefined();
+      const text = (q?.[0] as TemplateStringsArray).join('');
+      expect(text).toContain('consecutive_failures = fleet_tracking_watermarks.consecutive_failures + 1');
+    });
+
+    it('threads the bumped streak into the alert so decideAlert can suppress it', async () => {
+      stubSql({ activeTrackers: 3, failureConsecutive: 4 });
+      netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
+      await run(AUTH);
+      expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'gap', consecutiveFailures: 4 })
+      );
+    });
+
+    it('resets the counter to 0 on a healthy tick, so the next gap alerts immediately', async () => {
+      stubSql({ activeTrackers: 3 });
+      netstarProviderMock.mockReturnValue(
+        makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([{ externalId: '1' }]) })
+      );
+      await run(AUTH);
+      expect(gapWatermarkQuery()).toBeUndefined();
+      const healthy = sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracking_watermarks'));
+      expect((healthy?.[0] as TemplateStringsArray).join('')).toContain('consecutive_failures = 0');
+      expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('watermark write: pins the value written to last_event_ts', () => {
     function successUpsertValue(): unknown {
       const call = sqlMock.mock.calls.find((c) => {
