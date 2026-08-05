@@ -341,6 +341,86 @@ describe('Ticket Service - CRUD Operations', () => {
       expect(result.ticket_uid).toMatch(/^FT\d{6}$/);
       expect(result.ticket_uid.length).toBe(8); // FT + 6 digits
     });
+
+    /**
+     * The INSERT keeps three hand-maintained lists in lockstep — column names,
+     * $n placeholders, and the values array. Nothing enforced that alignment, so
+     * adding a column could silently shift every value one position to the left
+     * and write plausible-looking garbage across the row. gps_coordinates was
+     * the 27th such column; these tests are the alignment guard.
+     */
+    describe('INSERT column/placeholder/value alignment', () => {
+      const basePayload: CreateTicketPayload = {
+        source: TicketSource.AD_HOC,
+        title: 'GPS alignment probe',
+        ticket_type: TicketType.MAINTENANCE,
+        created_by: 'user-uuid-123',
+      };
+
+      async function captureInsert(payload: CreateTicketPayload) {
+        vi.mocked(queryOne).mockResolvedValue({ id: 'x', ticket_uid: 'FT000001' });
+        await createTicket(payload);
+        const call = vi
+          .mocked(queryOne)
+          .mock.calls.find(
+            (c) =>
+              typeof c[0] === 'string' &&
+              (c[0] as string).includes('INSERT INTO maintenance_tickets')
+          );
+        expect(call).toBeDefined();
+        return { sql: call![0] as string, values: call![1] as unknown[] };
+      }
+
+      it('declares as many placeholders as columns, and passes exactly that many values', async () => {
+        const { sql, values } = await captureInsert(basePayload);
+
+        const columnBlock = sql.slice(
+          sql.indexOf('INSERT INTO maintenance_tickets ('),
+          sql.indexOf(') VALUES')
+        );
+        const columnCount = columnBlock
+          .slice(columnBlock.indexOf('(') + 1)
+          .split(',')
+          .map((c) => c.trim())
+          .filter(Boolean).length;
+
+        const placeholders = (sql.match(/\$\d+/g) ?? []).map((p) => Number(p.slice(1)));
+        const highest = Math.max(...placeholders);
+
+        expect(new Set(placeholders).size).toBe(highest); // no gaps, no repeats
+        expect(columnCount).toBe(highest);
+        expect(values.length).toBe(highest);
+      });
+
+      it('stores gps_coordinates as "lat,lng" at the position its column declares', async () => {
+        const { sql, values } = await captureInsert({
+          ...basePayload,
+          gps_coordinates: { latitude: -26.7387387, longitude: 27.0148998 },
+        });
+
+        const columnBlock = sql.slice(
+          sql.indexOf('INSERT INTO maintenance_tickets (') + 'INSERT INTO maintenance_tickets ('.length,
+          sql.indexOf(') VALUES')
+        );
+        const columns = columnBlock.split(',').map((c) => c.trim()).filter(Boolean);
+        const gpsIndex = columns.indexOf('gps_coordinates');
+
+        expect(gpsIndex).toBeGreaterThanOrEqual(0);
+        // Positional, not just "present somewhere in the array" — a shifted
+        // values list would still satisfy a toContain assertion.
+        expect(values[gpsIndex]).toBe('-26.7387387,27.0148998');
+      });
+
+      it('writes NULL when no coordinate is supplied', async () => {
+        const { sql, values } = await captureInsert(basePayload);
+        const columnBlock = sql.slice(
+          sql.indexOf('INSERT INTO maintenance_tickets (') + 'INSERT INTO maintenance_tickets ('.length,
+          sql.indexOf(') VALUES')
+        );
+        const columns = columnBlock.split(',').map((c) => c.trim()).filter(Boolean);
+        expect(values[columns.indexOf('gps_coordinates')]).toBeNull();
+      });
+    });
   });
 
   describe('getTicketById', () => {

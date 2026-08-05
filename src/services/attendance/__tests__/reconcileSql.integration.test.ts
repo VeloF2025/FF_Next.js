@@ -79,7 +79,8 @@ const TEMPLATES: Template[] = [
       FROM staff s CROSS JOIN workdays w
       LEFT JOIN public_holidays ph ON ph.date = w.work_date
       LEFT JOIN attendance_daily_summaries ds ON ds.staff_id = s.id AND ds.work_date = w.work_date
-      WHERE (s.is_active = true OR s.is_active IS NULL) AND s.end_date IS NULL
+      WHERE s.attendance_tracked = true
+        AND (s.is_active = true OR s.is_active IS NULL) AND s.end_date IS NULL
       ORDER BY w.work_date ASC, s.id ASC`,
     params: [DATE, DATE],
   },
