@@ -60,11 +60,14 @@ describe('lookupOesGpsByDr', () => {
     expect(sql).toMatch(/longitude BETWEEN/i);
   });
 
-  it('takes the most recent activation', async () => {
+  it('needs no recency tiebreak — oes_activations is UNIQUE (drop_number)', async () => {
+    // An earlier version ordered by activation_date here and claimed "latest
+    // activation wins". The unique constraint means there is at most one row per
+    // DR, so that ordering was dead code describing impossible behaviour.
     queryMock.mockResolvedValueOnce(empty);
     await lookupOesGpsByDr('DR100');
     const [sql] = queryMock.mock.calls[0] as [string];
-    expect(sql).toMatch(/ORDER BY\s+activation_date DESC NULLS LAST/i);
+    expect(sql).not.toMatch(/ORDER BY/i);
     expect(sql).toMatch(/LIMIT 1/i);
   });
 
@@ -89,10 +92,10 @@ describe('lookupOesGpsByDr', () => {
 describe('lookupOesGpsBySerial', () => {
   it('matches case-insensitively on the serial', async () => {
     queryMock.mockResolvedValueOnce(row('-26.5', '27.5'));
-    expect(await lookupOesGpsBySerial('sn200')).toEqual({ latitude: -26.5, longitude: 27.5 });
+    expect(await lookupOesGpsBySerial('alclb48e2002')).toEqual({ latitude: -26.5, longitude: 27.5 });
     const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
     expect(sql).toMatch(/LOWER\(serial_number\)\s*=\s*LOWER\(\$1\)/i);
-    expect(params?.[0]).toBe('sn200');
+    expect(params?.[0]).toBe('alclb48e2002');
   });
 
   it('short-circuits on empty input without querying', async () => {
@@ -103,14 +106,14 @@ describe('lookupOesGpsBySerial', () => {
 
   it('degrades to null on a DB error', async () => {
     queryMock.mockRejectedValueOnce(new Error('boom'));
-    await expect(lookupOesGpsBySerial('SN1')).resolves.toBeNull();
+    await expect(lookupOesGpsBySerial('ALCLB48E0001')).resolves.toBeNull();
   });
 });
 
 describe('lookupOesGps — DR first, serial as fallback', () => {
   it('uses the DR hit and never queries the serial', async () => {
     queryMock.mockResolvedValueOnce(row('-26.7387387', '27.0148998'));
-    expect(await lookupOesGps('DR100', 'SN100')).toEqual({
+    expect(await lookupOesGps('DR100', 'ALCLB48E1001')).toEqual({
       latitude: -26.7387387,
       longitude: 27.0148998,
     });
@@ -122,22 +125,22 @@ describe('lookupOesGps — DR first, serial as fallback', () => {
     // against, because the ONT actually activated somewhere else. The serial is
     // the anchor that survives a wrong DR link.
     queryMock.mockResolvedValueOnce(empty).mockResolvedValueOnce(row('-26.5', '27.5'));
-    expect(await lookupOesGps('DR200', 'SN200')).toEqual({ latitude: -26.5, longitude: 27.5 });
+    expect(await lookupOesGps('DR200', 'ALCLB48E2002')).toEqual({ latitude: -26.5, longitude: 27.5 });
     expect(queryMock).toHaveBeenCalledTimes(2);
-    expect((queryMock.mock.calls[1] as [string, unknown[]])[1]?.[0]).toBe('SN200');
+    expect((queryMock.mock.calls[1] as [string, unknown[]])[1]?.[0]).toBe('ALCLB48E2002');
   });
 
   it('returns null when neither matches', async () => {
     queryMock.mockResolvedValue(empty);
-    expect(await lookupOesGps('DR-X', 'SN-X')).toBeNull();
+    expect(await lookupOesGps('DR-X', 'ALCLB48EXXXX')).toBeNull();
   });
 
   it('still tries the serial when no DR is supplied at all', async () => {
     // not_found PP rows have no resolved DR — the serial is the only handle.
     queryMock.mockResolvedValueOnce(row('-26.9', '27.9'));
-    expect(await lookupOesGps(null, 'SN300')).toEqual({ latitude: -26.9, longitude: 27.9 });
+    expect(await lookupOesGps(null, 'ALCLB48E3003')).toEqual({ latitude: -26.9, longitude: 27.9 });
     expect(queryMock).toHaveBeenCalledTimes(1);
-    expect((queryMock.mock.calls[0] as [string, unknown[]])[1]?.[0]).toBe('SN300');
+    expect((queryMock.mock.calls[0] as [string, unknown[]])[1]?.[0]).toBe('ALCLB48E3003');
   });
 
   it('returns null without querying when both handles are absent', async () => {
@@ -147,6 +150,36 @@ describe('lookupOesGps — DR first, serial as fallback', () => {
 
   it('does not let a DR-side DB error suppress the serial fallback path', async () => {
     queryMock.mockRejectedValueOnce(new Error('db down')).mockResolvedValueOnce(row('-26.4', '27.4'));
-    expect(await lookupOesGps('DR400', 'SN400')).toEqual({ latitude: -26.4, longitude: 27.4 });
+    expect(await lookupOesGps('DR400', 'ALCLB48E4004')).toEqual({ latitude: -26.4, longitude: 27.4 });
+  });
+});
+
+describe('placeholder serials never reach the database', () => {
+  it('short-circuits on a placeholder rather than matching an unrelated row', async () => {
+    // '-' appears on 50 oes_activations rows across 50 unrelated DRs. An exact
+    // LOWER() match would return an arbitrary one — a real, wrong address.
+    expect(await lookupOesGpsBySerial('-')).toBeNull();
+    expect(await lookupOesGpsBySerial('------')).toBeNull();
+    expect(await lookupOesGpsBySerial('N/A')).toBeNull();
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back to a placeholder serial when the DR misses', async () => {
+    // The dangerous path: not_found / empty_serial / wa_no_oes all guarantee a
+    // DR miss, which is exactly when the serial fallback runs.
+    queryMock.mockResolvedValueOnce(empty);
+    expect(await lookupOesGps('DR-MISSING', '-')).toBeNull();
+    expect(queryMock).toHaveBeenCalledTimes(1); // DR attempted, serial refused
+  });
+});
+
+describe('DR lookup uses the index rather than UPPER()', () => {
+  it('uppercases in JS and compares the column directly', async () => {
+    queryMock.mockResolvedValueOnce(empty);
+    await lookupOesGpsByDr(' dr1734917 ');
+    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toMatch(/UPPER\(\s*drop_number/i);
+    expect(sql).toMatch(/drop_number = \$1/);
+    expect(params?.[0]).toBe('DR1734917');
   });
 });

@@ -82,6 +82,31 @@ export type DisplayPoint = GpsPoint;
 
 export const GPS_DIVERGENCE_THRESHOLD_M = 50;
 
+/**
+ * Is this serial specific enough to identify one installation?
+ *
+ * `oes_activations` stores 50 rows whose serial_number is literally "-", spread
+ * across 50 unrelated DRs in at least three suburbs ~115km apart; 105
+ * olt_mismatch_records carry the same placeholder in olt_serial. An exact
+ * LOWER(serial)=LOWER($1) match on "-" therefore resolves to an arbitrary one
+ * of those rows — a real address, belonging to a stranger.
+ *
+ * The by-DR lookup shields this today, but the serial fallback exists precisely
+ * for the cases where the DR misses: `not_found` and `empty_serial` are both
+ * eligible statuses, and wa_no_oes guarantees a DR miss by definition. One
+ * placeholder-serial record without an OES row by DR is all it takes.
+ *
+ * Real ONT serials are 12+ alphanumerics (e.g. ALCLB48E394B); requiring 6 is
+ * well below any genuine serial and well above any placeholder seen.
+ */
+export function isResolvableSerial(serial: string | null | undefined): serial is string {
+  if (!serial) return false;
+  const trimmed = serial.trim();
+  if (trimmed.length < 6) return false;
+  // Reject strings with no alphanumeric substance ("------", "??????").
+  return /[A-Za-z0-9]{6,}/.test(trimmed);
+}
+
 /** A usable coordinate: both axes present and numeric. Half a pair is not a location. */
 export function isDisplayPoint(p: unknown): p is DisplayPoint {
   if (!p || typeof p !== 'object') return false;
@@ -94,13 +119,61 @@ export function isDisplayPoint(p: unknown): p is DisplayPoint {
   );
 }
 
+/**
+ * The only ticket sources for which the OES coordinate outranks everything else.
+ *
+ * These three exist BECAUSE the DR<->serial link is in doubt, so a DR-derived
+ * location inherits the very error under investigation and the OES coordinate —
+ * anchored to the serial — is the better bet.
+ *
+ * That reasoning does NOT generalise. A snags ticket's stored coordinate is the
+ * technician's own on-site capture; a manual or construction ticket's is
+ * whoever raised it standing at the fault. Ranking OES above those is strictly
+ * worse, and measurably so: DR1734917 carries four open snags tickets whose
+ * captured position sits 6m from the design point, while its OES row (team
+ * law5, a Lawley drop) is pinned 94.7km away near Brits. Applying the OES
+ * ranking everywhere moved the pin on 447 open out-of-scope tickets.
+ */
+export const OES_RANKED_TICKET_SOURCES = ['olt_mismatch', 'wa_no_oes', 'pp_data'] as const;
+
+export function ranksOesFirst(source: string | null | undefined): boolean {
+  return !!source && (OES_RANKED_TICKET_SOURCES as readonly string[]).includes(source);
+}
+
+/**
+ * Coerce whatever `maintenance_tickets.gps_coordinates` arrives as into a point.
+ *
+ * It is a TEXT column and reaches the client as the raw "lat,lng" string —
+ * getTicketById does `SELECT t.*` and the route spreads the row straight into
+ * the JSON response. An earlier version of this file only accepted the object
+ * form, so the stored tier silently never fired.
+ */
+export function parseStoredGps(value: unknown): DisplayPoint | null {
+  if (isDisplayPoint(value)) return value;
+  if (typeof value !== 'string') return null;
+  const parts = value.split(',');
+  if (parts.length !== 2) return null;
+  const latitude = Number.parseFloat(parts[0] as string);
+  const longitude = Number.parseFloat(parts[1] as string);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (latitude === 0 && longitude === 0) return null;
+  return { latitude, longitude };
+}
+
 export interface TicketGpsDisplayInput {
+  /**
+   * The ticket's `source`. The OES coordinate is only ranked first for the
+   * sources in OES_RANKED_TICKET_SOURCES; for anything else it is ignored
+   * entirely rather than quietly demoted, so no other ticket type changes
+   * behaviour.
+   */
+  ticketSource?: string | null;
   /** From the daily OES report — independent of the design lineage. */
   oesGps?: unknown;
   /** SOW drops, then 1Map — the same design lineage either way. */
   fibreflowGps?: unknown;
   onemapGps?: unknown;
-  /** Whatever was stored on the ticket row, as a last resort. */
+  /** Whatever was stored on the ticket row; a "lat,lng" string or a point. */
   ticketGps?: unknown;
   /** Metres between the OES and design coordinates, precomputed server-side. */
   divergenceM?: number | null;
@@ -130,13 +203,16 @@ export interface TicketGpsDisplay {
  * disagreement can actually be settled.
  */
 export function selectTicketGpsDisplay(input: TicketGpsDisplayInput): TicketGpsDisplay {
-  const oes = isDisplayPoint(input.oesGps) ? input.oesGps : null;
+  // Scoped, not global — see OES_RANKED_TICKET_SOURCES.
+  const oes = ranksOesFirst(input.ticketSource) && isDisplayPoint(input.oesGps)
+    ? input.oesGps
+    : null;
   const design = isDisplayPoint(input.fibreflowGps)
     ? input.fibreflowGps
     : isDisplayPoint(input.onemapGps)
       ? input.onemapGps
       : null;
-  const stored = isDisplayPoint(input.ticketGps) ? input.ticketGps : null;
+  const stored = parseStoredGps(input.ticketGps);
 
   const primary = oes ?? design ?? stored;
   if (!primary) {

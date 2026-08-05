@@ -67,7 +67,7 @@ oes_by_dr AS (
      AND o.latitude IS NOT NULL AND o.longitude IS NOT NULL
      AND o.latitude BETWEEN -35 AND -22
      AND o.longitude BETWEEN 16 AND 33
-   ORDER BY t.id, o.activation_date DESC NULLS LAST, o.imported_at DESC
+   ORDER BY t.id, o.activation_date DESC NULLS LAST, o.imported_at DESC NULLS LAST, o.id DESC
 ),
 oes_by_serial AS (
   SELECT DISTINCT ON (t.id) t.id AS ticket_id, o.latitude, o.longitude
@@ -77,7 +77,13 @@ oes_by_serial AS (
      AND o.latitude IS NOT NULL AND o.longitude IS NOT NULL
      AND o.latitude BETWEEN -35 AND -22
      AND o.longitude BETWEEN 16 AND 33
-   ORDER BY t.id, o.activation_date DESC NULLS LAST, o.imported_at DESC
+     -- Placeholder serials resolve to a stranger's address. 50 oes_activations
+     -- rows have serial_number = '-' across 50 unrelated DRs ~115km apart, and
+     -- 105 olt_mismatch_records carry the same placeholder. Mirrors
+     -- isResolvableSerial() in modules/noc/utils/gps.ts.
+     AND o.serial_number ~ '[A-Za-z0-9]{6,}'
+     AND t.ont_serial ~ '[A-Za-z0-9]{6,}'
+   ORDER BY t.id, o.activation_date DESC NULLS LAST, o.imported_at DESC NULLS LAST, o.id DESC
 ),
 design AS (
   -- DISTINCT ON: a DR can appear more than once in `drops` (qfield + sow rows).
@@ -98,8 +104,16 @@ SELECT
   END AS gps_source,
   COALESCE(od.latitude,  os.latitude,  dz.latitude)  AS latitude,
   COALESCE(od.longitude, os.longitude, dz.longitude) AS longitude,
-  COALESCE(od.latitude,  os.latitude,  dz.latitude)::text || ','
-    || COALESCE(od.longitude, os.longitude, dz.longitude)::text AS new_gps
+  -- trim_scale, not a bare ::text cast. numeric(10,7) always renders 7 decimals
+  -- ("-26.3784200"), while the application writes JS Number stringification and
+  -- drops the trailing zeros ("-26.37842"). 5,866 of 25,414 OES rows (23%) end
+  -- in a zero, so a bare cast makes the migration and the runtime disagree on
+  -- the text for the SAME point — defeating both idempotence guards, which
+  -- compare strings: this migration's `IS DISTINCT FROM` and the PP backfill's
+  -- `next !== ticket.gps_coordinates`. Every such row would be rewritten on
+  -- every run.
+  trim_scale(COALESCE(od.latitude,  os.latitude,  dz.latitude))::text || ','
+    || trim_scale(COALESCE(od.longitude, os.longitude, dz.longitude))::text AS new_gps
 FROM targets t
 LEFT JOIN oes_by_dr     od ON od.ticket_id = t.id
 LEFT JOIN oes_by_serial os ON os.ticket_id = t.id

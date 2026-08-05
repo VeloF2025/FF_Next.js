@@ -110,6 +110,9 @@ dbDescribe('migration 479 — GPS backfill (needs TEST_DATABASE_URL)', () => {
       )`);
     await q(`
       CREATE TABLE oes_activations (
+        -- id mirrors the real table (uuid PRIMARY KEY); the migration uses it as
+        -- the final DISTINCT ON tiebreaker so a re-run is provably stable.
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         drop_number varchar(20),
         serial_number varchar(50),
         latitude numeric(10,7),
@@ -141,24 +144,24 @@ dbDescribe('migration 479 — GPS backfill (needs TEST_DATABASE_URL)', () => {
 
     await q(
       `INSERT INTO maintenance_tickets (id, source, status, dr_number, ont_serial, gps_coordinates) VALUES
-         ($1::uuid,'olt_mismatch','open',     'DR100','SN100', '-26.7295508,27.0179814'),
-         ($2::uuid,'olt_mismatch','assigned', 'DR200','SN200', NULL),
-         ($3::uuid,'pp_data',     'open',     'DR300','SN300', '-26.7295508,27.0179814'),
-         ($4::uuid,'wa_no_oes',   'open',     'DR400','SN400', NULL),
-         ($5::uuid,'wa_no_oes',   'open',     'DR500','SN500', '-26.1111111,27.1111111'),
-         ($6::uuid,'olt_mismatch','resolved', 'DR600','SN600', NULL),
-         ($7::uuid,'snags',       'open',     'DR700','SN700', NULL),
-         ($8::uuid,'pp_data',     'open',     'DR800','SN800', NULL)`,
+         ($1::uuid,'olt_mismatch','open',     'DR100','ALCLB48E1001', '-26.7295508,27.0179814'),
+         ($2::uuid,'olt_mismatch','assigned', 'DR200','ALCLB48E2002', NULL),
+         ($3::uuid,'pp_data',     'open',     'DR300','ALCLB48E3003', '-26.7295508,27.0179814'),
+         ($4::uuid,'wa_no_oes',   'open',     'DR400','ALCLB48E4004', NULL),
+         ($5::uuid,'wa_no_oes',   'open',     'DR500','ALCLB48E5005', '-26.1111111,27.1111111'),
+         ($6::uuid,'olt_mismatch','resolved', 'DR600','ALCLB48E6006', NULL),
+         ($7::uuid,'snags',       'open',     'DR700','ALCLB48E7007', NULL),
+         ($8::uuid,'pp_data',     'open',     'DR800','ALCLB48E8008', NULL)`,
       Object.values(TICKETS)
     );
 
     await q(
       `INSERT INTO oes_activations (drop_number, serial_number, latitude, longitude, activation_date) VALUES
-         ('DR100','SN100', -26.7387387, 27.0148998, '2026-07-01'),
-         ('DR-OTHER','SN200', -26.5000000, 27.5000000, '2026-07-01'),
-         ('DR300','SN300',  26.6458226, 87.7349221, '2026-07-01'),
-         ('DR600','SN600', -26.4000000, 27.4000000, '2026-07-01'),
-         ('DR700','SN700', -26.3000000, 27.3000000, '2026-07-01')`
+         ('DR100','ALCLB48E1001', -26.7387387, 27.0148998, '2026-07-01'),
+         ('DR-OTHER','ALCLB48E2002', -26.5000000, 27.5000000, '2026-07-01'),
+         ('DR300','ALCLB48E3003',  26.6458226, 87.7349221, '2026-07-01'),
+         ('DR600','ALCLB48E6006', -26.4000000, 27.4000000, '2026-07-01'),
+         ('DR700','ALCLB48E7007', -26.3000000, 27.3000000, '2026-07-01')`
     );
 
     await q(
@@ -182,7 +185,9 @@ dbDescribe('migration 479 — GPS backfill (needs TEST_DATABASE_URL)', () => {
       // The whole point for mismatch tickets: the DR link is what is in dispute,
       // the serial is not. DR200 has no OES row; SN200 activated under DR-OTHER.
       await client.query(FORWARD);
-      expect(await gpsOf(TICKETS.oesBySerial)).toBe('-26.5000000,27.5000000');
+      // trim_scale: must match what the application writes (JS Number
+      // stringification), not numeric(10,7)'s fixed 7 decimals.
+      expect(await gpsOf(TICKETS.oesBySerial)).toBe('-26.5,27.5');
     });
 
     it('rejects an out-of-bounds OES coordinate instead of teleporting the ticket', async () => {
@@ -194,7 +199,7 @@ dbDescribe('migration 479 — GPS backfill (needs TEST_DATABASE_URL)', () => {
 
     it('fills an empty column from the design position when no OES row exists', async () => {
       await client.query(FORWARD);
-      expect(await gpsOf(TICKETS.designOnlyEmpty)).toBe('-26.9000000,27.9000000');
+      expect(await gpsOf(TICKETS.designOnlyEmpty)).toBe('-26.9,27.9');
     });
 
     it('never overwrites an existing coordinate with the design position', async () => {
@@ -292,6 +297,31 @@ dbDescribe('migration 479 — GPS backfill (needs TEST_DATABASE_URL)', () => {
         expect(row.gps_coordinates).toBe(priorById.get(row.ticket_id) ?? null);
       }
       expect(changedIds.length).toBeGreaterThan(0);
+    });
+  });
+
+  dbDescribe('placeholder serials and text format', () => {
+    it('refuses to resolve a placeholder serial to an unrelated address', async () => {
+      // '-' exists on 50 production oes_activations rows across 50 unrelated
+      // DRs. Matching it would pin a ticket to a stranger's house.
+      await q(`UPDATE maintenance_tickets SET ont_serial = '-', dr_number = 'DR-NO-OES'
+                WHERE id = $1::uuid`, [TICKETS.oesBySerial]);
+      await q(`INSERT INTO oes_activations (drop_number, serial_number, latitude, longitude, activation_date)
+               VALUES ('DR-ELSEWHERE','-', -25.7000000, 28.4000000, '2026-07-01')`);
+
+      await client.query(FORWARD);
+
+      expect(await gpsOf(TICKETS.oesBySerial)).toBeNull();
+    });
+
+    it('writes the same text the application writes, so re-runs do not churn', async () => {
+      // numeric(10,7)::text renders 7 decimals ("-26.5000000"); the app writes
+      // JS Number stringification ("-26.5"). Both idempotence guards compare
+      // strings, so a mismatch rewrites ~23% of rows on every run.
+      await client.query(FORWARD);
+      const gps = await gpsOf(TICKETS.oesBySerial);
+      expect(gps).toBe('-26.5,27.5');
+      expect(gps).not.toMatch(/0{3,}/);
     });
   });
 

@@ -525,11 +525,17 @@ export async function enrichTicketData(drNumber: string | null): Promise<Enriche
         longitude: oesGps.longitude,
         address: null,
       };
-      if (result.fibreflow_gps) {
+      // Measure against whichever design coordinate the UI will actually rank
+      // second — sow_drops when present, else 1Map. Comparing only against
+      // sow_drops left the warning silent exactly where the cross-check was
+      // 1Map-only: 244 open tickets, 76 of them more than 50m apart and one
+      // 10.5km out, all rendered as a single confident pin.
+      const designForDivergence = result.fibreflow_gps ?? result.onemap_gps;
+      if (designForDivergence) {
         result.gps_divergence_m = Math.round(
           haversineMeters(oesGps, {
-            latitude: result.fibreflow_gps.latitude,
-            longitude: result.fibreflow_gps.longitude,
+            latitude: designForDivergence.latitude,
+            longitude: designForDivergence.longitude,
           })
         );
       }

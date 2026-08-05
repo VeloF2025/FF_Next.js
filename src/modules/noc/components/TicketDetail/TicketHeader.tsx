@@ -112,6 +112,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
     oesGps: enrichment?.oes_gps,
     fibreflowGps: enrichment?.fibreflow_gps,
     onemapGps: enrichment?.onemap_gps,
+    ticketSource: ticket.source,
     ticketGps: ticket.gps_coordinates,
     divergenceM: enrichment?.gps_divergence_m,
   });
