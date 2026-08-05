@@ -132,6 +132,50 @@ export function resolveRemoteTimeoutMs(raw: string | undefined): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REMOTE_TIMEOUT_MS;
 }
 
+/**
+ * Max concurrent in-flight remote-whisper POSTs.
+ *
+ * Each in-flight request pins its ENTIRE WAV in memory (16kHz 16-bit mono ≈ 115 MB
+ * per hour of audio) from readFileSync until the request settles. Nothing bounded the
+ * fan-out, so callers could pile requests up without limit.
+ *
+ * 2026-08-05: whisper.cpp on the Mac Mini stopped answering while its port stayed OPEN
+ * (TCP connect succeeds → no ECONNREFUSED → every request waits the full 30-minute
+ * timeout). 88 requests accumulated ≈ 9 GB and repeatedly exhausted prod's 16 GB cgroup.
+ * A healthy endpoint would OOM the same way given enough concurrent meetings — the dead
+ * service only made it easy to hit. The cap, not the timeout, is the fix.
+ */
+const DEFAULT_MAX_CONCURRENT_REMOTE = 2;
+
+/** Parse WHISPER_MAX_CONCURRENT; missing/invalid/<1 falls back to the default. */
+export function resolveMaxConcurrentRemote(raw: string | undefined): number {
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : DEFAULT_MAX_CONCURRENT_REMOTE;
+}
+
+let remoteActive = 0;
+const remoteWaiters: Array<() => void> = [];
+
+/**
+ * Acquire a transcription slot. Returns a release function that is safe to call
+ * more than once. Callers MUST acquire before reading the WAV into memory, so
+ * queued work holds only a file path rather than ~115 MB per hour of audio.
+ */
+async function acquireRemoteSlot(): Promise<() => void> {
+  // Re-read the cap each loop: it is env-driven and a waiter may resume much later.
+  while (remoteActive >= resolveMaxConcurrentRemote(process.env.WHISPER_MAX_CONCURRENT)) {
+    await new Promise<void>((resolve) => remoteWaiters.push(resolve));
+  }
+  remoteActive++;
+  let released = false;
+  return () => {
+    if (released) return; // idempotent — finally blocks can run more than once
+    released = true;
+    remoteActive--;
+    remoteWaiters.shift()?.();
+  };
+}
+
 /** Remove a temp file; ENOENT is expected, anything else is logged (never thrown). */
 function safeUnlink(filePath: string): void {
   try {
@@ -185,9 +229,16 @@ async function whisperRemote(
   const timeoutMs = resolveRemoteTimeoutMs(process.env.WHISPER_REMOTE_TIMEOUT_MS);
   const wavPath = toWav16k(audioPath);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let release: (() => void) | null = null;
+  let timer: NodeJS.Timeout | null = null;
 
   try {
+    // Acquire BEFORE readFileSync so queued work holds a path, not ~115 MB per hour
+    // of audio. The timeout starts only once the slot is granted, so time spent
+    // waiting in the queue never eats into the transcription budget.
+    release = await acquireRemoteSlot();
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+
     const wavBuffer = fs.readFileSync(wavPath);
     const blob = new Blob([wavBuffer], { type: 'audio/wav' });
 
@@ -222,7 +273,8 @@ async function whisperRemote(
     }
     return result;
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
+    release?.();
     safeUnlink(wavPath);
   }
 }
