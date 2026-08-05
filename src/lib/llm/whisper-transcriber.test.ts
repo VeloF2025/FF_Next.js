@@ -39,9 +39,15 @@ vi.mock('fs', () => {
   return { ...mod, default: mod };
 });
 
-import { resolveRemoteTimeoutMs, transcribeWithWhisper } from './whisper-transcriber';
+import {
+  acquireRemoteSlot,
+  resolveMaxConcurrentRemote,
+  resolveRemoteTimeoutMs,
+  transcribeWithWhisper,
+} from './whisper-transcriber';
 
 const DEFAULT_TIMEOUT_MS = 1_800_000;
+const DEFAULT_MAX_CONCURRENT = 2;
 
 const REMOTE = 'http://mac-mini:8009';
 
@@ -68,10 +74,12 @@ describe('transcribeWithWhisper — backend selection', () => {
     vi.clearAllMocks();
     delete process.env.WHISPER_REMOTE_URL;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.WHISPER_MAX_CONCURRENT;
   });
   afterEach(() => {
     delete process.env.WHISPER_REMOTE_URL;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.WHISPER_MAX_CONCURRENT;
   });
 
   it('routes both passes to the on-prem /inference endpoint when WHISPER_REMOTE_URL is set', async () => {
@@ -129,6 +137,108 @@ describe('transcribeWithWhisper — backend selection', () => {
     expect(resolveRemoteTimeoutMs('not-a-number')).toBe(DEFAULT_TIMEOUT_MS);
     expect(resolveRemoteTimeoutMs('0')).toBe(DEFAULT_TIMEOUT_MS);
     expect(resolveRemoteTimeoutMs('-1')).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  it('resolveMaxConcurrentRemote falls back to the default for bad values (never 0/NaN)', () => {
+    // A 0/NaN cap would either deadlock every call or disable the guard entirely.
+    expect(resolveMaxConcurrentRemote('4')).toBe(4);
+    expect(resolveMaxConcurrentRemote('2.7')).toBe(2); // floored, still >= 1
+    expect(resolveMaxConcurrentRemote(undefined)).toBe(DEFAULT_MAX_CONCURRENT);
+    expect(resolveMaxConcurrentRemote('')).toBe(DEFAULT_MAX_CONCURRENT);
+    expect(resolveMaxConcurrentRemote('not-a-number')).toBe(DEFAULT_MAX_CONCURRENT);
+    expect(resolveMaxConcurrentRemote('0')).toBe(DEFAULT_MAX_CONCURRENT);
+    expect(resolveMaxConcurrentRemote('-3')).toBe(DEFAULT_MAX_CONCURRENT);
+  });
+
+  it('never has more than WHISPER_MAX_CONCURRENT remote requests in flight', async () => {
+    // The OOM guard. Each in-flight request pins its whole WAV (~115 MB per hour of
+    // audio) in memory; on 2026-08-05 an unbounded fan-out reached 88 concurrent ≈ 9 GB
+    // against a dead endpoint and exhausted prod's 16 GB cgroup. Without the cap the
+    // peak below is 6 (one per call), not 2.
+    process.env.WHISPER_REMOTE_URL = REMOTE;
+    process.env.WHISPER_MAX_CONCURRENT = '2';
+
+    let inFlight = 0;
+    let peak = 0;
+    const gates: Array<() => void> = [];
+
+    global.fetch = vi.fn(() => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      return new Promise((resolve) => {
+        gates.push(() => {
+          inFlight--;
+          resolve(verboseJson('x') as never);
+        });
+      });
+    }) as never;
+
+    const runs = Array.from({ length: 6 }, (_, i) => transcribeWithWhisper(`/recordings/${i}.mp4`, i));
+
+    let allDone = false;
+    const settled = Promise.allSettled(runs).then((r) => { allDone = true; return r; });
+
+    // Release whatever is in flight, repeatedly, until every call settles. Each call
+    // makes two sequential passes (af then en), so this drains over several rounds.
+    for (let guard = 0; !allDone && guard < 500; guard++) {
+      while (gates.length) gates.shift()?.();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    await settled;
+
+    expect(allDone).toBe(true);
+    expect(peak).toBeGreaterThan(0);
+    expect(peak).toBeLessThanOrEqual(2);
+  });
+
+  it('hands a released slot to the longest-waiting caller, not a later arrival', async () => {
+    // FIFO. The previous implementation decremented the counter and then woke the
+    // head waiter, which only re-checks a microtask later — so a caller arriving in
+    // that gap grabbed the slot synchronously and pushed the queued waiter to the
+    // back, repeatedly, under sustained arrivals.
+    process.env.WHISPER_MAX_CONCURRENT = '1';
+    const order: string[] = [];
+
+    const releaseFirst = await acquireRemoteSlot();          // holds the only slot
+
+    const pB = acquireRemoteSlot().then((r) => { order.push('B'); return r; });
+    await new Promise((r) => setTimeout(r, 0));              // B is now queued
+    expect(order).toEqual([]);
+
+    releaseFirst();
+    // D arrives immediately after the release — exactly the barging window.
+    const pD = acquireRemoteSlot().then((r) => { order.push('D'); return r; });
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(order).toEqual(['B']);                            // B first, D did not barge
+
+    (await pB)();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(order).toEqual(['B', 'D']);
+    (await pD)();
+  });
+
+  it('releases the slot to a waiter even after the cap is lowered at runtime', async () => {
+    // The lowered-cap path shrinks by decrementing instead of handing over; it must
+    // still converge rather than strand the waiter forever.
+    process.env.WHISPER_MAX_CONCURRENT = '2';
+    const a = await acquireRemoteSlot();
+    const b = await acquireRemoteSlot();
+
+    let granted = false;
+    const pC = acquireRemoteSlot().then((r) => { granted = true; return r; });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(granted).toBe(false);
+
+    process.env.WHISPER_MAX_CONCURRENT = '1';                // shrink while C waits
+    a();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(granted).toBe(false);                             // still over the new cap
+
+    b();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(granted).toBe(true);                              // converges, no deadlock
+    (await pC)();
   });
 
   it('rejects when the remote returns a shape with no segments array', async () => {
