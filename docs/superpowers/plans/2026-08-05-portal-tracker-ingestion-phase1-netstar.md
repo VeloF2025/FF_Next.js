@@ -1063,6 +1063,7 @@ const fleet = [
 function deps(overrides = {}) {
   return {
     loadActiveFleet: async () => fleet,
+    deactivateOthersForVehicle: vi.fn(async () => {}),
     upsertTracker: vi.fn(async () => {}),
     deactivateMissing: vi.fn(async () => 0),
     ...overrides,
@@ -1100,6 +1101,22 @@ describe('reconcileTrackers', () => {
     const d = deps();
     await reconcileTrackers('netstar', 'europcar', [{ externalId: '999', registration: null }], d);
     expect(d.upsertTracker).not.toHaveBeenCalled();
+  });
+
+  it('deactivates a vehicle\'s other active tracker before activating this one', async () => {
+    // uq_fleet_trackers_one_active_per_vehicle allows exactly one. Newest wins.
+    const order: string[] = [];
+    const d = deps({
+      upsertTracker: vi.fn(async () => { order.push('upsert'); }),
+      deactivateOthersForVehicle: vi.fn(async () => { order.push('deactivate'); }),
+    });
+    await reconcileTrackers(
+      'netstar', 'europcar',
+      [{ externalId: '1447952', registration: 'LN40MGGP' }], d
+    );
+    expect(d.deactivateOthersForVehicle)
+      .toHaveBeenCalledWith('v1', 'netstar', 'europcar', '1447952');
+    expect(order).toEqual(['deactivate', 'upsert']);
   });
 
   it('deactivates tracker rows the portal no longer lists', async () => {
@@ -1156,6 +1173,10 @@ export interface ReconcileReport {
 
 export interface ReconcileDeps {
   loadActiveFleet: () => Promise<FleetVehicleRow[]>;
+  /** Enforces one-active-tracker-per-vehicle. Must run before upsertTracker. */
+  deactivateOthersForVehicle: (
+    vehicleId: string, provider: ProviderKey, accountRef: string, externalId: string
+  ) => Promise<void>;
   upsertTracker: (
     provider: ProviderKey, accountRef: string, externalId: string, vehicleId: string
   ) => Promise<void>;
@@ -1172,6 +1193,26 @@ const dbDeps: ReconcileDeps = {
       ORDER BY registration
     `;
     return rows.map((r) => ({ id: r.id, registration: r.registration }));
+  },
+
+  /**
+   * The DB enforces uq_fleet_trackers_one_active_per_vehicle — a UNIQUE index
+   * on (vehicle_id) WHERE is_active. Activating a second tracker for a vehicle
+   * that already has one violates it and throws, taking the whole poll down.
+   *
+   * Newest wins: a vehicle moving between rental partners gets a new device and
+   * the old one stops reporting, so the freshly discovered tracker is the
+   * truthful one. This must run BEFORE the upsert — the reverse order trips the
+   * very index it exists to respect.
+   */
+  deactivateOthersForVehicle: async (vehicleId, provider, accountRef, externalId) => {
+    await sql`
+      UPDATE fleet_vehicle_trackers
+      SET is_active = false, updated_at = now()
+      WHERE vehicle_id = ${vehicleId}
+        AND is_active
+        AND NOT (provider = ${provider} AND account_ref = ${accountRef} AND external_id = ${externalId})
+    `;
   },
 
   upsertTracker: async (provider, accountRef, externalId, vehicleId) => {
@@ -1210,6 +1251,8 @@ export async function reconcileTrackers(
   const { matched, portalOnly, fleetOnly } = matchVehicles(portal, fleet);
 
   for (const m of matched) {
+    // Order is load-bearing: see deactivateOthersForVehicle.
+    await deps.deactivateOthersForVehicle(m.vehicleId, provider, accountRef, m.externalId);
     await deps.upsertTracker(provider, accountRef, m.externalId, m.vehicleId);
   }
   const deactivated = await deps.deactivateMissing(
@@ -2168,16 +2211,24 @@ these tables.
 Run: `npm run agents:mirror && npm run agents:check`
 Expected: pass. Never hand-edit an `AGENTS.md` mirror.
 
-- [ ] **Step 5: Register the cron on Velocity**
+- [ ] **Step 5: Document the cron entry for Hein — do NOT register it**
 
-```bash
-ssh velo@100.96.203.105 "crontab -l | grep -q poll-portal-tracking || \
-  (crontab -l; echo '0 */2 * * * curl -fsS -H \"x-cron-secret: \$CRON_SECRET\" \
-   http://localhost:3005/api/cron/poll-portal-tracking >> /home/velo/logs/poll-portal-tracking.log 2>&1') | crontab -"
+Registering the cron is Hein's action, not a subagent's. Put the exact command in the PR
+description so it is a copy-paste, and state plainly that the feature does nothing until it runs:
+
+```
+0 */2 * * * curl -fsS -H "x-cron-secret: $CRON_SECRET" \
+  http://localhost:3005/api/cron/poll-portal-tracking \
+  >> /home/velo/logs/poll-portal-tracking.log 2>&1
 ```
 
-Verify with `crontab -l | grep poll-portal`. Registering the cron is what actually turns this on —
-the fleet reminder cron shipped without this step once and never ran.
+Verify afterwards with `crontab -l | grep poll-portal`. This step exists because the fleet
+reminder cron once shipped complete, correct, reviewed — and never ran, because nobody
+registered it.
+
+Also list in the PR description the env vars that must be set before the first tick:
+`NETSTAR_PORTAL_URL`, `NETSTAR_PORTAL_USER`, `NETSTAR_PORTAL_PASS`, `NETSTAR_ACCOUNT_REF`,
+`FLEET_ALERT_USER_IDS`. Names only — never values.
 
 - [ ] **Step 6: Run the full local CI gate**
 
