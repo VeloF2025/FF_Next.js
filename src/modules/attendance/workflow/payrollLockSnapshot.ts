@@ -1,5 +1,8 @@
 import type { TxnClient } from '@/lib/db-pool';
-import { employmentEffectivePredicate } from '@/services/attendance/employmentUniverse';
+import {
+  employmentEffectivePredicate,
+  expectedAttendanceDayPredicate,
+} from '@/services/attendance/employmentUniverse';
 import { assertApprovedBucketInvariant } from '@/services/attendance/policy/approvedBuckets';
 import type { AttendanceClassification } from '@/services/attendance/policy/types';
 import {
@@ -28,7 +31,7 @@ export async function readPayrollSnapshotSources(
     ), expected AS (
       SELECT s.id AS staff_id, w.work_date
       FROM staff s CROSS JOIN workdays w
-      WHERE ${employmentEffectivePredicate('s', 'w.work_date')}
+      WHERE ${expectedAttendanceDayPredicate('s', 'w.work_date')}
     )
     SELECT ds.staff_id, s.employee_id,
       TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS full_name,

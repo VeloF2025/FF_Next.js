@@ -3,6 +3,7 @@ import { graphFetch } from './auth';
 import { log } from '@/lib/logger';
 import * as fs from 'fs';
 import * as path from 'path';
+import { streamResponseToFile } from './streamToFile';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
@@ -90,11 +91,7 @@ export async function downloadRecordingToDisk(
     throw new Error(`Failed to download recording: ${response.status}`);
   }
 
-  // Buffer the entire response in memory then write atomically
-  const buffer = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(filePath, buffer);
-
-  const sizeBytes = buffer.length;
+  const sizeBytes = await streamResponseToFile(response, filePath);
   log.info(
     'Recording downloaded',
     { filePath, sizeBytes, dbMeetingId },

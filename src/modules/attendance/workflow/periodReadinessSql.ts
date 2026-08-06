@@ -1,4 +1,7 @@
-import { employmentEffectivePredicate } from '@/services/attendance/employmentUniverse';
+import {
+  employmentEffectivePredicate,
+  expectedAttendanceDayPredicate,
+} from '@/services/attendance/employmentUniverse';
 import { approvedBucketInvariantSql } from '@/services/attendance/policy/approvedBuckets';
 
 function snapshotEligible(alias: string): string { return `
@@ -8,7 +11,7 @@ function snapshotEligible(alias: string): string { return `
 export function metricsSql(): string { return `
   WITH bounds AS (SELECT $1::date AS from_date, $2::date AS to_date),
   workdays AS (SELECT day::date AS work_date FROM bounds, generate_series(from_date, to_date, '1 day') day WHERE EXTRACT(ISODOW FROM day) BETWEEN 1 AND 6),
-  expected AS (SELECT s.id AS staff_id, w.work_date FROM staff s CROSS JOIN workdays w WHERE ${employmentEffectivePredicate('s', 'w.work_date')}),
+  expected AS (SELECT s.id AS staff_id, w.work_date FROM staff s CROSS JOIN workdays w WHERE ${expectedAttendanceDayPredicate('s', 'w.work_date')}),
   latest_run AS (SELECT status, started_at, finished_at, failed_day_keys FROM attendance_reconciliation_runs, bounds WHERE scanned_from <= from_date AND scanned_to >= to_date ORDER BY started_at DESC LIMIT 1),
   last_success AS (SELECT finished_at FROM attendance_reconciliation_runs, bounds WHERE status = 'succeeded' AND scanned_from <= from_date AND scanned_to >= to_date ORDER BY finished_at DESC LIMIT 1),
   summary_change AS (SELECT MAX(ds.computed_at) AS changed_at FROM attendance_daily_summaries ds, bounds WHERE ds.work_date BETWEEN from_date AND to_date),
@@ -35,7 +38,7 @@ export function metricsSql(): string { return `
 
 export function blockersSql(): string { return `
   WITH workdays AS (SELECT day::date AS work_date FROM generate_series($1::date, $2::date, '1 day') day WHERE EXTRACT(ISODOW FROM day) BETWEEN 1 AND 6),
-  expected AS (SELECT s.id AS staff_id, w.work_date FROM staff s CROSS JOIN workdays w WHERE ${employmentEffectivePredicate('s', 'w.work_date')}),
+  expected AS (SELECT s.id AS staff_id, w.work_date FROM staff s CROSS JOIN workdays w WHERE ${expectedAttendanceDayPredicate('s', 'w.work_date')}),
   unresolved AS (SELECT de.staff_id, TO_CHAR(de.work_date, 'YYYY-MM-DD') AS work_date, de.status AS blocker_kind, de.id::text AS exception_id, de.kind AS exception_kind, de.status AS exception_status
     FROM attendance_day_exceptions de JOIN staff sde ON sde.id = de.staff_id
     WHERE de.work_date BETWEEN $1::date AND $2::date

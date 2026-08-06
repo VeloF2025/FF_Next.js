@@ -63,7 +63,23 @@ latest_onemap AS (
       FILTER (WHERE NULLIF(BTRIM(op.contact_surname), '') IS NOT NULL))[1] AS contact_surname,
     (array_agg(op.home_signup_date ORDER BY op.updated_at DESC NULLS LAST,
       op.import_id DESC NULLS LAST, op.id DESC)
-      FILTER (WHERE op.home_signup_date IS NOT NULL))[1] AS home_signup_date
+      FILTER (WHERE op.home_signup_date IS NOT NULL))[1] AS home_signup_date,
+    (array_agg(NULLIF(BTRIM(op.location_address), '') ORDER BY op.updated_at DESC NULLS LAST,
+      op.import_id DESC NULLS LAST, op.id DESC)
+      FILTER (WHERE NULLIF(BTRIM(op.location_address), '') IS NOT NULL))[1] AS install_address,
+    -- Latitude and longitude are aggregated as one pre-joined pair, NOT as two
+    -- independent columns. Picking each separately could take the latitude from one
+    -- onemap row and the longitude from another, yielding a coordinate that points
+    -- somewhere neither row describes. Requiring both on the same row is the point.
+    (array_agg(op.latitude::text || ',' || op.longitude::text
+      ORDER BY op.updated_at DESC NULLS LAST, op.import_id DESC NULLS LAST, op.id DESC)
+      FILTER (WHERE op.latitude IS NOT NULL AND op.longitude IS NOT NULL))[1] AS install_gps,
+    (array_agg(NULLIF(BTRIM(op.pole_number), '') ORDER BY op.updated_at DESC NULLS LAST,
+      op.import_id DESC NULLS LAST, op.id DESC)
+      FILTER (WHERE NULLIF(BTRIM(op.pole_number), '') IS NOT NULL))[1] AS pole_number,
+    (array_agg(NULLIF(BTRIM(op.ont_barcode), '') ORDER BY op.updated_at DESC NULLS LAST,
+      op.import_id DESC NULLS LAST, op.id DESC)
+      FILTER (WHERE NULLIF(BTRIM(op.ont_barcode), '') IS NOT NULL))[1] AS ont_barcode
   FROM onemap_properties op
   JOIN candidates c ON c.dr_number = UPPER(BTRIM(op.drop_number))
   GROUP BY UPPER(BTRIM(op.drop_number))
@@ -86,6 +102,11 @@ reviews AS (
     (array_agg(NULLIF(BTRIM(r.qcontact_name), '')
       ORDER BY r.submitted_date DESC NULLS LAST, r.updated_at DESC NULLS LAST)
       FILTER (WHERE NULLIF(BTRIM(r.qcontact_name), '') IS NOT NULL))[1] AS qcontact_name,
+    -- onemap carries an installer_name column but it is empty for every drop in the
+    -- exported cohort; the review record is the only populated source (205 of 262).
+    (array_agg(NULLIF(BTRIM(r.installer_name), '')
+      ORDER BY r.submitted_date DESC NULLS LAST, r.updated_at DESC NULLS LAST)
+      FILTER (WHERE NULLIF(BTRIM(r.installer_name), '') IS NOT NULL))[1] AS installer_name,
     BOOL_OR(COALESCE(r.step_10_signature, FALSE)) AS signature_present,
     MAX(COALESCE(
       r.whatsapp_submitted_at,
@@ -100,7 +121,8 @@ reviews AS (
 SELECT c.dr_number, c.sources,
   o.onemap_phone, rv.subscriber_phone, rv.qcontact_phone,
   o.contact_name, o.contact_surname, o.home_signup_date,
-  rv.subscriber_name, rv.qcontact_name,
+  rv.subscriber_name, rv.qcontact_name, rv.installer_name,
+  o.install_address, o.install_gps, o.pole_number, o.ont_barcode,
   COALESCE(rv.signature_present, FALSE) AS signature_present,
   rv.signature_evidence_at
 FROM candidates c

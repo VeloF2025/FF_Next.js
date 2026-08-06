@@ -289,6 +289,13 @@ export interface CreateTicketPayload {
   pole_number?: string;
   pon_number?: string;
   address?: string;
+  /**
+   * Persisted to the `gps_coordinates` text column as "lat,lng". Callers should
+   * resolve this through ticketGpsService so the OES activation coordinate wins
+   * over the SOW/1Map design position, and so the pair always comes from ONE
+   * source.
+   */
+  gps_coordinates?: GPSCoordinates;
   assigned_to?: string;
   assigned_contractor_id?: string;
   assigned_team?: string;
@@ -519,6 +526,11 @@ export interface FibreFlowEnrichment {
   onemap_contact_number: string | null;
   onemap_address: string | null;
   onemap_gps: GPSEnrichmentData | null;
+
+  /** From the daily OES report — independent of the SOW/1Map design lineage. */
+  oes_gps: GPSEnrichmentData | null;
+  /** Metres between oes_gps and the design coordinate actually ranked second (sow_drops, else 1Map). */
+  gps_divergence_m: number | null;
 
   // Project info (from DR number lookup or pattern matching)
   project: ProjectEnrichmentInfo | null;

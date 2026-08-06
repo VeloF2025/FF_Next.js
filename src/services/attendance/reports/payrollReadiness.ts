@@ -1,5 +1,5 @@
 import { sql } from '@/lib/db-pool';
-import { employmentEffectivePredicate } from '@/services/attendance/employmentUniverse';
+import { expectedAttendanceDayPredicate } from '@/services/attendance/employmentUniverse';
 import { approvedBucketInvariantSql } from '@/services/attendance/policy/approvedBuckets';
 
 import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
@@ -48,7 +48,8 @@ export async function runPayrollReadiness(input: ReportInput): Promise<ReportRun
   const rows = await sql.query<WorkerFacts>(`
     WITH staff_scope AS (
       SELECT s.id, s.first_name, s.last_name, s.department,
-             s.is_active, s.join_date, s.end_date, s.account_status
+             s.is_active, s.join_date, s.end_date, s.account_status,
+             s.attendance_tracked
       FROM staff s
       ${staffWhere.length > 0 ? `WHERE ${staffWhere.join(' AND ')}` : ''}
     ), workdays AS (
@@ -56,7 +57,7 @@ export async function runPayrollReadiness(input: ReportInput): Promise<ReportRun
       WHERE EXTRACT(ISODOW FROM day) BETWEEN 1 AND 6
     ), expected AS (
       SELECT s.*, w.work_date FROM staff_scope s CROSS JOIN workdays w
-      WHERE ${employmentEffectivePredicate('s', 'w.work_date')}
+      WHERE ${expectedAttendanceDayPredicate('s', 'w.work_date')}
     ), joined AS (
       SELECT expected.*, ds.result_status, ds.locked_period_version,
         ds.approved_regular_hrs, ds.approved_overtime_hrs, ds.approved_sunday_hrs,

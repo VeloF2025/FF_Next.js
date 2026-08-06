@@ -96,6 +96,39 @@ jobs:
             --filter "label=ff-migration-run=ci-${{ github.run_id }}-${{ github.run_attempt }}" \
             | xargs -r docker rm -f
 
+      # Replan pole import — the matching decisions and the write path.
+      #
+      # These are Python, and this workflow runs no Python at all: every
+      # scripts/test_*.py suite is invoked only by scripts/ci-local.sh, i.e. by
+      # `npm run ci:quick` and the pre-push hook. That is fine until someone
+      # pushes with --no-verify or from a machine where the hook is not
+      # installed, at which point a regression in code that DELETES production
+      # pole rows merges green.
+      #
+      # Scoped deliberately to the two replan suites rather than all of
+      # scripts/test_*.py: widening it is a change to every PR's gate, not to
+      # this one's, and belongs in its own change. The other seven qfield Python
+      # suites still run nowhere in CI.
+      #
+      # test_replan_import_db.py spins its own throwaway Postgres on an
+      # ephemeral port — never the shared dev+prod database. Requires docker.
+      - name: Replan import tests — matching + write path (gate)
+        run: |
+          python3 scripts/test_replan_match.py
+          python3 scripts/test_replan_import_db.py
+          python3 scripts/test_replan_guards.py
+        timeout-minutes: 15
+
+      # The container is removed in the suite's teardown, but a cancelled or timed-out
+      # run never reaches it. Sweep by label so a crashed run cannot leave a Postgres
+      # holding a port on the self-hosted runner. Scoped to THIS run's label so it
+      # cannot destroy a developer's container mid-test.
+      - name: Clean up this run's replan test container
+        if: always()
+        run: |
+          docker ps -aq --filter "label=ff-replan-run=${{ github.run_id }}" \
+            | xargs -r docker rm -f
+
       # Velocity review repository tests — same reasoning as the migration gate
       # above, one layer up. These drive the real repository functions against a
       # real Postgres: the concurrent-claim race (two connections contending for

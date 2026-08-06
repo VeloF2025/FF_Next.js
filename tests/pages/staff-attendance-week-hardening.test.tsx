@@ -9,6 +9,24 @@ vi.mock('@/components/layout/AppLayout', () => ({
 vi.mock('@/components/attendance/AttendanceNav', () => ({ AttendanceNav: () => <nav>Attendance</nav> }));
 vi.mock('@/lib/logger', () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
 
+/**
+ * The page seeds its week-start from `thisWeekMonday()`, which reads the real
+ * clock via `todayInSast()`. WEEK_A below is a fixed date, so the URLs this
+ * suite mocks only matched while wall-clock time happened to sit inside that
+ * week — the suite passed when written and started failing the moment real time
+ * moved on, taking master's full-suite gate down with it from 2026-08-03.
+ *
+ * Pinning "today" inside WEEK_A makes the initial fetch deterministic. Do not
+ * "fix" a recurrence by moving WEEK_A forward: that just re-arms the same bomb.
+ *
+ * Spread the real module rather than replacing it — the page and its children
+ * use other helpers from here, and a bare factory would return undefined.
+ */
+vi.mock('@/components/attendance/dateUtils', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/components/attendance/dateUtils')>(),
+  todayInSast: () => '2026-07-29', // Wednesday of WEEK_A
+}));
+
 import StaffAttendanceWeekPage from '../../pages/staff/attendance/week';
 
 const WEEK_A = '2026-07-27';

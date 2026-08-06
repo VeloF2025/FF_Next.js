@@ -5,6 +5,7 @@
  *
  * Features:
  * - Look up GPS coordinates from DR number via sow_drops
+ * - Look up the independent OES activation coordinate via oes_activations
  * - Look up customer info from onemap_properties
  * - Cross-reference with existing FibreFlow data
  *
@@ -13,6 +14,7 @@
 
 import { queryOne } from '../utils/db';
 import { createLogger } from '@/lib/logger';
+import { lookupOesGpsByDr, haversineMeters } from './ticketGpsService';
 
 const logger = createLogger('maintenance:enrichment');
 
@@ -94,6 +96,21 @@ export interface EnrichedTicketData {
   onemap_contact_number: string | null;
   onemap_address: string | null;
   onemap_gps: GPSData | null;
+
+  /**
+   * From the daily OES report (`oes_activations`) — recorded at activation and
+   * keyed to the ONT serial, independent of the SOW/1Map design lineage that
+   * feeds `fibreflow_gps`. Ranked above the design coordinate by consumers;
+   * both are returned so the UI can show the disagreement rather than pick a
+   * winner silently.
+   */
+  oes_gps: GPSData | null;
+
+  /**
+   * Metres between `oes_gps` and the design coordinate the UI ranks second —
+   * `fibreflow_gps` when present, else `onemap_gps`. Null unless both exist.
+   */
+  gps_divergence_m: number | null;
 
   // Project info (from DR number lookup or pattern matching)
   project: ProjectInfo | null;
@@ -446,6 +463,8 @@ export async function enrichTicketData(drNumber: string | null): Promise<Enriche
     onemap_contact_number: null,
     onemap_address: null,
     onemap_gps: null,
+    oes_gps: null,
+    gps_divergence_m: null,
     project: null,
     sow_match_found: false,
     onemap_match_found: false,
@@ -458,10 +477,11 @@ export async function enrichTicketData(drNumber: string | null): Promise<Enriche
 
   try {
     // Look up in all sources in parallel
-    const [sowDrop, oneMapDrop, projectInfo] = await Promise.all([
+    const [sowDrop, oneMapDrop, projectInfo, oesGps] = await Promise.all([
       lookupSOWDrop(drNumber),
       lookupOneMapDrop(drNumber),
       lookupProjectFromDR(drNumber),
+      lookupOesGpsByDr(drNumber),
     ]);
 
     // Populate from SOW data
@@ -495,6 +515,32 @@ export async function enrichTicketData(drNumber: string | null): Promise<Enriche
           longitude: Number(oneMapDrop.longitude),
           address: oneMapDrop.address,
         };
+      }
+    }
+
+    // Populate the OES activation coordinate and measure the disagreement.
+    // Deliberately NOT folded into fibreflow_gps: consumers rank the two, and
+    // collapsing them here would hide exactly the discrepancy field techs
+    // reported (median 23 m, p90 268 m, worst live ticket 6.1 km).
+    if (oesGps) {
+      result.oes_gps = {
+        latitude: oesGps.latitude,
+        longitude: oesGps.longitude,
+        address: null,
+      };
+      // Measure against whichever design coordinate the UI will actually rank
+      // second — sow_drops when present, else 1Map. Comparing only against
+      // sow_drops left the warning silent exactly where the cross-check was
+      // 1Map-only: 244 open tickets, 76 of them more than 50m apart and one
+      // 10.5km out, all rendered as a single confident pin.
+      const designForDivergence = result.fibreflow_gps ?? result.onemap_gps;
+      if (designForDivergence) {
+        result.gps_divergence_m = Math.round(
+          haversineMeters(oesGps, {
+            latitude: designForDivergence.latitude,
+            longitude: designForDivergence.longitude,
+          })
+        );
       }
     }
 

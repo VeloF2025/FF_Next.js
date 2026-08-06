@@ -5,6 +5,7 @@ import { getInternalUsers } from './auto-recording';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
 import * as fs from 'fs';
 import * as path from 'path';
+import { streamResponseToFile } from './streamToFile';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const LOGGER = 'OneDriveRecordings';
@@ -132,12 +133,7 @@ export async function downloadDriveItem(
     throw new Error(`Download failed: ${response.status}`);
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const dir = path.dirname(destPath);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(destPath, buffer);
-
-  return buffer.length;
+  return streamResponseToFile(response, destPath);
 }
 
 /**
