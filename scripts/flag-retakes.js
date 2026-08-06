@@ -4,7 +4,8 @@
  */
 const { neon } = require('@neondatabase/serverless');
 
-const sql = neon('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon((process.env.DATABASE_URL
+  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })()));
 
 const STEP_NAMES = {
   s1: 'Before Photo',

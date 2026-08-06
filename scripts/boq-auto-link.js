@@ -14,7 +14,8 @@
 const { neon } = require('@neondatabase/serverless');
 
 const DATABASE_URL =
-  'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+  (process.env.DATABASE_URL
+  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })());
 
 const APPLY = process.argv.includes('--apply');
 const PROJECT_FILTER_IDX = process.argv.indexOf('--project');

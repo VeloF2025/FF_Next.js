@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon((process.env.DATABASE_URL
+  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })()));
 
 // 1. Add columns
 await sql`ALTER TABLE gl_journal_lines ADD COLUMN IF NOT EXISTS vat_type TEXT`;
