@@ -174,6 +174,54 @@ describe('POST /api/field/attendance-adjust', () => {
     expect(mocks.createAndApproveAdjustmentTxn).not.toHaveBeenCalled();
   });
 
+  // Ordering. A correction submitted days after its work date can carry the
+  // submission date in the clock-in field; that is how a -61.5h row reached
+  // the review queue and sat there for three months. Migration 482 enforces
+  // the same rule in the schema — this arm exists so the worker gets a 400
+  // rather than a constraint violation surfaced as a 500.
+  it('400 when adjusted_clock_out_at precedes adjusted_clock_in_at', async () => {
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({
+        ...VALID_BODY,
+        adjusted_clock_in_at: '2026-05-18T05:00:00Z', // submission date, not work date
+        adjusted_clock_out_at: '2026-05-15T15:30:00Z',
+      }),
+      res
+    );
+    expect(captured.statusCode).toBe(400);
+    expect(mocks.sql).not.toHaveBeenCalled();
+    expect(mocks.createAndApproveAdjustmentTxn).not.toHaveBeenCalled();
+  });
+
+  it('400 when adjusted times are equal (zero-length shift)', async () => {
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({
+        ...VALID_BODY,
+        adjusted_clock_in_at: '2026-06-20T05:00:00Z',
+        adjusted_clock_out_at: '2026-06-20T05:00:00Z',
+      }),
+      res
+    );
+    expect(captured.statusCode).toBe(400);
+    expect(mocks.createAndApproveAdjustmentTxn).not.toHaveBeenCalled();
+  });
+
+  it('allows a shift ending after midnight the next day', async () => {
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({
+        ...VALID_BODY,
+        adjusted_clock_in_at: '2026-06-20T21:00:00Z',
+        adjusted_clock_out_at: '2026-06-21T05:00:00Z',
+      }),
+      res
+    );
+    expect(captured.statusCode).toBe(200);
+    expect(mocks.createAndApproveAdjustmentTxn).toHaveBeenCalled();
+  });
+
   it('404 when entry not found in DB', async () => {
     mocks.sql.mockImplementation(async (strings: TemplateStringsArray) =>
       /FROM staff WHERE user_id/i.test(strings.join(' ')) ? [{ id: REQUESTER_STAFF_ID }] : []

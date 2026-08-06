@@ -96,6 +96,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     apiResponse.badRequest(res, 'adjusted_clock_out_at must be a valid ISO timestamp');
     return;
   }
+  // Ordering. Only checkable when the caller sets both sides — a one-sided
+  // correction (forgot_clock_out) has nothing to compare against here, and the
+  // adjustment is measured against the raw entry at approval time instead.
+  // Without this a correction submitted days after its work date can carry the
+  // submission date in the clock-in field and describe a negative shift, which
+  // is what put a -61.5h row into the review queue. Migration 482 enforces the
+  // same rule at the storage layer; this arm exists so the worker gets a 400
+  // they can act on rather than a constraint violation surfaced as a 500.
+  if (cin && cout && cout.getTime() <= cin.getTime()) {
+    apiResponse.badRequest(
+      res,
+      'adjusted_clock_out_at must be after adjusted_clock_in_at'
+    );
+    return;
+  }
 
   try {
     // attendance_adjustments.requested_by references staff(id), while
