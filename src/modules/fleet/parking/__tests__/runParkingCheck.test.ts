@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ParkingCandidate } from '../parkingQueries';
+import type { ParkingCandidate } from '../types';
 
 const loadParkingCheckCandidates = vi.fn();
 const insertComplianceCheck = vi.fn();
@@ -24,10 +24,15 @@ function candidate(over: Partial<ParkingCandidate> = {}): ParkingCandidate {
   };
 }
 
+/** A fresh row for the day. */
+const wroteNew = { inserted: true, previousResult: null };
+/** An overwrite of a row that already said the same thing. */
+const overwrote = (previousResult: string) => ({ inserted: false, previousResult });
+
 beforeEach(() => {
   loadParkingCheckCandidates.mockReset();
   insertComplianceCheck.mockReset();
-  insertComplianceCheck.mockResolvedValue(true);
+  insertComplianceCheck.mockResolvedValue(wroteNew);
 });
 
 describe('sastDateString', () => {
@@ -66,6 +71,16 @@ describe('runParkingCheck', () => {
     );
   });
 
+  // The row has to name its vehicle even after that vehicle is hard-deleted
+  // and the FK is nulled, so the registration travels with the evidence.
+  it('snapshots the registration onto the row it writes', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([candidate({ registration: 'MW67LFGP' })]);
+    await runParkingCheck(CHECK_AT);
+    expect(insertComplianceCheck).toHaveBeenCalledWith(
+      expect.objectContaining({ registration: 'MW67LFGP' })
+    );
+  });
+
   // One malformed vehicle must not cost us the other 21 results.
   it('continues after a failed insert and counts the error', async () => {
     loadParkingCheckCandidates.mockResolvedValue([
@@ -74,7 +89,7 @@ describe('runParkingCheck', () => {
     ]);
     insertComplianceCheck
       .mockRejectedValueOnce(new Error('constraint violation'))
-      .mockResolvedValueOnce(true);
+      .mockResolvedValueOnce(wroteNew);
 
     const report = await runParkingCheck(CHECK_AT);
 
@@ -88,7 +103,9 @@ describe('runParkingCheck', () => {
       candidate({ vehicleId: 'veh-1', registration: 'MW67LFGP' }),
       candidate({ vehicleId: 'veh-2', registration: 'MW68LFGP', location: null }),
     ]);
-    insertComplianceCheck.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    insertComplianceCheck
+      .mockResolvedValueOnce(wroteNew)
+      .mockResolvedValueOnce(overwrote('no_address'));
 
     const report = await runParkingCheck(CHECK_AT);
 
@@ -100,6 +117,8 @@ describe('runParkingCheck', () => {
       distanceM: 0,
       lastFixAgeSeconds: 3600,
       inserted: true,
+      previousResult: null,
+      newViolation: false,
     });
     expect(report.results[1]).toEqual({
       vehicleId: 'veh-2',
@@ -108,6 +127,8 @@ describe('runParkingCheck', () => {
       distanceM: null,
       lastFixAgeSeconds: null,
       inserted: false,
+      previousResult: 'no_address',
+      newViolation: false,
     });
   });
 
@@ -118,7 +139,7 @@ describe('runParkingCheck', () => {
     ]);
     insertComplianceCheck
       .mockRejectedValueOnce(new Error('constraint violation'))
-      .mockResolvedValueOnce(true);
+      .mockResolvedValueOnce(wroteNew);
 
     const report = await runParkingCheck(CHECK_AT);
 
@@ -140,6 +161,23 @@ describe('runParkingCheck', () => {
     );
   });
 
+  // A row that says "no address on file" must not also link to the address it
+  // was supposedly checked against — that contradiction is what a disputed
+  // violation gets argued over.
+  it('does not attribute a location to a no_address row', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([
+      // Out of range: the classifier refuses it, so it did not decide anything.
+      candidate({ location: { id: 'loc-bad', lat: 200, lon: 28.0305, radiusM: 200 } }),
+    ]);
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    expect(report.counts.no_address).toBe(1);
+    expect(insertComplianceCheck).toHaveBeenCalledWith(
+      expect.objectContaining({ result: 'no_address', parkingLocationId: null })
+    );
+  });
+
   it('handles an empty fleet without throwing', async () => {
     loadParkingCheckCandidates.mockResolvedValue([]);
     const report = await runParkingCheck(CHECK_AT);
@@ -155,9 +193,9 @@ describe('runParkingCheck', () => {
       candidate({ vehicleId: 'veh-3', hasTracker: false }),
     ]);
     insertComplianceCheck
-      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(wroteNew)
       .mockRejectedValueOnce(new Error('constraint violation'))
-      .mockResolvedValueOnce(true);
+      .mockResolvedValueOnce(wroteNew);
 
     const report = await runParkingCheck(CHECK_AT);
 
@@ -179,5 +217,58 @@ describe('runParkingCheck', () => {
 
     expect(report.counts.compliant).toBe(0);
     expect(report.errors).toBe(1);
+  });
+});
+
+/**
+ * The alerting seam PR 2 consumes. `inserted` alone is the wrong key: the run
+ * that discovers a violation is very often an update, not an insert.
+ */
+describe('runParkingCheck — newViolation', () => {
+  const away = candidate({
+    // ~40 km from the declared location: well outside the 200 m radius.
+    lastFix: { recordedAt: new Date(CHECK_AT.getTime() - 3600_000), lat: -25.8, lon: 28.3 },
+  });
+
+  it('is true for a violation recorded for the first time today', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([away]);
+    insertComplianceCheck.mockResolvedValue(wroteNew);
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    expect(report.results[0]!.result).toBe('violation');
+    expect(report.results[0]!.newViolation).toBe(true);
+  });
+
+  // The case `inserted` gets wrong: the 20:00 run wrote `unknown` against a
+  // lagging feed, and this 20:30 re-run is the first to see the violation.
+  it('is true when a re-run upgrades an earlier non-violation to a violation', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([away]);
+    insertComplianceCheck.mockResolvedValue(overwrote('unknown'));
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    expect(report.results[0]!.inserted).toBe(false);
+    expect(report.results[0]!.newViolation).toBe(true);
+  });
+
+  it('is false when a re-run finds the same violation already recorded', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([away]);
+    insertComplianceCheck.mockResolvedValue(overwrote('violation'));
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    expect(report.results[0]!.result).toBe('violation');
+    expect(report.results[0]!.newViolation).toBe(false);
+  });
+
+  it('is false for any non-violation result', async () => {
+    loadParkingCheckCandidates.mockResolvedValue([candidate()]);
+    insertComplianceCheck.mockResolvedValue(wroteNew);
+
+    const report = await runParkingCheck(CHECK_AT);
+
+    expect(report.results[0]!.result).toBe('compliant');
+    expect(report.results[0]!.newViolation).toBe(false);
   });
 });

@@ -54,6 +54,12 @@ export default defineConfig({
     alias: [
       { find: '@/modules', replacement: path.resolve(__dirname, './src/modules') },
       { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
+      // db-pool's own closure: src/lib/db.ts imports both of these, and the
+      // generic @/lib fallback below would send them to ./lib, where only
+      // logger exists. Needed by any test that drives real service SQL rather
+      // than applying a migration file (483_fleet_parking_queries).
+      { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
+      { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@', replacement: path.resolve(__dirname, './src') },
     ],

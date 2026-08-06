@@ -113,7 +113,7 @@ The existing live map already has a related symptom worth noting: `STALE_AFTER_S
 is 15 minutes in `pages/api/fleet/positions/live.ts`, so every parked vehicle greys out
 and reads as "tracker offline". That is a separate pre-existing UX issue, not addressed here.
 
-## 6. Schema — migration 479
+## 6. Schema — migration 483
 
 Files go in `scripts/migrations/sql/`. The migration runner only scans that directory;
 a file placed in a parent directory is silently ignored.
@@ -275,7 +275,7 @@ Authorization in this codebase is **page/route based**, not role-capability base
 `fleet.locations` and a `route`. There is **no** "fleet manager" capability to gate on —
 an earlier draft of this document assumed one incorrectly.
 
-Migration 479 therefore also seeds two `access_permissions` rows, following the existing
+Migration 483 therefore also seeds two `access_permissions` rows, following the existing
 pattern:
 
 | type | key | label | route |

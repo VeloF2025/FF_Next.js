@@ -26,8 +26,8 @@
 
 | File | Responsibility |
 |---|---|
-| `scripts/migrations/sql/479_fleet_parking_compliance.sql` | Two tables, indexes, two `access_permissions` rows |
-| `scripts/migrations/sql/rollback_479_fleet_parking_compliance.sql` | Reverses 479 |
+| `scripts/migrations/sql/483_fleet_parking_compliance.sql` | Two tables, indexes, two `access_permissions` rows |
+| `scripts/migrations/sql/rollback_483_fleet_parking_compliance.sql` | Reverses 483 |
 | `src/modules/fleet/parking/types.ts` | Shared types for the parking domain |
 | `src/modules/fleet/parking/classifyParkingCompliance.ts` | Pure decision logic + `STALE_FIX_MAX_HOURS` |
 | `src/modules/fleet/parking/__tests__/classifyParkingCompliance.test.ts` | Exhaustive classifier tests |
@@ -40,11 +40,11 @@
 
 ---
 
-### Task 1: Migration 479
+### Task 1: Migration 483
 
 **Files:**
-- Create: `scripts/migrations/sql/479_fleet_parking_compliance.sql`
-- Create: `scripts/migrations/sql/rollback_479_fleet_parking_compliance.sql`
+- Create: `scripts/migrations/sql/483_fleet_parking_compliance.sql`
+- Create: `scripts/migrations/sql/rollback_483_fleet_parking_compliance.sql`
 
 **Interfaces:**
 - Consumes: nothing.
@@ -53,7 +53,7 @@
 - [ ] **Step 1: Write the forward migration**
 
 ```sql
--- 479_fleet_parking_compliance.sql
+-- 483_fleet_parking_compliance.sql
 -- Overnight parking compliance (Phase 1). See
 -- docs/superpowers/specs/2026-08-04-fleet-parking-compliance-design.md
 
@@ -132,7 +132,7 @@ COMMIT;
 - [ ] **Step 2: Write the rollback**
 
 ```sql
--- rollback_479_fleet_parking_compliance.sql
+-- rollback_483_fleet_parking_compliance.sql
 BEGIN;
 
 DELETE FROM access_permissions WHERE key IN ('fleet.parking', 'fleet.parking-requests');
@@ -166,9 +166,9 @@ WHERE NOT EXISTS (SELECT 1 FROM access_permissions ap WHERE ap.key = v.key);
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/migrations/sql/479_fleet_parking_compliance.sql \
-        scripts/migrations/sql/rollback_479_fleet_parking_compliance.sql
-git commit -m "feat(fleet): migration 479 — overnight parking compliance tables"
+git add scripts/migrations/sql/483_fleet_parking_compliance.sql \
+        scripts/migrations/sql/rollback_483_fleet_parking_compliance.sql
+git commit -m "feat(fleet): migration 483 — overnight parking compliance tables"
 ```
 
 ---
@@ -1200,7 +1200,7 @@ Expected: ESLint 0 errors, silent-catch and Neon-shim gates unchanged, secret sc
 
 Known environment issue: on a Windows workstation, gate 2d fails because `command -v python3` matches the Windows Store alias stub, and the script then aborts before gates 3, 4 and 7. If that happens, run those manually: `npm run type-check` and `bash scripts/secret-scan.sh`. Compare the type-check **error count** against a clean `origin/master` before concluding anything — there is a pre-existing baseline of unrelated errors.
 
-- [ ] **Step 3: Apply migration 479 to the shared database**
+- [ ] **Step 3: Apply migration 483 to the shared database**
 
 The database is shared by dev and production, so this affects both immediately. Apply it through the project's migration runner, not by hand.
 

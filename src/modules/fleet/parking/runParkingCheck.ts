@@ -16,41 +16,14 @@
 import { log } from '@/lib/logger';
 import { classifyParkingCompliance } from './classifyParkingCompliance';
 import { insertComplianceCheck, loadParkingCheckCandidates } from './parkingQueries';
-import type { ParkingCheckResult } from './types';
+import { sastDateString } from './sastDate';
+import type { ParkingCheckReport, ParkingCheckResult } from './types';
 
-/** Per-vehicle outcome, for callers (e.g. later violation notifications) that need more than the aggregate counts. Only present for vehicles whose insert succeeded. */
-export interface ParkingCheckVehicleResult {
-  vehicleId: string;
-  registration: string;
-  result: ParkingCheckResult;
-  distanceM: number | null;
-  lastFixAgeSeconds: number | null;
-  /** True when this was a new row for the day, false when it overwrote an earlier run's row (see insertComplianceCheck). */
-  inserted: boolean;
-}
-
-export interface ParkingCheckReport {
-  checkDate: string;
-  evaluated: number;
-  counts: Record<ParkingCheckResult, number>;
-  errors: number;
-  results: ParkingCheckVehicleResult[];
-}
-
-/**
- * The SAST calendar date for an instant. The server runs in
- * Africa/Johannesburg today, but deriving the date explicitly means a
- * future host in another zone cannot silently shift every check_date.
- * `en-CA` is used because it formats as YYYY-MM-DD.
- */
-export function sastDateString(at: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Johannesburg',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(at);
-}
+export { sastDateString } from './sastDate';
+export type {
+  ParkingCheckReport,
+  ParkingCheckVehicleResult,
+} from './types';
 
 function emptyCounts(): Record<ParkingCheckResult, number> {
   return { compliant: 0, violation: 0, unknown: 0, not_verifiable: 0, no_address: 0 };
@@ -77,11 +50,17 @@ export async function runParkingCheck(checkAt: Date): Promise<ParkingCheckReport
         checkAt,
       });
 
-      const inserted = await insertComplianceCheck({
+      const write = await insertComplianceCheck({
         vehicleId: c.vehicleId,
+        registration: c.registration,
         checkDate,
         evaluatedAt: checkAt,
-        parkingLocationId: c.location?.id ?? null,
+        // `no_address` is exactly the branch where the classifier refused the
+        // declared location — either it is missing or its coordinates are out
+        // of range. Attributing the row to it anyway produces the contradiction
+        // "no address on file" next to a link to the address it was checked
+        // against, in the drill-in a disputed violation is settled from.
+        parkingLocationId: outcome.result === 'no_address' ? null : (c.location?.id ?? null),
         lastFixAt: c.lastFix?.recordedAt ?? null,
         lastFixLat: c.lastFix?.lat ?? null,
         lastFixLon: c.lastFix?.lon ?? null,
@@ -96,7 +75,9 @@ export async function runParkingCheck(checkAt: Date): Promise<ParkingCheckReport
         result: outcome.result,
         distanceM: outcome.distanceM,
         lastFixAgeSeconds: outcome.lastFixAgeSeconds,
-        inserted,
+        inserted: write.inserted,
+        previousResult: write.previousResult,
+        newViolation: outcome.result === 'violation' && write.previousResult !== 'violation',
       });
     } catch (error) {
       report.errors += 1;
