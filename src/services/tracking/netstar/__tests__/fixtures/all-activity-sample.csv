@@ -1,0 +1,51 @@
+Driver,Driver Department,Driver Unique Code,Time,Speed,Address,Status,Gps,Speed Limit,Latitude,Longitude,RPM,Battery Voltage,Odometer
+No driver,,,04/08/2026 07:26:38,"0,0","0.05 km from Tamarisk Road Benoni AH, Benoni, Gauteng, South Africa,Benoni AH",Ignition on,true,"60,0","-26,08975","28,35431",0,"14,8",54302
+No driver,,,04/08/2026 07:27:52,"0,0","0.05 km from Tamarisk Road Benoni AH, Benoni, Gauteng, South Africa,Benoni AH",Timed Event,true,"60,0","-26,08983","28,35433",0,"14,7",54302
+No driver,,,04/08/2026 07:29:08,"0,0","0.05 km from Tamarisk Road Benoni AH, Benoni, Gauteng, South Africa,Benoni AH",Timed Event,true,"60,0","-26,08983","28,35428",0,"14,7",54302
+No driver,,,04/08/2026 07:30:23,"1,0","0.06 km from Tamarisk Road Benoni AH, Benoni, Gauteng, South Africa,Benoni AH",Timed Event,true,"60,0","-26,08985","28,35431",0,"14,6",54302
+No driver,,,04/08/2026 07:31:38,"1,0","Tamarisk Road Benoni AH, Benoni, Gauteng, South Africa,BENONI AH",Timed Event,true,"60,0","-26,08933","28,35428",0,"14,4",54302
+No driver,,,04/08/2026 07:31:49,"16,0","0 km from Tamarisk Road Benoni AH, Benoni, Gauteng, South Africa,BENONI AH",HeadingChange,true,"60,0","-26,08921","28,35441",0,"14,5",54302
+No driver,,,04/08/2026 07:31:51,"19,0","0 km from Tamarisk Road Benoni AH, Benoni, Gauteng, South Africa,BENONI AH",Moving,true,"60,0","-26,08916","28,35449",0,"14,7",54302
+No driver,,,04/08/2026 07:32:29,"9,0","0.01 km from Tamarisk Road Benoni AH, Benoni, Gauteng, South Africa,BENONI AH",HeadingChange,true,"60,0","-26,08797","28,3567",0,"14,4",54303
+No driver,,,04/08/2026 07:32:34,"24,0","0.01 km from Nature Road Sesfontein, Benoni, Gauteng, South Africa,BENONI AH",HeadingChange,true,"60,0","-26,08818","28,35682",0,"14,5",54303
+No driver,,,04/08/2026 07:33:48,"42,0","0 km from Nature Road Sesfontein, Benoni, Gauteng, South Africa,BENONI AH",Timed Event,true,"60,0","-26,09455","28,3588",0,"14,6",54303
+No driver,,,04/08/2026 07:34:36,"10,0","0.01 km from Nature Road Sesfontein, Benoni, Gauteng, South Africa,SESFONTEIN",HeadingChange,true,"60,0","-26,09894","28,36022",0,"14,6",54304
+No driver,,,04/08/2026 07:34:43,"51,0","0 km from Birch Road Sesfontein, Benoni, Gauteng, South Africa,SESFONTEIN",HeadingChange,true,"80,0","-26,09871","28,36077",0,"14,6",54304
+No driver,,,04/08/2026 07:35:03,"75,0","0 km from Birch Road Sesfontein, Benoni, Gauteng, South Africa,SESFONTEIN",HeadingChange,true,"80,0","-26,09748","28,3642",0,"14,5",54304
+No driver,,,04/08/2026 07:35:09,"73,0","0 km from Birch Road Sesfontein, Benoni, Gauteng, South Africa,SESFONTEIN",HeadingChange,true,"80,0","-26,09756","28,36542",0,"14,6",54304
+No driver,,,04/08/2026 07:35:19,"69,0","0 km from Birch Road Sesfontein, Benoni, Gauteng, South Africa,SESFONTEIN",HeadingChange,true,"80,0","-26,09836","28,36709",0,"14,5",54305
+No driver,,,04/08/2026 07:36:15,"11,0","0.01 km from Birch Road Petit, Benoni, Gauteng, South Africa,PETIT",HeadingChange,true,"80,0","-26,10087","28,37128",0,"14,4",54305
+No driver,,,04/08/2026 07:37:20,"26,0","0 km from Pretoria Road Petit, Benoni, Gauteng, South Africa,PETIT",HeadingChange,true,"70,0","-26,10442","28,36973",0,"14,5",54305
+No driver,,,04/08/2026 07:38:01,"19,0","0 km from Springs Road Petit, Benoni, Gauteng, South Africa,FAIRLEAD AH",HeadingChange,true,"60,0","-26,10746","28,36815",0,"14,5",54306
+No driver,,,04/08/2026 07:39:14,"46,0","0.01 km from Springs Road Petit, Benoni, Gauteng, South Africa,CRYSTAL PARK EXT 3",Timed Event,true,"60,0","-26,11366","28,37334",0,"14,3",54307
+No driver,,,04/08/2026 07:40:27,"58,0","0.01 km from Springs Road Inglethorpe AH, Benoni, Gauteng, South Africa,PETIT",Timed Event,true,"80,0","-26,12338","28,38167",0,"14,4",54308
+No driver,,,04/08/2026 07:41:41,"32,0","0.01 km from Springs Road Lilyvale AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Timed Event,true,"80,0","-26,13099","28,38807",0,"14,3",54309
+No driver,,,04/08/2026 07:42:18,"0,0","0 km from Springs Road Lilyvale AH, Benoni, Gauteng, South Africa,PUTFONTEIN OUTLYING",Stopped,true,"80,0","-26,13167","28,38895",0,"14,4",54309
+No driver,,,04/08/2026 07:43:31,"1,0","0 km from Springs Road Lilyvale AH, Benoni, Gauteng, South Africa,PUTFONTEIN OUTLYING",Timed Event,true,"80,0","-26,13172","28,38921",0,"14,3",54309
+No driver,,,04/08/2026 07:44:02,"25,0","0 km from Du Randt Road Lilyvale AH, Benoni, Gauteng, South Africa,PUTFONTEIN OUTLYING",HeadingChange,true,"40,0","-26,13181","28,38951",0,"14,4",54309
+No driver,,,04/08/2026 07:44:53,"0,0","0.01 km from Kingsway Avenue Lilyvale AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Stopped,true,"40,0","-26,13359","28,38977",0,"14,3",54310
+No driver,,,04/08/2026 07:46:06,"1,0","0.01 km from Kingsway Avenue Benoni East AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Timed Event,true,"40,0","-26,13423","28,38989",0,"14,1",54310
+No driver,,,04/08/2026 07:47:19,"1,0","0 km from Kingsway Avenue Benoni East AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Timed Event,true,"40,0","-26,13465","28,38994",0,"14,4",54310
+No driver,,,04/08/2026 07:48:32,"16,0","0.01 km from Kingsway Avenue Benoni East AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Timed Event,true,"40,0","-26,13577","28,39016",0,"14,3",54310
+No driver,,,04/08/2026 07:48:59,"19,0","0.01 km from Kingsway Avenue Lilyvale AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Moving,true,"80,0","-26,13646","28,39036",0,"14,3",54310
+No driver,,,04/08/2026 07:49:44,"0,0","0.01 km from Kingsway Avenue Lilyvale AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Stopped,true,"80,0","-26,13737","28,39087",0,"14,3",54310
+No driver,,,04/08/2026 07:50:57,"4,0","0.01 km from Kingsway Avenue Lilyvale AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Timed Event,true,"80,0","-26,13793","28,3912",0,"14,3",54310
+No driver,,,04/08/2026 07:52:09,"2,0","0.01 km from Kingsway Avenue Lilyvale AH, Benoni, Gauteng, South Africa,BENONI EAST AH",Timed Event,true,"80,0","-26,13864","28,39163",0,"14,4",54310
+No driver,,,04/08/2026 07:52:24,"30,0","0.01 km from Kingsway Avenue Daveyton Ext 4, Benoni, Gauteng, South Africa,DAVEYTON EXT 4",Moving,true,"80,0","-26,1389","28,39178",0,"14,3",54310
+No driver,,,04/08/2026 07:53:37,"64,0","0 km from Kingsway Avenue Chief Albert Luthuli Park Suburbs, Chief Albert Luthuli Park, Gauteng, Sou,DAVEYTON EXT 4",Timed Event,true,"80,0","-26,14741","28,39654",0,"14,3",54311
+No driver,,,04/08/2026 07:54:27,"80,0","0 km from Kingsway Avenue Chief Albert Luthuli Park Suburbs, Chief Albert Luthuli Park, Gauteng, Sou,DAVEYTON EXT 2",HeadingChange,true,"60,0","-26,15633","28,39719",0,"14,4",54312
+No driver,,,04/08/2026 07:55:37,"26,0","Daveyton Suburbs, Daveyton, Gauteng, South Africa,Daveyton Ext 5",HeadingChange,true,"60,0","-26,16532","28,39782",0,"14,4",54313
+No driver,,,04/08/2026 07:55:51,"63,0","Daveyton Suburbs, Daveyton, Gauteng, South Africa,Daveyton Ext 5",HeadingChange,true,"120,0","-26,16598","28,39959",0,"14,4",54313
+No driver,,,04/08/2026 07:56:05,"93,0","0.01 km from N12 Alliance Ext 10, Benoni, Gauteng, South Africa,DAVEYTON EXT 5",HeadingChange,true,"120,0","-26,16564","28,4025",0,"14,4",54314
+No driver,,,04/08/2026 07:56:24,"119,0","0 km from N12 Modder B, Benoni, Gauteng, South Africa,DAVEYTON EXT 6",HeadingChange,true,"120,0","-26,16379","28,40795",0,"14,4",54314
+No driver,,,04/08/2026 07:57:22,"116,0","0 km from N12 Springs Suburbs, Springs, Gauteng, South Africa,BASOTHO SECTION EXT 5",HeadingChange,true,"120,0","-26,15715","28,4253",0,"14,5",54316
+No driver,,,04/08/2026 07:57:29,"125,0","0.01 km from N12 Springs Suburbs, Springs, Gauteng, South Africa,Gauteng",HeadingChange,true,"120,0","-26,15706","28,42764",0,"14,3",54316
+No driver,,,04/08/2026 07:58:32,"65,0","0.01 km from N12 Springs Suburbs, Springs, Gauteng, South Africa,Gauteng",HeadingChange,true,"60,0","-26,16065","28,44224",0,"14,4",54318
+No driver,,,04/08/2026 07:58:46,"35,0","0 km from Near Intersection Of Laris Street And N12 Springs Suburbs, Springs, Gauteng, South Africa,Gauteng",HeadingChange,true,"0,0","-26,15996","28,44407",0,"14,4",54318
+No driver,,,04/08/2026 07:58:53,"56,0","0 km from Laris Street Springs Suburbs, Springs, Gauteng, South Africa,Gauteng",HeadingChange,true,"60,0","-26,15911","28,44419",0,"14,4",54318
+No driver,,,04/08/2026 08:00:04,"70,0","0 km from Laris Street Springs Suburbs, Springs, Gauteng, South Africa,Gauteng",Timed Event,true,"80,0","-26,14763","28,44451",0,"14,5",54320
+No driver,,,04/08/2026 08:00:23,"64,0","0 km from Laris Street Chris Hani, Daveyton, Gauteng, South Africa,Gauteng",HeadingChange,true,"80,0","-26,14442","28,44579",0,"14,4",54320
+No driver,,,04/08/2026 08:01:28,"63,0","0.01 km from Laris Street Chris Hani, Daveyton, Gauteng, South Africa,CHRIS HANI",HeadingChange,true,"80,0","-26,13863","28,45365",0,"14,5",54321
+No driver,,,04/08/2026 08:02:23,"65,0","0 km from Laris Street Holfontein, Ekurhuleni, Gauteng, South Africa,Gauteng",HeadingChange,true,"80,0","-26,13548","28,46044",0,"14,5",54322
+No driver,,,04/08/2026 08:03:34,"62,0","0.01 km from Laris Street Holfontein, Ekurhuleni, Gauteng, South Africa,Gauteng",Timed Event,true,"80,0","-26,13534","28,47127",0,"14,5",54323
+No driver,,,04/08/2026 08:04:10,"38,0","0 km from Main Street Etwatwa Suburbs, Etwatwa, Gauteng, South Africa,Gauteng",HeadingChange,true,"80,0","-26,13354","28,47719",0,"14,5",54323
