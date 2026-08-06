@@ -11,24 +11,7 @@
 const { neon } = require('@neondatabase/serverless');
 const fs = require('fs');
 const path = require('path');
-
-/**
- * Read a required environment variable, or exit non-zero with a clear message.
- *
- * Deliberately fails the whole process: a cron that cannot reach its config
- * should be loudly broken, not quietly pointed somewhere else.
- */
-function requireEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    console.error(
-      `FATAL: ${name} is not set. Refusing to run — set it in the environment ` +
-        `(see .env.local) rather than hardcoding a value.`
-    );
-    process.exit(1);
-  }
-  return value;
-}
+const { requireEnv } = require('./lib/require-env.cjs');
 
 // Require DATABASE_URL rather than falling back to a literal. The previous
 // fallback pointed at Neon, which was retired at the 2026-04-18 Supabase

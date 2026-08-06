@@ -10,9 +10,9 @@ import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import pg from 'pg';
 import XLSX from 'xlsx';
+import { requireEnv } from './lib/require-env.cjs';
 
-const DATABASE_URL = (process.env.DATABASE_URL
-  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })());
+const DATABASE_URL = requireEnv('DATABASE_URL');
 const BASE_DIR = '/tmp/ft-invoicing/fibertime Weekly Invoicing';
 
 // ─── Patterns ────────────────────────────────────────────────────────────────

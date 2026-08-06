@@ -9,9 +9,9 @@
  */
 
 const { Client } = require('pg');
+const { requireEnv } = require('./lib/require-env.cjs');
 
-const PRODUCTION_DB = (process.env.DATABASE_URL
-  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })());
+const PRODUCTION_DB = requireEnv('DATABASE_URL');
 
 async function seedPermissions() {
   const client = new Client({ connectionString: PRODUCTION_DB });

@@ -16,11 +16,11 @@
  */
 
 const { neon } = require('@neondatabase/serverless');
+const { requireEnv } = require('./lib/require-env.cjs');
 
 // Configuration
 const ONEMAP_API = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
-const DATABASE_URL = (process.env.DATABASE_URL
-  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })());
+const DATABASE_URL = requireEnv('DATABASE_URL');
 
 const sql = neon(DATABASE_URL);
 

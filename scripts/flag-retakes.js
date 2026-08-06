@@ -3,9 +3,9 @@
  * Updates construction_qa_reviews with retake info and generates a summary report.
  */
 const { neon } = require('@neondatabase/serverless');
+const { requireEnv } = require('./lib/require-env.cjs');
 
-const sql = neon((process.env.DATABASE_URL
-  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })()));
+const sql = neon(requireEnv('DATABASE_URL'));
 
 const STEP_NAMES = {
   s1: 'Before Photo',

@@ -12,10 +12,10 @@
 'use strict';
 
 const { neon } = require('@neondatabase/serverless');
+const { requireEnv } = require('./lib/require-env.cjs');
 
 const DATABASE_URL =
-  (process.env.DATABASE_URL
-  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })());
+  requireEnv('DATABASE_URL');
 
 const APPLY = process.argv.includes('--apply');
 const PROJECT_FILTER_IDX = process.argv.indexOf('--project');

@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless';
+import { requireEnv } from './lib/require-env.cjs';
 
-const sql = neon((process.env.DATABASE_URL
-  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })()));
+const sql = neon(requireEnv('DATABASE_URL'));
 
 // 1. Add columns
 await sql`ALTER TABLE gl_journal_lines ADD COLUMN IF NOT EXISTS vat_type TEXT`;

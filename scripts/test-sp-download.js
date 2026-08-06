@@ -1,13 +1,13 @@
 const { neon } = require('@neondatabase/serverless');
 const fs = require('fs');
 const path = require('path');
+const { requireEnv } = require('./lib/require-env.cjs');
 
-const sql = neon((process.env.DATABASE_URL
-  || (() => { throw new Error('DATABASE_URL is required — the old Neon fallback was retired at the 2026-04-18 Supabase cutover'); })()));
+const sql = neon(requireEnv('DATABASE_URL'));
 const STORAGE_ROOT = '/home/velo/storage/qa-photos';
-const SP_TENANT_ID = 'f22e6344-a35d-43b0-ad8c-a247f513c1ee';
-const SP_CLIENT_ID = '075bd672-bffa-45ba-9fd0-724535e612db';
-const SP_CLIENT_SECRET = 'Ozw8Q~HG1PMZFPNb0Ze1f-eTYrtglVioRzy2lakF';
+const SP_TENANT_ID = requireEnv('SP_TENANT_ID');
+const SP_CLIENT_ID = requireEnv('SP_CLIENT_ID');
+const SP_CLIENT_SECRET = requireEnv('SP_CLIENT_SECRET');
 
 async function main() {
   const tokenRes = await fetch(
