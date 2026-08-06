@@ -402,3 +402,48 @@ The `VehicleCalibrationModal` and `OdometerOverrideModal` use `navigator.mediaDe
 - Added calibration API with grandfathering logic
 - Integrated NAFNet deblurring for blurry dashboard photos
 - CPU mode for NAFNet (RTX 5090 sm_120 incompatible)
+
+## Overnight Parking Compliance (mig 483, PR 1 of 3)
+
+Nightly job that asks, for every active vehicle at 20:00 SAST: is it where its
+driver declared it parks?
+
+| Piece | Where |
+|-------|-------|
+| Pure classifier | `src/modules/fleet/parking/classifyParkingCompliance.ts` |
+| SQL | `src/modules/fleet/parking/parkingQueries.ts` |
+| Orchestrator | `src/modules/fleet/parking/runParkingCheck.ts` |
+| Shared types (pg-free) | `src/modules/fleet/parking/types.ts` |
+| Endpoint | `pages/api/cron/fleet-parking-check.ts` (x-cron-secret) |
+| Cron wrapper | `scripts/cron-fleet-parking-check.sh` |
+| Tables | `fleet_vehicle_parking_locations`, `fleet_parking_compliance_checks` |
+
+**Schedule.** `0 20 * * * /home/velo/fibreflow-<env>/scripts/cron-fleet-parking-check.sh`.
+The endpoint is inert until that line is in velo's crontab, and an absent nightly
+run raises no alert — check `fleet_parking_compliance_checks` has rows for
+yesterday before assuming it is running.
+
+**Backfill.** `scripts/cron-fleet-parking-check.sh 2026-08-04` re-runs a missed
+night as of 20:00 SAST that day, from the position history already stored. The
+endpoint rejects a malformed or future `?date=` rather than falling back to now.
+
+### Rules
+- **Results are evidence.** Every FK on `fleet_parking_compliance_checks` is
+  `ON DELETE SET NULL`, and `vehicle_registration` is snapshotted onto the row,
+  so a hard-deleted vehicle (`DELETE /api/fleet/vehicles?permanent=true`) leaves
+  its violation history readable. Never make these CASCADE.
+- **Alert on the transition, not on `inserted`.** `insertComplianceCheck`
+  returns `previousResult` as well; the seam is
+  `result === 'violation' && previousResult !== 'violation'` (`newViolation`).
+  A re-run that upgrades `unknown` → `violation` is an UPDATE, so dedup keyed on
+  `inserted` drops the only alert that mattered.
+- **Precedence is deliberate:** `no_address` > `not_verifiable` > `unknown` >
+  `compliant`/`violation`. A missing address is the driver's problem; a missing
+  tracker is a hardware problem. They go to different people.
+- **`unknown` is not `compliant`.** Absence of evidence is stored as its own
+  result, never collapsed into a pass.
+- Staleness ceiling is 72h (`STALE_FIX_MAX_HOURS`) so a weekend park still
+  classifies normally.
+- SQL is covered against a real Postgres by
+  `tests/migrations/483_fleet_parking_queries.test.ts` — the unit tests mock the
+  query layer out, so without that file the statements are never parsed.
