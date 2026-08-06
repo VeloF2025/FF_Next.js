@@ -31,6 +31,38 @@
 --
 -- Re-runnable: the ADD fires only when the constraint is absent.
 
+-- Preflight. ADD CONSTRAINT validates existing rows immediately, and
+-- run-pending-migrations.sh aborts the whole deploy on a failed migration
+-- (`✗ FAILED — aborting`, exit 1). A bare constraint violation would surface
+-- as SQLSTATE 23514 naming neither the row nor the remedy, on a shared
+-- dev+prod database, mid-deploy. Fail here instead with the offending ids.
+--
+-- This deliberately still BLOCKS rather than skipping: a violating row means
+-- someone's shift is recorded as negative, and silently declining to enforce
+-- the rule would leave that true indefinitely. The goal is an actionable
+-- failure, not an avoidable one.
+DO $$
+DECLARE
+  bad_count integer;
+  bad_ids   text;
+BEGIN
+  SELECT COUNT(*), COALESCE(string_agg(id::text, ', ' ORDER BY id), '')
+  INTO bad_count, bad_ids
+  FROM attendance_adjustments
+  WHERE adjusted_clock_in_at IS NOT NULL
+    AND adjusted_clock_out_at IS NOT NULL
+    AND adjusted_clock_out_at <= adjusted_clock_in_at;
+
+  IF bad_count > 0 THEN
+    RAISE EXCEPTION
+      'Migration 482 preflight: % attendance_adjustments row(s) have a clock-out at or before their clock-in. Correct them before this constraint can be added. Offending ids: %',
+      bad_count, bad_ids
+      USING HINT =
+        'Typically the clock-in carries the submission date instead of the work date. '
+        'Reset the timestamp to the value the worker intended; do not delete the row.';
+  END IF;
+END $$;
+
 DO $$
 BEGIN
   -- to_regclass() resolves through search_path so the guard inspects the same

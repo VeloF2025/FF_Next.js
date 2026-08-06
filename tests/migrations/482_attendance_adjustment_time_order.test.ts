@@ -159,6 +159,72 @@ describe('migration 482 — attendance adjustment clock ordering', () => {
     expect((await tryInsert(null, null)).ok).toBe(true);
   });
 
+  it('rejects an UPDATE that inverts a previously valid row', async () => {
+    // A CHECK constraint guards every write, not just INSERT. Without this
+    // case the suite would still pass if the constraint were somehow
+    // insert-only, and an approved correction could be inverted after review.
+    await scoped(FORWARD);
+    await scoped(
+      `INSERT INTO attendance_adjustments (id, adjusted_clock_in_at, adjusted_clock_out_at)
+       VALUES ('00000000-0000-0000-0000-0000000000e1', $1::timestamptz, $2::timestamptz)`,
+      [IN_AT, OUT_AT],
+    );
+
+    let failed = false;
+    try {
+      await scoped(
+        `UPDATE attendance_adjustments SET adjusted_clock_out_at = $1::timestamptz
+         WHERE id = '00000000-0000-0000-0000-0000000000e1'`,
+        ['2026-05-15 04:00:00+00'],
+      );
+    } catch (err) {
+      failed = true;
+      expect((err as { code?: string }).code).toBe('23514');
+    }
+    expect(failed).toBe(true);
+  });
+
+  it('preflight blocks the migration and names the offending row', async () => {
+    // The deploy runner aborts on a failed migration, so the failure must say
+    // which row to fix rather than emitting a bare 23514.
+    const BAD_ID = '00000000-0000-0000-0000-0000000000b1';
+    await scoped(
+      `INSERT INTO attendance_adjustments (id, adjusted_clock_in_at, adjusted_clock_out_at)
+       VALUES ($1, '2026-05-18 05:00:00+00'::timestamptz, $2::timestamptz)`,
+      [BAD_ID, OUT_AT],
+    );
+
+    let message = '';
+    try {
+      await scoped(FORWARD);
+    } catch (err) {
+      message = (err as { message?: string }).message ?? '';
+    }
+
+    expect(message).toContain('Migration 482 preflight');
+    expect(message).toContain(BAD_ID);
+    // And it must not have half-applied.
+    expect(await hasConstraint()).toBe(false);
+  });
+
+  it('applies cleanly once the offending row is corrected', async () => {
+    const BAD_ID = '00000000-0000-0000-0000-0000000000b2';
+    await scoped(
+      `INSERT INTO attendance_adjustments (id, adjusted_clock_in_at, adjusted_clock_out_at)
+       VALUES ($1, '2026-05-18 05:00:00+00'::timestamptz, $2::timestamptz)`,
+      [BAD_ID, OUT_AT],
+    );
+    await expect(scoped(FORWARD)).rejects.toThrow();
+
+    await scoped(
+      `UPDATE attendance_adjustments SET adjusted_clock_in_at = $1::timestamptz WHERE id = $2`,
+      [IN_AT, BAD_ID],
+    );
+
+    await expect(scoped(FORWARD)).resolves.toBeDefined();
+    expect(await hasConstraint()).toBe(true);
+  });
+
   it('does not reject rows that already exist when it is applied', async () => {
     // Ordering is enforced going forward; applying it must not fail on the
     // legitimate rows already in the table.

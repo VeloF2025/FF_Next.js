@@ -83,6 +83,10 @@ const DB_ENTRY_ROW = {
   staff_id: STAFF_ID,
   work_date: '2026-06-20',
   site_geofence_id: 'geo-site-1',
+  // The raw punch. A one-sided correction is judged against these, so they
+  // have to be present for the handler to compare anything.
+  clock_in_at: '2026-06-20T06:00:00.000Z',
+  clock_out_at: null as string | null,
 };
 const ADJUSTMENT_ROW = {
   id: 'adj-001',
@@ -220,6 +224,58 @@ describe('POST /api/field/attendance-adjust', () => {
     );
     expect(captured.statusCode).toBe(200);
     expect(mocks.createAndApproveAdjustmentTxn).toHaveBeenCalled();
+  });
+
+  // One-sided corrections — the common case (forgot_clock_out). These are
+  // judged against the raw punch, so the check can only run after the entry
+  // lookup. This is the shape that put a negative-duration row into
+  // production: clock-out set 13 minutes before the recorded clock-in.
+  it('400 when a lone adjusted_clock_out_at precedes the raw clock_in_at', async () => {
+    const { adjusted_clock_in_at: _drop, ...body } = VALID_BODY;
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({ ...body, adjusted_clock_out_at: '2026-06-20T05:30:00Z' }), // raw in = 06:00
+      res
+    );
+    expect(captured.statusCode).toBe(400);
+    expect(mocks.createAndApproveAdjustmentTxn).not.toHaveBeenCalled();
+  });
+
+  it('400 when a lone adjusted_clock_in_at is at or after the raw clock_out_at', async () => {
+    mocks.sql.mockImplementation(async (strings: TemplateStringsArray) =>
+      /FROM staff WHERE user_id/i.test(strings.join(' '))
+        ? [{ id: REQUESTER_STAFF_ID }]
+        : [{ ...DB_ENTRY_ROW, clock_out_at: '2026-06-20T14:00:00.000Z' }]
+    );
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({ ...VALID_BODY, adjusted_clock_in_at: '2026-06-20T15:00:00Z' }),
+      res
+    );
+    expect(captured.statusCode).toBe(400);
+    expect(mocks.createAndApproveAdjustmentTxn).not.toHaveBeenCalled();
+  });
+
+  it('allows a lone adjusted_clock_out_at that is after the raw clock_in_at', async () => {
+    const { adjusted_clock_in_at: _drop, ...body } = VALID_BODY;
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({ ...body, adjusted_clock_out_at: '2026-06-20T15:00:00Z' }), // raw in = 06:00
+      res
+    );
+    expect(captured.statusCode).toBe(200);
+    expect(mocks.createAndApproveAdjustmentTxn).toHaveBeenCalled();
+  });
+
+  it('allows a one-sided correction when the entry has no opposing punch', async () => {
+    // clock_out_at is null on the raw entry, so there is nothing to compare a
+    // lone clock-in against. It must not be rejected for lack of evidence.
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({ ...VALID_BODY, adjusted_clock_in_at: '2026-06-20T04:00:00Z' }),
+      res
+    );
+    expect(captured.statusCode).toBe(200);
   });
 
   it('404 when entry not found in DB', async () => {

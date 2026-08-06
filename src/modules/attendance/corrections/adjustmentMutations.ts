@@ -12,7 +12,36 @@ export interface InsertAdjustmentArgs {
   reason: string;
 }
 
+/**
+ * Thrown when an adjustment's own timestamps describe a shift that ends at or
+ * before it starts. Callers that front a request should map this to a 400 —
+ * without it the caller gets a raw SQLSTATE 23514 from the migration-482
+ * constraint, which surfaces as a 500.
+ *
+ * This validates only the pair carried by the adjustment itself. A one-sided
+ * correction has to be judged against the raw entry, which this writer does
+ * not load; that check belongs to the request handler (see
+ * pages/api/field/attendance-adjust.ts).
+ */
+export class AdjustmentTimeOrderError extends Error {
+  readonly code = 'adjustment_time_order';
+  constructor(readonly clockInAt: Date, readonly clockOutAt: Date) {
+    super(
+      `Adjusted clock-out ${clockOutAt.toISOString()} must be after ` +
+        `adjusted clock-in ${clockInAt.toISOString()}`
+    );
+    this.name = 'AdjustmentTimeOrderError';
+  }
+}
+
 export async function insertAdjustment(args: InsertAdjustmentArgs): Promise<AdjustmentRow> {
+  if (
+    args.adjustedClockInAt &&
+    args.adjustedClockOutAt &&
+    args.adjustedClockOutAt.getTime() <= args.adjustedClockInAt.getTime()
+  ) {
+    throw new AdjustmentTimeOrderError(args.adjustedClockInAt, args.adjustedClockOutAt);
+  }
   const rows = await sql<AdjustmentRow>`
     INSERT INTO attendance_adjustments (
       entry_id, requested_by, adjustment_kind,
