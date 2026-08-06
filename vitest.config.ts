@@ -56,6 +56,7 @@ export default defineConfig({
       'tests/migrations/479_ticket_gps_oes_backfill.test.ts',
       'tests/migrations/480_pole_plan_replan_backup.test.ts',
       'tests/migrations/481_pole_qa_photo_superseded.test.ts',
+      'tests/migrations/482_attendance_adjustment_time_order.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.
