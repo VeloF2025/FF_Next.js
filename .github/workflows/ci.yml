@@ -117,6 +117,7 @@ jobs:
           python3 scripts/test_replan_match.py
           python3 scripts/test_replan_import_db.py
           python3 scripts/test_replan_guards.py
+          python3 scripts/test_qfield_hierarchy_backfill.py
         timeout-minutes: 15
 
       # The container is removed in the suite's teardown, but a cancelled or timed-out

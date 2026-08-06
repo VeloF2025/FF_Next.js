@@ -1,4 +1,23 @@
-"""Persist verified QField audit hierarchy into FibreFlow QA rows."""
+"""Persist verified QField audit hierarchy into FibreFlow QA rows.
+
+⚠️ BACKFILL ONLY. Every write here is `COALESCE(existing, gpkg)` — the GPKG fills a
+NULL and never replaces a value that is already set. The argument order is the whole
+contract; flipping it to `COALESCE(gpkg, existing)` turns this into an overwrite.
+
+Why it matters (measured 2026-08-06, Thembisa POP 3): it WAS
+`COALESCE(gpkg, existing)`. The audit layer's `zone_no`/`pon_no` attributes are stale
+on a replanned project — they still carry the pre-replan scheme — so one extractor run
+rewrote 98 poles that the replan import had just corrected: TEM.P.I544 zone 66 -> 62,
+TEM.P.M040 zone 69 -> 6. Nothing errored; the plan silently reverted for those poles.
+
+The authority for zone/PON is the PLAN (the replan import, or SOW). This module exists
+to fill gaps for poles the plan never covered — which is what "backfill" in
+`hierarchy_backfill_needed` has always meant. Reading a corrected value back out of a
+field-captured attribute is not a sync, it is a regression.
+
+See [[qfield-pole-zone-comes-from-boundaries-not-attributes]]: the audit layer's
+zone/PON attributes are unreliable by design and must never be treated as authoritative.
+"""
 import json
 import os
 import subprocess
@@ -81,15 +100,15 @@ def _update_planning_poles(cur, hierarchy_values):
         cur,
         """
         UPDATE poles AS p SET
-          pon_no = COALESCE(h.pon_no::integer, p.pon_no),
-          zone_no = COALESCE(h.zone_no::integer, p.zone_no),
+          pon_no = COALESCE(p.pon_no, h.pon_no::integer),
+          zone_no = COALESCE(p.zone_no, h.zone_no::integer),
           updated_at = NOW()
         FROM (VALUES %s) AS h(project_id, pole_label, zone_no, pon_no)
         WHERE p.project_id = h.project_id::uuid
           AND p.pole_number = h.pole_label
           AND (
-            p.pon_no IS DISTINCT FROM COALESCE(h.pon_no::integer, p.pon_no)
-            OR p.zone_no IS DISTINCT FROM COALESCE(h.zone_no::integer, p.zone_no)
+            p.pon_no IS DISTINCT FROM COALESCE(p.pon_no, h.pon_no::integer)
+            OR p.zone_no IS DISTINCT FROM COALESCE(p.zone_no, h.zone_no::integer)
           )
         RETURNING p.id
         """,
@@ -128,14 +147,14 @@ def _upsert_work_qa(cur, hierarchy_values, validated_labels):
         INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
         VALUES %s
         ON CONFLICT (project_id, pole_label) DO UPDATE SET
-          zone_no = COALESCE(EXCLUDED.zone_no, pole_qa_photos.zone_no),
-          pon_no = COALESCE(EXCLUDED.pon_no, pole_qa_photos.pon_no),
+          zone_no = COALESCE(pole_qa_photos.zone_no, EXCLUDED.zone_no),
+          pon_no = COALESCE(pole_qa_photos.pon_no, EXCLUDED.pon_no),
           updated_at = NOW()
         WHERE
           pole_qa_photos.zone_no IS DISTINCT FROM
-            COALESCE(EXCLUDED.zone_no, pole_qa_photos.zone_no)
+            COALESCE(pole_qa_photos.zone_no, EXCLUDED.zone_no)
           OR pole_qa_photos.pon_no IS DISTINCT FROM
-            COALESCE(EXCLUDED.pon_no, pole_qa_photos.pon_no)
+            COALESCE(pole_qa_photos.pon_no, EXCLUDED.pon_no)
         RETURNING pole_label
         """,
         qa_values,
@@ -150,16 +169,16 @@ def _update_reviews(cur, hierarchy_values):
         cur,
         """
         UPDATE construction_qa_reviews AS r SET
-          zone_no = COALESCE(h.zone_no::integer, r.zone_no),
-          pon_no = COALESCE(h.pon_no::integer, r.pon_no),
+          zone_no = COALESCE(r.zone_no, h.zone_no::integer),
+          pon_no = COALESCE(r.pon_no, h.pon_no::integer),
           updated_at = NOW()
         FROM (VALUES %s) AS h(project_id, pole_label, zone_no, pon_no)
         WHERE r.project_id = h.project_id::uuid
           AND r.feature_type = 'pole'
           AND r.feature_id = h.pole_label
           AND (
-            r.zone_no IS DISTINCT FROM COALESCE(h.zone_no::integer, r.zone_no)
-            OR r.pon_no IS DISTINCT FROM COALESCE(h.pon_no::integer, r.pon_no)
+            r.zone_no IS DISTINCT FROM COALESCE(r.zone_no, h.zone_no::integer)
+            OR r.pon_no IS DISTINCT FROM COALESCE(r.pon_no, h.pon_no::integer)
           )
         RETURNING r.id
         """,

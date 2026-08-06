@@ -83,7 +83,17 @@ PROJECTS = {
         "ff_project_id": "1de088dd-fe24-43fb-b8d3-94fca61ef91d",
         "gpkg_path": "THM_3_Poles.gpkg",
         "table_name": "thm_3_poles",
-        "label_col": "label_1",
+        # 'label', not 'label_1'. QField appends _1 when a layer name collides on
+        # publish; THM_3_Poles was republished without the collision, so the suffix
+        # disappeared. Confirmed against the live GPKG (v20260806102340): the table
+        # has `label` with 4,590 non-null values and no `label_1` at all.
+        #
+        # The mismatch froze this project's ingest from 2026-08-04 14:02. It failed
+        # LOUDLY and correctly — qfield_gpkg_table bails before writing sync state
+        # precisely so a no-op run cannot stamp last_version and look fresh forever —
+        # but nothing alerted on it, so 27 poles' QA photos captured on 5–6 Aug sat in
+        # QField unseen. Johan Scott reported it as "PON 818 wys net 1 paal".
+        "label_col": "label",
     },
     "Tonga": {
         "qf_project_id": "7fe59cdc-b1d5-475d-8448-5cf2e9f7175b",

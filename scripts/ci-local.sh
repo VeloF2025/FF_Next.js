@@ -165,6 +165,17 @@ if command -v python3 >/dev/null 2>&1; then
     tail -25 /tmp/ci-replan-guards.txt | sed 's/^/    /'
   fi
 
+  # Backfill-only contract for qfield_hierarchy_sync: the GPKG fills NULLs and never
+  # overwrites a value the PLAN owns. Reversing the COALESCE order silently reverted
+  # 98 replanned poles on 2026-08-06, so this executes the real SQL rather than
+  # inspecting it. Needs docker.
+  if python3 scripts/test_qfield_hierarchy_backfill.py > /tmp/ci-hierarchy-backfill.txt 2>&1; then
+    pass "QField hierarchy backfill-only: all checks pass"
+  else
+    fail "QField hierarchy backfill-only: regression detected"
+    tail -25 /tmp/ci-hierarchy-backfill.txt | sed 's/^/    /'
+  fi
+
   if python3 scripts/test_qfield_hierarchy.py > /tmp/ci-qfield-hierarchy.txt 2>&1; then
     pass "QField hierarchy mapping: all checks pass"
   else
