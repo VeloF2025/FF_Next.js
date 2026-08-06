@@ -46,11 +46,44 @@ export interface NetstarClientOptions {
   fetchImpl?: typeof fetch;
   /** Injectable so tests do not sleep. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Wall-clock budget for one fetchPositions call. Worst case per vehicle is
+   * ~11 minutes (one GenerateReport plus EXPORT_ATTEMPTS polls at the session's
+   * 60s timeout), so at ~22 vehicles a degenerate portal outruns the 2-hourly
+   * cadence and every later tick skips on the advisory lock with a 200 while
+   * tracking is dead. Stopping at the budget makes that a partial fetch
+   * instead: what was collected is stored and the next tick resumes.
+   */
+  maxRuntimeMs?: number;
+  /** Injectable so the budget is testable without waiting. */
+  now?: () => number;
 }
 
 export interface NetstarClient {
   listVehicles(): Promise<PortalVehicle[]>;
   fetchPositions(from: Date, to: Date, vehicles: PortalVehicle[]): Promise<ProviderPosition[]>;
+}
+
+/**
+ * Some vehicles were fetched, some were not.
+ *
+ * Thrown rather than returned so a caller that ignores it cannot mistake a
+ * partial result for a complete one, but it carries the positions that DID
+ * arrive so the caller can still store them. The caller must not advance its
+ * watermark past a window it only partly fetched — see pollProvider.ts.
+ *
+ * Total failure is a plain Error: nothing was fetched, so there is nothing to
+ * store and the whole tick failed.
+ */
+export class PartialFetchError extends Error {
+  constructor(
+    message: string,
+    readonly positions: ProviderPosition[],
+    readonly failures: Array<{ externalId: string; error: string }>
+  ) {
+    super(message);
+    this.name = 'PartialFetchError';
+  }
 }
 
 /** Split a window into contiguous chunks no wider than `maxMs`. */
@@ -71,8 +104,13 @@ export function chunkWindow(
   return out;
 }
 
+/** Comfortably inside the 2-hour cadence, with room for the next tick. */
+const DEFAULT_MAX_RUNTIME_MS = 25 * 60 * 1000;
+
 export function netstarClient(opts: NetstarClientOptions): NetstarClient {
   const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+  const now = opts.now ?? (() => Date.now());
+  const maxRuntimeMs = opts.maxRuntimeMs ?? DEFAULT_MAX_RUNTIME_MS;
 
   const session = new PortalSession({
     baseUrl: opts.baseUrl,
@@ -134,6 +172,18 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
     to: Date,
     vehicles: PortalVehicle[]
   ): Promise<ProviderPosition[]> {
+    // JSON.stringify serialises NaN as null, so a non-numeric external id would
+    // reach the portal as `selectedIds: [null]` — a report for no vehicle, which
+    // returns an empty export and reads downstream as a data gap rather than as
+    // the bad id it is. Fail loudly instead.
+    const selectedIds = vehicles.map((v) => {
+      const n = Number(v.externalId);
+      if (!Number.isFinite(n)) {
+        throw new Error(`[netstar] non-numeric external id "${v.externalId}"`);
+      }
+      return n;
+    });
+
     const payload = {
       reportId: REPORT_ID,
       reportName: 'All Activity',
@@ -144,7 +194,7 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
       embededMap: false,
       useVehicleTimeZone: false,
       selectedTimeZone: TIMEZONE,
-      selectedIds: vehicles.map((v) => Number(v.externalId)),
+      selectedIds,
       selectedNames: vehicles.map((v) => v.registration ?? ''),
       reportBy: 'Vehicle',
       reportTree: 'Vehicles',
@@ -196,16 +246,54 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
     listVehicles,
     async fetchPositions(from, to, vehicles) {
       const all: ProviderPosition[] = [];
+      const failures: Array<{ externalId: string; error: string }> = [];
       // Paced, not parallel: one report at a time, with a gap between them.
       let first = true;
+      let attempted = 0;
+      const deadline = now() + maxRuntimeMs;
       for (const chunk of chunkWindow(from, to, MAX_REPORT_MS)) {
         for (const v of vehicles) {
+          if (now() >= deadline) {
+            failures.push({ externalId: v.externalId, error: 'runtime budget exhausted' });
+            attempted += 1;
+            continue;
+          }
           if (!first) await sleep(REQUEST_PACE_MS);
           first = false;
-          all.push(...(await fetchChunk(chunk.from, chunk.to, [v])));
+          attempted += 1;
+          // Isolated per vehicle. Without this, one vehicle whose export job
+          // never becomes ready throws out of the loop and discards every
+          // position already collected for the others — and because the caller
+          // leaves the watermark untouched on a throw, the next tick re-requests
+          // the identical window and hits the same stuck vehicle again. One bad
+          // report becomes a permanent fleet-wide blackout.
+          try {
+            all.push(...(await fetchChunk(chunk.from, chunk.to, [v])));
+          } catch (err) {
+            const error = err instanceof Error ? err.message : String(err);
+            failures.push({ externalId: v.externalId, error });
+            log.error('[netstar] vehicle report failed — continuing with the rest', {
+              externalId: v.externalId, registration: v.registration,
+              from: chunk.from.toISOString(), to: chunk.to.toISOString(), error,
+            });
+          }
         }
       }
-      return all;
+
+      if (failures.length === 0) return all;
+      // Everything failed: not a partial result, a dead portal. Fail the tick
+      // outright so the watermark stays put and the caller's existing handler
+      // classifies it (auth vs transient).
+      if (failures.length === attempted) {
+        throw new Error(
+          `[netstar] every vehicle report failed (${attempted}): ${failures[0]!.error}`
+        );
+      }
+      throw new PartialFetchError(
+        `[netstar] ${failures.length} of ${attempted} vehicle reports failed`,
+        all,
+        failures
+      );
     },
   };
 }

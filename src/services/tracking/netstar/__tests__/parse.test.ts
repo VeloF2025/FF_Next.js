@@ -8,6 +8,14 @@ const fixture = readFileSync(
   'utf8'
 );
 
+/**
+ * The live export is CRLF; the committed fixture is whatever git checked out,
+ * which on a Linux runner is LF. Never split on a hardcoded '\r\n' here.
+ */
+function splitLines(csv: string): string[] {
+  return csv.split(/\r\n|\n/);
+}
+
 import { parseDecimalComma, parseNetstarTs } from '../parse';
 
 describe('parseDecimalComma', () => {
@@ -93,12 +101,31 @@ describe('parseAllActivityCsv', () => {
   });
 
   it('drops rows whose Gps column is false', () => {
-    const lines = fixture.split('\r\n');
-    const bad = lines[1].replace(',true,', ',false,');
-    expect(parseAllActivityCsv(`${lines[0]}\r\n${bad}`)).toEqual([]);
+    const [header, firstRow] = splitLines(fixture);
+    const bad = firstRow!.replace(',true,', ',false,');
+    expect(bad).not.toBe(firstRow); // the substitution has to have bitten
+    expect(parseAllActivityCsv(`${header}\r\n${bad}`)).toEqual([]);
   });
 
   it('returns an empty array for a header-only export', () => {
-    expect(parseAllActivityCsv(fixture.split('\r\n')[0])).toEqual([]);
+    const [header] = splitLines(fixture);
+    expect(header).toMatch(/^[^\n]+$/); // one line, not the whole file
+    expect(parseAllActivityCsv(header!)).toEqual([]);
+  });
+
+  it('returns an empty array for a completely empty export', () => {
+    expect(parseAllActivityCsv('')).toEqual([]);
+  });
+
+  // Netstar's live export is CRLF, but git normalises the committed fixture to
+  // LF on checkout and this repo has no .gitattributes to stop it. Splitting on
+  // a hardcoded '\r\n' therefore returned ONE element on CI: `lines[1]` was
+  // undefined and `lines[0]` was the entire 50-row file, so the two cases above
+  // silently tested nothing while one of them crashed. Accept either ending.
+  it('parses the fixture whichever line ending it is checked out with', () => {
+    const lf = fixture.replace(/\r\n/g, '\n');
+    const crlf = lf.replace(/\n/g, '\r\n');
+    expect(parseAllActivityCsv(crlf)).toEqual(parseAllActivityCsv(lf));
+    expect(parseAllActivityCsv(lf).length).toBeGreaterThan(0);
   });
 });

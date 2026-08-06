@@ -20,6 +20,7 @@ import { setVehicleTracker } from './trackerQueries';
 import {
   matchVehicles,
   type FleetVehicleRow,
+  type MatchResult,
   type PortalVehicle,
 } from './portal/registration';
 import type { ProviderKey } from './types';
@@ -31,20 +32,36 @@ export interface ReconcileReport {
   fleetOnly: FleetVehicleRow[];
   /**
    * True when deactivation was refused because this reconcile would have
-   * unmapped more than half the account's active trackers. Surfaced rather
+   * unmapped half or more of the account's active trackers. Surfaced rather
    * than swallowed: a suppressed run leaves stale mappings in place on
    * purpose, and whoever reads the poll output has to be able to see that a
    * safety brake engaged instead of inferring health from `deactivated: 0`.
    */
   deactivationSuppressed: boolean;
+  /**
+   * True when the portal returned vehicles but none of them could be placed —
+   * or when everything placeable was skipped. Distinct from `upserted: 0`,
+   * which is also what a healthy already-mapped account looks like.
+   */
+  matchedNone: boolean;
+  /**
+   * Vehicles this portal carries that are already tracked by a DIFFERENT
+   * provider or account, and were therefore left alone. See the takeover
+   * comment below.
+   */
+  skippedOtherProvider: Array<{ vehicleId: string; registration: string }>;
+  /** Normalised keys that collided in either direction — see MatchResult.ambiguous. */
+  ambiguous: MatchResult['ambiguous'];
 }
 
 /**
- * Above this share of the account's active trackers, a deactivation is
+ * At or above this share of the account's active trackers, a deactivation is
  * treated as a portal/parsing fault rather than as truth. Half is deliberately
  * blunt: fleets do not lose half their trackers between two ticks two hours
  * apart, but a shape change or a registration-format drift removes exactly
- * that much in one go.
+ * that much in one go — so the boundary itself must be suppressed, not allowed
+ * through. A report truncated to the first of two equal pages lands precisely
+ * on it.
  */
 const MAX_DEACTIVATION_SHARE = 0.5;
 
@@ -72,6 +89,12 @@ export interface ReconcileDeps {
    * testable without a database.
    */
   countActiveTrackers: (provider: ProviderKey, accountRef: string) => Promise<number>;
+  /**
+   * Vehicle ids that currently hold an active tracker belonging to some OTHER
+   * provider/account. The takeover guard's input; a dep so it is testable
+   * without a database.
+   */
+  loadTrackedElsewhere: (provider: ProviderKey, accountRef: string) => Promise<Set<string>>;
 }
 
 const dbDeps: ReconcileDeps = {
@@ -91,9 +114,10 @@ const dbDeps: ReconcileDeps = {
    * one transaction so a failure between the two statements cannot leave the
    * vehicle with zero active trackers.
    *
-   * Newest wins: a vehicle moving between rental partners gets a new device
-   * and the old one stops reporting, so the freshly discovered tracker is the
-   * truthful one.
+   * Newest wins WITHIN a provider account: a vehicle moving between rental
+   * partners gets a new device and the old one stops reporting, so the freshly
+   * discovered tracker is the truthful one. Across providers it is the caller's
+   * job to have filtered first — see loadTrackedElsewhere.
    */
   assignTracker: async (vehicleId, provider, accountRef, externalId) => {
     await setVehicleTracker({ vehicleId, provider, accountRef, externalId });
@@ -121,6 +145,15 @@ const dbDeps: ReconcileDeps = {
     `;
     return rows[0]?.n ?? 0;
   },
+
+  loadTrackedElsewhere: async (provider, accountRef) => {
+    const rows = await sql<{ vehicle_id: string }>`
+      SELECT DISTINCT vehicle_id FROM fleet_vehicle_trackers
+      WHERE is_active
+        AND NOT (provider = ${provider} AND account_ref = ${accountRef})
+    `;
+    return new Set(rows.map((r) => r.vehicle_id));
+  },
 };
 
 export async function reconcileTrackers(
@@ -130,6 +163,10 @@ export async function reconcileTrackers(
   deps: ReconcileDeps = dbDeps
 ): Promise<ReconcileReport> {
   const fleet = await deps.loadActiveFleet();
+  const empty = {
+    upserted: 0, deactivated: 0, deactivationSuppressed: false,
+    skippedOtherProvider: [] as ReconcileReport['skippedOtherProvider'],
+  };
 
   // An empty portal list is treated as a fetch failure, not as truth about the
   // account. listVehicles() can return [] for reasons that have nothing to do
@@ -143,12 +180,11 @@ export async function reconcileTrackers(
       provider, accountRef,
     });
     return {
-      upserted: 0, deactivated: 0, portalOnly: [], fleetOnly: fleet,
-      deactivationSuppressed: false,
+      ...empty, portalOnly: [], fleetOnly: fleet, matchedNone: true, ambiguous: [],
     };
   }
 
-  const { matched, portalOnly, fleetOnly } = matchVehicles(portal, fleet);
+  const { matched, portalOnly, fleetOnly, ambiguous } = matchVehicles(portal, fleet);
 
   // A non-empty list that matches NOTHING is the same class of failure as an
   // empty one, and the empty-list guard above does not catch it. listVehicles()
@@ -168,8 +204,48 @@ export async function reconcileTrackers(
       sampleNames: portal.slice(0, 5).map((p) => p.registration),
     });
     return {
-      upserted: 0, deactivated: 0, portalOnly: portal, fleetOnly: fleet,
-      deactivationSuppressed: false,
+      ...empty, portalOnly: portal, fleetOnly: fleet, matchedNone: true, ambiguous,
+    };
+  }
+
+  // NEVER take a vehicle off another provider.
+  //
+  // uq_fleet_trackers_one_active_per_vehicle is fleet-wide, and
+  // setVehicleTracker's deactivate is `WHERE vehicle_id = $1 AND is_active`
+  // with no provider predicate — so mapping a vehicle Cartrack already tracks
+  // switches the Cartrack row off. This portal is a multi-client reseller tree
+  // and loadActiveFleet loads the WHOLE fleet, so the collision is expected.
+  // The result is a silent downgrade from a 2-minute feed to a 2-hourly
+  // scrape: poll-tracking.ts then drops that vehicle's positions as unmapped
+  // at log.info, runs no discovery, and nothing ever maps it back. Reported,
+  // not hidden — two providers on one vehicle is a subscription paid twice.
+  const trackedElsewhere = await deps.loadTrackedElsewhere(provider, accountRef);
+  const skippedOtherProvider = matched
+    .filter((m) => trackedElsewhere.has(m.vehicleId))
+    .map((m) => ({ vehicleId: m.vehicleId, registration: m.registration }));
+  const claimable = matched.filter((m) => !trackedElsewhere.has(m.vehicleId));
+
+  if (skippedOtherProvider.length > 0) {
+    log.warn('[tracking-discovery] vehicles already tracked by another provider — not taking over', {
+      provider, accountRef,
+      registrations: skippedOtherProvider.map((s) => s.registration),
+    });
+  }
+  if (ambiguous.length > 0) {
+    log.error('[tracking-discovery] ambiguous registration match — refusing to map', {
+      provider, accountRef, ambiguous,
+    });
+  }
+
+  // Everything the portal offered is already someone else's. Same reasoning as
+  // the zero-match guard: proceeding would hand deactivateMissing an empty keep
+  // list and unmap the account.
+  if (claimable.length === 0) {
+    log.warn('[tracking-discovery] every matched vehicle is tracked elsewhere — nothing to reconcile', {
+      provider, accountRef, skipped: skippedOtherProvider.length,
+    });
+    return {
+      ...empty, portalOnly, fleetOnly, matchedNone: true, ambiguous, skippedOtherProvider,
     };
   }
 
@@ -177,7 +253,7 @@ export async function reconcileTrackers(
   // looked like going in, not what this run has already changed.
   const activeBefore = await deps.countActiveTrackers(provider, accountRef);
 
-  for (const m of matched) {
+  for (const m of claimable) {
     await deps.assignTracker(m.vehicleId, provider, accountRef, m.externalId);
   }
 
@@ -187,19 +263,20 @@ export async function reconcileTrackers(
   // data does not come back. Refusing to deactivate costs at most some stale
   // rows, which the next healthy tick clears; deactivating wrongly costs
   // history.
-  const wouldDeactivate = Math.max(0, activeBefore - matched.length);
-  const deactivationSuppressed = wouldDeactivate > activeBefore * MAX_DEACTIVATION_SHARE;
+  const wouldDeactivate = Math.max(0, activeBefore - claimable.length);
+  const deactivationSuppressed =
+    wouldDeactivate > 0 && wouldDeactivate >= activeBefore * MAX_DEACTIVATION_SHARE;
 
   let deactivated = 0;
   if (deactivationSuppressed) {
     log.error('[tracking-discovery] refusing to deactivate: this reconcile would unmap most of the account', {
       provider, accountRef,
-      activeBefore, matched: matched.length, wouldDeactivate,
+      activeBefore, matched: claimable.length, wouldDeactivate,
       portalCount: portal.length,
     });
   } else {
     deactivated = await deps.deactivateMissing(
-      provider, accountRef, matched.map((m) => m.externalId)
+      provider, accountRef, claimable.map((m) => m.externalId)
     );
   }
 
@@ -217,7 +294,7 @@ export async function reconcileTrackers(
   }
 
   return {
-    upserted: matched.length, deactivated, portalOnly, fleetOnly,
-    deactivationSuppressed,
+    upserted: claimable.length, deactivated, portalOnly, fleetOnly,
+    deactivationSuppressed, matchedNone: false, skippedOtherProvider, ambiguous,
   };
 }

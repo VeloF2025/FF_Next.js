@@ -69,9 +69,30 @@ Full reference for the tracking services: `src/services/tracking/.claude.md`. De
 matches the portal's vehicle list against active `fleet_vehicles` by registration. It is
 bidirectional: vehicles active in FibreFlow but absent from the portal (`fleetOnly`), and portal
 vehicles matching no active fleet vehicle (`portalOnly`), are both surfaced in the poll response
-under `coverage`. A tracker row is only written on a confident match — an empty portal vehicle
-list is treated as a fetch failure and reconciliation is skipped entirely, rather than
-deactivating every tracker on the account.
+under `coverage`. A tracker row is only written on a confident match.
+
+Four guards, all of which report rather than fail silently:
+
+1. **Empty portal list = fetch failure**, not truth. Reconciliation is skipped entirely rather
+   than deactivating every tracker on the account.
+2. **Zero matches = fetch failure** too. A reseller report tree can legitimately return folder
+   nodes that pass validation and match nothing.
+3. **Never take over from another provider.** `uq_fleet_trackers_one_active_per_vehicle` is
+   fleet-wide, and `setVehicleTracker`'s deactivate is `WHERE vehicle_id = $1 AND is_active`
+   with no provider predicate — so mapping a vehicle Cartrack already tracks switches the
+   Cartrack row off, silently downgrading it from a 2-minute feed to a 2-hourly scrape with
+   nothing to map it back. Vehicles tracked elsewhere are skipped and reported as
+   `coverage.alreadyTrackedElsewhere` (which also means somebody is paying for two
+   subscriptions).
+4. **Half or more of the account cannot be unmapped in one tick.** The boundary is inclusive:
+   a report truncated to the first of two equal pages lands exactly on it.
+
+**Ambiguity is refused, never resolved.** Two fleet rows normalising to one registration
+("LN40 MGGP" vs "LN40-MGGP", both legal under the raw-string UNIQUE), or one portal external id
+appearing twice, drop out to `coverage.ambiguous` instead of picking a winner. A position stored
+against the wrong vehicle cannot be repaired later — the dedup key
+(`syn:account:external:recordedAt`) has no `vehicle_id`, so the corrected re-insert collides and
+is dropped.
 
 ### Backfill
 One-off historical backfill for a portal provider, walking backwards from now in provider-max
@@ -81,8 +102,19 @@ chunks (Netstar: 31 days) until retention is discovered by two consecutive empty
 npx tsx scripts/backfill-tracking.ts --provider=netstar --floor=2024-08-01
 ```
 
-Idempotent — safe to interrupt and re-run, and safe to run alongside the 2-hourly poll, because
-every write goes through the same `ingestPositions()` dedup.
+Safe to run alongside the 2-hourly poll: it only appends positions and never touches
+`fleet_vehicle_trackers`, so it cannot race the poll's reconcile.
+
+**Interrupting is safe for the database, not for the portal.** Every write goes through
+`ingestPositions()`'s dedup, so a re-run stores nothing twice — but a plain restart begins again
+at `now()` and re-issues every report job it already did, one per vehicle per 31-day chunk,
+against a partner-owned account. The cursor is printed on every chunk, on failure, and on
+Ctrl-C; resume with it:
+
+```bash
+npx tsx scripts/backfill-tracking.ts --provider=netstar --floor=2024-08-01 \
+  --to=2025-11-14T00:00:00.000Z
+```
 
 ### Notification Events
 Registered in `src/modules/notifications/constants/index.ts`:
@@ -93,8 +125,28 @@ Registered in `src/modules/notifications/constants/index.ts`:
 | `fleet.tracking_pull_degraded` | 3+ consecutive transient failures, or an auth failure overnight | No |
 | `fleet.tracking_data_gap` | Portal authenticated but returned no usable data while trackers remain mapped | No |
 
+`fleet.tracking_data_gap` also fires when discovery itself failed — a portal list that matched
+nothing, or the deactivation brake engaging. Neither is visible in position volume, because
+`fetchPositions` reads already-mapped trackers: positions keep arriving from the previous tick's
+mappings while every newly added or renamed vehicle silently stops being trackable.
+
 Recipients come from `FLEET_ALERT_USER_IDS` (env var, comma-separated `users.id`, not
 `staff.id`) rather than a role lookup, since the fleet manager's `staff.position` is "Staff".
+**Unset means every alert is dropped** — the poll response reports `alertRecipients: 0` so that
+is visible without reading logs.
+
+### Scheduling
+The endpoint is inert until it is in velo's crontab. Registration wrapper resolves the secret
+and port from the deploy dir's env file:
+
+```
+0 */2 * * * /home/velo/fibreflow-<env>/scripts/cron-portal-tracking.sh >> /home/velo/logs/poll-portal-tracking.log 2>&1
+```
+
+One tick is bounded to ~25 minutes by the client's runtime budget. Without it, a degenerate
+portal (~11 min worst case per vehicle × 22 vehicles) outruns the 2-hour cadence, and every
+later tick then skips on the advisory lock with a 200 while tracking is dead. Exceeding the
+budget is reported as a partial fetch, which holds the watermark so the next tick resumes.
 
 ## API Endpoints
 

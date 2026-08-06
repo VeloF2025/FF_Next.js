@@ -4,7 +4,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 const {
   sqlMock, poolConnectMock, netstarClientMock, netstarProviderMock,
-  reconcileTrackersMock, ingestPositionsMock, raiseTrackingAlertMock, logMock,
+  reconcileTrackersMock, ingestPositionsMock, raiseTrackingAlertMock,
+  alertRecipientCountMock, logMock,
 } = vi.hoisted(() => ({
   sqlMock: vi.fn(),
   poolConnectMock: vi.fn(),
@@ -13,6 +14,7 @@ const {
   reconcileTrackersMock: vi.fn(),
   ingestPositionsMock: vi.fn(),
   raiseTrackingAlertMock: vi.fn(),
+  alertRecipientCountMock: vi.fn(() => 1),
   logMock: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
 
@@ -21,9 +23,15 @@ vi.mock('@/lib/db-pool', () => ({
   pool: { connect: (...a: unknown[]) => poolConnectMock(...a) },
 }));
 vi.mock('@/lib/logger', () => ({ log: logMock }));
-vi.mock('@/services/tracking/netstar/client', () => ({
-  netstarClient: (...a: unknown[]) => netstarClientMock(...a),
-}));
+// importActual so PartialFetchError stays the real class — `instanceof` in
+// pollProvider is what separates "some vehicles failed" from "the portal died",
+// and a stubbed class would make that check silently false.
+vi.mock('@/services/tracking/netstar/client', async () => {
+  const actual = await vi.importActual<typeof import('@/services/tracking/netstar/client')>(
+    '@/services/tracking/netstar/client'
+  );
+  return { ...actual, netstarClient: (...a: unknown[]) => netstarClientMock(...a) };
+});
 vi.mock('@/services/tracking/netstar/provider', () => ({
   netstarProvider: (...a: unknown[]) => netstarProviderMock(...a),
 }));
@@ -35,8 +43,10 @@ vi.mock('@/services/tracking/ingest', () => ({
 }));
 vi.mock('@/services/tracking/alerts', () => ({
   raiseTrackingAlert: (...a: unknown[]) => raiseTrackingAlertMock(...a),
+  alertRecipientCount: () => alertRecipientCountMock(),
 }));
 
+import { PartialFetchError } from '@/services/tracking/netstar/client';
 import handler from '../poll-portal-tracking';
 
 const SECRET = 'test-cron-secret';
@@ -68,6 +78,27 @@ function stubSql({
     if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: activeTrackers }];
     return [];
   });
+}
+
+/**
+ * A complete ReconcileReport. Built by a helper rather than spelled out inline
+ * so a new field on the report cannot leave a mock silently missing it — which
+ * is not cosmetic: pollProvider reads recon.ambiguous.length, and an undefined
+ * there throws inside the per-provider try, turning a passing case into a
+ * "provider failed" alert that looks like real behaviour.
+ */
+function recon(overrides: Record<string, unknown> = {}) {
+  return {
+    upserted: 0,
+    deactivated: 0,
+    portalOnly: [],
+    fleetOnly: [],
+    deactivationSuppressed: false,
+    matchedNone: false,
+    skippedOtherProvider: [],
+    ambiguous: [],
+    ...overrides,
+  };
 }
 
 function makeFakeProvider(overrides: Partial<{
@@ -102,7 +133,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
       listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
     });
     netstarProviderMock.mockReturnValue(makeFakeProvider());
-    reconcileTrackersMock.mockResolvedValue({ upserted: 1, deactivated: 0, portalOnly: [], fleetOnly: [] });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 1 }));
     ingestPositionsMock.mockResolvedValue({ inserted: 0, skippedUnmapped: 0, maxIngestedAt: null });
     raiseTrackingAlertMock.mockResolvedValue(undefined);
   });
@@ -194,7 +225,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
 
   it('does not add a second empty-portal guard — reconcileTrackers governs, polling still proceeds for mapped vehicles', async () => {
     netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]) });
-    reconcileTrackersMock.mockResolvedValue({ upserted: 0, deactivated: 0, portalOnly: [], fleetOnly: [] });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
     const fetchPositions = vi.fn().mockResolvedValue([]);
     netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions }));
     const res = await run(AUTH);
@@ -239,21 +270,31 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
 
   it('reports inserted/skippedUnmapped/coverage per provider on success', async () => {
     ingestPositionsMock.mockResolvedValue({ inserted: 5, skippedUnmapped: 2, maxIngestedAt: null });
-    reconcileTrackersMock.mockResolvedValue({
-      upserted: 1, deactivated: 0, portalOnly: [{ externalId: '9', registration: null }], fleetOnly: [{ id: 'v1', registration: 'CA1XYZ' }],
-    });
+    reconcileTrackersMock.mockResolvedValue(recon({
+      upserted: 1,
+      portalOnly: [{ externalId: '9', registration: null }],
+      fleetOnly: [{ id: 'v1', registration: 'CA1XYZ' }],
+    }));
     const res = await run(AUTH);
     expect(res._getJSONData().data.results).toEqual([
       expect.objectContaining({
         provider: 'netstar', accountRef: 'europcar', inserted: 5, skippedUnmapped: 2,
-        coverage: { mapped: 1, activeTrackers: 1, notOnPortal: ['CA1XYZ'], unknownOnPortal: ['9'] },
+        // `complete` distinguishes a full sweep from one that lost some
+        // vehicles to failed reports — a partial tick still returns positions,
+        // so without this the response cannot say which it was.
+        complete: true,
+        coverage: {
+          mapped: 1, activeTrackers: 1,
+          notOnPortal: ['CA1XYZ'], unknownOnPortal: ['9'],
+          alreadyTrackedElsewhere: [], ambiguous: [], deactivationSuppressed: false,
+        },
       }),
     ]);
   });
 
   it('raises a gap alert when the portal returns no positions for mapped vehicles', async () => {
     stubSql({ activeTrackers: 3 });
-    reconcileTrackersMock.mockResolvedValue({ upserted: 3, deactivated: 0, portalOnly: [], fleetOnly: [] });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 3 }));
     netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
     await run(AUTH);
     expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
@@ -263,7 +304,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
 
   it('does not raise a gap alert when nothing is mapped (empty portal already handled by reconcileTrackers)', async () => {
     stubSql({ activeTrackers: 0 });
-    reconcileTrackersMock.mockResolvedValue({ upserted: 0, deactivated: 0, portalOnly: [], fleetOnly: [] });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
     netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
     await run(AUTH);
     expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
@@ -277,7 +318,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     it('1. empty portal list + zero positions + mapped trackers exist -> alert raised', async () => {
       stubSql({ activeTrackers: 2 });
       netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]) });
-      reconcileTrackersMock.mockResolvedValue({ upserted: 0, deactivated: 0, portalOnly: [], fleetOnly: [] });
+      reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
       netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
       await run(AUTH);
       expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
@@ -288,7 +329,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     it('2. empty portal list + positions returned + mapped trackers exist -> alert raised', async () => {
       stubSql({ activeTrackers: 2 });
       netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]) });
-      reconcileTrackersMock.mockResolvedValue({ upserted: 0, deactivated: 0, portalOnly: [], fleetOnly: [] });
+      reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
       netstarProviderMock.mockReturnValue(
         makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([{ externalId: '1' }]) })
       );
@@ -303,7 +344,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
       netstarClientMock.mockReturnValue({
         listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'AB1CDGP' }]),
       });
-      reconcileTrackersMock.mockResolvedValue({ upserted: 1, deactivated: 0, portalOnly: [], fleetOnly: [] });
+      reconcileTrackersMock.mockResolvedValue(recon({ upserted: 1 }));
       netstarProviderMock.mockReturnValue(
         makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([{ externalId: '1' }]) })
       );
@@ -316,7 +357,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
       // before discovery has ever succeeded: there is nothing to be missing yet.
       stubSql({ activeTrackers: 0 });
       netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]) });
-      reconcileTrackersMock.mockResolvedValue({ upserted: 0, deactivated: 0, portalOnly: [], fleetOnly: [] });
+      reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
       netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
       await run(AUTH);
       expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
@@ -510,4 +551,145 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
       expect(successUpsertValue()).toBeNull();
     });
   });
+
+/**
+ * Discovery health is not inferable from position volume.
+ *
+ * provider.fetchPositions reads ALREADY-MAPPED trackers, so when a portal
+ * reformat makes the vehicle list match nothing, positions keep arriving from
+ * the previous tick's mappings. A volume-only gap check therefore stays quiet
+ * forever while every newly added or renamed vehicle silently stops being
+ * trackable — and the wholesale-unmapping brake, the single most important
+ * thing this job can report, only ever reached a log line.
+ */
+describe('gap alert: discovery failures are alerts, not just log lines', () => {
+  const positions = [{ externalId: '1' }];
+
+  it('alerts when the portal returned vehicles but none could be mapped', async () => {
+    stubSql({ activeTrackers: 5 });
+    netstarClientMock.mockReturnValue({
+      listVehicles: vi.fn().mockResolvedValue([
+        { externalId: '900', registration: 'Europcar Gauteng' },
+      ]),
+    });
+    reconcileTrackersMock.mockResolvedValue(recon({ matchedNone: true }));
+    netstarProviderMock.mockReturnValue(
+      makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue(positions) })
+    );
+
+    await run(AUTH);
+
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'gap',
+        detail: expect.stringContaining('none could be mapped'),
+      })
+    );
+  });
+
+  it('alerts when the deactivation brake engaged', async () => {
+    stubSql({ activeTrackers: 10 });
+    reconcileTrackersMock.mockResolvedValue(
+      recon({ upserted: 2, deactivationSuppressed: true })
+    );
+    netstarProviderMock.mockReturnValue(
+      makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue(positions) })
+    );
+
+    await run(AUTH);
+
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'gap',
+        detail: expect.stringContaining('refused to unmap'),
+      })
+    );
+  });
+
+  it('stays quiet on a healthy tick that mapped everything and returned data', async () => {
+    stubSql({ activeTrackers: 5 });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 5 }));
+    netstarProviderMock.mockReturnValue(
+      makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue(positions) })
+    );
+
+    await run(AUTH);
+
+    expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A partly-covered window must not move the watermark.
+ *
+ * The positions that arrived are worth storing, but the vehicles whose reports
+ * failed were never fetched for that window — and the watermark is per account,
+ * not per vehicle. Advancing it would skip that window for them permanently.
+ */
+describe('partial fetch', () => {
+  const RECOVERED = [{ externalId: '1' }];
+
+  function partialProvider() {
+    return makeFakeProvider({
+      fetchPositions: vi.fn().mockRejectedValue(
+        new PartialFetchError('[netstar] 1 of 3 vehicle reports failed', RECOVERED, [
+          { externalId: '222', error: 'HTTP 500' },
+        ])
+      ),
+    });
+  }
+
+  it('still ingests the positions that arrived', async () => {
+    netstarProviderMock.mockReturnValue(partialProvider());
+    await run(AUTH);
+    expect(ingestPositionsMock).toHaveBeenCalledWith('netstar', 'europcar', RECOVERED);
+  });
+
+  it('holds the watermark at its previous value instead of advancing it', async () => {
+    const lastEventTs = '2026-08-05T07:00:00.000Z';
+    stubSql({ watermarkRow: { last_event_ts: lastEventTs } });
+    ingestPositionsMock.mockResolvedValue({
+      inserted: 1, skippedUnmapped: 0,
+      // A later maxIngestedAt that must NOT be adopted, because the window was
+      // only partly covered.
+      maxIngestedAt: new Date('2026-08-05T11:00:00.000Z'),
+    });
+    netstarProviderMock.mockReturnValue(partialProvider());
+
+    await run(AUTH);
+
+    const watermarkWrite = sqlMock.mock.calls.find((c) =>
+      (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracking_watermarks')
+    );
+    expect(watermarkWrite).toBeDefined();
+    const written = watermarkWrite!.slice(1).find((v) => v instanceof Date) as Date | undefined;
+    expect(written?.toISOString()).toBe(lastEventTs);
+  });
+
+  it('reports the tick as incomplete and raises a transient alert', async () => {
+    netstarProviderMock.mockReturnValue(partialProvider());
+    const res = await run(AUTH);
+
+    expect(res._getJSONData().data.results[0]).toMatchObject({ complete: false });
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'transient', detail: expect.stringContaining('1 of 3') })
+    );
+  });
+
+  it('does not treat a partial fetch as a provider failure', async () => {
+    // The old behaviour: any throw out of fetchPositions took the whole tick
+    // down and discarded every other vehicle's positions.
+    netstarProviderMock.mockReturnValue(partialProvider());
+    const res = await run(AUTH);
+    expect(res._getJSONData().data.results[0]).not.toHaveProperty('error');
+  });
+});
+
+describe('alert recipients are visible in the response', () => {
+  it('reports 0 when FLEET_ALERT_USER_IDS is unset, so a dead alert path is not silent', async () => {
+    alertRecipientCountMock.mockReturnValue(0);
+    const res = await run(AUTH);
+    expect(res._getJSONData().data.alertRecipients).toBe(0);
+  });
+});
 });

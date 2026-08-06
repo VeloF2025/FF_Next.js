@@ -12,6 +12,8 @@ function deps(overrides = {}) {
     assignTracker: vi.fn(async () => {}),
     deactivateMissing: vi.fn(async () => 0),
     countActiveTrackers: vi.fn(async () => 0),
+    // Nobody else is tracking these vehicles unless a case says so.
+    loadTrackedElsewhere: vi.fn(async () => new Set<string>()),
     ...overrides,
   };
 }
@@ -159,5 +161,113 @@ describe('reconcileTrackers', () => {
       expect(calls[0]).toBe('count');
       expect(calls[calls.length - 1]).toBe('deactivate');
     });
+  });
+});
+
+/**
+ * The takeover guard.
+ *
+ * uq_fleet_trackers_one_active_per_vehicle is fleet-wide, and
+ * setVehicleTracker's deactivate is `WHERE vehicle_id = $1 AND is_active` with
+ * no provider predicate — so without this filter, assigning a Netstar tracker
+ * to a vehicle Cartrack already tracks switches the Cartrack row off. The
+ * vehicle silently drops from a 2-minute REST feed to a 2-hourly scrape,
+ * poll-tracking.ts then discards its positions as unmapped at log.info, and
+ * nothing ever maps it back.
+ */
+describe('reconcileTrackers — never takes a vehicle off another provider', () => {
+  it('skips a matched vehicle that another provider already tracks', async () => {
+    const d = deps({ loadTrackedElsewhere: vi.fn(async () => new Set(['v1'])) });
+
+    const r = await reconcileTrackers(
+      'netstar', 'europcar',
+      [
+        { externalId: '1447952', registration: 'LN40MGGP' }, // v1 — Cartrack's
+        { externalId: '1447953', registration: 'LG94NLGP' }, // v2 — free
+      ],
+      d
+    );
+
+    expect(d.assignTracker).toHaveBeenCalledTimes(1);
+    expect(d.assignTracker).toHaveBeenCalledWith('v2', 'netstar', 'europcar', '1447953');
+    expect(r.upserted).toBe(1);
+    expect(r.skippedOtherProvider).toEqual([
+      { vehicleId: 'v1', registration: 'LN40MGGP' },
+    ]);
+  });
+
+  it('writes nothing at all when every match is already tracked elsewhere', async () => {
+    // Same reasoning as the zero-match guard: proceeding would hand
+    // deactivateMissing an empty keep list and unmap the whole account.
+    const d = deps({ loadTrackedElsewhere: vi.fn(async () => new Set(['v1', 'v2'])) });
+
+    const r = await reconcileTrackers(
+      'netstar', 'europcar',
+      [
+        { externalId: '1447952', registration: 'LN40MGGP' },
+        { externalId: '1447953', registration: 'LG94NLGP' },
+      ],
+      d
+    );
+
+    expect(d.assignTracker).not.toHaveBeenCalled();
+    expect(d.deactivateMissing).not.toHaveBeenCalled();
+    expect(r.upserted).toBe(0);
+    expect(r.matchedNone).toBe(true);
+    expect(r.skippedOtherProvider).toHaveLength(2);
+  });
+
+  it('does not skip a vehicle this same provider/account already tracks', async () => {
+    // loadTrackedElsewhere excludes our own rows: re-confirming an existing
+    // mapping every tick is the normal, healthy path and must not be filtered.
+    const d = deps({ loadTrackedElsewhere: vi.fn(async () => new Set<string>()) });
+
+    const r = await reconcileTrackers(
+      'netstar', 'europcar', [{ externalId: '1447952', registration: 'LN40MGGP' }], d
+    );
+
+    expect(d.assignTracker).toHaveBeenCalledWith('v1', 'netstar', 'europcar', '1447952');
+    expect(r.skippedOtherProvider).toEqual([]);
+  });
+});
+
+describe('reconcileTrackers — the deactivation brake includes its own boundary', () => {
+  // `wouldDeactivate > activeBefore * 0.5` let EXACTLY half through: 5 of 10,
+  // which is what a report truncated to the first of two equal pages produces.
+  // The comment on the constant says a shape change "removes exactly that much
+  // in one go" — so the boundary is the case it exists to catch.
+  it('suppresses a deactivation of exactly half the account', async () => {
+    const tenVehicles = Array.from({ length: 10 }, (_, i) => ({
+      id: `v${i}`, registration: `AA${i}AAGP`,
+    }));
+    const d = deps({
+      loadActiveFleet: async () => tenVehicles,
+      countActiveTrackers: vi.fn(async () => 10),
+    });
+
+    const r = await reconcileTrackers(
+      'netstar', 'europcar',
+      tenVehicles.slice(0, 5).map((v, i) => ({ externalId: `e${i}`, registration: v.registration })),
+      d
+    );
+
+    expect(r.deactivationSuppressed).toBe(true);
+    expect(d.deactivateMissing).not.toHaveBeenCalled();
+    // The five that DID match are still mapped — suppressing a deactivation is
+    // not the same as abandoning the tick.
+    expect(d.assignTracker).toHaveBeenCalledTimes(5);
+  });
+
+  it('does not suppress when nothing would be deactivated on a fresh account', async () => {
+    // activeBefore = 0 makes `wouldDeactivate >= activeBefore * 0.5` read
+    // `0 >= 0` — true — which would brake every first run forever.
+    const d = deps({ countActiveTrackers: vi.fn(async () => 0) });
+
+    const r = await reconcileTrackers(
+      'netstar', 'europcar', [{ externalId: '1447952', registration: 'LN40MGGP' }], d
+    );
+
+    expect(r.deactivationSuppressed).toBe(false);
+    expect(d.deactivateMissing).toHaveBeenCalled();
   });
 });

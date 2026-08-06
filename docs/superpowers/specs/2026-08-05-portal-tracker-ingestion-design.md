@@ -336,10 +336,15 @@ None block starting work; all three are settled before the code paths they affec
 
 ## Security note
 
-The Netstar portal password was exposed on 2026-08-05 when Playwright's `fill()` error log
-echoed the value into a session transcript. The recon tooling was fixed to scrub secrets from
-all output before this document was written.
+No credential appears in this document or in any tracked file. The portal login is read from
+`NETSTAR_PORTAL_USER` / `NETSTAR_PORTAL_PASS` at run time and never logged: login errors carry
+only `HTTP <status>`, and `PortalSession` logs the path it re-authenticated on, never the cookie.
 
-**Rotation was considered and declined by Hein on 2026-08-05.** The credential remains in use
-unchanged. Recorded here as an accepted risk: the value persists in that transcript, so
-anyone with access to it holds the Netstar login. Revisit if transcript access widens.
+During recon on 2026-08-05, tooling outside this repo echoed a secret into its own output. That
+tooling was fixed to scrub secrets before this document was written, and the resulting risk
+assessment — including the rotation decision Hein made on 2026-08-05 and the condition for
+revisiting it — is recorded in `.claude/credentials.local.md`, which is gitignored.
+
+It is kept there rather than here deliberately. Naming which live account is known-exposed, and
+that it was deliberately left unrotated, is itself useful to an attacker: it turns a guess into
+a target. The decision needs a durable record; it does not need a public one.

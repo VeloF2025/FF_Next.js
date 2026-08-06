@@ -11,7 +11,13 @@ fixture keeps the header plus the first 50 data rows.
 
     Driver,Driver Department,Driver Unique Code,Time,Speed,Address,Status,Gps,Speed Limit,Latitude,Longitude,RPM,Battery Voltage,Odometer
 
-Line endings are CRLF.
+Line endings are CRLF **on the wire**. The committed copy is not: git normalises
+it to LF on checkout and this repo has no `.gitattributes` to prevent that, so
+what a test reads off disk is LF on Linux. Never split this fixture on a
+hardcoded `'\r\n'` — that returns a single element containing the whole file,
+which is how two tests here spent their life asserting against nothing while a
+third crashed on CI. `parseAllActivityCsv` itself is newline-agnostic (Papa
+Parse), so this only ever bites test code that re-splits the text by hand.
 
 ## The trap: comma is the decimal separator
 

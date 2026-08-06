@@ -129,11 +129,35 @@ export interface RaiseAlertDeps {
  * and an alerting system that silently addresses no one is worse than none.
  * An env var keeps it changeable without a deploy touching code.
  */
-async function configuredRecipients(): Promise<string[]> {
-  return (process.env.FLEET_ALERT_USER_IDS ?? '')
+/**
+ * Ids are UUIDs downstream (`${userId}::uuid` in notificationBus). A typo in
+ * the env var would otherwise surface once per recipient per alert as a caught
+ * cast error, which reads as "the mail server is flaky" rather than "this list
+ * is wrong". Dropping malformed entries here, loudly, keeps the good ones.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function alertRecipientIds(): string[] {
+  const raw = (process.env.FLEET_ALERT_USER_IDS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+  const valid = raw.filter((id) => UUID_RE.test(id));
+  if (valid.length !== raw.length) {
+    log.error('[tracking-alerts] FLEET_ALERT_USER_IDS contains entries that are not UUIDs', {
+      rejected: raw.filter((id) => !UUID_RE.test(id)),
+    });
+  }
+  return valid;
+}
+
+/** How many recipients an alert would reach right now. 0 means "nobody". */
+export function alertRecipientCount(): number {
+  return alertRecipientIds().length;
+}
+
+async function configuredRecipients(): Promise<string[]> {
+  return alertRecipientIds();
 }
 
 export async function raiseTrackingAlert(

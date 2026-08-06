@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { chunkWindow, MAX_REPORT_MS, netstarClient } from '../client';
+import { chunkWindow, MAX_REPORT_MS, netstarClient, PartialFetchError } from '../client';
 
 /**
  * Builds a fetchImpl that answers the login POST with a bare 200 (so
@@ -251,5 +251,162 @@ describe('netstarClient fetchPositions', () => {
     // 61 days -> 2 chunks, 2 vehicles -> 4 reports.
     expect(generated).toHaveLength(4);
     expect(new Date(String(generated[0]?.startTime)).getTime()).toBe(wide.getTime());
+  });
+});
+
+/**
+ * Per-vehicle isolation.
+ *
+ * The loop used to let any throw escape, which discarded every position already
+ * collected for the other vehicles. Because the caller leaves the watermark
+ * untouched on a throw, the next tick re-requested the identical window and hit
+ * the same stuck vehicle again — one bad report became a permanent fleet-wide
+ * blackout.
+ */
+describe('netstarClient.fetchPositions — one bad vehicle must not blank the fleet', () => {
+  const FROM = new Date('2026-08-01T00:00:00Z');
+  const TO = new Date('2026-08-02T00:00:00Z');
+  const CSV = [
+    'Driver,Driver Department,Driver Unique Code,Time,Speed,Address,Status,Gps,Speed Limit,Latitude,Longitude,RPM,Battery Voltage,Odometer',
+    'No driver,,,01/08/2026 10:00:00,"0",Somewhere,Ignition on,true,"60","-26,08975","28,35431","0","12,8","5430"',
+  ].join('\r\n');
+
+  /**
+   * Answers login, then GenerateReport/Export per vehicle. `broken` names the
+   * external ids whose export never succeeds.
+   */
+  function reportFetch(broken: string[]) {
+    let pendingVehicle = '';
+    return async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.includes('/Authentication/Account/Login')) return new Response(null, { status: 200 });
+      if (url.includes('/GenerateReport')) {
+        const body = JSON.parse(String(init?.body)) as { selectedIds: number[] };
+        pendingVehicle = String(body.selectedIds[0]);
+        return new Response(`"job-${pendingVehicle}"`, { status: 200 });
+      }
+      if (url.includes('/Reports/Export')) {
+        const jobId = (JSON.parse(String(init?.body)) as { reportId: string }).reportId;
+        const vehicle = jobId.replace('job-', '');
+        // 500 is not a retryable status, so this fails the vehicle immediately.
+        if (broken.includes(vehicle)) return new Response(null, { status: 500 });
+        return new Response(CSV, { status: 200 });
+      }
+      throw new Error(`unexpected url ${url}`);
+    };
+  }
+
+  function client(broken: string[], overrides = {}) {
+    return netstarClient({
+      baseUrl: 'https://portal.example.com',
+      username: 'u', password: 'p',
+      fetchImpl: reportFetch(broken) as unknown as typeof fetch,
+      sleep: async () => {},
+      ...overrides,
+    });
+  }
+
+  const vehicles = [
+    { externalId: '111', registration: 'AA11AAGP' },
+    { externalId: '222', registration: 'BB22BBGP' },
+    { externalId: '333', registration: 'CC33CCGP' },
+  ];
+
+  it('returns every healthy vehicle when one fails, as a PartialFetchError', async () => {
+    const err = await client(['222']).fetchPositions(FROM, TO, vehicles).catch((e) => e);
+
+    expect(err).toBeInstanceOf(PartialFetchError);
+    expect(err.positions).toHaveLength(2);
+    expect(err.positions.map((p: { externalId: string }) => p.externalId)).toEqual(['111', '333']);
+    expect(err.failures.map((f: { externalId: string }) => f.externalId)).toEqual(['222']);
+  });
+
+  it('throws a plain Error when every vehicle fails, so the tick fails outright', async () => {
+    // Nothing was fetched, so there is nothing to store and the watermark must
+    // not move — that is the existing total-failure path, not a partial one.
+    const err = await client(['111', '222', '333']).fetchPositions(FROM, TO, vehicles).catch((e) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(PartialFetchError);
+    expect(err.message).toMatch(/every vehicle report failed \(3\)/);
+  });
+
+  it('resolves normally when nothing fails', async () => {
+    const positions = await client([]).fetchPositions(FROM, TO, vehicles);
+    expect(positions.map((p) => p.externalId)).toEqual(['111', '222', '333']);
+  });
+});
+
+describe('netstarClient.fetchPositions — runtime budget', () => {
+  it('stops at the budget and reports the rest as failures rather than running past the next tick', async () => {
+    // Worst case is ~11 minutes per vehicle; at 22 vehicles a degenerate portal
+    // outruns the 2-hour cadence, and every later tick then skips on the
+    // advisory lock with a 200 while tracking is dead.
+    let clock = 0;
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.includes('/Authentication/Account/Login')) return new Response(null, { status: 200 });
+      if (url.includes('/GenerateReport')) {
+        clock += 10 * 60 * 1000; // each vehicle burns ten minutes
+        const body = JSON.parse(String(init?.body)) as { selectedIds: number[] };
+        return new Response(`"job-${body.selectedIds[0]}"`, { status: 200 });
+      }
+      if (url.includes('/Reports/Export')) {
+        return new Response(
+          'Driver,Driver Department,Driver Unique Code,Time,Speed,Address,Status,Gps,Speed Limit,Latitude,Longitude,RPM,Battery Voltage,Odometer',
+          { status: 200 }
+        );
+      }
+      throw new Error(`unexpected url ${url}`);
+    };
+
+    const c = netstarClient({
+      baseUrl: 'https://portal.example.com',
+      username: 'u', password: 'p',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      sleep: async () => {},
+      now: () => clock,
+      maxRuntimeMs: 25 * 60 * 1000,
+    });
+
+    const many = Array.from({ length: 6 }, (_, i) => ({
+      externalId: String(i), registration: `Z${i}`,
+    }));
+    const err = await c.fetchPositions(
+      new Date('2026-08-01T00:00:00Z'), new Date('2026-08-02T00:00:00Z'), many
+    ).catch((e) => e);
+
+    expect(err).toBeInstanceOf(PartialFetchError);
+    // Three vehicles fit inside 25 minutes at ten minutes each; the rest are
+    // recorded as budget failures so the caller holds the watermark and the
+    // next tick resumes rather than losing them.
+    expect(err.failures).toHaveLength(3);
+    expect(err.failures.every((f: { error: string }) => f.error === 'runtime budget exhausted')).toBe(true);
+  });
+});
+
+describe('netstarClient.fetchPositions — a non-numeric external id fails loudly', () => {
+  it('does not send selectedIds: [null] to the portal', async () => {
+    // JSON.stringify turns NaN into null, so the portal would have received a
+    // report request for no vehicle — an empty export that reads downstream as
+    // a data gap rather than as the bad id it is.
+    const c = netstarClient({
+      baseUrl: 'https://portal.example.com',
+      username: 'u', password: 'p',
+      fetchImpl: (async (input: RequestInfo | URL) => {
+        if (input.toString().includes('/Authentication/Account/Login')) {
+          return new Response(null, { status: 200 });
+        }
+        throw new Error('should never reach the portal');
+      }) as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await expect(
+      c.fetchPositions(
+        new Date('2026-08-01T00:00:00Z'), new Date('2026-08-02T00:00:00Z'),
+        [{ externalId: 'folder-node', registration: 'Europcar Gauteng' }]
+      )
+    ).rejects.toThrow(/non-numeric external id "folder-node"/);
   });
 });
