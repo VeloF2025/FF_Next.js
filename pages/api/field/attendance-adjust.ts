@@ -132,19 +132,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     // The raw punch times come back as explicit ISO-8601 UTC rather than bare
     // casts: `timestamptz::text` renders as 'YYYY-MM-DD HH:MI:SS+00' (a space,
     // not a 'T'), which new Date() parses only by implementation-defined
-    // grace. to_char with an explicit format is unambiguous everywhere.
+    // grace. to_char with an explicit format is unambiguous everywhere. US
+    // keeps the column's full microsecond precision in the string; the
+    // comparison below is still millisecond-resolution because that is all a
+    // JS Date carries, which is far finer than any real shift boundary.
     const rows = await sql<{
       staff_id: string;
       work_date: string;
       site_geofence_id: string | null;
+      status: string;
       clock_in_at: string | null;
       clock_out_at: string | null;
     }>`
       SELECT staff_id,
              to_char(work_date, 'YYYY-MM-DD') AS work_date,
              site_geofence_id,
-             to_char(clock_in_at  AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS clock_in_at,
-             to_char(clock_out_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS clock_out_at
+             status,
+             to_char(clock_in_at  AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS clock_in_at,
+             to_char(clock_out_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS clock_out_at
       FROM   attendance_entries
       WHERE  id = ${entryId}
       LIMIT  1
@@ -164,8 +169,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     // negative shift. One such row exists in production from before this
     // guard. requiredActionCorrection.validateClaimedClockOut applies the
     // same rule on the day-exception path.
+    //
+    // An auto-closed entry's clock-out is an operational closure, not evidence
+    // that the worker left — the same rule calculateDailyResult applies in
+    // effectiveEvidence(). Treating it as real would reject an admin correcting
+    // only the clock-in on such a row. Today every auto_closed entry carries a
+    // NULL clock-out (624/624, cleared by the legacy autoclose reset), so this
+    // is guarding against the pre-#2351 shape returning, not an active case.
     const rawIn = entry.clock_in_at ? new Date(entry.clock_in_at) : null;
-    const rawOut = entry.clock_out_at ? new Date(entry.clock_out_at) : null;
+    const rawOut =
+      entry.status === 'auto_closed' || !entry.clock_out_at
+        ? null
+        : new Date(entry.clock_out_at);
     const effectiveIn = cin ?? rawIn;
     const effectiveOut = cout ?? rawOut;
     if (effectiveIn && effectiveOut && effectiveOut.getTime() <= effectiveIn.getTime()) {
