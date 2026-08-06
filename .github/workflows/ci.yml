@@ -105,14 +105,14 @@ jobs:
       # installed, at which point a regression in code that DELETES production
       # pole rows merges green.
       #
-      # Scoped deliberately to the two replan suites rather than all of
+      # Scoped deliberately to the replan + hierarchy suites rather than all of
       # scripts/test_*.py: widening it is a change to every PR's gate, not to
       # this one's, and belongs in its own change. The other seven qfield Python
       # suites still run nowhere in CI.
       #
       # test_replan_import_db.py spins its own throwaway Postgres on an
       # ephemeral port — never the shared dev+prod database. Requires docker.
-      - name: Replan import tests — matching + write path (gate)
+      - name: QField Python suites — replan import + hierarchy authority (gate)
         run: |
           python3 scripts/test_replan_match.py
           python3 scripts/test_replan_import_db.py

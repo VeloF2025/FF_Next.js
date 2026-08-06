@@ -178,7 +178,12 @@ PROJECTS = {
 ALTERNATE_GPKGS = {
     "Mamelodi": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label"},
     "Thembisa POP 1": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label_1"},
-    "Thembisa POP 3": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label_1"},
+    # label_col mirrors the primary THM_3 entry above. `extract-gpkg-photos.py` merges
+    # these as {**config, **ALTERNATE_GPKGS[name]}, so a stale value here silently
+    # overrides the corrected one for this path — the same freeze, different GPKG.
+    # (No sync-state row has ever been written for any civil_audit_ alternate, so the
+    # file likely does not resolve today; corrected rather than left contradicting.)
+    "Thembisa POP 3": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label"},
 }
 
 # Per-pole OPTICAL dome-audit GPKGs (8 dome steps). Detected as discipline='optical'
