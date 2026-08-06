@@ -96,6 +96,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     apiResponse.badRequest(res, 'adjusted_clock_out_at must be a valid ISO timestamp');
     return;
   }
+  // Ordering. Only checkable when the caller sets both sides — a one-sided
+  // correction (forgot_clock_out) has nothing to compare against here, and the
+  // adjustment is measured against the raw entry at approval time instead.
+  // Without this a correction submitted days after its work date can carry the
+  // submission date in the clock-in field and describe a negative shift, which
+  // is what put a -61.5h row into the review queue. Migration 482 enforces the
+  // same rule at the storage layer; this arm exists so the worker gets a 400
+  // they can act on rather than a constraint violation surfaced as a 500.
+  if (cin && cout && cout.getTime() <= cin.getTime()) {
+    apiResponse.badRequest(
+      res,
+      'adjusted_clock_out_at must be after adjusted_clock_in_at'
+    );
+    return;
+  }
 
   try {
     // attendance_adjustments.requested_by references staff(id), while
@@ -114,14 +129,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     // ── Entry lookup ────────────────────────────────────────────────────────
 
+    // The raw punch times come back as explicit ISO-8601 UTC rather than bare
+    // casts: `timestamptz::text` renders as 'YYYY-MM-DD HH:MI:SS+00' (a space,
+    // not a 'T'), which new Date() parses only by implementation-defined
+    // grace. to_char with an explicit format is unambiguous everywhere. US
+    // keeps the column's full microsecond precision in the string; the
+    // comparison below is still millisecond-resolution because that is all a
+    // JS Date carries, which is far finer than any real shift boundary.
     const rows = await sql<{
       staff_id: string;
       work_date: string;
       site_geofence_id: string | null;
+      status: string;
+      clock_in_at: string | null;
+      clock_out_at: string | null;
     }>`
       SELECT staff_id,
              to_char(work_date, 'YYYY-MM-DD') AS work_date,
-             site_geofence_id
+             site_geofence_id,
+             status,
+             to_char(clock_in_at  AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS clock_in_at,
+             to_char(clock_out_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS clock_out_at
       FROM   attendance_entries
       WHERE  id = ${entryId}
       LIMIT  1
@@ -129,6 +157,38 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     const entry = rows[0];
     if (!entry) {
       apiResponse.notFound(res, 'Attendance entry', entryId);
+      return;
+    }
+
+    // Ordering against the RAW punch. The pre-lookup check above only catches
+    // a caller that supplies both sides; the common correction supplies one
+    // (forgot_clock_out) and is measured against whatever the entry already
+    // holds. Without this, an adjusted clock-out earlier than the recorded
+    // clock-in is accepted, and — because approval writes the adjusted value
+    // back onto attendance_entries — it leaves the ENTRY itself describing a
+    // negative shift. One such row exists in production from before this
+    // guard. requiredActionCorrection.validateClaimedClockOut applies the
+    // same rule on the day-exception path.
+    //
+    // An auto-closed entry's clock-out is an operational closure, not evidence
+    // that the worker left — the same rule calculateDailyResult applies in
+    // effectiveEvidence(). Treating it as real would reject an admin correcting
+    // only the clock-in on such a row. Today every auto_closed entry carries a
+    // NULL clock-out (624/624, cleared by the legacy autoclose reset), so this
+    // is guarding against the pre-#2351 shape returning, not an active case.
+    const rawIn = entry.clock_in_at ? new Date(entry.clock_in_at) : null;
+    const rawOut =
+      entry.status === 'auto_closed' || !entry.clock_out_at
+        ? null
+        : new Date(entry.clock_out_at);
+    const effectiveIn = cin ?? rawIn;
+    const effectiveOut = cout ?? rawOut;
+    if (effectiveIn && effectiveOut && effectiveOut.getTime() <= effectiveIn.getTime()) {
+      apiResponse.badRequest(
+        res,
+        'The corrected shift must end after it starts: ' +
+          `clock-out ${effectiveOut.toISOString()} is not after clock-in ${effectiveIn.toISOString()}`
+      );
       return;
     }
 
