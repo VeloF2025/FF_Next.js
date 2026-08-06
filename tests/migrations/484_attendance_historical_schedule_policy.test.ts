@@ -199,6 +199,19 @@ describe('migration 484 — forward', () => {
       expect(await fx.historical()).toBeDefined();
     });
 
+    it('still checks the boundary when the era is already covered', async () => {
+      // The boundary check runs before the insert branch, so a re-application
+      // over an already-covered era can fail where it previously could not.
+      // That is deliberate: earlier data means the boundary is stale and those
+      // days are unprojectable regardless of whether this migration already ran.
+      await fx.seedCurrentPolicy(ERA_START);
+      await fx.addEntry('2026-04-01');
+
+      const message = await runForward();
+      expect(message).toContain('Migration 484 preflight');
+      expect(message).toContain('2026-04-01');
+    });
+
     it('blocks when the default overtime rule is ambiguous', async () => {
       await fx.seedCurrentPolicy();
       await fx.scoped(`INSERT INTO attendance_overtime_rules (is_default) VALUES (true)`);
@@ -238,6 +251,19 @@ describe('migration 484 — forward', () => {
       const message = await runForward();
       expect(message).toContain('Migration 484 post-condition');
       expect(message).toContain('overlap');
+    });
+
+    it('blocks when all coverage ends before the era starts', async () => {
+      // Degenerate shape: every policy starts AND ends before era_start. The
+      // insert branch is skipped (earliest_active_from <= era_start), and the
+      // gap range would be era_start..(something earlier) — generate_series
+      // returns zero rows when start > stop, so without the GREATEST clamp this
+      // reports zero uncovered days while the entire era is uncovered.
+      await fx.seedPolicy('ancient', '2026-01-01', '2026-02-01');
+
+      const message = await runForward();
+      expect(message).toContain('Migration 484 post-condition');
+      expect(message).toContain('covered by no schedule policy');
     });
 
     it('passes cleanly on the production shape', async () => {

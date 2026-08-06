@@ -106,6 +106,13 @@ BEGIN
   -- The era boundary is a claim about the data, so re-check it against the data.
   -- attendance_entries may legitimately be empty (a fresh database), which is not
   -- an error; only data EARLIER than the assumed boundary is.
+  --
+  -- Deliberately unconditional — it runs before the branch that decides whether to
+  -- insert, so a re-application over an already-covered era still re-checks the
+  -- boundary. That makes repeat application able to fail where it previously could
+  -- not, which is the intent: earlier data appearing means the boundary is stale
+  -- and the days below it are silently unprojectable, whether or not this
+  -- migration has already run once.
   SELECT MIN(work_date) INTO earliest_entry FROM attendance_entries;
 
   IF earliest_entry IS NOT NULL AND earliest_entry < era_start THEN
@@ -154,8 +161,17 @@ BEGIN
   -- branch that was taken.
   SELECT MAX(active_from) INTO latest_active_from FROM attendance_schedule_policies;
 
+  -- The upper bound is clamped to at least era_start. generate_series returns ZERO
+  -- rows when start > stop, so an unclamped range would make this check degenerate
+  -- exactly when it matters most: if every policy starts before era_start and the
+  -- latest one also ENDS before it, the whole era is uncovered, no insert happens
+  -- (the branch above is skipped), and an empty series would report zero uncovered
+  -- days. The clamp guarantees era_start itself is always tested.
   SELECT COUNT(*) INTO uncovered_days
-    FROM generate_series(era_start::timestamp, latest_active_from::timestamp, INTERVAL '1 day') d(day)
+    FROM generate_series(
+           era_start::timestamp,
+           GREATEST(latest_active_from, era_start)::timestamp,
+           INTERVAL '1 day') d(day)
    WHERE NOT EXISTS (
      SELECT 1 FROM attendance_schedule_policies p
       WHERE p.active_from <= d.day::date
