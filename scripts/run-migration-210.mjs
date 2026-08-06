@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
+import { requireEnv } from './lib/require-env.cjs';
 
-const sql = neon('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon(requireEnv('DATABASE_URL'));
 
 // 1. Add columns
 await sql`ALTER TABLE gl_journal_lines ADD COLUMN IF NOT EXISTS vat_type TEXT`;

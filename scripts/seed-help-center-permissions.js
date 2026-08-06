@@ -9,8 +9,9 @@
  */
 
 const { Client } = require('pg');
+const { requireEnv } = require('./lib/require-env.cjs');
 
-const PRODUCTION_DB = 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const PRODUCTION_DB = requireEnv('DATABASE_URL');
 
 async function seedPermissions() {
   const client = new Client({ connectionString: PRODUCTION_DB });

@@ -7,8 +7,9 @@
 
 import { readFileSync } from 'fs';
 import pg from 'pg';
+import { requireEnv } from './lib/require-env.cjs';
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = requireEnv('DATABASE_URL');
 
 const CSV_PATH = '/tmp/ft-invoicing/billing_summary.csv';
 

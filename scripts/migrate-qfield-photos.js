@@ -6,8 +6,9 @@ const { neon } = require('@neondatabase/serverless');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { requireEnv } = require('./lib/require-env.cjs');
 
-const sql = neon('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon(requireEnv('DATABASE_URL'));
 const STORAGE_ROOT = '/home/velo/storage/qa-photos';
 const MINIO_BUCKET = 'qfieldcloud-prod';
 

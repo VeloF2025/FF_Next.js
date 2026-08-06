@@ -11,14 +11,26 @@
 const { neon } = require('@neondatabase/serverless');
 const fs = require('fs');
 const path = require('path');
+const { requireEnv } = require('./lib/require-env.cjs');
 
-const DB_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+// Require DATABASE_URL rather than falling back to a literal. The previous
+// fallback pointed at Neon, which was retired at the 2026-04-18 Supabase
+// cutover: this script's cron never sets DATABASE_URL, so every run since then
+// silently dialled a dead database and died with "password authentication
+// failed" (151 consecutive failures, 3126 SharePoint photos never copied).
+//
+// Worse than the downtime is the shape of the bug: before the cutover the same
+// fallback would have written to the WRONG LIVE DATABASE instead of erroring.
+// A missing connection string must stop the job, never redirect it.
+const DB_URL = requireEnv('DATABASE_URL');
 const sql = neon(DB_URL);
 const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-photos';
 
-const SP_TENANT_ID = 'f22e6344-a35d-43b0-ad8c-a247f513c1ee';
-const SP_CLIENT_ID = '075bd672-bffa-45ba-9fd0-724535e612db';
-const SP_CLIENT_SECRET = 'Ozw8Q~HG1PMZFPNb0Ze1f-eTYrtglVioRzy2lakF';
+// SharePoint app credentials. Never hardcode: a tracked literal is a published
+// secret, and this file already leaked one once.
+const SP_TENANT_ID = requireEnv('SP_TENANT_ID');
+const SP_CLIENT_ID = requireEnv('SP_CLIENT_ID');
+const SP_CLIENT_SECRET = requireEnv('SP_CLIENT_SECRET');
 
 const args = process.argv.slice(2);
 const limitIdx = args.indexOf('--limit');
