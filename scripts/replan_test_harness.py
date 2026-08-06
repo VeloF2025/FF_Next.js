@@ -85,15 +85,25 @@ def connect():
     return conn
 
 
+def teardown_container():
+    """Kill the throwaway Postgres, if this process started one.
+
+    Separate from teardown() so a suite with its own scratch schema (the hierarchy
+    tests) can reuse the container lifecycle without inheriting the replan schema.
+    Safe to call when no container was started — TEST_DATABASE_URL was supplied.
+    """
+    if _container:
+        subprocess.run(["docker", "kill", _container],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def teardown(conn):
     try:
         conn.cursor().execute(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE")
         conn.commit()
     finally:
         conn.close()
-        if _container:
-            subprocess.run(["docker", "kill", _container],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        teardown_container()
 
 
 def fixture(conn):

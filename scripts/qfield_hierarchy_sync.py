@@ -1,33 +1,16 @@
 """Persist verified QField audit hierarchy into FibreFlow QA rows.
 
-⚠️ WRITE DIRECTION DEPENDS ON WHO OWNS THE ZONE. Read `plan_owns_hierarchy()` before
-touching any statement here — the COALESCE argument order is chosen per project, not
-fixed, and getting it backwards silently corrupts data in one direction or freezes it
-in the other.
+⚠️ zone/PON authority is PER-POLE and lives in qfield_hierarchy_writers — read its
+docstring before touching any write. In one line: the plan owns a pole if the plan HAS
+that pole, otherwise the GPKG does, otherwise leave the value alone.
 
-  project HAS a plan  ->  COALESCE(existing, gpkg)   BACKFILL: fill NULLs, never
-                                                     overwrite what the plan owns
-  project has NO plan ->  COALESCE(gpkg, existing)   AUTHORITATIVE: the GPKG is the
-                                                     only zone source there is
+Both halves are load-bearing and each was a real incident on 2026-08-06. Letting the
+GPKG win over a planned pole silently reverted 98 Thembisa POP 3 poles the replan had
+just corrected. Letting the plan win over a pole it does not contain skipped 1,190
+pole_qa_photos and 1,196 construction_qa_reviews rows that then had no source at all.
 
-Both halves are load-bearing, and each was a real incident:
-
-* Backfill (plan exists). Measured 2026-08-06, Thembisa POP 3: this module was
-  unconditionally `COALESCE(gpkg, existing)`. The audit layer's zone_no/pon_no
-  attributes are stale on a replanned project, so one extractor run rewrote 98 poles
-  the replan import had just corrected — TEM.P.I544 zone 66 -> 62, TEM.P.M040 zone
-  69 -> 6. Nothing errored; the plan silently reverted.
-
-* Authoritative (no plan). Making it unconditionally backfill-only was ALSO wrong:
-  Mahikeng, Middelburg, Namakgale and Cradock have zero rows in `poles` and zero in
-  `v_pole_planning`. Their zone comes from the GPKG `Phase` column and nowhere else —
-  there is no replan importer for HT projects. Freezing them at their first-ingest
-  zone removes the only correction mechanism those projects have (499 zoned QA rows
-  on Mahikeng + Namakgale alone).
-
-So the rule is not "the GPKG is untrustworthy" — it is "the PLAN outranks the GPKG,
-where a plan exists". See [[qfield-pole-zone-comes-from-boundaries-not-attributes]] for
-why the audit layer's attributes cannot be trusted to overrule a plan.
+See [[qfield-pole-zone-comes-from-boundaries-not-attributes]] for why the audit layer's
+attributes cannot be trusted to overrule a plan.
 """
 import json
 import os
@@ -40,28 +23,6 @@ from qfield_hierarchy import resolve_hierarchy
 from qfield_hierarchy_writers import (
     _update_planning_poles, _update_reviews, _upsert_work_qa, _validated_pole_labels,
 )
-
-
-def plan_owns_hierarchy(cur, ff_project_id):
-    """True when this project has a plan, so the plan outranks the GPKG.
-
-    A project with rows in `poles` has a design that something else maintains — the
-    replan importer, a design GPKG import, or SOW. For those, a field-captured
-    attribute must never overrule it.
-
-    A project with NO poles rows has no plan to protect: the audit GPKG is the only
-    place its zone/PON has ever come from, so it must stay authoritative or those
-    projects can never be corrected again.
-
-    Deliberately keyed on `poles`, not `v_pole_planning`: the view UNIONs `sow_poles`,
-    so a project could show planning rows that no writer actually maintains. Presence
-    of a real `poles` row is the honest test of "someone owns this plan".
-    """
-    cur.execute(
-        "SELECT EXISTS(SELECT 1 FROM poles WHERE project_id = %s::uuid) AS has_plan",
-        (ff_project_id,),
-    )
-    return bool(cur.fetchone()["has_plan"])
 
 
 def hierarchy_backfill_needed(cur, ff_project_id, config):
@@ -141,16 +102,14 @@ def sync_hierarchy(cur, conn, ff_project_id, rows, label_col, config, spatial_po
         (ff_project_id, label, zone, pon)
         for label, (pon, zone) in hierarchy.items()
     ]
-    plan_owns = plan_owns_hierarchy(cur, ff_project_id)
     poles_updated = _update_planning_poles(cur, hierarchy_values)
     validated = _validated_pole_labels(cur, ff_project_id, list(hierarchy))
-    qa_updated = _upsert_work_qa(cur, hierarchy_values, validated, plan_owns)
-    reviews_updated = _update_reviews(cur, hierarchy_values, plan_owns)
+    qa_updated = _upsert_work_qa(cur, hierarchy_values, validated)
+    reviews_updated = _update_reviews(cur, hierarchy_values)
     conn.commit()
     return {
         "mapped": len(hierarchy),
         "poles": poles_updated,
         "qa_poles": qa_updated,
         "reviews": reviews_updated,
-        "plan_owns": plan_owns,
     }

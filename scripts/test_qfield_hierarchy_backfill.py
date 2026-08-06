@@ -1,32 +1,29 @@
 #!/usr/bin/env python3
 """
-Execution test for qfield_hierarchy_sync's BACKFILL-ONLY contract — real Postgres.
+Execution test for the zone/PON authority rule — against a real Postgres.
 
-The three write sites in that module all read `COALESCE(existing, gpkg)`. That
-argument order IS the contract: reversed, the GPKG overwrites values the plan owns.
-Asserting it by grepping the SQL text would prove nothing about what Postgres does, so
-these run the real statements against real tables.
+qfield_hierarchy_writers resolves every QA/review write to
+`COALESCE(plan, gpkg, existing)`. That expression IS the contract, and grepping the
+SQL would prove nothing about what Postgres does, so these run the real statements.
 
-What must hold, for poles, pole_qa_photos and construction_qa_reviews alike:
+What must hold:
 
-  existing NULL, gpkg set    -> filled          (the entire point of a backfill)
-  existing set,  gpkg set    -> UNCHANGED       (the regression this guards)
-  existing set,  gpkg NULL   -> UNCHANGED
-  both NULL                  -> stays NULL, and reports no change
+  pole IS in the plan       the plan wins, even over a value already there
+  pole is NOT in the plan   the GPKG wins — it is that pole's only source
+  neither has a value       the existing value stands
+  `poles` itself            backfill only: the GPKG fills a NULL, never overwrites
 
-The regression it guards (2026-08-06, Thembisa POP 3): with the arguments the other way
-round, one extractor run rewrote 98 poles the replan import had just corrected —
-TEM.P.I544 zone 66 -> 62, TEM.P.M040 zone 69 -> 6 — silently, because a stale field
-attribute was allowed to win over the plan.
+Each is a real incident from 2026-08-06: the GPKG winning over a planned pole reverted
+98 Thembisa POP 3 poles; the plan winning over a pole it does not contain (an INNER
+JOIN) skipped 1,190 pole_qa_photos and 1,196 construction_qa_reviews rows.
 
-Starts a throwaway postgres:15-alpine unless TEST_DATABASE_URL is set, and works inside
-a scratch schema dropped at the end. `public` is never touched.
+Container lifecycle and reporting come from replan_test_harness. Everything happens in
+a scratch schema dropped at the end; `public` is never touched.
 
 Run:  python3 scripts/test_qfield_hierarchy_backfill.py
 Wired into CI via scripts/ci-local.sh and .github/workflows/ci.yml.
 """
 import os
-import subprocess
 import sys
 import time
 
@@ -34,7 +31,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import psycopg2  # noqa: E402
 import psycopg2.extras  # noqa: E402
-from qfield_hierarchy_sync import plan_owns_hierarchy  # noqa: E402
+# Container lifecycle and pass/fail reporting are shared with the replan suite — one
+# copy of the docker teardown, one set of labels for CI's sweep step.
+from replan_test_harness import check, finish, start_pg, teardown_container  # noqa: E402
 from qfield_hierarchy_writers import (  # noqa: E402
     _update_planning_poles, _upsert_work_qa, _update_reviews,
 )
@@ -42,34 +41,6 @@ from qfield_hierarchy_writers import (  # noqa: E402
 SCHEMA = "hierarchy_backfill_test"
 PROJECT = "33333333-3333-3333-3333-333333333333"
 NO_PLAN_PROJECT = "44444444-4444-4444-4444-444444444444"
-_FAILURES = []
-_container = ""
-
-
-def check(label, ok):
-    print(f"  {'PASS' if ok else 'FAIL'}  {label}")
-    if not ok:
-        _FAILURES.append(label)
-
-
-def start_pg():
-    global _container
-    run_id = os.environ.get("GITHUB_RUN_ID", f"local-{os.getpid()}")
-    _container = subprocess.check_output([
-        "docker", "run", "-d", "--rm", "-P",
-        "--label", "ff-replan-test=1", "--label", f"ff-replan-run={run_id}",
-        "-e", "POSTGRES_PASSWORD=test", "-e", "POSTGRES_DB=test",
-        "postgres:15-alpine"], text=True).strip()
-    port = subprocess.check_output(
-        ["docker", "port", _container, "5432/tcp"], text=True).strip().rsplit(":", 1)[-1]
-    url = f"postgresql://postgres:test@127.0.0.1:{port}/test"
-    for _ in range(60):
-        try:
-            psycopg2.connect(url).close()
-            return url
-        except psycopg2.OperationalError:
-            time.sleep(1)
-    raise RuntimeError("throwaway Postgres never became ready")
 
 
 def fixture(cur):
@@ -87,9 +58,8 @@ def fixture(cur):
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
         feature_type text, feature_id text, zone_no integer, pon_no integer,
         updated_at timestamptz)""")
-    # Stands in for the real view. Production UNIONs sow_poles with poles; only the
-    # poles half matters here, and reading it as a view (not a copy) keeps the test
-    # honest about reviews being sourced from the PLAN rather than the GPKG.
+    # Stands in for the real view (production UNIONs sow_poles). A view, not a copy,
+    # so the tests stay honest about reading the PLAN rather than the GPKG.
     cur.execute("""CREATE VIEW v_pole_planning AS
         SELECT project_id, pole_number, zone_no, pon_no FROM poles""")
 
@@ -150,7 +120,7 @@ def main():
             check(f"{why} ({lab})", (r["zone_no"], r["pon_no"]) == (wz, wp))
 
         print("\npole_qa_photos:")
-        _upsert_work_qa(cur, values, {lab for lab, *_ in CASES}, True)
+        _upsert_work_qa(cur, values, {lab for lab, *_ in CASES})
         conn.commit()
         for lab, _, _, (wz, wp), why in CASES:
             cur.execute("SELECT zone_no, pon_no FROM pole_qa_photos WHERE pole_label=%s", (lab,))
@@ -158,7 +128,7 @@ def main():
             check(f"{why} ({lab})", (r["zone_no"], r["pon_no"]) == (wz, wp))
 
         print("\nconstruction_qa_reviews:")
-        _update_reviews(cur, values, True)
+        _update_reviews(cur, values)
         conn.commit()
         for lab, _, _, (wz, wp), why in CASES:
             cur.execute("SELECT zone_no, pon_no FROM construction_qa_reviews WHERE feature_id=%s",
@@ -179,7 +149,7 @@ def main():
         cur.execute("INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no) "
                     "VALUES (%s,'QADRIFT',62,745)", (PROJECT,))
         conn.commit()
-        _upsert_work_qa(cur, [(PROJECT, "QADRIFT", 62, 745)], {"QADRIFT"}, True)
+        _upsert_work_qa(cur, [(PROJECT, "QADRIFT", 62, 745)], {"QADRIFT"})
         conn.commit()
         cur.execute("SELECT zone_no, pon_no FROM pole_qa_photos "
                     "WHERE project_id=%s AND pole_label='QADRIFT'", (PROJECT,))
@@ -191,7 +161,7 @@ def main():
         cur.execute("INSERT INTO poles (project_id, pole_number, zone_no, pon_no) "
                     "VALUES (%s,'FRESH',66,781)", (PROJECT,))
         conn.commit()
-        _upsert_work_qa(cur, [(PROJECT, "FRESH", 62, 745)], {"FRESH"}, True)
+        _upsert_work_qa(cur, [(PROJECT, "FRESH", 62, 745)], {"FRESH"})
         conn.commit()
         cur.execute("SELECT zone_no, pon_no FROM pole_qa_photos "
                     "WHERE project_id=%s AND pole_label='FRESH'", (PROJECT,))
@@ -201,7 +171,7 @@ def main():
 
         # A pole the plan does not cover still seeds from the GPKG — otherwise a
         # photographed-but-unplanned pole would land with no zone at all.
-        _upsert_work_qa(cur, [(PROJECT, "UNPLANNED", 62, 745)], {"UNPLANNED"}, True)
+        _upsert_work_qa(cur, [(PROJECT, "UNPLANNED", 62, 745)], {"UNPLANNED"})
         conn.commit()
         cur.execute("SELECT zone_no, pon_no FROM pole_qa_photos "
                     "WHERE project_id=%s AND pole_label='UNPLANNED'", (PROJECT,))
@@ -220,7 +190,7 @@ def main():
                     "(project_id, feature_type, feature_id, zone_no, pon_no) "
                     "VALUES (%s,'pole','DRIFTED',62,745)", (PROJECT,))
         conn.commit()
-        _update_reviews(cur, [(PROJECT, "DRIFTED", 62, 745)], True)
+        _update_reviews(cur, [(PROJECT, "DRIFTED", 62, 745)])
         conn.commit()
         cur.execute("SELECT zone_no, pon_no FROM construction_qa_reviews "
                     "WHERE feature_id='DRIFTED'")
@@ -232,22 +202,73 @@ def main():
         # Namakgale live here. The GPKG must stay authoritative or they can never be
         # corrected again.
         print("\nno-plan project: the GPKG keeps its authority:")
-        check("plan_owns_hierarchy() is True for a project with poles",
-              plan_owns_hierarchy(cur, PROJECT) is True)
-        check("plan_owns_hierarchy() is False for a project with none",
-              plan_owns_hierarchy(cur, NO_PLAN_PROJECT) is False)
         for lab, (ez, ep), _, _, _ in NO_PLAN_CASES:
             cur.execute("INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no) "
                         "VALUES (%s,%s,%s,%s)", (NO_PLAN_PROJECT, lab, ez, ep))
         conn.commit()
         np_values = [(NO_PLAN_PROJECT, lab, gz, gp) for lab, _, (gz, gp), _, _ in NO_PLAN_CASES]
-        _upsert_work_qa(cur, np_values, {lab for lab, *_ in NO_PLAN_CASES}, False)
+        _upsert_work_qa(cur, np_values, {lab for lab, *_ in NO_PLAN_CASES})
         conn.commit()
         for lab, _, _, (wz, wp), why in NO_PLAN_CASES:
             cur.execute("SELECT zone_no, pon_no FROM pole_qa_photos "
                         "WHERE project_id=%s AND pole_label=%s", (NO_PLAN_PROJECT, lab))
             r = cur.fetchone()
             check(f"{why} ({lab})", (r["zone_no"], r["pon_no"]) == (wz, wp))
+
+        # THE 1,190-ROW CASE: an INNER JOIN on the plan skipped every pole the plan
+        # does not contain — 1,190 QA and 1,196 review rows with no source at all.
+        print("\na pole absent from the plan still takes the GPKG:")
+        cur.execute("INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no) "
+                    "VALUES (%s,'NOPLANROW',NULL,NULL)", (PROJECT,))
+        cur.execute("INSERT INTO construction_qa_reviews "
+                    "(project_id, feature_type, feature_id, zone_no, pon_no) "
+                    "VALUES (%s,'pole','NOPLANROW',NULL,NULL)", (PROJECT,))
+        conn.commit()
+        _upsert_work_qa(cur, [(PROJECT, "NOPLANROW", 7, 70)], {"NOPLANROW"})
+        _update_reviews(cur, [(PROJECT, "NOPLANROW", 7, 70)])
+        conn.commit()
+        cur.execute("SELECT zone_no, pon_no FROM pole_qa_photos WHERE pole_label='NOPLANROW'")
+        r = cur.fetchone()
+        check("  QA row filled from the GPKG", (r["zone_no"], r["pon_no"]) == (7, 70))
+        cur.execute("SELECT zone_no, pon_no FROM construction_qa_reviews "
+                    "WHERE feature_id='NOPLANROW'")
+        r = cur.fetchone()
+        check("  review row filled from the GPKG", (r["zone_no"], r["pon_no"]) == (7, 70))
+
+        # feature_type is load-bearing: 21 live review rows of other types share a
+        # feature_id with a pole label in the same project.
+        print("\nnon-pole reviews are never touched:")
+        cur.execute("INSERT INTO poles (project_id, pole_number, zone_no, pon_no) "
+                    "VALUES (%s,'SHARED',66,781)", (PROJECT,))
+        cur.execute("INSERT INTO construction_qa_reviews "
+                    "(project_id, feature_type, feature_id, zone_no, pon_no) "
+                    "VALUES (%s,'joint','SHARED',9,90)", (PROJECT,))
+        cur.execute("INSERT INTO construction_qa_reviews "
+                    "(project_id, feature_type, feature_id, zone_no, pon_no) "
+                    "VALUES (%s,'pole','SHARED',66,781)", (PROJECT,))
+        conn.commit()
+        _update_reviews(cur, [(PROJECT, "SHARED", 62, 745)])
+        conn.commit()
+        cur.execute("SELECT zone_no, pon_no FROM construction_qa_reviews "
+                    "WHERE feature_id='SHARED' AND feature_type='joint'")
+        r = cur.fetchone()
+        check("a joint review sharing a pole's feature_id keeps its own zone/PON",
+              (r["zone_no"], r["pon_no"]) == (9, 90))
+
+        # Return values are the only signal the caller logs; assert them.
+        print("\nreturn counts are real:")
+        n = _update_reviews(cur, [(PROJECT, "SHARED", 62, 745)])
+        conn.commit()
+        check("a no-op review run returns 0", n == 0)
+        cur.execute("UPDATE construction_qa_reviews SET zone_no=1 "
+                    "WHERE feature_id='SHARED' AND feature_type='pole'")
+        conn.commit()
+        n = _update_reviews(cur, [(PROJECT, "SHARED", 62, 745)])
+        conn.commit()
+        check("a review run that changes one row returns 1", n == 1)
+        n = _upsert_work_qa(cur, [(PROJECT, "BRANDNEW", 3, 30)], {"BRANDNEW"})
+        conn.commit()
+        check("an insert-only QA run counts the inserted row", n == 1)
 
         print("\nidempotence + change reporting:")
         again = _update_planning_poles(cur, values)
@@ -270,15 +291,9 @@ def main():
             conn.commit()
         finally:
             conn.close()
-            if _container:
-                subprocess.run(["docker", "kill", _container],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            teardown_container()
 
-    print()
-    if _FAILURES:
-        print(f"FAILED ({len(_FAILURES)}): {_FAILURES}")
-        sys.exit(1)
-    print("All hierarchy backfill checks passed.")
+    finish("hierarchy backfill")
 
 
 if __name__ == "__main__":
