@@ -36,10 +36,21 @@ const WHISPER_TEAMS_RECORDINGS = process.env.WHISPER_TEAMS_RECORDINGS === 'true'
  * This bound is about the scrape run's budget, not the network: on expiry we give
  * up on THIS item and let the loop continue. The abandoned request finishes (or
  * times out) on its own; nothing here can cancel it.
+ *
+ * The default must not kill legitimate long recordings — that is the inverse
+ * failure, and it marks real meetings failed. Measured over 11 backfill runs
+ * against the on-prem Whisper: median 9.4x realtime, slowest 8.3x. At 8.3x:
+ *
+ *     1h audio ->  7.2 min      2h audio -> 14.5 min      3h audio -> 21.7 min
+ *
+ * A real 2h24m recording took 13.6 min, so a 10-minute default would have killed
+ * it. 45 min covers roughly 6h of audio at the slowest observed rate, which is
+ * well past any plausible meeting, while still bounding a hung Mac Mini to
+ * minutes instead of the hours an unbounded call can take.
  */
 export function resolveTranscribeBudgetMs(raw: string | undefined): number {
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : 600_000; // 10 min
+  return Number.isFinite(n) && n > 0 ? n : 2_700_000; // 45 min
 }
 const TRANSCRIBE_BUDGET_MS = resolveTranscribeBudgetMs(process.env.ONEDRIVE_TRANSCRIBE_BUDGET_MS);
 

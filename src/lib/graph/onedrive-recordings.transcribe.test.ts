@@ -134,15 +134,26 @@ describe('scrapeOneDriveRecordings — transcribes before summarising', () => {
 });
 
 describe('resolveTranscribeBudgetMs', () => {
-  it('defaults to 10 minutes when unset or invalid', () => {
-    expect(resolveTranscribeBudgetMs(undefined)).toBe(600_000);
-    expect(resolveTranscribeBudgetMs('')).toBe(600_000);
-    expect(resolveTranscribeBudgetMs('nonsense')).toBe(600_000);
-    expect(resolveTranscribeBudgetMs('0')).toBe(600_000);
-    expect(resolveTranscribeBudgetMs('-5')).toBe(600_000);
+  it('defaults to 45 minutes when unset or invalid', () => {
+    expect(resolveTranscribeBudgetMs(undefined)).toBe(2_700_000);
+    expect(resolveTranscribeBudgetMs('')).toBe(2_700_000);
+    expect(resolveTranscribeBudgetMs('nonsense')).toBe(2_700_000);
+    expect(resolveTranscribeBudgetMs('0')).toBe(2_700_000);
+    expect(resolveTranscribeBudgetMs('-5')).toBe(2_700_000);
   });
 
   it('honours a valid override', () => {
     expect(resolveTranscribeBudgetMs('120000')).toBe(120_000);
+  });
+
+  it('leaves headroom for the longest recordings actually seen', () => {
+    // Measured worst case: 8.3x realtime. The backlog's longest recording is
+    // 2h24m. A default that cannot absorb that would mark a real meeting failed
+    // — the inverse of the stall this budget exists to prevent.
+    const longestAudioSec = 2 * 3600 + 24 * 60;
+    const slowestRate = 8.3;
+    const needMs = (longestAudioSec / slowestRate) * 1000;
+
+    expect(resolveTranscribeBudgetMs(undefined)).toBeGreaterThan(needMs * 2);
   });
 });
