@@ -16,7 +16,7 @@ import { raiseTrackingAlert } from '@/services/tracking/alerts';
 import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
 import { isAuthFailure } from '@/services/tracking/authFailure';
-import { isAuthCircuitOpen, reportOpenCircuit } from '@/services/tracking/authBreaker';
+import { authBreakerDecision, logProbe, reportThrottled } from '@/services/tracking/authBreaker';
 import type { ProviderPosition, TrackingProvider } from '@/services/tracking/types';
 
 /** No watermark yet: how far back the first tick reaches. */
@@ -101,16 +101,25 @@ export async function pollProvider(
       last_event_ts: Date | null;
       consecutive_failures: number;
       last_error: string | null;
+      last_run_at: Date | null;
     }>`
-      SELECT last_event_ts, consecutive_failures, last_error
+      SELECT last_event_ts, consecutive_failures, last_error, last_run_at
       FROM fleet_tracking_watermarks
       WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
     `;
     const failures = wm[0]?.consecutive_failures ?? 0;
     const priorError = wm[0]?.last_error ?? '';
-    if (isAuthCircuitOpen(failures, priorError)) {
-      return reportOpenCircuit(provider.key, provider.accountRef, failures, priorError);
+    // Half-open on a cooldown, NOT a latch: while throttled the tick is skipped
+    // without writing the watermark, so a permanently-skipping breaker would
+    // freeze consecutive_failures and block the only path that could ever clear
+    // it. Letting one probe through per cooldown is what makes a fixed
+    // credential heal the provider without anyone editing the database.
+    const decision = authBreakerDecision(
+      failures, priorError, wm[0]?.last_run_at ? new Date(wm[0].last_run_at) : null);
+    if (decision.state === 'open' || decision.state === 'hard-stop') {
+      return reportThrottled(provider.key, provider.accountRef, decision, priorError);
     }
+    if (decision.state === 'half-open') logProbe(provider.key, provider.accountRef, decision.failures);
     const portalVehicles = await listVehicles();
     const recon = await reconcileTrackers(provider.key, provider.accountRef, portalVehicles);
 
