@@ -9,6 +9,8 @@ import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { netstarProvider } from '@/services/tracking/netstar/provider';
 import { netstarClient, PartialFetchError } from '@/services/tracking/netstar/client';
+import { cartrackPortalClient } from '@/services/tracking/cartrack/portalClient';
+import { cartrackPortalProvider } from '@/services/tracking/cartrack/portalProvider';
 import { reconcileTrackers } from '@/services/tracking/discovery';
 import { ingestPositions } from '@/services/tracking/ingest';
 import { raiseTrackingAlert } from '@/services/tracking/alerts';
@@ -81,6 +83,47 @@ export function configuredProviders(): ConfiguredProvider[] {
       hint: 'set these in the service env file; until then this cron does nothing',
     });
   }
+
+  // Cartrack's fleetweb PORTAL, which is not the REST API poll-tracking.ts uses.
+  // The urent account authenticates with three fields (account + sub-user +
+  // password); HTTP Basic has two slots, so it can never reach the REST API
+  // however the username is shaped. It rides this cadence rather than the
+  // 2-minute one because it is a portal scrape.
+  const {
+    CARTRACK_PORTAL_URL, CARTRACK_PORTAL_ACCOUNT,
+    CARTRACK_PORTAL_SUBUSER, CARTRACK_PORTAL_PASS,
+  } = process.env;
+  if (CARTRACK_PORTAL_ACCOUNT && CARTRACK_PORTAL_SUBUSER && CARTRACK_PORTAL_PASS) {
+    const client = cartrackPortalClient({
+      baseUrl: CARTRACK_PORTAL_URL || 'https://fleetweb-za.cartrack.com',
+      account: CARTRACK_PORTAL_ACCOUNT,
+      subUser: CARTRACK_PORTAL_SUBUSER,
+      password: CARTRACK_PORTAL_PASS,
+    });
+    out.push({
+      provider: cartrackPortalProvider({
+        accountRef: process.env.CARTRACK_PORTAL_ACCOUNT_REF ?? 'urent',
+        client,
+      }),
+      listVehicles: () => client.listVehicles(),
+      feedFreshness: () => client.feedFreshness(),
+    });
+  } else if (CARTRACK_PORTAL_URL || CARTRACK_PORTAL_ACCOUNT || CARTRACK_PORTAL_SUBUSER) {
+    // Only complain when something was clearly attempted. Unlike Netstar this
+    // provider is optional, so an entirely absent config is not a fault — but a
+    // half-filled one is, and it would otherwise look like a healthy tick.
+    const missing = (
+      [
+        ['CARTRACK_PORTAL_ACCOUNT', CARTRACK_PORTAL_ACCOUNT],
+        ['CARTRACK_PORTAL_SUBUSER', CARTRACK_PORTAL_SUBUSER],
+        ['CARTRACK_PORTAL_PASS', CARTRACK_PORTAL_PASS],
+      ] as const
+    ).filter(([, value]) => !value).map(([name]) => name);
+    log.warn('[poll-portal-tracking] cartrack portal partially configured — skipping it', {
+      missing,
+      hint: 'set all three, or none, in the service env file',
+    });
+  }
   return out;
 }
 
@@ -113,6 +156,11 @@ export function isAuthFailure(message: string): boolean {
       // a credentials fault, but it equally will not fix itself on the next
       // tick and equally needs a human.
       'bot challenge did not clear',
+      // Cartrack portal. Its rejected-credential message already contains
+      // "login failed" above; these two do not, and the first is especially
+      // urgent because that endpoint counts failures toward a lockout.
+      'still unauthenticated after re-login',
+      'issued no session cookies',
     ].join('|'),
     'i'
   ).test(message);

@@ -68,3 +68,27 @@ describe('isAuthFailure — genuinely transient conditions stay transient', () =
     expect(isAuthFailure('ingested 4011 positions')).toBe(false);
   });
 });
+
+describe('isAuthFailure — Cartrack portal vocabulary', () => {
+  // Constructed verbatim in cartrack/portalClient.ts. The first is urgent
+  // beyond the usual: that endpoint counts failures toward an account lockout.
+  it('classifies a rejected portal credential as auth', () => {
+    expect(
+      isAuthFailure('[cartrack-portal/auth] login failed: status=WRONG_CREDENTIALS, attempts_remaining=19')
+    ).toBe(true);
+  });
+
+  it('classifies a session that will not re-establish as auth', () => {
+    expect(isAuthFailure('[cartrack-portal/auth] still unauthenticated after re-login')).toBe(true);
+  });
+
+  it('classifies a cookie-less successful login as auth', () => {
+    expect(isAuthFailure('[cartrack-portal/auth] login succeeded but issued no session cookies')).toBe(true);
+  });
+
+  it('leaves the portal transport errors transient', () => {
+    expect(isAuthFailure('[cartrack-portal/network] ECONNRESET')).toBe(false);
+    expect(isAuthFailure('[cartrack-portal/http] vehiclelist: HTTP 500')).toBe(false);
+    expect(isAuthFailure('[cartrack-portal/shape] vehiclelist: expected result.ct_fleet_get_vehiclelist array, got undefined')).toBe(false);
+  });
+});
