@@ -60,6 +60,9 @@ export default defineConfig({
       // than applying a migration file (483_fleet_parking_queries).
       { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
       { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
+      // approvalQueries measures how far a driver moved their address, so the
+      // parking approval test's closure reaches haversineDistanceM.
+      { find: '@/lib/geo', replacement: path.resolve(__dirname, './src/lib/geo') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@', replacement: path.resolve(__dirname, './src') },
     ],

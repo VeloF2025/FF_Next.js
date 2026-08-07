@@ -60,6 +60,7 @@ export default defineConfig({
       'tests/migrations/483_fleet_parking_compliance.test.ts',
       'tests/migrations/483_fleet_parking_queries.test.ts',
       'tests/migrations/483_fleet_parking_driver_queries.test.ts',
+      'tests/migrations/483_fleet_parking_approval.test.ts',
       'tests/migrations/484_attendance_historical_schedule_policy.test.ts',
       'tests/migrations/484_attendance_historical_schedule_policy_rollback.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',

@@ -13,6 +13,8 @@
  *   /fleet/fuel                         → Operations → Fuel
  *   /fleet/mileage                      → Operations → Mileage
  *   /fleet/maintenance                  → Operations → Maintenance
+ *   /fleet/parking                      → Operations → Parking Compliance
+ *   /fleet/parking/requests             → Operations → Parking Requests
  *   /fleet/check-in                     → Check-Ins → Check In Now
  *   /fleet/check-in/history             → Check-Ins → History
  *   /fleet/check-in/templates           → Check-Ins → Templates
@@ -71,6 +73,13 @@ export const TABS: Tab[] = [
         section: 'Service',
         items: [
           { label: 'Maintenance', href: '/fleet/maintenance' },
+        ],
+      },
+      {
+        section: 'Parking',
+        items: [
+          { label: 'Parking Compliance', href: '/fleet/parking' },
+          { label: 'Parking Requests', href: '/fleet/parking/requests' },
         ],
       },
     ],
@@ -136,11 +145,12 @@ export function getActiveTabId(
     return 'vehicles';
   }
 
-  // Operations — drivers, fuel, mileage, maintenance
+  // Operations — drivers, fuel, mileage, maintenance, overnight parking
   if (pathname.startsWith('/fleet/drivers') ||
       pathname.startsWith('/fleet/fuel') ||
       pathname.startsWith('/fleet/mileage') ||
-      pathname.startsWith('/fleet/maintenance')) {
+      pathname.startsWith('/fleet/maintenance') ||
+      pathname.startsWith('/fleet/parking')) {
     return 'operations';
   }
 

@@ -64,6 +64,17 @@ describe('getActiveTabId', () => {
     expect(getActiveTabId('/fleet/drivers/staff-1', {})).toBe('operations');
   });
 
+  // Both parking routes live under Operations. The approval queue is a nested
+  // route, so it is the case most likely to fall through to the catch-all —
+  // exactly how mileage and import were swallowed before.
+  it('resolves the parking compliance dashboard to operations', () => {
+    expect(getActiveTabId('/fleet/parking', {})).toBe('operations');
+  });
+
+  it('resolves the parking approval queue to operations', () => {
+    expect(getActiveTabId('/fleet/parking/requests', {})).toBe('operations');
+  });
+
   it('falls back to dashboard for an unknown fleet route', () => {
     expect(getActiveTabId('/fleet/not-a-real-page', {})).toBe('dashboard');
   });
