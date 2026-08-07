@@ -594,11 +594,20 @@ retry storm it replaces, because it fires after ~6 hours instead of ~40.
 **18 of 23 active vehicles**, as at 2026-08-07. Four independent feeds, all writing
 `fleet_vehicle_positions` through the same `pollProvider()` tick.
 
+⚠️ **A feed only runs if its credentials are in the DEPLOYED env.** Merging a provider is not
+the same as switching it on: `configuredProviders()` skips one whose vars are absent, silently
+and by design, and the tick then reports a perfectly healthy `providersConfigured: 1`. Urent
+shipped in #2392 but sat dark until `CARTRACK_PORTAL_ACCOUNT`/`_SUBUSER`/`_PASS` were added to
+prod `.env.local` and the service restarted — Next.js reads that file at start, so a restart
+is required, not just a deploy. **To check what is actually live, read
+`providersConfigured` and the `results[]` accountRefs in
+`/home/velo/logs/poll-portal-tracking.log` — not this table.**
+
 | provider / account_ref | Vehicles | Transport | Cadence |
 |---|---|---|---|
 | `cartrack` / `velocity` | 7 | REST API, HTTP Basic | 2 min, **from dev** (:3005) |
 | `netstar` / `europcar` | 6 | portal form login | 2 h, from prod (:3000) |
-| `cartrack` / `urent` | 3 | fleetweb JSON-RPC | 2 h, same cron as Netstar |
+| `cartrack` / `urent` | 3 | fleetweb JSON-RPC | 2 h, same cron as Netstar (`configuredProviders()`) |
 | `ituran` / `avis` | 2 | portal + WAF, browser mint | 2 h at :30, standalone script |
 
 ⚠️ Cartrack REST polls **from dev** and the portals **from prod**. One shared database, so
@@ -617,19 +626,31 @@ login for", not "a bug".
 | Vehicle | Ownership | Why dark | What would fix it |
 |---|---|---|---|
 | **KR27FNGP** Land Cruiser | **company** | **No Cartrack unit subscribed.** Our account carries 8 subscriptions — 5 Foton, 3 Suzuki EECO — and none is a Land Cruiser. Not a mapping fault; the device does not exist. | Commercial: add it to the Cartrack subscription. Discovery then maps it by plate on the next 2-min poll, no code change. **The only one of the five within our own control.** |
-| HW50PDGP | rental | `docs/Fleet` lists it under Urent, but it is **not on that portal**. The portal carries HW50JYGP instead, which is **retired** in `fleet_vehicles` — possibly the same physical vehicle re-plated. | Ask Urent which plate is current, then fix `docs/Fleet`. |
+| HW50PDGP | rental | `docs/Fleet` lists it under Urent, but it is **not on that portal**. | Ask Urent which plate is current, then fix `docs/Fleet`. |
 | MV49GBGP, NC60ZDGP | rental | Hire company unknown — not Europcar, Urent or Avis. | Identify the company; if it has a portal, adding a provider is now a well-trodden path. |
 | CR69KTZN | **leased** | Our only leased vehicle. The lessor holds any tracker. | Ask the lessor for access. |
 
 ### Data corrections outstanding
 
-- ⚠️ **`docs/Fleet`'s Urent list is wrong in two places**: it names HW50PDGP (not on the
-  portal) and does not note that HW50JYGP and JZ29GCGP are **retired**. The account shows 5
-  vehicles but only 3 are worth mapping.
-- ⚠️ Our Cartrack account has an **8th subscription with no vehicle name**, registered
-  `TEMP-2071192S1` — the `S1` suffix on MW67LZGP's `TEMP-2071192`, so likely a second device
-  on that same vehicle. Correctly left unmapped (`vehicle_name` is null), but it may be a
-  subscription being paid for and not used.
+- ⚠️ **`docs/Fleet`'s Urent list does not match the portal.** The doc lists HG16TDGP,
+  HW50PDGP, HW50KNGP, JZ29GJGP, JZ29GCGP. The portal (captured live 2026-08-07) serves
+  HG16TDGP, **HW50JYGP**, HW50KNGP, JZ29GCGP, JZ29GJGP. So:
+  - **HW50PDGP** is in the doc but **not on the portal** — it is one of the 5 dark vehicles.
+  - **HW50JYGP** is on the portal but **absent from the doc**, and is `retired` in
+    `fleet_vehicles`.
+  - **JZ29GCGP** is in both and is also `retired`.
+
+  Five plates on the portal, only **3 map** to active fleet rows: HG16TDGP, HW50KNGP,
+  JZ29GJGP. Worth asking Urent whether HW50PDGP and HW50JYGP are the same vehicle re-plated —
+  that is a question for them, not an inference to record as fact.
+- ⚠️ Our Cartrack account has an **8th subscription with no `vehicle_name`**. Source: the
+  live REST call `GET /vehicles` on 2026-08-07 — these are Cartrack's OWN
+  `registration` values, which are internal placeholders and do NOT appear anywhere in
+  `fleet_vehicles`, so this cannot be checked from our database. That row's `registration` is
+  `TEMP-2071192S1`; MW67LZGP's is `TEMP-2071192`, so the `S1` suffix suggests a second device
+  on the same vehicle. Correctly left unmapped (the provider matches on `vehicle_name`, which
+  is null here), but possibly a subscription being paid for and unused. **Verify against the
+  Cartrack billing portal before acting** — the suffix is suggestive, not proof.
 
 ### Watch-item: the circuit-breaker numbers are Cartrack-calibrated
 
