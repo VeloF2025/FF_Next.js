@@ -7,12 +7,33 @@
  * *every* caller persists the failure itself (see the TranscriptMissingError
  * docstring in src/lib/llm/meeting-processor.ts).
  *
- * The CLI scripts used to only `console.error` the message, so a meeting whose
+ * The CLI scripts used to only print the message to stderr, so a meeting whose
  * processing threw kept whatever status it had before — usually 'processing',
  * occasionally a stale 'completed' — with no processing_error to explain it.
  * PR #2393 made those throws routine rather than rare, which is what turned a
  * latent gap into a reporting problem.
  */
+
+import * as fs from 'fs';
+
+/**
+ * Delete paths, never throwing.
+ *
+ * Built for `finally` blocks. A throw inside `finally` *replaces* the in-flight
+ * exception, so an unguarded `fs.rmSync` would overwrite the real transcription
+ * or LLM error with a filesystem one — losing exactly the message this module
+ * exists to preserve. `force: true` also removes the existsSync/unlink
+ * time-of-check-to-time-of-use race between two runs of the same meeting.
+ */
+export function safeRemove(paths: string[], onError?: (err: unknown) => void): void {
+  for (const target of paths) {
+    try {
+      fs.rmSync(target, { recursive: true, force: true });
+    } catch (err: unknown) {
+      onError?.(err);
+    }
+  }
+}
 
 /** Minimal tagged-template shape shared by pg.Pool wrappers and neon(). */
 export type SqlFn = (

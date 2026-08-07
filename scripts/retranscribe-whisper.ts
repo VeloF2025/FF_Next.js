@@ -30,7 +30,7 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { processWithLLM } from '../src/lib/llm/meeting-processor';
-import { markMeetingFailed, runMeetingStep, toErrorMessage } from './lib/meeting-failure';
+import { markMeetingFailed, runMeetingStep, safeRemove, toErrorMessage } from './lib/meeting-failure';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -92,12 +92,13 @@ interface WhisperResponse {
 const audioPathFor = (meetingId: number): string => `/tmp/meeting-${meetingId}-audio.mp3`;
 const chunkDirFor = (meetingId: number): string => `/tmp/meeting-${meetingId}-chunks`;
 
-/** Remove this meeting's extracted audio and chunk directory if present. */
+/** Remove this meeting's extracted audio and chunk directory. Never throws —
+ *  it runs in a `finally`, where a throw would replace the real error. */
 function cleanupTempFiles(meetingId: number): void {
-  const audioPath = audioPathFor(meetingId);
-  if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-  const chunkDir = chunkDirFor(meetingId);
-  if (fs.existsSync(chunkDir)) fs.rmSync(chunkDir, { recursive: true });
+  safeRemove([audioPathFor(meetingId), chunkDirFor(meetingId)], err =>
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+    console.error(`  WARN: temp cleanup failed for meeting ${meetingId}: ${toErrorMessage(err)}`),
+  );
 }
 
 /**

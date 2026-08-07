@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   markMeetingFailed,
   runMeetingStep,
+  safeRemove,
   toErrorMessage,
 } from '../lib/meeting-failure';
 
@@ -47,6 +52,76 @@ describe('toErrorMessage', () => {
 
   it('falls back to a usable string for an empty message', () => {
     expect(toErrorMessage(new Error('   '))).toBe('Unknown error');
+  });
+});
+
+describe('safeRemove', () => {
+  const made: string[] = [];
+  const locked: string[] = [];
+  const tmp = (name: string) => {
+    const p = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-')), name);
+    made.push(path.dirname(p));
+    return p;
+  };
+  afterEach(() => {
+    // Restore write permission first — otherwise removing the temp root fails
+    // with the very EACCES these tests deliberately provoke.
+    locked.splice(0).forEach(d => fs.chmodSync(d, 0o700));
+    made.splice(0).forEach(d => fs.rmSync(d, { recursive: true, force: true }));
+  });
+
+  it('removes both a file and a populated directory', () => {
+    const file = tmp('audio.mp3');
+    fs.writeFileSync(file, 'x');
+    const dir = tmp('chunks');
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, 'chunk_000.mp3'), 'x');
+
+    safeRemove([file, dir]);
+
+    expect(fs.existsSync(file)).toBe(false);
+    expect(fs.existsSync(dir)).toBe(false);
+  });
+
+  it('does not throw when a path is already gone (the concurrent-run race)', () => {
+    const gone = tmp('never-created.mp3');
+    const onError = vi.fn();
+
+    expect(() => safeRemove([gone], onError)).not.toThrow();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  /** A file inside a non-writable directory cannot be unlinked — a real EACCES
+   *  from the kernel, no mocking of `fs` involved. */
+  function undeletableFile(): string {
+    const dir = tmp('locked');
+    fs.mkdirSync(dir);
+    const file = path.join(dir, 'audio.mp3');
+    fs.writeFileSync(file, 'x');
+    fs.chmodSync(dir, 0o500);
+    locked.push(dir);
+    return file;
+  }
+
+  it('swallows a filesystem error so a `finally` cannot replace the real error', () => {
+    const blocked = undeletableFile();
+    const onError = vi.fn();
+
+    expect(() => safeRemove([blocked], onError)).not.toThrow();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(fs.existsSync(blocked)).toBe(true);
+  });
+
+  it('still removes later paths after an earlier one fails', () => {
+    const blocked = undeletableFile();
+    const second = tmp('second.mp3');
+    fs.writeFileSync(second, 'x');
+    const onError = vi.fn();
+
+    safeRemove([blocked, second], onError);
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(fs.existsSync(second)).toBe(false);
   });
 });
 
