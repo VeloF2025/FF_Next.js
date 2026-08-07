@@ -14,6 +14,13 @@ MEETING_ID=${1:-}
 OUT=${2:-}
 [ -z "$MEETING_ID" ] && { echo "usage: $0 <meeting_id> [outfile]" >&2; exit 2; }
 
+# The id is interpolated into a psql -c string, so constrain it to digits before
+# it gets anywhere near SQL. Without this, `'1; DROP TABLE meetings--'` is a
+# valid argument.
+case "$MEETING_ID" in
+  ''|*[!0-9]*) echo "meeting id must be a positive integer, got: $MEETING_ID" >&2; exit 2 ;;
+esac
+
 WHISPER=${WHISPER_REMOTE_URL:-http://100.117.249.72:8009}/inference
 CHUNK_SEC=900          # 15 min per request
 MIN_CHARS=200          # below this, Whisper hallucinated on silence — not content
