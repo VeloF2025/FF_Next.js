@@ -47,18 +47,20 @@ describe('chunkWindow', () => {
  */
 function treeFetch(body: unknown, status = 200) {
   const seen: string[] = [];
+  const headers: Array<Record<string, string>> = [];
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
     if (url.includes('/Authentication/Account/Login')) return new Response(null, { status: 200 });
     if (url.includes('/Main/VehicleRepo/GetVehicleTreeDataPaging')) {
       seen.push(`${(init?.method || 'GET')} ${url}`);
+      headers.push((init?.headers ?? {}) as Record<string, string>);
       return new Response(JSON.stringify(body), {
         status, headers: { 'Content-Type': 'application/json' },
       });
     }
     throw new Error(`treeFetch: unexpected url ${url}`);
   };
-  return { fetchImpl: fetchImpl as unknown as typeof fetch, seen };
+  return { fetchImpl: fetchImpl as unknown as typeof fetch, seen, headers };
 }
 
 const LEAF = (leafId: number, name: string, over: Record<string, unknown> = {}) => ({
@@ -79,19 +81,35 @@ describe('netstarClient listVehicles', () => {
   it('maps vehicle leaves to externalId + registration', async () => {
     const { client } = build({ data: [LEAF(123, 'ABC123GP'), LEAF(456, 'XYZ789GP')] });
     expect(await client.listVehicles()).toEqual([
-      { externalId: '123', registration: 'ABC123GP' },
-      { externalId: '456', registration: 'XYZ789GP' },
+      { externalId: '123', registration: 'ABC123GP', groupName: 'Ungrouped' },
+      { externalId: '456', registration: 'XYZ789GP', groupName: 'Ungrouped' },
     ]);
   });
 
   // POST, not GET: the identical path answers 404 to a GET, and the portal
   // routes on X-Requested-With. Getting either wrong is a silent empty account.
+  // Both halves of this are load-bearing against the real portal: the same
+  // path answers 404 to a GET, and 404s again without the XHR header. Asserting
+  // only the method would let the header be deleted with every test still green.
   it('POSTs, with the XHR header the portal routes on', async () => {
-    const { client, seen } = build({ data: [LEAF(1, 'A')] });
+    const { client, seen, headers } = build({ data: [LEAF(1, 'A')] });
     await client.listVehicles();
     expect(seen[0]).toMatch(/^POST /);
     expect(seen[0]).toContain('pageSize=2147483647');
     expect(seen[0]).toMatch(/__ts=\d+/);
+    expect(headers[0]).toMatchObject({ 'X-Requested-With': 'XMLHttpRequest' });
+  });
+
+  it('returns an empty list for an empty account without throwing', async () => {
+    const { client } = build({ data: [] });
+    expect(await client.listVehicles()).toEqual([]);
+  });
+
+  it('reports a null registration when the leaf carries no Name', async () => {
+    const { client } = build({ data: [LEAF(5, 'X', { Name: undefined })] });
+    expect(await client.listVehicles()).toEqual([
+      { externalId: '5', registration: null, groupName: 'Ungrouped' },
+    ]);
   });
 
   it('excludes folder nodes, which are other clients on the reseller tree', async () => {
@@ -99,7 +117,9 @@ describe('netstarClient listVehicles', () => {
       { LeafId: 0, Name: 'Clients', GroupName: 'Clients' },
       LEAF(7, 'REAL01GP'),
     ] });
-    expect(await client.listVehicles()).toEqual([{ externalId: '7', registration: 'REAL01GP' }]);
+    expect(await client.listVehicles()).toEqual([
+      { externalId: '7', registration: 'REAL01GP', groupName: 'Ungrouped' },
+    ]);
   });
 
   it('throws on a non-JSON-envelope body rather than reporting an empty account', async () => {
@@ -141,6 +161,24 @@ describe('netstarClient fetchPositions (tree snapshot)', () => {
       { externalId: '1', registration: 'A' },
     ]);
     expect(out).toEqual([]);
+  });
+
+  // Inclusive at both ends. An off-by-one here silently drops a vehicle's only
+  // fix for the tick, or double-counts it against the dedup key.
+  it('includes a fix exactly at `from` and exactly at `to`', async () => {
+    const client = build({ data: [LEAF(1, 'A')] });
+    const atFrom = await client.fetchPositions(FIX_AT, after, [{ externalId: '1', registration: 'A' }]);
+    const atTo = await client.fetchPositions(before, FIX_AT, [{ externalId: '1', registration: 'A' }]);
+    expect(atFrom).toHaveLength(1);
+    expect(atTo).toHaveLength(1);
+  });
+
+  it('excludes a fix one millisecond outside either end', async () => {
+    const client = build({ data: [LEAF(1, 'A')] });
+    const justAfterFrom = new Date(FIX_AT.getTime() + 1);
+    const justBeforeTo = new Date(FIX_AT.getTime() - 1);
+    expect(await client.fetchPositions(justAfterFrom, after, [{ externalId: '1', registration: 'A' }])).toEqual([]);
+    expect(await client.fetchPositions(before, justBeforeTo, [{ externalId: '1', registration: 'A' }])).toEqual([]);
   });
 
   it('returns nothing for a vehicle the portal has no fix for', async () => {
@@ -456,5 +494,62 @@ describe('netstarClient.fetchHistory — a non-numeric external id fails loudly'
         [{ externalId: 'folder-node', registration: 'Europcar Gauteng' }]
       )
     ).rejects.toThrow(/non-numeric external id "folder-node"/);
+  });
+});
+
+describe('netstarClient — one tree download per tick', () => {
+  // pollProvider calls listVehicles, then fetchPositions, then feedFreshness on
+  // the SAME client within milliseconds. Without the memo that is three
+  // multi-MB downloads every two hours in a process with a prod OOM history,
+  // and the three copies can disagree with each other mid-tick.
+  it('serves listVehicles, fetchPositions and feedFreshness from one request', async () => {
+    const t = treeFetch({ data: [LEAF(1, 'A')] });
+    const client = netstarClient({
+      baseUrl: 'https://x.test', username: 'u', password: 'p',
+      fetchImpl: t.fetchImpl, sleep: async () => {},
+    });
+    await client.listVehicles();
+    await client.fetchPositions(new Date(0), new Date('2100-01-01'), [
+      { externalId: '1', registration: 'A' },
+    ]);
+    await client.feedFreshness();
+    expect(t.seen).toHaveLength(1);
+  });
+
+  it('refetches on a later tick rather than caching across them', async () => {
+    let clock = 0;
+    const t = treeFetch({ data: [LEAF(1, 'A')] });
+    const client = netstarClient({
+      baseUrl: 'https://x.test', username: 'u', password: 'p',
+      fetchImpl: t.fetchImpl, sleep: async () => {}, now: () => clock, treeTtlMs: 60_000,
+    });
+    await client.listVehicles();
+    clock += 2 * 60 * 60 * 1000; // next 2-hourly tick
+    await client.listVehicles();
+    expect(t.seen).toHaveLength(2);
+  });
+
+  it('reports the newest fix across the WHOLE account, including foreign vehicles', async () => {
+    // The dead-feed probe deliberately spans other companies' vehicles: if it
+    // only looked at ours, a parked weekend would be indistinguishable from an
+    // outage — which is the failure it exists to catch.
+    const t = treeFetch({ data: [
+      LEAF(1, 'OURS', { DateTimeUtc: '/Date(1786000000000)/' }),
+      LEAF(2, 'THEIRS', { DateTimeUtc: '/Date(1786039740000)/', GroupName: 'Motus' }),
+    ] });
+    const client = netstarClient({
+      baseUrl: 'https://x.test', username: 'u', password: 'p',
+      fetchImpl: t.fetchImpl, sleep: async () => {},
+    });
+    expect((await client.feedFreshness())?.toISOString()).toBe('2026-08-06T18:09:00.000Z');
+  });
+
+  it('returns null freshness for an account with no usable fix at all', async () => {
+    const t = treeFetch({ data: [LEAF(1, 'A', { Lat: null, Long: null })] });
+    const client = netstarClient({
+      baseUrl: 'https://x.test', username: 'u', password: 'p',
+      fetchImpl: t.fetchImpl, sleep: async () => {},
+    });
+    expect(await client.feedFreshness()).toBeNull();
   });
 });

@@ -19,6 +19,8 @@
 export interface PortalVehicle {
   externalId: string;
   registration: string | null;
+  /** Which client/group the portal files this under, where the portal says. */
+  groupName?: string | null;
 }
 
 export interface FleetVehicleRow {
@@ -27,7 +29,13 @@ export interface FleetVehicleRow {
 }
 
 export interface MatchResult {
-  matched: Array<{ externalId: string; vehicleId: string; registration: string }>;
+  matched: Array<{
+    externalId: string;
+    vehicleId: string;
+    registration: string;
+    /** The portal's own grouping, carried through for reporting. */
+    groupName?: string | null;
+  }>;
   portalOnly: PortalVehicle[];
   fleetOnly: FleetVehicleRow[];
   /**
@@ -38,7 +46,10 @@ export interface MatchResult {
    * vehicle "not on the portal", so neither belongs in fleetOnly: they are a
    * data fault somebody has to resolve, and they need to say so.
    */
-  ambiguous: Array<{ reason: 'duplicate-fleet-registration' | 'duplicate-portal-id'; key: string }>;
+  ambiguous: Array<{
+    reason: 'duplicate-fleet-registration' | 'duplicate-portal-id' | 'duplicate-portal-registration';
+    key: string;
+  }>;
 }
 
 export function normaliseRegistration(raw: string): string {
@@ -86,6 +97,11 @@ export function matchVehicles(
   // while the run still reports both as upserted.
   const usedExternalIds = new Set<string>();
 
+  // Which fleet vehicle each portal row claimed, so a later collision can undo
+  // the earlier winner rather than letting first-past-the-post decide.
+  const claimedBy = new Map<string, number>();
+  const contested = new Set<string>();
+
   for (const p of portal) {
     if (usedExternalIds.has(p.externalId)) {
       ambiguous.push({ reason: 'duplicate-portal-id', key: p.externalId });
@@ -94,17 +110,48 @@ export function matchVehicles(
     }
     const key = p.registration ? normaliseRegistration(p.registration) : '';
     const hit = key ? byReg.get(key) : undefined;
-    if (!hit || claimed.has(hit.id)) {
+    if (!hit) {
+      portalOnly.push(p);
+      continue;
+    }
+    if (claimed.has(hit.id)) {
+      // Two portal rows normalise to one of our plates. This is NOT a stale
+      // duplicate to be ignored — on a multi-client reseller tree carrying
+      // thousands of other companies' vehicles, the second row is as likely to
+      // be a stranger's re-issued plate as our own duplicate. Whoever appeared
+      // first is not more trustworthy, so refuse BOTH: a position written
+      // against the wrong vehicle can never be repaired, because the ingest
+      // dedup key carries no vehicle id.
+      contested.add(hit.id);
+      ambiguous.push({ reason: 'duplicate-portal-registration', key });
       portalOnly.push(p);
       continue;
     }
     claimed.add(hit.id);
     usedExternalIds.add(p.externalId);
+    claimedBy.set(hit.id, matched.length);
     matched.push({
       externalId: p.externalId,
       vehicleId: hit.id,
       registration: normaliseRegistration(hit.registration),
+      groupName: p.groupName ?? null,
     });
+  }
+
+  // Withdraw the earlier winner for every contested plate, and hand its portal
+  // row back so the run reports it as unplaced rather than silently mapped.
+  if (contested.size > 0) {
+    const withdrawnIdx = new Set<number>();
+    for (const vehicleId of contested) {
+      const idx = claimedBy.get(vehicleId);
+      if (idx !== undefined) withdrawnIdx.add(idx);
+      claimed.delete(vehicleId);
+    }
+    for (const idx of withdrawnIdx) {
+      const m = matched[idx];
+      if (m) portalOnly.push({ externalId: m.externalId, registration: m.registration });
+    }
+    for (const idx of [...withdrawnIdx].sort((a, b) => b - a)) matched.splice(idx, 1);
   }
 
   return {

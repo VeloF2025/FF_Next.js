@@ -1,14 +1,11 @@
 /**
  * Reconciles a portal's vehicle list against fleet_vehicles.
  *
- * This is what makes coverage a continuously verified property rather than a
- * number somebody counted once. It runs before every poll and answers, every
- * time: which of our vehicles is this portal not carrying, and which of its
- * vehicles do we not recognise?
- *
- * Both directions matter. During recon the reverse direction surfaced a live
- * Cartrack subscription attached to no identifiable vehicle, and two retired
- * vehicles still being tracked on a partner's account.
+ * Coverage as a continuously verified property rather than a number somebody
+ * counted once: before every poll it answers which of our vehicles this portal
+ * is not carrying, and which of its vehicles we do not recognise. Both
+ * directions matter — the reverse one surfaced a live Cartrack subscription
+ * attached to no identifiable vehicle, and two retired vehicles still tracked.
  *
  * A tracker row is written ONLY for a confident registration match. Guessing
  * would attribute one vehicle's movements to another, which is worse than
@@ -237,9 +234,8 @@ export async function reconcileTrackers(
     });
   }
 
-  // Everything the portal offered is already someone else's. Same reasoning as
-  // the zero-match guard: proceeding would hand deactivateMissing an empty keep
-  // list and unmap the account.
+  // All of it is already someone else's. Same reasoning as the zero-match
+  // guard: proceeding hands deactivateMissing an empty keep list.
   if (claimable.length === 0) {
     log.warn('[tracking-discovery] every matched vehicle is tracked elsewhere — nothing to reconcile', {
       provider, accountRef, skipped: skippedOtherProvider.length,
@@ -287,9 +283,13 @@ export async function reconcileTrackers(
     });
   }
   if (portalOnly.length > 0) {
+    // Sampled, not listed: on a reseller account this is every OTHER company's
+    // vehicle (~11.4k ids), which overruns journald's LineMax and bloats the
+    // cron log twelve times a day. Count is the signal; five ids show shape.
     log.warn('[tracking-discovery] portal vehicles matching no active fleet vehicle', {
       provider, accountRef,
-      externalIds: portalOnly.map((p) => p.externalId),
+      count: portalOnly.length,
+      sampleExternalIds: portalOnly.slice(0, 5).map((p) => p.externalId),
     });
   }
 

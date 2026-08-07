@@ -121,11 +121,21 @@ Hire, SSA Acoustic, ICT-SA Worldwide, New Planet Telecoms). Six are Velocity's, 
 Motus and Ungrouped. Everything else belongs to other companies — which is why discovery
 matches by registration and refuses ambiguity.
 
-**`fetchPositions` is a snapshot.** At most one fix per vehicle; `from`/`to` filter it rather
-than fetching history. Because the watermark is the newest ingested fix and the window opens an
-hour behind it, the vehicle that set the watermark is always back inside the window — so a
-parked fleet re-presents the same fixes each tick and dedup absorbs them, rather than reading
-as a data gap.
+**`fetchPositions` is a snapshot**, declared as `granularity: 'snapshot'` on the provider so a
+caller can tell. At most one fix per vehicle; `from`/`to` filter it rather than fetching
+history. Because the watermark is the newest ingested fix and the window opens an hour behind
+it, the vehicle that set the watermark is always back inside the window — so a parked fleet
+re-presents the same fixes each tick and dedup absorbs them.
+
+**That same property is why "no positions" cannot detect a dead feed.** A frozen portal keeps
+returning the identical stale fixes forever, so `positions.length === 0` is unreachable and an
+outage looks exactly like a healthy tick. The detector is instead the **newest fix across the
+WHOLE account** (`newestFixAt`, exposed as `client.feedFreshness()`): the reseller tree carries
+~11.5k vehicles across several commercial fleets, so something on it has always reported
+recently. Silence across all of them is an outage; silence across our six is a parked weekend.
+Stale beyond `STALE_FEED_MS` (6h = three cycles) raises `fleet.tracking_data_gap`. For
+`granularity: 'history'` providers the old empty-window check still applies, because for them an
+empty window really does mean nothing happened.
 
 ### Backfill
 One-off historical backfill for a portal provider, walking backwards from now in provider-max

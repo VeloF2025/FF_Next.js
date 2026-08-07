@@ -19,7 +19,7 @@ describe('matchVehicles', () => {
   it('matches on normalised registration', () => {
     const r = matchVehicles([{ externalId: '1447952', registration: 'ln40 mggp' }], fleet);
     expect(r.matched).toEqual([
-      { externalId: '1447952', vehicleId: 'v1', registration: 'LN40MGGP' },
+      { externalId: '1447952', vehicleId: 'v1', registration: 'LN40MGGP', groupName: null },
     ]);
   });
 
@@ -39,7 +39,12 @@ describe('matchVehicles', () => {
     expect(r.portalOnly).toHaveLength(1);
   });
 
-  it('does not match two portal vehicles to the same fleet row', () => {
+  // Refuses BOTH, not first-past-the-post. On a multi-client reseller tree the
+  // second row is as likely to be a stranger's re-issued plate as our own stale
+  // duplicate, and whoever appeared first is not more trustworthy. A position
+  // written against the wrong vehicle can never be repaired — the ingest dedup
+  // key carries no vehicle id.
+  it('refuses BOTH portal vehicles when two claim the same fleet row', () => {
     const r = matchVehicles(
       [
         { externalId: 'a', registration: 'LN40MGGP' },
@@ -47,8 +52,34 @@ describe('matchVehicles', () => {
       ],
       fleet
     );
-    expect(r.matched).toHaveLength(1);
-    expect(r.portalOnly.map((p) => p.externalId)).toContain('b');
+    expect(r.matched).toHaveLength(0);
+    expect(r.portalOnly.map((p) => p.externalId).sort()).toEqual(['a', 'b']);
+    expect(r.ambiguous).toEqual([
+      { reason: 'duplicate-portal-registration', key: 'LN40MGGP' },
+    ]);
+    // The other fleet vehicle is unaffected — one contested plate must not
+    // take the rest of the account down with it.
+    expect(r.fleetOnly.map((f) => f.id).sort()).toEqual(['v1', 'v2']);
+  });
+
+  it('leaves an uncontested match intact alongside a contested one', () => {
+    const r = matchVehicles(
+      [
+        { externalId: 'a', registration: 'LN40MGGP' },
+        { externalId: 'b', registration: 'LN40MGGP' },
+        { externalId: 'c', registration: 'LG94NLGP' },
+      ],
+      fleet
+    );
+    expect(r.matched.map((m) => m.vehicleId)).toEqual(['v2']);
+  });
+
+  it('carries the portal group through onto the match, for reporting', () => {
+    const r = matchVehicles(
+      [{ externalId: '1', registration: 'LN40MGGP', groupName: 'Ungrouped' }],
+      fleet
+    );
+    expect(r.matched[0]!.groupName).toBe('Ungrouped');
   });
 });
 
@@ -78,7 +109,7 @@ describe('matchVehicles — ambiguity is refused, not resolved', () => {
     );
 
     expect(r.matched).toEqual([
-      { externalId: '1447952', vehicleId: 'v1', registration: 'LN40MGGP' },
+      { externalId: '1447952', vehicleId: 'v1', registration: 'LN40MGGP', groupName: null },
     ]);
     expect(r.portalOnly.map((p) => p.registration)).toEqual(['LG94NLGP']);
     expect(r.ambiguous).toEqual([{ reason: 'duplicate-portal-id', key: '1447952' }]);
@@ -96,7 +127,7 @@ describe('matchVehicles — ambiguity is refused, not resolved', () => {
     );
 
     expect(r.matched).toEqual([
-      { externalId: '77', vehicleId: 'v1', registration: 'LN40MGGP' },
+      { externalId: '77', vehicleId: 'v1', registration: 'LN40MGGP', groupName: null },
     ]);
     expect(r.ambiguous).toEqual([]);
   });

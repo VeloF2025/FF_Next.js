@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAspNetDate, parseVehicleTree } from '../tree';
+import { newestFixAt, parseAspNetDate, parseVehicleTree } from '../tree';
 
 /**
  * Shapes taken verbatim from the live portal on 2026-08-07 (Velocity FIBRE
@@ -103,5 +103,50 @@ describe('parseVehicleTree', () => {
   it('reads numeric strings, which the portal mixes in', () => {
     const [n] = parseVehicleTree({ data: [{ ...VEHICLE, Lat: '-26.1', Long: '28.3', SpeedValue: '42' }] });
     expect(n!.position).toMatchObject({ lat: -26.1, lon: 28.3, speedKph: 42 });
+  });
+});
+
+describe('parseVehicleTree — null island', () => {
+  // (0,0) is the canonical "no GPS lock" sentinel and sits inside the WGS84
+  // bounds, so a range check alone accepts it. ./parse.ts drops it on the CSV
+  // side after the map drew a vehicle in the Gulf of Guinea; the tree parser
+  // has to agree, or the same bug returns through the other door.
+  it('rejects a (0,0) fix but keeps the vehicle listed', () => {
+    const nodes = parseVehicleTree({ data: [{ ...VEHICLE, Lat: 0, Long: 0 }] });
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]!.position).toBeNull();
+  });
+
+  it('still accepts a genuine fix on one axis at zero', () => {
+    // Only the pair is a sentinel — the equator and the prime meridian are real
+    // places, and rejecting either alone would silently drop valid fixes.
+    expect(parseVehicleTree({ data: [{ ...VEHICLE, Lat: 0 }] })[0]!.position).not.toBeNull();
+    expect(parseVehicleTree({ data: [{ ...VEHICLE, Long: 0 }] })[0]!.position).not.toBeNull();
+  });
+
+  it('rejects every out-of-range bound, not just latitude', () => {
+    for (const over of [{ Lat: 91 }, { Lat: -91 }, { Long: 181 }, { Long: -181 }]) {
+      expect(parseVehicleTree({ data: [{ ...VEHICLE, ...over }] })[0]!.position).toBeNull();
+    }
+  });
+});
+
+describe('newestFixAt', () => {
+  it('returns the newest fix across all nodes', () => {
+    const nodes = parseVehicleTree({ data: [
+      { ...VEHICLE, LeafId: 1, DateTimeUtc: '/Date(1786000000000)/' },
+      { ...VEHICLE, LeafId: 2, DateTimeUtc: '/Date(1786039740000)/' },
+      { ...VEHICLE, LeafId: 3, DateTimeUtc: '/Date(1786010000000)/' },
+    ] });
+    expect(newestFixAt(nodes)?.toISOString()).toBe('2026-08-06T18:09:00.000Z');
+  });
+
+  it('ignores vehicles with no position', () => {
+    const nodes = parseVehicleTree({ data: [{ ...VEHICLE, Lat: null, Long: null }] });
+    expect(newestFixAt(nodes)).toBeNull();
+  });
+
+  it('returns null for an empty account', () => {
+    expect(newestFixAt([])).toBeNull();
   });
 });

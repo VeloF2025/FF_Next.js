@@ -22,7 +22,14 @@ Two ingestion paths, both landing in `fleet_vehicle_positions` via `ingest.ts`:
   last fix. **POST only** — the same path answers 404 to a GET — and it needs
   `X-Requested-With: XMLHttpRequest`. Verified against the live portal 2026-08-07:
   11,454 leaves, all with usable positions.
-- **`fetchPositions` is a SNAPSHOT, `fetchHistory` is the report/CSV flow.** The snapshot
+- **A dead feed cannot be detected by an empty result.** A snapshot provider returns the same
+  stale fix forever, so `positions.length === 0` never fires. Use `client.feedFreshness()` —
+  newest fix across the WHOLE reseller account — and alert past `STALE_FEED_MS`.
+- **Two portal rows matching one of our plates refuse BOTH.** First-past-the-post would let a
+  stranger's re-issued plate win, and misattribution is unrepairable (dedup key has no vehicle id).
+- **`granularity` on `TrackingProvider`** says whether `fetchPositions` means history or a
+  snapshot. Cartrack is `'history'`, Netstar `'snapshot'`. They are not substitutable.
+- **`fetchPositions` is a SNAPSHOT, `fetchHistory` is the report/CSV flow** (in `netstar/history.ts`). The snapshot
   returns at most one fix per vehicle; `from`/`to` filter it, they do not fetch history. Only
   `scripts/backfill-tracking.ts` uses `fetchHistory`, and that path is UNVERIFIED against the
   live portal — it was documented in the same pass that had the vehicle list pointing at

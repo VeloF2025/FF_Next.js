@@ -58,7 +58,17 @@ function num(v: unknown): number | null {
   return null;
 }
 
+/**
+ * A coordinate we are willing to store.
+ *
+ * (0, 0) is rejected on purpose. It is the canonical "no GPS lock" sentinel —
+ * a heartbeat or ignition event without a fix is a normal telematics event, not
+ * an exotic one — and it is inside the WGS84 bounds, so a range check alone
+ * lets it through. ./parse.ts drops it for the same reason on the CSV side,
+ * after the map drew a vehicle in the Gulf of Guinea.
+ */
 function inRange(lat: number, lon: number): boolean {
+  if (lat === 0 && lon === 0) return false;
   return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
 }
 
@@ -127,4 +137,28 @@ export function parseVehicleTree(body: unknown): NetstarTreeNode[] {
     out.push({ externalId: String(leafId), registration: name, groupName, position });
   }
   return out;
+}
+
+/**
+ * The newest fix anywhere on the account, across every client on the tree.
+ *
+ * This is the dead-feed detector. Under a snapshot source, "we received no
+ * positions" cannot mean the feed died — the portal keeps returning the same
+ * stale fix forever, so a frozen tree looks exactly like a healthy one. What
+ * DOES distinguish them is the account as a whole: this login sees ~11.5k
+ * vehicles belonging to several commercial fleets, so at any hour of any day
+ * something on it has reported recently. If the newest fix across all of them
+ * is hours old, the feed is broken, not the fleet parked.
+ *
+ * Deliberately spans foreign vehicles too — that breadth is the entire point.
+ * Restricting it to our six would make a quiet weekend indistinguishable from
+ * an outage, which is the failure this exists to catch.
+ */
+export function newestFixAt(nodes: NetstarTreeNode[]): Date | null {
+  let newest: Date | null = null;
+  for (const n of nodes) {
+    if (!n.position) continue;
+    if (newest === null || n.position.recordedAt > newest) newest = n.position.recordedAt;
+  }
+  return newest;
 }
