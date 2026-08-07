@@ -3,6 +3,14 @@ import { graphFetch } from './auth';
 import { log } from '@/lib/logger';
 import { getInternalUsers } from './auto-recording';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
+// NOTE: this closes a transitive import cycle —
+//   onedrive-recordings → graph/meeting-processor → meeting-helpers → onedrive-recordings
+// (meeting-helpers.ts imports listUserRecordings/downloadDriveItem/parseRecordingFilename
+// from this file). It is inert: every cross-cycle reference is a hoisted top-level
+// function declaration that is only *called* from inside another function, and nothing
+// in the chain executes at module-evaluation time. Verified by loading the real chain
+// from both entry points — all bindings resolve, none are undefined. Do not add
+// module-load-time work to any file in that cycle.
 import { transcribeStoredRecordingWithWhisper } from './meeting-processor';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -13,6 +21,42 @@ const LOGGER = 'OneDriveRecordings';
 // Same gate the Teams webhook path uses (graph/meeting-processor), so both
 // recording sources honour one switch.
 const WHISPER_TEAMS_RECORDINGS = process.env.WHISPER_TEAMS_RECORDINGS === 'true';
+
+/**
+ * Per-item ceiling on transcription inside a scrape run.
+ *
+ * scrape-onedrive.ts awaits scrapeOneDriveRecordings directly in its HTTP handler
+ * and the user/item loops are sequential, so a single slow item stalls the whole
+ * run. Whisper's own network timeout is 30 minutes and transcribeWithWhisper makes
+ * two sequential remote calls per chunk, so an unresponsive Mac Mini could hold one
+ * request for hours — the documented 2026-08-05 failure shape is whisper.cpp
+ * accepting connections but never answering, so the socket never errors and the
+ * full timeout is always paid.
+ *
+ * This bound is about the scrape run's budget, not the network: on expiry we give
+ * up on THIS item and let the loop continue. The abandoned request finishes (or
+ * times out) on its own; nothing here can cancel it.
+ */
+export function resolveTranscribeBudgetMs(raw: string | undefined): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 600_000; // 10 min
+}
+const TRANSCRIBE_BUDGET_MS = resolveTranscribeBudgetMs(process.env.ONEDRIVE_TRANSCRIBE_BUDGET_MS);
+
+/** Reject if `work` outruns the budget, so one stuck item can't stall the run. */
+async function withBudget<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} exceeded ${ms}ms budget`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 const RECORDINGS_BASE =
   process.env.MEETING_RECORDINGS_PATH || '/home/velo/meeting-recordings';
@@ -351,7 +395,11 @@ export async function scrapeOneDriveRecordings(
                   FROM meetings WHERE id = ${meetingId}
                 ` as Array<{ len: number }>;
                 if ((t[0]?.len ?? 0) === 0) {
-                  await transcribeStoredRecordingWithWhisper(meetingId);
+                  await withBudget(
+                    transcribeStoredRecordingWithWhisper(meetingId),
+                    TRANSCRIBE_BUDGET_MS,
+                    `transcription of meeting ${meetingId}`,
+                  );
                 }
               }
 
@@ -362,6 +410,12 @@ export async function scrapeOneDriveRecordings(
               const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);
               log.warn('LLM enrichment failed', { meetingId, error: msg }, LOGGER);
               await sql`UPDATE meetings SET processing_status = 'failed', processing_error = ${msg}, updated_at = NOW() WHERE id = ${meetingId}`;
+              // Count it. This branch marked the row failed but left the run's
+              // counters untouched, so a scrape that failed to enrich every
+              // meeting still returned failed:0 with an empty errors[] — the
+              // cron's own output said the run was clean.
+              result.failed++;
+              result.errors.push(`${item.name}: enrichment failed: ${msg}`);
             }
           }
 

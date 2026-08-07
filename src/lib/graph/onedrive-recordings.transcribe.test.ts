@@ -34,13 +34,14 @@ vi.mock('@/lib/llm/meeting-processor', () => ({
 vi.mock('./meeting-processor', () => ({
   transcribeStoredRecordingWithWhisper: vi.fn(async () => { calls.push('transcribe'); }),
 }));
+import { transcribeStoredRecordingWithWhisper } from './meeting-processor';
 
 vi.mock('fs', () => {
   const mod = { existsSync: vi.fn(() => true), statSync: vi.fn(() => ({ size: 1234 })) };
   return { ...mod, default: mod };
 });
 
-import { scrapeOneDriveRecordings } from './onedrive-recordings';
+import { scrapeOneDriveRecordings, resolveTranscribeBudgetMs } from './onedrive-recordings';
 
 /** Drives listUserRecordings: root children, then the Recordings folder's children. */
 function primeGraph(itemIso: string) {
@@ -95,5 +96,53 @@ describe('scrapeOneDriveRecordings — transcribes before summarising', () => {
     await scrapeOneDriveRecordings(makeSql(12_425) as any);
 
     expect(calls).toEqual(['summarise']);
+  });
+
+  it('gives up on an item whose transcription outruns the budget, and marks it failed', async () => {
+    // The documented Mac Mini failure is "accepts the connection, never answers",
+    // so the call neither resolves nor rejects — exactly what the budget is for.
+    vi.mocked(transcribeStoredRecordingWithWhisper).mockImplementation(
+      () => new Promise(() => { /* never settles */ }),
+    );
+    process.env.ONEDRIVE_TRANSCRIBE_BUDGET_MS = '50';
+    vi.resetModules();
+    const { scrapeOneDriveRecordings: scrape } = await import('./onedrive-recordings');
+
+    const statuses: string[] = [];
+    const sql = (strings: TemplateStringsArray) => {
+      const q = (strings as unknown as string[]).join(' ? ');
+      if (/SELECT id FROM meetings WHERE onedrive_item_id/i.test(q)) return Promise.resolve([]);
+      if (/FROM meetings\s+WHERE source = 'teams'/i.test(q)) return Promise.resolve([]);
+      if (/INSERT INTO meetings/i.test(q)) return Promise.resolve([{ id: 42 }]);
+      if (/SELECT processing_status FROM meetings/i.test(q)) {
+        return Promise.resolve([{ processing_status: 'fetching' }]);
+      }
+      if (/length\(raw_transcript\)/i.test(q)) return Promise.resolve([{ len: 0 }]);
+      if (/processing_status = 'failed'/i.test(q)) { statuses.push('failed'); return Promise.resolve([]); }
+      return Promise.resolve([]);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await scrape(sql as any);
+
+    expect(calls).not.toContain('summarise');   // never reached past the stuck call
+    expect(statuses).toContain('failed');        // item recorded as failed, not silently dropped
+    expect(result.failed).toBeGreaterThan(0);    // and the run returned rather than hanging
+
+    delete process.env.ONEDRIVE_TRANSCRIBE_BUDGET_MS;
+  });
+});
+
+describe('resolveTranscribeBudgetMs', () => {
+  it('defaults to 10 minutes when unset or invalid', () => {
+    expect(resolveTranscribeBudgetMs(undefined)).toBe(600_000);
+    expect(resolveTranscribeBudgetMs('')).toBe(600_000);
+    expect(resolveTranscribeBudgetMs('nonsense')).toBe(600_000);
+    expect(resolveTranscribeBudgetMs('0')).toBe(600_000);
+    expect(resolveTranscribeBudgetMs('-5')).toBe(600_000);
+  });
+
+  it('honours a valid override', () => {
+    expect(resolveTranscribeBudgetMs('120000')).toBe(120_000);
   });
 });
