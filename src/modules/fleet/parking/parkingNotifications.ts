@@ -20,7 +20,11 @@ import { notify } from '@/modules/notifications/services/notificationBus';
 
 const APPROVER_PERMISSION = 'fleet.parking-requests';
 
-async function findApproverUserIds(): Promise<string[]> {
+/**
+ * Exported for the real-Postgres test in tests/migrations, and for the PR 3
+ * approval queue, which needs the same list to decide who may act.
+ */
+export async function findApproverUserIds(): Promise<string[]> {
   const rows = await sql<{ id: string }>`
     SELECT u.id
     FROM users u

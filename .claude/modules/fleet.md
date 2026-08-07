@@ -446,10 +446,10 @@ The `VehicleCalibrationModal` and `OdometerOverrideModal` use `navigator.mediaDe
 - Integrated NAFNet deblurring for blurry dashboard photos
 - CPU mode for NAFNet (RTX 5090 sm_120 incompatible)
 
-## Overnight Parking Compliance (mig 483, PR 1 of 3)
+## Overnight Parking Compliance (mig 483, PRs 1–2 of 3)
 
 Nightly job that asks, for every active vehicle at 20:00 SAST: is it where its
-driver declared it parks?
+driver declared it parks? PR 2 added the half that produces the declaration.
 
 | Piece | Where |
 |-------|-------|
@@ -460,6 +460,36 @@ driver declared it parks?
 | Endpoint | `pages/api/cron/fleet-parking-check.ts` (x-cron-secret) |
 | Cron wrapper | `scripts/cron-fleet-parking-check.sh` |
 | Tables | `fleet_vehicle_parking_locations`, `fleet_parking_compliance_checks` |
+| **Driver API** | `pages/api/my/vehicle/parking.ts` (GET/POST/DELETE) |
+| **Driver page** | `/my/vehicle/parking` + hub tile in `tiles.tsx` |
+| **Driver SQL** | `src/modules/fleet/parking/driverParkingQueries.ts` |
+| **Capture rules** | `src/modules/fleet/parking/declarationRules.ts` |
+| **Approver notify** | `src/modules/fleet/parking/parkingNotifications.ts` |
+
+### Driver side (PR 2)
+- **The vehicle comes from the session, never the body.** `resolveDriverVehicle`
+  joins `vehicle_assignments` → `fleet_vehicles` on the registration *string*
+  (there is no vehicle FK on assignments). A body `vehicleId` is ignored, pinned
+  by a test.
+- **Every submission enters as `pending`** — a first address needs approval just
+  as a change does. `ux_parking_active_per_vehicle` and
+  `ux_parking_pending_per_vehicle` enforce one of each in the database; the
+  route maps the pending index's 23505 to a 409 **by constraint name**, so that
+  name is load-bearing.
+- **Accuracy gate: 100 m** (`MAX_CAPTURE_ACCURACY_M`), enforced server-side and
+  again in the browser. A 500 m fix sits inside the 200 m radius by luck and
+  poisons every later check on that address.
+- Capture uses `captureGPSWithFallback` from `@/modules/fleet/offline/gpsCapture`
+  — never `navigator.geolocation` directly — so the iOS watchdog and the
+  low-accuracy retry apply.
+- Reverse geocoding is resolved server-side and is never fatal; a failure stores
+  coordinates and the UI shows "Unnamed location".
+
+**Not built yet (PR 3):** `/fleet/parking` (dashboard) and
+`/fleet/parking/requests` (approval queue). Both permission keys are already
+seeded by 483, and `findApproverUserIds()` is exported for the queue to reuse.
+**Until PR 3 ships a pending request can only be approved directly in the
+database** — the driver-facing flow otherwise dead-ends.
 
 **Schedule.** `0 20 * * * /home/velo/fibreflow-<env>/scripts/cron-fleet-parking-check.sh`.
 The endpoint is inert until that line is in velo's crontab, and an absent nightly
@@ -488,5 +518,10 @@ endpoint rejects a malformed or future `?date=` rather than falling back to now.
 - Staleness ceiling is 72h (`STALE_FIX_MAX_HOURS`) so a weekend park still
   classifies normally.
 - SQL is covered against a real Postgres by
-  `tests/migrations/483_fleet_parking_queries.test.ts` — the unit tests mock the
-  query layer out, so without that file the statements are never parsed.
+  `tests/migrations/483_fleet_parking_queries.test.ts` and, for the driver side,
+  `tests/migrations/483_fleet_parking_driver_queries.test.ts` — the unit tests
+  mock the query layer out, so without those files the statements are never
+  parsed. **Both are excluded from the default vitest run** (they throw at module
+  load without `TEST_DATABASE_URL`), so CI does not execute them: run them
+  deliberately with `TEST_DATABASE_URL=… npx vitest run tests/migrations/483_*`
+  after touching either query module.

@@ -2,7 +2,6 @@
  * The four states of a driver's parking address: none, pending, active,
  * rejected. Presentational only — the page owns loading and mutations.
  */
-import React from 'react';
 import { MapPin, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 import type { ParkingDeclaration } from '../types';
