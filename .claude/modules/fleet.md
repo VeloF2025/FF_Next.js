@@ -588,3 +588,53 @@ watermark write, so a breaker that only ever skips freezes
 the only code path that could produce the success needed to clear it. That is a
 one-way latch requiring hand-editing the database — strictly worse than the
 retry storm it replaces, because it fires after ~6 hours instead of ~40.
+
+## Live tracking coverage — who is on which feed, and why the rest are dark
+
+**18 of 23 active vehicles**, as at 2026-08-07. Four independent feeds, all writing
+`fleet_vehicle_positions` through the same `pollProvider()` tick.
+
+| provider / account_ref | Vehicles | Transport | Cadence |
+|---|---|---|---|
+| `cartrack` / `velocity` | 7 | REST API, HTTP Basic | 2 min, **from dev** (:3005) |
+| `netstar` / `europcar` | 6 | portal form login | 2 h, from prod (:3000) |
+| `cartrack` / `urent` | 3 | fleetweb JSON-RPC | 2 h, same cron as Netstar |
+| `ituran` / `avis` | 2 | portal + WAF, browser mint | 2 h at :30, standalone script |
+
+⚠️ Cartrack REST polls **from dev** and the portals **from prod**. One shared database, so
+coverage is correct either way, but the credentials live in different `.env.local` files and a
+dev deploy interrupts velocity's feed while prod deploys interrupt the other three.
+
+### The rule that explains the gaps
+
+**We do not fit trackers to vehicles we do not own.** Every feed above except
+`cartrack/velocity` is a *rental or lease company's own* tracking, which we see only because
+they gave us portal access. So an untracked vehicle usually means "a hire company we have no
+login for", not "a bug".
+
+### The 5 that cannot be synced (checked 2026-08-07)
+
+| Vehicle | Ownership | Why dark | What would fix it |
+|---|---|---|---|
+| **KR27FNGP** Land Cruiser | **company** | **No Cartrack unit subscribed.** Our account carries 8 subscriptions — 5 Foton, 3 Suzuki EECO — and none is a Land Cruiser. Not a mapping fault; the device does not exist. | Commercial: add it to the Cartrack subscription. Discovery then maps it by plate on the next 2-min poll, no code change. **The only one of the five within our own control.** |
+| HW50PDGP | rental | `docs/Fleet` lists it under Urent, but it is **not on that portal**. The portal carries HW50JYGP instead, which is **retired** in `fleet_vehicles` — possibly the same physical vehicle re-plated. | Ask Urent which plate is current, then fix `docs/Fleet`. |
+| MV49GBGP, NC60ZDGP | rental | Hire company unknown — not Europcar, Urent or Avis. | Identify the company; if it has a portal, adding a provider is now a well-trodden path. |
+| CR69KTZN | **leased** | Our only leased vehicle. The lessor holds any tracker. | Ask the lessor for access. |
+
+### Data corrections outstanding
+
+- ⚠️ **`docs/Fleet`'s Urent list is wrong in two places**: it names HW50PDGP (not on the
+  portal) and does not note that HW50JYGP and JZ29GCGP are **retired**. The account shows 5
+  vehicles but only 3 are worth mapping.
+- ⚠️ Our Cartrack account has an **8th subscription with no vehicle name**, registered
+  `TEMP-2071192S1` — the `S1` suffix on MW67LZGP's `TEMP-2071192`, so likely a second device
+  on that same vehicle. Correctly left unmapped (`vehicle_name` is null), but it may be a
+  subscription being paid for and not used.
+
+### Watch-item: the circuit-breaker numbers are Cartrack-calibrated
+
+`AUTH_BREAKER_THRESHOLD` 3 / `AUTH_PROBE_COOLDOWN_MS` 24h / `AUTH_HARD_STOP` 12 are derived
+from **Cartrack's observed ~20-attempt lockout**. Netstar's and Ituran's real lockout
+behaviour is **undocumented** — those numbers became their default without being verified for
+them. Better than the unbounded retries they had before, but it is an assumption: if either
+starts throttling unexpectedly, check that tuning first. See the breaker section above.
