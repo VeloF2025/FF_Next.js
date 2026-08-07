@@ -26,11 +26,33 @@ export interface ProviderPosition {
   gpsFixType: number | null;
 }
 
+/**
+ * What a provider's fetchPositions actually returns.
+ *
+ *   'history'  — every event the provider recorded in [from, to]. Cartrack.
+ *   'snapshot' — each vehicle's LAST KNOWN fix, filtered by [from, to]. Netstar's
+ *                portal exposes no history API, so a window returns at most one
+ *                point per vehicle however wide it is.
+ *
+ * This is on the interface rather than in a comment because the two are not
+ * substitutable and the difference is invisible at the call site. A caller that
+ * wants a track (a trip report, a route replay, a re-ingest) gets one point per
+ * vehicle from a snapshot provider with no type error and no runtime signal.
+ * It also decides how a caller detects a dead feed: an empty array means
+ * "nothing happened" for history, but a snapshot keeps returning the same stale
+ * fix forever, so absence of data is not the signal. See pollProvider.ts.
+ */
+export type ProviderGranularity = 'history' | 'snapshot';
+
 export interface TrackingProvider {
   readonly key: ProviderKey;
   readonly accountRef: string;
+  readonly granularity: ProviderGranularity;
   /**
    * Most events one fetchPositions call can return before it gives up.
+   *
+   * Only meaningful for `granularity: 'history'`. A snapshot provider is bounded
+   * by fleet size, not by event volume, and sets this to MAX_SAFE_INTEGER.
    *
    * The caller needs this to size its query window: these feeds are
    * account-wide, so events scale with fleet size, and a window wide enough to

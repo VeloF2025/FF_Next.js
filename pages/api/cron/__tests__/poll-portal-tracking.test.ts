@@ -104,11 +104,13 @@ function recon(overrides: Record<string, unknown> = {}) {
 function makeFakeProvider(overrides: Partial<{
   key: string;
   accountRef: string;
+  granularity: 'history' | 'snapshot';
   fetchPositions: ReturnType<typeof vi.fn>;
 }> = {}) {
   return {
     key: overrides.key ?? 'netstar',
     accountRef: overrides.accountRef ?? 'europcar',
+    granularity: overrides.granularity ?? 'snapshot',
     maxEventsPerFetch: Number.MAX_SAFE_INTEGER,
     fetchPositions: overrides.fetchPositions ?? vi.fn().mockResolvedValue([]),
   };
@@ -131,6 +133,8 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     poolConnectMock.mockImplementation(async () => makeFakeClient());
     netstarClientMock.mockReturnValue({
       listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
+      // Fresh by default; the dead-feed cases override it.
+      feedFreshness: vi.fn().mockResolvedValue(new Date()),
     });
     netstarProviderMock.mockReturnValue(makeFakeProvider());
     reconcileTrackersMock.mockResolvedValue(recon({ upserted: 1 }));
@@ -183,7 +187,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
   it('always releases the pinned connection back to the pool, even when a provider throws', async () => {
     const client = makeFakeClient();
     poolConnectMock.mockImplementation(async () => client);
-    netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockRejectedValue(new Error('boom')) });
+    netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockRejectedValue(new Error('boom')), feedFreshness: vi.fn().mockResolvedValue(new Date()) });
     await run(AUTH);
     expect(client.query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_unlock'), expect.anything());
     expect(client.release).toHaveBeenCalledTimes(1);
@@ -216,7 +220,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
 
   it('runs discovery (reconcileTrackers) before fetching positions, threaded with the portal vehicle list', async () => {
     const listVehicles = vi.fn().mockResolvedValue([{ externalId: '9', registration: 'CA1XYZ' }]);
-    netstarClientMock.mockReturnValue({ listVehicles });
+    netstarClientMock.mockReturnValue({ listVehicles, feedFreshness: vi.fn().mockResolvedValue(new Date()) });
     await run(AUTH);
     expect(reconcileTrackersMock).toHaveBeenCalledWith(
       'netstar', 'europcar', [{ externalId: '9', registration: 'CA1XYZ' }]
@@ -224,7 +228,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
   });
 
   it('does not add a second empty-portal guard — reconcileTrackers governs, polling still proceeds for mapped vehicles', async () => {
-    netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]) });
+    netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]), feedFreshness: vi.fn().mockResolvedValue(new Date()) });
     reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
     const fetchPositions = vi.fn().mockResolvedValue([]);
     netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions }));
@@ -285,16 +289,20 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
         complete: true,
         coverage: {
           mapped: 1, activeTrackers: 1,
-          notOnPortal: ['CA1XYZ'], unknownOnPortal: ['9'],
+          notOnPortal: ['CA1XYZ'], unknownOnPortalCount: 1, unknownOnPortal: ['9'],
           alreadyTrackedElsewhere: [], ambiguous: [], deactivationSuppressed: false,
         },
       }),
     ]);
   });
 
-  it('raises a gap alert when the portal returns no positions for mapped vehicles', async () => {
+  it('raises a gap alert when the account-wide feed has gone stale', async () => {
     stubSql({ activeTrackers: 3 });
     reconcileTrackersMock.mockResolvedValue(recon({ upserted: 3 }));
+    netstarClientMock.mockReturnValue({
+      listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
+      feedFreshness: vi.fn().mockResolvedValue(new Date(Date.now() - 8 * 60 * 60 * 1000)),
+    });
     netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
     await run(AUTH);
     expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
@@ -317,7 +325,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     // vehicle list — the exact case that must not go silent.
     it('1. empty portal list + zero positions + mapped trackers exist -> alert raised', async () => {
       stubSql({ activeTrackers: 2 });
-      netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]) });
+      netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]), feedFreshness: vi.fn().mockResolvedValue(new Date()) });
       reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
       netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
       await run(AUTH);
@@ -328,7 +336,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
 
     it('2. empty portal list + positions returned + mapped trackers exist -> alert raised', async () => {
       stubSql({ activeTrackers: 2 });
-      netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]) });
+      netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]), feedFreshness: vi.fn().mockResolvedValue(new Date()) });
       reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
       netstarProviderMock.mockReturnValue(
         makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([{ externalId: '1' }]) })
@@ -343,6 +351,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
       stubSql({ activeTrackers: 2 });
       netstarClientMock.mockReturnValue({
         listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'AB1CDGP' }]),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
       });
       reconcileTrackersMock.mockResolvedValue(recon({ upserted: 1 }));
       netstarProviderMock.mockReturnValue(
@@ -356,7 +365,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
       // This is what stops the fix from becoming a false alarm on first run,
       // before discovery has ever succeeded: there is nothing to be missing yet.
       stubSql({ activeTrackers: 0 });
-      netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]) });
+      netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockResolvedValue([]), feedFreshness: vi.fn().mockResolvedValue(new Date()) });
       reconcileTrackersMock.mockResolvedValue(recon({ upserted: 0 }));
       netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
       await run(AUTH);
@@ -365,7 +374,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
   });
 
   it('does not advance the watermark when a provider fails, and the failure does not blow up the tick', async () => {
-    netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockRejectedValue(new Error('network down')) });
+    netstarClientMock.mockReturnValue({ listVehicles: vi.fn().mockRejectedValue(new Error('network down')), feedFreshness: vi.fn().mockResolvedValue(new Date()) });
     const res = await run(AUTH);
     expect(res._getStatusCode()).toBe(200);
     const watermarkUpsert = sqlMock.mock.calls.find((c) =>
@@ -383,6 +392,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
   it('treats a Netstar login failure as an auth failure, not a generic one', async () => {
     netstarClientMock.mockReturnValue({
       listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+      feedFreshness: vi.fn().mockResolvedValue(new Date()),
     });
     const res = await run(AUTH);
     expect(res._getJSONData().data.results[0]).toMatchObject({ authFailure: true });
@@ -392,6 +402,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
   it('treats "still logged out after re-auth" as an auth failure', async () => {
     netstarClientMock.mockReturnValue({
       listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+      feedFreshness: vi.fn().mockResolvedValue(new Date()),
     });
     const res = await run(AUTH);
     expect(res._getJSONData().data.results[0]).toMatchObject({ authFailure: true });
@@ -400,6 +411,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
   it('does not mark a generic failure as an auth failure', async () => {
     netstarClientMock.mockReturnValue({
       listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] Export: HTTP 500')),
+      feedFreshness: vi.fn().mockResolvedValue(new Date()),
     });
     const res = await run(AUTH);
     expect(res._getJSONData().data.results[0]).toMatchObject({ authFailure: false });
@@ -490,6 +502,10 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     it('increments rather than resets the counter on a gap tick', async () => {
       stubSql({ activeTrackers: 3, failureConsecutive: 4 });
       netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
+        feedFreshness: vi.fn().mockResolvedValue(new Date(Date.now() - 8 * 60 * 60 * 1000)),
+      });
       await run(AUTH);
       const q = gapWatermarkQuery();
       expect(q).toBeDefined();
@@ -500,6 +516,10 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     it('threads the bumped streak into the alert so decideAlert can suppress it', async () => {
       stubSql({ activeTrackers: 3, failureConsecutive: 4 });
       netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
+        feedFreshness: vi.fn().mockResolvedValue(new Date(Date.now() - 8 * 60 * 60 * 1000)),
+      });
       await run(AUTH);
       expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
         expect.objectContaining({ kind: 'gap', consecutiveFailures: 4 })
@@ -571,6 +591,7 @@ describe('gap alert: discovery failures are alerts, not just log lines', () => {
       listVehicles: vi.fn().mockResolvedValue([
         { externalId: '900', registration: 'Europcar Gauteng' },
       ]),
+      feedFreshness: vi.fn().mockResolvedValue(new Date()),
     });
     reconcileTrackersMock.mockResolvedValue(recon({ matchedNone: true }));
     netstarProviderMock.mockReturnValue(
@@ -690,6 +711,85 @@ describe('alert recipients are visible in the response', () => {
     alertRecipientCountMock.mockReturnValue(0);
     const res = await run(AUTH);
     expect(res._getJSONData().data.alertRecipients).toBe(0);
+  });
+});
+
+/**
+ * The dead-feed detector.
+ *
+ * Under a snapshot provider the portal keeps returning the same stale fix
+ * forever, so `positions.length === 0` — the old gap condition — is
+ * structurally unreachable and a frozen tree reads exactly like a healthy one.
+ * The account-wide freshness probe is what separates them.
+ */
+describe('dead feed detection for snapshot providers', () => {
+  const positions = [{ externalId: '1' }];
+
+  function withFreshness(at: Date | null) {
+    netstarClientMock.mockReturnValue({
+      listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
+      feedFreshness: vi.fn().mockResolvedValue(at),
+    });
+    netstarProviderMock.mockReturnValue(
+      makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue(positions) })
+    );
+  }
+
+  it('alerts when the newest fix on the whole account is hours old', async () => {
+    stubSql({ activeTrackers: 6 });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 6 }));
+    withFreshness(new Date(Date.now() - 8 * 60 * 60 * 1000));
+
+    await run(AUTH);
+
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'gap', detail: expect.stringContaining('feed is stale') })
+    );
+  });
+
+  // The exact regression the old detector could not see: the portal answers,
+  // returns data, and every fix in it is frozen.
+  it('does NOT stay silent just because stale positions keep arriving', async () => {
+    stubSql({ activeTrackers: 6 });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 6 }));
+    withFreshness(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+
+    const res = await run(AUTH);
+
+    expect(res._getJSONData().data.results[0]).not.toHaveProperty('error');
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'gap' })
+    );
+  });
+
+  it('stays quiet when the account is fresh, even if OUR vehicles are parked', async () => {
+    // A parked fleet is not an outage. The probe spans ~11.5k vehicles across
+    // several commercial fleets, so something has always reported recently.
+    stubSql({ activeTrackers: 6 });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 6 }));
+    withFreshness(new Date(Date.now() - 30 * 60 * 1000));
+
+    await run(AUTH);
+
+    expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('does not apply the freshness rule to history providers', async () => {
+    // For a history provider an empty window genuinely means nothing happened,
+    // and it has no account-wide probe to consult.
+    stubSql({ activeTrackers: 6 });
+    reconcileTrackersMock.mockResolvedValue(recon({ upserted: 6 }));
+    netstarClientMock.mockReturnValue({
+      listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
+      feedFreshness: vi.fn().mockResolvedValue(new Date(Date.now() - 8 * 60 * 60 * 1000)),
+    });
+    netstarProviderMock.mockReturnValue(
+      makeFakeProvider({ granularity: 'history', fetchPositions: vi.fn().mockResolvedValue(positions) })
+    );
+
+    await run(AUTH);
+
+    expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
   });
 });
 });

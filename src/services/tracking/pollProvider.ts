@@ -1,10 +1,8 @@
 /**
  * One provider's tick: reconcile, fetch, ingest, move the watermark, alert.
  *
- * Extracted from pages/api/cron/poll-portal-tracking.ts so the route is only
- * auth, the advisory lock, and the loop — and so this logic can be exercised
- * without a request. Everything here is per provider and self-contained: a
- * provider that fails returns an error entry rather than throwing, because one
+ * Extracted from the route so that is only auth, the lock and the loop. A
+ * provider that fails returns an error entry rather than throwing — one
  * provider must never take the others down with it.
  */
 import { sql } from '@/lib/db-pool';
@@ -14,6 +12,7 @@ import { netstarClient, PartialFetchError } from '@/services/tracking/netstar/cl
 import { reconcileTrackers } from '@/services/tracking/discovery';
 import { ingestPositions } from '@/services/tracking/ingest';
 import { raiseTrackingAlert } from '@/services/tracking/alerts';
+import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
 import type { ProviderPosition, TrackingProvider } from '@/services/tracking/types';
 
@@ -33,7 +32,20 @@ const MAX_POLL_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
 export interface ConfiguredProvider {
   provider: TrackingProvider;
   listVehicles: () => Promise<PortalVehicle[]>;
+  /**
+   * Newest fix anywhere on the provider's account — the dead-feed probe for
+   * snapshot providers. Optional: history providers do not need it, because for
+   * them an empty window genuinely means nothing happened.
+   */
+  feedFreshness?: () => Promise<Date | null>;
 }
+
+/**
+ * How stale the WHOLE account may go before a snapshot provider's feed counts
+ * as dead. Three poll cycles: long enough not to trip on a quiet early morning,
+ * short enough to catch a blackout the same working day. See gapReason.ts.
+ */
+const STALE_FEED_MS = 6 * 60 * 60 * 1000;
 
 export function configuredProviders(): ConfiguredProvider[] {
   const out: ConfiguredProvider[] = [];
@@ -49,6 +61,7 @@ export function configuredProviders(): ConfiguredProvider[] {
     out.push({
       provider: netstarProvider({ ...opts, client }),
       listVehicles: () => client.listVehicles(),
+      feedFreshness: () => client.feedFreshness(),
     });
   } else {
     // Say so, loudly and by name. A provider that is simply absent from the
@@ -76,13 +89,10 @@ export function isAuthFailure(message: string): boolean {
 }
 
 /**
- * Fetch, tolerating a partial result.
- *
- * A PartialFetchError means some vehicles were fetched and some were not. The
- * positions that arrived are still worth storing, but the window was not fully
- * covered — so the caller must NOT advance the watermark past it, or the
- * vehicles that failed lose that window permanently. `complete: false` is what
- * carries that.
+ * Fetch, tolerating a partial result. The positions that arrived are worth
+ * storing, but the window was not fully covered — so the caller must NOT
+ * advance the watermark past it, or the vehicles that failed lose it for good.
+ * `complete: false` carries that. (Only the history path can produce one.)
  */
 async function fetchTolerantly(
   provider: TrackingProvider, from: Date, to: Date
@@ -102,17 +112,15 @@ async function fetchTolerantly(
 }
 
 export async function pollProvider(
-  { provider, listVehicles }: ConfiguredProvider
+  { provider, listVehicles, feedFreshness }: ConfiguredProvider
 ): Promise<Record<string, unknown>> {
   try {
     const portalVehicles = await listVehicles();
     const recon = await reconcileTrackers(provider.key, provider.accountRef, portalVehicles);
 
-    // Independent of this tick's upsert count: reconcileTrackers()
-    // short-circuits on an empty portal list (by design — see discovery.ts),
-    // so recon.upserted is 0 both on a genuinely fresh account AND on a dying
-    // session that never got as far as a real vehicle list. Only the current
-    // count of already-mapped trackers can tell those two apart.
+    // Not recon.upserted: that is 0 both on a fresh account AND on a dying
+    // session that never reached a real vehicle list. Only the current count of
+    // already-mapped trackers tells those apart.
     const trackerRows = await sql<{ n: number }>`
       SELECT count(*)::int AS n FROM fleet_vehicle_trackers
       WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef} AND is_active
@@ -155,33 +163,23 @@ export async function pollProvider(
     // vehicles whose reports failed lose it for good.
     const advanceTo = fetched.complete ? (maxIngestedAt ?? last) : last;
 
-    // Authenticating cleanly and returning nothing is the failure mode that
-    // otherwise hides for weeks — it looks exactly like a healthy tick.
-    //
-    // Gated on activeTrackers (mapped NOW), not recon.upserted (mapped BY THIS
-    // TICK): a dying session that returns [] from listVehicles never throws and
-    // never upserts anything, so recon.upserted alone would stay 0 forever on a
-    // total outage while existing mappings sit untouched — total silence.
-    //
-    // Discovery health is part of this, and cannot be inferred from position
-    // volume. fetchPositions reads ALREADY-MAPPED trackers, so when a portal
-    // reformat makes the vehicle list match nothing, positions keep flowing
-    // from the previous tick's mappings and a volume-only check stays quiet
-    // forever while every newly added or renamed vehicle silently stops being
-    // trackable. Same for the wholesale-unmapping brake: an engaged safety
-    // brake is the single most important thing this job can tell anyone, and
-    // logging it is not telling anyone.
-    const gapReason =
-      portalVehicles.length === 0
-        ? `portal returned an empty vehicle list while ${activeTrackers} trackers remain mapped`
-        : recon.matchedNone
-          ? `portal returned ${portalVehicles.length} vehicles but none could be mapped — registration format drift or a report-tree change`
-          : recon.deactivationSuppressed
-            ? `refused to unmap ${activeTrackers} trackers: this tick matched only ${recon.upserted}`
-            : positions.length === 0
-              ? `${activeTrackers} vehicles mapped but the report returned no positions`
-              : null;
-    const gap = activeTrackers > 0 && gapReason !== null;
+    // Staleness of the WHOLE account is the dead-feed probe for snapshot
+    // providers; see decideGapReason for why an empty result cannot be.
+    const staleFeedAt =
+      provider.granularity === 'snapshot' && feedFreshness !== undefined
+        ? await feedFreshness()
+        : null;
+    const gapReason = decideGapReason({
+      granularity: provider.granularity,
+      portalVehicleCount: portalVehicles.length,
+      activeTrackers,
+      matchedNone: recon.matchedNone,
+      deactivationSuppressed: recon.deactivationSuppressed,
+      positionCount: positions.length,
+      feedAgeMs: staleFeedAt ? now.getTime() - staleFeedAt.getTime() : null,
+      staleFeedMs: STALE_FEED_MS,
+    });
+    const gap = gapReason !== null;
     const gapDetail = gapReason ?? '';
 
     // Two explicit statements rather than one with a conditional fragment: this
@@ -230,9 +228,8 @@ export async function pollProvider(
       });
     }
 
-    // A partial fetch is a degraded tick even when it produced data: reported
-    // as transient so a portal that keeps dropping one vehicle eventually says
-    // so, rather than looking healthy because the other twenty-one worked.
+    // A partial fetch is degraded even when it produced data: reported as
+    // transient so a portal dropping one vehicle eventually says so.
     if (!fetched.complete) {
       await raiseTrackingAlert({
         kind: 'transient',
@@ -260,7 +257,10 @@ export async function pollProvider(
         mapped: recon.upserted,
         activeTrackers,
         notOnPortal: recon.fleetOnly.map((f) => f.registration),
-        unknownOnPortal: recon.portalOnly.map((p) => p.externalId),
+        // Count plus a sample: the full list is every other company on the
+        // reseller tree, and this body is curled straight into a log file.
+        unknownOnPortalCount: recon.portalOnly.length,
+        unknownOnPortal: recon.portalOnly.slice(0, 5).map((p) => p.externalId),
         alreadyTrackedElsewhere: recon.skippedOtherProvider.map((s) => s.registration),
         ambiguous: recon.ambiguous,
         deactivationSuppressed: recon.deactivationSuppressed,

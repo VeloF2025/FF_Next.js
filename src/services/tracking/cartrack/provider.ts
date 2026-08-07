@@ -73,6 +73,7 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
   return {
     key: 'cartrack',
     accountRef: opts.accountRef,
+    granularity: 'history',
     maxEventsPerFetch: CARTRACK_MAX_EVENTS_PER_FETCH,
 
     async fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]> {
