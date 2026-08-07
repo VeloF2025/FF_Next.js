@@ -106,7 +106,7 @@ export default withMySession(async (req, res, session) => {
     // swallows and logs its own failures.
     void notifyParkingChangeRequested({
       registration: vehicle.registration,
-      driverName: session.staffName ?? null,
+      driverName: session.staffName,
       declarationId: declaration.id,
     });
 

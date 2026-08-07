@@ -24,7 +24,7 @@ interface Envelope<T> {
 
 async function request<T>(init: RequestInit & { url: string }): Promise<T> {
   const { url, ...rest } = init;
-  const res = await fetch(url, { credentials: 'same-origin', ...rest });
+  const res = await fetch(url, { credentials: 'include', ...rest });
 
   let payload: Envelope<T> | null = null;
   try {
@@ -78,7 +78,7 @@ export function withdrawDeclaration(): Promise<{ withdrawn: boolean }> {
 export async function fetchGeocodeLabel(lat: number, lon: number): Promise<string | null> {
   try {
     const res = await fetch(`/api/my/geocode?lat=${lat}&lon=${lon}`, {
-      credentials: 'same-origin',
+      credentials: 'include',
     });
     if (!res.ok) return null;
     const payload = (await res.json()) as {
