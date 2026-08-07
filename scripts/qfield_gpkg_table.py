@@ -59,6 +59,13 @@ def require_column(db, table_name, column, purpose="label"):
     """
     have = [row[1] for row in db.execute(
         f"PRAGMA table_info({sqlite_ident(table_name)})").fetchall()]
+    if not have:
+        # PRAGMA table_info on a table that does not exist returns an empty set rather
+        # than erroring, so this would otherwise be reported as a missing column on a
+        # table that is itself missing — the wrong thing to go looking for.
+        raise KeyError(
+            f"table {table_name!r} does not exist in this GPKG (checking for the "
+            f"{purpose} column {column!r})")
     if column not in have:
         raise KeyError(
             f"{purpose} column {column!r} is not a column of {table_name!r} — "

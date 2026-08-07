@@ -328,6 +328,14 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
     gpkg_conn = sqlite3.connect(tmp)
     gpkg_cur = gpkg_conn.cursor()
 
+    # Validate the configured columns BEFORE dropping any trigger or writing anything:
+    # SQLite reads an unresolvable "identifier" as a string literal rather than raising,
+    # so a stale label_col would hand back one constant-valued row per pole instead of
+    # failing. Checked up front so a misconfigured project aborts before it mutates the
+    # local copy. The caller catches per project, so this fails THIS project only.
+    require_column(gpkg_conn, table_name, label_col, purpose="label")
+    require_column(gpkg_conn, table_name, qa_date_col, purpose="QA date")
+
     # Disable R-tree spatial triggers that call ST_IsEmpty (SpatiaLite function
     # not available in plain SQLite). We only update attribute columns, not geom,
     # so the R-tree index stays valid.
@@ -356,11 +364,7 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
     # Field-set statuses we must never clobber with a gap-fill.
     PROTECTED = {"Pole Removed/Canceled"}
 
-    # Get all poles from GPKG. Validate first: SQLite reads an unresolvable
-    # "identifier" as a string literal rather than raising, so a stale label_col
-    # would hand back one constant-valued row per pole instead of failing.
-    require_column(gpkg_conn, table_name, label_col, purpose="label")
-    require_column(gpkg_conn, table_name, qa_date_col, purpose="QA date")
+    # Get all poles from GPKG
     gpkg_cur.execute(f'SELECT fid, "{label_col}", "Status", "Pole Plant Date", "{qa_date_col}" FROM "{table_name}"')
     poles = gpkg_cur.fetchall()
 

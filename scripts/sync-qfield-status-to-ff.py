@@ -133,20 +133,24 @@ def sync_project(name: str, cfg: dict, dry_run: bool = False) -> bool:
             pass
         return False
 
+    # Connection opened OUTSIDE the try so the finally can always close it: the
+    # require_column calls below raise, and closing only on the success path would
+    # leak the handle for every misconfigured project.
+    gpkg = sqlite3.connect(tmp)
     try:
-        gpkg = sqlite3.connect(tmp)
         # Both columns are interpolated straight into the SQL below, where SQLite
         # degrades an unresolvable "identifier" into a string literal instead of
         # raising — a wrong name yields one constant-valued row per pole and mirrors
-        # nothing, silently. See require_column.
+        # nothing, silently. See require_column. The caller catches per project, so a
+        # raise here fails THIS project loudly and leaves the others to sync.
         require_column(gpkg, cfg["table"], cfg["label"], purpose="label")
         require_column(gpkg, cfg["table"], cfg["status"], purpose="status")
         rows = gpkg.execute(
             f'SELECT "{cfg["label"]}" AS label, "{cfg["status"]}" AS status '
             f'FROM "{cfg["table"]}" WHERE "{cfg["label"]}" IS NOT NULL'
         ).fetchall()
-        gpkg.close()
     finally:
+        gpkg.close()
         try:
             os.unlink(tmp)
         except OSError:
