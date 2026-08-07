@@ -490,3 +490,61 @@ endpoint rejects a malformed or future `?date=` rather than falling back to now.
 - SQL is covered against a real Postgres by
   `tests/migrations/483_fleet_parking_queries.test.ts` — the unit tests mock the
   query layer out, so without that file the statements are never parsed.
+
+## Ituran (Avis account) — portal behind a bot challenge
+
+Covers KW96KRGP and KX82PLGP. Live since 2026-08-07; brings coverage to 15/23.
+
+**Why this one is a script, not a provider in `/api/cron/poll-portal-tracking`.**
+`www.ituran.com` is behind a Reblaze WAF that answers unrecognised clients with
+**HTTP 247** and a JS puzzle. Clearing it needs a real browser, and the browser
+is Playwright — a *devDependency*. Registering Ituran in `configuredProviders()`
+would make the Next.js route bundle reach Playwright, so the mint lives in
+`scripts/poll-ituran-tracking.ts`. Everything after the mint is shared: the
+script builds the same `ConfiguredProvider` and calls the same `pollProvider()`,
+so reconcile/ingest/watermark/alerting are identical across providers.
+
+**The two credentials fail independently** (all verified against the live portal):
+
+| Sent | Result |
+|------|--------|
+| `waap_id` cookie alone | 200, full data |
+| `IWEB_LB` alone, or no cookies | 247 challenge |
+| `waap_id` + bogus `PassEnc` | 200-family, `ErrorStr: "LoginError!"` |
+
+So `waap_id` (WAF pass) and `PassEnc` (login token) are separate, and each maps
+to a different repair. The ASP.NET `Iweb_SSID` cookie is **not** required and is
+deliberately not sent. Session is minted fresh per run and never persisted — at
+a 2-hourly cadence a ~5s mint is not worth caching, and nothing portal-shaped
+ever lands in the database.
+
+**Three mint traps, each of which cost an attempt:**
+1. `channel: 'chromium'` is required — Playwright's default headless *shell* is
+   detected and never clears the puzzle. The full build clears it in ~1.6s.
+2. `userAgent` **must** be overridden. Even the full chromium channel still
+   advertises `HeadlessChrome/...` in headless mode and the WAF refuses it. The
+   failure is indistinguishable from "browser not installed". One shared
+   `BROWSER_UA` constant is used by both the mint and the poller, because the
+   WAF issues `waap_id` against the minting client's identity.
+3. Submit must **click `#btnLogin`** — it is ASP.NET WebForms and Enter does not
+   fire the postback. A wrong password does not throw; the portal re-serves the
+   login page, so success is asserted positively (navigated away + holds a token).
+
+**Timestamps — the payload carries one instant in three zones:**
+```
+Location_RowLocTime  "2026-08-07 10:26:54"  UTC          <- the only one used
+LastGoodLocTimeStr   "07/08/2026 12:26:54"  SAST, display
+DATEsortable         "2026-08-07 12:26:54"  SAST          <- the trap
+DataTimeStamp        "2026-08-07 13:27:01"  Israel (UTC+3), envelope-level
+```
+`DATEsortable` looks ISO and sorts correctly, so it reads as the obvious choice —
+it is local time with no zone marker, and using it files every fix 2h in the
+future, poisoning the watermark.
+
+**Always send `LastDataTimeStamp=not initialized`** (full snapshot). The app's own
+later polls send a timestamp plus `OnlyDifferences` **and map bounds** — copying
+that shape silently drops every vehicle outside the rectangle you happened to send.
+
+Cron: `30 */2 * * *` via `scripts/cron-ituran-tracking.sh`, offset from the
+Netstar poll. Env: `ITURAN_PORTAL_USER`, `ITURAN_PORTAL_PASS`, optional
+`ITURAN_PORTAL_URL` / `ITURAN_ACCOUNT_REF` (default `avis`).
