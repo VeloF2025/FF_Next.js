@@ -99,9 +99,13 @@ def _validated_pole_labels(cur, ff_project_id, labels):
 def _upsert_work_qa(cur, hierarchy_values, validated_labels):
     """Create missing QA rows, then align every row with plan-then-GPKG.
 
-    Two statements because the INSERT and the UPDATE need different fallbacks: a new
-    row has nothing to keep, an existing one does. Both LEFT JOIN the plan so a pole
-    the plan does not cover is still reached.
+    The INSERT deliberately seeds zone/PON as NULL and lets the UPDATE below resolve
+    them, so precedence is decided in exactly ONE place. Resolving it in the INSERT too
+    would be unverifiable dead logic: the UPDATE recomputes every row this statement
+    inserts, in the same call, so any precedence bug seeded here is overwritten before
+    the transaction ends and no test could observe it. A NULL seed always differs from
+    a resolved value, so the UPDATE's WHERE fires on each new row; when the plan and
+    the GPKG are both silent it stays NULL, which is the same outcome either way.
     """
     qa_values = [
         value for value in hierarchy_values if value[1] in validated_labels
@@ -113,12 +117,8 @@ def _upsert_work_qa(cur, hierarchy_values, validated_labels):
         cur,
         """
         INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
-        SELECT s.project_id::uuid, s.pole_label,
-               COALESCE(v.zone_no, s.zone_no::integer),
-               COALESCE(v.pon_no, s.pon_no::integer)
+        SELECT s.project_id::uuid, s.pole_label, NULL::integer, NULL::integer
         FROM (VALUES %s) AS s(project_id, pole_label, zone_no, pon_no)
-        LEFT JOIN v_pole_planning v
-          ON v.project_id = s.project_id::uuid AND v.pole_number = s.pole_label
         ON CONFLICT (project_id, pole_label) DO NOTHING
         RETURNING pole_label
         """,
@@ -149,7 +149,12 @@ def _upsert_work_qa(cur, hierarchy_values, validated_labels):
         page_size=200,
         fetch=True,
     )
-    return len(inserted) + len(updated)
+    # DISTINCT labels, not a sum: seeding the INSERT with NULLs means the UPDATE fires
+    # on every row this call just inserted, so adding the two counts reports each new
+    # row twice. The caller logs this as `qa_poles`, so a sum would overstate the work
+    # done — and a run that inserted 40 rows and changed nothing else would claim 80.
+    return len({row["pole_label"] for row in inserted}
+               | {row["pole_label"] for row in updated})
 
 
 def _update_reviews(cur, hierarchy_values):

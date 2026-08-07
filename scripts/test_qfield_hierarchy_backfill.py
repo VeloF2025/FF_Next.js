@@ -33,7 +33,9 @@ import psycopg2  # noqa: E402
 import psycopg2.extras  # noqa: E402
 # Container lifecycle and pass/fail reporting are shared with the replan suite — one
 # copy of the docker teardown, one set of labels for CI's sweep step.
-from replan_test_harness import check, finish, start_pg, teardown_container  # noqa: E402
+from replan_test_harness import (  # noqa: E402
+    check, finish, hierarchy_fixture, start_pg, teardown_container,
+)
 from qfield_hierarchy_writers import (  # noqa: E402
     _update_planning_poles, _upsert_work_qa, _update_reviews,
 )
@@ -41,27 +43,6 @@ from qfield_hierarchy_writers import (  # noqa: E402
 SCHEMA = "hierarchy_backfill_test"
 PROJECT = "33333333-3333-3333-3333-333333333333"
 NO_PLAN_PROJECT = "44444444-4444-4444-4444-444444444444"
-
-
-def fixture(cur):
-    cur.execute(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE; CREATE SCHEMA {SCHEMA};")
-    cur.execute(f"SET search_path TO {SCHEMA}")
-    cur.execute("""CREATE TABLE poles (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
-        pole_number varchar, zone_no integer, pon_no integer,
-        updated_at timestamptz, UNIQUE (project_id, pole_number))""")
-    cur.execute("""CREATE TABLE pole_qa_photos (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
-        pole_label text, zone_no integer, pon_no integer,
-        updated_at timestamptz, UNIQUE (project_id, pole_label))""")
-    cur.execute("""CREATE TABLE construction_qa_reviews (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
-        feature_type text, feature_id text, zone_no integer, pon_no integer,
-        updated_at timestamptz)""")
-    # Stands in for the real view (production UNIONs sow_poles). A view, not a copy,
-    # so the tests stay honest about reading the PLAN rather than the GPKG.
-    cur.execute("""CREATE VIEW v_pole_planning AS
-        SELECT project_id, pole_number, zone_no, pon_no FROM poles""")
 
 
 # (label, existing zone/pon, gpkg zone/pon, expected zone/pon after)
@@ -95,7 +76,7 @@ def main():
     conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
     cur = conn.cursor()
     try:
-        fixture(cur)
+        hierarchy_fixture(cur, SCHEMA)
         conn.commit()
         cur.execute(f"SET search_path TO {SCHEMA}")
 

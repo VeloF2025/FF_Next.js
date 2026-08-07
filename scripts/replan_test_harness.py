@@ -101,6 +101,34 @@ def connect():
     return conn
 
 
+def hierarchy_fixture(cur, schema):
+    """Scratch tables for the hierarchy-authority suites, in `schema`.
+
+    Shared by test_qfield_hierarchy_backfill and test_qfield_hierarchy_scoping so the
+    two cannot drift into disagreeing pictures of the same three tables — the whole
+    reason this module exists. Each suite passes its OWN schema name so they stay
+    isolated and can run concurrently.
+    """
+    cur.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE; CREATE SCHEMA {schema};")
+    cur.execute(f"SET search_path TO {schema}")
+    cur.execute("""CREATE TABLE poles (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
+        pole_number varchar, zone_no integer, pon_no integer,
+        updated_at timestamptz, UNIQUE (project_id, pole_number))""")
+    cur.execute("""CREATE TABLE pole_qa_photos (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
+        pole_label text, zone_no integer, pon_no integer,
+        updated_at timestamptz, UNIQUE (project_id, pole_label))""")
+    cur.execute("""CREATE TABLE construction_qa_reviews (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
+        feature_type text, feature_id text, zone_no integer, pon_no integer,
+        updated_at timestamptz)""")
+    # Stands in for the real view (production UNIONs sow_poles). A view, not a copy,
+    # so the tests stay honest about reading the PLAN rather than the GPKG.
+    cur.execute("""CREATE VIEW v_pole_planning AS
+        SELECT project_id, pole_number, zone_no, pon_no FROM poles""")
+
+
 def teardown_container():
     """Kill the throwaway Postgres, if this process started one.
 

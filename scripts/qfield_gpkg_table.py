@@ -38,6 +38,35 @@ def sqlite_ident(name):
     return '"' + str(name).replace('"', '""') + '"'
 
 
+def require_column(db, table_name, column, purpose="label"):
+    """Raise unless `column` exists on `table_name`. Call BEFORE interpolating it.
+
+    SQLite does not error on a double-quoted identifier it cannot resolve — it falls
+    back to treating it as a STRING LITERAL. So when a config names a column the table
+    does not have, `SELECT "label_1" FROM t WHERE "label_1" IS NOT NULL` does not raise:
+    it returns the constant 'label_1' for every row and matches all of them. The caller
+    then reads a full result set in which every pole is named "label_1", matches nothing
+    in FibreFlow, writes nothing, and reports success.
+
+    That is exactly how Thembisa POP 3's status mirror died silently. QField dropped the
+    `_1` suffix when the layer was republished without a name collision; the config still
+    said `label_1`; all 4,590 rows came back as the literal string. Verified against
+    every THM_3_Poles.gpkg version published 2026-08-06 — `label` has 4,590 non-null
+    values and `label_1` does not exist. Nothing alerted, because nothing failed.
+
+    Callers that must skip rather than crash should catch KeyError — but they have to
+    make that choice explicitly, which is the whole point of failing loudly here.
+    """
+    have = [row[1] for row in db.execute(
+        f"PRAGMA table_info({sqlite_ident(table_name)})").fetchall()]
+    if column not in have:
+        raise KeyError(
+            f"{purpose} column {column!r} is not a column of {table_name!r} — "
+            f"SQLite would silently read it as the string literal {column!r} for every "
+            f"row. Available columns: {have}")
+    return column
+
+
 def open_gpkg(tmp_path, config, gpkg_path):
     """Open the GPKG, resolve its photo table, read rows; None to abort.
 

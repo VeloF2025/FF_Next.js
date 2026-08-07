@@ -176,6 +176,16 @@ if command -v python3 >/dev/null 2>&1; then
     tail -25 /tmp/ci-hierarchy-backfill.txt | sed 's/^/    /'
   fi
 
+  # The other half of the same writers: WHICH rows get touched, and what survives when
+  # neither the plan nor the GPKG has a value. Both were unprotected — dropping a
+  # project predicate or the third COALESCE argument left the backfill suite green.
+  if python3 scripts/test_qfield_hierarchy_scoping.py > /tmp/ci-hierarchy-scoping.txt 2>&1; then
+    pass "QField hierarchy scoping + fallback: all checks pass"
+  else
+    fail "QField hierarchy scoping + fallback: regression detected"
+    tail -25 /tmp/ci-hierarchy-scoping.txt | sed 's/^/    /'
+  fi
+
   if python3 scripts/test_qfield_hierarchy.py > /tmp/ci-qfield-hierarchy.txt 2>&1; then
     pass "QField hierarchy mapping: all checks pass"
   else

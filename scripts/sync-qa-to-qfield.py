@@ -42,6 +42,9 @@ from datetime import datetime, timezone
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from qfield_gpkg_table import require_column  # noqa: E402
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
 # DATABASE_URL must come from the environment (post-Neon-cutover this points at
@@ -67,7 +70,7 @@ FF_TO_QF_CIVIL_AUDIT = {
         "ff_project_id": "1de088dd-fe24-43fb-b8d3-94fca61ef91d",
         "gpkg_path": "THM_3_Poles.gpkg",
         "table_name": "thm_3_poles",
-        "label_col": "label_1",
+        "label_col": "label",
         "qa_comments_col": "Q/A Civil Comments",
         "qa_date_col": "Q/A Date",
     },
@@ -353,7 +356,11 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
     # Field-set statuses we must never clobber with a gap-fill.
     PROTECTED = {"Pole Removed/Canceled"}
 
-    # Get all poles from GPKG
+    # Get all poles from GPKG. Validate first: SQLite reads an unresolvable
+    # "identifier" as a string literal rather than raising, so a stale label_col
+    # would hand back one constant-valued row per pole instead of failing.
+    require_column(gpkg_conn, table_name, label_col, purpose="label")
+    require_column(gpkg_conn, table_name, qa_date_col, purpose="QA date")
     gpkg_cur.execute(f'SELECT fid, "{label_col}", "Status", "Pole Plant Date", "{qa_date_col}" FROM "{table_name}"')
     poles = gpkg_cur.fetchall()
 

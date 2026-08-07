@@ -85,8 +85,11 @@ PROJECTS = {
         "table_name": "thm_3_poles",
         # 'label', not 'label_1'. QField appends _1 when a layer name collides on
         # publish; THM_3_Poles was republished without the collision, so the suffix
-        # disappeared. Confirmed against the live GPKG (v20260806102340): the table
-        # has `label` with 4,590 non-null values and no `label_1` at all.
+        # disappeared. Confirmed against ALL TEN THM_3_Poles.gpkg versions published
+        # on 2026-08-06 (v20260806100317 … v20260806143001): every one has `label`
+        # with 4,590 non-null values and none has `label_1`. Checked the whole set
+        # rather than one version because QFieldCloud republishes on every push, so
+        # pinning a single version dates the evidence within hours.
         #
         # The mismatch froze this project's ingest from 2026-08-04 14:02. It failed
         # LOUDLY and correctly — qfield_gpkg_table bails before writing sync state

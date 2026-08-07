@@ -27,6 +27,9 @@ from collections import Counter
 import psycopg2
 from psycopg2.extras import execute_values
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from qfield_gpkg_table import require_column  # noqa: E402
+
 DB_URL = os.environ.get("DATABASE_URL", "")
 MINIO_BUCKET = "qfieldcloud-prod"
 
@@ -34,10 +37,16 @@ MINIO_BUCKET = "qfieldcloud-prod"
 # (the live FT_<site> project the field crews edit, NOT the older *_Pole_Audit
 # copies, which are stale); `ff` = FibreFlow projects.id; `gpkg`/`table`/`label`/
 # `status` = the poles layer's file, table, pole-label column, and civil-audit
-# Status column. These differ per project (e.g. Thembisa's label column is
-# `label_1`, its table is lower-case), so each was confirmed against the live GPKG
-# + a join cross-check vs poles.pole_number before being added — do NOT assume a
-# new project follows Mohadin's shape.
+# Status column. These differ per project (Thembisa POP1's label column is `label_1`
+# and POP3's table is lower-case), so each was confirmed against the live GPKG + a
+# join cross-check vs poles.pole_number before being added — do NOT assume a new
+# project follows Mohadin's shape.
+#
+# These values EXPIRE. QField appends `_1` only while a layer name collides on
+# publish, so republishing a project can rename its label column underneath us —
+# that is what happened to POP3 on 2026-08-04 (`label_1` → `label`) and it froze
+# this mirror for three days without an error. require_column() now turns that
+# into a loud failure; re-confirm against the live file before trusting an entry.
 #
 # NOTE on Status vocab: removal is spelled "Pole Removed/Canceled" in some GPKGs
 # and "Pole Canceled / Removed" in others, and Thembisa POP1 carries a pre-plant
@@ -61,7 +70,7 @@ PROJECTS = {
                       "gpkg": "Poles.gpkg", "table": "Poles", "label": "label_1", "status": "Status"},
     "Thembisa POP3": {"qf": "5f3b962a-7901-43f7-a284-1c1a9ed7f3d1",
                       "ff": "1de088dd-fe24-43fb-b8d3-94fca61ef91d",
-                      "gpkg": "THM_3_Poles.gpkg", "table": "thm_3_poles", "label": "label_1", "status": "Status"},
+                      "gpkg": "THM_3_Poles.gpkg", "table": "thm_3_poles", "label": "label", "status": "Status"},
 }
 
 
@@ -126,6 +135,12 @@ def sync_project(name: str, cfg: dict, dry_run: bool = False) -> bool:
 
     try:
         gpkg = sqlite3.connect(tmp)
+        # Both columns are interpolated straight into the SQL below, where SQLite
+        # degrades an unresolvable "identifier" into a string literal instead of
+        # raising — a wrong name yields one constant-valued row per pole and mirrors
+        # nothing, silently. See require_column.
+        require_column(gpkg, cfg["table"], cfg["label"], purpose="label")
+        require_column(gpkg, cfg["table"], cfg["status"], purpose="status")
         rows = gpkg.execute(
             f'SELECT "{cfg["label"]}" AS label, "{cfg["status"]}" AS status '
             f'FROM "{cfg["table"]}" WHERE "{cfg["label"]}" IS NOT NULL'
