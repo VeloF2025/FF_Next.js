@@ -123,7 +123,14 @@ if 'segments' not in d:
     print("whisper response has no 'segments' key", file=sys.stderr)
     sys.exit(1)
 off = int(sys.argv[2])
-for seg in d['segments']:
+for i, seg in enumerate(d['segments']):
+    # A segment missing text/start means the response shape changed. Stop with a
+    # readable reason rather than a traceback — and never skip it silently, which
+    # would drop audio from a transcript that still looks complete.
+    if 'text' not in seg or 'start' not in seg:
+        print(f"segment {i} missing text/start — unexpected whisper response shape",
+              file=sys.stderr)
+        sys.exit(1)
     t = seg['text'].strip()
     if t:
         st = off + int(float(seg['start']))
