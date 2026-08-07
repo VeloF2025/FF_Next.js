@@ -11,7 +11,7 @@
  * never arrived.
  */
 import { describe, expect, it } from 'vitest';
-import { isAuthFailure } from '../pollProvider';
+import { isAuthFailure } from '../authFailure';
 
 describe('isAuthFailure — Netstar and generic vocabulary', () => {
   it('recognises the shared portal-session and HTTP wordings', () => {

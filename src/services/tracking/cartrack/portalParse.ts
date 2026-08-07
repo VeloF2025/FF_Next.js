@@ -59,11 +59,16 @@ export function plateOf(v: FleetwebVehicle): string | null {
 /**
  * Ignition, or null when it cannot be read.
  *
- * Observed values are "2" while a vehicle was driving (speed 25 then 12) and "1"
- * on four stationary vehicles, so 2=on / 1=off. That is a two-state observation
- * of an undocumented enum, not a specification — anything else is reported as
- * unknown rather than guessed, because downstream overnight-parking compliance
- * treats `false` as a definite state.
+ * Observed values are "2" on a driving vehicle (speed 25, then 12) and again on
+ * a stationary one that was idling — so it is not merely speed-derived — and
+ * "1" on parked vehicles. Hence 2=on / 1=off.
+ *
+ * That is a two-state observation of an undocumented enum, not a specification,
+ * so every other value is reported unknown rather than guessed. Note no current
+ * consumer reads `ignition` at all — the parking-compliance classifier decides
+ * purely on distance and fix age — so a wrong mapping would not corrupt a
+ * verdict today. It is kept honest for the consumer that eventually does,
+ * because `false` reads as a definite state and a guess would be invisible.
  */
 export function readIgnition(raw: string | number | null | undefined): boolean | null {
   const n = num(raw);

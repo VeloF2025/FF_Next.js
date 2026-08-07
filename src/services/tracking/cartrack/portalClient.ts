@@ -161,11 +161,20 @@ class HttpCartrackPortalClient implements CartrackPortalClient {
       );
     }
 
-    const setCookie =
-      typeof (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === 'function'
-        ? (res.headers as unknown as { getSetCookie: () => string[] }).getSetCookie()
-        : [res.headers.get('set-cookie') ?? ''];
-    const jar = setCookie
+    // getSetCookie() is required, not preferred. The login issues THREE
+    // Set-Cookie headers, and the folded `get('set-cookie')` form joins them
+    // into one comma-separated string that cannot be split back apart
+    // reliably — a naive split keeps only `fs` and silently drops
+    // `refresh_token` and `SERVERID`, producing a session that half-works.
+    // Node 18+ implements it; failing loudly beats a subtly broken jar.
+    const headers = res.headers as unknown as { getSetCookie?: () => string[] };
+    if (typeof headers.getSetCookie !== 'function') {
+      throw new CartrackPortalError(
+        'shape',
+        'fetch implementation lacks Headers.getSetCookie(); cannot read the session cookies safely'
+      );
+    }
+    const jar = headers.getSetCookie()
       .filter(Boolean)
       .map((line) => line.split(';')[0])
       .filter((pair): pair is string => Boolean(pair && pair.includes('=')));
