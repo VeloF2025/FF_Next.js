@@ -3,12 +3,16 @@ import { graphFetch } from './auth';
 import { log } from '@/lib/logger';
 import { getInternalUsers } from './auto-recording';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
+import { transcribeStoredRecordingWithWhisper } from './meeting-processor';
 import * as fs from 'fs';
 import * as path from 'path';
 import { streamResponseToFile } from './streamToFile';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const LOGGER = 'OneDriveRecordings';
+// Same gate the Teams webhook path uses (graph/meeting-processor), so both
+// recording sources honour one switch.
+const WHISPER_TEAMS_RECORDINGS = process.env.WHISPER_TEAMS_RECORDINGS === 'true';
 
 const RECORDINGS_BASE =
   process.env.MEETING_RECORDINGS_PATH || '/home/velo/meeting-recordings';
@@ -335,6 +339,22 @@ export async function scrapeOneDriveRecordings(
           if (meetingRow[0]?.processing_status !== 'completed') {
             try {
               await sql`UPDATE meetings SET processing_status = 'processing', updated_at = NOW() WHERE id = ${meetingId}`;
+
+              // This path downloads a recording but never fetched a transcript by
+              // any means, so every meeting it created could only ever summarise
+              // to "No transcript available". Transcribe first when the recording
+              // has no transcript yet; the meeting is then summarised from real
+              // content instead of being abandoned.
+              if (WHISPER_TEAMS_RECORDINGS) {
+                const t = await sql`
+                  SELECT coalesce(length(raw_transcript), 0) AS len
+                  FROM meetings WHERE id = ${meetingId}
+                ` as Array<{ len: number }>;
+                if ((t[0]?.len ?? 0) === 0) {
+                  await transcribeStoredRecordingWithWhisper(meetingId);
+                }
+              }
+
               await processWithLLM(meetingId);
               await sql`UPDATE meetings SET processing_status = 'completed', processed_at = NOW(), updated_at = NOW() WHERE id = ${meetingId}`;
               result.enriched++;
