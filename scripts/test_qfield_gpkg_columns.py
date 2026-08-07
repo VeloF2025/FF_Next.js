@@ -36,9 +36,16 @@ def main():
     db = build()
 
     print("the misfeature this guard exists for:")
-    rows = db.execute(
-        'SELECT "label_1" FROM poles WHERE "label_1" IS NOT NULL').fetchall()
-    check("an unresolvable identifier does NOT raise", True)
+    try:
+        rows = db.execute(
+            'SELECT "label_1" FROM poles WHERE "label_1" IS NOT NULL').fetchall()
+        raised = False
+    except sqlite3.OperationalError:
+        rows, raised = [], True
+    # Asserted on a real observation, not a literal: if a future SQLite (or SQLITE_DQS=0)
+    # starts rejecting the unresolvable identifier, this must FAIL so we learn the
+    # guard's premise changed — a hardcoded True would keep passing and hide that.
+    check("an unresolvable identifier does NOT raise", raised is False)
     check("  ...it degrades to a string literal", [r[0] for r in rows] == ["label_1", "label_1"])
     check("  ...and matches every row", len(rows) == 2)
 
