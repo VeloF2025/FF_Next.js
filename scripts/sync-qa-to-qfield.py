@@ -338,7 +338,14 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
     # Checked up front so a misconfigured project aborts before it mutates its local
     # copy. The caller catches per project, so this fails THIS project only.
     try:
+        # qa_comments_col is included even though an unresolvable SET target DOES raise
+        # ("no such column"), unlike a SELECT: it is the most drift-prone value in the
+        # config — two projects carry a TRAILING SPACE ("Q/A Civil Comments ") — and it
+        # is only interpolated on the branch where a pole has a comment. A run of pure
+        # gap-fills never touches it, so a wrong value lies dormant and then fails
+        # mid-loop after the download instead of up front with everything else.
         for _col, _purpose in ((label_col, "label"), (qa_date_col, "QA date"),
+                               (qa_comments_col, "QA comments"),
                                ("Status", "status"), ("Pole Plant Date", "plant date")):
             require_column(gpkg_conn, table_name, _col, purpose=_purpose)
     except Exception:
