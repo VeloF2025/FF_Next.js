@@ -33,20 +33,73 @@ echo "$LOG_PREFIX === Ituran tracking poll start ==="
 # the whole tick exits 127 before it starts. Next.js's own dotenv loader reads
 # these files literally, so the wrapper must too: split on the FIRST `=`, never
 # evaluate the value.
+# It must agree with dotenv on every value, not merely avoid crashing. Where the
+# two disagree the wrapper and the app read the SAME file differently, and the
+# resulting failure looks like a portal rejecting good credentials. So this
+# mirrors dotenv 16.x's grammar (@next/env vendors it): optional `export`,
+# optional whitespace around `=`, quoted values kept verbatim (and allowed to
+# span lines), unquoted values truncated at `#` and trimmed.
+#
+# Shell-critical names are refused: this script resolves `timeout` through PATH
+# after loading, and an env file is not a place that should be able to change
+# that.
+__ENV_SET_BY_LOADER=" "
+
 load_env_file() {
-  local file="$1" line key val
+  local file="$1" line key val quote cont
   while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}                      # CRLF-authored file
+    line=${line#"${line%%[![:space:]]*}"}   # leading indentation
     case "$line" in ''|'#'*) continue ;; esac
+    case "$line" in
+      export[[:space:]]*)
+        line=${line#export}
+        line=${line#"${line%%[![:space:]]*}"}
+        ;;
+    esac
+    case "$line" in *=*) ;; *) continue ;; esac
+
     key=${line%%=*}
     val=${line#*=}
-    # Skip anything that is not a plain KEY= assignment (stray text, `export `
-    # prefixes, continuation lines from a multi-line value).
-    case "$key" in ''|*[!A-Za-z0-9_]*) continue ;; esac
-    # Strip one layer of matching surrounding quotes, as dotenv does.
+    key=${key%"${key##*[![:space:]]}"}      # `FOO = bar`
+    case "$key" in ''|*[!A-Za-z0-9_.-]*) continue ;; esac
+    val=${val#"${val%%[![:space:]]*}"}
+
     case "$val" in
-      \"*\") val=${val#\"}; val=${val%\"} ;;
-      \'*\') val=${val#\'}; val=${val%\'} ;;
+      \"*|\'*)
+        # Quoted: keep the content exactly, including '#'. dotenv lets these
+        # span lines, so keep reading until the closing quote rather than
+        # emitting a value with a stray leading quote and dropping the rest.
+        quote=${val:0:1}
+        val=${val#?}
+        while :; do
+          case "$val" in *"$quote") val=${val%"$quote"}; break ;; esac
+          IFS= read -r cont || break
+          val="$val
+${cont%$'\r'}"
+        done
+        ;;
+      *)
+        val=${val%%#*}                      # inline trailing comment
+        val=${val%"${val##*[![:space:]]}"}  # trailing whitespace
+        ;;
     esac
+
+    case " PATH IFS ENV BASH_ENV SHELLOPTS PS4 LD_PRELOAD LD_LIBRARY_PATH " in
+      *" $key "*)
+        echo "$LOG_PREFIX WARNING: refusing to import $key from $(basename "$file")" >&2
+        continue
+        ;;
+    esac
+
+    # A value already in the real environment wins over the files (dotenv does
+    # not override process.env), but a later FILE overrides an earlier one so
+    # .env.local still beats .env.
+    case "$__ENV_SET_BY_LOADER" in
+      *" $key "*) ;;
+      *) [ -n "${!key+isset}" ] && continue ;;
+    esac
+    __ENV_SET_BY_LOADER="$__ENV_SET_BY_LOADER$key "
     export "$key=$val"
   done < "$file"
 }
@@ -71,7 +124,9 @@ fi
 # the tick cannot run without, and a missing one is a deploy/config fault that
 # needs naming, not debugging.
 for required in DATABASE_URL ITURAN_PORTAL_USER ITURAN_PORTAL_PASS; do
-  if [ -z "$(eval "printf '%s' \"\${$required:-}\"")" ]; then
+  # Indirect expansion, not eval. The `:-` matters: under `set -u` a bare
+  # ${!required} aborts on the very case this is meant to report.
+  if [ -z "${!required:-}" ]; then
     echo "$LOG_PREFIX ERROR: $required is not set (checked .env and .env.local in $PROJECT_DIR)" >&2
     exit 1
   fi
