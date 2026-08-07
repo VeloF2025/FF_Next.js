@@ -50,10 +50,18 @@ function makeSql(pool) {
 // fallback would have written to the WRONG LIVE DATABASE instead of erroring.
 // A missing connection string must stop the job, never redirect it.
 const DB_URL = requireEnv('DATABASE_URL');
-// ssl:false — the replacement Postgres is reached over the loopback/Tailscale
-// interface and presents an unrelated certificate; the Neon driver's forced TLS
-// was itself part of why this script could not connect after the cutover.
-const pool = new Pool({ connectionString: DB_URL, max: 4, ssl: false });
+// Keep the connection encrypted but skip the hostname check: the replacement
+// Postgres presents a certificate for an unrelated domain, which is what the
+// Neon driver's stricter TLS choked on (ERR_TLS_CERT_ALTNAME_INVALID). Disabling
+// TLS outright would also clear the error but needlessly drops encryption — and
+// DATABASE_URL is not guaranteed to be loopback (the same DB is reachable over
+// Tailscale at 100.96.203.105:5437). Matches the pattern already used across
+// scripts/, e.g. backfill-occurrence-transcripts.js.
+const pool = new Pool({
+  connectionString: DB_URL,
+  max: 4,
+  ssl: DB_URL.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
+});
 const sql = makeSql(pool);
 const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-photos';
 
@@ -196,4 +204,12 @@ main()
     console.error('Fatal:', e);
     process.exitCode = 1;
   })
-  .finally(() => pool.end().catch(() => {}));
+  .finally(() =>
+    // Never swallow: a teardown failure here is the difference between a clean
+    // cron exit and an accumulating pile of idle node processes, and nobody is
+    // watching this run interactively.
+    pool.end().catch(err => {
+      console.error('pool.end failed:', err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    })
+  );
