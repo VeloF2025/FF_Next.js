@@ -114,9 +114,9 @@ const admin = new Pool({ connectionString: BASE_URL, ssl: false, max: 1 });
 const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 2 });
 
 type DriverQueries = typeof import('@/modules/fleet/parking/driverParkingQueries');
-type Notifications = typeof import('@/modules/fleet/parking/parkingNotifications');
+type Approvers = typeof import('@/modules/fleet/parking/parkingApprovers');
 let queries: DriverQueries;
-let notifications: Notifications;
+let approvers: Approvers;
 
 async function assign(
   staffId: string,
@@ -151,7 +151,7 @@ beforeAll(async () => {
   await db.query(PREREQUISITES);
   await db.query(FORWARD);
   queries = await import('@/modules/fleet/parking/driverParkingQueries');
-  notifications = await import('@/modules/fleet/parking/parkingNotifications');
+  approvers = await import('@/modules/fleet/parking/parkingApprovers');
 });
 
 afterAll(async () => {
@@ -341,15 +341,15 @@ describe('withdrawPendingDeclaration', () => {
  */
 describe('findApproverUserIds', () => {
   it('returns users whose role holds view on fleet.parking-requests', async () => {
-    expect(await notifications.findApproverUserIds()).toContain(MANAGER_USER);
+    expect(await approvers.findApproverUserIds()).toContain(MANAGER_USER);
   });
 
   // 483 grants viewer view:false on the requests page deliberately.
   it('excludes a role granted the page with view false', async () => {
-    expect(await notifications.findApproverUserIds()).not.toContain(VIEWER_USER);
+    expect(await approvers.findApproverUserIds()).not.toContain(VIEWER_USER);
   });
 
   it('excludes a deactivated user', async () => {
-    expect(await notifications.findApproverUserIds()).not.toContain(INACTIVE_MANAGER);
+    expect(await approvers.findApproverUserIds()).not.toContain(INACTIVE_MANAGER);
   });
 });
