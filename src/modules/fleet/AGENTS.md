@@ -65,6 +65,8 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - Parking compliance rows are evidence: FKs are `ON DELETE SET NULL`, never CASCADE
 - Driver parking declarations resolve the vehicle from the `/my` session — a body `vehicleId` is ignored
 - Every parking submission enters as `pending`; even a first address needs approval
+- Parking approval is ONE transaction (supersede + promote); half of it leaves two active rows or none
+- Approving re-checks the driver still holds the vehicle; rejecting deliberately does not
 
 ## Common Issues
 | Issue | Fix |

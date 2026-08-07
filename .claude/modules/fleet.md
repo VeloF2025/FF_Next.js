@@ -446,10 +446,11 @@ The `VehicleCalibrationModal` and `OdometerOverrideModal` use `navigator.mediaDe
 - Integrated NAFNet deblurring for blurry dashboard photos
 - CPU mode for NAFNet (RTX 5090 sm_120 incompatible)
 
-## Overnight Parking Compliance (mig 483, PRs 1–2 of 3)
+## Overnight Parking Compliance (mig 483, PRs 1–3)
 
 Nightly job that asks, for every active vehicle at 20:00 SAST: is it where its
-driver declared it parks? PR 2 added the half that produces the declaration.
+driver declared it parks? PR 2 added the driver-facing declaration, PR 3 the
+approval queue and the results dashboard.
 
 | Piece | Where |
 |-------|-------|
@@ -485,11 +486,32 @@ driver declared it parks? PR 2 added the half that produces the declaration.
 - Reverse geocoding is resolved server-side and is never fatal; a failure stores
   coordinates and the UI shows "Unnamed location".
 
-**Not built yet (PR 3):** `/fleet/parking` (dashboard) and
-`/fleet/parking/requests` (approval queue). Both permission keys are already
-seeded by 483, and `findApproverUserIds()` is exported for the queue to reuse.
-**Until PR 3 ships a pending request can only be approved directly in the
-database** — the driver-facing flow otherwise dead-ends.
+### Fleet side (PR 3)
+| Piece | Where |
+|---|---|
+| Approval queue | `/fleet/parking/requests` · `pages/api/fleet/parking/requests.ts` + `requests/[requestId]/decide.ts` |
+| Compliance dashboard | `/fleet/parking` · `pages/api/fleet/parking/compliance.ts` |
+| Decision transaction | `src/modules/fleet/parking/approvalQueries.ts` |
+| Dashboard reads | `src/modules/fleet/parking/complianceQueries.ts` |
+| Driver notification | `src/modules/fleet/parking/decisionNotifications.ts` |
+
+- **Approval is one transaction on a pinned connection.** Promoting the pending
+  row without superseding the active one leaves two active rows (which
+  `ux_parking_active_per_vehicle` refuses, aborting the request) or none — and
+  none silently turns every future nightly check into `no_address`. The row is
+  re-read `FOR UPDATE` inside the transaction, not trusted from the queue the
+  approver was looking at.
+- **The driver's assignment is re-validated at approval time** (spec §11). A
+  request from someone who has since handed the vehicle over is refused with
+  `assignment_ended`, surfaced as a 409. A *rejection* skips that check — the
+  driver may be gone and the request still needs closing out.
+- **`decided_by` is a `staff(id)` FK but web sessions carry `users.id`** — hence
+  `resolveStaffIdForUser`, which stores null rather than failing when an
+  approver has no staff row.
+- **Deciding is gated on `edit` of `fleet.parking-requests`**, reading the queue
+  on `view`, and the dashboard on `view` of `fleet.parking`. 483 seeds all of it.
+- The `@/lib/geo` alias in `vitest.migrations.config.ts` exists for this
+  module's approval test; without it the whole file fails at collection.
 
 **Schedule.** `0 20 * * * /home/velo/fibreflow-<env>/scripts/cron-fleet-parking-check.sh`.
 The endpoint is inert until that line is in velo's crontab, and an absent nightly
@@ -519,7 +541,8 @@ endpoint rejects a malformed or future `?date=` rather than falling back to now.
   classifies normally.
 - SQL is covered against a real Postgres by
   `tests/migrations/483_fleet_parking_queries.test.ts` and, for the driver side,
-  `tests/migrations/483_fleet_parking_driver_queries.test.ts` — the unit tests
+  `tests/migrations/483_fleet_parking_driver_queries.test.ts`, and for the
+  approval transaction `tests/migrations/483_fleet_parking_approval.test.ts` — the unit tests
   mock the query layer out, so without those files the statements are never
   parsed. **Both are excluded from the default vitest run** (they throw at module
   load without `TEST_DATABASE_URL`), so CI does not execute them: run them

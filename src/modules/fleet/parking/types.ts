@@ -10,12 +10,22 @@
  */
 
 /** Outcome of a single nightly parking check. */
-export type ParkingCheckResult =
-  | 'compliant'
-  | 'violation'
-  | 'unknown'
-  | 'not_verifiable'
-  | 'no_address';
+/**
+ * Every result the nightly check can produce, as a runtime array.
+ *
+ * Single source of truth: the type below is DERIVED from it. Two call sites
+ * previously hand-copied this list, so adding a sixth result would have been
+ * silently missed by whichever one nobody remembered to edit.
+ */
+export const PARKING_CHECK_RESULTS = [
+  'compliant',
+  'violation',
+  'unknown',
+  'not_verifiable',
+  'no_address',
+] as const;
+
+export type ParkingCheckResult = (typeof PARKING_CHECK_RESULTS)[number];
 
 export interface ParkingLocation {
   id: string;
@@ -162,4 +172,62 @@ export interface DeclarationInput {
   accuracyM: unknown;
   label?: unknown;
   requestNote?: unknown;
+}
+
+/* -------------------------------------------------------------------------
+ * Fleet side (web). The approval queue and the compliance dashboard.
+ * ---------------------------------------------------------------------- */
+
+/** A pending request, with everything an approver needs to judge it. */
+export interface PendingRequest {
+  id: string;
+  vehicleId: string;
+  registration: string;
+  driverStaffId: string;
+  driverName: string | null;
+  /** The address being requested. */
+  requested: {
+    lat: number;
+    lon: number;
+    accuracyM: number | null;
+    label: string | null;
+    addressText: string | null;
+  };
+  /** The address in force today, or null when this is a first declaration. */
+  current: {
+    lat: number;
+    lon: number;
+    label: string | null;
+    addressText: string | null;
+  } | null;
+  /** Metres between current and requested. Null when there is no current. */
+  moveDistanceM: number | null;
+  requestNote: string | null;
+  createdAt: string;
+}
+
+/** One night's verdict for one vehicle, with the evidence behind it. */
+export interface ComplianceRow {
+  id: string;
+  vehicleId: string | null;
+  registration: string;
+  checkDate: string;
+  result: ParkingCheckResult;
+  distanceM: number | null;
+  lastFixAt: string | null;
+  lastFixLat: number | null;
+  lastFixLon: number | null;
+  lastFixAgeSeconds: number | null;
+  /** The declared address this was judged against, when there was one. */
+  addressLabel: string | null;
+}
+
+export type DecisionOutcome = 'approved' | 'rejected';
+
+export interface DecisionInput {
+  requestId: string;
+  outcome: DecisionOutcome;
+  decidedByUserId: string;
+  decidedByStaffId: string | null;
+  decisionNote: string | null;
 }
