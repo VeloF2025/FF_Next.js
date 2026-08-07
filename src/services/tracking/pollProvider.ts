@@ -7,15 +7,16 @@
  */
 import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
-import { netstarProvider } from '@/services/tracking/netstar/provider';
-import { netstarClient, PartialFetchError } from '@/services/tracking/netstar/client';
+import { PartialFetchError } from '@/services/tracking/netstar/client';
+import { netstarFromEnv } from '@/services/tracking/netstar/config';
 import { cartrackPortalFromEnv } from '@/services/tracking/cartrack/portalConfig';
 import { reconcileTrackers } from '@/services/tracking/discovery';
 import { ingestPositions } from '@/services/tracking/ingest';
 import { raiseTrackingAlert } from '@/services/tracking/alerts';
 import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
-import { isAuthCircuitOpen, isAuthFailure } from '@/services/tracking/authFailure';
+import { isAuthFailure } from '@/services/tracking/authFailure';
+import { isAuthCircuitOpen, reportOpenCircuit } from '@/services/tracking/authBreaker';
 import type { ProviderPosition, TrackingProvider } from '@/services/tracking/types';
 
 /** No watermark yet: how far back the first tick reaches. */
@@ -51,38 +52,8 @@ const STALE_FEED_MS = 6 * 60 * 60 * 1000;
 
 export function configuredProviders(): ConfiguredProvider[] {
   const out: ConfiguredProvider[] = [];
-  const { NETSTAR_PORTAL_URL, NETSTAR_PORTAL_USER, NETSTAR_PORTAL_PASS } = process.env;
-  if (NETSTAR_PORTAL_URL && NETSTAR_PORTAL_USER && NETSTAR_PORTAL_PASS) {
-    const opts = {
-      baseUrl: NETSTAR_PORTAL_URL,
-      username: NETSTAR_PORTAL_USER,
-      password: NETSTAR_PORTAL_PASS,
-      accountRef: process.env.NETSTAR_ACCOUNT_REF ?? 'europcar',
-    };
-    const client = netstarClient(opts);
-    out.push({
-      provider: netstarProvider({ ...opts, client }),
-      listVehicles: () => client.listVehicles(),
-      feedFreshness: () => client.feedFreshness(),
-    });
-  } else {
-    // Say so, loudly and by name. A provider that is simply absent from the
-    // loop produces a 200 with an empty result set — indistinguishable from a
-    // healthy tick — so a typo in a variable name (or an env file that never
-    // reached the service) would stay invisible for as long as nobody thought
-    // to ask why no positions were arriving.
-    const missing = (
-      [
-        ['NETSTAR_PORTAL_URL', NETSTAR_PORTAL_URL],
-        ['NETSTAR_PORTAL_USER', NETSTAR_PORTAL_USER],
-        ['NETSTAR_PORTAL_PASS', NETSTAR_PORTAL_PASS],
-      ] as const
-    ).filter(([, value]) => !value).map(([name]) => name);
-    log.warn('[poll-portal-tracking] netstar not configured — skipping provider entirely', {
-      missing,
-      hint: 'set these in the service env file; until then this cron does nothing',
-    });
-  }
+  const netstar = netstarFromEnv();
+  if (netstar) out.push(netstar);
 
   // Cartrack's fleetweb PORTAL, which is not the REST API poll-tracking.ts uses.
   // The urent account authenticates with three fields (account + sub-user +
@@ -138,33 +109,8 @@ export async function pollProvider(
     const failures = wm[0]?.consecutive_failures ?? 0;
     const priorError = wm[0]?.last_error ?? '';
     if (isAuthCircuitOpen(failures, priorError)) {
-      log.error('[poll-portal-tracking] auth circuit OPEN — refusing to re-authenticate', {
-        provider: provider.key,
-        accountRef: provider.accountRef,
-        consecutiveFailures: failures,
-        lastError: priorError,
-        hint: 'fix the credential; the next successful tick closes the breaker automatically',
-      });
-      // Still alerted, every tick: the breaker stops the retries, not the
-      // reporting. Nobody may be watching the logs, and an open breaker means
-      // this account is ingesting nothing at all.
-      await raiseTrackingAlert({
-        kind: 'auth',
-        consecutiveFailures: failures,
-        nowSast: new Date(),
-        provider: provider.key,
-        accountRef: provider.accountRef,
-        detail: `auth circuit open after ${failures} consecutive failures — not retrying: ${priorError}`,
-      });
-      return {
-        provider: provider.key,
-        accountRef: provider.accountRef,
-        skipped: 'auth-circuit-open',
-        consecutiveFailures: failures,
-        lastError: priorError,
-      };
+      return reportOpenCircuit(provider.key, provider.accountRef, failures, priorError);
     }
-
     const portalVehicles = await listVehicles();
     const recon = await reconcileTrackers(provider.key, provider.accountRef, portalVehicles);
 

@@ -98,7 +98,7 @@ describe('login', () => {
   });
 
   it('produces an auth message the alert classifier recognises', async () => {
-    // pollProvider.isAuthFailure() matches on message text to choose between an
+    // authFailure.isAuthFailure() matches on message text to choose between an
     // immediate WhatsApp and a silent-until-threshold transient.
     const { client } = make([
       json({ id: 10, result: { status: 'WRONG_CREDENTIALS', attempts_remaining: 19 } }),
