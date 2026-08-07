@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+// The permission arguments are CAPTURED, not discarded. Mocking
+// `withPermission: () => h => h` makes the gate invisible to the suite: change
+// 'edit' to 'view', typo the resource key, or delete the wrapper entirely and
+// every test still passes. This is the gate on a decision that carries
+// disciplinary consequence, so it is asserted explicitly below.
+// vi.hoisted because vi.mock is hoisted above ordinary const declarations —
+// a plain `const` here throws "cannot access before initialization".
+const withPermissionArgs = vi.hoisted(() => [] as Array<[string, string]>);
 vi.mock('@/lib/auth/middleware', () => ({
   withAuth: (h: unknown) => h,
-  withPermission: () => (h: unknown) => h,
+  withPermission: (key: string, action: string) => {
+    withPermissionArgs.push([key, action]);
+    return (h: unknown) => h;
+  },
 }));
 
 const decideRequest = vi.fn();
@@ -170,6 +181,80 @@ describe('POST /api/fleet/parking/requests/[requestId]/decide', () => {
   it('rejects a non-POST method', async () => {
     const res = await call({ method: 'GET', query: { requestId: 'req-1' } });
     expect(res.statusCode).toBe(405);
+    expect(decideRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('authorization gate', () => {
+  it('is wrapped in withPermission("fleet.parking-requests", "edit")', () => {
+    // Mutation-kill: change the action to 'view', change the resource key, or
+    // remove the wrapper, and this fails. Previously nothing did.
+    expect(withPermissionArgs).toContainEqual(['fleet.parking-requests', 'edit']);
+  });
+
+  it('requires the EDIT action — a view-level grant must not decide', () => {
+    // Named separately because 'view' is the action the sibling list routes
+    // use, so a copy-paste between them is the realistic way this regresses.
+    const parkingGates = withPermissionArgs.filter(([key]) => key === 'fleet.parking-requests');
+    expect(parkingGates.length).toBeGreaterThan(0);
+    for (const [, action] of parkingGates) expect(action).toBe('edit');
+  });
+});
+
+describe('separation of duties and audit trail', () => {
+  it('refuses a self-decision with 403, not a retryable conflict', async () => {
+    // 403 rather than 409 deliberately: retrying never helps, a DIFFERENT
+    // person has to act. A conflict code invites the client to try again.
+    decideRequest.mockResolvedValue({ ok: false, reason: 'self_decision' });
+    const res = await call({
+      method: 'POST',
+      query: { requestId: 'req-1' },
+      body: { outcome: 'approved' },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(JSON.stringify(res.body)).toMatch(/somebody else/i);
+  });
+
+  it('rejects a decline with no note — the UI rule enforced server-side', async () => {
+    // RequestCard disables the button, but that is a button, not a rule.
+    const res = await call({
+      method: 'POST',
+      query: { requestId: 'req-1' },
+      body: { outcome: 'rejected' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(decideRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a decline whose note is only whitespace', async () => {
+    const res = await call({
+      method: 'POST',
+      query: { requestId: 'req-1' },
+      body: { outcome: 'rejected', decisionNote: '   ' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(decideRequest).not.toHaveBeenCalled();
+  });
+
+  it('still allows an APPROVAL with no note', async () => {
+    // Only declining requires a justification; approving the driver's own
+    // stated address does not.
+    decideRequest.mockResolvedValue({
+      ok: true, vehicleId: 'v1', registration: 'AA11AAGP', driverStaffId: 's1',
+    });
+    const res = await call({
+      method: 'POST', query: { requestId: 'req-1' }, body: { outcome: 'approved' },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('caps an over-long note instead of writing unbounded TEXT', async () => {
+    const res = await call({
+      method: 'POST',
+      query: { requestId: 'req-1' },
+      body: { outcome: 'rejected', decisionNote: 'x'.repeat(1001) },
+    });
+    expect(res.statusCode).toBe(400);
     expect(decideRequest).not.toHaveBeenCalled();
   });
 });

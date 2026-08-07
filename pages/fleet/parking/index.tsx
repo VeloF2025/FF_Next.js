@@ -12,15 +12,10 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { fleetConfig } from '@/modules/navigation';
 import { ComplianceTable } from '@/modules/fleet/parking/web/ComplianceTable';
+import { PARKING_CHECK_RESULTS } from '@/modules/fleet/parking/types';
 import type { ComplianceRow, ParkingCheckResult } from '@/modules/fleet/parking/types';
 
-const RESULTS: ParkingCheckResult[] = [
-  'compliant',
-  'violation',
-  'unknown',
-  'not_verifiable',
-  'no_address',
-];
+const RESULTS: readonly ParkingCheckResult[] = PARKING_CHECK_RESULTS;
 
 const RESULT_LABEL: Record<ParkingCheckResult, string> = {
   compliant: 'Compliant',

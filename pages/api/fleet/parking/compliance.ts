@@ -12,15 +12,10 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { loadCompliance } from '@/modules/fleet/parking/complianceQueries';
+import { PARKING_CHECK_RESULTS } from '@/modules/fleet/parking/types';
 import type { ParkingCheckResult } from '@/modules/fleet/parking/types';
 
-const RESULTS: ParkingCheckResult[] = [
-  'compliant',
-  'violation',
-  'unknown',
-  'not_verifiable',
-  'no_address',
-];
+const RESULTS: readonly ParkingCheckResult[] = PARKING_CHECK_RESULTS;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 

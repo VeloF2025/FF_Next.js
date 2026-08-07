@@ -104,7 +104,7 @@ export async function loadPendingRequests(): Promise<PendingRequest[]> {
 
 export type DecisionResult =
   | { ok: true; vehicleId: string; registration: string; driverStaffId: string }
-  | { ok: false; reason: 'not_found' | 'not_pending' | 'assignment_ended' };
+  | { ok: false; reason: 'not_found' | 'not_pending' | 'assignment_ended' | 'self_decision' };
 
 /**
  * Approve or reject one request.
@@ -124,6 +124,15 @@ export type DecisionResult =
  * applied — approving it would attach an address to a vehicle on the say-so of
  * someone no longer responsible for it. A *rejection* skips that check: the
  * driver may well be gone, and the request still needs closing out.
+ *
+ * NOBODY DECIDES THEIR OWN DECLARATION. Holding `fleet.parking-requests:edit`
+ * and holding a company vehicle are not mutually exclusive — in production
+ * today two people are in exactly that position, one of them a super_admin. A
+ * decision carries disciplinary consequence for the named driver, so a
+ * self-issued one is not oversight at all. Enforced here rather than in the
+ * route so every caller inherits it, and applied to REJECTION as well as
+ * approval: quietly closing your own violation is the same failure of
+ * separation as approving it.
  */
 export async function decideRequest(input: DecisionInput): Promise<DecisionResult> {
   const client = await pool.connect();
@@ -153,6 +162,15 @@ export async function decideRequest(input: DecisionInput): Promise<DecisionResul
     if (request.status !== 'pending') {
       await client.query('ROLLBACK');
       return { ok: false, reason: 'not_pending' };
+    }
+    // Separation of duties. See the header note: approver and driver overlap in
+    // real staff data, so this is a live path, not a theoretical one.
+    if (
+      input.decidedByStaffId !== null &&
+      input.decidedByStaffId === request.declared_by_staff_id
+    ) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'self_decision' };
     }
 
     if (input.outcome === 'approved') {

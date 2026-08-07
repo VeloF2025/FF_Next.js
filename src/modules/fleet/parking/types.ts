@@ -10,12 +10,22 @@
  */
 
 /** Outcome of a single nightly parking check. */
-export type ParkingCheckResult =
-  | 'compliant'
-  | 'violation'
-  | 'unknown'
-  | 'not_verifiable'
-  | 'no_address';
+/**
+ * Every result the nightly check can produce, as a runtime array.
+ *
+ * Single source of truth: the type below is DERIVED from it. Two call sites
+ * previously hand-copied this list, so adding a sixth result would have been
+ * silently missed by whichever one nobody remembered to edit.
+ */
+export const PARKING_CHECK_RESULTS = [
+  'compliant',
+  'violation',
+  'unknown',
+  'not_verifiable',
+  'no_address',
+] as const;
+
+export type ParkingCheckResult = (typeof PARKING_CHECK_RESULTS)[number];
 
 export interface ParkingLocation {
   id: string;

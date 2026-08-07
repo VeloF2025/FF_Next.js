@@ -19,6 +19,9 @@ interface AuthedRequest extends NextApiRequest {
   user?: { id: string; role: string };
 }
 
+/** Matches the driver-side note cap in declarationRules.ts. */
+const MAX_DECISION_NOTE = 1000;
+
 const OUTCOMES: DecisionOutcome[] = ['approved', 'rejected'];
 
 async function handler(req: AuthedRequest, res: NextApiResponse) {
@@ -43,6 +46,20 @@ async function handler(req: AuthedRequest, res: NextApiResponse) {
     typeof body.decisionNote === 'string' && body.decisionNote.trim().length > 0
       ? body.decisionNote.trim()
       : null;
+  // The UI disables Decline until a note is typed and its placeholder says
+  // "required when declining" — but that is a button, not a rule. Without this
+  // a direct POST closes a disciplinary-adjacent decision with no recorded
+  // justification, and the audit trail the interface promises is simply empty.
+  if (outcome === 'rejected' && decisionNote === null) {
+    return apiResponse.badRequest(res, 'A note for the driver is required when declining');
+  }
+  // Cap it here as well: the column is unconstrained TEXT and the client's
+  // maxLength is cosmetic. Matches the driver route's own discipline.
+  if (decisionNote !== null && decisionNote.length > MAX_DECISION_NOTE) {
+    return apiResponse.badRequest(
+      res, `The note must be ${MAX_DECISION_NOTE} characters or fewer`
+    );
+  }
 
   try {
     const result = await decideRequest({
@@ -56,6 +73,14 @@ async function handler(req: AuthedRequest, res: NextApiResponse) {
     if (!result.ok) {
       if (result.reason === 'not_found') {
         return apiResponse.notFound(res, 'Parking request', requestId);
+      }
+      // Separation of duties is a permission failure, not a state conflict —
+      // retrying will never help, and a different person has to act.
+      if (result.reason === 'self_decision') {
+        return apiResponse.forbidden(
+          res,
+          'You declared this parking address, so somebody else has to decide it.'
+        );
       }
       return apiResponse.conflict(
         res,
@@ -81,5 +106,9 @@ async function handler(req: AuthedRequest, res: NextApiResponse) {
     return apiResponse.internalError(res, err);
   }
 }
+
+// Matches the driver route (pages/api/my/vehicle/parking.ts): the only field
+// is a note, so anything larger than this is not a decision.
+export const config = { api: { bodyParser: { sizeLimit: '8kb' } } };
 
 export default withAuth(withPermission('fleet.parking-requests', 'edit')(handler));

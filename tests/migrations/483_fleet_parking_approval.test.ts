@@ -82,6 +82,12 @@ const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 2 });
 type Queries = typeof import('@/modules/fleet/parking/approvalQueries');
 let queries: Queries;
 
+/**
+ * `$6::text` in BOTH places is load-bearing. Used bare, the same parameter is
+ * deduced as `character varying` from the status column and as `text` from the
+ * CASE comparison, and Postgres refuses with 42P08 "inconsistent types deduced
+ * for parameter $6". Every test that seeds a row dies on it.
+ */
 async function insertLocation(
   status: 'pending' | 'active',
   over: { lat?: number; lon?: number; label?: string } = {}
@@ -89,7 +95,8 @@ async function insertLocation(
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO fleet_vehicle_parking_locations
        (vehicle_id, declared_by_staff_id, lat, lon, accuracy_m, label, status, effective_from)
-     VALUES ($1, $2, $3, $4, 12, $5, $6, CASE WHEN $6 = 'active' THEN now() ELSE NULL END)
+     VALUES ($1, $2, $3, $4, 12, $5, $6::text,
+             CASE WHEN $6::text = 'active' THEN now() ELSE NULL END)
      RETURNING id`,
     [VEHICLE, DRIVER, over.lat ?? -26.1929, over.lon ?? 28.0305, over.label ?? null, status]
   );
@@ -340,5 +347,86 @@ describe('loadPendingRequests', () => {
     await assign();
     await insertLocation('active');
     expect(await queries.loadPendingRequests()).toEqual([]);
+  });
+});
+
+describe('separation of duties', () => {
+  it('refuses a decision by the person who declared it', async () => {
+    // The exploit this closes: holding fleet.parking-requests:edit and holding
+    // a company vehicle are not mutually exclusive. In production today two
+    // people are in exactly that position, one a super_admin. Without this
+    // guard they could declare their own overnight parking and approve it.
+    //
+    // Exercised against the REAL decideRequest and a real Postgres, not a
+    // mocked route: mocking decideRequest would only prove the route maps the
+    // reason to a 403, which is true even with the guard deleted.
+    await assign();
+    const pendingId = await insertLocation('pending');
+    expect(
+      await queries.decideRequest({ ...input(pendingId, 'approved'), decidedByStaffId: DRIVER })
+    ).toEqual({ ok: false, reason: 'self_decision' });
+
+    // and it must still be pending afterwards — refused, not silently consumed
+    expect((await statuses())[pendingId]).toBe('pending');
+  });
+
+  it('refuses a self-REJECTION too, not just a self-approval', async () => {
+    // Quietly closing your own violation is the same failure of separation as
+    // approving it.
+    await assign();
+    const pendingId = await insertLocation('pending');
+    expect(
+      await queries.decideRequest({
+        ...input(pendingId, 'rejected', 'never mind'),
+        decidedByStaffId: DRIVER,
+      })
+    ).toEqual({ ok: false, reason: 'self_decision' });
+  });
+
+  it('still allows a DIFFERENT approver to decide', async () => {
+    // Guard must not block the normal path.
+    await assign();
+    const pendingId = await insertLocation('pending');
+    const result = await queries.decideRequest(input(pendingId, 'approved'));
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('concurrency — overlapping decisions', () => {
+  it('lets exactly one of two overlapping decisions win', async () => {
+    // What this DOES prove: two decisions started before either finishes
+    // produce exactly one winner and never two active rows for a vehicle.
+    //
+    // What it does NOT prove, stated plainly so nobody reads more into it:
+    // that `FOR UPDATE OF p` is what produces that. Deleting the lock leaves
+    // this test green — the ux_parking_active_per_vehicle unique index already
+    // refuses a second active row, so the invariant holds either way. Writing
+    // a test that genuinely fails without the lock needs forced interleaving
+    // (advisory lock or a paused transaction), which is flaky in CI.
+    //
+    // The lock is still correct and worth keeping: it converts a constraint
+    // violation (a 500) into a clean `not_pending` (a 409). That difference is
+    // what this test's assertion on the loser's reason actually pins.
+    await assign();
+    const pendingId = await insertLocation('pending');
+
+    const [a, b] = await Promise.all([
+      queries.decideRequest(input(pendingId, 'approved')),
+      queries.decideRequest(input(pendingId, 'approved')),
+    ]);
+
+    // Exactly one wins; the other is refused, never both.
+    const outcomes = [a.ok, b.ok].sort();
+    expect(outcomes).toEqual([false, true]);
+    const loser = a.ok ? b : a;
+    expect(loser).toEqual({ ok: false, reason: 'not_pending' });
+
+    // And the invariant that matters: never two active rows for one vehicle.
+    const { rows } = await db.query<{ n: string }>(
+      `SELECT count(*) AS n FROM fleet_vehicle_parking_locations
+        WHERE vehicle_id = $1 AND status = 'active'`,
+      [VEHICLE]
+    );
+    expect(Number(rows[0]!.n)).toBe(1);
   });
 });
