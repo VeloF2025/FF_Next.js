@@ -127,7 +127,10 @@ describe('scrapeOneDriveRecordings — transcribes before summarising', () => {
 
     expect(calls).not.toContain('summarise');   // never reached past the stuck call
     expect(statuses).toContain('failed');        // item recorded as failed, not silently dropped
-    expect(result.failed).toBeGreaterThan(0);    // and the run returned rather than hanging
+    // Exactly one: the inner enrichment catch counts it and does NOT rethrow, so
+    // the outer per-item catch must not count the same item a second time.
+    expect(result.failed).toBe(1);
+    expect(result.errors).toHaveLength(1);
 
     delete process.env.ONEDRIVE_TRANSCRIBE_BUDGET_MS;
   });
