@@ -46,9 +46,22 @@ echo "$LOG_PREFIX === Ituran tracking poll start ==="
 __ENV_SET_BY_LOADER=" "
 
 load_env_file() {
-  local file="$1" line key val quote cont
+  local file="$1" line key val quote buf closed i j n
+  # Read the whole file first. A streaming loop cannot back out of a quote that
+  # turns out never to close: it consumes the rest of the file into that value
+  # and every later key silently vanishes. dotenv instead falls back to reading
+  # that one line as unquoted and carries on, which needs lookahead the array
+  # gives us for free. These files are a few hundred lines.
+  local -a lines=()
   while IFS= read -r line || [ -n "$line" ]; do
-    line=${line%$'\r'}                      # CRLF-authored file
+    lines+=("${line%$'\r'}")                # CRLF-authored file
+  done < "$file"
+
+  n=${#lines[@]}
+  i=0
+  while [ "$i" -lt "$n" ]; do
+    line=${lines[$i]}
+    i=$((i + 1))
     line=${line#"${line%%[![:space:]]*}"}   # leading indentation
     case "$line" in ''|'#'*) continue ;; esac
     case "$line" in
@@ -67,17 +80,31 @@ load_env_file() {
 
     case "$val" in
       \"*|\'*)
-        # Quoted: keep the content exactly, including '#'. dotenv lets these
-        # span lines, so keep reading until the closing quote rather than
-        # emitting a value with a stray leading quote and dropping the rest.
+        # Quoted: content kept exactly, including '#'. dotenv allows these to
+        # span lines, so look ahead for the closing quote.
         quote=${val:0:1}
-        val=${val#?}
-        while :; do
-          case "$val" in *"$quote") val=${val%"$quote"}; break ;; esac
-          IFS= read -r cont || break
-          val="$val
-${cont%$'\r'}"
-        done
+        buf=${val#?}
+        closed=0
+        case "$buf" in *"$quote") buf=${buf%"$quote"}; closed=1 ;; esac
+        if [ "$closed" -eq 0 ]; then
+          j=$i
+          while [ "$j" -lt "$n" ]; do
+            buf="$buf
+${lines[$j]}"
+            j=$((j + 1))
+            case "$buf" in *"$quote") buf=${buf%"$quote"}; closed=1; break ;; esac
+          done
+          [ "$closed" -eq 1 ] && i=$j
+        fi
+        if [ "$closed" -eq 1 ]; then
+          val=$buf
+        else
+          # Never closed. Treat THIS line as unquoted — opening quote and all,
+          # exactly as dotenv does — and resume at the next line rather than
+          # swallowing the remainder of the file.
+          val=${val%%#*}
+          val=${val%"${val##*[![:space:]]}"}
+        fi
         ;;
       *)
         val=${val%%#*}                      # inline trailing comment
@@ -101,7 +128,7 @@ ${cont%$'\r'}"
     esac
     __ENV_SET_BY_LOADER="$__ENV_SET_BY_LOADER$key "
     export "$key=$val"
-  done < "$file"
+  done
 }
 
 # BOTH files, `.env` first so `.env.local` wins — the same precedence Next.js
