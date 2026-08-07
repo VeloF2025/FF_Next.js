@@ -105,18 +105,21 @@ jobs:
       # installed, at which point a regression in code that DELETES production
       # pole rows merges green.
       #
-      # Scoped deliberately to the two replan suites rather than all of
+      # Scoped deliberately to the replan + hierarchy suites rather than all of
       # scripts/test_*.py: widening it is a change to every PR's gate, not to
       # this one's, and belongs in its own change. The other seven qfield Python
       # suites still run nowhere in CI.
       #
       # test_replan_import_db.py spins its own throwaway Postgres on an
       # ephemeral port — never the shared dev+prod database. Requires docker.
-      - name: Replan import tests — matching + write path (gate)
+      - name: QField Python suites — replan import + hierarchy authority (gate)
         run: |
           python3 scripts/test_replan_match.py
           python3 scripts/test_replan_import_db.py
           python3 scripts/test_replan_guards.py
+          python3 scripts/test_qfield_hierarchy_backfill.py
+          python3 scripts/test_qfield_hierarchy_scoping.py
+          python3 scripts/test_qfield_gpkg_columns.py
         timeout-minutes: 15
 
       # The container is removed in the suite's teardown, but a cancelled or timed-out
@@ -125,9 +128,19 @@ jobs:
       # cannot destroy a developer's container mid-test.
       - name: Clean up this run's replan test container
         if: always()
+        env:
+          RUN_LABEL: ff-replan-run=${{ github.run_id }}
         run: |
-          docker ps -aq --filter "label=ff-replan-run=${{ github.run_id }}" \
-            | xargs -r docker rm -f
+          # Best-effort by definition: this only exists to catch a CRASHED run that
+          # never reached its own teardown. On a healthy run the suites kill their
+          # containers themselves and --rm removes them, so this races that removal
+          # and `docker rm -f` reports "removal already in progress" — xargs then
+          # exits 123 and fails a build whose tests all passed. Never fail here.
+          ids=$(docker ps -aq --filter "label=$RUN_LABEL" || true)
+          if [ -n "$ids" ]; then
+            echo "sweeping leftover container(s): $ids"
+            docker rm -f $ids || echo "  already gone or mid-removal — nothing to do"
+          fi
 
       # Velocity review repository tests — same reasoning as the migration gate
       # above, one layer up. These drive the real repository functions against a

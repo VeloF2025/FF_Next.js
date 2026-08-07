@@ -36,7 +36,7 @@ The Construction-QA module provides comprehensive quality assurance workflows fo
 | Mamelodi | 2ce80264-170c-4f05-ada1-68220d7e5885 | MAMPoles.gpkg | label |
 | Etwatwa | 47585401-1b25-4d3b-8d18-4337ea26df88 | PolesAudit.gpkg | label |
 | Thembisa POP 1 | 63341eb4-bc81-4607-a3d6-580ea2a7457c | Poles.gpkg | label_1 |
-| Thembisa POP 3 | 5f3b962a-7901-43f7-a284-1c1a9ed7f3d1 | THM_3_Poles.gpkg | label_1 |
+| Thembisa POP 3 | 5f3b962a-7901-43f7-a284-1c1a9ed7f3d1 | THM_3_Poles.gpkg | label |
 | Tonga | 7fe59cdc-b1d5-475d-8448-5cf2e9f7175b | Civil Audit.gpkg | Pole Label |
 
 **Checklist Steps (Column-to-Step Mapping):**

@@ -48,7 +48,10 @@ DB). The wrapper resolves `DATABASE_URL` from the deploy dir's `.env.local` →
 `scripts/sync-qfield-status-to-ff.py` (Mohadin, Etwatwa, Lawley, Mamelodi,
 Thembisa POP1, Thembisa POP3). Each project's GPKG file / table / label column /
 status column **differ and were verified against the live GPKG before adding** —
-e.g. Thembisa's pole-label column is `label_1` and its table is lower-case. The
+e.g. Thembisa POP 1's pole-label column is `label_1`, and POP 3's table is lower-case
+(POP 3's label column is `label` — it lost the `_1` suffix when the layer was
+republished on 2026-08-04). These values EXPIRE on republish; `require_column` fails
+loudly rather than silently reading a string literal. The
 `qf` id is the live `FT_<site>` QFieldCloud project the crews edit (NOT the stale
 `*_Pole_Audit` copies).
 

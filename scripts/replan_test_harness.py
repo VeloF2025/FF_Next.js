@@ -50,11 +50,27 @@ def start_pg():
     # orphaned Postgres holds a port on a long-lived self-hosted runner. RUN_ID scopes
     # the sweep to this run so it cannot kill a developer's container.
     run_id = os.environ.get("GITHUB_RUN_ID", f"local-{os.getpid()}")
-    _container = subprocess.check_output([
-        "docker", "run", "-d", "--rm", "-P",
-        "--label", "ff-replan-test=1", "--label", f"ff-replan-run={run_id}",
-        "-e", "POSTGRES_PASSWORD=test", "-e", "POSTGRES_DB=test",
-        "postgres:15-alpine"], text=True).strip()
+    # Retry the run itself: rootless Docker's port manager can hand out a host port it
+    # has not finished releasing from a container that just exited, so `docker run -P`
+    # dies with "bind: address already in use" (exit 125). The four Python suites start
+    # containers back-to-back, which is exactly the window that race needs — it took the
+    # gate down on run 31139831645 after three suites had already passed. Each retry
+    # redraws a different ephemeral port, so a plain re-run clears it.
+    last_err = ""
+    for attempt in range(5):
+        proc = subprocess.run([
+            "docker", "run", "-d", "--rm", "-P",
+            "--label", "ff-replan-test=1", "--label", f"ff-replan-run={run_id}",
+            "-e", "POSTGRES_PASSWORD=test", "-e", "POSTGRES_DB=test",
+            "postgres:15-alpine"], capture_output=True, text=True)
+        if proc.returncode == 0:
+            _container = proc.stdout.strip()
+            break
+        last_err = proc.stderr.strip()
+        print(f"  docker run failed (attempt {attempt + 1}/5): {last_err[:160]}")
+        time.sleep(2 * (attempt + 1))
+    else:
+        raise RuntimeError(f"throwaway Postgres would not start: {last_err[:300]}")
     port = subprocess.check_output(
         ["docker", "port", _container, "5432/tcp"], text=True).strip().rsplit(":", 1)[-1]
     url = f"postgresql://postgres:test@127.0.0.1:{port}/test"
@@ -85,15 +101,53 @@ def connect():
     return conn
 
 
+def hierarchy_fixture(cur, schema):
+    """Scratch tables for the hierarchy-authority suites, in `schema`.
+
+    Shared by test_qfield_hierarchy_backfill and test_qfield_hierarchy_scoping so the
+    two cannot drift into disagreeing pictures of the same three tables — the whole
+    reason this module exists. Each suite passes its OWN schema name so they stay
+    isolated and can run concurrently.
+    """
+    cur.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE; CREATE SCHEMA {schema};")
+    cur.execute(f"SET search_path TO {schema}")
+    cur.execute("""CREATE TABLE poles (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
+        pole_number varchar, zone_no integer, pon_no integer,
+        updated_at timestamptz, UNIQUE (project_id, pole_number))""")
+    cur.execute("""CREATE TABLE pole_qa_photos (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
+        pole_label text, zone_no integer, pon_no integer,
+        updated_at timestamptz, UNIQUE (project_id, pole_label))""")
+    cur.execute("""CREATE TABLE construction_qa_reviews (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
+        feature_type text, feature_id text, zone_no integer, pon_no integer,
+        updated_at timestamptz)""")
+    # Stands in for the real view (production UNIONs sow_poles). A view, not a copy,
+    # so the tests stay honest about reading the PLAN rather than the GPKG.
+    cur.execute("""CREATE VIEW v_pole_planning AS
+        SELECT project_id, pole_number, zone_no, pon_no FROM poles""")
+
+
+def teardown_container():
+    """Kill the throwaway Postgres, if this process started one.
+
+    Separate from teardown() so a suite with its own scratch schema (the hierarchy
+    tests) can reuse the container lifecycle without inheriting the replan schema.
+    Safe to call when no container was started — TEST_DATABASE_URL was supplied.
+    """
+    if _container:
+        subprocess.run(["docker", "kill", _container],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def teardown(conn):
     try:
         conn.cursor().execute(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE")
         conn.commit()
     finally:
         conn.close()
-        if _container:
-            subprocess.run(["docker", "kill", _container],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        teardown_container()
 
 
 def fixture(conn):

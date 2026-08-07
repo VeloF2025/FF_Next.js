@@ -83,7 +83,20 @@ PROJECTS = {
         "ff_project_id": "1de088dd-fe24-43fb-b8d3-94fca61ef91d",
         "gpkg_path": "THM_3_Poles.gpkg",
         "table_name": "thm_3_poles",
-        "label_col": "label_1",
+        # 'label', not 'label_1'. QField appends _1 when a layer name collides on
+        # publish; THM_3_Poles was republished without the collision, so the suffix
+        # disappeared. Confirmed against ALL TEN THM_3_Poles.gpkg versions published
+        # on 2026-08-06 (v20260806100317 … v20260806143001): every one has `label`
+        # with 4,590 non-null values and none has `label_1`. Checked the whole set
+        # rather than one version because QFieldCloud republishes on every push, so
+        # pinning a single version dates the evidence within hours.
+        #
+        # The mismatch froze this project's ingest from 2026-08-04 14:02. It failed
+        # LOUDLY and correctly — qfield_gpkg_table bails before writing sync state
+        # precisely so a no-op run cannot stamp last_version and look fresh forever —
+        # but nothing alerted on it, so 27 poles' QA photos captured on 5–6 Aug sat in
+        # QField unseen. Johan Scott reported it as "PON 818 wys net 1 paal".
+        "label_col": "label",
     },
     "Tonga": {
         "qf_project_id": "7fe59cdc-b1d5-475d-8448-5cf2e9f7175b",
@@ -168,6 +181,19 @@ PROJECTS = {
 ALTERNATE_GPKGS = {
     "Mamelodi": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label"},
     "Thembisa POP 1": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label_1"},
+    # KEEP `label_1` here even though the primary THM_3 entry above is now `label`.
+    # These are DIFFERENT LAYERS and the suffix is per-layer, not per-project: the
+    # civil-audit layer still collides on publish, the poles layer no longer does.
+    # Verified against the live file — `Civil Audit.gpkg` for POP 3 (latest version
+    # v20260310073855) has table `civil_audit_` with `label_1`, 3,597 rows, and no
+    # `label`. An earlier revision of this PR "corrected" it to `label` by analogy with
+    # the poles layer; that was wrong and is reverted.
+    #
+    # Note the path is also wrong and has always been: the object is `Civil Audit.gpkg`
+    # (space, title case), not `civil_audit_.gpkg` — that is the TABLE name. So this
+    # entry does not resolve, which is why no sync-state row has ever been written for
+    # a civil_audit_ alternate. Left as-is rather than silently repointing a path at a
+    # 3,597-row March layer that nothing currently ingests.
     "Thembisa POP 3": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label_1"},
 }
 

@@ -42,6 +42,9 @@ from datetime import datetime, timezone
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from qfield_gpkg_table import require_column  # noqa: E402
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
 # DATABASE_URL must come from the environment (post-Neon-cutover this points at
@@ -67,7 +70,7 @@ FF_TO_QF_CIVIL_AUDIT = {
         "ff_project_id": "1de088dd-fe24-43fb-b8d3-94fca61ef91d",
         "gpkg_path": "THM_3_Poles.gpkg",
         "table_name": "thm_3_poles",
-        "label_col": "label_1",
+        "label_col": "label",
         "qa_comments_col": "Q/A Civil Comments",
         "qa_date_col": "Q/A Date",
     },
@@ -324,6 +327,40 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
     # 3. Update GPKG
     gpkg_conn = sqlite3.connect(tmp)
     gpkg_cur = gpkg_conn.cursor()
+
+    # Validate EVERY identifier this function interpolates, BEFORE dropping a trigger or
+    # writing anything: SQLite reads an unresolvable "identifier" as a string literal
+    # rather than raising, so any wrong name hands back one constant-valued row per pole
+    # instead of failing. The hardcoded pair matters as much as the configured pair — if
+    # "Status" were absent, every pole's status would read as the literal 'Status', no
+    # pole would look pending, writes would be 0 and the run would report success. That
+    # is the same silent-success this guard exists to kill.
+    # Checked up front so a misconfigured project aborts before it mutates its local
+    # copy. The caller catches per project, so this fails THIS project only.
+    try:
+        # qa_comments_col is included even though an unresolvable SET target DOES raise
+        # ("no such column"), unlike a SELECT: it is the most drift-prone value in the
+        # config — two projects carry a TRAILING SPACE ("Q/A Civil Comments ") — and it
+        # is only interpolated on the branch where a pole has a comment. A run of pure
+        # gap-fills never touches it, so a wrong value lies dormant and then fails
+        # mid-loop after the download instead of up front with everything else.
+        for _col, _purpose in ((label_col, "label"), (qa_date_col, "QA date"),
+                               (qa_comments_col, "QA comments"),
+                               ("Status", "status"), ("Pole Plant Date", "plant date")):
+            require_column(gpkg_conn, table_name, _col, purpose=_purpose)
+    except Exception:
+        # Release what we already hold before propagating: the cleanup that closes the
+        # handle and unlinks the download lives at the END of this function, so raising
+        # here would strand a ~1 MB temp GPKG and an open sqlite handle per bad config.
+        # Scoped to this raise site rather than wrapping the whole body — the remaining
+        # ~150 lines have the same pre-existing exposure on any sqlite error, but
+        # reindenting them wholesale is out of scope for this PR.
+        gpkg_conn.close()
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
     # Disable R-tree spatial triggers that call ST_IsEmpty (SpatiaLite function
     # not available in plain SQLite). We only update attribute columns, not geom,

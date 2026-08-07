@@ -527,7 +527,11 @@ python3 scripts/sync-qa-to-qfield.py --project Mohadin
 | Mamelodi | `2ce80264-...` | `MAMPoles.gpkg` | `MAMPoles` |
 | Etwatwa | `47585401-...` | `PolesAudit.gpkg` | `PolesAudit` |
 
-**Label column** for pole ID matching: `label_1` (Thembisa), `label` (all others)
+**Label column** for pole ID matching: `label_1` (Thembisa **POP 1** only), `label`
+(everything else, including Thembisa POP 3). QField appends `_1` only while a layer
+name collides on publish, so republishing a project can rename this column underneath
+us — POP 3 went `label_1` → `label` on 2026-08-04 and froze its ingest for three days.
+Never assume; `require_column` now fails loudly if a config is stale.
 
 ### VLM Photo Validation
 

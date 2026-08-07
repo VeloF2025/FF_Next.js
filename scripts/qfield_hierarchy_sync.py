@@ -1,4 +1,17 @@
-"""Persist verified QField audit hierarchy into FibreFlow QA rows."""
+"""Persist verified QField audit hierarchy into FibreFlow QA rows.
+
+⚠️ zone/PON authority is PER-POLE and lives in qfield_hierarchy_writers — read its
+docstring before touching any write. In one line: the plan owns a pole if the plan HAS
+that pole, otherwise the GPKG does, otherwise leave the value alone.
+
+Both halves are load-bearing and each was a real incident on 2026-08-06. Letting the
+GPKG win over a planned pole silently reverted 98 Thembisa POP 3 poles the replan had
+just corrected. Letting the plan win over a pole it does not contain skipped 1,190
+pole_qa_photos and 1,196 construction_qa_reviews rows that then had no source at all.
+
+See [[qfield-pole-zone-comes-from-boundaries-not-attributes]] for why the audit layer's
+attributes cannot be trusted to overrule a plan.
+"""
 import json
 import os
 import subprocess
@@ -7,6 +20,9 @@ import sys
 import psycopg2.extras
 
 from qfield_hierarchy import resolve_hierarchy
+from qfield_hierarchy_writers import (
+    _update_planning_poles, _update_reviews, _upsert_work_qa, _validated_pole_labels,
+)
 
 
 def hierarchy_backfill_needed(cur, ff_project_id, config):
@@ -74,100 +90,6 @@ def _hierarchy_by_label(rows, label_col, config, spatial_pon_map):
         if pon_no is not None or zone_no is not None:
             hierarchy[label] = (pon_no, zone_no)
     return hierarchy
-
-
-def _update_planning_poles(cur, hierarchy_values):
-    changed = psycopg2.extras.execute_values(
-        cur,
-        """
-        UPDATE poles AS p SET
-          pon_no = COALESCE(h.pon_no::integer, p.pon_no),
-          zone_no = COALESCE(h.zone_no::integer, p.zone_no),
-          updated_at = NOW()
-        FROM (VALUES %s) AS h(project_id, pole_label, zone_no, pon_no)
-        WHERE p.project_id = h.project_id::uuid
-          AND p.pole_number = h.pole_label
-          AND (
-            p.pon_no IS DISTINCT FROM COALESCE(h.pon_no::integer, p.pon_no)
-            OR p.zone_no IS DISTINCT FROM COALESCE(h.zone_no::integer, p.zone_no)
-          )
-        RETURNING p.id
-        """,
-        hierarchy_values,
-        page_size=200,
-        fetch=True,
-    )
-    return len(changed)
-
-
-def _validated_pole_labels(cur, ff_project_id, labels):
-    cur.execute(
-        """
-        SELECT DISTINCT q.feature_id
-        FROM qfield_photo_validations q
-        JOIN qfield_projects qp ON qp.qfield_project_id = q.project_id::text
-        JOIN qfield_project_links l ON l.qfield_project_id = qp.id
-        WHERE l.fibreflow_project_id = %s::uuid
-          AND q.feature_type = 'pole'
-          AND q.feature_id = ANY(%s::text[])
-        """,
-        (ff_project_id, labels),
-    )
-    return {row["feature_id"] for row in cur.fetchall()}
-
-
-def _upsert_work_qa(cur, hierarchy_values, validated_labels):
-    qa_values = [
-        value for value in hierarchy_values if value[1] in validated_labels
-    ]
-    if not qa_values:
-        return 0
-    changed = psycopg2.extras.execute_values(
-        cur,
-        """
-        INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
-        VALUES %s
-        ON CONFLICT (project_id, pole_label) DO UPDATE SET
-          zone_no = COALESCE(EXCLUDED.zone_no, pole_qa_photos.zone_no),
-          pon_no = COALESCE(EXCLUDED.pon_no, pole_qa_photos.pon_no),
-          updated_at = NOW()
-        WHERE
-          pole_qa_photos.zone_no IS DISTINCT FROM
-            COALESCE(EXCLUDED.zone_no, pole_qa_photos.zone_no)
-          OR pole_qa_photos.pon_no IS DISTINCT FROM
-            COALESCE(EXCLUDED.pon_no, pole_qa_photos.pon_no)
-        RETURNING pole_label
-        """,
-        qa_values,
-        page_size=200,
-        fetch=True,
-    )
-    return len(changed)
-
-
-def _update_reviews(cur, hierarchy_values):
-    changed = psycopg2.extras.execute_values(
-        cur,
-        """
-        UPDATE construction_qa_reviews AS r SET
-          zone_no = COALESCE(h.zone_no::integer, r.zone_no),
-          pon_no = COALESCE(h.pon_no::integer, r.pon_no),
-          updated_at = NOW()
-        FROM (VALUES %s) AS h(project_id, pole_label, zone_no, pon_no)
-        WHERE r.project_id = h.project_id::uuid
-          AND r.feature_type = 'pole'
-          AND r.feature_id = h.pole_label
-          AND (
-            r.zone_no IS DISTINCT FROM COALESCE(h.zone_no::integer, r.zone_no)
-            OR r.pon_no IS DISTINCT FROM COALESCE(h.pon_no::integer, r.pon_no)
-          )
-        RETURNING r.id
-        """,
-        hierarchy_values,
-        page_size=200,
-        fetch=True,
-    )
-    return len(changed)
 
 
 def sync_hierarchy(cur, conn, ff_project_id, rows, label_col, config, spatial_pon_map):
