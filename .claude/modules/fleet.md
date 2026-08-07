@@ -641,7 +641,11 @@ login for", not "a bug".
   - **JZ29GCGP** is in both and is also `retired`.
 
   Five plates on the portal, only **3 map** to active fleet rows: HG16TDGP, HW50KNGP,
-  JZ29GJGP. Worth asking Urent whether HW50PDGP and HW50JYGP are the same vehicle re-plated —
+  JZ29GJGP. The mechanism is `reconcileTrackers` in `discovery.ts`, which matches only against
+  `fleet_vehicles WHERE status = 'active'` — so a retired vehicle appears in
+  `unknownOnPortal` even when its plate matches perfectly. That is why HW50JYGP
+  (`439158881`) and JZ29GCGP (`214881212`) never map, and it is correct behaviour, not a
+  matching failure: a retired vehicle should not acquire a live tracker. Worth asking Urent whether HW50PDGP and HW50JYGP are the same vehicle re-plated —
   that is a question for them, not an inference to record as fact.
 - ⚠️ Our Cartrack account has an **8th subscription with no `vehicle_name`**. Source: the
   live REST call `GET /vehicles` on 2026-08-07 — these are Cartrack's OWN
