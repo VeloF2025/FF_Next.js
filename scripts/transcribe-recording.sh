@@ -50,6 +50,11 @@ say() { echo "[$(date +%H:%M:%S)] $*" >&2; }
 # Keep psql's exit status distinct from "row has no recording" — otherwise a DB
 # outage and a genuinely missing row report the same thing.
 PSQL_ERR=$(mktemp /tmp/tr-psql-XXXXXX) || { echo "could not create temp file" >&2; exit 1; }
+# psql has no timeout here, so this can block indefinitely against a hung DB.
+# Arm a trap immediately — the main one isn't installed until $WORK exists, and a
+# signal arriving in that window would otherwise leave this file behind.
+trap 'rm -f "$PSQL_ERR"' EXIT
+trap 'rm -f "$PSQL_ERR"; exit 130' INT TERM
 if ! path=$(psql "$DBURL" -t -A -c \
       "SELECT recording_path FROM meetings WHERE id = $MEETING_ID;" 2>"$PSQL_ERR"); then
   echo "meeting $MEETING_ID: database query failed" >&2
@@ -79,12 +84,13 @@ say "meeting $MEETING_ID: ${dur}s audio, mean_volume ${mean:-?}dB"
 
 WORK=$(mktemp -d /tmp/tr-XXXXXX) || { echo "could not create temp dir" >&2; exit 1; }
 [ -d "$WORK" ] || { echo "temp dir missing after mktemp" >&2; exit 1; }
+# Supersedes the PSQL_ERR-only trap above; that file is already gone by here.
 cleanup() { rm -rf "$WORK"; }
 # INT/TERM must also EXIT. A trap that only cleans up lets bash resume the script
 # afterwards, so the loop carries on against a work dir that no longer exists —
 # the incident documented in references/batch.md.
 trap cleanup EXIT
-trap 'cleanup; exit 130' INT TERM
+trap 'cleanup; trap - EXIT; exit 130' INT TERM
 
 : > "$WORK/out.txt"
 n=0
