@@ -29,7 +29,16 @@ vi.mock('@/lib/db-neon', () => ({
     ((strings: TemplateStringsArray) => {
       const q = (strings as unknown as string[]).join(' ? ');
       if (/SELECT id, title, meeting_date/i.test(q)) {
-        return Promise.resolve(dbState.meetingRow ? [dbState.meetingRow] : []);
+        // Project only what the query actually asks for. Returning the whole row
+        // regardless would mean dropping recording_path from the production
+        // SELECT still passed these tests — the guard depends on that column
+        // being fetched, so the mock has to be able to withhold it.
+        if (!dbState.meetingRow) return Promise.resolve([]);
+        const projected: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(dbState.meetingRow)) {
+          if (new RegExp(`\\b${k}\\b`).test(q)) projected[k] = v;
+        }
+        return Promise.resolve([projected]);
       }
       if (/FROM meeting_transcripts/i.test(q)) {
         return Promise.resolve([]); // no fallback transcript

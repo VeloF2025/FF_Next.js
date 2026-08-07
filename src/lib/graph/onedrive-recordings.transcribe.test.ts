@@ -69,7 +69,7 @@ function makeSql(transcriptLen: number) {
     if (/SELECT processing_status FROM meetings/i.test(q)) {
       return Promise.resolve([{ processing_status: 'fetching' }]);
     }
-    if (/length\(raw_transcript\)/i.test(q)) return Promise.resolve([{ len: transcriptLen }]);
+    if (/raw_transcript/i.test(q)) return Promise.resolve([{ len: transcriptLen }]);
     return Promise.resolve([]);
   };
 }
@@ -98,6 +98,34 @@ describe('scrapeOneDriveRecordings — transcribes before summarising', () => {
     expect(calls).toEqual(['summarise']);
   });
 
+  it('consults the meeting_transcripts fallback, not just raw_transcript', async () => {
+    // A VTT longer than TRANSCRIPT_INLINE_LIMIT is spilled to meeting_transcripts
+    // with raw_transcript left empty (meeting-helpers), and processWithLLM reads
+    // it from there. Checking raw_transcript alone would re-transcribe a meeting
+    // that already has a transcript — burning the budget on exactly the long
+    // meetings most likely to exhaust it and be marked failed for it.
+    const seen: string[] = [];
+    const sql = (strings: TemplateStringsArray) => {
+      const q = (strings as unknown as string[]).join(' ? ');
+      seen.push(q);
+      if (/SELECT id FROM meetings WHERE onedrive_item_id/i.test(q)) return Promise.resolve([]);
+      if (/FROM meetings\s+WHERE source = 'teams'/i.test(q)) return Promise.resolve([]);
+      if (/INSERT INTO meetings/i.test(q)) return Promise.resolve([{ id: 42 }]);
+      if (/SELECT processing_status FROM meetings/i.test(q)) {
+        return Promise.resolve([{ processing_status: 'fetching' }]);
+      }
+      if (/raw_transcript/i.test(q)) return Promise.resolve([{ len: 0 }]);
+      return Promise.resolve([]);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await scrapeOneDriveRecordings(sql as any);
+
+    const transcriptCheck = seen.find((q) => /raw_transcript/i.test(q));
+    expect(transcriptCheck).toBeDefined();
+    expect(transcriptCheck).toMatch(/meeting_transcripts/i);
+  });
+
   it('gives up on an item whose transcription outruns the budget, and marks it failed', async () => {
     // The documented Mac Mini failure is "accepts the connection, never answers",
     // so the call neither resolves nor rejects — exactly what the budget is for.
@@ -117,7 +145,7 @@ describe('scrapeOneDriveRecordings — transcribes before summarising', () => {
       if (/SELECT processing_status FROM meetings/i.test(q)) {
         return Promise.resolve([{ processing_status: 'fetching' }]);
       }
-      if (/length\(raw_transcript\)/i.test(q)) return Promise.resolve([{ len: 0 }]);
+      if (/raw_transcript/i.test(q)) return Promise.resolve([{ len: 0 }]);
       if (/processing_status = 'failed'/i.test(q)) { statuses.push('failed'); return Promise.resolve([]); }
       return Promise.resolve([]);
     };

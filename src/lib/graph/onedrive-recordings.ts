@@ -401,9 +401,22 @@ export async function scrapeOneDriveRecordings(
               // has no transcript yet; the meeting is then summarised from real
               // content instead of being abandoned.
               if (WHISPER_TEAMS_RECORDINGS) {
+                // Must mirror how processWithLLM resolves a transcript: primary
+                // column first, then the meeting_transcripts fallback. A VTT
+                // longer than TRANSCRIPT_INLINE_LIMIT is spilled to that table
+                // with raw_transcript left empty (meeting-helpers), so checking
+                // raw_transcript alone would re-transcribe a meeting that already
+                // has a perfectly good transcript — and long meetings are both the
+                // ones that spill and the ones most likely to exhaust the budget
+                // and be marked failed for it.
                 const t = await sql`
-                  SELECT coalesce(length(raw_transcript), 0) AS len
-                  FROM meetings WHERE id = ${meetingId}
+                  SELECT coalesce(length(m.raw_transcript), 0)
+                       + coalesce((
+                           SELECT max(length(t2.content))
+                           FROM meeting_transcripts t2
+                           WHERE t2.meeting_id = m.id
+                         ), 0) AS len
+                  FROM meetings m WHERE m.id = ${meetingId}
                 ` as Array<{ len: number }>;
                 if ((t[0]?.len ?? 0) === 0) {
                   await withBudget(
