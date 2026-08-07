@@ -159,3 +159,41 @@ describe('newestFixAt', () => {
     expect(newestFixAt([])).toBeNull();
   });
 });
+
+describe('newestFixAt — future-dated fixes must not defeat the dead-feed probe', () => {
+  const NOW = new Date('2026-08-07T14:00:00Z');
+
+  it('ignores a fix from a rolled-over device clock', () => {
+    // The failure this guards: pollProvider computes feedAgeMs = now - newest.
+    // A 2043 fix makes that NEGATIVE, so gapReason's `feedAgeMs > staleFeedMs`
+    // is false forever. For a snapshot provider that is the ONLY dead-feed
+    // signal, so the whole account could go dark permanently while every tick
+    // logged as healthy.
+    const rows: FleetwebVehicle[] = [
+      { ...LIVE[0]!, vehicle_id: 'broken', event_ts: '2043-01-01 00:00:00+02' },
+      { ...LIVE[1]!, vehicle_id: 'real', event_ts: '2026-08-01 09:00:00+02' },
+    ];
+    const newest = newestFixAt(rows, NOW);
+    expect(newest?.toISOString()).toBe('2026-08-01T07:00:00.000Z');
+    expect(newest!.getTime()).toBeLessThan(NOW.getTime()); // feedAgeMs stays positive
+  });
+
+  it('still accepts a fix inside the clock-skew tolerance ingest allows', () => {
+    // Must match ingestPositions' own 5-minute cutoff: a fix it would store
+    // has to count as fresh, or the two disagree about the same reading.
+    const rows: FleetwebVehicle[] = [
+      { ...LIVE[0]!, vehicle_id: 'skewed', event_ts: '2026-08-07 16:02:00+02' }, // 14:02Z, +2min
+    ];
+    expect(newestFixAt(rows, NOW)?.toISOString()).toBe('2026-08-07T14:02:00.000Z');
+  });
+
+  it('returns null when EVERY fix is future-dated, rather than a future date', () => {
+    // null makes feedAgeMs null, which gapReason treats as "cannot tell" —
+    // strictly better than a confidently wrong "fresh".
+    const rows: FleetwebVehicle[] = [
+      { ...LIVE[0]!, vehicle_id: 'a', event_ts: '2043-01-01 00:00:00+02' },
+      { ...LIVE[1]!, vehicle_id: 'b', event_ts: '2044-01-01 00:00:00+02' },
+    ];
+    expect(newestFixAt(rows, NOW)).toBeNull();
+  });
+});

@@ -110,6 +110,16 @@ describe('login', () => {
     const { client } = make([json({ id: 10, result: { status: 'SUCCEEDED' } })]);
     await expect(client.listVehicles()).rejects.toThrow(/issued no session cookies/);
   });
+
+  it('rejects a login that set cookies but not the session one', async () => {
+    // Accepting any cookie would let an LB-affinity-only response read as
+    // "logged in", failing on the next RPC and burning the one same-tick
+    // re-login before it surfaced.
+    const r = json({ id: 10, result: { status: 'SUCCEEDED' } });
+    r.headers.append('set-cookie', 'SERVERID=6; path=/');
+    const { client } = make([r]);
+    await expect(client.listVehicles()).rejects.toThrow(/expected fs/);
+  });
 });
 
 describe('session expiry', () => {

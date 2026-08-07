@@ -43,3 +43,34 @@ export function isAuthFailure(message: string): boolean {
     'i'
   ).test(message);
 }
+
+/**
+ * Consecutive AUTH failures before a provider stops being called at all.
+ *
+ * Sized against the tightest known limit: Cartrack's ct_login locks an account
+ * out after roughly 20 failures. Three burns a sixth of that budget before the
+ * breaker opens — enough to ride out a genuine blip without approaching the
+ * ceiling. Any successful tick resets consecutive_failures to 0, closing it.
+ */
+export const AUTH_BREAKER_THRESHOLD = 3;
+
+/**
+ * Whether to stop calling a provider entirely.
+ *
+ * Portal logins are rate-limited by the far side, and at least one of them
+ * enforces a hard, numbered account lockout that takes the data source with it.
+ * A credential that has gone bad — a rotated password, an expired sub-user —
+ * fails identically on every tick, so retrying blindly every two hours burns
+ * that budget in under two days, unattended, over a weekend.
+ *
+ * consecutive_failures was written on every failure but never read. This is
+ * what reads it. Deliberately narrow: a transient or gap streak also increments
+ * the counter, and those CAN self-heal, so only a last_error that classifies as
+ * an auth failure opens the breaker.
+ */
+export function isAuthCircuitOpen(
+  consecutiveFailures: number,
+  lastError: string | null
+): boolean {
+  return consecutiveFailures >= AUTH_BREAKER_THRESHOLD && isAuthFailure(lastError ?? '');
+}

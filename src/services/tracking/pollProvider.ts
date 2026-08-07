@@ -15,7 +15,7 @@ import { ingestPositions } from '@/services/tracking/ingest';
 import { raiseTrackingAlert } from '@/services/tracking/alerts';
 import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
-import { isAuthFailure } from '@/services/tracking/authFailure';
+import { isAuthCircuitOpen, isAuthFailure } from '@/services/tracking/authFailure';
 import type { ProviderPosition, TrackingProvider } from '@/services/tracking/types';
 
 /** No watermark yet: how far back the first tick reaches. */
@@ -123,6 +123,48 @@ export async function pollProvider(
   { provider, listVehicles, feedFreshness }: ConfiguredProvider
 ): Promise<Record<string, unknown>> {
   try {
+    // Read the watermark FIRST — before anything that authenticates, so a
+    // known-bad credential never spends another login attempt. See
+    // isAuthCircuitOpen for why that matters.
+    const wm = await sql<{
+      last_event_ts: Date | null;
+      consecutive_failures: number;
+      last_error: string | null;
+    }>`
+      SELECT last_event_ts, consecutive_failures, last_error
+      FROM fleet_tracking_watermarks
+      WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+    `;
+    const failures = wm[0]?.consecutive_failures ?? 0;
+    const priorError = wm[0]?.last_error ?? '';
+    if (isAuthCircuitOpen(failures, priorError)) {
+      log.error('[poll-portal-tracking] auth circuit OPEN — refusing to re-authenticate', {
+        provider: provider.key,
+        accountRef: provider.accountRef,
+        consecutiveFailures: failures,
+        lastError: priorError,
+        hint: 'fix the credential; the next successful tick closes the breaker automatically',
+      });
+      // Still alerted, every tick: the breaker stops the retries, not the
+      // reporting. Nobody may be watching the logs, and an open breaker means
+      // this account is ingesting nothing at all.
+      await raiseTrackingAlert({
+        kind: 'auth',
+        consecutiveFailures: failures,
+        nowSast: new Date(),
+        provider: provider.key,
+        accountRef: provider.accountRef,
+        detail: `auth circuit open after ${failures} consecutive failures — not retrying: ${priorError}`,
+      });
+      return {
+        provider: provider.key,
+        accountRef: provider.accountRef,
+        skipped: 'auth-circuit-open',
+        consecutiveFailures: failures,
+        lastError: priorError,
+      };
+    }
+
     const portalVehicles = await listVehicles();
     const recon = await reconcileTrackers(provider.key, provider.accountRef, portalVehicles);
 
@@ -135,10 +177,6 @@ export async function pollProvider(
     `;
     const activeTrackers = trackerRows[0]?.n ?? 0;
 
-    const wm = await sql<{ last_event_ts: Date | null; consecutive_failures: number }>`
-      SELECT last_event_ts, consecutive_failures FROM fleet_tracking_watermarks
-      WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
-    `;
     const now = new Date();
     const last = wm[0]?.last_event_ts ? new Date(wm[0].last_event_ts) : null;
     const wanted = last

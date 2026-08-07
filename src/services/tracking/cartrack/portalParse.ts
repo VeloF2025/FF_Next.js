@@ -10,6 +10,7 @@
  * Pure and network-free so it can be tested against a committed fixture.
  */
 import { parseSampleTs } from './client';
+import { MAX_FUTURE_MS } from '../ingest';
 import type { PortalVehicle } from '../portal/registration';
 import type { ProviderPosition } from '../types';
 
@@ -169,15 +170,29 @@ export function toVehicles(vehicles: FleetwebVehicle[]): PortalVehicle[] {
 /**
  * Newest fix anywhere on the account — the dead-feed probe.
  *
- * A snapshot provider cannot signal a dead feed by returning nothing. Note this
- * account legitimately contains vehicles idle for days, so only the freshest
- * matters.
+ * A snapshot provider cannot signal a dead feed by returning nothing, so for
+ * this provider staleness is the ONLY such signal: gapReason's
+ * "returned no positions" branch is gated on `granularity === 'history'`. That
+ * makes this function load-bearing, and it is why future-dated fixes must be
+ * excluded rather than merely not stored.
+ *
+ * A tracker with a rolled-over or corrupted clock reports a date years ahead.
+ * Taking a plain max would then make `feedAgeMs = now - newest` NEGATIVE, so
+ * `feedAgeMs > staleFeedMs` is false forever and the whole account could go
+ * dark permanently while every tick still logs as healthy. ingestPositions
+ * already refuses such a fix, so counting it as "fresh" would also be
+ * incoherent: it would mean the feed is proven live by a reading we declined
+ * to store. Same tolerance as ingest, deliberately shared.
+ *
+ * `now` is injectable so the guard is testable without touching the clock.
  */
-export function newestFixAt(vehicles: FleetwebVehicle[]): Date | null {
+export function newestFixAt(vehicles: FleetwebVehicle[], now: Date = new Date()): Date | null {
+  const cutoff = now.getTime() + MAX_FUTURE_MS;
   let newest: Date | null = null;
   for (const [, v] of usableRows(vehicles)) {
     const at = parseSampleTs(v.event_ts ?? '');
-    if (at && (newest === null || at > newest)) newest = at;
+    if (!at || at.getTime() > cutoff) continue;
+    if (newest === null || at > newest) newest = at;
   }
   return newest;
 }

@@ -178,8 +178,17 @@ class HttpCartrackPortalClient implements CartrackPortalClient {
       .filter(Boolean)
       .map((line) => line.split(';')[0])
       .filter((pair): pair is string => Boolean(pair && pair.includes('=')));
-    if (jar.length === 0) {
-      throw new CartrackPortalError('auth', 'login succeeded but issued no session cookies');
+    // `fs` is the cookie that actually carries the session. Accepting any
+    // cookie would let a response that set only an incidental one (load-balancer
+    // affinity, analytics) read as "logged in", which then fails on the next RPC
+    // and spends the single allowed same-tick re-login before surfacing.
+    if (!jar.some((pair) => pair.startsWith('fs='))) {
+      throw new CartrackPortalError(
+        'auth',
+        `login succeeded but issued no session cookies (got ${
+          jar.map((p) => p.split('=')[0]).join(', ') || 'none'
+        }, expected fs)`
+      );
     }
     this.cookie = jar.join('; ');
     log.info('[cartrack-portal] session established', {
