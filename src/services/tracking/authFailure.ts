@@ -43,3 +43,17 @@ export function isAuthFailure(message: string): boolean {
     'i'
   ).test(message);
 }
+
+/**
+ * Whether two failures belong to the same streak.
+ *
+ * `fleet_tracking_watermarks.consecutive_failures` is incremented by the gap
+ * branch as well as the error branch, so it counts consecutive failures of ONE
+ * KIND rather than failures in general. Without that distinction a long gap
+ * streak carries its count into the auth breaker, and a single auth failure
+ * landing on a count already past the hard-stop ceiling would skip the open and
+ * half-open states entirely and demand manual SQL to clear.
+ */
+export function isSameFailureKind(a: string | null, b: string | null): boolean {
+  return isAuthFailure(a ?? '') === isAuthFailure(b ?? '');
+}

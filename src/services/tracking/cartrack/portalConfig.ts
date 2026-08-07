@@ -1,6 +1,11 @@
 /**
  * Env-driven registration for the Cartrack fleetweb portal provider.
  *
+ * This is the fleetweb PORTAL API, not the REST API that poll-tracking.ts uses
+ * for the velocity account. The urent account authenticates with three fields
+ * (account code + sub-user + password) and HTTP Basic has only two slots, so it
+ * can never reach the REST API however the username is shaped.
+ *
  * Lives here rather than inline in pollProvider.ts, which is already over the
  * 300-line limit before this provider existed — adding a fourth env block to it
  * would push it further out.

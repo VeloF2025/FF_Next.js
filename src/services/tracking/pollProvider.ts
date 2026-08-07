@@ -7,17 +7,17 @@
  */
 import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
-import { PartialFetchError } from '@/services/tracking/netstar/client';
 import { netstarFromEnv } from '@/services/tracking/netstar/config';
+import { fetchTolerantly } from '@/services/tracking/fetchTolerantly';
 import { cartrackPortalFromEnv } from '@/services/tracking/cartrack/portalConfig';
 import { reconcileTrackers } from '@/services/tracking/discovery';
 import { ingestPositions } from '@/services/tracking/ingest';
 import { raiseTrackingAlert } from '@/services/tracking/alerts';
 import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
-import { isAuthFailure } from '@/services/tracking/authFailure';
+import { isAuthFailure, isSameFailureKind } from '@/services/tracking/authFailure';
 import { authBreakerDecision, logProbe, reportThrottled } from '@/services/tracking/authBreaker';
-import type { ProviderPosition, TrackingProvider } from '@/services/tracking/types';
+import type { TrackingProvider } from '@/services/tracking/types';
 
 /** No watermark yet: how far back the first tick reaches. */
 const COLD_START_MS = 24 * 60 * 60 * 1000;
@@ -55,11 +55,8 @@ export function configuredProviders(): ConfiguredProvider[] {
   const netstar = netstarFromEnv();
   if (netstar) out.push(netstar);
 
-  // Cartrack's fleetweb PORTAL, which is not the REST API poll-tracking.ts uses.
-  // The urent account authenticates with three fields (account + sub-user +
-  // password); HTTP Basic has two slots, so it can never reach the REST API
-  // however the username is shaped. It rides this cadence rather than the
-  // 2-minute one because it is a portal scrape.
+  // The fleetweb PORTAL, not the REST API poll-tracking.ts uses — see
+  // cartrack/portalConfig.ts. A portal scrape, so it rides this cadence.
   const cartrackPortal = cartrackPortalFromEnv();
   if (cartrackPortal) out.push(cartrackPortal);
 
@@ -67,32 +64,10 @@ export function configuredProviders(): ConfiguredProvider[] {
 }
 
 
-/**
- * Fetch, tolerating a partial result. The positions that arrived are worth
- * storing, but the window was not fully covered — so the caller must NOT
- * advance the watermark past it, or the vehicles that failed lose it for good.
- * `complete: false` carries that. (Only the history path can produce one.)
- */
-async function fetchTolerantly(
-  provider: TrackingProvider, from: Date, to: Date
-): Promise<{ positions: ProviderPosition[]; complete: boolean; detail: string | null }> {
-  try {
-    return { positions: await provider.fetchPositions(from, to), complete: true, detail: null };
-  } catch (err) {
-    if (err instanceof PartialFetchError) {
-      log.warn('[poll-portal-tracking] partial fetch — storing what arrived, holding the watermark', {
-        provider: provider.key, accountRef: provider.accountRef,
-        recovered: err.positions.length, failures: err.failures,
-      });
-      return { positions: err.positions, complete: false, detail: err.message };
-    }
-    throw err;
-  }
-}
-
 export async function pollProvider(
   { provider, listVehicles, feedFreshness }: ConfiguredProvider
 ): Promise<Record<string, unknown>> {
+  let priorError = '';   // hoisted: the catch compares failure kinds
   try {
     // Read the watermark FIRST — before anything that authenticates, so a
     // known-bad credential never spends another login attempt. See
@@ -108,7 +83,7 @@ export async function pollProvider(
       WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
     `;
     const failures = wm[0]?.consecutive_failures ?? 0;
-    const priorError = wm[0]?.last_error ?? '';
+    priorError = wm[0]?.last_error ?? '';
     // Half-open on a cooldown, NOT a latch: while throttled the tick is skipped
     // without writing the watermark, so a permanently-skipping breaker would
     // freeze consecutive_failures and block the only path that could ever clear
@@ -269,6 +244,9 @@ export async function pollProvider(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // Restarts the streak at 1 when the failure kind changes — see
+    // isSameFailureKind for why the gap branch makes that necessary.
+    const sameKind = isSameFailureKind(message, priorError);
     const auth = isAuthFailure(message);
     // Watermark deliberately untouched — the next tick retries the same window,
     // so a transient outage loses no data. This INSERT omits last_event_ts
@@ -279,7 +257,8 @@ export async function pollProvider(
       VALUES (${provider.key}, ${provider.accountRef}, now(), ${message}, 1)
       ON CONFLICT (provider, account_ref) DO UPDATE
         SET last_run_at = now(), last_error = ${message},
-            consecutive_failures = fleet_tracking_watermarks.consecutive_failures + 1
+            consecutive_failures = CASE WHEN ${sameKind}::boolean
+              THEN fleet_tracking_watermarks.consecutive_failures + 1 ELSE 1 END
       RETURNING consecutive_failures
     `;
     log.error('[poll-portal-tracking] provider failed', {
