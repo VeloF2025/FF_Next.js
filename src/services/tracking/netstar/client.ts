@@ -94,13 +94,51 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
     fetchImpl: opts.fetchImpl,
     isLoggedOut: (res) =>
       res.status === 302 && /Account\/Login/i.test(res.headers.get('location') ?? ''),
+    /**
+     * Two requests, because the form is anti-forgery protected.
+     *
+     * GET the login page to pick up the session cookie and the
+     * `__RequestVerificationToken` hidden field, then POST both back. ASP.NET
+     * MVC validates the token against the cookie, so the pair has to travel
+     * together — posting credentials alone is rejected and the session is never
+     * established, which surfaces later as "still logged out after re-auth"
+     * against whatever endpoint ran next.
+     *
+     * The form posts to `/Authentication/`, NOT to
+     * `/Authentication/Account/Login` — that second path is where the form is
+     * SERVED, and posting to it does not log you in. Verified against the live
+     * portal 2026-08-07: GET the page, POST to /Authentication/, receive a 302
+     * and a session cookie, after which /Main answers 200 instead of redirecting.
+     */
     login: async (fetchImpl, jar: CookieJar) => {
-      const url = `${opts.baseUrl.replace(/\/+$/, '')}/Authentication/Account/Login`;
+      const base = opts.baseUrl.replace(/\/+$/, '');
+
+      const page = await fetchImpl(`${base}/Authentication/Account/Login`, {
+        headers: { Cookie: jar.header() },
+      });
+      jar.absorb(page);
+      if (!page.ok) {
+        throw new Error(`[netstar] login page: HTTP ${page.status}`);
+      }
+      const html = await page.text();
+      const token = /name="__RequestVerificationToken"[^>]*value="([^"]+)"/.exec(html)?.[1];
+      if (!token) {
+        // Shape change, or a login page that is really an error page. Failing
+        // here names the cause; posting without the token would surface three
+        // calls later as a mysterious logged-out error.
+        throw new Error('[netstar] login page carried no __RequestVerificationToken');
+      }
+
       const body = new URLSearchParams({
         UserName: opts.username,
         Password: opts.password,
+        __RequestVerificationToken: token,
+        // The form submits both; the portal uses them to render times in the
+        // operator's zone. SAST is UTC+2 year-round.
+        timeZone: '120',
+        timeZoneName: 'South Africa Standard Time',
       });
-      const res = await fetchImpl(url, {
+      const res = await fetchImpl(`${base}/Authentication/`, {
         method: 'POST',
         body,
         redirect: 'manual',
@@ -141,6 +179,9 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
     const qs = `page=1&pageSize=2147483647&__ts=${Date.now()}&treeFilter=&sortBy=&sortDir=`;
     const res = await session.request(`/Main/VehicleRepo/GetVehicleTreeDataPaging?${qs}`, {
       method: 'POST',
+      // Explicit empty body: the portal answers 411 Length Required to a POST
+      // that carries no Content-Length.
+      body: '',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',

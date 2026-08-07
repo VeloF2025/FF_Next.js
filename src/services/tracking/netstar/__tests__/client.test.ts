@@ -45,12 +45,24 @@ describe('chunkWindow', () => {
  * a bare array. That path 404s — it never worked against the real portal — so
  * these fixtures are built from a capture of the running app instead.
  */
-function treeFetch(body: unknown, status = 200) {
+const LOGIN_PAGE = '<html><form action="/VigilCloud4/Authentication/" method="post">'
+  + '<input name="__RequestVerificationToken" type="hidden" value="TOKEN-abc123" />'
+  + '<input name="UserName" /><input name="Password" type="password" /></form></html>';
+
+function treeFetch(body: unknown, status = 200, loginPage: string = LOGIN_PAGE) {
   const seen: string[] = [];
   const headers: Array<Record<string, string>> = [];
+  const logins: Array<{ url: string; body: string }> = [];
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
-    if (url.includes('/Authentication/Account/Login')) return new Response(null, { status: 200 });
+    // GET the form, then POST to /Authentication/ — two different paths.
+    if (url.endsWith('/Authentication/Account/Login')) {
+      return new Response(loginPage, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    }
+    if (url.endsWith('/Authentication/')) {
+      logins.push({ url, body: String(init?.body ?? '') });
+      return new Response(null, { status: 302, headers: { location: '/VigilCloud4/Main' } });
+    }
     if (url.includes('/Main/VehicleRepo/GetVehicleTreeDataPaging')) {
       seen.push(`${(init?.method || 'GET')} ${url}`);
       headers.push((init?.headers ?? {}) as Record<string, string>);
@@ -60,7 +72,7 @@ function treeFetch(body: unknown, status = 200) {
     }
     throw new Error(`treeFetch: unexpected url ${url}`);
   };
-  return { fetchImpl: fetchImpl as unknown as typeof fetch, seen, headers };
+  return { fetchImpl: fetchImpl as unknown as typeof fetch, seen, headers, logins };
 }
 
 const LEAF = (leafId: number, name: string, over: Record<string, unknown> = {}) => ({
@@ -220,8 +232,11 @@ function reportFetch(exportStatuses: number[]) {
   let exportCall = 0;
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
-    if (url.includes('/Authentication/Account/Login')) {
-      return new Response(null, { status: 200 });
+    if (url.endsWith('/Authentication/Account/Login')) {
+      return new Response(LOGIN_PAGE, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    }
+    if (url.endsWith('/Authentication/')) {
+      return new Response(null, { status: 302, headers: { location: '/VigilCloud4/Main' } });
     }
     if (url.includes('/Reports/ReportRepo/GenerateReport')) {
       const payload: unknown = JSON.parse(String(init?.body ?? '{}'));
@@ -365,7 +380,12 @@ describe('netstarClient.fetchHistory — one bad vehicle must not blank the flee
     let pendingVehicle = '';
     return async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
-      if (url.includes('/Authentication/Account/Login')) return new Response(null, { status: 200 });
+      if (url.endsWith('/Authentication/Account/Login')) {
+        return new Response(LOGIN_PAGE, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      if (url.endsWith('/Authentication/')) {
+        return new Response(null, { status: 302, headers: { location: '/VigilCloud4/Main' } });
+      }
       if (url.includes('/GenerateReport')) {
         const body = JSON.parse(String(init?.body)) as { selectedIds: number[] };
         pendingVehicle = String(body.selectedIds[0]);
@@ -431,7 +451,12 @@ describe('netstarClient.fetchHistory — runtime budget', () => {
     let clock = 0;
     const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
-      if (url.includes('/Authentication/Account/Login')) return new Response(null, { status: 200 });
+      if (url.endsWith('/Authentication/Account/Login')) {
+        return new Response(LOGIN_PAGE, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      if (url.endsWith('/Authentication/')) {
+        return new Response(null, { status: 302, headers: { location: '/VigilCloud4/Main' } });
+      }
       if (url.includes('/GenerateReport')) {
         clock += 10 * 60 * 1000; // each vehicle burns ten minutes
         const body = JSON.parse(String(init?.body)) as { selectedIds: number[] };
@@ -551,5 +576,51 @@ describe('netstarClient — one tree download per tick', () => {
       fetchImpl: t.fetchImpl, sleep: async () => {},
     });
     expect(await client.feedFreshness()).toBeNull();
+  });
+});
+
+/**
+ * The login is anti-forgery protected and the form does NOT post back to the
+ * URL that serves it. Getting either wrong establishes no session, and the
+ * failure surfaces much later as "still logged out after re-auth" against
+ * whatever endpoint happened to run next — which is exactly how this shipped.
+ */
+describe('netstarClient login', () => {
+  function build(loginPage?: string) {
+    const t = treeFetch({ data: [LEAF(1, 'A')] }, 200, loginPage);
+    return { ...t, client: netstarClient({
+      baseUrl: 'https://x.test/VigilCloud4', username: 'u', password: 'p',
+      fetchImpl: t.fetchImpl, sleep: async () => {},
+    }) };
+  }
+
+  it('POSTs to /Authentication/, not to the page that served the form', async () => {
+    const { client, logins } = build();
+    await client.listVehicles();
+    expect(logins).toHaveLength(1);
+    expect(logins[0]!.url).toBe('https://x.test/VigilCloud4/Authentication/');
+  });
+
+  it('carries the __RequestVerificationToken lifted from the page', async () => {
+    const { client, logins } = build();
+    await client.listVehicles();
+    const sent = new URLSearchParams(logins[0]!.body);
+    expect(sent.get('__RequestVerificationToken')).toBe('TOKEN-abc123');
+    expect(sent.get('UserName')).toBe('u');
+    expect(sent.get('Password')).toBe('p');
+  });
+
+  it('submits the timezone fields the form carries', async () => {
+    const { client, logins } = build();
+    await client.listVehicles();
+    const sent = new URLSearchParams(logins[0]!.body);
+    expect(sent.get('timeZone')).toBe('120');
+    expect(sent.get('timeZoneName')).toBe('South Africa Standard Time');
+  });
+
+  // Naming the cause here beats a logged-out error three calls later.
+  it('fails loudly when the page carries no token', async () => {
+    const { client } = build('<html><form action="/x"><input name="UserName" /></form></html>');
+    await expect(client.listVehicles()).rejects.toThrow(/no __RequestVerificationToken/);
   });
 });
