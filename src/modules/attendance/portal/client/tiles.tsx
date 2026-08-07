@@ -17,6 +17,7 @@ import {
   Camera,
   ShieldCheck,
   Users,
+  MapPin,
 } from 'lucide-react';
 
 import type { HubSummaryResponse } from './api';
@@ -83,6 +84,31 @@ export function VehicleTile({
       badge={checkDue ? `${checkDue} due` : null}
       badgeClass="bg-orange-500/15 text-orange-300 border-orange-500/30"
       disabled={pending}
+    />
+  );
+}
+
+/**
+ * Overnight parking address. Rendered on the same condition as VehicleTile —
+ * a driver with no vehicle has nothing to declare — so the hub does not grow
+ * a dead tile for office staff.
+ */
+export function ParkingTile({
+  hasVehicle,
+  onClick,
+}: {
+  hasVehicle: boolean;
+  onClick: () => void;
+}) {
+  if (!hasVehicle) return null;
+
+  return (
+    <Tile
+      onClick={onClick}
+      icon={<MapPin className="w-5 h-5" />}
+      iconClass="bg-indigo-500/15 text-indigo-300"
+      title="Vehicle parking"
+      subtitle="Where you park overnight"
     />
   );
 }

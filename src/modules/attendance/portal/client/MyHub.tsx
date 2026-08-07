@@ -14,6 +14,7 @@ import {
   CorrectionsTile,
   HsCheckinTile,
   HsCrewCheckinTile,
+  ParkingTile,
   PayslipsTile,
   ReceiptsTile,
   SiteCamTile,
@@ -118,6 +119,10 @@ export function MyHub({ profile }: MyHubProps) {
               hasVehicle={profile.hasAssignedVehicle}
               pending={data.vehicleHandoffPending}
               onClick={() => void data.handleVehicleTap()}
+            />
+            <ParkingTile
+              hasVehicle={profile.hasAssignedVehicle}
+              onClick={() => router.push('/my/vehicle/parking')}
             />
             <PayslipsTile summary={data.summary} onClick={() => router.push('/my/payslips')} />
             <ReceiptsTile summary={data.summary} onClick={() => router.push('/my/receipts')} />
