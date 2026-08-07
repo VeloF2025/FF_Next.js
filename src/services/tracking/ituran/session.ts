@@ -42,6 +42,23 @@ const SUBMIT_SELECTOR = '#btnLogin, input[name="btnLogin"]';
 /** The login token the app puts in the page and sends back as PassEnc. */
 const TOKEN_RE = /tok-[A-Za-z0-9_-]+/;
 
+/**
+ * Removes credential values from text that is about to leave this process.
+ *
+ * Exported for tests. Matches literally rather than by pattern, because the
+ * only values we can be certain are secret are the ones we were handed. Short
+ * or empty values are skipped — redacting a 2-character password would blank
+ * out unrelated text and destroy the diagnostic instead of protecting it.
+ */
+export function redactSecrets(text: string, secrets: Array<string | undefined>): string {
+  let out = text;
+  for (const secret of secrets) {
+    if (!secret || secret.length < 4) continue;
+    out = out.split(secret).join('[redacted]');
+  }
+  return out;
+}
+
 export async function mintIturanSession(opts: MintOptions): Promise<IturanSession> {
   // Imported lazily and by a computed specifier so that neither the Next.js
   // bundler nor a stray `import` of this module's siblings can pull Playwright
@@ -102,12 +119,20 @@ export async function mintIturanSession(opts: MintOptions): Promise<IturanSessio
     // inline message and no token, which would otherwise flow onward as an
     // empty session and surface much later as an unexplained 'LoginError!'.
     if (!token || !waap?.value) {
-      const message = await page
+      const raw = await page
         .evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim().slice(0, 200))
         .catch(() => '');
+      // This string does not stay local: it becomes the thrown message, which
+      // pollProvider writes to fleet_tracking_watermarks.last_error, log.error's,
+      // and passes as the alert `detail` that raiseTrackingAlert forwards to
+      // FLEET_ALERT_USER_IDS over WhatsApp/email. A WebForms error page that
+      // echoed the submitted form back would therefore publish the credentials
+      // to all four sinks. The observed page does not echo them — it says only
+      // "Incorrect user name or password" — but that is one observation of a
+      // third party's template, not a guarantee, so scrub unconditionally.
       throw new Error(
         `login did not yield a session (token=${Boolean(token)}, waap_id=${Boolean(waap?.value)}); ` +
-          `page said: ${message || '(unreadable)'}`
+          `page said: ${redactSecrets(raw, [opts.username, opts.password]) || '(unreadable)'}`
       );
     }
 

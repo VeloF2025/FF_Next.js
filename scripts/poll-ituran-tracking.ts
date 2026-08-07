@@ -31,6 +31,20 @@ import { log } from '@/lib/logger';
 
 const DEFAULT_BASE_URL = 'https://www.ituran.com';
 
+/**
+ * Distinct from poll-tracking's 4417301 and poll-portal-tracking's 4417302, so
+ * Ituran serialises only against itself and never blocks the other cadences.
+ *
+ * Running outside the API route means this does not inherit that route's
+ * advisory lock, and it still needs one for the same reason the route
+ * documents: two concurrent ticks race reconcileTrackers' read-then-write and
+ * can land a stale watermark upsert after a fresher one. A mint takes ~5s and a
+ * tick well under a minute, so overlap needs a stall — but a stalled portal is
+ * exactly when a second tick fires, and it would also mean two browser logins
+ * against a partner-owned account at once.
+ */
+const LOCK_KEY = 4417303;
+
 async function main(): Promise<number> {
   const baseUrl = process.env.ITURAN_PORTAL_URL || DEFAULT_BASE_URL;
   const username = process.env.ITURAN_PORTAL_USER;
@@ -65,20 +79,57 @@ async function main(): Promise<number> {
     });
   }
 
-  const result = await pollProvider({
-    provider: ituranProvider({ accountRef, client }),
-    listVehicles: () => client.listVehicles(),
-    // A snapshot feed keeps serving the same fix after the account goes dark,
-    // so staleness — not emptiness — is the dead-feed signal.
-    feedFreshness: () => client.feedFreshness(),
-  });
+  // Same pinned-connection discipline as the API-route pollers:
+  // pg_try_advisory_lock and pg_advisory_unlock are SESSION-scoped, so acquire
+  // and release must run on the identical physical connection or the unlock
+  // silently no-ops on a session that never held the lock — stranding it on
+  // whichever session did. sql()/pool.query() each check out an arbitrary
+  // connection, so a pinned client is required.
+  const client_ = await pool.connect();
+  let lockHeld = false;
+  try {
+    const { rows } = await client_.query<{ locked: boolean }>(
+      'SELECT pg_try_advisory_lock($1) AS locked', [LOCK_KEY]);
+    lockHeld = rows[0]?.locked ?? false;
+    if (!lockHeld) {
+      // Not an error: the previous tick is still going. Exit 0 so cron does not
+      // mail about it, but say so on stdout where the log file will show it.
+      log.info('[poll-ituran] previous run still in progress — skipping tick');
+      process.stdout.write(`${JSON.stringify({ accountRef, skipped: 'already-running' })}\n`);
+      return 0;
+    }
 
-  // Printed, not just logged: the cron appends stdout to the log file, and
-  // log.info goes to journald, which is not where anyone looks when a day of
-  // telemetry is missing.
-  process.stdout.write(`${JSON.stringify({ accountRef, alertRecipients: recipients, result })}\n`);
+    const result = await pollProvider({
+      provider: ituranProvider({ accountRef, client }),
+      listVehicles: () => client.listVehicles(),
+      // A snapshot feed keeps serving the same fix after the account goes dark,
+      // so staleness — not emptiness — is the dead-feed signal.
+      feedFreshness: () => client.feedFreshness(),
+    });
 
-  return 'error' in (result as Record<string, unknown>) ? 1 : 0;
+    // Printed, not just logged: the cron appends stdout to the log file, and
+    // log.info goes to journald, which is not where anyone looks when a day of
+    // telemetry is missing.
+    process.stdout.write(`${JSON.stringify({ accountRef, alertRecipients: recipients, result })}\n`);
+
+    return 'error' in (result as Record<string, unknown>) ? 1 : 0;
+  } finally {
+    let unlockFailed = false;
+    if (lockHeld) {
+      try {
+        await client_.query('SELECT pg_advisory_unlock($1)', [LOCK_KEY]);
+      } catch (err) {
+        unlockFailed = true;
+        log.error('[poll-ituran] advisory unlock failed', {
+          error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    // A connection whose unlock failed still holds the session-scoped lock.
+    // Destroying it ends the session, which is what makes Postgres drop it —
+    // otherwise every later tick skips with a clean exit and tracking stops
+    // dead while looking healthy.
+    client_.release(unlockFailed);
+  }
 }
 
 main()

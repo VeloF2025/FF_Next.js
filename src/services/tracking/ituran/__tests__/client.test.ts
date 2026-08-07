@@ -168,3 +168,28 @@ describe('ituranClient request shape', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('redactSecrets', () => {
+  it('scrubs credentials out of text bound for the DB, logs and WhatsApp alerts', async () => {
+    // A failed login's page text becomes the thrown message, which lands in
+    // fleet_tracking_watermarks.last_error, log.error, and the alert detail
+    // forwarded to FLEET_ALERT_USER_IDS. A WebForms page that echoed the
+    // submitted form would publish the password to all four sinks.
+    const { redactSecrets } = await import('../session');
+    expect(redactSecrets('Login failed for BlitzFibre / hunter2secret', ['BlitzFibre', 'hunter2secret']))
+      .toBe('Login failed for [redacted] / [redacted]');
+  });
+
+  it('leaves text alone when the secret is absent', async () => {
+    const { redactSecrets } = await import('../session');
+    expect(redactSecrets('Incorrect user name or password', ['BlitzFibre', 'hunter2secret']))
+      .toBe('Incorrect user name or password');
+  });
+
+  it('skips short secrets rather than blanking unrelated text', async () => {
+    // Redacting a 2-character password would destroy the diagnostic it is
+    // meant to protect.
+    const { redactSecrets } = await import('../session');
+    expect(redactSecrets('an ordinary sentence', ['an', undefined])).toBe('an ordinary sentence');
+  });
+});

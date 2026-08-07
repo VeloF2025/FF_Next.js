@@ -44,7 +44,14 @@ fi
 # A hung browser must not run into the next tick. The mint is ~5s and the grid
 # fetch is one request, so 10 minutes is generous headroom before something is
 # genuinely wrong.
-if ! timeout 600 ./node_modules/.bin/tsx scripts/poll-ituran-tracking.ts; then
+#
+# Playwright installs its own SIGTERM handler (handleSIGTERM defaults to true)
+# and kills the browser process, so the plain TERM below does NOT orphan
+# Chromium — measured: 10 chromium processes spawned, 0 left 6s after SIGTERM.
+# --kill-after adds a SIGKILL backstop for the case where that graceful close
+# is itself what has hung. A concurrent tick is prevented by an advisory lock in
+# the script, not by this timeout.
+if ! timeout --kill-after=30s 600 ./node_modules/.bin/tsx scripts/poll-ituran-tracking.ts; then
   echo "$LOG_PREFIX ERROR: ituran tracking poll failed" >&2
   exit 1
 fi

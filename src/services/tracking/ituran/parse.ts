@@ -125,16 +125,38 @@ export function readIgnition(statuses: IturanStatus[] | null | undefined): boole
   return null;
 }
 
-/** Rows carrying a usable fix, keyed by the portal's PlatformId. */
+/**
+ * Rows carrying a usable fix, keyed by the portal's PlatformId.
+ *
+ * `PlatformId` is the identity; the dict key is only a fallback, since in every
+ * captured payload the two are the same value. That fallback makes a collision
+ * conceivable — a row missing its PlatformId whose dict key equals another
+ * row's real one — and two rows sharing an externalId would attribute one
+ * vehicle's positions to the other. The ingest dedup key carries no vehicle_id,
+ * so such a position can never be repaired by re-ingesting.
+ *
+ * So a duplicate refuses BOTH rows rather than letting the first win, matching
+ * how registration.ts resolves the same class of ambiguity.
+ */
 function* usableRows(res: IturanGridResponse): Generator<[string, IturanGridRow]> {
   const rows = res.rows_data;
   if (!rows || typeof rows !== 'object') return;
+
+  const seen = new Map<string, IturanGridRow>();
+  const duplicated = new Set<string>();
   for (const [key, row] of Object.entries(rows)) {
     if (!row || typeof row !== 'object') continue;
     const externalId = String(row.PlatformId ?? key ?? '').trim();
     if (!externalId) continue;
-    yield [externalId, row];
+    if (seen.has(externalId)) {
+      duplicated.add(externalId);
+      continue;
+    }
+    seen.set(externalId, row);
   }
+  for (const externalId of duplicated) seen.delete(externalId);
+
+  yield* seen;
 }
 
 /**

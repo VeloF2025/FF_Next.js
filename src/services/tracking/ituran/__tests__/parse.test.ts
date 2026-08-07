@@ -149,6 +149,27 @@ describe('toPositions', () => {
     expect(out.map((p) => p.externalId)).toEqual(['1242358']);
   });
 
+  it('refuses BOTH rows when two resolve to the same externalId', () => {
+    // PlatformId is identity; the dict key is only a fallback. A row missing
+    // its PlatformId whose key collides with another row's real one would
+    // otherwise attribute one vehicle's position to the other — and the ingest
+    // dedup key carries no vehicle_id, so that is unrepairable.
+    const out = toPositions(
+      {
+        rows_data: {
+          // No PlatformId — falls back to its own key, '999'.
+          '999': { Plate: 'AA11AAGP', Lat: -26, Lon: 28, Location_RowLocTime: '2026-08-07 10:00:00' },
+          // A different key, but its real PlatformId is 999 — they collide.
+          zzz: { PlatformId: 999, Plate: 'BB22BBGP', Lat: -25, Lon: 27, Location_RowLocTime: '2026-08-07 10:00:01' },
+          '111': { PlatformId: 111, Plate: 'CC33CCGP', Lat: -24, Lon: 26, Location_RowLocTime: '2026-08-07 10:00:02' },
+        },
+      },
+      WIDE_FROM, WIDE_TO
+    );
+    // The uncontested row survives; neither contender does.
+    expect(out.map((p) => p.externalId)).toEqual(['111']);
+  });
+
   it('survives a missing or malformed rows_data without throwing', () => {
     expect(toPositions({}, WIDE_FROM, WIDE_TO)).toEqual([]);
     expect(toPositions({ rows_data: null }, WIDE_FROM, WIDE_TO)).toEqual([]);
