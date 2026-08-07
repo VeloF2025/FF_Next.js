@@ -90,8 +90,28 @@ describe('downloadRecordingToDisk — streams instead of buffering', () => {
 
     expect(renames).toHaveLength(1);
     const [from, to] = renames[0]!;
-    expect(from).toBe(`${to}.part`);
+    // Scratch name is unique per download (pid + random) so concurrent
+    // downloads of the same meeting cannot clobber each other's partial.
+    expect(from).toMatch(new RegExp(`^${to.replace(/[.]/g, '\\.')}\\.\\d+\\.[0-9a-f]{8}\\.part$`));
     expect(to).toMatch(/88\.mp4$/);
+  });
+
+  it('gives each download a distinct .part path so concurrent writers cannot collide', async () => {
+    // A fresh body per call — a single ReadableStream can only be consumed once.
+    graphFetch.mockImplementation(async () => ({
+      ok: true,
+      body: webBody([new Uint8Array([9])]),
+      arrayBuffer: vi.fn(),
+    }));
+
+    await downloadRecordingToDisk('user-1', 'meet-1', 'rec-1', 88);
+    await downloadRecordingToDisk('user-1', 'meet-1', 'rec-1', 88);
+
+    expect(renames).toHaveLength(2);
+    const [firstFrom, firstTo] = renames[0]!;
+    const [secondFrom, secondTo] = renames[1]!;
+    expect(firstTo).toBe(secondTo);          // same final destination
+    expect(firstFrom).not.toBe(secondFrom);  // but different scratch files
   });
 
   it('cleans up the .part file when the stream fails mid-download', async () => {

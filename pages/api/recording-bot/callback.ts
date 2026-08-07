@@ -86,6 +86,9 @@ export default async function handler(
 
   // Background: transcribe + enrich
   setImmediate(async () => {
+    // Declared outside the try so the catch can mark the meeting failed —
+    // otherwise a throw leaves it stuck at processing_status='processing'.
+    let meetingId: number | null = null;
     try {
       const recording = await sql`
         SELECT id, join_url, audio_path, duration_sec, triggered_by, meeting_id
@@ -95,7 +98,7 @@ export default async function handler(
       if (!rec || !rec.audio_path) return;
 
       // Create or get meeting row first (need meetingId for Whisper temp files)
-      let meetingId = rec.meeting_id as number | null;
+      meetingId = rec.meeting_id as number | null;
 
       if (!meetingId) {
         // Create a new meeting row for this bot recording
@@ -153,6 +156,16 @@ export default async function handler(
       await sql`
         UPDATE bot_recordings SET status = 'failed', error = ${msg} WHERE id = ${body.recording_id}
       `;
+      // The meeting row was set to 'processing' before the LLM step. Without
+      // this it stays 'processing' forever on any throw — invisible to both the
+      // completed and failed views.
+      if (meetingId) {
+        await sql`
+          UPDATE meetings
+          SET processing_status = 'failed', processing_error = ${msg}, updated_at = NOW()
+          WHERE id = ${meetingId}
+        `;
+      }
     }
   });
 }
