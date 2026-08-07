@@ -11,7 +11,7 @@
  * never arrived.
  */
 import { describe, expect, it } from 'vitest';
-import { isAuthFailure } from '../pollProvider';
+import { isAuthFailure, isSameFailureKind } from '../authFailure';
 
 describe('isAuthFailure — Netstar and generic vocabulary', () => {
   it('recognises the shared portal-session and HTTP wordings', () => {
@@ -66,5 +66,63 @@ describe('isAuthFailure — genuinely transient conditions stay transient', () =
 
   it('does not match a 401 appearing inside an unrelated number', () => {
     expect(isAuthFailure('ingested 4011 positions')).toBe(false);
+  });
+});
+
+describe('isAuthFailure — Cartrack portal vocabulary', () => {
+  // Constructed verbatim in cartrack/portalClient.ts. The first is urgent
+  // beyond the usual: that endpoint counts failures toward an account lockout.
+  it('classifies a rejected portal credential as auth', () => {
+    expect(
+      isAuthFailure('[cartrack-portal/auth] login failed: status=WRONG_CREDENTIALS, attempts_remaining=19')
+    ).toBe(true);
+  });
+
+  it('classifies a session that will not re-establish as auth', () => {
+    expect(isAuthFailure('[cartrack-portal/auth] still unauthenticated after re-login')).toBe(true);
+  });
+
+  it('classifies a cookie-less successful login as auth', () => {
+    expect(isAuthFailure('[cartrack-portal/auth] login succeeded but issued no session cookies')).toBe(true);
+  });
+
+  it('leaves the portal transport errors transient', () => {
+    expect(isAuthFailure('[cartrack-portal/network] ECONNRESET')).toBe(false);
+    expect(isAuthFailure('[cartrack-portal/http] vehiclelist: HTTP 500')).toBe(false);
+    expect(isAuthFailure('[cartrack-portal/shape] vehiclelist: expected result.ct_fleet_get_vehiclelist array, got undefined')).toBe(false);
+  });
+});
+
+describe('isSameFailureKind — the counter counts one kind of streak', () => {
+  it('treats two auth failures as the same streak', () => {
+    expect(isSameFailureKind(
+      '[cartrack-portal/auth] login failed: status=WRONG_CREDENTIALS',
+      '[ituran/auth] still rejected after re-mint: PassEnc rejected')).toBe(true);
+  });
+
+  it('treats two non-auth failures as the same streak', () => {
+    expect(isSameFailureKind('[cartrack-portal/network] ECONNRESET', 'portal feed is stale: 9h old'))
+      .toBe(true);
+  });
+
+  it('breaks the streak when a gap run is followed by an auth failure', () => {
+    // The bug this closes: the gap branch increments the SAME counter. A long
+    // gap streak could carry its count past the breaker's hard-stop ceiling, so
+    // one single auth failure would skip open AND half-open and demand manual
+    // SQL to clear.
+    expect(isSameFailureKind(
+      '[cartrack-portal/auth] login failed: status=WRONG_CREDENTIALS',
+      'portal feed is stale: newest fix on the whole account is 9h old')).toBe(false);
+  });
+
+  it('breaks the streak in the other direction too', () => {
+    expect(isSameFailureKind(
+      '[cartrack-portal/network] ECONNRESET',
+      '[cartrack-portal/auth] login failed: status=WRONG_CREDENTIALS')).toBe(false);
+  });
+
+  it('handles a null prior error as non-auth', () => {
+    expect(isSameFailureKind('[cartrack-portal/network] ECONNRESET', null)).toBe(true);
+    expect(isSameFailureKind('[cartrack-portal/auth] login failed', null)).toBe(false);
   });
 });

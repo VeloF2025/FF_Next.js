@@ -32,7 +32,7 @@ import type { ProviderKey, ProviderPosition } from './types';
  */
 
 /** Reject fixes dated further ahead than this — device clock skew. */
-const MAX_FUTURE_MS = 5 * 60 * 1000;
+export const MAX_FUTURE_MS = 5 * 60 * 1000;
 
 /** Rows per INSERT: 500 * 18 columns = 9,000 params, well under Postgres's 65,535 limit. */
 const CHUNK_SIZE = 500;

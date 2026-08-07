@@ -20,6 +20,7 @@
  * watermark and strands the poll on an inverted window. Verified against a live
  * capture where SAST was 12:26 and UTC was 10:26.
  */
+import { MAX_FUTURE_MS } from '../ingest';
 import type { PortalVehicle } from '../portal/registration';
 import type { ProviderPosition } from '../types';
 
@@ -237,11 +238,25 @@ export function toVehicles(res: IturanGridResponse): PortalVehicle[] {
  * staleness is measured account-wide instead. Returns null when the account
  * carries no parseable fix at all.
  */
-export function newestFixAt(res: IturanGridResponse): Date | null {
+export function newestFixAt(
+  res: IturanGridResponse,
+  now: Date = new Date()
+): Date | null {
+  // Future-dated fixes are excluded, not just left unstored. A device with a
+  // rolled-over clock reporting years ahead would make pollProvider's
+  // `feedAgeMs = now - newest` NEGATIVE, so gapReason's `feedAgeMs >
+  // staleFeedMs` is false forever — and for a snapshot provider that check is
+  // the ONLY dead-feed signal, since the "returned no positions" branch is
+  // gated on granularity === 'history'. The account could then go dark
+  // permanently while every tick logged as healthy. ingestPositions already
+  // refuses such a fix, so treating it as proof of freshness would also be
+  // incoherent. Same tolerance as ingest, deliberately shared.
+  const cutoff = now.getTime() + MAX_FUTURE_MS;
   let newest: Date | null = null;
   for (const [, row] of usableRows(res)) {
     const at = parseUtcTimestamp(row.Location_RowLocTime);
-    if (at && (newest === null || at > newest)) newest = at;
+    if (!at || at.getTime() > cutoff) continue;
+    if (newest === null || at > newest) newest = at;
   }
   return newest;
 }

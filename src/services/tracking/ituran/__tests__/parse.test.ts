@@ -234,3 +234,34 @@ describe('isLoginError', () => {
     expect(isLoginError({})).toBe(false);
   });
 });
+
+describe('newestFixAt — future-dated fixes must not defeat the dead-feed probe', () => {
+  const NOW = new Date('2026-08-07T14:00:00Z');
+
+  it('ignores a fix from a rolled-over device clock', () => {
+    // Same defect as the Cartrack portal parser: a negative feedAgeMs makes
+    // gapReason's staleness check permanently false, and for a snapshot
+    // provider that is the only dead-feed signal there is.
+    const res: IturanGridResponse = { rows_data: {
+      broken: { PlatformId: 'broken', Plate: 'AA11AAGP', Lat: -26, Lon: 28, Location_RowLocTime: '2043-01-01 00:00:00' },
+      real:   { PlatformId: 'real',   Plate: 'BB22BBGP', Lat: -25, Lon: 27, Location_RowLocTime: '2026-08-01 09:00:00' },
+    } };
+    const newest = newestFixAt(res, NOW);
+    expect(newest?.toISOString()).toBe('2026-08-01T09:00:00.000Z');
+    expect(newest!.getTime()).toBeLessThan(NOW.getTime());
+  });
+
+  it('still accepts a fix inside the clock-skew tolerance ingest allows', () => {
+    const res: IturanGridResponse = { rows_data: {
+      skewed: { PlatformId: 'skewed', Plate: 'CC33CCGP', Lat: -26, Lon: 28, Location_RowLocTime: '2026-08-07 14:02:00' },
+    } };
+    expect(newestFixAt(res, NOW)?.toISOString()).toBe('2026-08-07T14:02:00.000Z');
+  });
+
+  it('returns null when EVERY fix is future-dated', () => {
+    const res: IturanGridResponse = { rows_data: {
+      a: { PlatformId: 'a', Plate: 'DD44DDGP', Lat: -26, Lon: 28, Location_RowLocTime: '2043-01-01 00:00:00' },
+    } };
+    expect(newestFixAt(res, NOW)).toBeNull();
+  });
+});

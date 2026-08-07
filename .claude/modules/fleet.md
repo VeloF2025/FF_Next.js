@@ -548,3 +548,43 @@ that shape silently drops every vehicle outside the rectangle you happened to se
 Cron: `30 */2 * * *` via `scripts/cron-ituran-tracking.sh`, offset from the
 Netstar poll. Env: `ITURAN_PORTAL_USER`, `ITURAN_PORTAL_PASS`, optional
 `ITURAN_PORTAL_URL` / `ITURAN_ACCOUNT_REF` (default `avis`).
+
+## Tracking auth circuit breaker — and how to clear it
+
+Portal logins are rate-limited by the vendor. **Cartrack's `ct_login` locks the
+account out after ~20 failed attempts**, which would cost us the data source
+entirely — so a dead credential must not be retried every tick. `authBreaker.ts`
+throttles it, keyed on `fleet_tracking_watermarks.consecutive_failures` and
+`last_error`. It applies to **every** provider that runs through `pollProvider()`
+— Netstar and the Cartrack portal via `configuredProviders()`, and Ituran via
+`scripts/poll-ituran-tracking.ts`, which calls the same function.
+
+| State | When | Behaviour |
+|---|---|---|
+| closed | < 3 consecutive auth failures | polls normally |
+| open | ≥ 3, within 24h of the last attempt | tick skipped, still alerts |
+| half-open | ≥ 3, 24h since the last attempt | **one probe allowed** — a working credential closes it automatically |
+| hard-stop | ≥ 12 failures | probing stops; needs the SQL below |
+
+Only failures whose `last_error` classifies as an auth failure
+(`authFailure.ts`) throttle anything — a transient or gap streak also increments
+the counter, and those can self-heal.
+
+**Budget:** 3 to open, then ≤1 probe/day, stopping at 12 — about 12 vendor
+attempts over nine days, leaving ~8 of Cartrack's 20 unspent. Unthrottled, a
+2-hourly cron spends all 20 in under two days.
+
+**Clearing a hard-stop** (fix the credential in the env file FIRST, or the next
+probe just re-arms it):
+```sql
+UPDATE fleet_tracking_watermarks
+SET consecutive_failures = 0, last_error = NULL
+WHERE provider = 'cartrack' AND account_ref = 'urent';   -- adjust to the account
+```
+
+⚠️ Do NOT "simplify" the half-open state away. The skip returns *before* any
+watermark write, so a breaker that only ever skips freezes
+`consecutive_failures`, making its own predicate permanently true and blocking
+the only code path that could produce the success needed to clear it. That is a
+one-way latch requiring hand-editing the database — strictly worse than the
+retry storm it replaces, because it fires after ~6 hours instead of ~40.

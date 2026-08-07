@@ -89,7 +89,7 @@ describe('ituranClient session handling', () => {
   });
 
   it('raises an auth error whose message the alert classifier recognises', async () => {
-    // pollProvider.isAuthFailure() matches on message text to decide between an
+    // authFailure.isAuthFailure() matches on message text to decide between an
     // immediate WhatsApp and a silent-until-threshold transient. If this wording
     // drifts, a dead password degrades to a low-urgency alert.
     const { client } = makeClient([challenge(), challenge()]);
