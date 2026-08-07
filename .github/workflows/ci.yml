@@ -127,9 +127,19 @@ jobs:
       # cannot destroy a developer's container mid-test.
       - name: Clean up this run's replan test container
         if: always()
+        env:
+          RUN_LABEL: ff-replan-run=${{ github.run_id }}
         run: |
-          docker ps -aq --filter "label=ff-replan-run=${{ github.run_id }}" \
-            | xargs -r docker rm -f
+          # Best-effort by definition: this only exists to catch a CRASHED run that
+          # never reached its own teardown. On a healthy run the suites kill their
+          # containers themselves and --rm removes them, so this races that removal
+          # and `docker rm -f` reports "removal already in progress" — xargs then
+          # exits 123 and fails a build whose tests all passed. Never fail here.
+          ids=$(docker ps -aq --filter "label=$RUN_LABEL" || true)
+          if [ -n "$ids" ]; then
+            echo "sweeping leftover container(s): $ids"
+            docker rm -f $ids || echo "  already gone or mid-removal — nothing to do"
+          fi
 
       # Velocity review repository tests — same reasoning as the migration gate
       # above, one layer up. These drive the real repository functions against a
