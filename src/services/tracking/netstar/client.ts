@@ -77,6 +77,34 @@ export interface NetstarClient {
   feedFreshness(): Promise<Date | null>;
 }
 
+/**
+ * Lift the anti-forgery token out of the login page.
+ *
+ * Deliberately tolerant of markup this codebase does not control:
+ *   - attributes in any order (`value=` may precede `name=`)
+ *   - single or double quotes
+ *   - arbitrary whitespace and self-closing slashes
+ *
+ * The page carries two forms — the login form and a forgot-password form, both
+ * posting to /Authentication/ — so "first token on the page" is a real choice
+ * rather than an accident. It is the right one: the portal's own client-side
+ * code selects the token the same way, globally rather than scoped to a form
+ * (`$('input[name=__RequestVerificationToken]').val()`). Matching that keeps us
+ * consistent with the server's expectation if a second token ever appears.
+ *
+ * Returns null rather than throwing so the caller can name the failure.
+ */
+export function extractVerificationToken(html: string): string | null {
+  const inputs = html.match(/<input\b[^>]*>/gi) ?? [];
+  for (const tag of inputs) {
+    const name = /\bname\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+    if (name !== '__RequestVerificationToken') continue;
+    const value = /\bvalue\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1];
+    if (value) return value;
+  }
+  return null;
+}
+
 /** Collapses one tick's repeated tree reads; far below the 2-hour cadence. */
 const DEFAULT_TREE_TTL_MS = 60_000;
 
@@ -114,6 +142,11 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
       const base = opts.baseUrl.replace(/\/+$/, '');
 
       const page = await fetchImpl(`${base}/Authentication/Account/Login`, {
+        // manual, like every other request this session makes: an already-authed
+        // GET here 302s to the dashboard, and following it would run the token
+        // scrape against the wrong page and report "no token" instead of "already
+        // logged in".
+        redirect: 'manual',
         headers: { Cookie: jar.header() },
       });
       jar.absorb(page);
@@ -121,7 +154,7 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
         throw new Error(`[netstar] login page: HTTP ${page.status}`);
       }
       const html = await page.text();
-      const token = /name="__RequestVerificationToken"[^>]*value="([^"]+)"/.exec(html)?.[1];
+      const token = extractVerificationToken(html);
       if (!token) {
         // Shape change, or a login page that is really an error page. Failing
         // here names the cause; posting without the token would surface three
