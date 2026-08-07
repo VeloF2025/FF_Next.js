@@ -1,4 +1,5 @@
 // 🟢 WORKING: shared streaming download helper for Graph/OneDrive media
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Readable } from 'stream';
@@ -31,7 +32,15 @@ export async function streamResponseToFile(
 
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
-  const partPath = `${destPath}.part`;
+  // The scratch name must be unique per download, not just per destination.
+  // Two downloads racing for the same meeting (webhook + OneDrive scraper both
+  // claiming it) previously shared one `<dest>.part`: the first rename moved it
+  // away, and the second failed with
+  //   ENOENT: rename '<dest>.part' -> '<dest>'
+  // after having overwritten the first's bytes mid-flight. Meeting 251591 was
+  // left recorded as 2.4MB against a 51MB file on disk, and was transcribed from
+  // the truncated fragment.
+  const partPath = `${destPath}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.part`;
   try {
     await pipeline(
       Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]),

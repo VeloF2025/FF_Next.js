@@ -57,6 +57,24 @@ interface MeetingRow {
   participants: Array<{ displayName?: string; name?: string; email?: string }> | null;
   raw_transcript: string | null;
   organizer_name: string | null;
+  recording_path: string | null;
+}
+
+/**
+ * Thrown when a meeting has a recording on disk but no transcript.
+ *
+ * This is a transcription *failure*, not an empty meeting, so it must surface as
+ * one. Every processWithLLM caller wraps the call and writes
+ * processing_status='failed' + processing_error from the thrown message.
+ */
+export class TranscriptMissingError extends Error {
+  constructor(meetingId: number, recordingPath: string) {
+    super(
+      `Meeting ${meetingId} has a recording (${recordingPath}) but no transcript — ` +
+        `transcription did not run or produced nothing`,
+    );
+    this.name = 'TranscriptMissingError';
+  }
 }
 
 interface TranscriptRow {
@@ -118,7 +136,7 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
   // 1. Load meeting row
   // ------------------------------------------------------------------
   const rows = (await sql`
-    SELECT id, title, meeting_date, participants, raw_transcript, organizer_name
+    SELECT id, title, meeting_date, participants, raw_transcript, organizer_name, recording_path
     FROM meetings
     WHERE id = ${meetingId}
   `) as MeetingRow[];
@@ -145,10 +163,33 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
   }
 
   // ------------------------------------------------------------------
-  // 3. No transcript → return minimal summary immediately
+  // 3. No transcript
   // ------------------------------------------------------------------
+  // A meeting that HAS a recording but no transcript is a transcription
+  // failure, not an empty meeting. Writing the "No transcript available"
+  // placeholder here marks it processing_status='completed' (writeSummary sets
+  // that unconditionally), so the meeting reads as successfully processed with
+  // nothing to say. That silently hid 405 recordings — including two Executive
+  // Sessions and a 2h24m project meeting — behind a confident-looking summary.
+  //
+  // Throw instead: every caller wraps processWithLLM and records
+  // processing_status='failed' + processing_error, so the meeting stays visible
+  // as needing work. Note two callers (graph/onedrive) force 'completed' on the
+  // line *after* this returns, so marking failed in-place would be clobbered —
+  // throwing is what actually sticks.
   if (!transcript) {
-    log.warn('No transcript available', { meetingId }, logger);
+    if (meeting.recording_path) {
+      log.error(
+        'Recording present but no transcript — refusing to write placeholder summary',
+        { meetingId, recordingPath: meeting.recording_path },
+        logger,
+      );
+      throw new TranscriptMissingError(meetingId, meeting.recording_path);
+    }
+
+    // No recording either: genuinely nothing to analyse (e.g. a calendar entry
+    // that was never recorded). The placeholder is honest here.
+    log.warn('No transcript and no recording available', { meetingId }, logger);
     const minimal: MeetingSummary = {
       suggested_title: '',
       overview: 'No transcript available for analysis.',

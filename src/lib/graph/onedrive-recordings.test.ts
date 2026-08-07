@@ -91,7 +91,11 @@ describe('downloadDriveItem — streams instead of buffering', () => {
 
     await downloadDriveItem('user-1', 'item-1', '/tmp/x/out.mp4');
 
-    expect(renames).toEqual([['/tmp/x/out.mp4.part', '/tmp/x/out.mp4']]);
+    expect(renames).toHaveLength(1);
+    const [from, to] = renames[0]!;
+    expect(to).toBe('/tmp/x/out.mp4');
+    // Unique scratch name per download — see streamToFile for the collision this prevents.
+    expect(from).toMatch(/^\/tmp\/x\/out\.mp4\.\d+\.[0-9a-f]{8}\.part$/);
   });
 
   it('cleans up the .part file when the download fails mid-stream', async () => {
@@ -109,7 +113,7 @@ describe('downloadDriveItem — streams instead of buffering', () => {
 
     await expect(downloadDriveItem('u', 'i', '/tmp/x/out.mp4')).rejects.toThrow();
     expect(renames).toHaveLength(0);
-    expect(unlinked).toContain('/tmp/x/out.mp4.part');
+    expect(unlinked.some((p) => /^\/tmp\/x\/out\.mp4\.\d+\.[0-9a-f]{8}\.part$/.test(p))).toBe(true);
   });
 
   it('throws when the metadata lookup fails', async () => {
