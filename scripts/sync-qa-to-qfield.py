@@ -328,13 +328,32 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False, approve
     gpkg_conn = sqlite3.connect(tmp)
     gpkg_cur = gpkg_conn.cursor()
 
-    # Validate the configured columns BEFORE dropping any trigger or writing anything:
-    # SQLite reads an unresolvable "identifier" as a string literal rather than raising,
-    # so a stale label_col would hand back one constant-valued row per pole instead of
-    # failing. Checked up front so a misconfigured project aborts before it mutates the
-    # local copy. The caller catches per project, so this fails THIS project only.
-    require_column(gpkg_conn, table_name, label_col, purpose="label")
-    require_column(gpkg_conn, table_name, qa_date_col, purpose="QA date")
+    # Validate EVERY identifier this function interpolates, BEFORE dropping a trigger or
+    # writing anything: SQLite reads an unresolvable "identifier" as a string literal
+    # rather than raising, so any wrong name hands back one constant-valued row per pole
+    # instead of failing. The hardcoded pair matters as much as the configured pair — if
+    # "Status" were absent, every pole's status would read as the literal 'Status', no
+    # pole would look pending, writes would be 0 and the run would report success. That
+    # is the same silent-success this guard exists to kill.
+    # Checked up front so a misconfigured project aborts before it mutates its local
+    # copy. The caller catches per project, so this fails THIS project only.
+    try:
+        for _col, _purpose in ((label_col, "label"), (qa_date_col, "QA date"),
+                               ("Status", "status"), ("Pole Plant Date", "plant date")):
+            require_column(gpkg_conn, table_name, _col, purpose=_purpose)
+    except Exception:
+        # Release what we already hold before propagating: the cleanup that closes the
+        # handle and unlinks the download lives at the END of this function, so raising
+        # here would strand a ~1 MB temp GPKG and an open sqlite handle per bad config.
+        # Scoped to this raise site rather than wrapping the whole body — the remaining
+        # ~150 lines have the same pre-existing exposure on any sqlite error, but
+        # reindenting them wholesale is out of scope for this PR.
+        gpkg_conn.close()
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
     # Disable R-tree spatial triggers that call ST_IsEmpty (SpatiaLite function
     # not available in plain SQLite). We only update attribute columns, not geom,

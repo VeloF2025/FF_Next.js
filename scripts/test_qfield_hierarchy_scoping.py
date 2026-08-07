@@ -26,7 +26,7 @@ import psycopg2.extras
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from qfield_hierarchy_writers import (  # noqa: E402
-    _update_reviews, _upsert_work_qa,
+    _update_planning_poles, _update_reviews, _upsert_work_qa,
 )
 from replan_test_harness import (  # noqa: E402
     check, finish, hierarchy_fixture, start_pg, teardown_container,
@@ -168,6 +168,60 @@ def main():
         r = cur.fetchone()
         check("review falls back to the GPKG, not another project's plan",
               (r["zone_no"], r["pon_no"]) == (62, 745))
+        # validated_labels is a FILTER, but both suites had only ever passed it the full
+        # label set — so deleting the filter entirely left every test green. Without it
+        # _upsert_work_qa creates a QA row for every pole in the GPKG: on Thembisa POP 3
+        # that is 4,590 rows against 340 real ones, inflating the very PON counts this
+        # module reports. Exercise it as a filter, with something to reject.
+        print("\nvalidated_labels actually filters:")
+        n = _upsert_work_qa(cur, [(PROJECT, "UNVALIDATED", 4, 40)], set())
+        conn.commit()
+        check("a label absent from validated_labels is not written", n == 0)
+        cur.execute("SELECT count(*) AS c FROM pole_qa_photos"
+                    " WHERE project_id=%s AND pole_label='UNVALIDATED'", (PROJECT,))
+        check("  ...and creates no QA row", cur.fetchone()["c"] == 0)
+        n = _upsert_work_qa(cur, [(PROJECT, "UNVALIDATED", 4, 40),
+                                  (PROJECT, "VALIDATED", 5, 50)], {"VALIDATED"})
+        conn.commit()
+        check("a mixed batch writes only the validated label", n == 1)
+        cur.execute("SELECT count(*) AS c FROM pole_qa_photos"
+                    " WHERE project_id=%s AND pole_label='UNVALIDATED'", (PROJECT,))
+        check("  ...the unvalidated one is still absent", cur.fetchone()["c"] == 0)
+
+        # The count is keyed on (project_id, pole_label). Keying on the label alone
+        # collapses two real rows in two projects into one — the only batch that can
+        # show it is one spanning projects, which sync_hierarchy never builds today.
+        print("\nthe count does not collapse a label shared across projects:")
+        for proj in (PROJECT, OTHER):
+            cur.execute("INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)"
+                        " VALUES (%s,'COUNTED',NULL,NULL)", (proj,))
+        conn.commit()
+        n = _upsert_work_qa(cur, [(PROJECT, "COUNTED", 3, 33), (OTHER, "COUNTED", 4, 44)],
+                            {"COUNTED"})
+        conn.commit()
+        check("two projects, one label, counts 2 not 1", n == 2)
+
+        # _update_planning_poles was never reached by the scoping property above, so
+        # dropping its project predicate survived. No pole_number is currently shared
+        # across projects in `poles`, so this is latent rather than live — cover it
+        # before that stops being true.
+        print("\nthe planning write is scoped to its project too:")
+        for proj in (PROJECT, OTHER):
+            cur.execute("INSERT INTO poles (project_id, pole_number, zone_no, pon_no)"
+                        " VALUES (%s,'PLANSCOPE',NULL,NULL)", (proj,))
+        conn.commit()
+        _update_planning_poles(cur, [(PROJECT, "PLANSCOPE", 8, 88)])
+        conn.commit()
+        cur.execute("SELECT zone_no, pon_no FROM poles"
+                    " WHERE project_id=%s AND pole_number='PLANSCOPE'", (PROJECT,))
+        r = cur.fetchone()
+        check("the addressed project's pole is backfilled",
+              (r["zone_no"], r["pon_no"]) == (8, 88))
+        cur.execute("SELECT zone_no, pon_no FROM poles"
+                    " WHERE project_id=%s AND pole_number='PLANSCOPE'", (OTHER,))
+        r = cur.fetchone()
+        check("another project's pole with the SAME number stays NULL",
+              (r["zone_no"], r["pon_no"]) == (None, None))
     finally:
         try:
             cur.execute(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE")

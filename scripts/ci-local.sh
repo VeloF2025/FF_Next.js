@@ -186,6 +186,17 @@ if command -v python3 >/dev/null 2>&1; then
     tail -25 /tmp/ci-hierarchy-scoping.txt | sed 's/^/    /'
   fi
 
+  # The guard that makes a stale GPKG column name fail LOUDLY. SQLite reads an
+  # unresolvable "identifier" as a string literal instead of raising, which is how one
+  # stale config froze a project's mirror for three days with no error. Pure sqlite,
+  # no docker.
+  if python3 scripts/test_qfield_gpkg_columns.py > /tmp/ci-gpkg-columns.txt 2>&1; then
+    pass "QField GPKG column guard: all checks pass"
+  else
+    fail "QField GPKG column guard: regression detected"
+    tail -25 /tmp/ci-gpkg-columns.txt | sed 's/^/    /'
+  fi
+
   if python3 scripts/test_qfield_hierarchy.py > /tmp/ci-qfield-hierarchy.txt 2>&1; then
     pass "QField hierarchy mapping: all checks pass"
   else

@@ -128,7 +128,7 @@ def _upsert_work_qa(cur, hierarchy_values, validated_labels):
         SELECT s.project_id::uuid, s.pole_label, NULL::integer, NULL::integer
         FROM (VALUES %s) AS s(project_id, pole_label, zone_no, pon_no)
         ON CONFLICT (project_id, pole_label) DO NOTHING
-        RETURNING pole_label
+        RETURNING project_id, pole_label
         """,
         qa_values,
         page_size=200,
@@ -151,18 +151,24 @@ def _upsert_work_qa(cur, hierarchy_values, validated_labels):
             q.zone_no IS DISTINCT FROM COALESCE(v.zone_no, s.zone_no::integer, q.zone_no)
             OR q.pon_no IS DISTINCT FROM COALESCE(v.pon_no, s.pon_no::integer, q.pon_no)
           )
-        RETURNING q.pole_label
+        RETURNING q.project_id, q.pole_label
         """,
         qa_values,
         page_size=200,
         fetch=True,
     )
-    # DISTINCT labels, not a sum: seeding the INSERT with NULLs means the UPDATE fires
-    # on every row this call just inserted, so adding the two counts reports each new
-    # row twice. The caller logs this as `qa_poles`, so a sum would overstate the work
-    # done — and a run that inserted 40 rows and changed nothing else would claim 80.
-    return len({row["pole_label"] for row in inserted}
-               | {row["pole_label"] for row in updated})
+    # DISTINCT rows, not a sum: seeding the INSERT with NULLs means the UPDATE fires on
+    # every row this call just inserted, so adding the two counts reports each new row
+    # twice. The caller logs this as `qa_poles`, so a sum would overstate the work done
+    # — a run that inserted 40 rows and changed nothing else would claim 80.
+    #
+    # Keyed on (project_id, pole_label), not the label alone: pole labels are NOT unique
+    # across projects (4 are shared live), so a label-only key would collapse two real
+    # rows into one. sync_hierarchy passes a single project today, which is exactly why
+    # this would go unnoticed if it were wrong.
+    # Requires a dict-style cursor (RealDictCursor), as _validated_pole_labels already does.
+    return len({(row["project_id"], row["pole_label"]) for row in inserted}
+               | {(row["project_id"], row["pole_label"]) for row in updated})
 
 
 def _update_reviews(cur, hierarchy_values):

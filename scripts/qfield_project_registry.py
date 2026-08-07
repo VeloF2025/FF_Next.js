@@ -181,12 +181,20 @@ PROJECTS = {
 ALTERNATE_GPKGS = {
     "Mamelodi": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label"},
     "Thembisa POP 1": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label_1"},
-    # label_col mirrors the primary THM_3 entry above. `extract-gpkg-photos.py` merges
-    # these as {**config, **ALTERNATE_GPKGS[name]}, so a stale value here silently
-    # overrides the corrected one for this path — the same freeze, different GPKG.
-    # (No sync-state row has ever been written for any civil_audit_ alternate, so the
-    # file likely does not resolve today; corrected rather than left contradicting.)
-    "Thembisa POP 3": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label"},
+    # KEEP `label_1` here even though the primary THM_3 entry above is now `label`.
+    # These are DIFFERENT LAYERS and the suffix is per-layer, not per-project: the
+    # civil-audit layer still collides on publish, the poles layer no longer does.
+    # Verified against the live file — `Civil Audit.gpkg` for POP 3 (latest version
+    # v20260310073855) has table `civil_audit_` with `label_1`, 3,597 rows, and no
+    # `label`. An earlier revision of this PR "corrected" it to `label` by analogy with
+    # the poles layer; that was wrong and is reverted.
+    #
+    # Note the path is also wrong and has always been: the object is `Civil Audit.gpkg`
+    # (space, title case), not `civil_audit_.gpkg` — that is the TABLE name. So this
+    # entry does not resolve, which is why no sync-state row has ever been written for
+    # a civil_audit_ alternate. Left as-is rather than silently repointing a path at a
+    # 3,597-row March layer that nothing currently ingests.
+    "Thembisa POP 3": {"gpkg_path": "civil_audit_.gpkg", "table_name": "civil_audit_", "label_col": "label_1"},
 }
 
 # Per-pole OPTICAL dome-audit GPKGs (8 dome steps). Detected as discipline='optical'
