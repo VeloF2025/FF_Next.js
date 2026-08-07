@@ -115,3 +115,51 @@ export interface ParkingCheckReport {
   errors: number;
   results: ParkingCheckVehicleResult[];
 }
+
+/* -------------------------------------------------------------------------
+ * Driver side (/my PWA). The nightly job above reads what a driver declares
+ * through the shapes below.
+ * ---------------------------------------------------------------------- */
+
+/** Lifecycle of a declared parking address (migration 483). */
+export type ParkingDeclarationStatus =
+  | 'pending'
+  | 'active'
+  | 'superseded'
+  | 'rejected'
+  | 'withdrawn';
+
+/** One row of fleet_vehicle_parking_locations, as the driver sees it. */
+export interface ParkingDeclaration {
+  id: string;
+  status: ParkingDeclarationStatus;
+  lat: number;
+  lon: number;
+  accuracyM: number | null;
+  radiusM: number;
+  label: string | null;
+  addressText: string | null;
+  requestNote: string | null;
+  decisionNote: string | null;
+  effectiveFrom: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+/** Everything /my/vehicle/parking needs in one round-trip. */
+export interface DriverParkingState {
+  vehicle: { id: string; registration: string };
+  active: ParkingDeclaration | null;
+  pending: ParkingDeclaration | null;
+  /** Most recent decided rows, newest first. Excludes active and pending. */
+  history: ParkingDeclaration[];
+}
+
+/** Raw, untrusted body of a POST from the capture flow. */
+export interface DeclarationInput {
+  lat: unknown;
+  lon: unknown;
+  accuracyM: unknown;
+  label?: unknown;
+  requestNote?: unknown;
+}

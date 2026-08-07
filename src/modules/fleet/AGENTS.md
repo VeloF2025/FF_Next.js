@@ -63,6 +63,8 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - Portal sessions use separate auth (no user login required)
 - Offline sync writes to local IndexedDB, then `POST /check-in/sync` on reconnect
 - Parking compliance rows are evidence: FKs are `ON DELETE SET NULL`, never CASCADE
+- Driver parking declarations resolve the vehicle from the `/my` session — a body `vehicleId` is ignored
+- Every parking submission enters as `pending`; even a first address needs approval
 
 ## Common Issues
 | Issue | Fix |
