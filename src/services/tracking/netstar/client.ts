@@ -1,14 +1,20 @@
 /**
  * Netstar VigilCloud portal client.
  *
- * VigilCloud is a human portal, but its report builder is backed by a JSON
- * endpoint, so this speaks HTTP rather than driving a browser. Contract
- * captured live on 2026-08-05:
+ * VigilCloud is a human portal backed by JSON endpoints, so this speaks HTTP
+ * rather than driving a browser. Two paths, and they are not interchangeable:
  *
- *   POST /VigilCloud4/Reports/ReportRepo/GenerateReport/  -> "<jobId>"  (async)
- *   POST /VigilCloud4/Reports/Export                      -> CSV bytes
+ *   LIVE (listVehicles / fetchPositions) — the tree API, see ./tree.ts. One
+ *   POST returns every vehicle on the account with its last known fix. This is
+ *   what the 2-hourly poll uses.
  *
- * Report generation is ASYNCHRONOUS: GenerateReport returns a job id, not data.
+ *   HISTORY (fetchHistory) — the report builder:
+ *     POST /Reports/ReportRepo/GenerateReport/  -> "<jobId>"  (async)
+ *     POST /Reports/Export                      -> CSV bytes
+ *   One job per vehicle per 31-day chunk, each polled until ready. Only
+ *   scripts/backfill-tracking.ts uses it, and it is UNVERIFIED against the live
+ *   portal — the contract was documented in the same pass that got the vehicle
+ *   list wrong (it pointed at /Reports/ReportRepo/GetReportTree, which 404s).
  *
  * The login form's inputs carry readonly="readonly" with an onmousedown handler
  * that clears it — an anti-autofill measure that only affects browser
@@ -17,6 +23,7 @@
  */
 import { PortalSession, type CookieJar } from '../portal/session';
 import { parseAllActivityCsv } from './parse';
+import { parseVehicleTree, type NetstarTreeNode } from './tree';
 import type { PortalVehicle } from '../portal/registration';
 import type { ProviderPosition } from '../types';
 import { log } from '@/lib/logger';
@@ -61,7 +68,21 @@ export interface NetstarClientOptions {
 
 export interface NetstarClient {
   listVehicles(): Promise<PortalVehicle[]>;
+  /**
+   * Current position per vehicle, from the tree API. A SNAPSHOT: at most one
+   * fix per vehicle, whatever the portal last heard. `from`/`to` filter that
+   * snapshot; they do not fetch history — see fetchHistory.
+   */
   fetchPositions(from: Date, to: Date, vehicles: PortalVehicle[]): Promise<ProviderPosition[]>;
+  /**
+   * Historical positions via the report/CSV flow — slow, one job per vehicle
+   * per 31-day chunk. Used only by scripts/backfill-tracking.ts.
+   *
+   * UNVERIFIED against the live portal. The report endpoints were documented in
+   * the same pass that got the vehicle-list endpoint wrong (it 404'd), so treat
+   * a failure here as "the contract was never right" before assuming an outage.
+   */
+  fetchHistory(from: Date, to: Date, vehicles: PortalVehicle[]): Promise<ProviderPosition[]>;
 }
 
 /**
@@ -139,32 +160,37 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
     },
   });
 
-  async function listVehicles(): Promise<PortalVehicle[]> {
-    const res = await session.request('/Reports/ReportRepo/GetReportTree', {
+  /**
+   * The whole account in one POST, vehicles and their last fix together.
+   *
+   * `pageSize` is deliberately unbounded: this is a multi-client reseller tree
+   * (~11.5k vehicles at the time of writing) and paging it would mean holding a
+   * cursor across requests for a list we consume whole. Roughly a few MB every
+   * two hours, which is cheaper than the per-vehicle report jobs it replaces.
+   *
+   * `__ts` is a cache-buster the portal's own UI sends; without it a proxy can
+   * hand back a stale tree, which would look exactly like "nothing moved".
+   */
+  async function fetchTree(): Promise<NetstarTreeNode[]> {
+    const qs = `page=1&pageSize=2147483647&__ts=${Date.now()}&treeFilter=&sortBy=&sortDir=`;
+    const res = await session.request(`/Main/VehicleRepo/GetVehicleTreeDataPaging?${qs}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ reportTree: 'Vehicles' }),
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        // The portal routes on this; without it the same path answers 404.
+        'X-Requested-With': 'XMLHttpRequest',
+      },
     });
-    if (!res.ok) throw new Error(`[netstar] vehicle list: HTTP ${res.status}`);
-    const body: unknown = await res.json();
-    if (!Array.isArray(body)) {
-      throw new Error(`[netstar] vehicle list: expected an array, got ${typeof body}`);
-    }
+    if (!res.ok) throw new Error(`[netstar] vehicle tree: HTTP ${res.status}`);
+    return parseVehicleTree(await res.json());
+  }
 
-    // Validated at runtime rather than cast: an untrusted response that is
-    // silently trusted here would surface downstream as "no vehicles on this
-    // account" instead of "we failed to parse the response" — exactly the
-    // kind of silent coverage loss this feature exists to prevent. A single
-    // malformed element is skipped rather than failing the whole list.
-    const out: PortalVehicle[] = [];
-    for (const item of body) {
-      if (typeof item !== 'object' || item === null || !('id' in item)) continue;
-      const id = item.id;
-      if (typeof id !== 'string' && typeof id !== 'number') continue;
-      const name = 'name' in item ? item.name : undefined;
-      out.push({ externalId: String(id), registration: typeof name === 'string' ? name : null });
-    }
-    return out;
+  async function listVehicles(): Promise<PortalVehicle[]> {
+    return (await fetchTree()).map((n) => ({
+      externalId: n.externalId,
+      registration: n.registration,
+    }));
   }
 
   async function fetchChunk(
@@ -244,7 +270,25 @@ export function netstarClient(opts: NetstarClientOptions): NetstarClient {
 
   return {
     listVehicles,
+    /**
+     * The snapshot path — one request, no report jobs.
+     *
+     * Returns each requested vehicle's last fix when it falls inside the
+     * window. A fix older than `from` is one we have already stored on an
+     * earlier tick, and re-returning it would only churn the dedup key.
+     */
     async fetchPositions(from, to, vehicles) {
+      const wanted = new Set(vehicles.map((v) => v.externalId));
+      const nodes = await fetchTree();
+      const out: ProviderPosition[] = [];
+      for (const n of nodes) {
+        if (!wanted.has(n.externalId) || !n.position) continue;
+        const t = n.position.recordedAt.getTime();
+        if (t >= from.getTime() && t <= to.getTime()) out.push(n.position);
+      }
+      return out;
+    },
+    async fetchHistory(from, to, vehicles) {
       const all: ProviderPosition[] = [];
       const failures: Array<{ externalId: string; error: string }> = [];
       // Paced, not parallel: one report at a time, with a gap between them.

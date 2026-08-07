@@ -25,7 +25,7 @@
  * Sequential and paced on purpose. These are partner-owned accounts and a
  * backfill that looks like an attack gets an account suspended.
  */
-import { netstarClient, netstarProvider, MAX_REPORT_MS } from '@/services/tracking/netstar';
+import { netstarClient, mappedVehicles, MAX_REPORT_MS } from '@/services/tracking/netstar';
 import { ingestPositions } from '@/services/tracking/ingest';
 import {
   countDry, nextChunk, parseDateArg, resumeCommand, shouldContinue,
@@ -68,7 +68,10 @@ async function main(): Promise<void> {
     password: NETSTAR_PORTAL_PASS,
     accountRef,
   };
-  const provider = netstarProvider({ ...opts, client: netstarClient(opts) });
+  // The HISTORY path, deliberately — not provider.fetchPositions(), which now
+  // returns a live snapshot (one fix per vehicle) and would make this walk
+  // collect the same current position for every chunk while reporting success.
+  const client = netstarClient(opts);
 
   // Discovery has to have run at least once, and this script does not run it.
   // netstarProvider.fetchPositions() returns [] when no vehicle is mapped, so
@@ -113,7 +116,7 @@ async function main(): Promise<void> {
   try {
     while (shouldContinue(to, floor, dryChunks, DRY_CHUNKS_BEFORE_STOP)) {
       const { from } = nextChunk(to, floor, MAX_REPORT_MS);
-      const positions = await provider.fetchPositions(from, to);
+      const positions = await client.fetchHistory(from, to, await mappedVehicles(accountRef));
       const { inserted, skippedUnmapped } = await ingestPositions(
         'netstar', accountRef, positions);
       totalInserted += inserted;

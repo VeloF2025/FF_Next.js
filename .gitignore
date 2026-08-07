@@ -155,6 +155,12 @@ docs/wa-digests/
 docs/weekly-dev-reports/
 # docs/schema/ contains DATABASE_SCHEMA_INDEX.md (keep tracked)
 
+# Fleet tracking portal logins (Cartrack / Netstar / Ituran). The file was
+# untracked but NOT ignored, so a single `git add .` would have committed four
+# live sets of credentials. Leading slash anchors it to the repo root — a bare
+# `docs/Fleet` would also match any nested docs/Fleet path.
+/docs/Fleet
+
 # Private operational review artifacts (may contain staff names)
 /.private/hs-operational-rollout/
 

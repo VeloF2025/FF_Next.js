@@ -52,7 +52,7 @@ paths, both funneling through `src/services/tracking/ingest.ts`:
 | Path | Cadence | Endpoint | Providers |
 |---|---|---|---|
 | REST API | 2 min | `/api/cron/poll-tracking` | Cartrack (Velocity account) |
-| Portal scrape | 2 hours | `/api/cron/poll-portal-tracking` | Netstar |
+| Portal API | 2 hours | `/api/cron/poll-portal-tracking` | Netstar |
 
 Full reference for the tracking services: `src/services/tracking/.claude.md`. Design spec:
 `docs/superpowers/specs/2026-08-05-portal-tracker-ingestion-design.md`.
@@ -93,6 +93,39 @@ appearing twice, drop out to `coverage.ambiguous` instead of picking a winner. A
 against the wrong vehicle cannot be repaired later — the dedup key
 (`syn:account:external:recordedAt`) has no `vehicle_id`, so the corrected re-insert collides and
 is dropped.
+
+### Netstar: the tree API, not reports
+
+Live positions come from ONE call, which returns every vehicle on the account together with
+its last fix:
+
+```
+POST /VigilCloud4/Main/VehicleRepo/GetVehicleTreeDataPaging
+     ?page=1&pageSize=2147483647&__ts=<ms>&treeFilter=&sortBy=&sortDir=
+     X-Requested-With: XMLHttpRequest
+-> { data: [ { Name, LeafId, GroupName, Lat, Long, DateTimeUtc, SpeedValue, Dir, IgnitionOn } ] }
+```
+
+**POST only** — the identical path answers 404 to a GET, and the portal routes on the XHR
+header. `LeafId: 0` rows are folders (other clients on the reseller tree), not vehicles.
+`DateTimeUtc` is `/Date(<epoch ms>)/`; folder rows carry DateTime.MinValue, which must be
+rejected rather than stored as a year-0001 fix.
+
+This replaced a per-vehicle CSV report flow that issued one job per vehicle per 31-day chunk
+and polled each export up to ten times. It also replaced a `listVehicles` that called
+`/Reports/ReportRepo/GetReportTree` — an endpoint that does not exist and always 404'd, so the
+integration could never have mapped a single vehicle.
+
+**The account is a reseller tree of ~11.5k vehicles across 6 groups** (Motus, Ungrouped, Key
+Hire, SSA Acoustic, ICT-SA Worldwide, New Planet Telecoms). Six are Velocity's, split between
+Motus and Ungrouped. Everything else belongs to other companies — which is why discovery
+matches by registration and refuses ambiguity.
+
+**`fetchPositions` is a snapshot.** At most one fix per vehicle; `from`/`to` filter it rather
+than fetching history. Because the watermark is the newest ingested fix and the window opens an
+hour behind it, the vehicle that set the watermark is always back inside the window — so a
+parked fleet re-presents the same fixes each tick and dedup absorbs them, rather than reading
+as a data gap.
 
 ### Backfill
 One-off historical backfill for a portal provider, walking backwards from now in provider-max

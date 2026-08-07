@@ -21,7 +21,13 @@ export interface NetstarProviderOptions {
   loadMappedVehicles?: () => Promise<PortalVehicle[]>;
 }
 
-async function mappedVehicles(accountRef: string): Promise<PortalVehicle[]> {
+/**
+ * The vehicles this account has already mapped in fleet_vehicle_trackers.
+ *
+ * Exported because the backfill script needs the same list to drive the
+ * history path, and duplicating the query there is how the two drift apart.
+ */
+export async function mappedVehicles(accountRef: string): Promise<PortalVehicle[]> {
   const rows = await sql<{ external_id: string; registration: string }>`
     SELECT t.external_id, v.registration
     FROM fleet_vehicle_trackers t
@@ -44,6 +50,8 @@ export function netstarProvider(opts: NetstarProviderOptions): TrackingProvider 
     // out of that clamp is only safe because poll-portal-tracking.ts applies
     // its own floor (MAX_POLL_WINDOW_MS) — without it a stale watermark would
     // fan out into one report job per vehicle per 31-day chunk.
+    // The tree API returns one snapshot per vehicle, so a fetch is bounded by
+    // fleet size rather than by event volume — there is no page to blow.
     maxEventsPerFetch: Number.MAX_SAFE_INTEGER,
     async fetchPositions(from: Date, to: Date): Promise<ProviderPosition[]> {
       const vehicles = await load();
