@@ -50,11 +50,27 @@ def start_pg():
     # orphaned Postgres holds a port on a long-lived self-hosted runner. RUN_ID scopes
     # the sweep to this run so it cannot kill a developer's container.
     run_id = os.environ.get("GITHUB_RUN_ID", f"local-{os.getpid()}")
-    _container = subprocess.check_output([
-        "docker", "run", "-d", "--rm", "-P",
-        "--label", "ff-replan-test=1", "--label", f"ff-replan-run={run_id}",
-        "-e", "POSTGRES_PASSWORD=test", "-e", "POSTGRES_DB=test",
-        "postgres:15-alpine"], text=True).strip()
+    # Retry the run itself: rootless Docker's port manager can hand out a host port it
+    # has not finished releasing from a container that just exited, so `docker run -P`
+    # dies with "bind: address already in use" (exit 125). The four Python suites start
+    # containers back-to-back, which is exactly the window that race needs — it took the
+    # gate down on run 31139831645 after three suites had already passed. Each retry
+    # redraws a different ephemeral port, so a plain re-run clears it.
+    last_err = ""
+    for attempt in range(5):
+        proc = subprocess.run([
+            "docker", "run", "-d", "--rm", "-P",
+            "--label", "ff-replan-test=1", "--label", f"ff-replan-run={run_id}",
+            "-e", "POSTGRES_PASSWORD=test", "-e", "POSTGRES_DB=test",
+            "postgres:15-alpine"], capture_output=True, text=True)
+        if proc.returncode == 0:
+            _container = proc.stdout.strip()
+            break
+        last_err = proc.stderr.strip()
+        print(f"  docker run failed (attempt {attempt + 1}/5): {last_err[:160]}")
+        time.sleep(2 * (attempt + 1))
+    else:
+        raise RuntimeError(f"throwaway Postgres would not start: {last_err[:300]}")
     port = subprocess.check_output(
         ["docker", "port", _container, "5432/tcp"], text=True).strip().rsplit(":", 1)[-1]
     url = f"postgresql://postgres:test@127.0.0.1:{port}/test"
