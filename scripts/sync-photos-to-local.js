@@ -8,10 +8,37 @@
  * Only processes source='sharepoint' photos (QField photos are served
  * directly from MinIO on Velo — no need to copy).
  */
-const { neon } = require('@neondatabase/serverless');
+const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 const { requireEnv } = require('./lib/require-env.cjs');
+
+/**
+ * Tagged-template query helper over pg, API-compatible with neon()'s.
+ *
+ * This script used `neon()` from @neondatabase/serverless. Inside the Next.js
+ * build that import is webpack-aliased to the pg-backed shim (src/lib/neon-shim
+ * .ts), so it works — but a standalone cron script gets the REAL Neon driver,
+ * which speaks Neon's HTTP/WS protocol and cannot talk to a plain Postgres.
+ * Against the self-hosted Supabase that replaced Neon on 2026-04-18 it fails at
+ * the TLS handshake:
+ *
+ *   ERR_TLS_CERT_ALTNAME_INVALID: Host: localhost is not in the cert's altnames
+ *
+ * So supplying the right credentials was necessary but not sufficient — the
+ * driver itself had to change. Uses pg directly, matching the repo convention
+ * that new code uses pg.Pool rather than the Neon shim.
+ */
+function makeSql(pool) {
+  return async function sql(strings, ...values) {
+    const text = strings.reduce(
+      (acc, part, i) => acc + part + (i < values.length ? `$${i + 1}` : ''),
+      ''
+    );
+    const result = await pool.query(text, values);
+    return result.rows;
+  };
+}
 
 // Require DATABASE_URL rather than falling back to a literal. The previous
 // fallback pointed at Neon, which was retired at the 2026-04-18 Supabase
@@ -23,7 +50,19 @@ const { requireEnv } = require('./lib/require-env.cjs');
 // fallback would have written to the WRONG LIVE DATABASE instead of erroring.
 // A missing connection string must stop the job, never redirect it.
 const DB_URL = requireEnv('DATABASE_URL');
-const sql = neon(DB_URL);
+// Keep the connection encrypted but skip the hostname check: the replacement
+// Postgres presents a certificate for an unrelated domain, which is what the
+// Neon driver's stricter TLS choked on (ERR_TLS_CERT_ALTNAME_INVALID). Disabling
+// TLS outright would also clear the error but needlessly drops encryption — and
+// DATABASE_URL is not guaranteed to be loopback (the same DB is reachable over
+// Tailscale at 100.96.203.105:5437). Matches the pattern already used across
+// scripts/, e.g. backfill-occurrence-transcripts.js.
+const pool = new Pool({
+  connectionString: DB_URL,
+  max: 4,
+  ssl: DB_URL.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
+});
+const sql = makeSql(pool);
 const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-photos';
 
 // SharePoint app credentials. Never hardcode: a tracked literal is a published
@@ -143,7 +182,11 @@ async function main() {
       // Throttle
       await new Promise(r => setTimeout(r, 50));
     } catch (err) {
+      // Log rather than swallow. This counter-only catch is part of why the
+      // sync's failure went unnoticed: per-photo errors vanished and the run
+      // still printed a tidy summary.
       stats.fail++;
+      console.error(`  FAIL ${row.filename ?? row.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     if ((i + 1) % 100 === 0) {
@@ -154,4 +197,19 @@ async function main() {
   console.log(`Done: OK=${stats.ok} Skip=${stats.skip} Fail=${stats.fail}`);
 }
 
-main().catch(e => { console.error('Fatal:', e); process.exit(1); });
+// pg keeps its sockets open, so the pool must be closed or the process hangs
+// forever — which for a */30 cron would stack up idle node processes.
+main()
+  .catch(e => {
+    console.error('Fatal:', e);
+    process.exitCode = 1;
+  })
+  .finally(() =>
+    // Never swallow: a teardown failure here is the difference between a clean
+    // cron exit and an accumulating pile of idle node processes, and nobody is
+    // watching this run interactively.
+    pool.end().catch(err => {
+      console.error('pool.end failed:', err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    })
+  );
