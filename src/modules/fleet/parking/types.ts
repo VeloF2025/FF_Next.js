@@ -163,3 +163,61 @@ export interface DeclarationInput {
   label?: unknown;
   requestNote?: unknown;
 }
+
+/* -------------------------------------------------------------------------
+ * Fleet side (web). The approval queue and the compliance dashboard.
+ * ---------------------------------------------------------------------- */
+
+/** A pending request, with everything an approver needs to judge it. */
+export interface PendingRequest {
+  id: string;
+  vehicleId: string;
+  registration: string;
+  driverStaffId: string;
+  driverName: string | null;
+  /** The address being requested. */
+  requested: {
+    lat: number;
+    lon: number;
+    accuracyM: number | null;
+    label: string | null;
+    addressText: string | null;
+  };
+  /** The address in force today, or null when this is a first declaration. */
+  current: {
+    lat: number;
+    lon: number;
+    label: string | null;
+    addressText: string | null;
+  } | null;
+  /** Metres between current and requested. Null when there is no current. */
+  moveDistanceM: number | null;
+  requestNote: string | null;
+  createdAt: string;
+}
+
+/** One night's verdict for one vehicle, with the evidence behind it. */
+export interface ComplianceRow {
+  id: string;
+  vehicleId: string | null;
+  registration: string;
+  checkDate: string;
+  result: ParkingCheckResult;
+  distanceM: number | null;
+  lastFixAt: string | null;
+  lastFixLat: number | null;
+  lastFixLon: number | null;
+  lastFixAgeSeconds: number | null;
+  /** The declared address this was judged against, when there was one. */
+  addressLabel: string | null;
+}
+
+export type DecisionOutcome = 'approved' | 'rejected';
+
+export interface DecisionInput {
+  requestId: string;
+  outcome: DecisionOutcome;
+  decidedByUserId: string;
+  decidedByStaffId: string | null;
+  decisionNote: string | null;
+}
