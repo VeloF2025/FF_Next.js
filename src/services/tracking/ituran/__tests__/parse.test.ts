@@ -1,0 +1,190 @@
+/**
+ * Fixture is a trimmed copy of a real PeleGrid response captured from the live
+ * portal on 2026-08-07 (both Avis vehicles). Field names and the three
+ * differently-zoned timestamps are verbatim — do not "tidy" them.
+ */
+import { describe, expect, it } from 'vitest';
+import {
+  isLoginError,
+  newestFixAt,
+  parseUtcTimestamp,
+  readIgnition,
+  toPositions,
+  toVehicles,
+  type IturanGridResponse,
+} from '../parse';
+
+const WIDE_FROM = new Date('2026-08-01T00:00:00Z');
+const WIDE_TO = new Date('2026-08-31T00:00:00Z');
+
+const LIVE: IturanGridResponse = {
+  ResultType: 'ALL_DATA',
+  ErrorStr: 'OK',
+  DataTimeStamp: '2026-08-07 13:27:01', // Israel time (UTC+3) — envelope only
+  rows_data: {
+    '1242358': {
+      PlatformId: 1242358,
+      Plate: 'KX82PLGP',
+      Label: 'KX82PLGP (R)',
+      Lat: -25.9742,
+      Lon: 28.21489,
+      LastSpeed: 0,
+      LastHead: 346,
+      LastMileage: '89718',
+      SpeedLimit: 60,
+      Location_RowLocTime: '2026-08-07 10:26:54', // UTC
+      Statuses: [
+        { StatName: 'Ignition Off' },
+        { StatName: 'Engine Off' },
+        { StatName: 'Vehicle Stopped' },
+      ],
+    },
+    '2305830': {
+      PlatformId: 2305830,
+      Plate: 'KW96KRGP',
+      Label: 'KW96KRGP (R)',
+      Lat: -26.75209,
+      Lon: 27.00402,
+      LastSpeed: 82,
+      LastHead: 230,
+      LastMileage: '105624',
+      SpeedLimit: 60,
+      Location_RowLocTime: '2026-08-07 10:26:53', // UTC
+      Statuses: [{ StatName: 'Engine On' }],
+    },
+  },
+};
+
+describe('parseUtcTimestamp', () => {
+  it('reads Location_RowLocTime as UTC, not as server-local time', () => {
+    // The bug this guards: `new Date('2026-08-07 10:26:54')` is parsed as LOCAL
+    // time by V8, so on the SAST deploy host it would yield 08:26:54Z — every
+    // fix shifted two hours early.
+    expect(parseUtcTimestamp('2026-08-07 10:26:54')?.toISOString())
+      .toBe('2026-08-07T10:26:54.000Z');
+  });
+
+  it('rejects the SAST display format rather than silently misreading it', () => {
+    // LastGoodLocTimeStr is "07/08/2026 12:26:54" — day-first and local. If it
+    // ever reached this function, returning null is far safer than guessing.
+    expect(parseUtcTimestamp('07/08/2026 12:26:54')).toBeNull();
+  });
+
+  it('returns null for empty and malformed input', () => {
+    expect(parseUtcTimestamp(null)).toBeNull();
+    expect(parseUtcTimestamp('')).toBeNull();
+    expect(parseUtcTimestamp('not a date')).toBeNull();
+  });
+});
+
+describe('toPositions', () => {
+  it('maps both live vehicles with UTC instants', () => {
+    const out = toPositions(LIVE, WIDE_FROM, WIDE_TO);
+    expect(out).toHaveLength(2);
+    const kx = out.find((p) => p.externalId === '1242358');
+    expect(kx).toMatchObject({
+      lat: -25.9742,
+      lon: 28.21489,
+      speedKph: 0,
+      bearing: 346,
+      odometerKm: 89718,
+      ignition: false,
+      providerEventId: null,
+    });
+    expect(kx?.recordedAt.toISOString()).toBe('2026-08-07T10:26:54.000Z');
+  });
+
+  it('flags speeding only when both speed and limit are known', () => {
+    const out = toPositions(LIVE, WIDE_FROM, WIDE_TO);
+    expect(out.find((p) => p.externalId === '2305830')?.isSpeeding).toBe(true);
+    expect(out.find((p) => p.externalId === '1242358')?.isSpeeding).toBe(false);
+
+    const noLimit = toPositions(
+      { ...LIVE, rows_data: { a: { PlatformId: 'a', Lat: 1, Lon: 2, LastSpeed: 99, Location_RowLocTime: '2026-08-07 10:00:00' } } },
+      WIDE_FROM, WIDE_TO
+    );
+    expect(noLimit[0]?.isSpeeding).toBeNull();
+  });
+
+  it('drops a null-island fix instead of putting the vehicle in the Atlantic', () => {
+    const out = toPositions(
+      { rows_data: { z: { PlatformId: 'z', Plate: 'ZZ99ZZGP', Lat: 0, Lon: 0, Location_RowLocTime: '2026-08-07 10:00:00' } } },
+      WIDE_FROM, WIDE_TO
+    );
+    expect(out).toHaveLength(0);
+  });
+
+  it('drops rows with no parseable timestamp or no coordinates', () => {
+    const out = toPositions(
+      {
+        rows_data: {
+          a: { PlatformId: 'a', Lat: -26, Lon: 28, Location_RowLocTime: null },
+          b: { PlatformId: 'b', Lat: null, Lon: 28, Location_RowLocTime: '2026-08-07 10:00:00' },
+        },
+      },
+      WIDE_FROM, WIDE_TO
+    );
+    expect(out).toHaveLength(0);
+  });
+
+  it('filters to the requested window', () => {
+    const out = toPositions(LIVE, new Date('2026-08-07T10:26:54Z'), new Date('2026-08-07T10:26:54Z'));
+    // Inclusive on both ends: only the 10:26:54 fix qualifies, not the :53 one.
+    expect(out.map((p) => p.externalId)).toEqual(['1242358']);
+  });
+
+  it('survives a missing or malformed rows_data without throwing', () => {
+    expect(toPositions({}, WIDE_FROM, WIDE_TO)).toEqual([]);
+    expect(toPositions({ rows_data: null }, WIDE_FROM, WIDE_TO)).toEqual([]);
+  });
+});
+
+describe('toVehicles', () => {
+  it('uses Plate, never the suffixed Label', () => {
+    // Label is "KW96KRGP (R)"; matching on it would normalise to KW96KRGPR and
+    // never find the fleet row.
+    expect(toVehicles(LIVE)).toEqual([
+      { externalId: '1242358', registration: 'KX82PLGP', groupName: null },
+      { externalId: '2305830', registration: 'KW96KRGP', groupName: null },
+    ]);
+  });
+
+  it('yields a null registration rather than an empty string', () => {
+    expect(toVehicles({ rows_data: { q: { PlatformId: 'q', Plate: '  ' } } }))
+      .toEqual([{ externalId: 'q', registration: null, groupName: null }]);
+  });
+});
+
+describe('newestFixAt', () => {
+  it('returns the newest fix across the account', () => {
+    expect(newestFixAt(LIVE)?.toISOString()).toBe('2026-08-07T10:26:54.000Z');
+  });
+
+  it('returns null when nothing on the account has a parseable fix', () => {
+    expect(newestFixAt({ rows_data: { a: { PlatformId: 'a' } } })).toBeNull();
+    expect(newestFixAt({})).toBeNull();
+  });
+});
+
+describe('readIgnition', () => {
+  it('reads ignition state from the status list', () => {
+    expect(readIgnition([{ StatName: 'Ignition On' }])).toBe(true);
+    expect(readIgnition([{ StatName: 'Engine Off' }, { StatName: 'Ignition Off' }])).toBe(false);
+  });
+
+  it('is null — not false — when the portal does not say', () => {
+    // Downstream parking compliance treats false as a definite state, so an
+    // unknown must not masquerade as "engine off".
+    expect(readIgnition([{ StatName: 'Vehicle Stopped' }])).toBeNull();
+    expect(readIgnition(null)).toBeNull();
+    expect(readIgnition([])).toBeNull();
+  });
+});
+
+describe('isLoginError', () => {
+  it('detects the dead-token body that rides on a 200-family status', () => {
+    expect(isLoginError({ ResultType: 'ALL_DATA', ErrorStr: 'LoginError!' })).toBe(true);
+    expect(isLoginError({ ResultType: 'ALL_DATA', ErrorStr: 'OK' })).toBe(false);
+    expect(isLoginError({})).toBe(false);
+  });
+});
