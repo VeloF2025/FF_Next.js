@@ -106,6 +106,14 @@ def _upsert_work_qa(cur, hierarchy_values, validated_labels):
     the transaction ends and no test could observe it. A NULL seed always differs from
     a resolved value, so the UPDATE's WHERE fires on each new row; when the plan and
     the GPKG are both silent it stays NULL, which is the same outcome either way.
+
+    ⚠️ LOAD-BEARING: the two statements must stay in ONE transaction. Between them a
+    new row exists with zone_no NULL, and a NULL zone is invisible to every
+    zone-filtered screen — committing in between would briefly reproduce the exact bug
+    this module exists to fix. Today that holds: sync_hierarchy is the only caller and
+    commits once after all three writers, with extract-gpkg-photos setting
+    autocommit = False. Do not add a commit between them, and do not call this without
+    a surrounding transaction.
     """
     qa_values = [
         value for value in hierarchy_values if value[1] in validated_labels
