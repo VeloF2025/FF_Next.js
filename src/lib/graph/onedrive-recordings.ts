@@ -3,12 +3,71 @@ import { graphFetch } from './auth';
 import { log } from '@/lib/logger';
 import { getInternalUsers } from './auto-recording';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
+// NOTE: this closes a transitive import cycle —
+//   onedrive-recordings → graph/meeting-processor → meeting-helpers → onedrive-recordings
+// (meeting-helpers.ts imports listUserRecordings/downloadDriveItem/parseRecordingFilename
+// from this file). It is inert: every cross-cycle reference is a hoisted top-level
+// function declaration that is only *called* from inside another function, and nothing
+// in the chain executes at module-evaluation time. Verified by loading the real chain
+// from both entry points — all bindings resolve, none are undefined. Do not add
+// module-load-time work to any file in that cycle.
+import { transcribeStoredRecordingWithWhisper } from './meeting-processor';
 import * as fs from 'fs';
 import * as path from 'path';
 import { streamResponseToFile } from './streamToFile';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const LOGGER = 'OneDriveRecordings';
+// Same gate the Teams webhook path uses (graph/meeting-processor), so both
+// recording sources honour one switch.
+const WHISPER_TEAMS_RECORDINGS = process.env.WHISPER_TEAMS_RECORDINGS === 'true';
+
+/**
+ * Per-item ceiling on transcription inside a scrape run.
+ *
+ * scrape-onedrive.ts awaits scrapeOneDriveRecordings directly in its HTTP handler
+ * and the user/item loops are sequential, so a single slow item stalls the whole
+ * run. Whisper's own network timeout is 30 minutes and transcribeWithWhisper makes
+ * two sequential remote calls per chunk, so an unresponsive Mac Mini could hold one
+ * request for hours — the documented 2026-08-05 failure shape is whisper.cpp
+ * accepting connections but never answering, so the socket never errors and the
+ * full timeout is always paid.
+ *
+ * This bound is about the scrape run's budget, not the network: on expiry we give
+ * up on THIS item and let the loop continue. The abandoned request finishes (or
+ * times out) on its own; nothing here can cancel it.
+ *
+ * The default must not kill legitimate long recordings — that is the inverse
+ * failure, and it marks real meetings failed. Measured over 11 backfill runs
+ * against the on-prem Whisper: median 9.4x realtime, slowest 8.3x. At 8.3x:
+ *
+ *     1h audio ->  7.2 min      2h audio -> 14.5 min      3h audio -> 21.7 min
+ *
+ * A real 2h24m recording took 13.6 min, so a 10-minute default would have killed
+ * it. 45 min covers roughly 6h of audio at the slowest observed rate, which is
+ * well past any plausible meeting, while still bounding a hung Mac Mini to
+ * minutes instead of the hours an unbounded call can take.
+ */
+export function resolveTranscribeBudgetMs(raw: string | undefined): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 2_700_000; // 45 min
+}
+const TRANSCRIBE_BUDGET_MS = resolveTranscribeBudgetMs(process.env.ONEDRIVE_TRANSCRIBE_BUDGET_MS);
+
+/** Reject if `work` outruns the budget, so one stuck item can't stall the run. */
+async function withBudget<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} exceeded ${ms}ms budget`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 const RECORDINGS_BASE =
   process.env.MEETING_RECORDINGS_PATH || '/home/velo/meeting-recordings';
@@ -335,6 +394,39 @@ export async function scrapeOneDriveRecordings(
           if (meetingRow[0]?.processing_status !== 'completed') {
             try {
               await sql`UPDATE meetings SET processing_status = 'processing', updated_at = NOW() WHERE id = ${meetingId}`;
+
+              // This path downloads a recording but never fetched a transcript by
+              // any means, so every meeting it created could only ever summarise
+              // to "No transcript available". Transcribe first when the recording
+              // has no transcript yet; the meeting is then summarised from real
+              // content instead of being abandoned.
+              if (WHISPER_TEAMS_RECORDINGS) {
+                // Must mirror how processWithLLM resolves a transcript: primary
+                // column first, then the meeting_transcripts fallback. A VTT
+                // longer than TRANSCRIPT_INLINE_LIMIT is spilled to that table
+                // with raw_transcript left empty (meeting-helpers), so checking
+                // raw_transcript alone would re-transcribe a meeting that already
+                // has a perfectly good transcript — and long meetings are both the
+                // ones that spill and the ones most likely to exhaust the budget
+                // and be marked failed for it.
+                const t = await sql`
+                  SELECT coalesce(length(m.raw_transcript), 0)
+                       + coalesce((
+                           SELECT max(length(t2.content))
+                           FROM meeting_transcripts t2
+                           WHERE t2.meeting_id = m.id
+                         ), 0) AS len
+                  FROM meetings m WHERE m.id = ${meetingId}
+                ` as Array<{ len: number }>;
+                if ((t[0]?.len ?? 0) === 0) {
+                  await withBudget(
+                    transcribeStoredRecordingWithWhisper(meetingId),
+                    TRANSCRIBE_BUDGET_MS,
+                    `transcription of meeting ${meetingId}`,
+                  );
+                }
+              }
+
               await processWithLLM(meetingId);
               await sql`UPDATE meetings SET processing_status = 'completed', processed_at = NOW(), updated_at = NOW() WHERE id = ${meetingId}`;
               result.enriched++;
@@ -342,6 +434,12 @@ export async function scrapeOneDriveRecordings(
               const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);
               log.warn('LLM enrichment failed', { meetingId, error: msg }, LOGGER);
               await sql`UPDATE meetings SET processing_status = 'failed', processing_error = ${msg}, updated_at = NOW() WHERE id = ${meetingId}`;
+              // Count it. This branch marked the row failed but left the run's
+              // counters untouched, so a scrape that failed to enrich every
+              // meeting still returned failed:0 with an empty errors[] — the
+              // cron's own output said the run was clean.
+              result.failed++;
+              result.errors.push(`${item.name}: enrichment failed: ${msg}`);
             }
           }
 

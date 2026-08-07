@@ -20,7 +20,16 @@ const MIN_DURATION_SECONDS = 60;
 const LOGGER = 'MeetingProcessor';
 const WHISPER_TEAMS_RECORDINGS = process.env.WHISPER_TEAMS_RECORDINGS === 'true';
 
-async function transcribeStoredRecordingWithWhisper(meetingId: number): Promise<void> {
+/**
+ * Transcribe a meeting's stored recording with Whisper and persist the result.
+ *
+ * Exported because the OneDrive scraper (graph/onedrive-recordings) downloads
+ * recordings on a path that never fetched a transcript by any means — no Teams
+ * VTT, no Whisper — and then summarised them anyway. Those meetings could only
+ * ever produce an empty summary. Sharing this is what lets that path produce a
+ * real transcript instead.
+ */
+export async function transcribeStoredRecordingWithWhisper(meetingId: number): Promise<void> {
   const rows = await sql`
     SELECT recording_path
     FROM meetings
