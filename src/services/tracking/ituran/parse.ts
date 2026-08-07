@@ -69,9 +69,27 @@ export function isLoginError(res: IturanGridResponse): boolean {
 export function parseUtcTimestamp(raw: string | null | undefined): Date | null {
   if (!raw) return null;
   const t = raw.trim();
-  if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(t)) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/.exec(t);
+  if (!m) return null;
+
   const d = new Date(`${t.replace(' ', 'T')}Z`);
-  return Number.isNaN(d.getTime()) ? null : d;
+  if (Number.isNaN(d.getTime())) return null;
+
+  // Shape and NaN are NOT enough. V8 rolls an impossible day over instead of
+  // rejecting it — `new Date('2026-02-30T10:26:54Z')` is a valid Date for
+  // 2 March. A corrupted day field would therefore survive as a
+  // wrong-but-plausible instant a few days off, which is precisely the silent
+  // misfiling this function exists to prevent. (Month 13 and hour 25 ARE
+  // rejected by V8; only day overflow within 01-31 slips through.) Comparing
+  // the parsed fields back against the input rejects exactly that case.
+  if (
+    d.getUTCFullYear() !== Number(m[1]) ||
+    d.getUTCMonth() + 1 !== Number(m[2]) ||
+    d.getUTCDate() !== Number(m[3])
+  ) {
+    return null;
+  }
+  return d;
 }
 
 function num(v: number | string | null | undefined): number | null {
@@ -86,6 +104,16 @@ function num(v: number | string | null | undefined): number | null {
  * Null is not "off": a vehicle whose statuses we cannot read must not be
  * reported as stationary-with-engine-off, because downstream parking
  * compliance treats that as a definite state.
+ *
+ * ONLY the literal "Ignition On"/"Ignition Off" statuses count, matching
+ * Netstar's convention. The portal reports engine and ignition independently,
+ * and a live capture of a moving vehicle carried `Engine On` with no ignition
+ * status at all — so in practice a driving vehicle often yields null here.
+ * That is deliberate. "Engine On" implies ignition, but "Engine Off" does NOT
+ * imply ignition off (accessory mode is engine-off, ignition-on), so inferring
+ * from engine state would be sound in one direction only, and an asymmetric
+ * rule buried in a parser is how a wrong overnight-parking verdict gets built.
+ * Prefer an honest unknown.
  */
 export function readIgnition(statuses: IturanStatus[] | null | undefined): boolean | null {
   if (!Array.isArray(statuses)) return null;

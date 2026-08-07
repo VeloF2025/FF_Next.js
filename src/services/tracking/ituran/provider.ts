@@ -8,14 +8,18 @@
 import { ituranClient, type IturanClient, type IturanClientOptions } from './client';
 import type { ProviderPosition, TrackingProvider } from '../types';
 
-export interface IturanProviderOptions extends IturanClientOptions {
-  accountRef: string;
-  /** Injectable for tests. */
-  client?: IturanClient;
-}
+/**
+ * Either hand over a ready client, or the ingredients to build one — never
+ * both. Extending IturanClientOptions unconditionally would force every caller
+ * that already has a client to also wire up a mintSession closure that is then
+ * never called.
+ */
+export type IturanProviderOptions =
+  | ({ accountRef: string; client: IturanClient } & Partial<IturanClientOptions>)
+  | ({ accountRef: string; client?: undefined } & IturanClientOptions);
 
 export function ituranProvider(opts: IturanProviderOptions): TrackingProvider {
-  const client = opts.client ?? ituranClient(opts);
+  const client = opts.client ?? ituranClient(opts as IturanClientOptions);
 
   return {
     key: 'ituran',

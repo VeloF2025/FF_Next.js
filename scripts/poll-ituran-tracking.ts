@@ -66,10 +66,7 @@ async function main(): Promise<number> {
   }
 
   const result = await pollProvider({
-    provider: ituranProvider({
-      baseUrl, username, accountRef, client,
-      mintSession: () => mintIturanSession({ baseUrl, username, password }),
-    }),
+    provider: ituranProvider({ accountRef, client }),
     listVehicles: () => client.listVehicles(),
     // A snapshot feed keeps serving the same fix after the account goes dark,
     // so staleness — not emptiness — is the dead-feed signal.

@@ -164,7 +164,10 @@ class HttpIturanClient implements IturanClient {
     if (res.status === CHALLENGE_STATUS) {
       return { ok: false, reason: `WAF challenge (HTTP ${CHALLENGE_STATUS}) — waap_id rejected` };
     }
-    if (!res.ok && res.status !== 203) {
+    // 203 is inside res.ok, and it is what the portal actually returns
+    // alongside ErrorStr 'LoginError!' — so a dead token is detected from the
+    // body below, not from the status.
+    if (!res.ok) {
       throw new IturanError('http', `grid: HTTP ${res.status}`);
     }
 

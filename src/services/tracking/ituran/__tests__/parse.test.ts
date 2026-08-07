@@ -75,6 +75,22 @@ describe('parseUtcTimestamp', () => {
     expect(parseUtcTimestamp('')).toBeNull();
     expect(parseUtcTimestamp('not a date')).toBeNull();
   });
+
+  it('rejects impossible calendar days instead of rolling them over', () => {
+    // V8 silently rolls these: new Date('2026-02-30T…Z') is 2 March, a VALID
+    // Date. Shape-checking plus a NaN test would let a corrupted day field
+    // through as a wrong-but-plausible instant days away from the truth.
+    expect(parseUtcTimestamp('2026-02-30 10:26:54')).toBeNull();
+    expect(parseUtcTimestamp('2026-04-31 10:26:54')).toBeNull();
+    expect(parseUtcTimestamp('2025-02-29 10:26:54')).toBeNull(); // 2025 is not a leap year
+  });
+
+  it('still accepts genuinely valid edge dates', () => {
+    expect(parseUtcTimestamp('2024-02-29 00:00:00')?.toISOString())
+      .toBe('2024-02-29T00:00:00.000Z'); // 2024 IS a leap year
+    expect(parseUtcTimestamp('2026-12-31 23:59:59')?.toISOString())
+      .toBe('2026-12-31T23:59:59.000Z');
+  });
 });
 
 describe('toPositions', () => {
@@ -170,6 +186,15 @@ describe('readIgnition', () => {
   it('reads ignition state from the status list', () => {
     expect(readIgnition([{ StatName: 'Ignition On' }])).toBe(true);
     expect(readIgnition([{ StatName: 'Engine Off' }, { StatName: 'Ignition Off' }])).toBe(false);
+  });
+
+  it('is null for a moving vehicle reporting only Engine On', () => {
+    // Verbatim from the live capture of KW96KRGP while driving: the portal
+    // sent Engine On and no ignition status. Asserted so the honest-unknown
+    // choice is visible rather than looking like an oversight.
+    expect(readIgnition([{ StatName: 'Engine On' }])).toBeNull();
+    expect(toPositions(LIVE, WIDE_FROM, WIDE_TO).find((p) => p.externalId === '2305830')?.ignition)
+      .toBeNull();
   });
 
   it('is null — not false — when the portal does not say', () => {
