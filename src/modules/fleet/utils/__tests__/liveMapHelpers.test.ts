@@ -10,6 +10,8 @@ import type { LiveVehicle, TrackingState } from '@/pages/api/fleet/positions/liv
 import {
   PARKED_SILENT_AFTER_SECONDS,
   STATUS_STYLE,
+  swatchBackground,
+  type VehicleStatus,
   ageLabel,
   notPlottedReason,
   partitionVehicles,
@@ -230,5 +232,28 @@ describe('notPlottedReason', () => {
     // teaches this function about. Cast through `unknown`, not `any`.
     const v = vehicle({ trackingState: 'unknown_state' as unknown as TrackingState });
     expect(notPlottedReason(v)).toBe('no position data');
+  });
+});
+
+describe('swatchBackground', () => {
+  // The legend swatch must fade its FILL only. Both `opacity` and
+  // `filter: opacity()` composite the whole element including box-shadow, and
+  // Tailwind's ring-white IS a box-shadow — so either would dim the white ring
+  // the real marker always keeps opaque. Baking alpha into the colour is the
+  // only form that leaves the ring alone.
+  it('bakes the fill opacity into the colour as an alpha channel', () => {
+    expect(swatchBackground('parked')).toBe('#7c3aede6'); // 0.9 -> e6
+    expect(swatchBackground('parkedSilent')).toBe('#7c3aed73'); // 0.45 -> 73
+  });
+
+  it('returns a valid 8-digit hex for every status', () => {
+    for (const status of Object.keys(STATUS_STYLE) as VehicleStatus[]) {
+      expect(swatchBackground(status)).toMatch(/^#[0-9a-f]{8}$/);
+    }
+  });
+
+  it('keeps the dimmer status visibly dimmer once baked', () => {
+    const alpha = (s: VehicleStatus) => parseInt(swatchBackground(s).slice(7), 16);
+    expect(alpha('parkedSilent')).toBeLessThan(alpha('parked'));
   });
 });

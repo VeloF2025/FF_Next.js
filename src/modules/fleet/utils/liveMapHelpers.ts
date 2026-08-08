@@ -81,6 +81,25 @@ export const STATUS_STYLE: Record<
   unknown: { fill: '#6b7280', fillOpacity: 0.6, label: 'No recent fix' },
 };
 
+/**
+ * The status fill with its opacity baked into the colour, for the legend
+ * swatch.
+ *
+ * Neither `opacity` nor `filter: opacity()` works here: both composite the
+ * ELEMENT, box-shadow included, and Tailwind paints `ring-white` as a
+ * box-shadow — so either one fades the white ring along with the fill. The
+ * real marker never has that problem, because Leaflet's stroke opacity is a
+ * separate path attribute pinned to 1. Putting the alpha in the colour leaves
+ * the ring alone.
+ */
+export function swatchBackground(status: VehicleStatus): string {
+  const { fill, fillOpacity } = STATUS_STYLE[status];
+  const alpha = Math.round(Math.min(Math.max(fillOpacity, 0), 1) * 255)
+    .toString(16)
+    .padStart(2, '0');
+  return `${fill}${alpha}`;
+}
+
 /** Human-readable age of a position fix, or 'never' if there isn't one. */
 export function ageLabel(seconds: number | null): string {
   if (seconds === null) return 'never';
