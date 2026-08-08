@@ -15,6 +15,7 @@ import { RefreshCw, Calendar, Filter, X, Download, ChevronRight, ChevronDown, La
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import type { ZoneBreakdown } from '../types/reporting.types';
+import { getMonthToDateRange, type QuickDateFilter } from '../utils/dateQuickFilters';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ReportsDashboard } from './reporting/ReportsDashboard';
 import {
@@ -121,7 +122,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
   }, []);
 
   // Quick filter handler for project table
-  const handleQuickFilter = useCallback((filter: 'today' | 'yesterday' | 'currentCycle' | 'previousCycle' | 'all') => {
+  const handleQuickFilter = useCallback((filter: QuickDateFilter) => {
     const todayStr = getTodaySAST();
 
     switch (filter) {
@@ -131,6 +132,11 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
       case 'yesterday': {
         const yesterdayStr = getYesterdaySAST();
         setFilters(prev => ({ ...prev, dateFrom: yesterdayStr, dateTo: yesterdayStr }));
+        break;
+      }
+      case 'mtd': {
+        const monthToDate = getMonthToDateRange(todayStr);
+        setFilters(prev => ({ ...prev, dateFrom: monthToDate.from, dateTo: monthToDate.to }));
         break;
       }
       case 'currentCycle': {
@@ -150,16 +156,18 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
   }, [setFilters, getCycleDates]);
 
   // Get active quick filter
-  const getActiveQuickFilter = (): 'today' | 'yesterday' | 'currentCycle' | 'previousCycle' | 'all' => {
+  const getActiveQuickFilter = (): QuickDateFilter => {
     if (!filters.dateFrom && !filters.dateTo) return 'all';
 
     const todayStr = getTodaySAST();
     const yesterdayStr = getYesterdaySAST();
+    const monthToDate = getMonthToDateRange(todayStr);
     const currentCycle = getCycleDates('current');
     const previousCycle = getCycleDates('previous');
 
     if (filters.dateFrom === todayStr && filters.dateTo === todayStr) return 'today';
     if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) return 'yesterday';
+    if (filters.dateFrom === monthToDate.from && filters.dateTo === monthToDate.to) return 'mtd';
     if (filters.dateFrom === currentCycle.from && filters.dateTo === currentCycle.to) return 'currentCycle';
     if (filters.dateFrom === previousCycle.from && filters.dateTo === previousCycle.to) return 'previousCycle';
 
@@ -585,11 +593,12 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                 </h2>
 
                 {/* Quick Filter Buttons */}
-                <div className="flex gap-2">
-                  {(['today', 'yesterday', 'currentCycle', 'previousCycle', 'all'] as const).map((filter) => {
+                <div className="flex flex-wrap justify-end gap-2">
+                  {(['today', 'yesterday', 'mtd', 'currentCycle', 'previousCycle', 'all'] as const).map((filter) => {
                     const labels: Record<typeof filter, string> = {
                       today: 'Today',
                       yesterday: 'Yesterday',
+                      mtd: 'MTD',
                       currentCycle: 'Current Cycle',
                       previousCycle: 'Previous Cycle',
                       all: 'All',
@@ -597,6 +606,9 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                     return (
                       <button
                         key={filter}
+                        type="button"
+                        aria-pressed={getActiveQuickFilter() === filter}
+                        aria-label={`Filter numbers per project by ${labels[filter]}`}
                         onClick={() => handleQuickFilter(filter)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           getActiveQuickFilter() === filter
