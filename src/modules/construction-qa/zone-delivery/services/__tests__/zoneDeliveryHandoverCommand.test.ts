@@ -160,6 +160,32 @@ describe('declareZoneHandoverCommand', () => {
     await expect(run()).rejects.toThrow(/reason is required/i);
   });
 
+  it('reports missing evidence even when the caller expected an existing row', async () => {
+    // This is the behaviour that changed: a missing row used to short-circuit to
+    // VERSION_CONFLICT for any non-zero expectedRowVersion, hiding the real
+    // reason. A stale row version is not what is wrong here — the FAC and CAC
+    // were never uploaded.
+    lockZone.mockResolvedValue(null);
+    readZoneAggregate.mockResolvedValue({ pons: [], snagLinks: [], documents: [] });
+
+    await expect(run(input({ expectedRowVersion: 7 }))).rejects.toThrow(/requires an active/i);
+    expect(declareHandover).not.toHaveBeenCalled();
+  });
+
+  it('conflicts when another transaction creates the zone between the two reads', async () => {
+    // lockZone takes no lock when there is no row, so under READ COMMITTED the
+    // documents can appear after it returns null. The evidence gate then passes
+    // with no state row in hand; the caller's view is stale.
+    lockZone.mockResolvedValue(null);
+    readZoneAggregate.mockResolvedValue({
+      pons: [], snagLinks: [], documents: [doc('fac'), doc('cac')],
+    });
+
+    await expect(run(input({ expectedRowVersion: 0, reason: 'x' })))
+      .rejects.toThrow(/reload and retry/i);
+    expect(declareHandover).not.toHaveBeenCalled();
+  });
+
   it('reports missing evidence when the zone has no delivery-state row', async () => {
     // zone_delivery_documents FKs to zone_delivery_state, so a zone with no row
     // provably has no FAC/CAC either — the evidence check owns this case.

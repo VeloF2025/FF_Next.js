@@ -79,8 +79,12 @@ export function declareZoneHandoverCommand(
       );
     }
 
-    // Past the evidence gate a state row necessarily exists — an active FAC or
-    // CAC cannot reference a zone that has none.
+    // An active FAC or CAC cannot reference a zone with no state row, so
+    // normally the evidence gate above has already rejected this case. It is
+    // still reachable: lockZone takes no lock when there is no row, so under
+    // READ COMMITTED another transaction can create the row and register both
+    // documents between that read and readZoneAggregate. Reporting a version
+    // conflict is right — the caller's view of the zone is stale.
     if (!state) versionConflict();
 
     const snapshot = buildSnapshot(aggregate);
@@ -91,8 +95,6 @@ export function declareZoneHandoverCommand(
       // path — the derived stamp, backfills, ad-hoc UPDATEs — still terminal.
       await client.query(`SET LOCAL ff.zone_handover_correction = 'true'`);
     }
-    // CAS on the row's real version: a row this command just created is at the
-    // column default, not at the caller's expectedRowVersion of 0.
     const saved = await write.declareHandover(
       client, input, snapshot, input.effectiveAt, state!.row_version,
     );
