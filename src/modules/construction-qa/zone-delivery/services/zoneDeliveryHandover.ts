@@ -44,7 +44,7 @@ function snapshotDocument(doc: DocumentRow) {
   };
 }
 
-function buildSnapshot(aggregate: ZoneAggregate) {
+export function buildSnapshot(aggregate: ZoneAggregate) {
   const scope = aggregate.pons.map(pon => ({
     ponStageId: pon.pon_stage_id,
     ponNo: pon.pon_no,

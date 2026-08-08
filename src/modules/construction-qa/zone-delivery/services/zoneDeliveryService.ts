@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import type {
-  CommandMeta, ConfirmMilestoneInput, DeliveryActor, RecordZoneQaInput,
+  CommandMeta, ConfirmMilestoneInput, DeclareHandoverInput, DeliveryActor, RecordZoneQaInput,
   RegisterDocumentInput, UpdateScopeInput, ZoneDeliveryActivity,
   ZoneDeliveryView, ZoneKey, ZoneRegisterFilters, ZoneRegisterResult,
 } from '../types/zoneDelivery.types';
@@ -20,11 +20,13 @@ import { validateMilestoneConfirmation } from './zoneDeliveryMilestoneActions';
 import { invalidateZoneEvidence } from './zoneDeliveryInvalidation';
 import { requireSupervisedDocumentSource } from './zoneDeliveryDocumentSecurity';
 import { recordZoneQaCommand } from './zoneDeliveryQaCommands';
+import { declareZoneHandoverCommand } from './zoneDeliveryHandoverCommand';
 export interface ZoneDeliveryService {
   getRegister(filters: ZoneRegisterFilters): Promise<ZoneRegisterResult>; getZone(key: ZoneKey): Promise<ZoneDeliveryView>;
   updateScope(input: UpdateScopeInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
   confirmPonMilestone(input: ConfirmMilestoneInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
   recordZoneQa(input: RecordZoneQaInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
+  declareZoneHandover(input: DeclareHandoverInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
   registerDocument(input: RegisterDocumentInput, actor: DeliveryActor): Promise<ZoneDeliveryView>;
   recalculateForSnag(snagId: string, actor: DeliveryActor): Promise<void>; getActivity(key: ZoneKey): Promise<ZoneDeliveryActivity[]>;
 }
@@ -213,6 +215,9 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
   }
   recordZoneQa(input: RecordZoneQaInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
     return recordZoneQaCommand(this.pool, input, actor);
+  }
+  declareZoneHandover(input: DeclareHandoverInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
+    return declareZoneHandoverCommand(this.pool, input, actor);
   }
   registerDocument(input: RegisterDocumentInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
     return transaction(this.pool, async client => {

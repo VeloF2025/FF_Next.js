@@ -214,6 +214,32 @@ export async function stampEligibility(client: PoolClient, key: ZoneKey): Promis
  * an operator has already declared by hand must never be silently restamped
  * with a derived date.
  */
+/**
+ * Operator-declared handover, carrying a business date the operator chooses.
+ *
+ * Deliberately has no `handed_over_at IS NULL` guard, unlike stampHandover: a
+ * mistyped legacy date must be correctable. On legacy sites the FAC is signed
+ * on one date and uploaded on another, and a zone is often handed over before
+ * FibreFlow knows the site exists, so a derived-only handover cannot express
+ * the truth. The row_version CAS is what keeps the correction safe, and callers
+ * require a reason (validateMeta's `correction` mode) so it stays attributable.
+ */
+export async function declareHandover(
+  client: PoolClient,
+  key: ZoneKey,
+  snapshot: unknown,
+  effectiveAt: Date | string,
+  expected: number,
+): Promise<ZoneStateRow | null> {
+  const { rows } = await client.query<ZoneStateRow>(`
+    UPDATE zone_delivery_state SET handed_over_at = $4, handover_snapshot = $3,
+      row_version = row_version + 1, updated_at = NOW()
+    WHERE project_id = $1 AND zone_no = $2 AND row_version = $5
+    RETURNING *
+  `, [key.projectId, key.zoneNo, JSON.stringify(snapshot), effectiveAt, expected]);
+  return rows[0] ?? null;
+}
+
 export async function stampHandover(
   client: PoolClient,
   key: ZoneKey,

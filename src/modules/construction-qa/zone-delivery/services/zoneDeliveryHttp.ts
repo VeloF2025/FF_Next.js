@@ -3,6 +3,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type {
   ConfirmMilestoneInput,
+  DeclareHandoverInput,
   PonMilestone,
   RecordZoneQaInput,
   RegisterDocumentInput,
@@ -176,6 +177,15 @@ export function parseMilestoneBody(value: unknown): ConfirmMilestoneInput {
     ...(body.affectedGate === undefined
       ? {}
       : { affectedGate: member(body.affectedGate, MILESTONES, 'affectedGate') }),
+    // Only an explicit boolean true opts in; a stray string or 1 must not.
+    ...(body.overridePrerequisite === true ? { overridePrerequisite: true } : {}),
+  };
+}
+
+export function parseHandoverBody(value: unknown): DeclareHandoverInput {
+  const body = objectBody(value);
+  return {
+    ...commandMeta(body),
     // Only an explicit boolean true opts in; a stray string or 1 must not.
     ...(body.overridePrerequisite === true ? { overridePrerequisite: true } : {}),
   };
