@@ -80,7 +80,13 @@ function confirmBlocker(
     return blocker(input, 'HANDOVER_LOCKED', 'zone handover is terminal');
   }
   const previousGate = gates[index - 1];
-  if (previousGate && !input.milestones[previousGate]) {
+  // port_submitted is an attestation, not a derived fact: it records that the
+  // operator uploaded the PON's optical pack to the FNO's SharePoint, which
+  // happens entirely outside FibreFlow and which FibreFlow cannot verify. On
+  // legacy sites the earlier gates were never recorded here at all, so
+  // requiring them only stops the operator from telling us the truth. The
+  // gates it feeds (port_approved, technically_live) stay sequenced.
+  if (previousGate && gate !== 'port_submitted' && !input.milestones[previousGate]) {
     const prerequisite = prerequisiteBlockers[gate];
     return blocker(input, prerequisite.code, prerequisite.message.toLowerCase());
   }
@@ -99,28 +105,6 @@ function confirmBlocker(
     return blocker(input, 'SNAG_RECONFIRMATION_BLOCKED', 'affected snag must be closed first');
   }
   return null;
-}
-
-/**
- * The blocker that would remain if every preceding gate were already confirmed
- * — everything except the sequencing assumption itself.
- *
- * `confirmBlocker` returns only the FIRST blocker and evaluates sequence before
- * evidence, so authorising a sequence override without this would walk straight
- * past a missing test pack or QA approval that was never reached. Anything this
- * returns is a genuine blocker that an override must not bypass.
- */
-export function blockerIgnoringSequence(
-  input: PonActionInput,
-  gate: PonMilestone,
-): DeliveryBlocker | null {
-  const index = gates.indexOf(gate);
-  if (index < 0) return null;
-  const milestones = { ...input.milestones };
-  for (const prior of gates.slice(0, index)) {
-    if (!milestones[prior]) milestones[prior] = 'sequence-overridden';
-  }
-  return confirmBlocker({ ...input, milestones }, gate, index);
 }
 
 export function calculatePonActions(

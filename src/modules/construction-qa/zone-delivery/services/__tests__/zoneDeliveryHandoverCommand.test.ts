@@ -5,7 +5,6 @@ const readTransactionTime = vi.fn();
 const lockZone = vi.fn();
 const declareHandover = vi.fn();
 const appendActivity = vi.fn();
-const calculateAggregate = vi.fn();
 const recalculateZone = vi.fn();
 
 vi.mock('../../repositories/zoneDeliveryReadRepository', () => ({
@@ -19,7 +18,6 @@ vi.mock('../../repositories/zoneDeliveryWriteRepository', () => ({
 }));
 vi.mock('../zoneDeliveryHandover', () => ({
   buildSnapshot: () => ({ snapshot: true }),
-  calculateAggregate: (...a: unknown[]) => calculateAggregate(...a),
   recalculateZone: (...a: unknown[]) => recalculateZone(...a),
 }));
 vi.mock('../zoneDeliveryCanonical', () => ({ assertCanonicalZone: async () => undefined }));
@@ -32,11 +30,10 @@ import { declareZoneHandoverCommand } from '../zoneDeliveryHandoverCommand';
 
 const NOW = new Date('2026-08-08T06:00:00.000Z');
 
-const actor = (over: Partial<DeliveryActor> = {}): DeliveryActor => ({
+const actor = (): DeliveryActor => ({
   userId: '11111111-1111-4111-8111-111111111111',
   email: 'johan@velocityfibre.co.za',
   permission: 'construction-qa.zone-delivery.zone-qa-approve',
-  ...over,
 });
 
 const input = (over: Partial<DeclareHandoverInput> = {}): DeclareHandoverInput => ({
@@ -48,15 +45,20 @@ const input = (over: Partial<DeclareHandoverInput> = {}): DeclareHandoverInput =
   ...over,
 } as DeclareHandoverInput);
 
-const run = (i = input(), a = actor()) =>
-  declareZoneHandoverCommand({} as never, i, a);
+const doc = (documentType: 'fac' | 'cac', over: Record<string, unknown> = {}) => ({
+  document_type: documentType, pon_stage_id: null, superseded_at: null, ...over,
+});
+
+const run = (i = input()) => declareZoneHandoverCommand({} as never, i, actor());
 
 beforeEach(() => {
   vi.clearAllMocks();
   readTransactionTime.mockResolvedValue(NOW);
   lockZone.mockResolvedValue({ id: 'zone-1', row_version: 4, handed_over_at: null });
-  readZoneAggregate.mockResolvedValue({ pons: [], documents: [], snagLinks: [] });
-  calculateAggregate.mockReturnValue({ eligibleForHandover: true, blockers: [] });
+  // Johan supplies both documents every time — that upload IS the handover.
+  readZoneAggregate.mockResolvedValue({
+    pons: [], snagLinks: [], documents: [doc('fac'), doc('cac')],
+  });
   declareHandover.mockResolvedValue({ id: 'zone-1', handed_over_at: '2026-08-08T05:59:00.000Z' });
   recalculateZone.mockResolvedValue({ ok: true });
 });
@@ -70,10 +72,53 @@ describe('declareZoneHandoverCommand', () => {
     );
   });
 
+  it('records a legacy zone that never completed its gates in FibreFlow', async () => {
+    // No PONs, no zone QA, no milestones — the zone was delivered before
+    // FibreFlow tracked the site. It must still be recordable.
+    readZoneAggregate.mockResolvedValue({
+      pons: [], snagLinks: [], documents: [doc('fac'), doc('cac')],
+    });
+
+    await run(input({ effectiveAt: '2026-05-08T00:00:00.000Z', reason: 'Lawley 17, legacy' }));
+
+    expect(declareHandover).toHaveBeenCalled();
+  });
+
   it('requires a reason to back-date', async () => {
     await expect(run(input({ effectiveAt: '2026-05-08T00:00:00.000Z' })))
       .rejects.toThrow(/reason is required/i);
     expect(declareHandover).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['FAC', [doc('cac')]],
+    ['CAC', [doc('fac')]],
+    ['FAC and CAC', []],
+  ])('refuses without an active %s', async (_label, documents) => {
+    readZoneAggregate.mockResolvedValue({ pons: [], snagLinks: [], documents });
+
+    await expect(run()).rejects.toThrow(/requires an active/i);
+    expect(declareHandover).not.toHaveBeenCalled();
+  });
+
+  it('ignores a superseded FAC when checking for one', async () => {
+    readZoneAggregate.mockResolvedValue({
+      pons: [],
+      snagLinks: [],
+      documents: [doc('fac', { superseded_at: '2026-07-01T00:00:00.000Z' }), doc('cac')],
+    });
+
+    await expect(run()).rejects.toThrow(/requires an active FAC/i);
+  });
+
+  it('ignores a PON-scoped document when checking for the zone-level one', async () => {
+    readZoneAggregate.mockResolvedValue({
+      pons: [],
+      snagLinks: [],
+      documents: [doc('fac', { pon_stage_id: 'pon-1' }), doc('cac')],
+    });
+
+    await expect(run()).rejects.toThrow(/requires an active FAC/i);
   });
 
   it('corrects an existing handover date, and records it as a correction', async () => {
@@ -100,62 +145,6 @@ describe('declareZoneHandoverCommand', () => {
   it('conflicts when the row version moved', async () => {
     lockZone.mockResolvedValue({ id: 'zone-1', row_version: 9, handed_over_at: null });
     await expect(run()).rejects.toThrow(/reload and retry/i);
-    expect(declareHandover).not.toHaveBeenCalled();
-  });
-
-  it('blocks an ineligible zone when no override is offered', async () => {
-    calculateAggregate.mockReturnValue({
-      eligibleForHandover: false,
-      blockers: [{ code: 'PON_NOT_LIVE', message: 'PONs are not technically live' }],
-    });
-
-    await expect(run()).rejects.toThrow(/not technically live/i);
-    expect(declareHandover).not.toHaveBeenCalled();
-  });
-
-  it('proceeds on an ineligible legacy zone with an authorised override', async () => {
-    calculateAggregate.mockReturnValue({
-      eligibleForHandover: false,
-      blockers: [{ code: 'PON_NOT_LIVE', message: 'PONs are not technically live' }],
-    });
-
-    await run(
-      input({ overridePrerequisite: true, reason: 'Lawley 17 delivered before FibreFlow' }),
-      actor({ canOverridePrerequisites: true }),
-    );
-
-    expect(declareHandover).toHaveBeenCalled();
-    const activity = appendActivity.mock.calls[0]![1] as Record<string, never>;
-    expect(activity.newValue).toMatchObject({ overrodePrerequisite: true });
-  });
-
-  it.each([
-    ['FAC_MISSING', 'Active FAC is missing'],
-    ['CAC_MISSING', 'Active CAC is missing'],
-    ['OPEN_HANDOVER_SNAGS', '2 open handover-blocking snag(s)'],
-  ])('never waives %s, even with an authorised override', async (code, message) => {
-    calculateAggregate.mockReturnValue({
-      eligibleForHandover: false,
-      blockers: [{ code, message }],
-    });
-
-    await expect(run(
-      input({ overridePrerequisite: true, reason: 'legacy site' }),
-      actor({ canOverridePrerequisites: true }),
-    )).rejects.toThrow(new RegExp(message.replace(/[()]/g, '.'), 'i'));
-    expect(declareHandover).not.toHaveBeenCalled();
-  });
-
-  it('refuses an override from an actor without the grant', async () => {
-    calculateAggregate.mockReturnValue({
-      eligibleForHandover: false,
-      blockers: [{ code: 'PON_NOT_LIVE', message: 'PONs are not technically live' }],
-    });
-
-    await expect(run(
-      input({ overridePrerequisite: true, reason: 'legacy site' }),
-      actor({ canOverridePrerequisites: false }),
-    )).rejects.toThrow(/override is required/i);
     expect(declareHandover).not.toHaveBeenCalled();
   });
 });

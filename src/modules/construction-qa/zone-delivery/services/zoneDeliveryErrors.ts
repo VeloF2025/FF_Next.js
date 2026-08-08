@@ -31,31 +31,6 @@ export function deliveryError(
 
 export const hasReason = (reason?: string): boolean => Boolean(reason?.trim());
 
-/**
- * Authorise a sequencing-prerequisite override, returning whether one applies.
- *
- * Fails closed on every axis: not requested → false; requested without the
- * grant → error; requested without a reason → error. The grant itself is
- * resolved at the API edge (`canOverridePrerequisites`) because it lives in a
- * different permission namespace than this module's own commands.
- */
-export function requirePrerequisiteOverride(
-  input: { overridePrerequisite?: boolean; reason?: string },
-  actor: DeliveryActor,
-): boolean {
-  if (!input.overridePrerequisite) return false;
-  if (actor.canOverridePrerequisites !== true) {
-    deliveryError(
-      'VALIDATION_ERROR',
-      'Permission construction-qa.works-qa.override is required to bypass a prerequisite',
-    );
-  }
-  if (!hasReason(input.reason)) {
-    deliveryError('VALIDATION_ERROR', 'A reason is required to bypass a prerequisite');
-  }
-  return true;
-}
-
 export function requirePermission(actor: DeliveryActor, suffix: string): void {
   const required = `construction-qa.zone-delivery.${suffix}`;
   if (actor.permission !== required) {

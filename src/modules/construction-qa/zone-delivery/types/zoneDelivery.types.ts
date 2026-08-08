@@ -33,15 +33,6 @@ export interface DeliveryActor {
   userId: string;
   email: string;
   permission: string;
-  /**
-   * Whether this actor may bypass a sequencing prerequisite.
-   *
-   * Resolved at the API edge via the DB-backed permission check, never from
-   * `user.permissions` — the operators who need this hold the grant through
-   * `user_permission_overrides`, which the in-token array does not carry.
-   * Absent means no.
-   */
-  canOverridePrerequisites?: boolean;
 }
 
 export interface CommandMeta {
@@ -59,11 +50,7 @@ export interface UpdateScopeInput extends ZoneKey, CommandMeta {
  * Record a zone handover on a date the operator chooses, rather than the date
  * the system noticed the gates had passed. Re-issuing it corrects the date.
  */
-export interface DeclareHandoverInput extends ZoneKey, CommandMeta {
-  /** Proceed despite an incomplete-but-historical workflow. Never waives a
-   *  missing FAC/CAC or an open handover-blocking snag. */
-  overridePrerequisite?: boolean;
-}
+export interface DeclareHandoverInput extends ZoneKey, CommandMeta {}
 
 export interface ConfirmMilestoneInput extends ZoneKey, CommandMeta {
   ponStageId: string;
@@ -71,15 +58,6 @@ export interface ConfirmMilestoneInput extends ZoneKey, CommandMeta {
   action: 'confirm' | 'reopen' | 'link_maintenance';
   snagId?: string;
   affectedGate?: PonMilestone;
-  /**
-   * Proceed despite an unmet *sequencing* prerequisite (e.g. confirming
-   * port_submitted on a legacy PON whose testing was never recorded in
-   * FibreFlow). Requires `canOverridePrerequisites` and a reason.
-   *
-   * Does NOT bypass evidence blockers — a missing QA approval or test pack is
-   * an absence of proof, not an ordering assumption, and stays hard.
-   */
-  overridePrerequisite?: boolean;
 }
 
 export interface RecordZoneQaInput extends ZoneKey, CommandMeta {

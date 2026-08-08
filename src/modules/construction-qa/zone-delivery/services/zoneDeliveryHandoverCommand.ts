@@ -9,42 +9,41 @@ import * as write from '../repositories/zoneDeliveryWriteRepository';
 import {
   deliveryError,
   requirePermission,
-  requirePrerequisiteOverride,
   validateMeta,
   versionConflict,
 } from './zoneDeliveryErrors';
 import { assertCanonicalZone } from './zoneDeliveryCanonical';
-import { buildSnapshot, calculateAggregate, recalculateZone } from './zoneDeliveryHandover';
+import { buildSnapshot, recalculateZone } from './zoneDeliveryHandover';
 import { transaction } from './zoneDeliveryTransactions';
 
 type Time = Date | string | null;
 const iso = (value: Time): string | null =>
   value === null ? null : (value instanceof Date ? value : new Date(value)).toISOString();
 
-/**
- * Handover blockers an override may never waive.
- *
- * A missing FAC or CAC is absent evidence, and an open handover-blocking snag
- * is a live defect — neither is "the workflow predates FibreFlow", which is the
- * only thing the override exists to forgive.
- */
-const NON_WAIVABLE: ReadonlySet<string> = new Set([
-  'FAC_MISSING',
-  'CAC_MISSING',
-  'OPEN_HANDOVER_SNAGS',
-]);
+const hasActive = (
+  documents: read.DocumentRow[],
+  documentType: 'fac' | 'cac',
+): boolean => documents.some(document =>
+  document.document_type === documentType
+    && document.pon_stage_id === null
+    && !document.superseded_at);
 
 /**
- * Record a zone handover with an operator-chosen date.
+ * Record a zone handover on a date the operator chooses.
  *
- * The register previously derived handover automatically the moment every gate
- * passed, which cannot express a legacy zone that was handed over months before
- * FibreFlow tracked the site, nor a FAC signed on one date and uploaded on
- * another. This is the declared counterpart; the derived path still runs and
- * still refuses to overwrite a declared date.
+ * This is an attestation, not a derived fact. Handover was previously stamped
+ * automatically the moment every gate passed, which cannot express a zone that
+ * was delivered before FibreFlow tracked the site, nor a FAC signed on one date
+ * and uploaded on another. The operator performs the handover in the field and
+ * records it here afterwards, so the earlier gates are deliberately NOT
+ * preconditions — on legacy sites they were never captured and never will be,
+ * and requiring them only stops the operator recording the truth.
  *
- * Gated on zone-qa-approve because handover is a zone-level act, matching the
- * other zone-level command rather than the per-PON confirm permissions.
+ * The FAC and CAC are required, because uploading them IS the handover action
+ * rather than a gate upon it — the operator supplies both every time.
+ *
+ * The derived path (stampHandover) still runs for zones that complete inside
+ * FibreFlow, and still refuses to overwrite a date declared here.
  */
 export function declareZoneHandoverCommand(
   pool: Pool,
@@ -65,19 +64,13 @@ export function declareZoneHandoverCommand(
     validateMeta(input, now, previousHandover !== null);
 
     const aggregate = await read.readZoneAggregate(client, input);
-    const calculation = calculateAggregate(aggregate);
-    if (!calculation.eligibleForHandover) {
-      const blocking = calculation.blockers.filter(item => NON_WAIVABLE.has(item.code));
-      if (blocking.length > 0) {
-        deliveryError('EVIDENCE_REQUIRED', blocking.map(item => item.message).join('; '));
-      }
-      if (!requirePrerequisiteOverride(input, actor)) {
-        deliveryError(
-          'PREREQUISITE_BLOCKED',
-          calculation.blockers.map(item => item.message).join('; ')
-            || 'Zone is not eligible for handover',
-        );
-      }
+    const missing = (['fac', 'cac'] as const)
+      .filter(documentType => !hasActive(aggregate.documents, documentType));
+    if (missing.length > 0) {
+      deliveryError(
+        'EVIDENCE_REQUIRED',
+        `Zone handover requires an active ${missing.map(m => m.toUpperCase()).join(' and ')}`,
+      );
     }
 
     const snapshot = buildSnapshot(aggregate);
@@ -101,7 +94,6 @@ export function declareZoneHandoverCommand(
         snapshot,
         declared: true,
         ...(previousHandover === null ? {} : { corrected: true }),
-        ...(input.overridePrerequisite ? { overrodePrerequisite: true } : {}),
       },
     });
 

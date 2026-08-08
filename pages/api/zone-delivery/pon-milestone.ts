@@ -2,11 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth';
-import { userHasPermission } from '@/lib/permissions';
 import { createZoneDeliveryService } from '@/modules/construction-qa/zone-delivery/services/zoneDeliveryService';
 import {
   COMMAND_PERMISSIONS,
-  PREREQUISITE_OVERRIDE_PERMISSION,
   parseMilestoneBody,
   zoneDeliveryErrorBoundary,
   zoneDeliveryResponse,
@@ -33,17 +31,10 @@ function permittedHandler(permission: MilestonePermission) {
     return zoneDeliveryResponse(res, async () => {
       const input = parseMilestoneBody(req.body);
       const user = (req as AuthenticatedNextApiRequest).user;
-      // Resolved against the database rather than the token's permission array:
-      // the operators who need this hold the grant via user_permission_overrides,
-      // which never appears in `user.permissions`. Only looked up when the
-      // request actually asks to override.
-      const canOverridePrerequisites = input.overridePrerequisite === true
-        && await userHasPermission(user.id, PREREQUISITE_OVERRIDE_PERMISSION, 'edit');
       return service.confirmPonMilestone(input, {
         userId: user.id,
         email: user.email,
         permission,
-        canOverridePrerequisites,
       });
     });
   });
