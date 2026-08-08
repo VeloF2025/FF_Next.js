@@ -13,12 +13,16 @@
  * @/lib/db-neon and the email/WhatsApp delivery closure — into a suite that
  * only wants to parse one SELECT.
  *
- * Known limitation, recorded rather than hidden: this reads role_permissions
- * only. A user granted the page through user_permission_overrides is not
- * returned, and one revoked through an override still is. Folding overrides in
- * means per-user evaluation (src/lib/permissions/index.ts works one user at a
- * time) for a set that is currently three roles wide. PR 3's approval queue
- * needs the same list — that is the point to revisit it.
+ * Overrides ARE folded in, and must be: migration 485 narrowed approval from
+ * three roles (30 users) to two named people granted individually. Reading
+ * role_permissions alone would return nobody at all, so every violation would
+ * notify an empty list while the queue itself worked — a silent failure that
+ * looks exactly like "no violations occurred".
+ *
+ * The CASE below mirrors isPermissionBlocked (src/lib/permissions/index.ts)
+ * branch for branch, including the non-obvious one: a `revoke` override whose
+ * action is false does NOT block — it falls through to the role. Approximating
+ * that would make this list disagree with the gate on the page.
  */
 import { sql } from '@/lib/db-pool';
 
@@ -28,10 +32,25 @@ export async function findApproverUserIds(): Promise<string[]> {
   const rows = await sql<{ id: string }>`
     SELECT u.id
     FROM users u
-    JOIN role_permissions rp ON rp.role = u.role
+    LEFT JOIN LATERAL (
+      SELECT o.override_type, o.actions
+      FROM user_permission_overrides o
+      WHERE o.user_id = u.id
+        AND o.permission_key = ${APPROVER_PERMISSION}
+        AND (o.expires_at IS NULL OR o.expires_at > now())
+      LIMIT 1
+    ) ov ON TRUE
+    LEFT JOIN role_permissions rp
+      ON rp.role = u.role AND rp.permission_key = ${APPROVER_PERMISSION}
     WHERE u.is_active = true
-      AND rp.permission_key = ${APPROVER_PERMISSION}
-      AND rp.actions->>'view' = 'true'
+      AND CASE
+            WHEN ov.override_type = 'grant'
+              THEN ov.actions->>'view' = 'true'
+            WHEN ov.override_type = 'revoke' AND ov.actions->>'view' = 'true'
+              THEN false
+            ELSE rp.actions->>'view' = 'true'
+          END
   `;
   return rows.map((r) => r.id);
 }
+
