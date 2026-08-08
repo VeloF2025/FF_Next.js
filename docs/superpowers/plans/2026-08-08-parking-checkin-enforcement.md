@@ -34,9 +34,21 @@ Set the anchor a few days ahead of the announcement so the soft phase is real.
 
 ## Injection point
 
-`pages/api/my/attendance/clock-in.ts`, **before** `executeClockInCommand`
-(around line 38). The route already uses `withMySession` and returns
-`apiResponse.forbidden` shapes, so the gate fits the existing error contract.
+Put the gate **inside `executeClockInCommand`**
+(`src/modules/attendance/portal/clockInCommand.ts`), not in the route adapter.
+
+The earlier draft of this plan said the route, before the command call. That
+breaks from the pattern this exact class of gate already follows: the command
+carries a `stage` variable and blocks clock-in on outstanding conditions at
+`consent_check`, `open_entry_check` and `required_action_check`, each with
+structured rejection logging. A parking gate in the route would be the only
+"you may not clock in yet" rule sitting outside that sequence, with no stage
+label in the logs and nothing tying it to the others.
+
+`executeClockInCommand` has exactly one caller today, so the route is not a
+bypass risk — this is about consistency and debuggability, not security. Follow
+`required_action_check`: add a stage, log the rejection with a `reason`, and
+return the existing FORBIDDEN shape the route already maps.
 
 Server-side is the enforcement; the client prompt is UX and must not be the
 only thing standing between a driver and an undeclared address.
@@ -132,6 +144,18 @@ the anchor (never counted), and anchor unset (fail open — never block).
   outcome than an undeclared address.
 - Someone who works Mon/Tue then takes leave could return to a block having seen
   only two prompts. Accepted, given the anchor; revisit if it bites.
+- **A reassigned vehicle carries its old declaration.** Declarations key on
+  `vehicle_id` and merely record `declared_by_staff_id`; `superseded` fires only
+  when a *new* declaration for the same vehicle is approved
+  (`approvalQueries.ts`), and nothing in the assignment path touches parking at
+  all. So a driver handed a vehicle that already has an `active` declaration
+  inherits "compliant" and is never gated, having declared nothing — and the
+  address on file is the previous driver's home. Zero instances today (checked
+  2026-08-08: no active declaration whose declarer differs from the assigned
+  driver), but only because one declaration exists in total. Decide before
+  building whether the gate matches on vehicle alone or on
+  `(vehicle_id, declared_by_staff_id)`; the latter closes it with no new
+  invalidation machinery.
 - The soft phase needs an actual announcement. Enforcement that arrives
   unannounced reads as a bug.
 - **Corrections to the premises this plan was written on** (re-verified against
