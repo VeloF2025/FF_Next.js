@@ -15,15 +15,23 @@
  * on the assumption it was needed — it was dead code. A raw `children.length`
  * WOULD be wrong here, which is what the test pins.
  */
-import { Children, type ReactNode } from 'react';
+import { Children, useId, type ReactNode } from 'react';
 
 export function TileGroup({ title, children }: { title: string; children: ReactNode }) {
+  const headingId = useId();
   const visible = Children.toArray(children);
   if (visible.length === 0) return null;
 
+  // aria-labelledby, so the section exposes as a NAMED region to a screen
+  // reader rather than an anonymous one. Without it the heading is readable but
+  // the landmark it introduces has no accessible name, which is worse than
+  // having no landmark at all.
   return (
-    <section className="mt-4 first:mt-0">
-      <h2 className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
+    <section className="mt-4 first:mt-0" aria-labelledby={headingId}>
+      <h2
+        id={headingId}
+        className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-neutral-500"
+      >
         {title}
       </h2>
       <div className="grid grid-cols-2 gap-3">{visible}</div>

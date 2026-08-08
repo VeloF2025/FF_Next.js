@@ -38,3 +38,29 @@ describe('TileGroup', () => {
     expect(screen.getByText('SiteCam')).toBeTruthy();
   });
 });
+
+describe('accessibility', () => {
+  it('names the section via aria-labelledby pointing at its own heading', () => {
+    // An unnamed landmark is worse than no landmark: a screen reader announces
+    // "region" with nothing to distinguish it from the next one.
+    const { container } = render(
+      <TileGroup title="My vehicle"><button>Vehicle</button></TileGroup>
+    );
+    const section = container.querySelector('section');
+    const heading = container.querySelector('h2');
+    expect(section?.getAttribute('aria-labelledby')).toBeTruthy();
+    expect(section?.getAttribute('aria-labelledby')).toBe(heading?.id);
+  });
+
+  it('gives each group a distinct id so two groups do not collide', () => {
+    const { container } = render(
+      <>
+        <TileGroup title="One"><button>A</button></TileGroup>
+        <TileGroup title="Two"><button>B</button></TileGroup>
+      </>
+    );
+    const ids = Array.from(container.querySelectorAll('h2')).map((h) => h.id);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+  });
+});
