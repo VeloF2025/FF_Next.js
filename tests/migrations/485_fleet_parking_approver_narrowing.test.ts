@@ -58,6 +58,12 @@ const BASE_SCHEMA = `
     role VARCHAR(50) NOT NULL, permission_key VARCHAR(100) NOT NULL,
     actions JSONB NOT NULL, PRIMARY KEY (role, permission_key)
   );
+  CREATE TABLE access_permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type VARCHAR(50) NOT NULL, key VARCHAR(100) NOT NULL UNIQUE,
+    parent_key VARCHAR(100), label VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE
+  );
   CREATE TABLE user_permission_overrides (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL, permission_key VARCHAR(100) NOT NULL,
@@ -80,6 +86,15 @@ const SEED = `
     ('super_admin', 'fleet.parking-requests', '{"view":true,"edit":true,"create":true,"delete":true}'),
     ('manager',     'fleet.parking-requests', '{"view":true,"edit":true,"create":true,"delete":false}'),
     ('viewer',      'fleet.parking-requests', '{"view":false,"edit":false,"create":false,"delete":false}');
+  -- Parent chain copied from prod: fleet.parking-requests -> fleet -> root.
+  INSERT INTO access_permissions (type, key, parent_key, label) VALUES
+    ('module', 'fleet', NULL, 'Fleet'),
+    ('page',   'fleet.parking-requests', 'fleet', 'Parking requests');
+  INSERT INTO role_permissions (role, permission_key, actions) VALUES
+    ('admin',       'fleet', '{"view":true,"edit":true,"create":true,"delete":true}'),
+    ('super_admin', 'fleet', '{"view":true,"edit":true,"create":true,"delete":true}'),
+    ('manager',     'fleet', '{"view":true,"edit":true,"create":true,"delete":false}'),
+    ('viewer',      'fleet', '{"view":true,"edit":false,"create":false,"delete":false}');
 `;
 
 beforeAll(async () => {
@@ -98,6 +113,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.query('DELETE FROM user_permission_overrides');
   await db.query('DELETE FROM role_permissions');
+  await db.query('DELETE FROM access_permissions');
   await db.query('DELETE FROM users');
   await db.query(SEED);
 });
@@ -204,5 +220,83 @@ describe('rollback', () => {
     await db.query(ROLLBACK);
     await db.query(ROLLBACK);
     expect((await approvers.findApproverUserIds()).length).toBe(4);
+  });
+});
+
+/**
+ * The narrowing only exists if something CONSULTS it. withPermission() and
+ * userHasPermission() both return early for role === 'super_admin' before they
+ * read role_permissions or the overrides, so on prod's 10 active super_admins
+ * the migration above is inert on its own. isApprover() is the check that
+ * gives it effect, and these are the cases that would let it back through.
+ */
+describe('isApprover — the check that makes the migration bite', () => {
+  beforeEach(async () => { await db.query(FORWARD); });
+
+  it('a super_admin with no override is NOT an approver', async () => {
+    // The whole point: role alone must not be enough post-485, and the
+    // super_admin bypass in the middleware must not reach this decision.
+    const other = '10000000-0000-0000-0000-000000000009';
+    await db.query(
+      `INSERT INTO users (id, email, role) VALUES ($1,'zander@velocityfibre.co.za','super_admin')`,
+      [other]
+    );
+    expect(await approvers.isApprover(other)).toBe(false);
+  });
+
+  it('both named approvers ARE approvers', async () => {
+    expect(await approvers.isApprover(LIZELLE)).toBe(true);
+    expect(await approvers.isApprover(HEIN)).toBe(true);
+  });
+
+  it('agrees with findApproverUserIds for every seeded user', async () => {
+    // Access and notification must be the same set — someone who can decide a
+    // request they were never told about is the failure this pairing prevents.
+    const notified = (await approvers.findApproverUserIds()).sort();
+    const ids = [LIZELLE, HEIN, OTHER_ADMIN, A_MANAGER, A_VIEWER];
+    const canAct: string[] = [];
+    for (const id of ids) if (await approvers.isApprover(id)) canAct.push(id);
+    expect(canAct.sort()).toEqual(notified);
+  });
+
+  it('an unknown user id is not an approver', async () => {
+    expect(await approvers.isApprover('10000000-0000-0000-0000-0000000000ff')).toBe(false);
+  });
+
+  it('a deactivated named approver loses it', async () => {
+    await db.query('UPDATE users SET is_active = false WHERE id = $1', [LIZELLE]);
+    expect(await approvers.isApprover(LIZELLE)).toBe(false);
+  });
+});
+
+describe('ancestor cascade matches userHasPermission', () => {
+  beforeEach(async () => { await db.query(FORWARD); });
+
+  it('blocking the parent module revokes approval from a named approver', async () => {
+    // userHasPermission denies the child when any ancestor is blocked, so a
+    // list that ignored the cascade would notify — and now authorise — someone
+    // who cannot open /fleet at all.
+    await db.query(
+      `INSERT INTO user_permission_overrides (user_id, permission_key, override_type, actions)
+       VALUES ($1,'fleet','revoke','{"view":true}')`, [LIZELLE]
+    );
+    expect(await approvers.isApprover(LIZELLE)).toBe(false);
+    expect(await approvers.findApproverUserIds()).not.toContain(LIZELLE);
+  });
+
+  it('a role with no row at all for the parent is blocked, not granted', async () => {
+    // "No permission entry = blocked" (src/lib/permissions/index.ts) — the
+    // COALESCE in the cascade is what encodes that; without it NULL reads as
+    // "not blocked" and the user slips through.
+    await db.query(`DELETE FROM role_permissions WHERE permission_key = 'fleet' AND role = 'admin'`);
+    expect(await approvers.isApprover(LIZELLE)).toBe(false);
+  });
+
+  it('a revoke on the parent with view:false still falls through to the role', async () => {
+    await db.query(
+      `INSERT INTO user_permission_overrides (user_id, permission_key, override_type, actions)
+       VALUES ($1,'fleet','revoke','{"view":false}')`, [LIZELLE]
+    );
+    expect(await approvers.isApprover(LIZELLE)).toBe(true);
   });
 });

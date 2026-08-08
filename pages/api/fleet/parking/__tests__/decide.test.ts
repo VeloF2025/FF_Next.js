@@ -27,6 +27,14 @@ vi.mock('@/modules/fleet/parking/decisionNotifications', () => ({
   notifyParkingChangeDecided: (...a: unknown[]) => notifyParkingChangeDecided(...a),
 }));
 
+// Mocked, but defaulted to TRUE in beforeEach so the happy-path tests below
+// still exercise the rest of the handler — and so the 403 case has to set it
+// false explicitly rather than passing by accident.
+const isApprover = vi.fn();
+vi.mock('@/modules/fleet/parking/parkingApprovers', () => ({
+  isApprover: (...a: unknown[]) => isApprover(...a),
+}));
+
 const resolveStaffId = vi.fn();
 vi.mock('@/modules/fleet/parking/staffLookup', () => ({
   resolveStaffIdForUser: (...a: unknown[]) => resolveStaffId(...a),
@@ -72,6 +80,7 @@ beforeEach(() => {
   decideRequest.mockReset().mockResolvedValue(OK);
   notifyParkingChangeDecided.mockReset().mockResolvedValue(undefined);
   resolveStaffId.mockReset().mockResolvedValue('staff-approver');
+  isApprover.mockReset().mockResolvedValue(true);
 });
 
 describe('POST /api/fleet/parking/requests/[requestId]/decide', () => {
@@ -256,5 +265,43 @@ describe('separation of duties and audit trail', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(decideRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('approver gate', () => {
+  // withPermission cannot enforce this: it returns early for super_admin
+  // without reading the RBAC tables, so on prod all 10 super_admins would
+  // reach decideRequest. isApprover is the only check standing there.
+  it('403s a non-approver and never touches the request', async () => {
+    isApprover.mockResolvedValue(false);
+    const res = await call({
+      method: 'POST',
+      query: { requestId: 'req-1' },
+      body: { outcome: 'approved' },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(decideRequest).not.toHaveBeenCalled();
+    expect(notifyParkingChangeDecided).not.toHaveBeenCalled();
+  });
+
+  it('checks the authenticated user id, not anything from the body or query', async () => {
+    // A gate that read the id from user input would authorise the caller to
+    // nominate whose permissions get checked.
+    await call({
+      method: 'POST',
+      query: { requestId: 'req-1', userId: 'someone-else' },
+      body: { outcome: 'approved', decidedByUserId: 'someone-else' },
+    });
+    expect(isApprover).toHaveBeenCalledWith('user-1');
+  });
+
+  it('runs before body validation, so a non-approver cannot probe the rules', async () => {
+    isApprover.mockResolvedValue(false);
+    const res = await call({
+      method: 'POST',
+      query: { requestId: 'req-1' },
+      body: { outcome: 'not-a-valid-outcome' },
+    });
+    expect(res.statusCode).toBe(403);
   });
 });
