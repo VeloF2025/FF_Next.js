@@ -63,15 +63,9 @@ describe('declared zone handover lifecycle', () => {
     return rowVersion;
   }
 
-  it('declares a handover on a zone that has no delivery-state row yet', async () => {
-    // The legacy population this command exists for: never scope-approved, so
-    // zone_delivery_state has no row at all and getZone reports rowVersion 0.
-    const before = await pool.query(
-      'SELECT 1 FROM zone_delivery_state WHERE project_id = $1 AND zone_no = $2',
-      [PROJECT_ID, key.zoneNo],
-    );
-    expect(before.rowCount).toBe(0);
-
+  it('declares a handover on a legacy zone with no scope, PONs or QA recorded', async () => {
+    // The population this command exists for: nothing was ever captured in
+    // FibreFlow, so no milestone, scope approval or Zone QA exists.
     const rowVersion = await registerHandoverDocuments();
 
     const view = await service.declareZoneHandover({
@@ -83,6 +77,30 @@ describe('declared zone handover lifecycle', () => {
     }, zoneQaActor());
 
     expect(view.handedOverAt).toBe('2026-05-08T00:00:00.000Z');
+  });
+
+  it('reports missing evidence — not a version conflict — when the zone has no row', async () => {
+    // zone_delivery_documents FKs to zone_delivery_state, so "no row" and "no
+    // FAC/CAC" are the same state. The operator must be told which it is.
+    const before = await pool.query(
+      'SELECT 1 FROM zone_delivery_state WHERE project_id = $1 AND zone_no = $2',
+      [PROJECT_ID, key.zoneNo],
+    );
+    expect(before.rowCount).toBe(0);
+
+    await expect(service.declareZoneHandover({
+      ...key,
+      effectiveAt: new Date().toISOString(),
+      source: 'works-qa',
+      expectedRowVersion: 0,
+    }, zoneQaActor())).rejects.toThrow(/requires an active/i);
+
+    // And no row was conjured as a side effect of the failed attempt.
+    const after = await pool.query(
+      'SELECT 1 FROM zone_delivery_state WHERE project_id = $1 AND zone_no = $2',
+      [PROJECT_ID, key.zoneNo],
+    );
+    expect(after.rowCount).toBe(0);
   });
 
   it('corrects a declared handover date — the real trigger permits it', async () => {

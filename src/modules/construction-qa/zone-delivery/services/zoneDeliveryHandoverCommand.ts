@@ -54,21 +54,16 @@ export function declareZoneHandoverCommand(
     requirePermission(actor, 'zone-qa-approve');
     await assertCanonicalZone(client, input);
     const now = await read.readTransactionTime(client);
-    // A zone delivered before FibreFlow tracked the site has no delivery-state
-    // row at all — which is the whole population this command exists for, so a
-    // missing row is a create, not a conflict. getZone reports rowVersion 0 for
-    // such a zone, so 0 is the caller stating "I believe there is no record yet".
-    let state = await write.lockZone(client, input);
-    if (!state) {
-      if (input.expectedRowVersion !== 0) versionConflict();
-      // ON CONFLICT DO NOTHING returns nothing when a concurrent transaction won
-      // the insert; that genuinely is a conflict — reload and retry.
-      state = await write.insertZone(client, input);
-      if (!state) versionConflict();
-    } else if (state.row_version !== input.expectedRowVersion) {
-      versionConflict();
-    }
-    const previousHandover = iso(state!.handed_over_at);
+    // A zone with no delivery-state row yet is not a conflict — it is a zone
+    // whose FAC and CAC have not been uploaded, because zone_delivery_documents
+    // carries a foreign key to zone_delivery_state. Registering either document
+    // creates the row, so by the time a handover can legitimately be declared it
+    // always exists. The evidence check below therefore reports the real reason;
+    // creating the row here would be pointless, since the same transaction
+    // always rolls back on EVIDENCE_REQUIRED.
+    const state = await write.lockZone(client, input);
+    if (state && state.row_version !== input.expectedRowVersion) versionConflict();
+    const previousHandover = iso(state?.handed_over_at ?? null);
 
     // Re-dating an existing handover is a correction, which forces a reason
     // even when the new date is today. Back-dating forces one regardless.
@@ -83,6 +78,10 @@ export function declareZoneHandoverCommand(
         `Zone handover requires an active ${missing.map(m => m.toUpperCase()).join(' and ')}`,
       );
     }
+
+    // Past the evidence gate a state row necessarily exists — an active FAC or
+    // CAC cannot reference a zone that has none.
+    if (!state) versionConflict();
 
     const snapshot = buildSnapshot(aggregate);
     if (previousHandover !== null) {

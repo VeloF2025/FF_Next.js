@@ -7,7 +7,6 @@ const declareHandover = vi.fn();
 const appendActivity = vi.fn();
 const recalculateZone = vi.fn();
 const clientQuery = vi.fn();
-const insertZone = vi.fn();
 
 vi.mock('../../repositories/zoneDeliveryReadRepository', () => ({
   readZoneAggregate: (...a: unknown[]) => readZoneAggregate(...a),
@@ -15,7 +14,6 @@ vi.mock('../../repositories/zoneDeliveryReadRepository', () => ({
 }));
 vi.mock('../../repositories/zoneDeliveryWriteRepository', () => ({
   lockZone: (...a: unknown[]) => lockZone(...a),
-  insertZone: (...a: unknown[]) => insertZone(...a),
   declareHandover: (...a: unknown[]) => declareHandover(...a),
   appendActivity: (...a: unknown[]) => appendActivity(...a),
 }));
@@ -66,7 +64,6 @@ beforeEach(() => {
   declareHandover.mockResolvedValue({ id: 'zone-1', handed_over_at: '2026-08-08T05:59:00.000Z' });
   recalculateZone.mockResolvedValue({ ok: true });
   clientQuery.mockResolvedValue({ rows: [] });
-  insertZone.mockResolvedValue({ id: 'zone-1', row_version: 1, handed_over_at: null });
 });
 
 describe('declareZoneHandoverCommand', () => {
@@ -163,32 +160,13 @@ describe('declareZoneHandoverCommand', () => {
     await expect(run()).rejects.toThrow(/reason is required/i);
   });
 
-  it('creates the delivery-state row when the zone has none', async () => {
-    // A zone delivered before FibreFlow tracked the site has no state row at
-    // all; getZone reports rowVersion 0 for it, so 0 means "no record yet".
+  it('reports missing evidence when the zone has no delivery-state row', async () => {
+    // zone_delivery_documents FKs to zone_delivery_state, so a zone with no row
+    // provably has no FAC/CAC either — the evidence check owns this case.
     lockZone.mockResolvedValue(null);
+    readZoneAggregate.mockResolvedValue({ pons: [], snagLinks: [], documents: [] });
 
-    await run(input({ expectedRowVersion: 0, effectiveAt: '2026-05-08T00:00:00.000Z', reason: 'legacy' }));
-
-    expect(insertZone).toHaveBeenCalled();
-    // CAS must use the created row's real version, not the caller's 0.
-    expect(declareHandover).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), { snapshot: true }, '2026-05-08T00:00:00.000Z', 1,
-    );
-  });
-
-  it('does not create a row when the caller expected one to exist', async () => {
-    lockZone.mockResolvedValue(null);
-
-    await expect(run(input({ expectedRowVersion: 3 }))).rejects.toThrow(/reload and retry/i);
-    expect(insertZone).not.toHaveBeenCalled();
-  });
-
-  it('conflicts when a concurrent transaction won the insert', async () => {
-    lockZone.mockResolvedValue(null);
-    insertZone.mockResolvedValue(null);
-
-    await expect(run(input({ expectedRowVersion: 0 }))).rejects.toThrow(/reload and retry/i);
+    await expect(run(input({ expectedRowVersion: 0 }))).rejects.toThrow(/requires an active/i);
     expect(declareHandover).not.toHaveBeenCalled();
   });
 
