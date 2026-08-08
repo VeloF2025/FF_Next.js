@@ -39,7 +39,10 @@ export const APPROVER_PERMISSION = 'fleet.parking-requests';
  * a second query — a conditional SQL fragment would fork the predicate, which
  * is the exact drift this module exists to prevent.
  */
-async function approverIds(onlyUserId: string | null): Promise<string[]> {
+async function approverIds(
+  onlyUserId: string | null,
+  action: 'view' | 'edit'
+): Promise<string[]> {
   const rows = await sql<{ id: string }>`
     WITH RECURSIVE ancestors AS (
       SELECT parent_key FROM access_permissions
@@ -66,10 +69,10 @@ async function approverIds(onlyUserId: string | null): Promise<string[]> {
       AND COALESCE(
             CASE
               WHEN ov.override_type = 'grant'
-                THEN ov.actions->>'view' = 'true'
-              WHEN ov.override_type = 'revoke' AND ov.actions->>'view' = 'true'
+                THEN ov.actions->>${action} = 'true'
+              WHEN ov.override_type = 'revoke' AND ov.actions->>${action} = 'true'
                 THEN false
-              ELSE rp.actions->>'view' = 'true'
+              ELSE rp.actions->>${action} = 'true'
             END, false)
       -- Cascade: a blocked ancestor denies the child, so someone who cannot
       -- open /fleet at all is not an approver however the child key reads.
@@ -99,17 +102,28 @@ async function approverIds(onlyUserId: string | null): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-/** Everyone to notify when a driver declares a new overnight address. */
+/**
+ * Everyone to notify when a driver declares a new overnight address. Keyed on
+ * `view` — the notification says "come and look at the queue", which is the
+ * same action the page itself is gated on (pages/api/fleet/parking/requests.ts).
+ */
 export async function findApproverUserIds(): Promise<string[]> {
-  return approverIds(null);
+  return approverIds(null, 'view');
 }
 
 /**
  * May this specific user decide a request? Checked in the decide route on top
  * of withPermission, which cannot answer this for a super_admin because it
  * short-circuits before reading the tables.
+ *
+ * Keyed on `edit`, NOT `view`, and the difference is load-bearing. Deciding is
+ * an edit action (decide.ts gates on 'edit'); being told about the queue is a
+ * view action. Sharing one predicate would mean a view-only grant — an auditor
+ * given read access to the queue — also passes this gate. For an ordinary role
+ * withPermission('edit') would still stop them, but a super_admin skips that
+ * check entirely, so `view` here would let a read-only grant decide.
  */
 export async function isApprover(userId: string): Promise<boolean> {
-  const rows = await approverIds(userId);
+  const rows = await approverIds(userId, 'edit');
   return rows.length > 0;
 }
