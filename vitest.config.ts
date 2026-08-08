@@ -63,6 +63,7 @@ export default defineConfig({
       'tests/migrations/483_fleet_parking_approval.test.ts',
       'tests/migrations/484_attendance_historical_schedule_policy.test.ts',
       'tests/migrations/484_attendance_historical_schedule_policy_rollback.test.ts',
+      'tests/migrations/485_fleet_parking_approver_narrowing.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.

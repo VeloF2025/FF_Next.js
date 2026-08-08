@@ -72,6 +72,17 @@ const PREREQUISITES = `
     parent_key VARCHAR(100), label VARCHAR(100) NOT NULL, description TEXT,
     route VARCHAR(200), sort_order INTEGER DEFAULT 0, is_active BOOLEAN DEFAULT TRUE
   );
+  -- findApproverUserIds folds user_permission_overrides in as of migration 485.
+  -- Without this table the scratch schema no longer mirrors production and the
+  -- query cannot run — the same divergence that let the staff.full_name 500 ship.
+  CREATE TABLE user_permission_overrides (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL, permission_key VARCHAR(100) NOT NULL,
+    override_type VARCHAR(10) NOT NULL CHECK (override_type IN ('grant','revoke')),
+    actions JSONB NOT NULL, granted_by UUID, granted_at TIMESTAMPTZ DEFAULT now(),
+    expires_at TIMESTAMPTZ, reason TEXT,
+    UNIQUE (user_id, permission_key)
+  );
   CREATE TABLE role_permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     role VARCHAR(50) NOT NULL,
@@ -152,6 +163,24 @@ beforeAll(async () => {
   await admin.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
   await admin.query(`CREATE SCHEMA ${SCHEMA}`);
   await db.query(PREREQUISITES);
+  // The 'fleet' MODULE row and its role grants, which migration 483 does not
+  // create — it hangs its pages off parent_key='fleet' and relies on the
+  // module already existing in prod (271_rbac_missing_pages.sql). The scratch
+  // schema starts empty, so without this the parent is "no permission entry =
+  // blocked" and findApproverUserIds' ancestor cascade correctly returns
+  // nobody. Values copied from the live DB.
+  await db.query(`
+    INSERT INTO access_permissions (type, key, parent_key, label, sort_order, is_active)
+    VALUES ('module', 'fleet', NULL, 'Fleet', 10, true)
+    ON CONFLICT (key) DO NOTHING;
+    INSERT INTO role_permissions (role, permission_key, actions) VALUES
+      ('super_admin', 'fleet', '{"view":true,"create":true,"edit":true,"delete":true}'::jsonb),
+      ('admin',       'fleet', '{"view":true,"create":true,"edit":true,"delete":true}'::jsonb),
+      ('manager',     'fleet', '{"view":true,"create":true,"edit":true,"delete":false}'::jsonb),
+      ('technician',  'fleet', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
+      ('viewer',      'fleet', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb)
+    ON CONFLICT (role, permission_key) DO NOTHING;
+  `);
   await db.query(FORWARD);
   queries = await import('@/modules/fleet/parking/driverParkingQueries');
   approvers = await import('@/modules/fleet/parking/parkingApprovers');

@@ -5,7 +5,9 @@
  * drivers" — that rule was set for violations. Someone who submits a request
  * has to learn the outcome or the workflow stalls at their end.
  *
- * In-app only, per the event's registered channel defaults.
+ * In-app AND email, per the event's registered channel defaults. Email was
+ * added deliberately: a decline carries disciplinary weight, and in-app alone
+ * means the affected driver finds out whenever they next happen to open /my.
  */
 import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';

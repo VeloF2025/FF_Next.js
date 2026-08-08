@@ -47,7 +47,9 @@ export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
   'fleet.license_expiring':         { in_app: true, email: true,  whatsapp: false },
   'fleet.parking_violation':        { in_app: true, email: true,  whatsapp: false },
   'fleet.parking_change_requested': { in_app: true, email: true,  whatsapp: false },
-  'fleet.parking_change_decided':   { in_app: true, email: false, whatsapp: false },
+  // Email as well as in-app: a decline carries disciplinary weight, and in-app
+  // alone means the driver finds out whenever they next happen to open /my.
+  'fleet.parking_change_decided':   { in_app: true, email: true,  whatsapp: false },
   'fleet.tracking_pull_failed':     { in_app: true, email: true,  whatsapp: true  },
   'fleet.tracking_data_gap':        { in_app: true, email: true,  whatsapp: false },
   'fleet.tracking_pull_degraded':   { in_app: true, email: true,  whatsapp: false },

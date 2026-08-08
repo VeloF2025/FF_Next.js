@@ -4,6 +4,14 @@
  * Approve or reject a driver's parking address request. Gated on `edit` of
  * fleet.parking-requests, not `view`: migration 483 grants viewer no access to
  * this page at all, and manager edit-but-not-delete.
+ *
+ * withPermission is necessary but NOT sufficient here. It returns early for
+ * role === 'super_admin' without reading role_permissions or the overrides,
+ * so on its own it lets all 10 active super_admins decide — and migration
+ * 485, which narrows approval to two named people, would be dead code for
+ * every one of them. The isApprover() check below closes that: it is the same
+ * query that decides who gets notified, so the set that can act and the set
+ * that is told are identical by construction.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 
@@ -12,6 +20,7 @@ import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { decideRequest } from '@/modules/fleet/parking/approvalQueries';
 import { notifyParkingChangeDecided } from '@/modules/fleet/parking/decisionNotifications';
+import { isApprover } from '@/modules/fleet/parking/parkingApprovers';
 import { resolveStaffIdForUser } from '@/modules/fleet/parking/staffLookup';
 import type { DecisionOutcome } from '@/modules/fleet/parking/types';
 
@@ -35,6 +44,16 @@ async function handler(req: AuthedRequest, res: NextApiResponse) {
   const requestId = req.query.requestId;
   if (typeof requestId !== 'string' || requestId.length === 0) {
     return apiResponse.badRequest(res, 'A single requestId is required');
+  }
+
+  // Before any state is read or written: the super_admin short-circuit in
+  // withPermission means this is the only check that actually enforces
+  // migration 485's narrowing.
+  if (!(await isApprover(userId))) {
+    return apiResponse.forbidden(
+      res,
+      'Only a named parking approver can decide this request.'
+    );
   }
 
   const body = (req.body ?? {}) as { outcome?: unknown; decisionNote?: unknown };
