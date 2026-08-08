@@ -7,7 +7,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { LiveVehicle, TrackingState } from '@/pages/api/fleet/positions/live';
-import { ageLabel, colourFor, notPlottedReason, partitionVehicles } from '../liveMapHelpers';
+import {
+  STATUS_STYLE,
+  ageLabel,
+  colourFor,
+  notPlottedReason,
+  partitionVehicles,
+  statusFor,
+} from '../liveMapHelpers';
 
 function vehicle(overrides: Partial<LiveVehicle> = {}): LiveVehicle {
   return {
@@ -29,10 +36,11 @@ function vehicle(overrides: Partial<LiveVehicle> = {}): LiveVehicle {
 }
 
 describe('colourFor', () => {
-  it('reads stale fixes as stale (grey) even when the last known state was speeding', () => {
-    // Precedence matters: we don't know a stale vehicle is STILL speeding.
+  it('reads stale fixes as unknown even when the last known state was speeding', () => {
+    // Precedence still matters where we are genuinely uncertain: we don't know
+    // a stale ignition-on vehicle is STILL speeding.
     const v = vehicle({ isStale: true, isSpeeding: true, ignition: true });
-    expect(colourFor(v)).toBe('#9ca3af');
+    expect(statusFor(v)).toBe('unknown');
   });
 
   it('reads a fresh speeding vehicle as speeding (red)', () => {
@@ -45,14 +53,47 @@ describe('colourFor', () => {
     expect(colourFor(v)).toBe('#0f9d6b');
   });
 
-  it('reads a fresh stopped (ignition off) vehicle as stopped (blue)', () => {
+  it('reads an ignition-off vehicle as parked', () => {
     const v = vehicle({ isStale: false, isSpeeding: false, ignition: false });
-    expect(colourFor(v)).toBe('#2563eb');
+    expect(statusFor(v)).toBe('parked');
   });
 
-  it('treats a stale, non-speeding, ignition-on vehicle as stale, not moving', () => {
+  it('treats a stale, non-speeding, ignition-on vehicle as unknown, not moving', () => {
     const v = vehicle({ isStale: true, isSpeeding: false, ignition: true });
-    expect(colourFor(v)).toBe('#9ca3af');
+    expect(statusFor(v)).toBe('unknown');
+  });
+
+  it('an ignition-off vehicle stays PARKED however old the fix is', () => {
+    // The bug this fixes: every plotted vehicle read 'stale' at 0.35 opacity
+    // on 2026-08-08 (18/18, 16 of them ignition-off) because staleness
+    // outranked everything. A parked car does not move, so its position stays
+    // true — 41 hours old was a real observed age.
+    const v = vehicle({ isStale: true, ignition: false, ageSeconds: 41 * 3600 });
+    expect(statusFor(v)).toBe('parked');
+  });
+
+  it('an ignition-off vehicle is parked, not speeding, when the record claims both', () => {
+    // Self-contradictory data (4 such rows exist in all of history). An engine
+    // that is off is not moving, so the speeding bit is the wrong one.
+    const v = vehicle({ isStale: false, isSpeeding: true, ignition: false });
+    expect(statusFor(v)).toBe('parked');
+  });
+
+  it('treats unknown ignition with a fresh fix as unknown, not parked', () => {
+    // null is "the tracker didn't say", which must not be read as "engine off".
+    const v = vehicle({ isStale: false, isSpeeding: false, ignition: null });
+    expect(statusFor(v)).toBe('unknown');
+  });
+
+  it('gives parked a far more visible fill than unknown', () => {
+    // The whole point of the change is legibility on a pale basemap.
+    expect(STATUS_STYLE.parked.fillOpacity).toBeGreaterThan(STATUS_STYLE.unknown.fillOpacity);
+    expect(colourFor(vehicle({ ignition: false }))).toBe(STATUS_STYLE.parked.fill);
+  });
+
+  it('gives every status a distinct colour, so the legend can tell them apart', () => {
+    const fills = Object.values(STATUS_STYLE).map((s) => s.fill);
+    expect(new Set(fills).size).toBe(fills.length);
   });
 });
 
