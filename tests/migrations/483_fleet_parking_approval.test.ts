@@ -45,7 +45,10 @@ const REGISTRATION = 'MW67LFGP';
 
 const PREREQUISITES = `
   CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY);
-  CREATE TABLE staff (id UUID PRIMARY KEY, full_name TEXT NOT NULL);
+  -- Mirrors the REAL staff table: production has first_name/last_name/name
+  -- and NO full_name. Inventing a column here is what let a 500 reach
+  -- production — the query passed against a schema that does not exist.
+  CREATE TABLE staff (id UUID PRIMARY KEY, name TEXT NOT NULL);
   CREATE TABLE access_permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type VARCHAR(20) NOT NULL, key VARCHAR(100) UNIQUE NOT NULL,
@@ -69,7 +72,7 @@ const PREREQUISITES = `
     assignment_start TIMESTAMPTZ NOT NULL DEFAULT now(),
     is_active BOOLEAN NOT NULL DEFAULT true
   );
-  INSERT INTO staff (id, full_name) VALUES
+  INSERT INTO staff (id, name) VALUES
     ('${DRIVER}', 'Test Driver'), ('${APPROVER}', 'Test Approver');
   INSERT INTO fleet_vehicles (id, registration) VALUES ('${VEHICLE}', '${REGISTRATION}');
 `;

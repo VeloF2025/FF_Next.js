@@ -58,7 +58,10 @@ const INACTIVE_MANAGER = '99999999-9999-9999-9999-999999999999';
 /** Everything 483 and the driver query layer reference. */
 const PREREQUISITES = `
   CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY);
-  CREATE TABLE staff (id UUID PRIMARY KEY, full_name TEXT NOT NULL);
+  -- Mirrors the REAL staff table: production has first_name/last_name/name
+  -- and NO full_name. Inventing a column here is what let a 500 reach
+  -- production — the query passed against a schema that does not exist.
+  CREATE TABLE staff (id UUID PRIMARY KEY, name TEXT NOT NULL);
   CREATE TABLE users (
     id UUID PRIMARY KEY, role VARCHAR(50) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT true
@@ -98,7 +101,7 @@ const PREREQUISITES = `
     assignment_start TIMESTAMPTZ NOT NULL DEFAULT now(),
     is_active BOOLEAN NOT NULL DEFAULT true
   );
-  INSERT INTO staff (id, full_name) VALUES
+  INSERT INTO staff (id, name) VALUES
     ('${DRIVER}', 'Test Driver'), ('${OTHER_DRIVER}', 'Other Driver');
   INSERT INTO users (id, role, is_active) VALUES
     ('${MANAGER_USER}', 'manager', true),
