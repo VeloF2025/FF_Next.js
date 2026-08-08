@@ -21,6 +21,7 @@ import {
   StoresTile,
   VehicleTile,
 } from './tiles';
+import { TileGroup } from './TileGroup';
 
 function canSeeSiteCam(
   _role: StaffRole | null,
@@ -58,6 +59,12 @@ export function MyHub({ profile }: MyHubProps) {
       `&exception_id=${encodeURIComponent(requiredAction.exceptionId)}`
     );
   }, [requiredAction, router]);
+
+  // Explicit, because a heading over an empty group is the failure mode here.
+  const showCrewCheckin = !isPending && data.canCrewCheckin;
+  const showStores = !isPending && isStoresAuthorised(profile.role, profile.authRole);
+  const showSiteCam = canSeeSiteCam(profile.role, profile.authRole, profile.accountStatus);
+  const showTools = showStores || showSiteCam;
 
   return (
     <MyPortalShell
@@ -103,42 +110,66 @@ export function MyHub({ profile }: MyHubProps) {
         onVehicleCheck={(checkType) => void data.handleVehicleTap(checkType)}
       />
 
-      <div className="grid grid-cols-2 gap-3">
+      {/*
+        Grouped rather than one flat grid. Ten tiles in a single 2-column list
+        had no scent: a driver looking for their parking address scanned past
+        Payslips and Receipts to find it. Groups also give the next feature an
+        obvious home instead of being appended to the end.
+
+        Visibility is computed above as explicit booleans rather than by
+        counting rendered children — `{cond && <Tile/>}` yields `false`, not
+        nothing, so child-counting would render a heading over an empty group.
+        Note SiteCam is deliberately NOT gated on isPending; that predates this
+        change and is preserved.
+      */}
+      <TileGroup title="Time &amp; attendance">
         <ClockTile summary={data.summary} onClick={() => router.push('/my/attendance')} />
+        {!isPending && (
+          <CorrectionsTile
+            summary={data.summary}
+            onClick={() => router.push('/my/attendance/corrections')}
+          />
+        )}
+      </TileGroup>
+
+      <TileGroup title="Health &amp; safety">
         <HsCheckinTile status={data.hsCheckin} onClick={() => router.push('/my/hs-checkin')} />
-        {!isPending && data.canCrewCheckin && (
+        {showCrewCheckin && (
           <HsCrewCheckinTile
             recordedToday={data.crewRecordedToday}
             onClick={() => router.push('/my/hs-checkin-crew')}
           />
         )}
-        {!isPending && (
-          <>
-            <VehicleTile
-              summary={data.summary}
-              hasVehicle={profile.hasAssignedVehicle}
-              pending={data.vehicleHandoffPending}
-              onClick={() => void data.handleVehicleTap()}
-            />
-            <ParkingTile
-              hasVehicle={profile.hasAssignedVehicle}
-              onClick={() => router.push('/my/vehicle/parking')}
-            />
-            <PayslipsTile summary={data.summary} onClick={() => router.push('/my/payslips')} />
-            <ReceiptsTile summary={data.summary} onClick={() => router.push('/my/receipts')} />
-            <CorrectionsTile
-              summary={data.summary}
-              onClick={() => router.push('/my/attendance/corrections')}
-            />
-            {isStoresAuthorised(profile.role, profile.authRole) && (
-              <StoresTile onClick={() => router.push('/my/stores')} />
-            )}
-          </>
-        )}
-        {canSeeSiteCam(profile.role, profile.authRole, profile.accountStatus) && (
-          <SiteCamTile onClick={() => router.push('/my/sitecam')} />
-        )}
-      </div>
+      </TileGroup>
+
+      {!isPending && (
+        <TileGroup title="My vehicle">
+          <VehicleTile
+            summary={data.summary}
+            hasVehicle={profile.hasAssignedVehicle}
+            pending={data.vehicleHandoffPending}
+            onClick={() => void data.handleVehicleTap()}
+          />
+          <ParkingTile
+            hasVehicle={profile.hasAssignedVehicle}
+            onClick={() => router.push('/my/vehicle/parking')}
+          />
+        </TileGroup>
+      )}
+
+      {!isPending && (
+        <TileGroup title="Pay &amp; expenses">
+          <PayslipsTile summary={data.summary} onClick={() => router.push('/my/payslips')} />
+          <ReceiptsTile summary={data.summary} onClick={() => router.push('/my/receipts')} />
+        </TileGroup>
+      )}
+
+      {showTools && (
+        <TileGroup title="Tools">
+          {showStores && <StoresTile onClick={() => router.push('/my/stores')} />}
+          {showSiteCam && <SiteCamTile onClick={() => router.push('/my/sitecam')} />}
+        </TileGroup>
+      )}
 
       <button
         type="button"
