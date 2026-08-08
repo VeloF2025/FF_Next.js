@@ -39,7 +39,7 @@ export async function loadPendingRequests(): Promise<PendingRequest[]> {
       p.vehicle_id,
       v.registration,
       p.declared_by_staff_id AS driver_staff_id,
-      s.full_name            AS driver_name,
+      s.name                 AS driver_name,
       p.lat::text            AS req_lat,
       p.lon::text            AS req_lon,
       p.accuracy_m::text     AS req_accuracy_m,

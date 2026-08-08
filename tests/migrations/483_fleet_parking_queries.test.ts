@@ -54,7 +54,10 @@ const CHECK_AT = new Date('2026-08-04T18:00:00.000Z'); // 20:00 SAST
 /** Everything 483 and the query layer reference, declared in the scratch schema. */
 const PREREQUISITES = `
   CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY);
-  CREATE TABLE staff (id UUID PRIMARY KEY, full_name TEXT NOT NULL);
+  -- Mirrors the REAL staff table: production has first_name/last_name/name
+  -- and NO full_name. Inventing a column here is what let a 500 reach
+  -- production — the query passed against a schema that does not exist.
+  CREATE TABLE staff (id UUID PRIMARY KEY, name TEXT NOT NULL);
   CREATE TABLE access_permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type VARCHAR(20) NOT NULL, key VARCHAR(100) UNIQUE NOT NULL,
@@ -83,7 +86,7 @@ const PREREQUISITES = `
     received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     lat NUMERIC(10,7) NOT NULL, lon NUMERIC(10,7) NOT NULL
   );
-  INSERT INTO staff (id, full_name) VALUES ('${STAFF}', 'Test Tech');
+  INSERT INTO staff (id, name) VALUES ('${STAFF}', 'Test Tech');
   INSERT INTO fleet_vehicles (id, registration, status) VALUES
     ('${VEHICLE}', 'MW67LFGP', 'active'), ('${RETIRED}', 'MW99OLDGP', 'retired');
   INSERT INTO fleet_vehicle_trackers (vehicle_id) VALUES ('${VEHICLE}');
