@@ -37,7 +37,7 @@ function vehicle(overrides: Partial<LiveVehicle> = {}): LiveVehicle {
   };
 }
 
-describe('colourFor', () => {
+describe('statusFor', () => {
   it('reads stale fixes as unknown even when the last known state was speeding', () => {
     // Precedence still matters where we are genuinely uncertain: we don't know
     // a stale ignition-on vehicle is STILL speeding.
