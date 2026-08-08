@@ -154,6 +154,9 @@ describe('zone delivery command routes', () => {
       userId: user.id,
       email: user.email,
       permission,
+      // A request that does not ask to override is never granted one, and the
+      // permission lookup is short-circuited entirely (false, not a promise).
+      canOverridePrerequisites: false,
     });
   });
 

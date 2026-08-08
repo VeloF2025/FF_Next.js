@@ -11,7 +11,7 @@ import {
 } from './zoneDeliveryHandover';
 import {
   deliveryError, handoverLocked, hasReason, requirePermission,
-  validateMeta, versionConflict,
+  requirePrerequisiteOverride, validateMeta, versionConflict,
 } from './zoneDeliveryErrors';
 import { getZoneDeliveryRegister } from './zoneDeliveryRegister';
 import { transaction, withClient } from './zoneDeliveryTransactions';
@@ -179,6 +179,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         return recalculateZone(client, input, actor);
       }
       validateMeta(input, now, Boolean(current));
+      const overrideAllowed = requirePrerequisiteOverride(input, actor);
       const { testPack, reconfirmations } = await validateMilestoneConfirmation(
         client,
         input,
@@ -187,6 +188,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         canonical,
         aggregate,
         current,
+        overrideAllowed,
       );
       const updated = await write.confirmMilestone(
         client, input.ponStageId, input.milestone, state.row_version, input.effectiveAt, actor.userId, testPack?.id,
@@ -203,7 +205,8 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
           ...(input.milestone === 'testing_passed' ? { testPackDocumentId: state.testing_test_pack_document_id } : {}),
         } : null,
         newValue: { effectiveAt: input.effectiveAt, actorUserId: actor.userId,
-          ...(testPack ? { testPackDocumentId: testPack.id } : {}) },
+          ...(testPack ? { testPackDocumentId: testPack.id } : {}),
+          ...(overrideAllowed ? { overrodePrerequisite: true } : {}) },
       });
       return recalculateZone(client, input, actor);
     });

@@ -119,9 +119,11 @@ export async function recalculateZone(
   }
   if (calculation.eligibleForHandover && !aggregate.zone?.handed_over_at) {
     const snapshot = buildSnapshot(aggregate);
-    const stamped = await stampHandover(client, key, snapshot);
+    // One clock for both writes: the stamped date and the activity row used to
+    // be read separately (NOW() vs the transaction time) and could disagree.
+    const effectiveAt = await readTransactionTime(client);
+    const stamped = await stampHandover(client, key, snapshot, effectiveAt);
     if (stamped) {
-      const effectiveAt = await readTransactionTime(client);
       await appendActivity(client, {
         key,
         entityType: 'zone',

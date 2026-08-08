@@ -205,16 +205,26 @@ export async function stampEligibility(client: PoolClient, key: ZoneKey): Promis
     WHERE project_id = $1 AND zone_no = $2 AND eligible_for_zone_qa_at IS NULL
   `, [key.projectId, key.zoneNo]);
 }
+/**
+ * Derived handover, written by recalculateZone when every gate passes.
+ *
+ * `effectiveAt` is the transaction time rather than NOW() so the stamped date
+ * matches the activity row written alongside it; the two used to be read from
+ * two different clocks. The `handed_over_at IS NULL` guard stays: a zone that
+ * an operator has already declared by hand must never be silently restamped
+ * with a derived date.
+ */
 export async function stampHandover(
   client: PoolClient,
   key: ZoneKey,
   snapshot: unknown,
+  effectiveAt: Date | string,
 ): Promise<ZoneStateRow | null> {
   const { rows } = await client.query<ZoneStateRow>(`
-    UPDATE zone_delivery_state SET handed_over_at = NOW(), handover_snapshot = $3,
+    UPDATE zone_delivery_state SET handed_over_at = $4, handover_snapshot = $3,
       row_version = row_version + 1, updated_at = NOW()
     WHERE project_id = $1 AND zone_no = $2 AND handed_over_at IS NULL
     RETURNING *
-  `, [key.projectId, key.zoneNo, JSON.stringify(snapshot)]);
+  `, [key.projectId, key.zoneNo, JSON.stringify(snapshot), effectiveAt]);
   return rows[0] ?? null;
 }

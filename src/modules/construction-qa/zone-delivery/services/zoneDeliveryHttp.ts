@@ -28,6 +28,17 @@ export const COMMAND_PERMISSIONS = {
   document: 'construction-qa.zone-delivery.documents-manage',
 } as const;
 
+/**
+ * Authorises bypassing a sequencing prerequisite.
+ *
+ * Deliberately reuses the existing Works QA override grant rather than minting
+ * a seventh zone-delivery permission: it already gates the comparable
+ * photo/pole override routes, it is already held by the operator role, and a
+ * new permission would need a migration plus per-user grants to avoid landing
+ * inert.
+ */
+export const PREREQUISITE_OVERRIDE_PERMISSION = 'construction-qa.works-qa.override';
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES: ReadonlySet<ZoneDeliveryStatus> = new Set([
   'handed_over', 'scope_pending', 'handover_blocked', 'zone_qa_in_progress',
@@ -165,6 +176,8 @@ export function parseMilestoneBody(value: unknown): ConfirmMilestoneInput {
     ...(body.affectedGate === undefined
       ? {}
       : { affectedGate: member(body.affectedGate, MILESTONES, 'affectedGate') }),
+    // Only an explicit boolean true opts in; a stray string or 1 must not.
+    ...(body.overridePrerequisite === true ? { overridePrerequisite: true } : {}),
   };
 }
 

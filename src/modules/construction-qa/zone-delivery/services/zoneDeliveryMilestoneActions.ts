@@ -8,7 +8,14 @@ import {
   type ZoneStateRow,
 } from '../repositories/zoneDeliveryReadRepository';
 import type { ConfirmMilestoneInput } from '../types/zoneDelivery.types';
-import { calculatePonActions } from './zoneDeliveryActionCalculator';
+import { blockerIgnoringSequence, calculatePonActions } from './zoneDeliveryActionCalculator';
+
+/** Missing proof, as opposed to a violated ordering assumption. Never overridable. */
+const EVIDENCE_BLOCKERS: ReadonlySet<string> = new Set([
+  'CIVIL_QA_INCOMPLETE',
+  'OPTICAL_QA_INCOMPLETE',
+  'TEST_PACK_MISSING',
+]);
 import { deliveryError } from './zoneDeliveryErrors';
 import { milestoneState } from './zoneDeliveryHandover';
 
@@ -25,6 +32,7 @@ export async function validateMilestoneConfirmation(
   canonical: PonStateRow,
   aggregate: ZoneAggregate,
   current: Date | string | null,
+  overrideAllowed = false,
 ): Promise<MilestoneDependencies> {
   if (input.milestone === 'civil_complete' || input.milestone === 'optical_complete') {
     const discipline = input.milestone === 'civil_complete' ? 'civil' : 'optical';
@@ -46,7 +54,7 @@ export async function validateMilestoneConfirmation(
       && link.affected_gate === input.milestone
       && link.requires_reconfirmation);
   if (!current) {
-    const availability = calculatePonActions({
+    const actionInput = {
       ponStageId: input.ponStageId,
       ponNo: canonical.pon_no,
       scopeApproved: Boolean(zone?.scope_approved_at),
@@ -60,19 +68,28 @@ export async function validateMilestoneConfirmation(
         gate: input.milestone,
         status: link.status,
       })),
-    })[input.milestone];
+    };
+    const availability = calculatePonActions(actionInput)[input.milestone];
     if (!availability.enabled) {
-      const evidenceBlockers = new Set([
-        'CIVIL_QA_INCOMPLETE',
-        'OPTICAL_QA_INCOMPLETE',
-        'TEST_PACK_MISSING',
-      ]);
-      deliveryError(
-        evidenceBlockers.has(availability.blocker!.code)
-          ? 'EVIDENCE_REQUIRED'
-          : 'PREREQUISITE_BLOCKED',
-        availability.blocker!.message,
-      );
+      // A sequencing prerequisite may be overridden by an authorised actor with
+      // a reason: legacy zones were delivered before FibreFlow knew the site
+      // existed, so their earlier gates will never be recorded. Evidence is
+      // never overridable — that is missing proof, not a violated ordering
+      // assumption.
+      //
+      // The residual check matters: confirmBlocker returns only the FIRST
+      // blocker and evaluates sequence before evidence, so waving the sequence
+      // through without re-testing would smuggle past a missing test pack or QA
+      // approval that was never reached.
+      const residual = overrideAllowed
+        ? blockerIgnoringSequence(actionInput, input.milestone)
+        : availability.blocker;
+      if (residual) {
+        deliveryError(
+          EVIDENCE_BLOCKERS.has(residual.code) ? 'EVIDENCE_REQUIRED' : 'PREREQUISITE_BLOCKED',
+          residual.message,
+        );
+      }
     }
   }
   return { testPack, reconfirmations };
