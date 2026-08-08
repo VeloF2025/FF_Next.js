@@ -87,10 +87,15 @@ describe('PON delivery milestone lifecycle', () => {
       .rejects.toMatchObject({ code: 'PREREQUISITE_BLOCKED' });
     view = await confirm(view, 'civil_complete', 'construction-confirm');
     view = await confirm(view, 'optical_complete', 'construction-confirm');
-    await expect(confirm(view, 'port_submitted', 'operations-confirm'))
-      .rejects.toMatchObject({ code: 'PREREQUISITE_BLOCKED' });
+    // port_submitted is an attestation, not a sequenced gate: it records an
+    // upload to the FNO's SharePoint that FibreFlow cannot verify, and on
+    // legacy PONs the earlier gates were never captured here at all.
+    view = await confirm(view, 'port_submitted', 'operations-confirm');
     await expect(confirm(view, 'testing_passed', 'testing-confirm'))
       .rejects.toMatchObject({ code: 'EVIDENCE_REQUIRED' });
+    // The gates that FOLLOW it are still sequenced.
+    await expect(confirm(view, 'technically_live', 'operations-confirm'))
+      .rejects.toMatchObject({ code: 'PREREQUISITE_BLOCKED' });
     expect((await service.getZone(key)).handedOverAt).toBeNull();
   });
   it('uses exact row versions and audits backdating and corrections with old and new evidence', async () => {

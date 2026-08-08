@@ -6,6 +6,8 @@ const lockZone = vi.fn();
 const declareHandover = vi.fn();
 const appendActivity = vi.fn();
 const recalculateZone = vi.fn();
+const clientQuery = vi.fn();
+const insertZone = vi.fn();
 
 vi.mock('../../repositories/zoneDeliveryReadRepository', () => ({
   readZoneAggregate: (...a: unknown[]) => readZoneAggregate(...a),
@@ -13,6 +15,7 @@ vi.mock('../../repositories/zoneDeliveryReadRepository', () => ({
 }));
 vi.mock('../../repositories/zoneDeliveryWriteRepository', () => ({
   lockZone: (...a: unknown[]) => lockZone(...a),
+  insertZone: (...a: unknown[]) => insertZone(...a),
   declareHandover: (...a: unknown[]) => declareHandover(...a),
   appendActivity: (...a: unknown[]) => appendActivity(...a),
 }));
@@ -22,7 +25,8 @@ vi.mock('../zoneDeliveryHandover', () => ({
 }));
 vi.mock('../zoneDeliveryCanonical', () => ({ assertCanonicalZone: async () => undefined }));
 vi.mock('../zoneDeliveryTransactions', () => ({
-  transaction: async (_pool: unknown, fn: (c: unknown) => Promise<unknown>) => fn({}),
+  transaction: async (_pool: unknown, fn: (c: unknown) => Promise<unknown>) =>
+    fn({ query: (...a: unknown[]) => clientQuery(...a) }),
 }));
 
 import type { DeclareHandoverInput, DeliveryActor } from '../../types/zoneDelivery.types';
@@ -61,6 +65,8 @@ beforeEach(() => {
   });
   declareHandover.mockResolvedValue({ id: 'zone-1', handed_over_at: '2026-08-08T05:59:00.000Z' });
   recalculateZone.mockResolvedValue({ ok: true });
+  clientQuery.mockResolvedValue({ rows: [] });
+  insertZone.mockResolvedValue({ id: 'zone-1', row_version: 1, handed_over_at: null });
 });
 
 describe('declareZoneHandoverCommand', () => {
@@ -68,7 +74,7 @@ describe('declareZoneHandoverCommand', () => {
     await run(input({ effectiveAt: '2026-05-08T00:00:00.000Z', reason: 'FAC signed 8 May' }));
 
     expect(declareHandover).toHaveBeenCalledWith(
-      {}, expect.anything(), { snapshot: true }, '2026-05-08T00:00:00.000Z', 4,
+      expect.anything(), expect.anything(), { snapshot: true }, '2026-05-08T00:00:00.000Z', 4,
     );
   });
 
@@ -132,6 +138,21 @@ describe('declareZoneHandoverCommand', () => {
     const activity = appendActivity.mock.calls[0]![1] as Record<string, never>;
     expect(activity.previousValue).toEqual({ handedOverAt: '2026-08-01T00:00:00.000Z' });
     expect(activity.newValue).toMatchObject({ declared: true, corrected: true });
+    // Migration 470 keeps handed_over_at immutable in the database; 485 narrows
+    // that to "unless this GUC is set". Without the opt-in the UPDATE raises.
+    expect(clientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('ff.zone_handover_correction'),
+    );
+  });
+
+  it('does NOT opt into the correction gate on a first declare', async () => {
+    // OLD.handed_over_at is NULL, so the trigger never fires — widening the
+    // window would relax the invariant for a write that does not need it.
+    await run(input({ effectiveAt: '2026-05-08T00:00:00.000Z', reason: 'legacy' }));
+
+    expect(clientQuery).not.toHaveBeenCalledWith(
+      expect.stringContaining('ff.zone_handover_correction'),
+    );
   });
 
   it('requires a reason to correct, even when the new date is today', async () => {
@@ -140,6 +161,35 @@ describe('declareZoneHandoverCommand', () => {
     });
 
     await expect(run()).rejects.toThrow(/reason is required/i);
+  });
+
+  it('creates the delivery-state row when the zone has none', async () => {
+    // A zone delivered before FibreFlow tracked the site has no state row at
+    // all; getZone reports rowVersion 0 for it, so 0 means "no record yet".
+    lockZone.mockResolvedValue(null);
+
+    await run(input({ expectedRowVersion: 0, effectiveAt: '2026-05-08T00:00:00.000Z', reason: 'legacy' }));
+
+    expect(insertZone).toHaveBeenCalled();
+    // CAS must use the created row's real version, not the caller's 0.
+    expect(declareHandover).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), { snapshot: true }, '2026-05-08T00:00:00.000Z', 1,
+    );
+  });
+
+  it('does not create a row when the caller expected one to exist', async () => {
+    lockZone.mockResolvedValue(null);
+
+    await expect(run(input({ expectedRowVersion: 3 }))).rejects.toThrow(/reload and retry/i);
+    expect(insertZone).not.toHaveBeenCalled();
+  });
+
+  it('conflicts when a concurrent transaction won the insert', async () => {
+    lockZone.mockResolvedValue(null);
+    insertZone.mockResolvedValue(null);
+
+    await expect(run(input({ expectedRowVersion: 0 }))).rejects.toThrow(/reload and retry/i);
+    expect(declareHandover).not.toHaveBeenCalled();
   });
 
   it('conflicts when the row version moved', async () => {

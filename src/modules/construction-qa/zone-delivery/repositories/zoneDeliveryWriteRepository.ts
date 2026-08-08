@@ -206,23 +206,16 @@ export async function stampEligibility(client: PoolClient, key: ZoneKey): Promis
   `, [key.projectId, key.zoneNo]);
 }
 /**
- * Derived handover, written by recalculateZone when every gate passes.
- *
- * `effectiveAt` is the transaction time rather than NOW() so the stamped date
- * matches the activity row written alongside it; the two used to be read from
- * two different clocks. The `handed_over_at IS NULL` guard stays: a zone that
- * an operator has already declared by hand must never be silently restamped
- * with a derived date.
- */
-/**
  * Operator-declared handover, carrying a business date the operator chooses.
  *
  * Deliberately has no `handed_over_at IS NULL` guard, unlike stampHandover: a
  * mistyped legacy date must be correctable. On legacy sites the FAC is signed
  * on one date and uploaded on another, and a zone is often handed over before
  * FibreFlow knows the site exists, so a derived-only handover cannot express
- * the truth. The row_version CAS is what keeps the correction safe, and callers
- * require a reason (validateMeta's `correction` mode) so it stays attributable.
+ * the truth. Correcting an existing date additionally requires the caller to set
+ * ff.zone_handover_correction (migration 485) — the database keeps the column
+ * immutable for every other path. The row_version CAS guards the write, and
+ * validateMeta's `correction` mode forces a reason so it stays attributable.
  */
 export async function declareHandover(
   client: PoolClient,
@@ -240,6 +233,15 @@ export async function declareHandover(
   return rows[0] ?? null;
 }
 
+/**
+ * Derived handover, written by recalculateZone when every gate passes.
+ *
+ * `effectiveAt` is the transaction time rather than NOW() so the stamped date
+ * matches the activity row written alongside it; the two used to be read from
+ * two different clocks. The `handed_over_at IS NULL` guard stays: a zone that
+ * an operator has already declared by hand must never be silently restamped
+ * with a derived date.
+ */
 export async function stampHandover(
   client: PoolClient,
   key: ZoneKey,

@@ -54,10 +54,21 @@ export function declareZoneHandoverCommand(
     requirePermission(actor, 'zone-qa-approve');
     await assertCanonicalZone(client, input);
     const now = await read.readTransactionTime(client);
-    const zone = await write.lockZone(client, input);
-    if (!zone || zone.row_version !== input.expectedRowVersion) versionConflict();
-    const state = zone!;
-    const previousHandover = iso(state.handed_over_at);
+    // A zone delivered before FibreFlow tracked the site has no delivery-state
+    // row at all — which is the whole population this command exists for, so a
+    // missing row is a create, not a conflict. getZone reports rowVersion 0 for
+    // such a zone, so 0 is the caller stating "I believe there is no record yet".
+    let state = await write.lockZone(client, input);
+    if (!state) {
+      if (input.expectedRowVersion !== 0) versionConflict();
+      // ON CONFLICT DO NOTHING returns nothing when a concurrent transaction won
+      // the insert; that genuinely is a conflict — reload and retry.
+      state = await write.insertZone(client, input);
+      if (!state) versionConflict();
+    } else if (state.row_version !== input.expectedRowVersion) {
+      versionConflict();
+    }
+    const previousHandover = iso(state!.handed_over_at);
 
     // Re-dating an existing handover is a correction, which forces a reason
     // even when the new date is today. Back-dating forces one regardless.
@@ -74,8 +85,17 @@ export function declareZoneHandoverCommand(
     }
 
     const snapshot = buildSnapshot(aggregate);
+    if (previousHandover !== null) {
+      // Migration 470 makes handed_over_at immutable at the database level, and
+      // 485 narrows that to "immutable unless this GUC is set". Opting in here,
+      // per-transaction and only when actually correcting, keeps every other
+      // path — the derived stamp, backfills, ad-hoc UPDATEs — still terminal.
+      await client.query(`SET LOCAL ff.zone_handover_correction = 'true'`);
+    }
+    // CAS on the row's real version: a row this command just created is at the
+    // column default, not at the caller's expectedRowVersion of 0.
     const saved = await write.declareHandover(
-      client, input, snapshot, input.effectiveAt, input.expectedRowVersion,
+      client, input, snapshot, input.effectiveAt, state!.row_version,
     );
     if (!saved) versionConflict();
 
