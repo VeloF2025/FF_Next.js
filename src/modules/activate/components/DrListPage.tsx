@@ -9,7 +9,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { RefreshCw, Calendar, Filter, X, Download, ChevronRight, ChevronDown, Layers, Wifi, Radio, Eye, CheckCircle } from 'lucide-react';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
@@ -163,13 +163,20 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
 
   // Which button renders as active. Not inferred from the dates alone —
   // several presets collide (see resolveActiveQuickFilter).
-  const activeQuickFilter = useMemo(
-    () => resolveActiveQuickFilter(
-      { from: filters.dateFrom, to: filters.dateTo },
-      quickFilterRange,
-      selectedQuickFilter
-    ),
-    [filters.dateFrom, filters.dateTo, quickFilterRange, selectedQuickFilter]
+  //
+  // Deliberately NOT memoised. The right answer depends on the wall clock:
+  // quickFilterRange calls getTodaySAST()/getCycleDates(), and no dependency
+  // array can express "the date rolled over". This dashboard auto-refreshes
+  // every 30s (ActivateDataProvider refreshInterval={30000}) and re-renders on
+  // each tick via lastRefreshAt, so recomputing here is what lets a highlight
+  // set before midnight correct itself on a tab that is left open. A useMemo
+  // keyed on the filters would stay stuck on the stale preset instead.
+  // It is computed once per render and reused by every button below, which is
+  // the only sharing that was needed.
+  const activeQuickFilter = resolveActiveQuickFilter(
+    { from: filters.dateFrom, to: filters.dateTo },
+    quickFilterRange,
+    selectedQuickFilter
   );
 
   // Debounced search - update context filter after 300ms

@@ -106,8 +106,18 @@ describe('resolveActiveQuickFilter', () => {
       expect(resolveActiveQuickFilter({ from: '2026-04-02', to: '2026-06-17' }, rangeFor, 'mtd')).toBe('all');
     });
 
-    it('does not go stale across a date rollover', () => {
-      // Clicked "today" on the 12th; the tab was left open past midnight.
+    it('drops a recorded choice the wall clock has moved past', () => {
+      // Clicked "today" on the 12th; the tab was left open past midnight, so
+      // rangeFor now resolves 'today' to the 13th and the recorded choice no
+      // longer describes {12th, 12th}.
+      //
+      // Scope: this proves the resolver returns the right answer WHEN CALLED
+      // with a rangeFor built from the new date. It cannot prove DrListPage
+      // actually calls it again after midnight — that depends on the component
+      // recomputing rather than memoising, and there is no test covering the
+      // component's render path (DrListPage has no test file). Memoising this
+      // call is what made it stale once already; see the comment at the call
+      // site before adding one back.
       const rangeFor = rangesFor('2026-08-13', '2026-08-10');
       expect(resolveActiveQuickFilter({ from: '2026-08-12', to: '2026-08-12' }, rangeFor, 'today')).toBe('all');
     });
