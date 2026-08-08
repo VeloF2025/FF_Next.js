@@ -9,17 +9,95 @@ import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 
 export type PlottedVehicle = LiveVehicle & { lat: number; lon: number };
 
+export type VehicleStatus = 'speeding' | 'moving' | 'parked' | 'parkedSilent' | 'unknown';
+
 /**
- * Marker colour for a vehicle. Precedence matters: a stale fix must read as
- * stale even if the last known state was speeding or moving — we don't know
- * the vehicle is still doing that, only that it was, more than 15 minutes
- * ago. Stale therefore outranks every other signal.
+ * How long a parked vehicle may stay quiet before we stop vouching for it.
+ *
+ * The slowest providers (Netstar, Ituran) are polled 2-hourly, so a healthy
+ * parked vehicle still lands a fix well inside 2 hours; 6 is three times that,
+ * which is late enough not to cry wolf over a missed cycle. Against prod on
+ * 2026-08-08 it split the fleet 13 plainly parked / 5 gone quiet, the quietest
+ * of them silent for over a day.
  */
-export function colourFor(v: LiveVehicle): string {
-  if (v.isStale) return '#9ca3af';
-  if (v.isSpeeding) return '#dc2626';
-  if (v.ignition) return '#0f9d6b';
-  return '#2563eb';
+export const PARKED_SILENT_AFTER_SECONDS = 6 * 3600;
+
+/**
+ * What the map is asserting about a vehicle.
+ *
+ * `ignition === false` is the strong signal here: a car with its engine off is
+ * not moving, so its last position stays true for as long as it stays off.
+ * Ranking staleness above it (the previous behaviour) painted the whole fleet
+ * the "we don't know" grey every weekend — 18 of 18 plotted vehicles on
+ * 2026-08-08, 16 of them reporting ignition off, all at the lowest opacity on
+ * the map. The state we were most certain about rendered as the one we were
+ * least certain about.
+ *
+ * But "parked" only vouches for the POSITION, never for the tracker. A unit
+ * that is flat, disabled, or ripped out of a stolen vehicle also reports
+ * nothing, and its last word may well have been "ignition off". So parked
+ * carries a ceiling: past PARKED_SILENT_AFTER_SECONDS it becomes
+ * `parkedSilent`, which still reads as a parked car but visibly flags that
+ * nobody has heard from it. Without that the map loses its only glanceable
+ * way to spot a tracker gone dark.
+ *
+ * A fresh speeding fix outranks everything, including ignition. The two can
+ * disagree when a subsystem lags — a real high-speed fix arriving beside a
+ * glitched ignition bit — and between a false red and a missed speeding
+ * vehicle, the false red costs one click and the miss costs an incident. It
+ * must be fresh to count, for the original reason: a stale "speeding" tells
+ * us what a vehicle was doing, not what it is doing.
+ */
+export function statusFor(v: LiveVehicle): VehicleStatus {
+  if (!v.isStale && v.isSpeeding) return 'speeding';
+  if (v.ignition === false) {
+    // A missing age is not evidence of freshness — treat it as silence.
+    const quiet = v.ageSeconds === null || v.ageSeconds > PARKED_SILENT_AFTER_SECONDS;
+    return quiet ? 'parkedSilent' : 'parked';
+  }
+  if (v.isStale) return 'unknown';
+  if (v.ignition === true) return 'moving';
+  return 'unknown';
+}
+
+/**
+ * Fill, opacity, outline and label per status, in one place so the markers and
+ * the legend cannot drift apart.
+ *
+ * Every marker gets an opaque white stroke. The OSM basemap is pale grey with
+ * pale roads, so a low-opacity fill of any colour dissolves into it; the halo
+ * is what separates a marker from the map, and the fill only says which kind
+ * it is. `dash` breaks that ring up for the one status that means "this is our
+ * last word, not our current one".
+ */
+export const STATUS_STYLE: Record<
+  VehicleStatus,
+  { fill: string; fillOpacity: number; label: string; dash?: string }
+> = {
+  speeding: { fill: '#dc2626', fillOpacity: 0.9, label: 'Speeding' },
+  moving: { fill: '#0f9d6b', fillOpacity: 0.9, label: 'Moving' },
+  parked: { fill: '#7c3aed', fillOpacity: 0.9, label: 'Parked' },
+  parkedSilent: { fill: '#7c3aed', fillOpacity: 0.45, label: 'Parked · no contact', dash: '3 3' },
+  unknown: { fill: '#6b7280', fillOpacity: 0.6, label: 'No recent fix' },
+};
+
+/**
+ * The status fill with its opacity baked into the colour, for the legend
+ * swatch.
+ *
+ * Neither `opacity` nor `filter: opacity()` works here: both composite the
+ * ELEMENT, box-shadow included, and Tailwind paints `ring-white` as a
+ * box-shadow — so either one fades the white ring along with the fill. The
+ * real marker never has that problem, because Leaflet's stroke opacity is a
+ * separate path attribute pinned to 1. Putting the alpha in the colour leaves
+ * the ring alone.
+ */
+export function swatchBackground(status: VehicleStatus): string {
+  const { fill, fillOpacity } = STATUS_STYLE[status];
+  const alpha = Math.round(Math.min(Math.max(fillOpacity, 0), 1) * 255)
+    .toString(16)
+    .padStart(2, '0');
+  return `${fill}${alpha}`;
 }
 
 /** Human-readable age of a position fix, or 'never' if there isn't one. */

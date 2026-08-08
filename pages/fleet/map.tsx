@@ -9,9 +9,15 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { FleetMapLegend } from '@/modules/fleet/components/FleetMapLegend';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 import { log } from '@/lib/logger';
-import { notPlottedReason, partitionVehicles } from '@/modules/fleet/utils/liveMapHelpers';
+import {
+  notPlottedReason,
+  partitionVehicles,
+  statusFor,
+  type VehicleStatus,
+} from '@/modules/fleet/utils/liveMapHelpers';
 
 const FleetMap = dynamic(() => import('@/modules/fleet/components/FleetMap'), {
   ssr: false,
@@ -56,6 +62,13 @@ export default function FleetMapPage() {
   }, []);
 
   const { plotted, notPlotted } = partitionVehicles(vehicles);
+  // Counted from the plotted set only — the legend describes what is on the
+  // map, and the not-plotted vehicles are already listed separately below it.
+  const statusCounts = plotted.reduce<Partial<Record<VehicleStatus, number>>>((acc, v) => {
+    const s = statusFor(v);
+    acc[s] = (acc[s] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <AppLayout>
@@ -88,11 +101,13 @@ export default function FleetMapPage() {
           <h1 className="text-lg font-semibold">Fleet map</h1>
           <p className="text-sm text-gray-500">
             Showing {plotted.length} of {vehicles.length} active vehicles.
-            {notPlotted.length > 0 && ` ${notPlotted.length} not on the map.`}
-            {' '}
-            Positions refresh every 30 seconds and are typically 1–5 minutes behind.
+            {notPlotted.length > 0 && ` ${notPlotted.length} not on the map.`} Positions refresh
+            every 30 seconds and are typically 1–5 minutes behind.
           </p>
           {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="mt-2">
+            <FleetMapLegend counts={statusCounts} />
+          </div>
         </header>
         <div className="flex-1 min-h-0">
           <FleetMap vehicles={vehicles} />

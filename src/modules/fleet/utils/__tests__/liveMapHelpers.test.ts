@@ -7,7 +7,16 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { LiveVehicle, TrackingState } from '@/pages/api/fleet/positions/live';
-import { ageLabel, colourFor, notPlottedReason, partitionVehicles } from '../liveMapHelpers';
+import {
+  PARKED_SILENT_AFTER_SECONDS,
+  STATUS_STYLE,
+  swatchBackground,
+  type VehicleStatus,
+  ageLabel,
+  notPlottedReason,
+  partitionVehicles,
+  statusFor,
+} from '../liveMapHelpers';
 
 function vehicle(overrides: Partial<LiveVehicle> = {}): LiveVehicle {
   return {
@@ -29,30 +38,97 @@ function vehicle(overrides: Partial<LiveVehicle> = {}): LiveVehicle {
 }
 
 describe('colourFor', () => {
-  it('reads stale fixes as stale (grey) even when the last known state was speeding', () => {
-    // Precedence matters: we don't know a stale vehicle is STILL speeding.
+  it('reads stale fixes as unknown even when the last known state was speeding', () => {
+    // Precedence still matters where we are genuinely uncertain: we don't know
+    // a stale ignition-on vehicle is STILL speeding.
     const v = vehicle({ isStale: true, isSpeeding: true, ignition: true });
-    expect(colourFor(v)).toBe('#9ca3af');
+    expect(statusFor(v)).toBe('unknown');
   });
 
-  it('reads a fresh speeding vehicle as speeding (red)', () => {
+  it('reads a fresh speeding vehicle as speeding', () => {
     const v = vehicle({ isStale: false, isSpeeding: true });
-    expect(colourFor(v)).toBe('#dc2626');
+    expect(statusFor(v)).toBe('speeding');
   });
 
-  it('reads a fresh moving (ignition on, not speeding) vehicle as moving (green)', () => {
+  it('reads a fresh moving (ignition on, not speeding) vehicle as moving', () => {
     const v = vehicle({ isStale: false, isSpeeding: false, ignition: true });
-    expect(colourFor(v)).toBe('#0f9d6b');
+    expect(statusFor(v)).toBe('moving');
   });
 
-  it('reads a fresh stopped (ignition off) vehicle as stopped (blue)', () => {
+  it('reads an ignition-off vehicle as parked', () => {
     const v = vehicle({ isStale: false, isSpeeding: false, ignition: false });
-    expect(colourFor(v)).toBe('#2563eb');
+    expect(statusFor(v)).toBe('parked');
   });
 
-  it('treats a stale, non-speeding, ignition-on vehicle as stale, not moving', () => {
+  it('treats a stale, non-speeding, ignition-on vehicle as unknown, not moving', () => {
     const v = vehicle({ isStale: true, isSpeeding: false, ignition: true });
-    expect(colourFor(v)).toBe('#9ca3af');
+    expect(statusFor(v)).toBe('unknown');
+  });
+
+  it('an ignition-off vehicle stays parked despite a stale fix, within the ceiling', () => {
+    // The bug this fixes: every plotted vehicle read 'stale' at 0.35 opacity
+    // on 2026-08-08 (18/18, 16 of them ignition-off) because staleness
+    // outranked everything. Stale here (>15 min) but well inside the 6h
+    // ceiling, which is the normal weekend state for a 2-hourly provider.
+    const v = vehicle({ isStale: true, ignition: false, ageSeconds: 3 * 3600 });
+    expect(statusFor(v)).toBe('parked');
+  });
+
+  it('a parked vehicle that has gone quiet past the ceiling is flagged, not silently parked', () => {
+    // 'parked' vouches for the POSITION, never the tracker. A flat, disabled
+    // or removed unit also says nothing, and its last word may well have been
+    // "ignition off" — so it must not look identical to a car parked 2
+    // minutes ago. 41h was a real observed age on 2026-08-08.
+    const v = vehicle({ isStale: true, ignition: false, ageSeconds: 41 * 3600 });
+    expect(statusFor(v)).toBe('parkedSilent');
+  });
+
+  it('treats a missing age as silence rather than freshness', () => {
+    const v = vehicle({ isStale: true, ignition: false, ageSeconds: null });
+    expect(statusFor(v)).toBe('parkedSilent');
+  });
+
+  it('puts the ceiling boundary on the silent side only once exceeded', () => {
+    const at = vehicle({ ignition: false, ageSeconds: PARKED_SILENT_AFTER_SECONDS });
+    const past = vehicle({ ignition: false, ageSeconds: PARKED_SILENT_AFTER_SECONDS + 1 });
+    expect(statusFor(at)).toBe('parked');
+    expect(statusFor(past)).toBe('parkedSilent');
+  });
+
+  it('a FRESH speeding fix outranks ignition-off, so a real one is never hidden', () => {
+    // The two disagree when a subsystem lags. A false red costs one click; a
+    // missed speeding vehicle costs an incident.
+    const v = vehicle({ isStale: false, isSpeeding: true, ignition: false });
+    expect(statusFor(v)).toBe('speeding');
+  });
+
+  it('a STALE speeding fix does not keep a vehicle red forever', () => {
+    // It tells us what the vehicle was doing, not what it is doing.
+    const v = vehicle({ isStale: true, isSpeeding: true, ignition: false, ageSeconds: 3 * 3600 });
+    expect(statusFor(v)).toBe('parked');
+  });
+
+  it('treats unknown ignition with a fresh fix as unknown, not parked', () => {
+    // null is "the tracker didn't say", which must not be read as "engine off".
+    const v = vehicle({ isStale: false, isSpeeding: false, ignition: null });
+    expect(statusFor(v)).toBe('unknown');
+  });
+
+  it('gives parked a far more visible fill than unknown', () => {
+    // The whole point of the change is legibility on a pale basemap.
+    expect(STATUS_STYLE.parked.fillOpacity).toBeGreaterThan(STATUS_STYLE.unknown.fillOpacity);
+  });
+
+  it('styles every status, and distinguishes the two parked states visually', () => {
+    // parkedSilent deliberately shares the parked fill — it IS a parked car —
+    // so the dashed outline is the only thing telling them apart. Losing it
+    // would re-hide the dark trackers this ceiling exists to surface.
+    for (const status of Object.keys(STATUS_STYLE)) {
+      expect(STATUS_STYLE[status as keyof typeof STATUS_STYLE].label).toBeTruthy();
+    }
+    expect(STATUS_STYLE.parkedSilent.dash).toBeTruthy();
+    expect(STATUS_STYLE.parked.dash).toBeUndefined();
+    expect(STATUS_STYLE.parkedSilent.fillOpacity).toBeLessThan(STATUS_STYLE.parked.fillOpacity);
   });
 });
 
@@ -89,7 +165,13 @@ describe('partitionVehicles', () => {
   });
 
   it('excludes an untracked vehicle (no coordinates) from plotting', () => {
-    const v = vehicle({ trackingState: 'untracked', lat: null, lon: null, recordedAt: null, ageSeconds: null });
+    const v = vehicle({
+      trackingState: 'untracked',
+      lat: null,
+      lon: null,
+      recordedAt: null,
+      ageSeconds: null,
+    });
     const { plotted, notPlotted } = partitionVehicles([v]);
     expect(plotted).toEqual([]);
     expect(notPlotted).toEqual([v]);
@@ -106,8 +188,22 @@ describe('partitionVehicles', () => {
 
   it('splits a mixed list correctly', () => {
     const tracked = vehicle({ vehicleId: 'v1' });
-    const awaiting = vehicle({ vehicleId: 'v2', trackingState: 'awaiting_data', lat: null, lon: null, recordedAt: null, ageSeconds: null });
-    const untracked = vehicle({ vehicleId: 'v3', trackingState: 'untracked', lat: null, lon: null, recordedAt: null, ageSeconds: null });
+    const awaiting = vehicle({
+      vehicleId: 'v2',
+      trackingState: 'awaiting_data',
+      lat: null,
+      lon: null,
+      recordedAt: null,
+      ageSeconds: null,
+    });
+    const untracked = vehicle({
+      vehicleId: 'v3',
+      trackingState: 'untracked',
+      lat: null,
+      lon: null,
+      recordedAt: null,
+      ageSeconds: null,
+    });
     const { plotted, notPlotted } = partitionVehicles([tracked, awaiting, untracked]);
     expect(plotted.map((v) => v.vehicleId)).toEqual(['v1']);
     expect(notPlotted.map((v) => v.vehicleId)).toEqual(['v2', 'v3']);
@@ -136,5 +232,28 @@ describe('notPlottedReason', () => {
     // teaches this function about. Cast through `unknown`, not `any`.
     const v = vehicle({ trackingState: 'unknown_state' as unknown as TrackingState });
     expect(notPlottedReason(v)).toBe('no position data');
+  });
+});
+
+describe('swatchBackground', () => {
+  // The legend swatch must fade its FILL only. Both `opacity` and
+  // `filter: opacity()` composite the whole element including box-shadow, and
+  // Tailwind's ring-white IS a box-shadow — so either would dim the white ring
+  // the real marker always keeps opaque. Baking alpha into the colour is the
+  // only form that leaves the ring alone.
+  it('bakes the fill opacity into the colour as an alpha channel', () => {
+    expect(swatchBackground('parked')).toBe('#7c3aede6'); // 0.9 -> e6
+    expect(swatchBackground('parkedSilent')).toBe('#7c3aed73'); // 0.45 -> 73
+  });
+
+  it('returns a valid 8-digit hex for every status', () => {
+    for (const status of Object.keys(STATUS_STYLE) as VehicleStatus[]) {
+      expect(swatchBackground(status)).toMatch(/^#[0-9a-f]{8}$/);
+    }
+  });
+
+  it('keeps the dimmer status visibly dimmer once baked', () => {
+    const alpha = (s: VehicleStatus) => parseInt(swatchBackground(s).slice(7), 16);
+    expect(alpha('parkedSilent')).toBeLessThan(alpha('parked'));
   });
 });

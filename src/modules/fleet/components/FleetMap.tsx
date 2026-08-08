@@ -13,7 +13,7 @@ import { useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
-import { ageLabel, colourFor, partitionVehicles } from '../utils/liveMapHelpers';
+import { STATUS_STYLE, ageLabel, partitionVehicles, statusFor } from '../utils/liveMapHelpers';
 
 export type { LiveVehicle };
 
@@ -63,29 +63,42 @@ export default function FleetMap({ vehicles }: { vehicles: LiveVehicle[] }) {
         maxZoom={18}
         detectRetina
       />
-      {plotted.map((v) => (
-        <CircleMarker
-          key={v.vehicleId}
-          center={[v.lat, v.lon]}
-          radius={7}
-          pathOptions={{ color: colourFor(v), fillColor: colourFor(v), fillOpacity: v.isStale ? 0.35 : 0.85 }}
-        >
-          <Popup>
-            <strong>{v.registration}</strong>
-            <br />
-            {v.driverName ?? 'No driver assigned'}
-            <br />
-            {v.ignition ? 'Moving' : 'Stopped'}
-            {v.speedKph !== null ? ` · ${Math.round(v.speedKph)} km/h` : ''}
-            {v.isSpeeding ? ' · SPEEDING' : ''}
-            <br />
-            Last fix: {ageLabel(v.ageSeconds)}
-            {v.isStale ? ' (stale)' : ''}
-            <br />
-            <small>via {v.provider ?? 'unknown'}</small>
-          </Popup>
-        </CircleMarker>
-      ))}
+      {plotted.map((v) => {
+        const style = STATUS_STYLE[statusFor(v)];
+        return (
+          <CircleMarker
+            key={v.vehicleId}
+            center={[v.lat, v.lon]}
+            radius={8}
+            // White stroke, not a tinted one: on the pale OSM basemap the halo is
+            // what makes a marker findable at a glance, the fill only says which
+            // kind it is.
+            pathOptions={{
+              color: '#ffffff',
+              weight: 2,
+              opacity: 1,
+              dashArray: style.dash,
+              fillColor: style.fill,
+              fillOpacity: style.fillOpacity,
+            }}
+          >
+            <Popup>
+              <strong>{v.registration}</strong>
+              <br />
+              {v.driverName ?? 'No driver assigned'}
+              <br />
+              {style.label}
+              {v.speedKph !== null ? ` · ${Math.round(v.speedKph)} km/h` : ''}
+              {v.isSpeeding ? ' · SPEEDING' : ''}
+              <br />
+              Last fix: {ageLabel(v.ageSeconds)}
+              {v.isStale ? ' (stale)' : ''}
+              <br />
+              <small>via {v.provider ?? 'unknown'}</small>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
     </MapContainer>
   );
 }
