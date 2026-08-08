@@ -12,7 +12,12 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { FleetMapLegend } from '@/modules/fleet/components/FleetMapLegend';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 import { log } from '@/lib/logger';
-import { notPlottedReason, partitionVehicles, statusFor, type VehicleStatus } from '@/modules/fleet/utils/liveMapHelpers';
+import {
+  notPlottedReason,
+  partitionVehicles,
+  statusFor,
+  type VehicleStatus,
+} from '@/modules/fleet/utils/liveMapHelpers';
 
 const FleetMap = dynamic(() => import('@/modules/fleet/components/FleetMap'), {
   ssr: false,
@@ -96,9 +101,8 @@ export default function FleetMapPage() {
           <h1 className="text-lg font-semibold">Fleet map</h1>
           <p className="text-sm text-gray-500">
             Showing {plotted.length} of {vehicles.length} active vehicles.
-            {notPlotted.length > 0 && ` ${notPlotted.length} not on the map.`}
-            {' '}
-            Positions refresh every 30 seconds and are typically 1–5 minutes behind.
+            {notPlotted.length > 0 && ` ${notPlotted.length} not on the map.`} Positions refresh
+            every 30 seconds and are typically 1–5 minutes behind.
           </p>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="mt-2">

@@ -9,59 +9,77 @@ import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 
 export type PlottedVehicle = LiveVehicle & { lat: number; lon: number };
 
-export type VehicleStatus = 'parked' | 'speeding' | 'moving' | 'unknown';
+export type VehicleStatus = 'speeding' | 'moving' | 'parked' | 'parkedSilent' | 'unknown';
 
 /**
- * What the map is actually asserting about a vehicle.
+ * How long a parked vehicle may stay quiet before we stop vouching for it.
  *
- * `ignition === false` wins outright, and that is the whole point of this
- * function. A car with its engine off is not moving, so its last position
- * stays true for as long as it stays off — fix age is irrelevant to a parked
- * car in a way it is not to a driving one. Ranking staleness above it (the
- * previous behaviour) painted the entire fleet the "we don't know" grey every
- * weekend: 18 of 18 plotted vehicles on 2026-08-08, 16 of them reporting
- * ignition off. The one state we were most certain about rendered as the one
- * we were least certain about, at the lowest opacity on the map.
+ * The slowest providers (Netstar, Ituran) are polled 2-hourly, so a healthy
+ * parked vehicle still lands a fix well inside 2 hours; 6 is three times that,
+ * which is late enough not to cry wolf over a missed cycle. Against prod on
+ * 2026-08-08 it split the fleet 13 plainly parked / 5 gone quiet, the quietest
+ * of them silent for over a day.
+ */
+export const PARKED_SILENT_AFTER_SECONDS = 6 * 3600;
+
+/**
+ * What the map is asserting about a vehicle.
  *
- * It also outranks `isSpeeding`, which reads backwards until you notice the
- * two can only disagree when the data is self-contradictory: a record saying
- * "engine off, speeding" is wrong about one of them, and "engine off" is the
- * claim a tracker gets right. 4 such rows exist in all of history.
+ * `ignition === false` is the strong signal here: a car with its engine off is
+ * not moving, so its last position stays true for as long as it stays off.
+ * Ranking staleness above it (the previous behaviour) painted the whole fleet
+ * the "we don't know" grey every weekend — 18 of 18 plotted vehicles on
+ * 2026-08-08, 16 of them reporting ignition off, all at the lowest opacity on
+ * the map. The state we were most certain about rendered as the one we were
+ * least certain about.
  *
- * Everywhere else staleness still outranks the last-known state, for the
- * original reason: a 3-hour-old "moving" fix does not mean the vehicle is
- * moving now, so it must not read as though it does.
+ * But "parked" only vouches for the POSITION, never for the tracker. A unit
+ * that is flat, disabled, or ripped out of a stolen vehicle also reports
+ * nothing, and its last word may well have been "ignition off". So parked
+ * carries a ceiling: past PARKED_SILENT_AFTER_SECONDS it becomes
+ * `parkedSilent`, which still reads as a parked car but visibly flags that
+ * nobody has heard from it. Without that the map loses its only glanceable
+ * way to spot a tracker gone dark.
+ *
+ * A fresh speeding fix outranks everything, including ignition. The two can
+ * disagree when a subsystem lags — a real high-speed fix arriving beside a
+ * glitched ignition bit — and between a false red and a missed speeding
+ * vehicle, the false red costs one click and the miss costs an incident. It
+ * must be fresh to count, for the original reason: a stale "speeding" tells
+ * us what a vehicle was doing, not what it is doing.
  */
 export function statusFor(v: LiveVehicle): VehicleStatus {
-  if (v.ignition === false) return 'parked';
+  if (!v.isStale && v.isSpeeding) return 'speeding';
+  if (v.ignition === false) {
+    // A missing age is not evidence of freshness — treat it as silence.
+    const quiet = v.ageSeconds === null || v.ageSeconds > PARKED_SILENT_AFTER_SECONDS;
+    return quiet ? 'parkedSilent' : 'parked';
+  }
   if (v.isStale) return 'unknown';
-  if (v.isSpeeding) return 'speeding';
   if (v.ignition === true) return 'moving';
   return 'unknown';
 }
 
 /**
- * Fill, opacity and label per status, in one place so the map markers and the
- * legend cannot drift apart.
+ * Fill, opacity, outline and label per status, in one place so the markers and
+ * the legend cannot drift apart.
  *
  * Every marker gets an opaque white stroke. The OSM basemap is pale grey with
  * pale roads, so a low-opacity fill of any colour dissolves into it; the halo
- * is what separates a marker from the map rather than the colour itself.
+ * is what separates a marker from the map, and the fill only says which kind
+ * it is. `dash` breaks that ring up for the one status that means "this is our
+ * last word, not our current one".
  */
 export const STATUS_STYLE: Record<
   VehicleStatus,
-  { fill: string; fillOpacity: number; label: string }
+  { fill: string; fillOpacity: number; label: string; dash?: string }
 > = {
-  parked: { fill: '#7c3aed', fillOpacity: 0.9, label: 'Parked' },
   speeding: { fill: '#dc2626', fillOpacity: 0.9, label: 'Speeding' },
   moving: { fill: '#0f9d6b', fillOpacity: 0.9, label: 'Moving' },
+  parked: { fill: '#7c3aed', fillOpacity: 0.9, label: 'Parked' },
+  parkedSilent: { fill: '#7c3aed', fillOpacity: 0.45, label: 'Parked · no contact', dash: '3 3' },
   unknown: { fill: '#6b7280', fillOpacity: 0.6, label: 'No recent fix' },
 };
-
-/** Marker colour for a vehicle. */
-export function colourFor(v: LiveVehicle): string {
-  return STATUS_STYLE[statusFor(v)].fill;
-}
 
 /** Human-readable age of a position fix, or 'never' if there isn't one. */
 export function ageLabel(seconds: number | null): string {

@@ -8,9 +8,9 @@
 import { describe, expect, it } from 'vitest';
 import type { LiveVehicle, TrackingState } from '@/pages/api/fleet/positions/live';
 import {
+  PARKED_SILENT_AFTER_SECONDS,
   STATUS_STYLE,
   ageLabel,
-  colourFor,
   notPlottedReason,
   partitionVehicles,
   statusFor,
@@ -43,14 +43,14 @@ describe('colourFor', () => {
     expect(statusFor(v)).toBe('unknown');
   });
 
-  it('reads a fresh speeding vehicle as speeding (red)', () => {
+  it('reads a fresh speeding vehicle as speeding', () => {
     const v = vehicle({ isStale: false, isSpeeding: true });
-    expect(colourFor(v)).toBe('#dc2626');
+    expect(statusFor(v)).toBe('speeding');
   });
 
-  it('reads a fresh moving (ignition on, not speeding) vehicle as moving (green)', () => {
+  it('reads a fresh moving (ignition on, not speeding) vehicle as moving', () => {
     const v = vehicle({ isStale: false, isSpeeding: false, ignition: true });
-    expect(colourFor(v)).toBe('#0f9d6b');
+    expect(statusFor(v)).toBe('moving');
   });
 
   it('reads an ignition-off vehicle as parked', () => {
@@ -63,19 +63,46 @@ describe('colourFor', () => {
     expect(statusFor(v)).toBe('unknown');
   });
 
-  it('an ignition-off vehicle stays PARKED however old the fix is', () => {
+  it('an ignition-off vehicle stays parked despite a stale fix, within the ceiling', () => {
     // The bug this fixes: every plotted vehicle read 'stale' at 0.35 opacity
     // on 2026-08-08 (18/18, 16 of them ignition-off) because staleness
-    // outranked everything. A parked car does not move, so its position stays
-    // true — 41 hours old was a real observed age.
-    const v = vehicle({ isStale: true, ignition: false, ageSeconds: 41 * 3600 });
+    // outranked everything. Stale here (>15 min) but well inside the 6h
+    // ceiling, which is the normal weekend state for a 2-hourly provider.
+    const v = vehicle({ isStale: true, ignition: false, ageSeconds: 3 * 3600 });
     expect(statusFor(v)).toBe('parked');
   });
 
-  it('an ignition-off vehicle is parked, not speeding, when the record claims both', () => {
-    // Self-contradictory data (4 such rows exist in all of history). An engine
-    // that is off is not moving, so the speeding bit is the wrong one.
+  it('a parked vehicle that has gone quiet past the ceiling is flagged, not silently parked', () => {
+    // 'parked' vouches for the POSITION, never the tracker. A flat, disabled
+    // or removed unit also says nothing, and its last word may well have been
+    // "ignition off" — so it must not look identical to a car parked 2
+    // minutes ago. 41h was a real observed age on 2026-08-08.
+    const v = vehicle({ isStale: true, ignition: false, ageSeconds: 41 * 3600 });
+    expect(statusFor(v)).toBe('parkedSilent');
+  });
+
+  it('treats a missing age as silence rather than freshness', () => {
+    const v = vehicle({ isStale: true, ignition: false, ageSeconds: null });
+    expect(statusFor(v)).toBe('parkedSilent');
+  });
+
+  it('puts the ceiling boundary on the silent side only once exceeded', () => {
+    const at = vehicle({ ignition: false, ageSeconds: PARKED_SILENT_AFTER_SECONDS });
+    const past = vehicle({ ignition: false, ageSeconds: PARKED_SILENT_AFTER_SECONDS + 1 });
+    expect(statusFor(at)).toBe('parked');
+    expect(statusFor(past)).toBe('parkedSilent');
+  });
+
+  it('a FRESH speeding fix outranks ignition-off, so a real one is never hidden', () => {
+    // The two disagree when a subsystem lags. A false red costs one click; a
+    // missed speeding vehicle costs an incident.
     const v = vehicle({ isStale: false, isSpeeding: true, ignition: false });
+    expect(statusFor(v)).toBe('speeding');
+  });
+
+  it('a STALE speeding fix does not keep a vehicle red forever', () => {
+    // It tells us what the vehicle was doing, not what it is doing.
+    const v = vehicle({ isStale: true, isSpeeding: true, ignition: false, ageSeconds: 3 * 3600 });
     expect(statusFor(v)).toBe('parked');
   });
 
@@ -88,12 +115,18 @@ describe('colourFor', () => {
   it('gives parked a far more visible fill than unknown', () => {
     // The whole point of the change is legibility on a pale basemap.
     expect(STATUS_STYLE.parked.fillOpacity).toBeGreaterThan(STATUS_STYLE.unknown.fillOpacity);
-    expect(colourFor(vehicle({ ignition: false }))).toBe(STATUS_STYLE.parked.fill);
   });
 
-  it('gives every status a distinct colour, so the legend can tell them apart', () => {
-    const fills = Object.values(STATUS_STYLE).map((s) => s.fill);
-    expect(new Set(fills).size).toBe(fills.length);
+  it('styles every status, and distinguishes the two parked states visually', () => {
+    // parkedSilent deliberately shares the parked fill — it IS a parked car —
+    // so the dashed outline is the only thing telling them apart. Losing it
+    // would re-hide the dark trackers this ceiling exists to surface.
+    for (const status of Object.keys(STATUS_STYLE)) {
+      expect(STATUS_STYLE[status as keyof typeof STATUS_STYLE].label).toBeTruthy();
+    }
+    expect(STATUS_STYLE.parkedSilent.dash).toBeTruthy();
+    expect(STATUS_STYLE.parked.dash).toBeUndefined();
+    expect(STATUS_STYLE.parkedSilent.fillOpacity).toBeLessThan(STATUS_STYLE.parked.fillOpacity);
   });
 });
 
@@ -130,7 +163,13 @@ describe('partitionVehicles', () => {
   });
 
   it('excludes an untracked vehicle (no coordinates) from plotting', () => {
-    const v = vehicle({ trackingState: 'untracked', lat: null, lon: null, recordedAt: null, ageSeconds: null });
+    const v = vehicle({
+      trackingState: 'untracked',
+      lat: null,
+      lon: null,
+      recordedAt: null,
+      ageSeconds: null,
+    });
     const { plotted, notPlotted } = partitionVehicles([v]);
     expect(plotted).toEqual([]);
     expect(notPlotted).toEqual([v]);
@@ -147,8 +186,22 @@ describe('partitionVehicles', () => {
 
   it('splits a mixed list correctly', () => {
     const tracked = vehicle({ vehicleId: 'v1' });
-    const awaiting = vehicle({ vehicleId: 'v2', trackingState: 'awaiting_data', lat: null, lon: null, recordedAt: null, ageSeconds: null });
-    const untracked = vehicle({ vehicleId: 'v3', trackingState: 'untracked', lat: null, lon: null, recordedAt: null, ageSeconds: null });
+    const awaiting = vehicle({
+      vehicleId: 'v2',
+      trackingState: 'awaiting_data',
+      lat: null,
+      lon: null,
+      recordedAt: null,
+      ageSeconds: null,
+    });
+    const untracked = vehicle({
+      vehicleId: 'v3',
+      trackingState: 'untracked',
+      lat: null,
+      lon: null,
+      recordedAt: null,
+      ageSeconds: null,
+    });
     const { plotted, notPlotted } = partitionVehicles([tracked, awaiting, untracked]);
     expect(plotted.map((v) => v.vehicleId)).toEqual(['v1']);
     expect(notPlotted.map((v) => v.vehicleId)).toEqual(['v2', 'v3']);

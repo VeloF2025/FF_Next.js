@@ -66,36 +66,37 @@ export default function FleetMap({ vehicles }: { vehicles: LiveVehicle[] }) {
       {plotted.map((v) => {
         const style = STATUS_STYLE[statusFor(v)];
         return (
-        <CircleMarker
-          key={v.vehicleId}
-          center={[v.lat, v.lon]}
-          radius={8}
-          // White stroke, not a tinted one: on the pale OSM basemap the halo is
-          // what makes a marker findable at a glance, the fill only says which
-          // kind it is.
-          pathOptions={{
-            color: '#ffffff',
-            weight: 2,
-            opacity: 1,
-            fillColor: style.fill,
-            fillOpacity: style.fillOpacity,
-          }}
-        >
-          <Popup>
-            <strong>{v.registration}</strong>
-            <br />
-            {v.driverName ?? 'No driver assigned'}
-            <br />
-            {style.label}
-            {v.speedKph !== null ? ` · ${Math.round(v.speedKph)} km/h` : ''}
-            {v.isSpeeding ? ' · SPEEDING' : ''}
-            <br />
-            Last fix: {ageLabel(v.ageSeconds)}
-            {v.isStale ? ' (stale)' : ''}
-            <br />
-            <small>via {v.provider ?? 'unknown'}</small>
-          </Popup>
-        </CircleMarker>
+          <CircleMarker
+            key={v.vehicleId}
+            center={[v.lat, v.lon]}
+            radius={8}
+            // White stroke, not a tinted one: on the pale OSM basemap the halo is
+            // what makes a marker findable at a glance, the fill only says which
+            // kind it is.
+            pathOptions={{
+              color: '#ffffff',
+              weight: 2,
+              opacity: 1,
+              dashArray: style.dash,
+              fillColor: style.fill,
+              fillOpacity: style.fillOpacity,
+            }}
+          >
+            <Popup>
+              <strong>{v.registration}</strong>
+              <br />
+              {v.driverName ?? 'No driver assigned'}
+              <br />
+              {style.label}
+              {v.speedKph !== null ? ` · ${Math.round(v.speedKph)} km/h` : ''}
+              {v.isSpeeding ? ' · SPEEDING' : ''}
+              <br />
+              Last fix: {ageLabel(v.ageSeconds)}
+              {v.isStale ? ' (stale)' : ''}
+              <br />
+              <small>via {v.provider ?? 'unknown'}</small>
+            </Popup>
+          </CircleMarker>
         );
       })}
     </MapContainer>
