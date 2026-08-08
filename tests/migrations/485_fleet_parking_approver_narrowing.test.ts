@@ -300,3 +300,50 @@ describe('ancestor cascade matches userHasPermission', () => {
     expect(await approvers.isApprover(LIZELLE)).toBe(true);
   });
 });
+
+/**
+ * Deciding is an `edit` action; being notified is a `view` action. They are
+ * the same two people today because migration 485 grants both together — so
+ * the only way to keep them from silently collapsing into one predicate is to
+ * test the case where they differ.
+ */
+describe('view notifies, edit decides', () => {
+  beforeEach(async () => { await db.query(FORWARD); });
+
+  it('a view-only grant is notified but CANNOT decide', async () => {
+    // The reachable shape of this: a super_admin handed read access to the
+    // queue. withPermission('edit') never runs for them, so if isApprover
+    // keyed on `view` they could decide with edit explicitly false.
+    const auditor = '10000000-0000-0000-0000-00000000000a';
+    await db.query(
+      `INSERT INTO users (id, email, role) VALUES ($1,'auditor@velocityfibre.co.za','super_admin')`,
+      [auditor]
+    );
+    await db.query(
+      `INSERT INTO user_permission_overrides (user_id, permission_key, override_type, actions)
+       VALUES ($1,'fleet.parking-requests','grant','{"view":true,"edit":false}')`,
+      [auditor]
+    );
+
+    expect(await approvers.findApproverUserIds()).toContain(auditor);
+    expect(await approvers.isApprover(auditor)).toBe(false);
+  });
+
+  it('the two named approvers hold both, so they decide and are notified', async () => {
+    for (const id of [LIZELLE, HEIN]) {
+      expect(await approvers.isApprover(id)).toBe(true);
+      expect(await approvers.findApproverUserIds()).toContain(id);
+    }
+  });
+
+  it('a revoke of edit alone stops the decision but leaves the notification', async () => {
+    await db.query(
+      `UPDATE user_permission_overrides
+          SET actions = '{"view":true,"edit":false}'
+        WHERE user_id = $1 AND permission_key = 'fleet.parking-requests'`,
+      [LIZELLE]
+    );
+    expect(await approvers.isApprover(LIZELLE)).toBe(false);
+    expect(await approvers.findApproverUserIds()).toContain(LIZELLE);
+  });
+});
