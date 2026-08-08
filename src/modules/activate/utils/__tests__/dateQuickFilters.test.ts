@@ -30,20 +30,40 @@ describe('getMonthToDateRange', () => {
 });
 
 describe('resolveActiveQuickFilter', () => {
+  const addDays = (isoDate: string, days: number): string => {
+    const d = new Date(`${isoDate}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
   /**
-   * Stands in for DrListPage's `quickFilterRange`. `today` is the SAST date and
-   * `cycleStart` the Monday of the current cycle, so a caller can reproduce any
-   * calendar shape — including the ones where presets collide.
+   * Stands in for DrListPage's `quickFilterRange`, which closes over the real
+   * clock and cannot be imported. `today` is the SAST date and `cycleStart` the
+   * Monday of the current cycle, so a caller can reproduce any calendar shape —
+   * including the ones where presets collide.
+   *
+   * Every branch must stay faithful to the production helper it represents,
+   * because `resolveActiveQuickFilter` decides by comparing these ranges. A
+   * branch returning a literal that can never match silently removes that
+   * preset from the comparison and makes the test assert an outcome production
+   * would not produce.
    */
   const rangesFor = (today: string, cycleStart: string) =>
     (filter: QuickDateFilter): DateRange => {
       switch (filter) {
         case 'today': return { from: today, to: today };
-        case 'yesterday': return { from: 'yesterday', to: 'yesterday' };
+        // getYesterdaySAST() is getTodaySAST() minus one day.
+        case 'yesterday': {
+          const yesterday = addDays(today, -1);
+          return { from: yesterday, to: yesterday };
+        }
         case 'mtd': return getMonthToDateRange(today);
         // getCycleDates('current') ends at today, not at the cycle's Sunday.
         case 'currentCycle': return { from: cycleStart, to: today };
-        case 'previousCycle': return { from: 'prev-mon', to: 'prev-sun' };
+        // getCycleDates('previous') shifts both ends back a week, so it ends on
+        // the Sunday before the current cycle's Monday.
+        case 'previousCycle':
+          return { from: addDays(cycleStart, -7), to: addDays(cycleStart, -1) };
         case 'all': return { from: '', to: '' };
       }
     };
@@ -108,8 +128,9 @@ describe('resolveActiveQuickFilter', () => {
 
     it('drops a recorded choice the wall clock has moved past', () => {
       // Clicked "today" on the 12th; the tab was left open past midnight, so
-      // rangeFor now resolves 'today' to the 13th and the recorded choice no
-      // longer describes {12th, 12th}.
+      // 'today' now means the 13th and the recorded choice no longer describes
+      // {12th, 12th}. The range is unchanged, so what it now describes is
+      // yesterday — which is what the user is in fact still looking at.
       //
       // Scope: this proves the resolver returns the right answer WHEN CALLED
       // with a rangeFor built from the new date. It cannot prove DrListPage
@@ -119,7 +140,7 @@ describe('resolveActiveQuickFilter', () => {
       // call is what made it stale once already; see the comment at the call
       // site before adding one back.
       const rangeFor = rangesFor('2026-08-13', '2026-08-10');
-      expect(resolveActiveQuickFilter({ from: '2026-08-12', to: '2026-08-12' }, rangeFor, 'today')).toBe('all');
+      expect(resolveActiveQuickFilter({ from: '2026-08-12', to: '2026-08-12' }, rangeFor, 'today')).toBe('yesterday');
     });
   });
 });
