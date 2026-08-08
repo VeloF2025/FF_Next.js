@@ -20,11 +20,14 @@
 import { neon } from '@neondatabase/serverless';
 import { processWithLLM } from '../src/lib/llm/meeting-processor';
 import { log } from '../src/lib/logger';
+import { runMeetingStep, toErrorMessage } from './lib/meeting-failure';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
 if (!DATABASE_URL) { console.error('DATABASE_URL not set'); process.exit(1); }
+// eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
 if (!OPENAI_API_KEY) { console.error('OPENAI_API_KEY not set'); process.exit(1); }
 
 const sql = neon(DATABASE_URL);
@@ -47,7 +50,9 @@ interface MeetingRow {
 }
 
 async function main() {
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`\nMeeting LLM Reprocessor ${dryRun ? '(DRY RUN)' : ''}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`Source: ${sourceFilter} | Limit: ${limit} | Force: ${force}\n`);
 
   // Find meetings that need processing
@@ -89,15 +94,18 @@ async function main() {
         LIMIT ${limit}
       `;
 
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`Found ${meetings.length} meetings to process\n`);
 
   if (meetings.length === 0) {
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log('Nothing to do.');
     return;
   }
 
   if (dryRun) {
     (meetings as MeetingRow[]).forEach((m, i) => {
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
       console.log(`  ${i + 1}. [${m.source}] id=${m.id} "${m.title}" (summary=${m.has_summary}, title_gen=${m.summary_has_title})`);
     });
     return;
@@ -109,34 +117,56 @@ async function main() {
 
   for (let i = 0; i < meetings.length; i++) {
     const m = meetings[i] as MeetingRow;
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log(`[${i + 1}/${meetings.length}] ${m.source} id=${m.id} "${m.title}"`);
 
-    try {
-      const result = await processWithLLM(m.id);
-      processed++;
+    // processWithLLM throws instead of writing its own status, so persisting
+    // 'failed' is this caller's job — otherwise the meeting silently keeps a
+    // stale 'processing'/'completed' status with no processing_error.
+    const outcome = await runMeetingStep(
+      sql,
+      m.id,
+      () => processWithLLM(m.id),
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+      persistErr => console.error(`  WARN: could not record failure: ${toErrorMessage(persistErr)}`),
+    );
 
-      const newTitle = result.suggested_title?.trim();
-      if (newTitle && m.title.startsWith('Teams Meeting -')) {
-        titlesUpdated++;
-        console.log(`  -> "${newTitle}"`);
-      }
-      console.log(`  ${result.action_items.length} action items, ${result.decisions.length} decisions`);
-    } catch (err: unknown) {
+    if (!outcome.ok) {
       failed++;
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`  ERROR: ${msg}`);
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+      console.error(`  ERROR: ${outcome.error}`);
+      continue;
     }
+
+    processed++;
+    const result = outcome.value;
+
+    const newTitle = result.suggested_title?.trim();
+    if (newTitle && m.title.startsWith('Teams Meeting -')) {
+      titlesUpdated++;
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+      console.log(`  -> "${newTitle}"`);
+    }
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+    console.log(`  ${result.action_items.length} action items, ${result.decisions.length} decisions`);
   }
 
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`\n${'='.repeat(50)}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`Results:`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  Processed:      ${processed}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  Titles updated: ${titlesUpdated}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  Failed:         ${failed}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`${'='.repeat(50)}`);
 }
 
 main().catch(err => {
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.error('Fatal error:', err);
   process.exit(1);
 });

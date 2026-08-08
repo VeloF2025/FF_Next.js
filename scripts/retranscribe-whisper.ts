@@ -30,11 +30,14 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { processWithLLM } from '../src/lib/llm/meeting-processor';
+import { markMeetingFailed, runMeetingStep, safeRemove, toErrorMessage } from './lib/meeting-failure';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
 if (!DATABASE_URL) { console.error('DATABASE_URL not set'); process.exit(1); }
+// eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
 if (!OPENAI_API_KEY) { console.error('OPENAI_API_KEY not set'); process.exit(1); }
 
 // Use pg.Pool directly — neon() HTTP client doesn't work for standalone scripts
@@ -84,12 +87,26 @@ interface WhisperResponse {
   segments: WhisperSegment[];
 }
 
+/** Temp paths are deterministic per meeting so `finally` can clean up even when
+ *  extraction itself throws part-way and leaves a partial file behind. */
+const audioPathFor = (meetingId: number): string => `/tmp/meeting-${meetingId}-audio.mp3`;
+const chunkDirFor = (meetingId: number): string => `/tmp/meeting-${meetingId}-chunks`;
+
+/** Remove this meeting's extracted audio and chunk directory. Never throws —
+ *  it runs in a `finally`, where a throw would replace the real error. */
+function cleanupTempFiles(meetingId: number): void {
+  safeRemove([audioPathFor(meetingId), chunkDirFor(meetingId)], err =>
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+    console.error(`  WARN: temp cleanup failed for meeting ${meetingId}: ${toErrorMessage(err)}`),
+  );
+}
+
 /**
  * Extract audio from MP4 as mono 16kHz MP3.
  * Returns path to the extracted audio file.
  */
 function extractAudio(mp4Path: string, meetingId: number): string {
-  const outPath = `/tmp/meeting-${meetingId}-audio.mp3`;
+  const outPath = audioPathFor(meetingId);
 
   execSync(
     `ffmpeg -i "${mp4Path}" -vn -ac 1 -ar 16000 -b:a 48k "${outPath}" -y 2>/dev/null`,
@@ -119,7 +136,7 @@ function splitAudioIfNeeded(audioPath: string, meetingId: number): string[] {
   const numChunks = Math.ceil(stats.size / (WHISPER_MAX_SIZE * 0.9));
   const chunkDuration = Math.floor(totalDuration / numChunks);
 
-  const chunkDir = `/tmp/meeting-${meetingId}-chunks`;
+  const chunkDir = chunkDirFor(meetingId);
   if (fs.existsSync(chunkDir)) {
     fs.rmSync(chunkDir, { recursive: true });
   }
@@ -207,16 +224,31 @@ function buildTranscriptText(segments: WhisperSegment[]): string {
  * Process a single meeting: extract → transcribe → translate → store → LLM.
  */
 async function processMeeting(meeting: MeetingRow): Promise<void> {
+  try {
+    await transcribeAndStore(meeting);
+  } finally {
+    // Cleanup must run on the failure path too. It used to sit at the end of
+    // the happy path, so any throw — and since #2393 the LLM step throws
+    // routinely for untranscribable recordings — orphaned ~16MB of audio per
+    // meeting in /tmp.
+    cleanupTempFiles(meeting.id);
+  }
+}
+
+async function transcribeAndStore(meeting: MeetingRow): Promise<void> {
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`\n  Extracting audio from ${meeting.recording_path}...`);
 
   // 1. Extract audio
   const audioPath = extractAudio(meeting.recording_path, meeting.id);
   const audioSize = fs.statSync(audioPath).size;
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  Audio extracted: ${(audioSize / 1024 / 1024).toFixed(1)}MB`);
 
   // 2. Split if needed
   const chunks = splitAudioIfNeeded(audioPath, meeting.id);
   if (chunks.length > 1) {
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log(`  Split into ${chunks.length} chunks`);
   }
 
@@ -228,9 +260,11 @@ async function processMeeting(meeting: MeetingRow): Promise<void> {
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]!;
     if (chunks.length > 1) {
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
       console.log(`  Chunk ${i + 1}/${chunks.length}...`);
     }
 
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log(`  Transcribing (Afrikaans)...`);
     const afResult = await whisperTranscribe(chunk);
     const afSegments = afResult.segments.map(s => ({
@@ -240,6 +274,7 @@ async function processMeeting(meeting: MeetingRow): Promise<void> {
     }));
     allAfSegments.push(...afSegments);
 
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log(`  Translating (English)...`);
     const enResult = await whisperTranslate(chunk);
     const enSegments = enResult.segments.map(s => ({
@@ -256,7 +291,9 @@ async function processMeeting(meeting: MeetingRow): Promise<void> {
   const afTranscript = buildTranscriptText(allAfSegments);
   const enTranscript = buildTranscriptText(allEnSegments);
 
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  Afrikaans: ${allAfSegments.length} segments, ${afTranscript.length} chars`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  English:   ${allEnSegments.length} segments, ${enTranscript.length} chars`);
 
   // 5. Store in database
@@ -277,24 +314,27 @@ async function processMeeting(meeting: MeetingRow): Promise<void> {
     VALUES (${meeting.id}, 'whisper-af', ${afTranscript}, NOW())
   `;
 
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  Stored both transcripts`);
 
   // 6. Re-run LLM processing
   if (!skipLLM) {
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log(`  Running LLM processing...`);
     const summary = await processWithLLM(meeting.id);
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log(`  Title: "${summary.suggested_title}"`);
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log(`  ${summary.action_items.length} action items, ${summary.decisions.length} decisions`);
   }
 
-  // 7. Cleanup temp files
-  if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-  const chunkDir = `/tmp/meeting-${meeting.id}-chunks`;
-  if (fs.existsSync(chunkDir)) fs.rmSync(chunkDir, { recursive: true });
+  // Temp files are removed by processMeeting's `finally`.
 }
 
 async function main() {
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`\nWhisper Re-transcription ${dryRun ? '(DRY RUN)' : ''}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`Skip LLM: ${skipLLM} | Limit: ${limit}\n`);
 
   let meetings: MeetingRow[];
@@ -328,9 +368,11 @@ async function main() {
     `) as unknown as MeetingRow[];
   }
 
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`Found ${meetings.length} meetings to re-transcribe\n`);
 
   if (meetings.length === 0) {
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log('Nothing to do.');
     return;
   }
@@ -338,6 +380,7 @@ async function main() {
   if (dryRun) {
     meetings.forEach((m, i) => {
       const sizeMB = (Number(m.recording_size_bytes) / 1024 / 1024).toFixed(0);
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
       console.log(`  ${i + 1}. id=${m.id} "${m.title}" (${sizeMB}MB recording)`);
     });
     return;
@@ -349,33 +392,51 @@ async function main() {
   for (let i = 0; i < meetings.length; i++) {
     const m = meetings[i]!;
     const sizeMB = (Number(m.recording_size_bytes) / 1024 / 1024).toFixed(0);
+    // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
     console.log(`[${i + 1}/${meetings.length}] id=${m.id} "${m.title}" (${sizeMB}MB)`);
 
     // Verify recording file exists
     if (!fs.existsSync(m.recording_path)) {
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
       console.log(`  [SKIP] Recording file not found: ${m.recording_path}`);
       failed++;
+      await markMeetingFailed(sql, m.id, `Recording file not found: ${m.recording_path}`)
+        // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+        .catch(err => console.error(`  WARN: could not record failure: ${toErrorMessage(err)}`));
       continue;
     }
 
-    try {
-      await processMeeting(m);
+    const outcome = await runMeetingStep(
+      sql,
+      m.id,
+      () => processMeeting(m),
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+      persistErr => console.error(`  WARN: could not record failure: ${toErrorMessage(persistErr)}`),
+    );
+
+    if (outcome.ok) {
       processed++;
-    } catch (err: unknown) {
+    } else {
       failed++;
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`  ERROR: ${msg}`);
+      // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
+      console.error(`  ERROR: ${outcome.error}`);
     }
   }
 
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`\n${'='.repeat(50)}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`Results:`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  Processed: ${processed}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`  Failed:    ${failed}`);
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.log(`${'='.repeat(50)}`);
 }
 
 main().catch(err => {
+  // eslint-disable-next-line no-console -- CLI script: console is the operator-facing output channel
   console.error('Fatal error:', err);
   process.exit(1);
 });
