@@ -48,6 +48,17 @@ describe('zone delivery migration 470', () => {
     // design — but a role and database of that name only exist in the container.
     const testUrl = process.env.DATABASE_URL_TEST;
     expect(testUrl, 'global setup did not export DATABASE_URL_TEST').toBeTruthy();
+    // Scheme checked as a string, not by parsing again: pg-connection-string
+    // ignores the scheme entirely, so dropping the old `protocol === 'postgres:'`
+    // assertion let mysql://…/fibreflow_test satisfy every remaining check.
+    // Not independently dangerous — host, role and database are still pinned —
+    // but it was a real regression from swapping parsers, and re-parsing with
+    // `new URL()` just to read the scheme would reintroduce the two-parser
+    // disagreement this whole check exists to remove.
+    expect(
+      /^postgres(ql)?:\/\//.test(testUrl!),
+      'refusing to connect with a non-Postgres scheme'
+    ).toBe(true);
     const conn = parseConnectionString(testUrl!);
     expect(conn.database, 'refusing to truncate a database that is not the throwaway one')
       .toBe('fibreflow_test');
