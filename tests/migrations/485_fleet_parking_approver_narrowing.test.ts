@@ -58,6 +58,13 @@ const BASE_SCHEMA = `
     role VARCHAR(50) NOT NULL, permission_key VARCHAR(100) NOT NULL,
     actions JSONB NOT NULL, PRIMARY KEY (role, permission_key)
   );
+  -- Mirrors prod (columns verified against the live DB): the rollback deletes
+  -- its own row here, and a scratch schema without this table would fail the
+  -- rollback for a reason production never has.
+  CREATE TABLE schema_migrations (
+    filename TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
   CREATE TABLE access_permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type VARCHAR(50) NOT NULL, key VARCHAR(100) NOT NULL UNIQUE,
@@ -111,6 +118,10 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await db.query('DELETE FROM schema_migrations');
+  await db.query(
+    `INSERT INTO schema_migrations (filename) VALUES ('485_fleet_parking_approver_narrowing.sql')`
+  );
   await db.query('DELETE FROM user_permission_overrides');
   await db.query('DELETE FROM role_permissions');
   await db.query('DELETE FROM access_permissions');
@@ -220,6 +231,20 @@ describe('rollback', () => {
     await db.query(ROLLBACK);
     await db.query(ROLLBACK);
     expect((await approvers.findApproverUserIds()).length).toBe(4);
+  });
+
+  it('removes its own tracker row, so a deploy can re-apply it', async () => {
+    // The runner decides pending-ness from schema_migrations alone, so leaving
+    // the row behind means a rollback can never be undone by a deploy: the
+    // migration is skipped forever and only a manual DELETE recovers it.
+    // Migrations 470, 483 and 484 all delete their row; 485 did not.
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+    const { rows } = await db.query(
+      `SELECT count(*)::int AS n FROM schema_migrations
+        WHERE filename = '485_fleet_parking_approver_narrowing.sql'`
+    );
+    expect(rows[0].n).toBe(0);
   });
 });
 
