@@ -14,15 +14,14 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 import { withAuth } from '@/lib/auth';
-
-/** A fix older than this is not "live" and must not be drawn as if it were. */
-const STALE_AFTER_SECONDS = 15 * 60;
+import { staleAfterSecondsFor } from '@/services/tracking/staleness';
 
 interface Row extends Record<string, unknown> {
   vehicle_id: string;
   registration: string;
   driver_name: string | null;
   provider: string | null;
+  account_ref: string | null;
   lat: string | null;
   lon: string | null;
   speed_kph: string | null;
@@ -47,11 +46,19 @@ export interface LiveVehicle {
   recordedAt: string | null;
   ageSeconds: number | null;
   isStale: boolean;
+  /**
+   * The threshold this vehicle was judged against, which differs per feed —
+   * Cartrack's REST account is polled every 2 minutes, the portals every 2
+   * hours. Exposed so the UI can say how long is too long without duplicating
+   * the table.
+   */
+  staleAfterSeconds: number;
   trackingState: TrackingState;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
+  if (req.method !== 'GET')
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
   try {
     const rows = await sql<Row>`
@@ -60,6 +67,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         v.registration,
         NULLIF(TRIM(CONCAT(s.first_name, ' ', s.last_name)), '') AS driver_name,
         p.provider,
+        p.account_ref,
         p.lat::text, p.lon::text, p.speed_kph::text,
         p.ignition, p.is_speeding, p.recorded_at,
         (t.id IS NOT NULL) AS has_tracker
@@ -68,7 +76,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN fleet_vehicle_trackers t ON t.vehicle_id = v.id AND t.is_active
       LEFT JOIN LATERAL (
         SELECT DISTINCT ON (fp.vehicle_id)
-               fp.provider, fp.lat, fp.lon, fp.speed_kph, fp.ignition, fp.is_speeding, fp.recorded_at
+               fp.provider, fp.account_ref, fp.lat, fp.lon, fp.speed_kph, fp.ignition, fp.is_speeding, fp.recorded_at
         FROM fleet_vehicle_positions fp
         WHERE fp.vehicle_id = v.id
         ORDER BY fp.vehicle_id, fp.recorded_at DESC
@@ -81,6 +89,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const vehicles: LiveVehicle[] = rows.map((r) => {
       const recordedAt = r.recorded_at ? new Date(r.recorded_at) : null;
       const ageSeconds = recordedAt ? Math.round((now - recordedAt.getTime()) / 1000) : null;
+      const staleAfterSeconds = staleAfterSecondsFor(r.provider, r.account_ref);
       const trackingState: TrackingState = !r.has_tracker
         ? 'untracked'
         : recordedAt === null
@@ -98,12 +107,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         isSpeeding: r.is_speeding,
         recordedAt: recordedAt?.toISOString() ?? null,
         ageSeconds,
-        isStale: ageSeconds !== null && ageSeconds > STALE_AFTER_SECONDS,
+        isStale: ageSeconds !== null && ageSeconds > staleAfterSeconds,
+        staleAfterSeconds,
         trackingState,
       };
     });
 
-    return apiResponse.success(res, { vehicles, staleAfterSeconds: STALE_AFTER_SECONDS });
+    // No top-level staleAfterSeconds any more: it is per-feed, so a single
+    // number for the whole response would be a value that is wrong for most of
+    // the fleet. It rides on each vehicle instead.
+    return apiResponse.success(res, { vehicles });
   } catch (error) {
     log.error('[fleet/positions/live] query failed', { error });
     return apiResponse.databaseError(res, error);

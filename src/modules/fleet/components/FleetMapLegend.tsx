@@ -12,7 +12,14 @@ import { STATUS_STYLE, swatchBackground, type VehicleStatus } from '../utils/liv
  * a fleet-safety view, so the state that needs acting on comes first and the
  * merely informational ones trail it.
  */
-const ORDER: VehicleStatus[] = ['speeding', 'moving', 'parked', 'parkedSilent', 'unknown'];
+const ORDER: VehicleStatus[] = [
+  'speeding',
+  'lostContact',
+  'moving',
+  'parked',
+  'parkedSilent',
+  'unknown',
+];
 
 export function FleetMapLegend({ counts }: { counts?: Partial<Record<VehicleStatus, number>> }) {
   return (

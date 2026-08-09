@@ -28,7 +28,7 @@ const REFRESH_MS = 30_000;
 
 interface LivePositionsResponse {
   success: true;
-  data: { vehicles: LiveVehicle[]; staleAfterSeconds: number };
+  data: { vehicles: LiveVehicle[] };
 }
 
 export default function FleetMapPage() {
