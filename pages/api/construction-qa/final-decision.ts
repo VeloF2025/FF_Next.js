@@ -65,7 +65,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.notFound(res, 'Review', reviewId);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const row = currentReview[0]!;
     const snapshot = {
       captured_at: new Date().toISOString(),
@@ -137,7 +136,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
 
         if (reviewDetails.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           const detail = reviewDetails[0]!;
           const message = buildFeedbackMessage(
             detail.project_name as string,

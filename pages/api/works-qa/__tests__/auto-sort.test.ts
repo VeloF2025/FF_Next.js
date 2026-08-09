@@ -112,7 +112,7 @@ describe('auto-sort', () => {
     poolMock.query.mockResolvedValueOnce({ rowCount: 1 }); // suggestion UPDATE
 
     const { req, res } = createMocks({ method: 'POST', body: { pole_id: 'pole-1' } });
-    // @ts-expect-error
+    // @ts-expect-error createMocks res isn't fully typed for our handler
     await handler(req, res);
 
     const body = JSON.parse(res._getData());
@@ -131,7 +131,7 @@ describe('auto-sort', () => {
     });
 
     const { req, res } = createMocks({ method: 'POST', body: { pole_id: 'pole-1' } });
-    // @ts-expect-error
+    // @ts-expect-error createMocks res isn't fully typed for our handler
     await handler(req, res);
 
     const body = JSON.parse(res._getData());
@@ -153,7 +153,7 @@ describe('auto-sort', () => {
     });
 
     const { req, res } = createMocks({ method: 'POST', body: { pole_id: 'pole-1' } });
-    // @ts-expect-error
+    // @ts-expect-error createMocks res isn't fully typed for our handler
     await handler(req, res);
 
     const body = JSON.parse(res._getData());
@@ -168,7 +168,7 @@ describe('auto-sort', () => {
 
   it('returns 400 when pole_id missing', async () => {
     const { req, res } = createMocks({ method: 'POST', body: {} });
-    // @ts-expect-error
+    // @ts-expect-error createMocks res isn't fully typed for our handler
     await handler(req, res);
     expect(res._getStatusCode()).toBe(400);
   });
@@ -176,7 +176,7 @@ describe('auto-sort', () => {
   it('returns 404 when pole not found', async () => {
     poolMock.query.mockResolvedValueOnce({ rows: [] });
     const { req, res } = createMocks({ method: 'POST', body: { pole_id: 'nope' } });
-    // @ts-expect-error
+    // @ts-expect-error createMocks res isn't fully typed for our handler
     await handler(req, res);
     expect(res._getStatusCode()).toBe(404);
   });

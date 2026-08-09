@@ -76,7 +76,9 @@ function Detail({ id }: { id: string }) {
         <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">Signature</h2>
         {letter.status === 'signed' && letter.signature_image ? (
           <div className="space-y-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {/* Raw <img>, not next/image: signature_image is a PNG data URL (see the
+                validSignatureImage guard in pages/api/health-safety/appointments/[letterId].ts),
+                which the image optimiser cannot process. */}
             <img src={letter.signature_image} alt="signature" className="border border-[var(--ff-border-light)] rounded-lg bg-white max-h-[140px]" />
             <p className="text-xs text-[var(--ff-text-tertiary)]">Signed by {letter.signature_name} on {letter.signed_at?.slice(0, 10)} (IP {letter.signed_ip})</p>
           </div>

@@ -45,7 +45,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (!glCode) { skipped++; continue; }
 
       // Look up GL account by account_code
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const glRows = (await sql`
         SELECT id FROM gl_accounts WHERE account_code = ${glCode} LIMIT 1
       `) as any[];
@@ -60,7 +59,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const ruleName = String(entry.standardCategory || entry.originalCategory).trim();
 
       // UPSERT — skip if match_pattern already exists
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const existing = (await sql`
         SELECT id FROM bank_categorisation_rules
         WHERE LOWER(match_pattern) = ${pattern} LIMIT 1
