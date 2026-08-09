@@ -35,6 +35,13 @@
   - `construction-qa.zone-delivery.documents-manage`
 - Read access remains `construction-qa.qa-centre:view`.
 
+## Delivery tracker and Works QA attestations (#2394)
+- `/field-ops/tracker` is a **reality-derived** sibling of the register: PON list from `v_pole_planning ∪ pole_qa_photos`, live/homes from `oes_activations`. Do not "fix" it to read the gate tables — they report 0 live PONs against 449 live in fact.
+- Submit PON and Zone Handover sit on the **Works QA** toolbar; `/api/zone-delivery/pon-submit` takes site/zone/PON, not a `pon_stage_id`.
+- **Three tables must exist before any zone command**: `pon_stage_tracking` (1Map-only, absent for 8 of 11 projects), `pon_delivery_state` (created by scope approval, which has never run), and `zone_delivery_state` (`zone_delivery_activity` has an FK to it). `ensureCanonicalPons` creates the first two and `confirmPonMilestone` the third; without them commands fail as ZONE_NOT_FOUND, VERSION_CONFLICT or an FK violation that names none of the above.
+- `port_submitted` is exempt from the gate sequence **and** from scope approval, in `confirmBlocker` and again in `confirmPonMilestone` — two independent copies that must agree. It is **not** exempt from scope status: an excluded PON is a decision, an unapproved scope is its absence.
+- Unit tests mock the repository and cannot see any of this; changes here need `npx vitest --config vitest.db.config.ts run tests/db/zone-delivery/`.
+
 ## Existing Construction QA and OTDR
 - The 5-phase construction review wizard covers civil, optical, and splicing; VLM suggestions never replace supervised decisions.
 - `src/modules/construction-qa/services/qfieldIngestionService.ts` ingests QField photos; `src/modules/construction-qa/services/vlmConstructionService.ts` uses Qwen3-VL on port 8100.

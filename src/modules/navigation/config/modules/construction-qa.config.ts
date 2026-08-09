@@ -6,7 +6,7 @@
  * - Works QA, OTDR Testing, Snags, Reports: operational follow-up sequence
  */
 
-import { HardHat, ClipboardCheck, BarChart3, Radio, AlertTriangle, LayoutGrid, List, Table2, Camera } from 'lucide-react';
+import { HardHat, ClipboardCheck, BarChart3, Radio, AlertTriangle, LayoutGrid, List, Table2, Camera, Gauge } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
 export const constructionQaConfig: ModuleNavigationConfig = {
@@ -22,6 +22,16 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       shortLabel: 'QA',
       icon: ClipboardCheck,
       path: '/field-ops',
+      rbacKey: 'construction-qa.qa-centre',
+    },
+    {
+      id: 'tracker',
+      label: 'Tracker',
+      shortLabel: 'Tracker',
+      icon: Gauge,
+      path: '/field-ops/tracker',
+      // Same key the tracker API is gated on, so the tab cannot appear to
+      // someone the endpoint behind it would reject.
       rbacKey: 'construction-qa.qa-centre',
     },
     {

@@ -70,23 +70,38 @@ function confirmBlocker(
   gate: PonMilestone,
   index: number,
 ): DeliveryBlocker | null {
-  if (!input.scopeApproved) {
-    return blocker(input, 'SCOPE_NOT_APPROVED', 'zone scope is not approved');
-  }
-  if (input.scopeStatus !== 'included') {
-    return blocker(input, 'PON_NOT_INCLUDED', 'is not included in approved scope');
-  }
-  if (input.handedOver) {
-    return blocker(input, 'HANDOVER_LOCKED', 'zone handover is terminal');
-  }
-  const previousGate = gates[index - 1];
   // port_submitted is an attestation, not a derived fact: it records that the
   // operator uploaded the PON's optical pack to the FNO's SharePoint, which
   // happens entirely outside FibreFlow and which FibreFlow cannot verify. On
   // legacy sites the earlier gates were never recorded here at all, so
   // requiring them only stops the operator from telling us the truth. The
   // gates it feeds (port_approved, technically_live) stay sequenced.
-  if (previousGate && gate !== 'port_submitted' && !input.milestones[previousGate]) {
+  //
+  // Scope APPROVAL is exempted for the same reason and not a lesser one: it is
+  // a zone-level act inside FibreFlow, and a legacy zone delivered before
+  // FibreFlow tracked the site has none. Leaving it ahead of the sequence
+  // exemption made that exemption unreachable — no zone in production has
+  // scope_approved_at set, so every attestation failed on SCOPE_NOT_APPROVED
+  // before the gate check below was ever consulted.
+  //
+  // Scope STATUS is deliberately not exempted. An unapproved scope is the
+  // absence of a decision; an excluded or cancelled PON is the presence of one,
+  // and attesting a submission against a PON somebody explicitly removed from
+  // scope contradicts that person rather than recording a legacy truth.
+  const attested = gate === 'port_submitted';
+  if (!attested && !input.scopeApproved) {
+    return blocker(input, 'SCOPE_NOT_APPROVED', 'zone scope is not approved');
+  }
+  if (input.scopeStatus !== 'included') {
+    return blocker(input, 'PON_NOT_INCLUDED', 'is not included in approved scope');
+  }
+  // Handover stays terminal for every gate: once a zone is handed over its
+  // delivery record is closed, and that is true of attestations too.
+  if (input.handedOver) {
+    return blocker(input, 'HANDOVER_LOCKED', 'zone handover is terminal');
+  }
+  const previousGate = gates[index - 1];
+  if (previousGate && !attested && !input.milestones[previousGate]) {
     const prerequisite = prerequisiteBlockers[gate];
     return blocker(input, prerequisite.code, prerequisite.message.toLowerCase());
   }

@@ -11,10 +11,49 @@ CREATE TABLE pon_stage_tracking (
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   zone_no INTEGER NOT NULL,
   pon_no INTEGER NOT NULL,
+  -- Prod defaults this to '1map' because the 1Map sync is its only writer.
+  -- ensureCanonicalPons stamps 'works-qa' on the rows it creates so the two
+  -- origins stay distinguishable.
+  sync_source VARCHAR DEFAULT '1map',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (project_id, zone_no, pon_no)
 );
+
+-- The PON list Works QA renders, which ensureCanonicalPons reads to create the
+-- canonical rows a zone command needs. Prod builds v_pole_planning from
+-- sow_poles over public.poles; only the zone/PON identity matters here.
+CREATE TABLE sow_poles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  zone_no INTEGER,
+  pon_no INTEGER,
+  pole_number TEXT
+);
+
+CREATE VIEW v_pole_planning AS
+  SELECT project_id, zone_no, pon_no, pole_number FROM sow_poles;
+
+CREATE TABLE pole_qa_photos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  zone_no INTEGER,
+  pon_no INTEGER,
+  pole_label TEXT,
+  approved_at TIMESTAMPTZ
+);
+
+-- Zone 9 of Test Project A exists in Works QA and nowhere else: no
+-- pon_stage_tracking row, no delivery state, no approved scope. That is the
+-- shape of eight of eleven production projects, and the case every zone
+-- command used to reject.
+INSERT INTO sow_poles (project_id, zone_no, pon_no, pole_number) VALUES
+  ('11111111-1111-1111-1111-111111111111', 9, 91, 'P-91-A'),
+  ('11111111-1111-1111-1111-111111111111', 9, 92, 'P-92-A');
+
+INSERT INTO pole_qa_photos (project_id, zone_no, pon_no, pole_label) VALUES
+  ('11111111-1111-1111-1111-111111111111', 9, 92, 'P-92-A'),
+  ('11111111-1111-1111-1111-111111111111', 9, 93, 'P-93-A');
 
 INSERT INTO pon_stage_tracking (id, project_id, zone_no, pon_no) VALUES
   (
