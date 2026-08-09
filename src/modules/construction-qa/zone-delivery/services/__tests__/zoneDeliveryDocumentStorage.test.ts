@@ -7,6 +7,7 @@ import {
   MAX_ZONE_DOCUMENT_BYTES,
   storeZoneDeliveryDocument,
 } from '../zoneDeliveryDocumentStorage';
+import { ZoneDeliveryError } from '../zoneDeliveryErrors';
 
 const key = {
   projectId: '11111111-1111-4111-8111-111111111111',
@@ -79,6 +80,52 @@ describe('zone delivery document storage', () => {
     });
     expect(deps.storage.uploadFile).toHaveBeenCalledOnce();
     expect(deps.service.registerDocument).toHaveBeenCalledOnce();
+  });
+
+  it('uploads the first document to a zone FibreFlow has never recorded', async () => {
+    // The eight projects the 1Map sync does not cover start here: the zone has
+    // no canonical PON rows, so the pre-read that names the superseded document
+    // cannot succeed. registerDocument is what creates those rows, so the read
+    // failing must not stop the upload — otherwise a zone handover can never be
+    // started on those projects at all.
+    const deps = dependencies();
+    (deps.service.getZone as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new ZoneDeliveryError('ZONE_NOT_FOUND', 'Zone has no canonical PON tracking rows'),
+    );
+
+    const { document } = await storeZoneDeliveryDocument({
+      ...deps,
+      command: { ...key, expectedRowVersion: 0, documentType: 'fac' },
+      actor,
+      file: {
+        buffer: Buffer.from('%PDF-1.4 first'),
+        mimeType: 'application/pdf',
+        originalFilename: 'fac.pdf',
+      },
+    });
+
+    expect(deps.storage.uploadFile).toHaveBeenCalledOnce();
+    expect(deps.service.registerDocument).toHaveBeenCalledOnce();
+    // Nothing existed, so nothing is recorded as superseded.
+    expect(document.supersededDocumentId).toBeUndefined();
+  });
+
+  it('still surfaces a non-ZONE_NOT_FOUND read failure instead of uploading', async () => {
+    const deps = dependencies();
+    const boom = new ZoneDeliveryError('VERSION_CONFLICT', 'stale');
+    (deps.service.getZone as ReturnType<typeof vi.fn>).mockRejectedValue(boom);
+
+    await expect(storeZoneDeliveryDocument({
+      ...deps,
+      command: { ...key, documentType: 'fac' },
+      actor,
+      file: {
+        buffer: Buffer.from('%PDF-1.4 test'),
+        mimeType: 'application/pdf',
+        originalFilename: 'evidence.pdf',
+      },
+    })).rejects.toBe(boom);
+    expect(deps.storage.uploadFile).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -9,7 +9,7 @@ import type {
   ZoneDeliveryView,
 } from '../types/zoneDelivery.types';
 import type { ZoneDeliveryService } from './zoneDeliveryService';
-import { deliveryError } from './zoneDeliveryErrors';
+import { deliveryError, ZoneDeliveryError } from './zoneDeliveryErrors';
 
 export const MAX_ZONE_DOCUMENT_BYTES = 50 * 1024 * 1024;
 
@@ -150,12 +150,20 @@ export async function storeZoneDeliveryDocument(args: {
     deliveryError('VALIDATION_ERROR', 'Document MIME, extension, or signature is invalid');
   }
   const safeName = sanitizeZoneDocumentFilename(file.originalFilename, file.mimeType as UploadMime);
-  const before = await service.getZone(command);
-  const supersededDocumentId = activeDocumentId(
-    before,
-    command.documentType,
-    command.ponStageId,
-  );
+  // This read exists only to name the document being superseded. A zone that
+  // FibreFlow has never recorded anything against has no canonical PON rows, so
+  // the read fails with ZONE_NOT_FOUND — and it is `registerDocument` below
+  // that seeds those rows. Letting the read's failure escape made the very
+  // first upload on such a zone impossible, which is every zone in the eight
+  // projects the 1Map sync does not cover. Nothing is superseded on a zone with
+  // no documents, so the absence is simply the answer.
+  const before = await service.getZone(command).catch((error: unknown) => {
+    if (error instanceof ZoneDeliveryError && error.code === 'ZONE_NOT_FOUND') return null;
+    throw error;
+  });
+  const supersededDocumentId = before
+    ? activeDocumentId(before, command.documentType, command.ponStageId)
+    : undefined;
   let uploadedFilename: string | undefined;
   try {
     const uploaded = await storage.uploadFile(
