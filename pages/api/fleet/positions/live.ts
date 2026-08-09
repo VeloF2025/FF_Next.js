@@ -51,6 +51,12 @@ export interface LiveVehicle {
    * Cartrack's REST account is polled every 2 minutes, the portals every 2
    * hours. Exposed so the UI can say how long is too long without duplicating
    * the table.
+   *
+   * Carries no meaning for a vehicle with no position at all (`untracked` or
+   * `awaiting_data`): there is no feed to have a cadence, so it reads as the
+   * default. `isStale` is false for those rows regardless, so nothing downstream
+   * turns on it — but do not present this number for a vehicle that has never
+   * reported.
    */
   staleAfterSeconds: number;
   trackingState: TrackingState;
