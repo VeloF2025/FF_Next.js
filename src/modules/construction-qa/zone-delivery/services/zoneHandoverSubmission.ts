@@ -83,11 +83,17 @@ async function uploadDocument(
     credentials: 'include',
     body: form,
   });
-  const view = await unwrap<ZoneDeliveryView>(
+  // The document route returns `{ zone, document }` — the zone view plus the
+  // audit metadata for the file just stored — not the zone view alone, which is
+  // what the two /zone endpoints return. Reading rowVersion off the envelope
+  // itself yielded undefined, and the next upload then sent
+  // `expectedRowVersion: undefined` and was rejected as invalid, so the second
+  // document could never be uploaded on any zone.
+  const { zone } = await unwrap<{ zone: ZoneDeliveryView }>(
     response,
     `Unable to upload the ${documentType.toUpperCase()}.`,
   );
-  return view.rowVersion;
+  return zone.rowVersion;
 }
 
 /**

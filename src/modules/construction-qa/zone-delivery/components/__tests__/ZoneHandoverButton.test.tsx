@@ -3,6 +3,16 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { ZoneHandoverButton } from '../ZoneHandoverButton';
+import type { storeZoneDeliveryDocument } from '../../services/zoneDeliveryDocumentStorage';
+
+/**
+ * The document route returns whatever storeZoneDeliveryDocument returns, so the
+ * mock is typed against that function rather than against what the client hopes
+ * for. Reading rowVersion off the wrong level of this envelope shipped a broken
+ * handover: the second upload sent expectedRowVersion undefined and was
+ * rejected. If the server shape changes, this stops compiling.
+ */
+type DocumentResponse = Awaited<ReturnType<typeof storeZoneDeliveryDocument>>;
 
 const can = vi.fn();
 vi.mock('@/hooks/usePermission', () => ({ usePermission: () => ({ can }) }));
@@ -18,9 +28,22 @@ const settle = async () => {
   });
 };
 
-const view = (rowVersion: number) => ({
+/** GET /zone and POST /zone return the zone view directly. */
+const view = (rowVersion: number, documents: unknown[] = []) => ({
   ok: true,
-  json: async () => ({ success: true, data: { rowVersion } }),
+  json: async () => ({ success: true, data: { rowVersion, documents } }),
+});
+
+/** POST /document returns { zone, document } — a different shape. */
+const uploaded = (rowVersion: number) => ({
+  ok: true,
+  json: async () => ({
+    success: true,
+    data: {
+      zone: { rowVersion, documents: [] },
+      document: { sourceRef: '/storage/x.pdf' },
+    } as unknown as DocumentResponse,
+  }),
 });
 
 /**
@@ -29,11 +52,11 @@ const view = (rowVersion: number) => ({
  */
 const happyPath = () => {
   fetchMock
-    .mockResolvedValueOnce(view(0))
-    .mockResolvedValueOnce(view(0))
-    .mockResolvedValueOnce(view(1))
-    .mockResolvedValueOnce(view(2))
-    .mockResolvedValueOnce(view(3));
+    .mockResolvedValueOnce(view(0))       // dialog opens: pre-flight read
+    .mockResolvedValueOnce(view(0))       // submit: current row version
+    .mockResolvedValueOnce(uploaded(1))   // FAC  -> { zone, document }
+    .mockResolvedValueOnce(uploaded(2))   // CAC  -> { zone, document }
+    .mockResolvedValueOnce(view(3));      // declare handover
 };
 
 const openWithFiles = () => {
@@ -94,8 +117,8 @@ describe('ZoneHandoverButton', () => {
     fetchMock
       .mockResolvedValueOnce(notFound)
       .mockResolvedValueOnce(notFound)
-      .mockResolvedValueOnce(view(1))
-      .mockResolvedValueOnce(view(2))
+      .mockResolvedValueOnce(uploaded(1))
+      .mockResolvedValueOnce(uploaded(2))
       .mockResolvedValueOnce(view(3));
     openWithFiles();
     submit();
