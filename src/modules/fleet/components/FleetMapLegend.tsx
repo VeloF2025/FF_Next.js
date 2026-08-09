@@ -29,11 +29,31 @@ export function FleetMapLegend({ counts }: { counts?: Partial<Record<VehicleStat
         const count = counts?.[status];
         return (
           <li key={status} className="flex items-center gap-1.5 text-xs text-gray-600">
-            <span
-              aria-hidden="true"
-              className="inline-block h-3 w-3 rounded-full ring-2 ring-white"
-              style={{ backgroundColor: swatchBackground(status) }}
-            />
+            {/*
+             * An SVG circle rather than a CSS one, so the swatch can carry the
+             * dash. It matters: parkedSilent is the EXACT violet of parked, so
+             * on the map the broken ring is the only thing separating them, and
+             * a legend that drops it cannot teach what the dash means.
+             *
+             * The ring is drawn in the status colour, NOT in the marker's white
+             * — copying the marker literally was tried and looks wrong. A white
+             * dashed stroke has nothing to show against a pale header, so it
+             * eats notches out of the disc and the swatch reads as a spiky
+             * blob rather than a circle with a broken ring. Same idea, drawn in
+             * a colour that survives the background it sits on.
+             */}
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16">
+              <circle cx="8" cy="8" r="3.5" fill={swatchBackground(status)} />
+              <circle
+                cx="8"
+                cy="8"
+                r="6"
+                fill="none"
+                stroke={style.fill}
+                strokeWidth="1.5"
+                strokeDasharray={style.dash}
+              />
+            </svg>
             {style.label}
             {count !== undefined && <span className="text-gray-400">({count})</span>}
           </li>
