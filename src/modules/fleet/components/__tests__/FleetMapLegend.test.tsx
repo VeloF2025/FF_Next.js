@@ -2,56 +2,71 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 
-import { FleetMapLegend } from '../FleetMapLegend';
-import { STATUS_STYLE } from '../../utils/liveMapHelpers';
+import { FleetMapLegend, RING_COLOUR } from '../FleetMapLegend';
+import { STATUS_STYLE, swatchBackground, type VehicleStatus } from '../../utils/liveMapHelpers';
 
-/** The swatch <circle> that carries the ring, i.e. the second one. */
-function rings(container: HTMLElement) {
+const ORDER: VehicleStatus[] = [
+  'speeding',
+  'lostContact',
+  'moving',
+  'parked',
+  'parkedSilent',
+  'unknown',
+];
+
+/** Disc and ring per legend row, in render order. */
+function swatches(container: HTMLElement) {
   return Array.from(container.querySelectorAll('li')).map((li) => {
-    const circles = li.querySelectorAll('circle');
+    const c = li.querySelectorAll('circle');
     return {
-      label: li.textContent ?? '',
-      dash: circles[1]?.getAttribute('stroke-dasharray') ?? null,
-      stroke: circles[1]?.getAttribute('stroke') ?? null,
+      label: (li.textContent ?? '').replace(/\(\d+\)/, '').trim(),
+      discFill: c[0]?.getAttribute('fill') ?? null,
+      ringStroke: c[1]?.getAttribute('stroke') ?? null,
+      dash: c[1]?.getAttribute('stroke-dasharray') ?? null,
     };
   });
 }
 
 describe('FleetMapLegend', () => {
-  it('breaks the ring for exactly the statuses the map draws dashed', () => {
-    // parkedSilent shares parked's exact fill, so without the dash the legend
-    // shows two swatches that differ only in opacity and never explains what
-    // the broken ring on the map means.
+  it('gives each row the identity colour of its OWN status', () => {
+    // Asserting "some non-white hex" is not enough — every ring painted the
+    // same wrong colour, or two statuses swapped, would satisfy it. Pin the
+    // exact value per status.
     const { container } = render(<FleetMapLegend />);
-    const byLabel = new Map(rings(container).map((r) => [r.label.trim(), r.dash]));
-
-    expect(byLabel.get('Parked')).toBeNull();
-    expect(byLabel.get('Parked · no contact')).toBe(STATUS_STYLE.parkedSilent.dash);
-    expect(byLabel.get('Lost contact')).toBe(STATUS_STYLE.lostContact.dash);
-    expect(byLabel.get('Speeding')).toBeNull();
+    const rows = swatches(container);
+    ORDER.forEach((status, i) => {
+      expect(rows[i]?.discFill).toBe(swatchBackground(status));
+    });
   });
 
-  it('draws the ring in the status colour, not white', () => {
-    // A white ring has nothing to show against the pale header — it notches
-    // the disc instead, and the swatch reads as a spiky blob.
+  it('keeps the ring one neutral colour, never the status hue', () => {
+    // The marker's grammar: disc = identity, ring = freshness only. Colouring
+    // the ring per status would encode the hue twice and drift from that.
     const { container } = render(<FleetMapLegend />);
-    for (const r of rings(container)) {
-      expect(r.stroke).not.toBe('#ffffff');
-      expect(r.stroke).toMatch(/^#[0-9a-f]{6}$/i);
+    for (const row of swatches(container)) {
+      expect(row.ringStroke).toBe(RING_COLOUR);
     }
+    // And the neutral must not be the marker's white, which is invisible here.
+    expect(RING_COLOUR).not.toBe('#ffffff');
+  });
+
+  it('breaks the ring for exactly the statuses the map draws dashed', () => {
+    const { container } = render(<FleetMapLegend />);
+    const rows = swatches(container);
+    ORDER.forEach((status, i) => {
+      expect(rows[i]?.dash ?? undefined).toBe(STATUS_STYLE[status].dash);
+    });
+    // The pair this exists for: same fill, told apart only by the dash.
+    expect(STATUS_STYLE.parked.fill).toBe(STATUS_STYLE.parkedSilent.fill);
+    expect(STATUS_STYLE.parked.dash).toBeUndefined();
+    expect(STATUS_STYLE.parkedSilent.dash).toBeTruthy();
   });
 
   it('renders every status, in urgency order', () => {
     const { container } = render(<FleetMapLegend />);
-    const labels = rings(container).map((r) => r.label.replace(/\(\d+\)/, '').trim());
-    expect(labels).toEqual([
-      STATUS_STYLE.speeding.label,
-      STATUS_STYLE.lostContact.label,
-      STATUS_STYLE.moving.label,
-      STATUS_STYLE.parked.label,
-      STATUS_STYLE.parkedSilent.label,
-      STATUS_STYLE.unknown.label,
-    ]);
+    expect(swatches(container).map((r) => r.label)).toEqual(
+      ORDER.map((s) => STATUS_STYLE[s].label)
+    );
   });
 
   it('shows counts when given and omits them when not', () => {
