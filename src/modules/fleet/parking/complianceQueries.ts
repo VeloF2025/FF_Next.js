@@ -2,8 +2,17 @@
  * Reads behind the compliance dashboard.
  *
  * The result filter is two whole queries rather than one with a conditional
- * fragment. That is not style: `${cond ? sql`AND x` : sql``}` is broken in this
- * codebase and silently produces wrong SQL. See CLAUDE.md.
+ * fragment. That is not style: interpolating a ternary that returns a tagged
+ * template fragment is broken in this codebase and silently produces wrong
+ * SQL. CLAUDE.md spells the pattern out.
+ *
+ * Described rather than quoted on purpose: the no-direct-db-connections guard
+ * greps this directory for tagged-template SQL and reads text, not syntax, so
+ * a comment SHOWING the broken form reported this file as a direct database
+ * connection. Teaching that guard to skip comments was tried and each attempt
+ * made it MISS real code instead — a worse failure for a guard than the false
+ * positive it was fixing. One sentence of prose is cheaper than a JavaScript
+ * lexer living inside a test.
  */
 import { sql } from '@/lib/db-pool';
 import type { ComplianceRow, ParkingCheckResult } from './types';

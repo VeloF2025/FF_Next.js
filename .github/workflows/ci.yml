@@ -166,3 +166,34 @@ jobs:
           docker ps -aq \
             --filter "label=ff-velocity-review-run=ci-${{ github.run_id }}-${{ github.run_attempt }}" \
             | xargs -r docker rm -f
+
+      # Zone delivery DB tests — the guarantees here exist ONLY at this layer.
+      # Mutation testing during review showed the load-bearing ones are
+      # invisible to the unit suite: deleting the server-side scope-approval
+      # exemption in zoneDeliveryService, or the zone-scoping guard in
+      # ensureCanonicalPons, leaves all 148 unit tests green and is caught
+      # solely by these files. Until this step existed they ran nowhere except
+      # a developer typing `npm run test:db` by hand.
+      #
+      # Scoped to tests/db/zone-delivery rather than the whole `npm run test:db`
+      # tree: that tree is currently RED on master for reasons unrelated to
+      # this module — 6 Sprint-E suites missing from the config's exclude list
+      # abort with "TEST_DATABASE_URL not set", velocity-review's candidateQuery
+      # wants its own container's credentials, and two field-stock assertions
+      # fail. Gating on the whole tree would wire a permanently-red step into
+      # CI; gating on the green subset closes the actual hole today. The other
+      # 10 files are a separate fix.
+      #
+      # Blocking, and spins its own throwaway Postgres on an EPHEMERAL port
+      # (tests/db/setup/global-setup.ts) — never the shared dev+prod database.
+      # Requires docker on the runner.
+      - name: Zone delivery DB tests — real Postgres (gate)
+        run: npm run test:db:zone-delivery
+        timeout-minutes: 15
+
+      - name: Clean up this run's zone delivery test container
+        if: always()
+        run: |
+          docker ps -aq \
+            --filter "label=ff-db-tests-run=ci-${{ github.run_id }}-${{ github.run_attempt }}" \
+            | xargs -r docker rm -f
