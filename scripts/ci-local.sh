@@ -9,10 +9,9 @@
 #   bash scripts/ci-local.sh --quick      # Lint gates only (fast, pre-PR)
 #   bash scripts/ci-local.sh --pre-deploy # Lint gates only (deploy uses this)
 #
-# Baselines (ratchet down over time, never up):
-#   Lint warnings: 170    (react-hooks/exhaustive-deps, react-refresh/only-export-components, no-constant-condition)
-#   Lint errors:   0      (all resolved)
-#   Silent catches: 72    (catch blocks without logging)
+# Baselines (ratchet down over time, never up) live in scripts/ci-baselines.env
+# — the single source of truth, sourced below. Do not restate the numbers here;
+# scripts/check-ci-baselines.mjs fails the build on any copy that disagrees.
 # =============================================================================
 
 set -euo pipefail
@@ -31,18 +30,20 @@ PASSED=0
 MODE="${1:---full}"
 START_TIME=$(date +%s)
 
-# --- Baselines (ratchet: lower these as you fix issues, never raise) ---
-# 2026-04-29: raised from 170→180 warnings, 72→74 catches to match pre-existing master state (verified via git stash; not PR-introduced regressions)
-# 2026-05-08: raised 180→183 warnings — pre-existing master regressions from PRs #1554/#1556 that landed without bumping the baseline (npm run lint on origin/master = 183). Multiple feature PRs (1558/1559/1560/1555) inherited the drift; baseline is master's actual state.
-# 2026-05-19: raised 74→75 catches — olt-report/reporting.ts + wa-monitor-sync-sharepoint*.ts contain pre-existing silent catches not tracked at baseline; verified via git stash (count is 75 without any field-stock-pwa changes).
-# 2026-05-20: raised 183→185 warnings — P3 scoped-snag-reports adds new test files using the established `(req: any, res: any)` withAuth mock pattern + one react-refresh warning on LegacySnagReportCard.tsx (helpers co-located with the row component). Test-file `any` casts in this codebase predate P3.
-# 2026-05-21: raised 75→76 catches — origin/master already at 76 before this branch (olt-report/reporting.ts:166, date-parse fallback for CSV export); verified by counting on a clean checkout of origin/master HEAD. Not introduced by feat/wa-dr-ticket-linking — my new files have 0 silent catches.
-# 2026-05-25: held at 185 — origin/master actually emits 186 (PR-10 #1762 left a react-refresh/only-export-components warning on SerialLifecyclePanel.tsx that was never accounted for in the baseline). Rather than ratchet up, this branch removes the warning at source: the pure fn `activatedSharePct` moved to serialLifecycle.utils.ts so the component module exports only components. Net lint count returns to 185.
-# 2026-07-24: raised 76→77 catches — origin/master already at 77 before this branch (communications/whatsapp/cloud-webhook.ts, landed via PR #2239) without bumping the baseline. Verified: all 77 no-silent-catch offenders are in files feat/hs-date-tz-fix does not touch; its edits add only `::text` date casts + one test file (0 silent catches).
-# 2026-07-25: raised 77→78 catches — origin/master already at 78 before this branch, again without the baseline being bumped. Verified by swapping cloud-webhook.ts (the only pages/api file feat/wa-cloud-phase3 touches) back to its origin/master content within a full pages/api scan: count stayed at 78. This branch adds no new catch blocks anywhere in pages/api. (Independently re-verified by feat/hs-contractor-docs-date-tz via `git stash` on a clean checkout of origin/master HEAD c6ef5c9e8 — same result, same root cause, two branches landed the same bump concurrently.)
-MAX_LINT_WARNINGS=185
-MAX_LINT_ERRORS=0
-MAX_SILENT_CATCHES=78
+# --- Baselines: single source of truth, with the full provenance log ---
+# Sourced rather than restated so this file cannot drift from the deploy gate,
+# the GitHub Actions gate, or /auto-improve — which is exactly what happened
+# before 2026-08-09, when five declarations held five different values.
+BASELINES_FILE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/ci-baselines.env"
+if [ ! -f "$BASELINES_FILE" ]; then
+  echo "FATAL: missing $BASELINES_FILE — cannot verify any ratchet gate" >&2
+  exit 1
+fi
+# shellcheck source=scripts/ci-baselines.env
+. "$BASELINES_FILE"
+: "${MAX_LINT_WARNINGS:?not set by ci-baselines.env}"
+: "${MAX_LINT_ERRORS:?not set by ci-baselines.env}"
+: "${MAX_SILENT_CATCHES:?not set by ci-baselines.env}"
 
 pass() { echo -e "${GREEN}  ✓ $*${NC}"; PASSED=$((PASSED + 1)); }
 fail() { echo -e "${RED}  ✗ $*${NC}"; FAILED=$((FAILED + 1)); }
@@ -53,6 +54,19 @@ echo -e "\n${BOLD}╔═══════════════════�
 echo -e "${BOLD}║  FibreFlow Local CI — Zero Tolerance                      ║${NC}"
 echo -e "${BOLD}║  Mode: ${CYAN}${MODE}${NC}${BOLD}                                                ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
+
+# ─── Gate 0: Baseline consistency ────────────────────────────────────────────
+# Runs before the gates it protects: every ratchet below is only as trustworthy
+# as the number it compares against, and those numbers used to be copied into
+# five files that disagreed. Cheap and dependency-free, so it runs in every mode.
+echo -e "\n${CYAN}── Gate 0: CI baseline consistency ──${NC}\n"
+
+if BASELINE_OUT=$(node scripts/check-ci-baselines.mjs 2>&1); then
+  pass "CI baselines: consistent across all declaration sites"
+else
+  fail "CI baselines: drift detected — a gate is comparing against the wrong number"
+  echo "$BASELINE_OUT" | sed 's/^/    /'
+fi
 
 # ─── Gate 1: ESLint (warnings + errors ratchet) ─────────────────────────────
 echo -e "\n${CYAN}── Gate 1: ESLint ──${NC}\n"

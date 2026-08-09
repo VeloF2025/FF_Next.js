@@ -35,8 +35,19 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      # Baseline consistency runs first: every ratchet below compares against a
+      # number, and until 2026-08-09 those numbers were copied into five files
+      # that disagreed — this step's own --max-warnings said 3765 against a real
+      # 186, so the gate that blocks PRs could not fail.
+      - name: CI baseline consistency (gate)
+        run: |
+          node --test scripts/check-ci-baselines.test.mjs
+          node scripts/check-ci-baselines.mjs
+
       - name: Lint (ratchet gate)
-        run: npm run lint -- --max-warnings 3765
+        run: |
+          set -a; . scripts/ci-baselines.env; set +a
+          npm run lint -- --max-warnings "$MAX_LINT_WARNINGS"
 
       - name: Type check (non-blocking — pre-existing errors)
         run: npm run type-check

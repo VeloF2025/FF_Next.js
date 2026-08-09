@@ -15,10 +15,10 @@ CI_GATE="bash scripts/ci-local.sh --quick"
 SRC_DIR="src"
 EXT="ts"
 
-# Ratchet baselines (from scripts/ci-local.sh — never exceed these)
-MAX_LINT_WARNINGS=3790
-MAX_LINT_ERRORS=77
-MAX_SILENT_CATCHES=91
+# Ratchet baselines — never exceed these. Read them, never restate them:
+# hardcoding drifted to 3790/77/91 against a real 186/0/78, which left this
+# loop unable to find lint work AND unable to catch a regression.
+. scripts/ci-baselines.env    # -> MAX_LINT_WARNINGS, MAX_LINT_ERRORS, MAX_SILENT_CATCHES
 ```
 
 **Worktree required.** All edits must happen in a dedicated worktree, never in the main `/home/hein/Workspace/FF_Next.js` tree:
@@ -56,7 +56,7 @@ find src/ \( -name "*.ts" -o -name "*.tsx" \) | xargs wc -l 2>/dev/null | sort -
 
 Choose the single highest-impact change in ≤50 lines / ≤3 files. Prioritize:
 1. Failing tests — fix the most common error pattern across multiple files
-2. Lint errors at or above `MAX_LINT_ERRORS=77` — fix new errors first
+2. Lint errors at or above `$MAX_LINT_ERRORS` (see `scripts/ci-baselines.env`) — fix new errors first
 3. TypeScript errors — fix the easiest repeating pattern
 4. Silent catches — add proper `log.error(...)` calls
 5. Files over 300 LOC — extract one large function

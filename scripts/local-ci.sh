@@ -55,7 +55,11 @@ echo ""
 # --- STEP 1: ESLint ---
 if [ "$TESTS_ONLY" = false ]; then
   log_step "ESLint"
-  if npm run lint -- --max-warnings 50 2>&1 | tail -5; then
+  # Baseline from scripts/ci-baselines.env — this said 50 against a real 186
+  # until 2026-08-09, so the outage fallback could never pass.
+  # shellcheck source=scripts/ci-baselines.env
+  . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/ci-baselines.env"
+  if npm run lint -- --max-warnings "$MAX_LINT_WARNINGS" 2>&1 | tail -5; then
     log_pass "Lint"
   else
     log_fail "Lint"
