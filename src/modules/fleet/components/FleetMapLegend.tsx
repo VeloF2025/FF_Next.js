@@ -20,7 +20,7 @@ export const RING_COLOUR = '#4b5563';
  * a fleet-safety view, so the state that needs acting on comes first and the
  * merely informational ones trail it.
  */
-const ORDER: VehicleStatus[] = [
+export const ORDER: VehicleStatus[] = [
   'speeding',
   'lostContact',
   'moving',

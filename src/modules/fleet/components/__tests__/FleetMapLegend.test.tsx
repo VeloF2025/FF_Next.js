@@ -2,17 +2,10 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 
-import { FleetMapLegend, RING_COLOUR } from '../FleetMapLegend';
-import { STATUS_STYLE, swatchBackground, type VehicleStatus } from '../../utils/liveMapHelpers';
-
-const ORDER: VehicleStatus[] = [
-  'speeding',
-  'lostContact',
-  'moving',
-  'parked',
-  'parkedSilent',
-  'unknown',
-];
+// ORDER is imported, not restated: a local copy would drift the day someone
+// reorders the legend, and every assertion below zips against it by index.
+import { FleetMapLegend, ORDER, RING_COLOUR } from '../FleetMapLegend';
+import { STATUS_STYLE, swatchBackground } from '../../utils/liveMapHelpers';
 
 /** Disc and ring per legend row, in render order. */
 function swatches(container: HTMLElement) {
