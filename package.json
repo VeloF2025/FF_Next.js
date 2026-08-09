@@ -49,6 +49,8 @@
     "ci:baselines": "node scripts/check-ci-baselines.mjs",
     "ci:baselines:list": "node scripts/check-ci-baselines.mjs --list",
     "ci:baselines:test": "node --test scripts/check-ci-baselines.test.mjs",
+    "ci:bundle-db": "node scripts/check-client-bundle-db.mjs",
+    "ci:bundle-db:test": "node --test scripts/check-client-bundle-db.test.mjs",
     "agents:mirror": "node scripts/mirror-agents-md.mjs",
     "agents:check": "node scripts/mirror-agents-md.mjs --check",
     "agents:test": "node --test scripts/mirror-agents-md.test.mjs",

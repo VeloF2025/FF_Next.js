@@ -494,6 +494,24 @@ fi
 BUILD_ID=$(sudo -u velo cat "$DIR/.next/BUILD_ID")
 log "Build validated (BUILD_ID: $BUILD_ID, all ${#CRITICAL_FILES[@]} critical files present)"
 
+# --- Step 7b: No database code in the browser bundle ---
+# Runs here because this is the only place a build exists — the check reads
+# .next/static rather than inferring from imports, which is what makes it exact
+# (measured: 32 modules were reachable from client entry points, one shipped).
+# It ratchets against KNOWN_LEAKING_ROUTES, so it fails on a NEW leaking route
+# and not on the three already recorded. Deploy is aborted before the service
+# starts: shipping a bundle that carries a database driver is not a warning.
+if ! sudo -u velo bash -c "cd $DIR && node scripts/check-client-bundle-db.mjs" 2>&1; then
+  warn "Client bundle carries database code — see the routes listed above"
+  if sudo -u velo test -d "$DIR/.next-backup-$TIMESTAMP"; then
+    log "Restoring .next from backup..."
+    sudo -u velo bash -c "cd $DIR && rm -rf .next && mv .next-backup-$TIMESTAMP .next"
+  fi
+  log "Starting $SVC on previous build..."
+  sudo /usr/bin/systemctl start "$SVC" 2>/dev/null || true
+  exit 1
+fi
+
 # --- Step 8: Start service ---
 log "Starting $SVC..."
 sudo /usr/bin/systemctl start "$SVC"
