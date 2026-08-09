@@ -101,7 +101,8 @@ describe('No Direct Database Connections', () => {
    * state is more precise in the common case and strictly more dangerous in
    * the uncommon one — a regex literal like `/a\//`, or a backtick inside a
    * `${}` interpolation, desyncs it, and from there it blanks real code until
-   * the next newline or `*​/`. Precision is not worth a hole in a guard.
+   * the next newline or block-comment terminator. Precision is not worth a
+   * hole in a guard.
    *
    * Accepted cost: a trailing comment (`const a = 1; // sql`X``) is still
    * scanned and can still raise a false positive. If that ever fires, write
