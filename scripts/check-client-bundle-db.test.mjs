@@ -48,8 +48,42 @@ test("findMarkers detects the driver, config, env read and pg parser", () => {
   ]);
 });
 
+test("findMarkers covers drivers beyond the one that prompted this gate", () => {
+  assert.deepEqual(findMarkers("new PrismaClient()").map((m) => m.name), ["prisma-client"]);
+  assert.deepEqual(findMarkers('import"drizzle-orm/pg-core"').map((m) => m.name), ["drizzle-orm"]);
+  assert.deepEqual(findMarkers("e.env.PGPASSWORD").map((m) => m.name), ["postgres-env"]);
+  assert.deepEqual(findMarkers("e.env.POSTGRES_URL").map((m) => m.name), ["postgres-env"]);
+});
+
 test("findMarkers does not fire on ordinary client code", () => {
   assert.deepEqual(findMarkers('const a = "database of records"; useEffect(()=>{})'), []);
+  // Words that merely contain a marker substring must not trip it.
+  assert.deepEqual(findMarkers("const MY_DATABASE_URLS = 1; const pghost = 2;"), []);
+});
+
+// A manifest we cannot parse is not an empty manifest: treating it as empty
+// would turn every attributed leak into an unattributed one.
+test("fails with a reason when a manifest is corrupt", (t) => {
+  const root = makeBuild({ "static/chunks/pages/index-abc.js": CLEAN }, {});
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(join(root, ".next", "build-manifest.json"), "{ not json", "utf8");
+
+  const { status, output } = check(root);
+  assert.equal(status, 1);
+  assert.match(output, /cannot read build-manifest\.json/);
+});
+
+test("tolerates a manifest whose entries are not chunk arrays", (t) => {
+  const root = makeBuild({ "static/chunks/pages/index-abc.js": CLEAN }, {});
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    join(root, ".next", "build-manifest.json"),
+    JSON.stringify({ pages: { "/a": null, "/b": [42], "/c": ["static/chunks/pages/index-abc.js"] } }),
+    "utf8",
+  );
+
+  const { status, output } = check(root);
+  assert.equal(status, 0, output);
 });
 
 // The direction that matters. A gate that cannot see the bundle must not

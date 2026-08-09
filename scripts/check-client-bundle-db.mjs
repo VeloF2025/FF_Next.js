@@ -48,9 +48,21 @@ const DEFAULT_ROOT = resolve(process.env.BUNDLE_DB_ROOT ?? join(HERE, ".."));
  * Markers that only appear when a database driver was bundled.
  *
  * Chosen to survive minification: every one is either a string literal the
- * minifier must preserve (error text, documentation URLs) or a property name
- * that is not mangled because it is read off `process.env`. Identifier-based
- * matching would not survive — `neon(...)` minifies to a single letter.
+ * minifier must preserve (error text, documentation URLs, package names in an
+ * inlined manifest) or a property name that is not mangled because it is read
+ * off `process.env`. Identifier matching would not survive — `neon(...)`
+ * minifies to a single letter.
+ *
+ * KNOWN LIMIT — this is a detector for the drivers this repo actually uses,
+ * not a general one. `pg` itself carries none of these strings, and neither
+ * would Prisma, Drizzle or postgres.js if adopted; the entries for those exist
+ * so adoption trips the gate rather than slipping past it, but a driver
+ * reading a differently-named variable (PGHOST/PGPASSWORD, POSTGRES_URL) is
+ * covered only by the env markers below. Two things narrow that gap today:
+ * `pg` cannot reach a client chunk at all, because next.config.js sets no
+ * `resolve.fallback` for `net`/`tls`/`fs` and the build hard-fails on the
+ * attempt; and any new driver arrives through a dependency change, which is a
+ * reviewed event. Add a marker when a driver is added.
  */
 export const MARKERS = [
   {
@@ -69,9 +81,27 @@ export const MARKERS = [
     why: "a connection string is read in browser-served code",
   },
   {
+    // Matched the inlined dependency manifest of @neondatabase/serverless in
+    // the first real run, not executing parser code — hence the wording. It is
+    // still a database driver's fingerprint either way.
     name: "pg-connection-string",
     pattern: /pg-connection-string/,
-    why: "the node-postgres connection parser is bundled",
+    why: "a Postgres connection-string parser is bundled, or named in a bundled dependency manifest",
+  },
+  {
+    name: "prisma-client",
+    pattern: /\bPrismaClient\b/,
+    why: "the Prisma client is in this chunk",
+  },
+  {
+    name: "drizzle-orm",
+    pattern: /drizzle-orm/,
+    why: "Drizzle, which talks to the database directly, is in this chunk",
+  },
+  {
+    name: "postgres-env",
+    pattern: /\b(?:PGPASSWORD|PGHOST|POSTGRES_URL)\b/,
+    why: "Postgres connection settings are read in browser-served code",
   },
 ];
 
@@ -102,21 +132,26 @@ export function chunkToRoutes(root) {
     map.get(key).add(route);
   };
 
-  const pagesManifest = join(root, ".next", "build-manifest.json");
-  if (existsSync(pagesManifest)) {
-    const manifest = JSON.parse(readFileSync(pagesManifest, "utf8"));
-    for (const [route, chunks] of Object.entries(manifest.pages ?? {})) {
-      for (const chunk of chunks) add(chunk, route);
+  // A manifest we cannot parse is not an empty manifest. Falling back to "no
+  // routes" would silently turn every attributed leak into an unattributed
+  // one; throwing here surfaces it as a build problem instead.
+  const load = (name) => {
+    const path = join(root, ".next", name);
+    if (!existsSync(path)) return;
+    let manifest;
+    try {
+      manifest = JSON.parse(readFileSync(path, "utf8"));
+    } catch (cause) {
+      throw new Error(`cannot read ${name}: ${cause.message}`, { cause });
     }
-  }
+    for (const [route, chunks] of Object.entries(manifest.pages ?? {})) {
+      if (!Array.isArray(chunks)) continue;
+      for (const chunk of chunks) if (typeof chunk === "string") add(chunk, route);
+    }
+  };
 
-  const appManifest = join(root, ".next", "app-build-manifest.json");
-  if (existsSync(appManifest)) {
-    const manifest = JSON.parse(readFileSync(appManifest, "utf8"));
-    for (const [route, chunks] of Object.entries(manifest.pages ?? {})) {
-      for (const chunk of chunks) add(chunk, route);
-    }
-  }
+  load("build-manifest.json");
+  load("app-build-manifest.json");
 
   return map;
 }
@@ -177,11 +212,30 @@ export function run({
     return 1;
   }
 
-  const routes = chunkToRoutes(root);
+  // Anything unreadable — a corrupt manifest, a broken symlink, a permission
+  // error — is reported as a gate failure with the reason, rather than as a
+  // raw stack trace. It already exited non-zero via the uncaught handler; this
+  // just makes the deploy log say why.
+  let routes;
+  try {
+    routes = chunkToRoutes(root);
+  } catch (err) {
+    error(`✗ ${err.message}`);
+    error("  The build output is unreadable, so this gate cannot vouch for it.");
+    return 1;
+  }
+
   const violations = [];
 
   for (const file of files) {
-    const source = readFileSync(file, "utf8");
+    let source;
+    try {
+      source = readFileSync(file, "utf8");
+    } catch (err) {
+      error(`✗ cannot read ${relative(root, file)}: ${err.message}`);
+      error("  Refusing to pass a bundle this gate could not scan in full.");
+      return 1;
+    }
     const hits = findMarkers(source);
     if (hits.length === 0) continue;
     // Manifests refer to chunks as `static/chunks/...`, i.e. relative to .next.
