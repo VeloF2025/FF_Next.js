@@ -104,23 +104,55 @@ describe('No Direct Database Connections', () => {
    * the next newline or block-comment terminator. Precision is not worth a
    * hole in a guard.
    *
-   * Accepted cost: a trailing comment (`const a = 1; // sql`X``) is still
-   * scanned and can still raise a false positive. If that ever fires, write
-   * the comment on its own line.
+   * One piece of cross-line state is unavoidable: multi-line template
+   * literals. A continuation line inside one is string DATA, so a line of
+   * help text or a report template that happens to begin `//` or `/*` is not
+   * a comment — and blanking it would hide any real call sharing those lines,
+   * or, for an unterminated-looking `/*`, every line after it in the file.
+   * Seven files under src/ already have that shape (help-center pages,
+   * report-template.ts, notificationQueries.ts). Backtick PARITY alone is
+   * tracked — a counter, not a string-state machine — and a continuation line
+   * is never treated as a comment start.
+   *
+   * Accepted costs, both false positives, both loud:
+   *   - a trailing comment (`const a = 1; // sql`X``) is still scanned;
+   *   - a comment-looking line inside a template literal is still scanned;
+   *   - a lone backtick inside a quoted string flips parity, which only ever
+   *     causes MORE scanning, never less.
+   * If one fires, move the comment to its own line.
    */
   function stripComments(source: string): string {
     const blank = (text: string) => text.replace(/[^\n\r]/g, ' ');
+    // Backticks not preceded by a backslash. Odd count on a line toggles
+    // whether the next line is inside a template literal.
+    const flipsTemplate = (text: string) =>
+      ((text.match(/(?<!\\)`/g) ?? []).length & 1) === 1;
+
     let inBlock = false;
+    let inTemplate = false;
 
     return source
       .split('\n')
       .map((line) => {
+        // Inside a multi-line template: string data, never a comment.
+        if (inTemplate) {
+          if (flipsTemplate(line)) inTemplate = false;
+          return line;
+        }
+
+        // Parity is only ever counted over text that SURVIVES: backticks
+        // inside a blanked comment are comment content, not code.
+        const keep = (surviving: string, blanked: string) => {
+          if (flipsTemplate(surviving)) inTemplate = true;
+          return blanked + surviving;
+        };
+
         if (inBlock) {
           const end = line.indexOf('*/');
           if (end === -1) return blank(line);
           inBlock = false;
           // Keep anything after the block ends — code may follow `*/`.
-          return blank(line.slice(0, end + 2)) + line.slice(end + 2);
+          return keep(line.slice(end + 2), blank(line.slice(0, end + 2)));
         }
 
         const indent = line.length - line.trimStart().length;
@@ -134,12 +166,12 @@ describe('No Direct Database Connections', () => {
             inBlock = true;
             return blank(line);
           }
-          return blank(line.slice(0, end + 2)) + line.slice(end + 2);
+          return keep(line.slice(end + 2), blank(line.slice(0, end + 2)));
         }
 
         // A continuation line of a block comment is handled by `inBlock`
         // above; anything else is code and is left exactly as written.
-        return line;
+        return keep(line, '');
       })
       .join('\n');
   }
@@ -174,11 +206,30 @@ describe('No Direct Database Connections', () => {
     ['real code below a comment that mentions it', '// sql`SELECT 1`\nconst r = sql`SELECT 2`;'],
     ['a URL in a string on the same line', "const u = 'https://x.com'; const r = sql`SELECT 1`;"],
     ['a regex literal containing an escaped slash', 'const re = /a\\//; const r = sql`SELECT 1`;'],
-    ['a backtick inside a nested interpolation', "const a = `${'`'}`;\nconst r = sql`SELECT 1`;"],
     ['code following the end of a block comment', '/* note */ const r = sql`SELECT 1`;'],
     ['code after a multi-line block comment ends', '/*\n x\n */ const r = sql`SELECT 1`;'],
+    // A template continuation line is string DATA. Reading one as a comment
+    // blanks live code: a `/*`-shaped line with no `*/` after it swallowed
+    // every remaining line of the file, hiding two real queries.
+    [
+      'code after a template line that looks like an unterminated block comment',
+      'const doc = `\n/* still just string data\n`;\nexport const r = sql`SELECT 1`;',
+    ],
+    [
+      'an interpolated query on a template line that looks like a comment',
+      'export const doc = `\n// note: ${sql`SELECT 1`}\n`;',
+    ],
+    [
+      'code after a template line that looks like a line comment',
+      'const doc = `\n// still just string data\n`;\nconst r = sql`SELECT 1`;',
+    ],
   ])('still flags %s', (_name, source) => {
     expect(scanMatches(source)).toBe(true);
+  });
+
+  it('leaves template-literal contents untouched', () => {
+    const source = 'const doc = `\n// not a comment\n/* nor this\n`;\nconst a = 1;';
+    expect(stripComments(source)).toBe(source);
   });
 
   it('preserves line numbers when blanking comments', () => {
