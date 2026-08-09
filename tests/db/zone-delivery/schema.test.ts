@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
+import { parse as parseConnectionString } from 'pg-connection-string';
 import {
   PERMISSIONS,
   verifyCrossOwnershipRejected,
@@ -9,8 +10,6 @@ import {
   verifyZoneEvidencePairing,
 } from './migrationLifecycle';
 
-const EXPECTED_TEST_URL =
-  'postgres://fibreflow_test:fibreflow_test@localhost:55432/fibreflow_test';
 
 const TABLES = [
   'pon_delivery_state',
@@ -29,7 +28,45 @@ describe('zone delivery migration 470', () => {
   let pool: Pool;
 
   beforeAll(async () => {
-    expect(process.env.DATABASE_URL_TEST).toBe(EXPECTED_TEST_URL);
+    // Guards the TRUNCATE two statements below.
+    //
+    // Parsed with pg-connection-string — the SAME parser `pg` uses to build the
+    // connection — and NOT with `new URL()`. They disagree, and the disagreement
+    // is the whole vulnerability: libpq-style query params (`?host=`, `?user=`,
+    // `?password=`) override the connection for pg, while `new URL()` sees them
+    // as opaque query text and keeps reporting the values in the URL's own
+    // authority section. So
+    //   postgres://fibreflow_test:pw@127.0.0.1:5432/fibreflow_test
+    //     ?host=100.96.203.105&port=5437&user=fibreflow_user
+    // reads as a local throwaway database to `new URL()` and connects to this
+    // project's real shared dev+prod database in reality. Validating with a
+    // different parser than the one that connects is not a guard at all.
+    //
+    // The names are what is pinned: the container always sets POSTGRES_DB and
+    // POSTGRES_USER to fibreflow_test, and the real database is fibreflow /
+    // fibreflow_user. Host and port cannot be pinned — the port is ephemeral by
+    // design — but a role and database of that name only exist in the container.
+    const testUrl = process.env.DATABASE_URL_TEST;
+    expect(testUrl, 'global setup did not export DATABASE_URL_TEST').toBeTruthy();
+    // Scheme checked as a string, not by parsing again: pg-connection-string
+    // ignores the scheme entirely, so dropping the old `protocol === 'postgres:'`
+    // assertion let mysql://…/fibreflow_test satisfy every remaining check.
+    // Not independently dangerous — host, role and database are still pinned —
+    // but it was a real regression from swapping parsers, and re-parsing with
+    // `new URL()` just to read the scheme would reintroduce the two-parser
+    // disagreement this whole check exists to remove.
+    expect(
+      /^postgres(ql)?:\/\//.test(testUrl!),
+      'refusing to connect with a non-Postgres scheme'
+    ).toBe(true);
+    const conn = parseConnectionString(testUrl!);
+    expect(conn.database, 'refusing to truncate a database that is not the throwaway one')
+      .toBe('fibreflow_test');
+    expect(conn.user, 'refusing to truncate as a role other than the container role')
+      .toBe('fibreflow_test');
+    expect(['127.0.0.1', 'localhost'], 'refusing to truncate anything non-local')
+      .toContain(conn.host);
+
     pool = new Pool({ connectionString: process.env.DATABASE_URL_TEST });
     await pool.query(`
       TRUNCATE zone_delivery_activity, zone_delivery_snag_links,
