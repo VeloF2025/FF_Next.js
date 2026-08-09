@@ -43,6 +43,17 @@ const IGNORED_PREFIXES = [
   join("docs", "superpowers", "plans") + sep,
 ];
 
+// This checker's own test file exists to assert that drifted literals are
+// DETECTED, so it necessarily contains drifted literals (3790, 3825, 77, ...).
+// Scanning it makes the gate fail on a correct repo — it did, the moment the
+// file became tracked. Fixtures are not declarations.
+const IGNORED_FILES = [join("scripts", "check-ci-baselines.test.mjs")];
+
+// A MUST_SOURCE file has to actually source the canonical file, not merely
+// mention it. Matches both a literal path (`. scripts/ci-baselines.env`) and a
+// composed one (`. "$SCRIPT_DIR/ci-baselines.env"`).
+const SOURCE_STATEMENT = /(?:^|[\s;&|])(?:\.|source)[ \t]+[^\n]*ci-baselines\.env/m;
+
 // The ratchet-bearing gates. Each must source the canonical file rather than
 // re-inline the numbers, and each is additionally checked for `--max-warnings`
 // literals.
@@ -91,7 +102,7 @@ export function findDeclarations(text, canonicalKeys, { includeFlagForm = false 
     for (const key of canonicalKeys) {
       // Assignment form. Require a non-word char (or start) before the name so
       // MAX_LINT_ERRORS never matches inside e.g. FOO_MAX_LINT_ERRORS.
-      const assign = new RegExp(`(?:^|[^A-Z0-9_])${key}=(\\d+)`, "g");
+      const assign = new RegExp(`(?:^|[^A-Z0-9_])${key}[ \\t]*=[ \\t]*(\\d+)`, "g");
       let m;
       while ((m = assign.exec(line)) !== null) {
         found.push({ line: i + 1, key, value: Number(m[1]), form: `${key}=${m[1]}` });
@@ -128,6 +139,7 @@ function trackedFiles(root) {
 
 function isIgnored(relPath) {
   if (relPath === ENV_REL) return true;
+  if (IGNORED_FILES.includes(relPath)) return true;
   return IGNORED_PREFIXES.some((prefix) => relPath.startsWith(prefix));
 }
 
@@ -156,7 +168,15 @@ export function run({ root = ROOT, log = console.log, error = console.error } = 
 
   const problems = [];
 
-  for (const relPath of trackedFiles(root)) {
+  let files;
+  try {
+    files = trackedFiles(root);
+  } catch (err) {
+    error(`✗ cannot enumerate tracked files: ${err.message}`);
+    return 1;
+  }
+
+  for (const relPath of files) {
     if (isIgnored(relPath)) continue;
     const text = readTextFile(join(root, relPath));
     if (text === null) continue;
@@ -180,12 +200,12 @@ export function run({ root = ROOT, log = console.log, error = console.error } = 
     const absPath = join(root, relPath);
     if (!existsSync(absPath)) continue;
     const text = readFileSync(absPath, "utf8");
-    if (!text.includes("ci-baselines.env")) {
+    if (!SOURCE_STATEMENT.test(text)) {
       problems.push({
         file: relPath,
         line: 0,
         key: "(structure)",
-        found: "no reference to ci-baselines.env",
+        found: "no `. …/ci-baselines.env` source statement",
         expected: "must source scripts/ci-baselines.env",
         form: "source",
       });

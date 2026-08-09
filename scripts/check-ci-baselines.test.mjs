@@ -199,6 +199,39 @@ test("ignores untracked files", (context) => {
   assert.equal(result.status, 0, result.stderr);
 });
 
+// The synthetic-fixture tests above all passed while the real invocation
+// failed: the checker scanned its own test file and read these fixture
+// literals as live declarations, which only became visible once the file was
+// git-tracked. Assert against the actual checkout, not just a temp repo.
+test("passes against the real repository checkout", () => {
+  const repoRoot = resolve(HERE, "..");
+  const result = spawnSync(process.execPath, [SOURCE_SCRIPT], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: { ...process.env, CI_BASELINES_ROOT: repoRoot },
+  });
+  assert.equal(result.status, 0, `checker failed on the real repo:\n${result.stderr}${result.stdout}`);
+});
+
+test("a MUST_SOURCE file that only mentions the env file in a comment fails", (context) => {
+  const root = createFixture();
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+
+  addTracked(root, "scripts/ci-local.sh", "#!/bin/bash\n# see ci-baselines.env for the values\n");
+
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /must source scripts\/ci-baselines\.env/);
+});
+
+test("detects a drifted assignment written with spaces around =", () => {
+  const found = findDeclarations("MAX_LINT_WARNINGS = 3790\n", ["MAX_LINT_WARNINGS"]);
+  assert.deepEqual(
+    found.map((f) => [f.key, f.value]),
+    [["MAX_LINT_WARNINGS", 3790]],
+  );
+});
+
 test("fails when the canonical file is missing", (context) => {
   const root = createFixture();
   context.after(() => rmSync(root, { recursive: true, force: true }));

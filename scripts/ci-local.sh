@@ -34,13 +34,13 @@ START_TIME=$(date +%s)
 # Sourced rather than restated so this file cannot drift from the deploy gate,
 # the GitHub Actions gate, or /auto-improve — which is exactly what happened
 # before 2026-08-09, when five declarations held five different values.
-BASELINES_FILE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/ci-baselines.env"
-if [ ! -f "$BASELINES_FILE" ]; then
-  echo "FATAL: missing $BASELINES_FILE — cannot verify any ratchet gate" >&2
+CI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [ ! -f "$CI_SCRIPT_DIR/ci-baselines.env" ]; then
+  echo "FATAL: missing $CI_SCRIPT_DIR/ci-baselines.env — cannot verify any ratchet gate" >&2
   exit 1
 fi
 # shellcheck source=scripts/ci-baselines.env
-. "$BASELINES_FILE"
+. "$CI_SCRIPT_DIR/ci-baselines.env"
 : "${MAX_LINT_WARNINGS:?not set by ci-baselines.env}"
 : "${MAX_LINT_ERRORS:?not set by ci-baselines.env}"
 : "${MAX_SILENT_CATCHES:?not set by ci-baselines.env}"
