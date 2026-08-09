@@ -30,7 +30,7 @@ describe('declared zone handover lifecycle', () => {
     // idempotent) keeps this suite independent of file ordering.
     await pool.query(await fs.readFile(path.join(
       process.cwd(),
-      'scripts/migrations/sql/485_zone_delivery_handover_correction.sql',
+      'scripts/migrations/sql/486_zone_delivery_handover_correction.sql',
     ), 'utf8'));
     harness = createZoneHandoverHarness(pool);
     service = harness.service;

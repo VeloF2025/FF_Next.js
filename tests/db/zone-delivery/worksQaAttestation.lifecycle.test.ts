@@ -25,7 +25,7 @@ describe('Works QA attestation lifecycle', () => {
     // immutability function; re-applying 485 keeps this suite order-independent.
     await pool.query(await fs.readFile(path.join(
       process.cwd(),
-      'scripts/migrations/sql/485_zone_delivery_handover_correction.sql',
+      'scripts/migrations/sql/486_zone_delivery_handover_correction.sql',
     ), 'utf8'));
     service = createZoneDeliveryService(pool);
   });

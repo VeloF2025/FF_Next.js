@@ -75,18 +75,46 @@ function resolveMigrationPool(): Pool {
   });
 }
 
+/**
+ * Refuses to guess when a number is ambiguous.
+ *
+ * Migration numbers are not unique in this repo — 7 numbers currently carry two
+ * or more forward migrations (401 has three), because branches pick MAX+1
+ * independently and collide on merge. `.find()` returned whichever entry
+ * `readdirSync` happened to list first, which is filesystem order, not sorted:
+ * `rollback 485` resolved to the FLEET migration's rollback while the operator
+ * meant the zone-delivery one, silently reverting an unrelated live change and
+ * reporting success. Throwing costs one manual disambiguation; guessing costs a
+ * production revert nobody asked for.
+ */
 function findRollbackFile(version: string): string | null {
   // Current project convention: scripts/migrations/sql/rollback_<version>_*.sql
   const currentConv = fs.readdirSync(MIGRATIONS_DIR)
-    .find(f => f.startsWith(`rollback_${version}_`) && f.endsWith('.sql'));
-  if (currentConv) return path.join(MIGRATIONS_DIR, currentConv);
+    .filter(f => f.startsWith(`rollback_${version}_`) && f.endsWith('.sql'))
+    .sort();
+  if (currentConv.length > 1) {
+    throw new Error(
+      `Migration number ${version} is ambiguous — ${currentConv.length} rollback files match:\n` +
+      currentConv.map(f => `  - ${f}`).join('\n') +
+      `\nRe-run with the exact filename instead of the number, so the wrong ` +
+      `migration is not reverted.`
+    );
+  }
+  if (currentConv.length === 1) return path.join(MIGRATIONS_DIR, currentConv[0]!);
 
   // Legacy convention (documented in README): sql/rollbacks/<version>_*.down.sql
   const legacyDir = path.join(MIGRATIONS_DIR, 'rollbacks');
   if (fs.existsSync(legacyDir)) {
     const legacy = fs.readdirSync(legacyDir)
-      .find(f => f.startsWith(`${version}_`) && f.endsWith('.down.sql'));
-    if (legacy) return path.join(legacyDir, legacy);
+      .filter(f => f.startsWith(`${version}_`) && f.endsWith('.down.sql'))
+      .sort();
+    if (legacy.length > 1) {
+      throw new Error(
+        `Migration number ${version} is ambiguous — ${legacy.length} legacy rollback files match:\n` +
+        legacy.map(f => `  - ${f}`).join('\n')
+      );
+    }
+    if (legacy.length === 1) return path.join(legacyDir, legacy[0]!);
   }
 
   return null;

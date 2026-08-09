@@ -62,7 +62,7 @@ export async function setup() {
   // to the docker suite, so the trigger it changes stays at its old behaviour
   // and the tests covering the change pass for the wrong reason.
   const zoneHandoverCorrection = await fs.readFile(path.join(process.cwd(),
-    'scripts/migrations/sql/485_zone_delivery_handover_correction.sql'), 'utf8');
+    'scripts/migrations/sql/486_zone_delivery_handover_correction.sql'), 'utf8');
   const pool = new Pool({ connectionString: URL });
   await pool.query(seed);
   await pool.query(zoneDeliverySeed);

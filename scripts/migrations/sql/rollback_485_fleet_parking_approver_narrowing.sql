@@ -24,4 +24,10 @@ DELETE FROM user_permission_overrides o
    AND o.reason LIKE 'Named parking approver%'
    AND u.email IN ('lizelle@velocityfibre.co.za', 'hein@velocityfibre.co.za');
 
+-- Same omission as the zone-delivery rollback: the runner decides pending-ness
+-- from this table, so leaving the row behind means a rollback can never be
+-- undone by a deploy. Siblings 470, 483 and 484 all delete their row.
+DELETE FROM schema_migrations
+WHERE filename = '485_fleet_parking_approver_narrowing.sql';
+
 COMMIT;
