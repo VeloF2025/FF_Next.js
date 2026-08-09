@@ -9,8 +9,6 @@ import {
   verifyZoneEvidencePairing,
 } from './migrationLifecycle';
 
-const EXPECTED_TEST_URL =
-  process.env.DATABASE_URL_TEST!;
 
 const TABLES = [
   'pon_delivery_state',
@@ -29,7 +27,21 @@ describe('zone delivery migration 470', () => {
   let pool: Pool;
 
   beforeAll(async () => {
-    expect(process.env.DATABASE_URL_TEST).toBe(EXPECTED_TEST_URL);
+    // The original check pinned a hardcoded URL, which caught a stale or
+    // misconfigured environment. The port is ephemeral now, so there is no
+    // constant left to compare against — but comparing the variable to a copy
+    // of itself would assert nothing at all. Assert the properties that still
+    // mean something: global setup ran, and it handed us a throwaway local
+    // database rather than a shared one.
+    const testUrl = process.env.DATABASE_URL_TEST;
+    expect(testUrl, 'global setup did not export DATABASE_URL_TEST').toBeTruthy();
+    const parsed = new URL(testUrl!);
+    expect(parsed.protocol).toBe('postgres:');
+    expect(['127.0.0.1', 'localhost']).toContain(parsed.hostname);
+    // A real, non-default port — proof it came from the container, not a
+    // hardcoded fallback pointing at someone's own Postgres.
+    expect(Number(parsed.port)).toBeGreaterThan(0);
+    expect(Number(parsed.port)).not.toBe(5432);
     pool = new Pool({ connectionString: process.env.DATABASE_URL_TEST });
     await pool.query(`
       TRUNCATE zone_delivery_activity, zone_delivery_snag_links,
