@@ -32,7 +32,6 @@ function NewLetterContent() {
   useEffect(() => {
     const def = letterTypeDef(form.letter_type);
     if (def) setForm((f) => ({ ...f, scope: def.defaultScope }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.letter_type]);
 
   async function submit(e: React.FormEvent) {

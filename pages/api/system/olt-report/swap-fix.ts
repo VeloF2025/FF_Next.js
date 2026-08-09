@@ -78,7 +78,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Pre-fix: Search DR A to capture the prop_id and photo IDs from the wrong-serial record
     // Must happen BEFORE fixDrOntSerial changes the serial
     const drAPreFixSearch = await oneMapApi.searchDR(drANumber);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const wrongSerialRecord = drAPreFixSearch.success
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? drAPreFixSearch.records.find((r: any) => r.ph_ont?.toUpperCase() === drAWrongSerial.toUpperCase())

@@ -92,7 +92,7 @@ describe('pon-zip — unassigned bucket', () => {
       method: 'GET',
       query: { project_id: 'proj-1', pon_no: '999' },
     });
-    // @ts-expect-error
+    // @ts-expect-error createMocks res isn't fully typed for our handler
     await handler(req, res);
     expect(res._getStatusCode()).toBe(404);
 
@@ -108,7 +108,7 @@ describe('pon-zip — unassigned bucket', () => {
       method: 'GET',
       query: { project_id: 'proj-1', pon_no: '999', include_unapproved: 'true' },
     });
-    // @ts-expect-error
+    // @ts-expect-error createMocks res isn't fully typed for our handler
     await handler(req, res);
     expect(res._getStatusCode()).toBe(200);
 
@@ -123,7 +123,7 @@ describe('pon-zip — unassigned bucket', () => {
       method: 'GET',
       query: { project_id: 'proj-1', pon_no: '999' },
     });
-    // @ts-expect-error
+    // @ts-expect-error createMocks res isn't fully typed for our handler
     await handler(req, res);
 
     const buf = res._getBuffer();

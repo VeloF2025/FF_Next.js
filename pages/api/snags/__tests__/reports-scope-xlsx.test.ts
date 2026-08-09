@@ -20,7 +20,6 @@ import { createMocks } from 'node-mocks-http';
 // vi.mock factories are hoisted, so helpers must be captured with vi.hoisted.
 
 const { realPool, realSql } = vi.hoisted(() => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Pool } = require('pg') as { Pool: typeof import('pg').Pool };
 
   const pool = new Pool({

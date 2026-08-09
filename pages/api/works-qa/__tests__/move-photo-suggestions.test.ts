@@ -81,7 +81,7 @@ describe('move-photo — suggestion cleanup (Johan PR #1721 hotfix)', () => {
       body: { pole_id: POLE_ID, photo_key: 'photo-X', from: 'unassigned', to: 'dome_03' },
     });
     (req as unknown as { user: { email: string } }).user = { email: 'test@example.com' };
-    // @ts-expect-error
+    // @ts-expect-error createMocks res not fully typed
     await handler(req, res);
 
     expect(res._getStatusCode()).toBe(200);
@@ -104,7 +104,7 @@ describe('move-photo — suggestion cleanup (Johan PR #1721 hotfix)', () => {
       body: { pole_id: POLE_ID, photo_key: 'photo-X', from: 'unassigned', to: 'dome_02' },
     });
     (req as unknown as { user: { email: string } }).user = { email: 'test@example.com' };
-    // @ts-expect-error
+    // @ts-expect-error createMocks res not fully typed
     await handler(req, res);
 
     expect(res._getStatusCode()).toBe(200);
@@ -141,7 +141,7 @@ describe('move-photo — suggestion cleanup (Johan PR #1721 hotfix)', () => {
       body: { pole_id: POLE_ID, photo_key: 'photo-Z', from: 'dome_03', to: 'unassigned' },
     });
     (req as unknown as { user: { email: string } }).user = { email: 'test@example.com' };
-    // @ts-expect-error
+    // @ts-expect-error createMocks res not fully typed
     await handler(req, res);
 
     expect(res._getStatusCode()).toBe(200);

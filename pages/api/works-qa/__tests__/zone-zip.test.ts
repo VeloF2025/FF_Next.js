@@ -53,7 +53,7 @@ describe('zone-zip', () => {
       method: 'GET',
       query: { project_id: 'proj-1', zone_no: '5', include_unapproved: 'true' },
     });
-    // @ts-expect-error
+    // @ts-expect-error node-mocks res is not our exact NextApiResponse
     await handler(req, res);
     const paths = await zipPaths(res);
     expect(paths).toContain('_manifest.txt');
@@ -65,7 +65,7 @@ describe('zone-zip', () => {
       method: 'GET',
       query: { project_id: 'proj-1', zone_no: '5', include_unapproved: 'true' },
     });
-    // @ts-expect-error
+    // @ts-expect-error node-mocks res is not our exact NextApiResponse
     await handler(req, res);
     expect(poolMock.query.mock.calls[0]![0] as string).not.toMatch(/approved_at IS NOT NULL/);
   });
@@ -76,7 +76,7 @@ describe('zone-zip', () => {
       method: 'GET',
       query: { project_id: 'proj-1', zone_no: '5' },
     });
-    // @ts-expect-error
+    // @ts-expect-error node-mocks res is not our exact NextApiResponse
     await handler(req, res);
     expect(res._getStatusCode()).toBe(404);
     expect(poolMock.query.mock.calls[0]![0] as string).toMatch(/approved_at IS NOT NULL/);
@@ -84,14 +84,14 @@ describe('zone-zip', () => {
 
   it('400s when zone_no is missing', async () => {
     const { req, res } = createMocks({ method: 'GET', query: { project_id: 'proj-1' } });
-    // @ts-expect-error
+    // @ts-expect-error node-mocks res is not our exact NextApiResponse
     await handler(req, res);
     expect(res._getStatusCode()).toBe(400);
   });
 
   it('400s when zone_no is not a clean number', async () => {
     const { req, res } = createMocks({ method: 'GET', query: { project_id: 'proj-1', zone_no: '5abc' } });
-    // @ts-expect-error
+    // @ts-expect-error node-mocks res is not our exact NextApiResponse
     await handler(req, res);
     expect(res._getStatusCode()).toBe(400);
   });
@@ -106,7 +106,7 @@ describe('zone-zip', () => {
       method: 'GET',
       query: { project_id: 'proj-1', zone_no: '5', include_unapproved: 'true' },
     });
-    // @ts-expect-error
+    // @ts-expect-error node-mocks res is not our exact NextApiResponse
     await handler(req, res);
     // the traversal key is skipped (not fetched) → no civil entry, and it is listed in the manifest
     for (const call of fetchMock.mock.calls) {

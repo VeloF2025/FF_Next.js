@@ -37,7 +37,6 @@ function getBuildVersion(): string {
 
   // Priority 2: Git commit hash
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { execSync } = require('child_process');
     return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
   } catch {
