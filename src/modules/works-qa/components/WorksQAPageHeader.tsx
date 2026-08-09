@@ -11,6 +11,8 @@ import type { ReactNode } from 'react';
 import { RefreshCw, ArrowLeft, Download } from 'lucide-react';
 import { WorksQAFiltersBar } from './WorksQAFiltersBar';
 import { SnagReportButton } from './SnagReportButton';
+import { SubmitPonButton } from '@/modules/construction-qa/zone-delivery/components/SubmitPonButton';
+import { ZoneHandoverButton } from '@/modules/construction-qa/zone-delivery/components/ZoneHandoverButton';
 import type { WorksQAZoneSummary } from '../types/works-qa.types';
 
 interface Props {
@@ -58,8 +60,30 @@ export function WorksQAPageHeader(p: Props) {
         )}
       </div>
 
-      {/* Right: snag-report button, sync, zip, optional slot */}
+      {/* Right: delivery controls, snag-report button, sync, zip, optional slot */}
       <div className="flex items-center gap-2">
+        {/* Johan's two controls, on the screen where the work happens. They
+            branch on the same zone/PON context the filter bar already carries:
+            a PON is selected, or a zone with All PONs. */}
+        {p.zoneNo !== null && p.ponNo !== null && (
+          <SubmitPonButton
+            projectId={p.projectId}
+            zoneNo={p.zoneNo}
+            ponNo={p.ponNo}
+          />
+        )}
+        {p.zoneNo !== null && p.ponNo === null && (
+          <ZoneHandoverButton projectId={p.projectId} zoneNo={p.zoneNo} />
+        )}
+        {p.zoneNo !== null && (
+          <a
+            href="/field-ops/tracker"
+            className="text-xs text-zinc-400 underline underline-offset-2 hover:text-zinc-200"
+            title="See submitted PONs and zone handovers by site"
+          >
+            Tracker
+          </a>
+        )}
         <SnagReportButton
           projectId={p.projectId}
           ctx={{

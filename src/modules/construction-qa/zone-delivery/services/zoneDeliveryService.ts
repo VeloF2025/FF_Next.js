@@ -15,7 +15,7 @@ import {
 } from './zoneDeliveryErrors';
 import { getZoneDeliveryRegister } from './zoneDeliveryRegister';
 import { transaction, withClient } from './zoneDeliveryTransactions';
-import { assertCanonicalZone } from './zoneDeliveryCanonical';
+import { assertCanonicalZone, ensureCanonicalPons } from './zoneDeliveryCanonical';
 import { validateMilestoneConfirmation } from './zoneDeliveryMilestoneActions';
 import { invalidateZoneEvidence } from './zoneDeliveryInvalidation';
 import { requireSupervisedDocumentSource } from './zoneDeliveryDocumentSecurity';
@@ -73,9 +73,18 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         if (pon.scopeStatus !== 'included' && !hasReason(pon.reason))
           deliveryError('VALIDATION_ERROR', 'Excluded or cancelled PONs require a reason');
       }
+      // "Never scoped" used to be inferred from row_version 0, which a PON with
+      // no pon_delivery_state row reported via COALESCE. Those rows are now
+      // materialised ahead of the first command on a zone, and the schema
+      // forbids row_version 0, so the inference is asked of the zone directly:
+      // if its scope has never been approved, every PON in it is first-time and
+      // is audited, exactly as before.
+      const firstApproval = !zone?.scope_approved_at;
+      const neverScoped = (previous: { row_version: number }) =>
+        firstApproval || previous.row_version === 0;
       const changes = input.pons.filter(pon => {
         const previous = canonical.get(pon.ponStageId)!;
-        return previous.row_version === 0
+        return neverScoped(previous)
           || previous.scope_status !== pon.scopeStatus
           || (previous.scope_reason ?? '') !== (pon.reason?.trim() ?? '');
       });
@@ -95,7 +104,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
           ...audit(input, actor), ponStageId: pon.ponStageId,
           entityType: 'pon', entityId: pon.ponStageId, action: 'scope_updated',
           reason: pon.reason ?? input.reason,
-          previousValue: previous.row_version === 0 ? null
+          previousValue: neverScoped(previous) ? null
             : { scopeStatus: previous.scope_status, scopeReason: previous.scope_reason },
           newValue: { scopeStatus: pon.scopeStatus, scopeReason: pon.reason?.trim() || null },
         });
@@ -129,7 +138,18 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
     return transaction(this.pool, async client => {
       const config = milestones.find(item => item.gate === input.milestone)!;
       requirePermission(actor, input.action === 'link_maintenance' ? 'operations-confirm' : config.permission);
+      await ensureCanonicalPons(client, input);
       await assertCanonicalZone(client, input);
+      // zone_delivery_activity carries a foreign key to zone_delivery_state, so
+      // the audit row this command always writes needs the zone row to exist.
+      // Scope approval and document registration each create it as part of
+      // their own flow; confirming a milestone had no equivalent, which made
+      // every milestone on a zone that had never been touched fail on the audit
+      // write rather than on anything to do with the milestone. Created before
+      // lockZone so the row is locked with the rest of the command, and not
+      // inside ensureCanonicalPons because registerDocument compares the
+      // caller's expectedRowVersion against a zone that is meant to be absent.
+      await write.insertZone(client, input);
       const now = await read.readTransactionTime(client);
       validateMeta(input, now);
       const zone = await write.lockZone(client, input);
@@ -158,7 +178,14 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         return recalculateZone(client, input, actor);
       }
       if (zone?.handed_over_at) handoverLocked();
-      if (!zone?.scope_approved_at || state.scope_status !== 'included')
+      // Mirrors the rule in zoneDeliveryActionCalculator.confirmBlocker: an
+      // unapproved scope does not block port_submitted, because it is an
+      // attestation about work done outside FibreFlow on zones that predate it.
+      // This check is a second, independent copy of that gate — the calculator
+      // below runs too late to be reached while this one still fires, so both
+      // have to agree or the exemption is dead code.
+      const attested = input.milestone === 'port_submitted';
+      if ((!attested && !zone?.scope_approved_at) || state.scope_status !== 'included')
         deliveryError('SCOPE_REQUIRED', 'PON must be in approved scope');
       const current = state[config.at] as Date | string | null;
       if (input.action === 'reopen') {
@@ -219,6 +246,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
   registerDocument(input: RegisterDocumentInput, actor: DeliveryActor): Promise<ZoneDeliveryView> {
     return transaction(this.pool, async client => {
       requirePermission(actor, 'documents-manage');
+      await ensureCanonicalPons(client, input);
       await assertCanonicalZone(client, input);
       const now = await read.readTransactionTime(client);
       const zone = await write.lockZone(client, input);

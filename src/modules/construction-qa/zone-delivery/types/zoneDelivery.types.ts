@@ -52,6 +52,18 @@ export interface UpdateScopeInput extends ZoneKey, CommandMeta {
  */
 export interface DeclareHandoverInput extends ZoneKey, CommandMeta {}
 
+/**
+ * Submit PON addressed the way the operator sees it — site, zone, PON. It
+ * carries no expectedRowVersion because the delivery row it targets may not
+ * exist yet; the command resolves the id and checks the version server-side.
+ */
+export interface SubmitPonInput extends ZoneKey {
+  ponNo: number;
+  effectiveAt: string;
+  source: string;
+  reason?: string;
+}
+
 export interface ConfirmMilestoneInput extends ZoneKey, CommandMeta {
   ponStageId: string;
   milestone: PonMilestone;
@@ -197,6 +209,35 @@ export interface ZoneRegisterResult {
     readyForQa: number;
     handedOver: number;
   };
+}
+
+/**
+ * The flat tracker Johan Scott described: two tables, no gates, no blockers.
+ * Deliberately separate from ZoneRegisterRow, which reports what FibreFlow has
+ * been told; these report what is true of the network.
+ */
+export interface TrackerPonRow {
+  projectId: string;
+  projectName: string;
+  zoneNo: number;
+  ponNo: number;
+  portSubmittedAt: string | null;
+  homesActive: number;
+}
+
+export interface TrackerZoneRow {
+  projectId: string;
+  projectName: string;
+  zoneNo: number;
+  totalPons: number;
+  livePons: number;
+  homesActive: number;
+  handedOverAt: string | null;
+}
+
+export interface TrackerResult {
+  zones: TrackerZoneRow[];
+  pons: TrackerPonRow[];
 }
 
 export interface ZoneDeliveryInput {

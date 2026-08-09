@@ -124,13 +124,26 @@ describe('Submit PON is an attestation, not a derived gate', () => {
     expect(actions.technically_live.blocker).toMatchObject({ code: 'PON_PORT_NOT_APPROVED' });
   });
 
-  it('still refuses on an unapproved scope, an excluded PON, or a handed-over zone', () => {
-    // Being ungated is not being unguarded: these are about whether the PON is a
-    // valid target at all, not about workflow evidence.
-    const unapproved = input(); unapproved.scopeApproved = false;
-    expect(calculatePonActions(unapproved).port_submitted.blocker)
-      .toMatchObject({ code: 'SCOPE_NOT_APPROVED' });
+  it('records a submission on a zone whose scope was never approved', () => {
+    // This assertion used to run the other way, and that made the exemption
+    // above unreachable in production: scope_approved_at is set on zero zones,
+    // so every attestation failed on SCOPE_NOT_APPROVED before the gate check
+    // was consulted. An unapproved scope is the absence of a decision, which is
+    // exactly the legacy-zone case Submit PON exists to record.
+    const unapproved = input();
+    unapproved.scopeApproved = false;
 
+    expect(calculatePonActions(unapproved).port_submitted).toEqual({
+      action: 'confirm',
+      enabled: true,
+      blocker: null,
+    });
+  });
+
+  it('still refuses on an excluded PON or a handed-over zone', () => {
+    // Being ungated is not being unguarded: these are about whether the PON is a
+    // valid target at all, not about workflow evidence. Unlike an unapproved
+    // scope, an excluded PON is a decision somebody actually recorded.
     const excluded = input(); excluded.scopeStatus = 'excluded' as never;
     expect(calculatePonActions(excluded).port_submitted.blocker)
       .toMatchObject({ code: 'PON_NOT_INCLUDED' });

@@ -12,7 +12,7 @@ import {
   validateMeta,
   versionConflict,
 } from './zoneDeliveryErrors';
-import { assertCanonicalZone } from './zoneDeliveryCanonical';
+import { assertCanonicalZone, ensureCanonicalPons } from './zoneDeliveryCanonical';
 import { buildSnapshot, recalculateZone } from './zoneDeliveryHandover';
 import { transaction } from './zoneDeliveryTransactions';
 
@@ -52,6 +52,7 @@ export function declareZoneHandoverCommand(
 ): Promise<ZoneDeliveryView> {
   return transaction(pool, async client => {
     requirePermission(actor, 'zone-qa-approve');
+    await ensureCanonicalPons(client, input);
     await assertCanonicalZone(client, input);
     const now = await read.readTransactionTime(client);
     // A zone with no delivery-state row yet is not a conflict — it is a zone

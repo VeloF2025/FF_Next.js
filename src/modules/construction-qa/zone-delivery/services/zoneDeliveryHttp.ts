@@ -8,6 +8,7 @@ import type {
   RecordZoneQaInput,
   RegisterDocumentInput,
   ScopeStatus,
+  SubmitPonInput,
   UpdateScopeInput,
   ZoneDeliveryStatus,
   ZoneKey,
@@ -115,6 +116,35 @@ export function parseZoneQuery(req: NextApiRequest): ZoneKey {
     projectId: uuid(singleQuery(req.query.project_id, 'project_id'), 'project_id')!,
     zoneNo: coercedInteger(singleQuery(req.query.zone_no, 'zone_no'), 'zone_no', true),
   };
+}
+
+/**
+ * Submit PON is addressed by site/zone/PON, not by pon_stage_id, so it carries
+ * no expectedRowVersion for the caller to supply — the row it targets may not
+ * exist until the command creates it. The version check still happens, against
+ * the id resolved server-side.
+ */
+export function parsePonSubmitBody(value: unknown): SubmitPonInput {
+  const body = objectBody(value);
+  const effectiveAt = string(body.effectiveAt, 'effectiveAt')!;
+  const effectiveTime = new Date(effectiveAt).valueOf();
+  if (Number.isNaN(effectiveTime)
+    || effectiveTime - Date.now() > MAX_EFFECTIVE_AT_FUTURE_SKEW_MS) {
+    return invalid('effectiveAt');
+  }
+  return {
+    projectId: uuid(body.projectId, 'projectId')!,
+    zoneNo: coercedInteger(body.zoneNo, 'zoneNo', true),
+    ponNo: coercedInteger(body.ponNo, 'ponNo', true),
+    effectiveAt,
+    source: string(body.source, 'source')!,
+    ...(body.reason === undefined ? {} : { reason: string(body.reason, 'reason')! }),
+  };
+}
+
+export function parseTrackerQuery(req: NextApiRequest): string | undefined {
+  const projectId = singleQuery(req.query.project_id, 'project_id');
+  return projectId === undefined ? undefined : uuid(projectId, 'project_id')!;
 }
 
 export function parseRegisterQuery(req: NextApiRequest): ZoneRegisterFilters {

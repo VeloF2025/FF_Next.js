@@ -1,5 +1,6 @@
-import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { useCallback, useState } from 'react';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 export interface AuditedActionValues {
   effectiveAt: string;
@@ -16,23 +17,12 @@ interface Props {
   onSubmit: (values: AuditedActionValues) => Promise<boolean>;
 }
 
-const FOCUSABLE = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(', ');
-
 export function ZoneDeliveryActionDialog({
   open, title, submitting, requireReason = false, children, onClose, onSubmit,
 }: Props) {
   const [effectiveAt, setEffectiveAt] = useState('');
   const [source, setSource] = useState('');
   const [reason, setReason] = useState('');
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLElement | null>(null);
 
   const close = useCallback(() => {
     setEffectiveAt('');
@@ -41,52 +31,7 @@ export function ZoneDeliveryActionDialog({
     onClose();
   }, [onClose]);
 
-  useEffect(() => {
-    let frame: number | undefined;
-    if (open) {
-      triggerRef.current = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-      frame = requestAnimationFrame(() => {
-        const dialog = dialogRef.current;
-        const first = dialog?.querySelector<HTMLElement>(FOCUSABLE);
-        (first ?? dialog)?.focus();
-      });
-    } else if (triggerRef.current) {
-      const trigger = triggerRef.current;
-      triggerRef.current = null;
-      frame = requestAnimationFrame(() => trigger.focus());
-    }
-    return () => {
-      if (frame !== undefined) cancelAnimationFrame(frame);
-    };
-  }, [open]);
-
-  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close();
-      return;
-    }
-    if (event.key !== 'Tab') return;
-    const focusable = Array.from(
-      dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [],
-    ).filter(element => !element.closest('[aria-hidden="true"]'));
-    if (focusable.length === 0) {
-      event.preventDefault();
-      dialogRef.current?.focus();
-      return;
-    }
-    const first = focusable[0]!;
-    const last = focusable.at(-1)!;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }, [close]);
+  const { dialogRef, handleKeyDown } = useDialogFocus(open, close);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

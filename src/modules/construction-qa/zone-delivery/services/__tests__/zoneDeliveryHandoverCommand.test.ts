@@ -21,7 +21,10 @@ vi.mock('../zoneDeliveryHandover', () => ({
   buildSnapshot: () => ({ snapshot: true }),
   recalculateZone: (...a: unknown[]) => recalculateZone(...a),
 }));
-vi.mock('../zoneDeliveryCanonical', () => ({ assertCanonicalZone: async () => undefined }));
+vi.mock('../zoneDeliveryCanonical', () => ({
+  assertCanonicalZone: async () => undefined,
+  ensureCanonicalPons: async () => undefined,
+}));
 vi.mock('../zoneDeliveryTransactions', () => ({
   transaction: async (_pool: unknown, fn: (c: unknown) => Promise<unknown>) =>
     fn({ query: (...a: unknown[]) => clientQuery(...a) }),
