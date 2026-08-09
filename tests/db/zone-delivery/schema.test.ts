@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
+import { parse as parseConnectionString } from 'pg-connection-string';
 import {
   PERMISSIONS,
   verifyCrossOwnershipRejected,
@@ -27,25 +28,33 @@ describe('zone delivery migration 470', () => {
   let pool: Pool;
 
   beforeAll(async () => {
-    // Guards the TRUNCATE two statements below. The original check pinned a
-    // hardcoded URL; the port is ephemeral now, so it pins the two things the
-    // throwaway container ALWAYS sets and the real database never does.
+    // Guards the TRUNCATE two statements below.
     //
-    // "loopback and not port 5432" was tried and is not enough:
-    // postgres://fibreflow_user:x@localhost:5437/fibreflow — this project's
-    // actual shared dev+prod database, per CLAUDE.md — satisfies both and
-    // would be TRUNCATEd. The database and role names cannot collide by
-    // accident: the container is created with POSTGRES_DB/POSTGRES_USER
-    // fibreflow_test, while the real one is fibreflow / fibreflow_user.
+    // Parsed with pg-connection-string — the SAME parser `pg` uses to build the
+    // connection — and NOT with `new URL()`. They disagree, and the disagreement
+    // is the whole vulnerability: libpq-style query params (`?host=`, `?user=`,
+    // `?password=`) override the connection for pg, while `new URL()` sees them
+    // as opaque query text and keeps reporting the values in the URL's own
+    // authority section. So
+    //   postgres://fibreflow_test:pw@127.0.0.1:5432/fibreflow_test
+    //     ?host=100.96.203.105&port=5437&user=fibreflow_user
+    // reads as a local throwaway database to `new URL()` and connects to this
+    // project's real shared dev+prod database in reality. Validating with a
+    // different parser than the one that connects is not a guard at all.
+    //
+    // The names are what is pinned: the container always sets POSTGRES_DB and
+    // POSTGRES_USER to fibreflow_test, and the real database is fibreflow /
+    // fibreflow_user. Host and port cannot be pinned — the port is ephemeral by
+    // design — but a role and database of that name only exist in the container.
     const testUrl = process.env.DATABASE_URL_TEST;
     expect(testUrl, 'global setup did not export DATABASE_URL_TEST').toBeTruthy();
-    const parsed = new URL(testUrl!);
-    expect(parsed.protocol).toBe('postgres:');
-    expect(['127.0.0.1', 'localhost']).toContain(parsed.hostname);
-    expect(parsed.pathname, 'refusing to truncate a database that is not the throwaway one')
-      .toBe('/fibreflow_test');
-    expect(parsed.username, 'refusing to truncate as a role other than the container role')
+    const conn = parseConnectionString(testUrl!);
+    expect(conn.database, 'refusing to truncate a database that is not the throwaway one')
       .toBe('fibreflow_test');
+    expect(conn.user, 'refusing to truncate as a role other than the container role')
+      .toBe('fibreflow_test');
+    expect(['127.0.0.1', 'localhost'], 'refusing to truncate anything non-local')
+      .toContain(conn.host);
 
     pool = new Pool({ connectionString: process.env.DATABASE_URL_TEST });
     await pool.query(`

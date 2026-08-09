@@ -51,11 +51,11 @@ async function waitForReady(timeoutMs = 30_000): Promise<void> {
       lastErr = e;
       await new Promise(r => setTimeout(r, 500));
     }
-    }
-    throw new Error(`test DB not ready after ${timeoutMs}ms: ${String(lastErr)}`);
   }
+  throw new Error(`test DB not ready after ${timeoutMs}ms: ${String(lastErr)}`);
+}
 
-  export async function setup() {
+export async function setup() {
   // startContainerAndSeed does everything fallible: docker port, readiness
   // polling, nine file reads and nine queries. Vitest's globalSetup plugin
   // calls process.exit(1) straight from its error handler when setup()
