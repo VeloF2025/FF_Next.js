@@ -3,16 +3,22 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { ZoneHandoverButton } from '../ZoneHandoverButton';
-import type { storeZoneDeliveryDocument } from '../../services/zoneDeliveryDocumentStorage';
-
 /**
- * The document route returns whatever storeZoneDeliveryDocument returns, so the
- * mock is typed against that function rather than against what the client hopes
- * for. Reading rowVersion off the wrong level of this envelope shipped a broken
- * handover: the second upload sent expectedRowVersion undefined and was
- * rejected. If the server shape changes, this stops compiling.
+ * Reading rowVersion off the wrong level of the document route's envelope
+ * shipped a broken handover: the second upload sent expectedRowVersion
+ * undefined and was rejected, so no zone could ever get its second document.
+ *
+ * The guard is the `uploaded()` fixture below, which nests the zone exactly as
+ * the route does. It is a RUNTIME guard: reverting the client makes the
+ * asserted expectedRowVersion come back undefined and the test fails.
+ *
+ * There is deliberately no type-level guard tying this fixture to the server's
+ * return type. tsconfig.json excludes test and __tests__ files entirely, so
+ * nothing declared here is ever type-checked — an alias resolving
+ * storeZoneDeliveryDocument's return shape would look like protection and catch
+ * nothing. If the route's shape changes, this fixture is what has to be
+ * updated, and the assertion below is what will notice.
  */
-type DocumentResponse = Awaited<ReturnType<typeof storeZoneDeliveryDocument>>;
 
 const can = vi.fn();
 vi.mock('@/hooks/usePermission', () => ({ usePermission: () => ({ can }) }));
@@ -42,7 +48,7 @@ const uploaded = (rowVersion: number) => ({
     data: {
       zone: { rowVersion, documents: [] },
       document: { sourceRef: '/storage/x.pdf' },
-    } as unknown as DocumentResponse,
+    },
   }),
 });
 
