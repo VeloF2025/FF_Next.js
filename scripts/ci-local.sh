@@ -43,6 +43,8 @@ fi
 . "$CI_SCRIPT_DIR/ci-baselines.env"
 : "${MAX_LINT_WARNINGS:?not set by ci-baselines.env}"
 : "${MAX_LINT_ERRORS:?not set by ci-baselines.env}"
+: "${MAX_PAGES_LINT_WARNINGS:?not set by ci-baselines.env}"
+: "${MAX_PAGES_LINT_ERRORS:?not set by ci-baselines.env}"
 : "${MAX_SILENT_CATCHES:?not set by ci-baselines.env}"
 
 pass() { echo -e "${GREEN}  ✓ $*${NC}"; PASSED=$((PASSED + 1)); }
@@ -86,6 +88,31 @@ else
   fi
   if [ "$LINT_WARNINGS" -gt "$MAX_LINT_WARNINGS" ]; then
     info "New lint warnings introduced! Fix or update baseline."
+  fi
+fi
+
+# ─── Gate 1b: ESLint on pages/ (warnings + errors ratchet) ──────────────────
+# `npm run lint` is `eslint src`, so until 2026-08-09 nothing linted pages/ —
+# 1,623 files, including every API route: auth, RBAC, every DB call. Scored
+# separately from src rather than as one combined number so that paying down
+# pages debt cannot buy headroom for src regressions, and vice versa.
+echo -e "\n${CYAN}── Gate 1b: ESLint (pages/) ──${NC}\n"
+
+PAGES_LINT_OUTPUT=$(npm run lint:pages 2>&1 || true)
+PAGES_LINT_SUMMARY=$(echo "$PAGES_LINT_OUTPUT" | grep -P '\d+ problems? \(' || echo "0 problems (0 errors, 0 warnings)")
+PAGES_LINT_ERRORS=$(echo "$PAGES_LINT_SUMMARY" | grep -oP '\d+ error' | grep -oP '\d+' || echo "0")
+PAGES_LINT_WARNINGS=$(echo "$PAGES_LINT_SUMMARY" | grep -oP '\d+ warning' | grep -oP '\d+' || echo "0")
+
+if [ "$PAGES_LINT_WARNINGS" -le "$MAX_PAGES_LINT_WARNINGS" ] && [ "$PAGES_LINT_ERRORS" -le "$MAX_PAGES_LINT_ERRORS" ]; then
+  pass "ESLint (pages): ${PAGES_LINT_ERRORS} errors (≤${MAX_PAGES_LINT_ERRORS}), ${PAGES_LINT_WARNINGS} warnings (≤${MAX_PAGES_LINT_WARNINGS})"
+else
+  fail "ESLint (pages): ${PAGES_LINT_ERRORS} errors (max ${MAX_PAGES_LINT_ERRORS}), ${PAGES_LINT_WARNINGS} warnings (max ${MAX_PAGES_LINT_WARNINGS})"
+  if [ "$PAGES_LINT_ERRORS" -gt "$MAX_PAGES_LINT_ERRORS" ]; then
+    info "New lint errors introduced under pages/! Fix before proceeding."
+    echo "$PAGES_LINT_OUTPUT" | grep "  error  " | tail -10 | sed 's/^/    /'
+  fi
+  if [ "$PAGES_LINT_WARNINGS" -gt "$MAX_PAGES_LINT_WARNINGS" ]; then
+    info "New lint warnings introduced under pages/! Fix or update baseline."
   fi
 fi
 

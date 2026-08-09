@@ -17,6 +17,8 @@ const ENV_BODY = [
   "# canonical",
   "MAX_LINT_WARNINGS=186",
   "MAX_LINT_ERRORS=0",
+  "MAX_PAGES_LINT_WARNINGS=1115",
+  "MAX_PAGES_LINT_ERRORS=0",
   "MAX_SILENT_CATCHES=78",
   "",
 ].join("\n");
@@ -75,12 +77,27 @@ test("findDeclarations matches assignment and --max-warnings forms", () => {
     keys,
     { includeFlagForm: true },
   );
+  // Assignments carry the baseline name; flag literals are reported as literals
+  // rather than pinned to a key, because with a second warning scope there is
+  // no single baseline a bare number can be attributed to.
+  assert.deepEqual(
+    found.map((f) => [f.key, f.value, Boolean(f.literal)]),
+    [
+      ["MAX_LINT_WARNINGS", 3790, false],
+      ["(literal flag)", 3765, true],
+      ["(literal flag)", 12, true],
+    ],
+  );
+});
+
+test("findDeclarations tells MAX_PAGES_LINT_WARNINGS apart from MAX_LINT_WARNINGS", () => {
+  const keys = ["MAX_LINT_WARNINGS", "MAX_PAGES_LINT_WARNINGS"];
+  const found = findDeclarations("MAX_PAGES_LINT_WARNINGS=1115\nMAX_LINT_WARNINGS=186\n", keys);
   assert.deepEqual(
     found.map((f) => [f.key, f.value]),
     [
-      ["MAX_LINT_WARNINGS", 3790],
-      ["MAX_LINT_WARNINGS", 3765],
-      ["MAX_LINT_WARNINGS", 12],
+      ["MAX_PAGES_LINT_WARNINGS", 1115],
+      ["MAX_LINT_WARNINGS", 186],
     ],
   );
 });
@@ -125,7 +142,7 @@ test("fails on a disagreeing shell assignment and names file, line and both valu
   assert.match(result.stderr, /found 3825, canonical is 186/);
 });
 
-test("fails on a disagreeing --max-warnings flag inside a ratchet gate", (context) => {
+test("fails on a hard-coded --max-warnings inside a ratchet gate", (context) => {
   const root = createFixture();
   context.after(() => rmSync(root, { recursive: true, force: true }));
 
@@ -138,7 +155,39 @@ test("fails on a disagreeing --max-warnings flag inside a ratchet gate", (contex
   const result = runChecker(root);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /ci\.yml:2/);
-  assert.match(result.stderr, /found 3765, canonical is 186/);
+  assert.match(result.stderr, /3765 is hard-coded/);
+});
+
+// The regression this closes: while `--max-warnings` was pinned to
+// MAX_LINT_WARNINGS, a literal equal to the src baseline PASSED even when it
+// was sitting on the pages gate — where it would have demanded 186 warnings
+// from a scope that legitimately emits 1115, i.e. permanently red. A literal is
+// wrong in a ratchet gate no matter which canonical value it happens to equal.
+test("rejects a --max-warnings literal even when it equals a canonical value", (context) => {
+  const root = createFixture();
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+
+  addTracked(
+    root,
+    ".github/workflows/ci.yml",
+    "steps:\n  - run: . scripts/ci-baselines.env && npm run lint:pages -- --max-warnings 186\n",
+  );
+
+  const result = runChecker(root);
+  assert.equal(result.status, 1, `expected failure, got:\n${result.stdout}${result.stderr}`);
+  assert.match(result.stderr, /186 is hard-coded/);
+});
+
+test("fails on a disagreeing pages baseline assignment", (context) => {
+  const root = createFixture();
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+
+  addTracked(root, "scripts/deploy-local-main.sh", "#!/bin/bash\nMAX_PAGES_LINT_WARNINGS=9999\n");
+
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /scripts\/deploy-local-main\.sh:2/);
+  assert.match(result.stderr, /found 9999, canonical is 1115/);
 });
 
 // `--max-warnings 0` is a deliberate STRICTER policy in package.json's

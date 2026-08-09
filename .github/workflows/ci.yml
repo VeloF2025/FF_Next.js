@@ -49,6 +49,16 @@ jobs:
           set -a; . scripts/ci-baselines.env; set +a
           npm run lint -- --max-warnings "$MAX_LINT_WARNINGS"
 
+      # pages/ is scored separately from src/ on purpose — see the rationale in
+      # ci-baselines.env. `npm run lint` is `eslint src`, so before 2026-08-09
+      # none of the ~1,300 API routes were linted here at all. Errors need no
+      # flag: ESLint exits non-zero on any error regardless of --max-warnings,
+      # which is what holds MAX_PAGES_LINT_ERRORS at 0.
+      - name: Lint pages/ (ratchet gate)
+        run: |
+          set -a; . scripts/ci-baselines.env; set +a
+          npm run lint:pages -- --max-warnings "$MAX_PAGES_LINT_WARNINGS"
+
       - name: Type check (non-blocking — pre-existing errors)
         run: npm run type-check
         continue-on-error: true

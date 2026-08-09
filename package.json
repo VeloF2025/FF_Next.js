@@ -30,6 +30,7 @@
     "test:e2e:mobile": "playwright test --grep @mobile",
     "test:wa-monitor": "tsx src/modules/wa-monitor/tests/integration.test.ts",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives",
+    "lint:pages": "eslint pages --ext ts,tsx --report-unused-disable-directives",
     "lint:strict": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint src --ext ts,tsx --fix",
     "type-check": "tsc --noEmit",

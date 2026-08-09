@@ -59,11 +59,23 @@ if [ "$TESTS_ONLY" = false ]; then
   # until 2026-08-09, so the outage fallback could never pass.
   # shellcheck source=scripts/ci-baselines.env
   . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/ci-baselines.env"
-  if npm run lint -- --max-warnings "$MAX_LINT_WARNINGS" 2>&1 | tail -5; then
+  # `if npm run lint … | tail -5` tested TAIL's exit status, not ESLint's, so
+  # this gate reported a pass on any outcome — a second way for it to be inert
+  # on top of the wrong baseline fixed on 2026-08-09. Capture the output and
+  # branch on the command's own status; print the tail either way as before.
+  if LINT_OUT=$(npm run lint -- --max-warnings "$MAX_LINT_WARNINGS" 2>&1); then
     log_pass "Lint"
   else
     log_fail "Lint"
   fi
+  echo "$LINT_OUT" | tail -5
+
+  if PAGES_LINT_OUT=$(npm run lint:pages -- --max-warnings "$MAX_PAGES_LINT_WARNINGS" 2>&1); then
+    log_pass "Lint (pages)"
+  else
+    log_fail "Lint (pages)"
+  fi
+  echo "$PAGES_LINT_OUT" | tail -5
 fi
 
 # --- STEP 2: TypeScript ---

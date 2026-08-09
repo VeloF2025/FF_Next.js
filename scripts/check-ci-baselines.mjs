@@ -12,11 +12,20 @@
 //   1. shell/markdown assignment   MAX_LINT_WARNINGS=186
 //   2. the ESLint flag             --max-warnings 186   (or --max-warnings=186)
 //
-// A literal is allowed as long as it AGREES with the canonical value. Files
-// that cannot source the env file at runtime — notably
+// An ASSIGNMENT literal is allowed as long as it AGREES with the canonical
+// value. Files that cannot source the env file at runtime — notably
 // scripts/deploy-local-main.sh, which deploy-local.sh materialises from
 // origin/master into a cache directory with no repo beside it — keep their
 // literals and are held in agreement by this check instead.
+//
+// A `--max-warnings` literal inside a ratchet-bearing gate is rejected
+// outright, whatever its value, because those gates DO source this file and so
+// the number belongs in the variable. Pinning that flag to one key stopped
+// being safe when pages/ gained its own baseline on 2026-08-09: a
+// `--max-warnings 186` written on the pages line would agree with
+// MAX_LINT_WARNINGS and pass, while pinning the pages gate to an unreachably
+// strict threshold. With two warning scopes there is no longer a single "the"
+// baseline for a bare literal to be checked against.
 //
 // Usage:
 //   node scripts/check-ci-baselines.mjs          # check, exit 1 on drift
@@ -68,7 +77,13 @@ const MUST_SOURCE = [
   join(".github", "workflows", "ci.yml"),
 ];
 
-const FLAG_TO_KEY = { "--max-warnings": "MAX_LINT_WARNINGS" };
+// Flags whose numeric argument IS a baseline. Inside a MUST_SOURCE file the
+// value has to come from the sourced variable, so any literal is a failure.
+const RATCHET_FLAGS = ["--max-warnings"];
+
+// Reported in place of a baseline name when the finding is a literal flag.
+// Not a key in ci-baselines.env.
+const LITERAL_FLAG_KEY = "(literal flag)";
 
 /** Parse `NAME=123` lines out of the canonical env file. */
 export function parseBaselines(text) {
@@ -111,12 +126,17 @@ export function findDeclarations(text, canonicalKeys, { includeFlagForm = false 
 
     if (!includeFlagForm) continue;
 
-    for (const [flag, key] of Object.entries(FLAG_TO_KEY)) {
-      if (!canonicalKeys.includes(key)) continue;
+    for (const flag of RATCHET_FLAGS) {
       const flagRe = new RegExp(`${flag}[ =]+(\\d+)`, "g");
       let m;
       while ((m = flagRe.exec(line)) !== null) {
-        found.push({ line: i + 1, key, value: Number(m[1]), form: `${flag} ${m[1]}` });
+        found.push({
+          line: i + 1,
+          key: LITERAL_FLAG_KEY,
+          value: Number(m[1]),
+          form: `${flag} ${m[1]}`,
+          literal: true,
+        });
       }
     }
   }
@@ -183,6 +203,16 @@ export function run({ root = ROOT, log = console.log, error = console.error } = 
 
     const includeFlagForm = MUST_SOURCE.includes(relPath);
     for (const decl of findDeclarations(text, keys, { includeFlagForm })) {
+      if (decl.literal) {
+        problems.push({
+          file: relPath,
+          line: decl.line,
+          key: decl.key,
+          form: decl.form,
+          message: `${decl.value} is hard-coded — a ratchet gate must pass the sourced variable, e.g. --max-warnings "$MAX_LINT_WARNINGS"`,
+        });
+        continue;
+      }
       if (decl.value !== canonical[decl.key]) {
         problems.push({
           file: relPath,
@@ -217,7 +247,11 @@ export function run({ root = ROOT, log = console.log, error = console.error } = 
     for (const p of problems) {
       const where = p.line > 0 ? `${p.file}:${p.line}` : p.file;
       error(`  ${where}`);
-      error(`    ${p.key}: found ${p.found}, canonical is ${p.expected}   (${p.form})`);
+      if (p.message) {
+        error(`    ${p.key}: ${p.message}   (${p.form})`);
+      } else {
+        error(`    ${p.key}: found ${p.found}, canonical is ${p.expected}   (${p.form})`);
+      }
     }
     error(`\n  Canonical values live in ${ENV_REL}. Change them there, not here.`);
     error(`  If a gate genuinely needs a different threshold, it needs its own name.\n`);
