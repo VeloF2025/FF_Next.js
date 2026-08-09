@@ -27,21 +27,26 @@ describe('zone delivery migration 470', () => {
   let pool: Pool;
 
   beforeAll(async () => {
-    // The original check pinned a hardcoded URL, which caught a stale or
-    // misconfigured environment. The port is ephemeral now, so there is no
-    // constant left to compare against — but comparing the variable to a copy
-    // of itself would assert nothing at all. Assert the properties that still
-    // mean something: global setup ran, and it handed us a throwaway local
-    // database rather than a shared one.
+    // Guards the TRUNCATE two statements below. The original check pinned a
+    // hardcoded URL; the port is ephemeral now, so it pins the two things the
+    // throwaway container ALWAYS sets and the real database never does.
+    //
+    // "loopback and not port 5432" was tried and is not enough:
+    // postgres://fibreflow_user:x@localhost:5437/fibreflow — this project's
+    // actual shared dev+prod database, per CLAUDE.md — satisfies both and
+    // would be TRUNCATEd. The database and role names cannot collide by
+    // accident: the container is created with POSTGRES_DB/POSTGRES_USER
+    // fibreflow_test, while the real one is fibreflow / fibreflow_user.
     const testUrl = process.env.DATABASE_URL_TEST;
     expect(testUrl, 'global setup did not export DATABASE_URL_TEST').toBeTruthy();
     const parsed = new URL(testUrl!);
     expect(parsed.protocol).toBe('postgres:');
     expect(['127.0.0.1', 'localhost']).toContain(parsed.hostname);
-    // A real, non-default port — proof it came from the container, not a
-    // hardcoded fallback pointing at someone's own Postgres.
-    expect(Number(parsed.port)).toBeGreaterThan(0);
-    expect(Number(parsed.port)).not.toBe(5432);
+    expect(parsed.pathname, 'refusing to truncate a database that is not the throwaway one')
+      .toBe('/fibreflow_test');
+    expect(parsed.username, 'refusing to truncate as a role other than the container role')
+      .toBe('fibreflow_test');
+
     pool = new Pool({ connectionString: process.env.DATABASE_URL_TEST });
     await pool.query(`
       TRUNCATE zone_delivery_activity, zone_delivery_snag_links,

@@ -14,61 +14,6 @@ describe('No Direct Database Connections', () => {
   const _excludedFiles = ['neonServiceAPI.ts'];
 
   // Patterns that indicate direct database usage
-  /**
-   * Blank out comments before scanning, keeping line numbers intact.
-   *
-   * The patterns below look for code, but a regex over raw text also matches
-   * PROSE about code. src/modules/fleet/parking/complianceQueries.ts documents
-   * why conditional SQL fragments are broken in this codebase — and quoting the
-   * broken form in that explanation was enough to report the file as a direct
-   * database connection, at the comment's line rather than any import. A guard
-   * that fires on documentation teaches people to stop writing it.
-   *
-   * This walks the source rather than running two regexes over it, because
-   * regexes cannot tell a comment from a string that merely contains one.
-   * `'//cdn.example.com'` would start a "line comment" and blank the real code
-   * after it, and an unterminated `/*` inside a string would swallow everything
-   * up to the next real close-comment several lines away — both of which make
-   * the guard MISS genuine database calls. Tracking quote state is the whole
-   * difference between hiding prose and hiding evidence.
-   */
-  function stripComments(source: string): string {
-    let out = '';
-    let i = 0;
-    // One of: null (code), "'" / '"' / '`' (inside that string), '//', '/*'
-    let state: string | null = null;
-
-    while (i < source.length) {
-      const ch = source[i]!;
-      const next = source[i + 1];
-
-      if (state === null) {
-        if (ch === '/' && next === '/') { state = '//'; out += '  '; i += 2; continue; }
-        if (ch === '/' && next === '*') { state = '/*'; out += '  '; i += 2; continue; }
-        if (ch === "'" || ch === '"' || ch === '`') { state = ch; out += ch; i += 1; continue; }
-        out += ch; i += 1; continue;
-      }
-
-      if (state === '//') {
-        if (ch === '\n') { state = null; out += ch; } else { out += ' '; }
-        i += 1; continue;
-      }
-
-      if (state === '/*') {
-        if (ch === '*' && next === '/') { state = null; out += '  '; i += 2; continue; }
-        out += ch === '\n' ? ch : ' ';
-        i += 1; continue;
-      }
-
-      // Inside a string literal: copy through, honouring escapes so a trailing
-      // backslash cannot end the string early.
-      if (ch === '\\') { out += source.slice(i, i + 2); i += 2; continue; }
-      if (ch === state) { state = null; }
-      out += ch; i += 1; continue;
-    }
-    return out;
-  }
-
   const dbPatterns = [
     /createNeonClient\s*\(/,
     /(?<!`)sql\s*`/,
@@ -161,7 +106,7 @@ describe('No Direct Database Connections', () => {
         } else if (file.endsWith('.ts') || file.endsWith('.tsx')) {
           // Skip excluded files
           if (!isExcluded(filePath)) {
-            const content = stripComments(readFileSync(filePath, 'utf-8'));
+            const content = readFileSync(filePath, 'utf-8');
             
             // Check for database patterns
             for (const pattern of dbPatterns) {
@@ -182,60 +127,6 @@ describe('No Direct Database Connections', () => {
     
     return violations;
   }
-
-  it('ignores database patterns that appear only inside comments', () => {
-    // The regression: a file documenting why `sql`AND x`` fragments are broken
-    // was itself reported as a direct database connection, at the comment's
-    // line. Real connections are code, never prose.
-    const prose = [
-      '/**',
-      ' * Explains that ${cond ? sql`AND x` : sql``} is broken here.',
-      ' */',
-      "import { thing } from '@/lib/thing';",
-    ].join('\n');
-    expect(dbPatterns.some((pattern) => pattern.test(stripComments(prose)))).toBe(false);
-
-    // ...and the same text as CODE still trips it, so stripping comments has
-    // not blunted the guard.
-    const code = 'const rows = await sql`SELECT 1`;';
-    expect(dbPatterns.some((pattern) => pattern.test(stripComments(code)))).toBe(true);
-  });
-
-  it('does not let a string containing comment markers hide real code', () => {
-    // These are the ways a regex-based stripper silently blinds the guard.
-    // Each case has a REAL sql`` call that must still be detected.
-    const cases: Array<[string, string]> = [
-      [
-        'protocol-relative URL starts a fake line comment',
-        "const url = '//cdn.example.com'; const rows = await sql`SELECT 1`;",
-      ],
-      [
-        'comment marker inside a template literal',
-        'const note = `see //notes`; const rows = await sql`SELECT 1`;',
-      ],
-      [
-        'unterminated block-comment marker in a string swallows later code',
-        [
-          "const a = '/* not a comment';",
-          'const rows = await sql`SELECT 1`;',
-          '/* a genuine comment */',
-        ].join('\n'),
-      ],
-      [
-        'escaped quote must not end the string early',
-        "const s = 'it\\'s fine'; const rows = await sql`SELECT 1`;",
-      ],
-    ];
-    for (const [label, source] of cases) {
-      const detected = dbPatterns.some((pattern) => pattern.test(stripComments(source)));
-      expect(detected, `should still detect the sql call: ${label}`).toBe(true);
-    }
-  });
-
-  it('still blanks a real comment that follows code on the same line', () => {
-    const source = "const x = 1; // mentions sql`SELECT 1` in passing";
-    expect(dbPatterns.some((pattern) => pattern.test(stripComments(source)))).toBe(false);
-  });
 
   it('should not have any direct database connections in frontend code', () => {
     const violations = scanDirectory(srcDir);

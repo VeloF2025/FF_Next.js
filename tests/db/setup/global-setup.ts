@@ -43,14 +43,14 @@ async function waitForReady(timeoutMs = 30_000): Promise<void> {
   let lastErr: unknown;
   while (Date.now() - start < timeoutMs) {
     try {
-        const pool = new Pool({ connectionString: URL, connectionTimeoutMillis: 1000 });
-        await pool.query('SELECT 1');
-        await pool.end();
-        return;
-      } catch (e) {
-        lastErr = e;
-        await new Promise(r => setTimeout(r, 500));
-      }
+      const pool = new Pool({ connectionString: URL, connectionTimeoutMillis: 1000 });
+      await pool.query('SELECT 1');
+      await pool.end();
+      return;
+    } catch (e) {
+      lastErr = e;
+      await new Promise(r => setTimeout(r, 500));
+    }
     }
     throw new Error(`test DB not ready after ${timeoutMs}ms: ${String(lastErr)}`);
   }
