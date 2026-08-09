@@ -385,8 +385,17 @@ fi
 if [[ "$SKIP_LINT" != true ]]; then
   log "Running lint gates..."
   LINT_FAILED=false
-  MAX_LINT_WARNINGS=3825
-  MAX_LINT_ERRORS=77
+  # Canonical values from scripts/ci-baselines.env, held in agreement by
+  # scripts/check-ci-baselines.mjs (a CI gate). Deliberately literals, NOT a
+  # `source`: deploy-local.sh materialises this script from origin/master into
+  # a cache directory after verifying its Git blob hash, and runs it from
+  # there — there is no scripts/ beside it, and sourcing an unverified file
+  # would put the gate threshold outside that trust boundary.
+  #
+  # Until 2026-08-09 these read 3825/77 against a real 186/0, so the gate
+  # guarding every dev and production deploy could not fail.
+  MAX_LINT_WARNINGS=186
+  MAX_LINT_ERRORS=0
 
   LINT_OUTPUT=$(sudo -u velo bash -c "cd $DIR && npm run lint" 2>&1 || true)
   LINT_SUMMARY=$(echo "$LINT_OUTPUT" | grep -P '\d+ problems? \(' || echo "0 problems (0 errors, 0 warnings)")
