@@ -9,7 +9,8 @@ import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 
 export type PlottedVehicle = LiveVehicle & { lat: number; lon: number };
 
-export type VehicleStatus = 'speeding' | 'moving' | 'parked' | 'parkedSilent' | 'unknown';
+export type VehicleStatus =
+  'speeding' | 'lostContact' | 'moving' | 'parked' | 'parkedSilent' | 'unknown';
 
 /**
  * How long a parked vehicle may stay quiet before we stop vouching for it.
@@ -47,6 +48,21 @@ export const PARKED_SILENT_AFTER_SECONDS = 6 * 3600;
  * vehicle, the false red costs one click and the miss costs an incident. It
  * must be fresh to count, for the original reason: a stale "speeding" tells
  * us what a vehicle was doing, not what it is doing.
+ *
+ * `lostContact` is the case worth waking up for, and it used to hide inside the
+ * same grey as an ordinary unknown: last we heard the engine was RUNNING, and
+ * then the feed went quiet past its own threshold. A moving vehicle that stops
+ * reporting is either a tracker that failed mid-trip or a vehicle going
+ * somewhere it should not — unlike a parked one, it cannot be explained by
+ * "nothing happened, so nothing was sent". On 2026-08-09 that was HG16TDGP:
+ * last word "85 km/h, ignition on", then ~14 hours of silence — while the
+ * portal poll it rides kept succeeding (complete, 3 of 3 trackers mapped) and
+ * its two siblings on that same feed reported themselves properly parked at 0
+ * km/h. A quiet feed explains all three; only one of them was moving when it
+ * went quiet.
+ *
+ * `unknown` now means only what it says — the tracker never told us whether the
+ * engine was on, so we cannot reason about it either way.
  */
 export function statusFor(v: LiveVehicle): VehicleStatus {
   if (!v.isStale && v.isSpeeding) return 'speeding';
@@ -55,8 +71,9 @@ export function statusFor(v: LiveVehicle): VehicleStatus {
     const quiet = v.ageSeconds === null || v.ageSeconds > PARKED_SILENT_AFTER_SECONDS;
     return quiet ? 'parkedSilent' : 'parked';
   }
-  if (v.isStale) return 'unknown';
-  if (v.ignition === true) return 'moving';
+  // Engine last known RUNNING, then silence: not "we don't know", but "it was
+  // going somewhere and stopped telling us".
+  if (v.ignition === true) return v.isStale ? 'lostContact' : 'moving';
   return 'unknown';
 }
 
@@ -75,6 +92,10 @@ export const STATUS_STYLE: Record<
   { fill: string; fillOpacity: number; label: string; dash?: string }
 > = {
   speeding: { fill: '#dc2626', fillOpacity: 0.9, label: 'Speeding' },
+  // Amber, not red: it demands a look, but it is an unanswered question rather
+  // than a confirmed violation. Dashed for the same reason parkedSilent is —
+  // the ring being broken is what reads as "no longer current".
+  lostContact: { fill: '#d97706', fillOpacity: 0.95, label: 'Lost contact', dash: '4 2' },
   moving: { fill: '#0f9d6b', fillOpacity: 0.9, label: 'Moving' },
   parked: { fill: '#7c3aed', fillOpacity: 0.9, label: 'Parked' },
   parkedSilent: { fill: '#7c3aed', fillOpacity: 0.45, label: 'Parked · no contact', dash: '3 3' },

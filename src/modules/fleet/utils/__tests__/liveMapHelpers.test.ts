@@ -38,11 +38,13 @@ function vehicle(overrides: Partial<LiveVehicle> = {}): LiveVehicle {
 }
 
 describe('statusFor', () => {
-  it('reads stale fixes as unknown even when the last known state was speeding', () => {
+  it('does not keep a stale speeding fix red — but does flag it as lost contact', () => {
     // Precedence still matters where we are genuinely uncertain: we don't know
-    // a stale ignition-on vehicle is STILL speeding.
+    // a stale ignition-on vehicle is STILL speeding. It is no longer dismissed
+    // as 'unknown' either — the engine was running and the feed went quiet,
+    // which is the alarming case, not the ignorable one.
     const v = vehicle({ isStale: true, isSpeeding: true, ignition: true });
-    expect(statusFor(v)).toBe('unknown');
+    expect(statusFor(v)).toBe('lostContact');
   });
 
   it('reads a fresh speeding vehicle as speeding', () => {
@@ -60,9 +62,11 @@ describe('statusFor', () => {
     expect(statusFor(v)).toBe('parked');
   });
 
-  it('treats a stale, non-speeding, ignition-on vehicle as unknown, not moving', () => {
+  it('treats a stale, non-speeding, ignition-on vehicle as lost contact, not moving', () => {
+    // Not 'moving' (we don't know that any more) and not 'unknown' (we know
+    // more than nothing: it was running when we last heard).
     const v = vehicle({ isStale: true, isSpeeding: false, ignition: true });
-    expect(statusFor(v)).toBe('unknown');
+    expect(statusFor(v)).toBe('lostContact');
   });
 
   it('an ignition-off vehicle stays parked despite a stale fix, within the ceiling', () => {
@@ -255,5 +259,41 @@ describe('swatchBackground', () => {
   it('keeps the dimmer status visibly dimmer once baked', () => {
     const alpha = (s: VehicleStatus) => parseInt(swatchBackground(s).slice(7), 16);
     expect(alpha('parkedSilent')).toBeLessThan(alpha('parked'));
+  });
+});
+
+describe('lostContact — the case that used to hide inside grey', () => {
+  it('an engine last known RUNNING that then goes silent is lostContact, not unknown', () => {
+    // HG16TDGP on 2026-08-09: last word "85 km/h, ignition on", then ~14h of
+    // silence, while the poll it rides kept succeeding and its two siblings on
+    // the same feed reported themselves parked at 0 km/h. It rendered the same
+    // grey as an ordinary unknown.
+    const v = vehicle({ ignition: true, isStale: true, ageSeconds: 13.5 * 3600 });
+    expect(statusFor(v)).toBe('lostContact');
+  });
+
+  it('a fresh ignition-on vehicle is still just moving', () => {
+    expect(statusFor(vehicle({ ignition: true, isStale: false }))).toBe('moving');
+  });
+
+  it('unknown now means only "the tracker never said" — ignition null', () => {
+    // The point of splitting lostContact out: 'unknown' stops being a bucket
+    // that quietly holds a vehicle we have real reason to worry about.
+    expect(statusFor(vehicle({ ignition: null, isStale: true }))).toBe('unknown');
+    expect(statusFor(vehicle({ ignition: null, isStale: false }))).toBe('unknown');
+  });
+
+  it('a silent PARKED vehicle is not lostContact — silence there is expected', () => {
+    // A parked car emits nothing by design, so it must not raise the alarm
+    // that a vehicle which was driving does.
+    const v = vehicle({ ignition: false, isStale: true, ageSeconds: 13.5 * 3600 });
+    expect(statusFor(v)).toBe('parkedSilent');
+  });
+
+  it('is styled to demand attention: distinct colour, and dashed like the other stale state', () => {
+    expect(STATUS_STYLE.lostContact.fill).not.toBe(STATUS_STYLE.unknown.fill);
+    expect(STATUS_STYLE.lostContact.fill).not.toBe(STATUS_STYLE.speeding.fill);
+    expect(STATUS_STYLE.lostContact.dash).toBeTruthy();
+    expect(STATUS_STYLE.lostContact.fillOpacity).toBeGreaterThan(STATUS_STYLE.unknown.fillOpacity);
   });
 });
