@@ -213,7 +213,7 @@ export async function stampEligibility(client: PoolClient, key: ZoneKey): Promis
  * on one date and uploaded on another, and a zone is often handed over before
  * FibreFlow knows the site exists, so a derived-only handover cannot express
  * the truth. Correcting an existing date additionally requires the caller to set
- * ff.zone_handover_correction (migration 485) — the database keeps the column
+ * ff.zone_handover_correction (migration 486) — the database keeps the column
  * immutable for every other path. The row_version CAS guards the write, and
  * validateMeta's `correction` mode forces a reason so it stays attributable.
  */

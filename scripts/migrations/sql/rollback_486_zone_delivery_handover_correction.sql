@@ -1,4 +1,4 @@
--- rollback_485_zone_delivery_handover_correction.sql
+-- rollback_486_zone_delivery_handover_correction.sql
 --
 -- Restore migration 470's unconditional handover immutability.
 --

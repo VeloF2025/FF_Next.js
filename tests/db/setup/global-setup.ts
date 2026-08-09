@@ -57,7 +57,7 @@ export async function setup() {
     'scripts/migrations/sql/367_drops_install_trigger.sql'), 'utf8');
   const zoneDeliveryMigration = await fs.readFile(path.join(process.cwd(),
     'scripts/migrations/sql/470_zone_delivery_handover.sql'), 'utf8');
-  // 485 narrows 470's handover immutability to "unless the correction GUC is
+  // 486 narrows 470's handover immutability to "unless the correction GUC is
   // set". This list is hand-maintained: a migration missing here is invisible
   // to the docker suite, so the trigger it changes stays at its old behaviour
   // and the tests covering the change pass for the wrong reason.

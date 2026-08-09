@@ -111,7 +111,9 @@ function findRollbackFile(version: string): string | null {
     if (legacy.length > 1) {
       throw new Error(
         `Migration number ${version} is ambiguous — ${legacy.length} legacy rollback files match:\n` +
-        legacy.map(f => `  - ${f}`).join('\n')
+        legacy.map(f => `  - ${f}`).join('\n') +
+        `\nRe-run with the exact filename instead of the number, so the wrong ` +
+        `migration is not reverted.`
       );
     }
     if (legacy.length === 1) return path.join(legacyDir, legacy[0]!);
