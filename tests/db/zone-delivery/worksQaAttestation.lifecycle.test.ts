@@ -120,7 +120,11 @@ describe('Works QA attestation lifecycle', () => {
       VALUES ($1, 9, 92, '1map')
     `, [PROJECT_ID]);
 
-    await expect(submitPon(91)).rejects.toThrow(/PON 91 does not belong to zone 9/);
+    // The refusal must name what the zone DOES have, so the operator can tell a
+    // typo from a PON 1Map has not synced yet.
+    await expect(submitPon(91)).rejects.toThrow(/Zone 9 has no PON 91 on record/);
+    await expect(submitPon(91)).rejects.toThrow(/currently lists: 92/);
+    await expect(submitPon(91)).rejects.toThrow(/1Map sync/);
 
     expect(await canonicalRows()).toEqual([{ pon_no: 92, sync_source: '1map' }]);
   });

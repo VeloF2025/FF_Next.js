@@ -44,7 +44,23 @@ export async function submitPonByNumber(
       WHERE t.project_id = $1::uuid AND t.zone_no = $2::integer AND t.pon_no = $3::integer
     `, [input.projectId, input.zoneNo, input.ponNo]);
     if (!rows[0]) {
-      deliveryError('VALIDATION_ERROR', `PON ${input.ponNo} does not belong to zone ${input.zoneNo}`);
+      // Reachable on the zones 1Map already tracks: ensureCanonicalPons leaves
+      // those alone, so a PON 1Map has not synced has no row here. Twelve PONs
+      // across seven production zones are in exactly that state. Naming the
+      // PONs the zone does have turns a dead end into something the operator
+      // can act on — either he mistyped, or the zone needs a 1Map sync.
+      const { rows: known } = await client.query<{ pon_no: number }>(`
+        SELECT pon_no FROM pon_stage_tracking
+        WHERE project_id = $1::uuid AND zone_no = $2::integer
+        ORDER BY pon_no
+      `, [input.projectId, input.zoneNo]);
+      const listed = known.slice(0, 20).map(row => row.pon_no).join(', ');
+      const suffix = known.length > 20 ? `, … (${known.length} total)` : '';
+      deliveryError(
+        'VALIDATION_ERROR',
+        `Zone ${input.zoneNo} has no PON ${input.ponNo} on record. It currently lists: ${listed}${suffix}. `
+          + 'If this PON is new, it reaches FibreFlow through the 1Map sync.',
+      );
     }
     return rows[0]!;
   });
