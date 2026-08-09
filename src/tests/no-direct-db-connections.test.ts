@@ -10,10 +10,35 @@ import { join } from 'path';
 describe('No Direct Database Connections', () => {
   const srcDir = join(process.cwd(), 'src');
   // Exclude server-side directories; modules/*/services/, utils/, portal/, scripts/ are server-side
-  const excludedDirs = ['api', 'lib', 'tests', '__tests__', 'services', 'scripts', 'utils', 'portal'];
+  const excludedDirs = [
+    'api',
+    'lib',
+    'tests',
+    '__tests__',
+    'services',
+    'scripts',
+    'utils',
+    'portal',
+  ];
   const _excludedFiles = ['neonServiceAPI.ts'];
 
   // Patterns that indicate direct database usage
+  /**
+   * Blank out comments before scanning, keeping line numbers intact.
+   *
+   * The patterns below look for code, but a regex over raw text also matches
+   * PROSE about code. src/modules/fleet/parking/complianceQueries.ts documents
+   * why conditional SQL fragments are broken in this codebase — and quoting the
+   * broken form in that explanation was enough to report the file as a direct
+   * database connection, at the comment's line number rather than any import.
+   * A guard that fires on documentation teaches people to stop writing it.
+   */
+  function stripComments(source: string): string {
+    return source
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+      .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
+  }
+
   const dbPatterns = [
     /createNeonClient\s*\(/,
     /(?<!`)sql\s*`/,
@@ -26,12 +51,12 @@ describe('No Direct Database Connections', () => {
   // Files that are allowed to have database connections (server-side only)
   const allowedFiles = [
     'neonServiceAPI.ts', // API wrapper
-    'analyticsApi.ts',   // API service files
+    'analyticsApi.ts', // API service files
     'clientApi.ts',
     'projectApi.ts',
     'sowApi.ts',
     'staffApi.ts',
-    'ClientsDebug.tsx',  // Dev-only debug component
+    'ClientsDebug.tsx', // Dev-only debug component
     // Server-side, but in directories excludedDirs does not cover (`config/`
     // and a module-root `queries.ts`). Listed as PATHS, not bare filenames:
     // entries containing '/' are matched against the src-relative path exactly
@@ -58,7 +83,7 @@ describe('No Direct Database Connections', () => {
         return true;
       }
     }
-    
+
     // Check if file is in allowed list. An entry containing '/' is matched
     // against the path RELATIVE TO src/, exactly — not as a suffix. `endsWith`
     // would have exempted any deeper path ending the same way (a hypothetical
@@ -90,14 +115,14 @@ describe('No Direct Database Connections', () => {
 
   function scanDirectory(dir: string): string[] {
     const violations: string[] = [];
-    
+
     try {
       const files = readdirSync(dir);
-      
+
       for (const file of files) {
         const filePath = join(dir, file);
         const stat = statSync(filePath);
-        
+
         if (stat.isDirectory()) {
           // Skip excluded directories
           if (!excludedDirs.includes(file) && !file.startsWith('.')) {
@@ -106,14 +131,14 @@ describe('No Direct Database Connections', () => {
         } else if (file.endsWith('.ts') || file.endsWith('.tsx')) {
           // Skip excluded files
           if (!isExcluded(filePath)) {
-            const content = readFileSync(filePath, 'utf-8');
-            
+            const content = stripComments(readFileSync(filePath, 'utf-8'));
+
             // Check for database patterns
             for (const pattern of dbPatterns) {
               if (pattern.test(content)) {
                 // Find line number for better error reporting
                 const lines = content.split('\n');
-                const lineNumber = lines.findIndex(line => pattern.test(line)) + 1;
+                const lineNumber = lines.findIndex((line) => pattern.test(line)) + 1;
                 violations.push(`${filePath}:${lineNumber} - Direct database connection found`);
                 break; // Only report once per file
               }
@@ -124,20 +149,40 @@ describe('No Direct Database Connections', () => {
     } catch (error) {
       console.error(`Error scanning directory ${dir}:`, error);
     }
-    
+
     return violations;
   }
 
+  it('ignores database patterns that appear only inside comments', () => {
+    // The regression: a file documenting why `sql`AND x`` fragments are broken
+    // was itself reported as a direct database connection, at the comment's
+    // line. Real connections are code, never prose.
+    const prose = [
+      '/**',
+      ' * Explains that ${cond ? sql`AND x` : sql``} is broken here.',
+      ' */',
+      "import { thing } from '@/lib/thing';",
+    ].join('\n');
+    expect(dbPatterns.some((pattern) => pattern.test(stripComments(prose)))).toBe(false);
+
+    // ...and the same text as CODE still trips it, so stripping comments has
+    // not blunted the guard.
+    const code = 'const rows = await sql`SELECT 1`;';
+    expect(dbPatterns.some((pattern) => pattern.test(stripComments(code)))).toBe(true);
+  });
+
   it('should not have any direct database connections in frontend code', () => {
     const violations = scanDirectory(srcDir);
-    
+
     if (violations.length > 0) {
       console.error('\nDirect database connections found in frontend code:');
-      violations.forEach(v => console.error(`  - ${v}`));
-      console.error('\nThese files should use API endpoints instead of direct database connections.');
+      violations.forEach((v) => console.error(`  - ${v}`));
+      console.error(
+        '\nThese files should use API endpoints instead of direct database connections.'
+      );
       console.error('Move database logic to /api routes or use existing API services.\n');
     }
-    
+
     expect(violations).toHaveLength(0);
   });
 
@@ -148,9 +193,9 @@ describe('No Direct Database Connections', () => {
       'src/services/api/project/index.ts',
       'src/services/api/sowApi.ts',
     ];
-    
+
     const missingServices: string[] = [];
-    
+
     for (const service of apiServices) {
       const servicePath = join(process.cwd(), service);
       try {
@@ -159,12 +204,12 @@ describe('No Direct Database Connections', () => {
         missingServices.push(service);
       }
     }
-    
+
     if (missingServices.length > 0) {
       console.error('\nMissing API service files:');
-      missingServices.forEach(s => console.error(`  - ${s}`));
+      missingServices.forEach((s) => console.error(`  - ${s}`));
     }
-    
+
     expect(missingServices).toHaveLength(0);
   });
 
@@ -174,9 +219,9 @@ describe('No Direct Database Connections', () => {
       'src/pages/api/health/index.ts',
       'src/pages/api/projects/[projectId]/sp-tracker.ts',
     ];
-    
+
     const missingEndpoints: string[] = [];
-    
+
     for (const endpoint of apiEndpoints) {
       const endpointPath = join(process.cwd(), endpoint);
       try {
@@ -185,13 +230,13 @@ describe('No Direct Database Connections', () => {
         missingEndpoints.push(endpoint);
       }
     }
-    
+
     if (missingEndpoints.length > 0) {
       console.error('\nMissing API endpoints:');
-      missingEndpoints.forEach(e => console.error(`  - ${e}`));
+      missingEndpoints.forEach((e) => console.error(`  - ${e}`));
       console.error('\nThese endpoints are required for database operations.');
     }
-    
+
     expect(missingEndpoints).toHaveLength(0);
   });
 });
