@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -110,6 +110,17 @@ test("fails when a build directory exists but holds no javascript", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("fails with a reason when the static tree cannot be walked", (t) => {
+  const root = makeBuild({ "static/chunks/pages/index-abc.js": CLEAN }, {});
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  // A dangling symlink: readdirSync lists it, statSync then throws ENOENT.
+  symlinkSync(join(root, "does-not-exist"), join(root, ".next", "static", "dangling.js"));
+
+  const { status, output } = check(root);
+  assert.equal(status, 1);
+  assert.match(output, /cannot enumerate/);
 });
 
 test("passes on a clean bundle", (t) => {
