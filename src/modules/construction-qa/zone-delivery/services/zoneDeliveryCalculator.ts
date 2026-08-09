@@ -46,8 +46,22 @@ const milestoneBlockers: Record<
   },
 };
 
+/**
+ * The earliest gate still genuinely outstanding.
+ *
+ * Not simply the first blank one: port_submitted is an attestation that can be
+ * recorded without its predecessors, because on legacy zones those were never
+ * captured in FibreFlow and never will be. A gate left blank BEHIND a recorded
+ * one is a record-keeping gap, not work still to do — reporting "testing is not
+ * passed" for a PON that has already been submitted is simply wrong, and that
+ * message is rendered to operators as the zone's blocker.
+ */
 function earliestMissingGate(pon: PonDeliveryView): PonMilestone | null {
-  return milestoneOrder.find((milestone) => !pon.milestones[milestone]) ?? null;
+  const lastRecorded = milestoneOrder.reduce(
+    (furthest, milestone, index) => (pon.milestones[milestone] ? index : furthest),
+    -1,
+  );
+  return milestoneOrder[lastRecorded + 1] ?? null;
 }
 
 function calculatePonBlockers(pons: PonDeliveryView[]): DeliveryBlocker[] {

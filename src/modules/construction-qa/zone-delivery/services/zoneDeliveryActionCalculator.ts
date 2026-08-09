@@ -80,7 +80,13 @@ function confirmBlocker(
     return blocker(input, 'HANDOVER_LOCKED', 'zone handover is terminal');
   }
   const previousGate = gates[index - 1];
-  if (previousGate && !input.milestones[previousGate]) {
+  // port_submitted is an attestation, not a derived fact: it records that the
+  // operator uploaded the PON's optical pack to the FNO's SharePoint, which
+  // happens entirely outside FibreFlow and which FibreFlow cannot verify. On
+  // legacy sites the earlier gates were never recorded here at all, so
+  // requiring them only stops the operator from telling us the truth. The
+  // gates it feeds (port_approved, technically_live) stay sequenced.
+  if (previousGate && gate !== 'port_submitted' && !input.milestones[previousGate]) {
     const prerequisite = prerequisiteBlockers[gate];
     return blocker(input, prerequisite.code, prerequisite.message.toLowerCase());
   }

@@ -3,6 +3,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type {
   ConfirmMilestoneInput,
+  DeclareHandoverInput,
   PonMilestone,
   RecordZoneQaInput,
   RegisterDocumentInput,
@@ -27,6 +28,7 @@ export const COMMAND_PERMISSIONS = {
   zoneQa: 'construction-qa.zone-delivery.zone-qa-approve',
   document: 'construction-qa.zone-delivery.documents-manage',
 } as const;
+
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES: ReadonlySet<ZoneDeliveryStatus> = new Set([
@@ -165,6 +167,13 @@ export function parseMilestoneBody(value: unknown): ConfirmMilestoneInput {
     ...(body.affectedGate === undefined
       ? {}
       : { affectedGate: member(body.affectedGate, MILESTONES, 'affectedGate') }),
+  };
+}
+
+export function parseHandoverBody(value: unknown): DeclareHandoverInput {
+  const body = objectBody(value);
+  return {
+    ...commandMeta(body),
   };
 }
 

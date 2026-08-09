@@ -270,3 +270,50 @@ describe('calculateZoneDelivery', () => {
     });
   });
 });
+
+describe('an attested port_submitted does not report its predecessors as blockers', () => {
+  const pon = (milestones: Record<string, unknown>) => ({
+    ponStageId: '47000000-0000-4000-8000-000000000009',
+    ponNo: 191,
+    scopeStatus: 'included' as const,
+    scopeReason: null,
+    milestones,
+    actions: {} as never,
+    rowVersion: 1,
+  });
+
+  const zone = (pons: ReturnType<typeof pon>[]) => calculateZoneDelivery({
+    scopeApproved: true,
+    pons: pons as never,
+    civilQa: 'not_started' as const,
+    opticalQa: 'not_started' as const,
+    hasFac: false,
+    hasCac: false,
+    openBlockingSnags: 0,
+    handedOverAt: null,
+  });
+
+  it('reports the next outstanding gate, not a gap left behind an attested one', () => {
+    // Johan submits a legacy PON whose testing was never captured. Saying
+    // "testing is not passed" is a record-keeping gap, not work outstanding —
+    // and it is rendered to operators as the zone's blocker.
+    const result = zone([pon({ port_submitted: { effectiveAt: '2026-08-05T00:00:00Z' } })]);
+
+    expect(result.blockers.map(b => b.code)).toEqual(['PON_PORT_NOT_APPROVED']);
+    expect(result.earliestIncompleteGate).toBe('port_approved');
+  });
+
+  it('still reports the first gate for a PON with nothing recorded', () => {
+    const result = zone([pon({})]);
+
+    expect(result.blockers.map(b => b.code)).toEqual(['PON_CIVIL_INCOMPLETE']);
+  });
+
+  it('reports no PON blocker once technically live', () => {
+    const result = zone([pon({
+      technically_live: { effectiveAt: '2026-08-05T00:00:00Z' },
+    })]);
+
+    expect(result.blockers.map(b => b.code)).not.toContain('PON_NOT_LIVE');
+  });
+});

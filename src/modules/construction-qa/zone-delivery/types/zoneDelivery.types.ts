@@ -46,6 +46,12 @@ export interface UpdateScopeInput extends ZoneKey, CommandMeta {
   pons: Array<{ ponStageId: string; scopeStatus: ScopeStatus; reason?: string }>;
 }
 
+/**
+ * Record a zone handover on a date the operator chooses, rather than the date
+ * the system noticed the gates had passed. Re-issuing it corrects the date.
+ */
+export interface DeclareHandoverInput extends ZoneKey, CommandMeta {}
+
 export interface ConfirmMilestoneInput extends ZoneKey, CommandMeta {
   ponStageId: string;
   milestone: PonMilestone;

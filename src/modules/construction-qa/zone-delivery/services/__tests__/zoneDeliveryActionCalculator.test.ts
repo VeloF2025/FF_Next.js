@@ -99,3 +99,51 @@ describe('calculatePonActions', () => {
     });
   });
 });
+
+describe('Submit PON is an attestation, not a derived gate', () => {
+  it('allows port_submitted on a PON with no earlier milestone recorded', () => {
+    // Johan's "Submit PON": he uploads the optical pack to the FNO's SharePoint
+    // by hand, then records that he did. On a legacy zone the earlier gates were
+    // never captured in FibreFlow, so gating this only blocks the truth.
+    const actions = calculatePonActions(input());
+
+    expect(actions.port_submitted).toEqual({
+      action: 'confirm',
+      enabled: true,
+      blocker: null,
+    });
+  });
+
+  it('still sequences the gates that follow it', () => {
+    // port_approved and technically_live remain derived from what precedes them.
+    const actions = calculatePonActions(input());
+
+    expect(actions.port_approved.enabled).toBe(false);
+    expect(actions.port_approved.blocker).toMatchObject({ code: 'PON_PORT_NOT_SUBMITTED' });
+    expect(actions.technically_live.enabled).toBe(false);
+    expect(actions.technically_live.blocker).toMatchObject({ code: 'PON_PORT_NOT_APPROVED' });
+  });
+
+  it('still refuses on an unapproved scope, an excluded PON, or a handed-over zone', () => {
+    // Being ungated is not being unguarded: these are about whether the PON is a
+    // valid target at all, not about workflow evidence.
+    const unapproved = input(); unapproved.scopeApproved = false;
+    expect(calculatePonActions(unapproved).port_submitted.blocker)
+      .toMatchObject({ code: 'SCOPE_NOT_APPROVED' });
+
+    const excluded = input(); excluded.scopeStatus = 'excluded' as never;
+    expect(calculatePonActions(excluded).port_submitted.blocker)
+      .toMatchObject({ code: 'PON_NOT_INCLUDED' });
+
+    const handedOver = input(); handedOver.handedOver = true;
+    expect(calculatePonActions(handedOver).port_submitted.blocker)
+      .toMatchObject({ code: 'HANDOVER_LOCKED' });
+  });
+
+  it('still refuses while an affecting snag is open', () => {
+    const snagged = input();
+    snagged.reconfirmationBlockers = [{ gate: 'port_submitted', status: 'open' }];
+    expect(calculatePonActions(snagged).port_submitted.blocker)
+      .toMatchObject({ code: 'SNAG_RECONFIRMATION_BLOCKED' });
+  });
+});

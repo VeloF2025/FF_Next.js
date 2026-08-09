@@ -53,11 +53,17 @@ describe('zone delivery read routes', () => {
 
   it('wraps every read route with auth and qa-centre view permission', () => {
     expect(h.authCount).toBe(3);
-    expect(h.permissionCalls).toEqual([
-      ['construction-qa.qa-centre', 'view'],
-      ['construction-qa.qa-centre', 'view'],
-      ['construction-qa.qa-centre', 'view'],
-    ]);
+    // Order follows module import order, which is incidental; what matters is
+    // that all three reads are view-gated and that zone.ts's declare-handover
+    // writer is edit-gated on the zone-level command permission — a viewer
+    // must not reach it.
+    expect(h.permissionCalls).toHaveLength(4);
+    expect(h.permissionCalls.filter(
+      ([key, action]: [string, string]) => key === 'construction-qa.qa-centre' && action === 'view',
+    )).toHaveLength(3);
+    expect(h.permissionCalls).toContainEqual(
+      ['construction-qa.zone-delivery.zone-qa-approve', 'edit'],
+    );
   });
 
   it('parses the approved register query filters', async () => {
@@ -112,12 +118,25 @@ describe('zone delivery read routes', () => {
   });
 
   it('rejects unsupported methods without calling reads', async () => {
+    // POST is now the declare-handover command, so DELETE stands in as the
+    // unsupported method.
     const res = await call(zoneHandler, {
-      method: 'POST',
+      method: 'DELETE',
       query: { project_id: projectId, zone_no: '7' },
     });
     expect(res.statusCode).toBe(405);
-    expect(res.headers.Allow).toBe('GET');
+    expect(res.headers.Allow).toBe('GET, POST');
+    expect(h.getZone).not.toHaveBeenCalled();
+  });
+
+  it('does not serve the zone read for a handover POST', async () => {
+    // An empty body fails validation rather than falling through to the read.
+    const res = await call(zoneHandler, {
+      method: 'POST',
+      query: { project_id: projectId, zone_no: '7' },
+      body: {},
+    });
+    expect(res.statusCode).toBe(400);
     expect(h.getZone).not.toHaveBeenCalled();
   });
 });

@@ -205,16 +205,54 @@ export async function stampEligibility(client: PoolClient, key: ZoneKey): Promis
     WHERE project_id = $1 AND zone_no = $2 AND eligible_for_zone_qa_at IS NULL
   `, [key.projectId, key.zoneNo]);
 }
+/**
+ * Operator-declared handover, carrying a business date the operator chooses.
+ *
+ * Deliberately has no `handed_over_at IS NULL` guard, unlike stampHandover: a
+ * mistyped legacy date must be correctable. On legacy sites the FAC is signed
+ * on one date and uploaded on another, and a zone is often handed over before
+ * FibreFlow knows the site exists, so a derived-only handover cannot express
+ * the truth. Correcting an existing date additionally requires the caller to set
+ * ff.zone_handover_correction (migration 485) — the database keeps the column
+ * immutable for every other path. The row_version CAS guards the write, and
+ * validateMeta's `correction` mode forces a reason so it stays attributable.
+ */
+export async function declareHandover(
+  client: PoolClient,
+  key: ZoneKey,
+  snapshot: unknown,
+  effectiveAt: Date | string,
+  expected: number,
+): Promise<ZoneStateRow | null> {
+  const { rows } = await client.query<ZoneStateRow>(`
+    UPDATE zone_delivery_state SET handed_over_at = $4, handover_snapshot = $3,
+      row_version = row_version + 1, updated_at = NOW()
+    WHERE project_id = $1 AND zone_no = $2 AND row_version = $5
+    RETURNING *
+  `, [key.projectId, key.zoneNo, JSON.stringify(snapshot), effectiveAt, expected]);
+  return rows[0] ?? null;
+}
+
+/**
+ * Derived handover, written by recalculateZone when every gate passes.
+ *
+ * `effectiveAt` is the transaction time rather than NOW() so the stamped date
+ * matches the activity row written alongside it; the two used to be read from
+ * two different clocks. The `handed_over_at IS NULL` guard stays: a zone that
+ * an operator has already declared by hand must never be silently restamped
+ * with a derived date.
+ */
 export async function stampHandover(
   client: PoolClient,
   key: ZoneKey,
   snapshot: unknown,
+  effectiveAt: Date | string,
 ): Promise<ZoneStateRow | null> {
   const { rows } = await client.query<ZoneStateRow>(`
-    UPDATE zone_delivery_state SET handed_over_at = NOW(), handover_snapshot = $3,
+    UPDATE zone_delivery_state SET handed_over_at = $4, handover_snapshot = $3,
       row_version = row_version + 1, updated_at = NOW()
     WHERE project_id = $1 AND zone_no = $2 AND handed_over_at IS NULL
     RETURNING *
-  `, [key.projectId, key.zoneNo, JSON.stringify(snapshot)]);
+  `, [key.projectId, key.zoneNo, JSON.stringify(snapshot), effectiveAt]);
   return rows[0] ?? null;
 }
