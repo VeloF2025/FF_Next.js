@@ -3,6 +3,22 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { ZoneHandoverButton } from '../ZoneHandoverButton';
+/**
+ * Reading rowVersion off the wrong level of the document route's envelope
+ * shipped a broken handover: the second upload sent expectedRowVersion
+ * undefined and was rejected, so no zone could ever get its second document.
+ *
+ * The guard is the `uploaded()` fixture below, which nests the zone exactly as
+ * the route does. It is a RUNTIME guard: reverting the client makes the
+ * asserted expectedRowVersion come back undefined and the test fails.
+ *
+ * There is deliberately no type-level guard tying this fixture to the server's
+ * return type. tsconfig.json excludes test and __tests__ files entirely, so
+ * nothing declared here is ever type-checked — an alias resolving
+ * storeZoneDeliveryDocument's return shape would look like protection and catch
+ * nothing. If the route's shape changes, this fixture is what has to be
+ * updated, and the assertion below is what will notice.
+ */
 
 const can = vi.fn();
 vi.mock('@/hooks/usePermission', () => ({ usePermission: () => ({ can }) }));
@@ -18,9 +34,22 @@ const settle = async () => {
   });
 };
 
-const view = (rowVersion: number) => ({
+/** GET /zone and POST /zone return the zone view directly. */
+const view = (rowVersion: number, documents: unknown[] = []) => ({
   ok: true,
-  json: async () => ({ success: true, data: { rowVersion } }),
+  json: async () => ({ success: true, data: { rowVersion, documents } }),
+});
+
+/** POST /document returns { zone, document } — a different shape. */
+const uploaded = (rowVersion: number) => ({
+  ok: true,
+  json: async () => ({
+    success: true,
+    data: {
+      zone: { rowVersion, documents: [] },
+      document: { sourceRef: '/storage/x.pdf' },
+    },
+  }),
 });
 
 /**
@@ -29,11 +58,11 @@ const view = (rowVersion: number) => ({
  */
 const happyPath = () => {
   fetchMock
-    .mockResolvedValueOnce(view(0))
-    .mockResolvedValueOnce(view(0))
-    .mockResolvedValueOnce(view(1))
-    .mockResolvedValueOnce(view(2))
-    .mockResolvedValueOnce(view(3));
+    .mockResolvedValueOnce(view(0))       // dialog opens: pre-flight read
+    .mockResolvedValueOnce(view(0))       // submit: current row version
+    .mockResolvedValueOnce(uploaded(1))   // FAC  -> { zone, document }
+    .mockResolvedValueOnce(uploaded(2))   // CAC  -> { zone, document }
+    .mockResolvedValueOnce(view(3));      // declare handover
 };
 
 const openWithFiles = () => {
@@ -94,8 +123,8 @@ describe('ZoneHandoverButton', () => {
     fetchMock
       .mockResolvedValueOnce(notFound)
       .mockResolvedValueOnce(notFound)
-      .mockResolvedValueOnce(view(1))
-      .mockResolvedValueOnce(view(2))
+      .mockResolvedValueOnce(uploaded(1))
+      .mockResolvedValueOnce(uploaded(2))
       .mockResolvedValueOnce(view(3));
     openWithFiles();
     submit();
