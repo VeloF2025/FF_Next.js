@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
+import * as ts from 'typescript';
 
 describe('No Direct Database Connections', () => {
   const srcDir = join(process.cwd(), 'src');
@@ -76,7 +77,7 @@ describe('No Direct Database Connections', () => {
   }
 
   /**
-   * Blank out comments so the scanner sees code, not prose.
+   * Offsets of pattern matches that are real CODE, not prose.
    *
    * A doc comment that *describes* a SQL rule is not a database connection,
    * but the patterns above cannot tell the two apart. On 2026-08-07 a JSDoc
@@ -85,96 +86,75 @@ describe('No Direct Database Connections', () => {
    * `sql\`` pattern and held master's full-suite gate red for two days. The
    * file's actual queries were never what matched.
    *
-   * Comment bodies become spaces rather than being deleted, so every surviving
-   * character keeps its original line and column and the line number reported
-   * below still points at the real offender.
+   * Comment boundaries come from the TypeScript parser, not from a regex.
+   * Three hand-rolled lexers were tried first and blind review broke every
+   * one of them with valid JS that hid a live query from this gate:
    *
-   * Deliberately line-oriented, and deliberately conservative: a line is only
-   * blanked from the point where a comment DEMONSTRABLY begins the line's
-   * content. Nothing is ever blanked on a line that has code in front of the
-   * comment marker.
+   *   - a character-level string/template scanner desynced on the regex
+   *     literal `/a\//` and on a backtick inside `${\'`\'}`;
+   *   - a line-oriented scanner read multi-line template CONTINUATION lines
+   *     as comments, and a `/*`-shaped line of string data swallowed every
+   *     remaining line of the file;
+   *   - adding backtick parity fixed that but a stray backtick inside a
+   *     `${}` interpolation cleared the parity early and reopened the hole.
    *
-   * That asymmetry is the whole design. This is a guard, so the two error
-   * directions are not equal: a false positive is loud, visible and quickly
-   * fixed, while a false negative silently licenses the exact thing the guard
-   * exists to stop. A character-level scanner tracking string and template
-   * state is more precise in the common case and strictly more dangerous in
-   * the uncommon one — a regex literal like `/a\//`, or a backtick inside a
-   * `${}` interpolation, desyncs it, and from there it blanks real code until
-   * the next newline or block-comment terminator. Precision is not worth a
-   * hole in a guard.
+   * Each fix moved the defect one layer deeper rather than removing it,
+   * because deciding where a comment ends in JS/TS *is* lexing. TypeScript
+   * is already a devDependency and does it correctly, including regex
+   * literals, nested template interpolations and JSX.
    *
-   * One piece of cross-line state is unavoidable: multi-line template
-   * literals. A continuation line inside one is string DATA, so a line of
-   * help text or a report template that happens to begin `//` or `/*` is not
-   * a comment — and blanking it would hide any real call sharing those lines,
-   * or, for an unterminated-looking `/*`, every line after it in the file.
-   * Seven files under src/ already have that shape (help-center pages,
-   * report-template.ts, notificationQueries.ts). Backtick PARITY alone is
-   * tracked — a counter, not a string-state machine — and a continuation line
-   * is never treated as a comment start.
-   *
-   * Accepted costs, both false positives, both loud:
-   *   - a trailing comment (`const a = 1; // sql`X``) is still scanned;
-   *   - a comment-looking line inside a template literal is still scanned;
-   *   - a lone backtick inside a quoted string flips parity, which only ever
-   *     causes MORE scanning, never less.
-   * If one fires, move the comment to its own line.
+   * Only files whose raw text already matches a pattern are parsed — today
+   * four of ~2,600 — so the common case stays a regex scan.
    */
-  function stripComments(source: string): string {
-    const blank = (text: string) => text.replace(/[^\n\r]/g, ' ');
-    // Backticks not preceded by a backslash. Odd count on a line toggles
-    // whether the next line is inside a template literal.
-    const flipsTemplate = (text: string) =>
-      ((text.match(/(?<!\\)`/g) ?? []).length & 1) === 1;
+  function codeMatchOffsets(source: string, fileName: string): number[] {
+    // Fast path: nothing matches even before comments are considered.
+    if (!dbPatterns.some((pattern) => pattern.test(source))) return [];
 
-    let inBlock = false;
-    let inTemplate = false;
+    const sourceFile = ts.createSourceFile(
+      fileName,
+      source,
+      ts.ScriptTarget.Latest,
+      /* setParentNodes */ true,
+      fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
 
-    return source
-      .split('\n')
-      .map((line) => {
-        // Inside a multi-line template: string data, never a comment.
-        if (inTemplate) {
-          if (flipsTemplate(line)) inTemplate = false;
-          return line;
-        }
+    const comments: Array<[number, number]> = [];
+    const seen = new Set<string>();
+    const add = (ranges?: ts.CommentRange[]) => {
+      for (const range of ranges ?? []) {
+        const key = `${range.pos}:${range.end}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        comments.push([range.pos, range.end]);
+      }
+    };
 
-        // Parity is only ever counted over text that SURVIVES: backticks
-        // inside a blanked comment are comment content, not code.
-        const keep = (surviving: string, blanked: string) => {
-          if (flipsTemplate(surviving)) inTemplate = true;
-          return blanked + surviving;
-        };
+    // Comments are trivia attached to token boundaries, so every token has
+    // to be visited — not just the named nodes.
+    const visit = (node: ts.Node) => {
+      add(ts.getLeadingCommentRanges(source, node.getFullStart()));
+      add(ts.getTrailingCommentRanges(source, node.getEnd()));
+      for (const child of node.getChildren(sourceFile)) visit(child);
+    };
+    visit(sourceFile);
 
-        if (inBlock) {
-          const end = line.indexOf('*/');
-          if (end === -1) return blank(line);
-          inBlock = false;
-          // Keep anything after the block ends — code may follow `*/`.
-          return keep(line.slice(end + 2), blank(line.slice(0, end + 2)));
-        }
+    const insideComment = (offset: number) =>
+      comments.some(([from, to]) => offset >= from && offset < to);
 
-        const indent = line.length - line.trimStart().length;
-        const trimmed = line.trimStart();
-
-        if (trimmed.startsWith('//')) return blank(line);
-
-        if (trimmed.startsWith('/*')) {
-          const end = line.indexOf('*/', indent + 2);
-          if (end === -1) {
-            inBlock = true;
-            return blank(line);
-          }
-          return keep(line.slice(end + 2), blank(line.slice(0, end + 2)));
-        }
-
-        // A continuation line of a block comment is handled by `inBlock`
-        // above; anything else is code and is left exactly as written.
-        return keep(line, '');
-      })
-      .join('\n');
+    const offsets: number[] = [];
+    for (const pattern of dbPatterns) {
+      const global = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
+      let match: RegExpExecArray | null;
+      while ((match = global.exec(source)) !== null) {
+        if (!insideComment(match.index)) offsets.push(match.index);
+        if (match[0].length === 0) global.lastIndex += 1;
+      }
+    }
+    return offsets.sort((a, b) => a - b);
   }
+
+  const lineOf = (source: string, offset: number) =>
+    source.slice(0, offset).split('\n').length;
 
   it.each([
     ['a direct tagged template', 'const rows = sql`SELECT 1`;', true],
@@ -184,33 +164,31 @@ describe('No Direct Database Connections', () => {
     expect(dbPatterns.some((pattern) => pattern.test(source))).toBe(expected);
   });
 
-  const scanMatches = (source: string) =>
-    dbPatterns.some((pattern) => pattern.test(stripComments(source)));
+  const flags = (source: string) => codeMatchOffsets(source, 'probe.tsx').length > 0;
 
-  // Comment-only text must not raise a violation. Each of these DOES match the
-  // raw patterns, so each one fails if stripComments becomes a no-op.
+  // Prose that merely mentions a query. Every one of these matches the raw
+  // patterns, so each fails if comment detection regresses to a no-op.
   it.each([
     ['a line comment', '// use sql`SELECT 1` here\nconst a = 1;'],
     ['a JSDoc block', '/**\n * `${c ? sql`AND x` : sql``}` is broken\n */\nconst a = 1;'],
     ['a commented-out query', '/* const r = sql`SELECT 1`; */'],
     ['an indented JSDoc continuation', 'class A {\n  /**\n   * sql`SELECT 1`\n   */\n}'],
+    ['a trailing comment after code', 'const a = 1; // sql`SELECT 1`'],
   ])('does not flag %s', (_name, source) => {
     expect(dbPatterns.some((pattern) => pattern.test(source))).toBe(true); // raw text matches
-    expect(scanMatches(source)).toBe(false); // stripped text does not
+    expect(flags(source)).toBe(false); // the parser knows it is a comment
   });
 
-  // The dangerous direction: real code must survive stripping. Each of these
-  // fails if stripComments over-reaches and blanks live code — the two
-  // desync vectors a character-level string/template scanner is prone to.
+  // The dangerous direction. Every case here is a vector that broke one of the
+  // three hand-rolled lexers this replaced — each hid a live query.
   it.each([
     ['real code below a comment that mentions it', '// sql`SELECT 1`\nconst r = sql`SELECT 2`;'],
     ['a URL in a string on the same line', "const u = 'https://x.com'; const r = sql`SELECT 1`;"],
     ['a regex literal containing an escaped slash', 'const re = /a\\//; const r = sql`SELECT 1`;'],
     ['code following the end of a block comment', '/* note */ const r = sql`SELECT 1`;'],
     ['code after a multi-line block comment ends', '/*\n x\n */ const r = sql`SELECT 1`;'],
-    // A template continuation line is string DATA. Reading one as a comment
-    // blanks live code: a `/*`-shaped line with no `*/` after it swallowed
-    // every remaining line of the file, hiding two real queries.
+    // Round 2: a template continuation line is string DATA, and reading one as
+    // a comment swallowed every remaining line of the file.
     [
       'code after a template line that looks like an unterminated block comment',
       'const doc = `\n/* still just string data\n`;\nexport const r = sql`SELECT 1`;',
@@ -219,31 +197,39 @@ describe('No Direct Database Connections', () => {
       'an interpolated query on a template line that looks like a comment',
       'export const doc = `\n// note: ${sql`SELECT 1`}\n`;',
     ],
+    // Round 3: a stray backtick inside a `${}` interpolation desynced parity
+    // and cleared the in-template flag, reopening the round-2 hole.
     [
-      'code after a template line that looks like a line comment',
-      'const doc = `\n// still just string data\n`;\nconst r = sql`SELECT 1`;',
+      'a stray backtick in an interpolation, then comment-shaped data, then code',
+      "const doc = `\nbefore ${'a literal ` backtick'} after\n/* still just string data\n`;\nexport const r = sql`SELECT 1`;",
     ],
+    [
+      'a stray backtick in an interpolation, then an interpolated query',
+      "const doc = `\nbefore ${'a literal ` backtick'} after\n// still data: ${sql`SELECT 1`}\n`;",
+    ],
+    ['a query inside a nested template interpolation', 'const a = `${`${sql`SELECT 1`}`}`;'],
   ])('still flags %s', (_name, source) => {
-    expect(scanMatches(source)).toBe(true);
+    expect(flags(source)).toBe(true);
   });
 
-  it('leaves template-literal contents untouched', () => {
-    const source = 'const doc = `\n// not a comment\n/* nor this\n`;\nconst a = 1;';
-    expect(stripComments(source)).toBe(source);
-  });
-
-  it('preserves line numbers when blanking comments', () => {
+  it('reports the line of the first real match, not of a comment', () => {
     const source = '/**\n * sql`X`\n */\nconst r = sql`SELECT 1`;';
-    const scanned = stripComments(source);
-    expect(scanned.split('\n')).toHaveLength(4);
-    const hit = scanned.split('\n').findIndex((line) => /(?<!`)sql\s*`/.test(line)) + 1;
-    expect(hit).toBe(4);
+    const offsets = codeMatchOffsets(source, 'probe.ts');
+    expect(offsets).toHaveLength(1);
+    expect(lineOf(source, offsets[0])).toBe(4);
   });
 
-  it('preserves CRLF line structure', () => {
-    const scanned = stripComments('/**\r\n * sql`X`\r\n */\r\nconst r = sql`SELECT 1`;');
-    expect(scanned.split('\n')).toHaveLength(4);
-    expect(scanned.split('\r\n')).toHaveLength(4);
+  it('reports the correct line with CRLF endings', () => {
+    const source = '/**\r\n * sql`X`\r\n */\r\nconst r = sql`SELECT 1`;';
+    const offsets = codeMatchOffsets(source, 'probe.ts');
+    expect(offsets).toHaveLength(1);
+    expect(lineOf(source, offsets[0])).toBe(4);
+  });
+
+  it('still flags code in a file the parser cannot fully parse', () => {
+    // createSourceFile is error-tolerant; a syntax error must not silence the
+    // gate by making every match look like trivia.
+    expect(flags('const r = sql`SELECT 1`;\nfunction ( { ] }')).toBe(true);
   });
 
   it('scans the metrics snapshot source instead of allowlisting it', () => {
@@ -269,19 +255,16 @@ describe('No Direct Database Connections', () => {
         } else if (file.endsWith('.ts') || file.endsWith('.tsx')) {
           // Skip excluded files
           if (!isExcluded(filePath)) {
-            // Comments are blanked first: this gate is about code that opens a
-            // database connection, not prose that mentions one.
-            const content = stripComments(readFileSync(filePath, 'utf-8'));
+            // This gate is about code that opens a database connection, not
+            // prose that mentions one, so matches inside comments don't count.
+            const content = readFileSync(filePath, 'utf-8');
+            const offsets = codeMatchOffsets(content, filePath);
 
-            // Check for database patterns
-            for (const pattern of dbPatterns) {
-              if (pattern.test(content)) {
-                // Find line number for better error reporting
-                const lines = content.split('\n');
-                const lineNumber = lines.findIndex(line => pattern.test(line)) + 1;
-                violations.push(`${filePath}:${lineNumber} - Direct database connection found`);
-                break; // Only report once per file
-              }
+            if (offsets.length > 0) {
+              // Report the first real one; one violation per file.
+              violations.push(
+                `${filePath}:${lineOf(content, offsets[0])} - Direct database connection found`,
+              );
             }
           }
         }
