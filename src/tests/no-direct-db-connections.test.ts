@@ -118,25 +118,40 @@ describe('No Direct Database Connections', () => {
       fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
 
-    const comments: Array<[number, number]> = [];
+    const candidates: Array<[number, number]> = [];
+    const jsxText: Array<[number, number]> = [];
     const seen = new Set<string>();
     const add = (ranges?: ts.CommentRange[]) => {
       for (const range of ranges ?? []) {
         const key = `${range.pos}:${range.end}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        comments.push([range.pos, range.end]);
+        candidates.push([range.pos, range.end]);
       }
     };
 
     // Comments are trivia attached to token boundaries, so every token has
-    // to be visited — not just the named nodes.
+    // to be visited — not just the named nodes. JsxText spans are recorded on
+    // the same pass, for the filter below.
     const visit = (node: ts.Node) => {
+      if (node.kind === ts.SyntaxKind.JsxText) jsxText.push([node.getFullStart(), node.getEnd()]);
       add(ts.getLeadingCommentRanges(source, node.getFullStart()));
       add(ts.getTrailingCommentRanges(source, node.getEnd()));
       for (const child of node.getChildren(sourceFile)) visit(child);
     };
     visit(sourceFile);
+
+    // getLeading/TrailingCommentRanges are context-blind text scanners: they
+    // look for `//` and `/*` without knowing the lexical mode. Inside JSX
+    // children those sequences are literal text with no special meaning, so a
+    // line of markup reading `// note {sql`SELECT 1`}` was reported as a
+    // comment covering the live JsxExpression — and an unterminated `/*` in
+    // markup swallowed everything to EOF, hiding a top-level query outside the
+    // component entirely. JsxText content is never trivia; drop any candidate
+    // that begins inside one.
+    const comments = candidates.filter(
+      ([from]) => !jsxText.some(([start, end]) => from >= start && from < end),
+    );
 
     const insideComment = (offset: number) =>
       comments.some(([from, to]) => offset >= from && offset < to);
@@ -210,6 +225,28 @@ describe('No Direct Database Connections', () => {
     ['a query inside a nested template interpolation', 'const a = `${`${sql`SELECT 1`}`}`;'],
   ])('still flags %s', (_name, source) => {
     expect(flags(source)).toBe(true);
+  });
+
+  // Round 4: `//` and `/*` inside JSX children are literal text, but the
+  // trivia scanners are context-blind and read them as comments. Both of
+  // these parse with zero diagnostics — no syntax error is needed.
+  it.each([
+    [
+      'a live expression after JSX text that looks like a line comment',
+      'const el = <div>\n  // not a comment, just jsx text {sql`SELECT 1`}\n</div>;',
+    ],
+    [
+      'a query outside the component, after JSX text that looks like an open block comment',
+      'export function El() {\n  return (\n    <div>\n      /* just jsx text, no closing marker\n      more text {sql`SELECT 1`}\n    </div>\n  );\n}\nexport const other = sql`SELECT 2`;',
+    ],
+  ])('still flags %s', (_name, source) => {
+    expect(codeMatchOffsets(source, 'probe.tsx').length).toBeGreaterThan(0);
+  });
+
+  it('still treats a real comment inside a JSX expression container as a comment', () => {
+    const source = 'const el = <div>{/* sql`SELECT 1` */}</div>;';
+    expect(dbPatterns.some((pattern) => pattern.test(source))).toBe(true);
+    expect(codeMatchOffsets(source, 'probe.tsx')).toHaveLength(0);
   });
 
   it('reports the line of the first real match, not of a comment', () => {
