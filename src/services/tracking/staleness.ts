@@ -31,6 +31,16 @@
  * on both environments, so it cannot drift from the thing it names. Anything
  * else on Cartrack is the REST feed by construction.
  *
+ * THE COST OF THAT INVERSION, stated plainly because it runs against the
+ * lenient default two paragraphs down: for Cartrack, an unrecognised account is
+ * treated as FAST, not lenient. Today that is safe — exactly two Cartrack
+ * accounts are ever constructed (poll-tracking.ts for the REST feed,
+ * cartrack/portalConfig.ts for the portal), with no third path and no loop over
+ * accounts. But onboarding ANY second Cartrack account, portal or otherwise,
+ * means revisiting this function: a new portal sub-account would be judged at
+ * 15 minutes and cry wolf every tick, which is the same "signal nobody reads"
+ * failure this module was written to remove.
+ *
  * Note this measures the age of the last EVENT, which is not the same as "when
  * we last reached the tracker": a parked car emits nothing, and a snapshot
  * provider keeps returning the same old fix. Distinguishing "tracker dark" from
