@@ -64,6 +64,17 @@ if [ "$TESTS_ONLY" = false ]; then
   else
     log_fail "Lint"
   fi
+
+  # Piping to `tail` does NOT mask ESLint's exit status here: `set -o pipefail`
+  # (line 17) makes the pipeline take the rightmost non-zero status. Verified
+  # empirically — without pipefail the same line would report a pass on any
+  # outcome, which is why it reads like the inert-gate pattern and has been
+  # mis-flagged as one.
+  if npm run lint:pages -- --max-warnings "$MAX_PAGES_LINT_WARNINGS" 2>&1 | tail -5; then
+    log_pass "Lint (pages)"
+  else
+    log_fail "Lint (pages)"
+  fi
 fi
 
 # --- STEP 2: TypeScript ---
