@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useZoneDeliveryTracker } from '../hooks/useZoneDeliveryTracker';
@@ -21,13 +21,26 @@ export function ZoneTrackerPage() {
   const tracker = useZoneDeliveryTracker(projectId || undefined);
 
   // Built from the rows themselves so the filter can only ever offer sites that
-  // are actually present — there is no separate project list to fall out of step.
-  const projects = useMemo(() => {
-    const known = new Map<string, string>();
-    for (const zone of tracker.data?.zones ?? []) known.set(zone.projectId, zone.projectName);
-    return [...known.entries()]
-      .map(([id, name]) => ({ id, name }))
-      .sort((left, right) => left.name.localeCompare(right.name));
+  // are actually present — there is no separate project list to fall out of
+  // step. Accumulated rather than recomputed, because the API returns only the
+  // selected site: deriving the list from the current response alone would
+  // collapse the dropdown to one option the moment a site was picked, stranding
+  // the user unless they went back through "All sites".
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!tracker.data) return;
+    setProjects(previous => {
+      const known = new Map(previous.map(project => [project.id, project]));
+      for (const zone of tracker.data!.zones) known.set(zone.projectId, {
+        id: zone.projectId,
+        name: zone.projectName,
+      });
+      const next = [...known.values()].sort((left, right) => left.name.localeCompare(right.name));
+      return next.length === previous.length
+        && next.every((project, index) => project.id === previous[index]?.id)
+        ? previous
+        : next;
+    });
   }, [tracker.data]);
 
   return (

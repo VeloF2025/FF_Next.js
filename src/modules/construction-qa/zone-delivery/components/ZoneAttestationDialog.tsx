@@ -16,6 +16,9 @@ interface Props {
   confirmLabel: string;
   submitting: boolean;
   error: string | null;
+  /** Force the reason field even on today's date (e.g. replacing evidence). */
+  requireReason?: boolean;
+  reasonHint?: string;
   children?: ReactNode;
   onClose: () => void;
   onSubmit: (values: AttestationValues) => Promise<boolean>;
@@ -23,7 +26,7 @@ interface Props {
 
 export function ZoneAttestationDialog({
   open, title, description, dateLabel, confirmLabel,
-  submitting, error, children, onClose, onSubmit,
+  submitting, error, requireReason = false, reasonHint, children, onClose, onSubmit,
 }: Props) {
   const today = sastToday();
   const [day, setDay] = useState(today);
@@ -42,13 +45,19 @@ export function ZoneAttestationDialog({
   // The command requires a reason for anything back-dated. Asking for one only
   // when it is actually needed keeps the ordinary case to a date and a click,
   // which is the whole point of the button.
+  // The command also demands a reason when it is correcting something that
+  // already exists — replacing an active document, or re-recording a date. The
+  // caller knows that before the date is chosen, so it can ask for one up
+  // front rather than letting the command reject a submission the operator
+  // has no way to fix from this dialog.
   const backdated = day < today;
+  const needsReason = backdated || requireReason;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const succeeded = await onSubmit({
       effectiveAt: effectiveAtFor(day, today),
-      ...(backdated && reason.trim() ? { reason: reason.trim() } : {}),
+      ...(needsReason && reason.trim() ? { reason: reason.trim() } : {}),
     });
     if (succeeded) close();
   };
@@ -90,9 +99,9 @@ export function ZoneAttestationDialog({
           />
         </label>
 
-        {backdated && (
+        {needsReason && (
           <label className="block text-sm text-[var(--ff-text-primary)]">
-            Reason for the earlier date
+            {backdated ? 'Reason for the earlier date' : (reasonHint ?? 'Reason')}
             <textarea
               required
               value={reason}

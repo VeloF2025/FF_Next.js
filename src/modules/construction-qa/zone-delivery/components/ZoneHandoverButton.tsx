@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { FileCheck2 } from 'lucide-react';
 import { usePermission } from '@/hooks/usePermission';
 import { COMMAND_PERMISSIONS } from '../services/zoneDeliveryHttp';
-import { submitZoneHandover } from '../services/zoneHandoverSubmission';
+import { readZoneHandoverState, submitZoneHandover } from '../services/zoneHandoverSubmission';
 import { ZoneAttestationDialog, type AttestationValues } from './ZoneAttestationDialog';
 
 interface Props {
@@ -31,6 +31,7 @@ export function ZoneHandoverButton({ projectId, zoneNo, onSubmitted }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [fac, setFac] = useState<File | null>(null);
   const [cac, setCac] = useState<File | null>(null);
+  const [replacing, setReplacing] = useState(false);
 
   // Declaring a handover is gated on zone-qa-approve; the uploads it performs
   // are gated on documents-manage. Both are required for the sequence to
@@ -43,7 +44,15 @@ export function ZoneHandoverButton({ projectId, zoneNo, onSubmitted }: Props) {
     setError(null);
     setFac(null);
     setCac(null);
+    setReplacing(false);
     setOpen(true);
+    // Uploading over evidence that is already on file is a correction, and the
+    // command rejects a correction with no reason. Ask before submitting rather
+    // than failing on a field that is not on screen — this is what a retry of a
+    // half-finished handover looks like.
+    void readZoneHandoverState(projectId, zoneNo)
+      .then(state => setReplacing(state.hasEvidence))
+      .catch(() => setReplacing(false));
   };
 
   const submit = async (values: AttestationValues): Promise<boolean> => {
@@ -85,6 +94,8 @@ export function ZoneHandoverButton({ projectId, zoneNo, onSubmitted }: Props) {
         confirmLabel="Record handover"
         submitting={submitting}
         error={error}
+        requireReason={replacing}
+        reasonHint="Reason for replacing the evidence on file"
         onClose={() => setOpen(false)}
         onSubmit={submit}
       >

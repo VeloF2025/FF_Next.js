@@ -73,9 +73,18 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
         if (pon.scopeStatus !== 'included' && !hasReason(pon.reason))
           deliveryError('VALIDATION_ERROR', 'Excluded or cancelled PONs require a reason');
       }
+      // "Never scoped" used to be inferred from row_version 0, which a PON with
+      // no pon_delivery_state row reported via COALESCE. Those rows are now
+      // materialised ahead of the first command on a zone, and the schema
+      // forbids row_version 0, so the inference is asked of the zone directly:
+      // if its scope has never been approved, every PON in it is first-time and
+      // is audited, exactly as before.
+      const firstApproval = !zone?.scope_approved_at;
+      const neverScoped = (previous: { row_version: number }) =>
+        firstApproval || previous.row_version === 0;
       const changes = input.pons.filter(pon => {
         const previous = canonical.get(pon.ponStageId)!;
-        return previous.row_version === 0
+        return neverScoped(previous)
           || previous.scope_status !== pon.scopeStatus
           || (previous.scope_reason ?? '') !== (pon.reason?.trim() ?? '');
       });
@@ -95,7 +104,7 @@ class PgZoneDeliveryService implements ZoneDeliveryService {
           ...audit(input, actor), ponStageId: pon.ponStageId,
           entityType: 'pon', entityId: pon.ponStageId, action: 'scope_updated',
           reason: pon.reason ?? input.reason,
-          previousValue: previous.row_version === 0 ? null
+          previousValue: neverScoped(previous) ? null
             : { scopeStatus: previous.scope_status, scopeReason: previous.scope_reason },
           newValue: { scopeStatus: pon.scopeStatus, scopeReason: pon.reason?.trim() || null },
         });

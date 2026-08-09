@@ -37,7 +37,7 @@ describe('Works QA attestation lifecycle', () => {
       RESTART IDENTITY CASCADE
     `);
     await pool.query(
-      `DELETE FROM pon_stage_tracking WHERE project_id = $1 AND zone_no = 9`,
+      `DELETE FROM pon_stage_tracking WHERE project_id = $1 AND zone_no IN (8, 9)`,
       [PROJECT_ID],
     );
   });
@@ -53,14 +53,18 @@ describe('Works QA attestation lifecycle', () => {
     return rows;
   };
 
-  const submitPon = (ponNo: number, effectiveAt = now(), reason?: string) =>
+  const submitPonIn = (zoneNo: number, ponNo: number, effectiveAt = now(), reason?: string) =>
     submitPonByNumber(pool, service, {
-      ...zone9,
+      projectId: PROJECT_ID,
+      zoneNo,
       ponNo,
       effectiveAt,
       source: 'works-qa-toolbar',
       ...(reason ? { reason } : {}),
     }, actor('operations-confirm'));
+
+  const submitPon = (ponNo: number, effectiveAt = now(), reason?: string) =>
+    submitPonIn(9, ponNo, effectiveAt, reason);
 
   it('records a submission on a zone with no canonical rows and no approved scope', async () => {
     expect(await canonicalRows()).toHaveLength(0);
@@ -91,19 +95,47 @@ describe('Works QA attestation lifecycle', () => {
     expect((await canonicalRows()).map(row => row.pon_no)).toEqual([91, 92, 93]);
   });
 
-  it('leaves a 1Map row alone rather than restamping it as works-qa', async () => {
+  it('reaches a zone that only public.poles carries', async () => {
+    // Zone 8 exists solely through the v_pole_planning arm that feeds the eight
+    // projects sow_poles does not cover. Seeding only the sow arm would let
+    // every other test here pass while this path stayed broken.
+    const view = await submitPonIn(8, 81);
+
+    expect(view.pons.find(pon => pon.ponNo === 81)?.milestones.port_submitted).toBeDefined();
+    const { rows } = await pool.query<{ pon_no: number }>(
+      `SELECT pon_no FROM pon_stage_tracking WHERE project_id = $1 AND zone_no = 8 ORDER BY pon_no`,
+      [PROJECT_ID],
+    );
+    expect(rows.map(row => row.pon_no)).toEqual([81, 82]);
+  });
+
+  it('leaves the canonical set of an already-tracked zone alone', async () => {
+    // 1Map owns this zone's PON list. Adding the PONs it has not synced would
+    // enlarge the denominator behind an approved scope — regressing Zone-QA
+    // eligibility and breaking updateScope's "every canonical PON exactly once"
+    // invariant, with no activity row to explain it. Seven production zones
+    // have exactly this shape.
     await pool.query(`
       INSERT INTO pon_stage_tracking (project_id, zone_no, pon_no, sync_source)
       VALUES ($1, 9, 92, '1map')
     `, [PROJECT_ID]);
 
+    await expect(submitPon(91)).rejects.toThrow(/PON 91 does not belong to zone 9/);
+
+    expect(await canonicalRows()).toEqual([{ pon_no: 92, sync_source: '1map' }]);
+  });
+
+  it('does not claim a 1Map sync that never ran', async () => {
+    // The Build Tracker publishes MAX(last_synced_at) as a project's "last
+    // synced" KPI, so a lazily created row must not carry one.
     await submitPon(91);
 
-    expect(await canonicalRows()).toEqual([
-      { pon_no: 91, sync_source: 'works-qa' },
-      { pon_no: 92, sync_source: '1map' },
-      { pon_no: 93, sync_source: 'works-qa' },
-    ]);
+    const { rows } = await pool.query<{ stamped: number }>(
+      `SELECT count(*)::int AS stamped FROM pon_stage_tracking
+       WHERE project_id = $1 AND zone_no = 9 AND last_synced_at IS NOT NULL`,
+      [PROJECT_ID],
+    );
+    expect(rows[0]!.stamped).toBe(0);
   });
 
   it('is idempotent — a second submission corrects rather than duplicates', async () => {

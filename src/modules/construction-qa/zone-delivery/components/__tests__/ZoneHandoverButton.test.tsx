@@ -23,9 +23,13 @@ const view = (rowVersion: number) => ({
   json: async () => ({ success: true, data: { rowVersion } }),
 });
 
-/** GET zone -> 0, FAC upload -> 1, CAC upload -> 2, declare -> 3. */
+/**
+ * open (pre-flight read) -> 0, GET zone -> 0, FAC -> 1, CAC -> 2, declare -> 3.
+ * The pre-flight read is what tells the dialog whether evidence already exists.
+ */
 const happyPath = () => {
   fetchMock
+    .mockResolvedValueOnce(view(0))
     .mockResolvedValueOnce(view(0))
     .mockResolvedValueOnce(view(1))
     .mockResolvedValueOnce(view(2))
@@ -35,6 +39,7 @@ const happyPath = () => {
 const openWithFiles = () => {
   render(<ZoneHandoverButton projectId="p-1" zoneNo={20} />);
   fireEvent.click(screen.getByRole('button', { name: /Zone Handover/ }));
+  // Drop the pre-flight read so the assertions below index the write sequence.
   fireEvent.change(screen.getByLabelText('FAC'), {
     target: { files: [new File(['fac'], 'fac.pdf', { type: 'application/pdf' })] },
   });
@@ -64,8 +69,8 @@ describe('ZoneHandoverButton', () => {
     submit();
     await settle();
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
-    const [read, facCall, cacCall, declare] = fetchMock.mock.calls;
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    const [, read, facCall, cacCall, declare] = fetchMock.mock.calls;
 
     expect(String(read![0])).toContain('/api/zone-delivery/zone?');
     // Each document registration bumps the zone's version, so the next request
@@ -85,8 +90,10 @@ describe('ZoneHandoverButton', () => {
   it('treats an unreadable zone as version 0 rather than failing up front', async () => {
     // A zone with no canonical PON rows cannot be read at all; the upload that
     // follows is what creates them.
+    const notFound = { ok: false, json: async () => ({ success: false, error: { message: 'Zone has no canonical PON tracking rows' } }) };
     fetchMock
-      .mockResolvedValueOnce({ ok: false, json: async () => ({ success: false, error: { message: 'Zone has no canonical PON tracking rows' } }) })
+      .mockResolvedValueOnce(notFound)
+      .mockResolvedValueOnce(notFound)
       .mockResolvedValueOnce(view(1))
       .mockResolvedValueOnce(view(2))
       .mockResolvedValueOnce(view(3));
@@ -94,12 +101,13 @@ describe('ZoneHandoverButton', () => {
     submit();
     await settle();
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
-    expect((fetchMock.mock.calls[1]![1].body as FormData).get('expectedRowVersion')).toBe('0');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    expect((fetchMock.mock.calls[2]![1].body as FormData).get('expectedRowVersion')).toBe('0');
   });
 
   it('stops at the failing step and reports it', async () => {
     fetchMock
+      .mockResolvedValueOnce(view(0))
       .mockResolvedValueOnce(view(0))
       .mockResolvedValueOnce({ ok: false, json: async () => ({ success: false, error: { message: 'Document metadata or owner is invalid' } }) });
     openWithFiles();
@@ -108,16 +116,54 @@ describe('ZoneHandoverButton', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Document metadata'));
     // The CAC upload and the declaration must not run after the FAC failed.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('refuses to start without both documents', async () => {
+    fetchMock.mockResolvedValue(view(0));
     render(<ZoneHandoverButton projectId="p-1" zoneNo={20} />);
     fireEvent.click(screen.getByRole('button', { name: /Zone Handover/ }));
     submit();
     await settle();
 
     expect(screen.getByRole('alert')).toHaveTextContent('Both the FAC and the CAC are required');
-    expect(fetchMock).not.toHaveBeenCalled();
+    // The pre-flight read is allowed; nothing may be written.
+    const wrote = fetchMock.mock.calls.some(([url, init]) =>
+      String(url).includes('/document') || (init as RequestInit | undefined)?.method === 'POST');
+    expect(wrote).toBe(false);
+  });
+
+  it('asks for a reason up front when evidence is already on file', async () => {
+    // Re-running a half-finished handover supersedes the document it already
+    // uploaded, which the command treats as a correction and rejects without a
+    // reason. Today's date alone would not surface the field.
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          rowVersion: 3,
+          documents: [{ documentType: 'fac', active: true }],
+        },
+      }),
+    });
+    render(<ZoneHandoverButton projectId="p-1" zoneNo={20} />);
+    fireEvent.click(screen.getByRole('button', { name: /Zone Handover/ }));
+    await settle();
+
+    const reason = screen.getByLabelText('Reason for replacing the evidence on file');
+    expect(reason).toBeRequired();
+  });
+
+  it('does not ask for a reason on a zone with no evidence yet', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { rowVersion: 0, documents: [] } }),
+    });
+    render(<ZoneHandoverButton projectId="p-1" zoneNo={20} />);
+    fireEvent.click(screen.getByRole('button', { name: /Zone Handover/ }));
+    await settle();
+
+    expect(screen.queryByLabelText(/^Reason/)).not.toBeInTheDocument();
   });
 });
