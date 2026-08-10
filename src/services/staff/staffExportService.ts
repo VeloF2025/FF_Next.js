@@ -14,10 +14,15 @@ export const staffExportService = {
   async exportToExcel(staff?: StaffMember[], access?: StaffAccessResult): Promise<Blob> {
     const XLSX = await import('xlsx');
     // Get all staff if not provided
-    // Imported lazily so the Neon driver does not land in the client bundle;
-    // this fallback only runs server-side, when no rows were passed in.
+    // Imported lazily so the Neon driver is not in the client bundle, and
+    // branched on environment so the browser never reaches it at all. Without
+    // the branch this fallback is safe only by accident: its one no-args caller
+    // is currently unreachable dead code, which is not a property to depend on.
     const dataToExport =
-      staff || (await (await import('./staffNeonService')).staffNeonService.getAll());
+      staff ||
+      (await (typeof window !== 'undefined'
+        ? (await import('./staffApiService')).staffApiService.getAll()
+        : (await import('./staffNeonService')).staffNeonService.getAll()));
 
     // Base export data - visible to all users
     const exportData = dataToExport.map(s => {

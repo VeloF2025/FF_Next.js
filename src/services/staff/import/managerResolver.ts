@@ -11,11 +11,24 @@ import { StaffImportRow } from '@/types/staff/import.types';
  */
 export async function findManagerByName(managerName: string): Promise<string | null> {
   try {
-    // Import staffNeonService directly to avoid circular dependency with staffService
-    const { staffNeonService } = await import('../staffNeonService');
-    
+    // Browser gets the HTTP service, server gets Neon.
+    //
+    // This used to import staffNeonService unconditionally. The staff import UI
+    // (/staff/import -> StaffImportAdvanced -> useStaffImportAdvanced ->
+    // staffImportService -> processImportRows -> here) runs in the BROWSER, so
+    // every imported row carrying a manager name downloaded the 144KB Neon
+    // driver and then failed: getSql() refuses to build a client in a browser,
+    // and the catch below turned that into a silent `return null`. Manager
+    // resolution has therefore been quietly failing on every UI-driven import.
+    //
+    // Still imported dynamically, and still not via staffService — that is the
+    // circular dependency the original comment was avoiding.
+    const staffService = typeof window !== 'undefined'
+      ? (await import('../staffApiService')).staffApiService
+      : (await import('../staffNeonService')).staffNeonService;
+
     // Get all existing staff to search for the manager
-    const allStaff = await staffNeonService.getAll();
+    const allStaff = await staffService.getAll();
     
     // Find manager by exact name match (case-insensitive)
     const manager = allStaff.find(staff => 

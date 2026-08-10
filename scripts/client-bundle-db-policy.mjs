@@ -83,27 +83,39 @@ export function findMarkers(source) {
  * fixed leak cannot quietly return behind a stale entry. That has already
  * fired twice for real.
  *
- * ALL THREE REMAINING ENTRIES ARE ONE CHUNK — the Neon driver, reached from
- * staffService / staffExportService / managerResolver.
+ * ONE ENTRY LEFT: the Neon driver chunk, emitted for staffService.
  *
- * They are a WEAKER class than everything above, and the distinction is worth
- * understanding before someone spends a day on them. These three are lazy
- * `import()` calls sitting on branches that never execute in a browser
- * (`isBrowser ? api : neon`). The chunk is emitted and publicly served, but no
- * client code path fetches it — measured: all six page-level dynamic imports
- * that used to pull it now pull zero. Nobody downloads it.
+ * It is emitted and publicly served, but no client path fetches it — the six
+ * pages that used to download it on mount now pull zero. That is a real user
+ * win, not a relabelling; it was verified per page against
+ * react-loadable-manifest.
  *
- * This gate still fails them, deliberately. "In .next/static" is the line
- * precisely because it needs no judgement; "emitted but nobody fetches it"
- * is a judgement, and the moment the gate starts making those it grows an
- * allowlist again.
+ * Do NOT read "nobody fetches it" as harmless. An earlier version of this
+ * comment said exactly that about managerResolver, and blind review disproved
+ * it: managerResolver had no environment branch at all, so the live
+ * /staff/import page really did download the driver, and then silently failed
+ * because getSql() refuses to build a client in a browser and the catch
+ * returned null. Manager resolution had been quietly broken on every UI-driven
+ * import. The branches are what make the claim true; they were added because
+ * it wasn't.
  *
- * Reaching zero needs the architectural split, not another lazy import — that
- * was tried and measured: webpack does NOT eliminate the dead branch, it emits
- * the chunk anyway. The split is: staffService becomes API-only (browser-safe)
- * and server callers import staffNeonService directly. That touches eight
- * consumers and needs a decision on whether the Excel export path runs client
- * or server side, so it is real work rather than a deletion.
+ * FOUR IMPORT SHAPES WERE MEASURED against staffService, so the next attempt
+ * does not repeat them:
+ *   1. static import                     -> driver in six pages' bundles
+ *   2. dynamic import, hoisted `const isBrowser`  -> chunk still emitted
+ *   3. dynamic import behind a module-level helper -> chunk still emitted
+ *   4. inline `typeof window` test + inline import at all nine sites
+ *                                        -> chunk STILL emitted here, even
+ *                                           though the identical shape DID
+ *                                           eliminate it in staffExportService
+ *                                           and managerResolver, which have one
+ *                                           call site each
+ *
+ * So reaching zero needs the architectural split rather than a fifth import
+ * shape: staffService becomes API-only (browser-safe) and server callers import
+ * staffNeonService directly. That touches eight consumers and needs a decision
+ * on whether the Excel export path runs client or server side — real work, not
+ * a deletion.
  *
  * Already fixed, kept as the worked examples because they cover the three
  * shapes this defect takes:
@@ -133,8 +145,4 @@ export function findMarkers(source) {
  * "(dynamic)", because that is the only attribution react-loadable-manifest
  * gives — and it names the file to go and fix.
  */
-export const KNOWN_LEAKING_ROUTES = [
-  "src/services/staff/import/managerResolver.ts (dynamic)",
-  "src/services/staff/staffExportService.ts (dynamic)",
-  "src/services/staffService.ts (dynamic)",
-];
+export const KNOWN_LEAKING_ROUTES = ["src/services/staffService.ts (dynamic)"];
