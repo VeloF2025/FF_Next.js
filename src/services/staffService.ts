@@ -3,11 +3,18 @@
  * Using API routes for browser, Neon for server/build
  */
 
-import { staffNeonService } from './staff/staffNeonService';
 import { staffApiService } from './staff/staffApiService';
 import { staffImportService } from './staff/staffImportService';
 import { staffExportService } from './staff/staffExportService';
 import type { StaffMember, StaffFilter, StaffDropdownOption, StaffSummary } from '@/types/staff.types';
+
+// Loaded lazily, and only on the server branch below.
+//
+// A static import here put the whole @neondatabase/serverless driver into every
+// client bundle that reaches this module — six pages via next/dynamic. The
+// `isBrowser` switch is a RUNTIME choice; it decides which branch executes and
+// has no bearing on what webpack bundles. Only the shape of the import does.
+const loadNeonService = async () => (await import('./staff/staffNeonService')).staffNeonService;
 
 // Use API service in browser, Neon service for server/build
 const isBrowser = typeof window !== 'undefined';
@@ -42,32 +49,32 @@ export const staffService: StaffService = {
   getAll: async (filter?: StaffFilter): Promise<StaffMember[]> => {
     return isBrowser
       ? staffApiService.getAll(filter as Record<string, unknown>)
-      : staffNeonService.getAll(filter);
+      : (await loadNeonService()).getAll(filter);
   },
 
   getById: async (id: string): Promise<StaffMember | null> => {
-    return isBrowser ? staffApiService.getById(id) : staffNeonService.getById(id);
+    return isBrowser ? staffApiService.getById(id) : (await loadNeonService()).getById(id);
   },
 
   create: async (data: Partial<StaffMember>): Promise<StaffMember> => {
-    return isBrowser ? staffApiService.create(data) : staffNeonService.create(data);
+    return isBrowser ? staffApiService.create(data) : (await loadNeonService()).create(data);
   },
 
   createOrUpdate: async (data: Partial<StaffMember>): Promise<StaffMember> => {
-    return isBrowser ? staffApiService.create(data) : staffNeonService.createOrUpdate(data);
+    return isBrowser ? staffApiService.create(data) : (await loadNeonService()).createOrUpdate(data);
   },
 
   update: async (id: string, data: Partial<StaffMember>): Promise<StaffMember> => {
-    return isBrowser ? staffApiService.update(id, data) : staffNeonService.update(id, data);
+    return isBrowser ? staffApiService.update(id, data) : (await loadNeonService()).update(id, data);
   },
 
   delete: async (id: string): Promise<void> => {
-    return isBrowser ? staffApiService.delete(id) : staffNeonService.delete(id);
+    return isBrowser ? staffApiService.delete(id) : (await loadNeonService()).delete(id);
   },
 
   // Query operations
   getActiveStaff: async (): Promise<StaffDropdownOption[]> => {
-    return isBrowser ? staffApiService.getActiveStaff() : staffNeonService.getActiveStaff();
+    return isBrowser ? staffApiService.getActiveStaff() : (await loadNeonService()).getActiveStaff();
   },
 
   getProjectManagers: async (): Promise<StaffDropdownOption[]> => {
@@ -87,11 +94,11 @@ export const staffService: StaffService = {
           maxProjectCount: s.maxProjectCount,
         }));
     }
-    return staffNeonService.getProjectManagers();
+    return (await loadNeonService()).getProjectManagers();
   },
 
   getStaffSummary: async (): Promise<StaffSummary> => {
-    return isBrowser ? staffApiService.getStaffSummary() : staffNeonService.getStaffSummary();
+    return isBrowser ? staffApiService.getStaffSummary() : (await loadNeonService()).getStaffSummary();
   },
 
   // Extended operations

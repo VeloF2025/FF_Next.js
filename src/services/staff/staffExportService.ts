@@ -1,5 +1,4 @@
 import { StaffMember } from '@/types/staff.types';
-import { staffNeonService } from './staffNeonService';
 import { formatDateISO } from '@/utils/dateFormat';
 import type { StaffAccessResult } from '@/types/staff/access.types';
 
@@ -15,7 +14,10 @@ export const staffExportService = {
   async exportToExcel(staff?: StaffMember[], access?: StaffAccessResult): Promise<Blob> {
     const XLSX = await import('xlsx');
     // Get all staff if not provided
-    const dataToExport = staff || await staffNeonService.getAll();
+    // Imported lazily so the Neon driver does not land in the client bundle;
+    // this fallback only runs server-side, when no rows were passed in.
+    const dataToExport =
+      staff || (await (await import('./staffNeonService')).staffNeonService.getAll());
 
     // Base export data - visible to all users
     const exportData = dataToExport.map(s => {

@@ -83,12 +83,27 @@ export function findMarkers(source) {
  * fixed leak cannot quietly return behind a stale entry. That has already
  * fired twice for real.
  *
- * ALL REMAINING ENTRIES ARE ONE CHUNK, reached by `next/dynamic` from the
- * projects and staff components, which transitively import staffService /
- * staffNeonService. Lazy is still shipped — it downloads when the component
- * mounts — so this is the same defect as an eager import, only deferred. Fix
- * them by moving those services behind API routes; they will come off this
- * list together, since they share the chunk.
+ * ALL THREE REMAINING ENTRIES ARE ONE CHUNK — the Neon driver, reached from
+ * staffService / staffExportService / managerResolver.
+ *
+ * They are a WEAKER class than everything above, and the distinction is worth
+ * understanding before someone spends a day on them. These three are lazy
+ * `import()` calls sitting on branches that never execute in a browser
+ * (`isBrowser ? api : neon`). The chunk is emitted and publicly served, but no
+ * client code path fetches it — measured: all six page-level dynamic imports
+ * that used to pull it now pull zero. Nobody downloads it.
+ *
+ * This gate still fails them, deliberately. "In .next/static" is the line
+ * precisely because it needs no judgement; "emitted but nobody fetches it"
+ * is a judgement, and the moment the gate starts making those it grows an
+ * allowlist again.
+ *
+ * Reaching zero needs the architectural split, not another lazy import — that
+ * was tried and measured: webpack does NOT eliminate the dead branch, it emits
+ * the chunk anyway. The split is: staffService becomes API-only (browser-safe)
+ * and server callers import staffNeonService directly. That touches eight
+ * consumers and needs a decision on whether the Excel export path runs client
+ * or server side, so it is real work rather than a deletion.
  *
  * Already fixed, kept as the worked examples because they cover the three
  * shapes this defect takes:
@@ -119,12 +134,7 @@ export function findMarkers(source) {
  * gives — and it names the file to go and fix.
  */
 export const KNOWN_LEAKING_ROUTES = [
-  "pages/projects/[id]/edit.tsx (dynamic)",
-  "pages/projects/new.tsx (dynamic)",
-  "pages/projects/pipeline/[id].tsx (dynamic)",
-  "pages/staff/[id].tsx (dynamic)",
-  "pages/staff/[id]/edit.tsx (dynamic)",
-  "pages/staff/new.tsx (dynamic)",
   "src/services/staff/import/managerResolver.ts (dynamic)",
-  "src/services/staff/import/rowProcessor.ts (dynamic)",
+  "src/services/staff/staffExportService.ts (dynamic)",
+  "src/services/staffService.ts (dynamic)",
 ];
