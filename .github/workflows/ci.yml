@@ -44,6 +44,14 @@ jobs:
           node --test scripts/check-ci-baselines.test.mjs
           node scripts/check-ci-baselines.mjs
 
+      # The guard itself needs a build and so runs on the deploy path, but its
+      # tests use synthetic .next fixtures and need nothing. They run here
+      # because they are the only thing keeping the ratchet and manifest
+      # parsing honest — an unrun test suite protects nothing, and the first
+      # sign of a regression would otherwise be a bad production deploy.
+      - name: Client bundle DB guard — unit tests
+        run: node --test scripts/check-client-bundle-db.test.mjs
+
       - name: Lint (ratchet gate)
         run: |
           set -a; . scripts/ci-baselines.env; set +a
