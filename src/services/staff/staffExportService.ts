@@ -1,5 +1,4 @@
 import { StaffMember } from '@/types/staff.types';
-import { staffNeonService } from './staffNeonService';
 import { formatDateISO } from '@/utils/dateFormat';
 import type { StaffAccessResult } from '@/types/staff/access.types';
 
@@ -15,7 +14,15 @@ export const staffExportService = {
   async exportToExcel(staff?: StaffMember[], access?: StaffAccessResult): Promise<Blob> {
     const XLSX = await import('xlsx');
     // Get all staff if not provided
-    const dataToExport = staff || await staffNeonService.getAll();
+    // Imported lazily so the Neon driver is not in the client bundle, and
+    // branched on environment so the browser never reaches it at all. Without
+    // the branch this fallback is safe only by accident: its one no-args caller
+    // is currently unreachable dead code, which is not a property to depend on.
+    const dataToExport =
+      staff ||
+      (await (typeof window !== 'undefined'
+        ? (await import('./staffApiService')).staffApiService.getAll()
+        : (await import('./staffNeonService')).staffNeonService.getAll()));
 
     // Base export data - visible to all users
     const exportData = dataToExport.map(s => {

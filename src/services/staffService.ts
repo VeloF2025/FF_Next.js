@@ -3,14 +3,30 @@
  * Using API routes for browser, Neon for server/build
  */
 
-import { staffNeonService } from './staff/staffNeonService';
 import { staffApiService } from './staff/staffApiService';
 import { staffImportService } from './staff/staffImportService';
 import { staffExportService } from './staff/staffExportService';
 import type { StaffMember, StaffFilter, StaffDropdownOption, StaffSummary } from '@/types/staff.types';
 
-// Use API service in browser, Neon service for server/build
-const isBrowser = typeof window !== 'undefined';
+// The Neon service is imported lazily, inside each server-only branch.
+//
+// What this DID fix, measured: a static import put the whole
+// @neondatabase/serverless driver into the dynamic-import graph of six pages
+// (staff and projects forms/details, pipeline detail), so visiting any of them
+// DOWNLOADED 144KB on component mount to serve a branch that never runs in a
+// browser. Those six now pull zero driver chunks.
+//
+// What it did NOT fix: webpack still emits the chunk for this module. Three
+// shapes were tried and measured — dynamic import behind a hoisted
+// `const isBrowser`, dynamic import behind a module-level helper, and this one
+// (inline `typeof window` test, inline import at all nine sites). The chunk
+// survives all three here, though the same inline shape DID eliminate it in
+// staffExportService and managerResolver, which have a single call site each.
+// It is emitted and served but no client path fetches it.
+//
+// Reaching zero needs the architectural split, not a fourth import shape:
+// staffService becomes API-only and server callers import staffNeonService
+// directly. See scripts/client-bundle-db-policy.mjs for the full record.
 
 /**
  * Staff Service Interface
@@ -40,38 +56,38 @@ interface StaffService {
 export const staffService: StaffService = {
   // Main CRUD operations
   getAll: async (filter?: StaffFilter): Promise<StaffMember[]> => {
-    return isBrowser
+    return typeof window !== 'undefined'
       ? staffApiService.getAll(filter as Record<string, unknown>)
-      : staffNeonService.getAll(filter);
+      : (await import('./staff/staffNeonService')).staffNeonService.getAll(filter);
   },
 
   getById: async (id: string): Promise<StaffMember | null> => {
-    return isBrowser ? staffApiService.getById(id) : staffNeonService.getById(id);
+    return typeof window !== 'undefined' ? staffApiService.getById(id) : (await import('./staff/staffNeonService')).staffNeonService.getById(id);
   },
 
   create: async (data: Partial<StaffMember>): Promise<StaffMember> => {
-    return isBrowser ? staffApiService.create(data) : staffNeonService.create(data);
+    return typeof window !== 'undefined' ? staffApiService.create(data) : (await import('./staff/staffNeonService')).staffNeonService.create(data);
   },
 
   createOrUpdate: async (data: Partial<StaffMember>): Promise<StaffMember> => {
-    return isBrowser ? staffApiService.create(data) : staffNeonService.createOrUpdate(data);
+    return typeof window !== 'undefined' ? staffApiService.create(data) : (await import('./staff/staffNeonService')).staffNeonService.createOrUpdate(data);
   },
 
   update: async (id: string, data: Partial<StaffMember>): Promise<StaffMember> => {
-    return isBrowser ? staffApiService.update(id, data) : staffNeonService.update(id, data);
+    return typeof window !== 'undefined' ? staffApiService.update(id, data) : (await import('./staff/staffNeonService')).staffNeonService.update(id, data);
   },
 
   delete: async (id: string): Promise<void> => {
-    return isBrowser ? staffApiService.delete(id) : staffNeonService.delete(id);
+    return typeof window !== 'undefined' ? staffApiService.delete(id) : (await import('./staff/staffNeonService')).staffNeonService.delete(id);
   },
 
   // Query operations
   getActiveStaff: async (): Promise<StaffDropdownOption[]> => {
-    return isBrowser ? staffApiService.getActiveStaff() : staffNeonService.getActiveStaff();
+    return typeof window !== 'undefined' ? staffApiService.getActiveStaff() : (await import('./staff/staffNeonService')).staffNeonService.getActiveStaff();
   },
 
   getProjectManagers: async (): Promise<StaffDropdownOption[]> => {
-    if (isBrowser) {
+    if (typeof window !== 'undefined') {
       // In browser, filter active staff as project managers
       const staff = await staffApiService.getAll();
       return staff
@@ -87,11 +103,11 @@ export const staffService: StaffService = {
           maxProjectCount: s.maxProjectCount,
         }));
     }
-    return staffNeonService.getProjectManagers();
+    return (await import('./staff/staffNeonService')).staffNeonService.getProjectManagers();
   },
 
   getStaffSummary: async (): Promise<StaffSummary> => {
-    return isBrowser ? staffApiService.getStaffSummary() : staffNeonService.getStaffSummary();
+    return typeof window !== 'undefined' ? staffApiService.getStaffSummary() : (await import('./staff/staffNeonService')).staffNeonService.getStaffSummary();
   },
 
   // Extended operations
