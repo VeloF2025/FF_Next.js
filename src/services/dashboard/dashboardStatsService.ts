@@ -2,49 +2,26 @@
  * Dashboard Statistics Service
  * Provides real database statistics for dashboard components
  * ZERO mock data - all statistics from actual database sources
+ *
+ * NO DATABASE CLIENT HERE, deliberately. Both public methods go through
+ * analyticsApi over HTTP, and this module is imported by useDashboardData — a
+ * React hook — so it ships to the browser.
+ *
+ * It used to import `neon` from '@/lib/db-neon' behind a lazy
+ * `typeof window === 'undefined'` guard. That guard prevented the client being
+ * CONSTRUCTED in a browser but did nothing about the import, and webpack
+ * bundles what is imported: the whole @neondatabase/serverless driver was in
+ * the client chunks for /enhanced-kpis, /analytics, /dashboard, /kpi-dashboard
+ * and /reports — a 144KB download for every visitor to any of them.
+ *
+ * Its only users were five `@deprecated` private statics with zero call sites,
+ * plus the three calculate* helpers those in turn called. All eight are gone;
+ * what is left is the two public methods, which have always gone through
+ * analyticsApi over HTTP, and the empty-stats fallback.
  */
 
 import { analyticsApi } from '@/services/api/analyticsApi';
 import { log } from '@/lib/logger';
-import { staffService } from '@/services/staffService';
-import { neon, NeonQueryFunction } from '@/lib/db-neon';
-
-// Lazy initialize SQL client for deprecated methods (prevents SSR/client mismatch)
-let _sql: NeonQueryFunction<false, false> | null = null;
-const getSql = () => {
-  if (!_sql && typeof window === 'undefined' && process.env.DATABASE_URL) {
-    _sql = neon(process.env.DATABASE_URL);
-  }
-  return _sql;
-};
-
-// Type definitions for deprecated query services
-const staffQueryService = {
-  getStaffSummary: () => staffService.getStaffSummary(),
-};
-
-const clientQueryService = {
-  getClientSummary: async () => ({
-    totalProjectValue: 0,
-    activeClients: 0,
-  }),
-};
-
-interface ProjectRecord {
-  status?: string;
-  budget?: number;
-  endDate?: Date | string | null;
-  actualEndDate?: Date | string | { toDate?: () => Date } | null;
-}
-
-const ProjectQueryService = {
-  getAllProjects: async (): Promise<ProjectRecord[]> => [],
-  getActiveProjects: async (): Promise<ProjectRecord[]> => [],
-};
-
-const ProjectStatus = {
-  COMPLETED: 'COMPLETED',
-} as const;
 
 // 🟢 WORKING: Core dashboard data types
 export interface DashboardStats {
@@ -117,235 +94,6 @@ export class DashboardStatsService {
       // Return zeros instead of mock data on error
       return this.getEmptyStats();
     }
-  }
-
-  /**
-   * @deprecated Use API endpoint instead
-   */
-  private static async getProjectStatistics() {
-    try {
-      // Get all projects from Neon
-      const allProjects = await ProjectQueryService.getAllProjects();
-      const activeProjects = await ProjectQueryService.getActiveProjects();
-      
-      // Get completed projects
-      const completedProjects = allProjects.filter(p => 
-        p.status === ProjectStatus.COMPLETED
-      );
-
-      // Calculate performance metrics from actual data
-      const totalBudget = allProjects.reduce((sum, p) => sum + (p.budget || 0), 0);
-      const completedBudget = completedProjects.reduce((sum, p) => sum + (p.budget || 0), 0);
-      
-      // Calculate on-time delivery from project dates
-      const onTimeProjects = completedProjects.filter(p => {
-        if (!p.endDate || !p.actualEndDate) return false;
-        // Compare actual end date with planned end date (using endDate as planned)
-        const actualEnd = p.actualEndDate instanceof Date ? p.actualEndDate :
-          typeof p.actualEndDate === 'string' ? new Date(p.actualEndDate) :
-          (typeof p.actualEndDate === 'object' && p.actualEndDate !== null && 'toDate' in p.actualEndDate ? p.actualEndDate.toDate?.() : undefined) || new Date();
-        const plannedEnd = p.endDate instanceof Date ? p.endDate :
-          typeof p.endDate === 'string' ? new Date(p.endDate) : new Date();
-        return actualEnd <= plannedEnd;
-      });
-      
-      const onTimeDelivery = completedProjects.length > 0 
-        ? (onTimeProjects.length / completedProjects.length) * 100 
-        : 0;
-
-      return {
-        total: allProjects.length,
-        active: activeProjects.length,
-        completed: completedProjects.length,
-        completedTasks: this.calculateCompletedTasks(allProjects),
-        performanceScore: this.calculatePerformanceScore(allProjects),
-        qualityScore: this.calculateQualityScore(completedProjects),
-        onTimeDelivery,
-        budgetUtilization: totalBudget > 0 ? (completedBudget / totalBudget) * 100 : 0,
-      };
-    } catch (error) {
-      log.error('Error getting project statistics:', { data: error }, 'dashboardStatsService');
-      return {
-        total: 0,
-        active: 0,
-        completed: 0,
-        completedTasks: 0,
-        performanceScore: 0,
-        qualityScore: 0,
-        onTimeDelivery: 0,
-        budgetUtilization: 0,
-      };
-    }
-  }
-
-  /**
-   * @deprecated Use API endpoint instead
-   */
-  private static async getStaffStatistics() {
-    try {
-      const staffSummary = await staffQueryService.getStaffSummary();
-      
-      return {
-        total: staffSummary.activeStaff, // Only count active staff
-        openIssues: 0, // TODO: Connect to issues system when available
-      };
-    } catch (error) {
-      log.error('Error getting staff statistics:', { data: error }, 'dashboardStatsService');
-      return {
-        total: 0,
-        openIssues: 0,
-      };
-    }
-  }
-
-  /**
-   * @deprecated Use API endpoint instead
-   */
-  private static async getClientStatistics() {
-    try {
-      const clientSummary = await clientQueryService.getClientSummary();
-      
-      return {
-        totalRevenue: clientSummary.totalProjectValue,
-        activeClients: clientSummary.activeClients,
-      };
-    } catch (error) {
-      log.error('Error getting client statistics:', { data: error }, 'dashboardStatsService');
-      return {
-        totalRevenue: 0,
-        activeClients: 0,
-      };
-    }
-  }
-
-  /**
-   * @deprecated Use API endpoint instead
-   */
-  private static async getInfrastructureStatistics() {
-    try {
-      // Try to get infrastructure data from Neon database
-      // If tables don't exist, return 0s
-      const sql = getSql();
-      if (!sql) return { poles: 0, drops: 0, fiber: 0 };
-
-      const result = await sql`
-        SELECT
-          COALESCE(SUM(CASE WHEN type = 'pole' THEN quantity ELSE 0 END), 0) as poles,
-          COALESCE(SUM(CASE WHEN type = 'drop' THEN quantity ELSE 0 END), 0) as drops,
-          COALESCE(SUM(CASE WHEN type = 'fiber' THEN length ELSE 0 END), 0) as fiber
-        FROM infrastructure_installations
-        WHERE status = 'completed'
-      `.catch(() => [{ poles: 0, drops: 0, fiber: 0 }]);
-
-      const stats = result[0] || { poles: 0, drops: 0, fiber: 0 };
-      
-      return {
-        poles: parseInt(stats.poles) || 0,
-        drops: parseInt(stats.drops) || 0,
-        fiber: parseInt(stats.fiber) || 0,
-      };
-    } catch (error) {
-      // Return 0s if infrastructure tracking not implemented yet
-      return {
-        poles: 0,
-        drops: 0,
-        fiber: 0,
-      };
-    }
-  }
-
-  /**
-   * @deprecated Use API endpoint instead
-   */
-  private static async getProcurementStatistics() {
-    try {
-      // Try to get procurement data from Neon database
-      // If tables don't exist, return 0s
-      const sql = getSql();
-      if (!sql) return {
-        boqsActive: 0,
-        rfqsActive: 0,
-        suppliersActive: 0,
-        contractorsActive: 0,
-        contractorsPending: 0,
-        reportsGenerated: 0,
-      };
-
-      const [boqResult, rfqResult, supplierResult, contractorResult] = await Promise.all([
-        sql`SELECT COUNT(*) as count FROM boqs WHERE status = 'active'`.catch(() => [{ count: 0 }]),
-        sql`SELECT COUNT(*) as count FROM rfqs WHERE status = 'active'`.catch(() => [{ count: 0 }]),
-        sql`SELECT COUNT(*) as count FROM suppliers WHERE status = 'active'`.catch(() => [{ count: 0 }]),
-        sql`
-          SELECT
-            COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
-            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-          FROM contractors
-        `.catch(() => [{ active: 0, pending: 0 }])
-      ]);
-
-      return {
-        boqsActive: parseInt(boqResult[0]?.count) || 0,
-        rfqsActive: parseInt(rfqResult[0]?.count) || 0,
-        suppliersActive: parseInt(supplierResult[0]?.count) || 0,
-        contractorsActive: parseInt(contractorResult[0]?.active) || 0,
-        contractorsPending: parseInt(contractorResult[0]?.pending) || 0,
-        reportsGenerated: 0, // TODO: Connect to reports system when available
-      };
-    } catch (error) {
-      // Return 0s if procurement tracking not fully implemented yet
-      return {
-        boqsActive: 0,
-        rfqsActive: 0,
-        suppliersActive: 0,
-        contractorsActive: 0,
-        contractorsPending: 0,
-        reportsGenerated: 0,
-      };
-    }
-  }
-
-  /**
-   * Calculate completed tasks from projects
-   */
-  private static calculateCompletedTasks(projects: ProjectRecord[]): number {
-    // This would need to be connected to a task management system
-    // For now, estimate based on completed projects
-    const completedProjects = projects.filter(p => 
-      p.status === 'COMPLETED' || p.status === 'FINISHED'
-    );
-    
-    // Rough estimate: 5 tasks per completed project on average
-    return completedProjects.length * 5;
-  }
-
-  /**
-   * Calculate performance score from project data
-   */
-  private static calculatePerformanceScore(projects: ProjectRecord[]): number {
-    if (projects.length === 0) return 0;
-    
-    const completedProjects = projects.filter(p => 
-      p.status === 'COMPLETED' || p.status === 'FINISHED'
-    );
-    
-    if (completedProjects.length === 0) return 0;
-    
-    // Calculate based on completion rate and budget adherence
-    const completionRate = (completedProjects.length / projects.length) * 100;
-    
-    // This is a simplified calculation - would need more metrics in practice
-    return Math.min(completionRate, 100);
-  }
-
-  /**
-   * Calculate quality score from completed projects
-   */
-  private static calculateQualityScore(completedProjects: ProjectRecord[]): number {
-    if (completedProjects.length === 0) return 0;
-    
-    // This would need to be connected to quality metrics/ratings
-    // Return 0 to show honest empty state until real quality metrics are implemented
-    return 0;
   }
 
   /**
