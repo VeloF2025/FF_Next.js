@@ -32,8 +32,18 @@
 // Components
 export * from './components';
 
-// Services
-export * from './services';
+// Services are deliberately NOT re-exported here.
+//
+// `export * from './services'` reached quoteExtractionService, which imports
+// vlmLearningService, which runs `neon(process.env.DATABASE_URL)` at MODULE
+// SCOPE — so merely importing this barrel put a database client construction
+// and the @neondatabase driver into the browser bundle for the only page that
+// uses it, /procurement/rfq/[id], which imports QuoteScannerModal and nothing
+// else. Confirmed in .next/static before this change, absent after.
+//
+// Nothing outside this module imported the services through the barrel or
+// directly, so narrowing it breaks no caller. Server code should import
+// './services/<name>' explicitly.
 
 // Types
 export type {
