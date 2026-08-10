@@ -75,31 +75,35 @@ export function findMarkers(source) {
 }
 
 /**
- * Routes that already ship database code, measured on 6c6d423dd.
+ * Routes that still ship database code. Started at three, measured on
+ * 6c6d423dd; two were fixed immediately after.
  *
- * A ratchet, not an allowlist: these are known-BAD and the list must shrink to
- * empty. Each is a client component calling a service that opens its own
- * connection, so fixing one means moving that work behind an API route —
- * separate work from installing this gate, and the gate is worth having in the
- * meantime because it stops a FOURTH from appearing.
+ * A ratchet, not an allowlist: these are known-BAD and the list must reach
+ * empty. Removing an entry is not optional — the gate FAILS when a listed
+ * route stops leaking, so a fix cannot land without shrinking this list, and
+ * a fixed leak cannot quietly return behind a stale entry.
  *
- *   /enhanced-kpis          useDashboardData.ts:65 calls
- *                           DashboardStatsService.getDashboardStats() from a
- *                           React hook.
- *   /procurement/boq/new    boqImportService.ts:9 is `export * from './import'`,
- *                           pulling three DB modules through a barrel into
- *                           BOQUpload.tsx.
- *   /procurement/rfq/[id]   quoteExtractionService calls buildVlmFewShotPrompt
- *                           and recordCorrectExtraction from vlmLearningService,
- *                           which runs neon(process.env.DATABASE_URL) at module
- *                           scope — the one case that reached module-scope
- *                           construction in the browser.
+ *   /enhanced-kpis          REMAINING. useDashboardData.ts:65 calls
+ *                           DashboardStatsService.getDashboardStats() directly
+ *                           from a React hook. Unlike the two below this is
+ *                           not a barrel accident — the hook really does query
+ *                           in the browser, so fixing it needs an API route to
+ *                           fetch from. No pages/api/dashboard/stats endpoint
+ *                           exists yet.
+ *
+ * Fixed (kept as the worked examples, since both were barrel collateral rather
+ * than intentional client-side queries — the common shape here):
+ *   /procurement/boq/new    boqImportService.ts was `export * from './import'`,
+ *                           pulling BOQImportEnhanced, MaterialMatcher and
+ *                           CategoryMapper in behind the four symbols its eight
+ *                           client-component consumers actually use.
+ *   /procurement/rfq/[id]   the quote-scanner barrel re-exported './services',
+ *                           reaching vlmLearningService and its module-scope
+ *                           neon(process.env.DATABASE_URL) — the one case that
+ *                           built a client in the browser. The page imports
+ *                           only QuoteScannerModal.
  *
  * Routes rather than chunk filenames: filenames carry a content hash and change
  * on every build, so a filename baseline would be stale immediately.
  */
-export const KNOWN_LEAKING_ROUTES = [
-  "/enhanced-kpis",
-  "/procurement/boq/new",
-  "/procurement/rfq/[id]",
-];
+export const KNOWN_LEAKING_ROUTES = ["/enhanced-kpis"];
