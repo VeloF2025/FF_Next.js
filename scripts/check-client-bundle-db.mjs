@@ -97,6 +97,31 @@ export function chunkToRoutes(root) {
   load("build-manifest.json");
   load("app-build-manifest.json");
 
+  // Lazily-loaded chunks appear in NEITHER of the above. `next/dynamic` records
+  // them here instead, keyed "<page> -> <imported module>" with a `files` list.
+  //
+  // Without this, a dynamic import that pulls a driver produced an
+  // unattributed chunk, which this gate fails on but cannot name a route for —
+  // and that is exactly what happened: removing the eager path from
+  // /enhanced-kpis left the same driver chunk reachable from eight
+  // `next/dynamic` imports across the projects, staff and pipeline pages,
+  // which had been masked while the chunk was also loaded eagerly. Lazy is
+  // still shipped; it downloads when the component mounts.
+  const loadable = join(root, ".next", "react-loadable-manifest.json");
+  if (existsSync(loadable)) {
+    let manifest;
+    try {
+      manifest = JSON.parse(readFileSync(loadable, "utf8"));
+    } catch (cause) {
+      throw new Error(`cannot read react-loadable-manifest.json: ${cause.message}`, { cause });
+    }
+    for (const [key, entry] of Object.entries(manifest)) {
+      const page = String(key).split(" -> ")[0].trim();
+      if (!page || !Array.isArray(entry?.files)) continue;
+      for (const chunk of entry.files) if (typeof chunk === "string") add(chunk, `${page} (dynamic)`);
+    }
+  }
+
   return map;
 }
 

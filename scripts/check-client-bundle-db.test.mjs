@@ -195,6 +195,56 @@ test("attributes a shared chunk to every route that loads it", (t) => {
   assert.match(output, /loaded by: \/a, \/b/);
 });
 
+// A next/dynamic chunk appears in NEITHER build manifest. Before this was
+// read, such a chunk was unattributed — correctly failing, but unable to name
+// the file to go and fix.
+test("attributes a lazily-loaded chunk via react-loadable-manifest", (t) => {
+  const root = makeBuild({ "static/chunks/lazy-abc.js": LEAKY }, {});
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    join(root, ".next", "react-loadable-manifest.json"),
+    JSON.stringify({
+      "pages/staff/new.tsx -> ../../src/modules/staff/components/StaffForm": {
+        id: 1,
+        files: ["static/chunks/lazy-abc.js"],
+      },
+    }),
+    "utf8",
+  );
+
+  const { status, output } = check(root, []);
+  assert.equal(status, 1);
+  assert.match(output, /pages\/staff\/new\.tsx \(dynamic\)/);
+  assert.doesNotMatch(output, /cannot be baselined/);
+});
+
+test("a baselined dynamic entry passes", (t) => {
+  const root = makeBuild({ "static/chunks/lazy-abc.js": LEAKY }, {});
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    join(root, ".next", "react-loadable-manifest.json"),
+    JSON.stringify({ "pages/staff/new.tsx -> x": { id: 1, files: ["static/chunks/lazy-abc.js"] } }),
+    "utf8",
+  );
+
+  const { status, output } = check(root, ["pages/staff/new.tsx (dynamic)"]);
+  assert.equal(status, 0, output);
+  assert.match(output, /known leaking route/);
+});
+
+test("tolerates a react-loadable entry with no files array", (t) => {
+  const root = makeBuild({ "static/chunks/pages/index-abc.js": CLEAN }, {});
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    join(root, ".next", "react-loadable-manifest.json"),
+    JSON.stringify({ "pages/a.tsx -> x": { id: 1 }, "": { files: ["static/chunks/pages/index-abc.js"] } }),
+    "utf8",
+  );
+
+  const { status, output } = check(root);
+  assert.equal(status, 0, output);
+});
+
 test("reads the app router manifest too", (t) => {
   const root = makeBuild({ "static/chunks/app-abc.js": LEAKY }, {});
   t.after(() => rmSync(root, { recursive: true, force: true }));

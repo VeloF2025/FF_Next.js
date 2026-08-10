@@ -75,35 +75,56 @@ export function findMarkers(source) {
 }
 
 /**
- * Routes that still ship database code. Started at three, measured on
- * 6c6d423dd; two were fixed immediately after.
+ * Entry points that still ship database code.
  *
  * A ratchet, not an allowlist: these are known-BAD and the list must reach
  * empty. Removing an entry is not optional — the gate FAILS when a listed
- * route stops leaking, so a fix cannot land without shrinking this list, and
- * a fixed leak cannot quietly return behind a stale entry.
+ * entry stops leaking, so a fix cannot land without shrinking this list, and a
+ * fixed leak cannot quietly return behind a stale entry. That has already
+ * fired twice for real.
  *
- *   /enhanced-kpis          REMAINING. useDashboardData.ts:65 calls
- *                           DashboardStatsService.getDashboardStats() directly
- *                           from a React hook. Unlike the two below this is
- *                           not a barrel accident — the hook really does query
- *                           in the browser, so fixing it needs an API route to
- *                           fetch from. No pages/api/dashboard/stats endpoint
- *                           exists yet.
+ * ALL REMAINING ENTRIES ARE ONE CHUNK, reached by `next/dynamic` from the
+ * projects and staff components, which transitively import staffService /
+ * staffNeonService. Lazy is still shipped — it downloads when the component
+ * mounts — so this is the same defect as an eager import, only deferred. Fix
+ * them by moving those services behind API routes; they will come off this
+ * list together, since they share the chunk.
  *
- * Fixed (kept as the worked examples, since both were barrel collateral rather
- * than intentional client-side queries — the common shape here):
- *   /procurement/boq/new    boqImportService.ts was `export * from './import'`,
- *                           pulling BOQImportEnhanced, MaterialMatcher and
- *                           CategoryMapper in behind the four symbols its eight
- *                           client-component consumers actually use.
- *   /procurement/rfq/[id]   the quote-scanner barrel re-exported './services',
- *                           reaching vlmLearningService and its module-scope
- *                           neon(process.env.DATABASE_URL) — the one case that
- *                           built a client in the browser. The page imports
- *                           only QuoteScannerModal.
+ * Already fixed, kept as the worked examples because they cover the three
+ * shapes this defect takes:
  *
- * Routes rather than chunk filenames: filenames carry a content hash and change
- * on every build, so a filename baseline would be stale immediately.
+ *   barrel collateral   /procurement/boq/new — boqImportService.ts was
+ *                       `export * from './import'`, pulling BOQImportEnhanced,
+ *                       MaterialMatcher and CategoryMapper in behind the four
+ *                       symbols its eight client-component consumers use.
+ *
+ *   barrel collateral   /procurement/rfq/[id] — the quote-scanner barrel
+ *                       re-exported './services', reaching vlmLearningService
+ *                       and its module-scope neon(process.env.DATABASE_URL).
+ *
+ *   dead code           /enhanced-kpis — dashboardStatsService imported `neon`
+ *                       behind a lazy `typeof window === 'undefined'` guard,
+ *                       for five @deprecated private statics with zero call
+ *                       sites. The guard stopped the client being CONSTRUCTED
+ *                       in a browser but not the module being IMPORTED, and
+ *                       webpack bundles what is imported. Both public methods
+ *                       already went through analyticsApi over HTTP, so no API
+ *                       route was needed — only deleting 216 lines of dead
+ *                       code.
+ *
+ * Entry points rather than chunk filenames: filenames carry a content hash and
+ * change on every build, so a filename baseline would be stale immediately.
+ * Dynamic entries are the SOURCE of the `next/dynamic` call, suffixed
+ * "(dynamic)", because that is the only attribution react-loadable-manifest
+ * gives — and it names the file to go and fix.
  */
-export const KNOWN_LEAKING_ROUTES = ["/enhanced-kpis"];
+export const KNOWN_LEAKING_ROUTES = [
+  "pages/projects/[id]/edit.tsx (dynamic)",
+  "pages/projects/new.tsx (dynamic)",
+  "pages/projects/pipeline/[id].tsx (dynamic)",
+  "pages/staff/[id].tsx (dynamic)",
+  "pages/staff/[id]/edit.tsx (dynamic)",
+  "pages/staff/new.tsx (dynamic)",
+  "src/services/staff/import/managerResolver.ts (dynamic)",
+  "src/services/staff/import/rowProcessor.ts (dynamic)",
+];
