@@ -97,8 +97,9 @@ export function chunkToRoutes(root) {
   load("build-manifest.json");
   load("app-build-manifest.json");
 
-  // Lazily-loaded chunks appear in NEITHER of the above. `next/dynamic` records
-  // them here instead, keyed "<page> -> <imported module>" with a `files` list.
+  // Lazily-loaded chunks appear in NEITHER of the above. Next records them here
+  // instead, keyed "<page> -> <imported module>" with a `files` list — covering
+  // both `next/dynamic()` component imports and plain `await import()`.
   //
   // Without this, a dynamic import that pulls a driver produced an
   // unattributed chunk, which this gate fails on but cannot name a route for —

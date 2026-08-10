@@ -11,20 +11,17 @@
  * `typeof window === 'undefined'` guard. That guard prevented the client being
  * CONSTRUCTED in a browser but did nothing about the import, and webpack
  * bundles what is imported: the whole @neondatabase/serverless driver was in
- * the /enhanced-kpis client chunk. Its only users were five `@deprecated`
- * private statics with zero call sites — dead code that was costing every
- * visitor to that page a 144KB download.
+ * the client chunks for /enhanced-kpis, /analytics, /dashboard, /kpi-dashboard
+ * and /reports — a 144KB download for every visitor to any of them.
+ *
+ * Its only users were five `@deprecated` private statics with zero call sites,
+ * plus the three calculate* helpers those in turn called. All eight are gone;
+ * what is left is the two public methods, which have always gone through
+ * analyticsApi over HTTP, and the empty-stats fallback.
  */
 
 import { analyticsApi } from '@/services/api/analyticsApi';
 import { log } from '@/lib/logger';
-
-interface ProjectRecord {
-  status?: string;
-  budget?: number;
-  endDate?: Date | string | null;
-  actualEndDate?: Date | string | { toDate?: () => Date } | null;
-}
 
 // 🟢 WORKING: Core dashboard data types
 export interface DashboardStats {
@@ -97,50 +94,6 @@ export class DashboardStatsService {
       // Return zeros instead of mock data on error
       return this.getEmptyStats();
     }
-  }
-
-  /**
-   * Calculate completed tasks from projects
-   */
-  private static calculateCompletedTasks(projects: ProjectRecord[]): number {
-    // This would need to be connected to a task management system
-    // For now, estimate based on completed projects
-    const completedProjects = projects.filter(p => 
-      p.status === 'COMPLETED' || p.status === 'FINISHED'
-    );
-    
-    // Rough estimate: 5 tasks per completed project on average
-    return completedProjects.length * 5;
-  }
-
-  /**
-   * Calculate performance score from project data
-   */
-  private static calculatePerformanceScore(projects: ProjectRecord[]): number {
-    if (projects.length === 0) return 0;
-    
-    const completedProjects = projects.filter(p => 
-      p.status === 'COMPLETED' || p.status === 'FINISHED'
-    );
-    
-    if (completedProjects.length === 0) return 0;
-    
-    // Calculate based on completion rate and budget adherence
-    const completionRate = (completedProjects.length / projects.length) * 100;
-    
-    // This is a simplified calculation - would need more metrics in practice
-    return Math.min(completionRate, 100);
-  }
-
-  /**
-   * Calculate quality score from completed projects
-   */
-  private static calculateQualityScore(completedProjects: ProjectRecord[]): number {
-    if (completedProjects.length === 0) return 0;
-    
-    // This would need to be connected to quality metrics/ratings
-    // Return 0 to show honest empty state until real quality metrics are implemented
-    return 0;
   }
 
   /**
