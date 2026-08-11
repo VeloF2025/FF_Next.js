@@ -132,21 +132,75 @@ log "Starting FibreFlow database backup from ${SAFE_TARGET}"
 # /proc/<pid>/environ, which is restricted to the process owner) and give
 # pg_dump a URI with the password removed. Everything else about the URI —
 # host, port, database, sslmode and friends — is preserved untouched.
+
+# libpq percent-decodes URI components but reads PGPASSWORD verbatim, so an
+# encoded password has to be decoded here or authentication fails.
+#
+# Decode ONLY well-formed %XX escapes, one at a time. The obvious shortcut —
+# `printf '%b' "${raw//%/\\x}"` — feeds the *whole* password through printf, so
+# any unrelated backslash already in it is reinterpreted too: `pa\nss%40end`
+# came out as `pa`, a newline, `ss@end`. That corrupts a password which worked
+# before, on a future rotation, with no code change to trigger it. Result goes
+# in a variable rather than through $(...) because command substitution eats
+# trailing newlines and %0A is a legal escape.
+PCT_DECODED=''
+percent_decode() {
+  # Declared separately: bash expands the whole `local` command before any of
+  # its assignments take effect, so `local s=$1 n=${#s}` reads an unset `s` and
+  # dies under `set -u`.
+  local s=$1
+  local out='' i=0 ch
+  local n=${#s}
+  while (( i < n )); do
+    if [[ ${s:i:1} == '%' && ${s:i+1:2} =~ ^[0-9A-Fa-f]{2}$ ]]; then
+      # The hex goes into the format string itself: bash's printf resolves \x
+      # while parsing the format, so '\x%s' is a literal-backslash error, not
+      # an escape. The two characters are validated as hex by the test above.
+      printf -v ch "\\x${s:i+1:2}"
+      out+=$ch
+      (( i += 3 ))
+    else
+      out+=${s:i:1}
+      (( i += 1 ))
+    fi
+  done
+  PCT_DECODED=$out
+}
+
+# --- Keep the password out of argv ---
+# pg_dump does not scrub its own command line: passing the full URI would put
+# the password in /proc/<pid>/cmdline and `ps aux` — world-readable — for the
+# entire multi-minute dump. Hand it over via PGPASSWORD (only visible through
+# /proc/<pid>/environ, which is restricted to the process owner) and give
+# pg_dump a URI with the password removed. Everything else about the URI —
+# host, port, database, sslmode and friends — is preserved untouched.
 PG_PASS_RAW=$(printf '%s' "$PGURL" | sed -nE 's#^[a-zA-Z][a-zA-Z0-9+.-]*://[^:/?#]+:([^@]*)@.*#\1#p')
 if [[ -n "$PG_PASS_RAW" ]]; then
-  # libpq percent-decodes URI components but reads PGPASSWORD verbatim, so a
-  # password carrying %40 or %25 has to be decoded here or authentication fails.
-  # Only decode when an escape is actually present; otherwise pass it through
-  # untouched so a literal backslash cannot be reinterpreted by printf %b.
-  if [[ "$PG_PASS_RAW" == *%* ]]; then
-    PGPASSWORD=$(printf '%b' "${PG_PASS_RAW//%/\\x}")
-  else
-    PGPASSWORD="$PG_PASS_RAW"
+  # A stray `%` that is not a valid escape is a malformed URI. libpq used to be
+  # the one rejecting it, with a precise message; now that it never sees the
+  # password, say so here rather than guessing at the operator's intent.
+  if [[ "$PG_PASS_RAW" =~ %([^0-9A-Fa-f]|[0-9A-Fa-f][^0-9A-Fa-f]|.?$) ]]; then
+    log "FAILED: the password in the database URL contains a malformed percent-escape"
+    alert "🔴 DB BACKUP FAILED on $(hostname): malformed percent-escape in the database URL. Check ${LOG_FILE}"
+    exit 2
   fi
+  percent_decode "$PG_PASS_RAW"
+  PGPASSWORD="$PCT_DECODED"
   export PGPASSWORD
   PG_CONN=$(printf '%s' "$PGURL" | sed -E 's#(^[a-zA-Z][a-zA-Z0-9+.-]*://[^:/?#]+):[^@]*@#\1@#')
 else
   PG_CONN="$PGURL"
+fi
+unset PCT_DECODED PG_PASS_RAW
+
+# Assert, against the value actually about to be passed, that no password is
+# going into argv. The strip above only understands URIs; a keyword/value
+# conninfo string (`host=... password=...`) would fall through untouched and
+# silently reinstate the leak this section exists to close.
+if printf '%s' "$PG_CONN" | grep -qE '://[^:/?#]+:[^@]*@|password='; then
+  log "FAILED: refusing to run pg_dump — the connection string still carries a password"
+  alert "🔴 DB BACKUP FAILED on $(hostname): connection string still carries a password. Check ${LOG_FILE}"
+  exit 2
 fi
 
 # --- Dump to a temp file; only publish it once it has been verified ---
@@ -164,6 +218,10 @@ if ! pg_dump "$PG_CONN" \
   alert "🔴 DB BACKUP FAILED on $(hostname) at $(date '+%H:%M'): pg_dump error. Check ${LOG_FILE}"
   exit 1
 fi
+
+# pg_dump is the only consumer. Everything after this — gzip, zcat, stat, the
+# curl in alert() — inherits the environment, and none of them need it.
+unset PGPASSWORD
 
 # --- Verify before publishing ---
 DUMP_BYTES=$(stat -c%s "$TMP_FILE")
