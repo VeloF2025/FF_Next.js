@@ -5,10 +5,13 @@
  * Runs the `local/no-direct-serial-status-write` ESLint rule (Track 3) at
  * "error" severity over src/, pages/ and scripts/, regardless of its
  * configured severity.
- * The rule ships "off" in .eslintrc.json and only flips to "error" AT cutover
- * (in the Track 7 PR), so a plain `npx eslint .` cannot catch anything before
- * then — this script forces the rule on so the readiness check is meaningful
- * pre-cutover.
+ * .eslintrc.json has said "error" for this rule since 2026-05-30, but that file
+ * is dead config: .eslintrc.cjs wins ESLint 8 precedence and never declares the
+ * `local` plugin, so `npm run lint` has never evaluated the rule. (The older
+ * wording here — "the rule ships off and flips at cutover" — described a plan,
+ * not the file.) This script is therefore the only thing that actually runs it,
+ * which is why it loads the rule by bare name and forces "error" rather than
+ * trusting any configured severity.
  *
  * Exit codes:
  *   0 — no direct stock_serials.status/holder_id writes outside the rule's

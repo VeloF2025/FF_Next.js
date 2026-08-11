@@ -26,6 +26,16 @@
 
 const path = require('path');
 
+// The repo root, derived from this file's own location — scripts/eslint-rules/.
+// Deliberately NOT context.getCwd(): that is whatever directory the ESLint host
+// happened to start in, so linting from src/ (or from the parent of the repo)
+// made path.relative() return something that no longer began with `src/`, and
+// the two allow-listed owner files were reported as violations. Measured: 0
+// violations with cwd at the root, 2 with cwd at <root>/src. An anchor that
+// moves with the caller is not an anchor. scripts/verify-no-direct-status-
+// writes.ts computes its own ROOT the same way, for the same reason.
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+
 // Each entry is the file's full path from the repo root, anchored at both ends.
 // Two weaker forms were tried and are wrong:
 //   /serialLifecycle\.ts$/          — matches on basename, so ANY file with
@@ -74,10 +84,10 @@ const ALLOWED_FILES = [
  * breaks every real importer of the module. It is a formal bypass, not a
  * stealthy one, and this gate's threat model is a PR that looks ordinary.
  */
-function repoRelative(filename, cwd) {
+function repoRelative(filename) {
   const norm = String(filename).replace(/\\/g, '/');
   if (!path.isAbsolute(norm)) return norm.replace(/^\.\//, '');
-  const rel = path.relative(cwd, norm).replace(/\\/g, '/');
+  const rel = path.relative(REPO_ROOT, norm).replace(/\\/g, '/');
   if (!rel || rel === '..' || rel.startsWith('../')) return null;
   return rel;
 }
@@ -172,8 +182,7 @@ module.exports = {
     },
   },
   create(context) {
-    const cwd = typeof context.getCwd === 'function' ? context.getCwd() : process.cwd();
-    const relative = repoRelative(context.getFilename(), cwd);
+    const relative = repoRelative(context.getFilename());
     if (relative !== null && ALLOWED_FILES.some((re) => re.test(relative))) return {};
 
     function check(node, text) {

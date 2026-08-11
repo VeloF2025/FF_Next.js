@@ -217,3 +217,64 @@ ruleTester.run('no-direct-serial-status-write', rule, {
     },
   ],
 });
+
+// ---------------------------------------------------------------------------
+// The allow-list must not depend on the caller's working directory.
+//
+// RuleTester cannot express this: ESLint 8 gives it no per-case `cwd`, and it
+// defaults to process.cwd(), which is the checkout root on every test run — so
+// the entire cwd-mismatch class is invisible to the cases above. An earlier
+// version anchored against context.getCwd() and passed all of them while
+// reporting the allow-listed owner file as a violation whenever ESLint was
+// invoked from anywhere but the root: 0 violations from the root, 2 from src/.
+//
+// A false positive here is worse than the evasion the anchoring exists to
+// close — it fails the gate on correct code — so it is pinned with a direct
+// Linter run, with the process cwd deliberately moved away from the root.
+// ---------------------------------------------------------------------------
+{
+  const { Linter } = require('eslint');
+  const os = require('os');
+  const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
+  const OWNER = path.join(
+    REPO_ROOT,
+    'src/modules/procurement/field-stock/services/serialLifecycle.ts',
+  );
+  const CODE = 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;';
+
+  const linter = new Linter();
+  linter.defineRule('no-direct-serial-status-write', rule);
+
+  const lintFrom = (cwd) => {
+    const previous = process.cwd();
+    process.chdir(cwd);
+    try {
+      return linter.verify(
+        CODE,
+        {
+          parserOptions: { ecmaVersion: 2022, sourceType: 'module' },
+          rules: { 'no-direct-serial-status-write': 'error' },
+        },
+        { filename: OWNER },
+      );
+    } finally {
+      process.chdir(previous);
+    }
+  };
+
+  for (const [label, cwd] of [
+    ['repo root', REPO_ROOT],
+    ['<root>/src', path.join(REPO_ROOT, 'src')],
+    ['parent of root', path.dirname(REPO_ROOT)],
+    ['os tmpdir', os.tmpdir()],
+  ]) {
+    const messages = lintFrom(cwd);
+    const label2 = `allow-listed owner file stays exempt with cwd = ${label}`;
+    if (messages.length === 0) {
+      console.log(`  ✓ ${label2}`);
+    } else {
+      console.error(`  ✗ ${label2}\n    got ${messages.length} violation(s): ${messages[0].message}`);
+      process.exitCode = 1;
+    }
+  }
+}
