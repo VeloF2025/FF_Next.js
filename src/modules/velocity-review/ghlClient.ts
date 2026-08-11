@@ -3,6 +3,7 @@ import {
 } from './ghlResponse';
 import { GhlRateLimiter } from './ghlRateLimiter';
 import { installContextFields } from './ghlCustomFields';
+import { isPlaceholderName, isRealName } from './types';
 import type { VelocityInstallContext } from './types';
 
 // Re-exported so './ghlClient' stays the module's entry point for callers and tests.
@@ -152,8 +153,15 @@ export class HighLevelClient {
 
   async upsertContact(input: VelocityReviewContactInput): Promise<HighLevelContact> {
     const existing = await this.findContactByPhone(input.phoneE164);
+    // A populated GHL name is authoritative and never overwritten — it may have been
+    // corrected by hand. The placeholder is the exception: it is the absence of a
+    // name, so it must yield to the first real one a source produces. Treating it as
+    // populated is what left customers greeted as "There" permanently, even after
+    // their name arrived, because the contact was already non-blank.
+    const overwritableFirstName = !existing?.firstName?.trim()
+      || (isPlaceholderName(existing.firstName) && isRealName(input.firstName));
     const nameFields = {
-      ...(!existing?.firstName?.trim() ? { firstName: input.firstName } : {}),
+      ...(overwritableFirstName ? { firstName: input.firstName } : {}),
       ...(!existing?.lastName?.trim() && input.lastName?.trim()
         ? { lastName: input.lastName.trim() }
         : {}),

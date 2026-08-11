@@ -3,6 +3,7 @@ import {
   normalizeSaMobileMsisdn,
   toE164,
 } from './phone';
+import { MISSING_NAME_PLACEHOLDER } from './types';
 import type {
   CandidateDbRow,
   CandidateDecision,
@@ -27,10 +28,10 @@ function resolvePhone(row: CandidateDbRow): ResolvedPhone | 'conflict' | null {
   return phones[0] ?? null;
 }
 
-// Rendered into the WhatsApp greeting when no source carries a name. It is also
-// persisted as the GHL contact's first name, because the workflow maps {{1}} from
-// Contact -> First Name and has nowhere else to read a fallback from.
-export const MISSING_NAME_PLACEHOLDER = 'there';
+// Declared in types.ts, which ghlClient.ts also reads so it can tell the placeholder
+// apart from a real name during upsert. Re-exported here because this module is where
+// it gets applied, and callers already look for it alongside resolveName.
+export { MISSING_NAME_PLACEHOLDER };
 
 // Source names arrive in mixed case — across the 2026-08-01..03 window, 49 started
 // lowercase and 4 were ALLCAPS. The value is greeted with ("Hi {{1}}") and shown in
