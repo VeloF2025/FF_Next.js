@@ -127,7 +127,7 @@ export async function getAttachment(attachmentId: string): Promise<AttachmentRec
   const row = await queryOne<Record<string, unknown>>(
     `SELECT ${SUMMARY_COLUMNS}, file_path,
             medical_id, contractor_document_id, library_id,
-            talk_id, capa_id, letter_id, permit_id
+            talk_id, capa_id, letter_id, permit_id, ppe_acknowledgement_id
        FROM hs_attachments
       WHERE id = $1`,
     [attachmentId]
@@ -143,6 +143,7 @@ export async function getAttachment(attachmentId: string): Promise<AttachmentRec
     ['capa', 'capa_id'],
     ['letter', 'letter_id'],
     ['permit', 'permit_id'],
+    ['ppe_acknowledgement', 'ppe_acknowledgement_id'],
   ];
 
   const matched = arcs.find(([, column]) => row[column] !== null && row[column] !== undefined);

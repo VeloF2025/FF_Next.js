@@ -15,6 +15,7 @@ import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import { captureESignature } from '@/modules/health-safety/services/esignature';
 import { PPE_DUE_SOON_DAYS } from '@/modules/health-safety/types/ppe.types';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
+import { countUnevidencedIssuances } from '@/modules/health-safety/services/ppeAcknowledgementService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -69,11 +70,17 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     ORDER BY i.replacement_due ASC NULLS LAST, i.issued_date DESC
   `;
 
+  // `unacknowledged` counts issues with no in-app signature. `unevidenced` is a
+  // different and stricter question: whether the worker has a signed
+  // acknowledgement SHEET on file at all — the indemnity that says they accept
+  // responsibility for the equipment. An issue can be acknowledged in-app while
+  // the worker has never signed one. Reported, never enforced (migration 489).
   const stats = {
     total: rows.length,
     overdue: rows.filter((r) => r.replacement_status === 'overdue').length,
     due_soon: rows.filter((r) => r.replacement_status === 'due_soon').length,
     unacknowledged: rows.filter((r) => r.acknowledged === false).length,
+    unevidenced: await countUnevidencedIssuances(),
   };
 
   return apiResponse.success(res, { issuance: rows, stats });

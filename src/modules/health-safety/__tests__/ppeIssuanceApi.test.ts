@@ -12,6 +12,13 @@ vi.mock('@neondatabase/serverless', () => ({
   neon: vi.fn(() => sqlMock),
   neonConfig: { fetchConnectionCache: false },
 }));
+// The issuance GET now also asks how many issues lack a signed acknowledgement
+// sheet (migration 489). That count goes through pg.Pool via @/lib/db-pool,
+// which this file's neon-shim mock does not cover — unmocked, the pool has no
+// connection and the handler dies on `undefined.rows`.
+vi.mock('@/modules/health-safety/services/ppeAcknowledgementService', () => ({
+  countUnevidencedIssuances: vi.fn(async () => 0),
+}));
 vi.mock('@/lib/auth', () => ({
   
   withPermission: () => (h: unknown) => h,

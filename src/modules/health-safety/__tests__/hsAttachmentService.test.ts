@@ -42,6 +42,7 @@ const ARCS = {
   capa: 'capa_id',
   letter: 'letter_id',
   permit: 'permit_id',
+  ppe_acknowledgement: 'ppe_acknowledgement_id',
 } as const;
 
 const NULL_ARCS = Object.fromEntries(Object.values(ARCS).map((c) => [c, null]));

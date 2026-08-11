@@ -14,6 +14,7 @@ import { ModulePage } from '@/components/module-page';
 import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, CheckCircle2, Trash2, PenLine } from 'lucide-react';
 import { ReplacementBadge } from '@/modules/health-safety/components/ppe/ReplacementBadge';
+import { PPEAcknowledgementPanel } from '@/modules/health-safety/components/ppe/PPEAcknowledgementPanel';
 import type { PPEReplacementStatus } from '@/modules/health-safety/types/ppe.types';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
@@ -23,6 +24,10 @@ interface Row {
   id: string; worker_name: string; item_name: string; size: string | null; quantity: number;
   issued_date: string; replacement_due: string | null; replacement_status: PPEReplacementStatus;
   signature_name: string | null; signed_at: string | null; project_name: string | null;
+  // Carried by `i.*` in the issuance list query; needed to find the worker's
+  // acknowledgement sheet, which is per worker rather than per issue.
+  staff_id: string | null; team_member_id: string | null;
+  contractor_id: string | null; project_id: string | null;
 }
 
 function Detail({ id }: { id: string }) {
@@ -92,6 +97,14 @@ function Detail({ id }: { id: string }) {
       {row.signature_name && (
         <p className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm"><CheckCircle2 className="w-4 h-4" /> Receipt acknowledged by {row.signature_name}</p>
       )}
+
+      <PPEAcknowledgementPanel
+        staffId={row.staff_id}
+        teamMemberId={row.team_member_id}
+        workerName={row.worker_name}
+        contractorId={row.contractor_id}
+        projectId={row.project_id}
+      />
 
       <div className="flex justify-end pt-2">
         <button onClick={remove} className="flex items-center gap-2 px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
