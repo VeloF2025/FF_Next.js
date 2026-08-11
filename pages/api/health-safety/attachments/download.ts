@@ -28,10 +28,19 @@ const logger = createLogger('HsAttachmentDownloadAPI');
 const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
 /**
- * Rendered in the browser tab only for formats that cannot carry script in a
- * way the sandbox below does not already contain. Everything else downloads.
+ * Rendered in the browser tab only for formats that cannot execute script at
+ * all. Everything else downloads.
+ *
+ * PDF is deliberately NOT here, even though it is the most common attachment.
+ * A PDF can carry JavaScript, and rendering one inline runs it in this origin
+ * unless the sandboxed CSP below survives to the browser. It may not: the
+ * global middleware sets its own, unsandboxed, Content-Security-Policy on every
+ * /api response (confirmed live — /api/health carries it), and which value wins
+ * when a route sets the same header was not something we could measure here.
+ * Downloading instead makes the protection structural rather than dependent on
+ * that answer. Images cannot execute script, so they stay.
  */
-const INLINE_SAFE_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const INLINE_SAFE_TYPES = new Set(['image/jpeg', 'image/png']);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -58,8 +67,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const response = await fetch(`${VF_STORAGE_URL}/${attachment.file_path}`);
   if (!response.ok) {
-    // The storage path is deliberately not logged: a medical certificate's
-    // location must not be recoverable from application logs.
+    // Only the id and status: on this path the attachment id is enough for an
+    // operator to look the row up, so the storage path adds nothing they need.
+    // The upload and delete routes DO log the path, deliberately — there the
+    // row is gone or was never written, so the path is the only handle left on
+    // an orphaned object. Knowing a path is not access in either case: nginx
+    // refuses the prefix, and these logs are server-side and never returned.
     logger.error('Storage fetch failed', { attachmentId, status: response.status });
     return res.status(502).json({ error: 'Failed to fetch the file from storage' });
   }

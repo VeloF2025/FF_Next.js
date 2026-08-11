@@ -7,7 +7,7 @@
  * upload — the same reason `checkinClearance.ts` is a pure function.
  *
  * Every surface here is private. `VF_PRIVATE_STORAGE_TYPE` is the prefix nginx
- * refuses (`location ~ ^/storage/hs-private/ { return 403; }`), so the bytes are
+ * refuses (`location ~* ^/storage/hs-private/ { return 403; }`), so the bytes are
  * reachable only through `/api/health-safety/attachments/download`, which
  * re-checks permission on each request. Adding a surface whose storage type is
  * not this constant silently publishes it — hence `storageCategory` is derived
@@ -129,5 +129,18 @@ export function storageLocation(surface: AttachmentSurface): {
  * guarding.
  */
 export function isPrivateStoragePath(filePath: string): boolean {
-  return filePath.startsWith(`${VF_PRIVATE_STORAGE_TYPE}/`);
+  if (!filePath.startsWith(`${VF_PRIVATE_STORAGE_TYPE}/`)) return false;
+  // A prefix check alone is satisfied by `hs-private/../staff/documents/x`,
+  // which the storage service would resolve straight back out of the guarded
+  // directory. Only VF Storage's own response currently reaches this column,
+  // so that is not reachable today — but this is the function the download
+  // route trusts before fetching, and a guard that can be walked out of is not
+  // one. Backslash is rejected too: it is a path separator to some resolvers
+  // and never legitimate in a storage key.
+  if (filePath.includes('..') || filePath.includes('\\')) return false;
+  // Control characters (NUL through US, and DEL) would change what the fetch
+  // resolves to, or split the request line outright.
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(filePath)) return false;
+  return true;
 }

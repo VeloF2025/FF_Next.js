@@ -89,3 +89,26 @@ describe('hsAttachmentPolicy', () => {
     }
   });
 });
+
+describe('isPrivateStoragePath — traversal', () => {
+  it('rejects a path that walks back out of the private prefix', () => {
+    // Satisfies a plain startsWith check, but the storage service would
+    // resolve it straight out of the guarded directory.
+    expect(isPrivateStoragePath('hs-private/../staff/documents/payslip.pdf')).toBe(false);
+    expect(isPrivateStoragePath('hs-private/medicals/../../staff/documents/x.pdf')).toBe(false);
+  });
+
+  it('rejects backslashes and control characters', () => {
+    expect(isPrivateStoragePath('hs-private/medicals\\..\\staff\\x.pdf')).toBe(false);
+    // A newline would split the request line sent to the storage service.
+    expect(isPrivateStoragePath('hs-private/medicals/x.pdf\nGET /staff/y.pdf')).toBe(false);
+    expect(isPrivateStoragePath('hs-private/medicals/x\u0000.pdf')).toBe(false);
+  });
+
+  it('still accepts a normal stored path', () => {
+    // The rejections above must not be so broad that they refuse real files;
+    // VF Storage names objects <epoch>-<hex>.<ext>.
+    expect(isPrivateStoragePath('hs-private/medicals/1786444140027-09c3a05978d8a212.pdf')).toBe(true);
+    expect(isPrivateStoragePath('hs-private/appointment_letters/1786444140027-aa.docx')).toBe(true);
+  });
+});

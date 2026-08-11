@@ -17,6 +17,7 @@ import { vfStorage } from '@/services/vfStorageAdapter';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import {
+  isPrivateStoragePath,
   storageLocation,
   surfaceConfig,
 } from '@/modules/health-safety/services/hsAttachmentPolicy';
@@ -47,6 +48,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.notFound(res, 'Attachment', attachmentId);
   }
 
+  // Same check the download route makes, for the same reason: this path is
+  // about to be turned into a storage URL. A row pointing outside the private
+  // prefix is not ours to act on, and deleting by an unvalidated path could
+  // remove an object in an unrelated directory.
+  if (!isPrivateStoragePath(attachment.file_path)) {
+    logger.error('Attachment path is outside the private prefix', { attachmentId });
+    return apiResponse.notFound(res, 'Attachment', attachmentId);
+  }
+
   const removed = await deleteAttachmentRow(attachmentId);
   if (!removed) {
     // Lost a race with a concurrent delete. The other caller owns the object.
@@ -54,7 +64,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const { type, category } = storageLocation(attachment.surface);
-  const filename = attachment.file_path.split('/').pop() ?? '';
+  // Encoded at the call site: vfStorageAdapter.deleteFile interpolates the
+  // filename into a URL path without escaping it.
+  const filename = encodeURIComponent(attachment.file_path.split('/').pop() ?? '');
   const objectDeleted = await vfStorage.deleteFile(type, category, filename).catch(() => false);
   if (!objectDeleted) {
     // The row is already gone, so the file is unreachable through the app. It
