@@ -106,9 +106,18 @@ esac
 # (Deliberately described rather than shown: an assignment-shaped example here
 # is itself caught by the rule below, as this file's own gate demonstrated.)
 #
-# `:pass@` / `:password@` cover the documented placeholder connection URI
-# (`postgresql://user:pass@host`), which the URI rule would otherwise flag.
-PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|\btest[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub|:pass(word)?@|:secret@'
+# NOT here: an exclusion for a placeholder connection URI. Adding userinfo
+# placeholder terms to this list was a REGRESSION, because PLACEHOLDER is
+# applied to the matched span of EVERY rule — so a value that merely CONTAINED
+# such a substring became exempt everywhere. Measured: a credential-named
+# assignment whose value was a nested URL went from flagged to clean via the
+# pre-existing `=` rule, which is exactly the shape that rule exists to catch.
+# A per-rule exclusion is the right place for this; a global one cannot be
+# scoped to the rule that needs it.
+#
+# (Described rather than shown, again: a concrete example here is itself matched
+# by the URI rule below. This file cannot safely quote the things it detects.)
+PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|\btest[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
 
 HITS=""
 add_hits() { # $1 = pattern, $2 = label, $3 = "cs" for case-SENSITIVE, $4 = extra
