@@ -41,6 +41,17 @@ case "$MODE" in
     if [ -z "$BASE" ] || [ -z "$HEAD" ]; then
       echo -e "${RED}secret-scan: --range needs <base> <head>${NC}"; exit 2
     fi
+    # Both ends must resolve BEFORE the diff runs. `git diff` on an unknown ref
+    # prints to stderr and produces no stdout, which `2>/dev/null ... || true`
+    # then turned into an empty ADDED and a green "scan passed" -- a scan that
+    # covered nothing reporting success. GitHub sends the all-zero SHA as
+    # `before` on a branch's first push, so this was reachable, not theoretical.
+    for ref in "$BASE" "$HEAD"; do
+      if ! git rev-parse --verify --quiet "${ref}^{commit}" >/dev/null 2>&1; then
+        echo -e "${RED}secret-scan: cannot resolve '${ref}' — refusing to report a clean scan.${NC}"
+        exit 2
+      fi
+    done
     ADDED=$(git diff "$BASE" "$HEAD" --unified=0 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' || true)
     ;;
   --tree)
@@ -56,13 +67,23 @@ case "$MODE" in
             | sed 's/^/+/' || true)
     ;;
   --branch)
+    # Fails CLOSED. This mode previously warned and exited 0 when it could not
+    # find a base, which was survivable while it ran only from ci-local.sh (where
+    # origin/master always exists) but is not survivable as a CI gate: a runner
+    # that failed to fetch the base branch would report a clean scan over an
+    # empty diff, and the gate would be exactly the paper guarantee this replaced.
+    if ! git rev-parse --verify --quiet origin/master >/dev/null 2>&1; then
+      echo -e "${RED}secret-scan: origin/master is not available — nothing was scanned.${NC}"
+      echo    "Fetch it first (git fetch origin master). Refusing to report a clean scan."
+      exit 2
+    fi
     BASE=$(git merge-base origin/master HEAD 2>/dev/null || true)
     if [ -z "$BASE" ]; then
-      echo -e "${YELLOW}secret-scan: no merge-base with origin/master — skipping diff scan${NC}"
-      ADDED=""
-    else
-      ADDED=$(git diff "$BASE"..HEAD --unified=0 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' || true)
+      echo -e "${RED}secret-scan: no merge-base with origin/master — nothing was scanned.${NC}"
+      echo    "Refusing to report a clean scan over an empty diff."
+      exit 2
     fi
+    ADDED=$(git diff "$BASE"..HEAD --unified=0 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' || true)
     ;;
   *)
     echo -e "${RED}secret-scan: unknown mode '$MODE'${NC}"; exit 2
