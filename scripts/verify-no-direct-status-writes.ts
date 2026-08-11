@@ -3,16 +3,21 @@
  * verify-no-direct-status-writes.ts — Sprint E cutover T-1 readiness gate.
  *
  * Runs the `local/no-direct-serial-status-write` ESLint rule (Track 3) at
- * "error" severity over src/ + pages/, regardless of its configured severity.
- * The rule ships "off" in .eslintrc.json and only flips to "error" AT cutover
- * (in the Track 7 PR), so a plain `npx eslint .` cannot catch anything before
- * then — this script forces the rule on so the readiness check is meaningful
- * pre-cutover.
+ * "error" severity over src/, pages/ and scripts/, regardless of its
+ * configured severity.
+ * .eslintrc.json has said "error" for this rule since 2026-05-30, but that file
+ * is dead config: .eslintrc.cjs wins ESLint 8 precedence and never declares the
+ * `local` plugin, so `npm run lint` has never evaluated the rule. (The older
+ * wording here — "the rule ships off and flips at cutover" — described a plan,
+ * not the file.) This script is therefore the only thing that actually runs it,
+ * which is why it loads the rule by bare name and forces "error" rather than
+ * trusting any configured severity.
  *
  * Exit codes:
  *   0 — no direct stock_serials.status/holder_id writes outside the rule's
- *       allow-list (serialLifecycle.ts, serialForceCorrectService.ts, the
- *       backfill script). Safe to create __sprint_e_cutover_gate__.
+ *       allow-list (serialLifecycle.ts, serialForceCorrectService.ts, and four
+ *       operator-invoked scripts — see ALLOWED_FILES in the rule for the list
+ *       and the reason each is there). Safe to create __sprint_e_cutover_gate__.
  *   1 — one or more direct writers remain; route them through promoteSerial()
  *       before cutover.
  *   2 — the check itself failed to run (ESLint/config error).
@@ -23,8 +28,14 @@
  * Single source of truth: it executes the SAME rule the cutover PR flips on, so
  * there is no second copy of the detection logic to drift from the rule.
  *
- * Scope note: scans runtime code (src/ + pages/). The allow-listed backfill
- * script under scripts/ is an intentional direct writer and is not scanned.
+ * Scope note: scans src/, pages/ and scripts/ (TS only). scripts/ was added after
+ * it turned out to hold three direct writers that the gate had never examined —
+ * "zero direct writers" had been a statement about the search path, not the
+ * code. Still outside scope, and deliberately: app/ (0 of its files reference
+ * stock_serials today, but it is part of the active hybrid router, so this is a
+ * blind spot rather than a guarantee), tests/ (ESLint-ignored; tests legitimately
+ * build raw trigger/backfill SQL), .js/.mjs files, and SQL migrations, which
+ * carry their own review process.
  *
  * Usage:  npx tsx scripts/verify-no-direct-status-writes.ts
  */
@@ -35,7 +46,10 @@ import * as path from 'node:path';
 // scripts/ci-local.sh runs the sibling no-silent-catch rule. The .eslintrc
 // "local/"-prefixed copy stays "off"; this bare-id copy is forced to "error".
 const RULE_ID = 'no-direct-serial-status-write';
-const TARGETS = ['src/**/*.{ts,tsx}', 'pages/**/*.{ts,tsx}'];
+// scripts/ is scanned too. Leaving it out meant the two operator-invoked
+// backfills that write stock_serials.status directly were never examined, so
+// the gate reported zero direct writers while two sat outside its search path.
+const TARGETS = ['src/**/*.{ts,tsx}', 'pages/**/*.{ts,tsx}', 'scripts/**/*.ts'];
 const ROOT = path.join(__dirname, '..');
 
 async function main(): Promise<void> {
