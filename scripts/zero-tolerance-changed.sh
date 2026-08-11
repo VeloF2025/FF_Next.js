@@ -107,6 +107,17 @@ CONSOLE_HITS=$(echo "$CHANGED" \
 # parsing at the program text, so everything after it is a file operand and a
 # literal `--` is read as a FILENAME. A leading-dash path is already safe here
 # for the same reason it is safe on the console check above.
+#
+# KNOWN LIMITS, so the next reader does not over-trust this:
+#   - It detects a BLANK body, not an inert one. Any non-blank content clears
+#     the pending state, so `catch (e) { // TODO }` and `catch (e) { ; }` score
+#     clean. Both were equally undetected before, but "empty catch" reads wider
+#     than what this actually finds.
+#   - No string or comment awareness: `const s = "catch (e) {}"` is a false
+#     positive. Same trade-off the console check already makes for a string
+#     containing "console.log(" — a line-based gate cannot tell code from text.
+# Closing either properly means an AST pass; `no-silent-catch` is the rule for
+# that, and Gate 2 already runs it over pages/api.
 EMPTY_CATCH=$(echo "$CHANGED" \
   | { grep -E '\.(ts|tsx)$' || true; } \
   | while read -r f; do
