@@ -63,8 +63,14 @@ MIN_BYTES="${FF_BACKUP_MIN_BYTES:-10485760}"   # 10 MB
 WA_BRIDGE="${FF_BACKUP_WA_BRIDGE:-}"
 WA_GROUP_JID="${FF_BACKUP_WA_GROUP:-}"
 
+# `|| true` is load-bearing, not defensive noise. $LOG_FILE lives in $BACKUP_DIR,
+# the same filesystem the dump is written to, so the most likely real failure —
+# a full disk — breaks the dump and this tee in the same instant. Every failure
+# branch below calls log() and *then* alert(); under `set -e` a failing tee
+# aborts the script between the two, so the one run that most needs an alert
+# would send none. tee still writes to stdout, which cron appends to the log.
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE" || true
 }
 
 alert() {
@@ -119,12 +125,36 @@ fi
 SAFE_TARGET=$(echo "$PGURL" | sed -E 's#(://[^:/]+):[^@]*@#\1:***@#')
 log "Starting FibreFlow database backup from ${SAFE_TARGET}"
 
+# --- Keep the password out of argv ---
+# pg_dump does not scrub its own command line: passing the full URI would put
+# the password in /proc/<pid>/cmdline and `ps aux` — world-readable — for the
+# entire multi-minute dump. Hand it over via PGPASSWORD (only visible through
+# /proc/<pid>/environ, which is restricted to the process owner) and give
+# pg_dump a URI with the password removed. Everything else about the URI —
+# host, port, database, sslmode and friends — is preserved untouched.
+PG_PASS_RAW=$(printf '%s' "$PGURL" | sed -nE 's#^[a-zA-Z][a-zA-Z0-9+.-]*://[^:/?#]+:([^@]*)@.*#\1#p')
+if [[ -n "$PG_PASS_RAW" ]]; then
+  # libpq percent-decodes URI components but reads PGPASSWORD verbatim, so a
+  # password carrying %40 or %25 has to be decoded here or authentication fails.
+  # Only decode when an escape is actually present; otherwise pass it through
+  # untouched so a literal backslash cannot be reinterpreted by printf %b.
+  if [[ "$PG_PASS_RAW" == *%* ]]; then
+    PGPASSWORD=$(printf '%b' "${PG_PASS_RAW//%/\\x}")
+  else
+    PGPASSWORD="$PG_PASS_RAW"
+  fi
+  export PGPASSWORD
+  PG_CONN=$(printf '%s' "$PGURL" | sed -E 's#(^[a-zA-Z][a-zA-Z0-9+.-]*://[^:/?#]+):[^@]*@#\1@#')
+else
+  PG_CONN="$PGURL"
+fi
+
 # --- Dump to a temp file; only publish it once it has been verified ---
 TMP_FILE=$(mktemp "${BACKUP_DIR}/.fibreflow-${DATE}.XXXXXX.sql.gz")
 cleanup() { rm -f "$TMP_FILE"; }
 trap cleanup EXIT
 
-if ! pg_dump "$PGURL" \
+if ! pg_dump "$PG_CONN" \
       --no-owner \
       --no-acl \
       --format=plain \
@@ -184,6 +214,14 @@ log "SUCCESS: ${DUMP_FILE} ($(du -h "$DUMP_FILE" | cut -f1))"
 # Counts only published backups; temp files never reach this pattern, and
 # failed runs no longer leave anything to count.
 mapfile -t BACKUPS < <(ls -1t "${BACKUP_DIR}"/fibreflow-*.sql.gz 2>/dev/null || true)
+# A misconfigured FF_BACKUP_RETENTION=0 would slice the whole array and delete
+# the backup published two lines ago along with every older one, leaving no
+# backup at all after a successful run. Keeping at least the newest copy is
+# never the wrong answer for a script whose only job is to have one.
+if [[ "$RETENTION_COUNT" -lt 1 ]]; then
+  log "WARNING: FF_BACKUP_RETENTION=${RETENTION_COUNT} would delete every backup; keeping the newest 1"
+  RETENTION_COUNT=1
+fi
 if [[ "${#BACKUPS[@]}" -gt "$RETENTION_COUNT" ]]; then
   for OLD_FILE in "${BACKUPS[@]:$RETENTION_COUNT}"; do
     log "Removing old backup: ${OLD_FILE}"
