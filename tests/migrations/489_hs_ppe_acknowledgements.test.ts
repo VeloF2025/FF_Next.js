@@ -75,8 +75,13 @@ const PREREQUISITES = `
   CREATE TABLE hs_ppe_issuance (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     ppe_item_id uuid NOT NULL,
-    staff_id uuid REFERENCES staff(id) ON DELETE CASCADE,
-    team_member_id uuid REFERENCES team_members(id) ON DELETE CASCADE,
+    -- SET NULL, matching live (hs_ppe_issuance_staff_id_fkey), NOT CASCADE.
+    -- The difference is semantically loaded here: on live, deleting a worker
+    -- turns their PPE issues into name-only rows — precisely the category the
+    -- unevidenced count excludes — rather than deleting the issues outright.
+    -- A CASCADE here would let a future test assert the wrong behaviour.
+    staff_id uuid REFERENCES staff(id) ON DELETE SET NULL,
+    team_member_id uuid REFERENCES team_members(id) ON DELETE SET NULL,
     contractor_id uuid,
     project_id uuid,
     worker_name text NOT NULL,
