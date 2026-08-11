@@ -350,24 +350,54 @@ else
   pass "Zero Tolerance: no changed files"
 fi
 
-# ─── Serial Lifecycle Discipline (Sprint E Track 3) ──────────────────────────
+# ─── Gate 2e: Serial Lifecycle Discipline (Sprint E Track 3) ─────────────────
 #
-# Enforcement at cutover is the ESLint rule `local/no-direct-serial-status-write`
-# (scripts/eslint-rules/), not a CI grep. To activate, the Sprint-E cutover PR
-# flips it "off" → "error" in .eslintrc.json; Gate 1 above runs ESLint with
-# MAX_LINT_ERRORS=0, so any direct `UPDATE stock_serials SET status/holder_id`
-# outside the allow-list (serialLifecycle / serialForceCorrectService /
-# backfill-serial-lifecycle-status) becomes a hard CI failure.
+# Every `stock_serials.status`/`holder_id` write must route through
+# promoteSerial() so mig 387's transition-matrix validation and event emission
+# run exactly once. Enforcement is the ESLint rule
+# `local/no-direct-serial-status-write` (scripts/eslint-rules/), not a CI grep.
+#
+# The plan below said the cutover PR would flip the rule "off" → "error" in
+# .eslintrc.json and that Gate 1's MAX_LINT_ERRORS=0 would then make a direct
+# write a hard failure. The flip happened on 2026-05-30. It enforced nothing:
+# .eslintrc.json is DEAD config (.eslintrc.cjs wins ESLint 8 precedence and
+# never declares the `local` plugin), and Gate 1 is `eslint src`, which would
+# have missed pages/ regardless. The rule ran nowhere for over two months while
+# three docs described it as enforced.
+#
+# So run it explicitly, via the readiness script that already exists for the
+# cutover gate — it forces the rule to "error" over src/ + pages/ irrespective
+# of configured severity, and is the single source of truth for the detection.
+echo -e "\n${CYAN}── Gate 2e: Serial Lifecycle Discipline ──${NC}\n"
+
+if RULE_TEST_OUT=$(node scripts/eslint-rules/__tests__/no-direct-serial-status-write.test.js 2>&1 \
+                   && node scripts/eslint-rules/__tests__/no-neon-shim-sql-divergence.test.js 2>&1); then
+  pass "Custom ESLint rule tests: pass"
+else
+  fail "Custom ESLint rule tests FAILED — the detection behind Gate 2c/2e is not trustworthy"
+  echo "$RULE_TEST_OUT" | grep -E '✗|Error' | head -10 | sed 's/^/    /'
+fi
+
+if SERIAL_OUT=$(npm run --silent verify:no-direct-status-writes 2>&1); then
+  pass "Serial lifecycle: no direct status/holder_id writes outside the allow-list"
+else
+  fail "Serial lifecycle: direct stock_serials.status/holder_id write(s) found"
+  echo "$SERIAL_OUT" | sed 's/^/    /' | head -15
+fi
+
 #
 # A separate `git grep` gate was deliberately NOT added: every real writer
 # spans two lines (`UPDATE stock_serials\n  SET status = ...`), which `git grep`
 # (line-oriented, no multiline mode) cannot match, and a portable multiline
 # `grep -Pz` cannot be relied on across dev/CI shells (e.g. ugrep treats -z as
 # decompress). The AST-based ESLint rule matches these correctly; duplicating
-# it in fragile shell would be false safety. Until cutover the rule stays "off"
-# because Track 2's legitimate pre-cutover direct writers (import-serials,
-# fault-reports, movementReversalService, the dead markSerialInstalled,
-# grn-confirm) still write directly by design.
+# it in fragile shell would be false safety.
+#
+# Track 2's former pre-cutover direct writers are all gone: the runbook records
+# them as routed through promoteSerial or deleted in the Track 7 commit, and the
+# gate above measures 0. `.eslintrc.json`'s "error" declaration for this rule
+# stays inert — that file is dead config. Deleting it is a repo-wide change and
+# is tracked separately; do not assume anything declared only there runs.
 
 # ─── Gate 5+6: Tests & Build (full mode only) ────────────────────────────────
 if [ "$MODE" = "--quick" ] || [ "$MODE" = "--pre-deploy" ]; then

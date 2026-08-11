@@ -67,6 +67,36 @@ jobs:
           set -a; . scripts/ci-baselines.env; set +a
           npm run lint:pages -- --max-warnings "$MAX_PAGES_LINT_WARNINGS"
 
+      # Custom ESLint rule tests. Neither suite ran anywhere before 2026-08-11:
+      # no package.json script, no ci-local.sh gate, no workflow step. These
+      # rules are the detection logic behind Gate 2c and the serial-lifecycle
+      # gate below, so an unrun suite here means the gates it backs are
+      # unverified — which is how no-direct-serial-status-write came to miss
+      # both the aliased and the concatenated form of the write it exists to ban.
+      - name: Custom ESLint rule tests
+        run: |
+          node scripts/eslint-rules/__tests__/no-neon-shim-sql-divergence.test.js
+          node scripts/eslint-rules/__tests__/no-direct-serial-status-write.test.js
+
+      # Serial lifecycle discipline (Sprint E Track 3) — every
+      # stock_serials.status / holder_id write must route through promoteSerial()
+      # so migration 387's transition-matrix validation and event emission run
+      # exactly once.
+      #
+      # The Track 7 cutover commit flipped this rule to "error" in
+      # .eslintrc.json on 2026-05-30. That file is dead config — .eslintrc.cjs
+      # wins ESLint 8 precedence and never declares the `local` plugin — so the
+      # flip enforced nothing, while the cutover runbook and two other docs
+      # described the rule as enforced.
+      #
+      # This runs the existing readiness script rather than a fresh eslint
+      # invocation: it loads the rule by bare name via rulePaths and forces it to
+      # "error" regardless of configured severity, and it is already the gate
+      # mig 387's cutover message names. One source of truth for the detection.
+      - name: Serial lifecycle discipline (gate)
+        run: npm run verify:no-direct-status-writes
+        timeout-minutes: 10
+
       - name: Type check (non-blocking — pre-existing errors)
         run: npm run type-check
         continue-on-error: true
