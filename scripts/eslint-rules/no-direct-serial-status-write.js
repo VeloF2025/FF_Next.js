@@ -65,6 +65,27 @@ const SET_CLAUSE_RE =
 const WRITTEN_COLUMN_RE = /\b(status|holder_id)\s*=/i;
 
 /**
+ * Blank the contents of single-quoted SQL string literals.
+ *
+ * The boundary keywords above are matched as plain text, so an ordinary English
+ * word inside an earlier column's VALUE ends the capture before it reaches the
+ * assignment that matters. The lazy quantifier stops at the leftmost boundary,
+ * whichever alternative it is:
+ *
+ *   UPDATE stock_serials SET notes = 'Received from warehouse', status = $1
+ *                                              ^^^^ capture ends here
+ *
+ * That statement writes status and scored CLEAN. "from" and "where" are ordinary
+ * words in stock-movement notes, so this is domain vocabulary, not a contrived
+ * input. Blanking literal bodies first removes the whole class rather than
+ * special-casing FROM. `''` is SQL's escaped quote and is preserved as an empty
+ * body, so a literal containing one does not swallow the rest of the statement.
+ */
+function blankStringLiterals(text) {
+  return text.replace(/'(?:[^']|'')*'/g, "''");
+}
+
+/**
  * The text of a string-ish node, with `${X}` standing in for anything whose
  * value is not statically known.
  *
@@ -109,7 +130,7 @@ module.exports = {
     if (ALLOWED_FILES.some((re) => re.test(filename))) return {};
 
     function check(node, text) {
-      const setClause = SET_CLAUSE_RE.exec(text);
+      const setClause = SET_CLAUSE_RE.exec(blankStringLiterals(text));
       if (!setClause) return;
       const col = setClause[1].match(WRITTEN_COLUMN_RE);
       if (col) {

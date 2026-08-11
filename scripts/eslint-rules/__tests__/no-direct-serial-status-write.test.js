@@ -127,6 +127,23 @@ ruleTester.run('no-direct-serial-status-write', rule, {
       code: "const q = 'UPDATE stock_serials SET holder_id = NULL WHERE id = $1';",
       errors: err('holder_id'),
     },
+    // REGRESSION: a boundary keyword appearing inside an earlier column's VALUE.
+    // The lazy capture stops at the leftmost boundary whichever alternative it
+    // is, so "from" in a notes string ended the SET clause before `status`.
+    // "received from" and "moved from" are ordinary stock-movement phrasing.
+    {
+      code:
+        "const q = `UPDATE stock_serials SET notes = 'Received from warehouse', " +
+        "status = $1 WHERE id = $2`;",
+      errors: err('status'),
+    },
+    // Same class, different boundary keyword — WHERE inside a value.
+    {
+      code:
+        "const q = `UPDATE stock_serials SET notes = 'unknown where it went', " +
+        "holder_id = $1 WHERE id = $2`;",
+      errors: err('holder_id'),
+    },
     // A file that merely resembles an allow-listed name is not allow-listed.
     {
       code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
