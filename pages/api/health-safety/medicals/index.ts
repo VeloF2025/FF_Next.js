@@ -149,9 +149,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     practitioner,
     practice_number,
     certificate_number,
-    certificate_url,
     notes,
   } = req.body;
+  // certificate_url is deliberately NOT read from the body. The certificate is
+  // an upload (POST /api/health-safety/attachments, surface 'medical') stored
+  // under the private prefix, and accepting a free-text link would put health
+  // data — POPIA special personal information — somewhere with no access
+  // control, expiry or deletion. Guarded by
+  // src/modules/health-safety/__tests__/medicalCertificateUrlGuard.test.ts.
   let { worker_name } = req.body;
   const outcome: MedicalOutcome = req.body.outcome || 'fit';
 
@@ -214,7 +219,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     INSERT INTO hs_worker_medicals (
       staff_id, team_member_id, contractor_id, worker_name, project_id,
       exam_date, expiry_date, outcome, restrictions, practitioner,
-      practice_number, certificate_number, certificate_url, notes, created_by
+      practice_number, certificate_number, notes, created_by
     ) VALUES (
       ${hasStaff ? staff_id : null},
       ${hasTeamMember ? team_member_id : null},
@@ -231,7 +236,6 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${practitioner || null},
       ${practice_number || null},
       ${certificate_number || null},
-      ${certificate_url || null},
       ${notes || null},
       ${userId}
     )

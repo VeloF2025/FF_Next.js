@@ -12,6 +12,7 @@ import { CAPADetailInfo } from './CAPADetailInfo';
 import { CAPAComments } from './CAPAComments';
 import { CAPAStatusChangeForm } from './CAPAStatusChangeForm';
 import type { CAPA, CAPAComment } from '@/modules/health-safety/types/capa.types';
+import { HSAttachmentUpload } from '../attachments/HSAttachmentUpload';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
 
@@ -60,6 +61,7 @@ export function CAPADetailView() {
       <CAPADetailHeader capa={capa} />
       <CAPADetailInfo capa={capa} />
       <CAPAStatusChangeForm capaId={capa.id} currentStatus={capa.status} onSuccess={() => mutate()} />
+      <HSAttachmentUpload surface="capa" parentId={capa.id} label="Evidence" />
       <CAPAComments comments={comments} />
     </div>
   );

@@ -72,7 +72,10 @@ async function handleGet(documentId: string, res: NextApiResponse) {
 }
 
 async function handlePut(documentId: string, req: NextApiRequest, res: NextApiResponse) {
-  const { document_number, file_url, file_name, issue_date, expiry_date, status, notes, verified_by } =
+  // file_url is deliberately NOT read from the body — see the POST handler in
+  // ../[contractorId]/documents.ts. The binary is an attachment under the
+  // private prefix, not a link.
+  const { document_number, file_name, issue_date, expiry_date, status, notes, verified_by } =
     req.body;
 
   // Get existing document
@@ -107,7 +110,6 @@ async function handlePut(documentId: string, req: NextApiRequest, res: NextApiRe
     UPDATE hs_contractor_documents
     SET
       document_number = COALESCE(${document_number}, document_number),
-      file_url = COALESCE(${file_url}, file_url),
       file_name = COALESCE(${file_name}, file_name),
       issue_date = COALESCE(${issue_date}, issue_date),
       expiry_date = ${newExpiry},

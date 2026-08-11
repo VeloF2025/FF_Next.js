@@ -155,6 +155,7 @@ export function SafetyLibraryForm({ entry, onSuccess, onCancel }: SafetyLibraryF
             isChemical={isChemical}
             set={set}
             setContentType={setContentType}
+            entryId={entry?.id}
           />
 
           <div className="flex items-center gap-3 pt-3 border-t border-[var(--ff-border-light)]">

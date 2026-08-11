@@ -148,7 +148,9 @@ async function handlePatch(medicalId: string, req: NextApiRequest, res: NextApiR
       practitioner = ${blankToNull(pick('practitioner', existing.practitioner))},
       practice_number = ${blankToNull(pick('practice_number', existing.practice_number))},
       certificate_number = ${blankToNull(pick('certificate_number', existing.certificate_number))},
-      certificate_url = ${blankToNull(pick('certificate_url', existing.certificate_url))},
+      -- certificate_url is deliberately not updated. The certificate is an
+      -- upload under the private prefix; accepting a free-text link would put
+      -- health data somewhere with no access control. See the POST handler.
       project_id = ${projectId}::uuid,
       notes = ${pick('notes', existing.notes)},
       updated_at = NOW()

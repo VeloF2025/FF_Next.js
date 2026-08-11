@@ -15,6 +15,7 @@ import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Save, Trash2 } from 'lucide-react';
 import { CompetencyBadge } from '@/modules/health-safety/components/training/CompetencyBadge';
 import { MedicalOutcomeBadge } from '@/modules/health-safety/components/medical/MedicalOutcomeBadge';
+import { HSAttachmentUpload } from '@/modules/health-safety/components/attachments/HSAttachmentUpload';
 import {
   MEDICAL_OUTCOMES,
   type MedicalOutcome,
@@ -36,7 +37,6 @@ interface MedicalDetail {
   practitioner: string | null;
   practice_number: string | null;
   certificate_number: string | null;
-  certificate_url: string | null;
   medical_status: MedicalStatus;
 }
 
@@ -47,7 +47,7 @@ function MedicalContent({ medicalId }: { medicalId: string }) {
 
   const [form, setForm] = useState({
     exam_date: '', expiry_date: '', outcome: 'fit' as MedicalOutcome, restrictions: '',
-    practitioner: '', practice_number: '', certificate_number: '', certificate_url: '',
+    practitioner: '', practice_number: '', certificate_number: '',
   });
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -66,7 +66,6 @@ function MedicalContent({ medicalId }: { medicalId: string }) {
         practitioner: record.practitioner ?? '',
         practice_number: record.practice_number ?? '',
         certificate_number: record.certificate_number ?? '',
-        certificate_url: record.certificate_url ?? '',
       });
     }
   }, [record]);
@@ -91,7 +90,6 @@ function MedicalContent({ medicalId }: { medicalId: string }) {
           practitioner: form.practitioner || null,
           practice_number: form.practice_number || null,
           certificate_number: form.certificate_number || null,
-          certificate_url: form.certificate_url || null,
         }),
       });
       const json = await res.json();
@@ -184,11 +182,9 @@ function MedicalContent({ medicalId }: { medicalId: string }) {
             <label className={labelCls}>Certificate number</label>
             <input type="text" className={inputCls} value={form.certificate_number} onChange={(e) => setForm({ ...form, certificate_number: e.target.value })} />
           </div>
-          <div>
-            <label className={labelCls}>Certificate URL</label>
-            <input type="url" className={inputCls} value={form.certificate_url} onChange={(e) => setForm({ ...form, certificate_url: e.target.value })} />
-          </div>
         </div>
+
+        <HSAttachmentUpload surface="medical" parentId={medicalId} label="Certificate" />
 
         <div className="flex justify-between pt-2">
           <button type="button" onClick={remove} className="flex items-center gap-2 px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">

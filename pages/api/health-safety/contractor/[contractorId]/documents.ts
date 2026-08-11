@@ -187,12 +187,15 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
   const {
     document_type,
     document_number,
-    file_url,
     file_name,
     issue_date,
     expiry_date,
     notes,
   } = req.body;
+  // file_url is deliberately NOT read from the body. A contractor compliance
+  // document is an upload (POST /api/health-safety/attachments, surface
+  // 'contractor_document') stored under the private prefix; a free-text link
+  // cannot be permission-checked, expiry-tracked or deleted.
 
   if (!document_type) {
     return apiResponse.badRequest(res, 'Document type is required');
@@ -222,13 +225,12 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
   // it's safe to same-name-cast both date columns for the client response.
   const documentRows = await sql`
     INSERT INTO hs_contractor_documents (
-      contractor_id, document_type, document_number, file_url, file_name,
+      contractor_id, document_type, document_number, file_name,
       issue_date, expiry_date, status, notes
     ) VALUES (
       ${contractorId},
       ${document_type},
       ${document_number || null},
-      ${file_url || null},
       ${file_name || null},
       ${issue_date || null},
       ${expiry_date || null},

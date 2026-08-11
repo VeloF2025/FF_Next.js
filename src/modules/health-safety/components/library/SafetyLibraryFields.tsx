@@ -13,6 +13,7 @@ import {
   SAFETY_LIBRARY_TYPES,
   type SafetyLibraryContentType,
 } from '@/modules/health-safety/types/library.types';
+import { HSAttachmentUpload } from '../attachments/HSAttachmentUpload';
 
 export interface SafetyLibraryFormValues {
   content_type: SafetyLibraryContentType;
@@ -36,13 +37,22 @@ interface Props {
   isChemical: boolean;
   set: (field: string, value: string) => void;
   setContentType: (value: SafetyLibraryContentType) => void;
+  /** Absent while creating — an attachment needs a saved entry to hang off. */
+  entryId?: string;
 }
 
 const inputClass =
   'w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]';
 const labelClass = 'block text-xs font-medium text-[var(--ff-text-secondary)] mb-1';
 
-export function SafetyLibraryFields({ form, projects, isChemical, set, setContentType }: Props) {
+export function SafetyLibraryFields({
+  form,
+  projects,
+  isChemical,
+  set,
+  setContentType,
+  entryId,
+}: Props) {
   return (
     <>
       <div className="grid grid-cols-2 gap-4">
@@ -84,7 +94,19 @@ export function SafetyLibraryFields({ form, projects, isChemical, set, setConten
       <div>
         <label className={labelClass}>Document URL</label>
         <input type="url" value={form.file_url} onChange={(e) => set('file_url', e.target.value)} className={inputClass} placeholder="https://…" />
+        <p className="mt-1 text-xs text-[var(--ff-text-tertiary)]">
+          For a document published elsewhere — a supplier SDS or a public standard. Upload the
+          file instead when it is ours to hold.
+        </p>
       </div>
+
+      {entryId ? (
+        <HSAttachmentUpload surface="library" parentId={entryId} label="Uploaded documents" />
+      ) : (
+        <p className="text-xs text-[var(--ff-text-tertiary)]">
+          Save the entry to upload a document to it.
+        </p>
+      )}
 
       {isChemical && (
         <div className="grid grid-cols-3 gap-4 p-3 rounded-lg border border-[var(--ff-border-light)]">

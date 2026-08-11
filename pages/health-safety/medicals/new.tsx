@@ -18,6 +18,11 @@ import {
   MEDICAL_VALIDITY_MONTHS,
   type MedicalOutcome,
 } from '@/modules/health-safety/types/medical.types';
+import { HSAttachmentPicker } from '@/modules/health-safety/components/attachments/HSAttachmentPicker';
+import {
+  MAX_ATTACHMENT_MB,
+  uploadAttachment,
+} from '@/modules/health-safety/components/attachments/attachmentClient';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 const inputCls =
@@ -36,8 +41,12 @@ function RecordMedicalContent() {
   const [outcome, setOutcome] = useState<MedicalOutcome>('fit');
   const [form, setForm] = useState({
     worker_id: '', contractor_id: '', exam_date: '', expiry_date: '', restrictions: '',
-    practitioner: '', practice_number: '', certificate_number: '', certificate_url: '',
+    practitioner: '', practice_number: '', certificate_number: '',
   });
+  // Held rather than uploaded on selection: the attachment needs the medical
+  // record's id for its foreign key, and that id does not exist until the POST
+  // below succeeds.
+  const [certificate, setCertificate] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -72,7 +81,6 @@ function RecordMedicalContent() {
       practitioner: form.practitioner || undefined,
       practice_number: form.practice_number || undefined,
       certificate_number: form.certificate_number || undefined,
-      certificate_url: form.certificate_url || undefined,
     };
     if (workerKind === 'staff') payload.staff_id = form.worker_id;
     else payload.team_member_id = form.worker_id;
@@ -89,6 +97,27 @@ function RecordMedicalContent() {
         setSaving(false);
         return;
       }
+
+      // The record is saved at this point. If the certificate upload fails the
+      // record must not be rolled back — the medical outcome is the compliance
+      // fact and is worth keeping — so the failure is reported against the
+      // saved record and the user is left on the form to retry rather than
+      // being redirected away from an error they cannot then act on.
+      const medicalId = (json?.data ?? json)?.id as string | undefined;
+      if (certificate && medicalId) {
+        try {
+          await uploadAttachment('medical', medicalId, certificate);
+        } catch (uploadError) {
+          setErr(
+            `The medical record was saved, but the certificate did not upload: ${
+              uploadError instanceof Error ? uploadError.message : 'unknown error'
+            }. Attach it from the record.`
+          );
+          setSaving(false);
+          return;
+        }
+      }
+
       router.push('/health-safety/medicals');
     } catch {
       setErr('Network error saving medical record');
@@ -197,10 +226,13 @@ function RecordMedicalContent() {
             <label className={labelCls}>Certificate number</label>
             <input type="text" className={inputCls} value={form.certificate_number} onChange={(e) => set('certificate_number', e.target.value)} />
           </div>
-          <div>
-            <label className={labelCls}>Certificate URL</label>
-            <input type="url" className={inputCls} placeholder="https://…" value={form.certificate_url} onChange={(e) => set('certificate_url', e.target.value)} />
-          </div>
+          <HSAttachmentPicker
+            label="Certificate"
+            file={certificate}
+            onFileChange={setCertificate}
+            disabled={saving}
+            hint={`Uploaded after the record is saved. PDF, JPG, PNG, DOC or DOCX, up to ${MAX_ATTACHMENT_MB} MB.`}
+          />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
