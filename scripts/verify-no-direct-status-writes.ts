@@ -35,7 +35,10 @@ import * as path from 'node:path';
 // scripts/ci-local.sh runs the sibling no-silent-catch rule. The .eslintrc
 // "local/"-prefixed copy stays "off"; this bare-id copy is forced to "error".
 const RULE_ID = 'no-direct-serial-status-write';
-const TARGETS = ['src/**/*.{ts,tsx}', 'pages/**/*.{ts,tsx}'];
+// scripts/ is scanned too. Leaving it out meant the two operator-invoked
+// backfills that write stock_serials.status directly were never examined, so
+// the gate reported zero direct writers while two sat outside its search path.
+const TARGETS = ['src/**/*.{ts,tsx}', 'pages/**/*.{ts,tsx}', 'scripts/**/*.ts'];
 const ROOT = path.join(__dirname, '..');
 
 async function main(): Promise<void> {

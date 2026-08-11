@@ -24,10 +24,28 @@
 
 'use strict';
 
+// Every entry is qualified by its directory. A bare /serialLifecycle\.ts$/
+// matches on basename alone, so a new file with that name created anywhere in
+// the repo would exempt itself from the rule just by being called the right
+// thing — the exemption has to name the one file it means.
 const ALLOWED_FILES = [
-  /serialLifecycle\.ts$/,
-  /serialForceCorrectService\.ts$/,
-  /scripts\/backfill-serial-lifecycle-status\.ts$/,
+  /(^|\/)src\/modules\/procurement\/field-stock\/services\/serialLifecycle\.ts$/,
+  /(^|\/)src\/modules\/procurement\/field-stock\/services\/serialForceCorrectService\.ts$/,
+  /(^|\/)scripts\/backfill-serial-lifecycle-status\.ts$/,
+  // Three operator-invoked scripts that predate the lifecycle service and still
+  // write stock_serials.status directly. Listing them is what makes the gate
+  // honest: before scripts/ was scanned they were simply invisible, so "zero
+  // direct writers" was a statement about the search path, not about the code.
+  // The third only came to light when scripts/ was added to the scan.
+  //
+  // They are exempted rather than rewritten because routing a backfill through
+  // the lifecycle service changes what it writes, and that needs its own change
+  // with its own tests. None runs on a schedule, but none is dead either: the
+  // two backfills export backfillActivationsFromOES / backfillInstallsFromQA
+  // (used by tests/db/backfill/), and all three run via `tsx ... --commit`.
+  /(^|\/)scripts\/backfill-stock-serials-activated-from-oes\.ts$/,
+  /(^|\/)scripts\/backfill-stock-serials-installed-from-qa\.ts$/,
+  /(^|\/)scripts\/cleanup-serial-drift-2026-05-28\.ts$/,
 ];
 
 // Capture ONLY the SET clause — everything between `SET` and the first

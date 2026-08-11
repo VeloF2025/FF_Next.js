@@ -133,5 +133,19 @@ ruleTester.run('no-direct-serial-status-write', rule, {
       filename: '/repo/src/services/notSerialLifecycle.helper.ts',
       errors: err('status'),
     },
+    // REGRESSION: the allow-list is by path, not by basename. While the entries
+    // were end-anchored only (/serialLifecycle\.ts$/), any file anywhere in the
+    // repo could exempt itself from the rule purely by choosing that name —
+    // including a brand-new one added in the same PR as the write it hides.
+    {
+      code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
+      filename: '/repo/src/some/unrelated/module/serialLifecycle.ts',
+      errors: err('status'),
+    },
+    {
+      code: 'const q = `UPDATE stock_serials SET holder_id = $1 WHERE id = $2`;',
+      filename: '/repo/src/elsewhere/serialForceCorrectService.ts',
+      errors: err('holder_id'),
+    },
   ],
 });
