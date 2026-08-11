@@ -65,15 +65,30 @@ ruleTester.run('no-direct-serial-status-write', rule, {
     { code: 'const q = `UPDATE stock_items SET status = $1 WHERE id = $2`;' },
     // Reads are irrelevant.
     { code: 'const q = `SELECT status, holder_id FROM stock_serials WHERE id = $1`;' },
-    // The allow-listed owner of the state machine.
+    // The allow-listed owner of the state machine. Filenames here are repo-
+    // relative because that is what the rule compares against; ESLint's
+    // absolute path is made relative to the project root before matching.
     {
       code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
-      filename: '/repo/src/modules/procurement/field-stock/services/serialLifecycle.ts',
+      filename: 'src/modules/procurement/field-stock/services/serialLifecycle.ts',
     },
     // The allow-listed force-correct service.
     {
       code: 'const q = `UPDATE stock_serials SET holder_id = $1 WHERE id = $2`;',
-      filename: '/repo/src/modules/procurement/field-stock/services/serialForceCorrectService.ts',
+      filename: 'src/modules/procurement/field-stock/services/serialForceCorrectService.ts',
+    },
+    // The same file reached by an absolute path, as ESLint actually supplies it.
+    {
+      code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
+      filename: require('path').join(
+        process.cwd(),
+        'src/modules/procurement/field-stock/services/serialLifecycle.ts',
+      ),
+    },
+    // An allow-listed script, likewise.
+    {
+      code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
+      filename: 'scripts/backfill-stock-serials-activated-from-oes.ts',
     },
   ],
 
@@ -147,7 +162,7 @@ ruleTester.run('no-direct-serial-status-write', rule, {
     // A file that merely resembles an allow-listed name is not allow-listed.
     {
       code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
-      filename: '/repo/src/services/notSerialLifecycle.helper.ts',
+      filename: 'src/services/notSerialLifecycle.helper.ts',
       errors: err('status'),
     },
     // REGRESSION: the allow-list is by path, not by basename. While the entries
@@ -156,13 +171,34 @@ ruleTester.run('no-direct-serial-status-write', rule, {
     // including a brand-new one added in the same PR as the write it hides.
     {
       code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
-      filename: '/repo/src/some/unrelated/module/serialLifecycle.ts',
+      filename: 'src/some/unrelated/module/serialLifecycle.ts',
       errors: err('status'),
     },
     {
       code: 'const q = `UPDATE stock_serials SET holder_id = $1 WHERE id = $2`;',
-      filename: '/repo/src/elsewhere/serialForceCorrectService.ts',
+      filename: 'src/elsewhere/serialForceCorrectService.ts',
       errors: err('holder_id'),
+    },
+    // REGRESSION: the second attempt at the fix anchored with `(^|\/)`, which
+    // is a path-SEGMENT boundary rather than the repo root — so re-creating the
+    // whole directory chain under any prefix restored the same exemption. The
+    // path is now resolved relative to the project root and anchored with `^`.
+    {
+      code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
+      filename: 'evil/src/modules/procurement/field-stock/services/serialLifecycle.ts',
+      errors: err('status'),
+    },
+    {
+      code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
+      filename: 'vendor/x/scripts/cleanup-serial-drift-2026-05-28.ts',
+      errors: err('status'),
+    },
+    // A file outside the project root cannot be located against the allow-list,
+    // so it is treated as not allow-listed rather than silently exempt.
+    {
+      code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
+      filename: '/somewhere/else/src/modules/procurement/field-stock/services/serialLifecycle.ts',
+      errors: err('status'),
     },
   ],
 });

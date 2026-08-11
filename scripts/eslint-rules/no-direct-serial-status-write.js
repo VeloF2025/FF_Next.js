@@ -24,14 +24,22 @@
 
 'use strict';
 
-// Every entry is qualified by its directory. A bare /serialLifecycle\.ts$/
-// matches on basename alone, so a new file with that name created anywhere in
-// the repo would exempt itself from the rule just by being called the right
-// thing — the exemption has to name the one file it means.
+const path = require('path');
+
+// Each entry is the file's full path from the repo root, anchored at both ends.
+// Two weaker forms were tried and are wrong:
+//   /serialLifecycle\.ts$/          — matches on basename, so ANY file with
+//                                     that name anywhere exempts itself.
+//   /(^|\/)src\/modules\/…\.ts$/    — `(^|\/)` is a path-SEGMENT boundary, not
+//                                     a repo-root anchor, so
+//                                     evil/src/modules/…/serialLifecycle.ts
+//                                     still matched. Same hole, one level down.
+// `^` only means "repo root" once the filename has been made relative to it,
+// which is what repoRelative() below is for.
 const ALLOWED_FILES = [
-  /(^|\/)src\/modules\/procurement\/field-stock\/services\/serialLifecycle\.ts$/,
-  /(^|\/)src\/modules\/procurement\/field-stock\/services\/serialForceCorrectService\.ts$/,
-  /(^|\/)scripts\/backfill-serial-lifecycle-status\.ts$/,
+  /^src\/modules\/procurement\/field-stock\/services\/serialLifecycle\.ts$/,
+  /^src\/modules\/procurement\/field-stock\/services\/serialForceCorrectService\.ts$/,
+  /^scripts\/backfill-serial-lifecycle-status\.ts$/,
   // Three operator-invoked scripts that predate the lifecycle service and still
   // write stock_serials.status directly. Listing them is what makes the gate
   // honest: before scripts/ was scanned they were simply invisible, so "zero
@@ -43,10 +51,27 @@ const ALLOWED_FILES = [
   // with its own tests. None runs on a schedule, but none is dead either: the
   // two backfills export backfillActivationsFromOES / backfillInstallsFromQA
   // (used by tests/db/backfill/), and all three run via `tsx ... --commit`.
-  /(^|\/)scripts\/backfill-stock-serials-activated-from-oes\.ts$/,
-  /(^|\/)scripts\/backfill-stock-serials-installed-from-qa\.ts$/,
-  /(^|\/)scripts\/cleanup-serial-drift-2026-05-28\.ts$/,
+  /^scripts\/backfill-stock-serials-activated-from-oes\.ts$/,
+  /^scripts\/backfill-stock-serials-installed-from-qa\.ts$/,
+  /^scripts\/cleanup-serial-drift-2026-05-28\.ts$/,
 ];
+
+/**
+ * The filename as a path from the repo root, or null when it does not sit under
+ * the root at all.
+ *
+ * ESLint hands the rule an absolute path in a real run and whatever the caller
+ * wrote in a RuleTester case. Null means "cannot be located relative to the
+ * project", and the caller treats that as NOT allow-listed — an unplaceable
+ * file being exempt is the failure this whole function exists to prevent.
+ */
+function repoRelative(filename, cwd) {
+  const norm = String(filename).replace(/\\/g, '/');
+  if (!path.isAbsolute(norm)) return norm.replace(/^\.\//, '');
+  const rel = path.relative(cwd, norm).replace(/\\/g, '/');
+  if (!rel || rel === '..' || rel.startsWith('../')) return null;
+  return rel;
+}
 
 // Capture ONLY the SET clause — everything between `SET` and the first
 // WHERE / RETURNING / ON CONFLICT / FROM / `;` / end-of-string boundary — so a
@@ -126,8 +151,9 @@ module.exports = {
     },
   },
   create(context) {
-    const filename = context.getFilename();
-    if (ALLOWED_FILES.some((re) => re.test(filename))) return {};
+    const cwd = typeof context.getCwd === 'function' ? context.getCwd() : process.cwd();
+    const relative = repoRelative(context.getFilename(), cwd);
+    if (relative !== null && ALLOWED_FILES.some((re) => re.test(relative))) return {};
 
     function check(node, text) {
       const setClause = SET_CLAUSE_RE.exec(blankStringLiterals(text));
