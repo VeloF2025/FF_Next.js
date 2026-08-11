@@ -138,6 +138,9 @@ export function PPEAcknowledgementPanel({
             surface="ppe_acknowledgement"
             parentId={current.id}
             label="Scanned acknowledgement form"
+            // Revalidate the sheet so `is_evidenced` above reflects the upload
+            // that just happened, rather than still reading "no signed sheet".
+            onChange={() => void mutate()}
           />
         </div>
       ) : (
