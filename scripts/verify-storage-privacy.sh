@@ -45,7 +45,13 @@ PRIVATE_PREFIXES=(
   # Traversal in from an open prefix. nginx normalises the path before it
   # matches a location, so this must land on the 403 — proving normalisation
   # rather than assuming it.
-  "/storage/staff/documents/../hs-private/medicals/verify-privacy-probe.pdf"
+  #
+  # Count the segments: `staff/..` resolves to nothing, leaving
+  # /storage/hs-private/... . An earlier version of this probe used
+  # `staff/documents/../hs-private/`, which resolves to
+  # /storage/staff/hs-private/ — a path that SHOULD 404, and the script
+  # reported a failure against a guard that was working correctly.
+  "/storage/staff/../hs-private/medicals/verify-privacy-probe.pdf"
   # Control: a prefix already guarded in production. If this one stops
   # returning 403, the script is measuring something other than what it thinks
   # — a green run with every probe passing for an unrelated reason.
