@@ -67,10 +67,14 @@ fi
 # `[ -f "$f" ]` is false for a file the change DELETED. Without the trailing
 # `|| true` the loop's last exit status is non-zero, pipefail propagates it out
 # of $(), and the gate dies silently mid-run on a deletion-only PR.
+# The dots are ESCAPED. Unanchored `.test.` is any-char + "test" + any-char, so
+# it exempted every production file with "test" as a substring of its name --
+# latestUtils.ts, ContestEntry.ts, AttestationForm.ts all skipped the console
+# check entirely. Verified before the fix: a latestUtils.ts containing a
+# console.log scored clean.
 CONSOLE_HITS=$(echo "$CHANGED" \
   | { grep -E '\.(ts|tsx)$' || true; } \
-  | { grep -v '.test.' || true; } \
-  | { grep -v '.spec.' || true; } \
+  | { grep -vE '\.(test|spec)\.' || true; } \
   | while read -r f; do
       [ -f "$f" ] && awk -v file="$f" '
         {
@@ -88,10 +92,40 @@ CONSOLE_HITS=$(echo "$CHANGED" \
 
 # Deliberately NOT filtered to exclude tests, matching the original gate: an
 # empty catch swallows a failure just as silently in a test as in production.
+#
+# awk, not grep. The previous `grep -n 'catch.*{[[:space:]]*}'` is line-oriented,
+# so it only ever saw `catch (e) {}` with both braces on ONE line. The ordinary
+# hand-written form
+#     catch (e) {
+#     }
+# was never detected -- the single thing this check exists to find, written the
+# way people actually write it. A multiline `grep -Pz` is not portable here (see
+# the note in ci-local.sh: ugrep reads -z as decompress), so the state machine
+# below does it in awk, which is already a dependency of the console check.
+#
+# No `--` guard is needed, and adding one is actively wrong: awk stops option
+# parsing at the program text, so everything after it is a file operand and a
+# literal `--` is read as a FILENAME. A leading-dash path is already safe here
+# for the same reason it is safe on the console check above.
 EMPTY_CATCH=$(echo "$CHANGED" \
   | { grep -E '\.(ts|tsx)$' || true; } \
   | while read -r f; do
-      [ -f "$f" ] && grep -n 'catch.*{[[:space:]]*}' "$f" 2>/dev/null | sed "s|^|$f:|" || true
+      [ -f "$f" ] && awk -v file="$f" '
+        # A catch whose brace closes on the same line.
+        /catch[^{]*\{[[:space:]]*\}/ { print file ":" NR ":" $0; next }
+        # Otherwise: remember an open catch brace, then look at what follows.
+        pending {
+          probe = $0
+          gsub(/[[:space:]]/, "", probe)
+          if (probe != "") {
+            # First non-blank line after the brace. If it opens with the closing
+            # brace, nothing ran in between.
+            if (probe ~ /^\}/) print file ":" pendingline ":" pendingtext
+            pending = 0
+          }
+        }
+        /catch[^{]*\{[[:space:]]*$/ { pending = 1; pendingline = NR; pendingtext = $0 }
+      ' "$f" || true
     done)
 
 FAILED=0

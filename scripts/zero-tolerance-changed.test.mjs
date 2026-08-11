@@ -144,6 +144,53 @@ test("--range skips console calls in test files but still flags empty catches th
   });
 });
 
+test("--range flags a MULTI-LINE empty catch block", () => {
+  withFixture((root) => {
+    const base = git(root, ["rev-parse", "HEAD"]);
+    // The way people actually write it. The old line-oriented grep required
+    // both braces on one line and never saw this form at all.
+    commitFile(root, "feature.ts", "export function f() {\n  try {\n    g();\n  } catch (e) {\n  }\n}\n");
+    const r = run(root, ["--range", base, "HEAD"]);
+    assert.equal(r.status, 1, `multi-line empty catch must be detected: ${describe(r)}`);
+    assert.match(r.stdout, /Empty catch/);
+  });
+});
+
+test("--range does NOT flag a catch that actually handles the error", () => {
+  withFixture((root) => {
+    const base = git(root, ["rev-parse", "HEAD"]);
+    commitFile(
+      root,
+      "feature.ts",
+      "export function f() {\n  try {\n    g();\n  } catch (e) {\n    report(e);\n  }\n}\n",
+    );
+    const r = run(root, ["--range", base, "HEAD"]);
+    assert.equal(r.status, 0, `a handled catch must pass: ${describe(r)}`);
+  });
+});
+
+test("--range still scans a production file whose name contains 'test'", () => {
+  withFixture((root) => {
+    const base = git(root, ["rev-parse", "HEAD"]);
+    // `grep -v '.test.'` unescaped matches any-char + "test" + any-char, which
+    // exempted latestUtils.ts, ContestEntry.ts, AttestationForm.ts and friends
+    // from the console check entirely.
+    commitFile(root, "latestUtils.ts", `export function f() { ${CONSOLE_CALL} }\n`);
+    const r = run(root, ["--range", base, "HEAD"]);
+    assert.equal(r.status, 1, `production file with 'test' in the name must be scanned: ${describe(r)}`);
+    assert.match(r.stdout, /latestUtils\.ts/);
+  });
+});
+
+test("--range still exempts a genuine .test.ts file from the console check", () => {
+  withFixture((root) => {
+    const base = git(root, ["rev-parse", "HEAD"]);
+    commitFile(root, "thing.spec.ts", `it('x', () => { ${CONSOLE_CALL} });\n`);
+    const r = run(root, ["--range", base, "HEAD"]);
+    assert.equal(r.status, 0, `real spec file must stay exempt: ${describe(r)}`);
+  });
+});
+
 test("--range survives a deletion-only change", () => {
   withFixture((root) => {
     commitFile(root, "doomed.ts", "export const c = 3;\n");
