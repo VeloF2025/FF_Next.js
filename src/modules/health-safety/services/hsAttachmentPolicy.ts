@@ -30,7 +30,8 @@ export type AttachmentSurface =
   | 'talk'
   | 'capa'
   | 'letter'
-  | 'permit';
+  | 'permit'
+  | 'ppe_acknowledgement';
 
 interface SurfaceConfig {
   /** Column on hs_attachments holding this surface's parent id. */
@@ -91,6 +92,12 @@ const SURFACES: Record<AttachmentSurface, SurfaceConfig> = {
     parentTable: 'hs_permits',
     storageCategory: 'permits',
     label: 'permit',
+  },
+  ppe_acknowledgement: {
+    parentColumn: 'ppe_acknowledgement_id',
+    parentTable: 'hs_ppe_acknowledgements',
+    storageCategory: 'ppe_acknowledgements',
+    label: 'PPE acknowledgement sheet',
   },
 };
 

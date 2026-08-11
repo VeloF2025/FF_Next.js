@@ -11,7 +11,7 @@ import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { healthSafetyConfig } from '@/modules/navigation';
-import { HardHat, Plus, ChevronLeft, Settings, CheckCircle2, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, Clock, HardHat, Plus, Settings } from 'lucide-react';
 import { ReplacementBadge } from '@/modules/health-safety/components/ppe/ReplacementBadge';
 import type { PPEReplacementStatus } from '@/modules/health-safety/types/ppe.types';
 
@@ -26,7 +26,7 @@ function PPEContent() {
   const [outstanding, setOutstanding] = useState(false);
   const { data, error, isLoading } = useSWR(`/api/health-safety/ppe/issuance${outstanding ? '?status=outstanding' : ''}`, fetcher);
   const rows: IssueRow[] = Array.isArray(data?.data?.issuance) ? data.data.issuance : [];
-  const stats = data?.data?.stats ?? { total: 0, overdue: 0, due_soon: 0, unacknowledged: 0 };
+  const stats = data?.data?.stats ?? { total: 0, overdue: 0, due_soon: 0, unacknowledged: 0, unevidenced: 0 };
 
   return (
     <div className="space-y-6">
@@ -49,6 +49,21 @@ function PPEContent() {
           </Link>
         </div>
       </div>
+
+      {/* Warning, never a gate. Issuing is deliberately not blocked on the
+          indemnity — a hard block on paperwork sends the storeman back to
+          paper, which is the state this register is trying to leave. This is
+          what makes the gap visible instead. */}
+      {stats.unevidenced > 0 && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>
+            <strong>{stats.unevidenced}</strong> issued item{stats.unevidenced === 1 ? '' : 's'}{' '}
+            {stats.unevidenced === 1 ? 'belongs' : 'belong'} to a worker with no signed PPE
+            acknowledgement on file. Open the item and upload the signed sheet.
+          </span>
+        </div>
+      )}
 
       <label className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)]">
         <input type="checkbox" checked={outstanding} onChange={(e) => setOutstanding(e.target.checked)} />

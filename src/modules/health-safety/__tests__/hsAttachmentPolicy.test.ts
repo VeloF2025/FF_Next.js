@@ -29,7 +29,7 @@ describe('hsAttachmentPolicy', () => {
     }
   });
 
-  it('covers the seven surfaces the migration created columns for', () => {
+  it('covers the eight surfaces the migrations created columns for', () => {
     // Guards against a column existing with no way to reach it, and against a
     // surface existing with no column — both compile fine.
     expect([...ATTACHMENT_SURFACES].sort()).toEqual(
@@ -40,6 +40,7 @@ describe('hsAttachmentPolicy', () => {
         'library',
         'medical',
         'permit',
+        'ppe_acknowledgement',
         'talk',
       ].sort()
     );
