@@ -191,6 +191,54 @@ jobs:
           fi
         timeout-minutes: 15
 
+      # Gate 4 in scripts/ci-local.sh — CLAUDE.md rule 12 on changed code: no
+      # console.* (use `log` from @/lib/logger) and no empty catch blocks. It ran
+      # only when a human typed `npm run ci:quick`.
+      #
+      # The detection is extracted to scripts/zero-tolerance-changed.sh so this
+      # step and the local gate run the same code; the awk it contains encodes
+      # several already-paid-for fixes and must not exist in two copies.
+      #
+      # An explicit RANGE, not the working tree. ci-local.sh's Gate 4 diffs
+      # against HEAD, which on a CI checkout is always empty — porting that mode
+      # verbatim would have produced a step that passes on every PR without
+      # examining anything. (It also means the local gate sees nothing once you
+      # have committed, which is worth knowing separately.)
+      #
+      # Changed-files-only is deliberate: rule 12 scopes zero-tolerance to
+      # CHANGED code, and the tree carries pre-existing debt in both categories
+      # that is ratcheted by Gate 1/1b and the silent-catch gate instead.
+      #
+      # BASE_REF goes through env, never inlined into run: — a fork PR's branch
+      # name is attacker-controlled. Same convention as the unit-test step.
+      - name: Zero Tolerance — changed files (gate)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash scripts/zero-tolerance-changed.sh --range "origin/${BASE_REF}" HEAD
+        timeout-minutes: 10
+
+      # On a push, scan the pushed range. `before` is the all-zero SHA on a
+      # branch's first push and can name a commit a force-push made unreachable;
+      # the script exits non-zero rather than scanning nothing when a ref does
+      # not resolve, so fall back to the first parent.
+      - name: Zero Tolerance — pushed range (gate)
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          base="$BEFORE_SHA"
+          if ! git rev-parse --verify --quiet "${base}^{commit}" >/dev/null 2>&1; then
+            echo "before-SHA '$base' does not resolve — falling back to HEAD~1"
+            base=$(git rev-parse "${AFTER_SHA}^1")
+          fi
+          bash scripts/zero-tolerance-changed.sh --range "$base" "$AFTER_SHA"
+        timeout-minutes: 10
+
+      - name: Zero Tolerance — unit tests
+        run: node --test scripts/zero-tolerance-changed.test.mjs
+
       # Custom ESLint rule tests. Neither suite ran anywhere before 2026-08-11:
       # no package.json script, no ci-local.sh gate, no workflow step. These
       # rules are the detection logic behind Gate 2c and the serial-lifecycle
