@@ -21,6 +21,18 @@ import { query, queryOne, transaction } from '@/lib/db-pool';
 const UNIQUE_VIOLATION = '23505';
 
 /**
+ * The index that refuses a second open sheet.
+ *
+ * Matched BY NAME, not just by SQLSTATE. Today this table has only two unique
+ * constraints — its primary key and this index — so any 23505 escaping
+ * startSheet is necessarily this one. That is a fact about the schema right
+ * now, not a property of the code: adding another unique constraint later
+ * would silently start reporting a genuine bug as a benign "someone else got
+ * there first". Naming it keeps the translation exact.
+ */
+const ONE_OPEN_SHEET_INDEX = 'hs_ppe_ack_one_open_per_worker';
+
+/**
  * Raised when two requests race to open a sheet for the same worker.
  *
  * The partial unique index genuinely prevents the second row — it does not
@@ -191,7 +203,8 @@ async function runStartSheet<T>(
   try {
     return await transaction(work);
   } catch (error) {
-    if ((error as { code?: string }).code === UNIQUE_VIOLATION) {
+    const pg = error as { code?: string; constraint?: string };
+    if (pg.code === UNIQUE_VIOLATION && pg.constraint === ONE_OPEN_SHEET_INDEX) {
       throw new PpeAcknowledgementConflict(
         'Another sheet was opened for this worker at the same time. Reload and try again.'
       );

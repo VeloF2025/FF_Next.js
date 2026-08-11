@@ -206,13 +206,32 @@ describe('startSheet — losing a race', () => {
   it('raises a typed conflict on a unique violation rather than a raw error', async () => {
     const { transaction } = await import('@/lib/db-pool');
     (transaction as unknown as { mockRejectedValueOnce: (e: unknown) => void })
-      .mockRejectedValueOnce(Object.assign(new Error('duplicate key'), { code: '23505' }));
+      .mockRejectedValueOnce(Object.assign(new Error('duplicate key'), {
+        code: '23505',
+        constraint: 'hs_ppe_ack_one_open_per_worker',
+      }));
 
     // The partial unique index genuinely refuses the second open sheet, so the
     // loser must surface as a 409, not a 500.
     await expect(
       startSheet({ worker: { staffId: 'staff-1' }, workerName: 'W', actorUserId: 'u' })
     ).rejects.toBeInstanceOf(PpeAcknowledgementConflict);
+  });
+
+  it('does not treat a DIFFERENT unique violation as the race', async () => {
+    const { transaction } = await import('@/lib/db-pool');
+    (transaction as unknown as { mockRejectedValueOnce: (e: unknown) => void })
+      .mockRejectedValueOnce(Object.assign(new Error('duplicate key'), {
+        code: '23505',
+        constraint: 'some_other_unique_index',
+      }));
+
+    // Same SQLSTATE, different constraint. Reporting this as "someone else got
+    // there first" would present a genuine bug as a benign conflict — and the
+    // only reason it cannot happen today is that no such constraint exists yet.
+    await expect(
+      startSheet({ worker: { staffId: 'staff-1' }, workerName: 'W', actorUserId: 'u' })
+    ).rejects.not.toBeInstanceOf(PpeAcknowledgementConflict);
   });
 
   it('does not swallow unrelated database errors', async () => {
