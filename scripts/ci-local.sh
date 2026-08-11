@@ -409,6 +409,16 @@ fi
 # ─── Gate 7: Secret scan (newly-added credentials) ───────────────────────────
 echo -e "\n${CYAN}── Gate 7: Secret Scan ──${NC}\n"
 
+# The scanner's own tests run here as well as in ci.yml. Local and CI must agree
+# on this gate: it is the one whose failure mode is silent, so a green ci:quick
+# that does not exercise the scanner would be a false all-clear.
+if SCANNER_TEST_OUT=$(node --test scripts/secret-scan.test.mjs 2>&1); then
+  pass "Secret scan: scanner tests pass"
+else
+  fail "Secret scan: scanner tests FAILED — the scan itself is not trustworthy"
+  echo "$SCANNER_TEST_OUT" | grep -E '^not ok|error:' | head -10 | sed 's/^/    /'
+fi
+
 if SECRET_OUT=$(bash scripts/secret-scan.sh --branch 2>&1); then
   pass "Secret scan: no new credential-like content"
 else
