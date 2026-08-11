@@ -105,6 +105,18 @@ const WRITTEN_COLUMN_RE = /\b(status|holder_id)\s*=/i;
  * input. Blanking literal bodies first removes the whole class rather than
  * special-casing FROM. `''` is SQL's escaped quote and is preserved as an empty
  * body, so a literal containing one does not swallow the rest of the statement.
+ *
+ * KNOWN LIMITS — this understands ONE of Postgres's string syntaxes, `'...'`
+ * with `''` escaping. Two others are not recognised, so a boundary word inside
+ * them still truncates the capture:
+ *   - dollar-quoting:  notes = $$received from depot$$, status = $1
+ *   - E-strings with a backslash-escaped quote:  E'it\'s from here'
+ * Both measured as MISSED. Neither is a regression — both were equally missed
+ * before — and neither shape appears in this repo, where every value literal is
+ * plain single-quoted. Recorded rather than fixed because handling them properly
+ * means a tokeniser, not a bigger regex. A genuinely unterminated quote is also
+ * never blanked, but that is invalid SQL and fails at runtime rather than
+ * shipping silently.
  */
 function blankStringLiterals(text) {
   return text.replace(/'(?:[^']|'')*'/g, "''");
