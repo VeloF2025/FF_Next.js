@@ -125,14 +125,6 @@ fi
 SAFE_TARGET=$(echo "$PGURL" | sed -E 's#(://[^:/]+):[^@]*@#\1:***@#')
 log "Starting FibreFlow database backup from ${SAFE_TARGET}"
 
-# --- Keep the password out of argv ---
-# pg_dump does not scrub its own command line: passing the full URI would put
-# the password in /proc/<pid>/cmdline and `ps aux` — world-readable — for the
-# entire multi-minute dump. Hand it over via PGPASSWORD (only visible through
-# /proc/<pid>/environ, which is restricted to the process owner) and give
-# pg_dump a URI with the password removed. Everything else about the URI —
-# host, port, database, sslmode and friends — is preserved untouched.
-
 # libpq percent-decodes URI components but reads PGPASSWORD verbatim, so an
 # encoded password has to be decoded here or authentication fails.
 #
@@ -197,31 +189,55 @@ unset PCT_DECODED PG_PASS_RAW
 # going into argv. The strip above only understands URIs; a keyword/value
 # conninfo string (`host=... password=...`) would fall through untouched and
 # silently reinstate the leak this section exists to close.
-if printf '%s' "$PG_CONN" | grep -qE '://[^:/?#]+:[^@]*@|password='; then
-  log "FAILED: refusing to run pg_dump — the connection string still carries a password"
+#
+# Both halves are scoped deliberately, because this guard aborts the run: a
+# false positive here does not leave a subtle risk in place, it stops backups
+# altogether, which is the worse outcome. The first version was a single loose
+# regex over the whole string and false-positived four ways — an `@` in any
+# query value (`?application_name=svc@host2`), and `password=` matched as a
+# bare substring inside `sslpassword=` (a real libpq keyword for the client-key
+# passphrase, not the database password) or inside a dbname.
+#
+# So: look for `user:pass@` only inside the authority component, and for
+# `password` only as a whole conninfo key.
+PG_AUTHORITY=$(printf '%s' "$PG_CONN" | sed -nE 's#^[a-zA-Z][a-zA-Z0-9+.-]*://([^/?#]*).*#\1#p')
+PG_LEAK=''
+[[ "$PG_AUTHORITY" == *:*@* ]] && PG_LEAK='userinfo'
+if printf '%s' "$PG_CONN" | grep -qE '(^|[[:space:]])password[[:space:]]*='; then
+  PG_LEAK='conninfo keyword'
+fi
+if [[ -n "$PG_LEAK" ]]; then
+  log "FAILED: refusing to run pg_dump — the connection string still carries a password (${PG_LEAK})"
   alert "🔴 DB BACKUP FAILED on $(hostname): connection string still carries a password. Check ${LOG_FILE}"
   exit 2
 fi
+unset PG_AUTHORITY PG_LEAK
 
 # --- Dump to a temp file; only publish it once it has been verified ---
 TMP_FILE=$(mktemp "${BACKUP_DIR}/.fibreflow-${DATE}.XXXXXX.sql.gz")
 cleanup() { rm -f "$TMP_FILE"; }
 trap cleanup EXIT
 
-if ! pg_dump "$PG_CONN" \
+DUMP_OK=0
+if pg_dump "$PG_CONN" \
       --no-owner \
       --no-acl \
       --format=plain \
       2>>"$LOG_FILE" \
     | gzip -9 > "$TMP_FILE"; then
+  DUMP_OK=1
+fi
+
+# pg_dump is the only consumer. Unset before the branch, not after it: on the
+# failure path `alert()` shells out to curl, so unsetting only on success left
+# the one call this was meant to protect still carrying the password.
+unset PGPASSWORD
+
+if (( ! DUMP_OK )); then
   log "FAILED: pg_dump did not complete — no backup written for ${DATE}"
   alert "🔴 DB BACKUP FAILED on $(hostname) at $(date '+%H:%M'): pg_dump error. Check ${LOG_FILE}"
   exit 1
 fi
-
-# pg_dump is the only consumer. Everything after this — gzip, zcat, stat, the
-# curl in alert() — inherits the environment, and none of them need it.
-unset PGPASSWORD
 
 # --- Verify before publishing ---
 DUMP_BYTES=$(stat -c%s "$TMP_FILE")
