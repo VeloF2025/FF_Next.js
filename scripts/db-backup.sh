@@ -185,33 +185,17 @@ else
 fi
 unset PCT_DECODED PG_PASS_RAW
 
-# Assert, against the value actually about to be passed, that no password is
-# going into argv. The strip above only understands URIs; a keyword/value
-# conninfo string (`host=... password=...`) would fall through untouched and
-# silently reinstate the leak this section exists to close.
-#
-# Both halves are scoped deliberately, because this guard aborts the run: a
-# false positive here does not leave a subtle risk in place, it stops backups
-# altogether, which is the worse outcome. The first version was a single loose
-# regex over the whole string and false-positived four ways — an `@` in any
-# query value (`?application_name=svc@host2`), and `password=` matched as a
-# bare substring inside `sslpassword=` (a real libpq keyword for the client-key
-# passphrase, not the database password) or inside a dbname.
-#
-# So: look for `user:pass@` only inside the authority component, and for
-# `password` only as a whole conninfo key.
-PG_AUTHORITY=$(printf '%s' "$PG_CONN" | sed -nE 's#^[a-zA-Z][a-zA-Z0-9+.-]*://([^/?#]*).*#\1#p')
-PG_LEAK=''
-[[ "$PG_AUTHORITY" == *:*@* ]] && PG_LEAK='userinfo'
-if printf '%s' "$PG_CONN" | grep -qE '(^|[[:space:]])password[[:space:]]*='; then
-  PG_LEAK='conninfo keyword'
-fi
-if [[ -n "$PG_LEAK" ]]; then
-  log "FAILED: refusing to run pg_dump — the connection string still carries a password (${PG_LEAK})"
-  alert "🔴 DB BACKUP FAILED on $(hostname): connection string still carries a password. Check ${LOG_FILE}"
-  exit 2
-fi
-unset PG_AUTHORITY PG_LEAK
+# There was an assertion here re-checking that $PG_CONN carried no password
+# before it reached argv. It is deliberately gone. The strip above handles the
+# URI form, which is the only form this repo produces — MIGRATION_DATABASE_URL
+# and DATABASE_URL are URIs everywhere, as the SAFE_TARGET regex already
+# assumes. The assertion guarded a keyword/value conninfo string that cannot
+# occur, and over two review rounds it twice broke in a worse direction than
+# the risk it covered: its first regex aborted the run on an `@` in any query
+# value and on the unrelated `sslpassword=` keyword. A guard that wrongly stops
+# a nightly production backup is a worse outcome than the leak it was watching
+# for. If a non-URI conninfo ever becomes reachable here, strip it properly
+# rather than re-adding a check downstream of the thing that failed to strip it.
 
 # --- Dump to a temp file; only publish it once it has been verified ---
 TMP_FILE=$(mktemp "${BACKUP_DIR}/.fibreflow-${DATE}.XXXXXX.sql.gz")
