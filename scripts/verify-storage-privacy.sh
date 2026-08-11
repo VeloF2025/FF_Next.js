@@ -37,6 +37,18 @@ PRIVATE_PREFIXES=(
   "/storage/hs-private/medicals/verify-privacy-probe.pdf"
   "/storage/hs-private/contractor_documents/verify-privacy-probe.pdf"
   "/storage/hs-private/appointment_letters/verify-privacy-probe.pdf"
+  # Case variation: the rule is ~* for this reason. Measured against the
+  # case-sensitive payslips rule, an uppercase path returns 404 rather than
+  # 403 — it misses the regex and is proxied. This probe fails if someone
+  # changes ~* back to ~.
+  "/storage/HS-PRIVATE/medicals/verify-privacy-probe.pdf"
+  # Traversal in from an open prefix. nginx normalises the path before it
+  # matches a location, so this must land on the 403 — proving normalisation
+  # rather than assuming it.
+  "/storage/staff/documents/../hs-private/medicals/verify-privacy-probe.pdf"
+  # Control: a prefix already guarded in production. If this one stops
+  # returning 403, the script is measuring something other than what it thinks
+  # — a green run with every probe passing for an unrelated reason.
   "/storage/staff/payslips/verify-privacy-probe.pdf"
 )
 
