@@ -24,6 +24,23 @@ const SOURCE_SCRIPT = resolve(HERE, "secret-scan.sh");
 const LEAKED_PG_LINE = ["PGPASS", "WORD='", "Zq7mKp2LvRt9Xn4", "'"].join("");
 const BURNED_VALUE = ["zander", "2026"].join("");
 
+// Detection-surface fixtures (#2431). Every value below is invented.
+//
+// The URI form is the one that matters: issue #1830 — the leak this scanner
+// exists to prevent — was a Postgres connection URI, and CLAUDE.md documents
+// that exact `psql "postgresql://…"` shape. Before this change every rule
+// required a credential keyword adjacent to an `=`, and a URI has neither.
+const URI_CREDENTIAL = ["postgresql://ff_user:", "Kx9mQ2vTn7Lp", "@100.96.0.1:5437/fibreflow"].join("");
+const URI_REDIS = ["redis://default:", "Rt4bVn8kLm2q", "@cache.internal:6379"].join("");
+// YAML/JSON colon assignment.
+const YAML_SECRET = ["DB_PASS", 'WORD: "', "Kx9mQ2vTn7Lp", '"'].join("");
+// Lowercase, unquoted — the .env idiom nobody writes in caps.
+const LOWER_ENV = ["db_", "pass=", "Kx9mQ2vTn7Lp"].join("");
+// A real value that merely starts with "test-". The PLACEHOLDER filter is
+// applied to the whole matched span, which includes the VALUE, so any secret
+// prefixed this way whitelisted itself.
+const TEST_PREFIXED = ["SESSION_SEC", 'RET="test-', "a1b2c3d4e5f6a7b8c9d0", '"'].join("");
+
 const ZERO_SHA = "0".repeat(40);
 
 function git(root, args) {
@@ -175,6 +192,123 @@ test("--range rejects a missing base instead of scanning nothing", () => {
     const r = runScan(root, ["--range", ZERO_SHA, "HEAD"]);
     assert.notEqual(r.status, 0, `unresolvable base must fail the build: ${describe(r)}`);
     assert.doesNotMatch(r.stdout, /Secret scan passed/);
+  });
+});
+
+// ── Detection surface (#2431) ────────────────────────────────────────────────
+// Enforcement was hardened in #2425 — the gate runs and fails closed. These
+// cover what it actually RECOGNISES, which was narrower than the green check
+// implied.
+
+test("flags a credential embedded in a connection URI", () => {
+  withFixture({}, (root) => {
+    commitFile(root, "runbook.md", `psql "${URI_CREDENTIAL}"\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `URI credential must be caught — this is the #1830 shape: ${describe(r)}`);
+    assert.match(r.stdout, /URI/i);
+  });
+});
+
+test("flags a credential in a non-postgres URI scheme", () => {
+  withFixture({}, (root) => {
+    commitFile(root, "compose.yml", `  REDIS_URL: ${URI_REDIS}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `any scheme://user:pass@host is a credential: ${describe(r)}`);
+  });
+});
+
+test("does not flag a URI with no credential, or a placeholder one", () => {
+  withFixture({}, (root) => {
+    commitFile(
+      root,
+      "docs.md",
+      [
+        "postgresql://localhost:5437/fibreflow",
+        "postgresql://user:pass@host:5437/db",
+        "postgresql://ff_user:${PGPASSWORD}@host:5437/db",
+        "https://app.fibreflow.app/storage/",
+        "postgresql://ff_user:<your-password>@host:5437/db",
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `documented placeholder URIs must stay clean: ${describe(r)}`);
+  });
+});
+
+test("flags a credential assigned with a colon (YAML/JSON)", () => {
+  withFixture({}, (root) => {
+    commitFile(root, "values.yaml", `${YAML_SECRET}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `colon assignment must be caught: ${describe(r)}`);
+  });
+});
+
+test("colon rule does not fire on prose values that merely follow a credential key", () => {
+  withFixture({}, (root) => {
+    // Both measured in this repo before the digit requirement. An error map and
+    // a schema example are ordinary things to add in a PR, and the gate blocks
+    // the PR — so a false positive here is not cosmetic.
+    commitFile(
+      root,
+      "errors.ts",
+      [
+        "const ERRORS = {",
+        "  'auth/wrong-password': 'Incorrect password.',",
+        "};",
+        'const schema = { "password": "string" };',
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `prose after a credential key is not a credential: ${describe(r)}`);
+  });
+});
+
+test("colon rule does not fire on an identifier that merely ends in a keyword", () => {
+  withFixture({}, (root) => {
+    // `minipass` is a real npm package and appears 29 times across
+    // package-lock.json and bun.lock in this repo. Without a boundary before
+    // the keyword, every lockfile update would trip the gate.
+    commitFile(
+      root,
+      "package-lock.json",
+      [
+        '{ "packages": {',
+        '  "node_modules/minipass": { "version": "7.0.4" },',
+        '  "node_modules/fs-minipass": { "minipass": "^7.0.4" }',
+        "} }",
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `a package named *pass is not a credential: ${describe(r)}`);
+  });
+});
+
+test("flags a lowercase unquoted credential assignment", () => {
+  withFixture({}, (root) => {
+    commitFile(root, ".env.sample", `${LOWER_ENV}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `lowercase keys are the .env idiom: ${describe(r)}`);
+  });
+});
+
+test("a value merely prefixed 'test-' does not whitelist itself", () => {
+  withFixture({}, (root) => {
+    commitFile(root, "config.ts", `${TEST_PREFIXED}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `the placeholder filter must not read the VALUE: ${describe(r)}`);
+  });
+});
+
+test("a genuinely test-scoped KEY is still exempt", () => {
+  withFixture({}, (root) => {
+    // The key names the fixture, not the value — this is the case the
+    // placeholder term exists for and must keep working.
+    commitFile(root, "helper.ts", "const TEST_PASSWORD = process.env.TEST_PASSWORD;\n");
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `env-var reference must stay clean: ${describe(r)}`);
   });
 });
 
