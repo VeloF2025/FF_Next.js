@@ -64,6 +64,15 @@ const ALLOWED_FILES = [
  * wrote in a RuleTester case. Null means "cannot be located relative to the
  * project", and the caller treats that as NOT allow-listed — an unplaceable
  * file being exempt is the failure this whole function exists to prevent.
+ *
+ * KNOWN LIMIT — symlinks. ESLint reports a file under its nominal path, not its
+ * realpath, so replacing an allow-listed file with a symlink to a writer
+ * elsewhere keeps the trusted path string and the target is never inspected.
+ * Confirmed against the real ESLint API, not just RuleTester. Left open
+ * deliberately: it requires REPLACING the live promoteSerial() implementation
+ * with a one-line symlink, which shows up in any diff as exactly that and
+ * breaks every real importer of the module. It is a formal bypass, not a
+ * stealthy one, and this gate's threat model is a PR that looks ordinary.
  */
 function repoRelative(filename, cwd) {
   const norm = String(filename).replace(/\\/g, '/');

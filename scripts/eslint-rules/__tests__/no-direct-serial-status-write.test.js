@@ -193,6 +193,21 @@ ruleTester.run('no-direct-serial-status-write', rule, {
       filename: 'vendor/x/scripts/cleanup-serial-drift-2026-05-28.ts',
       errors: err('status'),
     },
+    // The same attack as an ABSOLUTE path — which is the only shape real ESLint
+    // ever supplies. The two cases above pass bare relative strings, so they
+    // never reach repoRelative()'s path.relative() branch at all: they fail to
+    // match `^src/...` for the trivial reason that "evil/src/..." does not start
+    // with "src/", which would stay true even if that branch were broken.
+    // Without this case, a future change to the absolute-path handling could
+    // silently reopen the nested-prefix hole with every other test still green.
+    {
+      code: 'const q = `UPDATE stock_serials SET status = $1 WHERE id = $2`;',
+      filename: require('path').join(
+        process.cwd(),
+        'evil/src/modules/procurement/field-stock/services/serialLifecycle.ts',
+      ),
+      errors: err('status'),
+    },
     // A file outside the project root cannot be located against the allow-list,
     // so it is treated as not allow-listed rather than silently exempt.
     {
