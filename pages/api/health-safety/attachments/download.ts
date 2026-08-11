@@ -14,7 +14,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 import { isPrivateStoragePath } from '@/modules/health-safety/services/hsAttachmentPolicy';
 import { getAttachment } from '@/modules/health-safety/services/hsAttachmentService';
@@ -105,12 +105,14 @@ async function guarded(req: NextApiRequest, res: NextApiResponse) {
     return await handler(req, res);
   } catch (error) {
     if (error instanceof HsAttachmentError) {
-      if (error.code === 'not_found') return apiResponse.notFound(res, error.message);
+      // Sent verbatim: apiResponse.notFound appends "not found" to whatever it
+      // is given, and these messages are already complete sentences.
+      if (error.code === 'not_found') return apiResponse.error(res, ErrorCode.NOT_FOUND, error.message);
       return apiResponse.badRequest(res, error.message);
     }
     const message = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Attachment download failed', { error: message });
-    return res.status(500).json({ error: 'Failed to download the attachment' });
+    return apiResponse.internalError(res, error, 'Failed to download the attachment');
   }
 }
 

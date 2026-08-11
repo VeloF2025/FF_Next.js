@@ -75,6 +75,7 @@ vi.mock('@/services/vfStorageAdapter', () => ({
 }));
 
 import downloadHandler from '../../../../pages/api/health-safety/attachments/download';
+import { HsAttachmentError } from '../services/hsAttachmentValidation';
 
 const PRIVATE_ROW = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -190,5 +191,25 @@ describe('GET /api/health-safety/attachments/download', () => {
     await downloadHandler(req, res);
 
     expect(res._getStatusCode()).toBe(405);
+  });
+  it('does not append "not found" to a message that is already a sentence', async () => {
+    // apiResponse.notFound(res, resource) renders "<resource> not found", so
+    // routing a complete sentence through it produced
+    // "That attachment is not linked to a record not found" in the user's face.
+    h.attachment.current = { ...PRIVATE_ROW, medical_id: null, surface: undefined };
+    const { getAttachment } = await import(
+      '@/modules/health-safety/services/hsAttachmentService'
+    );
+    (getAttachment as unknown as { mockRejectedValueOnce: (e: unknown) => void })
+      .mockRejectedValueOnce(
+        new HsAttachmentError('not_found', 'That attachment is not linked to a record')
+      );
+
+    const res = await download(PRIVATE_ROW.id);
+
+    expect(res._getStatusCode()).toBe(404);
+    const body = JSON.stringify(res._getJSONData());
+    expect(body).toContain('That attachment is not linked to a record');
+    expect(body).not.toMatch(/record not found/);
   });
 });

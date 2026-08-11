@@ -173,7 +173,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   } catch (error) {
     if (error instanceof HsAttachmentError) {
       const status = STATUS_BY_CODE[error.code] ?? 400;
-      if (status === 404) return apiResponse.notFound(res, error.message);
+      // apiResponse.notFound(res, resource) renders "<resource> not found", so
+      // passing a complete sentence through it yields "…no longer exists not
+      // found". These messages are already sentences; send them verbatim.
+      if (status === 404) return apiResponse.error(res, ErrorCode.NOT_FOUND, error.message);
       if (status === 503) {
         return apiResponse.error(res, ErrorCode.SERVICE_UNAVAILABLE, error.message);
       }
@@ -184,9 +187,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (/maxFileSize/i.test(message)) {
       return apiResponse.badRequest(res, 'The file exceeds the 10 MB limit');
     }
-    // Deliberately no storage path, filename or record id.
+    // Deliberately no storage path, filename or record id in the client-facing
+    // message; internalError withholds detail outside development and logs the
+    // error server-side.
     logger.error('H&S attachment request failed', { method: req.method, error: message });
-    return res.status(500).json({ error: 'Failed to process the attachment' });
+    return apiResponse.internalError(res, error, 'Failed to process the attachment');
   }
 }
 
