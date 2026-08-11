@@ -308,61 +308,23 @@ else
   WARNED=$((WARNED + 1))
 fi
 
-# ─── Gate 4: Zero Tolerance (staged files only) ──────────────────────────────
+# ─── Gate 4: Zero Tolerance (changed files) ──────────────────────────────────
+# The detection now lives in scripts/zero-tolerance-changed.sh so the GitHub
+# Actions gate runs the SAME code. It used to be inline here and nowhere else,
+# which is why rule 12 was enforced only when a human typed `npm run ci:quick`.
+#
+# --worktree keeps this gate's original semantics (uncommitted vs HEAD). Note
+# what that means: once you commit, the set is empty and this gate passes on
+# nothing. The CI side scans an explicit commit range for exactly that reason.
 echo -e "\n${CYAN}── Gate 4: Zero Tolerance (changed files) ──${NC}\n"
 
-ZT_FAILED=false
-CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || true)
-if [ -n "$CHANGED_FILES" ]; then
-  # Check for console.log in changed .ts/.tsx files.
-  # Honours:
-  #   - leading-// comment lines (pre-existing)
-  #   - `// eslint-disable-line no-console` same-line pragma
-  #   - `// eslint-disable-next-line no-console` on the previous line
-  # The awk keeps a sliding one-line window so it can see the prior line.
-  # `[ -f "$f" ]` returns 1 when a file in the diff was deleted; without the
-  # trailing `|| true` the loop's last exit status is non-zero, pipefail
-  # propagates it through $(), and set -e kills Gate 4 silently mid-run on
-  # deletion-only PRs. Same pattern as Gate 2's CATCH_COUNT fix above and the
-  # EMPTY_CATCH loop below.
-  CONSOLE_HITS=$(echo "$CHANGED_FILES" | { grep -E '\.(ts|tsx)$' || true; } | { grep -v '.test.' || true; } | { grep -v '.spec.' || true; } | while read -r f; do
-    [ -f "$f" ] && awk -v file="$f" '
-      {
-        line = $0
-        if (line ~ /console\.(log|error|warn|info|debug)/ \
-            && line !~ /^[[:space:]]*\/\// \
-            && line !~ /eslint-disable-line[[:space:]]+(no-console|.*,[[:space:]]*no-console)/ \
-            && prev !~ /eslint-disable-next-line[[:space:]]+(no-console|.*,[[:space:]]*no-console)/) {
-          print file ":" NR ":" line
-        }
-        prev = line
-      }
-    ' "$f" || true
-  done)
-
-  if [ -n "$CONSOLE_HITS" ]; then
-    fail "console.* found in changed files (use log from @/lib/logger)"
-    echo "$CONSOLE_HITS" | head -10 | sed 's/^/    /'
-    ZT_FAILED=true
-  fi
-
-  # Check for empty catch blocks in changed files
-  EMPTY_CATCH=$(echo "$CHANGED_FILES" | { grep -E '\.(ts|tsx)$' || true; } | while read -r f; do
-    [ -f "$f" ] && grep -n 'catch.*{[[:space:]]*}' "$f" 2>/dev/null | sed "s|^|$f:|" || true
-  done)
-
-  if [ -n "$EMPTY_CATCH" ]; then
-    fail "Empty catch blocks in changed files"
-    echo "$EMPTY_CATCH" | head -10 | sed 's/^/    /'
-    ZT_FAILED=true
-  fi
-
-  if [ "$ZT_FAILED" = false ]; then
-    pass "Zero Tolerance: changed files clean"
-  fi
+if ZT_OUT=$(bash scripts/zero-tolerance-changed.sh --worktree 2>&1); then
+  pass "Zero Tolerance: changed files clean"
 else
-  pass "Zero Tolerance: no changed files"
+  fail "Zero Tolerance: violation(s) in changed files"
+  echo "$ZT_OUT" | sed 's/^/    /' | head -25
 fi
+
 
 # ─── Serial Lifecycle Discipline (Sprint E Track 3) ──────────────────────────
 #
