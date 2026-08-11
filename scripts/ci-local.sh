@@ -119,14 +119,22 @@ fi
 # ─── Gate 2: Silent catches (API routes) ─────────────────────────────────────
 echo -e "\n${CYAN}── Gate 2: Error Handling (no-silent-catch) ──${NC}\n"
 
-CATCH_OUTPUT=$(npx eslint pages/api --ext .ts --rulesdir scripts/eslint-rules --rule '{"no-silent-catch": "warn"}' 2>&1 || true)
+CATCH_RC=0
+CATCH_OUTPUT=$(npx eslint pages/api --ext .ts --rulesdir scripts/eslint-rules --rule '{"no-silent-catch": "warn"}' 2>&1) || CATCH_RC=$?
 # `grep -c` exits 1 when it finds 0 matches, which combined with `pipefail`
 # and a `|| echo "0"` fallback produced a "0\n0" multi-line count that broke
 # the `[ -le ]` numeric comparison. Count with grep + wc + tr, with `|| true`
 # so no-matches doesn't trip pipefail.
 CATCH_COUNT=$( { echo "$CATCH_OUTPUT" | grep "no-silent-catch" || true; } | wc -l | tr -d ' ')
 
-if [ "$CATCH_COUNT" -le "$MAX_SILENT_CATCHES" ]; then
+# ESLint exits 2 when it fails BEFORE linting anything — a bad --rulesdir, a
+# target path that no longer exists, a broken config. Its output then contains
+# no rule messages, so CATCH_COUNT is 0 and the gate would report a clean pass
+# having scanned nothing. The old `|| true` swallowed exactly that.
+if [ "$CATCH_RC" -ge 2 ]; then
+  fail "Silent catches: eslint failed to run (exit ${CATCH_RC}) — gate scanned nothing"
+  echo "$CATCH_OUTPUT" | tail -5 | sed 's/^/    /'
+elif [ "$CATCH_COUNT" -le "$MAX_SILENT_CATCHES" ]; then
   pass "Silent catches: ${CATCH_COUNT} (≤${MAX_SILENT_CATCHES})"
 else
   fail "Silent catches: ${CATCH_COUNT} (max ${MAX_SILENT_CATCHES}) — new silent catch blocks added"
@@ -142,10 +150,16 @@ fi
 # See docs/plans/2026-05-30-neon-shim-elimination-plan.md.
 echo -e "\n${CYAN}── Gate 2c: Neon-shim SQL divergence (no-neon-shim-sql-divergence) ──${NC}\n"
 
-DIVERGENCE_OUTPUT=$(npx eslint pages/api src lib --ext .ts,.tsx,.js --rulesdir scripts/eslint-rules --rule '{"no-neon-shim-sql-divergence": "error"}' 2>&1 || true)
+DIVERGENCE_RC=0
+DIVERGENCE_OUTPUT=$(npx eslint pages/api src lib --ext .ts,.tsx,.js --rulesdir scripts/eslint-rules --rule '{"no-neon-shim-sql-divergence": "error"}' 2>&1) || DIVERGENCE_RC=$?
 DIVERGENCE_COUNT=$( { echo "$DIVERGENCE_OUTPUT" | grep "no-neon-shim-sql-divergence" || true; } | wc -l | tr -d ' ')
 
-if [ "$DIVERGENCE_COUNT" -eq 0 ]; then
+# See Gate 2: exit >= 2 means eslint never linted, so a zero count is
+# indistinguishable from a clean scan.
+if [ "$DIVERGENCE_RC" -ge 2 ]; then
+  fail "Neon-shim SQL divergence: eslint failed to run (exit ${DIVERGENCE_RC}) — gate scanned nothing"
+  echo "$DIVERGENCE_OUTPUT" | tail -5 | sed 's/^/    /'
+elif [ "$DIVERGENCE_COUNT" -eq 0 ]; then
   pass "Neon-shim SQL divergence: none"
 else
   fail "Neon-shim SQL divergence: ${DIVERGENCE_COUNT} (must be 0) — fragment interpolation or sql.unsafe() executor"
