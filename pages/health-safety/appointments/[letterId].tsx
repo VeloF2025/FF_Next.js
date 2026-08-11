@@ -15,6 +15,7 @@ import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, Trash2, CheckCircle2 } from 'lucide-react';
 import { SignaturePad } from '@/modules/health-safety/components/appointments/SignaturePad';
 import { letterTypeDef } from '@/modules/health-safety/types/appointment.types';
+import { HSAttachmentUpload } from '@/modules/health-safety/components/attachments/HSAttachmentUpload';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
 
@@ -89,6 +90,8 @@ function Detail({ id }: { id: string }) {
           </>
         )}
       </div>
+
+      <HSAttachmentUpload surface="letter" parentId={id} label="Signed letter and supporting documents" />
 
       <div className="flex justify-end pt-2">
         <button onClick={remove} className="flex items-center gap-2 px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">

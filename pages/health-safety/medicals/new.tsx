@@ -18,11 +18,27 @@ import {
   MEDICAL_VALIDITY_MONTHS,
   type MedicalOutcome,
 } from '@/modules/health-safety/types/medical.types';
+import { HSAttachmentPicker } from '@/modules/health-safety/components/attachments/HSAttachmentPicker';
+import {
+  MAX_ATTACHMENT_MB,
+  uploadAttachment,
+} from '@/modules/health-safety/components/attachments/attachmentClient';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 const inputCls =
   'w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]';
 const labelCls = 'block text-sm font-medium text-[var(--ff-text-secondary)] mb-1';
+
+/**
+ * The record is never rolled back when its certificate fails to upload — the
+ * medical outcome is the compliance fact and is worth keeping. So the message
+ * has to say that the save succeeded, or the user will assume it did not and
+ * enter the whole record again.
+ */
+function uploadFailureMessage(error: unknown): string {
+  const detail = error instanceof Error ? error.message : 'unknown error';
+  return `The medical record was saved, but the certificate did not upload: ${detail}. Press Save to retry the upload, or attach it from the record later.`;
+}
 
 function RecordMedicalContent() {
   const router = useRouter();
@@ -36,8 +52,17 @@ function RecordMedicalContent() {
   const [outcome, setOutcome] = useState<MedicalOutcome>('fit');
   const [form, setForm] = useState({
     worker_id: '', contractor_id: '', exam_date: '', expiry_date: '', restrictions: '',
-    practitioner: '', practice_number: '', certificate_number: '', certificate_url: '',
+    practitioner: '', practice_number: '', certificate_number: '',
   });
+  // Held rather than uploaded on selection: the attachment needs the medical
+  // record's id for its foreign key, and that id does not exist until the POST
+  // below succeeds.
+  const [certificate, setCertificate] = useState<File | null>(null);
+  // Set once the record is created. A certificate upload can fail after the
+  // record has been saved, which leaves the user on a populated form; without
+  // this, pressing Save again would create a SECOND medical record rather than
+  // retrying the upload against the first.
+  const [savedMedicalId, setSavedMedicalId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -63,6 +88,24 @@ function RecordMedicalContent() {
       return;
     }
     setSaving(true);
+
+    // Retry path: the record already exists and only its certificate failed.
+    // Re-uploading is the whole job — re-posting would duplicate the record.
+    if (savedMedicalId) {
+      if (!certificate) {
+        router.push('/health-safety/medicals');
+        return;
+      }
+      try {
+        await uploadAttachment('medical', savedMedicalId, certificate);
+        router.push('/health-safety/medicals');
+      } catch (uploadError) {
+        setErr(uploadFailureMessage(uploadError));
+        setSaving(false);
+      }
+      return;
+    }
+
     const payload: Record<string, unknown> = {
       exam_date: form.exam_date,
       expiry_date: form.expiry_date || undefined,
@@ -72,7 +115,6 @@ function RecordMedicalContent() {
       practitioner: form.practitioner || undefined,
       practice_number: form.practice_number || undefined,
       certificate_number: form.certificate_number || undefined,
-      certificate_url: form.certificate_url || undefined,
     };
     if (workerKind === 'staff') payload.staff_id = form.worker_id;
     else payload.team_member_id = form.worker_id;
@@ -89,6 +131,26 @@ function RecordMedicalContent() {
         setSaving(false);
         return;
       }
+
+      // The record is saved at this point. If the certificate upload fails the
+      // record must not be rolled back — the medical outcome is the compliance
+      // fact and is worth keeping — so the failure is reported against the
+      // saved record and the user is left on the form to retry rather than
+      // being redirected away from an error they cannot then act on.
+      const medicalId = (json?.data ?? json)?.id as string | undefined;
+      if (certificate && medicalId) {
+        // Recorded BEFORE the upload is attempted, so a failure below cannot
+        // leave the form able to post a second record.
+        setSavedMedicalId(medicalId);
+        try {
+          await uploadAttachment('medical', medicalId, certificate);
+        } catch (uploadError) {
+          setErr(uploadFailureMessage(uploadError));
+          setSaving(false);
+          return;
+        }
+      }
+
       router.push('/health-safety/medicals');
     } catch {
       setErr('Network error saving medical record');
@@ -197,10 +259,13 @@ function RecordMedicalContent() {
             <label className={labelCls}>Certificate number</label>
             <input type="text" className={inputCls} value={form.certificate_number} onChange={(e) => set('certificate_number', e.target.value)} />
           </div>
-          <div>
-            <label className={labelCls}>Certificate URL</label>
-            <input type="url" className={inputCls} placeholder="https://…" value={form.certificate_url} onChange={(e) => set('certificate_url', e.target.value)} />
-          </div>
+          <HSAttachmentPicker
+            label="Certificate"
+            file={certificate}
+            onFileChange={setCertificate}
+            disabled={saving}
+            hint={`Uploaded after the record is saved. PDF, JPG, PNG, DOC or DOCX, up to ${MAX_ATTACHMENT_MB} MB.`}
+          />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

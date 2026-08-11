@@ -13,6 +13,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { healthSafetyConfig } from '@/modules/navigation';
 import { ChevronLeft, UserPlus, CheckCircle2, Clock, Trash2 } from 'lucide-react';
+import { HSAttachmentUpload } from '@/modules/health-safety/components/attachments/HSAttachmentUpload';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
 const inputCls =
@@ -121,6 +122,8 @@ function TalkContent({ talkId }: { talkId: string }) {
           </div>
         )}
       </div>
+
+      <HSAttachmentUpload surface="talk" parentId={talkId} label="Photos and attendance register" />
     </div>
   );
 }

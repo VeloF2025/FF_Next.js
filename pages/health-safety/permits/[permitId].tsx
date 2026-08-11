@@ -16,6 +16,7 @@ import { ChevronLeft, Trash2 } from 'lucide-react';
 import { PermitStatusBadge } from '@/modules/health-safety/components/permits/PermitStatusBadge';
 import { PERMIT_STATUS_TRANSITIONS, PERMIT_STATUS_CONFIG, type PermitStatus, type PermitPrecondition } from '@/modules/health-safety/types/permit.types';
 import { allMandatoryPreconditionsMet } from '@/modules/health-safety/services/permitService';
+import { HSAttachmentUpload } from '@/modules/health-safety/components/attachments/HSAttachmentUpload';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
 
@@ -112,6 +113,8 @@ function Detail({ id }: { id: string }) {
           })}
         </div>
       )}
+
+      <HSAttachmentUpload surface="permit" parentId={id} label="Permit documents" />
 
       <div className="flex justify-end pt-2">
         <button onClick={remove} className="flex items-center gap-2 px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
