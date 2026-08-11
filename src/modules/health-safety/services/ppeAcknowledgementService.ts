@@ -17,6 +17,23 @@
 
 import { query, queryOne, transaction } from '@/lib/db-pool';
 
+/** Postgres unique violation. */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Raised when two requests race to open a sheet for the same worker.
+ *
+ * The partial unique index genuinely prevents the second row — it does not
+ * merely narrow the window — so the loser gets a constraint violation. That is
+ * a conflict, not a server fault, and must not surface as a 500.
+ */
+export class PpeAcknowledgementConflict extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PpeAcknowledgementConflict';
+  }
+}
+
 export type WorkerRef = { staffId: string } | { teamMemberId: string };
 
 export type AcknowledgementSheet = {
@@ -127,7 +144,7 @@ export async function startSheet(sheet: NewSheet): Promise<AcknowledgementSheet>
     ? (sheet.worker as { staffId: string }).staffId
     : (sheet.worker as { teamMemberId: string }).teamMemberId;
 
-  const created = await transaction(async (txn) => {
+  const created = await runStartSheet(async (txn) => {
     await txn.query(
       `UPDATE hs_ppe_acknowledgements
           SET status = 'closed', updated_at = NOW()
@@ -162,6 +179,27 @@ export async function startSheet(sheet: NewSheet): Promise<AcknowledgementSheet>
   return full;
 }
 
+/**
+ * Runs the start-sheet transaction, translating the index's unique violation.
+ *
+ * Split out so the translation sits on the transaction boundary rather than
+ * being repeated at each call site.
+ */
+async function runStartSheet<T>(
+  work: (txn: Parameters<Parameters<typeof transaction>[0]>[0]) => Promise<T>
+): Promise<T> {
+  try {
+    return await transaction(work);
+  } catch (error) {
+    if ((error as { code?: string }).code === UNIQUE_VIOLATION) {
+      throw new PpeAcknowledgementConflict(
+        'Another sheet was opened for this worker at the same time. Reload and try again.'
+      );
+    }
+    throw error;
+  }
+}
+
 /** Close a sheet — the paper one is full, or has been returned to HSE. */
 export async function closeSheet(sheetId: string): Promise<boolean> {
   const rows = await query<{ id: string }>(
@@ -175,30 +213,53 @@ export async function closeSheet(sheetId: string): Promise<boolean> {
 }
 
 /**
- * Issuances whose worker has no evidenced sheet.
+ * Issuances whose worker has no evidenced sheet — and could have one.
  *
  * Reported, never enforced. The count is what makes "we issue PPE without a
  * signed indemnity" visible; blocking the issue instead would push the storeman
  * back to paper, which is the state this register is trying to leave.
+ *
+ * **Name-only issuances are excluded, deliberately.** `hs_ppe_issuance` permits
+ * an issue with NEITHER staff_id nor team_member_id — its constraint is
+ * `at_most_one_worker`, and migration 453 records that field crews routinely
+ * include workers in neither table. Such a row can never match a sheet, so
+ * counting it would (a) inflate this number permanently and (b) tell the user to
+ * "upload the signed sheet" for a row that `PPEAcknowledgementPanel` correctly
+ * refuses to offer a sheet for. The count must only include rows somebody can
+ * actually act on, or the banner is an instruction that cannot be followed.
+ *
+ * Those rows are not evidenced either — they are un-evidenceable, which is a
+ * different problem (the worker is not registered) and needs its own surface
+ * rather than being folded in here.
  */
+/**
+ * The exact SQL behind `countUnevidencedIssuances`, exported so the migration
+ * test can run IT against real Postgres rather than a paraphrase. Asserting on
+ * the query text alone proves nothing about what the query returns — and the
+ * name-only exclusion below is precisely the sort of thing a substring check
+ * cannot verify.
+ */
+export const UNEVIDENCED_ISSUANCE_COUNT_SQL = `
+  SELECT COUNT(*)::int AS n
+    FROM hs_ppe_issuance i
+   WHERE (i.staff_id IS NOT NULL OR i.team_member_id IS NOT NULL)
+     AND NOT EXISTS (
+           SELECT 1
+             FROM hs_ppe_acknowledgements a
+             LEFT JOIN LATERAL (
+               SELECT COUNT(*) AS n
+                 FROM hs_attachments att
+                WHERE att.ppe_acknowledgement_id = a.id
+             ) att ON TRUE
+            WHERE (
+                    (i.staff_id       IS NOT NULL AND a.staff_id       = i.staff_id)
+                 OR (i.team_member_id IS NOT NULL AND a.team_member_id = i.team_member_id)
+                  )
+              AND (att.n > 0 OR a.signature_name IS NOT NULL)
+         )
+`;
+
 export async function countUnevidencedIssuances(): Promise<number> {
-  const row = await queryOne<{ n: number }>(
-    `SELECT COUNT(*)::int AS n
-       FROM hs_ppe_issuance i
-      WHERE NOT EXISTS (
-              SELECT 1
-                FROM hs_ppe_acknowledgements a
-                LEFT JOIN LATERAL (
-                  SELECT COUNT(*) AS n
-                    FROM hs_attachments att
-                   WHERE att.ppe_acknowledgement_id = a.id
-                ) att ON TRUE
-               WHERE (
-                       (i.staff_id       IS NOT NULL AND a.staff_id       = i.staff_id)
-                    OR (i.team_member_id IS NOT NULL AND a.team_member_id = i.team_member_id)
-                     )
-                 AND (att.n > 0 OR a.signature_name IS NOT NULL)
-            )`
-  );
+  const row = await queryOne<{ n: number }>(UNEVIDENCED_ISSUANCE_COUNT_SQL);
   return row?.n ?? 0;
 }

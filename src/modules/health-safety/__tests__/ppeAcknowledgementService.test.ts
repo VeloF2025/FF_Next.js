@@ -54,6 +54,7 @@ vi.mock('@/lib/db-pool', () => ({
 }));
 
 import {
+  PpeAcknowledgementConflict,
   closeSheet,
   countUnevidencedIssuances,
   listSheetsFor,
@@ -185,5 +186,44 @@ describe('countUnevidencedIssuances', () => {
     h.oneRow.current = null;
     // A null here would render as "NaN unevidenced" in the register banner.
     expect(await countUnevidencedIssuances()).toBe(0);
+  });
+
+  it('excludes name-only issuances, which can never be evidenced', async () => {
+    h.oneRow.current = { n: 0 };
+    await countUnevidencedIssuances();
+
+    const q = squash(h.calls.current.at(-1)!.text);
+    // hs_ppe_issuance's constraint is at_most_one_worker — zero workers is
+    // legal, and migration 453 records that field crews routinely include
+    // workers in neither table. Such a row can never match a sheet, so counting
+    // it would inflate the banner permanently AND tell the user to upload a
+    // sheet for a row the panel correctly refuses to offer one for.
+    expect(q).toContain('i.staff_id IS NOT NULL OR i.team_member_id IS NOT NULL');
+  });
+});
+
+describe('startSheet — losing a race', () => {
+  it('raises a typed conflict on a unique violation rather than a raw error', async () => {
+    const { transaction } = await import('@/lib/db-pool');
+    (transaction as unknown as { mockRejectedValueOnce: (e: unknown) => void })
+      .mockRejectedValueOnce(Object.assign(new Error('duplicate key'), { code: '23505' }));
+
+    // The partial unique index genuinely refuses the second open sheet, so the
+    // loser must surface as a 409, not a 500.
+    await expect(
+      startSheet({ worker: { staffId: 'staff-1' }, workerName: 'W', actorUserId: 'u' })
+    ).rejects.toBeInstanceOf(PpeAcknowledgementConflict);
+  });
+
+  it('does not swallow unrelated database errors', async () => {
+    const { transaction } = await import('@/lib/db-pool');
+    (transaction as unknown as { mockRejectedValueOnce: (e: unknown) => void })
+      .mockRejectedValueOnce(Object.assign(new Error('connection reset'), { code: '08006' }));
+
+    // Translating every failure into a conflict would hide real faults behind a
+    // "reload and try again" the user can never satisfy.
+    await expect(
+      startSheet({ worker: { staffId: 'staff-1' }, workerName: 'W', actorUserId: 'u' })
+    ).rejects.not.toBeInstanceOf(PpeAcknowledgementConflict);
   });
 });

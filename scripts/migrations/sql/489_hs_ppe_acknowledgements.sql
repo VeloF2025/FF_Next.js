@@ -65,8 +65,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS hs_ppe_ack_one_open_per_worker
   ON hs_ppe_acknowledgements (COALESCE(staff_id, team_member_id))
   WHERE status = 'open';
 
-CREATE INDEX IF NOT EXISTS hs_ppe_ack_worker_idx
-  ON hs_ppe_acknowledgements (COALESCE(staff_id, team_member_id), sheet_date DESC);
+-- Plain per-column indexes, NOT an index on COALESCE(staff_id, team_member_id).
+-- Every lookup filters `staff_id = $1` or `team_member_id = $1`, and Postgres
+-- cannot match a plain-column predicate to a COALESCE expression index — such an
+-- index is dead for all of them. hs_worker_medicals (463) gets this right with
+-- two plain indexes; the COALESCE index above exists only to enforce the
+-- one-open-sheet uniqueness, which is a different job.
+CREATE INDEX IF NOT EXISTS hs_ppe_ack_staff_idx
+  ON hs_ppe_acknowledgements (staff_id, sheet_date DESC) WHERE staff_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS hs_ppe_ack_team_member_idx
+  ON hs_ppe_acknowledgements (team_member_id, sheet_date DESC) WHERE team_member_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS hs_ppe_ack_contractor_idx
   ON hs_ppe_acknowledgements (contractor_id) WHERE contractor_id IS NOT NULL;
 
@@ -96,6 +104,13 @@ CREATE INDEX IF NOT EXISTS hs_attachments_ppe_acknowledgement_idx
 -- The exclusive-arc CHECK has to be rewritten rather than added to, so it is
 -- dropped and recreated under the same name. Safe to re-run: DROP IF EXISTS,
 -- then ADD validates every existing row against the new expression.
+--
+-- Plain ADD rather than the NOT VALID + VALIDATE staging this repo uses on large
+-- tables: ADD CONSTRAINT takes ACCESS EXCLUSIVE for the validation scan, and
+-- hs_attachments was verified before writing this — 0 rows, 112 kB — so the scan
+-- is instantaneous and the lock window negligible. Same reasoning 482 records
+-- for its own plain ADD. If hs_attachments has grown by the time this runs
+-- somewhere new, stage it instead.
 ALTER TABLE hs_attachments
   DROP CONSTRAINT IF EXISTS hs_attachments_exactly_one_parent;
 

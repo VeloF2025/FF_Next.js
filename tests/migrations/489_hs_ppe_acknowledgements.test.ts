@@ -31,6 +31,7 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Pool } from 'pg';
+import { UNEVIDENCED_ISSUANCE_COUNT_SQL } from '@/modules/health-safety/services/ppeAcknowledgementService';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -65,14 +66,25 @@ const PREREQUISITES = `
   CREATE TABLE hs_corrective_actions   (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
   CREATE TABLE hs_appointment_letters  (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
   CREATE TABLE hs_permits              (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
-  -- Shaped like the live table for the columns 489 touches.
+  -- Shaped like the live table for every column the 489 code touches.
+  -- team_member_id is NOT optional here: the production count SQL references
+  -- it, and a scratch table missing it fails at parse time rather than
+  -- exercising the query. Its at_most_one_worker CHECK is reproduced because
+  -- the load-bearing case below is a row with NEITHER worker column set, which
+  -- only that constraint's shape makes legal.
   CREATE TABLE hs_ppe_issuance (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     ppe_item_id uuid NOT NULL,
-    staff_id uuid,
+    staff_id uuid REFERENCES staff(id) ON DELETE CASCADE,
+    team_member_id uuid REFERENCES team_members(id) ON DELETE CASCADE,
+    contractor_id uuid,
+    project_id uuid,
     worker_name text NOT NULL,
     quantity integer NOT NULL DEFAULT 1,
-    issued_date date NOT NULL DEFAULT CURRENT_DATE
+    issued_date date NOT NULL DEFAULT CURRENT_DATE,
+    signature_name text,
+    CONSTRAINT hs_ppe_issuance_at_most_one_worker
+      CHECK (NOT (staff_id IS NOT NULL AND team_member_id IS NOT NULL))
   );
 `;
 
@@ -255,5 +267,82 @@ describe('migration 489 — rewritten attachment arc', () => {
 
   it('is rerunnable', async () => {
     expect(await refusedBy(FORWARD)).toBeNull();
+  });
+});
+
+/**
+ * The unevidenced count, run as the PRODUCTION SQL against real Postgres.
+ *
+ * The service's unit test can only assert what the query text contains, which
+ * says nothing about what it returns. The case that matters here is a name-only
+ * issuance — hs_ppe_issuance's constraint is `at_most_one_worker`, so a row with
+ * NEITHER staff_id nor team_member_id is legal and, per migration 453, common
+ * for field crews. Such a row can never match a sheet. Counting it would inflate
+ * the register banner permanently and instruct the user to upload a sheet for a
+ * row the UI correctly refuses to offer one for.
+ */
+describe('migration 489 — unevidenced count semantics', () => {
+  const STAFF_C = '55555555-5555-5555-5555-555555555555';
+
+  async function countUnevidenced(): Promise<number> {
+    const rows = await scoped<{ n: number }>(UNEVIDENCED_ISSUANCE_COUNT_SQL);
+    return rows[0]!.n;
+  }
+
+  beforeAll(async () => {
+    await scoped(`DELETE FROM hs_ppe_issuance`);
+    await scoped(`DELETE FROM hs_ppe_acknowledgements`);
+    await scoped(`INSERT INTO staff (id) VALUES ($1)`, [STAFF_C]);
+  });
+
+  it('does NOT count a name-only issuance, which can never be evidenced', async () => {
+    await scoped(
+      `INSERT INTO hs_ppe_issuance (ppe_item_id, worker_name)
+       VALUES (gen_random_uuid(), 'Unregistered Crew Worker')`
+    );
+    expect(await countUnevidenced()).toBe(0);
+  });
+
+  it('counts an identified worker with no sheet at all', async () => {
+    await scoped(
+      `INSERT INTO hs_ppe_issuance (ppe_item_id, staff_id, worker_name)
+       VALUES (gen_random_uuid(), $1, 'Registered Worker')`,
+      [STAFF_C]
+    );
+    expect(await countUnevidenced()).toBe(1);
+  });
+
+  it('still counts them when the sheet exists but carries no proof', async () => {
+    // A sheet that merely exists is not evidence.
+    await scoped(
+      `INSERT INTO hs_ppe_acknowledgements (staff_id, worker_name, status, created_by)
+       VALUES ($1, 'Registered Worker', 'open', $2)`,
+      [STAFF_C, USER]
+    );
+    expect(await countUnevidenced()).toBe(1);
+  });
+
+  it('stops counting them once the signed sheet is uploaded', async () => {
+    const [sheet] = await scoped<{ id: string }>(
+      `SELECT id FROM hs_ppe_acknowledgements WHERE staff_id = $1 AND status = 'open'`,
+      [STAFF_C]
+    );
+    await scoped(
+      `INSERT INTO hs_attachments (ppe_acknowledgement_id, file_path, file_name, file_size, mime_type, uploaded_by)
+       VALUES ($1, 'hs-private/ppe_acknowledgements/signed.pdf', 's.pdf', 10, 'application/pdf', $2)`,
+      [sheet.id, USER]
+    );
+    expect(await countUnevidenced()).toBe(0);
+  });
+
+  it('accepts an in-app signature as proof instead of a scan', async () => {
+    await scoped(`DELETE FROM hs_attachments WHERE ppe_acknowledgement_id IS NOT NULL`);
+    expect(await countUnevidenced()).toBe(1);
+
+    await scoped(
+      `UPDATE hs_ppe_acknowledgements SET signature_name = 'Registered Worker' WHERE staff_id = $1`,
+      [STAFF_C]
+    );
+    expect(await countUnevidenced()).toBe(0);
   });
 });

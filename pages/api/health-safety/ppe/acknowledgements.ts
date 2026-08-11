@@ -20,6 +20,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withHsPermission } from '@/modules/health-safety/services/hsAuth';
 import { logHsActivity } from '@/modules/health-safety/services/activityLog';
 import {
+  PpeAcknowledgementConflict,
   closeSheet,
   listSheetsFor,
   startSheet,
@@ -84,7 +85,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
   await logHsActivity({
     activityType: 'ppe_acknowledgement_started',
-    entityType: 'hs_ppe_acknowledgements',
+    entityType: 'ppe_acknowledgement',
     entityId: sheet.id,
     description: `PPE acknowledgement sheet started for ${workerName}`,
     metadata: { sheetId: sheet.id, workerName },
@@ -113,7 +114,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
 
   await logHsActivity({
     activityType: 'ppe_acknowledgement_closed',
-    entityType: 'hs_ppe_acknowledgements',
+    entityType: 'ppe_acknowledgement',
     entityId: sheetId,
     description: 'PPE acknowledgement sheet closed',
     metadata: { sheetId },
@@ -130,6 +131,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'PATCH') return await handlePatch(req, res);
     return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'PATCH']);
   } catch (error) {
+    // Two requests raced to open a sheet for the same worker and the partial
+    // unique index refused the loser. That is a conflict the caller can resolve
+    // by reloading — not a server fault, and not a 500.
+    if (error instanceof PpeAcknowledgementConflict) {
+      return apiResponse.conflict(res, error.message);
+    }
     const message = error instanceof Error ? error.message : 'Unknown error';
     logger.error('PPE acknowledgement request failed', { method: req.method, error: message });
     return apiResponse.internalError(res, error, 'Failed to process the acknowledgement sheet');
