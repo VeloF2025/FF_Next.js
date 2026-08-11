@@ -27,10 +27,61 @@ jobs:
     steps:
       # fetch-depth: 0 so the PR job can diff against its base branch —
       # `vitest --changed origin/<base>` needs that ref to exist locally, and
-      # the default shallow clone does not provide it.
+      # the default shallow clone does not provide it. The secret scan below
+      # needs origin/master for the same reason; it now fails the build rather
+      # than reporting clean if that ref is missing, so shrinking this depth
+      # breaks loudly instead of quietly disarming the gate.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Secret scanning runs FIRST, before `npm ci`. It needs only git and bash,
+      # and `npm ci` costs ~7 minutes — there is no reason to spend those before
+      # telling someone they have committed a credential.
+      #
+      # CLAUDE.md rule 11 has claimed since May that this scan runs "by
+      # pre-commit, pre-push, and CI Gate 7". The CI half was not true: it ran
+      # only in scripts/ci-local.sh, i.e. when a human typed `npm run ci:quick`,
+      # and the two local hooks it names are both bypassable with --no-verify.
+      # After the 2026-05-29 plaintext-credential leak (#1830) and the
+      # 26-credential audit (#2333), a guarantee that existed only on paper was
+      # the worst of the gates left un-wired.
+      #
+      # The tests run alongside it because the scanner's failure mode is a false
+      # NEGATIVE — a real credential scored clean — which produces no signal at
+      # all. Until 2026-08-11 it had no tests.
+      - name: Secret scan — unit tests
+        run: node --test scripts/secret-scan.test.mjs
+
+      # --branch scans lines ADDED between the merge-base and HEAD, so it cannot
+      # trip on the repo's pre-existing hits (there are known ones; `--tree` is
+      # the audit mode and is deliberately not gated).
+      - name: Secret scan (gate)
+        if: github.event_name == 'pull_request'
+        run: bash scripts/secret-scan.sh --branch
+
+      # On a push to master the merge-base IS HEAD, so --branch would diff a
+      # commit against itself and pass on an empty set. Scan the pushed range
+      # instead — this is the path a direct `ALLOW_MASTER_COMMIT=1` commit takes,
+      # which by definition skipped PR review.
+      #
+      # The SHAs go through env and are never inlined into `run:`, matching the
+      # BASE_REF convention below. `before` is the all-zero SHA on a branch's
+      # first push and can also name a commit that a force-push made
+      # unreachable; either way it will not resolve, and the scanner now exits
+      # non-zero instead of scanning nothing, so fall back to the first parent.
+      - name: Secret scan — pushed range (gate)
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          base="$BEFORE_SHA"
+          if ! git rev-parse --verify --quiet "${base}^{commit}" >/dev/null 2>&1; then
+            echo "before-SHA '$base' does not resolve — falling back to HEAD~1"
+            base=$(git rev-parse "${AFTER_SHA}^1")
+          fi
+          bash scripts/secret-scan.sh --range "$base" "$AFTER_SHA"
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -66,6 +117,79 @@ jobs:
         run: |
           set -a; . scripts/ci-baselines.env; set +a
           npm run lint:pages -- --max-warnings "$MAX_PAGES_LINT_WARNINGS"
+
+      # Gate 2 in scripts/ci-local.sh. Ran only when a human typed
+      # `npm run ci:quick`; a --no-verify push merged past it.
+      #
+      # Counting is split from failure detection. The COUNT comes from
+      # rule-specific message lines, not from ESLint's exit status, because the
+      # scope includes files no error baseline covers (lib/ is in neither
+      # `eslint src` nor lint:pages) and a bare non-zero exit would fail the step
+      # on pre-existing findings unrelated to the gated rule.
+      #
+      # But exit >= 2 is still checked, because that means ESLint never linted at
+      # all and the count is 0 for the wrong reason. See the inline note below.
+      #
+      # The baseline comes from the sourced variable, never a literal:
+      # check-ci-baselines.mjs rejects an inlined ratchet number in this file,
+      # because five copies of these numbers once disagreed and the gate that
+      # blocked PRs compared against the wrong one.
+      - name: Silent catches (ratchet gate)
+        run: |
+          set -a; . scripts/ci-baselines.env; set +a
+          # An unset baseline makes `[ "$count" -gt "" ]` exit 2 with "integer
+          # expression expected". Inside an `if` condition that does NOT trip
+          # `set -e`, so the step falls through and reports success no matter how
+          # high the count is. ci-local.sh guards the same variable this way.
+          : "${MAX_SILENT_CATCHES:?not set by scripts/ci-baselines.env}"
+          rc=0
+          out=$(npx eslint pages/api --ext .ts --rulesdir scripts/eslint-rules \
+                  --rule '{"no-silent-catch": "warn"}' 2>&1) || rc=$?
+          # ESLint exits 2 when it fails before linting anything — a bad
+          # --rulesdir, a target path that no longer exists, a broken config. Its
+          # output then contains no rule messages at all, so the count below is 0
+          # and the gate would pass while having scanned NOTHING. That is the
+          # exact defect this gate exists to prevent, so treat it as fatal.
+          if [ "$rc" -ge 2 ]; then
+            echo "$out" | tail -20
+            echo "::error::eslint failed to run (exit ${rc}) — the silent-catch gate scanned nothing"
+            exit 1
+          fi
+          count=$( { echo "$out" | grep "no-silent-catch" || true; } | wc -l | tr -d ' ')
+          echo "no-silent-catch: ${count} (max ${MAX_SILENT_CATCHES})"
+          if [ "$count" -gt "$MAX_SILENT_CATCHES" ]; then
+            echo "$out" | grep "no-silent-catch" | tail -20
+            echo "::error::silent catches ${count} exceeds baseline ${MAX_SILENT_CATCHES}"
+            exit 1
+          fi
+        timeout-minutes: 15
+
+      # Gate 2c in scripts/ci-local.sh — same story, also un-run in CI.
+      #
+      # Hard zero, not ratcheted: both banned patterns are runtime bugs, not
+      # style. Fragment-in-fragment interpolation (`sql`...${sql`...`}...``) and
+      # `sql.unsafe(text, params)` as an executor each break the pg.Pool-backed
+      # sql clients. See docs/plans/2026-05-30-neon-shim-elimination-plan.md.
+      - name: Neon-shim SQL divergence (gate — must be 0)
+        run: |
+          rc=0
+          out=$(npx eslint pages/api src lib --ext .ts,.tsx,.js --rulesdir scripts/eslint-rules \
+                  --rule '{"no-neon-shim-sql-divergence": "error"}' 2>&1) || rc=$?
+          # See the silent-catch gate above: exit >= 2 means ESLint never linted,
+          # which produces a zero count indistinguishable from a clean scan.
+          if [ "$rc" -ge 2 ]; then
+            echo "$out" | tail -20
+            echo "::error::eslint failed to run (exit ${rc}) — the divergence gate scanned nothing"
+            exit 1
+          fi
+          count=$( { echo "$out" | grep "no-neon-shim-sql-divergence" || true; } | wc -l | tr -d ' ')
+          echo "no-neon-shim-sql-divergence: ${count} (must be 0)"
+          if [ "$count" -ne 0 ]; then
+            echo "$out" | grep -B1 "no-neon-shim-sql-divergence" | tail -30
+            echo "::error::${count} neon-shim SQL divergence(s) — fragment interpolation or sql.unsafe() executor"
+            exit 1
+          fi
+        timeout-minutes: 15
 
       # Custom ESLint rule tests. Neither suite ran anywhere before 2026-08-11:
       # no package.json script, no ci-local.sh gate, no workflow step. These

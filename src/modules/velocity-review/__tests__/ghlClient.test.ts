@@ -110,6 +110,56 @@ describe('HighLevelClient', () => {
     expect(body).not.toHaveProperty('dndSettings');
   });
 
+  it('replaces the capitalised missing-name placeholder once a real name arrives', async () => {
+    // GHL stores the lowercase placeholder capitalised, so the contact reads "There".
+    // Before the fix this counted as a populated name and the real one never landed.
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: {
+        id: 'contact-1', firstName: 'There', lastName: null, tags: [], dnd: false,
+      } }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-1' } }));
+
+    await new HighLevelClient(config).upsertContact({
+      phoneE164: phone, firstName: 'Siphosenkosi', lastName: 'Thomo', drNumber: 'DR-100',
+      eventDate: '2026-07-31', sources: ['dr_submitted'], exportKey: 'export-key-1',
+    });
+
+    expect(JSON.parse(String(fetchOptions(1).body))).toMatchObject({
+      firstName: 'Siphosenkosi',
+      lastName: 'Thomo',
+    });
+  });
+
+  it('leaves the placeholder alone when the source still has no name', async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: {
+        id: 'contact-1', firstName: 'There', lastName: null, tags: [], dnd: false,
+      } }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-1' } }));
+
+    await new HighLevelClient(config).upsertContact({
+      phoneE164: phone, firstName: 'there', lastName: null, drNumber: 'DR-100',
+      eventDate: '2026-07-31', sources: ['dr_submitted'], exportKey: 'export-key-1',
+    });
+
+    expect(JSON.parse(String(fetchOptions(1).body))).not.toHaveProperty('firstName');
+  });
+
+  it('never overwrites a real GHL name with the placeholder', async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(response({ contact: {
+        id: 'contact-1', firstName: 'Authoritative', lastName: null, tags: [], dnd: false,
+      } }))
+      .mockResolvedValueOnce(response({ contact: { id: 'contact-1' } }));
+
+    await new HighLevelClient(config).upsertContact({
+      phoneE164: phone, firstName: 'there', lastName: null, drNumber: 'DR-100',
+      eventDate: '2026-07-31', sources: ['dr_submitted'], exportKey: 'export-key-1',
+    });
+
+    expect(JSON.parse(String(fetchOptions(1).body))).not.toHaveProperty('firstName');
+  });
+
   it('fills only missing GHL name fields from source data', async () => {
     vi.mocked(global.fetch)
       .mockResolvedValueOnce(response({ contact: {

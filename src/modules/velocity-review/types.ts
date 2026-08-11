@@ -14,6 +14,38 @@
 export const READY_TAG = 'velocity-review-ready';
 export const ENROLLED_TAG = 'velocity-review-enrolled';
 
+/**
+ * Rendered into the WhatsApp greeting when no source carries a name. It is also
+ * persisted as the GHL contact's first name, because the workflow maps {{1}} from
+ * Contact -> First Name and has nowhere else to read a fallback from.
+ *
+ * It lives here for the same reason as the tags above: candidateService.ts produces
+ * it and ghlClient.ts has to recognise it, and the client must not import a service.
+ *
+ * Written lowercase so the greeting reads "Hi there". **GHL does not store it that
+ * way** — it capitalises the name field, so the contact surfaces in the inbox as
+ * "There" and the greeting goes out as "Hi There". Anything comparing against this
+ * value is therefore reading capitalised data and must fold case; isPlaceholderName
+ * exists so no caller has to remember that.
+ */
+export const MISSING_NAME_PLACEHOLDER = 'there';
+
+/**
+ * True when a stored name is really just the absence of one. A contact created
+ * before any source knew the customer's name holds the placeholder, and that must
+ * not count as a name worth preserving — otherwise the first export that does carry
+ * the real name is skipped and the customer stays "There" forever.
+ */
+export function isPlaceholderName(value: string | null | undefined): boolean {
+  return value?.trim().toLowerCase() === MISSING_NAME_PLACEHOLDER;
+}
+
+/** True when a name is present and is not the placeholder. */
+export function isRealName(value: string | null | undefined): boolean {
+  const trimmed = value?.trim();
+  return Boolean(trimmed) && !isPlaceholderName(trimmed);
+}
+
 export const CANDIDATE_SOURCES = [
   'dr_submitted',
   'drops_installed',
