@@ -15,6 +15,13 @@ import { RefreshCw, Calendar, Filter, X, Download, ChevronRight, ChevronDown, La
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import type { ZoneBreakdown } from '../types/reporting.types';
+import {
+  getMonthToDateRange,
+  resolveActiveQuickFilter,
+  QUICK_DATE_FILTERS,
+  type DateRange,
+  type QuickDateFilter,
+} from '../utils/dateQuickFilters';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ReportsDashboard } from './reporting/ReportsDashboard';
 import {
@@ -70,6 +77,9 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  // The quick-filter button the user last clicked. null until they click one,
+  // so the initial render infers 'today' from the context's default range.
+  const [selectedQuickFilter, setSelectedQuickFilter] = useState<QuickDateFilter | null>(null);
 
   // Expandable project rows state
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -120,51 +130,54 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
     };
   }, []);
 
-  // Quick filter handler for project table
-  const handleQuickFilter = useCallback((filter: 'today' | 'yesterday' | 'currentCycle' | 'previousCycle' | 'all') => {
-    const todayStr = getTodaySAST();
-
+  // The date range each quick-filter button stands for. Single source of truth:
+  // the click handler applies it and the active-state resolver compares against
+  // it, so the two cannot drift apart.
+  const quickFilterRange = useCallback((filter: QuickDateFilter): DateRange => {
     switch (filter) {
-      case 'today':
-        setFilters(prev => ({ ...prev, dateFrom: todayStr, dateTo: todayStr }));
-        break;
+      case 'today': {
+        const todayStr = getTodaySAST();
+        return { from: todayStr, to: todayStr };
+      }
       case 'yesterday': {
         const yesterdayStr = getYesterdaySAST();
-        setFilters(prev => ({ ...prev, dateFrom: yesterdayStr, dateTo: yesterdayStr }));
-        break;
+        return { from: yesterdayStr, to: yesterdayStr };
       }
-      case 'currentCycle': {
-        const cycle = getCycleDates('current');
-        setFilters(prev => ({ ...prev, dateFrom: cycle.from, dateTo: cycle.to }));
-        break;
-      }
-      case 'previousCycle': {
-        const cycle = getCycleDates('previous');
-        setFilters(prev => ({ ...prev, dateFrom: cycle.from, dateTo: cycle.to }));
-        break;
-      }
+      case 'mtd':
+        return getMonthToDateRange(getTodaySAST());
+      case 'currentCycle':
+        return getCycleDates('current');
+      case 'previousCycle':
+        return getCycleDates('previous');
       case 'all':
-        setFilters(prev => ({ ...prev, dateFrom: '', dateTo: '' }));
-        break;
+        return { from: '', to: '' };
     }
-  }, [setFilters, getCycleDates]);
+  }, [getCycleDates]);
 
-  // Get active quick filter
-  const getActiveQuickFilter = (): 'today' | 'yesterday' | 'currentCycle' | 'previousCycle' | 'all' => {
-    if (!filters.dateFrom && !filters.dateTo) return 'all';
+  // Quick filter handler for project table
+  const handleQuickFilter = useCallback((filter: QuickDateFilter) => {
+    const range = quickFilterRange(filter);
+    setSelectedQuickFilter(filter);
+    setFilters(prev => ({ ...prev, dateFrom: range.from, dateTo: range.to }));
+  }, [quickFilterRange, setFilters]);
 
-    const todayStr = getTodaySAST();
-    const yesterdayStr = getYesterdaySAST();
-    const currentCycle = getCycleDates('current');
-    const previousCycle = getCycleDates('previous');
-
-    if (filters.dateFrom === todayStr && filters.dateTo === todayStr) return 'today';
-    if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) return 'yesterday';
-    if (filters.dateFrom === currentCycle.from && filters.dateTo === currentCycle.to) return 'currentCycle';
-    if (filters.dateFrom === previousCycle.from && filters.dateTo === previousCycle.to) return 'previousCycle';
-
-    return 'all';
-  };
+  // Which button renders as active. Not inferred from the dates alone —
+  // several presets collide (see resolveActiveQuickFilter).
+  //
+  // Deliberately NOT memoised. The right answer depends on the wall clock:
+  // quickFilterRange calls getTodaySAST()/getCycleDates(), and no dependency
+  // array can express "the date rolled over". This dashboard auto-refreshes
+  // every 30s (ActivateDataProvider refreshInterval={30000}) and re-renders on
+  // each tick via lastRefreshAt, so recomputing here is what lets a highlight
+  // set before midnight correct itself on a tab that is left open. A useMemo
+  // keyed on the filters would stay stuck on the stale preset instead.
+  // It is computed once per render and reused by every button below, which is
+  // the only sharing that was needed.
+  const activeQuickFilter = resolveActiveQuickFilter(
+    { from: filters.dateFrom, to: filters.dateTo },
+    quickFilterRange,
+    selectedQuickFilter
+  );
 
   // Debounced search - update context filter after 300ms
   useEffect(() => {
@@ -585,11 +598,12 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                 </h2>
 
                 {/* Quick Filter Buttons */}
-                <div className="flex gap-2">
-                  {(['today', 'yesterday', 'currentCycle', 'previousCycle', 'all'] as const).map((filter) => {
-                    const labels: Record<typeof filter, string> = {
+                <div className="flex flex-wrap justify-end gap-2">
+                  {QUICK_DATE_FILTERS.map((filter) => {
+                    const labels: Record<QuickDateFilter, string> = {
                       today: 'Today',
                       yesterday: 'Yesterday',
+                      mtd: 'MTD',
                       currentCycle: 'Current Cycle',
                       previousCycle: 'Previous Cycle',
                       all: 'All',
@@ -597,9 +611,12 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                     return (
                       <button
                         key={filter}
+                        type="button"
+                        aria-pressed={activeQuickFilter === filter}
+                        aria-label={`Filter numbers per project by ${labels[filter]}`}
                         onClick={() => handleQuickFilter(filter)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          getActiveQuickFilter() === filter
+                          activeQuickFilter === filter
                             ? 'bg-[var(--ff-primary-500)] text-white'
                             : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]/80'
                         }`}
