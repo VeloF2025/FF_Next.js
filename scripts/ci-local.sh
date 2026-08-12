@@ -434,6 +434,15 @@ else
   echo "$HOOK_TEST_OUT" | grep -E '^not ok|error:' | head -10 | sed 's/^/    /'
 fi
 
+# The setup that points git at those hooks. It must not report success when the
+# hooks would not actually run.
+if SETUP_TEST_OUT=$(node --test scripts/install-hooks.test.mjs 2>&1); then
+  pass "Hook setup: core.hooksPath tests pass"
+else
+  fail "Hook setup: tests FAILED — the hooks may not actually be wired"
+  echo "$SETUP_TEST_OUT" | grep -E '^not ok|error:' | head -10 | sed 's/^/    /'
+fi
+
 if SECRET_OUT=$(bash scripts/secret-scan.sh --branch 2>&1); then
   pass "Secret scan: no new credential-like content"
 else

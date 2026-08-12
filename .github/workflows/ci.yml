@@ -62,6 +62,13 @@ jobs:
       - name: Pre-push hook — unit tests
         run: node --test scripts/pre-push.test.mjs
 
+      # The one-command setup that points git at the tracked hooks. Its failure
+      # mode is reporting success while the hooks would not actually run — a
+      # non-executable hook is skipped by git SILENTLY, and a config set against
+      # an unsupported git is ignored. Both are asserted.
+      - name: Hook setup — unit tests
+        run: node --test scripts/install-hooks.test.mjs
+
       # --branch scans lines ADDED between the merge-base and HEAD, so it cannot
       # trip on the repo's pre-existing hits (there are known ones; `--tree` is
       # the audit mode and is deliberately not gated).
