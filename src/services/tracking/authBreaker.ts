@@ -127,6 +127,7 @@ export async function reportThrottled(
     kind: 'auth',
     consecutiveFailures: decision.failures,
     nowSast: new Date(),
+    lastGapAlertAt: null, // auth decisions never read this field — see decideAlert
     provider,
     accountRef,
     detail: `${hardStopped ? 'auth circuit hard-stopped' : 'auth circuit open'} after `
