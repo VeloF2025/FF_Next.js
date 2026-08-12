@@ -106,6 +106,24 @@ esac
 # (Deliberately described rather than shown: an assignment-shaped example here
 # is itself caught by the rule below, as this file's own gate demonstrated.)
 #
+# The five documentation words -- example, sample, dummy, fake, placeholder --
+# carry a LEADING `\b` only, deliberately asymmetric, and for the opposite reason
+# to `test[-_]` above. `TEST_PASSWORD` names a fixture in the KEY, so that term
+# is anchored to an assignment. These five are normally the placeholder VALUE
+# itself (`API_TOKEN="sample-token"`), so anchoring them to a key position would
+# discard every real documentation placeholder -- 441 files mention "example"
+# alone. A leading boundary keeps those and drops the case that mattered: a
+# generated secret that merely CONTAINS one of the words mid-token, e.g. a
+# password of the form Kx9mQ2<word>Tn7Lp, which exempted itself.
+#
+# No TRAILING `\b`, and that is load-bearing rather than an oversight: a real
+# placeholder often continues into a word character (`exampleValue123`,
+# `sample-token`), and secret-scan.test.mjs asserts those stay exempt. Adding a
+# trailing boundary breaks that test.
+#
+# All five were fixed together. Doing `example` alone left four identical
+# bypasses behind a test name that read as if the class were closed.
+#
 # NOT here: an exclusion for a placeholder connection URI. Adding userinfo
 # placeholder terms to this list was a REGRESSION, because PLACEHOLDER is
 # applied to the matched span of EVERY rule — so a value that merely CONTAINED
@@ -117,7 +135,7 @@ esac
 #
 # (Described rather than shown, again: a concrete example here is itself matched
 # by the URI rule below. This file cannot safely quote the things it detects.)
-PLACEHOLDER='\byour\b|your_|\bexample|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|(^|[+[:space:]"'"'"'{(,])test[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
+PLACEHOLDER='\byour\b|your_|\bexample|\bplaceholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|\bdummy|\bfake|\bsample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|(^|[+[:space:]"'"'"'{(,])test[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
 
 HITS=""
 add_hits() { # $1 = pattern, $2 = label, $3 = "cs" for case-SENSITIVE,

@@ -49,6 +49,12 @@ const TEST_PREFIXED = ["SESSION_SEC", 'RET="test-', "a1b2c3d4e5f6a7b8c9d0", '"']
 // the `test[-_]` term had.
 const SECRET_CONTAINING_EXAMPLE = ["API_TOK", 'EN="a1b2c3', "example", '456def789"'].join("");
 const PG_CONTAINING_EXAMPLE = ["PGPASS", 'WORD="Kx9mQ2', "example", 'Tn7Lp"'].join("");
+// The same shape for every other bare placeholder word. `example` was one of
+// five; fixing it alone would have left four identical bypasses behind a test
+// name implying the class was closed.
+const SECRETS_CONTAINING_SIBLING_WORDS = ["sample", "dummy", "fake", "placeholder"].map((w) =>
+  ["PGPASS", 'WORD="Kx9mQ2', w, 'Tn7Lp"'].join(""),
+);
 
 const ZERO_SHA = "0".repeat(40);
 
@@ -419,6 +425,43 @@ test("a secret whose value merely CONTAINS 'example' is not exempt", () => {
     commitFile(root, "config.ts", `${SECRET_CONTAINING_EXAMPLE}\n${PG_CONTAINING_EXAMPLE}\n`);
     const r = runScan(root, ["--branch"]);
     assert.equal(r.status, 1, `a substring must not whitelist a real value: ${describe(r)}`);
+  });
+});
+
+test("a secret containing sample/dummy/fake/placeholder is not exempt either", () => {
+  withFixture({}, (root) => {
+    // One test per word would let three of them regress silently while the
+    // fourth kept the suite green, so they are asserted together: any one of
+    // them going unanchored fails this case.
+    for (const line of SECRETS_CONTAINING_SIBLING_WORDS) {
+      const fresh = createFixture();
+      try {
+        commitFile(fresh, "config.ts", `${line}\n`);
+        const r = runScan(fresh, ["--branch"]);
+        assert.equal(r.status, 1, `substring must not whitelist: ${line.slice(0, 14)}…\n${describe(r)}`);
+      } finally {
+        rmSync(fresh, { recursive: true, force: true });
+      }
+    }
+  });
+});
+
+test("genuine sample/dummy/fake/placeholder placeholders are still exempt", () => {
+  withFixture({}, (root) => {
+    commitFile(
+      root,
+      "docs.md",
+      [
+        'API_TOKEN="sample-token-here"',
+        'DB_PASSWORD="dummy-value-123"',
+        'SIGNING_KEY="fake-key-for-docs"',
+        'CLIENT_SECRET="placeholder-abc123"',
+        'AUTH_TOKEN="my-sample-value"',
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `documentation placeholders must stay clean: ${describe(r)}`);
   });
 });
 
