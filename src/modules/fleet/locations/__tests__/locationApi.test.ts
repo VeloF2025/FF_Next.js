@@ -118,7 +118,7 @@ describe('locationApi', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
-      json: vi.fn().mockResolvedValue({ success: false }),
+      json: vi.fn().mockResolvedValue({ success: true, data: location }),
     } as unknown as Response));
 
     await expect(createLocation(input)).rejects.toThrow('Location request failed');
