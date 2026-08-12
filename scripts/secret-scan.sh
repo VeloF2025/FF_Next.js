@@ -264,6 +264,13 @@ if [ -n "$ADDED" ]; then
   # Measured: this changed nothing in the tree audit either way — the optional
   # scheme added zero hits across the whole tree, and the sed shape occurs zero
   # times. The boundary is here so a future file cannot introduce it.
+  #
+  # KEPT DELIBERATELY: an authority at the very START of a line still matches,
+  # via the `^` alternative (and via the `+` that prefixes every added line). Do
+  # not "fix" that. It is what catches a COMMENTED-OUT credential — a line whose
+  # content begins `//user:secret@host` — and a commented-out credential is still
+  # a committed credential. The cost is that a contrived line-start `//a:b@c`
+  # also matches, which is a trade worth making in this direction.
   add_hits "(^|[^A-Za-z0-9])([a-z][a-z0-9+.-]{1,14}:)?//[A-Za-z0-9_.%+-]+:[^@[:space:]'\"]+@[A-Za-z0-9_.[-]" \
            "credential in connection URI" "" \
            ":(pass|passwd|password|secret|changeme|redacted)@"
