@@ -17,7 +17,11 @@ import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
 import { isAuthFailure, isEviction, isSameFailureKind } from '@/services/tracking/authFailure';
 import { authBreakerDecision, logProbe, reportThrottled } from '@/services/tracking/authBreaker';
+import { isTickDue } from '@/services/tracking/cadence';
 import type { TrackingProvider } from '@/services/tracking/types';
+
+/** No row yet, or an account never migrated onto explicit cadence. */
+const DEFAULT_POLL_INTERVAL_MINUTES = 120;
 
 /** No watermark yet: how far back the first tick reaches. */
 const COLD_START_MS = 24 * 60 * 60 * 1000;
@@ -82,8 +86,9 @@ export async function pollProvider(
       last_run_at: Date | null;
       last_gap_alert_at: Date | null;
       evicted_since: Date | null;
+      poll_interval_minutes: number | null;
     }>`
-      SELECT last_event_ts, consecutive_failures, last_error, last_run_at, last_gap_alert_at, evicted_since
+      SELECT last_event_ts, consecutive_failures, last_error, last_run_at, last_gap_alert_at, evicted_since, poll_interval_minutes
       FROM fleet_tracking_watermarks
       WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
     `;
@@ -102,6 +107,19 @@ export async function pollProvider(
       return reportThrottled(provider.key, provider.accountRef, decision, priorError);
     }
     if (decision.state === 'half-open') logProbe(provider.key, provider.accountRef, decision.failures);
+
+    // Not due yet: the cron fires at the fastest supported rate and each account
+    // decides for itself, so one portal can be ramped without touching others.
+    // Like the breaker's throttled path, this writes NOTHING — last_run_at must
+    // keep meaning "when we last actually polled".
+    if (!isTickDue(
+      wm[0]?.last_run_at ? new Date(wm[0].last_run_at) : null,
+      wm[0]?.poll_interval_minutes ?? DEFAULT_POLL_INTERVAL_MINUTES,
+      new Date()
+    )) {
+      return { provider: provider.key, accountRef: provider.accountRef, skipped: 'not-due' };
+    }
+
     const portalVehicles = await listVehicles();
     const recon = await reconcileTrackers(provider.key, provider.accountRef, portalVehicles);
 

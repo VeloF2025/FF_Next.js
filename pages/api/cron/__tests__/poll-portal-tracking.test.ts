@@ -263,6 +263,75 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     }
   });
 
+  describe('cadence gate: an account not yet due for a poll is skipped without writing the watermark', () => {
+    it('skips when the configured interval has not elapsed, without calling listVehicles or writing the watermark', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-08-12T10:00:00.000Z'));
+        const listVehicles = vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]);
+        sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+          const text = strings.join('');
+          if (text.includes('SELECT last_event_ts')) {
+            return [{
+              last_event_ts: '2026-08-12T08:00:00.000Z',
+              consecutive_failures: 0,
+              last_error: null,
+              last_run_at: '2026-08-12T09:00:00.000Z', // 60 min ago, interval is 120
+              last_gap_alert_at: null,
+              evicted_since: null,
+              poll_interval_minutes: 120,
+            }];
+          }
+          if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+          return [];
+        });
+        netstarClientMock.mockReturnValue({ listVehicles, feedFreshness: vi.fn().mockResolvedValue(new Date()) });
+        const res = await run(AUTH);
+        expect(res._getJSONData().data.results).toEqual([
+          { provider: 'netstar', accountRef: 'europcar', skipped: 'not-due' },
+        ]);
+        expect(listVehicles).not.toHaveBeenCalled();
+        expect(reconcileTrackersMock).not.toHaveBeenCalled();
+        expect(sqlMock.mock.calls.some((c) =>
+          (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracking_watermarks')
+          || (c[0] as TemplateStringsArray).join('').includes('UPDATE fleet_tracking_watermarks')
+        )).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('polls when a tighter per-account interval has elapsed, even though 120 minutes has not', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-08-12T10:00:00.000Z'));
+        sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+          const text = strings.join('');
+          if (text.includes('SELECT last_event_ts')) {
+            return [{
+              last_event_ts: '2026-08-12T08:00:00.000Z',
+              consecutive_failures: 0,
+              last_error: null,
+              last_run_at: '2026-08-12T09:45:00.000Z', // 15 min ago
+              last_gap_alert_at: null,
+              evicted_since: null,
+              poll_interval_minutes: 10, // ramped down from the 120-minute default
+            }];
+          }
+          if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 0 }];
+          if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+          return [];
+        });
+        const listVehicles = vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]);
+        netstarClientMock.mockReturnValue({ listVehicles, feedFreshness: vi.fn().mockResolvedValue(new Date()) });
+        await run(AUTH);
+        expect(listVehicles).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   it('threads provider.key AND provider.accountRef through to ingestPositions', async () => {
     const fakePositions = [{ externalId: '1' }];
     netstarProviderMock.mockReturnValue(
@@ -492,7 +561,10 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
               last_event_ts: null,
               consecutive_failures: 3,
               last_error: '[portal-session] still logged out after re-auth: /prev',
-              last_run_at: '2026-08-12T09:50:00.000Z',
+              // Outside the default 120-minute interval — this test is about
+              // the eviction clock, not cadence, so the tick must not be
+              // skipped as not-due before it ever reaches listVehicles().
+              last_run_at: '2026-08-12T07:00:00.000Z',
               last_gap_alert_at: null,
               evicted_since: evictedSince,
             }];
@@ -538,7 +610,10 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
             last_event_ts: null,
             consecutive_failures: 2,
             last_error: '[portal-session] still logged out after re-auth: /prev',
-            last_run_at: new Date().toISOString(),
+            // Outside the default 120-minute interval — this test is about the
+            // eviction clock not leaking into an unrelated auth failure, not
+            // about cadence, so the tick must not be skipped as not-due.
+            last_run_at: new Date(Date.now() - 3 * 60 * 60_000).toISOString(),
             last_gap_alert_at: null,
             evicted_since: new Date().toISOString(),
           }];
