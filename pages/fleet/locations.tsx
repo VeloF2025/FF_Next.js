@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Car, Globe, MapPin, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
@@ -37,16 +37,23 @@ export default function FleetLocationsPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
   const [pendingDeactivation, setPendingDeactivation] = useState<AuthorizedLocation | null>(null);
+  const listRequestId = useRef(0);
   const { can, isLoading: permissionsLoading } = usePermission();
   const canCreate = !permissionsLoading && can('fleet.locations', 'create');
   const canEdit = !permissionsLoading && can('fleet.locations', 'edit');
   const canDelete = !permissionsLoading && can('fleet.locations', 'delete');
 
   const loadLocations = useCallback(async () => {
+    const requestId = ++listRequestId.current;
     setLoading(true); setError(null);
-    try { setLocations(await listLocations(showInactive)); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'Failed to load locations'); }
-    finally { setLoading(false); }
+    try {
+      const nextLocations = await listLocations(showInactive);
+      if (listRequestId.current === requestId) setLocations(nextLocations);
+    }
+    catch (caught) {
+      if (listRequestId.current === requestId) setError(caught instanceof Error ? caught.message : 'Failed to load locations');
+    }
+    finally { if (listRequestId.current === requestId) setLoading(false); }
   }, [showInactive]);
 
   useEffect(() => { void loadLocations(); }, [loadLocations]);

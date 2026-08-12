@@ -1,4 +1,5 @@
-import { Circle, CircleMarker, MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
+import { useEffect } from 'react';
+import { Circle, CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 
 interface Coordinates {
   lat: number;
@@ -22,6 +23,14 @@ function ClickHandler({ onChange }: Pick<LocationMapPickerProps, 'onChange'>) {
   return null;
 }
 
+function ViewportFollower({ center, active }: { center: [number, number]; active: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (active) map.setView(center, 14);
+  }, [active, center, map]);
+  return null;
+}
+
 export function LocationMapPicker({ lat, lon, radiusKm, onChange }: LocationMapPickerProps) {
   const validCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
   const validRadius = Number.isFinite(radiusKm) && radiusKm > 0;
@@ -35,6 +44,7 @@ export function LocationMapPicker({ lat, lon, radiusKm, onChange }: LocationMapP
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ClickHandler onChange={onChange} />
+        <ViewportFollower center={center} active={validCoordinates} />
         {validCoordinates && (
           <>
             {validRadius && <Circle center={center} radius={radiusKm * 1000} pathOptions={{ color: '#2563eb' }} />}

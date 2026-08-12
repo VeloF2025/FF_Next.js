@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthorizedLocation } from '../../types';
 
@@ -27,6 +28,11 @@ describe('LocationFormModal', () => {
     render(<LocationFormModal mode="edit" location={saved} onClose={vi.fn()} onSaved={vi.fn()} />);
     expect(screen.getByLabelText('Name')).toHaveValue('Head Office');
     expect(screen.getByLabelText('Location type')).toHaveValue('office');
+    expect(screen.getByLabelText('Latitude')).toHaveValue(-26.1);
+    expect(screen.getByLabelText('Longitude')).toHaveValue(28.1);
+    expect(screen.getByLabelText('Radius (km)')).toHaveValue(1);
+    expect(screen.getByLabelText('Global location')).toBeChecked();
+    expect(screen.queryByLabelText('Vehicle')).not.toBeInTheDocument();
   });
 
   it('does not call the API when validation fails', async () => {
@@ -41,6 +47,20 @@ describe('LocationFormModal', () => {
     render(<LocationFormModal mode="create" location={null} onClose={vi.fn()} onSaved={vi.fn()} />);
     fireEvent.click(screen.getByLabelText('Global location'));
     expect(await screen.findByRole('option', { name: 'AB12CDGP' })).toBeInTheDocument();
+  });
+
+  it('requires a vehicle for a vehicle-specific location', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [] }) }));
+    render(<LocationFormModal mode="create" location={null} onClose={vi.fn()} onSaved={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Vehicle yard' } });
+    fireEvent.change(screen.getByLabelText('Latitude'), { target: { value: '-26.1' } });
+    fireEvent.change(screen.getByLabelText('Longitude'), { target: { value: '28.1' } });
+    fireEvent.click(screen.getByLabelText('Global location'));
+    await screen.findByLabelText('Vehicle');
+    await act(async () => undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Create location' }));
+    expect(await screen.findByText('Vehicle is required for a vehicle-specific location')).toBeInTheDocument();
+    expect(api.createLocation).not.toHaveBeenCalled();
   });
 
   it('reports API errors and stays open', async () => {

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mapEvents = vi.hoisted(() => ({ click: (_event: unknown) => undefined }));
 const circleProps = vi.hoisted(() => vi.fn());
 const markerProps = vi.hoisted(() => vi.fn());
+const setView = vi.hoisted(() => vi.fn());
 
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -15,6 +16,7 @@ vi.mock('react-leaflet', () => ({
     mapEvents.click = events.click;
     return null;
   },
+  useMap: () => ({ setView }),
 }));
 
 import { LocationMapPicker } from '../LocationMapPicker';
@@ -23,6 +25,7 @@ describe('LocationMapPicker', () => {
   beforeEach(() => {
     circleProps.mockClear();
     markerProps.mockClear();
+    setView.mockClear();
   });
 
   it('reports map clicks rounded to seven decimal places', () => {
@@ -51,5 +54,11 @@ describe('LocationMapPicker', () => {
     render(<LocationMapPicker lat={-26.1} lon={28.1} radiusKm={Number.NaN} onChange={vi.fn()} />);
     expect(markerProps).toHaveBeenCalled();
     expect(circleProps).not.toHaveBeenCalled();
+  });
+
+  it('moves the viewport when coordinates change after mount', () => {
+    const view = render(<LocationMapPicker lat={Number.NaN} lon={Number.NaN} radiusKm={1} onChange={vi.fn()} />);
+    view.rerender(<LocationMapPicker lat={-26.1} lon={28.1} radiusKm={1} onChange={vi.fn()} />);
+    expect(setView).toHaveBeenLastCalledWith([-26.1, 28.1], 14);
   });
 });

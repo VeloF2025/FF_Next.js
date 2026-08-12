@@ -89,6 +89,21 @@ describe('FleetLocationsPage', () => {
     await waitFor(() => expect(api.listLocations).toHaveBeenCalledTimes(2));
   });
 
+  it('ignores an older list response after the inactive filter changes', async () => {
+    let resolveActive!: (locations: typeof active[]) => void;
+    let resolveInactive!: (locations: typeof inactive[]) => void;
+    api.listLocations
+      .mockReturnValueOnce(new Promise((resolve) => { resolveActive = resolve; }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveInactive = resolve; }));
+    render(<FleetLocationsPage />);
+    fireEvent.click(screen.getByLabelText('Show inactive'));
+    await act(async () => { resolveInactive([inactive]); });
+    expect(await screen.findByText('Old depot')).toBeInTheDocument();
+    await act(async () => { resolveActive([active]); });
+    expect(screen.getByText('Old depot')).toBeInTheDocument();
+    expect(screen.queryByText('Depot')).not.toBeInTheDocument();
+  });
+
   it('reactivates inactive rows with edit permission', async () => {
     permissions.actions = new Set(['edit']); api.listLocations.mockResolvedValue([inactive]); api.reactivateLocation.mockResolvedValue(active);
     render(<FleetLocationsPage />);
