@@ -117,17 +117,18 @@ esac
 #
 # (Described rather than shown, again: a concrete example here is itself matched
 # by the URI rule below. This file cannot safely quote the things it detects.)
-PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|\btest[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
+PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|(^|[+[:space:]"'"'"'{(,])test[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
 
 HITS=""
-add_hits() { # $1 = pattern, $2 = label, $3 = "cs" for case-SENSITIVE, $4 = extra
-             #      regex the MATCHED span must also satisfy
-  # $4 exists for rules whose shape is common in ordinary code. The colon rule
-  # matches `key: 'value'`, which is also an error-message map, a JSON schema
-  # example and a type annotation. Requiring a digit somewhere in the span
-  # separates `password: 'Incorrect password.'` from a real credential without
-  # needing a dictionary. ERE has no lookahead, so this cannot be folded into
-  # the pattern itself.
+add_hits() { # $1 = pattern, $2 = label, $3 = "cs" for case-SENSITIVE,
+             # $4 = regex which, if it matches the SPAN, drops the hit
+  # $4 is a PER-RULE exclusion. Adding placeholder terms to the global
+  # PLACEHOLDER list instead was measured as a regression: that list is applied
+  # to every rule, so a term meant to spare one rule's placeholder form exempted
+  # the same substring inside every other rule's values as well. An exclusion
+  # that belongs to one rule has to live with that rule.
+  #
+  # ERE has no lookahead, so this cannot be folded into the pattern itself.
   # Rules that lean on [A-Z] MUST pass "cs": under -i, `[A-Z]` also matches
   # lowercase, which made an uppercase-only env rule fire on JSX props like
   # `showConfirmPassword={...}`. The placeholder filter stays case-insensitive.
@@ -142,13 +143,19 @@ add_hits() { # $1 = pattern, $2 = label, $3 = "cs" for case-SENSITIVE, $4 = extr
   # against the MATCH while the line number is retained. Done in a fixed number
   # of passes rather than a subshell per hit -- the per-hit form was correct but
   # spawned processes per match, which made --tree unusable on a 2M-line tree.
-  local nums require="${4:-}"
-  if [ -n "$require" ]; then
-    # `grep -no` emits `<lineno>:<matched text>`, so testing the whole line
-    # would let the LINE NUMBER satisfy a digit requirement and the filter would
-    # never reject anything. Strip the prefix and test only the match.
+  local nums exclude="${4:-}"
+  if [ -n "$exclude" ]; then
+    # `grep -no` emits `<lineno>:<matched text>`, so the prefix is stripped
+    # before testing: otherwise the LINE NUMBER is part of what the exclusion
+    # sees. That direction of mistake was measured on an earlier "must match a
+    # digit" form of this argument, where the line number satisfied the digit and
+    # the filter never rejected anything.
+    #
+    # `tolower` because an exclusion names placeholder WORDS and a URI scheme or
+    # userinfo may be written in any case; the pattern match above already
+    # honours $3.
     nums=$(echo "$ADDED" | grep -noE $iflag "$1" 2>/dev/null | grep -viE "$PLACEHOLDER" \
-           | awk -v re="$require" '{ t=$0; sub(/^[0-9]+:/,"",t); if (t ~ re) print }' \
+           | awk -v re="$exclude" '{ t=$0; sub(/^[0-9]+:/,"",t); if (tolower(t) !~ re) print }' \
            | cut -d: -f1 | sort -un | tr '\n' ' ')
   else
     nums=$(echo "$ADDED" | grep -noE $iflag "$1" 2>/dev/null | grep -viE "$PLACEHOLDER" \
@@ -208,40 +215,35 @@ if [ -n "$ADDED" ]; then
   # `psql "postgresql://…"` form. Every rule above needs a credential keyword
   # next to an `=`; a URI has neither, so none of them matched it.
   #
-  # The 6-char minimum on the password segment is what excludes the documented
-  # placeholder `postgresql://user:pass@host` without needing to enumerate
-  # placeholder words; `${VAR}` and `<your-password>` are caught by the
-  # PLACEHOLDER filter. The host must start with a word character so an email
-  # address in prose cannot masquerade as a URI authority.
-  add_hits "[a-z][a-z0-9+.-]{1,14}://[A-Za-z0-9_.%+-]+:[^@[:space:]/'\"]{6,}@[A-Za-z0-9_.-]" "credential in connection URI"
-  # Credential-named key assigned with a COLON — YAML, JSON, docker-compose.
+  # There is NO minimum password length. A short password is still a password,
+  # and a floor was measured letting a real 5-character credential through. The
+  # documented placeholder forms are excluded by NAME instead, via this rule's
+  # own $4 exclusion — placeholder words are enumerable, password lengths are not.
   #
-  # Kept as its own rule rather than adding `:` to the `=` rule above, whose
-  # comment records that allowing `:` there "pulled in hundreds of false
-  # positives from lockfiles and JSON config". The difference is that this one
-  # requires the key to END with a credential word (trailing \b) AND the value
-  # to be a quoted 6+ character run, which no lockfile integrity/resolved field
-  # satisfies.
-  # The digit requirement is what makes this rule usable. Without it it fires on
-  # `'auth/wrong-password': 'Incorrect password.'` (an error map) and
-  # `"password": "string"` (a schema example) — both measured in this tree.
-  # Machine-generated credentials essentially always carry a digit; the `=` rule
-  # above is unchanged and still catches a digit-less quoted secret.
-  # `(^|[^A-Za-z])` before the keyword, NOT the `=` rule's `[A-Za-z0-9_.-]*`.
-  # That prefix lets letters run straight into the keyword, so `minipass` — a
-  # real npm package appearing 29 times across package-lock.json and bun.lock —
-  # matched PASS and every lockfile update would have tripped the gate. A
-  # non-letter boundary still admits `DB_PASSWORD`, `db_pass` and `"password"`,
-  # because `_`, `-`, `.` and quotes are all non-letters.
-  add_hits "(^|[^A-Za-z])(PASSWORD|PASSWD|PASS|PWD|SECRET|TOKEN|(API|SECRET|PRIVATE|SIGNING|ENCRYPTION|MASTER|ACCESS|AUTH|CLIENT)[_-]?KEY)\b['\"]?[[:space:]]*:[[:space:]]*['\"][^'\"[:space:]\$][^'\"[:space:]]{5,}" "hardcoded credential in colon assignment" "" "[0-9]"
-  # Lowercase unquoted env assignment — `db_pass=<value>`.
+  # The password class excludes only `@`, whitespace and quotes: a `/` inside a
+  # password is legal and excluding it broke the `:`→`@` run, so a password
+  # containing a slash was missed entirely. `%` is admitted so a percent-encoded
+  # password still matches.
   #
-  # The uppercase rule above is deliberately case-SENSITIVE (under -i its
-  # `[A-Z]` class also matches lowercase and fired on JSX props like
-  # `showConfirmPassword={...}`), so it cannot simply be relaxed. This is the
-  # lowercase twin, equally case-sensitive, with the same 12-char minimum that
-  # keeps prose like `cortex_token=enabled` out.
-  add_hits "(^|[+:[:space:]])[a-z0-9_.-]*(password|passwd|pass|pwd|secret|token)=[^'\"[:space:]\$][^'\"[:space:]]{11,}" "hardcoded secret in env-style assignment" cs
+  # The host class admits an opening bracket so a bracketed IPv6 literal is
+  # recognised; while the class was word-characters only, every IPv6-host URI was
+  # missed entirely.
+  #
+  # NOTE FOR EDITORS: do not write an example URI in these comments. This rule is
+  # sensitive enough to match one, and this file is scanned by its own gate —
+  # three comments in this change were caught that way. Describe the shape in
+  # words; scripts/secret-scan.test.mjs holds the executable examples, assembled
+  # from fragments at runtime so they do not match on their own source line.
+  #
+  # $4 excludes, in order: placeholder userinfo by name; and a userinfo whose
+  # USERNAME begins `test-`/`test_`. That second one is not cosmetic — the
+  # global PLACEHOLDER list carries a `test[-_]…[:=]` term, and a URI's own
+  # mandatory `username:password` colon satisfies it, so a URI with a
+  # `test-`-prefixed username was exempt no matter how real its password was.
+  # Excluding it HERE, by shape, is what lets that global term stay narrow.
+  add_hits "[a-z][a-z0-9+.-]{1,14}://[A-Za-z0-9_.%+-]+:[^@[:space:]'\"]+@[A-Za-z0-9_.[-]" \
+           "credential in connection URI" "" \
+           ":(pass|passwd|password|secret|changeme|redacted|user|username|admin)@"
   # AWS access key id
   add_hits "AKIA[0-9A-Z]{16}" "AWS access key id"
   # Private key block (placeholder lines already excluded above)

@@ -32,10 +32,11 @@ const BURNED_VALUE = ["zander", "2026"].join("");
 // required a credential keyword adjacent to an `=`, and a URI has neither.
 const URI_CREDENTIAL = ["postgresql://ff_user:", "Kx9mQ2vTn7Lp", "@100.96.0.1:5437/fibreflow"].join("");
 const URI_REDIS = ["redis://default:", "Rt4bVn8kLm2q", "@cache.internal:6379"].join("");
-// YAML/JSON colon assignment.
-const YAML_SECRET = ["DB_PASS", 'WORD: "', "Kx9mQ2vTn7Lp", '"'].join("");
-// Lowercase, unquoted — the .env idiom nobody writes in caps.
-const LOWER_ENV = ["db_", "pass=", "Kx9mQ2vTn7Lp"].join("");
+// Shapes the URI rule missed on its first attempt, each measured as CLEAN then.
+const URI_SHORT_PW = ["postgresql://ff_user:", "Ax9zK", "@100.96.0.1:5437/fibreflow"].join("");
+const URI_IPV6 = ["redis://svc:", "Rt4bVn8kLm2q", "@[2001:db8::1]:6379"].join("");
+const URI_SLASH_PW = ["postgresql://ff_user:", "Xk9mQ2vT/Lp7Zn3", "@100.96.0.1:5437/db"].join("");
+const URI_TEST_USER = ["postgresql://test-user:", "Kx9mQ2vTn7LpReal", "@100.96.0.1:5437/prod"].join("");
 // A real value that merely starts with "test-". The PLACEHOLDER filter is
 // applied to the whole matched span, which includes the VALUE, so any secret
 // prefixed this way whitelisted itself.
@@ -236,11 +237,44 @@ test("does not flag a URI with no credential, or a placeholder one", () => {
   });
 });
 
-test("flags a credential assigned with a colon (YAML/JSON)", () => {
+test("flags a URI credential with a short password", () => {
   withFixture({}, (root) => {
-    commitFile(root, "values.yaml", `${YAML_SECRET}\n`);
+    // A length floor was measured letting a real 5-character credential through.
+    // A short password is still a password; placeholder forms are excluded by
+    // NAME instead, because placeholder words are enumerable and lengths are not.
+    commitFile(root, "deploy.md", `DATABASE_URL=${URI_SHORT_PW}\n`);
     const r = runScan(root, ["--branch"]);
-    assert.equal(r.status, 1, `colon assignment must be caught: ${describe(r)}`);
+    assert.equal(r.status, 1, `a short password is still a credential: ${describe(r)}`);
+  });
+});
+
+test("flags a URI credential on an IPv6 host", () => {
+  withFixture({}, (root) => {
+    // `[` was absent from the host class, so every IPv6-host URI was missed.
+    commitFile(root, "compose.yml", `  REDIS_URL: ${URI_IPV6}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `IPv6 authority must be recognised: ${describe(r)}`);
+  });
+});
+
+test("flags a URI credential whose password contains a slash", () => {
+  withFixture({}, (root) => {
+    // `/` was excluded from the password class, which broke the `:`→`@` run and
+    // dropped the whole credential regardless of its strength.
+    commitFile(root, "runbook.md", `psql "${URI_SLASH_PW}"\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a slash in the password must not hide it: ${describe(r)}`);
+  });
+});
+
+test("flags a URI credential whose USERNAME starts with test-", () => {
+  withFixture({}, (root) => {
+    // The global placeholder list carries a `test[-_]…[:=]` term, and a URI's
+    // own mandatory `username:password` colon satisfied it — so this was exempt
+    // no matter how real the password was.
+    commitFile(root, "runbook.md", `psql "${URI_TEST_USER}"\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a test-prefixed username must not exempt the password: ${describe(r)}`);
   });
 });
 
@@ -286,11 +320,32 @@ test("colon rule does not fire on an identifier that merely ends in a keyword", 
   });
 });
 
-test("flags a lowercase unquoted credential assignment", () => {
+test("does not flag the shapes that made the colon and lowercase rules unusable", () => {
   withFixture({}, (root) => {
-    commitFile(root, ".env.sample", `${LOWER_ENV}\n`);
+    // A colon rule and a lowercase env rule were attempted here and removed. All
+    // four lines below were measured tripping them, and a false positive BLOCKS
+    // an unrelated PR — a loud, expensive failure, unlike a missed pattern.
+    //
+    // The colon rule could not be made safe in diff mode: the scanner has no
+    // file-type information, so it cannot tell an auth fixture's
+    // `password: '<value>'` from the same line in production config. Its digit
+    // safeguard was also measured firing on the rule's own boundary character
+    // rather than on the value.
+    //
+    // Pinned so a future attempt has to clear these before landing.
+    commitFile(
+      root,
+      "assorted.ts",
+      [
+        "const testUser = { email: 'a@b.com', password: 'Passw0rd1' };",
+        '  "csrf-token": "^2.1.0",',
+        '1Password: "vaultitemlink"',
+        "cache_token=deterministic_hash_no_real_secret",
+        "",
+      ].join("\n"),
+    );
     const r = runScan(root, ["--branch"]);
-    assert.equal(r.status, 1, `lowercase keys are the .env idiom: ${describe(r)}`);
+    assert.equal(r.status, 0, `none of these is a credential: ${describe(r)}`);
   });
 });
 
