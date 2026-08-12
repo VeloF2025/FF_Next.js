@@ -16,6 +16,7 @@ function buildRow(over: Partial<BuildSectionRow> = {}): BuildSectionRow {
     name_matches: '1',
     pole_scope: '0',
     poles: '0',
+    poles_in_plan: '0',
     approved: '0',
     last_7d: '0',
     prior_7d: '0',
@@ -95,38 +96,53 @@ describe('every section', () => {
 });
 
 describe('build section', () => {
-  it('measures completion against pole scope, never the drop count', () => {
-    const s = shapeBuildSection(buildRow({ poles: '1493', pole_scope: '4538' }));
-    expect(s.completion.percent).toBe(32.9);
+  it('measures completion from PLAN-MATCHED captures, not the raw capture count', () => {
+    // pole_qa_photos and poles are independently populated and share only a label.
+    // QField auto-generates labels for captures it cannot place: Mamelodi has 459 of
+    // them against 1,821 captures, which reported 92.8% built where the plan-matched
+    // figure is 69.4%. The raw count is not a completion numerator.
+    const s = shapeBuildSection(
+      buildRow({ poles: '1821', poles_in_plan: '1362', pole_scope: '1963' }),
+    );
+    expect(s.completion.percent).toBe(69.4);
+    expect(s.polesCaptured.value).toBe(1821);
+    expect(s.polesCapturedInPlan.value).toBe(1362);
   });
 
-  it('names the capture funnel drop-off rather than only the pole count', () => {
-    // Etwatwa: 1,171 poles have a Before Photo, 313 have a Pole Label. Those 858 poles
-    // are part-captured, not unstarted, and the label step is where the process fails.
+  it('reports the widest gap across ALL civil slots, not first versus last', () => {
+    // Mamelodi's real shape: step 1 is the LOWEST (35) and step 7 the highest (1,552),
+    // so a first-vs-last comparison stays silent on the one project whose funnel is
+    // genuinely broken. The range must be found across every slot.
     const s = shapeBuildSection(
       buildRow({
-        poles: '1493',
+        poles: '1821',
         slot_progress: [
-          { slot: 'civil_01', label: 'Before Photo', discipline: 'civil', step: 1, polesWithPhoto: '1171' },
-          { slot: 'civil_08', label: 'Pole Label', discipline: 'civil', step: 8, polesWithPhoto: '313' },
+          { slot: 'civil_01', label: 'Before Photo', discipline: 'civil', step: 1, polesWithPhoto: '35' },
+          { slot: 'civil_04', label: 'End Plates', discipline: 'civil', step: 4, polesWithPhoto: '324' },
+          { slot: 'civil_07', label: 'After Photo', discipline: 'civil', step: 7, polesWithPhoto: '1552' },
         ],
       }),
     );
-    expect(s.caveats.join(' ')).toContain('drops from 1171 poles');
-    expect(s.caveats.join(' ')).toContain('not poles that were never started');
+    expect(s.caveats.join(' ')).toContain('1552 poles have "After Photo"');
+    expect(s.caveats.join(' ')).toContain('only 35 have "Before Photo"');
+    // No causal claim: the data does not say WHY the gap exists.
+    expect(s.caveats.join(' ')).not.toContain('never started');
   });
 
-  it('does not claim a drop-off when capture is even', () => {
+  it('stays quiet when capture is broadly even across the civil steps', () => {
+    // Tonga: steps 1-7 all 1,332-1,348 of 1,360. The old first-vs-last check fired on
+    // every project with any capture, because the last civil slot is a recently-added
+    // label step sitting near zero everywhere.
     const s = shapeBuildSection(
       buildRow({
-        poles: '100',
+        poles: '1360',
         slot_progress: [
-          { slot: 'civil_01', label: 'Before Photo', discipline: 'civil', step: 1, polesWithPhoto: '100' },
-          { slot: 'civil_08', label: 'Pole Label', discipline: 'civil', step: 8, polesWithPhoto: '100' },
+          { slot: 'civil_01', label: 'Before Photo', discipline: 'civil', step: 1, polesWithPhoto: '1348' },
+          { slot: 'civil_07', label: 'After Photo', discipline: 'civil', step: 7, polesWithPhoto: '1332' },
         ],
       }),
     );
-    expect(s.caveats.join(' ')).not.toContain('drops from');
+    expect(s.caveats.join(' ')).not.toContain('Civil capture is uneven');
   });
 
   it('generates one slot row per photo slot from the trusted constant', () => {
@@ -154,6 +170,18 @@ describe('quality section', () => {
     const { sql } = qualitySectionQuery('Etwatwa');
     expect(sql).toContain("vtype IS DISTINCT FROM 'boolean'");
     expect(sql).not.toMatch(/vtype <> 'boolean'/);
+  });
+
+  it('counts only canonical photo slots, not whatever is in the jsonb', () => {
+    // vlm_results also holds legacy optical_dome_NN keys duplicating dome_NN — 2,345 of
+    // them, NONE ever scored, so all landed in "never scored" and inflated it (38% of
+    // Mamelodi's count) — plus tray_<uuid>/unassigned_<uuid> keys that were being shown
+    // beside civil_05 as failing build steps.
+    const { sql } = qualitySectionQuery('Etwatwa');
+    expect(sql).toContain('v.key = ANY(ARRAY[');
+    expect(sql).toContain("'civil_07'");
+    expect(sql).toContain("'dome_01'");
+    expect(sql).not.toContain("'optical_dome_01'");
   });
 
   it('counts a snag with no status as outstanding rather than dropping it', () => {

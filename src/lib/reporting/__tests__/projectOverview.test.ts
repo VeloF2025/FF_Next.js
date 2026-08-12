@@ -14,6 +14,7 @@ function row(over: Partial<OverviewRow> = {}): OverviewRow {
     pole_scope: '0',
     name_matches: '1',
     poles: '0',
+    poles_in_plan: '0',
     poles_after_photo: '0',
     poles_approved: '0',
     poles_last_7d: '0',
@@ -101,7 +102,9 @@ describe('overviewQuery', () => {
 
 describe('shapeOverview', () => {
   it('withholds build completion when no POLE scope is imported', () => {
-    const o = shapeOverview(row({ poles: '1360', pole_scope: '0', poles_approved: '1291' }));
+    const o = shapeOverview(
+      row({ poles: '1360', poles_in_plan: '1360', pole_scope: '0', poles_approved: '1291' }),
+    );
     expect(o.build.completion.percent).toBeNull();
     expect(o.build.completion.absent).toBe('no-scope-recorded');
     expect(o.caveats.join(' ')).toContain('no pole scope is imported');
@@ -110,8 +113,11 @@ describe('shapeOverview', () => {
   it('divides poles by POLE scope, never by the drop count', () => {
     // Etwatwa's real shape: 1,493 captured, 4,538 poles in scope, 21,008 drops.
     // Using drops reported 7.1% where the truth is 32.9% — wrong by ~4x, pessimistically.
-    const o = shapeOverview(row({ poles: '1493', pole_scope: '4538', sow_drops: '21008' }));
-    expect(o.build.completion.percent).toBe(32.9);
+    const o = shapeOverview(
+      row({ poles: '1493', poles_in_plan: '1480', pole_scope: '4538', sow_drops: '21008' }),
+    );
+    // Plan-matched numerator: 1,480 of Etwatwa's 1,493 captures match a live pole.
+    expect(o.build.completion.percent).toBe(32.6);
     expect(o.build.completion.of).toBe(4538);
     // Activations keep drops as their denominator — they are a different scope.
     const withActs = shapeOverview(row({ activations: '1382', sow_drops: '21008', pole_scope: '4538' }));

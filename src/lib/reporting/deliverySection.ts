@@ -22,8 +22,11 @@ export function deliverySectionQuery(project: string): { sql: string; params: un
       -- oes_activations has no project_id; it reaches one through its drop.
       -- activation_date is a DATE, cast so the window matches the timestamptz ones used
       -- elsewhere rather than being offset by the session's UTC offset.
+      -- 'Uninstalled' rows are reversals, not activations; counted separately so the
+      -- headline figure is connections that stand, and the reversal count is still visible.
       act AS (
-        SELECT count(*)::bigint AS total,
+        SELECT count(*) FILTER (WHERE COALESCE(a.status, '') <> 'Uninstalled')::bigint AS total,
+               count(*) FILTER (WHERE a.status = 'Uninstalled')::bigint AS uninstalled,
                count(*) FILTER (WHERE a.activation_date::timestamptz >= now() - interval '7 days')::bigint  AS last_7d,
                count(*) FILTER (WHERE a.activation_date::timestamptz >= now() - interval '14 days'
                                   AND a.activation_date::timestamptz <  now() - interval '7 days')::bigint  AS prior_7d,
@@ -63,12 +66,12 @@ export function deliverySectionQuery(project: string): { sql: string; params: un
       )
       SELECT t.project_name, t.status, m.n AS name_matches,
              drops_scope.n AS drops_scope,
-             act.total AS activations, act.last_7d, act.prior_7d, act.newest AS newest_activation,
+             act.total AS activations, act.uninstalled, act.last_7d, act.prior_7d, act.newest AS newest_activation,
              po.n AS po_count, po.value AS po_value, po.pending AS po_pending, po.cancelled AS po_cancelled,
              boq.n AS boq_items, boq.value AS boq_value,
-             (SELECT json_agg(json_build_object('week', week, 'activations', activations))
+             (SELECT json_agg(json_build_object('week', week, 'activations', activations) ORDER BY week DESC)
                 FROM act_weekly) AS weekly,
-             (SELECT json_agg(json_build_object('status', status, 'count', n, 'value', value))
+             (SELECT json_agg(json_build_object('status', status, 'count', n, 'value', value) ORDER BY n DESC)
                 FROM po_by_status) AS po_status
       FROM target t, matches m, drops_scope, act, po, boq`,
   };
@@ -80,6 +83,7 @@ export interface DeliverySectionRow {
   name_matches: string;
   drops_scope: string;
   activations: string;
+  uninstalled: string;
   last_7d: string;
   prior_7d: string;
   newest_activation: string | null;
@@ -102,6 +106,7 @@ export interface DeliverySection {
     dropsInScope: Measure;
     completion: Ratio;
     throughput: Throughput;
+    reversed: Measure;
     newestActivation: string | null;
     weekly: Array<{ week: string; activations: number }>;
   };
@@ -136,6 +141,19 @@ export function shapeDeliverySection(
   const activations = n(row.activations);
   const caveats = baseCaveats(row.project_name, n(row.name_matches));
 
+  if (drops > 0 && activations === 0) {
+    caveats.push(
+      `${drops} drops are in scope but no activations are recorded. That may mean none have ` +
+        'been connected, or that the OES activation import does not cover this project — ' +
+        'this data cannot tell them apart, so read the 0% with that in mind.',
+    );
+  }
+  if (n(row.uninstalled) > 0) {
+    caveats.push(
+      `${row.uninstalled} activation${n(row.uninstalled) === 1 ? ' was' : 's were'} later reversed ` +
+        '(status "Uninstalled") and excluded from the total.',
+    );
+  }
   if (drops === 0 && activations === 0) {
     caveats.push(
       'No drops are imported for this project, so activation progress has no denominator. ' +
@@ -143,7 +161,9 @@ export function shapeDeliverySection(
     );
   }
   if (canSeeProcurement && n(row.po_pending) > 0) {
-    caveats.push(`${row.po_pending} purchase orders are awaiting approval.`);
+    caveats.push(
+      `${row.po_pending} purchase order${n(row.po_pending) === 1 ? ' is' : 's are'} awaiting approval.`,
+    );
   }
 
   return {
@@ -157,6 +177,7 @@ export function shapeDeliverySection(
         n(row.prior_7d),
         drops > 0 ? Math.max(drops - activations, 0) : null,
       ),
+      reversed: measure(n(row.uninstalled)),
       newestActivation: row.newest_activation,
       weekly: (row.weekly ?? []).map((w) => ({ week: w.week, activations: n(w.activations) })),
     },

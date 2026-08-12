@@ -9,7 +9,7 @@
  * describe a project that does not exist.
  */
 import { measure, ratio, type Measure, type Ratio } from './coverage';
-import { baseCaveats, targetCte } from './projectTarget';
+import { baseCaveats, CANONICAL_SLOT_KEYS_SQL, targetCte } from './projectTarget';
 
 /**
  * Read a slot's verdict out of `vlm_results`.
@@ -32,6 +32,12 @@ export function qualitySectionQuery(project: string): { sql: string; params: unk
         FROM pole_qa_photos w
         CROSS JOIN LATERAL jsonb_each(COALESCE(w.vlm_results, '{}'::jsonb)) AS v(key, value)
         WHERE w.project_id = (SELECT id FROM target)
+          -- Canonical slots only. The column also holds legacy optical_dome_NN keys
+          -- duplicating dome_NN (2,345 of them, NONE ever scored, so all landed in
+          -- "never scored" and inflated it — 38% of Mamelodi's count) plus
+          -- tray_<uuid> and unassigned_<uuid> keys that were surfacing beside civil_05
+          -- as failing build steps.
+          AND v.key = ANY(${CANONICAL_SLOT_KEYS_SQL})
       ),
       verdicts AS (
         SELECT
@@ -78,9 +84,9 @@ export function qualitySectionQuery(project: string): { sql: string; params: unk
              snag_totals.open AS snags_open, snag_totals.major AS snags_major,
              snag_totals.over_30d AS snags_over_30d, snag_totals.over_90d AS snags_over_90d,
              snag_totals.oldest AS snags_oldest,
-             (SELECT json_agg(json_build_object('slot', slot, 'failed', failed, 'scored', scored))
+             (SELECT json_agg(json_build_object('slot', slot, 'failed', failed, 'scored', scored) ORDER BY failed DESC)
                 FROM by_slot) AS worst_slots,
-             (SELECT json_agg(json_build_object('status', status, 'count', n))
+             (SELECT json_agg(json_build_object('status', status, 'count', n) ORDER BY n DESC)
                 FROM snag_by_status) AS snags_by_status
       FROM target t, matches m, verdicts, retakes, snag_totals`,
   };

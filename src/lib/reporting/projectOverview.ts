@@ -14,7 +14,7 @@ import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
 import { measure, ratio, throughput, type Measure, type Ratio, type Throughput } from './coverage';
 // ONE injection guard, not a second copy: a hardening applied to one of two identical
 // escapes silently leaves the other on the old behaviour.
-import { projectPredicate } from './projectTarget';
+import { CANONICAL_SLOT_KEYS_SQL, CAPTURED_IN_PLAN, projectPredicate } from './projectTarget';
 
 /**
  * Works-QA stores photos as up to 22 named key columns per pole, so "how many photos"
@@ -33,6 +33,7 @@ export interface OverviewRow {
   pole_scope: string;
   name_matches: string;
   poles: string;
+  poles_in_plan: string;
   poles_after_photo: string;
   poles_approved: string;
   poles_last_7d: string;
@@ -83,6 +84,7 @@ export function overviewQuery(project: string): { sql: string; params: unknown[]
       ),
       wq AS (
         SELECT count(*)::bigint                                                        AS n,
+               count(*) FILTER (WHERE ${CAPTURED_IN_PLAN})::bigint                      AS n_in_plan,
                count(*) FILTER (WHERE civil_step_07_key IS NOT NULL)::bigint           AS after_photo,
                count(*) FILTER (WHERE approved_at IS NOT NULL)::bigint                 AS approved,
                count(*) FILTER (WHERE created_at >= now() - interval '7 days')::bigint AS last_7d,
@@ -92,7 +94,7 @@ export function overviewQuery(project: string): { sql: string; params: unknown[]
                             + COALESCE(array_length(unassigned_photo_keys, 1), 0)
                             + COALESCE(array_length(main_joint_tray_keys, 1), 0)), 0)::bigint AS slot_photos,
                max(created_at)                                                         AS newest
-        FROM pole_qa_photos WHERE project_id = (SELECT id FROM target)
+        FROM pole_qa_photos w WHERE w.project_id = (SELECT id FROM target)
       ),
       -- Verdicts are counted per SLOT, not per pole: one pole carries up to 22 photos and
       -- can pass some while failing others, so a pole-level count would hide the failures.
@@ -110,6 +112,9 @@ export function overviewQuery(project: string): { sql: string; params: unknown[]
         FROM pole_qa_photos w
         CROSS JOIN LATERAL jsonb_each(COALESCE(w.vlm_results, '{}'::jsonb)) AS v(key, value)
         WHERE w.project_id = (SELECT id FROM target)
+          -- Canonical slots only: legacy optical_dome_NN keys are never scored and would
+          -- all land in unscored, and tray/unassigned keys are not slots at all.
+          AND v.key = ANY(${CANONICAL_SLOT_KEYS_SQL})
       ),
       cqa AS (
         SELECT count(*)::bigint n FROM construction_qa_photos WHERE project_id = (SELECT id FROM target)
@@ -149,7 +154,8 @@ export function overviewQuery(project: string): { sql: string; params: unknown[]
       SELECT t.id::text AS project_id, t.project_name, t.status,
              t.start_date::text, t.end_date::text,
              sow.n AS sow_drops, pole_scope.n AS pole_scope, matches.n AS name_matches,
-             wq.n AS poles, wq.after_photo AS poles_after_photo, wq.approved AS poles_approved,
+             wq.n AS poles, wq.n_in_plan AS poles_in_plan,
+             wq.after_photo AS poles_after_photo, wq.approved AS poles_approved,
              wq.last_7d AS poles_last_7d, wq.prior_7d AS poles_prior_7d,
              wq.slot_photos AS works_qa_photos,
              wq.newest AS newest_pole_at,
@@ -164,7 +170,7 @@ export function overviewQuery(project: string): { sql: string; params: unknown[]
 export interface ProjectOverview {
   project: { id: string; name: string; status: string | null; startDate: string | null; endDate: string | null };
   scope: { poleScope: Measure; sowDrops: Measure };
-  build: { poles: Measure; withAfterPhoto: Measure; approved: Measure; completion: Ratio; throughput: Throughput; newestPoleAt: string | null };
+  build: { poles: Measure; polesInPlan: Measure; withAfterPhoto: Measure; approved: Measure; completion: Ratio; throughput: Throughput; newestPoleAt: string | null };
   quality: { slotsPassed: Measure; slotsFailed: Measure; slotsUnscored: Measure; passRate: Ratio };
   activations: { total: Measure; last7Days: Measure; completion: Ratio };
   photos: { worksQa: Measure; constructionQa: Measure; qfield: Measure; total: number };
@@ -178,6 +184,7 @@ export function shapeOverview(row: OverviewRow): ProjectOverview {
   const sow = n(row.sow_drops);
   const poleScope = n(row.pole_scope);
   const poles = n(row.poles);
+  const inPlan = n(row.poles_in_plan);
   const activations = n(row.activations);
   const pass = n(row.vlm_pass);
   const fail = n(row.vlm_fail);
@@ -227,13 +234,15 @@ export function shapeOverview(row: OverviewRow): ProjectOverview {
     scope: { poleScope: measure(poleScope), sowDrops: measure(sow) },
     build: {
       poles: measure(poles),
+      polesInPlan: measure(inPlan),
       withAfterPhoto: measure(n(row.poles_after_photo)),
       approved: measure(n(row.poles_approved)),
-      completion: ratio(poles, poleScope, row.status),
+      // Plan-matched captures, not the raw row count — see CAPTURED_IN_PLAN.
+      completion: ratio(inPlan, poleScope, row.status),
       throughput: throughput(
         n(row.poles_last_7d),
         n(row.poles_prior_7d),
-        poleScope > 0 ? Math.max(poleScope - poles, 0) : null,
+        poleScope > 0 ? Math.max(poleScope - inPlan, 0) : null,
       ),
       newestPoleAt: row.newest_pole_at,
     },
@@ -252,7 +261,7 @@ export function shapeOverview(row: OverviewRow): ProjectOverview {
       worksQa: measure(n(row.works_qa_photos)),
       constructionQa: measure(n(row.qa_photos)),
       qfield: measure(n(row.qfield_photos)),
-      // Neither deduplicated nor complete: 3,575 keys are shared between construction-QA
+      // Neither deduplicated nor complete: 27,772 keys are shared between construction-QA
       // and works-QA (inflating), while QField holds photos the other stores never see.
       // Treat it as indicative and quote the per-store figures, which are exact.
       total: n(row.works_qa_photos) + n(row.qa_photos) + n(row.qfield_photos),

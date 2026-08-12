@@ -9,7 +9,7 @@
 import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
 
 import { measure, ratio, throughput, type Measure, type Ratio, type Throughput } from './coverage';
-import { baseCaveats, targetCte } from './projectTarget';
+import { baseCaveats, CAPTURED_IN_PLAN, targetCte } from './projectTarget';
 
 /** One row per slot: how many poles have that photo, generated from the trusted constant. */
 const SLOT_UNION = SLOT_META.map(
@@ -33,11 +33,12 @@ export function buildSectionQuery(project: string): { sql: string; params: unkno
       ),
       totals AS (
         SELECT count(*)::bigint AS poles,
+               count(*) FILTER (WHERE ${CAPTURED_IN_PLAN})::bigint AS poles_in_plan,
                count(*) FILTER (WHERE approved_at IS NOT NULL)::bigint AS approved,
                count(*) FILTER (WHERE created_at >= now() - interval '7 days')::bigint AS last_7d,
                count(*) FILTER (WHERE created_at >= now() - interval '14 days'
                                   AND created_at <  now() - interval '7 days')::bigint AS prior_7d
-        FROM pole_qa_photos WHERE project_id = (SELECT id FROM target)
+        FROM pole_qa_photos w WHERE w.project_id = (SELECT id FROM target)
       ),
       slots AS (${SLOT_UNION}),
       -- Twelve weeks of capture, oldest last. date_trunc runs in the session timezone,
@@ -52,12 +53,12 @@ export function buildSectionQuery(project: string): { sql: string; params: unkno
         GROUP BY 1 ORDER BY 1 DESC
       )
       SELECT t.project_name, t.status, m.n AS name_matches,
-             scope.n AS pole_scope, totals.poles, totals.approved,
+             scope.n AS pole_scope, totals.poles, totals.poles_in_plan, totals.approved,
              totals.last_7d, totals.prior_7d,
              (SELECT json_agg(json_build_object('slot', slot, 'label', label,
                 'discipline', discipline, 'step', step, 'polesWithPhoto', filled)
                 ORDER BY discipline, step) FROM slots) AS slot_progress,
-             (SELECT json_agg(json_build_object('week', week, 'poles', poles)) FROM weekly) AS weekly
+             (SELECT json_agg(json_build_object('week', week, 'poles', poles) ORDER BY week DESC) FROM weekly) AS weekly
       FROM target t, matches m, scope, totals`,
   };
 }
@@ -76,6 +77,7 @@ export interface BuildSectionRow {
   name_matches: string;
   pole_scope: string;
   poles: string;
+  poles_in_plan: string;
   approved: string;
   last_7d: string;
   prior_7d: string;
@@ -87,6 +89,8 @@ export interface BuildSection {
   project: string;
   poleScope: Measure;
   polesCaptured: Measure;
+  /** Captures that match a live pole in the plan — the completion numerator. */
+  polesCapturedInPlan: Measure;
   polesApproved: Measure;
   completion: Ratio;
   throughput: Throughput;
@@ -99,6 +103,7 @@ const n = (v: string | number | null | undefined): number => Number(v ?? 0);
 
 export function shapeBuildSection(row: BuildSectionRow): BuildSection {
   const poles = n(row.poles);
+  const inPlan = n(row.poles_in_plan);
   const scope = n(row.pole_scope);
   const caveats = baseCaveats(row.project_name, n(row.name_matches));
 
@@ -110,15 +115,22 @@ export function shapeBuildSection(row: BuildSectionRow): BuildSection {
     ofPoles: poles,
   }));
 
-  // The widest gap between a discipline's first and last slot is where capture stops.
+  // Range across ALL civil slots, not first-vs-last. Comparing the ends fired on every
+  // project with any capture — the last civil slot is a recently-added Pole Label step
+  // at ~14% fill everywhere — while staying silent on Mamelodi, whose funnel really is
+  // broken (35 poles at step 1, 1,552 at step 7) because its last exceeded its first.
+  // Stated as an observed range with no causal claim attached.
   const civil = slotProgress.filter((s) => s.discipline === 'civil');
-  const firstCivil = civil[0]?.polesWithPhoto ?? 0;
-  const lastCivil = civil[civil.length - 1]?.polesWithPhoto ?? 0;
-  if (poles > 0 && firstCivil > 0 && lastCivil < firstCivil) {
-    caveats.push(
-      `Civil capture drops from ${firstCivil} poles at the first step to ${lastCivil} at the last. ` +
-        'The difference is poles whose photo set is incomplete, not poles that were never started.',
-    );
+  if (poles > 0 && civil.length > 1) {
+    const highest = civil.reduce((a, b) => (b.polesWithPhoto > a.polesWithPhoto ? b : a));
+    const lowest = civil.reduce((a, b) => (b.polesWithPhoto < a.polesWithPhoto ? b : a));
+    if (highest.polesWithPhoto > 0 && lowest.polesWithPhoto < highest.polesWithPhoto / 2) {
+      caveats.push(
+        `Civil capture is uneven: ${highest.polesWithPhoto} poles have "${highest.label}" ` +
+          `but only ${lowest.polesWithPhoto} have "${lowest.label}". That gap is a capture ` +
+          'difference between steps; this data does not say why.',
+      );
+    }
   }
   if (poles > 0 && n(row.approved) === 0) {
     caveats.push(
@@ -130,12 +142,15 @@ export function shapeBuildSection(row: BuildSectionRow): BuildSection {
     project: row.project_name,
     poleScope: measure(scope),
     polesCaptured: measure(poles),
+    polesCapturedInPlan: measure(inPlan),
     polesApproved: measure(n(row.approved)),
-    completion: ratio(poles, scope, row.status),
+    // Plan-matched, not the raw capture count: the two tables are independently
+    // populated and share only a label, so raw/scope is not a completion ratio.
+    completion: ratio(inPlan, scope, row.status),
     throughput: throughput(
       n(row.last_7d),
       n(row.prior_7d),
-      scope > 0 ? Math.max(scope - poles, 0) : null,
+      scope > 0 ? Math.max(scope - inPlan, 0) : null,
     ),
     slotProgress,
     weeklyCapture: (row.weekly ?? []).map((w) => ({ week: w.week, poles: n(w.poles) })),
