@@ -84,6 +84,7 @@ async def test_every_fresh_service_registers_the_complete_tool_set_once(
         "view_photo",
         "find_project_photos",
         "get_photo_download_manifest",
+        "get_project_overview",
     }
 
     assert set(names) == expected

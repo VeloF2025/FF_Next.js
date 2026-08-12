@@ -184,6 +184,9 @@ export default defineConfig({
       // @/lib/photos/* lives at src/lib/photos/ — without this it falls through to the
       // generic @/lib → ./lib fallback below and fails to resolve under Vitest.
       { find: '@/lib/photos', replacement: path.resolve(__dirname, './src/lib/photos') },
+      // @/lib/reporting/* lives at src/lib/reporting/ — without this it falls through to
+      // the generic @/lib → ./lib fallback below and fails to resolve under Vitest.
+      { find: '@/lib/reporting', replacement: path.resolve(__dirname, './src/lib/reporting') },
       // @/lib/offline-queue lives at src/lib/offline-queue/ (generic offline-write
       // queue used by the snag-resolve PWA pilot) — explicit src-first override
       // before the @/lib → ./lib fallback.
