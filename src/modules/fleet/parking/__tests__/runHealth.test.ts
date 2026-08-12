@@ -31,6 +31,31 @@ describe('deriveParkingRunHealth', () => {
     });
   });
 
+  it('surfaces tonight’s running state during the grace window', () => {
+    const yesterday = row({ checkDate: '2026-08-10' });
+    const tonight = row({
+      checkDate: '2026-08-11',
+      status: 'running',
+      startedAt: '2026-08-11T18:05:00Z',
+      completedAt: null,
+    });
+
+    expect(deriveParkingRunHealth(tonight, yesterday, new Date('2026-08-11T18:10:00Z'))).toMatchObject({
+      state: 'warning',
+      reason: 'Parking check is running',
+    });
+  });
+
+  it('surfaces tonight’s failure during the grace window', () => {
+    const yesterday = row({ checkDate: '2026-08-10' });
+    const tonight = row({ checkDate: '2026-08-11', status: 'failed', errorSummary: 'tracker unavailable' });
+
+    expect(deriveParkingRunHealth(tonight, yesterday, new Date('2026-08-11T18:10:00Z'))).toMatchObject({
+      state: 'failed',
+      reason: 'tracker unavailable',
+    });
+  });
+
   it('fails when today has not completed at the grace boundary', () => {
     expect(deriveParkingRunHealth(row(), row(), new Date('2026-08-11T18:30:00Z'))).toMatchObject({ state: 'failed', reason: 'Today’s parking check has not completed' });
   });

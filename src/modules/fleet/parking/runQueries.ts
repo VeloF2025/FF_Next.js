@@ -29,7 +29,8 @@ export async function finalizeParkingRun(runId: string, update: {
 
 export async function loadParkingRunHealth(now: Date): Promise<ParkingRunHealth> {
   const expectedDate = expectedParkingCheckDate(now);
-  const latest = await sql<RunRow>`SELECT * FROM fleet_parking_check_runs WHERE check_date=${expectedDate}::date ORDER BY started_at DESC LIMIT 1`;
+  const today = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const latest = await sql<RunRow>`SELECT * FROM fleet_parking_check_runs WHERE check_date IN (${today}::date,${expectedDate}::date) ORDER BY CASE WHEN check_date=${today}::date THEN 0 ELSE 1 END,started_at DESC LIMIT 1`;
   const success = await sql<RunRow>`SELECT * FROM fleet_parking_check_runs WHERE check_date=${expectedDate}::date AND status IN ('succeeded','partial_failure') ORDER BY started_at DESC LIMIT 1`;
   return deriveParkingRunHealth(latest[0] ? mapRun(latest[0]) : null, success[0] ? mapRun(success[0]) : null, now);
 }

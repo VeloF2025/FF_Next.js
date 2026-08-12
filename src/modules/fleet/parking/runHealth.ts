@@ -40,7 +40,9 @@ export function deriveParkingRunHealth(
   const expectedCheckDate = expectedParkingCheckDate(now);
   const expectedNextRunAt = expectedAt(afterGrace ? new Date(expectedAt(today, 20, 0).getTime() + 86400000).toISOString().slice(0, 10) : today, 20, 0).toISOString();
   const output = (state: ParkingRunHealth['state'], reason: string | null): ParkingRunHealth => ({ state, reason, latestRun: latest, latestSuccessfulRun: latestSuccess, expectedNextRunAt });
-  const expectedRun = latest?.checkDate === expectedCheckDate
+  const expectedRun = latest?.checkDate === today
+    ? latest
+    : latest?.checkDate === expectedCheckDate
     ? latest
     : latestSuccess?.checkDate === expectedCheckDate ? latestSuccess : null;
   if (!expectedRun) {
