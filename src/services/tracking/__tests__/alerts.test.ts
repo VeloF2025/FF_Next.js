@@ -68,8 +68,13 @@ describe('gap re-alert is wall-clock, not tick-counted', () => {
   });
 
   it('stays silent 23 hours after the last gap alert', () => {
+    // consecutiveFailures: 48 is deliberate, not the brief's 50: 48 % 12 === 0,
+    // so the retired tick-counting rule (gapTicks % GAP_REPEAT_TICKS === 0)
+    // would ALSO have alerted here. That makes this test discriminate the two
+    // implementations — with 50 (50 % 12 = 2) the old rule stays silent too,
+    // so the assertion would pass against either mechanism and prove nothing.
     const d = decideAlert({
-      kind: 'gap', consecutiveFailures: 50, nowSast: base,
+      kind: 'gap', consecutiveFailures: 48, nowSast: base,
       lastGapAlertAt: new Date(base.getTime() - 23 * 3600_000),
     });
     expect(d).toBeNull();
@@ -103,18 +108,19 @@ describe('raiseTrackingAlert', () => {
     lastGapAlertAt: null,
   };
 
-  it('does not notify when the policy says stay silent', async () => {
+  it('does not notify when the policy says stay silent, and reports nothing delivered', async () => {
     const notify = vi.fn();
-    await raiseTrackingAlert(
+    const result = await raiseTrackingAlert(
       { ...base, kind: 'transient', consecutiveFailures: 1 },
       { notify, recipients: async () => ['u1'] }
     );
     expect(notify).not.toHaveBeenCalled();
+    expect(result).toEqual({ decision: null, delivered: false });
   });
 
-  it('notifies the configured recipients on an auth failure', async () => {
+  it('notifies the configured recipients on an auth failure, and reports delivered: true', async () => {
     const notify = vi.fn();
-    await raiseTrackingAlert(
+    const result = await raiseTrackingAlert(
       { ...base, kind: 'auth', consecutiveFailures: 1 },
       { notify, recipients: async () => ['u1', 'u2'] }
     );
@@ -124,23 +130,29 @@ describe('raiseTrackingAlert', () => {
     expect(payload.recipient_user_ids).toEqual(['u1', 'u2']);
     expect(payload.source_module).toBe('fleet');
     expect(payload.title).toContain('netstar');
+    expect(result).toEqual({ decision: { event: 'fleet.tracking_pull_failed' }, delivered: true });
   });
 
-  it('does not throw when no recipients are configured', async () => {
+  it('does not throw when no recipients are configured, and reports delivered: false', async () => {
     const notify = vi.fn();
-    await expect(raiseTrackingAlert(
+    const result = await raiseTrackingAlert(
       { ...base, kind: 'auth', consecutiveFailures: 1 },
       { notify, recipients: async () => [] }
-    )).resolves.toBeUndefined();
+    );
     expect(notify).not.toHaveBeenCalled();
+    // The decision (and thus the event that WOULD have fired) is still
+    // reported — only delivery failed — so a caller like the gap stamp can
+    // tell "nobody was there to hear it" apart from "the policy said no".
+    expect(result).toEqual({ decision: { event: 'fleet.tracking_pull_failed' }, delivered: false });
   });
 
-  it('never lets a notification failure break the poll', async () => {
+  it('never lets a notification failure break the poll, and reports delivered: false', async () => {
     const notify = vi.fn(async () => { throw new Error('smtp down'); });
-    await expect(raiseTrackingAlert(
+    const result = await raiseTrackingAlert(
       { ...base, kind: 'auth', consecutiveFailures: 1 },
       { notify, recipients: async () => ['u1'] }
-    )).resolves.toBeUndefined();
+    );
+    expect(result).toEqual({ decision: { event: 'fleet.tracking_pull_failed' }, delivered: false });
   });
 });
 

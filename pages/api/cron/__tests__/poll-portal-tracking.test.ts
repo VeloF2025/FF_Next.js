@@ -139,7 +139,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     netstarProviderMock.mockReturnValue(makeFakeProvider());
     reconcileTrackersMock.mockResolvedValue(recon({ upserted: 1 }));
     ingestPositionsMock.mockResolvedValue({ inserted: 0, skippedUnmapped: 0, maxIngestedAt: null });
-    raiseTrackingAlertMock.mockResolvedValue(undefined);
+    raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
   });
 
   it('rejects non-GET/POST methods with 405', async () => {
@@ -308,6 +308,59 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'gap', provider: 'netstar', accountRef: 'europcar' })
     );
+  });
+
+  /**
+   * The stamp must track DELIVERY, not just policy.
+   *
+   * decideAlert saying an alert is due only means the POLICY wants one sent —
+   * raiseTrackingAlert can still fail to reach anyone (no recipients
+   * configured, or notify() itself throwing). Stamping last_gap_alert_at
+   * regardless would suppress the next 24h of gap alerts for an outage
+   * nobody was actually told about.
+   */
+  describe('gap alert: last_gap_alert_at is stamped only when raiseTrackingAlert reports delivery', () => {
+    function stampQuery() {
+      return sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('SET last_gap_alert_at'));
+    }
+
+    function triggerGapTick() {
+      stubSql({ activeTrackers: 3 });
+      reconcileTrackersMock.mockResolvedValue(recon({ upserted: 3 }));
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
+        feedFreshness: vi.fn().mockResolvedValue(new Date(Date.now() - 8 * 60 * 60 * 1000)),
+      });
+      netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
+    }
+
+    it('stamps when the decision was due AND delivery succeeded', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+        delivered: true,
+      });
+      triggerGapTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeDefined();
+    });
+
+    it('does NOT stamp when the decision was due but delivery failed (e.g. no recipients configured)', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+        delivered: false,
+      });
+      triggerGapTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+
+    it('does NOT stamp when the policy says the gap is not due yet', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      triggerGapTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
   });
 
   it('does not raise a gap alert when nothing is mapped (empty portal already handled by reconcileTrackers)', async () => {

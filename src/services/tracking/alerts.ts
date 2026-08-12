@@ -173,12 +173,26 @@ async function configuredRecipients(): Promise<string[]> {
   return alertRecipientIds();
 }
 
+export interface RaiseAlertOutcome {
+  /** What `decideAlert` computed for this input, or null if it said stay silent. */
+  decision: AlertDecision | null;
+  /**
+   * Whether the notification actually reached `deps.notify` and it resolved —
+   * false whenever the policy said silent, no recipients were configured, or
+   * `notify` itself threw. Callers that gate side effects on "the alert went
+   * out" (e.g. stamping last_gap_alert_at) must check this, not just
+   * `decision`: a truthy decision only means the POLICY said to alert, not
+   * that anyone was actually told.
+   */
+  delivered: boolean;
+}
+
 export async function raiseTrackingAlert(
   input: RaiseAlertInput,
   deps: RaiseAlertDeps = { notify: busNotify, recipients: configuredRecipients }
-): Promise<void> {
+): Promise<RaiseAlertOutcome> {
   const decision = decideAlert(input);
-  if (!decision) return;
+  if (!decision) return { decision: null, delivered: false };
 
   const recipients = await deps.recipients();
   if (recipients.length === 0) {
@@ -186,7 +200,7 @@ export async function raiseTrackingAlert(
       event: decision.event, provider: input.provider,
       hint: 'set FLEET_ALERT_USER_IDS',
     });
-    return;
+    return { decision, delivered: false };
   }
 
   const title =
@@ -208,6 +222,7 @@ export async function raiseTrackingAlert(
         consecutiveFailures: input.consecutiveFailures,
       },
     });
+    return { decision, delivered: true };
   } catch (err) {
     // A broken mail server must never take the ingestion run down with it —
     // the positions are the point, the alert is the courtesy.
@@ -215,5 +230,6 @@ export async function raiseTrackingAlert(
       event: decision.event, provider: input.provider,
       error: err instanceof Error ? err.message : String(err),
     });
+    return { decision, delivered: false };
   }
 }

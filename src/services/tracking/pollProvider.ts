@@ -12,7 +12,7 @@ import { fetchTolerantly } from '@/services/tracking/fetchTolerantly';
 import { cartrackPortalFromEnv } from '@/services/tracking/cartrack/portalConfig';
 import { reconcileTrackers } from '@/services/tracking/discovery';
 import { ingestPositions } from '@/services/tracking/ingest';
-import { raiseTrackingAlert, decideAlert } from '@/services/tracking/alerts';
+import { raiseTrackingAlert } from '@/services/tracking/alerts';
 import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
 import { isAuthFailure, isSameFailureKind } from '@/services/tracking/authFailure';
@@ -196,20 +196,24 @@ export async function pollProvider(
         provider: provider.key, accountRef: provider.accountRef,
         activeTrackers, portalVehicleCount: portalVehicles.length,
         positionCount: positions.length, reason: gapDetail, gapTicks });
-      const gapAlertInput = {
-        kind: 'gap' as const,
+      const { decision, delivered } = await raiseTrackingAlert({
+        kind: 'gap',
         consecutiveFailures: gapTicks,
         nowSast: now,
         lastGapAlertAt,
         provider: provider.key,
         accountRef: provider.accountRef,
         detail: gapDetail,
-      };
-      const decision = decideAlert(gapAlertInput);
-      await raiseTrackingAlert(gapAlertInput);
+      });
       // Separate statement, not folded into the INSERT above: this repo's SQL
       // tag cannot carry a conditional fragment like `${cond ? sql`..` : sql``}`.
-      if (decision?.stampGapAlert) {
+      //
+      // Gated on `delivered`, not just `decision.stampGapAlert`: the decision
+      // is the POLICY saying an alert is due, but if nobody actually heard it
+      // (no recipients configured, or notify() itself failed) stamping the
+      // clock anyway would suppress the next 24h of gap alerts for an outage
+      // nobody was told about.
+      if (delivered && decision?.stampGapAlert) {
         await sql`
           UPDATE fleet_tracking_watermarks SET last_gap_alert_at = now()
           WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
