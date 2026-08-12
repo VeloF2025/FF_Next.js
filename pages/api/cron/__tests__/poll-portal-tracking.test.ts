@@ -1069,6 +1069,130 @@ describe('alert recipients are visible in the response', () => {
 });
 
 /**
+ * Per-vehicle silence detection (Task 8).
+ *
+ * findSilentTrackers itself is pure and covered by silence.test.ts. What
+ * belongs here is the WIRING: the detector runs once per tick against the
+ * whole fleet, independent of which providers are configured this run —
+ * proven by disabling every provider below and still seeing the alert fire.
+ */
+describe('per-vehicle silence detection', () => {
+  function stubSilenceRows(rows: Array<Record<string, unknown>>) {
+    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join('');
+      if (text.includes('FROM fleet_check_records')) return rows;
+      if (text.includes('SELECT last_event_ts')) return [];
+      if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+      if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+      return [];
+    });
+  }
+
+  const silentRow = (overrides: Record<string, unknown> = {}) => ({
+    vehicle_id: 'v1', registration: 'HW50KNGP',
+    created_at: new Date('2026-08-12T08:00:00.000Z'),
+    nearest_fix_ms: 40 * 60 * 60 * 1000, // 40h — well past the 12h window
+    provider: 'netstar', account_ref: 'europcar',
+    last_gap_alert_at: null,
+    ...overrides,
+  });
+
+  it('raises a gap alert for a vehicle whose tracker went dark, even with no providers configured this tick', async () => {
+    // No providers ticked at all this run — proves the check does not live
+    // inside pollProvider, which never even runs here.
+    delete process.env.NETSTAR_PORTAL_URL;
+    stubSilenceRows([silentRow()]);
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(200);
+    expect(res._getJSONData().data.results).toEqual([]);
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'gap', provider: 'netstar', accountRef: 'europcar',
+        detail: expect.stringContaining('HW50KNGP'),
+      })
+    );
+  });
+
+  it('does not alert when the checked-in vehicle has a nearby fix', async () => {
+    stubSilenceRows([silentRow({ nearest_fix_ms: 1 * 60 * 60 * 1000 })]);
+    await run(AUTH);
+    expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('does not assess a vehicle with a check-in but no fix anywhere (nearest_fix_ms null)', async () => {
+    stubSilenceRows([silentRow({ nearest_fix_ms: null })]);
+    await run(AUTH);
+    expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('reports the silent count in the response body', async () => {
+    stubSilenceRows([silentRow()]);
+    const res = await run(AUTH);
+    expect(res._getJSONData().data.silentTrackers).toBe(1);
+  });
+
+  it('groups multiple silent vehicles on the same account into a single alert call', async () => {
+    stubSilenceRows([
+      silentRow({ vehicle_id: 'v1', registration: 'HW50KNGP' }),
+      silentRow({ vehicle_id: 'v2', registration: 'LG88LJGP', nearest_fix_ms: 50 * 60 * 60 * 1000 }),
+    ]);
+    await run(AUTH);
+    const gapCalls = raiseTrackingAlertMock.mock.calls.filter(
+      (c) => (c[0] as { kind: string }).kind === 'gap'
+    );
+    expect(gapCalls).toHaveLength(1);
+    expect(gapCalls[0][0]).toMatchObject({
+      detail: expect.stringContaining('HW50KNGP'),
+    });
+    expect((gapCalls[0][0] as { detail: string }).detail).toContain('LG88LJGP');
+  });
+
+  it('stamps last_gap_alert_at for the account once delivery succeeds', async () => {
+    raiseTrackingAlertMock.mockResolvedValue({
+      decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+      delivered: true,
+    });
+    stubSilenceRows([silentRow()]);
+    await run(AUTH);
+    const stamp = sqlMock.mock.calls.find((c) =>
+      (c[0] as TemplateStringsArray).join('').includes('SET last_gap_alert_at'));
+    expect(stamp).toBeDefined();
+  });
+
+  it('does not stamp when raiseTrackingAlert reports no delivery', async () => {
+    raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+    stubSilenceRows([silentRow()]);
+    await run(AUTH);
+    const stamp = sqlMock.mock.calls.find((c) =>
+      (c[0] as TemplateStringsArray).join('').includes('SET last_gap_alert_at'));
+    expect(stamp).toBeUndefined();
+  });
+
+  it('never sends a WhatsApp-graded alert kind for silence — always gap, never auth/transient/evicted', async () => {
+    stubSilenceRows([silentRow()]);
+    await run(AUTH);
+    const kinds = raiseTrackingAlertMock.mock.calls.map((c) => (c[0] as { kind: string }).kind);
+    expect(kinds.every((k) => k === 'gap')).toBe(true);
+  });
+
+  it('does not let a silence-check failure take the whole tick down', async () => {
+    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join('');
+      if (text.includes('FROM fleet_check_records')) throw new Error('db exploded');
+      if (text.includes('SELECT last_event_ts')) return [];
+      if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+      return [];
+    });
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(200);
+    expect(logMock.error).toHaveBeenCalledWith(
+      expect.stringContaining('silence check failed'),
+      expect.objectContaining({ error: expect.stringContaining('db exploded') })
+    );
+  });
+});
+
+/**
  * The dead-feed detector.
  *
  * Under a snapshot provider the portal keeps returning the same stale fix
