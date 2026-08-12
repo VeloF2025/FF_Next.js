@@ -81,6 +81,9 @@ async def test_every_fresh_service_registers_the_complete_tool_set_once(
         "list_endpoints",
         "describe_endpoint",
         "get_qfield_project_stats",
+        "view_photo",
+        "find_project_photos",
+        "get_photo_download_manifest",
     }
 
     assert set(names) == expected
