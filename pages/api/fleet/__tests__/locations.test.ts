@@ -13,14 +13,37 @@ vi.mock('@/lib/auth/middleware', () => ({
 const vehicleRows = vi.hoisted(() => [] as Array<Record<string, unknown>>);
 const deactivationRows = vi.hoisted(() => [] as Array<Record<string, unknown>>);
 const sqlCalls = vi.hoisted(() => [] as string[]);
-const sql = vi.hoisted(() => vi.fn((strings: TemplateStringsArray) => {
+const sqlValues = vi.hoisted(() => [] as unknown[][]);
+const locationState = vi.hoisted(() => ({
+  isActive: true,
+  isGlobal: true,
+  vehicleId: null as string | null,
+}));
+const sql = vi.hoisted(() => vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
   const query = strings.join(' ? ');
   sqlCalls.push(query);
+  sqlValues.push(values);
 
   if (query.includes('SELECT id FROM fleet_vehicles')) return vehicleRows;
   if (query.includes('SET is_active = false')) return deactivationRows;
 
-  return [{ id: 'location-1', isActive: true }];
+  if (query.includes('UPDATE fleet_authorized_locations')) {
+    const relationshipUpdated = values[5] === true;
+    const isGlobal = values[6];
+    const clearVehicle = values[7] === true;
+    const hasVehicleId = values[8] === true;
+    const vehicleId = values[9];
+    const isActive = values[10];
+
+    if (relationshipUpdated) locationState.isGlobal = isGlobal === true;
+    if (clearVehicle) locationState.vehicleId = null;
+    else if (hasVehicleId) locationState.vehicleId = vehicleId as string;
+    if (isActive !== null) locationState.isActive = isActive === true;
+
+    return [{ id: 'location-1', ...locationState }];
+  }
+
+  return [{ id: 'location-1', ...locationState }];
 }));
 vi.mock('@/lib/neon-sql', () => ({ getSql: () => sql }));
 
@@ -60,6 +83,10 @@ beforeEach(() => {
   vehicleRows.splice(0);
   deactivationRows.splice(0, deactivationRows.length, { id: 'location-1' });
   sqlCalls.splice(0);
+  sqlValues.splice(0);
+  locationState.isActive = true;
+  locationState.isGlobal = true;
+  locationState.vehicleId = null;
   sql.mockClear();
 });
 
@@ -130,6 +157,7 @@ describe('/api/fleet/locations', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({ success: true, data: { id: 'location-1' } });
+    expect(sqlCalls[0]).not.toContain('is_active = true');
   });
 
   it('reactivates a location through PUT', async () => {
@@ -141,5 +169,35 @@ describe('/api/fleet/locations', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({ success: true, data: { id: 'location-1', isActive: true } });
+  });
+
+  it('rejects reassignment to a missing vehicle before updating the location', async () => {
+    const response = await callRoute({
+      method: 'PUT',
+      query: { id: 'location-1' },
+      body: { vehicleId: 'missing-vehicle' },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(sqlCalls).toHaveLength(1);
+    expect(sqlCalls[0]).toContain('SELECT id FROM fleet_vehicles');
+  });
+
+  it('reassigns a location as vehicle-specific after verifying the target vehicle', async () => {
+    vehicleRows.push({ id: 'vehicle-2' });
+
+    const response = await callRoute({
+      method: 'PUT',
+      query: { id: 'location-1' },
+      body: { vehicleId: 'vehicle-2' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: { id: 'location-1', isGlobal: false, vehicleId: 'vehicle-2' },
+    });
+    expect(sqlValues[1]).toContain(false);
+    expect(sqlValues[1]).toContain('vehicle-2');
   });
 });

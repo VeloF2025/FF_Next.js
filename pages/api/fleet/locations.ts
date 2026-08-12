@@ -207,6 +207,8 @@ async function routeHandler(req: NextApiRequest, res: NextApiResponse) {
 
       const body = requestBody(req.body);
       const input = normalizeLocationInput(body, UPDATE_DEFAULTS);
+      const relationshipUpdated = body.isGlobal !== undefined
+        || Object.prototype.hasOwnProperty.call(body, 'vehicleId');
       const errors = validateLocationInput(input);
       if (Object.keys(errors).length > 0) {
         return apiResponse.validationError(res, errors);
@@ -223,8 +225,12 @@ async function routeHandler(req: NextApiRequest, res: NextApiResponse) {
           lon = COALESCE(${body.lon === undefined ? null : input.lon}, lon),
           radius_km = COALESCE(${body.radiusKm === undefined ? null : input.radiusKm}, radius_km),
           location_type = COALESCE(${body.locationType ?? body.location_type ?? null}, location_type),
-          is_global = COALESCE(${body.isGlobal === undefined ? null : input.isGlobal}, is_global),
-          vehicle_id = COALESCE(${body.vehicleId === undefined ? null : input.vehicleId}, vehicle_id),
+          is_global = CASE WHEN ${relationshipUpdated} THEN ${input.isGlobal} ELSE is_global END,
+          vehicle_id = CASE
+            WHEN ${relationshipUpdated && input.isGlobal} THEN NULL
+            WHEN ${Object.prototype.hasOwnProperty.call(body, 'vehicleId')} THEN ${input.vehicleId}
+            ELSE vehicle_id
+          END,
           is_active = COALESCE(${body.isActive === undefined ? null : body.isActive === true}, is_active)
         WHERE id = ${id as string}
         RETURNING *, radius_km as "radiusKm", location_type as "locationType", is_global as "isGlobal",
