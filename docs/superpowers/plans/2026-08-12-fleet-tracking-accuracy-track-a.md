@@ -32,16 +32,13 @@
 - Consumes: nothing.
 - Produces: `fleet_tracking_watermarks.poll_interval_minutes INTEGER NOT NULL DEFAULT 120` and `fleet_tracking_watermarks.last_gap_alert_at TIMESTAMPTZ NULL`. Tasks 2, 4, 5 and 6 all read these.
 
-- [ ] **Step 1: Pre-flight — confirm the migration runner's true state**
+- [ ] **Step 1: Pre-flight — confirm the live table shape**
 
-`migrations.version` maxes at 416 while migration files run to 490. Establish which is authoritative before picking a number; do not assume.
+**RESOLVED before execution — do not re-investigate.** The apparent gap (`migrations.version` maxing at 416 while files run to 490) is a red herring. `scripts/run-pending-migrations.sh` tracks applied migrations in **`schema_migrations`, keyed by FILENAME**. That table contains `490_wiekus_health_safety_edit.sql`; nothing is missing. The `migrations` table is a legacy tracker that only receives a row when a migration file itself contains `INSERT INTO migrations (version, name, …)`, and 416 was simply the last file that did.
 
-```bash
-PGPASSWORD="$PGPASSWORD" psql -h 100.96.203.105 -p 5437 -U fibreflow_user -d fibreflow \
-  -c "SELECT version, name FROM migrations ORDER BY version DESC LIMIT 5;"
-```
+**Therefore 491 is the correct next number, and migration 491 MUST NOT contain `INSERT INTO migrations`.** The runner's own comment records why: a file that self-records in the legacy table but never lands in `schema_migrations` is seen as pending on the next run, re-executed, and aborts the deploy when its non-idempotent INSERT collides on `migrations_version_key`.
 
-Then confirm the live table shape rather than trusting this document:
+Confirm the live table shape rather than trusting this document:
 
 ```bash
 PGPASSWORD="$PGPASSWORD" psql -h 100.96.203.105 -p 5437 -U fibreflow_user -d fibreflow \
