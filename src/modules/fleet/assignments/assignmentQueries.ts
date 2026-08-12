@@ -62,6 +62,22 @@ export async function loadPreviewState(rows: AssignmentProposalRow[], db: Db = p
 
 export const runAssignmentTransaction = <T>(callback: (txn: TxnClient) => Promise<T>): Promise<T> => transaction(callback);
 
+/** Lock every mutable source that contributes to validation/fingerprinting. */
+export async function lockRelevantPreviewSources(tx: Db, rows: AssignmentProposalRow[], teamIds: string[] = []): Promise<void> {
+  const staffIds = [...new Set(rows.map((row) => row.staffId))];
+  const projectIds = [...new Set(rows.map((row) => row.projectId))];
+  const siteIds = [...new Set(rows.map((row) => row.operationalSiteId))];
+  const vehicleIds = [...new Set(rows.map((row) => row.vehicleAssignmentId).filter((id): id is string => Boolean(id)))];
+  await tx.query(`SELECT id FROM staff WHERE id = ANY($1::uuid[]) FOR UPDATE`, [staffIds]);
+  await tx.query(`SELECT id FROM projects WHERE id = ANY($1::uuid[]) FOR UPDATE`, [projectIds]);
+  await tx.query(`SELECT id FROM fleet_project_operational_sites WHERE id = ANY($1::uuid[]) FOR UPDATE`, [siteIds]);
+  await tx.query(`SELECT id FROM vehicle_assignments WHERE staff_id = ANY($1::uuid[]) OR id = ANY($2::uuid[]) FOR UPDATE`, [staffIds, vehicleIds]);
+  await tx.query(`SELECT fvpa.id FROM fleet_vehicle_project_assignments fvpa JOIN vehicle_assignments va ON va.fleet_vehicle_id = fvpa.vehicle_id WHERE va.staff_id = ANY($1::uuid[]) FOR UPDATE OF fvpa`, [staffIds]);
+  await tx.query(`SELECT id FROM teams WHERE id = ANY($1::uuid[]) FOR UPDATE`, [teamIds]);
+  await tx.query(`SELECT id FROM team_members WHERE team_id = ANY($1::uuid[]) FOR UPDATE`, [teamIds]);
+  await tx.query(`SELECT id FROM attendance_policy_assignments WHERE staff_id = ANY($1::uuid[]) FOR UPDATE`, [staffIds]);
+}
+
 export async function insertAssignment(tx: Db, row: AssignmentProposalRow, actorId: string, snapshot: PreviewState['snapshots'][string]): Promise<AssignmentRecord> {
   const result = await tx.queryOne<{ id: string }>(`INSERT INTO fleet_operational_assignments (staff_id,project_id,operational_site_id,start_date,end_date,assignment_kind,vehicle_assignment_id,reason,project_name_snapshot,project_code_snapshot,operational_site_display_name_snapshot,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`, [row.staffId,row.projectId,row.operationalSiteId,row.startDate,row.endDate,row.assignmentKind,row.vehicleAssignmentId,row.reason,snapshot.projectName,snapshot.projectCode,snapshot.sites[row.operationalSiteId],actorId]);
   if (!result) throw new Error('Assignment insert returned no row');

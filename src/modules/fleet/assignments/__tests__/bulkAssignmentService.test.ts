@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const q = vi.hoisted(() => ({
   expandActiveTeamStaff: vi.fn(), loadPreviewState: vi.fn(), runAssignmentTransaction: vi.fn(),
   insertAssignment: vi.fn(), insertAudit: vi.fn(), lockAssignment: vi.fn(), supersedeAssignment: vi.fn(),
-  endAssignmentRow: vi.fn(), listAssignmentHistory: vi.fn(), loadAssignmentsForCopy: vi.fn(),
+  endAssignmentRow: vi.fn(), listAssignmentHistory: vi.fn(), loadAssignmentsForCopy: vi.fn(), lockRelevantPreviewSources: vi.fn(),
 }));
 vi.mock('../assignmentQueries', () => q);
 
@@ -62,14 +62,23 @@ describe('bulk assignment service', () => {
     expect(q.insertAudit).toHaveBeenCalledTimes(2);
     expect(q.insertAudit.mock.calls[0][3]).toBe(result.batchId);
     expect(q.insertAudit.mock.calls[1][3]).toBe(result.batchId);
+    expect(q.lockRelevantPreviewSources).toHaveBeenCalledWith({}, rows, undefined);
+    expect(q.lockRelevantPreviewSources.mock.invocationCallOrder[0]).toBeLessThan(q.loadPreviewState.mock.invocationCallOrder.at(-1)!);
   });
 
   it('lets the transaction roll back all work when a later insert fails', async () => {
     const rows = [row(), row(STAFF_2)]; q.loadPreviewState.mockResolvedValue(state(rows));
     const preview = await previewAssignments({ rows }, { allProjects: true });
-    q.insertAssignment.mockResolvedValueOnce({ id: STAFF, ...row(), status: 'active' }).mockRejectedValueOnce(new Error('write failed'));
+    const persisted: string[] = [];
+    q.runAssignmentTransaction.mockImplementationOnce(async (fn) => {
+      const staged: string[] = [];
+      try { const result = await fn({ staged }); persisted.push(...staged); return result; }
+      catch (error) { staged.length = 0; throw error; }
+    });
+    q.insertAssignment.mockImplementationOnce(async (tx) => { tx.staged.push(STAFF); return { id: STAFF, ...row(), status: 'active' }; })
+      .mockRejectedValueOnce(new Error('write failed'));
     await expect(commitAssignments({ rows }, preview.fingerprint, ACTOR)).rejects.toThrow('write failed');
-    expect(q.runAssignmentTransaction).toHaveBeenCalledOnce();
+    expect(persisted).toEqual([]);
   });
 
   it('maps PostgreSQL exclusion conflicts to a 409 service error', async () => {
@@ -106,4 +115,23 @@ describe('bulk assignment service', () => {
 
 describe('AssignmentServiceError', () => {
   it('preserves code and status', () => expect(new AssignmentServiceError('STALE_PREVIEW', 'stale', 409)).toMatchObject({ code: 'STALE_PREVIEW', status: 409 }));
+});
+
+describe('assignment source locking', () => {
+  it('locks every mutable validation and fingerprint dependency before writes', async () => {
+    const actual = await vi.importActual<typeof import('../assignmentQueries')>('../assignmentQueries');
+    const statements: string[] = [];
+    const tx = { query: async (sql: string) => { statements.push(sql.replace(/\s+/g, ' ')); return []; }, queryOne: async () => null };
+
+    await actual.lockRelevantPreviewSources(tx, [row()], [TEAM]);
+
+    expect(statements.join('\n')).toMatch(/FROM staff .*FOR UPDATE/);
+    expect(statements.join('\n')).toMatch(/FROM projects .*FOR UPDATE/);
+    expect(statements.join('\n')).toMatch(/fleet_project_operational_sites .*FOR UPDATE/);
+    expect(statements.join('\n')).toMatch(/vehicle_assignments .*FOR UPDATE/);
+    expect(statements.join('\n')).toMatch(/fleet_vehicle_project_assignments .*FOR UPDATE OF fvpa/);
+    expect(statements.join('\n')).toMatch(/FROM teams .*FOR UPDATE/);
+    expect(statements.join('\n')).toMatch(/FROM team_members .*FOR UPDATE/);
+    expect(statements.join('\n')).toMatch(/attendance_policy_assignments .*FOR UPDATE/);
+  });
 });

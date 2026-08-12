@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { assignmentFingerprint } from './fingerprint';
 import {
-  endAssignmentRow, expandActiveTeamStaff, insertAssignment, insertAudit, listAssignmentHistory,
+  endAssignmentRow, expandActiveTeamStaff, insertAssignment, insertAudit, listAssignmentHistory, lockRelevantPreviewSources,
   loadAssignmentsForCopy, loadPreviewState, lockAssignment, runAssignmentTransaction,
   supersedeAssignment, type ActorScope, type AssignmentActor, type AssignmentRecord,
 } from './assignmentQueries';
@@ -71,6 +71,7 @@ export async function commitAssignments(input: CommitAssignmentsInput, fingerpri
   const expanded = await expand(input);
   try {
     return await runAssignmentTransaction(async (tx) => {
+      await lockRelevantPreviewSources(tx, expanded.rows, input.teamIds);
       const state = await loadPreviewState(expanded.rows, tx, true);
       if (assignmentFingerprint(expanded.rows, state.sourceVersion) !== fingerprint) {
         throw new AssignmentServiceError('STALE_PREVIEW', 'The preview is stale; preview again', 409);
