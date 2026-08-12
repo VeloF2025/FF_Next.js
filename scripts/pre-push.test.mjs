@@ -177,6 +177,34 @@ test("permits a branch DELETION push", () => {
   });
 });
 
+test("still blocks an attempt to DELETE master", () => {
+  withFixture((root) => {
+    const head = git(root, ["rev-parse", "HEAD"]);
+    // The deletion `continue` must not weaken master protection. Deleting master
+    // is more dangerous than pushing to it, not less. This holds because the two
+    // guards are separate loops and the master guard never inspects local_sha —
+    // pinned so a future refactor that merges the loops cannot silently drop it.
+    for (const ref of ["refs/heads/master", "refs/heads/main"]) {
+      const r = runHook(root, [`${ref} ${ZERO} ${ref} ${head}`]);
+      assert.equal(r.status, 1, `deleting ${ref} must still be blocked: ${describe(r)}`);
+      assert.match(r.stdout, /BLOCKED: Direct push/);
+    }
+  });
+});
+
+test("permits a force-push whose base is not an ancestor", () => {
+  withFixture((root) => {
+    const base = git(root, ["rev-parse", "HEAD"]);
+    const a = commitFile(root, "src/a.ts", "export const a = 1;\n");
+    git(root, ["reset", "--hard", base, "--quiet"]);
+    const b = commitFile(root, "src/b.ts", "export const b = 2;\n");
+    // `a` is not an ancestor of `b`. The scan uses two-ref `git diff`, which does
+    // not require ancestry, so this must scan rather than error.
+    const r = runHook(root, [`refs/heads/f/x ${b} refs/heads/f/x ${a}`]);
+    assert.equal(r.status, 0, `a diverged force-push must still scan cleanly: ${describe(r)}`);
+  });
+});
+
 test("permits a tag DELETION push", () => {
   withFixture((root) => {
     const head = git(root, ["rev-parse", "HEAD"]);
