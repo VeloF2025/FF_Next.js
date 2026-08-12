@@ -115,14 +115,47 @@ which raw fix counts made look like a dead tracker — is within ~1.5× of its a
 normalised for distance driven. Its low count is mostly low usage. Raw cross-vehicle fix counts
 measure how much a vehicle drove, not whether its tracker works.
 
-### Map presentation does not distinguish the feeds
+### Map presentation is mostly already correct
 
-- `pages/api/fleet/positions/live.ts:19` — `STALE_AFTER_SECONDS = 15 * 60`, applied uniformly.
-  For the 11 portal vehicles, whose designed ceiling is 2 hours, this is true nearly always and
-  therefore carries no signal.
-- `src/modules/fleet/components/FleetMap.tsx:78` — `{v.ignition ? 'Moving' : 'Stopped'}` derives
-  motion from the ignition flag alone. A stationary vehicle with the engine running renders as
-  "Moving · 0 km/h". A null speed renders as "Moving" with no figure beside it.
+Provider-aware staleness and multi-state status labelling already shipped. Verified against
+`origin/master`, not a working tree:
+
+- `src/services/tracking/staleness.ts` — `staleAfterSecondsFor(provider, accountRef)` returns
+  `DEFAULT_STALE_AFTER_SECONDS` (3 h) for portal feeds and `FAST_STALE_AFTER_SECONDS` (15 min)
+  for the Cartrack REST account. It splits by **account**, not provider name, because Cartrack
+  runs both a 2-minute REST feed and a 2-hourly portal feed.
+- `pages/api/fleet/positions/live.ts` — `staleAfterSeconds` is already per-vehicle on
+  `LiveVehicle`; the fleet-wide scalar has already been removed.
+- `src/modules/fleet/utils/liveMapHelpers.ts` — `statusFor()` already returns six states
+  (`speeding`, `lostContact`, `moving`, `parked`, `parkedSilent`, `unknown`), and the FleetMap
+  popup renders `STATUS_STYLE[statusFor(v)].label`.
+
+This existing code accounts for both observed cases exactly. LL92LYGP: netstar → 3 h threshold,
+15 h old → stale; ignition false and quiet past `PARKED_SILENT_AFTER_SECONDS` (6 h) →
+`parkedSilent` → "Parked · no contact (stale)". HW50KNGP: `cartrack/urent` → 3 h threshold, 1 h
+old → **not** stale, hence no stale marker.
+
+**One genuine defect remains.** `liveMapHelpers.ts:76`:
+
+```ts
+if (v.ignition === true) return v.isStale ? 'lostContact' : 'moving';
+```
+
+`'moving'` is returned whenever ignition is true and the fix is fresh, without ever consulting
+speed. A vehicle idling with the engine running renders as "Moving · 0 km/h". That is the
+HW50KNGP case.
+
+### `staleness.ts` will become wrong the moment cadence is configurable
+
+`staleness.ts` hardcodes its thresholds, and its header states the assumption plainly: *"The
+cadence is set by cron."* Once cadence is per-account configuration that ramps (design item 1),
+a hardcoded 3 h is wrong by construction — tightening the interval to 10 minutes would leave the
+map calling fresh data stale for hours. The threshold must derive from the same
+`poll_interval_minutes` the poller uses.
+
+Its header also records a standing landmine worth respecting here: for Cartrack, an
+*unrecognised* account is treated as FAST, so onboarding any second Cartrack account requires
+revisiting that function.
 
 ---
 
@@ -228,33 +261,40 @@ deliberately not guessed here.
 
 ### 6. Map presentation
 
-**Staleness derives from the feed.** `live.ts` joins `poll_interval_minutes` and computes the
-threshold per vehicle: **stale once age exceeds `poll_interval_minutes × 2`**, which tolerates
-exactly one missed tick. One source of truth — when the ramp tightens, the badge tightens
-automatically.
+Scope here is far smaller than originally drafted, because provider-aware staleness and
+multi-state labelling already shipped. Two changes remain.
 
-Note this correctly still marks LL92LYGP stale during its overnight silence: a 15-hour-old fix
-*is* stale for live ops. The change is that a 40-minute-old fix on a 2-hour feed stops being
-flagged, because that is as fresh as that feed goes.
+**Add an `idling` status.** `statusFor` currently ignores speed when ignition is true. Insert an
+idling branch ahead of the existing moving/lostContact decision:
 
-This changes the API contract: `staleAfterSeconds` (`live.ts:106`) is currently one fleet-wide
-scalar and becomes per-vehicle.
+| ignition | speed | isStale | status |
+|---|---|---|---|
+| true | `> 0` | false | `moving` |
+| true | `0` | false | **`idling`** (new) |
+| true | `null` | false | `moving` (unchanged — no speed to contradict it) |
+| true | any | true | `lostContact` (unchanged) |
+| false | any | any | `parked` / `parkedSilent` (unchanged) |
+| `null` | any | any | `unknown` (unchanged) |
 
-**Motion label**, as a pure function in `liveMapHelpers`:
+`idling` needs its own `STATUS_STYLE` entry. A null speed deliberately keeps reporting `moving`
+rather than inventing a state: only an explicit `0` is evidence of not moving, and treating
+"unknown speed" as idle would misreport every provider that omits the field.
 
-| speed | ignition | label |
-|---|---|---|
-| `> 0` | any | Moving |
-| `0` | true | Idling |
-| `0` | false | Stopped |
-| `null` | true | Ignition on |
-| `null` | false | Stopped |
-| `null` | `null` | Unknown |
+**Staleness derives from configured cadence, not a constant.** `staleAfterSecondsFor` takes the
+account's `poll_interval_minutes` and returns `interval × 2`, tolerating exactly one missed tick,
+rather than the hardcoded `DEFAULT_STALE_AFTER_SECONDS`. This is what stops the map calling fresh
+data stale once the ramp tightens.
 
-**The popup states the feed ceiling** — `via netstar · 2h feed` — so a 40-minute-old fix reads
-as normal for that vehicle rather than as a fault.
+Two properties of the existing module must survive the change: it keys on **account**, not
+provider name, because Cartrack runs a fast and a slow feed simultaneously; and an unrecognised
+Cartrack account still resolves to the fast threshold, which its header flags as requiring
+attention if a second Cartrack account is ever onboarded.
 
-**Fleet counts are surfaced, not implied:** 23 active — 7 live, 11 hours-behind, 5 untracked.
+The lenient fallback stays for any account with no configured interval — a false "stale" is the
+failure that module exists to remove.
+
+**Explicitly not in scope:** the `via netstar` line, marker colours, the legend, and the
+not-plotted list all already work. Leave them alone.
 
 ---
 
@@ -263,7 +303,12 @@ as normal for that vehicle rather than as a fault.
 Unit tests carry this; there is no new integration surface. Per DGTS, each test is checked that
 it **fails** without its fix rather than passing vacuously.
 
-- `liveMapHelpers` — the full six-row label table, including every null case.
+- `liveMapHelpers` — the new `idling` branch, and specifically that a **null** speed with
+  ignition on still returns `moving`. Existing `statusFor` cases must be asserted unchanged;
+  `liveMapHelpers.test.ts` already exists and is the regression net for them.
+- `staleness.ts` — threshold derived from a configured interval; account-keyed dispatch
+  preserved; unrecognised Cartrack account still resolving FAST; lenient fallback when no
+  interval is configured.
 - `alerts.ts` — gap repeat on wall-clock; `still logged out after re-auth` no longer reaching a
   WhatsApp-grade event; persistent eviction escalating past cooldown; `login failed` and
   `HTTP 401/403` retaining today's behaviour.
@@ -275,8 +320,13 @@ it **fails** without its fix rather than passing vacuously.
 
 - Nothing here proves the ramp is safe against the live portals. Only the staged rollout does,
   which is why demotion is automatic and promotion manual.
-- CI never runs `next build`, so the `staleAfterSeconds` contract change needs a real build
-  before shipping.
+- CI never runs `next build`. No API contract change remains in scope, but the `statusFor` union
+  gains a member, and every exhaustive `Record<VehicleStatus, …>` must still compile — so this
+  needs a real build before shipping.
+- This spec was first drafted against a working tree 133 commits behind `origin/master`, which
+  is how it originally proposed work that had already shipped. Every code reference here has
+  since been re-verified against `origin/master`. Anyone extending it should do the same rather
+  than trusting a local checkout.
 
 ---
 
