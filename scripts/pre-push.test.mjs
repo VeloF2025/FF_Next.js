@@ -225,6 +225,25 @@ test("permits a mixed push where one ref is a deletion and the other is real", (
   });
 });
 
+test("still SCANS a ref that comes after a deletion in the same push", () => {
+  withFixture((root) => {
+    const head = git(root, ["rev-parse", "HEAD"]);
+    const tip = commitFile(root, "pages/api/bad.ts", `${AUTH_VIOLATION_LINE}\n`);
+    // The deletion guard must skip only its own iteration. `continue` does;
+    // `break` would stop the loop and leave every later ref unscanned — and the
+    // mixed-push test above cannot tell the difference, because its second ref is
+    // a CLEAN file, so it only proves the deletion does not wrongly block.
+    // This one puts a real violation after the deletion, so a skipped scan shows
+    // up as a missed violation rather than as a false block.
+    const r = runHook(root, [
+      `refs/heads/gone ${ZERO} refs/heads/gone ${head}`,
+      `refs/heads/f/y ${tip} refs/heads/f/y ${head}`,
+    ]);
+    assert.equal(r.status, 1, `the post-deletion ref must still be scanned: ${describe(r)}`);
+    assert.match(r.stdout, /AUTH ISOLATION VIOLATION/);
+  });
+});
+
 test("permits empty stdin", () => {
   withFixture((root) => {
     // A here-string yields one iteration even for empty input, so both loops
