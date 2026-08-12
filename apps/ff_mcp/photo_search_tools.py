@@ -25,7 +25,7 @@ import anyio.to_thread
 from .server import mcp
 from .tools import _fibreflow_get_sync
 
-Source = Literal["qa", "qfield", "both"]
+Source = Literal["qa", "qfield", "worksqa", "both"]
 Verdict = Literal["pass", "fail"]
 
 
@@ -70,9 +70,16 @@ async def find_project_photos(
     - `type`: the kind of photo, matched against its label — "depth" finds "Depth Photo",
       "compaction" finds "Compaction / Backfill". QField photos use work types like
       "pole_installation" instead, so a type that exists in only one corpus narrows to it.
-    - `source`: "qa" (construction QA), "qfield", or "both".
-    - `vlm`: "pass" or "fail" — the automated verdict. QA photos ONLY: QField photos have
-      no verdict column, so this filter excludes them rather than guessing. There is no
+    - `source`: "qa" (construction QA), "qfield", "worksqa" (acceptance QA), or "both".
+      THREE stores exist and they hold different things. Only `worksqa` has both a step
+      label and a VLM verdict, so questions like "the after photo showing the pole
+      standing" are answerable there and nowhere else — QField classifies photos only to
+      a coarse work type like "pole_installation". A project can be in one store and not
+      the others: if a search comes back empty, say which stores you looked in rather
+      than reporting that no such photos exist.
+    - `vlm`: "pass" or "fail" — the automated verdict, available on `qa` and `worksqa`.
+      QField has no verdict column, so this filter excludes that corpus rather than
+      guessing. A failure a reviewer has overridden counts as a pass. There is no
       manual-review filter because that column is unpopulated; do not infer approval from
       its absence.
     - `pole`, `zone`, `pon`: identity filters. QField photos carry no zone or PON, so

@@ -23,7 +23,7 @@ describe('parseFilter', () => {
 
   it('rejects an unknown source instead of silently searching everything', () => {
     expect(parseFilter({ source: 'payroll' })).toEqual({
-      error: 'source must be qa, qfield or both — got "payroll"',
+      error: 'source must be qa, qfield, worksqa or both — got "payroll"',
     });
   });
 
@@ -227,7 +227,6 @@ describe('query construction', () => {
     const { sql } = pageQuery(filter());
     expect(sql).toContain('ORDER BY storage_key, corpus_rank, captured_at DESC NULLS LAST');
     expect(sql).toMatch(/0\s+AS corpus_rank/);
-    expect(sql).toMatch(/1\s+AS corpus_rank/);
   });
 
   it('escapes LIKE wildcards so a filter cannot silently match everything', () => {
@@ -237,6 +236,113 @@ describe('query construction', () => {
     expect(params).toContain('%\\%%');
     const typed = summaryQuery(filter({ type: '_', source: 'qa' }));
     expect(typed.params).toContain('%\\_%');
+  });
+
+  it('unpivots the works-QA slot columns into photo rows', () => {
+    // pole_qa_photos is ONE ROW PER POLE with 22 named key columns. Without the
+    // unpivot there is no photo to find, which is why this corpus was invisible.
+    const { sql } = pageQuery(filter({ source: 'worksqa', project: 'Namakgale' }));
+    expect(sql).toContain('CROSS JOIN LATERAL');
+    expect(sql).toContain('civil_step_07_key');
+    expect(sql).toContain("'After Photo'");
+    expect(sql).toContain('slot.storage_key IS NOT NULL');
+  });
+
+  it('never special-cases an override, because `valid` already carries the decision', () => {
+    // pole-override.ts accepts decision:'pass'|'fail' and writes valid: decision==='pass'.
+    // Any branch keyed on `overridden_by` therefore inverts an explicit FAIL override into
+    // a pass, and a "show me the failures" query silently omits work a human rejected.
+    for (const v of ['pass', 'fail'] as const) {
+      const { sql } = summaryQuery(filter({ source: 'worksqa', vlm: v }));
+      expect(sql).not.toContain('overridden_by');
+    }
+  });
+
+  it('reads the verdict through a type guard so one bad row cannot 500 every search', () => {
+    // A bare ::boolean cast throws on any non-boolean, and this expression sits inside
+    // the shared UNION — so one malformed vlm_results entry anywhere would take down
+    // search AND manifest for every project.
+    const { sql } = summaryQuery(filter({ source: 'worksqa', vlm: 'pass' }));
+    expect(sql).toContain("jsonb_typeof(w.vlm_results -> slot.slot_key -> 'valid') = 'boolean'");
+  });
+
+  it('excludes works-QA from date filters, since it records no photo timestamp', () => {
+    // Its only clock is the pole row's updated_at, shared by all 22 slots and bumped by
+    // merely marking a pole seen. Filtering on it returns a 2024 photo for "June".
+    const { sql } = summaryQuery(filter({ source: 'worksqa', from: '2026-06-01' }));
+    expect(sql).toContain('FALSE');
+    expect(sql).not.toContain('w.updated_at >=');
+  });
+
+  it('omits the works-QA corpus entirely when the caller is not entitled to it', () => {
+    // pole_qa_photos is gated on construction-qa.works-qa, a SIBLING of the qa-centre
+    // permission on these routes — adding a corpus must not widen who can read it.
+    const withOut = pageQuery(filter({ includeWorksQa: false }));
+    expect(withOut.sql).not.toContain('pole_qa_photos');
+    expect(withOut.sql.match(/UNION ALL/g)).toHaveLength(1);
+    const withIt = pageQuery(filter());
+    expect(withIt.sql).toContain('pole_qa_photos');
+  });
+
+  it('matches a works-QA photo by its step label', () => {
+    // "after" must reach 'After Photo' — the attribute QField cannot express at all.
+    const { params } = summaryQuery(filter({ source: 'worksqa', type: 'after' }));
+    expect(params).toContain('%after%');
+  });
+
+  it('excludes works-QA from a needsRetake filter it cannot answer', () => {
+    const { sql } = summaryQuery(filter({ source: 'worksqa', needsRetake: true }));
+    expect(sql).toContain('FALSE');
+  });
+
+  it('ranks each corpus by how much it knows, richest first', () => {
+    // construction-QA (0) > works-QA (1) > QField (3). Asserting the literals merely
+    // exist would let the ranks be SWAPPED with a green suite, so each rank is tied to
+    // the table it is emitted for.
+    const rankOf = (table: string) => {
+      const branch = pageQuery(filter()).sql.split('UNION ALL').find((b) => b.includes(table));
+      return Number(/(\d+)\s+AS corpus_rank/.exec(branch ?? '')?.[1]);
+    };
+    expect(rankOf('construction_qa_photos')).toBe(0);
+    expect(rankOf('pole_qa_photos')).toBe(1);
+    expect(rankOf('qfield_photo_validations')).toBe(3);
+    expect(rankOf('construction_qa_photos')).toBeLessThan(rankOf('pole_qa_photos'));
+    expect(rankOf('pole_qa_photos')).toBeLessThan(rankOf('qfield_photo_validations'));
+  });
+
+  it('keeps every UNION branch at the same column count', () => {
+    // Postgres binds a UNION by POSITION. An inserted column in one branch maps zone_no
+    // onto pon_no with no error, and SELECT * through DISTINCT ON hides it.
+    const branches = pageQuery(filter()).sql.split('UNION ALL');
+    expect(branches).toHaveLength(3);
+    const depthZeroCommas = (raw: string) => {
+      // Strip `--` comments first: prose commas inside them are not column separators.
+      const sql = raw.replace(/--[^\n]*/g, '');
+      // Anchor on the branch's OWN table — the first branch is preceded by the outer
+      // wrapper's SELECT, so indexOf('SELECT') would slice the wrapper instead.
+      const fromIdx = sql.search(
+        /FROM\s+(construction_qa_photos|pole_qa_photos|qfield_photo_validations)/,
+      );
+      const select = sql.slice(sql.lastIndexOf('SELECT', fromIdx), fromIdx);
+      let depth = 0;
+      let commas = 0;
+      for (const ch of select) {
+        if (ch === '(') depth += 1;
+        else if (ch === ')') depth -= 1;
+        else if (ch === ',' && depth === 0) commas += 1;
+      }
+      return commas;
+    };
+    const counts = branches.map(depthZeroCommas);
+    expect(new Set(counts).size).toBe(1);
+  });
+
+  it('unions all three corpora when source is both', () => {
+    const { sql } = pageQuery(filter());
+    expect(sql.match(/UNION ALL/g)).toHaveLength(2);
+    expect(sql).toContain('pole_qa_photos');
+    expect(sql).toContain('qfield_photo_validations');
+    expect(sql).toContain('construction_qa_photos');
   });
 
   it('applies no limit to the manifest query', () => {

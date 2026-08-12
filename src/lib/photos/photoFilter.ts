@@ -3,7 +3,11 @@
  * into it. Split from photoQuery.ts to keep both files inside the 300-line rule.
  */
 
-export type PhotoSource = 'qa' | 'qfield' | 'both';
+/**
+ * `worksqa` is `pole_qa_photos` — the acceptance-QA store, one row per pole with named
+ * photo slots. It is the only corpus carrying BOTH a step label and a VLM verdict.
+ */
+export type PhotoSource = 'qa' | 'qfield' | 'worksqa' | 'both';
 
 export interface PhotoFilter {
   project?: string;
@@ -27,11 +31,20 @@ export interface PhotoFilter {
   to?: string;
   limit: number;
   offset: number;
+  /**
+   * Whether the caller may see the works-QA corpus.
+   *
+   * `pole_qa_photos` is gated on `construction-qa.works-qa` everywhere else in the app —
+   * a SIBLING of `construction-qa.qa-centre`, not a child. Routes set this from the
+   * caller's own permissions so adding a corpus to a search cannot quietly widen who
+   * can read it. Defaults to allowed so non-HTTP callers are unaffected.
+   */
+  includeWorksQa?: boolean;
 }
 
 export interface PhotoRow {
   photo_id: string;
-  corpus: 'qa' | 'qfield';
+  corpus: 'qa' | 'qfield' | 'worksqa';
   storage_key: string;
   filename: string | null;
   step_label: string | null;
@@ -40,11 +53,12 @@ export interface PhotoRow {
   captured_at: string | null;
   /**
    * What `captured_at` actually measures for this row: 'captured' is EXIF capture time,
-   * 'validated' is when the QField validation ran. They are not interchangeable — a
-   * photo taken in June can be validated in August — so the basis travels with the row
-   * instead of being silently assumed.
+   * 'validated' is when the QField validation ran, and 'unknown' means the corpus records
+   * no photo timestamp (works-QA) — those rows carry a NULL date and are excluded from
+   * date filters rather than answered with a row's last-write time. A photo taken in
+   * June can be validated in August, so the basis travels with the row.
    */
-  date_basis: 'captured' | 'validated';
+  date_basis: 'captured' | 'validated' | 'unknown';
   file_size_bytes: string | null;
   pole_number: string | null;
   zone_no: number | null;
@@ -95,8 +109,8 @@ export function parseFilter(query: Record<string, string | string[] | undefined>
     Array.isArray(v) ? v[0] : v;
 
   const source = (one(query.source) ?? 'both') as PhotoSource;
-  if (!['qa', 'qfield', 'both'].includes(source)) {
-    return { error: `source must be qa, qfield or both — got "${source}"` };
+  if (!['qa', 'qfield', 'worksqa', 'both'].includes(source)) {
+    return { error: `source must be qa, qfield, worksqa or both — got "${source}"` };
   }
 
   const vlmRaw = one(query.vlm);

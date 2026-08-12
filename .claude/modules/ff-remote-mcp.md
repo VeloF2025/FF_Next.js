@@ -177,6 +177,22 @@ proxy then fails closed (502) and FibreFlow itself is unaffected.
   RBAC is evaluated once, when the manifest is minted for an authenticated user; the
   signed link carries that decision for an hour, bound to one photo key so a leaked link
   cannot be walked into the rest of the archive.
+- **THREE photo corpora exist, not two.** `construction_qa_photos` (step labels, not
+  every project), `qfield_photo_validations` (coarse `work_type` only), and
+  `pole_qa_photos` — the works-QA acceptance store, ONE ROW PER POLE with 22 named slot
+  columns, carrying both a step label and a per-slot VLM verdict. It has to be unpivoted
+  to look like photos at all, which is why a photo search built on the other two could
+  not see 14,893 rows across 13 projects. A project can live in one store and not the
+  others: Namakgale has 339 QField photos, 124 works-QA poles, and ZERO construction-QA
+  rows. An empty result must name the stores searched.
+- **An overridden VLM failure is a pass.** `pole-override.ts` records a human decision in
+  `vlm_results.<slot>.overridden_by`; counting those as failures tells a PM that work a
+  reviewer already accepted is still outstanding.
+- **`/api/works-qa/poles` returns EVERY pole (~76 KB) unless `limit` is passed**, and
+  before that parameter existed a capped consumer silently received a prefix. Read
+  through the connector's 15,000-char cap, a 124-pole project came back as its first ~24
+  poles and two slices of one label range were reported as two disagreeing systems. Pass
+  `limit` and read `total`; an unpaged call still returns the historic bare array.
 - **`qfield_photo_validations.project_id` is NULL on all 60,875 rows.** The project is
   recoverable only from the key path (`projects/<qfieldcloud-uuid>/...`) via
   `qfield_projects` → `qfield_project_links`. Filtering that table on its own
