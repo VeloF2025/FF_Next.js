@@ -27,6 +27,16 @@ interface HSAttachmentUploadProps {
   label?: string;
   /** Hides the upload control and the delete buttons. */
   readOnly?: boolean;
+  /**
+   * Called after an upload or delete commits.
+   *
+   * This component refreshes its OWN list, which is invisible to any parent
+   * showing state derived from it. The PPE panel shows "signed sheet on file"
+   * computed from the attachment count, and without this it kept saying "no
+   * signed sheet uploaded yet" directly above the file the user had just
+   * uploaded — the kind of thing that gets read as "it failed" and retried.
+   */
+  onChange?: () => void;
 }
 
 const labelCls = 'block text-sm font-medium text-[var(--ff-text-secondary)] mb-1';
@@ -36,6 +46,7 @@ export function HSAttachmentUpload({
   parentId,
   label = 'Attachments',
   readOnly = false,
+  onChange,
 }: HSAttachmentUploadProps) {
   const [attachments, setAttachments] = useState<AttachmentSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +82,7 @@ export function HSAttachmentUpload({
     try {
       await uploadAttachment(surface, parentId, file);
       await refresh();
+      onChange?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload the file');
       log.error('H&S attachment upload failed', { error: err }, 'HSAttachmentUpload');
@@ -85,6 +97,7 @@ export function HSAttachmentUpload({
     try {
       await deleteAttachment(attachment.id);
       await refresh();
+      onChange?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove the attachment');
       log.error('H&S attachment delete failed', { error: err }, 'HSAttachmentUpload');
