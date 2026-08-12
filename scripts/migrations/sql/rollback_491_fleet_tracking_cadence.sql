@@ -4,4 +4,5 @@ ALTER TABLE fleet_tracking_watermarks
 
 ALTER TABLE fleet_tracking_watermarks
   DROP COLUMN IF EXISTS poll_interval_minutes,
-  DROP COLUMN IF EXISTS last_gap_alert_at;
+  DROP COLUMN IF EXISTS last_gap_alert_at,
+  DROP COLUMN IF EXISTS evicted_since;

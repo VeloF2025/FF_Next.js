@@ -16,10 +16,20 @@
 -- counting silently tightens as the cadence tightens; at 10 minutes the same
 -- constant means one reminder every two hours. Wall-clock needs a timestamp to
 -- measure from, and there was nowhere to put one.
+--
+-- evicted_since exists for the same reason, one layer down. Netstar allows a
+-- single session, so a human opening the portal throws our poller out; that
+-- self-heals when they leave and must not page anyone. But a dead credential
+-- presents identically, so eviction has to escalate once it is SUSTAINED —
+-- which requires knowing when the eviction streak began. The only other source
+-- would be `consecutive_failures * poll_interval_minutes`, which reintroduces
+-- exactly the tick-coupling last_gap_alert_at was added to remove. Set when an
+-- eviction streak starts; cleared on a healthy tick or a different failure kind.
 
 ALTER TABLE fleet_tracking_watermarks
   ADD COLUMN IF NOT EXISTS poll_interval_minutes INTEGER NOT NULL DEFAULT 120,
-  ADD COLUMN IF NOT EXISTS last_gap_alert_at TIMESTAMPTZ NULL;
+  ADD COLUMN IF NOT EXISTS last_gap_alert_at TIMESTAMPTZ NULL,
+  ADD COLUMN IF NOT EXISTS evicted_since TIMESTAMPTZ NULL;
 
 ALTER TABLE fleet_tracking_watermarks
   ADD CONSTRAINT fleet_tracking_watermarks_poll_interval_check
