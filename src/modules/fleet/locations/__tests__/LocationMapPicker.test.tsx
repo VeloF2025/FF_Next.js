@@ -46,4 +46,10 @@ describe('LocationMapPicker', () => {
     expect(circleProps).not.toHaveBeenCalled();
     expect(markerProps).not.toHaveBeenCalled();
   });
+
+  it('keeps the marker but omits the circle for an invalid radius', () => {
+    render(<LocationMapPicker lat={-26.1} lon={28.1} radiusKm={Number.NaN} onChange={vi.fn()} />);
+    expect(markerProps).toHaveBeenCalled();
+    expect(circleProps).not.toHaveBeenCalled();
+  });
 });

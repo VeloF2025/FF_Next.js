@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Car, Globe, MapPin, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { usePermission } from '@/hooks/usePermission';
 import { fleetConfig } from '@/modules/navigation';
 import type { AuthorizedLocation } from '@/modules/fleet/types';
@@ -35,6 +36,7 @@ export default function FleetLocationsPage() {
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
+  const [pendingDeactivation, setPendingDeactivation] = useState<AuthorizedLocation | null>(null);
   const { can, isLoading: permissionsLoading } = usePermission();
   const canCreate = !permissionsLoading && can('fleet.locations', 'create');
   const canEdit = !permissionsLoading && can('fleet.locations', 'edit');
@@ -55,8 +57,15 @@ export default function FleetLocationsPage() {
     catch (caught) { setError(caught instanceof Error ? caught.message : 'Location request failed'); }
   };
 
+  const confirmDeactivation = () => {
+    if (!pendingDeactivation) return;
+    const location = pendingDeactivation;
+    setPendingDeactivation(null);
+    void mutate(() => deactivateLocation(location.id));
+  };
+
   const filtered = locations.filter((location) => location.name.toLowerCase().includes(search.toLowerCase()));
-  const sectionProps = { canEdit, canDelete, onEdit: (location: AuthorizedLocation) => setModal({ mode: 'edit', location }), onDeactivate: (location: AuthorizedLocation) => { if (window.confirm(`Deactivate ${location.name}?`)) void mutate(() => deactivateLocation(location.id)); }, onReactivate: (location: AuthorizedLocation) => void mutate(() => reactivateLocation(location.id)) };
+  const sectionProps = { canEdit, canDelete, onEdit: (location: AuthorizedLocation) => setModal({ mode: 'edit', location }), onDeactivate: setPendingDeactivation, onReactivate: (location: AuthorizedLocation) => void mutate(() => reactivateLocation(location.id)) };
 
   return <AppLayout><ModulePage config={fleetConfig} hideTabs><div className="space-y-6 p-6">
     <div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Authorized Locations</h1><p className="text-[var(--ff-text-secondary)]">Configure geofencing zones for trip classification</p></div>{canCreate && <button aria-label="Add location" onClick={() => setModal({ mode: 'create', location: null })} className="flex items-center gap-2 rounded-lg bg-[var(--ff-primary)] px-4 py-2 text-white"><Plus className="h-4 w-4" />Add Location</button>}</div>
@@ -65,5 +74,14 @@ export default function FleetLocationsPage() {
     {loading ? <p>Loading locations…</p> : <div className="space-y-6"><LocationSection title="Global Locations" icon={Globe} locations={filtered.filter((location) => location.isGlobal)} {...sectionProps} /><LocationSection title="Vehicle-Specific Locations" icon={Car} locations={filtered.filter((location) => !location.isGlobal)} {...sectionProps} /></div>}
     {filtered.length === 0 && !loading && !error && <div className="text-center"><MapPin className="mx-auto h-8 w-8" />No matching locations</div>}
     {modal && <LocationFormModal mode={modal.mode} location={modal.location} onClose={() => setModal(null)} onSaved={() => { setModal(null); void loadLocations(); }} />}
+    <ConfirmDialog
+      open={pendingDeactivation !== null}
+      onConfirm={confirmDeactivation}
+      onCancel={() => setPendingDeactivation(null)}
+      title="Deactivate location"
+      message={`Deactivate ${pendingDeactivation?.name ?? 'this location'}?`}
+      confirmLabel="Confirm deactivation"
+      variant="danger"
+    />
   </div></ModulePage></AppLayout>;
 }

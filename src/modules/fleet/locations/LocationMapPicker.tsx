@@ -24,6 +24,7 @@ function ClickHandler({ onChange }: Pick<LocationMapPickerProps, 'onChange'>) {
 
 export function LocationMapPicker({ lat, lon, radiusKm, onChange }: LocationMapPickerProps) {
   const validCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
+  const validRadius = Number.isFinite(radiusKm) && radiusKm > 0;
   const center: [number, number] = validCoordinates ? [lat, lon] : [-30.5595, 22.9375];
 
   return (
@@ -36,7 +37,7 @@ export function LocationMapPicker({ lat, lon, radiusKm, onChange }: LocationMapP
         <ClickHandler onChange={onChange} />
         {validCoordinates && (
           <>
-            <Circle center={center} radius={radiusKm * 1000} pathOptions={{ color: '#2563eb' }} />
+            {validRadius && <Circle center={center} radius={radiusKm * 1000} pathOptions={{ color: '#2563eb' }} />}
             <CircleMarker center={center} radius={6} pathOptions={{ color: '#1d4ed8', fillOpacity: 1 }} />
           </>
         )}
