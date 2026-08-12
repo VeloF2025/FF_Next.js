@@ -254,7 +254,17 @@ if [ -n "$ADDED" ]; then
   # NOT handled here: the `test-`-prefixed-username bypass. That one is fixed by
   # the boundary class on the global PLACEHOLDER list's `test[-_]…[:=]` term, not
   # by this exclusion — look there, not here.
-  add_hits "([a-z][a-z0-9+.-]{1,14}:)?//[A-Za-z0-9_.%+-]+:[^@[:space:]'\"]+@[A-Za-z0-9_.[-]" \
+  # `(^|[^A-Za-z0-9])` before the authority. Without it, making the scheme
+  # optional matched a `sed 's//old:new@thing/g'` expression — an empty sed
+  # pattern followed by text that happens to be userinfo-shaped. Requiring a
+  # non-alphanumeric before the slashes keeps every real form (`="//…`, `"//…`,
+  # `src="//…`, whitespace, start of line) and drops that one, because there the
+  # slashes are preceded by the `s` command letter.
+  #
+  # Measured: this changed nothing in the tree audit either way — the optional
+  # scheme added zero hits across the whole tree, and the sed shape occurs zero
+  # times. The boundary is here so a future file cannot introduce it.
+  add_hits "(^|[^A-Za-z0-9])([a-z][a-z0-9+.-]{1,14}:)?//[A-Za-z0-9_.%+-]+:[^@[:space:]'\"]+@[A-Za-z0-9_.[-]" \
            "credential in connection URI" "" \
            ":(pass|passwd|password|secret|changeme|redacted)@"
   # AWS access key id

@@ -279,6 +279,23 @@ test("flags a scheme-relative authority carrying a credential", () => {
   });
 });
 
+test("does not flag userinfo-shaped text that is not an authority", () => {
+  withFixture({}, (root) => {
+    // Making the scheme optional matched a sed expression with an EMPTY search
+    // pattern, where the replacement happens to be userinfo-shaped. Found by
+    // probing after the change rather than before it, which is the wrong order.
+    // A non-alphanumeric is now required before the slashes: real forms keep a
+    // quote, `=`, whitespace or line start there; sed keeps its `s`.
+    commitFile(
+      root,
+      "tidy.sh",
+      ["sed 's//old:new@thing/g' file.txt", "const re = /^\\/\\/user:pass@host/;", ""].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `not every colon-at-sign run is an authority: ${describe(r)}`);
+  });
+});
+
 test("flags a URI whose password is the literal word admin", () => {
   withFixture({}, (root) => {
     // "admin" is a real default credential, not a documentation placeholder, so
