@@ -104,6 +104,12 @@ def _fetch_photo_bytes(path: str, query: str) -> tuple[str, bytes]:
     return content_type, data
 
 
+# Pillow's own bomb guard, set explicitly rather than left at the library default.
+# MAX_SOURCE_BYTES bounds the COMPRESSED bytes only; a 25 MB image can still decode to
+# hundreds of MB, and this is a single process serving every connected user.
+PilImage.MAX_IMAGE_PIXELS = 80_000_000  # ~8x a 40MP phone photo
+
+
 def _render(data: bytes, max_dimension: int) -> bytes:
     """Downscale to JPEG. Raises PhotoFetchError when the bytes are not an image.
 

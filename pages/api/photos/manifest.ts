@@ -16,11 +16,18 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-import { isConfigured, LINK_TTL_SECONDS, signLink, verifyLink } from '@/lib/photos/photoLinks';
+import {
+  isConfigured,
+  LINK_TTL_SECONDS,
+  remainingTtl,
+  signLink,
+  verifyLink,
+} from '@/lib/photos/photoLinks';
+import rateLimiter from '@/lib/rateLimiter';
 import { allKeysQuery, parseFilter, proxySourceForKey, summaryQuery } from '@/lib/photos/photoQuery';
 
 interface KeyRow {
@@ -31,12 +38,23 @@ interface KeyRow {
   captured_at: string | null;
 }
 
+/**
+ * The only hosts a minted link may point at. An ALLOW-LIST, not "whatever the request
+ * claims": `host` reaches the app unmodified from any caller, so echoing it lets a
+ * minter aim their own signed URL at a host they control. Mirrors the same reasoning
+ * (and list) as pages/api/mcp/resource-metadata.ts.
+ */
+const ALLOWED_HOSTS = new Set(['app.fibreflow.app', 'dev.fibreflow.app']);
+const DEFAULT_BASE = 'https://app.fibreflow.app';
+
+/** A client needs the manifest once per download run, not repeatedly. */
+const MANIFEST_RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 60_000;
+
 function baseUrl(req: NextApiRequest): string {
-  // Host header only — never x-forwarded-host, which passes through from any caller
-  // here (the nginx configs do not set it). Same reasoning as mcp/resource-metadata.ts.
-  const host = req.headers.host ?? '';
-  const proto = host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
-  return `${proto}://${host}`;
+  const host = (req.headers.host ?? '').toLowerCase();
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return `http://${host}`;
+  return ALLOWED_HOSTS.has(host) ? `https://${host}` : DEFAULT_BASE;
 }
 
 /** A download name that stays unique across poles: keys collide on basename alone. */
@@ -51,7 +69,7 @@ async function serveSignedManifest(req: NextApiRequest, res: NextApiResponse) {
   const { exp, sig } = req.query;
   if (!f || !uid) return apiResponse.badRequest(res, 'Incomplete manifest link.');
 
-  const verdict = verifyLink({ f, uid }, exp, sig);
+  const verdict = verifyLink({ f, uid, purpose: 'manifest' }, exp, sig);
   if (verdict !== 'ok') {
     return apiResponse.unauthorized(
       res,
@@ -79,6 +97,14 @@ async function serveSignedManifest(req: NextApiRequest, res: NextApiResponse) {
   const parsed = parseFilter(filterQuery);
   if ('error' in parsed) return apiResponse.badRequest(res, parsed.error);
 
+  // This branch is unauthenticated by design and each hit re-runs an UNCAPPED query
+  // plus one HMAC per matching row. Without a limiter, one leaked manifest URL is an
+  // hour of unmetered full-corpus scans. Keyed on the user the link was minted for.
+  if (!rateLimiter.check(`photo-manifest:${uid}`, MANIFEST_RATE_LIMIT, RATE_WINDOW_MS).success) {
+    return apiResponse.error(res, ErrorCode.RATE_LIMIT, 'Too many manifest fetches — retry shortly.');
+  }
+
+  const childTtl = remainingTtl(Number(exp));
   const keys = allKeysQuery(parsed.filter);
   const rows = await pool.query<KeyRow>(keys.sql, keys.params as unknown[]);
   const origin = baseUrl(req);
@@ -86,7 +112,13 @@ async function serveSignedManifest(req: NextApiRequest, res: NextApiResponse) {
   const photos: Array<Record<string, unknown>> = [];
   for (const row of rows.rows) {
     const source = proxySourceForKey(row.storage_key);
-    const signed = signLink({ key: row.storage_key, source, uid });
+    // Capped by what is LEFT on the manifest link, never a fresh full hour. Otherwise
+    // fetching the manifest at T+59m would hand back downloads valid to T+119m, i.e.
+    // twice the advertised window, and the ceiling would not be a ceiling.
+    const signed = signLink(
+      { key: row.storage_key, source, uid, purpose: 'download' },
+      childTtl,
+    );
     if (!signed) {
       // Only reachable if the secret vanished between the isConfigured() check and here.
       // Emitting `&sig=undefined` links instead would hand back a manifest of dead URLs.
@@ -110,7 +142,7 @@ async function serveSignedManifest(req: NextApiRequest, res: NextApiResponse) {
     'photos-manifest',
   );
   res.setHeader('Cache-Control', 'no-store');
-  return apiResponse.success(res, { photos: photos.length, expiresInSeconds: LINK_TTL_SECONDS, files: photos });
+  return apiResponse.success(res, { photos: photos.length, expiresInSeconds: childTtl, files: photos });
 }
 
 async function mintManifest(req: NextApiRequest, res: NextApiResponse) {
@@ -142,7 +174,7 @@ async function mintManifest(req: NextApiRequest, res: NextApiResponse) {
     if (v !== undefined && k !== 'limit' && k !== 'offset') filterQuery[k] = String(v);
   }
   const f = Buffer.from(JSON.stringify(filterQuery), 'utf8').toString('base64url');
-  const signed = signLink({ f, uid: user.id });
+  const signed = signLink({ f, uid: user.id, purpose: 'manifest' });
   if (!signed) {
     return apiResponse.internalError(
       res,
@@ -220,7 +252,12 @@ async function authedHandler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-const authed = withAuth(withPermission('construction-qa.qa-centre')(authedHandler));
+// EXPORT, not qa-centre. This mints an uncapped bulk export of both photo corpora, and
+// the module already models that as a separate permission — /api/construction-qa/export
+// and both works-qa zips gate on an `.export` key, and the RBAC seed grants qa-centre to
+// at least one role it does not grant export to. Gating the largest export in the module
+// on its VIEW permission would make it the one export that ignores that split.
+const authed = withAuth(withPermission('construction-qa.export')(authedHandler));
 
 export default function route(req: NextApiRequest, res: NextApiResponse) {
   // A presented signature means mode 2. It is verified before anything is read, so an

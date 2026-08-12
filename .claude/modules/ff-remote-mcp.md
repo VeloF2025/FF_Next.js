@@ -147,6 +147,31 @@ proxy then fails closed (502) and FibreFlow itself is unaffected.
 - **A download manifest is uncapped, deliberately** (decision: Hein, 2026-08-12 — existing
   RBAC, no ceiling). One filter can therefore be ~79 GB. Every mint is logged with the
   user id, match count and filter, so a large egress stays attributable.
+- **Minting a manifest needs `construction-qa.export`, not `construction-qa.qa-centre`.**
+  The module already splits view from export — `/api/construction-qa/export` and both
+  works-qa zips gate on an `.export` key, and the RBAC seed grants `qa-centre` to at
+  least one role it does not grant `export` to. `/api/photos/search` (metadata only)
+  keeps `qa-centre`; the uncapped bulk export does not.
+- **A child link may never outlive its parent.** `serveSignedManifest` signs download
+  links with `remainingTtl(manifest.exp)`, not a fresh hour. Minting full-TTL children
+  would make the real window 2x the advertised one — fetch the manifest at T+59m, hold
+  working downloads until T+119m — and the ceiling would stop being a ceiling.
+- **Every signed link carries a `purpose`, enforced by a throw.** The two link classes
+  are otherwise distinguished only by having disjoint field names, which is an accident,
+  not a property: a third class reusing `key`/`uid` would be substitutable for a download
+  link with no test failing.
+- **Never buffer a photo to send it.** `/api/photos/download` pipes. The earlier
+  buffering implementation in this same subsystem drove the production heap past 12 GB
+  and caused multi-hundred-millisecond GC pauses across every route — see the header of
+  `src/lib/construction-qa/minioPhotoStream.ts`, which was rewritten to stream for
+  exactly this reason. This route serves a sandbox pulling thousands of images at once.
+- **Both signature-only branches are rate-limited** (`rateLimiter`, keyed on the minting
+  user). They are unauthenticated by design, and a manifest fetch re-runs an uncapped
+  query plus one HMAC per row, so one leaked URL would otherwise be an hour of unmetered
+  full-corpus scans.
+- **`rateLimiter` is a DEFAULT export.** `import { rateLimiter }` type-checks against the
+  module's other exports and is `undefined` at runtime — every request then throws on
+  `.check`.
 - **`/api/photos/download` authenticates on a SIGNATURE, not a session.** The downloader
   is Claude's Cowork sandbox, which holds no FibreFlow cookie and cannot be given one.
   RBAC is evaluated once, when the manifest is minted for an authenticated user; the

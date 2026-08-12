@@ -124,6 +124,17 @@ interface Clause {
   params: unknown[];
 }
 
+/**
+ * Escape LIKE wildcards in a user value.
+ *
+ * Without this, `project=%` matches every project and `project=_` matches any one-letter
+ * name — so a filter could never be relied on to BOUND a manifest, which matters because
+ * a manifest has no size cap.
+ */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 function push(params: unknown[], value: unknown): string {
   params.push(value);
   return `$${params.length}`;
@@ -137,7 +148,7 @@ function push(params: unknown[], value: unknown): string {
 function projectClause(column: string, project: string, params: unknown[]): string {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project);
   if (isUuid) return `${column} = ${push(params, project)}::uuid`;
-  return `${column} IN (SELECT id FROM projects WHERE project_name ILIKE ${push(params, `%${project}%`)})`;
+  return `${column} IN (SELECT id FROM projects WHERE project_name ILIKE ${push(params, `%${escapeLike(project)}%`)})`;
 }
 
 /** construction_qa_photos, joined to its review for pole/zone/PON identity. */
@@ -145,7 +156,7 @@ function qaQuery(filter: PhotoFilter, params: unknown[]): Clause {
   const where: string[] = ['1=1'];
 
   if (filter.project) where.push(projectClause('p.project_id', filter.project, params));
-  if (filter.type) where.push(`p.step_label ILIKE ${push(params, `%${filter.type}%`)}`);
+  if (filter.type) where.push(`p.step_label ILIKE ${push(params, `%${escapeLike(filter.type)}%`)}`);
   if (filter.vlm === 'pass') where.push('p.vlm_valid IS TRUE');
   // IS NOT TRUE would sweep in the 197 unscored rows as failures. A photo the VLM never
   // looked at is not a photo the VLM rejected.
@@ -153,7 +164,7 @@ function qaQuery(filter: PhotoFilter, params: unknown[]): Clause {
   if (filter.needsRetake !== undefined) {
     where.push(`p.needs_retake IS ${filter.needsRetake ? 'TRUE' : 'NOT TRUE'}`);
   }
-  if (filter.pole) where.push(`r.extracted_pole_number ILIKE ${push(params, `%${filter.pole}%`)}`);
+  if (filter.pole) where.push(`r.extracted_pole_number ILIKE ${push(params, `%${escapeLike(filter.pole)}%`)}`);
   if (filter.zone !== undefined) where.push(`r.zone_no = ${push(params, filter.zone)}`);
   if (filter.pon !== undefined) where.push(`r.pon_no = ${push(params, filter.pon)}`);
   if (filter.from) where.push(`p.captured_at >= ${push(params, filter.from)}::timestamptz`);
@@ -191,13 +202,13 @@ function qfieldQuery(filter: PhotoFilter, params: unknown[]): Clause {
   const where: string[] = ['1=1'];
 
   if (filter.project) where.push(projectClause('l.fibreflow_project_id', filter.project, params));
-  if (filter.type) where.push(`q.work_type ILIKE ${push(params, `%${filter.type}%`)}`);
+  if (filter.type) where.push(`q.work_type ILIKE ${push(params, `%${escapeLike(filter.type)}%`)}`);
   if (filter.vlm === 'pass') where.push('q.needs_retake IS NOT TRUE');
   if (filter.vlm === 'fail') where.push('q.needs_retake IS TRUE');
   if (filter.needsRetake !== undefined) {
     where.push(`q.needs_retake IS ${filter.needsRetake ? 'TRUE' : 'NOT TRUE'}`);
   }
-  if (filter.pole) where.push(`q.feature_id ILIKE ${push(params, `%${filter.pole}%`)}`);
+  if (filter.pole) where.push(`q.feature_id ILIKE ${push(params, `%${escapeLike(filter.pole)}%`)}`);
   if (filter.from) where.push(`q.validated_at >= ${push(params, filter.from)}::timestamptz`);
   if (filter.to) where.push(`q.validated_at < ${push(params, filter.to)}::timestamptz`);
   // zone/PON have no counterpart on this corpus; asking for one must return nothing

@@ -125,6 +125,15 @@ describe('query construction', () => {
     expect(summaryQuery(filter()).sql).toContain('count(file_size_bytes)::int AS sized');
   });
 
+  it('escapes LIKE wildcards so a filter cannot silently match everything', () => {
+    // `project=%` would otherwise match every project — and a manifest has no size cap,
+    // so a filter that cannot bound the result set is the whole ballgame.
+    const { params } = summaryQuery(filter({ project: '%', source: 'qa' }));
+    expect(params).toContain('%\\%%');
+    const typed = summaryQuery(filter({ type: '_', source: 'qa' }));
+    expect(typed.params).toContain('%\\_%');
+  });
+
   it('applies no limit to the manifest query', () => {
     // Decision (Hein, 2026-08-12): existing RBAC, no ceiling on a download.
     const { sql } = allKeysQuery(filter({ project: 'Etwatwa' }));
