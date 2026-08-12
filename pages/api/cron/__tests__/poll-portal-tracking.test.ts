@@ -1093,7 +1093,7 @@ describe('per-vehicle silence detection', () => {
     created_at: new Date('2026-08-12T08:00:00.000Z'),
     nearest_fix_ms: 40 * 60 * 60 * 1000, // 40h — well past the 12h window
     provider: 'netstar', account_ref: 'europcar',
-    last_gap_alert_at: null,
+    last_alert_at: null,
     ...overrides,
   });
 
@@ -1147,25 +1147,86 @@ describe('per-vehicle silence detection', () => {
     expect((gapCalls[0][0] as { detail: string }).detail).toContain('LG88LJGP');
   });
 
-  it('stamps last_gap_alert_at for the account once delivery succeeds', async () => {
+  function silenceStampCalls() {
+    return sqlMock.mock.calls.filter((c) =>
+      (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracker_silence_alerts'));
+  }
+
+  it('stamps this vehicle\'s own cooldown row once delivery succeeds', async () => {
     raiseTrackingAlertMock.mockResolvedValue({
       decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
       delivered: true,
     });
     stubSilenceRows([silentRow()]);
     await run(AUTH);
-    const stamp = sqlMock.mock.calls.find((c) =>
-      (c[0] as TemplateStringsArray).join('').includes('SET last_gap_alert_at'));
-    expect(stamp).toBeDefined();
+    expect(silenceStampCalls()).toHaveLength(1);
+    expect(silenceStampCalls()[0]?.[1]).toBe('v1');
   });
 
   it('does not stamp when raiseTrackingAlert reports no delivery', async () => {
     raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
     stubSilenceRows([silentRow()]);
     await run(AUTH);
-    const stamp = sqlMock.mock.calls.find((c) =>
-      (c[0] as TemplateStringsArray).join('').includes('SET last_gap_alert_at'));
-    expect(stamp).toBeUndefined();
+    expect(silenceStampCalls()).toHaveLength(0);
+  });
+
+  it('stamps EVERY vehicle named in a delivered alert, not just the one whose cooldown expired', async () => {
+    raiseTrackingAlertMock.mockResolvedValue({
+      decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+      delivered: true,
+    });
+    stubSilenceRows([
+      // v1's own cooldown is fresh (2h ago) — would not be due alone.
+      silentRow({ vehicle_id: 'v1', registration: 'HW50KNGP', last_alert_at: new Date(Date.now() - 2 * 60 * 60 * 1000) }),
+      // v2 has never alerted — this is what makes the GROUP due.
+      silentRow({ vehicle_id: 'v2', registration: 'LG88LJGP', nearest_fix_ms: 50 * 60 * 60 * 1000, last_alert_at: null }),
+    ]);
+    await run(AUTH);
+    const stampedVehicleIds = silenceStampCalls().map((c) => c[1]);
+    expect(stampedVehicleIds).toEqual(expect.arrayContaining(['v1', 'v2']));
+    expect(stampedVehicleIds).toHaveLength(2);
+  });
+
+  /**
+   * The exact case fix round 1 exists for: vehicle A on an account already
+   * alerted and is still mid-cooldown. A DIFFERENT vehicle (B) on the SAME
+   * account goes silent for the first time. B must still produce an alert —
+   * the account-level cooldown from round 1 would have suppressed it for up
+   * to 24h, reported by review as a real defect (3-7 vehicles/account makes
+   * this plausible, not an edge case).
+   */
+  it('alerts for a vehicle that goes silent while an account-mate is still mid-cooldown', async () => {
+    raiseTrackingAlertMock.mockResolvedValue({
+      decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+      delivered: true,
+    });
+    stubSilenceRows([
+      // Vehicle A: already alerted 4h ago — well inside the 24h cooldown, not
+      // due on its own.
+      silentRow({
+        vehicle_id: 'v1', registration: 'HW50KNGP',
+        last_alert_at: new Date(Date.now() - 4 * 60 * 60 * 1000),
+      }),
+      // Vehicle B: same account, silent for the first time — never alerted.
+      silentRow({
+        vehicle_id: 'v2', registration: 'LG88LJGP',
+        nearest_fix_ms: 50 * 60 * 60 * 1000, last_alert_at: null,
+      }),
+    ]);
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(200);
+    const gapCalls = raiseTrackingAlertMock.mock.calls.filter(
+      (c) => (c[0] as { kind: string }).kind === 'gap'
+    );
+    expect(gapCalls).toHaveLength(1);
+    // Both are still currently silent, so both are named.
+    expect((gapCalls[0]?.[0] as { detail: string }).detail).toContain('HW50KNGP');
+    expect((gapCalls[0]?.[0] as { detail: string }).detail).toContain('LG88LJGP');
+    // The real assertion: B's null cooldown must win the group's anchor, not
+    // A's recent one. An account-level clock (round 1) would have passed A's
+    // 4h-ago timestamp here — recent enough that the real decideAlert would
+    // have stayed silent, exactly the defect review caught.
+    expect(gapCalls[0]?.[0]).toMatchObject({ lastGapAlertAt: null });
   });
 
   it('never sends a WhatsApp-graded alert kind for silence — always gap, never auth/transient/evicted', async () => {

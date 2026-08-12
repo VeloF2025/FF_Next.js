@@ -69,8 +69,25 @@ type SilenceRow = {
   nearest_fix_ms: number | null;
   provider: ProviderKey;
   account_ref: string;
-  last_gap_alert_at: Date | null;
+  /** This vehicle's own re-alert cooldown — see fleet_tracker_silence_alerts (migration 492). */
+  last_alert_at: Date | null;
 };
+
+/**
+ * The timestamp to hand `decideAlert` for a GROUP of silent vehicles, given
+ * each one's own cooldown.
+ *
+ * `decideAlert` only knows how to ask "is ONE timestamp past 24h old (or
+ * null)". A group alert must fire the moment ANY member is due — a vehicle
+ * that has never alerted (null) is the most overdue state there is, so a
+ * single null anywhere in the group makes the whole group null (always due).
+ * Otherwise the OLDEST timestamp in the group determines it, because that is
+ * the member closest to (or past) its 24h mark.
+ */
+export function earliestCooldownAnchor(dates: Array<Date | null>): Date | null {
+  if (dates.length === 0 || dates.some((d) => d === null)) return null;
+  return (dates as Date[]).reduce((oldest, d) => (d < oldest ? d : oldest));
+}
 
 export interface SilenceCheckResult {
   /** Check-ins that had an active tracker to assess. */
@@ -84,15 +101,21 @@ export interface SilenceCheckResult {
  * pollProvider: that runs once PER PROVIDER, and this assesses the whole
  * fleet, so calling it there would evaluate every vehicle twice per tick.
  *
- * `last_gap_alert_at` is read from the SAME (provider, account_ref) row the
- * account-wide gap detector (pollProvider.ts) uses. There is no per-vehicle
- * dedup store — adding one is a schema change out of scope here — so silent
- * vehicles on one account are grouped into a single alert call and share that
- * account's 24h re-alert cooldown with each other AND with an unrelated
- * account-wide gap. That is a real coarseness, not a bug: both conditions mean
- * "this account's tracking data cannot be trusted right now", and reusing the
- * existing wall-clock (Task 2) is what keeps a dead tracker from paging
- * someone every tick once cadence ramps to 10 minutes.
+ * Cooldown is per VEHICLE (fleet_tracker_silence_alerts, migration 492), not
+ * per account. An earlier version reused fleet_tracking_watermarks'
+ * account-level last_gap_alert_at, which review correctly rejected: with 3-7
+ * vehicles per account, a second vehicle going silent within 24h of the first
+ * got no alert of its own — a real defect, not acceptable coarseness. See the
+ * migration header for why a dedicated table, not a synthetic account_ref
+ * (VARCHAR(50) is too short) or a widened watermarks row (would pollute every
+ * operational query against real provider/account pairs).
+ *
+ * The alert stays grouped per account — `detail` still names every currently
+ * silent vehicle in one notification — but now fires whenever ANY member of
+ * the group is past ITS OWN cooldown (earliestCooldownAnchor), and on
+ * delivery stamps last_alert_at for EVERY vehicle named, not just the one
+ * that triggered it. That is what makes a newly-silent vehicle always alert
+ * immediately, even mid-cooldown for an account-mate that alerted earlier.
  */
 export async function runSilenceCheck(now: Date): Promise<SilenceCheckResult> {
   // Validated against production (read-only) by the controller. The second
@@ -108,15 +131,15 @@ export async function runSilenceCheck(now: Date): Promise<SilenceCheckResult> {
       min(abs(extract(epoch FROM (p.recorded_at - c.created_at)))) * 1000 AS nearest_fix_ms,
       t.provider,
       t.account_ref,
-      w.last_gap_alert_at
+      sa.last_alert_at
     FROM fleet_check_records c
     JOIN fleet_vehicles v ON v.id = c.vehicle_id AND v.status = 'active'
     JOIN fleet_vehicle_trackers t ON t.vehicle_id = v.id AND t.is_active
     LEFT JOIN fleet_vehicle_positions p ON p.vehicle_id = v.id
-    LEFT JOIN fleet_tracking_watermarks w ON w.provider = t.provider AND w.account_ref = t.account_ref
+    LEFT JOIN fleet_tracker_silence_alerts sa ON sa.vehicle_id = v.id
     WHERE c.created_at > now() - interval '3 days'
       AND c.created_at > t.created_at
-    GROUP BY v.id, v.registration, c.created_at, t.provider, t.account_ref, w.last_gap_alert_at
+    GROUP BY v.id, v.registration, c.created_at, t.provider, t.account_ref, sa.last_alert_at
   `;
 
   const anchors: CheckInAnchor[] = rows.map((r) => ({
@@ -132,14 +155,14 @@ export async function runSilenceCheck(now: Date): Promise<SilenceCheckResult> {
     return { checked: anchors.length, silent: 0 };
   }
 
-  interface Group { provider: ProviderKey; accountRef: string; lastGapAlertAt: Date | null; trackers: SilentTracker[] }
+  interface Group { provider: ProviderKey; accountRef: string; trackers: SilentTracker[] }
   const groups = new Map<string, Group>();
   for (const s of silent) {
     const meta = byVehicle.get(s.vehicleId);
     if (!meta) continue; // unreachable: s was derived from these same rows
     const key = `${meta.provider}::${meta.account_ref}`;
     const group = groups.get(key)
-      ?? { provider: meta.provider, accountRef: meta.account_ref, lastGapAlertAt: meta.last_gap_alert_at, trackers: [] };
+      ?? { provider: meta.provider, accountRef: meta.account_ref, trackers: [] };
     group.trackers.push(s);
     groups.set(key, group);
   }
@@ -148,6 +171,9 @@ export async function runSilenceCheck(now: Date): Promise<SilenceCheckResult> {
     const detail = group.trackers
       .map((t) => `${t.registration} checked in ${t.checkInAt.toISOString()} with no tracker fix nearby`)
       .join('; ');
+    const cooldownAnchor = earliestCooldownAnchor(
+      group.trackers.map((t) => byVehicle.get(t.vehicleId)?.last_alert_at ?? null)
+    );
     const { decision, delivered } = await raiseTrackingAlert({
       kind: 'gap',
       // No per-vehicle tick streak exists to report (see the module header);
@@ -155,18 +181,23 @@ export async function runSilenceCheck(now: Date): Promise<SilenceCheckResult> {
       // metadata, so 0 is the honest value rather than an invented one.
       consecutiveFailures: 0,
       nowSast: now,
-      lastGapAlertAt: group.lastGapAlertAt,
+      lastGapAlertAt: cooldownAnchor,
       provider: group.provider,
       accountRef: group.accountRef,
       detail,
     });
-    // Same delivered-gate as pollProvider.ts's account-wide gap: a truthy
-    // decision only means the POLICY said to alert, not that anyone heard it.
+    // Same delivered-gate as the account-wide gap path: a truthy decision
+    // only means the POLICY said to alert, not that anyone heard it. An
+    // undelivered alert must not start a 24h silence on any vehicle named
+    // in it — the next tick has to be free to try again.
     if (delivered && decision?.stampGapAlert) {
-      await sql`
-        UPDATE fleet_tracking_watermarks SET last_gap_alert_at = now()
-        WHERE provider = ${group.provider} AND account_ref = ${group.accountRef}
-      `;
+      for (const tracker of group.trackers) {
+        await sql`
+          INSERT INTO fleet_tracker_silence_alerts (vehicle_id, last_alert_at, updated_at)
+          VALUES (${tracker.vehicleId}, now(), now())
+          ON CONFLICT (vehicle_id) DO UPDATE SET last_alert_at = now(), updated_at = now()
+        `;
+      }
     }
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findSilentTrackers } from '../silence';
+import { findSilentTrackers, earliestCooldownAnchor } from '../silence';
 
 const HOUR = 3600_000;
 const checkin = new Date('2026-08-12T08:00:00Z');
@@ -53,5 +53,36 @@ describe('findSilentTrackers', () => {
       6 * HOUR
     );
     expect(out.map((s) => s.registration)).toEqual(['SILENT1GP', 'SILENT2GP']);
+  });
+});
+
+/**
+ * Fix round 1: a group alert must fire the moment ANY member is past ITS OWN
+ * cooldown, not the group's oldest alert. decideAlert only understands a
+ * single timestamp, so this collapses a group of per-vehicle cooldowns down
+ * to the one value that makes decideAlert's null/24h check answer correctly
+ * for "is anyone in this group due".
+ */
+describe('earliestCooldownAnchor', () => {
+  it('is null (always due) when every vehicle has never alerted', () => {
+    expect(earliestCooldownAnchor([null, null])).toBeNull();
+  });
+
+  it('is null (always due) when even ONE vehicle in the group has never alerted', () => {
+    // The exact case the review round exists for: an account-mate already
+    // used up the cooldown (non-null, recent) but a second vehicle just went
+    // silent for the first time (null) — the group must still be due.
+    const recent = new Date('2026-08-12T08:00:00Z');
+    expect(earliestCooldownAnchor([recent, null])).toBeNull();
+  });
+
+  it('returns the OLDEST timestamp when every vehicle has alerted before', () => {
+    const older = new Date('2026-08-11T08:00:00Z');
+    const newer = new Date('2026-08-12T08:00:00Z');
+    expect(earliestCooldownAnchor([newer, older])).toEqual(older);
+  });
+
+  it('is null for an empty group', () => {
+    expect(earliestCooldownAnchor([])).toBeNull();
   });
 });
