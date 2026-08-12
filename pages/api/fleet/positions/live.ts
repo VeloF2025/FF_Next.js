@@ -29,6 +29,7 @@ interface Row extends Record<string, unknown> {
   is_speeding: boolean | null;
   recorded_at: Date | null;
   has_tracker: boolean;
+  poll_interval_minutes: number | null;
 }
 
 export type TrackingState = 'tracked' | 'awaiting_data' | 'untracked';
@@ -47,10 +48,11 @@ export interface LiveVehicle {
   ageSeconds: number | null;
   isStale: boolean;
   /**
-   * The threshold this vehicle was judged against, which differs per feed —
-   * Cartrack's REST account is polled every 2 minutes, the portals every 2
-   * hours. Exposed so the UI can say how long is too long without duplicating
-   * the table.
+   * The threshold this vehicle was judged against, which differs per feed:
+   * it is twice the account's own `fleet_tracking_watermarks.poll_interval_minutes`
+   * (a per-account cadence that ramps from 2h down to 10min — see cadence.ts).
+   * Exposed so the UI can say how long is too long without duplicating the
+   * table.
    *
    * Carries no meaning for a vehicle with no position at all (`untracked` or
    * `awaiting_data`): there is no feed to have a cadence, so it reads as the
@@ -76,7 +78,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         p.account_ref,
         p.lat::text, p.lon::text, p.speed_kph::text,
         p.ignition, p.is_speeding, p.recorded_at,
-        (t.id IS NOT NULL) AS has_tracker
+        (t.id IS NOT NULL) AS has_tracker,
+        w.poll_interval_minutes
       FROM fleet_vehicles v
       LEFT JOIN staff s ON s.id = v.assigned_driver_id
       LEFT JOIN fleet_vehicle_trackers t ON t.vehicle_id = v.id AND t.is_active
@@ -87,6 +90,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         WHERE fp.vehicle_id = v.id
         ORDER BY fp.vehicle_id, fp.recorded_at DESC
       ) p ON true
+      LEFT JOIN fleet_tracking_watermarks w
+        ON w.provider = p.provider AND w.account_ref = p.account_ref
       WHERE v.status = 'active'
       ORDER BY v.registration
     `;
@@ -95,7 +100,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const vehicles: LiveVehicle[] = rows.map((r) => {
       const recordedAt = r.recorded_at ? new Date(r.recorded_at) : null;
       const ageSeconds = recordedAt ? Math.round((now - recordedAt.getTime()) / 1000) : null;
-      const staleAfterSeconds = staleAfterSecondsFor(r.provider, r.account_ref);
+      const staleAfterSeconds = staleAfterSecondsFor(
+        r.provider,
+        r.account_ref,
+        r.poll_interval_minutes
+      );
       const trackingState: TrackingState = !r.has_tracker
         ? 'untracked'
         : recordedAt === null
