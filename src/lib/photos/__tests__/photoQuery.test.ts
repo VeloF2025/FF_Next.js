@@ -23,7 +23,7 @@ describe('parseFilter', () => {
 
   it('rejects an unknown source instead of silently searching everything', () => {
     expect(parseFilter({ source: 'payroll' })).toEqual({
-      error: 'source must be qa, qfield or both — got "payroll"',
+      error: 'source must be qa, qfield, worksqa or both — got "payroll"',
     });
   });
 
@@ -237,6 +237,51 @@ describe('query construction', () => {
     expect(params).toContain('%\\%%');
     const typed = summaryQuery(filter({ type: '_', source: 'qa' }));
     expect(typed.params).toContain('%\\_%');
+  });
+
+  it('unpivots the works-QA slot columns into photo rows', () => {
+    // pole_qa_photos is ONE ROW PER POLE with 22 named key columns. Without the
+    // unpivot there is no photo to find, which is why this corpus was invisible.
+    const { sql } = pageQuery(filter({ source: 'worksqa', project: 'Namakgale' }));
+    expect(sql).toContain('CROSS JOIN LATERAL');
+    expect(sql).toContain('civil_step_07_key');
+    expect(sql).toContain("'After Photo'");
+    expect(sql).toContain('slot.storage_key IS NOT NULL');
+  });
+
+  it('treats an overridden VLM failure as a pass, not a failure', () => {
+    // pole-override.ts records a human decision in `overridden_by`. Reporting those as
+    // failures tells a PM that work a reviewer already accepted is still outstanding.
+    const { sql } = summaryQuery(filter({ source: 'worksqa', vlm: 'fail' }));
+    expect(sql).toContain("->> 'overridden_by' IS NOT NULL THEN TRUE");
+  });
+
+  it('matches a works-QA photo by its step label', () => {
+    // "after" must reach 'After Photo' — the attribute QField cannot express at all.
+    const { params } = summaryQuery(filter({ source: 'worksqa', type: 'after' }));
+    expect(params).toContain('%after%');
+  });
+
+  it('excludes works-QA from a needsRetake filter it cannot answer', () => {
+    const { sql } = summaryQuery(filter({ source: 'worksqa', needsRetake: true }));
+    expect(sql).toContain('FALSE');
+  });
+
+  it('ranks the corpora by how much each knows, richest first', () => {
+    // construction-QA (0) > works-QA (1) > QField (3). A time-ordered tiebreak would
+    // hand duplicates to QField, the poorest, because validation postdates capture.
+    const { sql } = pageQuery(filter());
+    expect(sql).toMatch(/0\s+AS corpus_rank/);
+    expect(sql).toMatch(/1\s+AS corpus_rank/);
+    expect(sql).toMatch(/3\s+AS corpus_rank/);
+  });
+
+  it('unions all three corpora when source is both', () => {
+    const { sql } = pageQuery(filter());
+    expect(sql.match(/UNION ALL/g)).toHaveLength(2);
+    expect(sql).toContain('pole_qa_photos');
+    expect(sql).toContain('qfield_photo_validations');
+    expect(sql).toContain('construction_qa_photos');
   });
 
   it('applies no limit to the manifest query', () => {

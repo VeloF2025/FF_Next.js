@@ -16,6 +16,7 @@
  * placeholders silently bind to the first branch's values.
  */
 import type { PhotoFilter } from './photoFilter';
+import { WORKS_QA_SLOT_UNPIVOT, WORKS_QA_VLM_VALID } from './worksQaSource';
 
 export type { PhotoFilter, PhotoRow, PhotoSource } from './photoFilter';
 export { MAX_PAGE_SIZE, parseFilter, proxySourceForKey } from './photoFilter';
@@ -130,7 +131,7 @@ function qfieldQuery(filter: PhotoFilter, params: unknown[]): Clause {
     sql: `
       SELECT q.id::text        AS photo_id,
              'qfield'          AS corpus,
-             1                 AS corpus_rank,
+             3                 AS corpus_rank,
              q.photo_key       AS storage_key,
              NULL              AS filename,
              q.work_type       AS step_label,
@@ -152,25 +153,75 @@ function qfieldQuery(filter: PhotoFilter, params: unknown[]): Clause {
   };
 }
 
+/**
+ * pole_qa_photos, unpivoted from one-row-per-pole into one-row-per-photo.
+ *
+ * The richest corpus for reporting: step label, VLM verdict, pole label, zone and PON
+ * all present. Its only timestamp is `updated_at` (when the row was last written), so it
+ * is tagged `date_basis='recorded'` — it is NOT a capture time.
+ */
+function worksQaQuery(filter: PhotoFilter, params: unknown[]): Clause {
+  const where: string[] = ['slot.storage_key IS NOT NULL'];
+
+  if (filter.project) where.push(projectClause('w.project_id', filter.project, params));
+  if (filter.type) where.push(`slot.slot_label ILIKE ${push(params, `%${escapeLike(filter.type)}%`)}`);
+  if (filter.vlm === 'pass') where.push(`${WORKS_QA_VLM_VALID} IS TRUE`);
+  if (filter.vlm === 'fail') where.push(`${WORKS_QA_VLM_VALID} IS FALSE`);
+  if (filter.pole) where.push(`w.pole_label ILIKE ${push(params, `%${escapeLike(filter.pole)}%`)}`);
+  if (filter.zone !== undefined) where.push(`w.zone_no = ${push(params, filter.zone)}`);
+  if (filter.pon !== undefined) where.push(`w.pon_no = ${push(params, filter.pon)}`);
+  if (filter.from) where.push(`w.updated_at >= ${push(params, filter.from)}::timestamptz`);
+  if (filter.to) where.push(`w.updated_at < ${push(params, filter.to)}::timestamptz`);
+  // No retake flag on this corpus; answering with something else would be a wrong answer.
+  if (filter.needsRetake !== undefined) where.push('FALSE');
+
+  return {
+    sql: `
+      SELECT w.id::text || ':' || slot.slot_key AS photo_id,
+             'worksqa'         AS corpus,
+             1                 AS corpus_rank,
+             slot.storage_key,
+             NULL              AS filename,
+             slot.slot_label   AS step_label,
+             ${WORKS_QA_VLM_VALID} AS vlm_valid,
+             NULL::boolean     AS needs_retake,
+             w.updated_at      AS captured_at,
+             'recorded'        AS date_basis,
+             NULL::bigint      AS file_size_bytes,
+             w.pole_label      AS pole_number,
+             w.zone_no,
+             w.pon_no,
+             proj.project_name
+      FROM pole_qa_photos w${WORKS_QA_SLOT_UNPIVOT}
+      LEFT JOIN projects proj ON proj.id = w.project_id
+      WHERE ${where.join(' AND ')}`,
+    params,
+  };
+}
+
 function union(filter: PhotoFilter): Clause {
   const params: unknown[] = [];
   if (filter.source === 'qa') return qaQuery(filter, params);
   if (filter.source === 'qfield') return qfieldQuery(filter, params);
+  if (filter.source === 'worksqa') return worksQaQuery(filter, params);
   const qa = qaQuery(filter, params);
   const qf = qfieldQuery(filter, params);
+  const wq = worksQaQuery(filter, params);
   // UNION ALL, then DISTINCT ON the key below: the ~102 construction-QA rows whose
   // storage_key starts with `projects/` are the same objects as rows in the QField
   // corpus, and a duplicate here becomes a photo downloaded twice.
-  return { sql: `${qa.sql} UNION ALL ${qf.sql}`, params };
+  return { sql: `${qa.sql} UNION ALL ${qf.sql} UNION ALL ${wq.sql}`, params };
 }
 
 /**
- * `DISTINCT ON (storage_key)` keyed to prefer the QA row.
+ * `DISTINCT ON (storage_key)` keyed by how much each corpus knows about a photo:
+ * construction-QA (0) > works-QA (1) > QField (3).
  *
- * Ordering the tiebreak by time instead would hand every duplicate to the QField row,
- * because its timestamp is a validation run and validation always postdates capture —
- * and the QField row carries no file_size_bytes, vlm_valid, zone_no, pon_no or filename.
- * The richer row wins by rank, not by accident of clock.
+ * Ordering the tiebreak by time instead would hand every duplicate to whichever row was
+ * written last — and QField, the poorest of the three, always wins that race because its
+ * timestamp is a validation run and validation postdates capture. QField carries no
+ * step label, no zone, no PON and no file size; works-QA carries a step label AND a VLM
+ * verdict. The richer row wins by rank, not by accident of clock.
  */
 const DEDUPE = 'DISTINCT ON (storage_key)';
 const DEDUPE_ORDER = 'ORDER BY storage_key, corpus_rank, captured_at DESC NULLS LAST';

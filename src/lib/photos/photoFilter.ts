@@ -3,7 +3,11 @@
  * into it. Split from photoQuery.ts to keep both files inside the 300-line rule.
  */
 
-export type PhotoSource = 'qa' | 'qfield' | 'both';
+/**
+ * `worksqa` is `pole_qa_photos` — the acceptance-QA store, one row per pole with named
+ * photo slots. It is the only corpus carrying BOTH a step label and a VLM verdict.
+ */
+export type PhotoSource = 'qa' | 'qfield' | 'worksqa' | 'both';
 
 export interface PhotoFilter {
   project?: string;
@@ -31,7 +35,7 @@ export interface PhotoFilter {
 
 export interface PhotoRow {
   photo_id: string;
-  corpus: 'qa' | 'qfield';
+  corpus: 'qa' | 'qfield' | 'worksqa';
   storage_key: string;
   filename: string | null;
   step_label: string | null;
@@ -40,11 +44,11 @@ export interface PhotoRow {
   captured_at: string | null;
   /**
    * What `captured_at` actually measures for this row: 'captured' is EXIF capture time,
-   * 'validated' is when the QField validation ran. They are not interchangeable — a
-   * photo taken in June can be validated in August — so the basis travels with the row
-   * instead of being silently assumed.
+   * 'validated' is when the QField validation ran, 'recorded' is when the works-QA row
+   * was last written. They are not interchangeable — a photo taken in June can be
+   * validated in August — so the basis travels with the row rather than being assumed.
    */
-  date_basis: 'captured' | 'validated';
+  date_basis: 'captured' | 'validated' | 'recorded';
   file_size_bytes: string | null;
   pole_number: string | null;
   zone_no: number | null;
@@ -95,8 +99,8 @@ export function parseFilter(query: Record<string, string | string[] | undefined>
     Array.isArray(v) ? v[0] : v;
 
   const source = (one(query.source) ?? 'both') as PhotoSource;
-  if (!['qa', 'qfield', 'both'].includes(source)) {
-    return { error: `source must be qa, qfield or both — got "${source}"` };
+  if (!['qa', 'qfield', 'worksqa', 'both'].includes(source)) {
+    return { error: `source must be qa, qfield, worksqa or both — got "${source}"` };
   }
 
   const vlmRaw = one(query.vlm);
