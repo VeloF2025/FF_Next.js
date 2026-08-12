@@ -125,9 +125,10 @@ esac
 # All five were fixed together. Doing `example` alone left four identical
 # bypasses behind a test name that read as if the class were closed.
 #
-# ACCEPTED COST, recorded here rather than pinned as a test: a value like
-# `PASSWORD="mysamplevalue"` -- one of the words preceded by a word character --
-# flips from exempt to FLAGGED. Measured as dormant: a `--tree` audit is
+# ACCEPTED COST, recorded here rather than pinned as a test: a credential-named
+# key whose quoted value glues an ordinary word onto one of these five -- so the
+# word is preceded by a word character rather than a boundary -- flips from
+# exempt to FLAGGED. Measured as dormant: a `--tree` audit is
 # byte-identical before and after, and no tracked line has a credential-shaped
 # assignment with one of these words preceded by a word character. If that shape
 # ever does appear and the right answer is to exempt it, loosen the anchor
