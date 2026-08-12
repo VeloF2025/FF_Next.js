@@ -139,8 +139,8 @@ ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO role_permissions (role, permission_key, actions)
 VALUES
-  ('super_admin', 'fleet.assignments', '{"view": true, "create": true, "edit": true, "delete": true}'::jsonb),
-  ('admin', 'fleet.assignments', '{"view": true, "create": true, "edit": true, "delete": true}'::jsonb),
+  ('super_admin', 'fleet.assignments', '{"view": true, "create": true, "edit": true, "delete": false}'::jsonb),
+  ('admin', 'fleet.assignments', '{"view": true, "create": true, "edit": true, "delete": false}'::jsonb),
   ('manager', 'fleet.assignments', '{"view": true, "create": true, "edit": true, "delete": false}'::jsonb),
   ('viewer', 'fleet.assignments', '{"view": true, "create": false, "edit": false, "delete": false}'::jsonb)
 ON CONFLICT (role, permission_key) DO NOTHING;

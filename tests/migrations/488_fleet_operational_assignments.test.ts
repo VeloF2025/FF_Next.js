@@ -229,7 +229,7 @@ describe('migration 488 operational-assignment invariants', () => {
   });
 
   it('registers fleet.assignments under the Fleet parent with Fleet role grants', async () => {
-    const { rows } = await db.query<{ parent_key: string; role: string; actions: { view: boolean; edit: boolean } }>(
+    const { rows } = await db.query<{ parent_key: string; role: string; actions: { view: boolean; edit: boolean; delete: boolean } }>(
       `SELECT p.parent_key, r.role, r.actions
        FROM access_permissions p JOIN role_permissions r ON r.permission_key = p.key
        WHERE p.key = 'fleet.assignments' ORDER BY r.role`
@@ -238,6 +238,7 @@ describe('migration 488 operational-assignment invariants', () => {
     expect(rows.every((row) => row.parent_key === 'fleet')).toBe(true);
     expect(rows.find((row) => row.role === 'viewer')!.actions).toMatchObject({ view: true, edit: false });
     expect(rows.find((row) => row.role === 'manager')!.actions).toMatchObject({ view: true, edit: true });
+    expect(rows.every((row) => row.actions.delete === false)).toBe(true);
   });
 });
 
@@ -262,5 +263,9 @@ describe('migration 488 rollback', () => {
     await expect(db.query(`SELECT 1 FROM access_permissions WHERE key = 'fleet.assignments'`)).resolves.toMatchObject({ rows: [] });
     await expect(db.query(`SELECT 1 FROM role_permissions WHERE permission_key = 'fleet.assignments'`)).resolves.toMatchObject({ rows: [] });
     await expect(db.query(`SELECT 1 FROM user_permission_overrides WHERE permission_key = 'fleet.assignments'`)).resolves.toMatchObject({ rows: [] });
+    const extension = await db.query<{ present: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'btree_gist') AS present`
+    );
+    expect(extension.rows[0]!.present).toBe(true);
   });
 });
