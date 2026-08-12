@@ -53,6 +53,15 @@ jobs:
       - name: Secret scan — unit tests
         run: node --test scripts/secret-scan.test.mjs
 
+      # The pre-push hook, which invokes that scanner as one of three guards. It
+      # is tested here for the same reason: two of its guards fail silently if a
+      # loop runs in a subshell or a ref shape is mishandled, and a blind review
+      # found `git push --delete` being rejected as an "auth isolation
+      # violation" — a routine operation blocked by a security gate, naming the
+      # wrong cause. Cheap: spawns bash against throwaway repos, no deps.
+      - name: Pre-push hook — unit tests
+        run: node --test scripts/pre-push.test.mjs
+
       # --branch scans lines ADDED between the merge-base and HEAD, so it cannot
       # trip on the repo's pre-existing hits (there are known ones; `--tree` is
       # the audit mode and is deliberately not gated).
