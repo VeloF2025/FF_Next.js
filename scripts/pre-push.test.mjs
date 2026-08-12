@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Tests for scripts/pre-push.sh — the hook installed by scripts/install-hooks.sh.
+// Tests for scripts/githooks/pre-push — the hook git runs via core.hooksPath.
 //
 // This hook blocks every push and carries three independent guards, so it fails
 // in two opposite and equally bad directions:
@@ -26,7 +26,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const HOOK = resolve(HERE, "pre-push.sh");
+const HOOK = resolve(HERE, "githooks", "pre-push");
 const SCANNER = resolve(HERE, "secret-scan.sh");
 
 const ZERO = "0".repeat(40);
@@ -48,8 +48,8 @@ function git(root, args) {
  */
 function createFixture() {
   const root = mkdtempSync(join(tmpdir(), "pre-push-"));
-  mkdirSync(join(root, "scripts"), { recursive: true });
-  copyFileSync(HOOK, join(root, "scripts", "pre-push.sh"));
+  mkdirSync(join(root, "scripts", "githooks"), { recursive: true });
+  copyFileSync(HOOK, join(root, "scripts", "githooks", "pre-push"));
   copyFileSync(SCANNER, join(root, "scripts", "secret-scan.sh"));
   writeFileSync(join(root, "README.md"), "fixture\n", "utf8");
 
@@ -80,7 +80,7 @@ function commitFile(root, name, body) {
  * would report the guard working while never exercising it.
  */
 function runHook(root, refLines, env = {}) {
-  return spawnSync("bash", ["scripts/pre-push.sh", "origin", "https://example.invalid"], {
+  return spawnSync("bash", ["scripts/githooks/pre-push", "origin", "https://example.invalid"], {
     cwd: root,
     encoding: "utf8",
     input: Array.isArray(refLines) ? refLines.join("\n") + "\n" : refLines,
