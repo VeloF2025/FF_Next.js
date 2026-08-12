@@ -452,13 +452,112 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     expect(raiseTrackingAlertMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'auth' }));
   });
 
-  it('treats "still logged out after re-auth" as an auth failure', async () => {
+  it('treats "still logged out after re-auth" as eviction, not an auth failure', async () => {
+    // Was asserted `authFailure: true` here. Task 3: Netstar's single-session
+    // eviction (a human opened the same portal) used to share isAuthFailure's
+    // immediate-WhatsApp channel. It now raises kind: 'evicted', which
+    // decideAlert (alerts.ts) keeps silent until sustained past 30 minutes.
     netstarClientMock.mockReturnValue({
       listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
       feedFreshness: vi.fn().mockResolvedValue(new Date()),
     });
     const res = await run(AUTH);
-    expect(res._getJSONData().data.results[0]).toMatchObject({ authFailure: true });
+    expect(res._getJSONData().data.results[0]).toMatchObject({ authFailure: false });
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'evicted', evictedSinceMs: 0 })
+    );
+  });
+
+  describe('eviction: evicted_since is sourced from the watermark, not derived from tick count', () => {
+    it('starts the eviction clock at 0 on the first eviction (no prior evicted_since)', async () => {
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'evicted', evictedSinceMs: 0 })
+      );
+    });
+
+    it('continues the clock from the watermark evicted_since while the streak persists', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-08-12T10:00:00.000Z'));
+        const evictedSince = '2026-08-12T09:15:00.000Z'; // 45 minutes before "now"
+        sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+          const text = strings.join('');
+          if (text.includes('SELECT last_event_ts')) {
+            return [{
+              last_event_ts: null,
+              consecutive_failures: 3,
+              last_error: '[portal-session] still logged out after re-auth: /prev',
+              last_run_at: '2026-08-12T09:50:00.000Z',
+              last_gap_alert_at: null,
+              evicted_since: evictedSince,
+            }];
+          }
+          if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 4 }];
+          if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+          return [];
+        });
+        netstarClientMock.mockReturnValue({
+          listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+          feedFreshness: vi.fn().mockResolvedValue(new Date()),
+        });
+        await run(AUTH);
+        expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'evicted', evictedSinceMs: 45 * 60_000 })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('clears evicted_since in the watermark write on a healthy tick', async () => {
+      netstarProviderMock.mockReturnValue(
+        makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([{ externalId: '1' }]) })
+      );
+      await run(AUTH);
+      const healthy = sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracking_watermarks') &&
+        (c[0] as TemplateStringsArray).join('').includes('consecutive_failures = 0'));
+      expect(healthy).toBeDefined();
+      expect((healthy![0] as TemplateStringsArray).join('')).toContain('evicted_since = NULL');
+    });
+
+    it('does not carry a prior eviction clock into an unrelated auth failure', async () => {
+      // The bug isSameFailureKind's docstring warns about, seen from
+      // pollProvider's side: a prior eviction streak must not leak its clock
+      // (or its consecutive_failures count) into a genuinely different auth
+      // failure that follows it.
+      sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+        const text = strings.join('');
+        if (text.includes('SELECT last_event_ts')) {
+          return [{
+            last_event_ts: null,
+            consecutive_failures: 2,
+            last_error: '[portal-session] still logged out after re-auth: /prev',
+            last_run_at: new Date().toISOString(),
+            last_gap_alert_at: null,
+            evicted_since: new Date().toISOString(),
+          }];
+        }
+        if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+        if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+        return [];
+      });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+        // consecutiveFailures resets to 1 (not merged into the eviction streak's
+        // 2) and evictedSinceMs is null — the clock did not carry over.
+        expect.objectContaining({ kind: 'auth', consecutiveFailures: 1, evictedSinceMs: null })
+      );
+    });
   });
 
   it('does not mark a generic failure as an auth failure', async () => {

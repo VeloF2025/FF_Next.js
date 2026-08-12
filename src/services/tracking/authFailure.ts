@@ -23,7 +23,6 @@ export function isAuthFailure(message: string): boolean {
     [
       // Netstar / generic.
       'login failed',
-      'still logged out',
       String.raw`HTTP 401\b`,
       String.raw`HTTP 403\b`,
       // Ituran: the token was refused and a fresh mint did not help.
@@ -45,6 +44,39 @@ export function isAuthFailure(message: string): boolean {
 }
 
 /**
+ * Whether a failure is Netstar's single-session limit rather than bad credentials.
+ *
+ * PortalSession throws "still logged out after re-auth" when it logged in
+ * successfully and was then evicted — which is what happens when a human opens
+ * the same portal. That self-heals when they leave, so it must not page.
+ *
+ * It was previously matched by isAuthFailure's 'still logged out' entry and
+ * therefore raised fleet.tracking_pull_failed, the WhatsApp-enabled event. At a
+ * 2-hourly cadence that collided with a human 12 times a day at most. The
+ * cadence ramp takes that to 144, so an operator working in the portal for an
+ * hour would have paged roughly six times for a healthy system.
+ *
+ * A dead password can produce the same message, so callers must escalate this
+ * when it persists — see EVICTION_ESCALATE_AFTER_MS in alerts.ts.
+ */
+export function isEviction(message: string): boolean {
+  return /still logged out/i.test(message);
+}
+
+/**
+ * The three streaks `consecutive_failures` can carry: a genuine credentials
+ * problem, Netstar's single-session eviction, or everything else. Kept private
+ * — callers only need isSameFailureKind's boolean, not the label.
+ */
+type FailureKind = 'auth' | 'evicted' | 'transient';
+
+function failureKind(message: string): FailureKind {
+  if (isAuthFailure(message)) return 'auth';
+  if (isEviction(message)) return 'evicted';
+  return 'transient';
+}
+
+/**
  * Whether two failures belong to the same streak.
  *
  * `fleet_tracking_watermarks.consecutive_failures` is incremented by the gap
@@ -53,7 +85,13 @@ export function isAuthFailure(message: string): boolean {
  * streak carries its count into the auth breaker, and a single auth failure
  * landing on a count already past the hard-stop ceiling would skip the open and
  * half-open states entirely and demand manual SQL to clear.
+ *
+ * THREE-WAY, not `isAuthFailure(a) === isAuthFailure(b)`: once eviction left
+ * isAuthFailure, that two-way formula called an eviction and an ordinary
+ * transient failure the same kind (both `false`) and merged their streaks —
+ * corrupting both the transient alert threshold and evicted_since, the clock
+ * eviction's own escalation depends on. See failureKind above.
  */
 export function isSameFailureKind(a: string | null, b: string | null): boolean {
-  return isAuthFailure(a ?? '') === isAuthFailure(b ?? '');
+  return failureKind(a ?? '') === failureKind(b ?? '');
 }

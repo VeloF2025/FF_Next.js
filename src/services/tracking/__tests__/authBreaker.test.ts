@@ -42,6 +42,7 @@ import { pollProvider } from '@/services/tracking/pollProvider';
 
 const AUTH_ERR = '[cartrack-portal/auth] login failed: status=WRONG_CREDENTIALS, attempts_remaining=17';
 const NET_ERR = '[cartrack-portal/network] ECONNRESET';
+const EVICTED_ERR = '[portal-session] still logged out after re-auth: /Main/VehicleRepo/GetVehicleTreeDataPaging';
 const NOW = new Date('2026-08-07T12:00:00Z');
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
 
@@ -54,6 +55,17 @@ describe('authBreakerDecision — the state machine', () => {
     // Transient and gap failures also increment the counter, and they can
     // self-heal, so throttling them would suppress a recoverable provider.
     expect(authBreakerDecision(500, NET_ERR, ago(0), NOW)).toEqual({ state: 'closed' });
+  });
+
+  it('is closed for a sustained EVICTION streak, however long — this is intentional', () => {
+    // Task 3 moved eviction out of isAuthFailure, which removes this breaker
+    // as eviction's backstop: a human working in their own portal for a day
+    // must not get this account throttled for 24h, let alone hard-stopped.
+    // The replacement backstop is evicted_since escalating to the auth-grade
+    // alert channel in alerts.ts (EVICTION_ESCALATE_AFTER_MS), not a breaker
+    // state here. This pins that the breaker stays passive for eviction even
+    // at a failure count that would hard-stop a real auth streak.
+    expect(authBreakerDecision(AUTH_HARD_STOP, EVICTED_ERR, ago(0), NOW)).toEqual({ state: 'closed' });
   });
 
   it('is open inside the cooldown, and says how long is left', () => {

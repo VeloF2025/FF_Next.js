@@ -15,7 +15,7 @@ import { notify as busNotify } from '@/modules/notifications/services/notificati
 import { log } from '@/lib/logger';
 import type { ProviderKey } from './types';
 
-export type AlertKind = 'auth' | 'transient' | 'gap';
+export type AlertKind = 'auth' | 'transient' | 'gap' | 'evicted';
 
 export interface AlertInput {
   kind: AlertKind;
@@ -37,6 +37,16 @@ export interface AlertInput {
    * gap" and always alerts — failing loud on the first occurrence is the point.
    */
   lastGapAlertAt: Date | null;
+  /**
+   * How long this account has been continuously evicted, in ms; null or absent
+   * when the failure is not an eviction. Below the escalation threshold this
+   * stays silent on purpose.
+   *
+   * OPTIONAL deliberately: every non-evicted call site would otherwise have to
+   * pass a meaningless null, and the tests written in Task 2 would stop
+   * compiling the moment this field landed.
+   */
+  evictedSinceMs?: number | null;
 }
 
 export interface AlertDecision {
@@ -61,6 +71,13 @@ const TRANSIENT_THRESHOLD = 3;
  * ignore the channel". Wall-clock holds the promise the constant was making.
  */
 const GAP_REPEAT_AFTER_MS = 24 * 3600_000;
+/**
+ * Eviction is only newsworthy once it stops looking like a human at a keyboard.
+ * Thirty minutes is longer than a portal session someone opens to check one
+ * vehicle, and short enough that a genuinely dead password is not hidden for a
+ * working day.
+ */
+const EVICTION_ESCALATE_AFTER_MS = 30 * 60_000;
 const QUIET_UNTIL_HOUR = 7;
 const QUIET_FROM_HOUR = 20;
 const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
@@ -88,6 +105,11 @@ function sastHour(d: Date): number {
  * "deferral" falls out of the polling cadence for free — no timer needed —
  * at the cost of coarser granularity: up to one tick (~2h) after 07:00
  * rather than exactly at 07:00.
+ *
+ * `evicted` is silent below EVICTION_ESCALATE_AFTER_MS — a human in the portal
+ * is not an incident — then falls through to the same working-hours channel
+ * policy as `auth`, because sustained eviction and a dead credential present
+ * identically and both need the same human.
  */
 export function decideAlert(input: AlertInput): AlertDecision | null {
   if (input.kind === 'gap') {
@@ -105,6 +127,16 @@ export function decideAlert(input: AlertInput): AlertDecision | null {
   if (input.kind === 'transient') {
     if (input.consecutiveFailures < TRANSIENT_THRESHOLD) return null;
     return { event: 'fleet.tracking_pull_degraded' };
+  }
+
+  if (input.kind === 'evicted') {
+    // Normalize the OPTIONAL field to null first: `undefined` (never set) and
+    // `null` (not currently evicted) both mean "not sustained" the same way.
+    const evictedSinceMs = input.evictedSinceMs ?? null;
+    const sustained = evictedSinceMs !== null && evictedSinceMs >= EVICTION_ESCALATE_AFTER_MS;
+    if (!sustained) return null;
+    // Sustained eviction is indistinguishable from a dead credential, so from
+    // here it takes the auth path's working-hours channel policy exactly.
   }
 
   // Auth failure: will not self-heal, so WhatsApp is warranted during

@@ -11,14 +11,24 @@
  * never arrived.
  */
 import { describe, expect, it } from 'vitest';
-import { isAuthFailure, isSameFailureKind } from '../authFailure';
+import { isAuthFailure, isEviction, isSameFailureKind } from '../authFailure';
 
 describe('isAuthFailure — Netstar and generic vocabulary', () => {
-  it('recognises the shared portal-session and HTTP wordings', () => {
-    expect(isAuthFailure('[portal-session] still logged out after re-auth: /Main')).toBe(true);
+  it('recognises the shared HTTP wordings', () => {
     expect(isAuthFailure('netstar login failed: HTTP 200 but no auth cookie')).toBe(true);
     expect(isAuthFailure('Cartrack vehicles: HTTP 401 (page 1)')).toBe(true);
     expect(isAuthFailure('Cartrack vehicles: HTTP 403 (page 1)')).toBe(true);
+  });
+
+  // Was asserted true here. "still logged out after re-auth" is Netstar's
+  // single-session eviction, not a credentials problem — a human opening the
+  // same portal throws this job out and it self-heals when they leave. Task 3
+  // moved it to isEviction() precisely so it stops sharing isAuthFailure's
+  // immediate-WhatsApp channel; see isEviction's docstring in authFailure.ts.
+  it('routes the portal-session wording through isEviction instead', () => {
+    const msg = '[portal-session] still logged out after re-auth: /Main';
+    expect(isAuthFailure(msg)).toBe(false);
+    expect(isEviction(msg)).toBe(true);
   });
 });
 
@@ -93,6 +103,36 @@ describe('isAuthFailure — Cartrack portal vocabulary', () => {
   });
 });
 
+describe('eviction is distinguished from bad credentials', () => {
+  it('classifies a lost session as eviction, not auth', () => {
+    const msg = '[portal-session] still logged out after re-auth: /Main/VehicleRepo/GetVehicleTreeDataPaging';
+    expect(isEviction(msg)).toBe(true);
+    expect(isAuthFailure(msg)).toBe(false);
+  });
+
+  it('still treats a rejected login as auth', () => {
+    expect(isAuthFailure('login failed')).toBe(true);
+    expect(isEviction('login failed')).toBe(false);
+  });
+
+  it('still treats 401/403 as auth', () => {
+    expect(isAuthFailure('HTTP 401 Unauthorized')).toBe(true);
+    expect(isAuthFailure('HTTP 403 Forbidden')).toBe(true);
+  });
+
+  it('keeps the other providers auth vocabulary intact', () => {
+    for (const m of [
+      'still rejected after re-mint',
+      'login did not yield a session',
+      'bot challenge did not clear',
+      'still unauthenticated after re-login',
+      'issued no session cookies',
+    ]) {
+      expect(isAuthFailure(m)).toBe(true);
+    }
+  });
+});
+
 describe('isSameFailureKind — the counter counts one kind of streak', () => {
   it('treats two auth failures as the same streak', () => {
     expect(isSameFailureKind(
@@ -124,5 +164,37 @@ describe('isSameFailureKind — the counter counts one kind of streak', () => {
   it('handles a null prior error as non-auth', () => {
     expect(isSameFailureKind('[cartrack-portal/network] ECONNRESET', null)).toBe(true);
     expect(isSameFailureKind('[cartrack-portal/auth] login failed', null)).toBe(false);
+  });
+});
+
+describe('isSameFailureKind — eviction keeps its own streak', () => {
+  const evicted = '[portal-session] still logged out after re-auth: /Main/VehicleRepo/GetVehicleTreeDataPaging';
+  const auth = '[cartrack-portal/auth] login failed: status=WRONG_CREDENTIALS';
+  const transient = '[cartrack-portal/network] ECONNRESET';
+
+  it('does not merge an eviction streak into an auth streak', () => {
+    // Pre-fix, isAuthFailure(evicted) was also true, so the old two-way
+    // `isAuthFailure(a) === isAuthFailure(b)` formula called these the same
+    // kind and let an eviction streak feed the auth breaker's counter.
+    expect(isSameFailureKind(evicted, auth)).toBe(false);
+    expect(isSameFailureKind(auth, evicted)).toBe(false);
+  });
+
+  it('does not merge an eviction streak into a transient streak', () => {
+    // The exact bug isSameFailureKind's docstring warns about: once eviction
+    // leaves isAuthFailure, a two-way `isAuthFailure(a) === isAuthFailure(b)`
+    // comparison calls an eviction and an ordinary transient failure the SAME
+    // kind, because both are `false`. Note this assertion also holds against
+    // the pre-fix code (which routed eviction through isAuthFailure instead of
+    // dropping it to `false`), so on its own it does not discriminate against
+    // HEAD — it guards specifically against a half-applied fix that updates
+    // isAuthFailure without making isSameFailureKind three-way. The
+    // evicted-vs-auth pair above is what fails against HEAD.
+    expect(isSameFailureKind(evicted, transient)).toBe(false);
+    expect(isSameFailureKind(transient, evicted)).toBe(false);
+  });
+
+  it('treats two evictions as the same streak', () => {
+    expect(isSameFailureKind(evicted, evicted)).toBe(true);
   });
 });

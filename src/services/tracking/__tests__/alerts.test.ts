@@ -187,6 +187,33 @@ describe('decideAlert — quiet-hours boundaries', () => {
   });
 });
 
+describe('evicted kind', () => {
+  const noon = new Date('2026-08-12T10:00:00Z'); // 12:00 SAST, working hours
+
+  it('does not alert on a fresh eviction — a human using their portal is not an incident', () => {
+    expect(decideAlert({
+      kind: 'evicted', consecutiveFailures: 1, nowSast: noon,
+      lastGapAlertAt: null, evictedSinceMs: 5 * 60_000,
+    })).toBeNull();
+  });
+
+  it('escalates to auth-grade once eviction is sustained past 30 minutes', () => {
+    // A dead password can present identically, so it must not hide here forever.
+    expect(decideAlert({
+      kind: 'evicted', consecutiveFailures: 4, nowSast: noon,
+      lastGapAlertAt: null, evictedSinceMs: 31 * 60_000,
+    })?.event).toBe('fleet.tracking_pull_failed');
+  });
+
+  it('sustained eviction overnight uses the no-WhatsApp event', () => {
+    const night = new Date('2026-08-12T20:00:00Z'); // 22:00 SAST
+    expect(decideAlert({
+      kind: 'evicted', consecutiveFailures: 4, nowSast: night,
+      lastGapAlertAt: null, evictedSinceMs: 31 * 60_000,
+    })?.event).toBe('fleet.tracking_pull_degraded');
+  });
+});
+
 describe('alertRecipientIds', () => {
   const ORIGINAL = process.env.FLEET_ALERT_USER_IDS;
   afterEach(() => {
