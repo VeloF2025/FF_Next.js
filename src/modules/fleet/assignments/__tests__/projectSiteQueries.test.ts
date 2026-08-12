@@ -91,6 +91,22 @@ describe('createProjectSite', () => {
     expect(mocks.txnQueryOne.mock.calls[0]?.[0]).toContain('retired_at IS NULL');
   });
 
+  it('rejects an AOI already linked to a different project', async () => {
+    mocks.txnQueryOne.mockResolvedValueOnce(null);
+
+    await expect(createProjectSite({
+      projectId: PROJECT_ID,
+      displayName: 'North depot',
+      projectAoiId: AOI_ID,
+      authorizedLocationId: null,
+      isDefault: false,
+    }, { userId: USER_ID })).rejects.toMatchObject({ code: 'inactive_source' });
+
+    const sourceSql = mocks.txnQueryOne.mock.calls[0]?.[0] as string;
+    expect(sourceSql).toContain('existing.project_id = $2::uuid');
+    expect(mocks.txnQueryOne.mock.calls[0]?.[1]).toEqual([AOI_ID, PROJECT_ID]);
+  });
+
   it('links an active AOI without reading or copying geometry and appends an audit row', async () => {
     mocks.txnQueryOne
       .mockResolvedValueOnce({ id: AOI_ID, site_code: 'AOI-7', area_name: 'North' })
@@ -107,7 +123,7 @@ describe('createProjectSite', () => {
 
     const sourceSql = mocks.txnQueryOne.mock.calls[0]?.[0] as string;
     const insertSql = mocks.txnQueryOne.mock.calls[1]?.[0] as string;
-    expect(sourceSql).toContain('site_code, area_name');
+    expect(sourceSql).toContain('aoi.site_code, aoi.area_name');
     expect(sourceSql).not.toContain('geom');
     expect(insertSql).toContain('project_aoi_id');
     expect(mocks.txnQuery.mock.calls.at(-1)?.[0]).toContain('fleet_project_operational_site_audit');
@@ -160,7 +176,7 @@ describe('updateProjectSite', () => {
       .mockResolvedValueOnce({ ...siteRow, is_default: false, is_active: false });
     mocks.txnQuery.mockResolvedValue([]);
 
-    await expect(updateProjectSite(SITE_ID, { isActive: false }, { userId: USER_ID }))
+    await expect(updateProjectSite(SITE_ID, { projectId: PROJECT_ID, isActive: false }, { userId: USER_ID }))
       .resolves.toMatchObject({ isActive: false, isDefault: false });
 
     expect(mocks.txnQueryOne.mock.calls[0]?.[0]).toContain('FOR UPDATE');
@@ -177,10 +193,34 @@ describe('updateProjectSite', () => {
       .mockResolvedValueOnce(siteRow);
     mocks.txnQuery.mockResolvedValue([]);
 
-    await updateProjectSite(SITE_ID, { isDefault: true }, { userId: USER_ID });
+    await updateProjectSite(SITE_ID, { projectId: PROJECT_ID, isDefault: true }, { userId: USER_ID });
 
     expect(mocks.txnQuery.mock.calls[0]?.[0]).toContain('FOR UPDATE');
+    expect(mocks.txnQuery.mock.calls[0]?.[1]).toEqual([PROJECT_ID]);
+    expect(mocks.txnQuery.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.txnQueryOne.mock.invocationCallOrder[0]!,
+    );
     expect(mocks.txnQuery.mock.calls[1]?.[0]).toContain('SET is_default = false');
     expect(mocks.txnQuery.mock.calls.at(-1)?.[1]).toContain('default_changed');
+  });
+
+  it.each([
+    ['rename', { displayName: 'Renamed depot' }, { ...siteRow, display_name: 'Renamed depot' }],
+    ['reactivation', { isActive: true }, { ...siteRow, is_active: true, is_default: false }],
+  ])('audits a successful %s with before and after snapshots', async (_label, input, updatedRow) => {
+    const beforeRow = _label === 'reactivation'
+      ? { ...siteRow, is_active: false, is_default: false }
+      : siteRow;
+    mocks.txnQueryOne
+      .mockResolvedValueOnce(beforeRow)
+      .mockResolvedValueOnce(updatedRow);
+    mocks.txnQuery.mockResolvedValue([]);
+
+    await updateProjectSite(SITE_ID, { projectId: PROJECT_ID, ...input }, { userId: USER_ID });
+
+    const auditCall = mocks.txnQuery.mock.calls.at(-1);
+    expect(auditCall?.[0]).toContain('fleet_project_operational_site_audit');
+    expect(auditCall?.[1]?.[3]).toContain('North depot');
+    expect(auditCall?.[1]?.[4]).toContain(_label === 'rename' ? 'Renamed depot' : '"isActive":true');
   });
 });

@@ -88,10 +88,14 @@ function validateExactlyOneSource(input: CreateProjectSiteInput): void {
 async function resolveSourceDisplayName(txn: TxnClient, input: CreateProjectSiteInput): Promise<string> {
   if (input.projectAoiId) {
     const source = await txn.queryOne<AoiSourceRow>(`
-      SELECT id, site_code, area_name
-      FROM fno_atlas_project_aois
-      WHERE id = $1::uuid AND retired_at IS NULL
-      LIMIT 1`, [input.projectAoiId]);
+      SELECT aoi.id, aoi.site_code, aoi.area_name
+      FROM fno_atlas_project_aois aoi
+      LEFT JOIN fleet_project_operational_sites existing
+        ON existing.project_aoi_id = aoi.id AND existing.is_active = true
+      WHERE aoi.id = $1::uuid
+        AND aoi.retired_at IS NULL
+        AND (existing.project_id IS NULL OR existing.project_id = $2::uuid)
+      LIMIT 1`, [input.projectAoiId, input.projectId]);
     if (!source) {
       throw new ProjectSiteValidationError('inactive_source', 'The selected project AOI is missing or inactive');
     }
@@ -209,13 +213,20 @@ export async function updateProjectSite(
   }
 
   return transaction(async (txn) => {
+    if (!input.projectId) {
+      throw new ProjectSiteValidationError('invalid_update', 'projectId is required for site updates');
+    }
+    await txn.query(`
+      SELECT id
+      FROM fleet_project_operational_sites
+      WHERE project_id = $1::uuid AND is_active = true
+      FOR UPDATE`, [input.projectId]);
     const currentRow = await txn.queryOne<ProjectSiteRow>(`
       SELECT id, project_id, display_name, project_aoi_id, authorized_location_id,
         is_default, is_active
       FROM fleet_project_operational_sites
-      WHERE id = $1::uuid
-        AND ($2::uuid IS NULL OR project_id = $2::uuid)
-      FOR UPDATE`, [siteId, input.projectId ?? null]);
+      WHERE id = $1::uuid AND project_id = $2::uuid
+      FOR UPDATE`, [siteId, input.projectId]);
     if (!currentRow) return null;
 
     const before = mapSite(currentRow);
@@ -225,7 +236,10 @@ export async function updateProjectSite(
       throw new ProjectSiteValidationError('invalid_update', 'An inactive site cannot be default');
     }
     if (nextDefault && (!before.isDefault || !before.isActive)) {
-      await lockAndClearDefault(txn, before.projectId);
+      await txn.query(`
+        UPDATE fleet_project_operational_sites
+        SET is_default = false, updated_at = NOW()
+        WHERE project_id = $1::uuid AND is_active = true AND is_default = true`, [before.projectId]);
     }
 
     const updatedRow = await txn.queryOne<ProjectSiteRow>(`
@@ -240,11 +254,8 @@ export async function updateProjectSite(
     if (!updatedRow) return null;
 
     const updated = mapSite(updatedRow);
-    if (before.isActive && !updated.isActive) {
-      await insertAudit(txn, siteId, 'deactivated', actor, before, updated);
-    } else if (before.isDefault !== updated.isDefault) {
-      await insertAudit(txn, siteId, 'default_changed', actor, before, updated);
-    }
+    const action = before.isActive && !updated.isActive ? 'deactivated' : 'default_changed';
+    await insertAudit(txn, siteId, action, actor, before, updated);
     return updated;
   });
 }
