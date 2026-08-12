@@ -424,6 +424,16 @@ else
   echo "$SCANNER_TEST_OUT" | grep -E '^not ok|error:' | head -10 | sed 's/^/    /'
 fi
 
+# The pre-push hook drives that scanner as one of its three guards, and its own
+# failure modes are the same shape: a guard that silently never fires, or one
+# that blocks a routine push for the wrong reason.
+if HOOK_TEST_OUT=$(node --test scripts/pre-push.test.mjs 2>&1); then
+  pass "Pre-push hook: guard tests pass"
+else
+  fail "Pre-push hook: guard tests FAILED — a push guard is not trustworthy"
+  echo "$HOOK_TEST_OUT" | grep -E '^not ok|error:' | head -10 | sed 's/^/    /'
+fi
+
 if SECRET_OUT=$(bash scripts/secret-scan.sh --branch 2>&1); then
   pass "Secret scan: no new credential-like content"
 else

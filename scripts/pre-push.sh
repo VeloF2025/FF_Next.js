@@ -100,29 +100,35 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 VIOLATIONS_FOUND=0
 VIOLATION_FILES=()
 
+ZERO_SHA=0000000000000000000000000000000000000000
+
 # Ref format: <local ref> <local sha> <remote ref> <remote sha>
 while read -r local_ref local_sha remote_ref remote_sha; do
+  # An empty local_sha means an empty ref line: a here-string always yields one
+  # iteration even for empty input, so this is the no-input case.
   [ -z "${local_sha:-}" ] && continue
-  # Determine range of commits to check
-  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-    # New branch — scope to commits unique to this branch only
-    MERGE_BASE=$(git merge-base origin/master HEAD 2>/dev/null)
-    if [ -n "$MERGE_BASE" ]; then
-      RANGE="$MERGE_BASE..$local_sha"
-    else
-      RANGE="$local_sha"
-    fi
-    DIFF_CMD="git diff --name-only $RANGE"
-  else
-    # Existing branch — check only new commits
-    RANGE="$remote_sha..$local_sha"
-    DIFF_CMD="git diff --name-only $RANGE"
-  fi
+  # A local_sha of all zeros is a DELETION (`git push --delete <ref>`, or
+  # `git push origin :branch`). There is nothing to scan, and it must not be
+  # treated as a range: the zero SHA does not resolve, secret-scan.sh correctly
+  # refuses it with exit 2, and this loop counted that as a violation — so every
+  # branch or tag deletion was blocked, reporting "auth isolation violation",
+  # which is neither true nor actionable. Deletions push no content.
+  [ "$local_sha" = "$ZERO_SHA" ] && continue
+
+  # NOTE: a RANGE/DIFF_CMD pair used to be computed here for a "new branch" vs
+  # "existing branch" case. It was dead — DIFF_CMD was never executed, and the
+  # scans below derive their own ranges. It is deleted rather than left, because
+  # its `MERGE_BASE=$(git merge-base …)` had no `|| true`: under this script's
+  # `set -euo pipefail`, a failing command substitution in an assignment aborts
+  # the whole script, so on any checkout without origin/master fetched (shallow
+  # clone, fresh clone) the entire hook died before reaching the `if [ -n … ]`
+  # fallback written to handle exactly that. Measured: exit 128, no further
+  # output. The SCAN_BASE assignment below is the same shape done correctly.
 
   # ---------------------------------------------------------
   # Secret scan over the pushed range (new credentials only)
   # ---------------------------------------------------------
-  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+  if [ "$remote_sha" = "$ZERO_SHA" ]; then
     SCAN_BASE=$(git merge-base origin/master "$local_sha" 2>/dev/null || git rev-list --max-parents=0 "$local_sha" | tail -1)
   else
     SCAN_BASE="$remote_sha"
