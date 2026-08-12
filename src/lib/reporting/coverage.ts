@@ -6,12 +6,13 @@
  * most dangerous number a report can print — it reads as a fact about the site when it
  * is usually a fact about the data:
  *
- *   Thembisa POP 2  30,682 SOW drops, 0 poles   → genuinely not started (status planning)
- *   Tonga                0 SOW drops, 1,360 poles → work done, scope never imported
- *   Middelburg           0 SOW drops, 51 poles, status "planning" → status is stale
+ *   Thembisa POP 2  30,682 drops, 0 poles captured → genuinely not started (planning)
+ *   Grabouw          3,793 poles in scope, 122 captured, 0 drops → building, no drops yet
+ *   Middelburg       51 poles captured, status still "planning" → the status is stale
  *
- * A percentage built on an absent denominator is worse still: it is not zero, it is
- * undefined, and printing 0% for Tonga would say the opposite of the truth.
+ * Note that build and activation have DIFFERENT denominators — poles and drops — and a
+ * project can have one without the other. A percentage built on an absent denominator is
+ * not zero, it is undefined, and printing 0% would say the opposite of the truth.
  */
 
 /** Why a metric has no value, when it has none. */
@@ -44,8 +45,8 @@ export function measure(value: number): Measure {
 /**
  * A completion ratio that refuses to invent a denominator.
  *
- * `scope` of 0 means the SOW was never imported for this project, NOT that the project
- * has no work in it — 1,360 poles have been built at Tonga against an empty SOW.
+ * `scope` of 0 means that scope was never imported, NOT that the project has no work in
+ * it — Grabouw has 122 poles captured and no drops at all.
  */
 export function ratio(done: number, scope: number, projectStatus?: string | null): Ratio {
   if (scope > 0) {
@@ -57,8 +58,8 @@ export function ratio(done: number, scope: number, projectStatus?: string | null
       of: null,
       absent: 'no-scope-recorded',
       note:
-        `${done} recorded, but no SOW scope is imported for this project, so there is ` +
-        'no denominator. This is a missing import, not zero progress — do not report a percentage.',
+        `${done} recorded, but no scope of this kind is imported for the project, so there ` +
+        'is no denominator. This is a missing import, not zero progress — do not report a percentage.',
     };
   }
   return {
@@ -106,9 +107,11 @@ export function throughput(last7: number, prior7: number, remaining: number | nu
   const rawWeeks = remaining !== null && last7 > 0 ? Math.ceil(remaining / last7) : null;
   const weeks = rawWeeks !== null && rawWeeks <= MAX_PROJECTABLE_WEEKS ? rawWeeks : null;
 
-  const parts = ['Rate only. FibreFlow holds no maintained schedule, so "on track" and "behind" cannot be computed — this is throughput against SOW scope, not against a plan.'];
-  if (weeks === null && remaining !== null && last7 === 0) {
-    parts.push('No poles recorded in the last 7 days, so no completion estimate is possible.');
+  const parts = ['Rate only. FibreFlow holds no maintained schedule, so "on track" and "behind" cannot be computed — this is throughput against imported scope, not against a plan.'];
+  if (remaining === 0) {
+    parts.push('Everything in scope is captured, so there is nothing left to project.');
+  } else if (last7 === 0) {
+    parts.push('Nothing recorded in the last 7 days, so no completion estimate is possible.');
   }
   if (rawWeeks !== null && weeks === null) {
     parts.push(

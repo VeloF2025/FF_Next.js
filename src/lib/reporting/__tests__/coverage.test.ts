@@ -8,19 +8,20 @@ import { describe, expect, it } from 'vitest';
 import { measure, ratio, throughput } from '../coverage';
 
 describe('ratio — refusing to invent a denominator', () => {
-  it('withholds a percentage when scope was never imported', () => {
-    // Tonga: 1,360 poles built, 0 SOW drops. Reporting 0% would say the opposite of the
-    // truth — the work is done, the scope import is missing.
-    const r = ratio(1360, 0, 'active');
+  it('withholds a percentage when that scope was never imported', () => {
+    // Grabouw has 122 poles captured and no drops at all. Reporting 0% activation would
+    // say the opposite of the truth — the import is missing, not the work.
+    const r = ratio(122, 0, 'active');
     expect(r.percent).toBeNull();
     expect(r.absent).toBe('no-scope-recorded');
     expect(r.note).toContain('missing import, not zero progress');
   });
 
   it('reports a real percentage when scope exists', () => {
-    // Etwatwa: 1,493 of 21,008.
-    expect(ratio(1493, 21008, 'active').percent).toBe(7.1);
-    expect(ratio(1493, 21008, 'active').of).toBe(21008);
+    // Etwatwa build: 1,493 poles captured of 4,538 in scope. NOT 1,493/21,008 drops —
+    // poles and drops are different scopes, and confusing them understated this by ~4x.
+    expect(ratio(1493, 4538, 'active').percent).toBe(32.9);
+    expect(ratio(1493, 4538, 'active').of).toBe(4538);
   });
 
   it('distinguishes "not started" from "not captured" using project status', () => {
@@ -51,9 +52,9 @@ describe('throughput — a rate, never a date', () => {
   });
 
   it('withholds a projection when the rate is too low to project from', () => {
-    // Etwatwa measured 2 poles against 19,515 remaining — 9,758 weeks, or 187 years.
-    // Printing that gets the whole report dismissed.
-    const t = throughput(2, 7, 19515);
+    // Etwatwa measured 2 poles in 7 days against 3,045 remaining poles — 1,523 weeks,
+    // or 29 years. Printing that gets the whole report dismissed.
+    const t = throughput(2, 7, 3045);
     expect(t.weeksRemainingAtCurrentRate).toBeNull();
     expect(t.note).toContain('too little movement to project');
   });
@@ -61,7 +62,14 @@ describe('throughput — a rate, never a date', () => {
   it('withholds a projection when nothing moved at all', () => {
     const t = throughput(0, 0, 5000);
     expect(t.weeksRemainingAtCurrentRate).toBeNull();
-    expect(t.note).toContain('No poles recorded in the last 7 days');
+    expect(t.note).toContain('Nothing recorded in the last 7 days');
+  });
+
+  it('says the work is finished rather than that it cannot project', () => {
+    // remaining === 0 is completion, not an unprojectable rate.
+    const t = throughput(0, 12, 0);
+    expect(t.note).toContain('Everything in scope is captured');
+    expect(t.note).not.toContain('no completion estimate is possible');
   });
 
   it('withholds week-on-week change when the prior week has no baseline', () => {

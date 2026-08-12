@@ -42,7 +42,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// Project reporting reads across build, QA, activations, snags and procurement, but every
-// figure is an aggregate count — no photo bytes, no financial values, no personal data.
-// `projects.view` is the permission that already gates seeing a project at all.
-export default withAuth(withPermission('projects.view')(handler));
+// KEY then ACTION, not a dotted "projects.view" — that string is not a permission key,
+// and withPermission looks it up as one. There is no `projects.view` row in
+// access_permissions, and isPermissionBlocked denies when no role row exists, so the
+// dotted form 403s every non-super-admin caller while being inert for super-admins (who
+// bypass RBAC). Same shape as pages/api/qfield/project-stats.ts.
+export default withAuth(withPermission('projects', 'view')(handler));

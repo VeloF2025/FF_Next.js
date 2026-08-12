@@ -36,11 +36,16 @@ async def get_project_overview(project: str) -> str:
     approved, weekly throughput, VLM pass/fail per photo slot, activations, open snags and
     purchase orders — plus `caveats` you should read and pass on.
 
-    Three things to get right when reporting the answer:
+    Five things to get right when reporting the answer:
 
-    - A `percent` of null is NOT zero. It means the denominator is missing — usually that
-      the SOW was never imported — and `absent` says which. Tonga has 1,360 poles built
-      against no imported scope; reporting 0% there would be the opposite of the truth.
+    - Build and activation have DIFFERENT denominators: poles for the build, drops for
+      activations. Etwatwa has 4,538 poles and 21,008 drops, so they are not
+      interchangeable and one can be imported without the other.
+    - A `percent` of null is NOT zero. It means that denominator was never imported, and
+      `absent` says which kind. Grabouw has 122 poles captured and no drops at all;
+      reporting 0% activation there would be the opposite of the truth.
+    - `slotsUnscored` counts photos the VLM never judged. They are not failures — quote
+      pass, fail and unscored separately rather than implying everything was assessed.
     - `weeksRemainingAtCurrentRate` is a run rate, never a date, and is null when the
       current rate is too low to project from. Do not turn it into a delivery commitment.
     - Nothing here compares against a plan, because FibreFlow holds none. Never say a

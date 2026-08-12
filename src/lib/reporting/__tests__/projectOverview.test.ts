@@ -11,6 +11,8 @@ function row(over: Partial<OverviewRow> = {}): OverviewRow {
     start_date: null,
     end_date: null,
     sow_drops: '0',
+    pole_scope: '0',
+    name_matches: '1',
     poles: '0',
     poles_after_photo: '0',
     poles_approved: '0',
@@ -66,7 +68,25 @@ describe('overviewQuery', () => {
     // per pole would hide the failures inside a "passed" pole.
     const { sql } = overviewQuery('Etwatwa');
     expect(sql).toContain('jsonb_each');
-    expect(sql).toContain("jsonb_typeof(v.value -> 'valid') = 'boolean'");
+  });
+
+  it('detects an unscored slot with IS DISTINCT FROM, not <>', () => {
+    // jsonb_typeof is NULL when the key is absent, and `NULL <> 'boolean'` is NULL, so
+    // the FILTER never matched: unscored was structurally always 0. Etwatwa's real
+    // figure is 5,757 — a report claiming everything was scored is the exact failure
+    // this module exists to prevent.
+    const { sql } = overviewQuery('Etwatwa');
+    expect(sql).toContain("jsonb_typeof(v.value -> 'valid') IS DISTINCT FROM 'boolean'");
+    expect(sql).not.toMatch(/jsonb_typeof\(v\.value -> 'valid'\) <> 'boolean'/);
+  });
+
+  it('takes the build denominator from poles and the activation one from drops', () => {
+    // They differ by ~4x. Dividing poles built by drops reported Etwatwa at 7.1% where
+    // the truth is 32.9%, and Tonga as "no scope imported" where it is 61.8% built.
+    const { sql } = overviewQuery('Etwatwa');
+    expect(sql).toContain('pole_scope AS (');
+    expect(sql).toContain('FROM poles pl');
+    expect(sql).toContain("pl.status IS DISTINCT FROM 'cancelled'");
   });
 
   it('aggregates each store in its own CTE rather than joining them', () => {
@@ -80,17 +100,38 @@ describe('overviewQuery', () => {
 });
 
 describe('shapeOverview', () => {
-  it('withholds completion and explains itself when scope was never imported', () => {
-    // Tonga's real shape.
-    const o = shapeOverview(row({ poles: '1360', sow_drops: '0', poles_approved: '1291' }));
+  it('withholds build completion when no POLE scope is imported', () => {
+    const o = shapeOverview(row({ poles: '1360', pole_scope: '0', poles_approved: '1291' }));
     expect(o.build.completion.percent).toBeNull();
     expect(o.build.completion.absent).toBe('no-scope-recorded');
-    expect(o.caveats.join(' ')).toContain('No SOW scope is imported');
+    expect(o.caveats.join(' ')).toContain('no pole scope is imported');
+  });
+
+  it('divides poles by POLE scope, never by the drop count', () => {
+    // Etwatwa's real shape: 1,493 captured, 4,538 poles in scope, 21,008 drops.
+    // Using drops reported 7.1% where the truth is 32.9% — wrong by ~4x, pessimistically.
+    const o = shapeOverview(row({ poles: '1493', pole_scope: '4538', sow_drops: '21008' }));
+    expect(o.build.completion.percent).toBe(32.9);
+    expect(o.build.completion.of).toBe(4538);
+    // Activations keep drops as their denominator — they are a different scope.
+    const withActs = shapeOverview(row({ activations: '1382', sow_drops: '21008', pole_scope: '4538' }));
+    expect(withActs.activations.completion.of).toBe(21008);
+  });
+
+  it('says which project it answered for when the name was ambiguous', () => {
+    // "Thembisa" matches three projects; silently returning the first is how a PM reads
+    // POP 1's numbers as POP 3's.
+    const o = shapeOverview(row({ project_name: 'Thembisa POP 1', name_matches: '3' }));
+    expect(o.caveats.join(' ')).toContain('one of 3 projects');
+  });
+
+  it('does not raise ambiguity when exactly one project matched', () => {
+    expect(shapeOverview(row()).caveats.join(' ')).not.toContain('one of');
   });
 
   it('flags scope with no capture as ambiguous rather than as zero progress', () => {
     // Thembisa POP 2's real shape.
-    const o = shapeOverview(row({ sow_drops: '30682', poles: '0', status: 'planning' }));
+    const o = shapeOverview(row({ pole_scope: '5000', poles: '0', status: 'planning' }));
     expect(o.build.completion.percent).toBe(0);
     expect(o.caveats.join(' ')).toContain('may mean work has not started');
   });
