@@ -202,3 +202,4 @@ async def remote_help(request: Request):
 from . import catalogue as _catalogue  # noqa: E402,F401  (import for side effects)
 from . import tools as _tools  # noqa: E402,F401  (import for side effects)
 from . import qfield_tools as _qfield_tools  # noqa: E402,F401  (import for side effects)
+from . import photo_tools as _photo_tools  # noqa: E402,F401  (import for side effects)

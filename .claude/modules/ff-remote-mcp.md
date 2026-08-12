@@ -34,7 +34,7 @@ separate access-scope question.
 claude.ai ──► app.fibreflow.app/api/ff-remote-mcp/*   (edge proxy, unauthenticated)
                         │
                         ▼
-              127.0.0.1:7416  ff_mcp        (OAuth 2.1 AS + 3 tools, localhost only)
+              127.0.0.1:7416  ff_mcp        (OAuth 2.1 AS + 5 tools, localhost only)
                         │  authorize() redirects to ↓
                         ▼
               app.fibreflow.app/mcp/authorize?state_id=…   (consent page, user's session)
@@ -59,7 +59,8 @@ secret, and nothing else. No `JWT_SECRET`, no DB connection, no service credenti
 | `apps/ff_mcp/oauth.py` | OAuth 2.1 provider (copied from Cortex's `cortex_mcp`) |
 | `apps/ff_mcp/server.py` | HTTP surface: `/authorize/complete`, metadata, `/help` |
 | `apps/ff_mcp/catalogue.py` | `list_endpoints`, `describe_endpoint` |
-| `apps/ff_mcp/tools.py` | `fibreflow_get` + the path/denylist guards |
+| `apps/ff_mcp/tools.py` | `fibreflow_get` + `_guard_path`, the guard every tool shares |
+| `apps/ff_mcp/photo_tools.py` | `view_photo` — image content, not text |
 | `apps/ff_mcp/endpoints.json` | Generated catalogue (`npm run mcp:catalogue`) |
 | `pages/api/ff-remote-mcp/[...path].ts` | Edge proxy — the only public path |
 | `pages/api/mcp/consent.ts` | Mints the token, calls the service back |
@@ -133,6 +134,17 @@ proxy then fails closed (502) and FibreFlow itself is unaffected.
 - **The consent redirect must target `FF_APP_BASE`, not the proxy base.** The user's
   session cookie is on the app host. A dev service pointed at the prod base would send
   users to prod to authorize a dev connector.
+- **`fibreflow_get` cannot return a photo, and never will.** It decodes every response
+  as UTF-8 and caps it at `MAX_RESPONSE_CHARS`, so a 150 KB JPEG arrives as 15,000
+  characters of mojibake with its SOI marker already replaced — measured, not theorised.
+  Photos go through `view_photo`, which returns MCP image content. Both reach FibreFlow
+  through the same `_guard_path`, so the denylist and traversal checks apply to both;
+  a second fetch path with its own copy of the guard is how a denylist silently rots.
+- **Do not re-encode a photo that is already small enough.** QField photos arrive at
+  1600px, already compressed harder than `JPEG_QUALITY`. Re-encoding one measured
+  388 KB → 623 KB: more bytes and a second generation of artefacts, to shave 32 pixels
+  Claude's own resampler would have taken off. `PASSTHROUGH_SLACK` is why photos within
+  1.25× of the ceiling are forwarded untouched.
 - **The denylist is a blast-radius guard, not a security boundary.** RBAC and the
   read-only gate are the real controls. It is mirrored in two places —
   `scripts/build-mcp-endpoint-catalogue.ts` (`DENIED_GROUPS`) and `apps/ff_mcp/tools.py`
@@ -146,7 +158,7 @@ proxy then fails closed (502) and FibreFlow itself is unaffected.
   behind Cloudflare, which answers `Error 1010 browser_signature_banned` to
   `Python-urllib/*`. Measured on dev: `Python-urllib/3.12` → **403**, while
   `ff-remote-mcp/0.1` and `ff-remote-mcp-oauth/0.1` → **200**. The explicit `User-Agent`
-  headers in `tools.py` and `server.py` are therefore load-bearing, not decoration —
+  headers in `tools.py`, `photo_tools.py` and `server.py` are therefore load-bearing, not decoration —
   strip them and every tool call and token validation starts failing with an HTML error
   page. Any script written against these endpoints needs one too.
 - **The path guards run on a canonical path** — unquoted until stable, then lower-cased.
