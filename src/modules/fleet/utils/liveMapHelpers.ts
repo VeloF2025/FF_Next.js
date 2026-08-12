@@ -10,7 +10,7 @@ import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 export type PlottedVehicle = LiveVehicle & { lat: number; lon: number };
 
 export type VehicleStatus =
-  'speeding' | 'lostContact' | 'moving' | 'parked' | 'parkedSilent' | 'unknown';
+  'speeding' | 'lostContact' | 'moving' | 'idling' | 'parked' | 'parkedSilent' | 'unknown';
 
 /**
  * How long a parked vehicle may stay quiet before we stop vouching for it.
@@ -73,7 +73,13 @@ export function statusFor(v: LiveVehicle): VehicleStatus {
   }
   // Engine last known RUNNING, then silence: not "we don't know", but "it was
   // going somewhere and stopped telling us".
-  if (v.ignition === true) return v.isStale ? 'lostContact' : 'moving';
+  if (v.ignition === true) {
+    if (v.isStale) return 'lostContact';
+    // Only an explicit zero is evidence of not moving. A null speed means the
+    // provider did not say, and inventing "idle" from silence would misreport
+    // every feed that omits the field.
+    return v.speedKph === 0 ? 'idling' : 'moving';
+  }
   return 'unknown';
 }
 
@@ -97,6 +103,9 @@ export const STATUS_STYLE: Record<
   // the ring being broken is what reads as "no longer current".
   lostContact: { fill: '#d97706', fillOpacity: 0.95, label: 'Lost contact', dash: '4 2' },
   moving: { fill: '#0f9d6b', fillOpacity: 0.9, label: 'Moving' },
+  // Same green family as moving — the engine is running either way — but
+  // lighter, because the vehicle is not going anywhere.
+  idling: { fill: '#0f9d6b', fillOpacity: 0.55, label: 'Idling' },
   parked: { fill: '#7c3aed', fillOpacity: 0.9, label: 'Parked' },
   parkedSilent: { fill: '#7c3aed', fillOpacity: 0.45, label: 'Parked · no contact', dash: '3 3' },
   unknown: { fill: '#6b7280', fillOpacity: 0.6, label: 'No recent fix' },
