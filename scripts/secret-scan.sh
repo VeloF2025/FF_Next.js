@@ -268,8 +268,9 @@ if [ -n "$ADDED" ]; then
   # KEPT DELIBERATELY: an authority at the very start of a line's CONTENT still
   # matches. Do not "fix" that. It is what catches a COMMENTED-OUT credential — a
   # line whose content begins `//user:secret@host` — and commenting a credential
-  # out does not un-commit it. The cost is that a contrived line-start `//a:b@c`
-  # matches too, which is the right direction for this trade.
+  # out does not un-commit it. The cost is that a contrived authority-shaped run
+  # at the start of a line matches too, which is the right direction for a trade
+  # between missing a real credential and flagging a line nobody writes.
   #
   # It is the `[^A-Za-z0-9]` branch that does that work, NOT the `^`. Every line
   # in $ADDED is prefixed before any rule sees it: `+` in the three diff modes,

@@ -299,9 +299,9 @@ test("does not flag userinfo-shaped text that is not an authority", () => {
 test("flags a credential that has merely been commented out", () => {
   withFixture({}, (root) => {
     // Commenting a credential out does not un-commit it. This is the valuable
-    // half of allowing an authority at line start; the cost is that a contrived
-    // line-start `//a:b@c` matches too. Pinned so the boundary work above is not
-    // "tidied" into dropping the `^` alternative.
+    // half of allowing an authority at the start of a line's content; the cost
+    // is that a contrived authority-shaped run there matches too. Pinned so the
+    // boundary work in the rule is not "tidied" into dropping it.
     commitFile(root, "old.ts", `//${URI_SCHEME_RELATIVE}\n`);
     const r = runScan(root, ["--branch"]);
     assert.equal(r.status, 1, `a commented-out credential is still committed: ${describe(r)}`);
