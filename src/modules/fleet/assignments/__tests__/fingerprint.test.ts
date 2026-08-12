@@ -22,9 +22,19 @@ describe('assignmentFingerprint', () => {
     expect(assignmentFingerprint([ROW_A, ROW_B], 'v1')).toBe(assignmentFingerprint([ROW_B, ROW_A], 'v1'));
   });
 
+  it('is stable when rows tie on the primary sort fields', () => {
+    const selectedVehicle = { ...ROW_A, vehicleAssignmentId: '77777777-7777-4777-8777-777777777777', reason: 'Cover shift' };
+    const noVehicle = { ...ROW_A, vehicleAssignmentId: null, reason: null };
+
+    expect(assignmentFingerprint([selectedVehicle, noVehicle], 'v1')).toBe(
+      assignmentFingerprint([noVehicle, selectedVehicle], 'v1'),
+    );
+  });
+
   it('changes when any material source version changes', () => {
     const base = {
       assignments: '2026-08-10T08:00:00.000Z',
+      vehicles: '2026-08-10T08:00:00.000Z',
       vehicleAssignments: '2026-08-10T08:00:00.000Z',
       staff: '2026-08-10T08:00:00.000Z',
       projectSites: '2026-08-10T08:00:00.000Z',
@@ -41,7 +51,7 @@ describe('assignmentFingerprint', () => {
 
   it('does not change when callers change display-only labels outside the canonical rows', () => {
     const sourceVersion = assignmentSourceVersion({
-      assignments: '1', vehicleAssignments: '1', staff: '1', projectSites: '1', teamMembers: '1', attendancePolicies: '1',
+      assignments: '1', vehicles: '1', vehicleAssignments: '1', staff: '1', projectSites: '1', teamMembers: '1', attendancePolicies: '1',
     });
 
     expect(assignmentFingerprint([ROW_A], sourceVersion)).toBe(assignmentFingerprint([{ ...ROW_A }], sourceVersion));

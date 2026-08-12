@@ -50,6 +50,19 @@ describe('normalizeProposal', () => {
     expect(() => normalizeProposal([proposal({ startDate: '2026-02-30' })])).toThrow(/startDate/);
   });
 
+  it('rejects inherited, symbol, and non-enumerable unknown fields', () => {
+    const inherited = Object.create(proposal());
+    const withSymbol = proposal();
+    const symbol = Symbol('unknown');
+    Object.defineProperty(withSymbol, symbol, { value: 'unknown' });
+    const withHidden = proposal();
+    Object.defineProperty(withHidden, 'hidden', { value: 'unknown' });
+
+    expect(() => normalizeProposal([inherited])).toThrow(/plain object/);
+    expect(() => normalizeProposal([withSymbol])).toThrow(/unknown field/);
+    expect(() => normalizeProposal([withHidden])).toThrow(/unknown field/);
+  });
+
   it('normalizes date-only ISO values and nullable text', () => {
     expect(normalizeProposal([proposal({
       staffId: STAFF_ID.toUpperCase(),

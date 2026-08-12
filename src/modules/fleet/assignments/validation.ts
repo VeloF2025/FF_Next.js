@@ -65,11 +65,12 @@ export function normalizeProposal(input: unknown): AssignmentProposalRow[] {
   if (!Array.isArray(input)) throw new ProposalNormalizationError('Proposal must be an array of rows');
 
   return input.map((candidate, index) => {
-    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
-      throw new ProposalNormalizationError(`Row ${index} must be an object`);
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || Object.getPrototypeOf(candidate) !== Object.prototype) {
+      throw new ProposalNormalizationError(`Row ${index} must be a plain object`);
     }
     const row = candidate as Record<string, unknown>;
-    if (Object.keys(row).some((key) => !ALLOWED_KEYS.has(key))) {
+    const ownKeys = Object.getOwnPropertyNames(row);
+    if (Object.getOwnPropertySymbols(row).length > 0 || ownKeys.some((key) => !ALLOWED_KEYS.has(key))) {
       throw new ProposalNormalizationError(`Row ${index} contains an unknown field`);
     }
     const assignmentKind = row.assignmentKind;
