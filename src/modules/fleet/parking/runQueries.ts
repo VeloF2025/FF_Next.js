@@ -1,5 +1,5 @@
 import { sql } from '@/lib/db-pool';
-import { deriveParkingRunHealth, type ParkingRunHealth, type ParkingRunRecord, type ParkingRunStatus } from './runHealth';
+import { deriveParkingRunHealth, expectedParkingCheckDate, type ParkingRunHealth, type ParkingRunRecord, type ParkingRunStatus } from './runHealth';
 
 interface RunRow {
   id: string; check_date: string | Date; started_at: string | Date; completed_at: string | Date | null;
@@ -28,7 +28,8 @@ export async function finalizeParkingRun(runId: string, update: {
 }
 
 export async function loadParkingRunHealth(now: Date): Promise<ParkingRunHealth> {
-  const latest = await sql<RunRow>`SELECT * FROM fleet_parking_check_runs ORDER BY started_at DESC LIMIT 1`;
-  const success = await sql<RunRow>`SELECT * FROM fleet_parking_check_runs WHERE status IN ('succeeded','partial_failure') ORDER BY started_at DESC LIMIT 1`;
+  const expectedDate = expectedParkingCheckDate(now);
+  const latest = await sql<RunRow>`SELECT * FROM fleet_parking_check_runs WHERE check_date=${expectedDate}::date ORDER BY started_at DESC LIMIT 1`;
+  const success = await sql<RunRow>`SELECT * FROM fleet_parking_check_runs WHERE check_date=${expectedDate}::date AND status IN ('succeeded','partial_failure') ORDER BY started_at DESC LIMIT 1`;
   return deriveParkingRunHealth(latest[0] ? mapRun(latest[0]) : null, success[0] ? mapRun(success[0]) : null, now);
 }

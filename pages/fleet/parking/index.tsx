@@ -54,6 +54,7 @@ export default function ParkingCompliancePage() {
   const [health, setHealth] = useState<ParkingRunHealth | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [filtersReady, setFiltersReady] = useState(false);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -64,6 +65,7 @@ export default function ParkingCompliancePage() {
       setTo(filters.date);
     }
     if (filters.result) setResult(filters.result);
+    setFiltersReady(true);
   }, [router.isReady, router.query]);
 
   useEffect(() => {
@@ -103,8 +105,8 @@ export default function ParkingCompliancePage() {
   }, [from, to, result]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (filtersReady) void load();
+  }, [filtersReady, load]);
 
   const counts = RESULTS.map((r) => ({
     result: r,

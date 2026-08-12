@@ -21,7 +21,7 @@ import type {
 } from '../types';
 import { deliverEmail } from './emailDelivery';
 import { deliverWhatsApp } from './whatsappDelivery';
-import { claimNotification } from './notificationIdempotency';
+import { claimNotification, releaseNotificationClaim } from './notificationIdempotency';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -57,6 +57,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
   const severity = payload.severity || EVENT_SEVERITY[event_type] || 'info';
 
   for (const userId of recipient_user_ids) {
+    let claimedIdempotencyKey: string | null = null;
     try {
       if (payload.idempotency_key) {
         let claimed: boolean;
@@ -73,6 +74,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
           result.suppressed_recipients += 1;
           continue;
         }
+        claimedIdempotencyKey = payload.idempotency_key;
       }
       const channels = await getEffectiveChannels(userId, event_type);
 
@@ -114,6 +116,17 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
       }
       result.accepted_recipients += 1;
     } catch (err) {
+      if (claimedIdempotencyKey) {
+        try {
+          await releaseNotificationClaim(userId, event_type, claimedIdempotencyKey);
+        } catch (releaseError) {
+          log.error('Notification idempotency claim release failed', {
+            userId,
+            event_type,
+            error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+          }, 'NotificationBus');
+        }
+      }
       result.failed_recipients += 1;
       log.error('notify() failed for user', {
         userId, event_type, error: err instanceof Error ? err.message : String(err),

@@ -13,6 +13,24 @@ describe('deriveParkingRunHealth', () => {
     expect(deriveParkingRunHealth(row(), row(), new Date('2026-08-11T18:29:59Z')).state).toBe('healthy');
   });
 
+  it('fails before grace when the most recent completion is older than yesterday', () => {
+    expect(deriveParkingRunHealth(
+      row({ checkDate: '2026-08-09' }),
+      row({ checkDate: '2026-08-09' }),
+      new Date('2026-08-11T08:00:00Z')
+    )).toMatchObject({ state: 'failed', reason: 'Yesterday’s parking check has not completed' });
+  });
+
+  it('keeps today healthy when a later-started historical backfill is supplied as latest', () => {
+    const today = row({ checkDate: '2026-08-11' });
+    const backfill = row({ checkDate: '2026-08-01', startedAt: '2026-08-11T19:05:00Z' });
+
+    expect(deriveParkingRunHealth(backfill, today, new Date('2026-08-11T19:10:00Z'))).toMatchObject({
+      state: 'healthy',
+      latestSuccessfulRun: today,
+    });
+  });
+
   it('fails when today has not completed at the grace boundary', () => {
     expect(deriveParkingRunHealth(row(), row(), new Date('2026-08-11T18:30:00Z'))).toMatchObject({ state: 'failed', reason: 'Today’s parking check has not completed' });
   });

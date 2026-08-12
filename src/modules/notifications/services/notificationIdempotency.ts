@@ -13,3 +13,16 @@ export async function claimNotification(
   `;
   return rows.length === 1;
 }
+
+export async function releaseNotificationClaim(
+  userId: string,
+  eventType: string,
+  idempotencyKey: string
+): Promise<void> {
+  await sql`
+    DELETE FROM notification_idempotency_claims
+    WHERE user_id = ${userId}::uuid
+      AND event_type = ${eventType}
+      AND idempotency_key = ${idempotencyKey}
+  `;
+}

@@ -2,13 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
   claim: vi.fn(),
+  release: vi.fn(),
   sql: vi.fn(),
   email: vi.fn(),
   whatsapp: vi.fn(),
 }));
 
 vi.mock('@/lib/db-neon', () => ({ neon: () => state.sql }));
-vi.mock('../notificationIdempotency', () => ({ claimNotification: state.claim }));
+vi.mock('../notificationIdempotency', () => ({
+  claimNotification: state.claim,
+  releaseNotificationClaim: state.release,
+}));
 vi.mock('../emailDelivery', () => ({ deliverEmail: state.email }));
 vi.mock('../whatsappDelivery', () => ({ deliverWhatsApp: state.whatsapp }));
 vi.mock('../../constants', () => ({
@@ -27,6 +31,7 @@ describe('notification bus idempotency', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.claim.mockResolvedValue(true);
+    state.release.mockResolvedValue(undefined);
     state.sql.mockImplementation(async (strings: TemplateStringsArray) =>
       strings.join('').includes('notification_preferences') ? [] : [{ id: 'notification-1' }]);
     state.email.mockResolvedValue(undefined);
@@ -60,5 +65,19 @@ describe('notification bus idempotency', () => {
   it('allows one recipient while suppressing another', async () => {
     state.claim.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     expect(await notify(payload)).toEqual({ accepted_recipients: 1, suppressed_recipients: 1, failed_recipients: 0 });
+  });
+
+  it('releases a successful claim when durable in-app insertion fails', async () => {
+    state.sql.mockImplementation(async (strings: TemplateStringsArray) => {
+      if (strings.join('').includes('notification_preferences')) return [];
+      throw new Error('insert unavailable');
+    });
+
+    expect(await notify({ ...payload, recipient_user_ids: ['user-1'] })).toEqual({
+      accepted_recipients: 0,
+      suppressed_recipients: 0,
+      failed_recipients: 1,
+    });
+    expect(state.release).toHaveBeenCalledWith('user-1', 'test', 'stable-key');
   });
 });
