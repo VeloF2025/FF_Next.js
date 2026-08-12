@@ -180,16 +180,26 @@ describe('isSameFailureKind — eviction keeps its own streak', () => {
     expect(isSameFailureKind(auth, evicted)).toBe(false);
   });
 
-  it('does not merge an eviction streak into a transient streak', () => {
-    // The exact bug isSameFailureKind's docstring warns about: once eviction
-    // leaves isAuthFailure, a two-way `isAuthFailure(a) === isAuthFailure(b)`
-    // comparison calls an eviction and an ordinary transient failure the SAME
-    // kind, because both are `false`. Note this assertion also holds against
-    // the pre-fix code (which routed eviction through isAuthFailure instead of
-    // dropping it to `false`), so on its own it does not discriminate against
-    // HEAD — it guards specifically against a half-applied fix that updates
-    // isAuthFailure without making isSameFailureKind three-way. The
-    // evicted-vs-auth pair above is what fails against HEAD.
+  it('pins a half-applied-fix trap, NOT a HEAD regression guard: isAuthFailure alone does not keep eviction out of the transient streak', () => {
+    // This is not the guard for eviction/transient streak-merging — the
+    // evicted-vs-auth pair above is. This assertion is TRUE against every
+    // commit in this repo's history, including the pre-Task-3 code, because
+    // pre-Task-3 isAuthFailure(evicted) was `true` and isAuthFailure(transient)
+    // was `false`, so the OLD two-way `isAuthFailure(a) === isAuthFailure(b)`
+    // formula already answered "different kind" here — the right answer for
+    // the wrong reason. It cannot fail against any state that ever existed in
+    // git, so on its own it proves nothing about a real regression.
+    //
+    // What it DOES pin: a specific incomplete-refactor pattern — updating
+    // isAuthFailure to drop eviction while forgetting to also update
+    // isSameFailureKind to be three-way. In that (never-shipped) intermediate
+    // state, both isAuthFailure(evicted) and isAuthFailure(transient) are
+    // `false`, so the two-way formula wrongly calls them the same kind —
+    // exactly the corruption isSameFailureKind's docstring warns about.
+    // Verified by temporarily reverting only isSameFailureKind to the two-way
+    // form with isAuthFailure left fixed: this assertion failed as expected,
+    // then the three-way form was restored. See task-3-report.md fix round 1
+    // for the reproduction transcript.
     expect(isSameFailureKind(evicted, transient)).toBe(false);
     expect(isSameFailureKind(transient, evicted)).toBe(false);
   });
