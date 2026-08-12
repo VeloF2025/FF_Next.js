@@ -17,8 +17,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import {
+  withAuth,
+  withPermission,
+  type AuthenticatedNextApiRequest,
+} from '@/lib/auth/middleware';
 import pool from '@/lib/db';
+import { userHasPermission } from '@/lib/permissions';
 import { log } from '@/lib/logger';
 import {
   isConfigured,
@@ -28,7 +33,13 @@ import {
   verifyLink,
 } from '@/lib/photos/photoLinks';
 import rateLimiter from '@/lib/rateLimiter';
-import { allKeysQuery, parseFilter, proxySourceForKey, summaryQuery } from '@/lib/photos/photoQuery';
+import {
+  allKeysQuery,
+  parseFilter,
+  proxySourceForKey,
+  summaryQuery,
+  type PhotoFilter,
+} from '@/lib/photos/photoQuery';
 
 interface KeyRow {
   storage_key: string;
@@ -96,6 +107,9 @@ async function serveSignedManifest(req: NextApiRequest, res: NextApiResponse) {
 
   const parsed = parseFilter(filterQuery);
   if ('error' in parsed) return apiResponse.badRequest(res, parsed.error);
+  // Carried in the SIGNED filter, not re-derived: mode 2 has no session to check, and
+  // re-checking would let a later permission grant widen an already-minted manifest.
+  parsed.filter.includeWorksQa = filterQuery.includeWorksQa === 'true';
 
   // This branch is unauthenticated by design and each hit re-runs an UNCAPPED query
   // plus one HMAC per matching row. Without a limiter, one leaked manifest URL is an
@@ -149,6 +163,10 @@ async function mintManifest(req: NextApiRequest, res: NextApiResponse) {
   const user = (req as AuthenticatedNextApiRequest).user;
   const parsed = parseFilter(req.query);
   if ('error' in parsed) return apiResponse.badRequest(res, parsed.error);
+
+  const worksQa = await resolveWorksQaAccess(req, parsed.filter);
+  if ('denied' in worksQa) return apiResponse.forbidden(res, worksQa.denied);
+  parsed.filter.includeWorksQa = worksQa.allowed;
 
   const summarySql = summaryQuery(parsed.filter);
   const summary = await pool.query<{ matched: number; sized: number; total_bytes: string }>(
@@ -206,6 +224,26 @@ async function mintManifest(req: NextApiRequest, res: NextApiResponse) {
     expiresInSeconds: LINK_TTL_SECONDS,
     manifestUrl: `${baseUrl(req)}/api/photos/manifest?${query}`,
   });
+}
+
+
+/**
+ * Works-QA photos are gated on `construction-qa.works-qa`, a SIBLING permission of the
+ * `construction-qa.qa-centre` gate on this route. Adding that corpus to the search must
+ * not widen who can read pole labels, step labels, VLM verdicts — or mint download links
+ * for the bytes. An explicit `source=worksqa` from an unentitled caller is refused; a
+ * `both` search simply omits the corpus.
+ */
+async function resolveWorksQaAccess(
+  req: NextApiRequest,
+  filter: PhotoFilter,
+): Promise<{ allowed: boolean } | { denied: string }> {
+  const user = (req as AuthenticatedNextApiRequest).user;
+  const allowed = await userHasPermission(user.id, 'construction-qa.works-qa', 'view');
+  if (!allowed && filter.source === 'worksqa') {
+    return { denied: 'You do not have access to works-QA photos.' };
+  }
+  return { allowed };
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {

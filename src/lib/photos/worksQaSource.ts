@@ -33,16 +33,23 @@ export const WORKS_QA_SLOT_UNPIVOT = `
       ) AS slot(slot_key, slot_label, discipline, storage_key)`;
 
 /**
- * The per-slot VLM verdict, read out of the `vlm_results` jsonb.
+ * The per-slot verdict, read out of the `vlm_results` jsonb. NULL when unscored.
  *
- * An overridden failure is NOT a failure: `pole-override.ts` records a human decision in
- * `overridden_by`, and reporting those as failures would tell a PM that work already
- * accepted by a reviewer is still outstanding.
+ * A human override needs NO special case here, and adding one is a bug: `pole-override.ts`
+ * accepts `decision: 'pass' | 'fail'` and writes `valid: decision === 'pass'` alongside
+ * `overridden_by`, so `valid` ALREADY carries the reviewer's decision in both directions.
+ * Forcing TRUE whenever `overridden_by` is present silently converts an explicit FAIL
+ * override into a pass — the photo then answers a "show me the failures" query with
+ * nothing, hiding work a human deliberately rejected.
+ *
+ * Gated on `jsonb_typeof(...) = 'boolean'` rather than casting whatever is there. The
+ * cast throws on any non-boolean, and because this expression appears in the shared
+ * UNION, one malformed row anywhere in pole_qa_photos would 500 every photo search and
+ * every download manifest for every project, not just the affected one.
  */
 export const WORKS_QA_VLM_VALID = `
   CASE
-    WHEN w.vlm_results -> slot.slot_key ->> 'overridden_by' IS NOT NULL THEN TRUE
-    WHEN jsonb_exists(COALESCE(w.vlm_results -> slot.slot_key, '{}'::jsonb), 'valid')
+    WHEN jsonb_typeof(w.vlm_results -> slot.slot_key -> 'valid') = 'boolean'
       THEN (w.vlm_results -> slot.slot_key ->> 'valid')::boolean
     ELSE NULL
   END`;

@@ -156,9 +156,9 @@ function qfieldQuery(filter: PhotoFilter, params: unknown[]): Clause {
 /**
  * pole_qa_photos, unpivoted from one-row-per-pole into one-row-per-photo.
  *
- * The richest corpus for reporting: step label, VLM verdict, pole label, zone and PON
- * all present. Its only timestamp is `updated_at` (when the row was last written), so it
- * is tagged `date_basis='recorded'` — it is NOT a capture time.
+ * The richest corpus for reporting: step label, VLM verdict, pole label, zone and PON all
+ * present. It records NO photo timestamp, so rows carry a NULL date, `date_basis` of
+ * 'unknown', and are excluded from date filters entirely.
  */
 function worksQaQuery(filter: PhotoFilter, params: unknown[]): Clause {
   const where: string[] = ['slot.storage_key IS NOT NULL'];
@@ -170,10 +170,13 @@ function worksQaQuery(filter: PhotoFilter, params: unknown[]): Clause {
   if (filter.pole) where.push(`w.pole_label ILIKE ${push(params, `%${escapeLike(filter.pole)}%`)}`);
   if (filter.zone !== undefined) where.push(`w.zone_no = ${push(params, filter.zone)}`);
   if (filter.pon !== undefined) where.push(`w.pon_no = ${push(params, filter.pon)}`);
-  if (filter.from) where.push(`w.updated_at >= ${push(params, filter.from)}::timestamptz`);
-  if (filter.to) where.push(`w.updated_at < ${push(params, filter.to)}::timestamptz`);
-  // No retake flag on this corpus; answering with something else would be a wrong answer.
+  // Neither a retake flag nor ANY photo timestamp exists on this corpus, so both filters
+  // exclude it rather than answer with something else. `updated_at` is the pole row's
+  // last-write time — shared by all 22 unpivoted photos and bumped by 20+ unrelated
+  // paths, including merely marking a pole seen (recent-seen.ts). Filtering on it would
+  // return a 2024 photo because someone opened the pole last week.
   if (filter.needsRetake !== undefined) where.push('FALSE');
+  if (filter.from !== undefined || filter.to !== undefined) where.push('FALSE');
 
   return {
     sql: `
@@ -185,8 +188,11 @@ function worksQaQuery(filter: PhotoFilter, params: unknown[]): Clause {
              slot.slot_label   AS step_label,
              ${WORKS_QA_VLM_VALID} AS vlm_valid,
              NULL::boolean     AS needs_retake,
-             w.updated_at      AS captured_at,
-             'recorded'        AS date_basis,
+             -- NULL, not updated_at: this corpus records no photo timestamp at all, and
+             -- surfacing a row's last-write time as a capture time would float every
+             -- works-QA photo to the top of "most recent" whenever anyone edited a pole.
+             NULL::timestamptz AS captured_at,
+             'unknown'         AS date_basis,
              NULL::bigint      AS file_size_bytes,
              w.pole_label      AS pole_number,
              w.zone_no,
@@ -201,11 +207,17 @@ function worksQaQuery(filter: PhotoFilter, params: unknown[]): Clause {
 
 function union(filter: PhotoFilter): Clause {
   const params: unknown[] = [];
+  // Callers without `construction-qa.works-qa` never reach this branch (the routes 403 an
+  // explicit source=worksqa), and a `both` search silently omits it rather than leaking.
+  const withWorksQa = filter.includeWorksQa !== false;
+
   if (filter.source === 'qa') return qaQuery(filter, params);
   if (filter.source === 'qfield') return qfieldQuery(filter, params);
   if (filter.source === 'worksqa') return worksQaQuery(filter, params);
+
   const qa = qaQuery(filter, params);
   const qf = qfieldQuery(filter, params);
+  if (!withWorksQa) return { sql: `${qa.sql} UNION ALL ${qf.sql}`, params };
   const wq = worksQaQuery(filter, params);
   // UNION ALL, then DISTINCT ON the key below: the ~102 construction-QA rows whose
   // storage_key starts with `projects/` are the same objects as rows in the QField

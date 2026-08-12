@@ -31,6 +31,15 @@ export interface PhotoFilter {
   to?: string;
   limit: number;
   offset: number;
+  /**
+   * Whether the caller may see the works-QA corpus.
+   *
+   * `pole_qa_photos` is gated on `construction-qa.works-qa` everywhere else in the app —
+   * a SIBLING of `construction-qa.qa-centre`, not a child. Routes set this from the
+   * caller's own permissions so adding a corpus to a search cannot quietly widen who
+   * can read it. Defaults to allowed so non-HTTP callers are unaffected.
+   */
+  includeWorksQa?: boolean;
 }
 
 export interface PhotoRow {
@@ -44,11 +53,12 @@ export interface PhotoRow {
   captured_at: string | null;
   /**
    * What `captured_at` actually measures for this row: 'captured' is EXIF capture time,
-   * 'validated' is when the QField validation ran, 'recorded' is when the works-QA row
-   * was last written. They are not interchangeable — a photo taken in June can be
-   * validated in August — so the basis travels with the row rather than being assumed.
+   * 'validated' is when the QField validation ran, and 'unknown' means the corpus records
+   * no photo timestamp (works-QA) — those rows carry a NULL date and are excluded from
+   * date filters rather than answered with a row's last-write time. A photo taken in
+   * June can be validated in August, so the basis travels with the row.
    */
-  date_basis: 'captured' | 'validated' | 'recorded';
+  date_basis: 'captured' | 'validated' | 'unknown';
   file_size_bytes: string | null;
   pole_number: string | null;
   zone_no: number | null;
