@@ -142,7 +142,7 @@ async function serveSignedManifest(req: NextApiRequest, res: NextApiResponse) {
     'photos-manifest',
   );
   res.setHeader('Cache-Control', 'no-store');
-  return apiResponse.success(res, { photos: photos.length, expiresInSeconds: childTtl, files: photos });
+  return apiResponse.success(res, { photoCount: photos.length, expiresInSeconds: childTtl, files: photos });
 }
 
 async function mintManifest(req: NextApiRequest, res: NextApiResponse) {

@@ -64,6 +64,9 @@ function toDto(row: PhotoRow) {
     vlmValid: row.vlm_valid,
     needsRetake: row.needs_retake,
     capturedAt: row.captured_at,
+    // 'validated' means this timestamp is when QField validation RAN, not when the
+    // photo was taken. Filtering or sorting the two as one thing gives wrong answers.
+    dateBasis: row.date_basis,
     sizeBytes: row.file_size_bytes === null ? null : Number(row.file_size_bytes),
     pole: row.pole_number,
     zone: row.zone_no,

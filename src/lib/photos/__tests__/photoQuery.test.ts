@@ -37,8 +37,15 @@ describe('parseFilter', () => {
     expect(parseFilter({ pon: 'abc' })).toHaveProperty('error');
   });
 
-  it('rejects an unparseable date', () => {
+  it('rejects a date Postgres would reject, not just one Date.parse dislikes', () => {
+    // Date.parse rolls 2026-02-30 over to March 2 and accepts a bare year; ::timestamptz
+    // rejects both. Letting them through turns a bad parameter into a generic 500.
     expect(parseFilter({ from: 'last tuesday' })).toHaveProperty('error');
+    expect(parseFilter({ from: '2026-02-30' })).toHaveProperty('error');
+    expect(parseFilter({ to: '2026-13-01' })).toHaveProperty('error');
+    expect(parseFilter({ from: '2026' })).toHaveProperty('error');
+    expect(parseFilter({ from: '2026-06-15' })).toHaveProperty('filter');
+    expect(parseFilter({ from: '2026-06-15T10:30:00Z' })).toHaveProperty('filter');
   });
 
   it('clamps page size so one call cannot pull the corpus', () => {
@@ -63,6 +70,55 @@ describe('proxySourceForKey', () => {
     expect(proxySourceForKey('projects/uuid/files/DCIM/a.jpg')).toBe('qfield');
     expect(proxySourceForKey('etwatwa/ETW.P.F283/a.jpg')).toBe('local');
   });
+});
+
+/**
+ * Every `$n` occurrence in the SQL, not just the distinct ones.
+ *
+ * The distinct set alone is too weak to see the failure this guards: if each UNION
+ * branch numbered from $1 independently, the distinct max would STILL equal
+ * params.length. Only the occurrence COUNT reveals the collision — each parameter is
+ * pushed once and referenced once, so occurrences must equal params.length exactly.
+ */
+function placeholders(sql: string): { max: number; refs: Set<number>; occurrences: number } {
+  const refs = new Set<number>();
+  let occurrences = 0;
+  for (const m of sql.matchAll(/\$(\d+)/g)) {
+    refs.add(Number(m[1]));
+    occurrences += 1;
+  }
+  return { max: refs.size ? Math.max(...refs) : 0, refs, occurrences };
+}
+
+describe('parameter numbering across the UNION', () => {
+  // Both branch builders share ONE params array so $n runs continuously across the
+  // UNION. Give either branch its own array and the second branch's placeholders bind
+  // to the first branch's values — wrong rows, no error, green CI. Nothing else in this
+  // file can see that, because the rest assert on SQL text.
+  const shapes: Array<[string, Partial<PhotoFilter>]> = [
+    ['no filters, both corpora', {}],
+    ['fully populated, both corpora', {
+      project: 'Etwatwa', type: 'depth', pole: 'ETW.P.F283', from: '2026-06-01', to: '2026-07-01',
+    }],
+    ['qa only', { source: 'qa', project: 'Etwatwa', type: 'depth', pole: 'x' }],
+    ['qfield only', { source: 'qfield', project: 'Etwatwa', type: 'pole' }],
+    ['uuid project', { project: 'de408530-76f0-4d10-bf08-cfcd3202f69e', type: 'depth' }],
+    ['zone and pon', { project: 'Lawley', zone: 3, pon: 5 }],
+  ];
+
+  for (const [label, over] of shapes) {
+    it(`binds every placeholder exactly once — ${label}`, () => {
+      for (const build of [pageQuery, summaryQuery, allKeysQuery]) {
+        const { sql, params } = build(filter(over));
+        const { max, refs, occurrences } = placeholders(sql);
+        expect(max).toBe(params.length);
+        // Each param bound exactly once. Catches two branches both numbering from $1.
+        expect(occurrences).toBe(params.length);
+        // No gaps: $1..$max must all appear, or a value is silently unused.
+        for (let i = 1; i <= max; i += 1) expect(refs.has(i)).toBe(true);
+      }
+    });
+  }
 });
 
 describe('query construction', () => {
@@ -113,7 +169,7 @@ describe('query construction', () => {
     // DISTINCT ON dictates its own leading sort key. Without the outer ORDER BY,
     // "the 20 most recent photos" quietly returns the 20 alphabetically-first ones.
     const { sql } = pageQuery(filter());
-    const inner = sql.indexOf('ORDER BY storage_key, captured_at DESC');
+    const inner = sql.indexOf('ORDER BY storage_key, corpus_rank, captured_at DESC');
     const outer = sql.indexOf('ORDER BY captured_at DESC NULLS LAST, storage_key');
     expect(inner).toBeGreaterThan(-1);
     expect(outer).toBeGreaterThan(inner);
@@ -123,6 +179,34 @@ describe('query construction', () => {
     // qfield rows carry no size at all; summing alone would report 0 MB for a 10,980
     // photo download.
     expect(summaryQuery(filter()).sql).toContain('count(file_size_bytes)::int AS sized');
+  });
+
+  it('tags which timestamp each corpus is reporting', () => {
+    // QField's only timestamp is validated_at — the validation RUN time, not capture
+    // time. Presenting them as one column silently answers "photos from August" with
+    // June photos that were validated in August.
+    const { sql } = pageQuery(filter());
+    expect(sql).toContain("'captured'            AS date_basis");
+    expect(sql).toContain("'validated'       AS date_basis");
+  });
+
+  it('excludes QField from a VLM filter instead of substituting needs_retake', () => {
+    // qfield_photo_validations has no boolean verdict column. Answering "which photos
+    // did the VLM fail" with the retake flag is a wrong answer, not a partial one — and
+    // vlm='fail' + needsRetake=false compiled to `IS TRUE AND IS NOT TRUE`, always empty.
+    const { sql } = summaryQuery(filter({ source: 'qfield', vlm: 'pass' }));
+    expect(sql).toContain('FALSE');
+    expect(sql).not.toContain('q.needs_retake IS NOT TRUE');
+  });
+
+  it('resolves a cross-corpus duplicate to the QA row, not by timestamp', () => {
+    // ~102 keys exist in both corpora. A time-ordered tiebreak hands every one to the
+    // QField row (validation always postdates capture), losing file_size_bytes,
+    // vlm_valid, zone_no, pon_no and filename.
+    const { sql } = pageQuery(filter());
+    expect(sql).toContain('ORDER BY storage_key, corpus_rank, captured_at DESC NULLS LAST');
+    expect(sql).toContain('0                     AS corpus_rank');
+    expect(sql).toContain('1                 AS corpus_rank');
   });
 
   it('escapes LIKE wildcards so a filter cannot silently match everything', () => {

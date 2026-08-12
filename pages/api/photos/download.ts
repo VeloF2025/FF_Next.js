@@ -24,6 +24,17 @@ import { vlmProxyKeyParam } from '@/lib/vlm/photoProxyAuth';
 export const config = { api: { responseLimit: false } };
 
 const LOOPBACK_BASE = `http://127.0.0.1:${process.env.PORT ?? '3000'}`;
+
+/**
+ * Bounds the loopback fetch ONLY — cleared the moment the response headers arrive.
+ *
+ * It must not still be armed while the body streams to the client. Aborting the
+ * controller after the fetch resolves kills the in-flight body, so a timer left running
+ * across the transfer truncates any download slower than this: 8.9 MB in 30s needs a
+ * sustained 300 KB/s, which a sandbox pulling thousands of photos concurrently will not
+ * hold. The client would get a silently truncated JPEG — and for `source=qfield`
+ * upstream sends no Content-Length, so nothing downstream could even detect the cut.
+ */
 const FETCH_TIMEOUT_MS = 30_000;
 
 /** Guard the value that reaches photo-proxy's storage lookup. Mirrors its own check. */
@@ -101,9 +112,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     `?key=${encodeURIComponent(key)}&source=${encodeURIComponent(source)}${vlmProxyKeyParam()}`;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let timer: NodeJS.Timeout | undefined = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const disarm = () => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+  };
+
   try {
     const upstreamRes = await fetch(upstream, { signal: controller.signal });
+    // Headers are in: the fetch is done and the body is now the client's business.
+    disarm();
     if (!upstreamRes.ok || !upstreamRes.body) {
       // apiResponse.internalError sanitises the body, so the diagnosis has to go to the
       // log or it goes nowhere. 401 here is the one worth naming: it means the internal
@@ -147,13 +165,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       { module: 'photos-download', error: (error as Error).message, key, userId: uid },
       'photos-download',
     );
-    // Headers are already sent once piping starts; a second write would throw.
-    if (res.headersSent) {
+    // `destroyed` and `writableEnded`, not just `headersSent`. When the source fails
+    // before the first byte, stream/promises pipeline destroys the destination without
+    // any header having been sent — so `headersSent` is false, the 500 below does NOT
+    // throw, and it is silently swallowed by a dead socket. The caller then sees a bare
+    // connection reset while this code believes it answered.
+    if (res.headersSent || res.destroyed || res.writableEnded) {
       res.destroy();
       return;
     }
     return apiResponse.internalError(res, new Error('Photo download failed'));
   } finally {
-    clearTimeout(timer);
+    disarm();
   }
 }

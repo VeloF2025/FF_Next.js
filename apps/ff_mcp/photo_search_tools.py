@@ -71,11 +71,16 @@ async def find_project_photos(
       "compaction" finds "Compaction / Backfill". QField photos use work types like
       "pole_installation" instead, so a type that exists in only one corpus narrows to it.
     - `source`: "qa" (construction QA), "qfield", or "both".
-    - `vlm`: "pass" or "fail" — the automated verdict. There is no manual-review filter
-      because that column is unpopulated; do not infer approval from its absence.
+    - `vlm`: "pass" or "fail" — the automated verdict. QA photos ONLY: QField photos have
+      no verdict column, so this filter excludes them rather than guessing. There is no
+      manual-review filter because that column is unpopulated; do not infer approval from
+      its absence.
     - `pole`, `zone`, `pon`: identity filters. QField photos carry no zone or PON, so
       asking for one returns QA photos only.
-    - `from_date`/`to_date`: ISO dates, on capture time.
+    - `from_date`/`to_date`: ISO calendar dates. NOTE the basis differs by corpus — for
+      QA photos this is capture time, for QField photos it is when validation RAN, which
+      can be months later. Every result carries `dateBasis` saying which it is; say so
+      when a date-filtered answer includes QField rows.
 
     Each result carries a `view` block — pass its `path` and `query` straight to
     view_photo to look at that photo. `matched` is the FULL count; `photos` is one page.
@@ -113,9 +118,11 @@ async def get_photo_download_manifest(
 
     Takes the same filters as find_project_photos and returns a count, a size estimate,
     and a single `manifestUrl`. It does NOT return the photos: fetch `manifestUrl`
-    yourself, and it answers with one download URL per matching photo, each valid for an
-    hour. Download those to the folder the user asked for, keeping each file's
-    `filename`.
+    yourself, and it answers with one download URL per matching photo. Those links expire
+    when the manifest link does, NOT an hour from when you fetch it — the response's
+    `expiresInSeconds` is the real remaining window, and it shrinks the longer you wait.
+    Check the count with the user BEFORE fetching the manifest, not after, then download
+    to the folder they asked for, keeping each file's `filename`.
 
     Do not call this in a loop to page through results — the manifest already covers
     every match, however many there are. Tell the user the count and the estimated size

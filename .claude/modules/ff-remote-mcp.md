@@ -182,6 +182,28 @@ proxy then fails closed (502) and FibreFlow itself is unaffected.
   `qfield_projects` → `qfield_project_links`. Filtering that table on its own
   `project_id` column returns zero rows, always, and looks like "no photos" rather than
   a bug.
+- **`qfield_photo_validations` has no capture time.** Its only timestamp is
+  `validated_at` — when validation RAN, which can be months after the photo was taken.
+  It is surfaced under `captured_at` for the union but tagged `date_basis='validated'`,
+  and callers must say so when a date-filtered answer includes QField rows. Treating the
+  two as one column silently answers "photos from August" with June photos.
+- **Cross-corpus duplicates resolve by `corpus_rank`, never by timestamp.** ~102 keys
+  exist in both corpora; a time-ordered tiebreak hands every one to the QField row,
+  because validation always postdates capture — and that row carries no
+  `file_size_bytes`, `vlm_valid`, `zone_no`, `pon_no` or `filename`.
+- **A filter a corpus cannot answer must return NOTHING from it, not an approximation.**
+  QField has no VLM verdict column, so `vlm` excludes that corpus rather than
+  substituting `needs_retake`; zone/PON do the same. Substituting also produced
+  `vlm='fail'` + `needsRetake=false` → `IS TRUE AND IS NOT TRUE`, silently always empty.
+- **The abort timer on `/api/photos/download` must be disarmed the moment the fetch
+  resolves.** Aborting the controller after that kills the in-flight body, so a timer
+  left armed across the transfer truncates any download slower than it — 8.9 MB in 30s
+  needs a sustained 300 KB/s, which concurrent bulk pulls will not hold, and for
+  `source=qfield` upstream sends no `Content-Length` so nothing downstream detects the cut.
+- **After piping starts, `res.headersSent` is not enough.** When the source fails before
+  the first byte, `stream/promises` pipeline destroys the destination with
+  `headersSent === false` — so a 500 written on that path does not throw and is silently
+  swallowed by a dead socket. Check `headersSent || destroyed || writableEnded`.
 - **`file_size_bytes` is NULL on ~82% of QA photos and absent from QField entirely.**
   Summing it alone reports 0 MB for a 10,980-photo download. Report the unsized count
   alongside any total, and label the extrapolation an estimate.

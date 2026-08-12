@@ -39,11 +39,14 @@ MIN_DIMENSION = 256
 # makes a VLM misread a digit.
 JPEG_QUALITY = 90
 
-# How far over MAX_DIMENSION a photo may sit and still be forwarded untouched. QField
-# photos are 1600px against a 1568px budget — 2% over. Shaving that costs a full
-# re-encode that INFLATED a measured 388 KB photo to 623 KB, to save 32 pixels that
-# Claude's own resampler would have taken off anyway. Above this slack the downscale is
-# worth its re-encode; below it, it is pure loss.
+# How far over MAX_DIMENSION a photo may still be forwarded untouched.
+#
+# This does NOT avoid the re-encode — _render always encodes, then decides whether to
+# keep the result. What it avoids is SHIPPING a re-encode that made things worse: QField
+# photos are 1600px against a 1568px budget, and shaving those 32 pixels inflated a
+# measured 388 KB photo to 623 KB while adding a second generation of JPEG artefacts.
+# Beyond this slack the downscale is worth having even at a larger byte size, because
+# the pixel reduction is real; inside it, the result is discarded.
 PASSTHROUGH_SLACK = 1.25
 
 # Ceiling on the raw download, before downscaling. Well above the ~900 KB average site
@@ -134,8 +137,6 @@ def _render(data: bytes, max_dimension: int) -> bytes:
             out = io.BytesIO()
             img.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True)
             rendered = out.getvalue()
-    except PhotoFetchError:
-        raise
     except Exception as exc:  # Pillow raises a wide family for malformed input
         raise PhotoFetchError(
             f"Those bytes could not be decoded as an image ({exc}). The path returned "

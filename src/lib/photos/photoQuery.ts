@@ -1,6 +1,6 @@
 /**
- * One filter grammar over BOTH photo corpora, shared by /api/photos/search and
- * /api/photos/manifest so a search and its download return the same rows.
+ * SQL over BOTH photo corpora, shared by /api/photos/search and /api/photos/manifest so
+ * a search and its download return the same rows.
  *
  * The two corpora are not two views of one table:
  *   construction_qa_photos    ~90k  project_id is a real column; step/VLM verdict live here
@@ -10,114 +10,15 @@
  * Built with explicit $n parameters rather than tagged-template fragments: a conditional
  * sql`` fragment breaks both the webpack Neon shim and the @/lib/db-pool tag (see
  * CLAUDE.md), and this grammar is nothing but conditionals.
+ *
+ * BOTH branch builders share ONE params array, so `$n` numbering runs continuously
+ * across the UNION. Give either branch its own array and the second branch's
+ * placeholders silently bind to the first branch's values.
  */
+import type { PhotoFilter } from './photoFilter';
 
-export type PhotoSource = 'qa' | 'qfield' | 'both';
-
-export interface PhotoFilter {
-  project?: string;
-  source: PhotoSource;
-  /** Matched against step_label / work_type, e.g. "depth" finds "Depth Photo". */
-  type?: string;
-  /** 'pass' | 'fail' — the VLM verdict. Manual review status is unpopulated, so it is not offered. */
-  vlm?: 'pass' | 'fail';
-  needsRetake?: boolean;
-  pole?: string;
-  zone?: number;
-  pon?: number;
-  from?: string;
-  to?: string;
-  limit: number;
-  offset: number;
-}
-
-export interface PhotoRow {
-  photo_id: string;
-  corpus: 'qa' | 'qfield';
-  storage_key: string;
-  proxy_source: string;
-  filename: string | null;
-  step_label: string | null;
-  vlm_valid: boolean | null;
-  needs_retake: boolean | null;
-  captured_at: string | null;
-  file_size_bytes: string | null;
-  pole_number: string | null;
-  zone_no: number | null;
-  pon_no: number | null;
-  project_name: string | null;
-}
-
-/** Page size for browsing. NOT a download ceiling — manifests are deliberately uncapped. */
-export const MAX_PAGE_SIZE = 200;
-const DEFAULT_PAGE_SIZE = 25;
-
-/** Parse a request query into a filter, or explain what was wrong with it. */
-export function parseFilter(query: Record<string, string | string[] | undefined>):
-  | { filter: PhotoFilter }
-  | { error: string } {
-  const one = (v: string | string[] | undefined): string | undefined =>
-    Array.isArray(v) ? v[0] : v;
-
-  const source = (one(query.source) ?? 'both') as PhotoSource;
-  if (!['qa', 'qfield', 'both'].includes(source)) {
-    return { error: `source must be qa, qfield or both — got "${source}"` };
-  }
-
-  const vlmRaw = one(query.vlm);
-  if (vlmRaw !== undefined && vlmRaw !== 'pass' && vlmRaw !== 'fail') {
-    return { error: `vlm must be pass or fail — got "${vlmRaw}"` };
-  }
-
-  const int = (name: string, raw: string | undefined): number | undefined | { error: string } => {
-    if (raw === undefined || raw === '') return undefined;
-    const n = Number(raw);
-    if (!Number.isInteger(n)) return { error: `${name} must be an integer — got "${raw}"` };
-    return n;
-  };
-  const zone = int('zone', one(query.zone));
-  if (zone && typeof zone === 'object') return zone;
-  const pon = int('pon', one(query.pon));
-  if (pon && typeof pon === 'object') return pon;
-
-  for (const name of ['from', 'to'] as const) {
-    const raw = one(query[name]);
-    if (raw && Number.isNaN(Date.parse(raw))) {
-      return { error: `${name} must be a date — got "${raw}"` };
-    }
-  }
-
-  const limitRaw = Number(one(query.limit) ?? DEFAULT_PAGE_SIZE);
-  const limit = Number.isFinite(limitRaw)
-    ? Math.min(Math.max(Math.trunc(limitRaw), 1), MAX_PAGE_SIZE)
-    : DEFAULT_PAGE_SIZE;
-  const offsetRaw = Number(one(query.offset) ?? 0);
-  const offset = Number.isFinite(offsetRaw) ? Math.max(Math.trunc(offsetRaw), 0) : 0;
-
-  const retakeRaw = one(query.needsRetake);
-
-  return {
-    filter: {
-      project: one(query.project) || undefined,
-      source,
-      type: one(query.type) || undefined,
-      vlm: vlmRaw,
-      needsRetake: retakeRaw === undefined ? undefined : retakeRaw === 'true',
-      pole: one(query.pole) || undefined,
-      zone: zone as number | undefined,
-      pon: pon as number | undefined,
-      from: one(query.from) || undefined,
-      to: one(query.to) || undefined,
-      limit,
-      offset,
-    },
-  };
-}
-
-/** Photo keys under `projects/` are MinIO objects; everything else is on local disk. */
-export function proxySourceForKey(key: string): 'qfield' | 'local' {
-  return key.startsWith('projects/') ? 'qfield' : 'local';
-}
+export type { PhotoFilter, PhotoRow, PhotoSource } from './photoFilter';
+export { MAX_PAGE_SIZE, parseFilter, proxySourceForKey } from './photoFilter';
 
 interface Clause {
   sql: string;
@@ -129,7 +30,8 @@ interface Clause {
  *
  * Without this, `project=%` matches every project and `project=_` matches any one-letter
  * name — so a filter could never be relied on to BOUND a manifest, which matters because
- * a manifest has no size cap.
+ * a manifest has no size cap. Backslash is Postgres's default LIKE escape and these are
+ * bound parameters, so no ESCAPE clause is needed.
  */
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -158,7 +60,7 @@ function qaQuery(filter: PhotoFilter, params: unknown[]): Clause {
   if (filter.project) where.push(projectClause('p.project_id', filter.project, params));
   if (filter.type) where.push(`p.step_label ILIKE ${push(params, `%${escapeLike(filter.type)}%`)}`);
   if (filter.vlm === 'pass') where.push('p.vlm_valid IS TRUE');
-  // IS NOT TRUE would sweep in the 197 unscored rows as failures. A photo the VLM never
+  // IS NOT TRUE would sweep in the ~197 unscored rows as failures. A photo the VLM never
   // looked at is not a photo the VLM rejected.
   if (filter.vlm === 'fail') where.push('p.vlm_valid IS FALSE');
   if (filter.needsRetake !== undefined) {
@@ -174,12 +76,14 @@ function qaQuery(filter: PhotoFilter, params: unknown[]): Clause {
     sql: `
       SELECT p.id::text            AS photo_id,
              'qa'                  AS corpus,
+             0                     AS corpus_rank,
              p.storage_key,
              p.filename,
              p.step_label,
              p.vlm_valid,
              p.needs_retake,
              p.captured_at,
+             'captured'            AS date_basis,
              p.file_size_bytes,
              r.extracted_pole_number AS pole_number,
              r.zone_no,
@@ -197,34 +101,43 @@ function qaQuery(filter: PhotoFilter, params: unknown[]): Clause {
  * qfield_photo_validations. The project association exists ONLY in the key path:
  * `projects/<qfieldcloud-uuid>/files/DCIM/...`. Filtering this corpus on its own
  * project_id column returns zero rows, always — every row is NULL.
+ *
+ * Its only timestamp is `validated_at`, the validation-run time, NOT capture time. It is
+ * surfaced under `captured_at` for the union but tagged `date_basis='validated'` so no
+ * caller can mistake one for the other.
  */
 function qfieldQuery(filter: PhotoFilter, params: unknown[]): Clause {
   const where: string[] = ['1=1'];
 
   if (filter.project) where.push(projectClause('l.fibreflow_project_id', filter.project, params));
   if (filter.type) where.push(`q.work_type ILIKE ${push(params, `%${escapeLike(filter.type)}%`)}`);
-  if (filter.vlm === 'pass') where.push('q.needs_retake IS NOT TRUE');
-  if (filter.vlm === 'fail') where.push('q.needs_retake IS TRUE');
   if (filter.needsRetake !== undefined) {
     where.push(`q.needs_retake IS ${filter.needsRetake ? 'TRUE' : 'NOT TRUE'}`);
   }
   if (filter.pole) where.push(`q.feature_id ILIKE ${push(params, `%${escapeLike(filter.pole)}%`)}`);
   if (filter.from) where.push(`q.validated_at >= ${push(params, filter.from)}::timestamptz`);
   if (filter.to) where.push(`q.validated_at < ${push(params, filter.to)}::timestamptz`);
-  // zone/PON have no counterpart on this corpus; asking for one must return nothing
-  // rather than silently ignoring the filter and dumping the whole project.
-  if (filter.zone !== undefined || filter.pon !== undefined) where.push('FALSE');
+  // Filters this corpus cannot answer must return NOTHING rather than be ignored.
+  // zone/PON have no counterpart here at all; `vlm` has no boolean verdict column, and
+  // substituting needs_retake for it would answer a question about the VLM's judgement
+  // with a different fact — and `vlm='fail'` + `needsRetake=false` would compile to a
+  // self-contradicting pair that is silently always empty.
+  const unanswerable =
+    filter.zone !== undefined || filter.pon !== undefined || filter.vlm !== undefined;
+  if (unanswerable) where.push('FALSE');
 
   return {
     sql: `
       SELECT q.id::text        AS photo_id,
              'qfield'          AS corpus,
+             1                 AS corpus_rank,
              q.photo_key       AS storage_key,
              NULL              AS filename,
              q.work_type       AS step_label,
              NULL::boolean     AS vlm_valid,
              q.needs_retake,
              q.validated_at    AS captured_at,
+             'validated'       AS date_basis,
              NULL::bigint      AS file_size_bytes,
              q.feature_id      AS pole_number,
              NULL::integer     AS zone_no,
@@ -245,19 +158,29 @@ function union(filter: PhotoFilter): Clause {
   if (filter.source === 'qfield') return qfieldQuery(filter, params);
   const qa = qaQuery(filter, params);
   const qf = qfieldQuery(filter, params);
-  // UNION ALL, then DISTINCT ON the key below: the ~106 construction-QA rows whose
+  // UNION ALL, then DISTINCT ON the key below: the ~102 construction-QA rows whose
   // storage_key starts with `projects/` are the same objects as rows in the QField
   // corpus, and a duplicate here becomes a photo downloaded twice.
   return { sql: `${qa.sql} UNION ALL ${qf.sql}`, params };
 }
 
 /**
+ * `DISTINCT ON (storage_key)` keyed to prefer the QA row.
+ *
+ * Ordering the tiebreak by time instead would hand every duplicate to the QField row,
+ * because its timestamp is a validation run and validation always postdates capture —
+ * and the QField row carries no file_size_bytes, vlm_valid, zone_no, pon_no or filename.
+ * The richer row wins by rank, not by accident of clock.
+ */
+const DEDUPE = 'DISTINCT ON (storage_key)';
+const DEDUPE_ORDER = 'ORDER BY storage_key, corpus_rank, captured_at DESC NULLS LAST';
+
+/**
  * Rows for one page, newest first.
  *
  * The ORDER BY is doubled deliberately. DISTINCT ON dictates its own leading sort key,
- * so the inner ORDER BY is alphabetical-by-key and exists only to pick which duplicate
- * survives; without the OUTER sort, "the 20 most recent depth photos" silently returns
- * the 20 alphabetically-first ones.
+ * so the inner ORDER BY exists only to pick which duplicate survives; without the OUTER
+ * sort, "the 20 most recent depth photos" silently returns the 20 alphabetically-first.
  */
 export function pageQuery(filter: PhotoFilter): Clause {
   const base = union(filter);
@@ -265,9 +188,9 @@ export function pageQuery(filter: PhotoFilter): Clause {
   return {
     sql: `
       SELECT * FROM (
-        SELECT DISTINCT ON (storage_key) *
+        SELECT ${DEDUPE} *
         FROM (${base.sql}) matched
-        ORDER BY storage_key, captured_at DESC NULLS LAST
+        ${DEDUPE_ORDER}
       ) deduped
       ORDER BY captured_at DESC NULLS LAST, storage_key
       LIMIT ${push(params, filter.limit)} OFFSET ${push(params, filter.offset)}`,
@@ -290,9 +213,9 @@ export function summaryQuery(filter: PhotoFilter): Clause {
       SELECT count(*)::int AS matched,
              count(file_size_bytes)::int AS sized,
              COALESCE(sum(file_size_bytes), 0)::bigint AS total_bytes
-      FROM (SELECT DISTINCT ON (storage_key) storage_key, file_size_bytes, captured_at
+      FROM (SELECT ${DEDUPE} storage_key, file_size_bytes, captured_at, corpus_rank
             FROM (${base.sql}) m
-            ORDER BY storage_key, captured_at DESC NULLS LAST) deduped`,
+            ${DEDUPE_ORDER}) deduped`,
     params: base.params,
   };
 }
@@ -302,9 +225,9 @@ export function allKeysQuery(filter: PhotoFilter): Clause {
   const base = union(filter);
   return {
     sql: `
-      SELECT DISTINCT ON (storage_key) storage_key, filename, step_label, file_size_bytes, captured_at
+      SELECT ${DEDUPE} storage_key, filename, step_label, file_size_bytes, captured_at, corpus_rank
       FROM (${base.sql}) matched
-      ORDER BY storage_key, captured_at DESC NULLS LAST`,
+      ${DEDUPE_ORDER}`,
     params: base.params,
   };
 }

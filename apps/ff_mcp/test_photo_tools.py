@@ -11,6 +11,7 @@ Run with:  FF_MCP_CALLBACK_SECRET=test-secret python3 -m pytest apps/ff_mcp/ -q
 from __future__ import annotations
 
 import io
+import random
 
 import pytest
 from PIL import Image as PilImage
@@ -191,7 +192,54 @@ def test_render_passes_through_a_photo_only_just_over_the_ceiling(photos):
     result = photo_tools._render(original, 1568)
 
     assert result is original
-    assert len(result) <= len(original)
+
+
+def test_render_downscales_an_oversize_photo_even_when_the_reencode_is_bigger(photos):
+    """Pins PASSTHROUGH_SLACK: without it, this photo is forwarded at 2400px.
+
+    Every other conjunct of `already_optimal` holds here — JPEG, no rotation, and the
+    re-encode really is larger (465 KB -> 1027 KB measured) — so `fits_budget` is the
+    only thing making this photo get downscaled at all. A noisy image stored at low
+    quality is exactly that shape: bytes go UP while pixels go DOWN.
+    """
+    photo_tools, _tools = photos
+    noise = random.Random(20260812).randbytes(2400 * 1800 * 3)
+    buf = io.BytesIO()
+    PilImage.frombytes("RGB", (2400, 1800), noise).save(buf, format="JPEG", quality=10)
+    original = buf.getvalue()
+
+    result = photo_tools._render(original, 1568)
+
+    assert result is not original, "forwarded a 2400px photo — PASSTHROUGH_SLACK is inert"
+    with PilImage.open(io.BytesIO(result)) as out:
+        assert out.size == (1568, 1176)
+    assert len(result) > len(original), "fixture no longer exercises the inflating case"
+
+
+def test_render_rotates_even_when_the_reencode_is_bigger(photos):
+    """Pins the `not needs_rotation` conjunct of already_optimal.
+
+    Without it this photo passes through un-rotated: it is JPEG, within budget, and its
+    re-encode inflates (79 KB -> 126 KB measured). A sideways trench photo is one a model
+    reads WRONG rather than refuses, so the rotation must win over the byte-size test.
+    """
+    photo_tools, _tools = photos
+    img = PilImage.new("RGB", (800, 600))
+    for x in range(800):
+        for y in range(0, 600, 3):
+            img.putpixel((x, y), ((x * 7) % 256, (y * 13) % 256, (x + y) % 256))
+    exif = PilImage.Exif()
+    exif[0x0112] = 6  # rotate 90°
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=30, exif=exif.tobytes())
+    original = buf.getvalue()
+
+    result = photo_tools._render(original, 1568)
+
+    assert result is not original, "passed through un-rotated pixels"
+    with PilImage.open(io.BytesIO(result)) as out:
+        assert out.size == (600, 800), "EXIF rotation lost to the size comparison"
+    assert len(result) > len(original), "fixture no longer exercises the inflating case"
 
 
 def test_render_still_downscales_an_oversize_photo_that_compresses_well(photos):
