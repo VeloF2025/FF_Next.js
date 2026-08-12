@@ -95,6 +95,8 @@ export interface DeliverySectionRow {
 
 export interface DeliverySection {
   project: string;
+  /** Present only when the caller holds `procurement` view. */
+  procurementWithheld?: string;
   activations: {
     total: Measure;
     dropsInScope: Measure;
@@ -103,7 +105,7 @@ export interface DeliverySection {
     newestActivation: string | null;
     weekly: Array<{ week: string; activations: number }>;
   };
-  procurement: {
+  procurement?: {
     purchaseOrders: Measure;
     totalValue: number;
     pendingApproval: Measure;
@@ -117,7 +119,19 @@ export interface DeliverySection {
 
 const n = (v: string | number | null | undefined): number => Number(v ?? 0);
 
-export function shapeDeliverySection(row: DeliverySectionRow): DeliverySection {
+/**
+ * @param canSeeProcurement the caller's `procurement` view permission, resolved by the
+ * route. Purchase-order totals and BOQ values are financial data, and this repo already
+ * models that separately: contractor and storeman are explicitly denied `procurement`
+ * view, and technician and viewer have no row at all — yet all four hold `projects` view,
+ * which is what gates this route. Gating the whole section on `projects` would hand PO
+ * commitment values to every one of them, so the block is omitted rather than the
+ * request refused: the activation half is legitimately theirs to see.
+ */
+export function shapeDeliverySection(
+  row: DeliverySectionRow,
+  canSeeProcurement = true,
+): DeliverySection {
   const drops = n(row.drops_scope);
   const activations = n(row.activations);
   const caveats = baseCaveats(row.project_name, n(row.name_matches));
@@ -128,7 +142,7 @@ export function shapeDeliverySection(row: DeliverySectionRow): DeliverySection {
         'This is a missing import, not evidence that nothing has been activated — build progress is measured against poles and is unaffected.',
     );
   }
-  if (n(row.po_pending) > 0) {
+  if (canSeeProcurement && n(row.po_pending) > 0) {
     caveats.push(`${row.po_pending} purchase orders are awaiting approval.`);
   }
 
@@ -146,7 +160,14 @@ export function shapeDeliverySection(row: DeliverySectionRow): DeliverySection {
       newestActivation: row.newest_activation,
       weekly: (row.weekly ?? []).map((w) => ({ week: w.week, activations: n(w.activations) })),
     },
-    procurement: {
+    ...(canSeeProcurement
+      ? {}
+      : {
+          procurementWithheld:
+            'Purchase order and BOQ figures are withheld: they need the procurement permission, which this account does not hold. The activation figures above are unaffected.',
+        }),
+    procurement: canSeeProcurement
+      ? {
       purchaseOrders: measure(n(row.po_count)),
       totalValue: n(row.po_value),
       pendingApproval: measure(n(row.po_pending)),
@@ -158,7 +179,8 @@ export function shapeDeliverySection(row: DeliverySectionRow): DeliverySection {
       })),
       boqItems: measure(n(row.boq_items)),
       boqValue: n(row.boq_value),
-    },
+        }
+      : undefined,
     caveats,
   };
 }

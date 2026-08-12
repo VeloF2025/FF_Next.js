@@ -12,6 +12,9 @@
 import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
 
 import { measure, ratio, throughput, type Measure, type Ratio, type Throughput } from './coverage';
+// ONE injection guard, not a second copy: a hardening applied to one of two identical
+// escapes silently leaves the other on the old behaviour.
+import { projectPredicate } from './projectTarget';
 
 /**
  * Works-QA stores photos as up to 22 named key columns per pole, so "how many photos"
@@ -45,21 +48,6 @@ export interface OverviewRow {
   activations_last_7d: string;
   open_snags: string;
   purchase_orders: string;
-}
-
-/**
- * Resolve by UUID or by name. Name matching is loose because people say "Etwatwa" while
- * the row says "Etwatwa" and QField calls it "FT_Etwatwa_POP_2"; LIKE wildcards in the
- * input are escaped so `%` cannot silently match every project.
- */
-function projectPredicate(project: string, params: unknown[]): string {
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project);
-  if (isUuid) {
-    params.push(project);
-    return `p.id = $${params.length}::uuid`;
-  }
-  params.push(`%${project.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-  return `p.project_name ILIKE $${params.length}`;
 }
 
 export function overviewQuery(project: string): { sql: string; params: unknown[] } {

@@ -192,6 +192,32 @@ describe('delivery section', () => {
     expect(sql).toContain('SELECT id::text FROM target');
   });
 
+  it('withholds procurement figures from a caller without that permission', () => {
+    // PO totals and BOQ values are financial. contractor and storeman are explicitly
+    // denied `procurement` view and technician/viewer hold no row at all — yet all four
+    // hold the `projects` view that gates this route.
+    const s = shapeDeliverySection(
+      deliveryRow({ po_count: '108', po_value: '16882648', boq_items: '250', po_pending: '2' }),
+      false,
+    );
+    expect(s.procurement).toBeUndefined();
+    expect(s.procurementWithheld).toContain('procurement permission');
+    // The activation half is legitimately theirs and must survive.
+    expect(s.activations).toBeDefined();
+    // The pending-approval caveat leaks a procurement fact and must go too.
+    expect(s.caveats.join(' ')).not.toContain('awaiting approval');
+  });
+
+  it('returns procurement figures to a caller who holds the permission', () => {
+    const s = shapeDeliverySection(
+      deliveryRow({ po_count: '108', po_value: '16882648' }),
+      true,
+    );
+    expect(s.procurement?.purchaseOrders.value).toBe(108);
+    expect(s.procurement?.totalValue).toBe(16882648);
+    expect(s.procurementWithheld).toBeUndefined();
+  });
+
   it('surfaces purchase orders waiting on approval', () => {
     const s = shapeDeliverySection(deliveryRow({ po_pending: '2' }));
     expect(s.caveats.join(' ')).toContain('2 purchase orders are awaiting approval');

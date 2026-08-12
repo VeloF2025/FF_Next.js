@@ -43,13 +43,6 @@ export function targetCte(project: string, params: unknown[]): string {
       )`;
 }
 
-export interface SectionMeta {
-  project: string;
-  projectStatus: string | null;
-  nameMatches: number;
-  caveats: string[];
-}
-
 /** Caveats every section carries, whatever it measures. */
 export function baseCaveats(projectName: string, nameMatches: number): string[] {
   const caveats = [

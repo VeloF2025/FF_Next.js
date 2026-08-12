@@ -9,8 +9,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, withPermission } from '@/lib/auth/middleware';
+import {
+  withAuth,
+  withPermission,
+  type AuthenticatedNextApiRequest,
+} from '@/lib/auth/middleware';
 import pool from '@/lib/db';
+import { userHasPermission } from '@/lib/permissions';
 import { log } from '@/lib/logger';
 import { buildSectionQuery, shapeBuildSection, type BuildSectionRow } from '@/lib/reporting/buildSection';
 import {
@@ -35,7 +40,10 @@ const SECTIONS = {
   },
   delivery: {
     query: deliverySectionQuery,
-    shape: (r: unknown) => shapeDeliverySection(r as DeliverySectionRow),
+    // The only section carrying financial figures, so the only one that asks a second
+    // question about the caller.
+    shape: (r: unknown, canSeeProcurement: boolean) =>
+      shapeDeliverySection(r as DeliverySectionRow, canSeeProcurement),
   },
 } as const;
 
@@ -52,7 +60,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const rawSection = req.query.section;
   const section = (typeof rawSection === 'string' ? rawSection : 'build') as SectionName;
-  if (!(section in SECTIONS)) {
+  // hasOwnProperty, NOT `in`: `in` walks the prototype chain, so `constructor`,
+  // `__proto__`, `valueOf` and `toString` all pass an allowlist written with it. They
+  // then destructure to undefined and throw, turning a bad parameter into a 500 and a
+  // log line per request instead of the 400 this is meant to return.
+  if (!Object.prototype.hasOwnProperty.call(SECTIONS, section)) {
     return apiResponse.badRequest(
       res,
       `section must be one of ${Object.keys(SECTIONS).join(', ')} — got "${rawSection}"`,
@@ -67,8 +79,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const row = result.rows[0];
     if (!row) return apiResponse.notFound(res, 'Project', project);
 
+    // Purchase-order totals and BOQ values are financial data, and this repo already
+    // gates them separately: contractor and storeman are explicitly denied `procurement`
+    // view and technician and viewer hold no row at all, yet all four hold the `projects`
+    // view that gates this route. Asked per request rather than assumed from the route's
+    // own gate, and the section is trimmed rather than refused — the activation half is
+    // legitimately theirs.
+    const user = (req as AuthenticatedNextApiRequest).user;
+    const canSeeProcurement =
+      section === 'delivery'
+        ? await userHasPermission(user.id, 'procurement', 'view')
+        : true;
+
     res.setHeader('Cache-Control', 'private, no-store');
-    return apiResponse.success(res, { section, ...shape(row) });
+    return apiResponse.success(res, { section, ...shape(row, canSeeProcurement) });
   } catch (error) {
     log.error(
       'Project section failed',
