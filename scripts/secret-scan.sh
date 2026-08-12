@@ -117,7 +117,7 @@ esac
 #
 # (Described rather than shown, again: a concrete example here is itself matched
 # by the URI rule below. This file cannot safely quote the things it detects.)
-PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|(^|[+[:space:]"'"'"'{(,])test[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
+PLACEHOLDER='\byour\b|your_|\bexample|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|(^|[+[:space:]"'"'"'{(,])test[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
 
 HITS=""
 add_hits() { # $1 = pattern, $2 = label, $3 = "cs" for case-SENSITIVE,

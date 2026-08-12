@@ -43,6 +43,12 @@ const URI_ADMIN_PW = ["postgresql://ff_user:", "admin", "@100.96.0.1:5437/fibref
 // applied to the whole matched span, which includes the VALUE, so any secret
 // prefixed this way whitelisted itself.
 const TEST_PREFIXED = ["SESSION_SEC", 'RET="test-', "a1b2c3d4e5f6a7b8c9d0", '"'].join("");
+// A real secret that merely CONTAINS the placeholder word as a substring. The
+// `example` term was unanchored, so those seven characters appearing anywhere in
+// a value exempted the whole line — the same "the filter can see the value" bug
+// the `test[-_]` term had.
+const SECRET_CONTAINING_EXAMPLE = ["API_TOK", 'EN="a1b2c3', "example", '456def789"'].join("");
+const PG_CONTAINING_EXAMPLE = ["PGPASS", 'WORD="Kx9mQ2', "example", 'Tn7Lp"'].join("");
 
 const ZERO_SHA = "0".repeat(40);
 
@@ -405,6 +411,34 @@ test("a value merely prefixed 'test-' does not whitelist itself", () => {
     commitFile(root, "config.ts", `${TEST_PREFIXED}\n`);
     const r = runScan(root, ["--branch"]);
     assert.equal(r.status, 1, `the placeholder filter must not read the VALUE: ${describe(r)}`);
+  });
+});
+
+test("a secret whose value merely CONTAINS 'example' is not exempt", () => {
+  withFixture({}, (root) => {
+    commitFile(root, "config.ts", `${SECRET_CONTAINING_EXAMPLE}\n${PG_CONTAINING_EXAMPLE}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a substring must not whitelist a real value: ${describe(r)}`);
+  });
+});
+
+test("genuine 'example' placeholders are still exempt", () => {
+  withFixture({}, (root) => {
+    // The word appears as itself, which is what the term exists for: a
+    // documentation stand-in. Anchoring must not cost these.
+    commitFile(
+      root,
+      "docs.md",
+      [
+        'API_TOKEN="example-token-goes-here"',
+        'SIGNING_KEY="my-example-key"',
+        "SMTP_USER=noreply@example.com",
+        'DB_PASSWORD="exampleValue123"',
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `documentation placeholders must stay clean: ${describe(r)}`);
   });
 });
 
