@@ -457,6 +457,18 @@ test("genuine sample/dummy/fake/placeholder placeholders are still exempt", () =
         'SIGNING_KEY="fake-key-for-docs"',
         'CLIENT_SECRET="placeholder-abc123"',
         'AUTH_TOKEN="my-sample-value"',
+        // The four above are hyphenated, so the word is boundary-delimited on
+        // BOTH sides and a leading-only anchor is indistinguishable from a
+        // trailing-only one. These four continue into a word character, which is
+        // what discriminates: under a trailing anchor they stop matching, stop
+        // being exempt, and fail this test. `example` already had such a fixture
+        // (`exampleValue123`); the siblings did not, so flipping all four to
+        // `word\b` left the whole suite green while exempting a password merely
+        // ENDING in one of them.
+        'DB_PASSWORD="sampleValue123"',
+        'DB_PASSWORD="dummyValue123"',
+        'DB_PASSWORD="fakeValue123"',
+        'DB_PASSWORD="placeholderValue123"',
         "",
       ].join("\n"),
     );

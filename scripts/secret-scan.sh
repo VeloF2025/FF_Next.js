@@ -125,6 +125,25 @@ esac
 # All five were fixed together. Doing `example` alone left four identical
 # bypasses behind a test name that read as if the class were closed.
 #
+# ACCEPTED COST, recorded here rather than pinned as a test: a value like
+# `PASSWORD="mysamplevalue"` -- one of the words preceded by a word character --
+# flips from exempt to FLAGGED. Measured as dormant: a `--tree` audit is
+# byte-identical before and after, and no tracked line has a credential-shaped
+# assignment with one of these words preceded by a word character. If that shape
+# ever does appear and the right answer is to exempt it, loosen the anchor
+# knowingly -- and re-read the CONTAINS tests first, because the obvious loosening
+# reopens the bug this fixed. It is documented instead of tested on purpose: a
+# test asserting `mysamplevalue` MUST flag would fossilise a judgement call, and
+# the detection behaviour is already pinned from the other direction.
+#
+# STILL OPEN, deliberately: a word at the START of a value, or after punctuation,
+# still exempts -- `API_TOKEN="example1234..."`, and inside a URI's userinfo
+# (`postgresql://user:example9f8e@host`). The URI case is the more realistic of
+# the two, because prefixing a real secret with a descriptive word is an
+# authoring habit rather than a coincidence, and a Postgres URI is issue #1830's
+# own shape. It wants the URI rule's per-rule $4 exact-match exclusion rather
+# than a change to this global list -- see the note on that rule below.
+#
 # NOT here: an exclusion for a placeholder connection URI. Adding userinfo
 # placeholder terms to this list was a REGRESSION, because PLACEHOLDER is
 # applied to the matched span of EVERY rule — so a value that merely CONTAINED
