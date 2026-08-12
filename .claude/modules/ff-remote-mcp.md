@@ -34,7 +34,7 @@ separate access-scope question.
 claude.ai ──► app.fibreflow.app/api/ff-remote-mcp/*   (edge proxy, unauthenticated)
                         │
                         ▼
-              127.0.0.1:7416  ff_mcp        (OAuth 2.1 AS + 5 tools, localhost only)
+              127.0.0.1:7416  ff_mcp        (OAuth 2.1 AS + 7 tools, localhost only)
                         │  authorize() redirects to ↓
                         ▼
               app.fibreflow.app/mcp/authorize?state_id=…   (consent page, user's session)
@@ -61,6 +61,10 @@ secret, and nothing else. No `JWT_SECRET`, no DB connection, no service credenti
 | `apps/ff_mcp/catalogue.py` | `list_endpoints`, `describe_endpoint` |
 | `apps/ff_mcp/tools.py` | `fibreflow_get` + `_guard_path`, the guard every tool shares |
 | `apps/ff_mcp/photo_tools.py` | `view_photo` — image content, not text |
+| `apps/ff_mcp/photo_search_tools.py` | `find_project_photos`, `get_photo_download_manifest` |
+| `src/lib/photos/photoQuery.ts` | One filter grammar over both photo corpora |
+| `src/lib/photos/photoLinks.ts` | HMAC signing for download links |
+| `pages/api/photos/{search,manifest,download}.ts` | Query, download plan, and bytes |
 | `apps/ff_mcp/endpoints.json` | Generated catalogue (`npm run mcp:catalogue`) |
 | `pages/api/ff-remote-mcp/[...path].ts` | Edge proxy — the only public path |
 | `pages/api/mcp/consent.ts` | Mints the token, calls the service back |
@@ -77,6 +81,8 @@ secret, and nothing else. No `JWT_SECRET`, no DB connection, no service credenti
 | `FF_REMOTE_MCP_STORE` | `~/.local/state/ff-remote-mcp/oauth.json` — systemd's `StateDirectory` creates it 0700 |
 | `FF_MCP_CALLBACK_SECRET` | Shared with `/api/mcp/consent`. **Never in a tracked file** |
 | `FF_REMOTE_MCP_URL` | Read by the *edge proxy*: upstream, default `http://127.0.0.1:7416` |
+| `PHOTO_LINK_SECRET` | Signs photo download links. **Unset = downloads refuse, by design** |
+| `VLM_PROXY_SECRET` | Already required by works-qa zips; `/api/photos/download` needs it too |
 
 Secrets live in `~/.ff-remote-mcp.env` (chmod 600, untracked) and
 `.claude/credentials.local.md`.
@@ -134,6 +140,29 @@ proxy then fails closed (502) and FibreFlow itself is unaffected.
 - **The consent redirect must target `FF_APP_BASE`, not the proxy base.** The user's
   session cookie is on the app host. A dev service pointed at the prod base would send
   users to prod to authorize a dev connector.
+- **The three photo tools do different jobs and must not be substituted.**
+  `find_project_photos` returns metadata a page at a time, `view_photo` returns ONE photo
+  as an image, `get_photo_download_manifest` returns a link that yields every match. The
+  tool descriptions are what route the model between them — they are load-bearing.
+- **A download manifest is uncapped, deliberately** (decision: Hein, 2026-08-12 — existing
+  RBAC, no ceiling). One filter can therefore be ~79 GB. Every mint is logged with the
+  user id, match count and filter, so a large egress stays attributable.
+- **`/api/photos/download` authenticates on a SIGNATURE, not a session.** The downloader
+  is Claude's Cowork sandbox, which holds no FibreFlow cookie and cannot be given one.
+  RBAC is evaluated once, when the manifest is minted for an authenticated user; the
+  signed link carries that decision for an hour, bound to one photo key so a leaked link
+  cannot be walked into the rest of the archive.
+- **`qfield_photo_validations.project_id` is NULL on all 60,875 rows.** The project is
+  recoverable only from the key path (`projects/<qfieldcloud-uuid>/...`) via
+  `qfield_projects` → `qfield_project_links`. Filtering that table on its own
+  `project_id` column returns zero rows, always, and looks like "no photos" rather than
+  a bug.
+- **`file_size_bytes` is NULL on ~82% of QA photos and absent from QField entirely.**
+  Summing it alone reports 0 MB for a 10,980-photo download. Report the unsized count
+  alongside any total, and label the extrapolation an estimate.
+- **Vitest needs an explicit alias for anything under `src/lib`.** `@/lib` falls back to
+  `./lib`, so `@/lib/photos` resolves to nothing without its own entry in
+  `vitest.config.ts`. The failure is at import time and reads as "does the file exist?".
 - **`fibreflow_get` cannot return a photo, and never will.** It decodes every response
   as UTF-8 and caps it at `MAX_RESPONSE_CHARS`, so a 150 KB JPEG arrives as 15,000
   characters of mojibake with its SOI marker already replaced — measured, not theorised.
