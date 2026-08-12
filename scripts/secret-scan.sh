@@ -265,12 +265,19 @@ if [ -n "$ADDED" ]; then
   # scheme added zero hits across the whole tree, and the sed shape occurs zero
   # times. The boundary is here so a future file cannot introduce it.
   #
-  # KEPT DELIBERATELY: an authority at the very START of a line still matches,
-  # via the `^` alternative (and via the `+` that prefixes every added line). Do
-  # not "fix" that. It is what catches a COMMENTED-OUT credential — a line whose
-  # content begins `//user:secret@host` — and a commented-out credential is still
-  # a committed credential. The cost is that a contrived line-start `//a:b@c`
-  # also matches, which is a trade worth making in this direction.
+  # KEPT DELIBERATELY: an authority at the very start of a line's CONTENT still
+  # matches. Do not "fix" that. It is what catches a COMMENTED-OUT credential — a
+  # line whose content begins `//user:secret@host` — and commenting a credential
+  # out does not un-commit it. The cost is that a contrived line-start `//a:b@c`
+  # matches too, which is the right direction for this trade.
+  #
+  # It is the `[^A-Za-z0-9]` branch that does that work, NOT the `^`. Every line
+  # in $ADDED is prefixed before any rule sees it: `+` in the three diff modes,
+  # and `+` in front of git grep's own `file:line:` in --tree. So the character
+  # before a content-start `//` is always `+` or `:`, and both already satisfy the
+  # class. `^` is unreachable in every real invocation — verified by deleting it
+  # and re-running the suite, which stays green including the commented-out test.
+  # It is kept only as insurance for a future change to how $ADDED is collected.
   add_hits "(^|[^A-Za-z0-9])([a-z][a-z0-9+.-]{1,14}:)?//[A-Za-z0-9_.%+-]+:[^@[:space:]'\"]+@[A-Za-z0-9_.[-]" \
            "credential in connection URI" "" \
            ":(pass|passwd|password|secret|changeme|redacted)@"
