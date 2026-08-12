@@ -57,25 +57,34 @@ export const MAX_PAGE_SIZE = 200;
 const DEFAULT_PAGE_SIZE = 25;
 
 /**
- * Accept only a date Postgres will also accept.
+ * Reject a date `::timestamptz` would reject, and NOTHING ELSE.
  *
- * `Date.parse` is far looser than `::timestamptz`: it rolls '2026-02-30' over to March 2
- * and accepts a bare '2026'. Letting those through turns a bad parameter into a generic
- * 500 from the query layer instead of a 400 naming the field.
+ * `Date.parse` alone is too loose: it rolls '2026-02-30' over to March 2 and accepts a
+ * bare '2026', turning a bad parameter into a generic 500 from the query layer instead
+ * of a 400 naming the field.
+ *
+ * But the calendar check must run on the LITERAL Y-M-D components, never on the parsed
+ * instant. Comparing `getUTC*()` against the literal prefix looks equivalent and is not:
+ * for '2026-06-15T01:00:00+02:00' the instant is 2026-06-14T23:00Z, so the day differs
+ * and a perfectly valid timestamp is rejected — and whether it is rejected depends on
+ * the SERVER's timezone, so the same request behaves differently on a UTC box and on
+ * the SAST deploy host.
  */
 function isRejectableDate(raw: string): boolean {
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return true;
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(raw);
+  if (!ymd) return true; // bare '2026', '15/06/2026', prose — none reach Postgres intact
 
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
-  if (!ymd) return !/^\d{4}-\d{2}-\d{2}/.test(raw);
+  const [, year, month, day] = ymd;
+  // Built from the components themselves, so nothing here depends on any offset.
+  const asUtc = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  const rolledOver =
+    asUtc.getUTCFullYear() !== Number(year) ||
+    asUtc.getUTCMonth() + 1 !== Number(month) ||
+    asUtc.getUTCDate() !== Number(day);
+  if (rolledOver) return true;
 
-  // A real calendar date survives the round trip; a rolled-over one does not.
-  return (
-    parsed.getUTCFullYear() !== Number(ymd[1]) ||
-    parsed.getUTCMonth() + 1 !== Number(ymd[2]) ||
-    parsed.getUTCDate() !== Number(ymd[3])
-  );
+  // The date is a real calendar day; the time/offset part still has to parse.
+  return Number.isNaN(Date.parse(raw));
 }
 
 /** Parse a request query into a filter, or explain what was wrong with it. */

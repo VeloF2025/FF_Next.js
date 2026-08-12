@@ -64,11 +64,41 @@ describe('GET /api/photos/manifest', () => {
     expect(requiredPermission.value).toBe('construction-qa.export');
   });
 
+  it('refuses an unauthenticated mint, so the auth wrapper is provably wired', async () => {
+    // Every other test presents a signature and routes to mode 2, which never touches
+    // withAuth. Without this, dropping withAuth from the mint path passes the suite.
+    poolQuery.mockResolvedValue({ rows: [{ matched: 5, sized: 5, total_bytes: '5000' }] });
+    const { req, res } = get({ project: 'Etwatwa' }); // no sig -> mint path, no user
+
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(401);
+    expect(poolQuery).not.toHaveBeenCalled();
+  });
+
+  it('mints a manifest URL for an authenticated user', async () => {
+    poolQuery.mockResolvedValue({ rows: [{ matched: 1496, sized: 267, total_bytes: '238000000' }] });
+    const { req, res } = get({ project: 'Etwatwa', type: 'depth' });
+    (req as unknown as { user: { id: string } }).user = { id: 'user-5' };
+
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(200);
+    const body = res._getJSONData().data;
+    expect(body.matched).toBe(1496);
+    // Size is unknown for most rows, so the total must be labelled an estimate.
+    expect(body.sizeUnknownFor).toBe(1496 - 267);
+    expect(body.sizeNote).toContain('Estimate');
+    const url = new URL(body.manifestUrl);
+    expect(url.origin).toBe('https://app.fibreflow.app');
+    expect(url.searchParams.get('uid')).toBe('user-5');
+    expect(url.searchParams.get('sig')).toBeTruthy();
+  });
+
   it('never mints a download link that outlives the manifest link', async () => {
     // A fresh full TTL per fetch would double the real window: fetch the manifest at
     // T+59m and hold working downloads until T+119m.
     const parentTtl = 90;
-    const parent = signLink({ f: 'x', uid: 'user-1', purpose: 'manifest' }, parentTtl)!;
     const f = Buffer.from(JSON.stringify({ project: 'Etwatwa' }), 'utf8').toString('base64url');
     const signedF = signLink({ f, uid: 'user-1', purpose: 'manifest' }, parentTtl)!;
 
@@ -83,7 +113,6 @@ describe('GET /api/photos/manifest', () => {
       const childExp = Number(new URL(file.url).searchParams.get('exp'));
       expect(childExp).toBeLessThanOrEqual(signedF.exp);
     }
-    expect(parent.exp).toBeGreaterThan(0);
   });
 
   it('routes projects/ keys to the qfield backend and the rest to local', async () => {

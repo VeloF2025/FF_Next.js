@@ -48,6 +48,25 @@ describe('parseFilter', () => {
     expect(parseFilter({ from: '2026-06-15T10:30:00Z' })).toHaveProperty('filter');
   });
 
+  it('accepts an offset timestamp, and does so regardless of server timezone', () => {
+    // Comparing the parsed UTC instant against the literal Y-M-D looks equivalent and is
+    // not: '2026-06-15T01:00:00+02:00' is 2026-06-14T23:00Z, so the day differs and a
+    // valid timestamp was rejected — differently on a UTC box than on the SAST host.
+    for (const raw of [
+      '2026-06-15T01:00:00+02:00',
+      '2026-06-15T23:00:00-05:00',
+      '2026-06-15T00:30:00+02:00',
+      '2026-06-15T10:30:00',
+    ]) {
+      expect(parseFilter({ from: raw })).toHaveProperty('filter');
+    }
+  });
+
+  it('still rejects a rolled-over calendar date carrying a time part', () => {
+    expect(parseFilter({ from: '2026-02-30T10:00:00Z' })).toHaveProperty('error');
+    expect(parseFilter({ from: '15/06/2026' })).toHaveProperty('error');
+  });
+
   it('clamps page size so one call cannot pull the corpus', () => {
     const parsed = parseFilter({ limit: '100000' });
     expect('filter' in parsed && parsed.filter.limit).toBe(MAX_PAGE_SIZE);
@@ -186,8 +205,10 @@ describe('query construction', () => {
     // time. Presenting them as one column silently answers "photos from August" with
     // June photos that were validated in August.
     const { sql } = pageQuery(filter());
-    expect(sql).toContain("'captured'            AS date_basis");
-    expect(sql).toContain("'validated'       AS date_basis");
+    // Whitespace-insensitive: these pin the SEMANTICS, not the SELECT-list alignment,
+    // so a cosmetic reformat must not fail CI.
+    expect(sql).toMatch(/'captured'\s+AS date_basis/);
+    expect(sql).toMatch(/'validated'\s+AS date_basis/);
   });
 
   it('excludes QField from a VLM filter instead of substituting needs_retake', () => {
@@ -205,8 +226,8 @@ describe('query construction', () => {
     // vlm_valid, zone_no, pon_no and filename.
     const { sql } = pageQuery(filter());
     expect(sql).toContain('ORDER BY storage_key, corpus_rank, captured_at DESC NULLS LAST');
-    expect(sql).toContain('0                     AS corpus_rank');
-    expect(sql).toContain('1                 AS corpus_rank');
+    expect(sql).toMatch(/0\s+AS corpus_rank/);
+    expect(sql).toMatch(/1\s+AS corpus_rank/);
   });
 
   it('escapes LIKE wildcards so a filter cannot silently match everything', () => {

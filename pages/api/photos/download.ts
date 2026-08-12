@@ -10,7 +10,7 @@
  * cannot be edited into another.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Readable } from 'stream';
+import { Readable, Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
@@ -36,6 +36,36 @@ const LOOPBACK_BASE = `http://127.0.0.1:${process.env.PORT ?? '3000'}`;
  * upstream sends no Content-Length, so nothing downstream could even detect the cut.
  */
 const FETCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Idle timeout on the body — time since the last BYTE, not total transfer time.
+ *
+ * A total-duration cap cannot work here: a legitimate 8.9 MB photo on a congested link
+ * takes as long as it takes, and capping the whole transfer is what truncated downloads
+ * before. But leaving the body unbounded is not the answer either — measured, a stalled
+ * upstream leaves `pipeline` pending forever, holding this handler, its socket and the
+ * upstream connection open, on a route built for thousands of concurrent pulls.
+ *
+ * Resetting on every chunk gives both: slow-but-progressing transfers never trip it,
+ * genuinely wedged ones die.
+ */
+const STALL_TIMEOUT_MS = 30_000;
+
+/** Read per request so a host can tune these, and so tests can exercise them in ms. */
+function envMs(name: string, fallback: number): number {
+  const override = Number(process.env[name]);
+  return Number.isFinite(override) && override > 0 ? override : fallback;
+}
+
+/** Passes bytes through untouched, restarting `onProgress` each time some arrive. */
+function stallWatchdog(onProgress: () => void): Transform {
+  return new Transform({
+    transform(chunk, _encoding, callback) {
+      onProgress();
+      callback(null, chunk);
+    },
+  });
+}
 
 /** Guard the value that reaches photo-proxy's storage lookup. Mirrors its own check. */
 const UNSAFE_KEY = /[;`$|&\\(){}[\]!#]/;
@@ -112,7 +142,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     `?key=${encodeURIComponent(key)}&source=${encodeURIComponent(source)}${vlmProxyKeyParam()}`;
 
   const controller = new AbortController();
-  let timer: NodeJS.Timeout | undefined = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let timer: NodeJS.Timeout | undefined = setTimeout(
+    () => controller.abort(),
+    envMs('PHOTO_DOWNLOAD_FETCH_MS', FETCH_TIMEOUT_MS),
+  );
   const disarm = () => {
     if (timer) clearTimeout(timer);
     timer = undefined;
@@ -157,7 +190,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // GC pauses across every route (see src/lib/construction-qa/minioPhotoStream.ts).
     // This route is built for a sandbox pulling thousands of images concurrently, so
     // collecting each 9 MB photo into memory first would reproduce that exactly.
-    await pipeline(Readable.fromWeb(upstreamRes.body as Parameters<typeof Readable.fromWeb>[0]), res);
+    let stall: NodeJS.Timeout | undefined;
+    const restartStallTimer = () => {
+      if (stall) clearTimeout(stall);
+      stall = setTimeout(() => controller.abort(), envMs('PHOTO_DOWNLOAD_STALL_MS', STALL_TIMEOUT_MS));
+    };
+    restartStallTimer();
+    try {
+      await pipeline(
+        Readable.fromWeb(upstreamRes.body as Parameters<typeof Readable.fromWeb>[0]),
+        stallWatchdog(restartStallTimer),
+        res,
+      );
+    } finally {
+      if (stall) clearTimeout(stall);
+    }
     return;
   } catch (error) {
     log.error(
