@@ -772,6 +772,98 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     expect(raiseTrackingAlertMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'transient' }));
   });
 
+  it('reads last_transient_alert_at from the watermark and threads it into the transient alert (catch path)', async () => {
+    const priorAlertAt = '2026-08-11T09:00:00.000Z';
+    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join('');
+      if (text.includes('SELECT last_event_ts')) {
+        return [{
+          last_event_ts: null,
+          consecutive_failures: 0,
+          last_error: null,
+          last_run_at: null,
+          last_gap_alert_at: null,
+          evicted_since: null,
+          poll_interval_minutes: 120,
+          last_transient_alert_at: priorAlertAt,
+        }];
+      }
+      if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+      if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+      return [];
+    });
+    netstarClientMock.mockReturnValue({
+      listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] Export: HTTP 500')),
+      feedFreshness: vi.fn().mockResolvedValue(new Date()),
+    });
+    await run(AUTH);
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'transient', lastTransientAlertAt: new Date(priorAlertAt) })
+    );
+  });
+
+  /**
+   * Same delivered-gate as the gap stamp: decideAlert saying an alert is due
+   * only means the POLICY wants one sent. Stamping last_transient_alert_at
+   * regardless would suppress the next 24h of transient alerts for an outage
+   * nobody was actually told about. Exercises the catch-path alert — the one
+   * a real portal outage (connection errors, not partial fetches) actually
+   * takes.
+   */
+  describe('transient alert (catch path): last_transient_alert_at is stamped only when delivered', () => {
+    function stampQuery() {
+      return sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('SET last_transient_alert_at'));
+    }
+
+    function triggerTransientFailureTick() {
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] Export: HTTP 500')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+    }
+
+    it('stamps when the decision was due AND delivery succeeded', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true },
+        delivered: true,
+      });
+      triggerTransientFailureTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeDefined();
+    });
+
+    it('does NOT stamp when the decision was due but delivery failed (e.g. no recipients configured)', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true },
+        delivered: false,
+      });
+      triggerTransientFailureTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+
+    it('does NOT stamp when the policy says the repeat is not due yet', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      triggerTransientFailureTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+
+    it('does NOT stamp an auth decision, which never sets stampTransientAlert', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_failed' },
+        delivered: true,
+      });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+  });
+
   it('returns an empty results array when no provider is configured', async () => {
     delete process.env.NETSTAR_PORTAL_URL;
     const res = await run(AUTH);
@@ -1057,6 +1149,67 @@ describe('partial fetch', () => {
     netstarProviderMock.mockReturnValue(partialProvider());
     const res = await run(AUTH);
     expect(res._getJSONData().data.results[0]).not.toHaveProperty('error');
+  });
+
+  it('reads last_transient_alert_at from the watermark and threads it into the transient alert', async () => {
+    const priorAlertAt = '2026-08-11T09:00:00.000Z';
+    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join('');
+      if (text.includes('SELECT last_event_ts')) {
+        return [{
+          last_event_ts: null,
+          consecutive_failures: 0,
+          last_error: null,
+          last_run_at: null,
+          last_gap_alert_at: null,
+          evicted_since: null,
+          poll_interval_minutes: 120,
+          last_transient_alert_at: priorAlertAt,
+        }];
+      }
+      if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+      if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+      return [];
+    });
+    netstarProviderMock.mockReturnValue(partialProvider());
+    await run(AUTH);
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'transient', lastTransientAlertAt: new Date(priorAlertAt) })
+    );
+  });
+
+  describe('transient alert (partial-fetch path): last_transient_alert_at is stamped only when delivered', () => {
+    function stampQuery() {
+      return sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('SET last_transient_alert_at'));
+    }
+
+    it('stamps when the decision was due AND delivery succeeded', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true },
+        delivered: true,
+      });
+      netstarProviderMock.mockReturnValue(partialProvider());
+      await run(AUTH);
+      expect(stampQuery()).toBeDefined();
+    });
+
+    it('does NOT stamp when the decision was due but delivery failed', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true },
+        delivered: false,
+      });
+      netstarProviderMock.mockReturnValue(partialProvider());
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+
+    it('does NOT stamp when the policy says the repeat is not due yet', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      netstarProviderMock.mockReturnValue(partialProvider());
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
   });
 });
 

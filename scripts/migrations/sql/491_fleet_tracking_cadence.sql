@@ -25,11 +25,23 @@
 -- would be `consecutive_failures * poll_interval_minutes`, which reintroduces
 -- exactly the tick-coupling last_gap_alert_at was added to remove. Set when an
 -- eviction streak starts; cleared on a healthy tick or a different failure kind.
+--
+-- last_transient_alert_at exists for the same reason as last_gap_alert_at,
+-- one alert kind over. TRANSIENT_THRESHOLD correctly counts consecutive
+-- failures at any cadence, but nothing suppressed REPEATS once the streak
+-- passed it — so tightening poll_interval_minutes (this same migration)
+-- multiplied transient alert volume by the same factor the cadence
+-- tightened by: a six-hour outage that was 3 ticks / 1 alert at 120 minutes
+-- became 36 ticks / 34 alerts at 10 minutes. Wall-clock re-alerting needs its
+-- own timestamp to measure from, and last_gap_alert_at cannot be reused:
+-- transient and gap are different failure kinds with their own streaks (see
+-- alerts.ts) that must be free to diverge.
 
 ALTER TABLE fleet_tracking_watermarks
   ADD COLUMN IF NOT EXISTS poll_interval_minutes INTEGER NOT NULL DEFAULT 120,
   ADD COLUMN IF NOT EXISTS last_gap_alert_at TIMESTAMPTZ NULL,
-  ADD COLUMN IF NOT EXISTS evicted_since TIMESTAMPTZ NULL;
+  ADD COLUMN IF NOT EXISTS evicted_since TIMESTAMPTZ NULL,
+  ADD COLUMN IF NOT EXISTS last_transient_alert_at TIMESTAMPTZ NULL;
 
 ALTER TABLE fleet_tracking_watermarks
   ADD CONSTRAINT fleet_tracking_watermarks_poll_interval_check

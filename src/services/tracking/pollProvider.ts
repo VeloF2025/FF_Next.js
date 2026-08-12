@@ -82,6 +82,11 @@ export async function pollProvider(
   // re-queried — a second read there could disagree with the first and would
   // double DB round-trips on the failure path.
   let currentIntervalMinutes = DEFAULT_POLL_INTERVAL_MINUTES;
+  // Hoisted for the same reason as priorEvictedSince: a transient alert can
+  // fire from EITHER the partial-fetch path (try) or a thrown error (catch),
+  // unlike a gap alert which only ever fires from the try. Read once from the
+  // watermark below and reused by both sites.
+  let priorTransientAlertAt: Date | null = null;
   try {
     // Read the watermark FIRST — before anything that authenticates, so a
     // known-bad credential never spends another login attempt. See
@@ -94,14 +99,16 @@ export async function pollProvider(
       last_gap_alert_at: Date | null;
       evicted_since: Date | null;
       poll_interval_minutes: number | null;
+      last_transient_alert_at: Date | null;
     }>`
-      SELECT last_event_ts, consecutive_failures, last_error, last_run_at, last_gap_alert_at, evicted_since, poll_interval_minutes
+      SELECT last_event_ts, consecutive_failures, last_error, last_run_at, last_gap_alert_at, evicted_since, poll_interval_minutes, last_transient_alert_at
       FROM fleet_tracking_watermarks
       WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
     `;
     const failures = wm[0]?.consecutive_failures ?? 0;
     priorError = wm[0]?.last_error ?? '';
     priorEvictedSince = wm[0]?.evicted_since ? new Date(wm[0].evicted_since) : null;
+    priorTransientAlertAt = wm[0]?.last_transient_alert_at ? new Date(wm[0].last_transient_alert_at) : null;
     currentIntervalMinutes = wm[0]?.poll_interval_minutes ?? DEFAULT_POLL_INTERVAL_MINUTES;
     const lastGapAlertAt = wm[0]?.last_gap_alert_at ? new Date(wm[0].last_gap_alert_at) : null;
     // Half-open on a cooldown, NOT a latch: while throttled the tick is skipped
@@ -260,15 +267,27 @@ export async function pollProvider(
     // A partial fetch is degraded even when it produced data: reported as
     // transient so a portal dropping one vehicle eventually says so.
     if (!fetched.complete) {
-      await raiseTrackingAlert({
+      const { decision: transientDecision, delivered: transientDelivered } = await raiseTrackingAlert({
         kind: 'transient',
         consecutiveFailures: (wm[0]?.consecutive_failures ?? 0) + 1,
         nowSast: now,
         lastGapAlertAt,
+        lastTransientAlertAt: priorTransientAlertAt,
         provider: provider.key,
         accountRef: provider.accountRef,
         detail: fetched.detail ?? 'partial fetch',
       });
+      // Separate statement, not folded into the watermark write above: this
+      // repo's SQL tag cannot carry a conditional fragment. Gated on
+      // `delivered`, not just `stampTransientAlert` — same reasoning as the
+      // gap stamp above: an undelivered alert must not start a 24h silence
+      // for an outage nobody was actually told about.
+      if (transientDelivered && transientDecision?.stampTransientAlert) {
+        await sql`
+          UPDATE fleet_tracking_watermarks SET last_transient_alert_at = now()
+          WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+        `;
+      }
     }
 
     log.info('[poll-portal-tracking] polled', {
@@ -333,7 +352,7 @@ export async function pollProvider(
       error: message, authFailure: auth, evicted });
     // Named apart from the breaker's `decision` above (a different concept,
     // in a different scope) so the two are never misread as the same thing.
-    const { decision: alertDecision } = await raiseTrackingAlert({
+    const { decision: alertDecision, delivered: alertDelivered } = await raiseTrackingAlert({
       kind: auth ? 'auth' : evicted ? 'evicted' : 'transient',
       consecutiveFailures: updated[0]?.consecutive_failures ?? 1,
       nowSast: now,
@@ -341,11 +360,23 @@ export async function pollProvider(
       // decideAlert), and the try-scoped watermark read is out of scope in
       // this catch anyway.
       lastGapAlertAt: null,
+      // priorTransientAlertAt is hoisted above the try specifically so it
+      // survives into this catch — see its declaration for why.
+      lastTransientAlertAt: priorTransientAlertAt,
       evictedSinceMs: evictedSince ? now.getTime() - evictedSince.getTime() : null,
       provider: provider.key,
       accountRef: provider.accountRef,
       detail: message,
     });
+    // Separate statement — same delivered-gate as the partial-fetch transient
+    // stamp above. Only the transient branch of decideAlert ever sets
+    // stampTransientAlert, so this is a no-op for auth/evicted decisions.
+    if (alertDelivered && alertDecision?.stampTransientAlert) {
+      await sql`
+        UPDATE fleet_tracking_watermarks SET last_transient_alert_at = now()
+        WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+      `;
+    }
 
     // Slow down rather than keep hammering a portal that is pushing back.
     // Deliberately NOT inside the breaker's throttled path above: that path

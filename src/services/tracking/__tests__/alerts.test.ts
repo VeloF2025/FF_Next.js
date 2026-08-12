@@ -99,6 +99,67 @@ describe('gap re-alert is wall-clock, not tick-counted', () => {
   });
 });
 
+describe('transient re-alert is wall-clock, not tick-counted', () => {
+  const base = new Date('2026-08-12T09:00:00Z');
+
+  it('alerts on the first failure to cross the threshold, with no prior transient alert', () => {
+    const d = decideAlert({
+      kind: 'transient', consecutiveFailures: 3, nowSast: base, lastGapAlertAt: null,
+      lastTransientAlertAt: null,
+    });
+    expect(d?.event).toBe('fleet.tracking_pull_degraded');
+    expect(d?.stampTransientAlert).toBe(true);
+  });
+
+  it('stays silent 23 hours after the last transient alert, however high the streak', () => {
+    // consecutiveFailures: 48 is deliberately high — proves silence comes
+    // from the wall clock, not from the streak resetting or shrinking.
+    const d = decideAlert({
+      kind: 'transient', consecutiveFailures: 48, nowSast: base, lastGapAlertAt: null,
+      lastTransientAlertAt: new Date(base.getTime() - 23 * 3600_000),
+    });
+    expect(d).toBeNull();
+  });
+
+  it('re-alerts once 24 hours have passed', () => {
+    const d = decideAlert({
+      kind: 'transient', consecutiveFailures: 50, nowSast: base, lastGapAlertAt: null,
+      lastTransientAlertAt: new Date(base.getTime() - 24 * 3600_000 - 1000),
+    });
+    expect(d?.event).toBe('fleet.tracking_pull_degraded');
+    expect(d?.stampTransientAlert).toBe(true);
+  });
+
+  /**
+   * The test that matters for this task.
+   *
+   * The defect: TRANSIENT_THRESHOLD gates the FIRST alert but nothing gated
+   * repeats, so alert volume scaled with tick count — a 2h cadence made a 6h
+   * outage 3 ticks / 1 alert, but tightening to 10 minutes (this branch's own
+   * change) made the SAME 6h outage 36 ticks / 34 alerts with the old code.
+   *
+   * Replays 36 ticks 10 minutes apart — the exact bookkeeping pollProvider
+   * performs (advance lastTransientAlertAt only when a decision fires) — and
+   * asserts the total stays at 1, matching the untightened baseline exactly.
+   */
+  it('does not scale alert count with tick count when the poll cadence tightens', () => {
+    let lastTransientAlertAt: Date | null = null;
+    let alertCount = 0;
+    for (let tick = 1; tick <= 36; tick++) {
+      const now = new Date(base.getTime() + tick * 10 * 60_000);
+      const decision = decideAlert({
+        kind: 'transient', consecutiveFailures: tick, nowSast: now,
+        lastGapAlertAt: null, lastTransientAlertAt,
+      });
+      if (decision) {
+        alertCount++;
+        if (decision.stampTransientAlert) lastTransientAlertAt = now;
+      }
+    }
+    expect(alertCount).toBe(1);
+  });
+});
+
 describe('raiseTrackingAlert', () => {
   const base = {
     provider: 'netstar' as const,

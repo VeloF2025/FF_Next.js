@@ -47,6 +47,17 @@ export interface AlertInput {
    * compiling the moment this field landed.
    */
   evictedSinceMs?: number | null;
+  /**
+   * When this provider/account last had a transient alert raised, or null if
+   * never. Read from fleet_tracking_watermarks.last_transient_alert_at.
+   *
+   * OPTIONAL for the same reason evictedSinceMs is: every gap/auth/evicted
+   * call site would otherwise have to pass a meaningless null, and every
+   * other AlertInput literal in alerts.test.ts would stop compiling the
+   * moment this field landed. Absent (undefined) and null both mean "no
+   * prior transient alert" — always due, same as lastGapAlertAt's null.
+   */
+  lastTransientAlertAt?: Date | null;
 }
 
 export interface AlertDecision {
@@ -57,6 +68,12 @@ export interface AlertDecision {
    * bookkeeping in consecutive_failures and must not disturb the gap clock.
    */
   stampGapAlert?: boolean;
+  /**
+   * Whether the caller must write `now` to last_transient_alert_at. Only a
+   * transient decision past TRANSIENT_REPEAT_AFTER_MS sets this — mirrors
+   * stampGapAlert exactly, see its comment.
+   */
+  stampTransientAlert?: boolean;
 }
 
 /** Transient errors must repeat this many times before anyone is told. */
@@ -71,6 +88,22 @@ const TRANSIENT_THRESHOLD = 3;
  * ignore the channel". Wall-clock holds the promise the constant was making.
  */
 const GAP_REPEAT_AFTER_MS = 24 * 3600_000;
+/**
+ * A sustained transient outage re-alerts at most once a day.
+ *
+ * Same wall-clock reasoning as GAP_REPEAT_AFTER_MS: TRANSIENT_THRESHOLD
+ * counts consecutive failures correctly at any cadence, but nothing
+ * suppressed REPEATS once the streak passed it, so alert volume scaled with
+ * tick count as the poll interval tightened — the same coupling
+ * GAP_REPEAT_AFTER_MS was added to remove, just missed on this branch.
+ *
+ * Kept as its OWN constant rather than reusing GAP_REPEAT_AFTER_MS: gap and
+ * transient are different failure classes that happen to share a cadence
+ * today, and nothing says they must stay in lockstep — a flakier upstream
+ * that warrants more frequent reminders should be able to retune this
+ * without also retuning gap re-alerts.
+ */
+const TRANSIENT_REPEAT_AFTER_MS = 24 * 3600_000;
 /**
  * Eviction is only newsworthy once it stops looking like a human at a keyboard.
  * Thirty minutes is longer than a portal session someone opens to check one
@@ -126,7 +159,14 @@ export function decideAlert(input: AlertInput): AlertDecision | null {
 
   if (input.kind === 'transient') {
     if (input.consecutiveFailures < TRANSIENT_THRESHOLD) return null;
-    return { event: 'fleet.tracking_pull_degraded' };
+    // Alert on the first tick past the threshold, then go quiet while the
+    // outage continues, surfacing again once per TRANSIENT_REPEAT_AFTER_MS —
+    // same rule as the gap branch above. undefined/null both mean "never
+    // alerted"; treat that as due, matching lastGapAlertAt's null handling.
+    const last = input.lastTransientAlertAt ?? null;
+    const due = last === null || input.nowSast.getTime() - last.getTime() >= TRANSIENT_REPEAT_AFTER_MS;
+    if (!due) return null;
+    return { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true };
   }
 
   if (input.kind === 'evicted') {
