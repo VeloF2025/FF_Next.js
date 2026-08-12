@@ -59,14 +59,52 @@ fi
 
 # git >= 2.9. Refuse rather than set a key the local git will ignore, which
 # would leave the hooks silently unused while this reported success.
-GIT_MAJOR=$(git version | sed -E 's/^git version ([0-9]+)\.([0-9]+).*/\1/')
-GIT_MINOR=$(git version | sed -E 's/^git version ([0-9]+)\.([0-9]+).*/\2/')
+#
+# The parse must FAIL CLOSED, and getting that wrong is how this gate became the
+# very thing it guards against. `sed` echoes its input unchanged when the pattern
+# does not match, so an unparseable `git version` left non-numeric values here;
+# `[ "$x" -lt 2 ]` then errors instead of returning true or false, `set -e` does
+# not apply inside an `if` condition, both sides of the `||` errored, the whole
+# condition evaluated false, and the script fell through to print a green banner.
+# Measured with a shimmed `git`: exit 0, config set, two swallowed "integer
+# expression expected" lines. Reachable via a wrapped git — corporate security
+# tooling, a version manager.
+#
+# So: extract with a pattern that can only yield digits, and require BOTH parts
+# to be non-empty digit strings before comparing anything.
+GIT_VERSION_RAW=$(git version 2>/dev/null || echo '')
+GIT_MAJOR=$(printf '%s' "$GIT_VERSION_RAW" | sed -nE 's/^git version ([0-9]+)\.([0-9]+).*/\1/p')
+GIT_MINOR=$(printf '%s' "$GIT_VERSION_RAW" | sed -nE 's/^git version ([0-9]+)\.([0-9]+).*/\2/p')
+case "$GIT_MAJOR:$GIT_MINOR" in
+  *[!0-9:]* | :* | *: | '')
+    echo -e "${RED}🚫 Could not read a git version from: '${GIT_VERSION_RAW}'${NC}" >&2
+    echo    "   core.hooksPath needs git >= 2.9 and is IGNORED by older versions," >&2
+    echo    "   so refusing rather than setting a key that may never be read." >&2
+    exit 1
+    ;;
+esac
 if [ "$GIT_MAJOR" -lt 2 ] || { [ "$GIT_MAJOR" -eq 2 ] && [ "$GIT_MINOR" -lt 9 ]; }; then
-  echo -e "${RED}🚫 core.hooksPath needs git >= 2.9; this is $(git version).${NC}" >&2
+  echo -e "${RED}🚫 core.hooksPath needs git >= 2.9; this is ${GIT_VERSION_RAW}.${NC}" >&2
   exit 1
 fi
 
 echo "📎 Pointing git at $HOOKS_PATH ..."
+
+# Report what is being replaced. A pre-existing core.hooksPath is a higher-signal
+# conflict than a leftover file in .git/hooks, and overwriting it silently is the
+# same class of loss this design was chosen to avoid -- just in config rather
+# than in a file. `--show-origin` names which file it came from, so a value
+# inherited from ~/.gitconfig is distinguishable from a local one.
+PRIOR=$(git config --get core.hooksPath 2>/dev/null || echo '')
+if [ -n "$PRIOR" ] && [ "$PRIOR" != "$HOOKS_PATH" ]; then
+  echo -e "${YELLOW}⚠️  core.hooksPath was already set, and is being replaced:${NC}"
+  echo    "     was: $PRIOR"
+  echo    "     now: $HOOKS_PATH"
+  ORIGIN=$(git config --show-origin --get core.hooksPath 2>/dev/null | awk '{print $1}' || echo '')
+  [ -n "$ORIGIN" ] && echo "     previous value came from: $ORIGIN"
+  echo -e "${YELLOW}   If those hooks are still wanted, they need to move into${NC}"
+  echo -e "${YELLOW}   $HOOKS_PATH — git reads ONE hooks directory, not both.${NC}"
+fi
 
 if ! git config core.hooksPath "$HOOKS_PATH"; then
   echo -e "${RED}🚫 Could not set core.hooksPath.${NC}" >&2
@@ -105,16 +143,35 @@ fi
 
 # Anything previously copied into .git/hooks still takes no effect now, but it is
 # left in place rather than deleted: it may be the only copy of a local guard.
+# Report EVERY hook left in .git/hooks, not just the two this repo ships.
+#
+# core.hooksPath redirects git for ALL hook types, so a developer's own
+# `commit-msg` or `post-checkout` stops firing the moment this runs -- measured,
+# with a working commit-msg hook that stopped blocking. The earlier version of
+# this notice only looked for pre-commit and pre-push, so exactly the hooks that
+# are NOT ours -- the ones nobody else knows about -- went unmentioned.
+#
+# Nothing is deleted: one of these may be the only copy of something.
 COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null || echo "")
-if [ -n "$COMMON_DIR" ]; then
-  STALE=$(ls "$COMMON_DIR/hooks"/{pre-commit,pre-push} 2>/dev/null | grep -v '\.sample$' || true)
+if [ -n "$COMMON_DIR" ] && [ -d "$COMMON_DIR/hooks" ]; then
+  # Executable, non-sample files only: a non-executable leftover was already
+  # being ignored by git before this change, so it is not something being lost.
+  STALE=$(find "$COMMON_DIR/hooks" -maxdepth 1 -type f -perm -u+x ! -name '*.sample' \
+            -printf '%f\n' 2>/dev/null | sort || true)
   if [ -n "$STALE" ]; then
+    OURS=$(printf 'pre-commit\npre-push\n')
+    OTHERS=$(comm -23 <(printf '%s\n' "$STALE") <(printf '%s\n' "$OURS") || true)
     echo ""
-    echo -e "${YELLOW}Note: files remain in $COMMON_DIR/hooks:${NC}"
-    echo "$STALE" | sed 's/^/  /'
-    echo -e "${YELLOW}They are no longer used — core.hooksPath takes precedence. Left in${NC}"
-    echo -e "${YELLOW}place deliberately: one may be the only copy of a local guard. Check${NC}"
-    echo -e "${YELLOW}them for anything worth porting into $HOOKS_PATH, then delete.${NC}"
+    echo -e "${YELLOW}Note: executable hooks remain in $COMMON_DIR/hooks:${NC}"
+    printf '%s\n' "$STALE" | sed 's/^/  /'
+    echo -e "${YELLOW}git now reads ONLY $HOOKS_PATH, so none of them run.${NC}"
+    if [ -n "$OTHERS" ]; then
+      echo -e "${RED}   Including hook(s) this repo does NOT ship:${NC}"
+      printf '%s\n' "$OTHERS" | sed 's/^/     /'
+      echo -e "${RED}   Those were yours. They have stopped firing. To keep them, move${NC}"
+      echo -e "${RED}   them into $HOOKS_PATH — git reads one directory, not both.${NC}"
+    fi
+    echo -e "${YELLOW}   Nothing was deleted; one may be the only copy of a local guard.${NC}"
   fi
 fi
 

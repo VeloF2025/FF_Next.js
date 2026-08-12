@@ -144,6 +144,107 @@ test("reports a hook that is not executable instead of claiming success", () => 
   });
 });
 
+// ── The git version gate ────────────────────────────────────────────────────
+//
+// Exercised through a `git` shim on PATH that reports a chosen version and
+// delegates everything else to the real binary. Without these, deleting the
+// entire gate left all tests green — one of the two silent-failure protections
+// this script claims, undetected.
+
+/** Put a `git` on PATH that reports `version` and delegates the rest. */
+function withGitReporting(root, version, body) {
+  const bin = mkdtempSync(join(tmpdir(), "gitshim-"));
+  try {
+    const shim = join(bin, "git");
+    writeFileSync(
+      shim,
+      `#!/bin/bash\nif [ "$1" = "version" ]; then echo "${version}"; exit 0; fi\nexec /usr/bin/git "$@"\n`,
+      "utf8",
+    );
+    chmodSync(shim, 0o755);
+    body(
+      spawnSync("bash", ["scripts/install-hooks.sh"], {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      }),
+    );
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+}
+
+test("refuses an UNPARSEABLE git version rather than failing open", () => {
+  withFixture((root) => {
+    // `sed` echoes its input unchanged on no-match, so the old parse produced
+    // non-numeric values; `[ "$x" -lt 2 ]` then ERRORS rather than returning
+    // false, `set -e` does not apply inside an `if` condition, and the script
+    // fell through to a green banner with the config set. Measured.
+    withGitReporting(root, "git version SOMETHING-WEIRD", (r) => {
+      assert.notEqual(r.status, 0, `must refuse: ${describe(r)}`);
+      assert.match(r.stderr, /Could not read a git version/);
+      const cfg = git(root, ["config", "--get", "core.hooksPath"]);
+      assert.notEqual(cfg.status, 0, "config must NOT have been set");
+    });
+  });
+});
+
+test("refuses a git older than 2.9, which ignores core.hooksPath entirely", () => {
+  withFixture((root) => {
+    withGitReporting(root, "git version 2.8.6", (r) => {
+      assert.notEqual(r.status, 0, `must refuse: ${describe(r)}`);
+      assert.match(r.stderr, /needs git >= 2\.9/);
+    });
+  });
+});
+
+test("accepts the version strings real gits actually print", () => {
+  withFixture((root) => {
+    for (const v of [
+      "git version 2.9.0",
+      "git version 2.39.5 (Apple Git-154)",
+      "git version 2.9.0-rc1",
+      "git version 3.0.0",
+      "git version 2.34.1.1.g5c96eae0d",
+      "git version 2.43.0.windows.1",
+    ]) {
+      git(root, ["config", "--unset", "core.hooksPath"]);
+      withGitReporting(root, v, (r) => {
+        assert.equal(r.status, 0, `${v} must be accepted: ${describe(r)}`);
+      });
+    }
+  });
+});
+
+// ── Conflicts it must not resolve silently ──────────────────────────────────
+
+test("reports an existing core.hooksPath it is about to replace", () => {
+  withFixture((root) => {
+    // Overwriting this silently is the same class of loss as clobbering a file,
+    // and a higher-signal conflict than a leftover copy.
+    gitOk(root, ["config", "core.hooksPath", "my/personal/hooks"]);
+    const r = install(root);
+    assert.equal(r.status, 0, describe(r));
+    assert.match(r.stdout, /already set/);
+    assert.match(r.stdout, /my\/personal\/hooks/, "must name what it replaced");
+  });
+});
+
+test("reports a leftover hook of a type this repo does NOT ship", () => {
+  withFixture((root) => {
+    // core.hooksPath redirects git for EVERY hook type, so a developer's own
+    // commit-msg stops firing the moment this runs. The notice must name it —
+    // it is the one nobody else knows about.
+    const own = join(root, ".git", "hooks", "commit-msg");
+    writeFileSync(own, "#!/bin/bash\nexit 1\n", "utf8");
+    chmodSync(own, 0o755);
+    const r = install(root);
+    assert.equal(r.status, 0, describe(r));
+    assert.match(r.stdout, /commit-msg/, "the developer's own hook must be named");
+    assert.match(r.stdout, /does NOT ship/, "and flagged as theirs, not ours");
+  });
+});
+
 test("refuses when the tracked hooks directory is missing", () => {
   withFixture((root) => {
     rmSync(join(root, "scripts", "githooks"), { recursive: true, force: true });
@@ -166,19 +267,33 @@ test("refuses outside a git repository", () => {
   }
 });
 
-test("mentions leftover files in .git/hooks without deleting them", () => {
+test("mentions a leftover EXECUTABLE hook without deleting it", () => {
   withFixture((root) => {
     // A previously-copied hook may be the only copy of a local guard. It no
     // longer runs, but deleting it would be the very loss this replaced.
     const stale = join(root, ".git", "hooks", "pre-push");
     writeFileSync(stale, "#!/bin/bash\n# OLD_LOCAL_GUARD\nexit 0\n", "utf8");
+    chmodSync(stale, 0o755);
     const r = install(root);
     assert.equal(r.status, 0, describe(r));
-    assert.match(r.stdout, /no longer used/, "must point out the stale file");
+    assert.match(r.stdout, /none of them run/, "must point out the stale file");
     assert.match(
       spawnSync("cat", [stale], { encoding: "utf8" }).stdout,
       /OLD_LOCAL_GUARD/,
       "must NOT delete it",
     );
+  });
+});
+
+test("does NOT mention a NON-executable leftover", () => {
+  withFixture((root) => {
+    const stale = join(root, ".git", "hooks", "pre-push");
+    writeFileSync(stale, "#!/bin/bash\n# NEVER_RAN_ANYWAY\nexit 0\n", "utf8");
+    chmodSync(stale, 0o644);
+    const r = install(root);
+    assert.equal(r.status, 0, describe(r));
+    // git already ignored it, so no behaviour is being lost. Reporting it would
+    // be noise, and noise trains people to skim the notice that matters.
+    assert.doesNotMatch(r.stdout, /hooks remain/);
   });
 });
