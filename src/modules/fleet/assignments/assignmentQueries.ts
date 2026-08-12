@@ -14,6 +14,14 @@ export interface PreviewState {
   snapshots: Record<string, { projectName: string; projectCode: string | null; sites: Record<string, string> }>;
 }
 
+export async function loadAssignmentProjectId(id: string): Promise<string | null> {
+  const row = await poolDb.queryOne<{ project_id: string }>(
+    'SELECT project_id FROM fleet_operational_assignments WHERE id = $1::uuid',
+    [id],
+  );
+  return row?.project_id ?? null;
+}
+
 type Db = Pick<TxnClient, 'query' | 'queryOne'>;
 const poolDb: Db = { query: (text, params) => query(text, params), queryOne: async (text, params) => (await query(text, params))[0] ?? null };
 const dates = `TO_CHAR(start_date, 'YYYY-MM-DD') AS start_date, TO_CHAR(end_date, 'YYYY-MM-DD') AS end_date`;
