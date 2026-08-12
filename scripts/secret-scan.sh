@@ -111,8 +111,9 @@ esac
 # to `test[-_]` above. `TEST_PASSWORD` names a fixture in the KEY, so that term
 # is anchored to an assignment. These five are normally the placeholder VALUE
 # itself (`API_TOKEN="sample-token"`), so anchoring them to a key position would
-# discard every real documentation placeholder -- 441 files mention "example"
-# alone. A leading boundary keeps those and drops the case that mattered: a
+# discard every real documentation placeholder -- 858 tracked files mention
+# "example" alone (`git grep -lIi example`, case-insensitive, whole repo).
+# A leading boundary keeps those and drops the case that mattered: a
 # generated secret that merely CONTAINS one of the words mid-token, e.g. a
 # password of the form Kx9mQ2<word>Tn7Lp, which exempted itself.
 #
