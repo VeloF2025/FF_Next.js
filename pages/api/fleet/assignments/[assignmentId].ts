@@ -15,6 +15,7 @@ async function handler(req: AssignmentRequest, res: NextApiResponse) {
   const id = req.query.assignmentId; if (typeof id !== 'string' || !isValidUUID(id)) return apiResponse.badRequest(res, 'assignmentId must be a valid UUID');
   const user = req.user; if (!user) return apiResponse.unauthorized(res);
   const body = object(req.body); if (!body) return apiResponse.badRequest(res, 'A request body is required');
+  if (body.action !== 'replace' && body.action !== 'end') return apiResponse.badRequest(res, 'action must be replace or end');
   const existingProjectId = await loadAssignmentProjectId(id);
   if (!existingProjectId) return apiResponse.notFound(res, 'Assignment', id);
   const projectId = body.action === 'end' ? existingProjectId : body.projectId;

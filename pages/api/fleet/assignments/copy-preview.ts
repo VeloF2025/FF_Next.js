@@ -20,7 +20,10 @@ async function handler(req: AssignmentRequest, res: NextApiResponse) {
   try {
     return apiResponse.success(res, await previewAssignmentCopy({ assignmentIds: body.assignmentIds as string[], destinationStartDate: body.destinationStartDate }, { authorizedProjectIds: projectIds }));
   } catch (error) {
-    if (error instanceof AssignmentServiceError) return error.status === 409 ? apiResponse.conflict(res, error.message, { code: error.code }) : apiResponse.badRequest(res, error.message, { code: error.code });
+    if (error instanceof AssignmentServiceError) {
+      if (error.status === 404) return apiResponse.notFound(res, 'Assignment');
+      return error.status === 409 ? apiResponse.conflict(res, error.message, { code: error.code }) : apiResponse.badRequest(res, error.message, { code: error.code });
+    }
     log.error('Assignment copy preview failed', { error }, 'fleet'); return apiResponse.internalError(res, error);
   }
 }
