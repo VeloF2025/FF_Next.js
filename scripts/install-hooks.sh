@@ -121,7 +121,9 @@ if [ -n "$PRIOR" ] && [ "$PRIOR" != "$HOOKS_PATH" ]; then
   echo -e "${YELLOW}⚠️  core.hooksPath was already set, and is being replaced:${NC}"
   echo    "     was: $PRIOR"
   echo    "     now: $HOOKS_PATH"
-  ORIGIN=$(git config --show-origin --get core.hooksPath 2>/dev/null | awk '{print $1}' || echo '')
+  # `--show-origin` prints "<origin>\t<value>", so cut at the TAB. `awk '{print
+  # $1}'` split on whitespace and truncated any config path containing a space.
+  ORIGIN=$(git config --show-origin --get core.hooksPath 2>/dev/null | cut -f1 || echo '')
   [ -n "$ORIGIN" ] && echo "     previous value came from: $ORIGIN"
   echo -e "${YELLOW}   If those hooks are still wanted, they need to move into${NC}"
   echo -e "${YELLOW}   $HOOKS_PATH — git reads ONE hooks directory, not both.${NC}"

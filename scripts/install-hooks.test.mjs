@@ -210,6 +210,12 @@ test("refuses an all-digit but absurdly long version component", () => {
       "git version 99999999999999999999999999999999.0.0",
       "git version 9999999999999.1.0",
       "git version 2.99999999999999999999",
+      // 6 and 8 digits: just past the bound, and nowhere near where bash's
+      // comparison actually breaks. Without one of these the suite only pinned
+      // "somewhere <= 12" — relaxing the bound from 5 to 12 left all 16 green,
+      // so the constant the code documents was not actually tested.
+      "git version 2.999999",
+      "git version 99999999.0.0",
     ]) {
       git(root, ["config", "--unset", "core.hooksPath"]);
       withGitReporting(root, v, (r) => {
