@@ -91,8 +91,11 @@ describe('createProjectSite', () => {
     expect(mocks.txnQueryOne.mock.calls[0]?.[0]).toContain('retired_at IS NULL');
   });
 
-  it('rejects an AOI already linked to a different project', async () => {
-    mocks.txnQueryOne.mockResolvedValueOnce(null);
+  it('keeps an active AOI eligible because the project relationship is this explicit mapping', async () => {
+    mocks.txnQueryOne
+      .mockResolvedValueOnce({ id: AOI_ID, site_code: 'AOI-7', area_name: 'North' })
+      .mockResolvedValueOnce(siteRow);
+    mocks.txnQuery.mockResolvedValue([]);
 
     await expect(createProjectSite({
       projectId: PROJECT_ID,
@@ -100,11 +103,11 @@ describe('createProjectSite', () => {
       projectAoiId: AOI_ID,
       authorizedLocationId: null,
       isDefault: false,
-    }, { userId: USER_ID })).rejects.toMatchObject({ code: 'inactive_source' });
+    }, { userId: USER_ID })).resolves.toMatchObject({ projectAoiId: AOI_ID });
 
     const sourceSql = mocks.txnQueryOne.mock.calls[0]?.[0] as string;
-    expect(sourceSql).toContain('existing.project_id = $2::uuid');
-    expect(mocks.txnQueryOne.mock.calls[0]?.[1]).toEqual([AOI_ID, PROJECT_ID]);
+    expect(sourceSql).not.toContain('fleet_project_operational_sites');
+    expect(mocks.txnQueryOne.mock.calls[0]?.[1]).toEqual([AOI_ID]);
   });
 
   it('links an active AOI without reading or copying geometry and appends an audit row', async () => {
@@ -123,7 +126,7 @@ describe('createProjectSite', () => {
 
     const sourceSql = mocks.txnQueryOne.mock.calls[0]?.[0] as string;
     const insertSql = mocks.txnQueryOne.mock.calls[1]?.[0] as string;
-    expect(sourceSql).toContain('aoi.site_code, aoi.area_name');
+    expect(sourceSql).toContain('site_code, area_name');
     expect(sourceSql).not.toContain('geom');
     expect(insertSql).toContain('project_aoi_id');
     expect(mocks.txnQuery.mock.calls.at(-1)?.[0]).toContain('fleet_project_operational_site_audit');

@@ -88,14 +88,10 @@ function validateExactlyOneSource(input: CreateProjectSiteInput): void {
 async function resolveSourceDisplayName(txn: TxnClient, input: CreateProjectSiteInput): Promise<string> {
   if (input.projectAoiId) {
     const source = await txn.queryOne<AoiSourceRow>(`
-      SELECT aoi.id, aoi.site_code, aoi.area_name
-      FROM fno_atlas_project_aois aoi
-      LEFT JOIN fleet_project_operational_sites existing
-        ON existing.project_aoi_id = aoi.id AND existing.is_active = true
-      WHERE aoi.id = $1::uuid
-        AND aoi.retired_at IS NULL
-        AND (existing.project_id IS NULL OR existing.project_id = $2::uuid)
-      LIMIT 1`, [input.projectAoiId, input.projectId]);
+      SELECT id, site_code, area_name
+      FROM fno_atlas_project_aois
+      WHERE id = $1::uuid AND retired_at IS NULL
+      LIMIT 1`, [input.projectAoiId]);
     if (!source) {
       throw new ProjectSiteValidationError('inactive_source', 'The selected project AOI is missing or inactive');
     }
