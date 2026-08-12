@@ -75,14 +75,35 @@ fi
 GIT_VERSION_RAW=$(git version 2>/dev/null || echo '')
 GIT_MAJOR=$(printf '%s' "$GIT_VERSION_RAW" | sed -nE 's/^git version ([0-9]+)\.([0-9]+).*/\1/p')
 GIT_MINOR=$(printf '%s' "$GIT_VERSION_RAW" | sed -nE 's/^git version ([0-9]+)\.([0-9]+).*/\2/p')
-case "$GIT_MAJOR:$GIT_MINOR" in
-  *[!0-9:]* | :* | *: | '')
-    echo -e "${RED}🚫 Could not read a git version from: '${GIT_VERSION_RAW}'${NC}" >&2
-    echo    "   core.hooksPath needs git >= 2.9 and is IGNORED by older versions," >&2
-    echo    "   so refusing rather than setting a key that may never be read." >&2
-    exit 1
-    ;;
-esac
+git_version_unusable() {
+  # Digits only, and SHORT enough for `[ -lt ]` to compare.
+  #
+  # A digits-only check was not sufficient: an all-digit but huge value makes
+  # `[ "$x" -lt 2 ]` fail with "integer expression expected" -- the same error
+  # shape, down the same unguarded path, with the same fail-open outcome as a
+  # non-numeric value. Measured with a 32-digit major: exit 0, config set, green
+  # banner. My own probe of this vector used 13 digits, which fits in an int64
+  # and compared fine, so it reported the hole as closed.
+  #
+  # 5 digits is the bound. git's major and minor have never exceeded two, and a
+  # five-digit component is not a version -- it is garbage that happens to be
+  # numeric. Bounding the INPUT is what makes the comparison below safe to run,
+  # rather than trying to predict which values the shell can handle.
+  case "$1:$2" in
+    *[!0-9:]* | :* | *: | '') return 0 ;;
+  esac
+  [ "${#1}" -gt 5 ] && return 0
+  [ "${#2}" -gt 5 ] && return 0
+  return 1
+}
+
+if git_version_unusable "$GIT_MAJOR" "$GIT_MINOR"; then
+  echo -e "${RED}🚫 Could not read a usable git version from: '${GIT_VERSION_RAW}'${NC}" >&2
+  echo    "   core.hooksPath needs git >= 2.9 and is IGNORED by older versions," >&2
+  echo    "   so refusing rather than setting a key that may never be read." >&2
+  exit 1
+fi
+
 if [ "$GIT_MAJOR" -lt 2 ] || { [ "$GIT_MAJOR" -eq 2 ] && [ "$GIT_MINOR" -lt 9 ]; }; then
   echo -e "${RED}🚫 core.hooksPath needs git >= 2.9; this is ${GIT_VERSION_RAW}.${NC}" >&2
   exit 1

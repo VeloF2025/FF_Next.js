@@ -182,7 +182,7 @@ test("refuses an UNPARSEABLE git version rather than failing open", () => {
     // fell through to a green banner with the config set. Measured.
     withGitReporting(root, "git version SOMETHING-WEIRD", (r) => {
       assert.notEqual(r.status, 0, `must refuse: ${describe(r)}`);
-      assert.match(r.stderr, /Could not read a git version/);
+      assert.match(r.stderr, /Could not read a usable git version/);
       const cfg = git(root, ["config", "--get", "core.hooksPath"]);
       assert.notEqual(cfg.status, 0, "config must NOT have been set");
     });
@@ -195,6 +195,46 @@ test("refuses a git older than 2.9, which ignores core.hooksPath entirely", () =
       assert.notEqual(r.status, 0, `must refuse: ${describe(r)}`);
       assert.match(r.stderr, /needs git >= 2\.9/);
     });
+  });
+});
+
+test("refuses an all-digit but absurdly long version component", () => {
+  withFixture((root) => {
+    // Digits-only was not enough: a value too large for `[ -lt ]` errors with
+    // the SAME message as a non-numeric one, down the same unguarded path, to
+    // the same fail-open outcome. My own probe used 13 digits, which fits in an
+    // int64 and compared fine — so it reported this hole as closed. The values
+    // below straddle that: 13 digits is comparable, 32 is not, and both are
+    // nonsense as versions, so both must refuse.
+    for (const v of [
+      "git version 99999999999999999999999999999999.0.0",
+      "git version 9999999999999.1.0",
+      "git version 2.99999999999999999999",
+    ]) {
+      git(root, ["config", "--unset", "core.hooksPath"]);
+      withGitReporting(root, v, (r) => {
+        assert.notEqual(r.status, 0, `must refuse ${v}: ${describe(r)}`);
+        const cfg = git(root, ["config", "--get", "core.hooksPath"]);
+        assert.notEqual(cfg.status, 0, `config must not be set for ${v}`);
+      });
+    }
+  });
+});
+
+test("a second consecutive install is quiet, not a false 'already set' warning", () => {
+  withFixture((root) => {
+    // Re-running after a pull is a normal, documented case. Dropping the
+    // equality check from the prior-value comparison left all tests green while
+    // nagging on every ordinary re-run, because nothing installed twice.
+    const first = install(root);
+    assert.equal(first.status, 0, describe(first));
+    const second = install(root);
+    assert.equal(second.status, 0, describe(second));
+    assert.doesNotMatch(
+      second.stdout,
+      /already set/,
+      "re-running with the same value must not report a replacement",
+    );
   });
 });
 
