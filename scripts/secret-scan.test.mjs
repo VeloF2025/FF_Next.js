@@ -37,6 +37,8 @@ const URI_SHORT_PW = ["postgresql://ff_user:", "Ax9zK", "@100.96.0.1:5437/fibref
 const URI_IPV6 = ["redis://svc:", "Rt4bVn8kLm2q", "@[2001:db8::1]:6379"].join("");
 const URI_SLASH_PW = ["postgresql://ff_user:", "Xk9mQ2vT/Lp7Zn3", "@100.96.0.1:5437/db"].join("");
 const URI_TEST_USER = ["postgresql://test-user:", "Kx9mQ2vTn7LpReal", "@100.96.0.1:5437/prod"].join("");
+const URI_SCHEME_RELATIVE = ["//ff_user:", "Kx9mQ2vTn7LpReal", "@cdn.corp.net/lib.js"].join("");
+const URI_ADMIN_PW = ["postgresql://ff_user:", "admin", "@100.96.0.1:5437/fibreflow"].join("");
 // A real value that merely starts with "test-". The PLACEHOLDER filter is
 // applied to the whole matched span, which includes the VALUE, so any secret
 // prefixed this way whitelisted itself.
@@ -264,6 +266,26 @@ test("flags a URI credential whose password contains a slash", () => {
     commitFile(root, "runbook.md", `psql "${URI_SLASH_PW}"\n`);
     const r = runScan(root, ["--branch"]);
     assert.equal(r.status, 1, `a slash in the password must not hide it: ${describe(r)}`);
+  });
+});
+
+test("flags a scheme-relative authority carrying a credential", () => {
+  withFixture({}, (root) => {
+    // `//user:pass@host` with no scheme token, the HTML src/href form. Requiring
+    // a literal scheme contradicted the rule's own stated intent.
+    commitFile(root, "page.html", `<script src="${URI_SCHEME_RELATIVE}"></script>\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a missing scheme is not a missing credential: ${describe(r)}`);
+  });
+});
+
+test("flags a URI whose password is the literal word admin", () => {
+  withFixture({}, (root) => {
+    // "admin" is a real default credential, not a documentation placeholder, so
+    // it does not belong in the placeholder exclusion list.
+    commitFile(root, "runbook.md", `psql "${URI_ADMIN_PW}"\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a weak real password is still a password: ${describe(r)}`);
   });
 });
 

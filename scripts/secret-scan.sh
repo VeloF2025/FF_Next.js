@@ -235,15 +235,28 @@ if [ -n "$ADDED" ]; then
   # words; scripts/secret-scan.test.mjs holds the executable examples, assembled
   # from fragments at runtime so they do not match on their own source line.
   #
-  # $4 excludes, in order: placeholder userinfo by name; and a userinfo whose
-  # USERNAME begins `test-`/`test_`. That second one is not cosmetic — the
-  # global PLACEHOLDER list carries a `test[-_]…[:=]` term, and a URI's own
-  # mandatory `username:password` colon satisfies it, so a URI with a
-  # `test-`-prefixed username was exempt no matter how real its password was.
-  # Excluding it HERE, by shape, is what lets that global term stay narrow.
-  add_hits "[a-z][a-z0-9+.-]{1,14}://[A-Za-z0-9_.%+-]+:[^@[:space:]'\"]+@[A-Za-z0-9_.[-]" \
+  # $4 excludes placeholder userinfo BY NAME, and only where the password is
+  # exactly that word — it is an exact-value match, not a substring one, so a
+  # password merely containing "pass" is still reported.
+  #
+  # The list holds only words that are never plausible as a real secret.
+  # `user`, `username` and `admin` were in it and have been removed: "admin" in
+  # particular is a real default credential in the wild, not a documentation
+  # placeholder, so excluding it by name was a detection gap wearing a
+  # placeholder's clothes.
+  #
+  # The scheme is OPTIONAL so a scheme-relative authority (`//user:pass@host`,
+  # as written in HTML `src`/`href`) is covered too. Requiring a literal scheme
+  # contradicted the rule's own stated intent. Measured against ordinary `//`
+  # comment lines — no new false positives, because the userinfo class admits no
+  # whitespace and a comment has a space after the slashes.
+  #
+  # NOT handled here: the `test-`-prefixed-username bypass. That one is fixed by
+  # the boundary class on the global PLACEHOLDER list's `test[-_]…[:=]` term, not
+  # by this exclusion — look there, not here.
+  add_hits "([a-z][a-z0-9+.-]{1,14}:)?//[A-Za-z0-9_.%+-]+:[^@[:space:]'\"]+@[A-Za-z0-9_.[-]" \
            "credential in connection URI" "" \
-           ":(pass|passwd|password|secret|changeme|redacted|user|username|admin)@"
+           ":(pass|passwd|password|secret|changeme|redacted)@"
   # AWS access key id
   add_hits "AKIA[0-9A-Z]{16}" "AWS access key id"
   # Private key block (placeholder lines already excluded above)
