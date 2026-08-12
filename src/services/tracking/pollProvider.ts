@@ -12,7 +12,7 @@ import { fetchTolerantly } from '@/services/tracking/fetchTolerantly';
 import { cartrackPortalFromEnv } from '@/services/tracking/cartrack/portalConfig';
 import { reconcileTrackers } from '@/services/tracking/discovery';
 import { ingestPositions } from '@/services/tracking/ingest';
-import { raiseTrackingAlert } from '@/services/tracking/alerts';
+import { raiseTrackingAlert, decideAlert } from '@/services/tracking/alerts';
 import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
 import { isAuthFailure, isSameFailureKind } from '@/services/tracking/authFailure';
@@ -77,13 +77,15 @@ export async function pollProvider(
       consecutive_failures: number;
       last_error: string | null;
       last_run_at: Date | null;
+      last_gap_alert_at: Date | null;
     }>`
-      SELECT last_event_ts, consecutive_failures, last_error, last_run_at
+      SELECT last_event_ts, consecutive_failures, last_error, last_run_at, last_gap_alert_at
       FROM fleet_tracking_watermarks
       WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
     `;
     const failures = wm[0]?.consecutive_failures ?? 0;
     priorError = wm[0]?.last_error ?? '';
+    const lastGapAlertAt = wm[0]?.last_gap_alert_at ? new Date(wm[0].last_gap_alert_at) : null;
     // Half-open on a cooldown, NOT a latch: while throttled the tick is skipped
     // without writing the watermark, so a permanently-skipping breaker would
     // freeze consecutive_failures and block the only path that could ever clear
@@ -194,14 +196,25 @@ export async function pollProvider(
         provider: provider.key, accountRef: provider.accountRef,
         activeTrackers, portalVehicleCount: portalVehicles.length,
         positionCount: positions.length, reason: gapDetail, gapTicks });
-      await raiseTrackingAlert({
-        kind: 'gap',
+      const gapAlertInput = {
+        kind: 'gap' as const,
         consecutiveFailures: gapTicks,
         nowSast: now,
+        lastGapAlertAt,
         provider: provider.key,
         accountRef: provider.accountRef,
         detail: gapDetail,
-      });
+      };
+      const decision = decideAlert(gapAlertInput);
+      await raiseTrackingAlert(gapAlertInput);
+      // Separate statement, not folded into the INSERT above: this repo's SQL
+      // tag cannot carry a conditional fragment like `${cond ? sql`..` : sql``}`.
+      if (decision?.stampGapAlert) {
+        await sql`
+          UPDATE fleet_tracking_watermarks SET last_gap_alert_at = now()
+          WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+        `;
+      }
     }
 
     // A partial fetch is degraded even when it produced data: reported as
@@ -211,6 +224,7 @@ export async function pollProvider(
         kind: 'transient',
         consecutiveFailures: (wm[0]?.consecutive_failures ?? 0) + 1,
         nowSast: now,
+        lastGapAlertAt,
         provider: provider.key,
         accountRef: provider.accountRef,
         detail: fetched.detail ?? 'partial fetch',
@@ -268,6 +282,9 @@ export async function pollProvider(
       kind: auth ? 'auth' : 'transient',
       consecutiveFailures: updated[0]?.consecutive_failures ?? 1,
       nowSast: new Date(),
+      // auth/transient decisions never read lastGapAlertAt (see decideAlert),
+      // and the try-scoped watermark read is out of scope in this catch anyway.
+      lastGapAlertAt: null,
       provider: provider.key,
       accountRef: provider.accountRef,
       detail: message,

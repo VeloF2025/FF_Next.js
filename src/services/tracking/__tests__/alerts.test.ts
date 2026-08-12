@@ -6,65 +6,91 @@ const twoAm = new Date('2026-08-05T02:00:00+02:00');
 
 describe('decideAlert', () => {
   it('alerts immediately on an auth failure with WhatsApp (working hours)', () => {
-    const d = decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: noon });
+    const d = decideAlert({
+      kind: 'auth', consecutiveFailures: 1, nowSast: noon, lastGapAlertAt: null,
+    });
     // fleet.tracking_pull_failed is registered with whatsapp: true — see
     // src/modules/notifications/constants/index.ts
     expect(d?.event).toBe('fleet.tracking_pull_failed');
   });
 
   it('stays silent on the first two transient failures', () => {
-    expect(decideAlert({ kind: 'transient', consecutiveFailures: 1, nowSast: noon })).toBeNull();
-    expect(decideAlert({ kind: 'transient', consecutiveFailures: 2, nowSast: noon })).toBeNull();
+    expect(decideAlert({
+      kind: 'transient', consecutiveFailures: 1, nowSast: noon, lastGapAlertAt: null,
+    })).toBeNull();
+    expect(decideAlert({
+      kind: 'transient', consecutiveFailures: 2, nowSast: noon, lastGapAlertAt: null,
+    })).toBeNull();
   });
 
   it('alerts on the third consecutive transient failure, without WhatsApp', () => {
-    const d = decideAlert({ kind: 'transient', consecutiveFailures: 3, nowSast: noon });
+    const d = decideAlert({
+      kind: 'transient', consecutiveFailures: 3, nowSast: noon, lastGapAlertAt: null,
+    });
     // fleet.tracking_pull_degraded is registered with whatsapp: false
     expect(d?.event).toBe('fleet.tracking_pull_degraded');
   });
 
   it('raises a data gap immediately and never on WhatsApp', () => {
-    const d = decideAlert({ kind: 'gap', consecutiveFailures: 0, nowSast: noon });
+    const d = decideAlert({
+      kind: 'gap', consecutiveFailures: 0, nowSast: noon, lastGapAlertAt: null,
+    });
     // fleet.tracking_data_gap is registered with whatsapp: false
     expect(d?.event).toBe('fleet.tracking_data_gap');
   });
 
-  describe('a sustained gap must not alert twelve times a day', () => {
-    const gap = (n: number) =>
-      decideAlert({ kind: 'gap', consecutiveFailures: n, nowSast: noon });
-
-    it('alerts on the first gap tick', () => {
-      expect(gap(1)?.event).toBe('fleet.tracking_data_gap');
-    });
-
-    it('stays silent on the second through eleventh consecutive gap ticks', () => {
-      for (let n = 2; n <= 11; n++) {
-        expect(gap(n), `gap tick ${n} should be suppressed`).toBeNull();
-      }
-    });
-
-    it('re-alerts on the twelfth tick — roughly daily at a 2-hourly cadence', () => {
-      expect(gap(12)?.event).toBe('fleet.tracking_data_gap');
-    });
-
-    it('keeps the reminder to once per twelve ticks while the outage persists', () => {
-      for (let n = 13; n <= 23; n++) {
-        expect(gap(n), `gap tick ${n} should be suppressed`).toBeNull();
-      }
-      expect(gap(24)?.event).toBe('fleet.tracking_data_gap');
-    });
-  });
-
   it('downgrades an overnight auth failure to the no-WhatsApp event', () => {
-    const d = decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: twoAm });
+    const d = decideAlert({
+      kind: 'auth', consecutiveFailures: 1, nowSast: twoAm, lastGapAlertAt: null,
+    });
     // No scheduler here: the next daytime tick (job polls every 2h) will see
     // the same still-broken auth and emit fleet.tracking_pull_failed then.
     expect(d?.event).toBe('fleet.tracking_pull_degraded');
   });
 
   it('does not downgrade an auth failure during working hours', () => {
-    const d = decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: noon });
+    const d = decideAlert({
+      kind: 'auth', consecutiveFailures: 1, nowSast: noon, lastGapAlertAt: null,
+    });
     expect(d?.event).toBe('fleet.tracking_pull_failed');
+  });
+});
+
+describe('gap re-alert is wall-clock, not tick-counted', () => {
+  const base = new Date('2026-08-12T09:00:00Z');
+
+  it('alerts on the first gap regardless of elapsed time', () => {
+    const d = decideAlert({
+      kind: 'gap', consecutiveFailures: 1, nowSast: base, lastGapAlertAt: null,
+    });
+    expect(d?.event).toBe('fleet.tracking_data_gap');
+    expect(d?.stampGapAlert).toBe(true);
+  });
+
+  it('stays silent 23 hours after the last gap alert', () => {
+    const d = decideAlert({
+      kind: 'gap', consecutiveFailures: 50, nowSast: base,
+      lastGapAlertAt: new Date(base.getTime() - 23 * 3600_000),
+    });
+    expect(d).toBeNull();
+  });
+
+  it('re-alerts once 24 hours have passed', () => {
+    const d = decideAlert({
+      kind: 'gap', consecutiveFailures: 50, nowSast: base,
+      lastGapAlertAt: new Date(base.getTime() - 24 * 3600_000 - 1000),
+    });
+    expect(d?.event).toBe('fleet.tracking_data_gap');
+  });
+
+  it('does not tighten when the poll interval tightens', () => {
+    // The whole point: at a 10-minute cadence a vehicle accumulates 144 gap
+    // ticks a day. Under tick counting that alerted 12 times; it must not.
+    const d = decideAlert({
+      kind: 'gap', consecutiveFailures: 144, nowSast: base,
+      lastGapAlertAt: new Date(base.getTime() - 3600_000),
+    });
+    expect(d).toBeNull();
   });
 });
 
@@ -74,6 +100,7 @@ describe('raiseTrackingAlert', () => {
     accountRef: 'europcar',
     detail: 'HTTP 401',
     nowSast: new Date('2026-08-05T12:00:00+02:00'),
+    lastGapAlertAt: null,
   };
 
   it('does not notify when the policy says stay silent', async () => {
@@ -127,7 +154,9 @@ describe('raiseTrackingAlert', () => {
 describe('decideAlert — quiet-hours boundaries', () => {
   const at = (hhmm: string) => new Date(`2026-08-05T${hhmm}+02:00`);
   const eventAt = (hhmm: string) =>
-    decideAlert({ kind: 'auth', consecutiveFailures: 1, nowSast: at(hhmm) })?.event;
+    decideAlert({
+      kind: 'auth', consecutiveFailures: 1, nowSast: at(hhmm), lastGapAlertAt: null,
+    })?.event;
 
   it('06:59 is still quiet', () => {
     expect(eventAt('06:59:59')).toBe('fleet.tracking_pull_degraded');

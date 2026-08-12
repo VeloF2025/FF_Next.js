@@ -31,22 +31,36 @@ export interface AlertInput {
   consecutiveFailures: number;
   /** Current time expressed in SAST. South Africa has no DST. */
   nowSast: Date;
+  /**
+   * When this provider/account last had a gap alert raised, or null if never.
+   * Read from fleet_tracking_watermarks.last_gap_alert_at. Null means "first
+   * gap" and always alerts — failing loud on the first occurrence is the point.
+   */
+  lastGapAlertAt: Date | null;
 }
 
 export interface AlertDecision {
   event: 'fleet.tracking_pull_failed' | 'fleet.tracking_data_gap' | 'fleet.tracking_pull_degraded';
+  /**
+   * Whether the caller must write `now` to last_gap_alert_at. Only gap
+   * decisions set this — the auth and transient paths have their own
+   * bookkeeping in consecutive_failures and must not disturb the gap clock.
+   */
+  stampGapAlert?: boolean;
 }
 
 /** Transient errors must repeat this many times before anyone is told. */
 const TRANSIENT_THRESHOLD = 3;
 /**
- * A sustained gap re-alerts once every this many gap ticks. The job runs every
- * 2 hours, so 12 ticks is roughly one reminder a day — enough to keep an
- * unresolved outage visible, few enough that the alert still means something.
- * Without this, a portal that stays dark sends 12 in-app and 12 emails a day
- * forever, and the recipient learns to ignore the channel.
+ * A sustained gap re-alerts at most once a day.
+ *
+ * This was GAP_REPEAT_TICKS = 12, counted in ticks and calibrated to a 2-hourly
+ * job. Tick counting silently tightens as the cadence tightens: at a 10-minute
+ * interval the same 12 ticks is one reminder every two hours, which the original
+ * comment already identified as the failure mode — "the recipient learns to
+ * ignore the channel". Wall-clock holds the promise the constant was making.
  */
-const GAP_REPEAT_TICKS = 12;
+const GAP_REPEAT_AFTER_MS = 24 * 3600_000;
 const QUIET_UNTIL_HOUR = 7;
 const QUIET_FROM_HOUR = 20;
 const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
@@ -79,14 +93,13 @@ export function decideAlert(input: AlertInput): AlertDecision | null {
   if (input.kind === 'gap') {
     // Alert on the FIRST gap — that one is news and must never be delayed —
     // then go quiet while it stays broken, surfacing again once per
-    // GAP_REPEAT_TICKS. A count of 0 means the caller could not read the
-    // streak; treat that as a first occurrence and alert, because failing
+    // GAP_REPEAT_AFTER_MS. null means the provider/account has never had a
+    // gap alert; treat that as a first occurrence and alert, because failing
     // loud is the whole point of this alert.
-    const gapTicks = input.consecutiveFailures;
-    if (gapTicks <= 1 || gapTicks % GAP_REPEAT_TICKS === 0) {
-      return { event: 'fleet.tracking_data_gap' };
-    }
-    return null;
+    const last = input.lastGapAlertAt;
+    const due = last === null || input.nowSast.getTime() - last.getTime() >= GAP_REPEAT_AFTER_MS;
+    if (!due) return null;
+    return { event: 'fleet.tracking_data_gap', stampGapAlert: true };
   }
 
   if (input.kind === 'transient') {
