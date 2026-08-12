@@ -7,6 +7,7 @@
  * that make it a job for" (spec §6.3).
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
@@ -14,6 +15,9 @@ import { fleetConfig } from '@/modules/navigation';
 import { ComplianceTable } from '@/modules/fleet/parking/web/ComplianceTable';
 import { PARKING_CHECK_RESULTS } from '@/modules/fleet/parking/types';
 import type { ComplianceRow, ParkingCheckResult } from '@/modules/fleet/parking/types';
+import type { ParkingRunHealth } from '@/modules/fleet/parking/runHealth';
+import { ParkingRunHealthPanel } from '@/modules/fleet/parking/web/ParkingRunHealth';
+import { parkingQueryFilters } from '@/modules/fleet/parking/web/parkingQueryFilters';
 
 const RESULTS: readonly ParkingCheckResult[] = PARKING_CHECK_RESULTS;
 
@@ -39,6 +43,7 @@ function daysAgo(iso: string, days: number): string {
 }
 
 export default function ParkingCompliancePage() {
+  const router = useRouter();
   const today = sastToday();
   const [from, setFrom] = useState(daysAgo(today, 7));
   const [to, setTo] = useState(today);
@@ -46,6 +51,35 @@ export default function ParkingCompliancePage() {
   const [rows, setRows] = useState<ComplianceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [health, setHealth] = useState<ParkingRunHealth | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const filters = parkingQueryFilters(router.query);
+    if (filters.date) {
+      setFrom(filters.date);
+      setTo(filters.date);
+    }
+    if (filters.result) setResult(filters.result);
+  }, [router.isReady, router.query]);
+
+  useEffect(() => {
+    void fetch('/api/fleet/parking/health', { credentials: 'same-origin' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok || payload?.success !== true) {
+          throw new Error(payload?.error?.message ?? 'Could not load health');
+        }
+        setHealth(payload.data as ParkingRunHealth);
+      })
+      .catch((caught: unknown) => {
+        setHealthError(caught instanceof Error ? caught.message : 'Could not load health');
+      })
+      .finally(() => setHealthLoading(false));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +123,8 @@ export default function ParkingCompliancePage() {
               Every active vehicle is checked at 20:00 SAST against the address its driver declared.
             </p>
           </div>
+
+          <ParkingRunHealthPanel health={health} loading={healthLoading} error={healthError} />
 
           <div className="flex flex-wrap gap-3 items-end">
             <label className="text-xs text-[var(--ff-text-secondary)]">

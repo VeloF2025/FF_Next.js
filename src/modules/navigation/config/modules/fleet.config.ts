@@ -50,6 +50,9 @@ export const fleetConfig: ModuleNavigationConfig = {
     },
     // GPS & Location tracking
     {
+      id: 'map', label: 'Map', icon: MapPin, path: '/fleet/map',
+    },
+    {
       id: 'investigation',
       label: 'GPS Investigation',
       shortLabel: 'GPS',
@@ -65,6 +68,8 @@ export const fleetConfig: ModuleNavigationConfig = {
       rbacKey: 'fleet.locations',
     },
     // Operations
+    { id: 'parking', label: 'Parking Compliance', shortLabel: 'Parking', icon: ClipboardList, path: '/fleet/parking', rbacKey: 'fleet.parking' },
+    { id: 'parking-requests', label: 'Parking Requests', shortLabel: 'Requests', icon: ClipboardList, path: '/fleet/parking/requests', rbacKey: 'fleet.parking-requests' },
     {
       id: 'fuel',
       label: 'Fuel',
