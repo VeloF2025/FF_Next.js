@@ -17,7 +17,7 @@ import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
 import { isAuthFailure, isEviction, isSameFailureKind } from '@/services/tracking/authFailure';
 import { authBreakerDecision, logProbe, reportThrottled } from '@/services/tracking/authBreaker';
-import { isTickDue } from '@/services/tracking/cadence';
+import { demote, isTickDue } from '@/services/tracking/cadence';
 import type { TrackingProvider } from '@/services/tracking/types';
 
 /** No row yet, or an account never migrated onto explicit cadence. */
@@ -75,6 +75,13 @@ export async function pollProvider(
   // Hoisted: the catch either continues this eviction streak's clock or
   // starts a fresh one, and it needs the streak's prior start time to do that.
   let priorEvictedSince: Date | null = null;
+  // Hoisted: demotion happens in the catch, which needs to know the interval
+  // that was in effect for this tick to tell whether demoting would actually
+  // change anything. `wm` (the watermark read) is scoped to the try and is not
+  // reachable from the catch, so this is set from it below rather than
+  // re-queried — a second read there could disagree with the first and would
+  // double DB round-trips on the failure path.
+  let currentIntervalMinutes = DEFAULT_POLL_INTERVAL_MINUTES;
   try {
     // Read the watermark FIRST — before anything that authenticates, so a
     // known-bad credential never spends another login attempt. See
@@ -95,6 +102,7 @@ export async function pollProvider(
     const failures = wm[0]?.consecutive_failures ?? 0;
     priorError = wm[0]?.last_error ?? '';
     priorEvictedSince = wm[0]?.evicted_since ? new Date(wm[0].evicted_since) : null;
+    currentIntervalMinutes = wm[0]?.poll_interval_minutes ?? DEFAULT_POLL_INTERVAL_MINUTES;
     const lastGapAlertAt = wm[0]?.last_gap_alert_at ? new Date(wm[0].last_gap_alert_at) : null;
     // Half-open on a cooldown, NOT a latch: while throttled the tick is skipped
     // without writing the watermark, so a permanently-skipping breaker would
@@ -114,7 +122,7 @@ export async function pollProvider(
     // keep meaning "when we last actually polled".
     if (!isTickDue(
       wm[0]?.last_run_at ? new Date(wm[0].last_run_at) : null,
-      wm[0]?.poll_interval_minutes ?? DEFAULT_POLL_INTERVAL_MINUTES,
+      currentIntervalMinutes,
       new Date()
     )) {
       return { provider: provider.key, accountRef: provider.accountRef, skipped: 'not-due' };
@@ -323,7 +331,9 @@ export async function pollProvider(
     log.error('[poll-portal-tracking] provider failed', {
       provider: provider.key, accountRef: provider.accountRef,
       error: message, authFailure: auth, evicted });
-    await raiseTrackingAlert({
+    // Named apart from the breaker's `decision` above (a different concept,
+    // in a different scope) so the two are never misread as the same thing.
+    const { decision: alertDecision } = await raiseTrackingAlert({
       kind: auth ? 'auth' : evicted ? 'evicted' : 'transient',
       consecutiveFailures: updated[0]?.consecutive_failures ?? 1,
       nowSast: now,
@@ -336,6 +346,38 @@ export async function pollProvider(
       accountRef: provider.accountRef,
       detail: message,
     });
+
+    // Slow down rather than keep hammering a portal that is pushing back.
+    // Deliberately NOT inside the breaker's throttled path above: that path
+    // returns early via reportThrottled and writes no watermark on purpose, so
+    // that a probe can still clear consecutive_failures — a write here would
+    // freeze the counter the breaker depends on.
+    //
+    // - Auth failures demote unconditionally: decideAlert's own reasoning is
+    //   that an auth failure will never self-heal, so there is no threshold
+    //   to wait for.
+    // - Eviction only demotes once `alertDecision` is non-null, which for
+    //   kind 'evicted' only happens once decideAlert calls it sustained (past
+    //   EVICTION_ESCALATE_AFTER_MS) — a human in the portal for a minute must
+    //   not ratchet cadence down.
+    // - Transient never demotes here, no matter how many consecutive ones
+    //   there are. TRANSIENT_THRESHOLD already governs alerting for those;
+    //   folding it into demotion too would ratchet every account to 120
+    //   within a day of ordinary internet weather.
+    if (auth || (evicted && alertDecision !== null)) {
+      const slower = demote(currentIntervalMinutes);
+      if (slower !== currentIntervalMinutes) {
+        await sql`
+          UPDATE fleet_tracking_watermarks SET poll_interval_minutes = ${slower}
+          WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+        `;
+        log.warn('[poll-portal-tracking] cadence demoted after portal pushback', {
+          provider: provider.key, accountRef: provider.accountRef,
+          from: currentIntervalMinutes, to: slower,
+        });
+      }
+    }
+
     return {
       provider: provider.key, accountRef: provider.accountRef,
       error: message, authFailure: auth };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTickDue } from '../cadence';
+import { RAMP_STEPS, demote, isTickDue } from '../cadence';
 
 describe('isTickDue', () => {
   const now = new Date('2026-08-12T10:00:00Z');
@@ -20,5 +20,25 @@ describe('isTickDue', () => {
     // Cron fires on the minute and last_run_at is stamped seconds later, so an
     // exact >= comparison drops every other tick. 30s of grace absorbs that.
     expect(isTickDue(new Date(now.getTime() - 119.7 * 60_000), 120, now)).toBe(true);
+  });
+});
+
+describe('demotion', () => {
+  it('steps back to the next slower interval', () => {
+    expect(demote(10)).toBe(30);
+    expect(demote(30)).toBe(120);
+  });
+
+  it('stops at the slowest step', () => {
+    expect(demote(120)).toBe(120);
+  });
+
+  it('snaps an unrecognised interval to the slowest step', () => {
+    // A hand-edited row must fail safe — slower, never faster.
+    expect(demote(7)).toBe(120);
+  });
+
+  it('never proposes a step outside the ramp', () => {
+    for (const s of RAMP_STEPS) expect(RAMP_STEPS).toContain(demote(s));
   });
 });

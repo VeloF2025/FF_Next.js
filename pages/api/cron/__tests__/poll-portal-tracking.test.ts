@@ -635,6 +635,133 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     });
   });
 
+  describe('cadence demotion: back off the poll interval when a portal pushes back', () => {
+    function demoteQuery() {
+      return sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('SET poll_interval_minutes'));
+    }
+
+    function watermarkRow(overrides: Record<string, unknown> = {}) {
+      return {
+        last_event_ts: null,
+        consecutive_failures: 0,
+        last_error: null,
+        last_run_at: null, // never run: always due, and under the breaker threshold
+        last_gap_alert_at: null,
+        evicted_since: null,
+        poll_interval_minutes: 30,
+        ...overrides,
+      };
+    }
+
+    function stubWatermark(row: Record<string, unknown>) {
+      sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+        const text = strings.join('');
+        if (text.includes('SELECT last_event_ts')) return [row];
+        if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+        if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+        return [];
+      });
+    }
+
+    it('demotes immediately on an auth failure, with no threshold to wait for', async () => {
+      stubWatermark(watermarkRow({ poll_interval_minutes: 30 }));
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      const q = demoteQuery();
+      expect(q).toBeDefined();
+      expect(q![1]).toBe(120); // demote(30) === 120
+    });
+
+    it('demotes on a sustained eviction (decideAlert reports non-null)', async () => {
+      stubWatermark(watermarkRow({ poll_interval_minutes: 10 }));
+      // Mocked module: raiseTrackingAlert's real decideAlert only returns
+      // non-null for 'evicted' once the streak has passed
+      // EVICTION_ESCALATE_AFTER_MS (see alerts.ts). This mock stands in for
+      // that "sustained" outcome without re-deriving the 30-minute clock here.
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_failed' },
+        delivered: true,
+      });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      const q = demoteQuery();
+      expect(q).toBeDefined();
+      expect(q![1]).toBe(30); // demote(10) === 30
+    });
+
+    it('does NOT demote on an eviction that is not sustained yet', async () => {
+      stubWatermark(watermarkRow({ poll_interval_minutes: 10 }));
+      // decideAlert stays silent below EVICTION_ESCALATE_AFTER_MS.
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(demoteQuery()).toBeUndefined();
+    });
+
+    it('does NOT demote on a transient failure, even once raiseTrackingAlert reports a non-null decision', async () => {
+      // Proves demotion is not keyed off `decision !== null` alone — only
+      // auth, or evicted-and-sustained. TRANSIENT_THRESHOLD already governs
+      // alerting for transient failures; folding it into demotion too would
+      // ratchet every account to 120 within a day of ordinary internet
+      // weather.
+      stubWatermark(watermarkRow({ poll_interval_minutes: 10, consecutive_failures: 2 }));
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded' },
+        delivered: true,
+      });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] Export: HTTP 500')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(demoteQuery()).toBeUndefined();
+    });
+
+    it('does not write a no-op UPDATE when already at the slowest step', async () => {
+      stubWatermark(watermarkRow({ poll_interval_minutes: 120 }));
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(demoteQuery()).toBeUndefined();
+    });
+
+    it('never demotes from the breaker\'s throttled path — that path writes no watermark at all', async () => {
+      // 3 consecutive prior auth failures + a recent last_run_at => 'open':
+      // the tick never reaches listVehicles or the catch, so demote() is
+      // never even reachable, let alone able to write.
+      stubWatermark(watermarkRow({
+        consecutive_failures: 3,
+        last_error: '[netstar] login failed: HTTP 403',
+        last_run_at: new Date(Date.now() - 60_000).toISOString(), // 1 min ago, well inside the 24h cooldown
+        poll_interval_minutes: 10,
+      }));
+      const listVehicles = vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]);
+      netstarClientMock.mockReturnValue({ listVehicles, feedFreshness: vi.fn().mockResolvedValue(new Date()) });
+      const res = await run(AUTH);
+      expect(res._getJSONData().data.results[0]).toMatchObject({ skipped: 'auth-circuit-open' });
+      expect(listVehicles).not.toHaveBeenCalled();
+      expect(demoteQuery()).toBeUndefined();
+      expect(sqlMock.mock.calls.some((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracking_watermarks')
+        || (c[0] as TemplateStringsArray).join('').includes('UPDATE fleet_tracking_watermarks')
+      )).toBe(false);
+    });
+  });
+
   it('does not mark a generic failure as an auth failure', async () => {
     netstarClientMock.mockReturnValue({
       listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] Export: HTTP 500')),
