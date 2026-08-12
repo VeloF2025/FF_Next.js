@@ -31,6 +31,9 @@ vi.mock('swr', async () => {
   // component RE-RENDERS with fresh data. A mock whose mutate only returns a
   // value would let a missing revalidation pass, because nothing would repaint.
   const react = await vi.importActual<typeof import('react')>('react');
+  const { act } = await vi.importActual<typeof import('@testing-library/react')>(
+    '@testing-library/react'
+  );
   return {
     default: (key: string | null) => {
       const [, force] = react.useState(0);
@@ -51,8 +54,14 @@ vi.mock('swr', async () => {
         data: key ? { data: read() } : undefined,
         isLoading: false,
         error: undefined,
+        // Wrapped in act(): the real SWR mutate settles its re-render inside
+        // React's batching, and an unwrapped setState here warns and — more to
+        // the point — leaves the assertion racing a render React has not
+        // committed yet.
         mutate: async () => {
-          force((n) => n + 1);
+          await act(async () => {
+            force((n) => n + 1);
+          });
         },
       };
     },
