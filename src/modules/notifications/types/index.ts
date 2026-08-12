@@ -57,6 +57,8 @@ export interface NotifyPayload {
   metadata?: Record<string, unknown>;
   /** User IDs to notify — caller resolves recipients */
   recipient_user_ids: string[];
+  /** Stable producer key used for per-recipient at-most-once acceptance. */
+  idempotency_key?: string;
   /** Custom HTML for email (optional, else default template used) */
   email_html?: string;
   /** Custom email subject (defaults to title) */
@@ -65,6 +67,12 @@ export interface NotifyPayload {
   wa_group_jid?: string;
   /** Custom WA message text (optional, else title+body used) */
   wa_message?: string;
+}
+
+export interface NotifyResult {
+  accepted_recipients: number;
+  suppressed_recipients: number;
+  failed_recipients: number;
 }
 
 /** Notification preference row from DB */

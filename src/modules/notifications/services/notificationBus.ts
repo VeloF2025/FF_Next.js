@@ -15,11 +15,13 @@ import {
 } from '../constants';
 import type {
   NotifyPayload,
+  NotifyResult,
   UserNotification,
   ChannelPreferences,
 } from '../types';
 import { deliverEmail } from './emailDelivery';
 import { deliverWhatsApp } from './whatsappDelivery';
+import { claimNotification } from './notificationIdempotency';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -32,7 +34,7 @@ const sql = neon(process.env.DATABASE_URL!);
  * Creates in-app records and dispatches to email/WA based on preferences.
  * Non-blocking — errors are logged, never thrown to callers.
  */
-export async function notify(payload: NotifyPayload): Promise<void> {
+export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
   const {
     event_type,
     title,
@@ -46,14 +48,32 @@ export async function notify(payload: NotifyPayload): Promise<void> {
 
   if (!recipient_user_ids || recipient_user_ids.length === 0) {
     log.warn('notify() called with no recipients', { event_type }, 'NotificationBus');
-    return;
+    return { accepted_recipients: 0, suppressed_recipients: 0, failed_recipients: 0 };
   }
+
+  const result: NotifyResult = { accepted_recipients: 0, suppressed_recipients: 0, failed_recipients: 0 };
 
   const icon = payload.icon || EVENT_ICONS[event_type] || 'bell';
   const severity = payload.severity || EVENT_SEVERITY[event_type] || 'info';
 
   for (const userId of recipient_user_ids) {
     try {
+      if (payload.idempotency_key) {
+        let claimed: boolean;
+        try {
+          claimed = await claimNotification(userId, event_type, payload.idempotency_key);
+        } catch (err) {
+          result.failed_recipients += 1;
+          log.error('Notification idempotency claim failed', {
+            userId, event_type, error: err instanceof Error ? err.message : String(err),
+          }, 'NotificationBus');
+          continue;
+        }
+        if (!claimed) {
+          result.suppressed_recipients += 1;
+          continue;
+        }
+      }
       const channels = await getEffectiveChannels(userId, event_type);
 
       // Always create in-app notification if enabled
@@ -92,12 +112,15 @@ export async function notify(payload: NotifyPayload): Promise<void> {
           }, 'NotificationBus')
         );
       }
+      result.accepted_recipients += 1;
     } catch (err) {
+      result.failed_recipients += 1;
       log.error('notify() failed for user', {
         userId, event_type, error: err instanceof Error ? err.message : String(err),
       }, 'NotificationBus');
     }
   }
+  return result;
 }
 
 // =============================================================================
