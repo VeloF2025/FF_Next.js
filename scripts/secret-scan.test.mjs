@@ -24,6 +24,26 @@ const SOURCE_SCRIPT = resolve(HERE, "secret-scan.sh");
 const LEAKED_PG_LINE = ["PGPASS", "WORD='", "Zq7mKp2LvRt9Xn4", "'"].join("");
 const BURNED_VALUE = ["zander", "2026"].join("");
 
+// Detection-surface fixtures (#2431). Every value below is invented.
+//
+// The URI form is the one that matters: issue #1830 — the leak this scanner
+// exists to prevent — was a Postgres connection URI, and CLAUDE.md documents
+// that exact `psql "postgresql://…"` shape. Before this change every rule
+// required a credential keyword adjacent to an `=`, and a URI has neither.
+const URI_CREDENTIAL = ["postgresql://ff_user:", "Kx9mQ2vTn7Lp", "@100.96.0.1:5437/fibreflow"].join("");
+const URI_REDIS = ["redis://default:", "Rt4bVn8kLm2q", "@cache.internal:6379"].join("");
+// Shapes the URI rule missed on its first attempt, each measured as CLEAN then.
+const URI_SHORT_PW = ["postgresql://ff_user:", "Ax9zK", "@100.96.0.1:5437/fibreflow"].join("");
+const URI_IPV6 = ["redis://svc:", "Rt4bVn8kLm2q", "@[2001:db8::1]:6379"].join("");
+const URI_SLASH_PW = ["postgresql://ff_user:", "Xk9mQ2vT/Lp7Zn3", "@100.96.0.1:5437/db"].join("");
+const URI_TEST_USER = ["postgresql://test-user:", "Kx9mQ2vTn7LpReal", "@100.96.0.1:5437/prod"].join("");
+const URI_SCHEME_RELATIVE = ["//ff_user:", "Kx9mQ2vTn7LpReal", "@cdn.corp.net/lib.js"].join("");
+const URI_ADMIN_PW = ["postgresql://ff_user:", "admin", "@100.96.0.1:5437/fibreflow"].join("");
+// A real value that merely starts with "test-". The PLACEHOLDER filter is
+// applied to the whole matched span, which includes the VALUE, so any secret
+// prefixed this way whitelisted itself.
+const TEST_PREFIXED = ["SESSION_SEC", 'RET="test-', "a1b2c3d4e5f6a7b8c9d0", '"'].join("");
+
 const ZERO_SHA = "0".repeat(40);
 
 function git(root, args) {
@@ -175,6 +195,226 @@ test("--range rejects a missing base instead of scanning nothing", () => {
     const r = runScan(root, ["--range", ZERO_SHA, "HEAD"]);
     assert.notEqual(r.status, 0, `unresolvable base must fail the build: ${describe(r)}`);
     assert.doesNotMatch(r.stdout, /Secret scan passed/);
+  });
+});
+
+// ── Detection surface (#2431) ────────────────────────────────────────────────
+// Enforcement was hardened in #2425 — the gate runs and fails closed. These
+// cover what it actually RECOGNISES, which was narrower than the green check
+// implied.
+
+test("flags a credential embedded in a connection URI", () => {
+  withFixture({}, (root) => {
+    commitFile(root, "runbook.md", `psql "${URI_CREDENTIAL}"\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `URI credential must be caught — this is the #1830 shape: ${describe(r)}`);
+    assert.match(r.stdout, /URI/i);
+  });
+});
+
+test("flags a credential in a non-postgres URI scheme", () => {
+  withFixture({}, (root) => {
+    commitFile(root, "compose.yml", `  REDIS_URL: ${URI_REDIS}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `any scheme://user:pass@host is a credential: ${describe(r)}`);
+  });
+});
+
+test("does not flag a URI with no credential, or a placeholder one", () => {
+  withFixture({}, (root) => {
+    commitFile(
+      root,
+      "docs.md",
+      [
+        "postgresql://localhost:5437/fibreflow",
+        "postgresql://user:pass@host:5437/db",
+        "postgresql://ff_user:${PGPASSWORD}@host:5437/db",
+        "https://app.fibreflow.app/storage/",
+        "postgresql://ff_user:<your-password>@host:5437/db",
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `documented placeholder URIs must stay clean: ${describe(r)}`);
+  });
+});
+
+test("flags a URI credential with a short password", () => {
+  withFixture({}, (root) => {
+    // A length floor was measured letting a real 5-character credential through.
+    // A short password is still a password; placeholder forms are excluded by
+    // NAME instead, because placeholder words are enumerable and lengths are not.
+    commitFile(root, "deploy.md", `DATABASE_URL=${URI_SHORT_PW}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a short password is still a credential: ${describe(r)}`);
+  });
+});
+
+test("flags a URI credential on an IPv6 host", () => {
+  withFixture({}, (root) => {
+    // `[` was absent from the host class, so every IPv6-host URI was missed.
+    commitFile(root, "compose.yml", `  REDIS_URL: ${URI_IPV6}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `IPv6 authority must be recognised: ${describe(r)}`);
+  });
+});
+
+test("flags a URI credential whose password contains a slash", () => {
+  withFixture({}, (root) => {
+    // `/` was excluded from the password class, which broke the `:`→`@` run and
+    // dropped the whole credential regardless of its strength.
+    commitFile(root, "runbook.md", `psql "${URI_SLASH_PW}"\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a slash in the password must not hide it: ${describe(r)}`);
+  });
+});
+
+test("flags a scheme-relative authority carrying a credential", () => {
+  withFixture({}, (root) => {
+    // `//user:pass@host` with no scheme token, the HTML src/href form. Requiring
+    // a literal scheme contradicted the rule's own stated intent.
+    commitFile(root, "page.html", `<script src="${URI_SCHEME_RELATIVE}"></script>\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a missing scheme is not a missing credential: ${describe(r)}`);
+  });
+});
+
+test("does not flag userinfo-shaped text that is not an authority", () => {
+  withFixture({}, (root) => {
+    // Making the scheme optional matched a sed expression with an EMPTY search
+    // pattern, where the replacement happens to be userinfo-shaped. Found by
+    // probing after the change rather than before it, which is the wrong order.
+    // A non-alphanumeric is now required before the slashes: real forms keep a
+    // quote, `=`, whitespace or line start there; sed keeps its `s`.
+    commitFile(
+      root,
+      "tidy.sh",
+      ["sed 's//old:new@thing/g' file.txt", "const re = /^\\/\\/user:pass@host/;", ""].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `not every colon-at-sign run is an authority: ${describe(r)}`);
+  });
+});
+
+test("flags a credential that has merely been commented out", () => {
+  withFixture({}, (root) => {
+    // Commenting a credential out does not un-commit it. This is the valuable
+    // half of allowing an authority at the start of a line's content; the cost
+    // is that a contrived authority-shaped run there matches too. Pinned so the
+    // boundary work in the rule is not "tidied" into dropping it.
+    commitFile(root, "old.ts", `//${URI_SCHEME_RELATIVE}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a commented-out credential is still committed: ${describe(r)}`);
+  });
+});
+
+test("flags a URI whose password is the literal word admin", () => {
+  withFixture({}, (root) => {
+    // "admin" is a real default credential, not a documentation placeholder, so
+    // it does not belong in the placeholder exclusion list.
+    commitFile(root, "runbook.md", `psql "${URI_ADMIN_PW}"\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a weak real password is still a password: ${describe(r)}`);
+  });
+});
+
+test("flags a URI credential whose USERNAME starts with test-", () => {
+  withFixture({}, (root) => {
+    // The global placeholder list carries a `test[-_]…[:=]` term, and a URI's
+    // own mandatory `username:password` colon satisfied it — so this was exempt
+    // no matter how real the password was.
+    commitFile(root, "runbook.md", `psql "${URI_TEST_USER}"\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `a test-prefixed username must not exempt the password: ${describe(r)}`);
+  });
+});
+
+test("colon rule does not fire on prose values that merely follow a credential key", () => {
+  withFixture({}, (root) => {
+    // Both measured in this repo before the digit requirement. An error map and
+    // a schema example are ordinary things to add in a PR, and the gate blocks
+    // the PR — so a false positive here is not cosmetic.
+    commitFile(
+      root,
+      "errors.ts",
+      [
+        "const ERRORS = {",
+        "  'auth/wrong-password': 'Incorrect password.',",
+        "};",
+        'const schema = { "password": "string" };',
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `prose after a credential key is not a credential: ${describe(r)}`);
+  });
+});
+
+test("colon rule does not fire on an identifier that merely ends in a keyword", () => {
+  withFixture({}, (root) => {
+    // `minipass` is a real npm package and appears 29 times across
+    // package-lock.json and bun.lock in this repo. Without a boundary before
+    // the keyword, every lockfile update would trip the gate.
+    commitFile(
+      root,
+      "package-lock.json",
+      [
+        '{ "packages": {',
+        '  "node_modules/minipass": { "version": "7.0.4" },',
+        '  "node_modules/fs-minipass": { "minipass": "^7.0.4" }',
+        "} }",
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `a package named *pass is not a credential: ${describe(r)}`);
+  });
+});
+
+test("does not flag the shapes that made the colon and lowercase rules unusable", () => {
+  withFixture({}, (root) => {
+    // A colon rule and a lowercase env rule were attempted here and removed. All
+    // four lines below were measured tripping them, and a false positive BLOCKS
+    // an unrelated PR — a loud, expensive failure, unlike a missed pattern.
+    //
+    // The colon rule could not be made safe in diff mode: the scanner has no
+    // file-type information, so it cannot tell an auth fixture's
+    // `password: '<value>'` from the same line in production config. Its digit
+    // safeguard was also measured firing on the rule's own boundary character
+    // rather than on the value.
+    //
+    // Pinned so a future attempt has to clear these before landing.
+    commitFile(
+      root,
+      "assorted.ts",
+      [
+        "const testUser = { email: 'a@b.com', password: 'Passw0rd1' };",
+        '  "csrf-token": "^2.1.0",',
+        '1Password: "vaultitemlink"',
+        "cache_token=deterministic_hash_no_real_secret",
+        "",
+      ].join("\n"),
+    );
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `none of these is a credential: ${describe(r)}`);
+  });
+});
+
+test("a value merely prefixed 'test-' does not whitelist itself", () => {
+  withFixture({}, (root) => {
+    commitFile(root, "config.ts", `${TEST_PREFIXED}\n`);
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 1, `the placeholder filter must not read the VALUE: ${describe(r)}`);
+  });
+});
+
+test("a genuinely test-scoped KEY is still exempt", () => {
+  withFixture({}, (root) => {
+    // The key names the fixture, not the value — this is the case the
+    // placeholder term exists for and must keep working.
+    commitFile(root, "helper.ts", "const TEST_PASSWORD = process.env.TEST_PASSWORD;\n");
+    const r = runScan(root, ["--branch"]);
+    assert.equal(r.status, 0, `env-var reference must stay clean: ${describe(r)}`);
   });
 });
 
