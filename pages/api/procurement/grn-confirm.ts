@@ -141,9 +141,22 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           `SELECT quantity_ordered, quantity_received, item_code
              FROM purchase_order_items WHERE id = $1 FOR UPDATE`, [poItemId]);
         const line = poLine[0];
-        if (!line) continue; // GRN item references a PO line that no longer exists.
+        if (!line) {
+          // GRN item references a PO line that no longer exists: stock still
+          // posts (that path keys on stock_item_id), but the receipt goes
+          // untracked against the PO. Surface it rather than silently skipping.
+          log.warn('GRN item references a missing PO line; skipping PO write-back', {
+            grnId, poItemId, module: 'procurement:grn-confirm' });
+          continue;
+        }
         const ordered = Number(line.quantity_ordered) || 0;
         const newReceived = (Number(line.quantity_received) || 0) + accepted;
+        if (ordered <= 0) {
+          // ordered 0/NULL means the over-receipt cap can't be enforced for this
+          // line — almost always a data problem, not an intentional "no limit".
+          log.warn('PO line has no ordered quantity; over-receipt not enforced', {
+            grnId, poItemId, itemCode: line.item_code, module: 'procurement:grn-confirm' });
+        }
         if (ordered > 0 && newReceived > ordered) {
           throw new OverReceiptError(
             `Receipt exceeds the ordered quantity for ${line.item_code || 'a PO line'}: ` +
