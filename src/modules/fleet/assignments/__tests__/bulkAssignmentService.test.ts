@@ -132,6 +132,15 @@ describe('bulk assignment service', () => {
     expect(result.normalizedRows).toHaveLength(1);
     expect(result.normalizedRows[0]?.vehicleAssignmentId).toBe(VEHICLE);
   });
+
+  it('excludes inactive staff and never copies source notes', async () => {
+    q.loadAssignmentsForCopy.mockResolvedValue([{ ...row(), id: ASSIGNMENT, reason: 'Source-only note' }, { ...row(STAFF_2), id: 'departed', reason: 'Departure note' }]);
+    q.loadPreviewState.mockImplementation(async (rows) => ({ ...state(rows), context: { ...state(rows).context,
+      staffById: { [STAFF]: { isActive: true }, [STAFF_2]: { isActive: false } } } }));
+    const result = await previewAssignmentCopy({ assignmentIds: [ASSIGNMENT, 'departed'], destinationStartDate: '2026-09-01' }, { allProjects: true });
+    expect(result.normalizedRows).toEqual([expect.objectContaining({ staffId: STAFF, reason: null })]);
+    expect(result.excludedStaffIds).toEqual([STAFF_2]);
+  });
 });
 
 describe('AssignmentServiceError', () => {

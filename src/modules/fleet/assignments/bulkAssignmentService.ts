@@ -143,12 +143,13 @@ export async function previewAssignmentCopy(input: CopyPreviewInput, actorScope:
   const source = (await loadAssignmentsForCopy(input.assignmentIds)).filter((row) => row.assignmentKind === 'roster');
   const shifted = source.map((row) => ({ ...row, id: undefined, status: undefined, supersededBy: undefined,
     startDate: input.destinationStartDate, endDate: addDays(input.destinationStartDate, dayDifference(row.startDate, row.endDate)),
-    vehicleAssignmentId: null }));
+    vehicleAssignmentId: null, reason: null }));
   assertScope(shifted, actorScope);
   const initial = await loadPreviewState(shifted);
-  const rows = shifted.map((row) => ({ ...row, vehicleAssignmentId: initial.context.vehicleAssignments.find((vehicle) =>
+  const excludedStaffIds = shifted.filter((row) => !initial.context.staffById[row.staffId]?.isActive).map((row) => row.staffId);
+  const rows = shifted.filter((row) => initial.context.staffById[row.staffId]?.isActive).map((row) => ({ ...row, vehicleAssignmentId: initial.context.vehicleAssignments.find((vehicle) =>
     vehicle.staffId === row.staffId && vehicle.startDate <= row.startDate && vehicle.endDate >= row.endDate)?.id ?? null }));
   const state = await loadPreviewState(rows);
   return { normalizedRows: rows, conflicts: validateProposal(rows, state.context), sourceVersion: state.sourceVersion,
-    fingerprint: assignmentFingerprint(rows, state.sourceVersion), excludedStaffIds: [] };
+    fingerprint: assignmentFingerprint(rows, state.sourceVersion), excludedStaffIds };
 }

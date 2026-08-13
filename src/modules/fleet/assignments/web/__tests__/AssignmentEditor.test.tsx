@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AssignmentEditor } from '../AssignmentEditor';
 import { assignmentApi } from '../assignmentApi';
@@ -21,5 +22,26 @@ describe('AssignmentEditor', () => {
       expect.objectContaining({ staffId: '4', vehicleAssignmentId: null }),
     ], [], undefined));
     await screen.findByText('Commit assignments');
+  });
+
+  it('searches teams and previews the selected active team expansion', async () => {
+    const teamOptions = { ...options, staff: [], teams: [{ id: 'team-a', label: 'Civils North' }, { id: 'team-b', label: 'Maintenance South' }] };
+    render(<AssignmentEditor options={teamOptions} projectId="2" siteId="3" from="2026-08-12" to="2026-08-12" onCommitted={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Search teams'), { target: { value: 'civils' } });
+    expect(screen.getByRole('option', { name: 'Civils North' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Maintenance South' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Teams'), { target: { value: 'team-a' } });
+    vi.mocked(assignmentApi.preview).mockResolvedValue({ normalizedRows: [], conflicts: [], fingerprint: 'x', sourceVersion: 'v', excludedStaffIds: [] });
+    await act(async () => { fireEvent.click(screen.getByText('Preview assignments')); });
+    await waitFor(() => expect(assignmentApi.preview).toHaveBeenCalledWith([], ['team-a'], expect.objectContaining({ vehicleAssignmentId: null })));
+    await screen.findByText('Commit assignments');
+  });
+
+  it('keeps an API error visible while the manager adjusts the batch', async () => {
+    setup(); vi.mocked(assignmentApi.preview).mockRejectedValueOnce(new Error('Preview service unavailable'));
+    fireEvent.click(screen.getByText('Preview assignments'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Preview service unavailable');
+    fireEvent.change(screen.getByLabelText('Search staff'), { target: { value: 'Driver' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Preview service unavailable');
   });
 });

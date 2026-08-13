@@ -31,6 +31,21 @@ describe('listAssignmentRoster', () => {
     expect(sql).toContain('project_team_assignments');
     expect(params).toEqual([PROJECT_ID, 'unassigned', '2026-08-17', '2026-08-17', 25, 0]);
   });
+
+  it('maps effective and unassigned execution rows with schedule context', async () => {
+    mocks.query.mockResolvedValue([
+      { assignment_id: 'assignment-1', staff_id: 'staff-1', staff_name: 'Driver One', project_id: PROJECT_ID, project_name: 'Project One', operational_site_id: 'site-1', operational_site_name: 'Site One', start_date: '2026-08-17', end_date: '2026-08-21', assignment_kind: 'daily_override', vehicle_assignment_id: null, vehicle_registration: null, total_count: 2, work_date: '2026-08-17', scheduled: true, expected_start_time: '08:00:00', expected_end_time: '17:00:00' },
+      { assignment_id: null, staff_id: 'staff-2', staff_name: 'Driver Two', project_id: null, project_name: null, operational_site_id: null, operational_site_name: null, start_date: null, end_date: null, assignment_kind: 'unassigned', vehicle_assignment_id: null, vehicle_registration: null, total_count: 2, work_date: '2026-08-17', scheduled: true, expected_start_time: '08:00:00', expected_end_time: '17:00:00' },
+    ]);
+
+    const result = await listAssignmentRoster({ projectId: PROJECT_ID, startDate: '2026-08-17', endDate: '2026-08-17' });
+
+    expect(result.total).toBe(2);
+    expect(result.items).toEqual([
+      expect.objectContaining({ assignmentId: 'assignment-1', assignmentKind: 'daily_override', workDate: '2026-08-17', scheduled: true, expectedStartTime: '08:00:00' }),
+      expect.objectContaining({ assignmentId: null, projectId: null, assignmentKind: 'unassigned', workDate: '2026-08-17', scheduled: true }),
+    ]);
+  });
 });
 
 describe('listAssignmentOptions', () => {
