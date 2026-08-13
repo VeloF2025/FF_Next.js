@@ -1,5 +1,5 @@
-import type { AssignmentProposalRow, AssignmentRosterEntry, PreviewResult, ProposalConflict } from '../types';
-import type { AssignmentOptions } from '../rosterQueries';
+import type { AssignmentProposalRow, PreviewResult, ProposalConflict } from '../types';
+import type { AssignmentOptions, AssignmentRosterResult } from '../rosterQueries';
 
 interface Envelope<T> { success: boolean; data?: T; error?: { message?: string; details?: { conflicts?: ProposalConflict[] } } }
 export class AssignmentApiError extends Error {
@@ -13,7 +13,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 export interface AssignmentPreview extends PreviewResult { excludedStaffIds: string[] }
 export const assignmentApi = {
-  roster: (query: string) => request<{ items: AssignmentRosterEntry[]; total: number }>(`/api/fleet/assignments?${query}`),
+  roster: (query: string) => request<AssignmentRosterResult>(`/api/fleet/assignments?${query}`),
   options: (query: string) => request<AssignmentOptions>(`/api/fleet/assignments/options?${query}`),
   preview: (rows: AssignmentProposalRow[]) => request<AssignmentPreview>('/api/fleet/assignments/preview', { method: 'POST', body: JSON.stringify({ rows }) }),
   commit: (rows: AssignmentProposalRow[], preview: AssignmentPreview, confirmedWarnings: boolean) => request<{ batchId: string }>('/api/fleet/assignments/commit', { method: 'POST', body: JSON.stringify({ rows, fingerprint: preview.fingerprint, confirmedWarnings }) }),
@@ -21,4 +21,6 @@ export const assignmentApi = {
   history: (assignmentId: string) => request<Record<string, unknown>[]>(`/api/fleet/assignments/${assignmentId}/history`),
   update: (assignmentId: string, body: Record<string, unknown>) => request<unknown>(`/api/fleet/assignments/${assignmentId}`, { method: 'PUT', body: JSON.stringify(body) }),
   createSite: (body: Record<string, unknown>) => request<unknown>('/api/fleet/assignments/project-sites', { method: 'POST', body: JSON.stringify(body) }),
+  listSites: (projectId: string) => request<unknown[]>(`/api/fleet/assignments/project-sites?projectId=${encodeURIComponent(projectId)}`),
+  updateSite: (siteId: string, body: Record<string, unknown>) => request<unknown>(`/api/fleet/assignments/project-sites/${siteId}`, { method: 'PUT', body: JSON.stringify(body) }),
 };

@@ -33,8 +33,7 @@ interface RosterRow extends Record<string, unknown> {
   total_count: number | string;
 }
 
-export interface AssignmentRosterResult {
-  items: Array<{
+export interface AssignmentRosterItem {
     assignmentId: string;
     staffId: string;
     staffName: string;
@@ -47,7 +46,9 @@ export interface AssignmentRosterResult {
     assignmentKind: 'roster' | 'daily_override';
     vehicleAssignmentId: string | null;
     vehicleRegistration: string | null;
-  }>;
+}
+export interface AssignmentRosterResult {
+  items: AssignmentRosterItem[];
   total: number;
 }
 
