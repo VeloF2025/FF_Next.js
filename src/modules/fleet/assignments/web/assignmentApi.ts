@@ -15,7 +15,7 @@ export interface AssignmentPreview extends PreviewResult { excludedStaffIds: str
 export const assignmentApi = {
   roster: (query: string) => request<AssignmentRosterResult>(`/api/fleet/assignments?${query}`),
   options: (query: string) => request<AssignmentOptions>(`/api/fleet/assignments/options?${query}`),
-  preview: (rows: AssignmentProposalRow[]) => request<AssignmentPreview>('/api/fleet/assignments/preview', { method: 'POST', body: JSON.stringify({ rows }) }),
+  preview: (rows: AssignmentProposalRow[], teamIds: string[] = [], teamRow?: Omit<AssignmentProposalRow, 'staffId'>) => request<AssignmentPreview>('/api/fleet/assignments/preview', { method: 'POST', body: JSON.stringify({ rows, teamIds, teamRow }) }),
   commit: (rows: AssignmentProposalRow[], preview: AssignmentPreview, confirmedWarnings: boolean) => request<{ batchId: string }>('/api/fleet/assignments/commit', { method: 'POST', body: JSON.stringify({ rows, fingerprint: preview.fingerprint, confirmedWarnings }) }),
   copyPreview: (assignmentIds: string[], destinationStartDate: string) => request<AssignmentPreview>('/api/fleet/assignments/copy-preview', { method: 'POST', body: JSON.stringify({ assignmentIds, destinationStartDate }) }),
   history: (assignmentId: string) => request<Record<string, unknown>[]>(`/api/fleet/assignments/${assignmentId}/history`),
