@@ -38,8 +38,9 @@ export async function reverseMovement(
 
   try {
     // Guard errors (movement missing / already reversed / not completed) are
-    // signalled by throwing a ReversalGuardError inside the txn so the whole
-    // transaction rolls back; they're translated back to {success:false} below.
+    // signalled by an early return of a guard object from the txn callback,
+    // BEFORE any write — so the committed transaction is read-only and harmless.
+    // They're translated back to {success:false} below.
     const { reversalId, guardError, original } = await transaction(async (txn) => {
       // 1. Fetch + LOCK the original movement. FOR UPDATE serializes concurrent
       //    reversals of the same movement — the second sees is_reversed=true.
