@@ -51,7 +51,6 @@ function mapRule(row: RuleRow): OperationalStatusRule {
 function validate(input: CreateRuleVersionInput): { effectiveFrom: string; reason: string | null } {
   const effectiveMs = parseStrictIsoInstant(input.effectiveFrom);
   if (effectiveMs === null) throw new RuleValidationError('effectiveFrom must be a valid ISO instant');
-  const effective = new Date(effectiveMs);
   if (effectiveMs < Date.now() - IMMEDIATE_ACTIVATION_TOLERANCE_MS) {
     throw new RuleValidationError('effectiveFrom cannot be more than one minute in the past');
   }
@@ -70,7 +69,7 @@ function validate(input: CreateRuleVersionInput): { effectiveFrom: string; reaso
     throw new RuleValidationError('Minute and metre thresholds must be integers');
   }
   const reason = input.changeReason?.trim() || null;
-  return { effectiveFrom: effective.toISOString(), reason };
+  return { effectiveFrom: new Date(effectiveMs).toISOString(), reason };
 }
 
 export async function loadEffectiveRule(asOf: string): Promise<OperationalStatusRule | null> {

@@ -83,10 +83,14 @@ describe('operational status rules', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
-  it.each(['2099-02-30T00:00:00.000Z', '2099-01-01', 'January 1, 2099']) (
+  it.each(['2099-02-30T00:00:00.000Z', '2099-04-31T00:00:00+02:00', '2099-01-01', 'January 1, 2099']) (
     'rejects the malformed activation instant %s before SQL', async (effectiveFrom) => {
       await expect(createRuleVersion({ ...input, effectiveFrom }, USER)).rejects.toBeInstanceOf(RuleValidationError);
       expect(db.transaction).not.toHaveBeenCalled();
+      expect(db.query).not.toHaveBeenCalled();
+      expect(db.queryOne).not.toHaveBeenCalled();
+      expect(db.txnQuery).not.toHaveBeenCalled();
+      expect(db.txnQueryOne).not.toHaveBeenCalled();
     },
   );
 
