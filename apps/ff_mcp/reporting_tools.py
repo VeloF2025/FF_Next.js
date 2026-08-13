@@ -18,7 +18,7 @@ from functools import partial
 import anyio.to_thread
 
 from .server import mcp
-from .tools import _fibreflow_get_sync
+from .tools import _fibreflow_get_sync, build_query
 
 
 def _overview_sync(query: str) -> str:
@@ -138,3 +138,48 @@ async def get_procurement_summary(project: str) -> str:
     an approved PO is money committed, not money paid.
     """
     return await _section(project, "delivery")
+
+
+def _action_items_sync(query: str) -> str:
+    return _fibreflow_get_sync("/api/reporting/action-items", query)
+
+
+@mcp.tool()
+async def get_action_items(
+    assignee: str = "",
+    state: str = "open",
+    older_than_days: int | None = None,
+    source: str = "",
+    limit: int = 25,
+) -> str:
+    """The action-item backlog: how many are open, who is carrying them, how stale they
+    are, and how fast they arrive versus get closed.
+
+    - `assignee`: matched loosely against a FREE-TEXT name field.
+    - `state`: "open" (default), "completed" or "all".
+    - `older_than_days`: only items older than this.
+    - `source`: "transcript", "cortex-scribe", "visual", "system".
+
+    Read the result carefully before repeating the headline number, because it is easy to
+    state something false:
+
+    - Around 97% of open items were extracted AUTOMATICALLY from meeting transcripts. An
+      open machine-extracted item is an untriaged suggestion, not a commitment somebody
+      made and broke. Never present the count as work people promised and failed to do.
+    - The create-versus-close ratio (~37x) is the shape of an extraction pipeline with no
+      triage step. It is not a measure of anyone's delivery, and saying so about a named
+      person would be both wrong and unfair.
+    - Assignee is free text and the same person appears under several spellings, so every
+      per-person total is a FLOOR, not a count.
+    - There is no useful project or due-date dimension: project_id is populated on a
+      handful of rows out of thousands and due dates on fewer. Do not offer "action items
+      for project X" or "overdue items" — the data cannot answer either.
+    """
+    query = build_query(
+        assignee=assignee,
+        state=state,
+        olderThanDays=older_than_days,
+        source=source,
+        limit=limit,
+    )
+    return await anyio.to_thread.run_sync(partial(_action_items_sync, query))

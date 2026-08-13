@@ -90,6 +90,7 @@ async def test_every_fresh_service_registers_the_complete_tool_set_once(
         "get_snags_summary",
         "get_activation_progress",
         "get_procurement_summary",
+        "get_action_items",
     }
 
     assert set(names) == expected

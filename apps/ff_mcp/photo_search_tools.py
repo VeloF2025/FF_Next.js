@@ -16,27 +16,16 @@ it — which is why the manifest tool's response stays the same size for 10 phot
 
 from __future__ import annotations
 
-import urllib.parse
 from functools import partial
 from typing import Literal
 
 import anyio.to_thread
 
 from .server import mcp
-from .tools import _fibreflow_get_sync
+from .tools import _fibreflow_get_sync, build_query
 
 Source = Literal["qa", "qfield", "worksqa", "both"]
 Verdict = Literal["pass", "fail"]
-
-
-def _query(**params: object) -> str:
-    """Urlencode the parameters that were actually given, dropping the rest.
-
-    Sending `type=None` would filter on the literal string "None" and quietly match
-    nothing, which reads to the model as "this project has no depth photos".
-    """
-    present = {k: v for k, v in params.items() if v is not None and v != ""}
-    return urllib.parse.urlencode(present)
 
 
 def _search_sync(query: str) -> str:
@@ -93,7 +82,7 @@ async def find_project_photos(
     view_photo to look at that photo. `matched` is the FULL count; `photos` is one page.
     Sizes are missing for most photos, so `estimatedTotalMb` is an estimate and says so.
     """
-    query = _query(
+    query = build_query(
         project=project,
         type=type,
         source=source,
@@ -136,7 +125,7 @@ async def get_photo_download_manifest(
     BEFORE downloading: a whole project can run to thousands of photos and gigabytes,
     and the estimate is extrapolated from the minority of photos with a recorded size.
     """
-    query = _query(
+    query = build_query(
         project=project,
         type=type,
         source=source,

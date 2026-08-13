@@ -33,6 +33,15 @@ export const DENIED_GROUPS = new Set([
   // invites exactly the wandering this list exists to prevent.
   'cortex-remote-mcp',
   'ff-remote-mcp',
+  // `action-items` rows carry meeting content — descriptions extracted verbatim from
+  // transcripts. FibreFlow gates meetings on ATTENDANCE (see
+  // pages/api/meetings/[id]/transcript.ts), but /api/action-items is withAuth-only with
+  // no participant filter and returns up to 500 full rows including description and
+  // meeting_id. Leaving the group catalogued would let an agent read through
+  // fibreflow_get exactly what /api/reporting/action-items withholds, making that
+  // route's attendance scope cosmetic. The scoped reporting route lives in the
+  // `reporting` group and is unaffected.
+  'action-items',
 ]);
 
 /**
