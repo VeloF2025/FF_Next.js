@@ -4,10 +4,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { resolveActionItemAccess } from '@/lib/actionItems/meetingAccess';
-import {
-  buildActionItemListQuery,
-  type ActionItemListFilters,
-} from '@/lib/actionItems/listQuery';
+import { buildActionItemListQuery } from '@/lib/actionItems/listQuery';
 import pool from '@/lib/db';
 import { ActionItem, ActionItemCreateInput } from '@/types/action-items.types';
 import { log } from '@/lib/logger';
@@ -17,10 +14,7 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
   const resolved = resolveActionItemAccess((req as AuthenticatedNextApiRequest).user);
   if ('error' in resolved) return apiResponse.forbidden(res, resolved.error);
 
-  const built = buildActionItemListQuery(
-    req.query as ActionItemListFilters,
-    resolved.access,
-  );
+  const built = buildActionItemListQuery(req.query, resolved.access);
   if ('error' in built) return apiResponse.badRequest(res, built.error);
 
   const result = await pool.query(built.text, built.params);

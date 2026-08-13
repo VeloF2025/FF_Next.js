@@ -6,6 +6,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { isOwner } from '@/lib/auth/owner';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 
@@ -23,14 +25,42 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'type must be summary, transcript, or action-items');
   }
 
+  // This route serves the same three payloads as transcript.ts, notes.ts and
+  // recording.ts — all of which gate on participation — but had no check beyond withAuth.
+  // `?type=transcript` therefore walked straight around the gate its own sibling enforces,
+  // and `?type=action-items` returned the meeting content the action-item routes withhold.
+  const user = (req as AuthenticatedNextApiRequest).user;
+  const userEmail = (user?.email ?? '').trim().toLowerCase();
+  const owner = isOwner(user);
+
+  if (!owner && !userEmail) {
+    return apiResponse.forbidden(res, 'User email is required for meeting export');
+  }
+
   try {
-    const [meeting] = await sql`
-      SELECT id, title, meeting_date, summary, raw_transcript, user_notes
-      FROM meetings WHERE id = ${meetingId}
-    `;
+    // Owner reads unconditionally; everyone else must appear in participants. Matches the
+    // shape used by transcript.ts.
+    const rows = owner
+      ? await sql`
+          SELECT id, title, meeting_date, summary, raw_transcript, user_notes
+          FROM meetings WHERE id = ${meetingId}
+        `
+      : await sql`
+          SELECT id, title, meeting_date, summary, raw_transcript, user_notes
+          FROM meetings
+          WHERE id = ${meetingId}
+            AND EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements(COALESCE(participants, '[]'::jsonb)) AS p
+              WHERE LOWER(p->>'email') = ${userEmail}
+            )
+        `;
+    const [meeting] = rows;
 
     if (!meeting) {
-      return apiResponse.notFound(res, 'Meeting not found');
+      // 403, not 404 — a 404 here would still confirm which meeting ids exist to anyone
+      // enumerating them. Mirrors transcript.ts.
+      return apiResponse.forbidden(res, 'Meeting not found or you are not a participant');
     }
 
     const date = meeting.meeting_date

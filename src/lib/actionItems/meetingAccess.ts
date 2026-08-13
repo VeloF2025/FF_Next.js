@@ -82,34 +82,74 @@ function push(params: unknown[], value: unknown): string {
  * with no assignee_email fails closed, and `COALESCE(participants, '[]')` makes a meeting
  * with no participant list unmatchable rather than an error.
  */
+export interface VisibilityOptions {
+  /**
+   * Authorize a WRITE (PATCH/DELETE) rather than a read.
+   *
+   * Drops the "no meeting, so no attendance claim" arm. That arm is a sound reason to let
+   * you READ an operational item nobody linked to a meeting; it is not a reason to let you
+   * EDIT or DELETE one. Without this distinction the read rule would hand every user
+   * destructive rights over all 324 procurement and hs_audit_overdue rows.
+   *
+   * Cost of the stricter rule, measured: all 319 procurement items carry an assignee, so
+   * they stay editable by the person responsible. Only the 5 unassigned hs_audit_overdue
+   * rows become owner-only.
+   */
+  forWrite?: boolean;
+  /**
+   * Restrict to MEETING attendance alone — drop both assignment arms and the no-meeting
+   * arm, so a row is visible only if the caller sat in the meeting it came from.
+   *
+   * This is what the MCP reporting route needs. Its payload is verbatim meeting content
+   * delivered to an agent, and its aggregate counts are meant to describe meetings, so an
+   * item you were assigned in a meeting you missed is deliberately outside its scope, and
+   * a procurement row with no meeting has no place in a meeting report at all.
+   *
+   * It exists as an option here rather than as a second copy of the predicate elsewhere.
+   * Two independently-maintained visibility rules over one table is how they drift.
+   */
+  meetingsOnly?: boolean;
+}
+
 export function actionItemVisibility(
   access: ActionItemAccess,
   params: unknown[],
   alias = 'ai',
+  options: VisibilityOptions = {},
 ): string {
   if (access.isOwner) return 'TRUE';
 
   const email = push(params, access.email);
-  const clauses = [
-    // Not meeting content — no attendance claim applies.
-    `${alias}.meeting_id IS NULL`,
-    // Assigned to you by email.
-    `LOWER(${alias}.assignee_email) = ${email}`,
-    // You attended the meeting it came from.
-    `EXISTS (
+
+  const attended = `EXISTS (
         SELECT 1 FROM meetings m_acc
         WHERE m_acc.id = ${alias}.meeting_id
           AND EXISTS (
             SELECT 1 FROM jsonb_array_elements(COALESCE(m_acc.participants, '[]'::jsonb)) AS p_acc
             WHERE LOWER(p_acc->>'email') = ${email}
           )
-      )`,
+      )`;
+
+  // Attendance alone — no assignment arms, no no-meeting arm. See meetingsOnly.
+  if (options.meetingsOnly) return `(${attended})`;
+
+  const clauses = [
+    // Assigned to you by email.
+    `LOWER(${alias}.assignee_email) = ${email}`,
+    // You attended the meeting it came from.
+    attended,
   ];
 
   // Assigned to you by user id. Only when we have one — an empty string cast to uuid
   // throws, and a caller with no id should simply not match this arm.
   if (access.userId) {
     clauses.push(`${alias}.assigned_to_user_id = ${push(params, access.userId)}::uuid`);
+  }
+
+  // Reading an operational item with no meeting is fine; destroying one is not. See
+  // VisibilityOptions.forWrite.
+  if (!options.forWrite) {
+    clauses.push(`${alias}.meeting_id IS NULL`);
   }
 
   return `(${clauses.join('\n        OR ')})`;

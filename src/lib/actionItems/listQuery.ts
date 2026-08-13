@@ -9,16 +9,43 @@
 
 import { actionItemVisibility, type ActionItemAccess } from './meetingAccess';
 
+/**
+ * Raw query values as Next actually delivers them.
+ *
+ * A repeated parameter (`?status=a&status=b`) arrives as `string[]`, NOT `string`. Typing
+ * these as `string` and casting `req.query` was a lie the runtime punished: `.split` and
+ * `.replace` are not array methods, so `?status=a&status=b` threw a TypeError and became a
+ * 500 with a log line, from a URL anyone can construct. Worse, `overdue` compared an array
+ * against `'true'`, silently dropped the filter and returned the caller's whole backlog
+ * instead of their overdue items.
+ */
 export interface ActionItemListFilters {
-  status?: string;
-  assignee_name?: string;
-  meeting_id?: string;
-  project_id?: string;
-  priority?: string;
-  search?: string;
-  overdue?: string;
-  assigned_to_user_id?: string;
-  source_type?: string;
+  status?: string | string[];
+  assignee_name?: string | string[];
+  meeting_id?: string | string[];
+  project_id?: string | string[];
+  priority?: string | string[];
+  search?: string | string[];
+  overdue?: string | string[];
+  assigned_to_user_id?: string | string[];
+  source_type?: string | string[];
+}
+
+/**
+ * Collapse a repeated parameter to its first value.
+ *
+ * First rather than last, and never joined: taking one value keeps the filter narrowing.
+ * Joining would build a search term no row matches, which reads to the caller as "nothing
+ * found" rather than "your request was ambiguous".
+ */
+function one(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value.length > 0 ? value[0] : undefined;
+  return value;
+}
+
+/** Strict positive-integer parse. `parseInt` prefix-parses, so '1abc' and '1 OR 1=1' both yield 1. */
+function strictInt(value: string): number | null {
+  return /^\d+$/.test(value.trim()) ? Number(value.trim()) : null;
 }
 
 const SELECT_LIST = `
@@ -46,43 +73,58 @@ function likeLiteral(value: string): string {
 export type BuiltQuery = { text: string; params: unknown[] } | { error: string };
 
 export function buildActionItemListQuery(
-  filters: ActionItemListFilters,
+  rawFilters: ActionItemListFilters,
   access: ActionItemAccess,
 ): BuiltQuery {
   const params: unknown[] = [];
   const push = (value: unknown) => `$${params.push(value)}`;
 
+  // Normalise BEFORE any use. Every branch below assumes a plain string.
+  const meeting_id = one(rawFilters.meeting_id);
+  const project_id = one(rawFilters.project_id);
+  const assigned_to_user_id = one(rawFilters.assigned_to_user_id);
+  const source_type = one(rawFilters.source_type);
+  const priority = one(rawFilters.priority);
+  const status = one(rawFilters.status);
+  const assignee_name = one(rawFilters.assignee_name);
+  const search = one(rawFilters.search);
+  const overdue = one(rawFilters.overdue);
+
   // The visibility predicate is FIRST and unconditional. Every clause below only narrows
   // further, so no combination of query parameters can widen what comes back.
   const where: string[] = [actionItemVisibility(access, params)];
 
-  if (filters.meeting_id) {
-    const meetingId = Number.parseInt(filters.meeting_id, 10);
-    // A non-numeric meeting_id used to become NaN and get dropped, widening the result to
-    // every meeting. Reject it instead of quietly ignoring it.
-    if (!Number.isFinite(meetingId)) return { error: 'meeting_id must be a number' };
+  if (meeting_id) {
+    // Strict, not Number.parseInt: prefix-parsing accepted '1abc', '1 OR 1=1' and '1.9' as
+    // 1, so the filter silently answered a different question than the caller asked.
+    const meetingId = strictInt(meeting_id);
+    if (meetingId === null) return { error: 'meeting_id must be a number' };
     where.push(`ai.meeting_id = ${push(meetingId)}`);
   }
-  if (filters.project_id) where.push(`ai.project_id = ${push(filters.project_id)}::uuid`);
-  if (filters.assigned_to_user_id) {
-    where.push(`ai.assigned_to_user_id = ${push(filters.assigned_to_user_id)}::uuid`);
+  if (project_id) where.push(`ai.project_id = ${push(project_id)}::uuid`);
+  if (assigned_to_user_id) {
+    where.push(`ai.assigned_to_user_id = ${push(assigned_to_user_id)}::uuid`);
   }
-  if (filters.source_type) where.push(`ai.source_type = ${push(filters.source_type)}`);
+  if (source_type) where.push(`ai.source_type = ${push(source_type)}`);
   // ::text on both sides: status and priority are enums, so binding an unknown value
   // directly would raise "invalid input value for enum" — a 500 from a user-supplied string.
-  if (filters.priority) where.push(`ai.priority::text = ${push(filters.priority)}`);
-  if (filters.status) {
-    where.push(
-      `ai.status::text = ANY(${push(filters.status.split(',').map((s) => s.trim()))})`,
-    );
+  if (priority) where.push(`ai.priority::text = ${push(priority)}`);
+  if (status) {
+    where.push(`ai.status::text = ANY(${push(status.split(',').map((s) => s.trim()))})`);
   }
-  if (filters.assignee_name) {
-    where.push(`ai.assignee_name ILIKE ${push(`%${likeLiteral(filters.assignee_name)}%`)}`);
+  if (assignee_name) {
+    where.push(`ai.assignee_name ILIKE ${push(`%${likeLiteral(assignee_name)}%`)}`);
   }
-  if (filters.search) {
-    where.push(`ai.description ILIKE ${push(`%${likeLiteral(filters.search)}%`)}`);
+  if (search) {
+    where.push(`ai.description ILIKE ${push(`%${likeLiteral(search)}%`)}`);
   }
-  if (filters.overdue === 'true') {
+  if (overdue === 'true') {
+    // `due_date` is `timestamp without time zone`, so `< NOW()` resolves through the
+    // session timezone. Moving this from JS `new Date(...)` into SQL therefore makes a
+    // couple of hours' drift possible right at the day boundary. Left as-is deliberately:
+    // stats.ts already computed `overdue` this way on master, so matching it keeps the
+    // headline count and the list agreeing. Changing the basis is a separate decision
+    // about the whole module, not a side effect of this gate.
     where.push(`(ai.due_date < NOW() AND ai.status::text <> 'completed')`);
   }
 

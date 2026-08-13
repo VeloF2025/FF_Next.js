@@ -26,22 +26,30 @@ async function handler(
     return apiResponse.validationError(res, { id: 'Invalid action item ID' });
   }
 
-  // Gate every method on the same visibility rule as the list, BEFORE the method branches.
-  // Reading one item by id was the widest hole in this module: knowing an id was enough to
-  // read the verbatim description and transcript_url of any meeting, and PATCH and DELETE
-  // had no check at all — any authenticated user could edit or destroy any of the 5,230
-  // rows, including items from meetings they were never in.
+  // Gate every method BEFORE the method branches. Reading one item by id was the widest
+  // hole in this module: knowing an id was enough to read the verbatim description and
+  // transcript_url of any meeting, and PATCH and DELETE had no check at all — any
+  // authenticated user could edit or destroy any of the 5,230 rows.
+  //
+  // Writes use a STRICTER rule than reads. The read rule lets you see an operational item
+  // that belongs to no meeting, because no attendance claim can be made about it either
+  // way; that is not a reason to let you edit or delete one. Reusing the read rule for
+  // PATCH and DELETE would have handed every user destructive rights over all 324
+  // procurement and hs_audit_overdue rows.
   //
   // An inaccessible item answers 404, identical to a missing one. 403 would confirm the id
   // exists, which is the one bit an enumerating caller actually wants.
   const resolved = resolveActionItemAccess((req as AuthenticatedNextApiRequest).user);
   if ('error' in resolved) return apiResponse.forbidden(res, resolved.error);
 
+  const isWrite = req.method === 'PATCH' || req.method === 'DELETE';
+
   try {
     const params: unknown[] = [id];
     const visible = await pool.query(
       `SELECT 1 FROM action_items ai
-        WHERE ai.id = $1 AND ${actionItemVisibility(resolved.access, params)}
+        WHERE ai.id = $1
+          AND ${actionItemVisibility(resolved.access, params, 'ai', { forWrite: isWrite })}
         LIMIT 1`,
       params,
     );
