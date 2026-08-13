@@ -37,8 +37,29 @@ export async function createPicking(
       projectId, jobReference, jobType,
       contractorId, contractorName, teamName,
       technicianId, technicianName, scheduledDate,
-      notes, lines,
+      notes, lines, idempotencyKey,
     } = req.body;
+
+    // ── Idempotency check ──────────────────────────────────────────────────────
+    // The offline PWA queue retries the whole submit chain on a network blip; the
+    // same client-generated key on a replay must return the existing picking
+    // instead of creating a duplicate (and issuing the stock twice). Mirrors the
+    // returns flow (migration 359 / returns/_create.ts).
+    const idempotencyValue =
+      idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.trim() !== ''
+        ? idempotencyKey
+        : null;
+    if (idempotencyValue) {
+      const existing = await sql`
+        SELECT * FROM stock_pickings WHERE idempotency_key = ${idempotencyValue} LIMIT 1
+      `;
+      if (existing[0]) {
+        log.warn('pickings.create.idempotent_replay', {
+          idempotencyKey: idempotencyValue, pickingId: existing[0].id,
+        }, 'field-stock');
+        return apiResponse.success(res, existing[0]);
+      }
+    }
 
     if (!sourceLocationId) {
       return apiResponse.validationError(res, { sourceLocationId: 'Source location is required' });
@@ -204,7 +225,12 @@ export async function createPicking(
     const resolvedSerialIds = serialCheck.resolvedSerialIds ?? new Map<string, string>();
     // ── End serial availability check ────────────────────────────────────────
 
-    // Generate picking number
+    // Generate picking number. NOTE: COUNT(*)+1 is racy (two concurrent creates
+    // can collide on picking_number's unique constraint → 500). Left as-is here
+    // to preserve the existing PCK-###### format; switching to the race-safe
+    // generate_picking_number() changes the format to ISS-YYYYMM-##### and is a
+    // separate follow-up. The idempotency key below is the fix for the offline
+    // queue's duplicate-submission problem (the actual double-issue bug).
     const countResult = await sql`SELECT COUNT(*) as count FROM stock_pickings`;
     const count = countResult[0] ? Number(countResult[0].count || 0) : 0;
     const pickingNumber = `PCK-${String(count + 1).padStart(6, '0')}`;
@@ -219,7 +245,8 @@ export async function createPicking(
         technician_id, technician_name,
         scheduled_date, status, notes,
         created_by_staff_id,
-        proof_photo_key, proof_photo_url
+        proof_photo_key, proof_photo_url,
+        idempotency_key
       ) VALUES (
         ${pickingNumber}, ${pickingType || null},
         ${sourceLocationId}, ${destinationLocationId},
@@ -228,7 +255,8 @@ export async function createPicking(
         ${technicianId || null}, ${resolvedTechnicianName},
         ${scheduledDate || null}, 'draft', ${notes || null},
         ${createdByStaffId},
-        ${proofPhotoKey || null}, ${proofPhotoUrl || null}
+        ${proofPhotoKey || null}, ${proofPhotoUrl || null},
+        ${idempotencyValue}
       )
       RETURNING *
     `;
