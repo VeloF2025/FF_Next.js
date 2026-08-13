@@ -21,6 +21,11 @@ describe('continuity', () => {
     expect(continuousOutside(fixes, 300, 300, '2026-08-13T08:10:01Z')).toMatchObject({ confirmed: true, sequenceLength: 2 });
     expect(continuousOutside([...fixes, at(602, { valid: false, inside: false })], 301, 300, '2026-08-13T08:10:02Z')).toMatchObject({ confirmed: false, pending: true });
   });
+
+  it('does not let a stale earlier fix confirm dwell with a fresh latest fix', () => {
+    expect(continuousInside([at(0), at(600)], 300, 300, '2026-08-13T08:10:00Z'))
+      .toMatchObject({ confirmed: false, pending: true, sequenceLength: 1 });
+  });
 });
 
 describe('approachTrend', () => {
@@ -33,5 +38,9 @@ describe('approachTrend', () => {
     expect(approachTrend([at(0, { distanceM: 100 }), at(60, { distanceM: 90, speedKmh: 4.99 })], 2, 10_000, 5, 300, '2026-08-13T08:01:00Z')).toBe(false);
     expect(approachTrend([at(0, { distanceM: 11_000 }), at(60, { distanceM: 10_001 })], 2, 10_000, 5, 300, '2026-08-13T08:01:00Z')).toBe(false);
     expect(approachTrend([at(0, { distanceM: 100 }), at(60, { distanceM: 90 })], 2, 10_000, 5, 30, '2026-08-13T08:01:31Z')).toBe(false);
+  });
+
+  it('does not let a stale old reading contribute to an approach trend', () => {
+    expect(approachTrend([at(0, { distanceM: 10_000 }), at(600, { distanceM: 9_000 })], 2, 10_000, 5, 300, '2026-08-13T08:10:00Z')).toBe(false);
   });
 });

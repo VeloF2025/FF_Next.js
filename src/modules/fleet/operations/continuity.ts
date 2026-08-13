@@ -15,10 +15,10 @@ function usableFixes(fixes: ContinuityFix[], staleAfterSeconds: number, asOf: st
   if (!Number.isFinite(evaluatedAt)) return [];
   const usable = fixes.flatMap((fix) => {
     const timestamp = Date.parse(fix.recordedAt);
-    return fix.valid && Number.isFinite(timestamp) && timestamp <= evaluatedAt ? [{ ...fix, timestamp }] : [];
+    return fix.valid && Number.isFinite(timestamp) && timestamp <= evaluatedAt
+      && evaluatedAt - timestamp <= staleAfterSeconds * 1_000 ? [{ ...fix, timestamp }] : [];
   }).sort((a, b) => a.timestamp - b.timestamp);
-  const latest = usable.at(-1);
-  return !latest || evaluatedAt - latest.timestamp > staleAfterSeconds * 1_000 ? [] : usable;
+  return usable;
 }
 
 function newestSequence(fixes: TimedFix[], staleAfterSeconds: number, state: boolean): TimedFix[] {
