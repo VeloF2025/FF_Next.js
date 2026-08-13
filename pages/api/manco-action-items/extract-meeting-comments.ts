@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { resolveActionItemAccess } from '@/lib/actionItems/meetingAccess';
+import { meetingForCaller } from '@/lib/actionItems/meetingFetch';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 
@@ -61,6 +65,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const resolved = resolveActionItemAccess((req as AuthenticatedNextApiRequest).user);
+  if ('error' in resolved) return apiResponse.forbidden(res, resolved.error);
+  const access = resolved.access;
+
   try {
     const { manco_action_item_id, meeting_id } = req.body;
 
@@ -83,13 +91,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
     const actionItemText = String(itemRows[0]!.action_item);
 
-    // Fetch the meeting transcript
-    const meetingRows = await sql`
-      SELECT id, title, raw_transcript, summary FROM meetings
-      WHERE id = ${meetingIdNum}
-    `;
+    // Fetch the meeting transcript — ONLY if the caller sat in the meeting.
+    //
+    // `meeting_id` arrives in the REQUEST BODY and was never checked against the item's
+    // linked meetings, so this accepted any of the 4,000+ meetings in the table. Combined
+    // with PATCH /api/manco-action-items/[id] — which accepts `action_item` and has no
+    // ownership check — the keywords are caller-controlled too, and the extracted lines
+    // are INSERTED as comments that /api/manco-action-items/comments then serves to
+    // anyone. That made this a targeted transcript-extraction primitive over every
+    // meeting, writing what it took into a permanent readable store.
+    const gated = meetingForCaller(meetingIdNum, access);
+    const meetingRows = (await pool.query(gated.text, gated.params)).rows;
     if (meetingRows.length === 0) {
-      return apiResponse.notFound(res, 'Meeting', meeting_id);
+      // 403, not 404: this is a write path, so the caller needs to know it was refused
+      // rather than silently doing nothing. It does not distinguish "no such meeting"
+      // from "not yours".
+      return apiResponse.forbidden(res, 'Meeting not found or you are not a participant');
     }
     const meeting = meetingRows[0] as {
       id: number;

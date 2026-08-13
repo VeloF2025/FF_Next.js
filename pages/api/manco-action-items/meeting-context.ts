@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { resolveActionItemAccess } from '@/lib/actionItems/meetingAccess';
+import { meetingForCaller } from '@/lib/actionItems/meetingFetch';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 
@@ -85,6 +89,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const resolved = resolveActionItemAccess((req as AuthenticatedNextApiRequest).user);
+  if ('error' in resolved) return apiResponse.forbidden(res, resolved.error);
+  const access = resolved.access;
+
   try {
     const { item_id } = req.query;
 
@@ -139,12 +147,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
       return apiResponse.success(res, emptyResponse);
     }
 
-    // Fetch the meeting
-    const meetingResult = await sql`
-      SELECT id, title, meeting_date, raw_transcript, summary
-      FROM meetings
-      WHERE id = ${meetingId}
-    `;
+    // Fetch the meeting — ONLY if the caller sat in it.
+    //
+    // This route returns verbatim transcript excerpts and the meeting summary's overview,
+    // decisions and action items. Without this predicate every authenticated user could
+    // read them: the item ids are listable from /api/manco-action-items, which is
+    // withAuth with no scoping, and the four meetings reachable this way are two Velocity
+    // Manco strategy sessions (44k and 91k characters, 10 participants each) and a
+    // three-person weekly one-on-one.
+    //
+    // A non-attendee gets the same empty shape as an item with no linked meeting, rather
+    // than a 403. The route already has that shape and the UI already renders it, and it
+    // does not confirm to a non-attendee that a meeting exists at all.
+    const gated = meetingForCaller(meetingId, access);
+    const meetingResult = (await pool.query(gated.text, gated.params)).rows;
 
     if (meetingResult.length === 0) {
       const emptyResponse: MeetingContextResponse = {

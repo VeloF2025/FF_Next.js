@@ -27,6 +27,7 @@ import {
 } from '@/lib/actionItems/meetingAccess';
 import { buildActionItemListQuery } from '@/lib/actionItems/listQuery';
 import { meetingsQuery, parseMeetingFilter, shapeMeetings } from '@/lib/reporting/meetings';
+import { meetingForCaller } from '@/lib/actionItems/meetingFetch';
 
 const ALICE = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
@@ -434,5 +435,61 @@ describe('action item visibility (real Postgres)', () => {
       const noEmail: ActionItemAccess = { isOwner: false, email: '', userId: '' };
       expect(await found(noEmail)).toEqual([]);
     });
+
+  describe('manco meeting content fetch', () => {
+    // Both manco routes that read meeting content — meeting-context (returns verbatim
+    // transcript excerpts and the summary) and extract-meeting-comments (copies excerpts
+    // into a comment thread anyone can read) — took the meeting id straight from the
+    // request and applied no attendance check at all.
+    async function fetchAs(access: ActionItemAccess, meetingId: number) {
+      const { text, params } = meetingForCaller(meetingId, access);
+      const { rows } = await pool.query(text, params);
+      return rows;
+    }
+
+    it('returns the meeting to someone who was in it', async () => {
+      const rows = await fetchAs(alice, 1);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].raw_transcript).toBe('said things');
+    });
+
+    it('returns NOTHING to someone who was not', async () => {
+      expect(await fetchAs(bob, 1)).toHaveLength(0);
+      expect(await fetchAs(alice, 2)).toHaveLength(0);
+    });
+
+    it('refuses an arbitrary meeting id — the id came from the request body', async () => {
+      // extract-meeting-comments accepted any meeting_id, so this is the exact escalation:
+      // a caller naming a meeting they have no connection to.
+      expect(await fetchAs(bob, 3)).toHaveLength(0);
+      expect(await fetchAs(bob, 4)).toHaveLength(0);
+      expect(await fetchAs(bob, 5)).toHaveLength(0);
+    });
+
+    it('fails closed on a meeting with no participant list', async () => {
+      expect(await fetchAs(alice, 3)).toHaveLength(0);
+      expect(await fetchAs(owner, 3)).toHaveLength(1);
+    });
+
+    it('fails closed for an identity with no email', async () => {
+      const noEmail: ActionItemAccess = { isOwner: false, email: '', userId: '' };
+      for (const id of [1, 2, 3, 4, 5, 6]) {
+        expect(await fetchAs(noEmail, id)).toHaveLength(0);
+      }
+    });
+
+    it('gives the owner any meeting', async () => {
+      expect(await fetchAs(owner, 2)).toHaveLength(1);
+    });
+
+    it('carries the transcript and summary columns the routes rely on', async () => {
+      // If the column list drifted, the routes would silently render empty context rather
+      // than fail — the gate would look fine while the feature quietly broke.
+      const [row] = await fetchAs(alice, 1);
+      expect(Object.keys(row).sort()).toEqual(
+        ['id', 'meeting_date', 'raw_transcript', 'summary', 'title'],
+      );
+    });
+  });
   });
 });
