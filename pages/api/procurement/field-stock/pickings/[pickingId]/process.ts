@@ -94,11 +94,19 @@ export async function processPicking(req: NextApiRequest, res: NextApiResponse) 
         throw Object.assign(new Error('INSUFFICIENT_STOCK'), { stockErrors: avail.errors });
       }
 
-      // Status guard: prevents double-processing
-      await txn.query(
-        `UPDATE stock_pickings SET status = 'processing', updated_at = NOW() WHERE id = $1`,
+      // Atomic status guard: the claim only succeeds while the row is still
+      // 'confirmed'. Two concurrent process calls serialize on this UPDATE's row
+      // lock; the loser matches zero rows and aborts, so a picking can't be
+      // processed (and its stock issued) twice. The plain SELECT above can't take
+      // FOR UPDATE because it aggregates lines with json_agg/GROUP BY.
+      const claimed = await txn.query(
+        `UPDATE stock_pickings SET status = 'processing', updated_at = NOW()
+         WHERE id = $1 AND status = 'confirmed' RETURNING id`,
         [pickingId],
       );
+      if (claimed.length === 0) {
+        throw Object.assign(new Error('PICKING_INVALID_STATUS'), { currentStatus: 'processing' });
+      }
 
       // Resolve recipient holder ONCE (issue pickings only)
       let toHolderId: string | null = null;

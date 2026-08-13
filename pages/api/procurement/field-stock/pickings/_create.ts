@@ -77,22 +77,47 @@ export async function createPicking(
     const nonSerialLines = (lines as PickingLine[]).filter(
       (l) => !Array.isArray(l.serialIds) || l.serialIds.length === 0,
     );
+
+    // Positive quantity for EVERY quantity-based line, regardless of picking
+    // type. Previously only 'issue' was checked, so a transfer/scrap/receipt/
+    // return line could carry a negative plannedQuantity — at process time the
+    // source decrement (`quantity - $qty`) becomes an increment, fabricating
+    // stock at the source and destroying it at the destination.
+    const badQty = nonSerialLines.find(
+      (l) => typeof l.plannedQuantity !== 'number' || !(l.plannedQuantity > 0),
+    );
+    if (badQty) {
+      return apiResponse.badRequest(
+        res,
+        'Quantity must be greater than zero for non-serial lines',
+        { plannedQuantity: 'Quantity must be greater than zero for non-serial lines' },
+      );
+    }
+
+    // Duplicate-line guard: two lines for the same item (and lot) each pass the
+    // per-line availability check independently against the same on-hand, then
+    // both decrement at process time — driving stock negative. Reject duplicates;
+    // the client should combine them into one line.
+    const seenItems = new Set<string>();
+    for (const l of nonSerialLines) {
+      if (!l.stockItemId) continue;
+      const key = `${l.stockItemId}|${l.lotNumber ?? ''}`;
+      if (seenItems.has(key)) {
+        return apiResponse.badRequest(
+          res,
+          'Duplicate stock item in picking lines; combine them into a single line',
+          { code: 'DUPLICATE_PICKING_LINE' },
+        );
+      }
+      seenItems.add(key);
+    }
+
     if ((pickingType ?? null) === 'issue' && nonSerialLines.length > 0) {
       if (!proofPhotoKey) {
         return apiResponse.badRequest(
           res,
           'A proof photo is required when issuing non-serial stock',
           { proofPhotoKey: 'A proof photo is required when issuing non-serial stock' },
-        );
-      }
-      const badQty = nonSerialLines.find(
-        (l) => typeof l.plannedQuantity !== 'number' || !(l.plannedQuantity > 0),
-      );
-      if (badQty) {
-        return apiResponse.badRequest(
-          res,
-          'Quantity must be greater than zero for non-serial lines',
-          { plannedQuantity: 'Quantity must be greater than zero for non-serial lines' },
         );
       }
     }

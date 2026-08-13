@@ -35,8 +35,11 @@ export type { StoresTodayRow };
  * Get today's per-technician reconciliation for a specific stores user.
  *
  * @param storesStaffId  staff.id of the authenticated stores user
- * @param dateSAST       ISO date string "YYYY-MM-DD"; server interprets in
- *                       the DB's default timezone (Africa/Johannesburg)
+ * @param dateSAST       ISO date string "YYYY-MM-DD" naming a SAST calendar
+ *                       day. The queries convert it to the correct UTC instant
+ *                       via `AT TIME ZONE 'Africa/Johannesburg'` — the DB
+ *                       session runs in UTC, so a bare `::date` cast would
+ *                       shift the window by 2h (00:00 UTC ≠ 00:00 SAST).
  */
 export async function getTodayForStoresUser(
   storesStaffId: string,
@@ -55,8 +58,8 @@ export async function getTodayForStoresUser(
         JOIN stock_items si ON si.id = spl.stock_item_id
         WHERE sp.created_by_staff_id = ${storesStaffId}
           AND sp.picking_type = 'issue'
-          AND sp.created_at >= ${dateSAST}::date
-          AND sp.created_at < ${dateSAST}::date + INTERVAL '1 day'
+          AND sp.created_at >= (${dateSAST}::date)::timestamp AT TIME ZONE 'Africa/Johannesburg'
+          AND sp.created_at < (${dateSAST}::date + INTERVAL '1 day')::timestamp AT TIME ZONE 'Africa/Johannesburg'
           AND sp.technician_id IS NOT NULL
           AND spl.serial_ids IS NOT NULL
           AND array_length(spl.serial_ids, 1) > 0
@@ -77,8 +80,8 @@ export async function getTodayForStoresUser(
         FROM issued_today it
         JOIN stock_serial_events sse ON sse.serial_id = it.serial_id
         WHERE sse.event_type IN ('installed_at_drop', 'activated')
-          AND sse.occurred_at >= ${dateSAST}::date
-          AND sse.occurred_at < ${dateSAST}::date + INTERVAL '1 day'
+          AND sse.occurred_at >= (${dateSAST}::date)::timestamp AT TIME ZONE 'Africa/Johannesburg'
+          AND sse.occurred_at < (${dateSAST}::date + INTERVAL '1 day')::timestamp AT TIME ZONE 'Africa/Johannesburg'
         GROUP BY it.technician_id
       ),
       returned_today AS (
@@ -88,8 +91,8 @@ export async function getTodayForStoresUser(
         FROM issued_today it
         JOIN stock_return_lines srl ON srl.serial_id = it.serial_id
         JOIN stock_returns sr ON sr.id = srl.return_id
-        WHERE sr.created_at >= ${dateSAST}::date
-          AND sr.created_at < ${dateSAST}::date + INTERVAL '1 day'
+        WHERE sr.created_at >= (${dateSAST}::date)::timestamp AT TIME ZONE 'Africa/Johannesburg'
+          AND sr.created_at < (${dateSAST}::date + INTERVAL '1 day')::timestamp AT TIME ZONE 'Africa/Johannesburg'
         GROUP BY it.technician_id
       )
       SELECT
