@@ -65,4 +65,35 @@ describe('submitIssue body mapping', () => {
     const noProject = JSON.parse(requestMock.mock.calls[0][1].body as string);
     expect(noProject.projectId).toBeUndefined();
   });
+
+  it('threads the idempotencyKey into the create body', async () => {
+    await submitIssue({ ...BASE, quantity: 5, proofPhotoKey: 'k', proofPhotoUrl: '/storage/k' }, 'idem-123');
+    const body = JSON.parse(requestMock.mock.calls[0][1].body as string);
+    expect(body.idempotencyKey).toBe('idem-123');
+  });
+
+  it('on an idempotent replay of an already-processed picking, does not re-run confirm/sign/process', async () => {
+    // The server returned the EXISTING picking (status already 'done').
+    requestMock.mockReset();
+    requestMock.mockResolvedValueOnce({ id: 'p1', picking_number: 'PCK-1', status: 'done' });
+    const result = await submitIssue({ ...BASE, quantity: 5, proofPhotoKey: 'k', proofPhotoUrl: '/storage/k' }, 'idem-123');
+
+    // Only the create call happened — no confirm/sign/process.
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestMock.mock.calls[0][0]).toBe('/api/my/stores/pickings');
+    expect(result.status).toBe('processed');
+  });
+
+  it('on a replay of a confirmed picking, skips confirm but still signs + processes', async () => {
+    requestMock.mockReset();
+    requestMock.mockResolvedValueOnce({ id: 'p1', picking_number: 'PCK-1', status: 'confirmed' });
+    requestMock.mockResolvedValue({});
+    await submitIssue({ ...BASE, quantity: 5, proofPhotoKey: 'k', proofPhotoUrl: '/storage/k' }, 'idem-123');
+
+    const paths = requestMock.mock.calls.map((c) => c[0]);
+    expect(paths).toContain('/api/my/stores/pickings');
+    expect(paths.some((p) => String(p).endsWith('/confirm'))).toBe(false);
+    expect(paths.some((p) => String(p).endsWith('/sign'))).toBe(true);
+    expect(paths.some((p) => String(p).endsWith('/process'))).toBe(true);
+  });
 });
