@@ -70,7 +70,7 @@ export default function StockTakesPage() {
     fetchStockTakes();
   }, [fetchStockTakes]);
 
-  const handleCreate = async (formData: { name: string; description?: string; stock_take_type?: string; count_method?: string }) => {
+  const handleCreate = async (formData: { name: string; description?: string; stock_take_type?: string; count_method?: string; location_id?: string }) => {
     try {
       const res = await fetch('/api/procurement/stock-takes', {
         method: 'POST',
@@ -322,7 +322,13 @@ export default function StockTakesPage() {
 // Create Stock Take Modal
 interface CreateModalProps {
   onClose: () => void;
-  onCreate: (data: { name: string; description?: string; stock_take_type?: string; count_method?: string }) => void;
+  onCreate: (data: { name: string; description?: string; stock_take_type?: string; count_method?: string; location_id?: string }) => void;
+}
+
+interface WarehouseOption {
+  id: string;
+  code?: string;
+  name: string;
 }
 
 function CreateStockTakeModal({ onClose, onCreate }: CreateModalProps) {
@@ -331,12 +337,33 @@ function CreateStockTakeModal({ onClose, onCreate }: CreateModalProps) {
     description: '',
     stock_take_type: 'full',
     count_method: 'blind',
+    location_id: '',
   });
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/procurement/field-stock/locations?locationType=warehouse&isActive=true')
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : (data?.data ?? []);
+        setWarehouses(list as WarehouseOption[]);
+      })
+      .catch(() => {
+        if (!cancelled) notificationService.error('Failed to load warehouses');
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       notificationService.error('Name is required');
+      return;
+    }
+    if (!formData.location_id) {
+      notificationService.error('Select a location');
       return;
     }
     onCreate(formData);
@@ -373,6 +400,21 @@ function CreateStockTakeModal({ onClose, onCreate }: CreateModalProps) {
               rows={2}
               className="w-full px-3 py-2 bg-[#1a1d23] border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Location *</label>
+            <select
+              value={formData.location_id}
+              onChange={(e) => setFormData(prev => ({ ...prev, location_id: e.target.value }))}
+              className="w-full px-3 py-2 bg-[#1a1d23] border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              required
+            >
+              <option value="">Select a warehouse…</option>
+              {warehouses.map(w => (
+                <option key={w.id} value={w.id}>{w.name}{w.code ? ` (${w.code})` : ''}</option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
