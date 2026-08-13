@@ -273,8 +273,14 @@ function mockAcceptReturn() {
     status: 'restocked',
   });
 
-  // All txn queries succeed
-  mockTxnQuery.mockResolvedValue([]);
+  // Reset the txn mock so any unconsumed Once values from the create phase
+  // don't bleed into accept, then answer the in-txn FOR UPDATE re-check with
+  // 'inspected' so the accept proceeds; everything else → [].
+  mockTxnQuery.mockReset();
+  mockTxnQuery.mockImplementation(async (text?: string) =>
+    typeof text === 'string' && /stock_returns[\s\S]*FOR UPDATE/i.test(text)
+      ? [{ status: 'inspected' }]
+      : []);
 }
 
 // ── Test suites ────────────────────────────────────────────────────────────────
@@ -288,7 +294,10 @@ describe('Returns full flow integration', () => {
     mockTransaction.mockReset();
 
     // Re-apply defaults after clearAllMocks
-    mockTxnQuery.mockResolvedValue([]);
+    mockTxnQuery.mockImplementation(async (text?: string) =>
+      typeof text === 'string' && /stock_returns[\s\S]*FOR UPDATE/i.test(text)
+        ? [{ status: 'inspected' }]
+        : []);
     // `client` must be here too, not only in the vi.hoisted definition — this
     // override runs before every test and would otherwise hand the handler a txn
     // without it, so promoteSerial(txn.client, …) throws "Cannot use 'in'
@@ -357,7 +366,10 @@ describe('Returns full flow integration', () => {
       // ── Act 2: storeman inspects with mixed dispositions ──────────────────────
       mockNeonSql.mockReset();
       mockTxnQuery.mockReset();
-      mockTxnQuery.mockResolvedValue([]);
+      mockTxnQuery.mockImplementation(async (text?: string) =>
+      typeof text === 'string' && /stock_returns[\s\S]*FOR UPDATE/i.test(text)
+        ? [{ status: 'inspected' }]
+        : []);
 
       mockStoresStaff();
       mockInspectReturn();
@@ -393,7 +405,10 @@ describe('Returns full flow integration', () => {
       mockNeonSql.mockReset();
       mockQueryOne.mockReset();
       mockTxnQuery.mockReset();
-      mockTxnQuery.mockResolvedValue([]);
+      mockTxnQuery.mockImplementation(async (text?: string) =>
+      typeof text === 'string' && /stock_returns[\s\S]*FOR UPDATE/i.test(text)
+        ? [{ status: 'inspected' }]
+        : []);
 
       mockAcceptReturn();
 
