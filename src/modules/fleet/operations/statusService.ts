@@ -4,7 +4,7 @@ import type { OperationalEvaluation, OperationalEvidence, OperationalStatusSumma
 
 export class OperationalStatusRequestError extends Error { constructor(message: string) { super(message); this.name = 'OperationalStatusRequestError'; } }
 export interface RosterStatusRequest { projectId: string; workDate: string; asOf: string; page: number; limit: number }
-export interface EvidenceDetailRequest { projectId: string; staffId: string; workDate: string; asOf: string }
+export interface EvidenceDetailRequest { projectId?: string; staffId: string; workDate: string; asOf: string }
 export interface RosterStatusResult { items: OperationalStatusSummary[]; page: number; limit: number }
 export interface EvidencePointDetail { source: 'attendance_clock_in' | 'attendance_clock_out' | 'vehicle_latest'; latitude: number; longitude: number; recordedAt: string }
 export interface OperationalEvidenceDetail { staffId: string; workDate: string; evaluation: OperationalEvaluation; points: EvidencePointDetail[] }
@@ -41,7 +41,7 @@ export async function getOperationalRosterStatus(request: RosterStatusRequest): 
 
 export async function getOperationalEvidenceDetail(request: EvidenceDetailRequest): Promise<OperationalEvidenceDetail> {
   validate(request.workDate, request.asOf); if (!request.staffId) throw new OperationalStatusRequestError('staffId is required');
-  if (!request.projectId || request.projectId === '00000000-0000-0000-0000-000000000000') throw new OperationalStatusRequestError('projectId is required');
+  if (request.projectId !== undefined && (!request.projectId || request.projectId === '00000000-0000-0000-0000-000000000000')) throw new OperationalStatusRequestError('projectId is invalid');
   const [evidence] = await loadOperationalEvidence({ projectId: request.projectId, staffId: request.staffId, workDate: request.workDate, asOf: request.asOf, limit: 1, offset: 0 });
   if (!evidence) throw new OperationalStatusRequestError('Operational evidence not found');
   const points: EvidencePointDetail[] = [];

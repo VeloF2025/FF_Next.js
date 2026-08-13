@@ -55,7 +55,15 @@ describe('evidence mapping', () => {
     expect(result!.schedule).toMatchObject({ policyId: 'custom-policy', graceMinutes: 27 });
     expect(result!.attendance.requiredSite).toMatchObject({ inside: false, distanceM: 500, knownSiteId: 'site-2' });
     expect(result!.attendance.clockOutPoint).toMatchObject({ latitude: -26.2, longitude: 28.2, recordedAt: '2026-08-14T15:00:00.000Z' });
-    expect(String(mocks.query.mock.calls[2]![0])).toContain('candidate.project_id=$4::uuid');
+    expect(String(mocks.query.mock.calls[2]![0])).toContain('candidate.project_id=mapping.project_id');
+  });
+
+  it('uses the staff assignment project for oversight detail without a project filter', async () => {
+    mocks.query.mockResolvedValueOnce(roster(1)).mockResolvedValueOnce(schedules(1)).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await loadOperationalEvidence({ staffId: 'staff-0', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 1, offset: 0 });
+    expect(mocks.query.mock.calls[2]![1]).toEqual(expect.arrayContaining([['project-1']]));
+    expect(String(mocks.query.mock.calls[2]![0])).toContain('m(staff_id,site_id,project_id)');
   });
 
   it('isolates malformed staff mapping as evidence_source_error', async () => {

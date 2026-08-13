@@ -5,7 +5,7 @@ import { loadEffectiveRule } from './ruleQueries';
 import { operationalWindow } from './timeRules';
 import type { OperationalEvidence, OperationalRule, OperationalVehiclePoint } from './types';
 
-export interface OperationalEvidenceRequest { projectId: string; workDate: string; asOf: string; limit: number; offset: number; staffId?: string }
+export interface OperationalEvidenceRequest { projectId?: string; workDate: string; asOf: string; limit: number; offset: number; staffId?: string }
 type Row = Record<string, unknown>;
 const asString = (value: unknown): string | null => typeof value === 'string' ? value : value instanceof Date ? value.toISOString() : null;
 const asNumber = (value: unknown): number => { const result = Number(value); if (!Number.isFinite(result)) throw new Error('invalid number'); return result; };
@@ -14,6 +14,7 @@ const by = (rows: Row[], key: string): Map<string, Row[]> => rows.reduce((map, r
 export async function loadOperationalEvidence(request: OperationalEvidenceRequest): Promise<OperationalEvidence[]> {
   const rule = await loadEffectiveRule(request.asOf);
   if (!rule) throw new Error('No effective operational status rule');
+  if (!request.projectId && !request.staffId) throw new Error('A project or staff scope is required');
   const rosterQuery = buildAssignmentRosterQuery({ projectId: request.projectId, staffId: request.staffId,
     startDate: request.workDate, endDate: request.workDate, limit: request.limit, offset: request.offset });
   const rosterRows = await query<Row>(rosterQuery.text, rosterQuery.params);
@@ -34,7 +35,8 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
     source: row.assignment_kind, explicit_work: ['roster', 'daily_override'].includes(String(row.assignment_kind)) }));
   const staffIds = roster.map((row) => String(row.staff_id));
   const staffSiteIds = roster.map((row) => row.operational_site_id);
-  const attendance = await query<Row>(`WITH mapping AS (SELECT * FROM unnest($1::uuid[],$2::uuid[]) m(staff_id,site_id))
+  const staffProjectIds = roster.map((row) => row.project_id);
+  const attendance = await query<Row>(`WITH mapping AS (SELECT * FROM unnest($1::uuid[],$2::uuid[],$4::uuid[]) m(staff_id,site_id,project_id))
     SELECT ae.id entry_id,ae.staff_id,ae.clock_in_at,ae.clock_out_at,
     ae.clock_in_lat latitude,ae.clock_in_lon longitude,
     ae.clock_out_lat out_latitude,ae.clock_out_lon out_longitude,
@@ -52,9 +54,9 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
     LEFT JOIN LATERAL (SELECT candidate.id FROM fleet_project_operational_sites candidate
       LEFT JOIN fno_atlas_project_aois caoi ON caoi.id=candidate.project_aoi_id AND caoi.retired_at IS NULL
       LEFT JOIN fleet_authorized_locations cfal ON cfal.id=candidate.authorized_location_id AND cfal.is_active
-      WHERE candidate.project_id=$4::uuid AND candidate.is_active AND ((caoi.id IS NOT NULL AND ST_Covers(caoi.geom,point.geom))
+      WHERE candidate.project_id=mapping.project_id AND candidate.is_active AND ((caoi.id IS NOT NULL AND ST_Covers(caoi.geom,point.geom))
         OR (cfal.id IS NOT NULL AND ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(cfal.lon,cfal.lat),4326)::geography,cfal.radius_km*1000)))
-      ORDER BY CASE WHEN candidate.id=mapping.site_id THEN 0 ELSE 1 END LIMIT 1) known ON point.geom IS NOT NULL`, [staffIds, staffSiteIds, request.workDate, request.projectId]);
+      ORDER BY CASE WHEN candidate.id=mapping.site_id THEN 0 ELSE 1 END LIMIT 1) known ON point.geom IS NOT NULL`, [staffIds, staffSiteIds, request.workDate, staffProjectIds]);
   const vehicles = await query<Row>(`SELECT va.staff_id,va.id assignment_id,va.fleet_vehicle_id vehicle_id,
     fvt.provider,fvt.account_ref FROM vehicle_assignments va
     LEFT JOIN fleet_vehicle_trackers fvt ON fvt.vehicle_id=va.fleet_vehicle_id AND fvt.is_active
@@ -62,11 +64,12 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
       AND COALESCE(va.assignment_end,'9999-12-31'::date)>=$2::date`, [staffIds, request.workDate]);
   const vehicleIds = vehicles.map((row) => String(row.vehicle_id));
   const vehicleSiteIds = vehicles.map((vehicle) => roster.find((row) => row.staff_id === vehicle.staff_id)?.operational_site_id ?? null);
+  const vehicleProjectIds = vehicles.map((vehicle) => roster.find((row) => row.staff_id === vehicle.staff_id)?.project_id ?? null);
   const lookbackMinutes = Math.max(rule.arrivalDwellMinutes, rule.wrongSiteConfirmationMinutes, rule.earlyDepartureConfirmationMinutes);
   const starts = roster.flatMap((row) => { try { return [Date.parse(operationalWindow(toSchedule(row, request.workDate), rule).monitoringStart)]; } catch { return []; } });
   const fallbackStart = Date.parse(`${request.workDate}T00:00:00+02:00`) - rule.monitoringBeforeMinutes * 60_000;
   const earliest = new Date((starts.length ? Math.min(...starts) : fallbackStart) - lookbackMinutes * 60_000).toISOString();
-  const positions = await query<Row>(`WITH mapping AS (SELECT * FROM unnest($1::uuid[],$2::uuid[]) m(vehicle_id,site_id))
+  const positions = await query<Row>(`WITH mapping AS (SELECT * FROM unnest($1::uuid[],$2::uuid[],$5::uuid[]) m(vehicle_id,site_id,project_id))
     SELECT p.vehicle_id,p.recorded_at,p.latitude,p.longitude,p.speed_kmh,ops.id IS NOT NULL site_valid,
       CASE WHEN aoi.id IS NOT NULL THEN ST_Covers(aoi.geom,point.geom)
         WHEN fal.id IS NOT NULL THEN ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography,fal.radius_km*1000) ELSE false END site_inside,
@@ -81,11 +84,11 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
     LEFT JOIN LATERAL (SELECT candidate.id FROM fleet_project_operational_sites candidate
       LEFT JOIN fno_atlas_project_aois caoi ON caoi.id=candidate.project_aoi_id AND caoi.retired_at IS NULL
       LEFT JOIN fleet_authorized_locations cfal ON cfal.id=candidate.authorized_location_id AND cfal.is_active
-      WHERE candidate.project_id=$5::uuid AND candidate.is_active AND ((caoi.id IS NOT NULL AND ST_Covers(caoi.geom,point.geom))
+      WHERE candidate.project_id=mapping.project_id AND candidate.is_active AND ((caoi.id IS NOT NULL AND ST_Covers(caoi.geom,point.geom))
         OR (cfal.id IS NOT NULL AND ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(cfal.lon,cfal.lat),4326)::geography,cfal.radius_km*1000)))
       ORDER BY CASE WHEN candidate.id=mapping.site_id THEN 0 ELSE 1 END LIMIT 1) known ON true
     WHERE p.recorded_at BETWEEN $3::timestamptz AND $4::timestamptz ORDER BY p.vehicle_id,p.recorded_at`,
-  [vehicleIds, vehicleSiteIds, earliest, new Date(request.asOf).toISOString(), request.projectId]);
+  [vehicleIds, vehicleSiteIds, earliest, new Date(request.asOf).toISOString(), vehicleProjectIds]);
   const sites = await query<Row>(`SELECT ops.id operational_site_id,ops.is_active geometry_valid,
     aoi.confidence IN ('low','needs_verification') low_confidence
     FROM fleet_project_operational_sites ops

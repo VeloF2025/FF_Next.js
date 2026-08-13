@@ -42,7 +42,12 @@ describe('status service validation and privacy', () => {
     expect(detail).not.toHaveProperty('evidence');
   });
 
-  it.each([undefined, '', '00000000-0000-0000-0000-000000000000'])('rejects missing or zero detail projectId %#', async (projectId) => {
+  it('allows oversight detail without a project scope', async () => {
+    await expect(getOperationalEvidenceDetail({ staffId: 'staff-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z' })).resolves.toMatchObject({ staffId: 'staff-1' });
+    expect(mocks.load).toHaveBeenCalledWith(expect.objectContaining({ projectId: undefined, staffId: 'staff-1' }));
+  });
+
+  it.each(['', '00000000-0000-0000-0000-000000000000'])('rejects invalid detail projectId %#', async (projectId) => {
     await expect(getOperationalEvidenceDetail({ projectId, staffId: 'staff-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z' } as Parameters<typeof getOperationalEvidenceDetail>[0])).rejects.toBeInstanceOf(OperationalStatusRequestError);
     expect(mocks.load).not.toHaveBeenCalled();
   });
