@@ -27,6 +27,8 @@ import {
 } from '@/lib/actionItems/meetingAccess';
 import { buildActionItemListQuery } from '@/lib/actionItems/listQuery';
 import { meetingsQuery, parseMeetingFilter, shapeMeetings } from '@/lib/reporting/meetings';
+import { meetingForCaller } from '@/lib/actionItems/meetingFetch';
+import { commentVisibility } from '@/lib/actionItems/commentAccess';
 
 const ALICE = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
@@ -100,6 +102,22 @@ describe('action item visibility (real Postgres)', () => {
         ('${BOB}',   'Bob',   'B');
 
       CREATE TABLE ai_vis.meeting_transcripts (meeting_id INT);
+
+      CREATE TABLE ai_vis.manco_action_item_comments (
+        id                   SERIAL PRIMARY KEY,
+        manco_action_item_id UUID,
+        author_name          TEXT,
+        content              TEXT,
+        source_meeting_id    INTEGER,
+        created_at           TIMESTAMP DEFAULT NOW()
+      );
+
+      INSERT INTO ai_vis.manco_action_item_comments
+        (manco_action_item_id, author_name, content, source_meeting_id) VALUES
+        ('33333333-3333-4333-8333-333333333333', 'A Person', 'a human wrote this',        NULL),
+        ('33333333-3333-4333-8333-333333333333', 'Alice A',  'excerpt from alice meeting', 1),
+        ('33333333-3333-4333-8333-333333333333', 'Bob B',    'excerpt from bob meeting',   2),
+        ('33333333-3333-4333-8333-333333333333', 'Nobody',   'excerpt from no-participants', 3);
 
       INSERT INTO ai_vis.meetings (id, participants, title, meeting_date, raw_transcript, transcript_url, summary, duration, source) VALUES
         (1, '[{"email":"alice@example.com","name":"Alice A"},{"email":"x@example.com"}]'::jsonb,
@@ -434,5 +452,122 @@ describe('action item visibility (real Postgres)', () => {
       const noEmail: ActionItemAccess = { isOwner: false, email: '', userId: '' };
       expect(await found(noEmail)).toEqual([]);
     });
+
+  describe('manco meeting content fetch', () => {
+    // Both manco routes that read meeting content — meeting-context (returns verbatim
+    // transcript excerpts and the summary) and extract-meeting-comments (copies excerpts
+    // into a comment thread anyone can read) — took the meeting id straight from the
+    // request and applied no attendance check at all.
+    async function fetchAs(access: ActionItemAccess, meetingId: number) {
+      const { text, params } = meetingForCaller(meetingId, access);
+      const { rows } = await pool.query(text, params);
+      return rows;
+    }
+
+    it('returns the meeting to someone who was in it', async () => {
+      const rows = await fetchAs(alice, 1);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].raw_transcript).toBe('said things');
+    });
+
+    it('returns NOTHING to someone who was not', async () => {
+      expect(await fetchAs(bob, 1)).toHaveLength(0);
+      expect(await fetchAs(alice, 2)).toHaveLength(0);
+    });
+
+    it('refuses an arbitrary meeting id — the id came from the request body', async () => {
+      // extract-meeting-comments accepted any meeting_id, so this is the exact escalation:
+      // a caller naming a meeting they have no connection to.
+      expect(await fetchAs(bob, 3)).toHaveLength(0);
+      expect(await fetchAs(bob, 4)).toHaveLength(0);
+      expect(await fetchAs(bob, 5)).toHaveLength(0);
+    });
+
+    it('fails closed on a meeting with no participant list', async () => {
+      expect(await fetchAs(alice, 3)).toHaveLength(0);
+      expect(await fetchAs(owner, 3)).toHaveLength(1);
+    });
+
+    it('fails closed for an identity with no email', async () => {
+      const noEmail: ActionItemAccess = { isOwner: false, email: '', userId: '' };
+      for (const id of [1, 2, 3, 4, 5, 6]) {
+        expect(await fetchAs(noEmail, id)).toHaveLength(0);
+      }
+    });
+
+    it('gives the owner any meeting', async () => {
+      expect(await fetchAs(owner, 2)).toHaveLength(1);
+    });
+
+    it('carries the transcript and summary columns the routes rely on', async () => {
+      // If the column list drifted, the routes would silently render empty context rather
+      // than fail — the gate would look fine while the feature quietly broke.
+      const [row] = await fetchAs(alice, 1);
+      expect(Object.keys(row).sort()).toEqual(
+        ['id', 'meeting_date', 'raw_transcript', 'summary', 'title'],
+      );
+    });
+  });
+
+  describe('manco comment visibility', () => {
+    const ITEM = '33333333-3333-4333-8333-333333333333';
+
+    async function commentsFor(access: ActionItemAccess): Promise<string[]> {
+      const params: unknown[] = [ITEM];
+      const visible = commentVisibility(access, params, 'c');
+      const { rows } = await pool.query(
+        `SELECT c.content FROM manco_action_item_comments c
+          WHERE c.manco_action_item_id = $1::uuid AND ${visible}
+          ORDER BY c.content`,
+        params,
+      );
+      return rows.map((r) => r.content as string);
+    }
+
+    it('shows human-written comments to everyone', async () => {
+      // Gating the whole thread would break ordinary collaboration on manco items.
+      for (const who of [alice, bob]) {
+        expect(await commentsFor(who)).toContain('a human wrote this');
+      }
+    });
+
+    it('shows a transcript excerpt only to someone who was in that meeting', async () => {
+      expect(await commentsFor(alice)).toEqual([
+        'a human wrote this',
+        'excerpt from alice meeting',
+      ]);
+      expect(await commentsFor(bob)).toEqual([
+        'a human wrote this',
+        'excerpt from bob meeting',
+      ]);
+    });
+
+    it('withholds an excerpt from a meeting with no participant list', async () => {
+      for (const who of [alice, bob]) {
+        expect(await commentsFor(who)).not.toContain('excerpt from no-participants');
+      }
+    });
+
+    it('gives the owner every comment', async () => {
+      expect(await commentsFor(owner)).toHaveLength(4);
+    });
+
+    it('fails closed for an identity with no email', async () => {
+      // Human comments still show — they are not meeting content — but no excerpt does.
+      const noEmail: ActionItemAccess = { isOwner: false, email: '', userId: '' };
+      expect(await commentsFor(noEmail)).toEqual(['a human wrote this']);
+    });
+
+    it('numbers its placeholders against the enclosing query, not from 1', async () => {
+      // The item id is already $1. An off-by-one here would compare the meeting email
+      // against the item uuid — matching nothing, so the gate would look strict while
+      // silently hiding every excerpt from everyone including attendees.
+      const params: unknown[] = [ITEM];
+      const clause = commentVisibility(alice, params, 'c');
+      expect(clause).toContain('$2');
+      expect(clause).not.toMatch(/\$1\b/);
+      expect(params).toEqual([ITEM, 'alice@example.com']);
+    });
+  });
   });
 });
