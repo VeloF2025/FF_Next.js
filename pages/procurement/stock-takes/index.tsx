@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import { log } from '@/lib/logger';
 import { AppLayout } from '@/components/layout';
 import { StatCard, StatCardGrid } from '@/components/ui/StatCard';
 import {
@@ -59,7 +60,7 @@ export default function StockTakesPage() {
         notificationService.error(data.error || 'Failed to load stock takes');
       }
     } catch (error) {
-      console.error('Error fetching stock takes:', error);
+      log.error('Error fetching stock takes', { error });
       notificationService.error('Failed to load stock takes');
     } finally {
       setIsLoading(false);
@@ -88,7 +89,7 @@ export default function StockTakesPage() {
         notificationService.error(data.error || 'Failed to create stock take');
       }
     } catch (error) {
-      console.error('Error creating stock take:', error);
+      log.error('Error creating stock take', { error });
       notificationService.error('Failed to create stock take');
     }
   };
