@@ -112,6 +112,18 @@ export async function acceptReturn(
     let linesProcessed = 0;
 
     await transaction(async (txn) => {
+      // Atomic claim: lock the return and re-check status inside the txn. The
+      // outer check (line ~82) is a non-locked read, so two concurrent accepts
+      // could both pass it and both run the disposition loop — double-crediting
+      // the null-holder fallback quant. FOR UPDATE serializes them; the loser
+      // sees status != 'inspected' and aborts (409, whole txn rolls back).
+      const locked = await txn.query<{ status: string }>(
+        `SELECT status FROM stock_returns WHERE id = $1 FOR UPDATE`, [returnId]);
+      if (!locked[0] || locked[0].status !== 'inspected') {
+        throw Object.assign(new Error('RETURN_ALREADY_PROCESSED'), {
+          currentStatus: locked[0]?.status ?? 'missing' });
+      }
+
       for (const line of lines) {
         if (!line || !line.stock_item_id) continue;
 
@@ -247,6 +259,10 @@ export async function acceptReturn(
       return void apiResponse.validationError(res, { serial: (error as Error).message });
     }
     const msg = error instanceof Error ? error.message : String(error);
+    if (msg === 'RETURN_ALREADY_PROCESSED') {
+      log.warn('returns.accept.already_processed', { returnId }, 'field-stock');
+      return void apiResponse.conflict(res, 'This return has already been processed');
+    }
     if (msg.includes('supplier_return is not yet supported')) {
       return void apiResponse.validationError(res, { disposition: msg });
     }

@@ -158,7 +158,11 @@ function mockHappyPath() {
     .mockResolvedValueOnce(RETURN_RECORD_WITH_ONE_LINE)
     .mockResolvedValueOnce(RESTOCKED_RETURN);
 
-  mockTxnQuery.mockResolvedValue([]);
+  // The in-txn FOR UPDATE re-check must see 'inspected' so the happy path runs.
+  mockTxnQuery.mockImplementation(async (text?: string) =>
+    typeof text === 'string' && /stock_returns[\s\S]*FOR UPDATE/i.test(text)
+      ? [{ status: 'inspected' }]
+      : []);
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -186,7 +190,12 @@ describe('POST /returns/[id]/accept hardening (C.3)', () => {
         throw err;
       }
     });
-    mockTxnQuery.mockResolvedValue([]);
+    // Text-aware: the in-txn FOR UPDATE re-check of stock_returns must see
+    // status 'inspected' so the happy paths proceed; everything else → [].
+    mockTxnQuery.mockImplementation(async (text?: string) =>
+      typeof text === 'string' && /stock_returns[\s\S]*FOR UPDATE/i.test(text)
+        ? [{ status: 'inspected' }]
+        : []);
     mockClientQuery.mockResolvedValue({ rows: [] });
   });
 
@@ -223,6 +232,32 @@ describe('POST /returns/[id]/accept hardening (C.3)', () => {
     const body = res._json as { success: boolean; data: { status: string } };
     expect(body.success).toBe(true);
     expect(body.data.status).toBe('restocked');
+  });
+
+  it('returns 409 when a concurrent accept already processed the return (in-txn FOR UPDATE re-check)', async () => {
+    // Only the staff lookup + outer GET are consumed before the txn aborts, so
+    // queue exactly those two (not mockHappyPath's third final-SELECT, which
+    // would leak an unconsumed value into the next test).
+    mockQueryOne
+      .mockResolvedValueOnce(STAFF_ROW)
+      .mockResolvedValueOnce(RETURN_RECORD_WITH_ONE_LINE);
+    // The outer read still sees 'inspected', but the locked in-txn re-check sees
+    // it already moved on (a racer committed first) → abort, no double-credit.
+    mockTxnQuery.mockImplementation(async (text?: string) =>
+      typeof text === 'string' && /stock_returns[\s\S]*FOR UPDATE/i.test(text)
+        ? [{ status: 'restocked' }]
+        : []);
+
+    const req = makePostReq();
+    const res = makeRes();
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(409);
+    // No line was processed (the disposition loop never ran).
+    const processedLineWrite = mockTxnQuery.mock.calls.find(
+      (c) => typeof c[0] === 'string' && /UPDATE stock_return_lines/i.test(c[0] as string),
+    );
+    expect(processedLineWrite).toBeUndefined();
   });
 
   it('marks stock_return_lines.status="processed" after disposition applied', async () => {
@@ -349,7 +384,12 @@ describe('POST /returns/[id]/accept hardening (C.3)', () => {
       .mockResolvedValueOnce(RETURN_RECORD_WITH_ONE_LINE)
       .mockResolvedValueOnce(RESTOCKED_RETURN);
 
-    mockTxnQuery.mockResolvedValue([]);
+    // Text-aware: the in-txn FOR UPDATE re-check of stock_returns must see
+    // status 'inspected' so the happy paths proceed; everything else → [].
+    mockTxnQuery.mockImplementation(async (text?: string) =>
+      typeof text === 'string' && /stock_returns[\s\S]*FOR UPDATE/i.test(text)
+        ? [{ status: 'inspected' }]
+        : []);
 
     const req = makePostReq();
     const res = makeRes();
