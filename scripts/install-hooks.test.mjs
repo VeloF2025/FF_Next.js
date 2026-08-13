@@ -15,7 +15,15 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -43,8 +51,11 @@ function gitOk(root, args) {
  * A throwaway repo with the installer and stub hooks that announce themselves,
  * so a test can prove the hook actually RAN rather than that a file exists.
  */
-function createFixture() {
-  const root = mkdtempSync(join(tmpdir(), "hookspath-"));
+function createFixture(subdir = null) {
+  const base = mkdtempSync(join(tmpdir(), "hookspath-"));
+  // `subdir` lets a test put the repo at a path of its choosing — specifically
+  // one containing a space, which broke worktree resolution.
+  const root = subdir ? join(base, subdir) : base;
   mkdirSync(join(root, "scripts", "githooks"), { recursive: true });
   copyFileSync(INSTALLER, join(root, "scripts", "install-hooks.sh"));
   for (const h of HOOKS) {
@@ -67,13 +78,20 @@ function install(root, cwd = root) {
   return spawnSync("bash", ["scripts/install-hooks.sh"], { cwd, encoding: "utf8" });
 }
 
-function withFixture(body) {
-  const root = createFixture();
+function withFixture(body, subdir = null) {
+  const root = createFixture(subdir);
+  // Remove the mkdtemp base, not just the repo, or a spaced-path fixture leaks.
+  const cleanup = subdir ? dirname(root) : root;
   try {
     body(root);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    rmSync(cleanup, { recursive: true, force: true });
   }
+}
+
+function hooksPathOf(root) {
+  const r = git(root, ["config", "--get", "core.hooksPath"]);
+  return r.status === 0 ? r.stdout.trim() : null;
 }
 
 function describe(r) {
@@ -191,6 +209,132 @@ test("reports a hook that is not executable instead of claiming success", () => 
     assert.notEqual(r.status, 0, `must fail: ${describe(r)}`);
     assert.match(r.stderr, /not executable/);
     assert.match(r.stderr, /pre-push/);
+  });
+});
+
+// ── Resolving which directory to anchor to ──────────────────────────────────
+//
+// Each of these was a live defect a reviewer reproduced, not a hypothetical.
+
+test("resolves a repository path containing a SPACE", () => {
+  withFixture((root) => {
+    // `awk '/^worktree /{print $2; exit}'` splits on whitespace, so this path
+    // resolved to everything before the space. The directory could then never
+    // exist and the installer refused unconditionally with a wrong diagnosis
+    // ("on a commit predating these hooks") on a checkout that was perfectly fine.
+    assert.ok(root.includes(" "), "fixture must actually contain a space");
+    const r = install(root);
+    assert.equal(r.status, 0, `must install at a spaced path: ${describe(r)}`);
+    assert.equal(hooksPathOf(root), join(root, "scripts", "githooks"));
+
+    writeFileSync(join(root, "s.txt"), "x\n", "utf8");
+    gitOk(root, ["add", "s.txt"]);
+    const c = git(root, ["commit", "-m", "blocked"]);
+    assert.notEqual(c.status, 0, `hook must fire at a spaced path: ${describe(c)}`);
+    assert.match(c.stderr, /RAN-pre-commit/);
+  }, "has space");
+});
+
+test("anchors to a real working tree in a BARE repo + worktrees layout", () => {
+  withFixture((root) => {
+    // `git worktree list --porcelain` reports a bare repo's own git-dir as the
+    // first "worktree" entry. It has no checkout, so scripts/githooks can never
+    // be there: the installer refused forever from every linked worktree, and
+    // the remedy it printed (`git -C <git-dir> checkout master`) fails with
+    // "this operation must be run in a work tree".
+    const bare = join(dirname(root), "hub.git");
+    const wt = join(dirname(root), "hub-wt");
+    gitOk(root, ["clone", "--bare", "--quiet", root, bare]);
+    gitOk(bare, ["worktree", "add", "--quiet", wt, "master"]);
+
+    const r = install(wt);
+    assert.equal(r.status, 0, `must resolve past the bare git-dir: ${describe(r)}`);
+    const cfg = hooksPathOf(wt);
+    assert.equal(cfg, join(wt, "scripts", "githooks"));
+    assert.ok(!cfg.includes(".git/"), `must not anchor inside a git-dir: ${cfg}`);
+
+    writeFileSync(join(wt, "b.txt"), "x\n", "utf8");
+    gitOk(wt, ["add", "b.txt"]);
+    const c = git(wt, ["commit", "-m", "blocked"]);
+    assert.notEqual(c.status, 0, `hook must fire in the bare layout: ${describe(c)}`);
+    assert.match(c.stderr, /RAN-pre-commit/);
+  }, "src");
+});
+
+test("refuses when MAIN lacks the hooks but the CURRENT worktree has them", () => {
+  withFixture((root) => {
+    // The mutant this exists to kill: validate the CWD-relative directory rather
+    // than the resolved absolute target. Every other test installs from a
+    // checkout whose own copy is present, so the two paths agree and the bug is
+    // invisible. Here they disagree — and validating the wrong one would set the
+    // config to a directory that is not there, disabling hooks repo-wide.
+    gitOk(root, ["branch", "wt-branch", "HEAD"]);
+    const wt = join(dirname(root), `mainless-${process.pid}`);
+    gitOk(root, ["worktree", "add", "--quiet", wt, "wt-branch"]);
+    try {
+      rmSync(join(root, "scripts", "githooks"), { recursive: true, force: true });
+      assert.ok(existsSync(join(wt, "scripts", "githooks")), "worktree keeps its own copy");
+
+      const r = install(wt);
+      assert.notEqual(r.status, 0, `must refuse: ${describe(r)}`);
+      assert.match(r.stderr, /does not exist/);
+      assert.equal(hooksPathOf(wt), null, "must not set a path that is not there");
+    } finally {
+      gitOk(root, ["worktree", "remove", "--force", wt]);
+    }
+  });
+});
+
+test("falls back to this checkout when `git worktree` is unavailable", () => {
+  withFixture((root) => {
+    // The fallback for a git too old to have `worktree list`. Deleting the whole
+    // block left every test green, so it was unverified code in a fail-closed path.
+    const bin = mkdtempSync(join(tmpdir(), "gitshim-"));
+    try {
+      const shim = join(bin, "git");
+      writeFileSync(
+        shim,
+        `#!/bin/bash\nif [ "$1" = "worktree" ]; then echo "fatal: unknown subcommand" >&2; exit 129; fi\nexec /usr/bin/git "$@"\n`,
+        "utf8",
+      );
+      chmodSync(shim, 0o755);
+      const r = spawnSync("bash", ["scripts/install-hooks.sh"], {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      });
+      assert.equal(r.status, 0, `must fall back, not fail: ${describe(r)}`);
+      assert.equal(hooksPathOf(root), join(root, "scripts", "githooks"));
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── A reported failure must not leave config behind ─────────────────────────
+
+test("leaves core.hooksPath UNSET when a hook is not executable", () => {
+  withFixture((root) => {
+    // The check ran AFTER the config write: the script printed the green
+    // "core.hooksPath = ..." banner, then the red "not executable" line, exited
+    // 1 — and left the config pointing at hooks git would silently skip. A
+    // failure that still mutates config is the bug class this file guards.
+    chmodSync(join(root, "scripts", "githooks", "pre-commit"), 0o644);
+    const r = install(root);
+    assert.notEqual(r.status, 0, `must fail: ${describe(r)}`);
+    assert.equal(hooksPathOf(root), null, "a failed install must not set the config");
+    assert.doesNotMatch(r.stdout, /✅/, "must not print success before failing");
+  });
+});
+
+test("leaves core.hooksPath UNSET when the hooks directory is empty", () => {
+  withFixture((root) => {
+    // `[ -d ]` alone is satisfied by an empty directory — the hooks are what
+    // matter, not the folder.
+    for (const h of HOOKS) rmSync(join(root, "scripts", "githooks", h), { force: true });
+    const r = install(root);
+    assert.notEqual(r.status, 0, `must fail on an empty hooks dir: ${describe(r)}`);
+    assert.equal(hooksPathOf(root), null, "a failed install must not set the config");
   });
 });
 

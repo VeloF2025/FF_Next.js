@@ -8,34 +8,16 @@
 # scripts/githooks, where the hooks are tracked files. Git runs them in place;
 # nothing is copied. Absolute because the config is one value for the whole
 # repository while a relative path resolves per checkout -- see the note below.
-# =============================================================================
-# This used to COPY the hook scripts into .git/hooks. That design was the source
-# of the bug it was eventually rewritten to prevent: on one workstation the
-# installed pre-push had diverged from the tracked script and carried a
-# master-push guard the tracked one lacked, so installing would have added the
-# secret scan and deleted that guard in the same command, silently (#2438).
+# Requires git >= 2.9. Verified on 2.43 from both the main checkout and a worktree.
 #
-# Hardening the copy took three review rounds and fourteen findings -- backup on
-# divergence, collision-safe backup names, symlink replacement, an unguarded
-# chmod that let git skip a non-executable hook while the script reported
-# success, repo-shape resolution, refusal paths. Each was a real Unix edge case
-# around copying a file into a directory git owns. The list was not converging.
+# WHY it is absolute, WHY nothing is copied, and the residual failure mode this
+# design accepts -- a working-tree anchor means the gate is only as present as
+# that directory, and git does not warn when it is gone:
 #
-# core.hooksPath removes the class rather than guarding it:
+#   .claude/modules/git-hooks.md
 #
-#   nothing is copied      -> nothing can be clobbered, so no backups are needed
-#   nothing is written to  -> no permission, ownership or chmod failure path
-#     .git/hooks
-#   hooks are tracked      -> version-controlled, code-reviewed, and identical
-#                             on every clone by construction
-#
-# Verified on git 2.43: the hooks run from the main checkout AND from a worktree,
-# because the config is shared. Requires git >= 2.9.
-#
-# What this does NOT change: it is still one command per clone, `--no-verify`
-# still bypasses, and someone can still unset the config. That last one is a
-# deliberate act with a visible cause, not a silent overwrite -- which is the
-# whole difference.
+# Read that before changing anything here. The guards below look over-built; each
+# one is a defect that was measured, and the module doc says which.
 # =============================================================================
 
 set -uo pipefail
@@ -52,27 +34,44 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
   exit 1
 fi
 
-# The config is stored ONCE for the whole repository, but a RELATIVE
-# core.hooksPath resolves against each checkout's own root. In a repo with many
-# worktrees that is a silent hole: a worktree on a branch predating these hooks
-# has no scripts/githooks, so git finds nothing there and SKIPS the hooks without
-# a word. Measured on this machine at the time of writing: 42 of 43 worktrees
-# lacked the directory, i.e. the gate would have been off in all of them while
-# the installer reported success.
+# Resolve the worktree to anchor to: the first listed one that is a real working
+# tree. Absolute, because ONE config value is shared by every checkout while a
+# relative path resolves per checkout -- which silently disabled the hooks in 42
+# of 43 worktrees here.
 #
-# So the value is ABSOLUTE, and anchored to the MAIN worktree rather than to
-# whichever checkout happens to run this. Worktrees are created and deleted
-# constantly; the main worktree is the one stable location. Every checkout then
-# runs the same real directory regardless of its branch.
-#
-# The trade-off, stated plainly: a worktree on an old branch runs the MAIN tree's
-# hooks, not its own branch's. For a security gate that is the better direction —
-# the newest gate everywhere beats each branch's historical one.
-MAIN_WORKTREE=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')
+# Split on the "worktree " prefix, NOT on whitespace: `awk '{print $2}'` truncated
+# any repo path containing a SPACE. And require each candidate to be the ROOT of a
+# real working tree -- the first porcelain entry is a bare git-dir for a bare repo
+# and .git/modules/<name> inside a submodule, neither of which ever has the hooks.
+# Both measured; see .claude/modules/git-hooks.md.
+WT_LIST=$(git worktree list --porcelain 2>/dev/null || echo '')
+MAIN_WORKTREE=""
+while IFS= read -r line; do
+  [ "${line#worktree }" = "$line" ] && continue
+  cand=${line#worktree }
+  [ -n "$cand" ] && [ -d "$cand" ] || continue
+  cand_top=$(git -C "$cand" rev-parse --show-toplevel 2>/dev/null || echo '')
+  if [ -n "$cand_top" ] && [ "$cand_top" = "$cand" ]; then
+    MAIN_WORKTREE=$cand
+    break
+  fi
+done <<EOF
+$WT_LIST
+EOF
+
 if [ -z "$MAIN_WORKTREE" ]; then
-  # No worktree list (very old git, or an odd setup): fall back to this checkout.
-  MAIN_WORKTREE=$(git rev-parse --show-toplevel)
+  # No usable entry (very old git without `worktree list`, or a layout where no
+  # listed entry is a working tree). Fall back to this checkout, which is a real
+  # working tree by definition -- we already refused when not in a repo.
+  MAIN_WORKTREE=$(git rev-parse --show-toplevel 2>/dev/null || echo '')
 fi
+
+if [ -z "$MAIN_WORKTREE" ]; then
+  echo -e "${RED}🚫 Could not resolve a working tree to anchor the hooks to.${NC}" >&2
+  echo    "   core.hooksPath must be an absolute path to a real directory." >&2
+  exit 1
+fi
+
 HOOKS_ABS="$MAIN_WORKTREE/$HOOKS_PATH"
 
 # Verify the TARGET, not the current checkout. Setting a path that does not
@@ -82,11 +81,11 @@ HOOKS_ABS="$MAIN_WORKTREE/$HOOKS_PATH"
 if [ ! -d "$HOOKS_ABS" ]; then
   echo -e "${RED}🚫 $HOOKS_ABS does not exist.${NC}" >&2
   echo    "   core.hooksPath is one value for the whole repository, so it must" >&2
-  echo    "   point at a directory that is really there. The main worktree" >&2
+  echo    "   point at a directory that is really there. The anchor worktree" >&2
   echo    "   ($MAIN_WORKTREE) appears to be on a commit predating these hooks." >&2
   echo    "" >&2
   echo    "   Bring it up to date, then re-run:" >&2
-  echo    "     git -C $MAIN_WORKTREE checkout master && git -C $MAIN_WORKTREE pull" >&2
+  echo    "     git -C '$MAIN_WORKTREE' checkout master && git -C '$MAIN_WORKTREE' pull" >&2
   exit 1
 fi
 
@@ -144,6 +143,31 @@ fi
 
 echo "📎 Pointing git at $HOOKS_ABS ..."
 
+# A hook that is not executable is SKIPPED BY GIT SILENTLY, so check rather than
+# assume. The bit is tracked (mode 100755), but a clone with a restrictive umask
+# or a filesystem without the exec bit will not have it.
+#
+# This runs BEFORE the config is written, and that ordering is the point. It used
+# to run after: the script printed the green "core.hooksPath = ..." banner, then
+# the red "not executable" line, exited 1 -- and LEFT THE CONFIG SET to a
+# directory whose hooks git would skip. An empty directory did the same. A
+# reported failure that still mutates config is the exact shape of bug this file
+# exists to prevent, so validate first and only then write.
+MISSING_EXEC=""
+for h in pre-commit pre-push; do
+  if [ ! -x "$HOOKS_ABS/$h" ]; then
+    MISSING_EXEC="$MISSING_EXEC $h"
+  fi
+done
+
+if [ -n "$MISSING_EXEC" ]; then
+  echo -e "${RED}🚫 not executable:$MISSING_EXEC${NC}" >&2
+  echo    "   Git SKIPS a non-executable hook without saying so, so these would" >&2
+  echo    "   never run. core.hooksPath was NOT changed." >&2
+  echo    "   Fix with: chmod +x '$HOOKS_ABS'/*" >&2
+  exit 1
+fi
+
 # Report what is being replaced. A pre-existing core.hooksPath is a higher-signal
 # conflict than a leftover file in .git/hooks, and overwriting it silently is the
 # same class of loss this design was chosen to avoid -- just in config rather
@@ -167,16 +191,6 @@ if ! git config core.hooksPath "$HOOKS_ABS"; then
   exit 1
 fi
 
-# A hook that is not executable is SKIPPED BY GIT SILENTLY, so check rather than
-# assume. The bit is tracked (mode 100755), but a clone with a restrictive umask
-# or a filesystem without the exec bit will not have it.
-MISSING_EXEC=""
-for h in pre-commit pre-push; do
-  if [ ! -x "$HOOKS_ABS/$h" ]; then
-    MISSING_EXEC="$MISSING_EXEC $h"
-  fi
-done
-
 # Read the value back. `git config` can succeed against a config this repo does
 # not actually use -- confirm the effective value is the one intended.
 EFFECTIVE=$(git config --get core.hooksPath || echo '<unset>')
@@ -188,14 +202,10 @@ fi
 echo -e "${GREEN}✅ core.hooksPath = $HOOKS_ABS${NC}"
 echo "   pre-commit: secret scanner"
 echo "   pre-push:   master protection + secret scan + auth isolation"
-
-if [ -n "$MISSING_EXEC" ]; then
-  echo ""
-  echo -e "${RED}🚫 not executable:$MISSING_EXEC${NC}" >&2
-  echo    "   Git SKIPS a non-executable hook without saying so, so these would" >&2
-  echo    "   never run. Fix with: chmod +x $HOOKS_ABS/*" >&2
-  exit 1
-fi
+echo ""
+echo "   This is one value for the whole repository, and it is only as present as"
+echo "   that directory. If that checkout moves off a branch carrying the hooks,"
+echo "   git silently runs none of them anywhere. CI still scans pushed commits."
 
 # Anything previously copied into .git/hooks still takes no effect now, but it is
 # left in place rather than deleted: it may be the only copy of a local guard.
