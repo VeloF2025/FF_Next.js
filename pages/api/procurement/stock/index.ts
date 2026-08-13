@@ -72,11 +72,13 @@ export default withAuth(withErrorHandler(async (
       const summaryRows = await sql`
         SELECT
           COUNT(*)::int AS total_items,
-          COALESCE(SUM(qty_available * standard_cost), 0) AS total_value,
+          COALESCE(SUM(COALESCE(qty_available, 0) * COALESCE(standard_cost, 0)), 0) AS total_value,
           COUNT(*) FILTER (
-            WHERE qty_available > 0 AND min_stock_level > 0 AND qty_available <= min_stock_level
+            WHERE COALESCE(qty_available, 0) > 0 AND min_stock_level > 0 AND qty_available <= min_stock_level
           )::int AS low_stock,
-          COUNT(*) FILTER (WHERE qty_available = 0)::int AS out_of_stock
+          -- COALESCE so a NULL qty_available counts as out-of-stock, matching the
+          -- page-derived path's Number(qty ?? 0) === 0 check.
+          COUNT(*) FILTER (WHERE COALESCE(qty_available, 0) = 0)::int AS out_of_stock
         FROM stock_items
       `;
       const summary = {
