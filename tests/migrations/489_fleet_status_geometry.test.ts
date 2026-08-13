@@ -29,7 +29,11 @@ describe('operational AOI geometry contract', () => {
         ST_Distance(geom::geography, point::geography) AS distance_m
       FROM test_sites CROSS JOIN LATERAL ST_SetSRID(ST_Point($1,$2),4326) point`, [longitude, latitude]);
     expect(rows[0]!.inside).toBe(expectedInside);
-    expect(Number(rows[0]!.distance_m)).toBe(expectedInside ? 0 : expect.any(Number));
-    if (!expectedInside) expect(Number(rows[0]!.distance_m)).toBeGreaterThan(0);
+    const distanceM = Number(rows[0]!.distance_m);
+    if (expectedInside) expect(distanceM).toBeCloseTo(0, 6);
+    else {
+      expect(distanceM).toBeGreaterThan(900);
+      expect(distanceM).toBeLessThan(1100);
+    }
   });
 });

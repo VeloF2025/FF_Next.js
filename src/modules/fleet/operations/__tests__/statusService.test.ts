@@ -14,7 +14,9 @@ beforeEach(() => { vi.clearAllMocks(); mocks.load.mockResolvedValue([evidence]);
 describe('status service validation and privacy', () => {
   it.each([
     { projectId: 'p', workDate: 'bad', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
+    { projectId: 'p', workDate: '2026-02-30', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
     { projectId: 'p', workDate: '2026-08-14', asOf: 'bad', page: 1, limit: 25 },
+    { projectId: 'p', workDate: '2026-08-14', asOf: '2026-02-30T12:00:00Z', page: 1, limit: 25 },
     { projectId: 'p', workDate: '2026-01-01', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
     { projectId: 'p', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', page: 0, limit: 25 },
     { projectId: 'p', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 101 },
@@ -32,8 +34,17 @@ describe('status service validation and privacy', () => {
   });
 
   it('returns only minimum decision points in protected detail', async () => {
-    const detail = await getOperationalEvidenceDetail({ staffId: 'staff-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z' });
+    const detail = await getOperationalEvidenceDetail({ projectId: 'p', staffId: 'staff-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z' });
     expect(detail.points).toEqual([{ source: 'attendance_clock_in', ...point }]);
+    expect(mocks.load).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p', staffId: 'staff-1' }));
+    expect(JSON.stringify(detail)).not.toContain('clockInPoint');
+    expect(JSON.stringify(detail)).not.toContain('positions');
+    expect(detail).not.toHaveProperty('evidence');
+  });
+
+  it.each([undefined, '', '00000000-0000-0000-0000-000000000000'])('rejects missing or zero detail projectId %#', async (projectId) => {
+    await expect(getOperationalEvidenceDetail({ projectId, staffId: 'staff-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z' } as Parameters<typeof getOperationalEvidenceDetail>[0])).rejects.toBeInstanceOf(OperationalStatusRequestError);
+    expect(mocks.load).not.toHaveBeenCalled();
   });
 
   it('propagates a top-level load failure', async () => {

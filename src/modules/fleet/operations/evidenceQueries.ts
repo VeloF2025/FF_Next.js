@@ -2,6 +2,7 @@ import { query } from '@/lib/db-pool';
 import { staleAfterSecondsFor } from '@/services/tracking/staleness';
 import { buildAssignmentRosterQuery } from '../assignments/rosterQueries';
 import { loadEffectiveRule } from './ruleQueries';
+import { operationalWindow } from './timeRules';
 import type { OperationalEvidence, OperationalRule, OperationalVehiclePoint } from './types';
 
 export interface OperationalEvidenceRequest { projectId: string; workDate: string; asOf: string; limit: number; offset: number; staffId?: string }
@@ -15,10 +16,22 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
   if (!rule) throw new Error('No effective operational status rule');
   const rosterQuery = buildAssignmentRosterQuery({ projectId: request.projectId, staffId: request.staffId,
     startDate: request.workDate, endDate: request.workDate, limit: request.limit, offset: request.offset });
-  const roster = (await query<Row>(rosterQuery.text, rosterQuery.params)).map((row) => ({ ...row,
-    source: row.assignment_kind, policy_id: null, timezone: rule.timezone, start_time: row.expected_start_time,
-    end_time: row.expected_end_time, grace_minutes: row.grace_minutes ?? 15,
-    explicit_work: ['roster', 'daily_override'].includes(String(row.assignment_kind)) }));
+  const rosterRows = await query<Row>(rosterQuery.text, rosterQuery.params);
+  const schedules = await query<Row>(`WITH ids AS (SELECT unnest($1::uuid[]) staff_id)
+    SELECT ids.staff_id,ap.id policy_id,sp.id schedule_policy_id,
+      COALESCE(sp.timezone,'Africa/Johannesburg') timezone,ap.start_time::text,ap.end_time::text,
+      COALESCE((ap.work_days->>TRIM(LOWER(TO_CHAR($2::date,'day'))))::boolean,false) scheduled,
+      sp.late_alert_minutes grace_minutes
+    FROM ids LEFT JOIN LATERAL (SELECT ap.* FROM attendance_policy_assignments apa
+      JOIN attendance_policies ap ON ap.id=apa.policy_id AND ap.is_active
+      WHERE apa.staff_id=ids.staff_id AND apa.effective_from<=$2::date
+        AND COALESCE(apa.effective_to,'9999-12-31')>=$2::date ORDER BY apa.effective_from DESC LIMIT 1) ap ON true
+    LEFT JOIN LATERAL (SELECT asp.* FROM attendance_schedule_policies asp
+      WHERE asp.active_from<=$2::date AND COALESCE(asp.active_to,'9999-12-31')>=$2::date
+      ORDER BY asp.active_from DESC LIMIT 1) sp ON true`, [rosterRows.map((row) => row.staff_id), request.workDate]);
+  const schedulesByStaff = new Map(schedules.map((row) => [String(row.staff_id), row]));
+  const roster = rosterRows.map((row) => ({ ...row, ...schedulesByStaff.get(String(row.staff_id)),
+    source: row.assignment_kind, explicit_work: ['roster', 'daily_override'].includes(String(row.assignment_kind)) }));
   const staffIds = roster.map((row) => String(row.staff_id));
   const staffSiteIds = roster.map((row) => row.operational_site_id);
   const attendance = await query<Row>(`WITH mapping AS (SELECT * FROM unnest($1::uuid[],$2::uuid[]) m(staff_id,site_id))
@@ -29,12 +42,18 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
       WHEN fal.id IS NOT NULL THEN ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography,fal.radius_km*1000) END site_inside,
     CASE WHEN aoi.id IS NOT NULL THEN ST_Distance(aoi.geom::geography,point.geom::geography)
       WHEN fal.id IS NOT NULL THEN GREATEST(0,ST_Distance(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography)-fal.radius_km*1000) END site_distance_m,
-    CASE WHEN (aoi.id IS NOT NULL AND ST_Covers(aoi.geom,point.geom)) OR (fal.id IS NOT NULL AND ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography,fal.radius_km*1000)) THEN ops.id END known_site_id
+    known.id known_site_id
     FROM mapping JOIN attendance_entries ae ON ae.staff_id=mapping.staff_id AND ae.date=$3::date
     LEFT JOIN fleet_project_operational_sites ops ON ops.id=mapping.site_id AND ops.is_active
     LEFT JOIN fno_atlas_project_aois aoi ON aoi.id=ops.project_aoi_id AND aoi.retired_at IS NULL
     LEFT JOIN fleet_authorized_locations fal ON fal.id=ops.authorized_location_id AND fal.is_active
-    LEFT JOIN LATERAL (SELECT ST_SetSRID(ST_Point(ae.clock_in_longitude,ae.clock_in_latitude),4326) geom) point ON ae.clock_in_latitude IS NOT NULL AND ae.clock_in_longitude IS NOT NULL`, [staffIds, staffSiteIds, request.workDate]);
+    LEFT JOIN LATERAL (SELECT ST_SetSRID(ST_Point(ae.clock_in_longitude,ae.clock_in_latitude),4326) geom) point ON ae.clock_in_latitude IS NOT NULL AND ae.clock_in_longitude IS NOT NULL
+    LEFT JOIN LATERAL (SELECT candidate.id FROM fleet_project_operational_sites candidate
+      LEFT JOIN fno_atlas_project_aois caoi ON caoi.id=candidate.project_aoi_id AND caoi.retired_at IS NULL
+      LEFT JOIN fleet_authorized_locations cfal ON cfal.id=candidate.authorized_location_id AND cfal.is_active
+      WHERE candidate.project_id=$4::uuid AND candidate.is_active AND ((caoi.id IS NOT NULL AND ST_Covers(caoi.geom,point.geom))
+        OR (cfal.id IS NOT NULL AND ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(cfal.lon,cfal.lat),4326)::geography,cfal.radius_km*1000)))
+      ORDER BY CASE WHEN candidate.id=mapping.site_id THEN 0 ELSE 1 END LIMIT 1) known ON point.geom IS NOT NULL`, [staffIds, staffSiteIds, request.workDate, request.projectId]);
   const vehicles = await query<Row>(`SELECT va.staff_id,va.id assignment_id,va.fleet_vehicle_id vehicle_id,
     fvt.provider,fvt.account_ref FROM vehicle_assignments va
     LEFT JOIN fleet_vehicle_trackers fvt ON fvt.vehicle_id=va.fleet_vehicle_id AND fvt.is_active
@@ -42,21 +61,30 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
       AND COALESCE(va.assignment_end,'9999-12-31'::date)>=$2::date`, [staffIds, request.workDate]);
   const vehicleIds = vehicles.map((row) => String(row.vehicle_id));
   const vehicleSiteIds = vehicles.map((vehicle) => roster.find((row) => row.staff_id === vehicle.staff_id)?.operational_site_id ?? null);
-  const earliest = new Date(Date.parse(request.asOf) - (rule.monitoringBeforeMinutes + rule.earlyDepartureConfirmationMinutes + rule.arrivalDwellMinutes) * 60_000).toISOString();
+  const lookbackMinutes = Math.max(rule.arrivalDwellMinutes, rule.wrongSiteConfirmationMinutes, rule.earlyDepartureConfirmationMinutes);
+  const starts = roster.flatMap((row) => { try { return [Date.parse(operationalWindow(toSchedule(row, request.workDate), rule).monitoringStart)]; } catch { return []; } });
+  const fallbackStart = Date.parse(`${request.workDate}T00:00:00+02:00`) - rule.monitoringBeforeMinutes * 60_000;
+  const earliest = new Date((starts.length ? Math.min(...starts) : fallbackStart) - lookbackMinutes * 60_000).toISOString();
   const positions = await query<Row>(`WITH mapping AS (SELECT * FROM unnest($1::uuid[],$2::uuid[]) m(vehicle_id,site_id))
     SELECT p.vehicle_id,p.recorded_at,p.latitude,p.longitude,p.speed_kmh,ops.id IS NOT NULL site_valid,
       CASE WHEN aoi.id IS NOT NULL THEN ST_Covers(aoi.geom,point.geom)
         WHEN fal.id IS NOT NULL THEN ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography,fal.radius_km*1000) ELSE false END site_inside,
       CASE WHEN aoi.id IS NOT NULL THEN ST_Distance(aoi.geom::geography,point.geom::geography)
         WHEN fal.id IS NOT NULL THEN GREATEST(0,ST_Distance(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography)-fal.radius_km*1000) END site_distance_m,
-      CASE WHEN (aoi.id IS NOT NULL AND ST_Covers(aoi.geom,point.geom)) OR (fal.id IS NOT NULL AND ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography,fal.radius_km*1000)) THEN ops.id END known_site_id
+      known.id known_site_id
     FROM mapping JOIN fleet_vehicle_positions p ON p.vehicle_id=mapping.vehicle_id
     LEFT JOIN fleet_project_operational_sites ops ON ops.id=mapping.site_id AND ops.is_active
     LEFT JOIN fno_atlas_project_aois aoi ON aoi.id=ops.project_aoi_id AND aoi.retired_at IS NULL
     LEFT JOIN fleet_authorized_locations fal ON fal.id=ops.authorized_location_id AND fal.is_active
     CROSS JOIN LATERAL (SELECT ST_SetSRID(ST_Point(p.longitude,p.latitude),4326) geom) point
+    LEFT JOIN LATERAL (SELECT candidate.id FROM fleet_project_operational_sites candidate
+      LEFT JOIN fno_atlas_project_aois caoi ON caoi.id=candidate.project_aoi_id AND caoi.retired_at IS NULL
+      LEFT JOIN fleet_authorized_locations cfal ON cfal.id=candidate.authorized_location_id AND cfal.is_active
+      WHERE candidate.project_id=$5::uuid AND candidate.is_active AND ((caoi.id IS NOT NULL AND ST_Covers(caoi.geom,point.geom))
+        OR (cfal.id IS NOT NULL AND ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(cfal.lon,cfal.lat),4326)::geography,cfal.radius_km*1000)))
+      ORDER BY CASE WHEN candidate.id=mapping.site_id THEN 0 ELSE 1 END LIMIT 1) known ON true
     WHERE p.recorded_at BETWEEN $3::timestamptz AND $4::timestamptz ORDER BY p.vehicle_id,p.recorded_at`,
-  [vehicleIds, vehicleSiteIds, earliest, new Date(request.asOf).toISOString()]);
+  [vehicleIds, vehicleSiteIds, earliest, new Date(request.asOf).toISOString(), request.projectId]);
   const sites = await query<Row>(`SELECT ops.id operational_site_id,ops.is_active geometry_valid,
     aoi.confidence IN ('low','needs_verification') low_confidence
     FROM fleet_project_operational_sites ops
@@ -64,6 +92,11 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
     LEFT JOIN fleet_authorized_locations fal ON fal.id=ops.authorized_location_id AND fal.is_active
     WHERE ops.id=ANY($1::uuid[]) AND (aoi.id IS NOT NULL OR fal.id IS NOT NULL)`, [roster.map((row) => row.operational_site_id).filter(Boolean)]);
   return mapEvidence(roster, attendance, vehicles, positions, sites, rule, request);
+}
+
+function toSchedule(row: Row, workDate: string): NonNullable<OperationalEvidence['schedule']> {
+  return { policyId: String(row.schedule_policy_id ?? row.policy_id), workDate, timezone: String(row.timezone), scheduled: Boolean(row.scheduled),
+    explicitWork: Boolean(row.explicit_work), startTime: String(row.start_time), endTime: String(row.end_time), graceMinutes: asNumber(row.grace_minutes) };
 }
 
 function mapEvidence(roster: Row[], attendanceRows: Row[], vehicleRows: Row[], positionRows: Row[], siteRows: Row[], rule: OperationalRule, request: OperationalEvidenceRequest): OperationalEvidence[] {
@@ -79,7 +112,7 @@ function mapEvidence(roster: Row[], attendanceRows: Row[], vehicleRows: Row[], p
 
 function mapPerson(row: Row, attendance: Row | undefined, vehicle: Row | undefined, positions: Map<string, Row[]>, sites: Map<string, Row[]>, freshness: Map<string, number>, rule: OperationalRule, request: OperationalEvidenceRequest): OperationalEvidence {
   const base = emptyEvidence(row, rule, request, []); const site = sites.get(String(row.operational_site_id))?.[0];
-  base.schedule = { policyId: String(row.policy_id), workDate: request.workDate, timezone: String(row.timezone), scheduled: Boolean(row.scheduled), explicitWork: Boolean(row.explicit_work), startTime: String(row.start_time), endTime: String(row.end_time), graceMinutes: asNumber(row.grace_minutes) };
+  base.schedule = toSchedule(row, request.workDate);
   base.assignment.siteGeometryValid = Boolean(site?.geometry_valid ?? row.operational_site_id); base.assignment.siteGeometryLowConfidence = Boolean(site?.low_confidence);
   if (attendance) { const clockInAt = asString(attendance.clock_in_at); const latitude = attendance.latitude == null ? null : asNumber(attendance.latitude); const longitude = attendance.longitude == null ? null : asNumber(attendance.longitude); base.attendance = { entryId: String(attendance.entry_id), clockInAt, clockOutAt: asString(attendance.clock_out_at), clockInPoint: latitude === null || longitude === null || !clockInAt ? null : { latitude, longitude, recordedAt: clockInAt }, clockOutPoint: null, matchedSiteId: asString(attendance.matched_site_id), requiredSite: attendance.site_valid == null ? null : { valid: Boolean(attendance.site_valid), inside: Boolean(attendance.site_inside), distanceM: attendance.site_distance_m == null ? null : asNumber(attendance.site_distance_m), knownSiteId: asString(attendance.known_site_id) } }; }
   if (vehicle) { const vehicleId = String(vehicle.vehicle_id); const provider = String(vehicle.provider); const account = String(vehicle.account_ref); base.vehicle = { assignmentId: String(vehicle.assignment_id), vehicleId, provider, accountRef: account, staleAfterSeconds: freshness.get(`${provider}\0${account}`)!, positions: (positions.get(vehicleId) ?? []).map(mapPosition) }; }
