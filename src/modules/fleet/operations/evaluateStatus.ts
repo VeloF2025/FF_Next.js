@@ -1,4 +1,11 @@
-import { approachTrend, continuousInside, continuousOutside, type ContinuityResult } from './continuity';
+import {
+  approachTrend,
+  continuousHistoricalInside,
+  continuousHistoricalOutside,
+  continuousInside,
+  continuousOutsideAtKnownSite,
+  type ContinuityResult,
+} from './continuity';
 import { pointsWithinMismatchTolerance } from './geometry';
 import { operationalWindow, timePhase } from './timeRules';
 import type {
@@ -8,23 +15,38 @@ import type {
 interface Decision { status: OperationalStatus; reason: string }
 interface EvaluationContext {
   evidence: OperationalEvidence; flags: Set<OperationalFlag>; phase: ReturnType<typeof timePhase> | null;
-  freshVehicle: OperationalVehiclePoint[]; vehicleArrival: ContinuityResult | null;
+  usableVehicle: OperationalVehiclePoint[]; freshVehicle: OperationalVehiclePoint[];
+  vehicleArrival: ContinuityResult | null;
   vehicleOutside: ContinuityResult | null; attendanceInside: boolean;
 }
 
 function decision(status: OperationalStatus, reason: string): Decision { return { status, reason }; }
 function elapsedSeconds(from: string, to: string): number { return (Date.parse(to) - Date.parse(from)) / 1_000; }
 
-function freshVehiclePoints(evidence: OperationalEvidence, flags: Set<OperationalFlag>): OperationalVehiclePoint[] {
+function usableVehiclePoints(evidence: OperationalEvidence): OperationalVehiclePoint[] {
+  const asOf = Date.parse(evidence.asOf);
+  let evaluationEnd = asOf;
+  if (evidence.schedule) evaluationEnd = Math.min(asOf,
+    Date.parse(operationalWindow(evidence.schedule, evidence.rule).monitoringEnd));
+  return evidence.vehicle.positions.filter((point) => point.valid && Number.isFinite(Date.parse(point.recordedAt))
+    && Date.parse(point.recordedAt) <= evaluationEnd)
+    .sort((first, second) => Date.parse(first.recordedAt) - Date.parse(second.recordedAt));
+}
+
+function freshVehiclePoints(
+  evidence: OperationalEvidence,
+  usable: OperationalVehiclePoint[],
+  flags: Set<OperationalFlag>,
+): OperationalVehiclePoint[] {
   if (!evidence.vehicle.vehicleId) { flags.add('no_assigned_vehicle'); return []; }
-  if (!evidence.vehicle.positions.length) { flags.add('gps_missing'); return []; }
+  if (!usable.length) { flags.add('gps_missing'); return []; }
   const threshold = evidence.vehicle.staleAfterSeconds;
   if (threshold === null || !Number.isFinite(threshold) || threshold < 0) { flags.add('evidence_source_error'); return []; }
-  const asOf = Date.parse(evidence.asOf);
-  const fresh = evidence.vehicle.positions.filter((point) => point.valid && Number.isFinite(Date.parse(point.recordedAt))
-    && Date.parse(point.recordedAt) <= asOf && asOf - Date.parse(point.recordedAt) <= threshold * 1_000);
+  const asOf = evidence.schedule ? Math.min(Date.parse(evidence.asOf),
+    Date.parse(operationalWindow(evidence.schedule, evidence.rule).monitoringEnd)) : Date.parse(evidence.asOf);
+  const fresh = usable.filter((point) => asOf - Date.parse(point.recordedAt) <= threshold * 1_000);
   if (!fresh.length) flags.add('gps_stale');
-  return fresh.sort((first, second) => Date.parse(first.recordedAt) - Date.parse(second.recordedAt));
+  return fresh;
 }
 
 function buildContext(evidence: OperationalEvidence): EvaluationContext {
@@ -32,15 +54,22 @@ function buildContext(evidence: OperationalEvidence): EvaluationContext {
   if (!evidence.attendance.clockInAt) flags.add('attendance_missing');
   if (evidence.assignment.siteGeometryLowConfidence) flags.add('site_geometry_low_confidence');
   if (evidence.sourceErrors.length) flags.add('evidence_source_error');
-  const freshVehicle = freshVehiclePoints(evidence, flags);
+  const usableVehicle = usableVehiclePoints(evidence);
+  const freshVehicle = freshVehiclePoints(evidence, usableVehicle, flags);
   const staleAfter = evidence.vehicle.staleAfterSeconds;
   const fixes = freshVehicle.map((point) => ({ recordedAt: point.recordedAt, valid: point.valid, inside: point.inside,
-    distanceM: point.distanceM, speedKmh: point.speedKmh }));
+    distanceM: point.distanceM, speedKmh: point.speedKmh, knownSiteId: point.knownSiteId }));
   const vehicleArrival = staleAfter === null ? null : continuousInside(fixes, evidence.rule.arrivalDwellMinutes * 60, staleAfter, evidence.asOf);
-  const vehicleOutside = staleAfter === null ? null : continuousOutside(fixes, evidence.rule.earlyDepartureConfirmationMinutes * 60, staleAfter, evidence.asOf);
+  const historicalFixes = usableVehicle.map((point) => ({ recordedAt: point.recordedAt, valid: point.valid,
+    inside: point.inside, distanceM: point.distanceM, speedKmh: point.speedKmh,
+    knownSiteId: point.knownSiteId }));
+  const historicalAsOf = usableVehicle.at(-1)?.recordedAt ?? evidence.asOf;
+  const vehicleOutside = staleAfter === null ? null : continuousHistoricalOutside(historicalFixes,
+    evidence.rule.earlyDepartureConfirmationMinutes * 60, staleAfter, historicalAsOf);
   if (vehicleArrival?.pending && !vehicleArrival.confirmed) flags.add('arrival_dwell_pending');
   return { evidence, flags, phase: evidence.schedule ? timePhase(evidence.asOf, evidence.schedule, evidence.rule) : null,
-    freshVehicle, vehicleArrival, vehicleOutside, attendanceInside: Boolean(evidence.attendance.clockInAt && evidence.attendance.requiredSite?.valid && evidence.attendance.requiredSite.inside) };
+    usableVehicle, freshVehicle, vehicleArrival, vehicleOutside,
+    attendanceInside: Boolean(evidence.attendance.clockInAt && evidence.attendance.requiredSite?.valid && evidence.attendance.requiredSite.inside) };
 }
 
 function evaluateGates(context: EvaluationContext): Decision | null {
@@ -52,7 +81,8 @@ function evaluateGates(context: EvaluationContext): Decision | null {
   if (evidence.assignment.ambiguous) { flags.add('assignment_ambiguous'); return decision('unverifiable', 'assignment_ambiguous'); }
   if (!evidence.assignment.operationalSiteId) return decision('unassigned', 'operational_site_missing');
   if (!evidence.assignment.siteGeometryValid) return decision('unverifiable', 'site_geometry_invalid');
-  if (evidence.vehicle.vehicleId && !evidence.attendance.clockInAt && !context.freshVehicle.length) {
+  if (evidence.vehicle.vehicleId && !evidence.attendance.clockInAt && !context.freshVehicle.length
+    && !context.vehicleOutside?.confirmed) {
     return decision('unverifiable', 'expected_evidence_unavailable');
   }
   return null;
@@ -65,15 +95,16 @@ function latestVehicle(context: EvaluationContext): OperationalVehiclePoint | nu
 function attendanceWrongConfirmed(context: EvaluationContext): boolean {
   const { attendance } = context.evidence;
   return Boolean(attendance.clockInAt && !attendance.clockOutAt && attendance.requiredSite?.valid && !attendance.requiredSite.inside
-    && attendance.matchedSiteId && elapsedSeconds(attendance.clockInAt, context.evidence.asOf) >= context.evidence.rule.wrongSiteConfirmationMinutes * 60);
+    && attendance.requiredSite.knownSiteId && elapsedSeconds(attendance.clockInAt, context.evidence.asOf) >= context.evidence.rule.wrongSiteConfirmationMinutes * 60);
 }
 
 function vehicleWrong(context: EvaluationContext): ContinuityResult | null {
   const staleAfter = context.evidence.vehicle.staleAfterSeconds;
   if (staleAfter === null) return null;
   const fixes = context.freshVehicle.map((point) => ({ recordedAt: point.recordedAt, valid: point.valid, inside: point.inside,
-    distanceM: point.distanceM, speedKmh: point.speedKmh }));
-  return continuousOutside(fixes, context.evidence.rule.wrongSiteConfirmationMinutes * 60, staleAfter, context.evidence.asOf);
+    distanceM: point.distanceM, speedKmh: point.speedKmh, knownSiteId: point.knownSiteId }));
+  return continuousOutsideAtKnownSite(fixes, context.evidence.rule.wrongSiteConfirmationMinutes * 60,
+    staleAfter, context.evidence.asOf);
 }
 
 function evaluateSiteConflict(context: EvaluationContext): Decision | null {
@@ -84,8 +115,8 @@ function evaluateSiteConflict(context: EvaluationContext): Decision | null {
     return decision('evidence_mismatch', 'attendance_vehicle_site_mismatch');
   }
   const attendanceWrong = attendanceWrongConfirmed(context); const outside = vehicleWrong(context);
-  const vehicleWrongConfirmed = Boolean(outside?.confirmed && vehicle?.knownSiteId);
-  if (attendanceWrong && vehicleWrongConfirmed && attendanceSite === vehicle?.knownSiteId) return decision('wrong_site', 'sources_agree_wrong_site');
+  const vehicleWrongConfirmed = Boolean(outside?.confirmed && outside.knownSiteId);
+  if (attendanceWrong && vehicleWrongConfirmed && attendanceSite === outside?.knownSiteId) return decision('wrong_site', 'sources_agree_wrong_site');
   if (attendanceWrong && !vehicle) return decision('wrong_site', 'attendance_confirmed_wrong_site');
   if (vehicleWrongConfirmed && !attendance.clockInAt) return decision('wrong_site', 'vehicle_confirmed_wrong_site');
   if ((attendance.requiredSite?.valid && !attendance.requiredSite.inside && !attendanceWrong)
@@ -102,15 +133,17 @@ function evaluateDeparture(context: EvaluationContext): Decision | null {
       ? decision('shift_complete', 'attendance_normal_clock_out') : decision('left_early', 'attendance_early_clock_out');
   }
   const departureStarted = vehicleOutside?.startedAt;
-  const priorInside = departureStarted ? context.freshVehicle.filter((point) => point.inside
+  const priorInside = departureStarted ? context.usableVehicle.filter((point) => point.inside
     && Date.parse(point.recordedAt) < Date.parse(departureStarted)) : [];
   const priorInsideFixes = priorInside.map((point) => ({ recordedAt: point.recordedAt, valid: point.valid,
     inside: point.inside, distanceM: point.distanceM, speedKmh: point.speedKmh }));
   const staleAfter = evidence.vehicle.staleAfterSeconds;
-  const hadInsideBefore = Boolean(departureStarted && staleAfter !== null && continuousInside(priorInsideFixes,
+  const hadInsideBefore = Boolean(departureStarted && staleAfter !== null && continuousHistoricalInside(priorInsideFixes,
     evidence.rule.arrivalDwellMinutes * 60, staleAfter, departureStarted).confirmed);
   if (vehicleOutside?.confirmed && hadInsideBefore) {
-    if (Date.parse(evidence.asOf) < Date.parse(window.scheduledEnd)) return decision('left_early', 'vehicle_departure_confirmed_early');
+    if (departureStarted && Date.parse(departureStarted) < Date.parse(window.scheduledEnd)) {
+      return decision('left_early', 'vehicle_departure_confirmed_early');
+    }
     context.flags.add('vehicle_driver_presence_unconfirmed');
     return decision('shift_complete', 'vehicle_departure_confirmed_after_shift');
   }
@@ -134,7 +167,8 @@ function evaluateArrival(context: EvaluationContext): Decision {
 
 function sourceTimestamps(evidence: OperationalEvidence): string[] {
   return [...new Set([evidence.attendance.clockInAt, evidence.attendance.clockOutAt,
-    ...evidence.vehicle.positions.map((point) => point.recordedAt)].filter((value): value is string => Boolean(value)))].sort();
+    ...usableVehiclePoints(evidence).map((point) => point.recordedAt)]
+    .filter((value): value is string => Boolean(value) && Date.parse(value) <= Date.parse(evidence.asOf)))].sort();
 }
 
 export function evaluateOperationalStatus(evidence: OperationalEvidence): OperationalEvaluation {
@@ -149,5 +183,6 @@ export function evaluateOperationalStatus(evidence: OperationalEvidence): Operat
       approachingDistanceMeters: evidence.rule.approachingDistanceMeters,
       approachingMinReadings: evidence.rule.approachingMinReadings, minimumMovingSpeedKmh: evidence.rule.minimumMovingSpeedKmh,
       evidenceMismatchToleranceMeters: evidence.rule.evidenceMismatchToleranceMeters,
+      ...(evidence.vehicle.staleAfterSeconds === null ? {} : { gpsStaleAfterSeconds: evidence.vehicle.staleAfterSeconds }),
     } };
 }

@@ -13,7 +13,7 @@ const rule = {
 function evidence(change: Partial<OperationalEvidence> = {}): OperationalEvidence {
   return {
     asOf: '2026-08-14T06:20:00Z', workDate: '2026-08-14', staffId: 'staff-1', staffName: 'Driver One', rule,
-    assignment: { assignmentId: 'assignment-1', source: 'roster', projectId: 'project-1', operationalSiteId: 'site-1', ambiguous: false, siteGeometryValid: true, siteGeometryLowConfidence: false },
+    assignment: { assignmentId: 'assignment-1', source: 'roster', projectId: 'project-1', projectName: 'Project One', operationalSiteId: 'site-1', operationalSiteName: 'Site One', ambiguous: false, siteGeometryValid: true, siteGeometryLowConfidence: false },
     schedule: { policyId: 'policy-1', workDate: '2026-08-14', timezone: 'Africa/Johannesburg', scheduled: true, explicitWork: false, startTime: '08:00:00', endTime: '17:00:00', graceMinutes: 15 },
     attendance: { entryId: null, clockInAt: null, clockOutAt: null, clockInPoint: null, clockOutPoint: null, matchedSiteId: null, requiredSite: null },
     vehicle: { assignmentId: null, vehicleId: null, provider: null, accountRef: null, staleAfterSeconds: null, positions: [] },
@@ -74,6 +74,12 @@ describe('evaluateOperationalStatus', () => {
     expect(status(evidence({ attendance: { ...attendance, clockOutAt: '2026-08-14T15:00:00Z' } }))).toBe('shift_complete');
   });
 
+  it('confirms a normalized AOI wrong site without an Attendance circle id', () => {
+    const attendance = { ...attendanceInside, matchedSiteId: null,
+      requiredSite: { valid: true, inside: false, distanceM: 2000, knownSiteId: 'aoi-site-2' } };
+    expect(status(evidence({ attendance }))).toBe('wrong_site');
+  });
+
   it('distinguishes cross-site mismatch from coordinate jitter within tolerance', () => {
     const attendance = { ...attendanceInside, matchedSiteId: 'site-2', requiredSite: { valid: true, inside: false, distanceM: 1000, knownSiteId: 'site-2' } };
     const farVehicle = { ...vehicleInside, positions: vehicleInside.positions.map((point) => ({ ...point, latitude: -27, longitude: 29, knownSiteId: 'site-3' })) };
@@ -87,9 +93,34 @@ describe('evaluateOperationalStatus', () => {
     expect(status(evidence({ attendance: { ...attendanceInside, clockOutAt: '2026-08-14T15:00:00Z' } }))).toBe('shift_complete');
     const positions = [
       ...['11:50:00', '11:55:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: true, distanceM: 0, speedKmh: 0, knownSiteId: 'site-1' })),
-      ...['12:00:00', '12:10:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: false, distanceM: 500, speedKmh: 20, knownSiteId: null })),
+      ...['12:00:00', '12:05:00', '12:10:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: false, distanceM: 500, speedKmh: 20, knownSiteId: null })),
     ];
     expect(status(evidence({ asOf: '2026-08-14T12:10:00Z', vehicle: { ...vehicleInside, staleAfterSeconds: 3600, positions } }))).toBe('left_early');
+  });
+
+  it('keeps a confirmed early departure classified by departure time after shift end', () => {
+    const positions = [
+      ...['11:50:00', '11:55:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: true, distanceM: 0, speedKmh: 0, knownSiteId: 'site-1' })),
+      ...['12:00:00', '12:05:00', '12:10:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: false, distanceM: 500, speedKmh: 20, knownSiteId: null })),
+    ];
+    const result = evaluateOperationalStatus(evidence({
+      asOf: '2026-08-14T15:10:00Z',
+      vehicle: { ...vehicleInside, staleAfterSeconds: 300, positions },
+    }));
+    expect(result).toMatchObject({ status: 'left_early', reasonCodes: ['vehicle_departure_confirmed_early'] });
+  });
+
+  it('does not confirm wrong-site continuity across two different known sites', () => {
+    const positions = [
+      { ...insidePoint, recordedAt: '2026-08-14T06:00:00Z', valid: true, inside: false, distanceM: 500, speedKmh: 0, knownSiteId: 'site-2' },
+      { ...insidePoint, recordedAt: '2026-08-14T06:05:00Z', valid: true, inside: false, distanceM: 500, speedKmh: 0, knownSiteId: 'site-3' },
+    ];
+    const result = evaluateOperationalStatus(evidence({
+      asOf: '2026-08-14T06:05:00Z',
+      vehicle: { ...vehicleInside, staleAfterSeconds: 300, positions },
+    }));
+    expect(result.status).not.toBe('wrong_site');
+    expect(result.flags).toContain('wrong_site_confirmation_pending');
   });
 
   it.each([
@@ -140,5 +171,10 @@ describe('evaluateOperationalStatus', () => {
     expect(result).toMatchObject({ ruleId: 'rule-1', ruleVersion: 3, sourceTimestamps: ['2026-08-14T06:00:00Z'], thresholdsUsed: expect.objectContaining({ graceMinutes: 15 }) });
     expect(result).not.toHaveProperty('payrollAdjustment'); expect(result).not.toHaveProperty('disciplinaryAction');
     expect(result).not.toHaveProperty('fraudFlag'); expect(result).not.toHaveProperty('scoreMutation');
+  });
+
+  it('includes the provider freshness threshold in explainability metadata', () => {
+    expect(evaluateOperationalStatus(evidence({ vehicle: vehicleInside })).thresholdsUsed)
+      .toMatchObject({ gpsStaleAfterSeconds: 3600 });
   });
 });

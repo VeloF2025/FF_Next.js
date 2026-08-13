@@ -13,6 +13,10 @@ describe('operational rules API', () => {
   it('allows only GET and POST with method-specific permission actions', async () => { const result = await call('PATCH'); expect(result.status).toBe(405); expect(result.headers.Allow).toBe('GET, POST'); expect(mocks.create).not.toHaveBeenCalled(); });
   it('uses session actor and responds only after creation succeeds', async () => { const result = await call('POST', { ...body, actorUserId: 'attacker' }); expect(result.status).toBe(201); expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ changeReason: body.changeReason }), USER); });
   it('requires oversight and validates every field including instant and reason', async () => { mocks.oversight.mockResolvedValue(false); expect((await call('POST')).status).toBe(403); mocks.oversight.mockResolvedValue(true); expect((await call('POST', { ...body, changeReason: ' ' })).status).toBe(400); expect((await call('POST', { ...body, effectiveFrom: 'invalid' })).status).toBe(400); expect(mocks.create).not.toHaveBeenCalled(); });
+  it('rejects fewer than two approaching readings at the API boundary', async () => {
+    expect((await call('POST', { ...body, approachingMinReadings: 1 })).status).toBe(400);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
   it.each(['2099-02-30T00:00:00.000Z', '2099-01-01', 'January 1, 2099'])(
     'rejects malformed activation instant %s at the API boundary', async (effectiveFrom) => {
       expect((await call('POST', { ...body, effectiveFrom })).status).toBe(400);

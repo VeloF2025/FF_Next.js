@@ -24,7 +24,9 @@ import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { Pool } from 'pg';
 
-const IMAGE = 'postgres:15-alpine'; // matches the live server's major (15.8)
+// Production evidence queries use PostGIS geography predicates. Keep the
+// disposable harness on PostgreSQL 15 while including the production extension.
+const IMAGE = 'postgis/postgis:15-3.4-alpine';
 const USER = 'fibreflow_test';
 const DB = 'fibreflow_test';
 const LABEL = 'ff-migration-tests';

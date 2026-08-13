@@ -44,6 +44,16 @@ describe('StatusRulesDialog', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('requires at least two approaching readings', async () => {
+    render(<StatusRulesDialog open onClose={vi.fn()} canEdit />);
+    const input = await screen.findByLabelText('Approaching minimum readings (readings)');
+    expect(input).toHaveAttribute('min', '2');
+    fireEvent.change(input, { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Change reason'), { target: { value: 'Unsafe single sample' } });
+    expect(screen.getByText('Use a whole number of at least 2.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create rule version' })).toBeDisabled();
+  });
+
   it('does not allow a historical rule activation', async () => {
     render(<StatusRulesDialog open onClose={vi.fn()} canEdit />); await screen.findByLabelText('Effective from');
     fireEvent.change(screen.getByLabelText('Effective from'), { target: { value: '2020-01-01T00:00' } });

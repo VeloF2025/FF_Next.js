@@ -31,8 +31,8 @@ export type OperationalAssignmentSource =
 
 export interface OperationalAssignmentEvidence {
   assignmentId: string | null; source: OperationalAssignmentSource; projectId: string | null;
-  operationalSiteId: string | null; ambiguous: boolean; siteGeometryValid: boolean;
-  siteGeometryLowConfidence: boolean;
+  projectName: string | null; operationalSiteId: string | null; operationalSiteName: string | null;
+  ambiguous: boolean; siteGeometryValid: boolean; siteGeometryLowConfidence: boolean;
 }
 
 export interface OperationalSitePointEvidence {
@@ -71,7 +71,8 @@ export interface OperationalStatusSummary {
   staffId: string; staffName: string; projectId: string | null; projectName: string | null;
   operationalSiteId: string | null; operationalSiteName: string | null;
   status: OperationalStatus; flags: OperationalFlag[]; reasonCodes: string[];
-  scheduledStart: string | null; scheduledEnd: string | null;
+  monitoringStart: string | null; scheduledStart: string | null; graceEnd: string | null;
+  scheduledEnd: string | null; monitoringEnd: string | null; gpsStaleAfterSeconds: number | null;
   sourceTimestamps: string[]; ruleId: string; ruleVersion: number;
 }
 

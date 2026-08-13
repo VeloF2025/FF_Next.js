@@ -117,6 +117,7 @@ describe('operational status rules', () => {
     ['negative monitoring before', { monitoringBeforeMinutes: -1 }],
     ['zero approaching distance', { approachingDistanceMeters: 0 }],
     ['zero approaching readings', { approachingMinReadings: 0 }],
+    ['one approaching reading', { approachingMinReadings: 1 }],
     ['negative mismatch tolerance', { evidenceMismatchToleranceMeters: -1 }],
   ])('rejects %s before SQL', async (_label, change) => {
     await expect(createRuleVersion({ ...input, ...change }, USER)).rejects.toBeInstanceOf(RuleValidationError);

@@ -1,22 +1,29 @@
 export interface ContinuityFix {
   recordedAt: string; valid: boolean; inside: boolean; distanceM: number; speedKmh: number;
+  knownSiteId?: string | null;
 }
 
 export interface ContinuityResult {
   confirmed: boolean; pending: boolean; sequenceLength: number;
-  startedAt: string | null; latestAt: string | null; durationSeconds: number;
+  startedAt: string | null; latestAt: string | null; durationSeconds: number; knownSiteId?: string | null;
 }
 
 interface TimedFix extends ContinuityFix { timestamp: number }
 
-function usableFixes(fixes: ContinuityFix[], staleAfterSeconds: number, asOf: string): TimedFix[] {
+function usableFixes(
+  fixes: ContinuityFix[],
+  staleAfterSeconds: number,
+  asOf: string,
+  freshAtEvaluation = true,
+): TimedFix[] {
   if (!Number.isFinite(staleAfterSeconds) || staleAfterSeconds < 0) return [];
   const evaluatedAt = Date.parse(asOf);
   if (!Number.isFinite(evaluatedAt)) return [];
   const usable = fixes.flatMap((fix) => {
     const timestamp = Date.parse(fix.recordedAt);
     return fix.valid && Number.isFinite(timestamp) && timestamp <= evaluatedAt
-      && evaluatedAt - timestamp <= staleAfterSeconds * 1_000 ? [{ ...fix, timestamp }] : [];
+      && (!freshAtEvaluation || evaluatedAt - timestamp <= staleAfterSeconds * 1_000)
+      ? [{ ...fix, timestamp }] : [];
   }).sort((a, b) => a.timestamp - b.timestamp);
   return usable;
 }
@@ -33,8 +40,9 @@ function newestSequence(fixes: TimedFix[], staleAfterSeconds: number, state: boo
   return sequence;
 }
 
-function continuousState(fixes: ContinuityFix[], durationSeconds: number, staleAfterSeconds: number, asOf: string, state: boolean): ContinuityResult {
-  const sequence = newestSequence(usableFixes(fixes, staleAfterSeconds, asOf), staleAfterSeconds, state);
+function continuousState(fixes: ContinuityFix[], durationSeconds: number, staleAfterSeconds: number,
+  asOf: string, state: boolean, freshAtEvaluation = true): ContinuityResult {
+  const sequence = newestSequence(usableFixes(fixes, staleAfterSeconds, asOf, freshAtEvaluation), staleAfterSeconds, state);
   const first = sequence[0]; const latest = sequence.at(-1);
   const duration = first && latest ? (latest.timestamp - first.timestamp) / 1_000 : 0;
   return { confirmed: sequence.length >= 2 && duration >= durationSeconds, pending: sequence.length > 0,
@@ -47,6 +55,32 @@ export const continuousInside = (fixes: ContinuityFix[], durationSeconds: number
 
 export const continuousOutside = (fixes: ContinuityFix[], durationSeconds: number, staleAfterSeconds: number, asOf: string): ContinuityResult =>
   continuousState(fixes, durationSeconds, staleAfterSeconds, asOf, false);
+
+export const continuousHistoricalInside = (fixes: ContinuityFix[], durationSeconds: number,
+  staleAfterSeconds: number, asOf: string): ContinuityResult =>
+  continuousState(fixes, durationSeconds, staleAfterSeconds, asOf, true, false);
+
+export const continuousHistoricalOutside = (fixes: ContinuityFix[], durationSeconds: number,
+  staleAfterSeconds: number, asOf: string): ContinuityResult =>
+  continuousState(fixes, durationSeconds, staleAfterSeconds, asOf, false, false);
+
+export function continuousOutsideAtKnownSite(
+  fixes: ContinuityFix[],
+  durationSeconds: number,
+  staleAfterSeconds: number,
+  asOf: string,
+): ContinuityResult {
+  const usable = usableFixes(fixes, staleAfterSeconds, asOf);
+  const latest = usable.at(-1);
+  const knownSiteId = latest?.inside === false ? latest.knownSiteId ?? null : null;
+  if (!knownSiteId) {
+    return { confirmed: false, pending: false, sequenceLength: 0, startedAt: null,
+      latestAt: latest?.recordedAt ?? null, durationSeconds: 0, knownSiteId: null };
+  }
+  const matching = usable.map((fix) => ({ ...fix,
+    inside: fix.inside || fix.knownSiteId !== knownSiteId }));
+  return { ...continuousState(matching, durationSeconds, staleAfterSeconds, asOf, false), knownSiteId };
+}
 
 export function approachTrend(fixes: ContinuityFix[], minimumReadings: number, maximumDistanceM: number,
   minimumSpeedKmh: number, staleAfterSeconds: number, asOf: string): boolean {

@@ -41,8 +41,9 @@ describe('operational status APIs', () => {
 
   it('uses project scope for detail and returns coordinate-free roster summaries', async () => {
     const query = { projectId: PROJECT, staffId: STAFF, workDate: '2026-08-13', asOf: '2026-08-13T08:00:00.000Z' };
-    mocks.roster.mockResolvedValue({ items: [{ staffId: STAFF, status: 'attendance_confirmed' }], page: 1, limit: 25 });
+    mocks.roster.mockResolvedValue({ items: [{ staffId: STAFF, status: 'attendance_confirmed', projectName: 'Project One', operationalSiteName: 'Site One', monitoringStart: '2026-08-13T05:00:00.000Z', monitoringEnd: '2026-08-13T16:00:00.000Z', gpsStaleAfterSeconds: 7200 }], page: 1, limit: 25, total: 26, hasMore: true });
     const roster = await call(rosterHandler, 'GET', query); expect(JSON.stringify(roster.body)).not.toContain('latitude');
+    expect(roster.body).toMatchObject({ data: { total: 26, hasMore: true, items: [expect.objectContaining({ projectName: 'Project One', operationalSiteName: 'Site One', monitoringStart: '2026-08-13T05:00:00.000Z', monitoringEnd: '2026-08-13T16:00:00.000Z', gpsStaleAfterSeconds: 7200 })] } });
     await call(detailHandler, 'GET', query);
     expect(mocks.project).toHaveBeenCalledWith(USER, STAFF, 'manager', PROJECT);
     expect(mocks.detail).toHaveBeenCalledWith({ staffId: STAFF, projectId: PROJECT, workDate: query.workDate, asOf: query.asOf });

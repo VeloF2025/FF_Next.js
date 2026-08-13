@@ -9,7 +9,7 @@ export const RULE_FIELDS: RuleField[] = [
   { key: 'wrongSiteConfirmationMinutes', label: 'Wrong-site confirmation', unit: 'min', minimum: 0, integer: true },
   { key: 'earlyDepartureConfirmationMinutes', label: 'Early-departure confirmation', unit: 'min', minimum: 0, integer: true },
   { key: 'approachingDistanceMeters', label: 'Approaching distance', unit: 'm', minimum: 1, integer: true },
-  { key: 'approachingMinReadings', label: 'Approaching minimum readings', unit: 'readings', minimum: 1, integer: true },
+  { key: 'approachingMinReadings', label: 'Approaching minimum readings', unit: 'readings', minimum: 2, integer: true },
   { key: 'minimumMovingSpeedKmh', label: 'Minimum moving speed', unit: 'km/h', minimum: 0, integer: false },
   { key: 'evidenceMismatchToleranceMeters', label: 'Evidence mismatch tolerance', unit: 'm', minimum: 0, integer: true },
 ];

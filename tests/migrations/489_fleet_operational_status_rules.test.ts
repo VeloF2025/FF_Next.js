@@ -93,6 +93,7 @@ describe('migration 489 operational status rules', () => {
   it('enforces threshold checks and actor identity', async () => {
     await expect(insertRule({ monitoringBefore: -1 })).rejects.toMatchObject({ code: '23514' });
     await expect(insertRule({ approachingDistance: 0 })).rejects.toMatchObject({ code: '23514' });
+    await expect(insertRule({ approachingReadings: 1 })).rejects.toMatchObject({ code: '23514' });
     await expect(db.query(`INSERT INTO fleet_operational_status_rules (version, timezone, effective_from,
       monitoring_before_minutes, monitoring_after_minutes, arrival_dwell_minutes, wrong_site_confirmation_minutes,
       early_departure_confirmation_minutes, approaching_distance_meters, approaching_min_readings,

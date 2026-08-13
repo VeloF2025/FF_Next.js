@@ -18,7 +18,8 @@ function parseInput(body: unknown): CreateRuleVersionInput | null {
   const value = body as Record<string, unknown>;
   if (value.timezone !== 'Africa/Johannesburg' || typeof value.effectiveFrom !== 'string'
     || parseStrictIsoInstant(value.effectiveFrom) === null || typeof value.changeReason !== 'string'
-    || !value.changeReason.trim() || numericFields.some((field) => typeof value[field] !== 'number')) return null;
+    || !value.changeReason.trim() || numericFields.some((field) => typeof value[field] !== 'number')
+    || !Number.isInteger(value.approachingMinReadings) || value.approachingMinReadings < 2) return null;
   return {
     timezone: value.timezone, effectiveFrom: value.effectiveFrom,
     monitoringBeforeMinutes: value.monitoringBeforeMinutes as number,

@@ -100,7 +100,7 @@ presence, and source errors. One malformed person's mapped evidence becomes that
 The effective rule and attendance schedule create `monitoringStart -> scheduledStart -> graceEnd ->
 scheduledEnd -> monitoringEnd` in `Africa/Johannesburg`. Evaluation outside that bounded window is
 `off_duty`; GPS history is loaded only from the earliest monitoring/confirmation lookback through
-the requested `asOf`. Roster history is limited to 31 days. Tracker freshness is not redefined here:
+the earlier of the requested `asOf` and monitoring end. Roster history is limited to 31 days. Tracker freshness is not redefined here:
 the batch loader calls the shared `staleAfterSecondsFor(provider, account)` once per distinct feed,
 preserving the fast Cartrack REST versus slower portal-account thresholds.
 
@@ -112,8 +112,8 @@ departure additionally requires a prior confirmed inside sequence.
 ### Privacy, APIs, and scope
 
 - `GET /api/fleet/operations/status` returns coordinate-free roster summaries only.
-- `GET /api/fleet/operations/status/[staffId]` returns only the minimum decision points: Attendance
-  clock-in/out when present and the latest vehicle point, never the full GPS history.
+- `GET /api/fleet/operations/status/[staffId]` returns only decision-relevant points inside the
+  privacy window; an outside-window decision returns no coordinates and the full GPS history is never returned.
 - `GET/POST /api/fleet/operations/rules` lists history or creates a new version; the audit actor is
   always the authenticated session user, never a request-body value.
 - Status roster and detail reads require `fleet.operations-status:view`; rule-history GET requires
@@ -123,10 +123,10 @@ departure additionally requires a prior confirmed inside sequence.
   oversight. Rule POST additionally requires `fleet.operations-rules:edit` and oversight.
 
 PR 4 stops at calculation, protected APIs, rule history, and the compact Assignments rule dialog.
-PR 5 owns operational dashboard/map presentation and incident/notification workflows. PR 6 owns
-driver-facing confirmation/input and later workflow integrations. Do not pull dashboards, maps,
-alerts, persisted status snapshots, payroll/discipline effects, or driver-input behavior backward
-into this engine.
+PR 5 owns operational dashboard/map presentation. PR 6 owns incidents and notifications. PR 7 owns
+driver-facing confirmation/input, while PR 8 owns analytics and retention. Do not pull dashboards,
+maps, alerts, persisted status snapshots, payroll/discipline effects, driver input, or analytics
+backward into this engine.
 
 ## Tracking (Live GPS)
 

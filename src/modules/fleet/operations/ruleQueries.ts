@@ -60,8 +60,8 @@ function validate(input: CreateRuleVersionInput): { effectiveFrom: string; reaso
     input.evidenceMismatchToleranceMeters];
   if (nonnegative.some((value) => !Number.isFinite(value) || value < 0)) throw new RuleValidationError('Thresholds must be non-negative numbers');
   if (!Number.isInteger(input.approachingDistanceMeters) || input.approachingDistanceMeters <= 0
-    || !Number.isInteger(input.approachingMinReadings) || input.approachingMinReadings <= 0) {
-    throw new RuleValidationError('Approaching distance and readings must be positive integers');
+    || !Number.isInteger(input.approachingMinReadings) || input.approachingMinReadings < 2) {
+    throw new RuleValidationError('Approaching distance must be positive and readings must be at least two');
   }
   const integerThresholds = [input.monitoringBeforeMinutes, input.monitoringAfterMinutes, input.arrivalDwellMinutes,
     input.wrongSiteConfirmationMinutes, input.earlyDepartureConfirmationMinutes, input.evidenceMismatchToleranceMeters];

@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS fleet_operational_status_rules (
     AND wrong_site_confirmation_minutes >= 0 AND early_departure_confirmation_minutes >= 0
   ),
   CONSTRAINT fleet_operational_status_rules_approaching_positive CHECK (
-    approaching_distance_meters > 0 AND approaching_min_readings > 0
+    approaching_distance_meters > 0 AND approaching_min_readings >= 2
   ),
   CONSTRAINT fleet_operational_status_rules_motion_nonnegative CHECK (
     minimum_moving_speed_kmh >= 0 AND evidence_mismatch_tolerance_meters >= 0

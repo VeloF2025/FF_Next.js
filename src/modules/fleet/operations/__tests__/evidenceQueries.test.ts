@@ -8,7 +8,12 @@ vi.mock('@/services/tracking/staleness', () => ({ staleAfterSecondsFor: mocks.st
 import { loadOperationalEvidence } from '../evidenceQueries';
 
 const rule = { id: 'rule-1', version: 1, timezone: 'Africa/Johannesburg', effectiveFrom: '2026-01-01T00:00:00Z', effectiveTo: null, monitoringBeforeMinutes: 60, monitoringAfterMinutes: 60, arrivalDwellMinutes: 5, wrongSiteConfirmationMinutes: 5, earlyDepartureConfirmationMinutes: 10, approachingDistanceMeters: 10000, approachingMinReadings: 2, minimumMovingSpeedKmh: 5, evidenceMismatchToleranceMeters: 250, changeReason: null, createdBy: null, createdAt: '2026-01-01T00:00:00Z' };
-const roster = (count: number) => Array.from({ length: count }, (_, index) => ({ staff_id: `staff-${index}`, staff_name: `Driver ${index}`, assignment_id: `assignment-${index}`, assignment_kind: 'roster', project_id: 'project-1', operational_site_id: 'site-1', scheduled: true, assignment_ambiguous: false }));
+const roster = (count: number) => Array.from({ length: count }, (_, index) => ({
+  staff_id: `staff-${index}`, staff_name: `Driver ${index}`, assignment_id: `assignment-${index}`,
+  assignment_kind: 'roster', project_id: 'project-1', project_name: 'Project One',
+  operational_site_id: 'site-1', operational_site_name: 'Site One', vehicle_assignment_id: null,
+  total_count: count, scheduled: true,
+}));
 const schedules = (count: number, values: Record<string, unknown> = {}) => Array.from({ length: count }, (_, index) => ({ staff_id: `staff-${index}`, policy_id: 'policy-1', schedule_policy_id: 'schedule-policy-1', timezone: 'Africa/Johannesburg', start_time: '08:00:00', end_time: '17:00:00', grace_minutes: 15, scheduled: true, ...values }));
 
 beforeEach(() => { vi.clearAllMocks(); mocks.loadRule.mockResolvedValue(rule); mocks.stale.mockReturnValue(300); });
@@ -16,7 +21,8 @@ beforeEach(() => { vi.clearAllMocks(); mocks.loadRule.mockResolvedValue(rule); m
 it.each([1, 100])('loads %i staff with a constant seven set-based queries', async (count) => {
   mocks.query.mockResolvedValueOnce(roster(count)).mockResolvedValueOnce(schedules(count)).mockResolvedValueOnce([])
     .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-  await expect(loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: count, offset: 0 })).resolves.toHaveLength(count);
+  await expect(loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: count, offset: 0 }))
+    .resolves.toMatchObject({ items: { length: count }, total: count });
   expect(mocks.query).toHaveBeenCalledTimes(6); expect(mocks.loadRule).toHaveBeenCalledTimes(1);
   for (const [sql] of mocks.query.mock.calls) expect(sql).toEqual(expect.any(String));
 });
@@ -33,29 +39,34 @@ describe('evidence mapping', () => {
     for (const obsolete of ['ae.date=', 'ae.clock_in_time', 'ae.clock_out_time', 'ae.clock_in_latitude', 'ae.clock_in_longitude', 'ae.matched_geofence_id']) {
       expect(attendanceSql).not.toContain(obsolete);
     }
+    expect(attendanceSql).toContain('ae.clock_in_at<=$5::timestamptz');
+    expect(attendanceSql).toContain('ORDER BY ae.clock_in_at DESC,ae.id DESC LIMIT 1');
+    expect(attendanceSql).toContain('CASE WHEN ae.clock_out_at<=$5::timestamptz THEN ae.clock_out_at END');
   });
 
   it('maps trackers once per provider/account and bounds GPS history through asOf', async () => {
     mocks.query.mockResolvedValueOnce(roster(2)).mockResolvedValueOnce(schedules(2)).mockResolvedValueOnce([]).mockResolvedValueOnce([
       { staff_id: 'staff-0', assignment_id: 'va-0', vehicle_id: 'vehicle-0', provider: 'netstar', account_ref: 'account' },
       { staff_id: 'staff-1', assignment_id: 'va-1', vehicle_id: 'vehicle-1', provider: 'netstar', account_ref: 'account' },
-    ]).mockResolvedValueOnce([{ vehicle_id: 'vehicle-0', recorded_at: new Date('2026-08-14T11:55:00Z'), latitude: '-26.1', longitude: '28.1', speed_kmh: '12', site_inside: false, site_distance_m: 300, known_site_id: 'site-2' }]).mockResolvedValueOnce([]);
+    ]).mockResolvedValueOnce([{ vehicle_id: 'vehicle-0', recorded_at: new Date('2026-08-14T11:55:00Z'), lat: '-26.1', lon: '28.1', speed_kph: '12', site_inside: false, site_distance_m: 300, known_site_id: 'site-2' }]).mockResolvedValueOnce([]);
     const result = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
     expect(mocks.stale).toHaveBeenCalledTimes(1); expect(mocks.stale).toHaveBeenCalledWith('netstar', 'account');
-    const gpsCall = mocks.query.mock.calls[4]!; expect(gpsCall[0]).toContain('recorded_at BETWEEN'); expect(gpsCall[1]).toContain('2026-08-14T12:00:00.000Z');
+    const gpsCall = mocks.query.mock.calls[4]!; expect(gpsCall[0]).toContain('p.lat'); expect(gpsCall[0]).toContain('p.lon'); expect(gpsCall[0]).toContain('p.speed_kph');
+    expect(gpsCall[0]).not.toMatch(/p\.(latitude|longitude|speed_kmh)/); expect(gpsCall[0]).toContain('recorded_at BETWEEN'); expect(gpsCall[1]).toContain('2026-08-14T12:00:00.000Z');
     expect(gpsCall[1]).toContain('2026-08-14T04:50:00.000Z');
-    expect(result[0]!.vehicle.positions[0]).toMatchObject({ latitude: -26.1, longitude: 28.1, speedKmh: 12, knownSiteId: 'site-2' });
+    expect(result.items[0]!.vehicle.positions[0]).toMatchObject({ latitude: -26.1, longitude: 28.1, speedKmh: 12, knownSiteId: 'site-2' });
   });
 
   it('maps persisted policy grace and a distinct known attendance site', async () => {
     mocks.query.mockResolvedValueOnce(roster(1)).mockResolvedValueOnce(schedules(1, { schedule_policy_id: 'custom-policy', grace_minutes: 27 })).mockResolvedValueOnce([
       { staff_id: 'staff-0', entry_id: 'entry', clock_in_at: new Date('2026-08-14T06:05:00Z'), clock_out_at: new Date('2026-08-14T15:00:00Z'), latitude: -26.1, longitude: 28.1, out_latitude: -26.2, out_longitude: 28.2, site_valid: true, site_inside: false, site_distance_m: 500, known_site_id: 'site-2' },
     ]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([{ operational_site_id: 'site-1', geometry_valid: true }]);
-    const [result] = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
+    const { items: [result] } = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
     expect(result!.schedule).toMatchObject({ policyId: 'custom-policy', graceMinutes: 27 });
     expect(result!.attendance.requiredSite).toMatchObject({ inside: false, distanceM: 500, knownSiteId: 'site-2' });
     expect(result!.attendance.clockOutPoint).toMatchObject({ latitude: -26.2, longitude: 28.2, recordedAt: '2026-08-14T15:00:00.000Z' });
     expect(String(mocks.query.mock.calls[2]![0])).toContain('candidate.project_id=mapping.project_id');
+    expect(String(mocks.query.mock.calls[2]![0])).toContain('candidate.authorized_location_id=ae.site_geofence_id');
   });
 
   it('uses the staff assignment project for oversight detail without a project filter', async () => {
@@ -69,7 +80,47 @@ describe('evidence mapping', () => {
   it('isolates malformed staff mapping as evidence_source_error', async () => {
     mocks.query.mockResolvedValueOnce(roster(1)).mockResolvedValueOnce(schedules(1, { grace_minutes: 'bad' }))
       .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    const [result] = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
+    const { items: [result] } = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
     expect(result!.sourceErrors).toContain('malformed_evidence');
+  });
+
+  it('never treats missing geometry as valid merely because a site id exists', async () => {
+    mocks.query.mockResolvedValueOnce(roster(1)).mockResolvedValueOnce(schedules(1)).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const { items: [result] } = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
+    expect(result!.assignment).toMatchObject({ operationalSiteId: 'site-1', siteGeometryValid: false });
+    expect(result!.assignment).toMatchObject({ projectName: 'Project One', operationalSiteName: 'Site One' });
+  });
+
+  it('uses the roster-selected vehicle assignment and refuses an unselected ambiguity', async () => {
+    const selectedRoster = [{ ...roster(1)[0]!, vehicle_assignment_id: 'va-selected' }];
+    mocks.query.mockResolvedValueOnce(selectedRoster).mockResolvedValueOnce(schedules(1)).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ staff_id: 'staff-0', assignment_id: 'va-selected', vehicle_id: 'vehicle-selected', provider: 'netstar', account_ref: 'account', candidate_count: 1 }])
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([{ operational_site_id: 'site-1', geometry_valid: true }]);
+    const selected = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
+    expect(selected.items[0]!.vehicle).toMatchObject({ assignmentId: 'va-selected', vehicleId: 'vehicle-selected' });
+    const vehicleSql = String(mocks.query.mock.calls[3]![0]);
+    expect(vehicleSql).toContain('selected_assignment_id');
+
+    vi.clearAllMocks(); mocks.loadRule.mockResolvedValue(rule); mocks.stale.mockReturnValue(300);
+    mocks.query.mockResolvedValueOnce(roster(1)).mockResolvedValueOnce(schedules(1)).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { staff_id: 'staff-0', assignment_id: 'va-1', vehicle_id: 'vehicle-1', provider: 'netstar', account_ref: 'account', candidate_count: 2 },
+        { staff_id: 'staff-0', assignment_id: 'va-2', vehicle_id: 'vehicle-2', provider: 'netstar', account_ref: 'account', candidate_count: 2 },
+      ]).mockResolvedValueOnce([]).mockResolvedValueOnce([{ operational_site_id: 'site-1', geometry_valid: true }]);
+    const ambiguous = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
+    expect(ambiguous.items[0]!.assignment.ambiguous).toBe(true);
+    expect(ambiguous.items[0]!.vehicle.vehicleId).toBeNull();
+  });
+
+  it('caps every GPS mapping at its monitoring end', async () => {
+    mocks.query.mockResolvedValueOnce(roster(1)).mockResolvedValueOnce(schedules(1)).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ staff_id: 'staff-0', assignment_id: 'va-1', vehicle_id: 'vehicle-1', provider: 'netstar', account_ref: 'account', candidate_count: 1 }])
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([{ operational_site_id: 'site-1', geometry_valid: true }]);
+    await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T16:30:00Z', limit: 25, offset: 0 });
+    const gpsSql = String(mocks.query.mock.calls[4]![0]);
+    expect(gpsSql).toContain('monitoring_end');
+    expect(gpsSql).toContain('LEAST($4::timestamptz,mapping.monitoring_end)');
+    expect(mocks.query.mock.calls[4]![1]).toContainEqual(['2026-08-14T16:00:00.000Z']);
   });
 });

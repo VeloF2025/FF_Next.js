@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { approachTrend, continuousInside, continuousOutside, type ContinuityFix } from '../continuity';
+import {
+  approachTrend,
+  continuousInside,
+  continuousOutside,
+  continuousOutsideAtKnownSite,
+  type ContinuityFix,
+} from '../continuity';
 
 const at = (seconds: number, change: Partial<ContinuityFix> = {}): ContinuityFix => ({ recordedAt: new Date(Date.UTC(2026, 7, 13, 8, 0, seconds)).toISOString(), valid: true, inside: true, distanceM: 100, speedKmh: 10, ...change });
 const AS_OF = '2026-08-13T08:10:00.000Z';
@@ -25,6 +31,25 @@ describe('continuity', () => {
   it('does not let a stale earlier fix confirm dwell with a fresh latest fix', () => {
     expect(continuousInside([at(0), at(600)], 300, 300, '2026-08-13T08:10:00Z'))
       .toMatchObject({ confirmed: false, pending: true, sequenceLength: 1 });
+  });
+
+  it('requires one continuous known wrong-site identity for confirmation', () => {
+    const sameSite = [
+      at(0, { inside: false, knownSiteId: 'site-2' }),
+      at(300, { inside: false, knownSiteId: 'site-2' }),
+    ];
+    expect(continuousOutsideAtKnownSite(sameSite, 300, 300, '2026-08-13T08:05:00Z'))
+      .toMatchObject({ confirmed: true, knownSiteId: 'site-2', sequenceLength: 2 });
+
+    const changedSite = [sameSite[0]!, at(300, { inside: false, knownSiteId: 'site-3' })];
+    expect(continuousOutsideAtKnownSite(changedSite, 300, 300, '2026-08-13T08:05:00Z'))
+      .toMatchObject({ confirmed: false, knownSiteId: 'site-3', sequenceLength: 1 });
+    expect(continuousOutsideAtKnownSite(
+      [at(0, { inside: false, knownSiteId: null }), at(300, { inside: false, knownSiteId: null })],
+      300,
+      300,
+      '2026-08-13T08:05:00Z',
+    )).toMatchObject({ confirmed: false, knownSiteId: null });
   });
 });
 

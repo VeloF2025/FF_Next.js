@@ -8,7 +8,10 @@ const inputUnit: Record<string, string> = { min: 'minutes', m: 'metres', reading
 function effectiveDefault(): string { const value = new Date(Date.now() + 5 * 60_000); value.setMinutes(value.getMinutes() - value.getTimezoneOffset()); return value.toISOString().slice(0, 16); }
 function draftFrom(rule: OperationalStatusRule): Draft { return Object.assign({ effectiveFrom: effectiveDefault(), changeReason: '' }, Object.fromEntries(RULE_FIELDS.map((field) => [field.key, String(rule[field.key])]))) as Draft; }
 function fieldError(field: (typeof RULE_FIELDS)[number], value: string): string | null {
-  const number = Number(value); if (!value.trim() || !Number.isFinite(number) || number < field.minimum) return field.integer ? 'Use a non-negative whole number.' : 'Use a non-negative number.';
+  const number = Number(value); if (!value.trim() || !Number.isFinite(number) || number < field.minimum) {
+    if (field.key === 'approachingMinReadings') return 'Use a whole number of at least 2.';
+    return field.integer ? 'Use a non-negative whole number.' : 'Use a non-negative number.';
+  }
   if (field.integer && !Number.isInteger(number)) return 'Use a non-negative whole number.'; return null;
 }
 function toInput(rule: OperationalStatusRule, draft: Draft): CreateRuleVersionInput {
