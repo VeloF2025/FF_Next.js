@@ -193,3 +193,39 @@ then failed 1 of 18 evaluator assertions (`late` returned instead of
 Remaining verification concern: run the new production-loader/PostGIS contract and
 the whole quick-CI script in the normal Docker-enabled Linux CI environment. All
 focused PR 4 tests, changed-file lint, secret scan, and whitespace checks are green.
+
+### Residual final-review fix round
+
+Implementation commit: `7fbf824bb` (`fix(fleet): preserve status history boundaries`).
+
+1. **Empty-page pagination.** A nonzero-offset roster page can have no row from
+   which to read `COUNT(*) OVER()`. The loader now takes an explicit fallback
+   branch only for that case, builds the same roster scope at offset zero with a
+   one-row limit, and runs a parameterized count-result query over it. This
+   preserves the real `total` while returning an empty `items` array; the status
+   service consequently returns the correct total with `hasMore: false` for an
+   out-of-range page. Normal non-empty pages retain the six-query batch path.
+2. **Interrupted prior arrival.** Departure evaluation previously removed every
+   outside point before checking prior-inside continuity, which could join two
+   separated inside observations into a false arrival. It now passes the complete
+   ordered valid pre-departure fix stream to `continuousHistoricalInside`, so any
+   intervening outside fix breaks that sequence.
+
+Strict TDD RED was captured before implementation. The empty-page assertion
+returned `{ items: [], total: 0 }` instead of total 42, and the interrupted
+arrival case returned `left_early` instead of `late`. The initial combined RED
+run reported 7 failures/39 passes because the unconsumed future count mock also
+spilled into five later evidence tests; the test setup now resets queued query
+implementations between cases. The two requested behavioral failures were the
+first pagination failure and the evaluator failure in that output.
+
+| Command | Result |
+| --- | --- |
+| `.\\node_modules\\.bin\\vitest.cmd run src/modules/fleet/operations/__tests__/evidenceQueries.test.ts src/modules/fleet/operations/__tests__/evaluateStatus.test.ts src/modules/fleet/operations/__tests__/statusService.test.ts` (RED) | Exit 1: target failures reproduced (`total` 0 vs 42; `left_early` vs `late`); 7 failed and 39 passed including the described mock-queue spillover. |
+| Same three-suite command (GREEN) | Exit 0: 3 files, 46 tests passed. |
+| `.\\node_modules\\.bin\\vitest.cmd run src/modules/fleet/operations pages/api/fleet/operations` | Exit 0: 11 files, 134 tests passed. |
+| `.\\node_modules\\.bin\\eslint.cmd src/modules/fleet/operations/evidenceQueries.ts src/modules/fleet/operations/evaluateStatus.ts src/modules/fleet/operations/__tests__/evidenceQueries.test.ts src/modules/fleet/operations/__tests__/evaluateStatus.test.ts src/modules/fleet/operations/__tests__/statusService.test.ts --report-unused-disable-directives` | Exit 0 with no findings. |
+| `git diff --check` before commit | Exit 0. |
+
+No database, deployment, push, PR, or merge operation was performed in this
+residual round.
