@@ -245,6 +245,14 @@ test("anchors to a real working tree in a BARE repo + worktrees layout", () => {
     const bare = join(dirname(root), "hub.git");
     const wt = join(dirname(root), "hub-wt");
     gitOk(root, ["clone", "--bare", "--quiet", root, bare]);
+    // A clone is a NEW repo and inherits none of the fixture's local config. The
+    // committer identity has to be set here or the commit below fails with
+    // "Author identity unknown" on any machine without a global one — which is
+    // exactly what happened: this test passed locally and failed in CI, and
+    // `assert.notEqual(status, 0)` was satisfied for the wrong reason. Only the
+    // RAN-pre-commit assertion distinguished the two.
+    gitOk(bare, ["config", "user.email", "ci@example.com"]);
+    gitOk(bare, ["config", "user.name", "ci"]);
     gitOk(bare, ["worktree", "add", "--quiet", wt, "master"]);
 
     const r = install(wt);
