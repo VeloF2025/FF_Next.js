@@ -341,6 +341,15 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           return apiResponse.badRequest(res, 'Only pending POs can be approved');
         }
 
+        // Authorize the approver against the threshold-based approval chain.
+        // super_admin/admin always pass; otherwise the user must match the
+        // approval level (specific user or role) for this PO's amount.
+        const canApprove = await poApprovalService.canUserApprove(id, userId);
+        if (!canApprove) {
+          log.warn('PO approval denied', { id, userId, userName });
+          return apiResponse.forbidden(res, 'You are not authorized to approve this purchase order');
+        }
+
         await poApprovalService.approvePO(id, userId, userName, notes);
 
         log.info('PO approved', { id, approver: userName });

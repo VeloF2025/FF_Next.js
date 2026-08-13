@@ -20,6 +20,18 @@ import {
 
 const sql: NeonQueryFunction<false, false> = neon(process.env.DATABASE_URL!);
 
+/**
+ * Thrown when a user attempts to approve a PO they are not authorized for.
+ * The API route authorizes before calling approvePO; this guards direct
+ * service callers (defense-in-depth).
+ */
+export class UnauthorizedApprovalError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnauthorizedApprovalError';
+  }
+}
+
 // Row types for SQL query results
 interface ApprovalLevelRow {
   id: string;
@@ -454,8 +466,16 @@ class POApprovalService {
         throw new Error('PO is not pending approval');
       }
 
-      // Validate approver has permission (TODO: implement role check)
-      // For now, any authenticated user can approve
+      // Defense-in-depth: authorize the approver against the approval chain.
+      // The API route also checks this, but the service must not trust callers
+      // to have done so — canUserApprove enforces super_admin/admin bypass plus
+      // the threshold-level user/role assignment.
+      const authorized = await this.canUserApprove(poId, approverId);
+      if (!authorized) {
+        throw new UnauthorizedApprovalError(
+          `User ${approverId} is not authorized to approve PO ${po.po_number}`
+        );
+      }
 
       // Update approval request
       if (po.current_approval_request_id) {
@@ -472,12 +492,13 @@ class POApprovalService {
         `;
       }
 
-      // Update PO status
+      // Update PO status. approved_by stores the user id (joinable to users.id),
+      // consistent with created_by/requested_by/rejected_by — not the display name.
       await sql`
         UPDATE purchase_orders
         SET
           status = 'approved',
-          approved_by = ${approverName},
+          approved_by = ${approverId},
           approved_at = NOW(),
           updated_at = NOW()
         WHERE id = ${poId}
