@@ -140,6 +140,7 @@ When adding rules, keep path-scoped docs short — push detail into `.claude/mod
 | VLM | `.claude/modules/vlm.md` | Qwen3 on :8100, max 1024×768 images |
 | Fleet | `.claude/modules/fleet.md` | Vehicle check-in, VLM plate reading |
 | Procurement | `.claude/modules/procurement.md` | BOQ, RFQ, PO workflow |
+| Git hooks | `.claude/modules/git-hooks.md` | `core.hooksPath` → tracked `scripts/githooks/`; absolute, anchored at the main worktree |
 
 Enumerate current path-scoped docs with `find src -name .claude.md -type f`; enumerate full references with `find .claude/modules -maxdepth 1 -name '*.md' -type f`. `.claude/modules/_index.yaml` is a legacy curated category index, not an exhaustive inventory.
 
