@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-13T08:23:37.371Z",
+  "generatedAt": "2026-08-13T11:32:39.514Z",
   "routes": [
     {
       "path": "/api/activate/:dropNumber",
@@ -4891,6 +4891,14 @@
       ],
       "group": "reporting",
       "description": "GET /api/reporting/action-items?state=open&assignee=…&olderThanDays=90"
+    },
+    {
+      "path": "/api/reporting/meetings",
+      "methods": [
+        "GET"
+      ],
+      "group": "reporting",
+      "description": "GET /api/reporting/meetings?search=…&since=YYYY-MM-DD&until=YYYY-MM-DD&withTranscript=true"
     },
     {
       "path": "/api/reporting/project-overview",

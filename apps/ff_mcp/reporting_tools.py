@@ -183,3 +183,53 @@ async def get_action_items(
         limit=limit,
     )
     return await anyio.to_thread.run_sync(partial(_action_items_sync, query))
+
+
+def _meetings_sync(query: str) -> str:
+    return _fibreflow_get_sync("/api/reporting/meetings", query)
+
+
+@mcp.tool()
+async def find_meetings(
+    search: str = "",
+    since: str = "",
+    until: str = "",
+    with_transcript: bool | None = None,
+    limit: int = 50,
+) -> str:
+    """Find meetings YOU attended: when they happened, who was in them, whether a
+    transcript or summary was captured, and how many action items came out of each.
+
+    - `search`: matched against the meeting TITLE only, not its contents.
+    - `since` / `until`: `YYYY-MM-DD`, inclusive of the whole `until` day.
+    - `with_transcript`: True for only meetings with a stored transcript, False for only
+      those without.
+
+    Returns an INDEX, not contents. It carries no transcript text, no summary text and no
+    action-item wording — only whether those exist. To read what was said in a meeting,
+    fetch its transcript separately; that is a separate authorization each time.
+
+    Two ways to state something false from this result:
+
+    - For almost every caller the list is scoped to meetings where YOUR OWN email address
+      appears in the participant list, so it is not a view of the organisation's meetings.
+      An empty result means you were not recorded in any matching meeting — never report it
+      as "there were no meetings about X", because meetings you did not attend are
+      invisible here and their absence is not evidence. (One owner identity is exempt and
+      sees everything; the response says which case applies, so read its caveats rather
+      than assuming either.)
+    - `hasTranscript: false` means nothing was captured, so no question about what was
+      SAID in that meeting can be answered from this system. Do not infer content from the
+      title; a title is what someone typed into a calendar invite.
+
+    Participation is recorded per meeting from the calendar invite, so someone who joined
+    without being invited, or was invited and never spoke, is counted the same way.
+    """
+    query = build_query(
+        search=search,
+        since=since,
+        until=until,
+        withTranscript=None if with_transcript is None else str(with_transcript).lower(),
+        limit=limit,
+    )
+    return await anyio.to_thread.run_sync(partial(_meetings_sync, query))

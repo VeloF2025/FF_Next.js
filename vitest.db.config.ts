@@ -52,6 +52,7 @@ export default defineConfig({
       { find: '@sentry/nextjs', replacement: path.resolve(__dirname, 'src/lib/sentry/__stubs__/sentry-nextjs.ts') },
       { find: /^@\/lib\/sentry/, replacement: path.resolve(__dirname, 'src/lib/sentry') },
       { find: /^@\/lib\/observability/, replacement: path.resolve(__dirname, 'src/lib/observability') },
+      { find: '@/lib/reporting', replacement: path.resolve(__dirname, './src/lib/reporting') },
       { find: '@/lib/actionItems', replacement: path.resolve(__dirname, './src/lib/actionItems') },
       { find: '@/lib/utils', replacement: path.resolve(__dirname, './src/lib/utils') },
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },

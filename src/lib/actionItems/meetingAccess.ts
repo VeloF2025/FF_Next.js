@@ -82,6 +82,42 @@ function push(params: unknown[], value: unknown): string {
  * with no assignee_email fails closed, and `COALESCE(participants, '[]')` makes a meeting
  * with no participant list unmatchable rather than an error.
  */
+
+/**
+ * "This meetings row lists the caller as a participant."
+ *
+ * The single definition of attendance. Both the action-item predicate (which reaches a
+ * meeting through `meeting_id`) and the meeting search (which is already looking at the
+ * meetings row) compose it, so there is one place where the match is specified and one
+ * place to change it.
+ *
+ * Email only. `pages/api/meetings.ts` additionally matches `p->>'name'` and
+ * `p->>'displayName'` against the caller's display name; that is a string, not an
+ * identity, and it fails OPEN — `user.name` falls back to '' and 1,613 meetings carry a
+ * participant whose name is the empty string.
+ */
+function participantMatch(alias: string, emailPlaceholder: string): string {
+  return `EXISTS (
+            SELECT 1 FROM jsonb_array_elements(COALESCE(${alias}.participants, '[]'::jsonb)) AS p_acc
+            WHERE LOWER(p_acc->>'email') = ${emailPlaceholder}
+          )`;
+}
+
+/**
+ * Attendance applied directly to a `meetings` row — for queries whose FROM is already
+ * `meetings`. Returns the literal TRUE for the owner, for the same reason
+ * actionItemVisibility does.
+ */
+export function meetingAttendance(
+  access: ActionItemAccess,
+  params: unknown[],
+  alias = 'm',
+): string {
+  if (access.isOwner) return 'TRUE';
+  if (!access.email) return 'FALSE';
+  return `(${participantMatch(alias, push(params, access.email))})`;
+}
+
 export interface VisibilityOptions {
   /**
    * Authorize a WRITE (PATCH/DELETE) rather than a read.
@@ -118,16 +154,20 @@ export function actionItemVisibility(
   options: VisibilityOptions = {},
 ): string {
   if (access.isOwner) return 'TRUE';
+  // A non-owner with no email cannot be scoped, and binding '' does not mean "match
+  // nothing" — 1,625 of 4,054 meetings carry a participant whose email is the empty
+  // string, so `LOWER(p_acc->>'email') = ''` matches a third of the table. The callers
+  // all reject an empty email before reaching here; the guard belongs in the predicate
+  // anyway, because the caller that forgets is the one that ships the leak. This is the
+  // same fail-open shape this module criticises pages/api/meetings.ts for having on name.
+  if (!access.email) return 'FALSE';
 
   const email = push(params, access.email);
 
   const attended = `EXISTS (
         SELECT 1 FROM meetings m_acc
         WHERE m_acc.id = ${alias}.meeting_id
-          AND EXISTS (
-            SELECT 1 FROM jsonb_array_elements(COALESCE(m_acc.participants, '[]'::jsonb)) AS p_acc
-            WHERE LOWER(p_acc->>'email') = ${email}
-          )
+          AND ${participantMatch('m_acc', email)}
       )`;
 
   // Attendance alone — no assignment arms, no no-meeting arm. See meetingsOnly.
