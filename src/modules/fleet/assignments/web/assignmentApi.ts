@@ -1,4 +1,4 @@
-import type { AssignmentProposalRow, PreviewResult, ProposalConflict } from '../types';
+import type { AssignmentProposalRow, OperationalSite, PreviewResult, ProposalConflict } from '../types';
 import type { AssignmentOptions, AssignmentRosterResult } from '../rosterQueries';
 
 interface Envelope<T> { success: boolean; data?: T; error?: { message?: string; details?: { conflicts?: ProposalConflict[] } } }
@@ -21,6 +21,6 @@ export const assignmentApi = {
   history: (assignmentId: string) => request<Record<string, unknown>[]>(`/api/fleet/assignments/${assignmentId}/history`),
   update: (assignmentId: string, body: Record<string, unknown>) => request<unknown>(`/api/fleet/assignments/${assignmentId}`, { method: 'PUT', body: JSON.stringify(body) }),
   createSite: (body: Record<string, unknown>) => request<unknown>('/api/fleet/assignments/project-sites', { method: 'POST', body: JSON.stringify(body) }),
-  listSites: (projectId: string) => request<unknown[]>(`/api/fleet/assignments/project-sites?projectId=${encodeURIComponent(projectId)}`),
+  listSites: (projectId: string, includeInactive = true) => request<OperationalSite[]>(`/api/fleet/assignments/project-sites?projectId=${encodeURIComponent(projectId)}&includeInactive=${includeInactive}`),
   updateSite: (siteId: string, body: Record<string, unknown>) => request<unknown>(`/api/fleet/assignments/project-sites/${siteId}`, { method: 'PUT', body: JSON.stringify(body) }),
 };

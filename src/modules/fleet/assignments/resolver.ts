@@ -91,7 +91,7 @@ export async function resolveOperationalAssignment(staffId: string, workDate: st
 
   const home = await resolverDb.query<EvidenceRow>(`/* fleet-resolver:homeSite */
     SELECT fal.id, fal.name AS display_name
-    FROM staff s JOIN fleet_authorized_locations fal ON fal.id = s.home_location_id
+    FROM staff s JOIN fleet_authorized_locations fal ON fal.id = s.home_site_id
     WHERE s.id = $1::uuid AND LOWER(s.status) = 'active'
       AND COALESCE(s.is_active, true) AND fal.is_active = true LIMIT 1`, [staffId]);
   return result(staffId, workDate, home[0] ? 'home_site' : 'unassigned', home[0] ?? null, schedule, []);

@@ -42,6 +42,7 @@ function parseFilters(query: NextApiRequest['query']): AssignmentRosterFilters |
   const from = stringQuery(query.from);
   const to = stringQuery(query.to);
   const source = stringQuery(query.source);
+  const unassignedScheduled = stringQuery(query.unassignedScheduled);
   const page = positiveInteger(stringQuery(query.page), 'page', 100000);
   const limit = positiveInteger(stringQuery(query.limit), 'limit', 100);
 
@@ -50,9 +51,10 @@ function parseFilters(query: NextApiRequest['query']): AssignmentRosterFilters |
   if (siteId !== undefined && !isValidUUID(siteId)) return 'siteId must be a valid UUID';
   if (from !== undefined && !validIsoDate(from)) return 'from must be a valid ISO date';
   if (to !== undefined && !validIsoDate(to)) return 'to must be a valid ISO date';
-  if (source !== undefined && source !== 'roster' && source !== 'daily_override') {
-    return 'source must be roster or daily_override';
+  if (source !== undefined && !['roster', 'daily_override', 'vehicle_project', 'home_site', 'unassigned'].includes(source)) {
+    return 'source is invalid';
   }
+  if (unassignedScheduled !== undefined && unassignedScheduled !== 'true' && unassignedScheduled !== 'false') return 'unassignedScheduled must be true or false';
   if (typeof page === 'string') return page;
   if (typeof limit === 'string') return limit;
   if (from && to) {
@@ -65,7 +67,8 @@ function parseFilters(query: NextApiRequest['query']): AssignmentRosterFilters |
     projectId,
     staffId,
     siteId,
-    source,
+    source: source as AssignmentRosterFilters['source'],
+    unassignedScheduled: unassignedScheduled === 'true',
     startDate: from,
     endDate: to,
     limit: requestedLimit,

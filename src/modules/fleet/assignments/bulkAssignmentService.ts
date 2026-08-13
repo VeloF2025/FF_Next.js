@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { assignmentFingerprint } from './fingerprint';
 import {
   endAssignmentRow, expandActiveTeamStaff, insertAssignment, insertAudit, listAssignmentHistory, lockRelevantPreviewSources,
-  loadAssignmentsForCopy, loadPreviewState, lockAssignment, runAssignmentTransaction,
+  loadAssignmentsForCopy, loadPreviewState, lockAssignment, prepareAssignmentReplacement, runAssignmentTransaction,
   supersedeAssignment, type ActorScope, type AssignmentActor, type AssignmentRecord,
 } from './assignmentQueries';
 import type { AssignmentProposalRow, PreviewResult } from './types';
@@ -109,6 +109,7 @@ export async function replaceAssignment(id: string, replacement: unknown, actor:
       const snapshot = state.snapshots[proposal.projectId];
       if (!snapshot) throw new AssignmentServiceError('BLOCKING_CONFLICTS', 'Project snapshot is unavailable', 409);
       const correlationId = randomUUID();
+      await prepareAssignmentReplacement(tx, id);
       const created = await insertAssignment(tx, proposal, actor.userId, snapshot);
       await supersedeAssignment(tx, id, created.id);
       await insertAudit(tx, created.id, 'moved', correlationId, actor.userId, proposal.reason, null, created);

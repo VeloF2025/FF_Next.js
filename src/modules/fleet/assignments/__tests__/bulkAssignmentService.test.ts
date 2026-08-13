@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const q = vi.hoisted(() => ({
   expandActiveTeamStaff: vi.fn(), loadPreviewState: vi.fn(), runAssignmentTransaction: vi.fn(),
-  insertAssignment: vi.fn(), insertAudit: vi.fn(), lockAssignment: vi.fn(), supersedeAssignment: vi.fn(),
+  insertAssignment: vi.fn(), insertAudit: vi.fn(), lockAssignment: vi.fn(), prepareAssignmentReplacement: vi.fn(),
+  supersedeAssignment: vi.fn(),
   endAssignmentRow: vi.fn(), listAssignmentHistory: vi.fn(), loadAssignmentsForCopy: vi.fn(), lockRelevantPreviewSources: vi.fn(),
 }));
 vi.mock('../assignmentQueries', () => q);
@@ -87,12 +88,32 @@ describe('bulk assignment service', () => {
     await expect(commitAssignments({ rows: [row()] }, preview.fingerprint, ACTOR)).rejects.toMatchObject({ code: 'ASSIGNMENT_OVERLAP', status: 409 });
   });
 
-  it('replaces by inserting then superseding, linked by one correlation id', async () => {
+  it('makes the original non-active before inserting and links it after insertion', async () => {
     q.loadPreviewState.mockResolvedValue(state([row(STAFF_2)]));
     const created = await replaceAssignment(ASSIGNMENT, row(STAFF_2), ACTOR);
     expect(created.id).toBe(STAFF_2);
+    expect(q.prepareAssignmentReplacement).toHaveBeenCalledWith({}, ASSIGNMENT);
     expect(q.supersedeAssignment).toHaveBeenCalledWith({}, ASSIGNMENT, STAFF_2);
+    expect(q.prepareAssignmentReplacement.mock.invocationCallOrder[0]).toBeLessThan(q.insertAssignment.mock.invocationCallOrder[0]);
+    expect(q.insertAssignment.mock.invocationCallOrder[0]).toBeLessThan(q.supersedeAssignment.mock.invocationCallOrder[0]);
     expect(q.insertAudit.mock.calls.at(-1)?.[3]).toBe(q.insertAudit.mock.calls.at(-2)?.[3]);
+  });
+
+  it('rolls the original status back when replacement insertion fails', async () => {
+    q.loadPreviewState.mockResolvedValue(state([row(STAFF_2)]));
+    const persisted = { originalStatus: 'active' };
+    q.runAssignmentTransaction.mockImplementationOnce(async (fn) => {
+      const staged = { originalStatus: persisted.originalStatus };
+      const result = await fn(staged);
+      persisted.originalStatus = staged.originalStatus;
+      return result;
+    });
+    q.prepareAssignmentReplacement.mockImplementationOnce(async (tx) => { tx.originalStatus = 'superseded'; });
+    q.insertAssignment.mockRejectedValueOnce(new Error('replacement failed'));
+
+    await expect(replaceAssignment(ASSIGNMENT, row(STAFF_2), ACTOR)).rejects.toThrow('replacement failed');
+    expect(persisted.originalStatus).toBe('active');
+    expect(q.supersedeAssignment).not.toHaveBeenCalled();
   });
 
   it('ends without deleting, validates the date, and returns newest-first history', async () => {

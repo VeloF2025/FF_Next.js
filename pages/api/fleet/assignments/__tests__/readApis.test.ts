@@ -50,7 +50,7 @@ describe('assignment read APIs', () => {
   it('passes authorized roster filters with offset pagination', async () => {
     await call(assignmentsHandler, 'GET', { projectId: PROJECT, staffId: STAFF, siteId: SITE, from: '2026-08-01', to: '2026-08-31', source: 'roster', page: '2', limit: '10' });
     expect(mocks.scope).toHaveBeenCalledWith(USER, STAFF, 'manager', PROJECT);
-    expect(mocks.roster).toHaveBeenCalledWith({ projectId: PROJECT, staffId: STAFF, siteId: SITE, startDate: '2026-08-01', endDate: '2026-08-31', source: 'roster', limit: 10, offset: 10 });
+    expect(mocks.roster).toHaveBeenCalledWith({ projectId: PROJECT, staffId: STAFF, siteId: SITE, startDate: '2026-08-01', endDate: '2026-08-31', source: 'roster', unassignedScheduled: false, limit: 10, offset: 10 });
   });
 
   it('only exposes options for active projects in the user view scope', async () => {
