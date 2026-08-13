@@ -48,4 +48,20 @@ describe('operational time boundaries', () => {
   ])('rejects malformed or unsupported persisted schedule values', (persisted, message) => {
     expect(() => operationalWindow(persisted, rule)).toThrow(message);
   });
+
+  it.each([
+    '2026-02-30T08:00:00Z',
+    '2026-04-31T08:00:00+02:00',
+    '2026-08-14T24:00:00Z',
+    '2026-08-14T08:60:00+02:00',
+    '2026-08-14T08:00:00+24:00',
+  ])('rejects the impossible ISO instant %s', (asOf) => {
+    expect(() => timePhase(asOf, schedule, rule)).toThrow('Evaluation instant is malformed');
+  });
+
+  it.each(['2026-08-14T05:00:00Z', '2026-08-14T07:00:00+02:00', '2026-08-14T00:00:00-05:00'])(
+    'accepts the valid ISO instant %s', (asOf) => {
+      expect(() => timePhase(asOf, schedule, rule)).not.toThrow();
+    },
+  );
 });
