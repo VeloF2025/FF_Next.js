@@ -48,6 +48,13 @@ describe('status service validation and privacy', () => {
     });
   });
 
+  it('preserves total and reports no next page for an empty out-of-range page', async () => {
+    mocks.load.mockResolvedValue({ items: [], total: 42 });
+    await expect(getOperationalRosterStatus({ projectId: 'p', workDate: '2026-08-14',
+      asOf: '2026-08-14T12:00:00Z', page: 3, limit: 25 }))
+      .resolves.toMatchObject({ items: [], page: 3, limit: 25, total: 42, hasMore: false });
+  });
+
   it('returns only minimum decision points in protected detail', async () => {
     const detail = await getOperationalEvidenceDetail({ projectId: 'p', staffId: 'staff-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z' });
     expect(detail.points).toEqual([{ source: 'attendance_clock_in', ...point }]);

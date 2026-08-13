@@ -143,6 +143,18 @@ describe('evaluateOperationalStatus', () => {
     expect(status(evidence({ asOf: '2026-08-14T12:10:00Z', vehicle: { ...vehicleInside, staleAfterSeconds: 3600, positions } }))).toBe('late');
   });
 
+  it('does not reconstruct prior-arrival continuity across an intervening outside fix', () => {
+    const positions = [
+      { ...insidePoint, recordedAt: '2026-08-14T11:45:00Z', valid: true, inside: true, distanceM: 0, speedKmh: 0, knownSiteId: 'site-1' },
+      { ...insidePoint, recordedAt: '2026-08-14T11:50:00Z', valid: true, inside: false, distanceM: 500, speedKmh: 5, knownSiteId: null },
+      { ...insidePoint, recordedAt: '2026-08-14T11:55:00Z', valid: true, inside: true, distanceM: 0, speedKmh: 0, knownSiteId: 'site-1' },
+      ...['12:00:00', '12:10:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`,
+        valid: true, inside: false, distanceM: 500, speedKmh: 20, knownSiteId: null })),
+    ];
+    expect(status(evidence({ asOf: '2026-08-14T12:10:00Z',
+      vehicle: { ...vehicleInside, staleAfterSeconds: 3600, positions } }))).toBe('late');
+  });
+
   it('returns pending and evidence-quality supporting flags', () => {
     const pendingVehicle = { ...vehicleInside, positions: [vehicleInside.positions[0]!] };
     const result = evaluateOperationalStatus(evidence({ assignment: { ...evidence().assignment, siteGeometryLowConfidence: true }, vehicle: pendingVehicle, sourceWarnings: ['review'] }));

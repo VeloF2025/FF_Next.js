@@ -133,9 +133,9 @@ function evaluateDeparture(context: EvaluationContext): Decision | null {
       ? decision('shift_complete', 'attendance_normal_clock_out') : decision('left_early', 'attendance_early_clock_out');
   }
   const departureStarted = vehicleOutside?.startedAt;
-  const priorInside = departureStarted ? context.usableVehicle.filter((point) => point.inside
-    && Date.parse(point.recordedAt) < Date.parse(departureStarted)) : [];
-  const priorInsideFixes = priorInside.map((point) => ({ recordedAt: point.recordedAt, valid: point.valid,
+  const priorFixes = departureStarted ? context.usableVehicle.filter((point) =>
+    Date.parse(point.recordedAt) < Date.parse(departureStarted)) : [];
+  const priorInsideFixes = priorFixes.map((point) => ({ recordedAt: point.recordedAt, valid: point.valid,
     inside: point.inside, distanceM: point.distanceM, speedKmh: point.speedKmh }));
   const staleAfter = evidence.vehicle.staleAfterSeconds;
   const hadInsideBefore = Boolean(departureStarted && staleAfter !== null && continuousHistoricalInside(priorInsideFixes,

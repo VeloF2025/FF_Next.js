@@ -19,7 +19,14 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
   const rosterQuery = buildAssignmentRosterQuery({ projectId: request.projectId, staffId: request.staffId,
     startDate: request.workDate, endDate: request.workDate, limit: request.limit, offset: request.offset });
   const rosterRows = await query<Row>(rosterQuery.text, rosterQuery.params);
-  const total = rosterRows.length ? asNumber(rosterRows[0]!.total_count) : 0;
+  let total = rosterRows.length ? asNumber(rosterRows[0]!.total_count) : 0;
+  if (!rosterRows.length && request.offset > 0) {
+    const countSource = buildAssignmentRosterQuery({ projectId: request.projectId, staffId: request.staffId,
+      startDate: request.workDate, endDate: request.workDate, limit: 1, offset: 0 });
+    const countRows = await query<Row>(`SELECT COALESCE(MAX(total_count),0)::bigint total_count
+      FROM (${countSource.text}) counted`, countSource.params);
+    total = countRows[0] ? asNumber(countRows[0].total_count) : 0;
+  }
   const schedules = await query<Row>(`WITH ids AS (SELECT unnest($1::uuid[]) staff_id)
     SELECT ids.staff_id,ap.id policy_id,sp.id schedule_policy_id,
       COALESCE(sp.timezone,'Africa/Johannesburg') timezone,ap.start_time::text,ap.end_time::text,

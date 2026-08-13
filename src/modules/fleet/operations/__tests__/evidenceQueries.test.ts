@@ -16,15 +16,31 @@ const roster = (count: number) => Array.from({ length: count }, (_, index) => ({
 }));
 const schedules = (count: number, values: Record<string, unknown> = {}) => Array.from({ length: count }, (_, index) => ({ staff_id: `staff-${index}`, policy_id: 'policy-1', schedule_policy_id: 'schedule-policy-1', timezone: 'Africa/Johannesburg', start_time: '08:00:00', end_time: '17:00:00', grace_minutes: 15, scheduled: true, ...values }));
 
-beforeEach(() => { vi.clearAllMocks(); mocks.loadRule.mockResolvedValue(rule); mocks.stale.mockReturnValue(300); });
+beforeEach(() => {
+  vi.clearAllMocks(); mocks.query.mockReset(); mocks.loadRule.mockReset().mockResolvedValue(rule);
+  mocks.stale.mockReset().mockReturnValue(300);
+});
 
-it.each([1, 100])('loads %i staff with a constant seven set-based queries', async (count) => {
+it.each([1, 100])('loads %i staff with a constant six set-based queries', async (count) => {
   mocks.query.mockResolvedValueOnce(roster(count)).mockResolvedValueOnce(schedules(count)).mockResolvedValueOnce([])
     .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
   await expect(loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: count, offset: 0 }))
     .resolves.toMatchObject({ items: { length: count }, total: count });
   expect(mocks.query).toHaveBeenCalledTimes(6); expect(mocks.loadRule).toHaveBeenCalledTimes(1);
   for (const [sql] of mocks.query.mock.calls) expect(sql).toEqual(expect.any(String));
+});
+
+it('loads the real total for an empty out-of-range page with a parameterized count branch', async () => {
+  mocks.query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total_count: '42' }])
+    .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    .mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+  await expect(loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14',
+    asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 50 }))
+    .resolves.toEqual({ items: [], total: 42 });
+  const [countSql, countParams] = mocks.query.mock.calls[1]!;
+  expect(String(countSql)).toContain('SELECT COALESCE(MAX(total_count),0)::bigint total_count');
+  expect(String(countSql)).not.toContain('project-1');
+  expect(countParams).toContain('project-1');
 });
 
 describe('evidence mapping', () => {
