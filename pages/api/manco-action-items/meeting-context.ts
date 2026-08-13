@@ -3,7 +3,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { resolveActionItemAccess } from '@/lib/actionItems/meetingAccess';
-import { meetingForCaller } from '@/lib/actionItems/meetingFetch';
+import { meetingForCaller, type MeetingContentRow } from '@/lib/actionItems/meetingFetch';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
@@ -17,8 +17,10 @@ interface TranscriptCue {
 interface MeetingContextResponse {
   meeting: {
     id: number;
+    /** Nullable in the table; the UI renders this directly, so it gets a placeholder. */
     title: string;
-    meeting_date: string;
+    /** Nullable in the table — a meeting with no recorded date is real, not an error. */
+    meeting_date: string | null;
   } | null;
   excerpts: TranscriptCue[];
   summary: {
@@ -171,17 +173,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
       return apiResponse.success(res, emptyResponse);
     }
 
-    const meeting = meetingResult[0] as {
-      id: number;
-      title: string;
-      meeting_date: string;
-      raw_transcript: string;
-      summary: {
-        overview?: string;
-        decisions?: string[];
-        action_items?: string[];
-      };
-    };
+    // The shared row type, not a local cast: raw_transcript and summary are both
+    // nullable columns and the previous inline cast declared them non-null, which is
+    // exactly the shape of claim that turns a null into a runtime crash later.
+    const meeting = meetingResult[0] as MeetingContentRow;
 
     // Extract keywords from action item
     const keywords = extractMeetingKeywords(item.action_item);
@@ -193,7 +188,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
     const response: MeetingContextResponse = {
       meeting: {
         id: meeting.id,
-        title: meeting.title,
+        // Both columns are nullable and the previous inline cast declared them
+        // otherwise, so this substitution had no code behind it until the shared row
+        // type made the nulls visible.
+        title: meeting.title ?? '(untitled)',
         meeting_date: meeting.meeting_date,
       },
       excerpts,
@@ -206,6 +204,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
         : null,
     };
 
+    // This response now varies per caller — excerpts for an attendee, the empty shape
+    // for everyone else — so it must never be held in a shared cache. It was
+    // caller-independent before the gate, which is why no header was needed until now.
+    res.setHeader('Cache-Control', 'private, no-store');
     return apiResponse.success(res, response);
   } catch (error: unknown) {
     log.error('Error fetching meeting context', { error });
