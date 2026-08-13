@@ -22,6 +22,19 @@ it.each([1, 100])('loads %i staff with a constant seven set-based queries', asyn
 });
 
 describe('evidence mapping', () => {
+  it('queries only canonical attendance_entries columns from migration 310', async () => {
+    mocks.query.mockResolvedValueOnce(roster(1)).mockResolvedValueOnce(schedules(1)).mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
+    const attendanceSql = String(mocks.query.mock.calls[2]![0]);
+    for (const column of ['ae.work_date', 'ae.clock_in_at', 'ae.clock_out_at', 'ae.clock_in_lat', 'ae.clock_in_lon', 'ae.clock_out_lat', 'ae.clock_out_lon', 'ae.site_geofence_id']) {
+      expect(attendanceSql).toContain(column);
+    }
+    for (const obsolete of ['ae.date=', 'ae.clock_in_time', 'ae.clock_out_time', 'ae.clock_in_latitude', 'ae.clock_in_longitude', 'ae.matched_geofence_id']) {
+      expect(attendanceSql).not.toContain(obsolete);
+    }
+  });
+
   it('maps trackers once per provider/account and bounds GPS history through asOf', async () => {
     mocks.query.mockResolvedValueOnce(roster(2)).mockResolvedValueOnce(schedules(2)).mockResolvedValueOnce([]).mockResolvedValueOnce([
       { staff_id: 'staff-0', assignment_id: 'va-0', vehicle_id: 'vehicle-0', provider: 'netstar', account_ref: 'account' },
@@ -36,11 +49,12 @@ describe('evidence mapping', () => {
 
   it('maps persisted policy grace and a distinct known attendance site', async () => {
     mocks.query.mockResolvedValueOnce(roster(1)).mockResolvedValueOnce(schedules(1, { schedule_policy_id: 'custom-policy', grace_minutes: 27 })).mockResolvedValueOnce([
-      { staff_id: 'staff-0', entry_id: 'entry', clock_in_at: new Date('2026-08-14T06:05:00Z'), latitude: -26.1, longitude: 28.1, site_valid: true, site_inside: false, site_distance_m: 500, known_site_id: 'site-2' },
+      { staff_id: 'staff-0', entry_id: 'entry', clock_in_at: new Date('2026-08-14T06:05:00Z'), clock_out_at: new Date('2026-08-14T15:00:00Z'), latitude: -26.1, longitude: 28.1, out_latitude: -26.2, out_longitude: 28.2, site_valid: true, site_inside: false, site_distance_m: 500, known_site_id: 'site-2' },
     ]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([{ operational_site_id: 'site-1', geometry_valid: true }]);
     const [result] = await loadOperationalEvidence({ projectId: 'project-1', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', limit: 25, offset: 0 });
     expect(result!.schedule).toMatchObject({ policyId: 'custom-policy', graceMinutes: 27 });
     expect(result!.attendance.requiredSite).toMatchObject({ inside: false, distanceM: 500, knownSiteId: 'site-2' });
+    expect(result!.attendance.clockOutPoint).toMatchObject({ latitude: -26.2, longitude: 28.2, recordedAt: '2026-08-14T15:00:00.000Z' });
     expect(String(mocks.query.mock.calls[2]![0])).toContain('candidate.project_id=$4::uuid');
   });
 

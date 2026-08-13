@@ -35,19 +35,20 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
   const staffIds = roster.map((row) => String(row.staff_id));
   const staffSiteIds = roster.map((row) => row.operational_site_id);
   const attendance = await query<Row>(`WITH mapping AS (SELECT * FROM unnest($1::uuid[],$2::uuid[]) m(staff_id,site_id))
-    SELECT ae.id entry_id,ae.staff_id,ae.clock_in_time clock_in_at,
-    ae.clock_out_time clock_out_at,ae.clock_in_latitude latitude,ae.clock_in_longitude longitude,
-    ae.matched_geofence_id matched_site_id,ops.id IS NOT NULL site_valid,
+    SELECT ae.id entry_id,ae.staff_id,ae.clock_in_at,ae.clock_out_at,
+    ae.clock_in_lat latitude,ae.clock_in_lon longitude,
+    ae.clock_out_lat out_latitude,ae.clock_out_lon out_longitude,
+    ae.site_geofence_id matched_site_id,ops.id IS NOT NULL site_valid,
     CASE WHEN aoi.id IS NOT NULL THEN ST_Covers(aoi.geom,point.geom)
       WHEN fal.id IS NOT NULL THEN ST_DWithin(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography,fal.radius_km*1000) END site_inside,
     CASE WHEN aoi.id IS NOT NULL THEN ST_Distance(aoi.geom::geography,point.geom::geography)
       WHEN fal.id IS NOT NULL THEN GREATEST(0,ST_Distance(point.geom::geography,ST_SetSRID(ST_Point(fal.lon,fal.lat),4326)::geography)-fal.radius_km*1000) END site_distance_m,
     known.id known_site_id
-    FROM mapping JOIN attendance_entries ae ON ae.staff_id=mapping.staff_id AND ae.date=$3::date
+    FROM mapping JOIN attendance_entries ae ON ae.staff_id=mapping.staff_id AND ae.work_date=$3::date
     LEFT JOIN fleet_project_operational_sites ops ON ops.id=mapping.site_id AND ops.is_active
     LEFT JOIN fno_atlas_project_aois aoi ON aoi.id=ops.project_aoi_id AND aoi.retired_at IS NULL
     LEFT JOIN fleet_authorized_locations fal ON fal.id=ops.authorized_location_id AND fal.is_active
-    LEFT JOIN LATERAL (SELECT ST_SetSRID(ST_Point(ae.clock_in_longitude,ae.clock_in_latitude),4326) geom) point ON ae.clock_in_latitude IS NOT NULL AND ae.clock_in_longitude IS NOT NULL
+    LEFT JOIN LATERAL (SELECT ST_SetSRID(ST_Point(ae.clock_in_lon,ae.clock_in_lat),4326) geom) point ON ae.clock_in_lat IS NOT NULL AND ae.clock_in_lon IS NOT NULL
     LEFT JOIN LATERAL (SELECT candidate.id FROM fleet_project_operational_sites candidate
       LEFT JOIN fno_atlas_project_aois caoi ON caoi.id=candidate.project_aoi_id AND caoi.retired_at IS NULL
       LEFT JOIN fleet_authorized_locations cfal ON cfal.id=candidate.authorized_location_id AND cfal.is_active
@@ -114,7 +115,15 @@ function mapPerson(row: Row, attendance: Row | undefined, vehicle: Row | undefin
   const base = emptyEvidence(row, rule, request, []); const site = sites.get(String(row.operational_site_id))?.[0];
   base.schedule = toSchedule(row, request.workDate);
   base.assignment.siteGeometryValid = Boolean(site?.geometry_valid ?? row.operational_site_id); base.assignment.siteGeometryLowConfidence = Boolean(site?.low_confidence);
-  if (attendance) { const clockInAt = asString(attendance.clock_in_at); const latitude = attendance.latitude == null ? null : asNumber(attendance.latitude); const longitude = attendance.longitude == null ? null : asNumber(attendance.longitude); base.attendance = { entryId: String(attendance.entry_id), clockInAt, clockOutAt: asString(attendance.clock_out_at), clockInPoint: latitude === null || longitude === null || !clockInAt ? null : { latitude, longitude, recordedAt: clockInAt }, clockOutPoint: null, matchedSiteId: asString(attendance.matched_site_id), requiredSite: attendance.site_valid == null ? null : { valid: Boolean(attendance.site_valid), inside: Boolean(attendance.site_inside), distanceM: attendance.site_distance_m == null ? null : asNumber(attendance.site_distance_m), knownSiteId: asString(attendance.known_site_id) } }; }
+  if (attendance) {
+    const clockInAt = asString(attendance.clock_in_at); const clockOutAt = asString(attendance.clock_out_at);
+    const latitude = attendance.latitude == null ? null : asNumber(attendance.latitude); const longitude = attendance.longitude == null ? null : asNumber(attendance.longitude);
+    const outLatitude = attendance.out_latitude == null ? null : asNumber(attendance.out_latitude); const outLongitude = attendance.out_longitude == null ? null : asNumber(attendance.out_longitude);
+    base.attendance = { entryId: String(attendance.entry_id), clockInAt, clockOutAt,
+      clockInPoint: latitude === null || longitude === null || !clockInAt ? null : { latitude, longitude, recordedAt: clockInAt },
+      clockOutPoint: outLatitude === null || outLongitude === null || !clockOutAt ? null : { latitude: outLatitude, longitude: outLongitude, recordedAt: clockOutAt },
+      matchedSiteId: asString(attendance.matched_site_id), requiredSite: attendance.site_valid == null ? null : { valid: Boolean(attendance.site_valid), inside: Boolean(attendance.site_inside), distanceM: attendance.site_distance_m == null ? null : asNumber(attendance.site_distance_m), knownSiteId: asString(attendance.known_site_id) } };
+  }
   if (vehicle) { const vehicleId = String(vehicle.vehicle_id); const provider = String(vehicle.provider); const account = String(vehicle.account_ref); base.vehicle = { assignmentId: String(vehicle.assignment_id), vehicleId, provider, accountRef: account, staleAfterSeconds: freshness.get(`${provider}\0${account}`)!, positions: (positions.get(vehicleId) ?? []).map(mapPosition) }; }
   return base;
 }
