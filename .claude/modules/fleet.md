@@ -44,6 +44,89 @@ src/modules/fleet/
 | `fleet_gps_jobs` | GPS investigation jobs |
 | `fleet_gps_trips` | Analyzed GPS trips |
 
+## Operational Status Engine (migration 489, PR 4)
+
+Operational status is an explainable, read-time classification of a roster member's assignment,
+Attendance evidence, assigned-vehicle GPS, schedule, and required-site geometry. It is not stored
+as a snapshot and does not create incidents, notifications, payroll outcomes, disciplinary records,
+or driver scores. The implementation lives in `src/modules/fleet/operations/`; protected APIs are
+under `/api/fleet/operations`, and the compact rule editor remains inside the Assignments workspace.
+
+Migration `489_fleet_operational_status_rules.sql` adds `fleet_operational_status_rules` plus
+`fleet.operations-status` and `fleet.operations-rules` permissions. Rule intervals are half-open
+`[effective_from, effective_to)`, cannot overlap, and have exactly one open version. A change locks
+and closes the current version before inserting the next one in the same transaction; existing
+history is never mutated. Activation instants use strict ISO calendar/clock/offset validation at
+both the API and repository boundaries. The initial SAST rule is 60 minutes before/after the shift,
+5-minute arrival and wrong-site confirmation, 10-minute departure confirmation, 10 km approaching
+distance, two approaching readings, 5 km/h minimum motion, and 250 m mismatch tolerance.
+
+### Status vocabulary and precedence
+
+Every evidence package produces one primary status plus zero or more flags and a reason code.
+
+| Status | Meaning |
+|---|---|
+| `off_duty` | Unscheduled without explicit work, or outside the monitoring window. |
+| `scheduled_not_due` | Scheduled, but still before start or inside grace without confirmed arrival. |
+| `unassigned` | No required operational site can be resolved. |
+| `unverifiable` | Schedule/rule/source/geometry is unusable, assignment is ambiguous, or expected vehicle evidence is unavailable. |
+| `late` | Arrival remains unconfirmed after grace. |
+| `approaching` | Fresh vehicle fixes show the configured decreasing-distance moving trend. |
+| `attendance_confirmed` | Attendance clock-in is inside the required site; vehicle confirmation is absent. |
+| `vehicle_on_site_driver_unconfirmed` | Vehicle dwell is confirmed inside, but GPS alone cannot prove driver presence. |
+| `on_site_dual` | Attendance and vehicle dwell both confirm the required site. |
+| `wrong_site` | Attendance or continuous vehicle evidence confirms a different known site. |
+| `evidence_mismatch` | Attendance and vehicle identify different sites and exceed mismatch tolerance. |
+| `left_early` | Clock-out or confirmed departure occurs before scheduled end. |
+| `shift_complete` | Clock-out is at/after scheduled end, or confirmed post-shift vehicle departure follows confirmed arrival. |
+
+Decision precedence is: schedule/source/assignment/geometry gates, then cross-source mismatch and
+wrong-site confirmation, then departure/completion, then arrival/approach/due/late. Supporting flags
+retain material context: GPS stale/missing, Attendance missing, no vehicle, ambiguous assignment,
+low-confidence geometry, outside-window evaluation, pending dwell/wrong-site/departure, vehicle-only
+presence, and source errors. One malformed person's mapped evidence becomes that person's
+`unverifiable`; a top-level batch-load failure remains an error and is never an empty success.
+
+### Evidence and time rules
+
+| Evidence | Confirmed result | Guardrail |
+|---|---|---|
+| Attendance only | Inside clock-in confirms `attendance_confirmed`; a sustained known wrong-site clock-in can confirm `wrong_site`. | Missing/invalid coordinates never become presence. A closed entry proceeds to departure/completion. |
+| Vehicle only | Continuous inside dwell can produce `vehicle_on_site_driver_unconfirmed`; trend can produce `approaching`; continuous known-site outside evidence can produce `wrong_site`. | Always carries `vehicle_driver_presence_unconfirmed` when vehicle location is used as presence; a lone/stale/future/invalid fix cannot confirm continuity. |
+| Attendance + vehicle | Agreement produces `on_site_dual`; distinct known sites beyond tolerance produce `evidence_mismatch`. | Vehicle GPS never overrides or impersonates the driver's Attendance evidence. |
+| Neither / broken source | Before due: `scheduled_not_due`; after grace: `late`; an expected but unavailable vehicle feed: `unverifiable`. | Absence of evidence is not success. |
+
+The effective rule and attendance schedule create `monitoringStart -> scheduledStart -> graceEnd ->
+scheduledEnd -> monitoringEnd` in `Africa/Johannesburg`. Evaluation outside that bounded window is
+`off_duty`; GPS history is loaded only from the earliest monitoring/confirmation lookback through
+the requested `asOf`. Roster history is limited to 31 days. Tracker freshness is not redefined here:
+the batch loader calls the shared `staleAfterSecondsFor(provider, account)` once per distinct feed,
+preserving the fast Cartrack REST versus slower portal-account thresholds.
+
+Polygon containment uses PostGIS `ST_Covers`, so boundary points count as inside; distances use
+geography casts and metres. Authorized-location circles use their configured radius. Low-confidence
+AOIs remain usable but flagged. Arrival, wrong-site, and departure require continuous fresh sequences;
+departure additionally requires a prior confirmed inside sequence.
+
+### Privacy, APIs, and scope
+
+- `GET /api/fleet/operations/status` returns coordinate-free roster summaries only.
+- `GET /api/fleet/operations/status/[staffId]` returns only the minimum decision points: Attendance
+  clock-in/out when present and the latest vehicle point, never the full GPS history.
+- `GET/POST /api/fleet/operations/rules` lists history or creates a new version; the audit actor is
+  always the authenticated session user, never a request-body value.
+- All reads require `fleet.operations-status:view`. A project manager is limited to their own active
+  project. Cross-project access requires admin/super-admin or an active explicit user grant. Generic
+  manager role alone is insufficient. Home-site/unassigned detail has no project and therefore
+  requires oversight. Rule POST additionally requires `fleet.operations-rules:edit` and oversight.
+
+PR 4 stops at calculation, protected APIs, rule history, and the compact Assignments rule dialog.
+PR 5 owns operational dashboard/map presentation and incident/notification workflows. PR 6 owns
+driver-facing confirmation/input and later workflow integrations. Do not pull dashboards, maps,
+alerts, persisted status snapshots, payroll/discipline effects, or driver-input behavior backward
+into this engine.
+
 ## Tracking (Live GPS)
 
 Vehicle position history lands in `fleet_vehicle_positions` via two provider-blind ingestion
