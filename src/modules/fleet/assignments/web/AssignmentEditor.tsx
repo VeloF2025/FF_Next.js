@@ -1,19 +1,28 @@
-import { useState } from 'react';
-import type { AssignmentProposalRow } from '../types';
+import { useMemo, useState } from 'react';
+import type { AssignmentOptions } from '../rosterQueries';
+import type { AssignmentKind, AssignmentProposalRow } from '../types';
 import { assignmentApi, AssignmentApiError, type AssignmentPreview } from './assignmentApi';
 import { ConflictReview } from './ConflictReview';
 
-export function AssignmentEditor({ rows, onCommitted }: { rows: AssignmentProposalRow[]; onCommitted: () => Promise<void> | void }) {
-  const [preview, setPreview] = useState<AssignmentPreview | null>(null);
-  const [confirmedWarnings, setConfirmedWarnings] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const blocking = preview?.conflicts.some((item) => item.level === 'blocking') ?? false;
-  const warnings = preview?.conflicts.some((item) => item.level === 'warning') ?? false;
-  async function runPreview() { try { setError(null); setPreview(await assignmentApi.preview(rows)); setConfirmedWarnings(false); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Preview failed'); } }
-  async function commit() { if (!preview) return; try { setError(null); await assignmentApi.commit(rows, preview, confirmedWarnings); setPreview(null); await onCommitted(); } catch (caught) { if (caught instanceof AssignmentApiError && caught.status === 409) setPreview(null); setError(caught instanceof Error ? caught.message : 'Commit failed'); } }
-  return <section className="space-y-3" aria-label="Assignment editor">
-    <button type="button" onClick={() => void runPreview()} disabled={!rows.length}>Preview assignments</button>
-    {preview && <><ConflictReview conflicts={preview.conflicts} />{warnings && <label><input type="checkbox" checked={confirmedWarnings} onChange={(event) => setConfirmedWarnings(event.target.checked)} /> Confirm warnings</label>}<button type="button" onClick={() => void commit()} disabled={blocking || (warnings && !confirmedWarnings)}>Commit assignments</button></>}
+export function AssignmentEditor({ options, projectId, siteId, from, to, onCommitted }: { options: AssignmentOptions; projectId: string; siteId: string; from: string; to: string; onCommitted: () => Promise<void> | void }) {
+  const [staffIds, setStaffIds] = useState<string[]>([]); const [vehicleAssignmentId, setVehicle] = useState('');
+  const [kind, setKind] = useState<AssignmentKind>('roster'); const [reason, setReason] = useState('');
+  const [preview, setPreview] = useState<AssignmentPreview | null>(null); const [confirmed, setConfirmed] = useState(false);
+  const [pending, setPending] = useState(false); const [error, setError] = useState<string | null>(null);
+  const rows = useMemo<AssignmentProposalRow[]>(() => staffIds.map((staffId) => ({ staffId, projectId, operationalSiteId: siteId, startDate: kind === 'daily_override' ? from : from, endDate: kind === 'daily_override' ? from : to, assignmentKind: kind, vehicleAssignmentId: vehicleAssignmentId || null, reason: kind === 'daily_override' ? reason.trim() || null : null })), [staffIds, projectId, siteId, from, to, kind, vehicleAssignmentId, reason]);
+  const blocking = preview?.conflicts.some((item) => item.level === 'blocking') ?? false; const warnings = preview?.conflicts.some((item) => item.level === 'warning') ?? false;
+  function toggleStaff(id: string) { setPreview(null); setStaffIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]); }
+  async function runPreview() { setPending(true); try { setError(null); setPreview(await assignmentApi.preview(rows)); setConfirmed(false); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Preview failed'); } finally { setPending(false); } }
+  async function commit() { if (!preview || pending) return; setPending(true); try { setError(null); await assignmentApi.commit(rows, preview, confirmed); setPreview(null); setStaffIds([]); await onCommitted(); } catch (caught) { if (caught instanceof AssignmentApiError) { if (caught.status === 409) setPreview(caught.conflicts.length ? { ...preview, conflicts: caught.conflicts } : null); } setError(caught instanceof Error ? caught.message : 'Commit failed'); } finally { setPending(false); } }
+  const configured = Boolean(projectId && siteId && from && to);
+  return <section className="space-y-3" aria-label="Assignment editor"><h2>Build assignment batch</h2>
+    {!siteId && <p className="text-amber-300">Configure or select an operational site before assigning staff.</p>}
+    <div className="flex flex-wrap gap-3">{options.staff.map((staff) => <label key={staff.id}><input type="checkbox" checked={staffIds.includes(staff.id)} onChange={() => toggleStaff(staff.id)} /> {staff.label}</label>)}</div>
+    <select aria-label="Vehicle" value={vehicleAssignmentId} onChange={(event) => { setVehicle(event.target.value); setPreview(null); }}><option value="">No vehicle</option>{options.vehicles.map((vehicle) => <option key={vehicle.vehicleAssignmentId ?? vehicle.id} value={vehicle.vehicleAssignmentId}>{vehicle.label}</option>)}</select>
+    <select aria-label="Assignment kind" value={kind} onChange={(event) => { setKind(event.target.value as AssignmentKind); setPreview(null); }}><option value="roster">Roster</option><option value="daily_override">Daily override</option></select>
+    {kind === 'daily_override' && <input aria-label="Override reason" value={reason} onChange={(event) => { setReason(event.target.value); setPreview(null); }} />}
+    <button type="button" onClick={() => void runPreview()} disabled={pending || !configured || !rows.length || (kind === 'daily_override' && !reason.trim())}>Preview assignments</button>
+    {preview && <><ConflictReview conflicts={preview.conflicts} />{preview.excludedStaffIds.length > 0 && <p>{preview.excludedStaffIds.length} inactive staff excluded</p>}{warnings && <label><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /> Confirm warnings</label>}<button type="button" onClick={() => void commit()} disabled={pending || blocking || (warnings && !confirmed)}>Commit assignments</button></>}
     {error && <p role="alert" className="text-red-300">{error}</p>}
   </section>;
 }

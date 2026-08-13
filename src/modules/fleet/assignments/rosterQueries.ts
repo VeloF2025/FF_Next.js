@@ -51,13 +51,14 @@ export interface AssignmentRosterResult {
   total: number;
 }
 
-type OptionRow = { id: string; label: string; projectId?: string; vehicleAssignmentId?: string };
+export type AssignmentOption = { id: string; label: string; projectId?: string; vehicleAssignmentId?: string };
 
 export interface AssignmentOptions {
-  staff: OptionRow[];
-  projects: OptionRow[];
-  sites: OptionRow[];
-  vehicles: OptionRow[];
+  staff: AssignmentOption[];
+  teams: AssignmentOption[];
+  projects: AssignmentOption[];
+  sites: AssignmentOption[];
+  vehicles: AssignmentOption[];
 }
 
 function pagination(filters: AssignmentRosterFilters): { limit: number; offset: number } {
@@ -120,10 +121,10 @@ export async function listAssignmentOptions(
   const projectIds = filters.projectId
     ? authorizedProjectIds.filter((id) => id === filters.projectId)
     : authorizedProjectIds;
-  if (!projectIds.length) return { staff: [], projects: [], sites: [], vehicles: [] };
+  if (!projectIds.length) return { staff: [], teams: [], projects: [], sites: [], vehicles: [] };
 
   const rows = await query<{
-    staff: OptionRow[] | null; projects: OptionRow[] | null; sites: OptionRow[] | null; vehicles: OptionRow[] | null;
+    staff: AssignmentOption[] | null; teams: AssignmentOption[] | null; projects: AssignmentOption[] | null; sites: AssignmentOption[] | null; vehicles: AssignmentOption[] | null;
   }>(`
     SELECT
       COALESCE((SELECT jsonb_agg(value ORDER BY value->>'label') FROM (
@@ -131,6 +132,10 @@ export async function listAssignmentOptions(
         FROM staff s
         WHERE LOWER(COALESCE(s.status, '')) = 'active' AND COALESCE(s.is_active, true)
       ) staff_rows), '[]'::jsonb) AS staff,
+      COALESCE((SELECT jsonb_agg(value ORDER BY value->>'label') FROM (
+        SELECT jsonb_build_object('id', t.id, 'label', t.team_name) AS value
+        FROM teams t WHERE t.is_active = true AND t.team_type <> 'contractor'
+      ) team_rows), '[]'::jsonb) AS teams,
       COALESCE((SELECT jsonb_agg(value ORDER BY value->>'label') FROM (
         SELECT jsonb_build_object('id', p.id, 'label', p.project_name) AS value
         FROM projects p
@@ -156,5 +161,5 @@ export async function listAssignmentOptions(
           AND ($3::date IS NULL OR COALESCE(fvpa.returned_date, '9999-12-31'::date) >= $3::date)
       ) vehicle_rows), '[]'::jsonb) AS vehicles`, [projectIds, filters.startDate ?? null, filters.endDate ?? null]);
   const result = rows[0];
-  return { staff: result?.staff ?? [], projects: result?.projects ?? [], sites: result?.sites ?? [], vehicles: result?.vehicles ?? [] };
+  return { staff: result?.staff ?? [], teams: result?.teams ?? [], projects: result?.projects ?? [], sites: result?.sites ?? [], vehicles: result?.vehicles ?? [] };
 }

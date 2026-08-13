@@ -29,7 +29,7 @@ describe('listAssignmentRoster', () => {
 
 describe('listAssignmentOptions', () => {
   it('returns no options without authorized projects', async () => {
-    await expect(listAssignmentOptions({}, [])).resolves.toEqual({ staff: [], projects: [], sites: [], vehicles: [] });
+    await expect(listAssignmentOptions({}, [])).resolves.toEqual({ staff: [], teams: [], projects: [], sites: [], vehicles: [] });
     expect(mocks.query).not.toHaveBeenCalled();
   });
 
