@@ -84,7 +84,11 @@ test("sets core.hooksPath and reads it back", () => {
   withFixture((root) => {
     const r = install(root);
     assert.equal(r.status, 0, describe(r));
-    assert.equal(gitOk(root, ["config", "--get", "core.hooksPath"]), "scripts/githooks");
+    assert.equal(
+      gitOk(root, ["config", "--get", "core.hooksPath"]),
+      join(root, "scripts", "githooks"),
+      "must be an ABSOLUTE path at the main worktree",
+    );
   });
 });
 
@@ -125,10 +129,56 @@ test("installing FROM a worktree configures the shared repo", () => {
     try {
       const r = install(root, wt);
       assert.equal(r.status, 0, describe(r));
-      assert.equal(gitOk(root, ["config", "--get", "core.hooksPath"]), "scripts/githooks");
+      assert.equal(
+      gitOk(root, ["config", "--get", "core.hooksPath"]),
+      join(root, "scripts", "githooks"),
+      "must be an ABSOLUTE path at the main worktree",
+    );
     } finally {
       gitOk(root, ["worktree", "remove", "--force", wt]);
     }
+  });
+});
+
+test("hooks fire from a worktree whose own branch LACKS scripts/githooks", () => {
+  withFixture((root) => {
+    // The gap that shipped: core.hooksPath is ONE value for the repo, but a
+    // RELATIVE path resolves per checkout. A worktree on a branch predating the
+    // hooks had no scripts/githooks, so git found nothing and SKIPPED the hooks
+    // silently. Measured on the real machine: 42 of 43 worktrees affected.
+    //
+    // Every other test installs from a checkout that HAS the directory, which is
+    // why none of them caught it.
+    gitOk(root, ["branch", "no-hooks-branch", "HEAD"]);
+    install(root);
+    const wt = join(root, "..", `hookspath-nohooks-${process.pid}`);
+    gitOk(root, ["worktree", "add", "--quiet", wt, "no-hooks-branch"]);
+    try {
+      // Make the worktree's own copy absent, as an older branch would be.
+      rmSync(join(wt, "scripts", "githooks"), { recursive: true, force: true });
+      writeFileSync(join(wt, "h.txt"), "z\n", "utf8");
+      gitOk(wt, ["add", "h.txt"]);
+      const c = git(wt, ["commit", "-m", "should still be blocked"]);
+      assert.notEqual(c.status, 0, `hook must fire despite the local dir being absent: ${describe(c)}`);
+      assert.match(c.stderr, /RAN-pre-commit/);
+    } finally {
+      gitOk(root, ["worktree", "remove", "--force", wt]);
+    }
+  });
+});
+
+test("refuses when the MAIN worktree lacks the hooks directory", () => {
+  withFixture((root) => {
+    // Setting an absolute path that does not exist would be worse than the
+    // relative form: it disables the hooks EVERYWHERE rather than only in stale
+    // worktrees. This is the state the real machine was in — main worktree
+    // behind master, no scripts/githooks in it.
+    rmSync(join(root, "scripts", "githooks"), { recursive: true, force: true });
+    const r = install(root);
+    assert.notEqual(r.status, 0, `must refuse: ${describe(r)}`);
+    assert.match(r.stderr, /does not exist/);
+    const cfg = git(root, ["config", "--get", "core.hooksPath"]);
+    assert.notEqual(cfg.status, 0, "config must not be set to a missing path");
   });
 });
 

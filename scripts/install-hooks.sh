@@ -4,8 +4,10 @@
 # =============================================================================
 # Usage: bash scripts/install-hooks.sh
 #
-# Sets `core.hooksPath` to scripts/githooks, where the hooks are tracked files.
-# Git then runs them in place. Nothing is copied.
+# Sets `core.hooksPath` to an ABSOLUTE path at the main worktree's
+# scripts/githooks, where the hooks are tracked files. Git runs them in place;
+# nothing is copied. Absolute because the config is one value for the whole
+# repository while a relative path resolves per checkout -- see the note below.
 # =============================================================================
 # This used to COPY the hook scripts into .git/hooks. That design was the source
 # of the bug it was eventually rewritten to prevent: on one workstation the
@@ -50,10 +52,41 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
   exit 1
 fi
 
-REPO_ROOT=$(git rev-parse --show-toplevel)
-if [ ! -d "$REPO_ROOT/$HOOKS_PATH" ]; then
-  echo -e "${RED}🚫 $HOOKS_PATH does not exist in this checkout.${NC}" >&2
-  echo    "   Expected the tracked hooks to live there." >&2
+# The config is stored ONCE for the whole repository, but a RELATIVE
+# core.hooksPath resolves against each checkout's own root. In a repo with many
+# worktrees that is a silent hole: a worktree on a branch predating these hooks
+# has no scripts/githooks, so git finds nothing there and SKIPS the hooks without
+# a word. Measured on this machine at the time of writing: 42 of 43 worktrees
+# lacked the directory, i.e. the gate would have been off in all of them while
+# the installer reported success.
+#
+# So the value is ABSOLUTE, and anchored to the MAIN worktree rather than to
+# whichever checkout happens to run this. Worktrees are created and deleted
+# constantly; the main worktree is the one stable location. Every checkout then
+# runs the same real directory regardless of its branch.
+#
+# The trade-off, stated plainly: a worktree on an old branch runs the MAIN tree's
+# hooks, not its own branch's. For a security gate that is the better direction —
+# the newest gate everywhere beats each branch's historical one.
+MAIN_WORKTREE=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')
+if [ -z "$MAIN_WORKTREE" ]; then
+  # No worktree list (very old git, or an odd setup): fall back to this checkout.
+  MAIN_WORKTREE=$(git rev-parse --show-toplevel)
+fi
+HOOKS_ABS="$MAIN_WORKTREE/$HOOKS_PATH"
+
+# Verify the TARGET, not the current checkout. Setting a path that does not
+# exist is strictly worse than the relative form it replaces — it would disable
+# the hooks everywhere instead of only in stale worktrees. Fail closed and say
+# exactly how to fix it.
+if [ ! -d "$HOOKS_ABS" ]; then
+  echo -e "${RED}🚫 $HOOKS_ABS does not exist.${NC}" >&2
+  echo    "   core.hooksPath is one value for the whole repository, so it must" >&2
+  echo    "   point at a directory that is really there. The main worktree" >&2
+  echo    "   ($MAIN_WORKTREE) appears to be on a commit predating these hooks." >&2
+  echo    "" >&2
+  echo    "   Bring it up to date, then re-run:" >&2
+  echo    "     git -C $MAIN_WORKTREE checkout master && git -C $MAIN_WORKTREE pull" >&2
   exit 1
 fi
 
@@ -109,7 +142,7 @@ if [ "$GIT_MAJOR" -lt 2 ] || { [ "$GIT_MAJOR" -eq 2 ] && [ "$GIT_MINOR" -lt 9 ];
   exit 1
 fi
 
-echo "📎 Pointing git at $HOOKS_PATH ..."
+echo "📎 Pointing git at $HOOKS_ABS ..."
 
 # Report what is being replaced. A pre-existing core.hooksPath is a higher-signal
 # conflict than a leftover file in .git/hooks, and overwriting it silently is the
@@ -117,19 +150,19 @@ echo "📎 Pointing git at $HOOKS_PATH ..."
 # than in a file. `--show-origin` names which file it came from, so a value
 # inherited from ~/.gitconfig is distinguishable from a local one.
 PRIOR=$(git config --get core.hooksPath 2>/dev/null || echo '')
-if [ -n "$PRIOR" ] && [ "$PRIOR" != "$HOOKS_PATH" ]; then
+if [ -n "$PRIOR" ] && [ "$PRIOR" != "$HOOKS_ABS" ]; then
   echo -e "${YELLOW}⚠️  core.hooksPath was already set, and is being replaced:${NC}"
   echo    "     was: $PRIOR"
-  echo    "     now: $HOOKS_PATH"
+  echo    "     now: $HOOKS_ABS"
   # `--show-origin` prints "<origin>\t<value>", so cut at the TAB. `awk '{print
   # $1}'` split on whitespace and truncated any config path containing a space.
   ORIGIN=$(git config --show-origin --get core.hooksPath 2>/dev/null | cut -f1 || echo '')
   [ -n "$ORIGIN" ] && echo "     previous value came from: $ORIGIN"
   echo -e "${YELLOW}   If those hooks are still wanted, they need to move into${NC}"
-  echo -e "${YELLOW}   $HOOKS_PATH — git reads ONE hooks directory, not both.${NC}"
+  echo -e "${YELLOW}   $HOOKS_ABS — git reads ONE hooks directory, not both.${NC}"
 fi
 
-if ! git config core.hooksPath "$HOOKS_PATH"; then
+if ! git config core.hooksPath "$HOOKS_ABS"; then
   echo -e "${RED}🚫 Could not set core.hooksPath.${NC}" >&2
   exit 1
 fi
@@ -139,7 +172,7 @@ fi
 # or a filesystem without the exec bit will not have it.
 MISSING_EXEC=""
 for h in pre-commit pre-push; do
-  if [ ! -x "$REPO_ROOT/$HOOKS_PATH/$h" ]; then
+  if [ ! -x "$HOOKS_ABS/$h" ]; then
     MISSING_EXEC="$MISSING_EXEC $h"
   fi
 done
@@ -147,12 +180,12 @@ done
 # Read the value back. `git config` can succeed against a config this repo does
 # not actually use -- confirm the effective value is the one intended.
 EFFECTIVE=$(git config --get core.hooksPath || echo '<unset>')
-if [ "$EFFECTIVE" != "$HOOKS_PATH" ]; then
-  echo -e "${RED}🚫 core.hooksPath reads back as '$EFFECTIVE', not '$HOOKS_PATH'.${NC}" >&2
+if [ "$EFFECTIVE" != "$HOOKS_ABS" ]; then
+  echo -e "${RED}🚫 core.hooksPath reads back as '$EFFECTIVE', not '$HOOKS_ABS'.${NC}" >&2
   exit 1
 fi
 
-echo -e "${GREEN}✅ core.hooksPath = $HOOKS_PATH${NC}"
+echo -e "${GREEN}✅ core.hooksPath = $HOOKS_ABS${NC}"
 echo "   pre-commit: secret scanner"
 echo "   pre-push:   master protection + secret scan + auth isolation"
 
@@ -160,7 +193,7 @@ if [ -n "$MISSING_EXEC" ]; then
   echo ""
   echo -e "${RED}🚫 not executable:$MISSING_EXEC${NC}" >&2
   echo    "   Git SKIPS a non-executable hook without saying so, so these would" >&2
-  echo    "   never run. Fix with: chmod +x $HOOKS_PATH/*" >&2
+  echo    "   never run. Fix with: chmod +x $HOOKS_ABS/*" >&2
   exit 1
 fi
 
@@ -187,12 +220,12 @@ if [ -n "$COMMON_DIR" ] && [ -d "$COMMON_DIR/hooks" ]; then
     echo ""
     echo -e "${YELLOW}Note: executable hooks remain in $COMMON_DIR/hooks:${NC}"
     printf '%s\n' "$STALE" | sed 's/^/  /'
-    echo -e "${YELLOW}git now reads ONLY $HOOKS_PATH, so none of them run.${NC}"
+    echo -e "${YELLOW}git now reads ONLY $HOOKS_ABS, so none of them run.${NC}"
     if [ -n "$OTHERS" ]; then
       echo -e "${RED}   Including hook(s) this repo does NOT ship:${NC}"
       printf '%s\n' "$OTHERS" | sed 's/^/     /'
       echo -e "${RED}   Those were yours. They have stopped firing. To keep them, move${NC}"
-      echo -e "${RED}   them into $HOOKS_PATH — git reads one directory, not both.${NC}"
+      echo -e "${RED}   them into $HOOKS_ABS — git reads one directory, not both.${NC}"
     fi
     echo -e "${YELLOW}   Nothing was deleted; one may be the only copy of a local guard.${NC}"
   fi
