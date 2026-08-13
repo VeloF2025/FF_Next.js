@@ -114,6 +114,7 @@ export function meetingAttendance(
   alias = 'm',
 ): string {
   if (access.isOwner) return 'TRUE';
+  if (!access.email) return 'FALSE';
   return `(${participantMatch(alias, push(params, access.email))})`;
 }
 
@@ -153,6 +154,13 @@ export function actionItemVisibility(
   options: VisibilityOptions = {},
 ): string {
   if (access.isOwner) return 'TRUE';
+  // A non-owner with no email cannot be scoped, and binding '' does not mean "match
+  // nothing" — 1,625 of 4,054 meetings carry a participant whose email is the empty
+  // string, so `LOWER(p_acc->>'email') = ''` matches a third of the table. The callers
+  // all reject an empty email before reaching here; the guard belongs in the predicate
+  // anyway, because the caller that forgets is the one that ships the leak. This is the
+  // same fail-open shape this module criticises pages/api/meetings.ts for having on name.
+  if (!access.email) return 'FALSE';
 
   const email = push(params, access.email);
 

@@ -211,11 +211,13 @@ async def find_meetings(
 
     Two ways to state something false from this result:
 
-    - The list is scoped to meetings where YOUR OWN email address appears in the
-      participant list. It is not a view of the organisation's meetings. An empty result
-      means you were not recorded in any matching meeting — never report it as "there were
-      no meetings about X", because meetings you did not attend are invisible here and
-      their absence is not evidence.
+    - For almost every caller the list is scoped to meetings where YOUR OWN email address
+      appears in the participant list, so it is not a view of the organisation's meetings.
+      An empty result means you were not recorded in any matching meeting — never report it
+      as "there were no meetings about X", because meetings you did not attend are
+      invisible here and their absence is not evidence. (One owner identity is exempt and
+      sees everything; the response says which case applies, so read its caveats rather
+      than assuming either.)
     - `hasTranscript: false` means nothing was captured, so no question about what was
       SAID in that meeting can be answered from this system. Do not infer content from the
       title; a title is what someone typed into a calendar invite.

@@ -99,10 +99,26 @@ describe('action item visibility (real Postgres)', () => {
         ('${ALICE}', 'Alice', 'A'),
         ('${BOB}',   'Bob',   'B');
 
-      INSERT INTO ai_vis.meetings (id, participants, title, meeting_date, raw_transcript, source) VALUES
-        (1, '[{"email":"alice@example.com","name":"Alice A"}]'::jsonb, 'Alice handover', '2026-07-10', 'said things', 'teams'),
-        (2, '[{"email":"bob@example.com","name":""}]'::jsonb,          'Bob meeting',    '2026-07-20 14:30', NULL,          'teams'),
-        (3, NULL,                                                       'No participants','2026-07-30', NULL,          'teams');
+      CREATE TABLE ai_vis.meeting_transcripts (meeting_id INT);
+
+      INSERT INTO ai_vis.meetings (id, participants, title, meeting_date, raw_transcript, transcript_url, summary, duration, source) VALUES
+        (1, '[{"email":"alice@example.com","name":"Alice A"},{"email":"x@example.com"}]'::jsonb,
+            'Alice handover',  '2026-07-10 09:00', 'said things', NULL,        '{"k":1}'::jsonb, 30, 'teams'),
+        -- An empty-string participant email: 1,625 live meetings carry one. Binding '' as
+        -- the caller's email must NOT match it.
+        (2, '[{"email":"bob@example.com","name":""},{"email":""}]'::jsonb,
+            'Bob meeting',     '2026-07-20 14:30', NULL,          NULL,        NULL,             60, 'teams'),
+        (3, NULL,
+            'No participants', '2026-07-30 08:00', NULL,          NULL,        NULL,             15, 'teams'),
+        -- transcript_url but no raw_transcript: hasTranscript must still be true.
+        (4, '[{"email":"alice@example.com"}]'::jsonb,
+            'Url only',        '2026-07-25 10:00', NULL,          'http://t',  'null'::jsonb,    45, 'teams'),
+        -- held 22:40 UTC on the 28th = 00:40 SAST on the 29th.
+        (5, '[{"email":"alice@example.com"}]'::jsonb,
+            'Late evening',    '2026-07-28 22:40', NULL,          NULL,        NULL,             20, 'teams'),
+        -- Participant email stored mixed-case: the LOWER() on both sides is load-bearing.
+        (6, '[{"email":"Carol@Example.COM"}]'::jsonb,
+            'Mixed case',      '2026-07-05 11:00', NULL,          NULL,        NULL,             10, 'teams');
 
       INSERT INTO ai_vis.action_items (id, meeting_id, assignee_email, assigned_to_user_id, source_type) VALUES
         ('alice-attended',    1,    NULL,                NULL,      'meeting'),
@@ -263,17 +279,20 @@ describe('action item visibility (real Postgres)', () => {
   // midnight fixture cannot tell the two apart and the until-day test would pass
   // against the broken comparison.
   describe('meeting search (find_meetings)', () => {
-    async function found(access: ActionItemAccess, query = {}): Promise<string[]> {
+    async function report(access: ActionItemAccess, query = {}) {
       const parsed = parseMeetingFilter(query);
       if ('error' in parsed) throw new Error(parsed.error);
       const { sql, params } = meetingsQuery(parsed.filter, access);
       const { rows } = await pool.query(sql, params);
-      return shapeMeetings(rows as never, parsed.filter, access.isOwner)
-        .meetings.map((m) => m.title).sort();
+      return shapeMeetings(rows as never, parsed.filter, access.isOwner);
+    }
+
+    async function found(access: ActionItemAccess, query = {}): Promise<string[]> {
+      return (await report(access, query)).meetings.map((m) => m.title).sort();
     }
 
     it('returns only the meetings the caller attended', async () => {
-      expect(await found(alice)).toEqual(['Alice handover']);
+      expect(await found(alice)).toEqual(['Alice handover', 'Late evening', 'Url only']);
       expect(await found(bob)).toEqual(['Bob meeting']);
     });
 
@@ -292,7 +311,21 @@ describe('action item visibility (real Postgres)', () => {
     });
 
     it('gives the owner every meeting', async () => {
-      expect(await found(owner)).toHaveLength(3);
+      expect(await found(owner)).toHaveLength(6);
+    });
+
+    it('matches a mixed-case participant email', async () => {
+      // Dropping LOWER() from either side leaves this the only failing test.
+      const carol: ActionItemAccess = { isOwner: false, email: 'carol@example.com', userId: '' };
+      expect(await found(carol)).toEqual(['Mixed case']);
+    });
+
+    it('reports hasTranscript FALSE for a meeting with nothing captured', async () => {
+      // The projection test above only covers a meeting that HAS one, so forcing the flag
+      // to TRUE would pass it. This is the assertion that bites.
+      const late = (await report(alice, { search: 'Late evening' })).meetings[0];
+      expect(late.hasTranscript).toBe(false);
+      expect(late.hasSummary).toBe(false);
     });
 
     it('narrows on title search without widening the gate', async () => {
@@ -306,8 +339,9 @@ describe('action item visibility (real Postgres)', () => {
     });
 
     it('filters on transcript presence', async () => {
-      expect(await found(alice, { withTranscript: 'true' })).toEqual(['Alice handover']);
-      expect(await found(alice, { withTranscript: 'false' })).toEqual([]);
+      // 'Url only' has a transcript_url and no raw_transcript — it counts as having one.
+      expect(await found(alice, { withTranscript: 'true' })).toEqual(['Alice handover', 'Url only']);
+      expect(await found(alice, { withTranscript: 'false' })).toEqual(['Late evening']);
     });
 
     it('includes the whole of the until day rather than its midnight', async () => {
@@ -315,6 +349,90 @@ describe('action item visibility (real Postgres)', () => {
       // everything after 00:00.
       expect(await found(owner, { since: '2026-07-20', until: '2026-07-20' }))
         .toEqual(['Bob meeting']);
+    });
+
+    // The row SET being right says nothing about the row CONTENTS. Mapping only titles
+    // left every projected column — the flags, the counts, the ordering and the LIMIT —
+    // unverified, so corrupting any of them passed both suites.
+    it('projects each field correctly, not just the right rows', async () => {
+      const { meetings } = await report(owner, { search: 'Alice handover' });
+      expect(meetings).toEqual([
+        {
+          id: 1,
+          title: 'Alice handover',
+          date: '2026-07-10',
+          durationMinutes: 30,
+          source: 'teams',
+          participants: 2,
+          hasTranscript: true,
+          hasSummary: true,
+          actionItems: 1,
+        },
+      ]);
+    });
+
+    it('counts action items PER MEETING, not globally', async () => {
+      // Dropping the correlation makes every meeting report the table-wide total.
+      const byTitle = Object.fromEntries(
+        (await report(owner)).meetings.map((m) => [m.title, m.actionItems]),
+      );
+      expect(byTitle['Alice handover']).toBe(1);
+      expect(byTitle['Bob meeting']).toBe(4);
+      expect(byTitle['Url only']).toBe(0);
+    });
+
+    it('counts participants per meeting', async () => {
+      const byTitle = Object.fromEntries(
+        (await report(owner)).meetings.map((m) => [m.title, m.participants]),
+      );
+      expect(byTitle['Alice handover']).toBe(2);
+      expect(byTitle['No participants']).toBe(0);
+    });
+
+    it('treats a transcript_url as a transcript, as the rest of the app does', async () => {
+      const url = (await report(alice, { search: 'Url only' })).meetings[0];
+      expect(url.hasTranscript).toBe(true);
+      // ...and jsonb 'null' is not a summary.
+      expect(url.hasSummary).toBe(false);
+      expect(await found(alice, { withTranscript: 'true' })).toContain('Url only');
+    });
+
+    it('orders most recent first', async () => {
+      const titles = (await report(owner)).meetings.map((m) => m.title);
+      expect(titles[0]).toBe('No participants'); // 30 July, the latest
+      expect(titles[titles.length - 1]).toBe('Mixed case'); // 5 July, earliest
+    });
+
+    it('applies the LIMIT', async () => {
+      expect((await report(owner, { limit: '2' })).meetings).toHaveLength(2);
+    });
+
+    it('reports the total BEFORE the limit, so the truncation caveat is true', async () => {
+      const r = await report(owner, { limit: '2' });
+      expect(r.meetings).toHaveLength(2);
+      expect(r.matched.value).toBe(6);
+      expect(r.caveats.join(' ')).toContain('2 most recent of 6');
+    });
+
+    it('does not claim the store is empty when a filter simply matched nothing', async () => {
+      const r = await report(owner, { search: 'nothing matches this' });
+      expect(r.matched.value).toBe(0);
+      expect(r.matched.storeEmpty).toBe(false);
+    });
+
+    it('dates a late-evening meeting by its South African day', async () => {
+      // Held 22:40 UTC on the 28th = 00:40 SAST on the 29th.
+      const late = (await report(alice, { search: 'Late evening' })).meetings[0];
+      expect(late.date).toBe('2026-07-29');
+      expect(await found(alice, { since: '2026-07-29', until: '2026-07-29' }))
+        .toContain('Late evening');
+    });
+
+    it('fails CLOSED for an identity with no email', async () => {
+      // '' is not "match nothing": 1,625 live meetings carry a participant whose email is
+      // the empty string, so binding '' would match a third of the table.
+      const noEmail: ActionItemAccess = { isOwner: false, email: '', userId: '' };
+      expect(await found(noEmail)).toEqual([]);
     });
   });
 });

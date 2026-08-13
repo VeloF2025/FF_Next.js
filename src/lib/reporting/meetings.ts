@@ -20,7 +20,21 @@
  */
 
 import { meetingAttendance, type ActionItemAccess } from '@/lib/actionItems/meetingAccess';
-import { measure, type Measure } from './coverage';
+import { type Measure } from './coverage';
+
+/**
+ * "A transcript exists for this meeting", defined as pages/api/meetings.ts and
+ * pages/api/meetings/[id]/transcript.ts define it — not `raw_transcript IS NOT NULL`
+ * alone. One live meeting has a transcript_url and no raw_transcript; under the narrower
+ * test the tool would report hasTranscript:false, and its description states flatly that
+ * false means nothing was captured and no question about what was said can be answered.
+ */
+const TRANSCRIPT_EXISTS = `(m.raw_transcript IS NOT NULL
+        OR m.transcript_url IS NOT NULL
+        OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = m.id))`;
+
+/** The meeting instant as a South African wall-clock timestamp. See the filter comments. */
+const SAST_DATE = `(m.meeting_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg')`;
 
 /** Hard ceiling. A model asking for "all meetings" should get a bounded, honest answer. */
 export const MAX_MEETINGS = 50;
@@ -93,8 +107,12 @@ export function parseMeetingFilter(
   // silent limit of 1 reads to a model as "there is only one meeting".
   let limit = MAX_MEETINGS;
   if (rawLimit) {
-    if (!/^\d+$/.test(rawLimit)) return { error: 'limit must be a positive integer' };
-    limit = Math.min(MAX_MEETINGS, Math.max(1, Number(rawLimit)));
+    // `0` passes the digit test, and Math.max(1, 0) would turn it into exactly one
+    // meeting — the same "there is only one meeting" falsehood the default guards against.
+    if (!/^\d+$/.test(rawLimit) || Number(rawLimit) < 1) {
+      return { error: 'limit must be a positive integer' };
+    }
+    limit = Math.min(MAX_MEETINGS, Number(rawLimit));
   }
 
   if (withTranscript && !['true', 'false'].includes(withTranscript)) {
@@ -126,21 +144,28 @@ export function meetingsQuery(
   if (filter.search) {
     where.push(`m.title ILIKE ${push(`%${escapeLike(filter.search)}%`)}`);
   }
-  if (filter.since) where.push(`m.meeting_date >= ${push(filter.since)}::date`);
+  // meeting_date is `timestamp without time zone` holding UTC (measured: Teams rows lag
+  // created_at by ~+0.6h, which only works out if the stored value is UTC). A bare
+  // `>= '2026-07-01'::date` therefore cuts at 02:00 SAST, and two live meetings held late
+  // in the SA evening fall into the previous UTC day. Convert to SAST so "since 1 July"
+  // means the South African 1 July, matching how the rendered date is formatted below.
+  if (filter.since) where.push(`${SAST_DATE} >= ${push(filter.since)}::date`);
   // The whole of `until` day, not midnight at its start.
-  if (filter.until) where.push(`m.meeting_date < (${push(filter.until)}::date + 1)`);
-  if (filter.withTranscript === true) where.push(`m.raw_transcript IS NOT NULL`);
-  if (filter.withTranscript === false) where.push(`m.raw_transcript IS NULL`);
+  if (filter.until) where.push(`${SAST_DATE} < (${push(filter.until)}::date + 1)`);
+  if (filter.withTranscript === true) where.push(TRANSCRIPT_EXISTS);
+  if (filter.withTranscript === false) where.push(`NOT ${TRANSCRIPT_EXISTS}`);
 
   const scope = where.join('\n      AND ');
 
   return {
     sql: `
       WITH scoped AS (
-        SELECT m.id, m.title, m.meeting_date, m.duration, m.source,
+        SELECT m.id, m.title, ${SAST_DATE} AS meeting_date, m.duration, m.source,
                jsonb_array_length(COALESCE(m.participants, '[]'::jsonb)) AS participant_count,
-               (m.raw_transcript IS NOT NULL) AS has_transcript,
-               (m.summary IS NOT NULL) AS has_summary
+               ${TRANSCRIPT_EXISTS} AS has_transcript,
+               -- jsonb 'null' is NOT SQL NULL: one live meeting stores 'null'::jsonb and
+               -- would otherwise report hasSummary true with nothing in it.
+               (m.summary IS NOT NULL AND jsonb_typeof(m.summary) <> 'null') AS has_summary
         FROM meetings m
         WHERE ${scope}
       )
@@ -149,7 +174,7 @@ export function meetingsQuery(
              (SELECT count(*) FROM scoped)::int AS total_matched
       FROM scoped s
       ORDER BY s.meeting_date DESC NULLS LAST
-      LIMIT ${filter.limit}`,
+      LIMIT ${push(filter.limit)}`,
     params,
   };
 }
@@ -164,8 +189,8 @@ export function shapeMeetings(
   const meetings = rows.map((r) => ({
     id: r.id,
     title: r.title ?? '(untitled)',
-    // A DATE/timestamp rendered with toISOString() can move a meeting a day earlier in
-    // SAST. Format from the local parts instead.
+    // The SQL already converted to SAST, so this only has to avoid toISOString(), which
+    // would shift the value again by the runtime's own offset.
     date: r.meeting_date ? formatDate(r.meeting_date) : null,
     durationMinutes: r.duration ?? null,
     source: r.source,
@@ -197,7 +222,22 @@ export function shapeMeetings(
     );
   }
 
-  return { meetings, matched: measure(total), caveats };
+  // NOT measure(total): measure() sets storeEmpty when the count is 0, and Measure defines
+  // storeEmpty as "this store holds nothing at all". A filtered search that simply matched
+  // nothing would then tell a model the meetings store is empty while it holds 4,053 —
+  // exactly the false statement this reporting layer exists to prevent. A filtered zero is
+  // a zero about the FILTER; only an unfiltered zero says anything about the store.
+  // ...and only the OWNER's unfiltered zero can say it, because every other caller sees a
+  // slice. A user who attended no meetings gets zero from a store holding 4,055 of them;
+  // reporting storeEmpty there tells a model the organisation has never held a meeting.
+  const unfiltered = !filter.search && !filter.since && !filter.until
+    && filter.withTranscript === undefined;
+
+  return {
+    meetings,
+    matched: { value: total, storeEmpty: total === 0 && unfiltered && isOwner },
+    caveats,
+  };
 }
 
 function formatDate(value: Date | string): string {

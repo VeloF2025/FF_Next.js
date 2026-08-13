@@ -63,6 +63,12 @@ describe('parseMeetingFilter', () => {
     expect('error' in parseMeetingFilter({ limit: '-5' })).toBe(true);
   });
 
+  it('rejects limit=0 rather than turning it into one meeting', () => {
+    // '0' passes the digit test; Math.max(1, 0) would yield exactly one meeting, which is
+    // the "there is only one meeting" falsehood the default exists to avoid.
+    expect('error' in parseMeetingFilter({ limit: '0' })).toBe(true);
+  });
+
   it('distinguishes withTranscript=false from unset', () => {
     expect(filter({ withTranscript: 'false' }).withTranscript).toBe(false);
     expect(filter({ withTranscript: 'true' }).withTranscript).toBe(true);
@@ -86,6 +92,31 @@ describe('meetingsQuery', () => {
     expect(where).toContain('jsonb_array_elements');
   });
 
+  it('fails closed for an identity with no email', () => {
+    // Binding '' is not "match nothing": 1,625 of 4,054 live meetings carry a participant
+    // whose email is the empty string.
+    const { sql } = meetingsQuery(filter(), { isOwner: false, email: '', userId: '' });
+    expect(sql).toContain('FALSE');
+    expect(sql).not.toContain('jsonb_array_elements');
+  });
+
+  it('binds every value including the limit', () => {
+    const { sql, params } = meetingsQuery(filter({ limit: '7' }), USER);
+    expect(sql).toMatch(/LIMIT \$\d+/);
+    expect(params).toContain(7);
+  });
+
+  it('counts a transcript the way the rest of the app does', () => {
+    const { sql } = meetingsQuery(filter(), USER);
+    expect(sql).toContain('transcript_url IS NOT NULL');
+    expect(sql).toContain('meeting_transcripts');
+  });
+
+  it('filters on the South African day, not the UTC one', () => {
+    const { sql } = meetingsQuery(filter({ since: '2026-07-01' }), USER);
+    expect(sql).toContain("AT TIME ZONE 'Africa/Johannesburg'");
+  });
+
   it('binds the email rather than interpolating it', () => {
     const { sql, params } = meetingsQuery(filter(), USER);
     expect(sql).not.toContain('johan@velocityfibre.co.za');
@@ -100,10 +131,14 @@ describe('meetingsQuery', () => {
     expect(sql).not.toContain("displayName");
   });
 
-  it('gives the owner TRUE and binds nothing for the gate', () => {
+  it('gives the owner TRUE and binds nothing FOR THE GATE', () => {
+    // The limit is bound too, so "no params at all" is the wrong assertion — it would
+    // start failing for a reason that has nothing to do with the gate. What matters is
+    // that no identity value is bound and no participant sub-select is emitted.
     const { sql, params } = meetingsQuery(filter(), OWNER);
     expect(sql).toContain('WHERE TRUE');
-    expect(params).toHaveLength(0);
+    expect(sql).not.toContain('jsonb_array_elements');
+    expect(params).toEqual([MAX_MEETINGS]);
   });
 
   it('escapes LIKE metacharacters in the title search', () => {
@@ -171,5 +206,21 @@ describe('shapeMeetings', () => {
     const report = shapeMeetings([], filter(), false);
     expect(report.meetings).toEqual([]);
     expect(report.matched.value).toBe(0);
+  });
+
+  it('does not claim the store is empty when a FILTER matched nothing', () => {
+    // storeEmpty means "this store holds nothing at all". A search that matched nothing
+    // says something about the search, not about the store.
+    expect(shapeMeetings([], filter({ search: 'x' }), false).matched.storeEmpty).toBe(false);
+    expect(shapeMeetings([], filter({ since: '2026-01-01' }), false).matched.storeEmpty).toBe(false);
+  });
+
+  it('does not claim the store is empty for a user who simply attended nothing', () => {
+    // A scoped caller's zero is a fact about their slice. Only the owner sees the store.
+    expect(shapeMeetings([], filter(), false).matched.storeEmpty).toBe(false);
+  });
+
+  it('does say the store is empty for the owner with no filter and no rows', () => {
+    expect(shapeMeetings([], filter(), true).matched.storeEmpty).toBe(true);
   });
 });
