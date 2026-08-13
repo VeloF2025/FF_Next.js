@@ -203,21 +203,28 @@ export async function processPicking(req: NextApiRequest, res: NextApiResponse) 
         // "stock_movements" does not exist` on every issue, 500-ing the whole
         // process step. Removed (the field_stock_movements row is the audit record).
       } else {
-        // Non-issue path (transfer, scrap, receipt, return) — original behavior
+        // Non-issue path (transfer, scrap, receipt, return).
         for (const line of lines) {
+          // Lot-scoped decrement: only the line's lot (or the bulk/null-lot row),
+          // matching the availability check and the custody path. Without the lot
+          // filter this subtracted the quantity from EVERY lot row of the item at
+          // the source — over-decrementing a lot-tracked item with multiple lots.
           await txn.query(
             `UPDATE stock_quants SET quantity = quantity - $1,
              last_movement_date = NOW(), updated_at = NOW()
-             WHERE stock_item_id = $2 AND location_id = $3`,
-            [line.planned_quantity, line.stock_item_id, sourceLocationId],
+             WHERE stock_item_id = $2 AND location_id = $3
+               AND COALESCE(lot_number, '') = COALESCE($4, '')`,
+            [line.planned_quantity, line.stock_item_id, sourceLocationId, line.lot_number ?? null],
           );
+          // Credit the destination carrying the SAME lot, so a lot-tracked transfer
+          // preserves the lot rather than merging into the bulk/null-lot row.
           await txn.query(
-            `INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
-             VALUES ($1, $2, $3, NOW())
+            `INSERT INTO stock_quants (stock_item_id, location_id, lot_number, quantity, last_movement_date)
+             VALUES ($1, $2, $4, $3, NOW())
              ON CONFLICT (stock_item_id, location_id, COALESCE(lot_number, ''))
              DO UPDATE SET quantity = stock_quants.quantity + $3,
                last_movement_date = NOW(), updated_at = NOW()`,
-            [line.stock_item_id, destinationLocationId, line.planned_quantity],
+            [line.stock_item_id, destinationLocationId, line.planned_quantity, line.lot_number ?? null],
           );
           if (Array.isArray(line.serial_ids) && line.serial_ids.length > 0) {
             // Metadata first; promoteSerial routes status through mig 387 triggers.
