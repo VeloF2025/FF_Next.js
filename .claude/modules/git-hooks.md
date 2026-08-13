@@ -91,7 +91,7 @@ An earlier version of the script's header claimed the opposite — that the only
 way left to lose the hooks was "a deliberate act with a visible cause". That was
 wrong, and a reviewer disproved it by moving a directory.
 
-## Resolving the anchor worktree — three traps, all measured
+## Resolving the anchor worktree — four traps, all measured
 
 The resolution loop in the installer looks over-built. Each guard is a defect
 that was reproduced:
@@ -109,7 +109,16 @@ that was reproduced:
    (`git -C <git-dir> checkout master`) that itself fails with "this operation
    must be run in a work tree". Each candidate must therefore be confirmed as the
    **root of a real working tree** before being accepted.
-3. **A failed install must not leave config behind.** The exec-bit check
+3. **In a pure bare-hub layout the anchor is creation-order accident.** With a
+   bare repo and two or more live worktrees there is no "primary" checkout, so
+   the loop takes the first listed one. Installing from `bob-wt` anchors to
+   `alice-wt` — hooks fire, but on a directory someone else owns, and if alice
+   removes her worktree during ordinary cleanup everyone's hooks go dark with
+   bob having no idea hers was load-bearing. The installer prints the resolved
+   path, which is the only signal. FF_Next.js does not use this layout (normal
+   main checkout plus linked worktrees), so this is a documented limitation
+   rather than a fixed defect.
+4. **A failed install must not leave config behind.** The exec-bit check
    originally ran *after* the config write: the script printed the green
    `core.hooksPath = ...` banner, then the red "not executable" line, exited 1 —
    and left the config pointing at hooks git would silently skip. An empty
@@ -150,7 +159,7 @@ anything. Bounding the input is what makes the comparison safe to run.
 
 ## Tests
 
-`scripts/install-hooks.test.mjs` (24 cases) and `scripts/pre-push.test.mjs`
+`scripts/install-hooks.test.mjs` (25 cases) and `scripts/pre-push.test.mjs`
 (17 cases), both run in CI. The install tests prove hooks genuinely **fire** —
 by making a real commit and asserting it is blocked — rather than that a config
 value looks right. Cases exist for the spaced path, the bare-repo layout, the

@@ -269,6 +269,52 @@ test("anchors to a real working tree in a BARE repo + worktrees layout", () => {
   }, "src");
 });
 
+test("resolves inside a SUBMODULE, not to its .git/modules gitdir", () => {
+  withFixture((root) => {
+    // `git worktree list --porcelain` reports .git/modules/<name> inside a
+    // submodule. That path never has scripts/githooks, so the installer refused
+    // forever and printed a remedy that itself fails "must be run in a work tree".
+    //
+    // What rejects it is the ROOT-EQUALITY half of the candidate check: `git -C
+    // <gitdir> rev-parse --show-toplevel` SUCCEEDS there (git resolves
+    // core.worktree from the gitdir) and returns the real checkout, so a
+    // non-empty result is not enough — the two strings have to match. Weakening
+    // that check to just `[ -n "$cand_top" ]` looks like a harmless
+    // simplification and reintroduces the bug; without this test all 24 cases
+    // stayed green while it did.
+    const outer = join(dirname(root), "outer");
+    mkdirSync(outer, { recursive: true });
+    gitOk(outer, ["init", "--quiet"]);
+    gitOk(outer, ["config", "user.email", "ci@example.com"]);
+    gitOk(outer, ["config", "user.name", "ci"]);
+    writeFileSync(join(outer, "README.md"), "outer\n", "utf8");
+    gitOk(outer, ["add", "-A"]);
+    gitOk(outer, ["commit", "--quiet", "--no-verify", "-m", "outer baseline"]);
+    // file:// submodules are refused by default since the CVE-2022-39253 fix.
+    gitOk(outer, ["-c", "protocol.file.allow=always", "submodule", "add", "--quiet", root, "sub"]);
+
+    const sub = join(outer, "sub");
+    // `submodule add` clones, so the submodule inherits no identity either.
+    gitOk(sub, ["config", "user.email", "ci@example.com"]);
+    gitOk(sub, ["config", "user.name", "ci"]);
+    const listed = gitOk(sub, ["worktree", "list", "--porcelain"]).split("\n")[0];
+    assert.ok(
+      listed.includes(".git/modules/"),
+      `precondition: porcelain must report the gitdir, got: ${listed}`,
+    );
+
+    const r = install(sub);
+    assert.equal(r.status, 0, `must resolve to the real checkout: ${describe(r)}`);
+    assert.equal(hooksPathOf(sub), join(sub, "scripts", "githooks"));
+
+    writeFileSync(join(sub, "m.txt"), "x\n", "utf8");
+    gitOk(sub, ["add", "m.txt"]);
+    const c = git(sub, ["commit", "-m", "blocked"]);
+    assert.notEqual(c.status, 0, `hook must fire in the submodule: ${describe(c)}`);
+    assert.match(c.stderr, /RAN-pre-commit/);
+  }, "subsrc");
+});
+
 test("refuses when MAIN lacks the hooks but the CURRENT worktree has them", () => {
   withFixture((root) => {
     // The mutant this exists to kill: validate the CWD-relative directory rather
