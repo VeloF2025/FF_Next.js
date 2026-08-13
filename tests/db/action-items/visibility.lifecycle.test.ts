@@ -26,6 +26,7 @@ import {
   type ActionItemAccess,
 } from '@/lib/actionItems/meetingAccess';
 import { buildActionItemListQuery } from '@/lib/actionItems/listQuery';
+import { meetingsQuery, parseMeetingFilter, shapeMeetings } from '@/lib/reporting/meetings';
 
 const ALICE = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
@@ -58,7 +59,11 @@ describe('action item visibility (real Postgres)', () => {
         participants   JSONB,
         title          TEXT,
         meeting_date   TIMESTAMP,
-        transcript_url TEXT
+        transcript_url TEXT,
+        raw_transcript TEXT,
+        summary        JSONB,
+        duration       INT,
+        source         TEXT
       );
 
       CREATE TABLE ai_vis.users (
@@ -94,10 +99,10 @@ describe('action item visibility (real Postgres)', () => {
         ('${ALICE}', 'Alice', 'A'),
         ('${BOB}',   'Bob',   'B');
 
-      INSERT INTO ai_vis.meetings (id, participants, title) VALUES
-        (1, '[{"email":"alice@example.com"}]'::jsonb, 'Alice meeting'),
-        (2, '[{"email":"bob@example.com"}]'::jsonb,   'Bob meeting'),
-        (3, NULL,                                      'No participants');
+      INSERT INTO ai_vis.meetings (id, participants, title, meeting_date, raw_transcript, source) VALUES
+        (1, '[{"email":"alice@example.com","name":"Alice A"}]'::jsonb, 'Alice handover', '2026-07-10', 'said things', 'teams'),
+        (2, '[{"email":"bob@example.com","name":""}]'::jsonb,          'Bob meeting',    '2026-07-20 14:30', NULL,          'teams'),
+        (3, NULL,                                                       'No participants','2026-07-30', NULL,          'teams');
 
       INSERT INTO ai_vis.action_items (id, meeting_id, assignee_email, assigned_to_user_id, source_type) VALUES
         ('alice-attended',    1,    NULL,                NULL,      'meeting'),
@@ -250,6 +255,66 @@ describe('action item visibility (real Postgres)', () => {
     it('cannot be widened by SQL injection through a filter', async () => {
       const injected = await listFor(alice, { source_type: "x' OR '1'='1" });
       expect(injected).toEqual([]);
+    });
+  });
+
+  // NOTE: meeting 2 is at 14:30, not midnight. A meeting at exactly 00:00 satisfies
+  // `meeting_date <= until::date` as well as the correct `< until::date + 1`, so a
+  // midnight fixture cannot tell the two apart and the until-day test would pass
+  // against the broken comparison.
+  describe('meeting search (find_meetings)', () => {
+    async function found(access: ActionItemAccess, query = {}): Promise<string[]> {
+      const parsed = parseMeetingFilter(query);
+      if ('error' in parsed) throw new Error(parsed.error);
+      const { sql, params } = meetingsQuery(parsed.filter, access);
+      const { rows } = await pool.query(sql, params);
+      return shapeMeetings(rows as never, parsed.filter, access.isOwner)
+        .meetings.map((m) => m.title).sort();
+    }
+
+    it('returns only the meetings the caller attended', async () => {
+      expect(await found(alice)).toEqual(['Alice handover']);
+      expect(await found(bob)).toEqual(['Bob meeting']);
+    });
+
+    it('does NOT grant access on a name match, unlike /api/meetings', async () => {
+      // pages/api/meetings.ts also matches p->>'name' against the caller's display name.
+      // Bob's participant record carries name:"" — under that rule a user whose computed
+      // name is '' (the fallback when first/last are absent) matches it. 1,613 real
+      // meetings carry such a participant.
+      const nameless: ActionItemAccess = { isOwner: false, email: 'nobody@example.com', userId: '' };
+      expect(await found(nameless)).toEqual([]);
+    });
+
+    it('withholds a meeting whose participants are NULL from everyone but the owner', async () => {
+      expect(await found(alice)).not.toContain('No participants');
+      expect(await found(owner)).toContain('No participants');
+    });
+
+    it('gives the owner every meeting', async () => {
+      expect(await found(owner)).toHaveLength(3);
+    });
+
+    it('narrows on title search without widening the gate', async () => {
+      expect(await found(alice, { search: 'handover' })).toEqual(['Alice handover']);
+      // Bob attended no meeting titled "handover" — the search must not reach Alice's.
+      expect(await found(bob, { search: 'handover' })).toEqual([]);
+    });
+
+    it('treats a bare % as a literal, not a wildcard', async () => {
+      expect(await found(alice, { search: '%' })).toEqual([]);
+    });
+
+    it('filters on transcript presence', async () => {
+      expect(await found(alice, { withTranscript: 'true' })).toEqual(['Alice handover']);
+      expect(await found(alice, { withTranscript: 'false' })).toEqual([]);
+    });
+
+    it('includes the whole of the until day rather than its midnight', async () => {
+      // A meeting at any time on the until date must be included; `<= date` would drop
+      // everything after 00:00.
+      expect(await found(owner, { since: '2026-07-20', until: '2026-07-20' }))
+        .toEqual(['Bob meeting']);
     });
   });
 });

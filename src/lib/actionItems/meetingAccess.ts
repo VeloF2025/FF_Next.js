@@ -82,6 +82,41 @@ function push(params: unknown[], value: unknown): string {
  * with no assignee_email fails closed, and `COALESCE(participants, '[]')` makes a meeting
  * with no participant list unmatchable rather than an error.
  */
+
+/**
+ * "This meetings row lists the caller as a participant."
+ *
+ * The single definition of attendance. Both the action-item predicate (which reaches a
+ * meeting through `meeting_id`) and the meeting search (which is already looking at the
+ * meetings row) compose it, so there is one place where the match is specified and one
+ * place to change it.
+ *
+ * Email only. `pages/api/meetings.ts` additionally matches `p->>'name'` and
+ * `p->>'displayName'` against the caller's display name; that is a string, not an
+ * identity, and it fails OPEN — `user.name` falls back to '' and 1,613 meetings carry a
+ * participant whose name is the empty string.
+ */
+function participantMatch(alias: string, emailPlaceholder: string): string {
+  return `EXISTS (
+            SELECT 1 FROM jsonb_array_elements(COALESCE(${alias}.participants, '[]'::jsonb)) AS p_acc
+            WHERE LOWER(p_acc->>'email') = ${emailPlaceholder}
+          )`;
+}
+
+/**
+ * Attendance applied directly to a `meetings` row — for queries whose FROM is already
+ * `meetings`. Returns the literal TRUE for the owner, for the same reason
+ * actionItemVisibility does.
+ */
+export function meetingAttendance(
+  access: ActionItemAccess,
+  params: unknown[],
+  alias = 'm',
+): string {
+  if (access.isOwner) return 'TRUE';
+  return `(${participantMatch(alias, push(params, access.email))})`;
+}
+
 export interface VisibilityOptions {
   /**
    * Authorize a WRITE (PATCH/DELETE) rather than a read.
@@ -124,10 +159,7 @@ export function actionItemVisibility(
   const attended = `EXISTS (
         SELECT 1 FROM meetings m_acc
         WHERE m_acc.id = ${alias}.meeting_id
-          AND EXISTS (
-            SELECT 1 FROM jsonb_array_elements(COALESCE(m_acc.participants, '[]'::jsonb)) AS p_acc
-            WHERE LOWER(p_acc->>'email') = ${email}
-          )
+          AND ${participantMatch('m_acc', email)}
       )`;
 
   // Attendance alone — no assignment arms, no no-meeting arm. See meetingsOnly.

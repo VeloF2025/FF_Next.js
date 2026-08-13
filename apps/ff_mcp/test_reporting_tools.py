@@ -47,6 +47,7 @@ async def test_every_reporting_tool_body_actually_runs(reporting, monkeypatch):
         mod.get_activation_progress("Etwatwa"),
         mod.get_procurement_summary("Etwatwa"),
         mod.get_action_items(),
+        mod.find_meetings(),
     ):
         assert await call == '{"success":true}'
         assert seen["path"].startswith("/api/reporting/")
@@ -117,3 +118,51 @@ async def test_action_items_description_warns_against_the_wrong_reading(svc):
     # The warning itself must survive, not merely the words "project" and "due".
     assert "do not offer" in desc
     assert "project_id is populated on a" in desc
+
+
+@pytest.mark.asyncio
+async def test_find_meetings_sends_only_the_filters_given(reporting, monkeypatch):
+    mod, _ = reporting
+    seen = _capture(mod, monkeypatch)
+
+    await mod.find_meetings(search="handover", since="2026-01-01")
+
+    assert seen["path"] == "/api/reporting/meetings"
+    parsed = urllib.parse.parse_qs(seen["query"])
+    assert parsed == {"search": ["handover"], "since": ["2026-01-01"], "limit": ["50"]}
+    assert "None" not in seen["query"]
+
+
+@pytest.mark.asyncio
+async def test_find_meetings_distinguishes_false_from_unset(reporting, monkeypatch):
+    """with_transcript=False is a real filter; only None means "do not filter"."""
+    mod, _ = reporting
+    seen = _capture(mod, monkeypatch)
+
+    await mod.find_meetings(with_transcript=False)
+    assert urllib.parse.parse_qs(seen["query"])["withTranscript"] == ["false"]
+
+    await mod.find_meetings(with_transcript=True)
+    assert urllib.parse.parse_qs(seen["query"])["withTranscript"] == ["true"]
+
+    await mod.find_meetings()
+    assert "withTranscript" not in seen["query"]
+
+
+@pytest.mark.asyncio
+async def test_find_meetings_description_stops_the_absence_inference(svc):
+    """The failure this description exists to prevent.
+
+    The result is scoped to the caller's own attendance. A model that reads an empty list
+    as "there were no meetings about X" would be stating something false about the
+    organisation on the strength of one person's calendar.
+    """
+    server, _ = svc
+    tools = {t.name: t.description.lower() for t in await server.mcp.list_tools()}
+    desc = tools["find_meetings"]
+
+    assert "you attended" in desc
+    assert "absence is not evidence" in desc
+    assert "index, not contents" in desc
+    # Must not promise transcript search — search is title-only.
+    assert "title only" in desc
