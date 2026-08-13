@@ -55,8 +55,8 @@ under `/api/fleet/operations`, and the compact rule editor remains inside the As
 Migration `489_fleet_operational_status_rules.sql` adds `fleet_operational_status_rules` plus
 `fleet.operations-status` and `fleet.operations-rules` permissions. Rule intervals are half-open
 `[effective_from, effective_to)`, cannot overlap, and have exactly one open version. A change locks
-and closes the current version before inserting the next one in the same transaction; existing
-history is never mutated. Activation instants use strict ISO calendar/clock/offset validation at
+and closes the current interval before inserting the next version in the same transaction; threshold
+values in history are never overwritten. Activation instants use strict ISO calendar/clock/offset validation at
 both the API and repository boundaries. The initial SAST rule is 60 minutes before/after the shift,
 5-minute arrival and wrong-site confirmation, 10-minute departure confirmation, 10 km approaching
 distance, two approaching readings, 5 km/h minimum motion, and 250 m mismatch tolerance.
@@ -116,10 +116,11 @@ departure additionally requires a prior confirmed inside sequence.
   clock-in/out when present and the latest vehicle point, never the full GPS history.
 - `GET/POST /api/fleet/operations/rules` lists history or creates a new version; the audit actor is
   always the authenticated session user, never a request-body value.
-- All reads require `fleet.operations-status:view`. A project manager is limited to their own active
-  project. Cross-project access requires admin/super-admin or an active explicit user grant. Generic
-  manager role alone is insufficient. Home-site/unassigned detail has no project and therefore
-  requires oversight. Rule POST additionally requires `fleet.operations-rules:edit` and oversight.
+- Status roster and detail reads require `fleet.operations-status:view`; rule-history GET requires
+  `fleet.operations-rules:view`. A project manager is limited to their own active project.
+  Cross-project access requires admin/super-admin or an active explicit user grant. Generic manager
+  role alone is insufficient. Home-site/unassigned detail has no project and therefore requires
+  oversight. Rule POST additionally requires `fleet.operations-rules:edit` and oversight.
 
 PR 4 stops at calculation, protected APIs, rule history, and the compact Assignments rule dialog.
 PR 5 owns operational dashboard/map presentation and incident/notification workflows. PR 6 owns

@@ -9,4 +9,3 @@ DELETE FROM access_permissions
  WHERE key IN ('fleet.operations-status', 'fleet.operations-rules');
 DELETE FROM schema_migrations
  WHERE filename = '489_fleet_operational_status_rules.sql';
-
