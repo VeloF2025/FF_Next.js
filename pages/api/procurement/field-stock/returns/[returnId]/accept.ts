@@ -47,6 +47,19 @@ export interface AcceptActor {
   staffId: string;
 }
 
+/**
+ * Raised when the in-transaction FOR UPDATE re-check finds the return is no
+ * longer 'inspected' (a concurrent accept won the race). Typed (not a bare
+ * Error message) for a reliable instanceof in the catch — matches the
+ * GrnConflictError pattern in grn-confirm.ts.
+ */
+class ReturnConflictError extends Error {
+  constructor(readonly currentStatus: string) {
+    super('RETURN_ALREADY_PROCESSED');
+    this.name = 'ReturnConflictError';
+  }
+}
+
 /** Core accept logic reused by both auth tiers. */
 export async function acceptReturn(
   req: NextApiRequest,
@@ -120,8 +133,7 @@ export async function acceptReturn(
       const locked = await txn.query<{ status: string }>(
         `SELECT status FROM stock_returns WHERE id = $1 FOR UPDATE`, [returnId]);
       if (!locked[0] || locked[0].status !== 'inspected') {
-        throw Object.assign(new Error('RETURN_ALREADY_PROCESSED'), {
-          currentStatus: locked[0]?.status ?? 'missing' });
+        throw new ReturnConflictError(locked[0]?.status ?? 'missing');
       }
 
       for (const line of lines) {
@@ -258,11 +270,12 @@ export async function acceptReturn(
       log.warn('returns.accept.lifecycle_rejected', { error: (error as Error).message, returnId }, 'field-stock');
       return void apiResponse.validationError(res, { serial: (error as Error).message });
     }
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg === 'RETURN_ALREADY_PROCESSED') {
-      log.warn('returns.accept.already_processed', { returnId }, 'field-stock');
+    if (error instanceof ReturnConflictError) {
+      log.warn('returns.accept.already_processed',
+        { returnId, currentStatus: error.currentStatus }, 'field-stock');
       return void apiResponse.conflict(res, 'This return has already been processed');
     }
+    const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes('supplier_return is not yet supported')) {
       return void apiResponse.validationError(res, { disposition: msg });
     }
