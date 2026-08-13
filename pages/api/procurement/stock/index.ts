@@ -66,6 +66,26 @@ export default withAuth(withErrorHandler(async (
         LIMIT 500
       `;
 
+      // Accurate catalog-wide totals, computed over the FULL table (not the
+      // capped 500-row page above) so Total Items / Value / low / out-of-stock
+      // don't silently undercount once the catalog exceeds the display limit.
+      const summaryRows = await sql`
+        SELECT
+          COUNT(*)::int AS total_items,
+          COALESCE(SUM(qty_available * standard_cost), 0) AS total_value,
+          COUNT(*) FILTER (
+            WHERE qty_available > 0 AND min_stock_level > 0 AND qty_available <= min_stock_level
+          )::int AS low_stock,
+          COUNT(*) FILTER (WHERE qty_available = 0)::int AS out_of_stock
+        FROM stock_items
+      `;
+      const summary = {
+        totalItems: Number(summaryRows[0]?.total_items ?? 0),
+        totalValue: Number(summaryRows[0]?.total_value ?? 0),
+        lowStock: Number(summaryRows[0]?.low_stock ?? 0),
+        outOfStock: Number(summaryRows[0]?.out_of_stock ?? 0),
+      };
+
       // Get recent movements with item details
       try {
         movements = await sql`
@@ -152,8 +172,11 @@ export default withAuth(withErrorHandler(async (
         totalMovements: movements.length,
       };
 
-      res.status(200).json({ 
+      res.status(200).json({
         items: transformedItems,
+        // Catalog-wide accurate totals (over the full table); `total` etc. below
+        // reflect only the returned page and are kept for backward compatibility.
+        summary,
         total: transformedItems.length,
         lowStock: lowStockItems.length,
         outOfStock: outOfStockItems.length,
