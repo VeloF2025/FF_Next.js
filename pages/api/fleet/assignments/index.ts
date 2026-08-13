@@ -38,6 +38,7 @@ function validIsoDate(value: string | undefined): boolean {
 function parseFilters(query: NextApiRequest['query']): AssignmentRosterFilters | string {
   const projectId = stringQuery(query.projectId);
   const staffId = stringQuery(query.staffId);
+  const siteId = stringQuery(query.siteId);
   const from = stringQuery(query.from);
   const to = stringQuery(query.to);
   const source = stringQuery(query.source);
@@ -46,6 +47,7 @@ function parseFilters(query: NextApiRequest['query']): AssignmentRosterFilters |
 
   if (!projectId || !isValidUUID(projectId)) return 'projectId must be a valid UUID';
   if (staffId !== undefined && !isValidUUID(staffId)) return 'staffId must be a valid UUID';
+  if (siteId !== undefined && !isValidUUID(siteId)) return 'siteId must be a valid UUID';
   if (from !== undefined && !validIsoDate(from)) return 'from must be a valid ISO date';
   if (to !== undefined && !validIsoDate(to)) return 'to must be a valid ISO date';
   if (source !== undefined && source !== 'roster' && source !== 'daily_override') {
@@ -62,6 +64,8 @@ function parseFilters(query: NextApiRequest['query']): AssignmentRosterFilters |
   return {
     projectId,
     staffId,
+    siteId,
+    source,
     startDate: from,
     endDate: to,
     limit: requestedLimit,

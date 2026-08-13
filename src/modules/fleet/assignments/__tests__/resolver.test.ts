@@ -28,6 +28,20 @@ describe('resolveOperationalAssignment', () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes('fleet-resolver:roster'))).toBe(false);
   });
 
+  it.each([
+    ['daily overrides', { daily: [assignment('daily_override'), { ...assignment('daily_override'), id: 'daily-2' }] }, 'AMBIGUOUS_DAILY_OVERRIDES'],
+    ['roster assignments', { roster: [assignment('roster'), { ...assignment('roster'), id: 'roster-2' }] }, 'AMBIGUOUS_ROSTER_ASSIGNMENTS'],
+  ])('refuses ambiguous explicit %s', async (_name, evidence, warning) => {
+    rows({ ...evidence, schedule: [schedule] });
+    expect(await resolveOperationalAssignment(STAFF, DATE, { query })).toMatchObject({
+      source: 'unassigned', projectId: null, warnings: [warning], sourceRowIds: [],
+    });
+    const explicitSql = query.mock.calls
+      .map(([sql]) => String(sql))
+      .filter((sql) => sql.includes('fleet-resolver:daily') || sql.includes('fleet-resolver:roster'));
+    expect(explicitSql.every((sql) => sql.includes('LIMIT 2'))).toBe(true);
+  });
+
   it('gives a roster row precedence over vehicle evidence', async () => {
     rows({ roster: [assignment('roster')], vehicles: [{ id: 'va', vehicle_id: 'vehicle' }], schedule: [schedule] });
     expect(await resolveOperationalAssignment(STAFF, DATE, { query })).toMatchObject({ source: 'roster', projectId: 'roster-project' });

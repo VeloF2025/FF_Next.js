@@ -14,6 +14,7 @@ const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
 const PROJECT = '33333333-3333-4333-8333-333333333333';
 const OTHER = '44444444-4444-4444-8444-444444444444';
+const SITE = '55555555-5555-4555-8555-555555555555';
 async function call(handler: (req: NextApiRequest, res: NextApiResponse) => unknown, method: string, query: Record<string, string> = {}) {
   const state = { status: 200, body: undefined as unknown, headers: {} as Record<string, string> };
   const res = { status(code: number) { state.status = code; return res; }, json(body: unknown) { state.body = body; return res; }, setHeader(name: string, value: string) { state.headers[name] = value; return res; } } as unknown as NextApiResponse;
@@ -34,6 +35,7 @@ describe('assignment read APIs', () => {
   it('rejects invalid roster filters before querying assignments', async () => {
     expect((await call(assignmentsHandler, 'GET', { projectId: 'bad' })).status).toBe(400);
     expect((await call(assignmentsHandler, 'GET', { projectId: PROJECT, from: '2026-14-01' })).status).toBe(400);
+    expect((await call(assignmentsHandler, 'GET', { projectId: PROJECT, siteId: 'bad' })).status).toBe(400);
     expect((await call(assignmentsHandler, 'GET', { projectId: PROJECT, from: '2025-01-01', to: '2026-01-03' })).status).toBe(400);
     expect((await call(assignmentsHandler, 'GET', { projectId: PROJECT, source: 'unknown', page: '0', limit: '101' })).status).toBe(400);
     expect(mocks.roster).not.toHaveBeenCalled();
@@ -46,9 +48,9 @@ describe('assignment read APIs', () => {
   });
 
   it('passes authorized roster filters with offset pagination', async () => {
-    await call(assignmentsHandler, 'GET', { projectId: PROJECT, staffId: STAFF, from: '2026-08-01', to: '2026-08-31', source: 'roster', page: '2', limit: '10' });
+    await call(assignmentsHandler, 'GET', { projectId: PROJECT, staffId: STAFF, siteId: SITE, from: '2026-08-01', to: '2026-08-31', source: 'roster', page: '2', limit: '10' });
     expect(mocks.scope).toHaveBeenCalledWith(USER, STAFF, 'manager', PROJECT);
-    expect(mocks.roster).toHaveBeenCalledWith({ projectId: PROJECT, staffId: STAFF, startDate: '2026-08-01', endDate: '2026-08-31', limit: 10, offset: 10 });
+    expect(mocks.roster).toHaveBeenCalledWith({ projectId: PROJECT, staffId: STAFF, siteId: SITE, startDate: '2026-08-01', endDate: '2026-08-31', source: 'roster', limit: 10, offset: 10 });
   });
 
   it('only exposes options for active projects in the user view scope', async () => {
@@ -56,5 +58,17 @@ describe('assignment read APIs', () => {
     mocks.scope.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     await call(optionsHandler, 'GET');
     expect(mocks.options).toHaveBeenCalledWith({}, [PROJECT]);
+  });
+
+  it('validates and passes the requested option date range', async () => {
+    expect((await call(optionsHandler, 'GET', { from: '2026-14-01' })).status).toBe(400);
+    expect((await call(optionsHandler, 'GET', { from: '2025-01-01', to: '2026-01-03' })).status).toBe(400);
+    expect(mocks.options).not.toHaveBeenCalled();
+
+    await call(optionsHandler, 'GET', { projectId: PROJECT, from: '2026-08-01', to: '2026-08-31' });
+    expect(mocks.options).toHaveBeenCalledWith(
+      { projectId: PROJECT, startDate: '2026-08-01', endDate: '2026-08-31' },
+      [PROJECT],
+    );
   });
 });

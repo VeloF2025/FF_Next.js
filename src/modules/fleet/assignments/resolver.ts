@@ -58,11 +58,13 @@ export async function resolveOperationalAssignment(staffId: string, workDate: st
   const schedule = scheduleRows[0] ?? null;
 
   const daily = await resolverDb.query<EvidenceRow>(`/* fleet-resolver:daily */ ${assignmentSelect}
-    AND foa.assignment_kind = 'daily_override' LIMIT 1`, params);
+    AND foa.assignment_kind = 'daily_override' LIMIT 2`, params);
+  if (daily.length > 1) return result(staffId, workDate, 'unassigned', null, schedule, ['AMBIGUOUS_DAILY_OVERRIDES']);
   if (daily[0]) return result(staffId, workDate, 'daily_override', daily[0], schedule, []);
 
   const roster = await resolverDb.query<EvidenceRow>(`/* fleet-resolver:roster */ ${assignmentSelect}
-    AND foa.assignment_kind = 'roster' LIMIT 1`, params);
+    AND foa.assignment_kind = 'roster' LIMIT 2`, params);
+  if (roster.length > 1) return result(staffId, workDate, 'unassigned', null, schedule, ['AMBIGUOUS_ROSTER_ASSIGNMENTS']);
   if (roster[0]) return result(staffId, workDate, 'roster', roster[0], schedule, []);
 
   const vehicles = await resolverDb.query<EvidenceRow>(`/* fleet-resolver:vehicles */

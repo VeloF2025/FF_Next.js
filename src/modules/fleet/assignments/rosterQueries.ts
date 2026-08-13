@@ -3,6 +3,8 @@ import { query } from '@/lib/db-pool';
 export interface AssignmentRosterFilters {
   projectId?: string;
   staffId?: string;
+  siteId?: string;
+  source?: 'roster' | 'daily_override';
   startDate?: string;
   endDate?: string;
   limit?: number;
@@ -11,6 +13,8 @@ export interface AssignmentRosterFilters {
 
 export interface AssignmentOptionFilters {
   projectId?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface RosterRow extends Record<string, unknown> {
@@ -71,6 +75,8 @@ export async function listAssignmentRoster(filters: AssignmentRosterFilters = {}
   };
   if (filters.projectId) add('p.id = ?::uuid', filters.projectId);
   if (filters.staffId) add('s.id = ?::uuid', filters.staffId);
+  if (filters.siteId) add('ops.id = ?::uuid', filters.siteId);
+  if (filters.source) add('oa.assignment_kind = ?', filters.source);
   if (filters.startDate) add('oa.end_date >= ?::date', filters.startDate);
   if (filters.endDate) add('oa.start_date <= ?::date', filters.endDate);
   const { limit, offset } = pagination(filters);
@@ -90,8 +96,6 @@ export async function listAssignmentRoster(filters: AssignmentRosterFilters = {}
     JOIN projects p ON p.id = oa.project_id
     JOIN fleet_project_operational_sites ops ON ops.id = oa.operational_site_id
     LEFT JOIN vehicle_assignments va ON va.id = oa.vehicle_assignment_id
-      AND va.assignment_start <= CURRENT_DATE
-      AND COALESCE(va.assignment_end, '9999-12-31'::date) >= CURRENT_DATE
     LEFT JOIN fleet_vehicles fv ON fv.id = va.fleet_vehicle_id
     WHERE ${conditions.join(' AND ')}
     ORDER BY oa.start_date DESC, oa.id DESC
@@ -146,11 +150,11 @@ export async function listAssignmentOptions(
         JOIN fleet_vehicles fv ON fv.id = va.fleet_vehicle_id
         JOIN fleet_vehicle_project_assignments fvpa ON fvpa.vehicle_id = fv.id
         WHERE fvpa.project_id = ANY($1::uuid[])
-          AND va.assignment_start <= CURRENT_DATE
-          AND COALESCE(va.assignment_end, '9999-12-31'::date) >= CURRENT_DATE
-          AND fvpa.assigned_date <= CURRENT_DATE
-          AND COALESCE(fvpa.returned_date, '9999-12-31'::date) >= CURRENT_DATE
-      ) vehicle_rows), '[]'::jsonb) AS vehicles`, [projectIds]);
+          AND ($2::date IS NULL OR va.assignment_start <= $2::date)
+          AND ($3::date IS NULL OR COALESCE(va.assignment_end, '9999-12-31'::date) >= $3::date)
+          AND ($2::date IS NULL OR fvpa.assigned_date <= $2::date)
+          AND ($3::date IS NULL OR COALESCE(fvpa.returned_date, '9999-12-31'::date) >= $3::date)
+      ) vehicle_rows), '[]'::jsonb) AS vehicles`, [projectIds, filters.startDate ?? null, filters.endDate ?? null]);
   const result = rows[0];
   return { staff: result?.staff ?? [], projects: result?.projects ?? [], sites: result?.sites ?? [], vehicles: result?.vehicles ?? [] };
 }
