@@ -87,6 +87,45 @@ alert() {
 
 mkdir -p "$BACKUP_DIR"
 
+# --- Validate the numeric knobs before anything does arithmetic with them ---
+# `[[ $x -lt 1 ]]` performs ARITHMETIC evaluation, not string comparison, so a
+# non-numeric value is treated as a variable name: under `set -u` bash aborts
+# with "abc: unbound variable". For RETENTION_COUNT that abort lands *after* the
+# dump has been published — retention silently never runs (unbounded disk
+# growth) and the script dies between log() and alert(), so nothing is sent.
+# For MIN_BYTES it aborts mid-verification, discarding a good dump.
+#
+# Both are operator-supplied env vars, so both are validated here rather than at
+# the point of use. An empty value is not caught by this (it evaluates as 0),
+# which is fine — the retention floor below handles 0.
+if [[ -n "$RETENTION_COUNT" && ! "$RETENTION_COUNT" =~ ^[0-9]+$ ]]; then
+  log "WARNING: FF_BACKUP_RETENTION='${RETENTION_COUNT}' is not a number; using 14"
+  RETENTION_COUNT=14
+fi
+if [[ -n "$MIN_BYTES" && ! "$MIN_BYTES" =~ ^[0-9]+$ ]]; then
+  log "WARNING: FF_BACKUP_MIN_BYTES='${MIN_BYTES}' is not a number; using 10485760"
+  MIN_BYTES=10485760
+fi
+
+# --- One run at a time ---
+# The dump takes minutes. If a run stalls (an unresponsive database holds
+# pg_dump open), the next cron trigger would start a second dump against
+# production alongside it: double load, and both racing to mv onto the same
+# dated filename. Take an exclusive lock and skip rather than pile up.
+#
+# The lock is released automatically when the process exits, including on kill,
+# so a crashed run cannot wedge every subsequent night.
+#
+# An overlap is alerted, not merely logged. Skipping is the correct immediate
+# action, but a run that regularly finds the lock held means backups are being
+# skipped — the silent-gap failure this script exists to prevent.
+exec 9>"${BACKUP_DIR}/.backup.lock"
+if ! flock -n 9; then
+  log "SKIPPED: another backup run still holds ${BACKUP_DIR}/.backup.lock"
+  alert "⚠️ DB BACKUP SKIPPED on $(hostname): a previous run is still going. Check ${LOG_FILE}"
+  exit 0
+fi
+
 # --- Resolve the connection string ---
 # Same precedence as scripts/run-pending-migrations.sh: prefer the direct
 # superuser URL, fall back to the app URL. pg_dump needs to read every object,
@@ -100,17 +139,37 @@ mkdir -p "$BACKUP_DIR"
 # run from inside the app directory also works — a copy of this script executed
 # from somewhere else would otherwise resolve APP_DIR to "/" and report that no
 # database URL exists, which reads as a config fault rather than a bad cwd.
-PGURL="${MIGRATION_DATABASE_URL:-${DATABASE_URL:-}}"
-if [[ -z "$PGURL" ]]; then
+#
+# The variable is the outer loop and the files are the inner one, NOT the other
+# way round. Iterating files-first means the first file that defines EITHER name
+# wins, so a layout with DATABASE_URL in .env.local and MIGRATION_DATABASE_URL in
+# .env resolves to the app role and never looks further — silently dumping as a
+# role that cannot read every table. That produces a complete-looking backup
+# missing whatever it lacked permission to see, which the content check below
+# would not catch: it confirms one named table, not all of them.
+#
+# Resolving MIGRATION_DATABASE_URL across every file before considering
+# DATABASE_URL at all makes the precedence a property of the variable rather
+# than of file ordering. Verified against that exact split layout.
+read_env_var() {
+  local var_name=$1 env_file value
   for env_file in "$APP_DIR/.env.local" "$APP_DIR/.env" "$PWD/.env.local" "$PWD/.env"; do
     [[ -f "$env_file" ]] || continue
-    if [[ -z "$PGURL" ]]; then
-      PGURL=$(grep -E '^MIGRATION_DATABASE_URL=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
-    fi
-    if [[ -z "$PGURL" ]]; then
-      PGURL=$(grep -E '^DATABASE_URL=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    value=$(grep -E "^${var_name}=" "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    if [[ -n "$value" ]]; then
+      printf '%s' "$value"
+      return 0
     fi
   done
+  return 0
+}
+
+PGURL="${MIGRATION_DATABASE_URL:-${DATABASE_URL:-}}"
+if [[ -z "$PGURL" ]]; then
+  PGURL=$(read_env_var MIGRATION_DATABASE_URL)
+fi
+if [[ -z "$PGURL" ]]; then
+  PGURL=$(read_env_var DATABASE_URL)
 fi
 
 if [[ -z "$PGURL" ]]; then
@@ -122,7 +181,16 @@ fi
 # Log where we are dumping from, without the credentials. The previous script
 # gave no indication of its target, so a run that authenticated against the
 # wrong database would have looked identical to a correct one.
-SAFE_TARGET=$(echo "$PGURL" | sed -E 's#(://[^:/]+):[^@]*@#\1:***@#')
+# Two substitutions, because a connection string has two shapes. The URI form
+# carries the password between ':' and '@'; libpq also accepts keyword/value
+# conninfo ("host=... password=..."), which the URI pattern does not touch at
+# all — that shape would log the password in clear. This repo only produces
+# URIs today, but the masking is the last thing standing between a rotated
+# password and the log file, so it covers both rather than assuming.
+# The case-permuted character class avoids sed's GNU-only `I` flag.
+SAFE_TARGET=$(printf '%s' "$PGURL" \
+  | sed -E -e 's#(://[^:/]+):[^@]*@#\1:***@#' \
+           -e 's#([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]=)[^[:space:]]*#\1***#g')
 log "Starting FibreFlow database backup from ${SAFE_TARGET}"
 
 # libpq percent-decodes URI components but reads PGPASSWORD verbatim, so an
@@ -224,7 +292,12 @@ if (( ! DUMP_OK )); then
 fi
 
 # --- Verify before publishing ---
-DUMP_BYTES=$(stat -c%s "$TMP_FILE")
+# `stat -c%s` is GNU; `-f%z` is BSD/macOS. The script this replaced carried both
+# and the fallback was dropped without comment. Velocity is Linux, so this is
+# not load-bearing today — but the failure mode if it ever ran elsewhere is that
+# DUMP_BYTES comes back empty and the size floor below aborts a perfectly good
+# dump, which is exactly the class of self-inflicted loss this file guards against.
+DUMP_BYTES=$(stat -c%s "$TMP_FILE" 2>/dev/null || stat -f%z "$TMP_FILE")
 
 if ! gzip -t "$TMP_FILE" 2>>"$LOG_FILE"; then
   log "FAILED: archive is not a valid gzip stream — discarding"
