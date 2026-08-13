@@ -7,7 +7,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, withPermission } from '@/lib/auth/middleware';
+import { isOwner } from '@/lib/auth';
+import {
+  withAuth,
+  withPermission,
+  type AuthenticatedNextApiRequest,
+} from '@/lib/auth/middleware';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import {
@@ -25,8 +30,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const parsed = parseActionFilter(req.query);
   if ('error' in parsed) return apiResponse.badRequest(res, parsed.error);
 
+  // Action items are meeting content, and FibreFlow gates meetings on ATTENDANCE, not on
+  // a module permission. `dashboard.action-items` decides whether you may use this report
+  // at all; the participant predicate decides WHICH meetings it covers. Both are needed:
+  // the permission alone would hand every viewer 5,049 items across 1,015 meetings.
+  const user = (req as AuthenticatedNextApiRequest).user;
+  const email = (user.email ?? '').trim().toLowerCase();
+  const owner = isOwner(user);
+  if (!owner && !email) {
+    return apiResponse.forbidden(res, 'An email address is required to scope meeting access.');
+  }
+
   try {
-    const { sql, params } = actionItemsQuery(parsed.filter);
+    const { sql, params } = actionItemsQuery(parsed.filter, { isOwner: owner, email });
     const result = await pool.query<ActionItemsRow>(sql, params as unknown[]);
 
     // An aggregate without GROUP BY always yields one row, but the type system cannot
@@ -35,7 +51,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (!row) return apiResponse.internalError(res, new Error('Action item summary returned no rows'));
 
     res.setHeader('Cache-Control', 'private, no-store');
-    return apiResponse.success(res, shapeActionItems(row, Boolean(parsed.filter.assignee)));
+    return apiResponse.success(
+      res,
+      shapeActionItems(row, Boolean(parsed.filter.assignee), owner),
+    );
   } catch (error) {
     log.error(
       'Action item report failed',

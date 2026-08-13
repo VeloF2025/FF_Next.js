@@ -20,11 +20,32 @@
  * A machine-created item that nobody closed is not evidence of dropped work. It is
  * evidence of an extraction feed without a triage step, and the report says so rather
  * than presenting 5,047 as a to-do list.
+ *
+ * ACCESS: action items are meeting content. Their descriptions are extracted verbatim
+ * from transcripts, so an aggregate over them is an aggregate over meetings, and
+ * FibreFlow gates meetings on ATTENDANCE — /api/meetings/[id]/transcript admits a caller
+ * only when their email appears in that meeting's `participants`, and returns 403 rather
+ * than 404 specifically so a non-participant cannot learn the meeting exists. A report
+ * that ignored that would hand 5,049 items across 1,015 meetings to any holder of
+ * `dashboard.action-items` — a permission viewers, technicians and contractors all hold.
+ * So the same participant predicate is applied here, and it fails CLOSED: an item whose
+ * meeting cannot be resolved, or whose meeting records no participants, is excluded for
+ * everyone except the owner.
  */
 import { measure, type Measure } from './coverage';
 
 /** Both spellings of "nobody owns this" — the column carries a literal and a NULL. */
 const UNASSIGNED_SQL = `COALESCE(NULLIF(TRIM(a.assignee_name), ''), 'Unassigned')`;
+
+/**
+ * Who is asking. Mirrors the meeting routes: the owner sees everything, everyone else
+ * sees only meetings they attended.
+ */
+export interface ActionItemAccess {
+  isOwner: boolean;
+  /** Lower-cased, matched against participants[].email. */
+  email: string;
+}
 
 export interface ActionItemFilter {
   assignee?: string;
@@ -79,9 +100,28 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
-export function actionItemsQuery(filter: ActionItemFilter): { sql: string; params: unknown[] } {
+export function actionItemsQuery(
+  filter: ActionItemFilter,
+  access: ActionItemAccess,
+): { sql: string; params: unknown[] } {
   const params: unknown[] = [];
   const where: string[] = ['1=1'];
+
+  // Attendance scope, applied before any other filter. EXISTS over the meeting's
+  // participants, exactly as pages/api/meetings/[id]/transcript.ts does it. A NULL
+  // meeting_id or an empty participants array makes this false, so unresolvable items
+  // are withheld rather than shown — failing closed is the only safe default when the
+  // payload is verbatim meeting content.
+  if (!access.isOwner) {
+    where.push(`EXISTS (
+          SELECT 1 FROM meetings m
+          WHERE m.id = a.meeting_id
+            AND EXISTS (
+              SELECT 1 FROM jsonb_array_elements(COALESCE(m.participants, '[]'::jsonb)) AS p
+              WHERE LOWER(p->>'email') = ${push(params, access.email.toLowerCase())}
+            )
+        )`);
+  }
 
   // COALESCE, not a bare comparison: `status` is nullable and `<> 'completed'` is
   // NULL-inert, so an item with no status would vanish from the open count entirely.
@@ -123,11 +163,13 @@ export function actionItemsQuery(filter: ActionItemFilter): { sql: string; param
       -- Extraction versus triage over the same window. This is the number that says what
       -- the backlog IS: items arrive from transcript extraction far faster than anyone
       -- closes them, which is a pipeline shape, not a delivery failure.
+      -- Scoped to the SAME rows as everything else. Reading the whole table here would
+      -- leak the organisation-wide volume to a caller entitled to two meetings.
       flow AS (
         SELECT count(*) FILTER (WHERE created_at > now() - interval '30 days')::bigint AS created_30d,
                count(*) FILTER (WHERE status = 'completed'
                                   AND completed_date > now() - interval '30 days')::bigint AS completed_30d
-        FROM action_items a
+        FROM scoped
       ),
       by_assignee AS (
         SELECT assignee, count(*)::bigint AS n,
@@ -189,6 +231,7 @@ const n = (v: string | number | null | undefined): number => Number(v ?? 0);
 export function shapeActionItems(
   row: ActionItemsRow,
   filteredByAssignee = false,
+  isOwner = false,
 ): ActionItemsReport {
   const matched = n(row.matched);
   const created = n(row.created_30d);
@@ -199,6 +242,13 @@ export function shapeActionItems(
     .reduce((a, b) => a + b.count, 0);
 
   const caveats: string[] = [];
+
+  if (!isOwner) {
+    caveats.push(
+      'Scoped to meetings you attended. Items from meetings you were not part of are not ' +
+        'included and are not counted here, so these totals are yours, not the organisation\'s.',
+    );
+  }
 
   if (machineSources > 0 && matched > 0) {
     const pct = Math.round((machineSources / matched) * 100);
