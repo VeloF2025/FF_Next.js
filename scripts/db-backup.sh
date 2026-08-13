@@ -85,7 +85,74 @@ alert() {
     >/dev/null 2>&1 || log "WARNING: alert delivery failed"
 }
 
-mkdir -p "$BACKUP_DIR"
+if ! mkdir -p "$BACKUP_DIR" 2>/dev/null || [[ ! -w "$BACKUP_DIR" ]]; then
+  # Before log(), because log() writes into this very directory. Straight to
+  # stderr, which cron captures.
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] FAILED: ${BACKUP_DIR} is missing or not writable" >&2
+  alert "🔴 DB BACKUP FAILED on $(hostname): ${BACKUP_DIR} not writable"
+  exit 2
+fi
+
+# --- Validate the numeric knobs before anything does arithmetic with them ---
+# Two distinct traps, both reachable from an operator-supplied env var, and both
+# silent:
+#
+#   1. `[[ $x -lt 1 ]]` is ARITHMETIC evaluation, not string comparison, so a
+#      non-numeric value is read as a variable NAME and `set -u` aborts with
+#      "abc: unbound variable". For RETENTION_COUNT that lands *after* the dump
+#      is published — retention never runs, and the abort falls between log()
+#      and alert() so nothing is sent.
+#
+#   2. A LEADING ZERO makes bash read the value as octal. `010485760` — an
+#      entirely plausible zero-padded typo of the default — is not valid octal,
+#      so `[[ $DUMP_BYTES -lt $MIN_BYTES ]]` raises "value too great for base"
+#      and then evaluates FALSE. Not an abort: the comparison quietly answers
+#      "no". The size floor is disabled, and a 1-byte dump is published over
+#      yesterday's good one. Verified: MIN_BYTES=010485760 with DUMP_BYTES=1
+#      passes the floor. `^[0-9]+$` accepts this, which is why it is not enough.
+#
+# So: reject non-numeric, then normalise through base 10 to strip leading zeros.
+# `$((10#$x))` is what makes the value safe at every downstream comparison,
+# rather than relying on each one to be written defensively.
+# Written out twice rather than via a helper. A helper would have to return the
+# value through $(...), which captures stdout — and log() writes to stdout, so a
+# warning would be swallowed into the variable it was warning about.
+if [[ -z "$RETENTION_COUNT" ]]; then
+  RETENTION_COUNT=14
+elif [[ ! "$RETENTION_COUNT" =~ ^[0-9]+$ ]]; then
+  log "WARNING: FF_BACKUP_RETENTION='${RETENTION_COUNT}' is not a number; using 14"
+  RETENTION_COUNT=14
+else
+  RETENTION_COUNT=$((10#$RETENTION_COUNT))
+fi
+
+if [[ -z "$MIN_BYTES" ]]; then
+  MIN_BYTES=10485760
+elif [[ ! "$MIN_BYTES" =~ ^[0-9]+$ ]]; then
+  log "WARNING: FF_BACKUP_MIN_BYTES='${MIN_BYTES}' is not a number; using 10485760"
+  MIN_BYTES=10485760
+else
+  MIN_BYTES=$((10#$MIN_BYTES))
+fi
+
+# --- One run at a time ---
+# The dump takes minutes. If a run stalls (an unresponsive database holds
+# pg_dump open), the next cron trigger would start a second dump against
+# production alongside it: double load, and both racing to mv onto the same
+# dated filename. Take an exclusive lock and skip rather than pile up.
+#
+# The lock is released automatically when the process exits, including on kill,
+# so a crashed run cannot wedge every subsequent night.
+#
+# An overlap is alerted, not merely logged. Skipping is the correct immediate
+# action, but a run that regularly finds the lock held means backups are being
+# skipped — the silent-gap failure this script exists to prevent.
+exec 9>"${BACKUP_DIR}/.backup.lock"
+if ! flock -n 9; then
+  log "SKIPPED: another backup run still holds ${BACKUP_DIR}/.backup.lock"
+  alert "⚠️ DB BACKUP SKIPPED on $(hostname): a previous run is still going. Check ${LOG_FILE}"
+  exit 0
+fi
 
 # --- Resolve the connection string ---
 # Same precedence as scripts/run-pending-migrations.sh: prefer the direct
@@ -100,17 +167,48 @@ mkdir -p "$BACKUP_DIR"
 # run from inside the app directory also works — a copy of this script executed
 # from somewhere else would otherwise resolve APP_DIR to "/" and report that no
 # database URL exists, which reads as a config fault rather than a bad cwd.
-PGURL="${MIGRATION_DATABASE_URL:-${DATABASE_URL:-}}"
-if [[ -z "$PGURL" ]]; then
+#
+# The variable is the outer loop and the files are the inner one, NOT the other
+# way round. Iterating files-first means the first file that defines EITHER name
+# wins, so a layout with DATABASE_URL in .env.local and MIGRATION_DATABASE_URL in
+# .env resolves to the app role and never looks further — silently dumping as a
+# role that cannot read every table. That produces a complete-looking backup
+# missing whatever it lacked permission to see, which the content check below
+# would not catch: it confirms one named table, not all of them.
+#
+# Resolving MIGRATION_DATABASE_URL across every file before considering
+# DATABASE_URL at all makes the precedence a property of the variable rather
+# than of file ordering. Verified against that exact split layout.
+read_env_var() {
+  local var_name=$1 env_file value
   for env_file in "$APP_DIR/.env.local" "$APP_DIR/.env" "$PWD/.env.local" "$PWD/.env"; do
     [[ -f "$env_file" ]] || continue
-    if [[ -z "$PGURL" ]]; then
-      PGURL=$(grep -E '^MIGRATION_DATABASE_URL=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    value=$(grep -E "^${var_name}=" "$env_file" 2>/dev/null | head -1 | cut -d= -f2- || true)
+    # Strip only a MATCHED pair of wrapping quotes. `tr -d '"'` deleted every
+    # double quote anywhere in the value, so a password legitimately containing
+    # one was silently corrupted and authentication failed with no clue why.
+    # Inline `# comments` are deliberately still not stripped: `#` is legal
+    # inside a password, and breaking a working value to tidy a hypothetical
+    # one is the worse trade.
+    if [[ ${#value} -ge 2 && ${value:0:1} == '"' && ${value: -1} == '"' ]]; then
+      value=${value:1:${#value}-2}
+    elif [[ ${#value} -ge 2 && ${value:0:1} == "'" && ${value: -1} == "'" ]]; then
+      value=${value:1:${#value}-2}
     fi
-    if [[ -z "$PGURL" ]]; then
-      PGURL=$(grep -E '^DATABASE_URL=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    if [[ -n "$value" ]]; then
+      printf '%s' "$value"
+      return 0
     fi
   done
+  return 0
+}
+
+PGURL="${MIGRATION_DATABASE_URL:-${DATABASE_URL:-}}"
+if [[ -z "$PGURL" ]]; then
+  PGURL=$(read_env_var MIGRATION_DATABASE_URL)
+fi
+if [[ -z "$PGURL" ]]; then
+  PGURL=$(read_env_var DATABASE_URL)
 fi
 
 if [[ -z "$PGURL" ]]; then
@@ -122,7 +220,16 @@ fi
 # Log where we are dumping from, without the credentials. The previous script
 # gave no indication of its target, so a run that authenticated against the
 # wrong database would have looked identical to a correct one.
-SAFE_TARGET=$(echo "$PGURL" | sed -E 's#(://[^:/]+):[^@]*@#\1:***@#')
+# Two substitutions, because a connection string has two shapes. The URI form
+# carries the password between ':' and '@'; libpq also accepts keyword/value
+# conninfo ("host=... password=..."), which the URI pattern does not touch at
+# all — that shape would log the password in clear. This repo only produces
+# URIs today, but the masking is the last thing standing between a rotated
+# password and the log file, so it covers both rather than assuming.
+# The case-permuted character class avoids sed's GNU-only `I` flag.
+SAFE_TARGET=$(printf '%s' "$PGURL" \
+  | sed -E -e 's#(://[^:/]+):[^@]*@#\1:***@#' \
+           -e 's#([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]=)[^[:space:]]*#\1***#g')
 log "Starting FibreFlow database backup from ${SAFE_TARGET}"
 
 # libpq percent-decodes URI components but reads PGPASSWORD verbatim, so an
@@ -224,7 +331,21 @@ if (( ! DUMP_OK )); then
 fi
 
 # --- Verify before publishing ---
-DUMP_BYTES=$(stat -c%s "$TMP_FILE")
+# `stat -c%s` is GNU; `-f%z` is BSD/macOS. The script this replaced carried both
+# and the fallback was dropped without comment. Velocity is Linux, so the GNU
+# branch is what actually runs here.
+#
+# Wrapped in `if !` rather than left bare. A bare `X=$(a || b)` is a simple
+# command: when BOTH branches fail its status is non-zero, `errexit` fires on
+# that line, and the script dies *there* — before the size check, and between
+# nothing and nothing, so neither log() nor alert() runs. The only trace would
+# be raw stat stderr in the log with no notification. Handling it explicitly
+# turns a silent death into a reported failure.
+if ! DUMP_BYTES=$(stat -c%s "$TMP_FILE" 2>/dev/null || stat -f%z "$TMP_FILE" 2>/dev/null); then
+  log "FAILED: could not determine the size of the dump — discarding"
+  alert "🔴 DB BACKUP FAILED on $(hostname): could not stat the dump. Check ${LOG_FILE}"
+  exit 1
+fi
 
 if ! gzip -t "$TMP_FILE" 2>>"$LOG_FILE"; then
   log "FAILED: archive is not a valid gzip stream — discarding"
