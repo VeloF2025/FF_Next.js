@@ -35,12 +35,21 @@ vi.mock('@neondatabase/serverless', () => ({
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@/services/procurement/approval', () => ({
-  poApprovalService: {
-    canUserApprove: mocks.canUserApprove,
-    approvePO: mocks.approvePO,
-  },
-}));
+vi.mock('@/services/procurement/approval', () => {
+  class UnauthorizedApprovalError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'UnauthorizedApprovalError';
+    }
+  }
+  return {
+    poApprovalService: {
+      canUserApprove: mocks.canUserApprove,
+      approvePO: mocks.approvePO,
+    },
+    UnauthorizedApprovalError,
+  };
+});
 vi.mock('@/services/procurement/auditService', () => ({
   createAuditLog: mocks.createAuditLog,
 }));
@@ -51,6 +60,9 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 import handler from '../[id]';
+// Resolves to the mocked class defined in the vi.mock factory above, so
+// `instanceof` in the route matches what this test throws.
+import { UnauthorizedApprovalError } from '@/services/procurement/approval';
 
 type TestUser = { id: string; role: string; email: string; name?: string };
 
@@ -90,5 +102,16 @@ describe('PO approve authorization', () => {
 
     expect(res._getStatusCode()).toBe(200);
     expect(mocks.approvePO).toHaveBeenCalledWith(PO_ID, 'usr-admin', expect.any(String), 'ok');
+  });
+
+  it('maps the service-layer authorization guard to 403, not 500', async () => {
+    // Route check passes but approvePO's own re-check fails (e.g. a race);
+    // the thrown UnauthorizedApprovalError must surface as 403, not internalError.
+    mocks.canUserApprove.mockResolvedValue(true);
+    mocks.approvePO.mockRejectedValueOnce(new UnauthorizedApprovalError('not authorized'));
+    const { res, promise } = invoke(approver);
+    await promise;
+
+    expect(res._getStatusCode()).toBe(403);
   });
 });
