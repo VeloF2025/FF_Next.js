@@ -83,12 +83,36 @@ describe('operational status rules', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
+  it('allows an activation timestamp captured immediately before the request', async () => {
+    const capturedNow = new Date(Date.now() - 1_000).toISOString();
+    db.txnQueryOne.mockResolvedValueOnce({ ...row, effective_from: '2026-08-13T08:00:00.000Z' })
+      .mockResolvedValueOnce({ ...row, version: 2, effective_from: capturedNow });
+    db.txnQuery.mockResolvedValue([]);
+
+    await expect(createRuleVersion({ ...input, effectiveFrom: capturedNow }, USER)).resolves.toMatchObject({ version: 2 });
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ['negative monitoring before', { monitoringBeforeMinutes: -1 }],
     ['zero approaching distance', { approachingDistanceMeters: 0 }],
     ['zero approaching readings', { approachingMinReadings: 0 }],
     ['negative mismatch tolerance', { evidenceMismatchToleranceMeters: -1 }],
   ])('rejects %s before SQL', async (_label, change) => {
+    await expect(createRuleVersion({ ...input, ...change }, USER)).rejects.toBeInstanceOf(RuleValidationError);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['monitoring before', { monitoringBeforeMinutes: 1.5 }],
+    ['monitoring after', { monitoringAfterMinutes: 1.5 }],
+    ['arrival dwell', { arrivalDwellMinutes: 1.5 }],
+    ['wrong-site confirmation', { wrongSiteConfirmationMinutes: 1.5 }],
+    ['early-departure confirmation', { earlyDepartureConfirmationMinutes: 1.5 }],
+    ['approaching distance', { approachingDistanceMeters: 1.5 }],
+    ['approaching readings', { approachingMinReadings: 1.5 }],
+    ['mismatch tolerance', { evidenceMismatchToleranceMeters: 1.5 }],
+  ])('rejects decimal %s before SQL', async (_label, change) => {
     await expect(createRuleVersion({ ...input, ...change }, USER)).rejects.toBeInstanceOf(RuleValidationError);
     expect(db.transaction).not.toHaveBeenCalled();
   });

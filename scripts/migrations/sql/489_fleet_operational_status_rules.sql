@@ -67,8 +67,8 @@ VALUES
   ('super_admin', 'fleet.operations-status', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
   ('admin', 'fleet.operations-status', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
   ('manager', 'fleet.operations-status', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
+  ('project_manager', 'fleet.operations-status', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
   ('viewer', 'fleet.operations-status', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
   ('super_admin', 'fleet.operations-rules', '{"view":true,"create":true,"edit":true,"delete":false}'::jsonb),
   ('admin', 'fleet.operations-rules', '{"view":true,"create":true,"edit":true,"delete":false}'::jsonb)
 ON CONFLICT (role, permission_key) DO NOTHING;
-

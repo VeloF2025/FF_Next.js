@@ -27,6 +27,8 @@ export class RuleValidationError extends Error {
   constructor(message: string) { super(message); this.name = 'RuleValidationError'; }
 }
 
+const IMMEDIATE_ACTIVATION_TOLERANCE_MS = 60_000;
+
 const columns = `id,version,timezone,effective_from,effective_to,monitoring_before_minutes,
   monitoring_after_minutes,arrival_dwell_minutes,wrong_site_confirmation_minutes,
   early_departure_confirmation_minutes,approaching_distance_meters,approaching_min_readings,
@@ -47,7 +49,9 @@ function mapRule(row: RuleRow): OperationalStatusRule {
 
 function validate(input: CreateRuleVersionInput): { effectiveFrom: string; reason: string | null } {
   const effective = new Date(input.effectiveFrom);
-  if (Number.isNaN(effective.getTime()) || effective.getTime() <= Date.now()) throw new RuleValidationError('effectiveFrom must be a future timestamp');
+  if (Number.isNaN(effective.getTime()) || effective.getTime() < Date.now() - IMMEDIATE_ACTIVATION_TOLERANCE_MS) {
+    throw new RuleValidationError('effectiveFrom cannot be more than one minute in the past');
+  }
   if (!input.timezone.trim()) throw new RuleValidationError('timezone is required');
   const nonnegative = [input.monitoringBeforeMinutes, input.monitoringAfterMinutes, input.arrivalDwellMinutes,
     input.wrongSiteConfirmationMinutes, input.earlyDepartureConfirmationMinutes, input.minimumMovingSpeedKmh,
@@ -56,6 +60,11 @@ function validate(input: CreateRuleVersionInput): { effectiveFrom: string; reaso
   if (!Number.isInteger(input.approachingDistanceMeters) || input.approachingDistanceMeters <= 0
     || !Number.isInteger(input.approachingMinReadings) || input.approachingMinReadings <= 0) {
     throw new RuleValidationError('Approaching distance and readings must be positive integers');
+  }
+  const integerThresholds = [input.monitoringBeforeMinutes, input.monitoringAfterMinutes, input.arrivalDwellMinutes,
+    input.wrongSiteConfirmationMinutes, input.earlyDepartureConfirmationMinutes, input.evidenceMismatchToleranceMeters];
+  if (integerThresholds.some((value) => !Number.isInteger(value))) {
+    throw new RuleValidationError('Minute and metre thresholds must be integers');
   }
   const reason = input.changeReason?.trim() || null;
   return { effectiveFrom: effective.toISOString(), reason };

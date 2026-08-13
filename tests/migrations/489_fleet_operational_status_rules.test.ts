@@ -118,7 +118,7 @@ describe('migration 489 operational status rules', () => {
     );
     expect(rows.every((row) => row.parent_key === 'fleet')).toBe(true);
     expect(rows.filter((row) => row.key === 'fleet.operations-status').map((row) => row.role))
-      .toEqual(['admin', 'manager', 'super_admin', 'viewer']);
+      .toEqual(['admin', 'manager', 'project_manager', 'super_admin', 'viewer']);
     expect(rows.filter((row) => row.key === 'fleet.operations-rules').map((row) => row.role))
       .toEqual(['admin', 'super_admin']);
     expect(rows.filter((row) => row.key === 'fleet.operations-rules').every((row) => row.actions.edit)).toBe(true);
