@@ -85,26 +85,54 @@ alert() {
     >/dev/null 2>&1 || log "WARNING: alert delivery failed"
 }
 
-mkdir -p "$BACKUP_DIR"
+if ! mkdir -p "$BACKUP_DIR" 2>/dev/null || [[ ! -w "$BACKUP_DIR" ]]; then
+  # Before log(), because log() writes into this very directory. Straight to
+  # stderr, which cron captures.
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] FAILED: ${BACKUP_DIR} is missing or not writable" >&2
+  alert "🔴 DB BACKUP FAILED on $(hostname): ${BACKUP_DIR} not writable"
+  exit 2
+fi
 
 # --- Validate the numeric knobs before anything does arithmetic with them ---
-# `[[ $x -lt 1 ]]` performs ARITHMETIC evaluation, not string comparison, so a
-# non-numeric value is treated as a variable name: under `set -u` bash aborts
-# with "abc: unbound variable". For RETENTION_COUNT that abort lands *after* the
-# dump has been published — retention silently never runs (unbounded disk
-# growth) and the script dies between log() and alert(), so nothing is sent.
-# For MIN_BYTES it aborts mid-verification, discarding a good dump.
+# Two distinct traps, both reachable from an operator-supplied env var, and both
+# silent:
 #
-# Both are operator-supplied env vars, so both are validated here rather than at
-# the point of use. An empty value is not caught by this (it evaluates as 0),
-# which is fine — the retention floor below handles 0.
-if [[ -n "$RETENTION_COUNT" && ! "$RETENTION_COUNT" =~ ^[0-9]+$ ]]; then
+#   1. `[[ $x -lt 1 ]]` is ARITHMETIC evaluation, not string comparison, so a
+#      non-numeric value is read as a variable NAME and `set -u` aborts with
+#      "abc: unbound variable". For RETENTION_COUNT that lands *after* the dump
+#      is published — retention never runs, and the abort falls between log()
+#      and alert() so nothing is sent.
+#
+#   2. A LEADING ZERO makes bash read the value as octal. `010485760` — an
+#      entirely plausible zero-padded typo of the default — is not valid octal,
+#      so `[[ $DUMP_BYTES -lt $MIN_BYTES ]]` raises "value too great for base"
+#      and then evaluates FALSE. Not an abort: the comparison quietly answers
+#      "no". The size floor is disabled, and a 1-byte dump is published over
+#      yesterday's good one. Verified: MIN_BYTES=010485760 with DUMP_BYTES=1
+#      passes the floor. `^[0-9]+$` accepts this, which is why it is not enough.
+#
+# So: reject non-numeric, then normalise through base 10 to strip leading zeros.
+# `$((10#$x))` is what makes the value safe at every downstream comparison,
+# rather than relying on each one to be written defensively.
+# Written out twice rather than via a helper. A helper would have to return the
+# value through $(...), which captures stdout — and log() writes to stdout, so a
+# warning would be swallowed into the variable it was warning about.
+if [[ -z "$RETENTION_COUNT" ]]; then
+  RETENTION_COUNT=14
+elif [[ ! "$RETENTION_COUNT" =~ ^[0-9]+$ ]]; then
   log "WARNING: FF_BACKUP_RETENTION='${RETENTION_COUNT}' is not a number; using 14"
   RETENTION_COUNT=14
+else
+  RETENTION_COUNT=$((10#$RETENTION_COUNT))
 fi
-if [[ -n "$MIN_BYTES" && ! "$MIN_BYTES" =~ ^[0-9]+$ ]]; then
+
+if [[ -z "$MIN_BYTES" ]]; then
+  MIN_BYTES=10485760
+elif [[ ! "$MIN_BYTES" =~ ^[0-9]+$ ]]; then
   log "WARNING: FF_BACKUP_MIN_BYTES='${MIN_BYTES}' is not a number; using 10485760"
   MIN_BYTES=10485760
+else
+  MIN_BYTES=$((10#$MIN_BYTES))
 fi
 
 # --- One run at a time ---
@@ -155,7 +183,18 @@ read_env_var() {
   local var_name=$1 env_file value
   for env_file in "$APP_DIR/.env.local" "$APP_DIR/.env" "$PWD/.env.local" "$PWD/.env"; do
     [[ -f "$env_file" ]] || continue
-    value=$(grep -E "^${var_name}=" "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    value=$(grep -E "^${var_name}=" "$env_file" 2>/dev/null | head -1 | cut -d= -f2- || true)
+    # Strip only a MATCHED pair of wrapping quotes. `tr -d '"'` deleted every
+    # double quote anywhere in the value, so a password legitimately containing
+    # one was silently corrupted and authentication failed with no clue why.
+    # Inline `# comments` are deliberately still not stripped: `#` is legal
+    # inside a password, and breaking a working value to tidy a hypothetical
+    # one is the worse trade.
+    if [[ ${#value} -ge 2 && ${value:0:1} == '"' && ${value: -1} == '"' ]]; then
+      value=${value:1:${#value}-2}
+    elif [[ ${#value} -ge 2 && ${value:0:1} == "'" && ${value: -1} == "'" ]]; then
+      value=${value:1:${#value}-2}
+    fi
     if [[ -n "$value" ]]; then
       printf '%s' "$value"
       return 0
@@ -293,11 +332,20 @@ fi
 
 # --- Verify before publishing ---
 # `stat -c%s` is GNU; `-f%z` is BSD/macOS. The script this replaced carried both
-# and the fallback was dropped without comment. Velocity is Linux, so this is
-# not load-bearing today — but the failure mode if it ever ran elsewhere is that
-# DUMP_BYTES comes back empty and the size floor below aborts a perfectly good
-# dump, which is exactly the class of self-inflicted loss this file guards against.
-DUMP_BYTES=$(stat -c%s "$TMP_FILE" 2>/dev/null || stat -f%z "$TMP_FILE")
+# and the fallback was dropped without comment. Velocity is Linux, so the GNU
+# branch is what actually runs here.
+#
+# Wrapped in `if !` rather than left bare. A bare `X=$(a || b)` is a simple
+# command: when BOTH branches fail its status is non-zero, `errexit` fires on
+# that line, and the script dies *there* — before the size check, and between
+# nothing and nothing, so neither log() nor alert() runs. The only trace would
+# be raw stat stderr in the log with no notification. Handling it explicitly
+# turns a silent death into a reported failure.
+if ! DUMP_BYTES=$(stat -c%s "$TMP_FILE" 2>/dev/null || stat -f%z "$TMP_FILE" 2>/dev/null); then
+  log "FAILED: could not determine the size of the dump — discarding"
+  alert "🔴 DB BACKUP FAILED on $(hostname): could not stat the dump. Check ${LOG_FILE}"
+  exit 1
+fi
 
 if ! gzip -t "$TMP_FILE" 2>>"$LOG_FILE"; then
   log "FAILED: archive is not a valid gzip stream — discarding"
