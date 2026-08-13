@@ -114,5 +114,6 @@ async def test_action_items_description_warns_against_the_wrong_reading(svc):
     assert "not a commitment" in desc
     assert "floor" in desc
     assert "free text" in desc
-    for absent in ("project", "due"):
-        assert absent in desc
+    # The warning itself must survive, not merely the words "project" and "due".
+    assert "do not offer" in desc
+    assert "project_id is populated on a" in desc

@@ -16,7 +16,6 @@ it — which is why the manifest tool's response stays the same size for 10 phot
 
 from __future__ import annotations
 
-import urllib.parse
 from functools import partial
 from typing import Literal
 

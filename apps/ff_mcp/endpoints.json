@@ -1,35 +1,6 @@
 {
-  "generatedAt": "2026-07-30T06:29:08.970Z",
+  "generatedAt": "2026-08-13T08:23:37.371Z",
   "routes": [
-    {
-      "path": "/api/action-items",
-      "methods": [
-        "GET"
-      ],
-      "group": "action-items"
-    },
-    {
-      "path": "/api/action-items/:id",
-      "methods": [
-        "GET"
-      ],
-      "group": "action-items"
-    },
-    {
-      "path": "/api/action-items/my-items",
-      "methods": [
-        "GET"
-      ],
-      "group": "action-items",
-      "description": "GET /api/action-items/my-items"
-    },
-    {
-      "path": "/api/action-items/stats",
-      "methods": [
-        "GET"
-      ],
-      "group": "action-items"
-    },
     {
       "path": "/api/activate/:dropNumber",
       "methods": [
@@ -1485,8 +1456,7 @@
     {
       "path": "/api/cortex-bridge/:path*",
       "methods": [
-        "GET",
-        "HEAD"
+        "GET"
       ],
       "group": "cortex-bridge",
       "description": "Public Cortex Bridge proxy for remote MCP/API clients."
@@ -2109,6 +2079,22 @@
       "description": "Fleet Mileage Project Summaries API"
     },
     {
+      "path": "/api/fleet/parking/compliance",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "GET /api/fleet/parking/compliance?from=&to=&result="
+    },
+    {
+      "path": "/api/fleet/parking/requests",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "GET /api/fleet/parking/requests — the pending approval queue."
+    },
+    {
       "path": "/api/fleet/portal/session",
       "methods": [
         "GET"
@@ -2338,6 +2324,22 @@
       "description": "H&S Appointment Letter detail API"
     },
     {
+      "path": "/api/health-safety/attachments",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S attachments — upload and list."
+    },
+    {
+      "path": "/api/health-safety/attachments/download",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "H&S attachment download."
+    },
+    {
       "path": "/api/health-safety/audits/:auditId",
       "methods": [
         "GET"
@@ -2512,6 +2514,14 @@
       ],
       "group": "health-safety",
       "description": "H&S Permit Types API"
+    },
+    {
+      "path": "/api/health-safety/ppe/acknowledgements",
+      "methods": [
+        "GET"
+      ],
+      "group": "health-safety",
+      "description": "PPE acknowledgement sheets."
     },
     {
       "path": "/api/health-safety/ppe/catalogue",
@@ -2723,7 +2733,7 @@
         "HEAD"
       ],
       "group": "mcp",
-      "description": "RFC 9728 protected-resource metadata for the FibreFlow remote MCP connector."
+      "description": "RFC 9728 protected-resource metadata for FibreFlow-hosted MCP connectors."
     },
     {
       "path": "/api/me/mcp-tokens",
@@ -2768,6 +2778,30 @@
         "GET"
       ],
       "group": "meetings"
+    },
+    {
+      "path": "/api/metrics-list",
+      "methods": [
+        "GET"
+      ],
+      "group": "metrics-list",
+      "description": "GET /api/metrics-list — the metric catalogue."
+    },
+    {
+      "path": "/api/metrics-match",
+      "methods": [
+        "GET"
+      ],
+      "group": "metrics-match",
+      "description": "GET /api/metrics-match?q=how+many+open+pre-provisions"
+    },
+    {
+      "path": "/api/metrics-query",
+      "methods": [
+        "GET"
+      ],
+      "group": "metrics-query",
+      "description": "GET /api/metrics-query?key=..&from=YYYY-MM-DD&to=YYYY-MM-DD&grain=day&dimensions=project,pop"
     },
     {
       "path": "/api/mission-control/:path*",
@@ -3273,6 +3307,30 @@
         "GET"
       ],
       "group": "onemap"
+    },
+    {
+      "path": "/api/photos/download",
+      "methods": [
+        "GET"
+      ],
+      "group": "photos",
+      "description": "GET /api/photos/download?key=&source=&uid=&exp=&sig= — one photo, by signed link."
+    },
+    {
+      "path": "/api/photos/manifest",
+      "methods": [
+        "GET"
+      ],
+      "group": "photos",
+      "description": "GET /api/photos/manifest — the download plan for a photo filter."
+    },
+    {
+      "path": "/api/photos/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "photos",
+      "description": "GET /api/photos/search"
     },
     {
       "path": "/api/pipeline/approval-types",
@@ -4827,6 +4885,30 @@
       "group": "reminders"
     },
     {
+      "path": "/api/reporting/action-items",
+      "methods": [
+        "GET"
+      ],
+      "group": "reporting",
+      "description": "GET /api/reporting/action-items?state=open&assignee=…&olderThanDays=90"
+    },
+    {
+      "path": "/api/reporting/project-overview",
+      "methods": [
+        "GET"
+      ],
+      "group": "reporting",
+      "description": "GET /api/reporting/project-overview?project=Etwatwa"
+    },
+    {
+      "path": "/api/reporting/project-section",
+      "methods": [
+        "GET"
+      ],
+      "group": "reporting",
+      "description": "GET /api/reporting/project-section?project=Etwatwa&section=build"
+    },
+    {
       "path": "/api/reports/ont-serials-export",
       "methods": [
         "GET"
@@ -5731,6 +5813,34 @@
       ],
       "group": "ws",
       "description": "WebSocket API Route"
+    },
+    {
+      "path": "/api/zone-delivery/activity",
+      "methods": [
+        "GET"
+      ],
+      "group": "zone-delivery"
+    },
+    {
+      "path": "/api/zone-delivery/register",
+      "methods": [
+        "GET"
+      ],
+      "group": "zone-delivery"
+    },
+    {
+      "path": "/api/zone-delivery/tracker",
+      "methods": [
+        "GET"
+      ],
+      "group": "zone-delivery"
+    },
+    {
+      "path": "/api/zone-delivery/zone",
+      "methods": [
+        "GET"
+      ],
+      "group": "zone-delivery"
     }
   ]
 }

@@ -43,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const { sql, params } = actionItemsQuery(parsed.filter, { isOwner: owner, email });
-    const result = await pool.query<ActionItemsRow>(sql, params as unknown[]);
+    const result = await pool.query<ActionItemsRow>(sql, params);
 
     // An aggregate without GROUP BY always yields one row, but the type system cannot
     // know it, and a silent undefined would report an empty backlog as fact.

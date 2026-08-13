@@ -33,6 +33,14 @@
  * everyone except the owner.
  */
 import { measure, type Measure } from './coverage';
+import {
+  parseActionFilter,
+  type ActionItemAccess,
+  type ActionItemFilter,
+} from './actionItemsFilter';
+
+export { parseActionFilter };
+export type { ActionItemAccess, ActionItemFilter };
 
 /** Both spellings of "nobody owns this" — the column carries a literal and a NULL. */
 const UNASSIGNED_SQL = `COALESCE(NULLIF(TRIM(a.assignee_name), ''), 'Unassigned')`;
@@ -41,56 +49,6 @@ const UNASSIGNED_SQL = `COALESCE(NULLIF(TRIM(a.assignee_name), ''), 'Unassigned'
  * Who is asking. Mirrors the meeting routes: the owner sees everything, everyone else
  * sees only meetings they attended.
  */
-export interface ActionItemAccess {
-  isOwner: boolean;
-  /** Lower-cased, matched against participants[].email. */
-  email: string;
-}
-
-export interface ActionItemFilter {
-  assignee?: string;
-  /** 'open' (default) | 'completed' | 'all' */
-  state: 'open' | 'completed' | 'all';
-  /** Only items older than this many days. */
-  olderThanDays?: number;
-  source?: string;
-  limit: number;
-}
-
-export function parseActionFilter(query: Record<string, string | string[] | undefined>):
-  | { filter: ActionItemFilter }
-  | { error: string } {
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-
-  const state = (one(query.state) ?? 'open') as ActionItemFilter['state'];
-  if (!['open', 'completed', 'all'].includes(state)) {
-    return { error: `state must be open, completed or all — got "${state}"` };
-  }
-
-  const olderRaw = one(query.olderThanDays);
-  let olderThanDays: number | undefined;
-  if (olderRaw !== undefined && olderRaw !== '') {
-    const n = Number(olderRaw);
-    if (!Number.isInteger(n) || n < 0) {
-      return { error: `olderThanDays must be a non-negative integer — got "${olderRaw}"` };
-    }
-    olderThanDays = n;
-  }
-
-  const limitRaw = Number(one(query.limit) ?? 25);
-  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.trunc(limitRaw), 1), 100) : 25;
-
-  return {
-    filter: {
-      assignee: one(query.assignee) || undefined,
-      state,
-      olderThanDays,
-      source: one(query.source) || undefined,
-      limit,
-    },
-  };
-}
-
 function push(params: unknown[], value: unknown): string {
   params.push(value);
   return `$${params.length}`;
@@ -105,6 +63,12 @@ export function actionItemsQuery(
   access: ActionItemAccess,
 ): { sql: string; params: unknown[] } {
   const params: unknown[] = [];
+
+  // Access first, and kept SEPARATE from the state/assignee filters, because the flow
+  // figures need the access scope WITHOUT the state filter. Folding them together made
+  // `completed_30d` structurally zero on the default `state=open` path — the report then
+  // said "none recorded as completed in the last 30 days" while 53 had been.
+  const accessOnly: string[] = ['1=1'];
   const where: string[] = ['1=1'];
 
   // Attendance scope, applied before any other filter. EXISTS over the meeting's
@@ -113,7 +77,7 @@ export function actionItemsQuery(
   // are withheld rather than shown — failing closed is the only safe default when the
   // payload is verbatim meeting content.
   if (!access.isOwner) {
-    where.push(`EXISTS (
+    accessOnly.push(`EXISTS (
           SELECT 1 FROM meetings m
           WHERE m.id = a.meeting_id
             AND EXISTS (
@@ -122,6 +86,7 @@ export function actionItemsQuery(
             )
         )`);
   }
+  where.push(...accessOnly.slice(1));
 
   // COALESCE, not a bare comparison: `status` is nullable and `<> 'completed'` is
   // NULL-inert, so an item with no status would vanish from the open count entirely.
@@ -136,7 +101,11 @@ export function actionItemsQuery(
     where.push(`a.created_at < now() - (${push(params, filter.olderThanDays)}::int * interval '1 day')`);
   }
 
+  // AND, always. Joining with OR would make `1=1 OR EXISTS(...)` match every row — a
+  // one-word change that hands the whole organisation's meeting content to a caller
+  // entitled to a handful of meetings. Asserted structurally in the tests.
   const scope = where.join(' AND ');
+  const accessScope = accessOnly.join(' AND ');
   // One params array, pushed in the order the placeholders appear. The sample LIMIT is
   // pushed last because it is the last placeholder in the statement.
   const limitRef = push(params, filter.limit);
@@ -163,13 +132,15 @@ export function actionItemsQuery(
       -- Extraction versus triage over the same window. This is the number that says what
       -- the backlog IS: items arrive from transcript extraction far faster than anyone
       -- closes them, which is a pipeline shape, not a delivery failure.
-      -- Scoped to the SAME rows as everything else. Reading the whole table here would
-      -- leak the organisation-wide volume to a caller entitled to two meetings.
+      -- Access-scoped but NOT state-scoped. Reading the whole table would leak
+      -- organisation-wide volume; reading scoped would exclude completed rows on the
+      -- default path and report a clearance rate of zero that is simply false.
       flow AS (
-        SELECT count(*) FILTER (WHERE created_at > now() - interval '30 days')::bigint AS created_30d,
-               count(*) FILTER (WHERE status = 'completed'
-                                  AND completed_date > now() - interval '30 days')::bigint AS completed_30d
-        FROM scoped
+        SELECT count(*) FILTER (WHERE a.created_at > now() - interval '30 days')::bigint AS created_30d,
+               count(*) FILTER (WHERE a.status = 'completed'
+                                  AND a.completed_date > now() - interval '30 days')::bigint AS completed_30d
+        FROM action_items a
+        WHERE ${accessScope}
       ),
       by_assignee AS (
         SELECT assignee, count(*)::bigint AS n,
@@ -267,12 +238,16 @@ export function shapeActionItems(
   // therefore a floor, not a count, and the top-assignee list understates whoever is
   // most fragmented.
   const spellings = n(row.distinct_assignees);
-  if (filteredByAssignee && spellings > 1) {
+  if (filteredByAssignee) {
+    // Fires on ONE match too, and that is the case that matters most: a search for
+    // "Llewelyn Hofmeyr" returns a single spelling and one item, while the same person
+    // carries 255 more under "Lew Hofmeyr", "Lew Hofmeyr - Velo" and "Lew". Presenting
+    // that single figure without warning is the most misleading output this can produce.
     caveats.push(
-      `That name matched ${spellings} different spellings of the assignee field, which is free text. ` +
-        'The totals below combine them, but anyone NOT matching your search string is still excluded — treat a per-person figure as a floor.',
+      `That search matched ${spellings} spelling${spellings === 1 ? '' : 's'} of a free-text ` +
+        'assignee field. Anyone recorded under a different spelling is NOT included, so treat this as a floor, not a count.',
     );
-  } else if (!filteredByAssignee) {
+  } else {
     caveats.push(
       'Assignee is free text and the same person appears under several spellings, so the ' +
         'per-person breakdown splits some people across rows and understates them.',
@@ -287,7 +262,9 @@ export function shapeActionItems(
   const ratio = completed > 0 ? Math.round((created / completed) * 10) / 10 : null;
 
   return {
-    matched: measure(matched),
+    // NOT measure(): storeEmpty means "this store holds nothing", which is false for a
+    // caller who simply attended no meetings. Their slice is empty; the store is not.
+    matched: { value: matched, storeEmpty: false },
     unassigned: measure(n(row.unassigned)),
     olderThan30Days: measure(n(row.over_30d)),
     olderThan90Days: measure(n(row.over_90d)),

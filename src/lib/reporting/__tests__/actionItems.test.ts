@@ -32,13 +32,31 @@ describe('attendance scoping', () => {
     expect(sql).not.toContain('FROM meetings m');
   });
 
-  it('scopes the create/close rate too, not just the list', () => {
-    // Reading the whole table for the flow figures would leak organisation-wide volume
-    // to a caller entitled to two meetings.
+  it('access-scopes the create/close rate without state-scoping it', () => {
+    // Two failure modes, opposite directions. Reading the whole table leaks
+    // organisation-wide volume. Reading `scoped` excludes completed rows on the default
+    // state=open path, so completed_30d is structurally zero and the report claims
+    // "none recorded as completed" while 53 were.
     const { sql } = actionItemsQuery(OPEN, { isOwner: false, email: 'a@b.com' });
     const flow = sql.slice(sql.indexOf('flow AS ('), sql.indexOf('by_assignee AS ('));
-    expect(flow).toContain('FROM scoped');
-    expect(flow).not.toContain('FROM action_items');
+    expect(flow).toContain('FROM action_items a');
+    expect(flow).toContain('EXISTS');            // access predicate present
+    expect(flow).not.toContain("<> 'completed'"); // state filter absent
+  });
+
+  it('joins the WHERE with AND — an OR would match every row', () => {
+    // Changing the join to OR turns the clause into `1=1 OR EXISTS(...)`, which matched
+    // ALL 5,227 items for a caller entitled to 716. Substring assertions on the presence
+    // of the predicate cannot see that, because the predicate is still present.
+    const { sql } = actionItemsQuery(
+      { ...OPEN, assignee: 'x', source: 'transcript' },
+      { isOwner: false, email: 'a@b.com' },
+    );
+    const whereClause = sql.slice(sql.indexOf('WHERE 1=1'), sql.indexOf('      ),'));
+    expect(whereClause).not.toMatch(/\bOR\b\s+EXISTS/);
+    expect(whereClause).not.toMatch(/1=1\s+OR/);
+    // Each additional filter must NARROW: every one is AND-joined.
+    expect(whereClause.match(/\bAND\b/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
   it('fails closed: an item whose meeting cannot be resolved is withheld', () => {
@@ -71,11 +89,17 @@ describe('reading the backlog honestly', () => {
     expect(r.flow.note).toContain('not as a measure');
   });
 
-  it('says a per-person total is a floor when the name is fragmented', () => {
-    // One person appears as "Lew Hofmeyr", "Lew Hofmeyr - Velo", "Lew", "Llewellyn".
-    const r = shapeActionItems(row({ matched: '262', distinct_assignees: '4' }), true);
-    expect(r.caveats.join(' ')).toContain('4 different spellings');
-    expect(r.caveats.join(' ')).toContain('floor');
+  it('warns that a per-person total is a floor — including on a single match', () => {
+    // The single-spelling case is the MOST misleading and used to emit no warning at
+    // all: "Llewelyn Hofmeyr" matches one spelling and one item, while the same person
+    // carries 255 more under "Lew Hofmeyr", "Lew Hofmeyr - Velo" and "Lew".
+    const many = shapeActionItems(row({ matched: '262', distinct_assignees: '4' }), true);
+    expect(many.caveats.join(' ')).toContain('4 spellings');
+    expect(many.caveats.join(' ')).toContain('floor');
+
+    const one = shapeActionItems(row({ matched: '1', distinct_assignees: '1' }), true);
+    expect(one.caveats.join(' ')).toContain('1 spelling');
+    expect(one.caveats.join(' ')).toContain('floor');
   });
 
   it('always states that project and due-date cannot be filtered', () => {

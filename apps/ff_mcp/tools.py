@@ -34,7 +34,18 @@ from .server import mcp
 # Mirrors DENIED_GROUPS in scripts/build-mcp-endpoint-catalogue.ts. Omitting a group
 # from the catalogue is not enough on its own — Claude can construct a path it never saw
 # listed — so fibreflow_get refuses them too.
-DENIED_GROUPS = ("accounting", "staff", "my", "cortex-remote-mcp", "ff-remote-mcp")
+# `action-items` is denied because those rows are meeting content and /api/action-items
+# applies no attendance filter — see the note in build-mcp-endpoint-catalogue.ts. The
+# attendance-scoped report at /api/reporting/action-items is in the `reporting` group and
+# stays reachable.
+DENIED_GROUPS = (
+    "accounting",
+    "staff",
+    "my",
+    "cortex-remote-mcp",
+    "ff-remote-mcp",
+    "action-items",
+)
 
 MAX_RESPONSE_CHARS = 15_000
 
