@@ -84,7 +84,12 @@ function pagination(filters: AssignmentRosterFilters): { limit: number; offset: 
   return { limit: Math.min(Math.max(requestedLimit, 1), 100), offset: Math.max(requestedOffset, 0) };
 }
 
-export async function listAssignmentRoster(filters: AssignmentRosterFilters = {}): Promise<AssignmentRosterResult> {
+export interface AssignmentRosterQuery {
+  text: string;
+  params: unknown[];
+}
+
+export function buildAssignmentRosterQuery(filters: AssignmentRosterFilters = {}): AssignmentRosterQuery {
   const conditions: string[] = [];
   const params: unknown[] = [];
   const add = (condition: string, value: unknown) => {
@@ -102,7 +107,7 @@ export async function listAssignmentRoster(filters: AssignmentRosterFilters = {}
   const startDateParam = params.length - 1; const endDateParam = params.length;
   params.push(limit, offset);
 
-  const rows = await query<RosterRow>(`
+  return { text: `
     WITH staff_days AS (
       SELECT s.id AS staff_id, CONCAT_WS(' ', s.first_name, s.last_name) AS staff_name, s.home_site_id,
         day::date AS work_date
@@ -137,8 +142,12 @@ export async function listAssignmentRoster(filters: AssignmentRosterFilters = {}
     FROM effective LEFT JOIN projects p ON p.id=effective.project_id LEFT JOIN fleet_project_operational_sites ops ON ops.id=effective.operational_site_id
     WHERE ${conditions.length ? conditions.join(' AND ') : 'true'}
     ORDER BY effective.work_date DESC, effective.staff_name
-    LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
+    LIMIT $${params.length - 1} OFFSET $${params.length}`, params };
+}
 
+export async function listAssignmentRoster(filters: AssignmentRosterFilters = {}): Promise<AssignmentRosterResult> {
+  const rosterQuery = buildAssignmentRosterQuery(filters);
+  const rows = await query<RosterRow>(rosterQuery.text, rosterQuery.params);
   return {
     items: rows.map((row) => ({
       assignmentId: row.assignment_id, staffId: row.staff_id, staffName: row.staff_name,

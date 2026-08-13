@@ -11,6 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
+import { buildAssignmentRosterQuery } from '@/modules/fleet/assignments/rosterQueries';
 
 const SCHEMA = 'mig488_fleet_operational_assignments_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
@@ -30,6 +31,10 @@ const STAFF = '10000000-0000-4000-8000-000000000003';
 const LOCATION = '10000000-0000-4000-8000-000000000004';
 const AOI = '10000000-0000-4000-8000-000000000005';
 const VEHICLE_ASSIGNMENT = '10000000-0000-4000-8000-000000000006';
+const UNASSIGNED_STAFF = '10000000-0000-4000-8000-000000000007';
+const UNASSIGNED_USER = '10000000-0000-4000-8000-000000000008';
+const TEAM = '10000000-0000-4000-8000-000000000009';
+const POLICY = '10000000-0000-4000-8000-000000000010';
 
 const admin = new Pool({ connectionString: BASE_URL, ssl: false, max: 1 });
 const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 1 });
@@ -40,11 +45,27 @@ const PREREQUISITES = `
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
   CREATE TABLE users (id UUID PRIMARY KEY, email TEXT NOT NULL UNIQUE);
-  CREATE TABLE staff (id UUID PRIMARY KEY, user_id UUID REFERENCES users(id), full_name TEXT NOT NULL);
-  CREATE TABLE projects (id UUID PRIMARY KEY, project_name TEXT NOT NULL, project_code TEXT);
+  CREATE TABLE staff (id UUID PRIMARY KEY, user_id UUID REFERENCES users(id), full_name TEXT NOT NULL,
+    first_name TEXT, last_name TEXT, status TEXT DEFAULT 'active', is_active BOOLEAN DEFAULT true,
+    home_site_id UUID);
+  CREATE TABLE projects (id UUID PRIMARY KEY, project_name TEXT NOT NULL, project_code TEXT,
+    status TEXT DEFAULT 'active');
   CREATE TABLE fno_atlas_project_aois (id UUID PRIMARY KEY);
   CREATE TABLE fleet_authorized_locations (id UUID PRIMARY KEY, name TEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true);
-  CREATE TABLE vehicle_assignments (id UUID PRIMARY KEY, staff_id UUID NOT NULL REFERENCES staff(id));
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration_number TEXT, status TEXT);
+  CREATE TABLE vehicle_assignments (id UUID PRIMARY KEY, staff_id UUID NOT NULL REFERENCES staff(id),
+    fleet_vehicle_id UUID, assignment_start DATE, assignment_end DATE);
+  CREATE TABLE fleet_vehicle_project_assignments (id UUID PRIMARY KEY, vehicle_id UUID, project_id UUID,
+    is_active BOOLEAN, assigned_date DATE, returned_date DATE);
+  CREATE TABLE attendance_policies (id UUID PRIMARY KEY, is_active BOOLEAN, start_time TIME, end_time TIME,
+    work_days JSONB);
+  CREATE TABLE attendance_policy_assignments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), staff_id UUID,
+    policy_id UUID, effective_from DATE, effective_to DATE);
+  CREATE TABLE teams (id UUID PRIMARY KEY, team_name TEXT, is_active BOOLEAN, team_type TEXT);
+  CREATE TABLE team_members (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), team_id UUID, user_id UUID,
+    is_active BOOLEAN);
+  CREATE TABLE project_team_assignments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), project_id UUID,
+    team_id UUID, role TEXT);
   CREATE TABLE access_permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), type VARCHAR(20) NOT NULL,
     key VARCHAR(100) UNIQUE NOT NULL, parent_key VARCHAR(100), label VARCHAR(100) NOT NULL,
@@ -60,12 +81,22 @@ const PREREQUISITES = `
     permission_key VARCHAR(100) NOT NULL, override_type VARCHAR(10) NOT NULL, actions JSONB NOT NULL,
     UNIQUE (user_id, permission_key)
   );
-  INSERT INTO users (id, email) VALUES ('${USER}', 'migration-488@example.test');
-  INSERT INTO staff (id, user_id, full_name) VALUES ('${STAFF}', '${USER}', 'Migration Test Staff');
+  INSERT INTO users (id, email) VALUES ('${USER}', 'migration-488@example.test'),
+    ('${UNASSIGNED_USER}', 'migration-488-unassigned@example.test');
+  INSERT INTO staff (id, user_id, full_name, first_name, last_name) VALUES
+    ('${STAFF}', '${USER}', 'Migration Test Staff', 'Explicit', 'Driver'),
+    ('${UNASSIGNED_STAFF}', '${UNASSIGNED_USER}', 'Unassigned Test Staff', 'Scheduled', 'Unassigned');
   INSERT INTO projects (id, project_name, project_code) VALUES ('${PROJECT}', 'Migration Test Project', 'M488');
   INSERT INTO fno_atlas_project_aois (id) VALUES ('${AOI}');
   INSERT INTO fleet_authorized_locations (id, name) VALUES ('${LOCATION}', 'Migration Test Location');
   INSERT INTO vehicle_assignments (id, staff_id) VALUES ('${VEHICLE_ASSIGNMENT}', '${STAFF}');
+  INSERT INTO attendance_policies (id, is_active, start_time, end_time, work_days) VALUES
+    ('${POLICY}', true, '08:00', '17:00', '{"monday":true}');
+  INSERT INTO attendance_policy_assignments (staff_id, policy_id, effective_from) VALUES
+    ('${STAFF}', '${POLICY}', '2026-01-01'), ('${UNASSIGNED_STAFF}', '${POLICY}', '2026-01-01');
+  INSERT INTO teams (id, team_name, is_active, team_type) VALUES ('${TEAM}', 'Migration Team', true, 'internal');
+  INSERT INTO team_members (team_id, user_id, is_active) VALUES ('${TEAM}', '${UNASSIGNED_USER}', true);
+  INSERT INTO project_team_assignments (project_id, team_id, role) VALUES ('${PROJECT}', '${TEAM}', 'other');
   INSERT INTO access_permissions (type, key, label) VALUES ('module', 'fleet', 'Fleet');
 `;
 
@@ -239,6 +270,32 @@ describe('migration 488 operational-assignment invariants', () => {
     expect(rows.find((row) => row.role === 'viewer')!.actions).toMatchObject({ view: true, edit: false });
     expect(rows.find((row) => row.role === 'manager')!.actions).toMatchObject({ view: true, edit: true });
     expect(rows.every((row) => row.actions.delete === false)).toBe(true);
+  });
+});
+
+describe('effective roster production SQL', () => {
+  it('executes explicit precedence with Attendance schedule state', async () => {
+    const siteId = await insertSite({ aoiId: AOI, locationId: null });
+    await db.query(`UPDATE staff SET home_site_id = $1 WHERE id = $2`, [LOCATION, STAFF]);
+    await insertAssignment({ siteId, startDate: '2026-08-17', endDate: '2026-08-17' });
+    const built = buildAssignmentRosterQuery({ projectId: PROJECT, startDate: '2026-08-17', endDate: '2026-08-17' });
+    const { rows } = await db.query<{ staff_id: string; assignment_kind: string; operational_site_id: string; scheduled: boolean; expected_start_time: string }>(built.text, built.params);
+
+    expect(rows).toEqual([expect.objectContaining({
+      staff_id: STAFF,
+      assignment_kind: 'roster',
+      operational_site_id: siteId,
+      scheduled: true,
+      expected_start_time: '08:00:00',
+    })]);
+  });
+
+  it('executes the scheduled-unassigned project-team scope branch', async () => {
+    const built = buildAssignmentRosterQuery({ projectId: PROJECT, source: 'unassigned', unassignedScheduled: true,
+      startDate: '2026-08-17', endDate: '2026-08-17' });
+    const { rows } = await db.query<{ staff_id: string; assignment_kind: string; scheduled: boolean }>(built.text, built.params);
+
+    expect(rows).toEqual([expect.objectContaining({ staff_id: UNASSIGNED_STAFF, assignment_kind: 'unassigned', scheduled: true })]);
   });
 });
 
