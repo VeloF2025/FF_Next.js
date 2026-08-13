@@ -83,6 +83,22 @@ describe('operational status rules', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
+  it.each(['2099-02-30T00:00:00.000Z', '2099-01-01', 'January 1, 2099']) (
+    'rejects the malformed activation instant %s before SQL', async (effectiveFrom) => {
+      await expect(createRuleVersion({ ...input, effectiveFrom }, USER)).rejects.toBeInstanceOf(RuleValidationError);
+      expect(db.transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['2099-01-01T00:00:00.000Z', '2099-01-01T02:00:00+02:00'])(
+    'accepts and normalizes the valid future instant %s', async (effectiveFrom) => {
+      db.txnQueryOne.mockResolvedValueOnce(row).mockResolvedValueOnce({ ...row, version: 2, effective_from: '2099-01-01T00:00:00.000Z' });
+      db.txnQuery.mockResolvedValue([]);
+      await expect(createRuleVersion({ ...input, effectiveFrom }, USER)).resolves.toMatchObject({ version: 2 });
+      expect(db.txnQuery.mock.calls[0]?.[1]?.[0]).toBe('2099-01-01T00:00:00.000Z');
+    },
+  );
+
   it('allows an activation timestamp captured immediately before the request', async () => {
     const capturedNow = new Date(Date.now() - 1_000).toISOString();
     db.txnQueryOne.mockResolvedValueOnce({ ...row, effective_from: '2026-08-13T08:00:00.000Z' })

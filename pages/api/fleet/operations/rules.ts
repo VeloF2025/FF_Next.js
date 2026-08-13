@@ -3,6 +3,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { hasOperationalOversight } from '@/modules/fleet/operations/projectScope';
+import { parseStrictIsoInstant } from '@/modules/fleet/operations/instantValidation';
 import { createRuleVersion, listRuleVersions, RuleValidationError, type CreateRuleVersionInput } from '@/modules/fleet/operations/ruleQueries';
 
 interface Request extends NextApiRequest { user?: { id: string; role: string } }
@@ -16,7 +17,7 @@ function parseInput(body: unknown): CreateRuleVersionInput | null {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
   const value = body as Record<string, unknown>;
   if (value.timezone !== 'Africa/Johannesburg' || typeof value.effectiveFrom !== 'string'
-    || !Number.isFinite(Date.parse(value.effectiveFrom)) || typeof value.changeReason !== 'string'
+    || parseStrictIsoInstant(value.effectiveFrom) === null || typeof value.changeReason !== 'string'
     || !value.changeReason.trim() || numericFields.some((field) => typeof value[field] !== 'number')) return null;
   return {
     timezone: value.timezone, effectiveFrom: value.effectiveFrom,

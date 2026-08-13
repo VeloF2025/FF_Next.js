@@ -1,9 +1,9 @@
 import type { OperationalRule, OperationalSchedule, OperationalTimePhase, OperationalWindow } from './types';
+import { parseStrictIsoInstant } from './instantValidation';
 
 const SUPPORTED_TIMEZONE = 'Africa/Johannesburg';
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
-const ISO_INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 function nonnegativeInteger(value: number, label: string): void {
   if (!Number.isInteger(value) || value < 0) throw new Error(`${label} must be a non-negative integer`);
@@ -37,29 +37,6 @@ function addMinutes(value: Date, minutes: number): Date {
   return new Date(value.getTime() + minutes * 60_000);
 }
 
-function parseInstant(value: string): number {
-  const match = ISO_INSTANT.exec(value);
-  if (!match) throw new Error('Evaluation instant is malformed');
-  const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]);
-  const hour = Number(match[4]); const minute = Number(match[5]); const second = Number(match[6]);
-  const millisecond = Number((match[7] ?? '').padEnd(3, '0'));
-  const offsetHour = match[8] === 'Z' ? 0 : Number(match[10]);
-  const offsetMinute = match[8] === 'Z' ? 0 : Number(match[11]);
-  if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59
-    || offsetHour > 23 || offsetMinute > 59) throw new Error('Evaluation instant is malformed');
-  const local = new Date(0);
-  local.setUTCFullYear(year, month - 1, day); local.setUTCHours(hour, minute, second, millisecond);
-  if (local.getUTCFullYear() !== year || local.getUTCMonth() !== month - 1 || local.getUTCDate() !== day
-    || local.getUTCHours() !== hour || local.getUTCMinutes() !== minute || local.getUTCSeconds() !== second) {
-    throw new Error('Evaluation instant is malformed');
-  }
-  const offsetSign = match[9] === '-' ? -1 : 1;
-  const expected = local.getTime() - offsetSign * (offsetHour * 60 + offsetMinute) * 60_000;
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed) || parsed !== expected) throw new Error('Evaluation instant is malformed');
-  return parsed;
-}
-
 function validate(schedule: OperationalSchedule | null, rule: OperationalRule): OperationalSchedule {
   if (!schedule) throw new Error('Attendance schedule policy is required');
   if (schedule.timezone !== SUPPORTED_TIMEZONE || rule.timezone !== SUPPORTED_TIMEZONE) {
@@ -87,7 +64,8 @@ export function operationalWindow(schedule: OperationalSchedule | null, rule: Op
 }
 
 export function timePhase(asOf: string, schedule: OperationalSchedule | null, rule: OperationalRule): OperationalTimePhase {
-  const instant = parseInstant(asOf);
+  const instant = parseStrictIsoInstant(asOf);
+  if (instant === null) throw new Error('Evaluation instant is malformed');
   const resolved = validate(schedule, rule);
   if (!resolved.scheduled && !resolved.explicitWork) return 'off_duty';
   const window = operationalWindow(resolved, rule);

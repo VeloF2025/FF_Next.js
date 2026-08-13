@@ -1,4 +1,5 @@
 import { query, queryOne, transaction } from '@/lib/db-pool';
+import { parseStrictIsoInstant } from './instantValidation';
 
 export interface OperationalStatusRule {
   id: string; version: number; timezone: string; effectiveFrom: string; effectiveTo: string | null;
@@ -48,8 +49,10 @@ function mapRule(row: RuleRow): OperationalStatusRule {
 }
 
 function validate(input: CreateRuleVersionInput): { effectiveFrom: string; reason: string | null } {
-  const effective = new Date(input.effectiveFrom);
-  if (Number.isNaN(effective.getTime()) || effective.getTime() < Date.now() - IMMEDIATE_ACTIVATION_TOLERANCE_MS) {
+  const effectiveMs = parseStrictIsoInstant(input.effectiveFrom);
+  if (effectiveMs === null) throw new RuleValidationError('effectiveFrom must be a valid ISO instant');
+  const effective = new Date(effectiveMs);
+  if (effectiveMs < Date.now() - IMMEDIATE_ACTIVATION_TOLERANCE_MS) {
     throw new RuleValidationError('effectiveFrom cannot be more than one minute in the past');
   }
   if (!input.timezone.trim()) throw new RuleValidationError('timezone is required');

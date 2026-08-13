@@ -13,6 +13,18 @@ describe('operational rules API', () => {
   it('allows only GET and POST with method-specific permission actions', async () => { const result = await call('PATCH'); expect(result.status).toBe(405); expect(result.headers.Allow).toBe('GET, POST'); expect(mocks.create).not.toHaveBeenCalled(); });
   it('uses session actor and responds only after creation succeeds', async () => { const result = await call('POST', { ...body, actorUserId: 'attacker' }); expect(result.status).toBe(201); expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ changeReason: body.changeReason }), USER); });
   it('requires oversight and validates every field including instant and reason', async () => { mocks.oversight.mockResolvedValue(false); expect((await call('POST')).status).toBe(403); mocks.oversight.mockResolvedValue(true); expect((await call('POST', { ...body, changeReason: ' ' })).status).toBe(400); expect((await call('POST', { ...body, effectiveFrom: 'invalid' })).status).toBe(400); expect(mocks.create).not.toHaveBeenCalled(); });
+  it.each(['2099-02-30T00:00:00.000Z', '2099-01-01', 'January 1, 2099'])(
+    'rejects malformed activation instant %s at the API boundary', async (effectiveFrom) => {
+      expect((await call('POST', { ...body, effectiveFrom })).status).toBe(400);
+      expect(mocks.create).not.toHaveBeenCalled();
+    },
+  );
+  it.each(['2099-01-01T00:00:00.000Z', '2099-01-01T02:00:00+02:00'])(
+    'accepts valid future instant %s at the API boundary', async (effectiveFrom) => {
+      expect((await call('POST', { ...body, effectiveFrom })).status).toBe(201);
+      expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ effectiveFrom }), USER);
+    },
+  );
   it('does not convert transaction failure into success', async () => { mocks.create.mockRejectedValue(new Error('insert failed')); const result = await call('POST'); expect(result.status).toBe(500); expect(result.body).not.toMatchObject({ success: true }); });
   it('does not convert rule-list database failure into an empty list', async () => { mocks.list.mockRejectedValue(new Error('select failed')); const result = await call('GET'); expect(result.status).toBe(500); expect(result.body).not.toMatchObject({ data: [] }); });
 });

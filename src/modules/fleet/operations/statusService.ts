@@ -1,5 +1,6 @@
 import { evaluateOperationalStatus } from './evaluateStatus';
 import { loadOperationalEvidence } from './evidenceQueries';
+import { parseStrictIsoInstant } from './instantValidation';
 import type { OperationalEvaluation, OperationalEvidence, OperationalStatusSummary } from './types';
 
 export class OperationalStatusRequestError extends Error { constructor(message: string) { super(message); this.name = 'OperationalStatusRequestError'; } }
@@ -10,20 +11,10 @@ export interface EvidencePointDetail { source: 'attendance_clock_in' | 'attendan
 export interface OperationalEvidenceDetail { staffId: string; workDate: string; evaluation: OperationalEvaluation; points: EvidencePointDetail[] }
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/;
 function validDate(value: string): boolean { const match = DATE.exec(value); if (!match) return false; const date = new Date(0); date.setUTCFullYear(Number(match[1]), Number(match[2]) - 1, Number(match[3])); return date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3]); }
-function validInstant(value: string): boolean {
-  const match = INSTANT.exec(value); if (!match) return false;
-  const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]); const hour = Number(match[4]); const minute = Number(match[5]); const second = Number(match[6]);
-  const offsetHour = match[8] === 'Z' ? 0 : Number(match[10]); const offsetMinute = match[8] === 'Z' ? 0 : Number(match[11]);
-  if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59 || offsetHour > 23 || offsetMinute > 59) return false;
-  const local = new Date(0); local.setUTCFullYear(year, month - 1, day); local.setUTCHours(hour, minute, second, Number((match[7] ?? '').padEnd(3, '0')));
-  if (local.getUTCFullYear() !== year || local.getUTCMonth() !== month - 1 || local.getUTCDate() !== day || local.getUTCHours() !== hour) return false;
-  const sign = match[9] === '-' ? -1 : 1; return Date.parse(value) === local.getTime() - sign * (offsetHour * 60 + offsetMinute) * 60_000;
-}
 function validate(workDate: string, asOf: string): void {
   if (!validDate(workDate)) throw new OperationalStatusRequestError('workDate must be a valid ISO date');
-  const timestamp = Date.parse(asOf); if (!validInstant(asOf)) throw new OperationalStatusRequestError('asOf must be an ISO instant');
+  const timestamp = parseStrictIsoInstant(asOf); if (timestamp === null) throw new OperationalStatusRequestError('asOf must be an ISO instant');
   const ageDays = (timestamp - Date.parse(`${workDate}T00:00:00Z`)) / 86_400_000;
   if (ageDays < 0 || ageDays > 31) throw new OperationalStatusRequestError('workDate must be within the 31-day history window');
 }
