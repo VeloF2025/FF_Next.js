@@ -123,6 +123,21 @@ export async function runSilenceCheck(now: Date): Promise<SilenceCheckResult> {
   // check-in that predates its tracker's mapping has no positions to match
   // against, reports as days-stale, and fires a false alert on day one — that
   // is exactly what the first calibration pass hit before this was added.
+  //
+  // The third clause closes a real-time race, seen in production 2026-08-13:
+  // LL92LYGP checked in at 07:05:35; the detector ran at 07:10, five minutes
+  // later, and the nearest fix on record was still the PREVIOUS evening's —
+  // 13.1h away, past the 12h window — so it was flagged. The tracker actually
+  // reported 24 minutes after check-in (true gap 0.40h). The vehicle was
+  // never silent; the detector just asked before a healthy tracker had any
+  // chance to answer. Left unfixed this fires most mornings for most of the
+  // fleet — park overnight, check in at 07:00, tracker reports minutes later
+  // — which is exactly the alert-fatigue failure this detector exists to
+  // remove. A check-in is therefore only evaluated once a FULL window has
+  // elapsed since it, so the answer is determinate rather than a race. This
+  // looks like a pointless restriction in isolation; it is not — do not
+  // remove it. Must equal SILENCE_WINDOW_MS, never a second hardcoded
+  // literal, or the two will silently drift apart.
   const rows = await sql<SilenceRow>`
     SELECT
       v.id AS vehicle_id,
@@ -139,6 +154,7 @@ export async function runSilenceCheck(now: Date): Promise<SilenceCheckResult> {
     LEFT JOIN fleet_tracker_silence_alerts sa ON sa.vehicle_id = v.id
     WHERE c.created_at > now() - interval '3 days'
       AND c.created_at > t.created_at
+      AND c.created_at < now() - (${SILENCE_WINDOW_MS} || ' milliseconds')::interval
     GROUP BY v.id, v.registration, c.created_at, t.provider, t.account_ref, sa.last_alert_at
   `;
 
