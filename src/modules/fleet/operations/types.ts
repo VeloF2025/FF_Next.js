@@ -31,18 +31,27 @@ export type OperationalAssignmentSource =
 
 export interface OperationalAssignmentEvidence {
   assignmentId: string | null; source: OperationalAssignmentSource; projectId: string | null;
-  operationalSiteId: string | null; ambiguous: boolean;
+  operationalSiteId: string | null; ambiguous: boolean; siteGeometryValid: boolean;
+  siteGeometryLowConfidence: boolean;
+}
+
+export interface OperationalSitePointEvidence {
+  valid: boolean; inside: boolean; distanceM: number | null; knownSiteId: string | null;
 }
 
 export interface OperationalAttendanceEvidence {
   entryId: string | null; clockInAt: string | null; clockOutAt: string | null;
   clockInPoint: OperationalPoint | null; clockOutPoint: OperationalPoint | null;
-  matchedSiteId: string | null;
+  matchedSiteId: string | null; requiredSite: OperationalSitePointEvidence | null;
+}
+
+export interface OperationalVehiclePoint extends OperationalPoint {
+  valid: boolean; inside: boolean; distanceM: number; speedKmh: number; knownSiteId: string | null;
 }
 
 export interface OperationalVehicleEvidence {
   assignmentId: string | null; vehicleId: string | null; provider: string | null;
-  accountRef: string | null; staleAfterSeconds: number | null; positions: OperationalPoint[];
+  accountRef: string | null; staleAfterSeconds: number | null; positions: OperationalVehiclePoint[];
 }
 
 export interface OperationalEvidence {
