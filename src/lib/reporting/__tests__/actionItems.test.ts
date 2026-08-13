@@ -3,6 +3,7 @@
  * FibreFlow gates meetings on ATTENDANCE, so these tests exist mainly to prove this
  * report cannot become a way around that.
  */
+import { actionItemVisibility } from '@/lib/actionItems/meetingAccess';
 import { describe, expect, it } from 'vitest';
 
 import { actionItemsQuery, parseActionFilter, shapeActionItems, type ActionItemsRow } from '../actionItems';
@@ -18,18 +19,44 @@ function row(over: Partial<ActionItemsRow> = {}): ActionItemsRow {
 }
 
 describe('attendance scoping', () => {
-  it('restricts a normal caller to meetings they attended', () => {
-    // Verified live: owner 5,049 items; Johan 716; someone who attended nothing 0.
+  it('delegates to the shared visibility module rather than carrying its own copy', () => {
+    // Asserts DELEGATION, not SQL text. Two independently-maintained visibility rules over
+    // action_items is how they drift — they had already reached 528 vs 200 rows for one
+    // real user before being converged. If someone re-inlines a predicate here, the
+    // generated clause stops matching the module's and this fails.
+    //
+    // The substantive proof that the predicate returns the right ROWS lives in
+    // tests/db/action-items/visibility.lifecycle.test.ts, which executes it. Asserting on
+    // query text cannot establish it: three separate widening mutations preserve every
+    // substring while returning the whole table.
     const { sql, params } = actionItemsQuery(OPEN, { isOwner: false, email: 'Johan@Velocityfibre.co.za' });
-    expect(sql).toContain('FROM meetings m');
-    expect(sql).toContain("LOWER(p->>'email')");
+
+    const expectedParams: unknown[] = [];
+    const expectedClause = actionItemVisibility(
+      { isOwner: false, email: 'johan@velocityfibre.co.za', userId: '' },
+      expectedParams,
+      'a',
+      { meetingsOnly: true },
+    );
+    expect(sql).toContain(expectedClause);
     // Lower-cased before binding, because participants[].email is compared lower-cased.
     expect(params).toContain('johan@velocityfibre.co.za');
+    expect(expectedParams).toEqual(['johan@velocityfibre.co.za']);
+  });
+
+  it('scopes on attendance ALONE — not the wider rule the HTTP routes use', () => {
+    // The browser routes also grant access by assignment and to items with no meeting.
+    // This report deliberately does not: its payload is verbatim meeting content sent to
+    // an agent, and a procurement row belongs in no meeting report.
+    const { sql } = actionItemsQuery(OPEN, { isOwner: false, email: 'a@b.com' });
+    expect(sql).not.toContain('a.meeting_id IS NULL');
+    expect(sql).not.toContain('assignee_email');
+    expect(sql).not.toContain('assigned_to_user_id =');
   });
 
   it('gives the owner unconditional access, as the meeting routes do', () => {
     const { sql } = actionItemsQuery(OPEN, { isOwner: true, email: 'owner@x.com' });
-    expect(sql).not.toContain('FROM meetings m');
+    expect(sql).not.toContain('FROM meetings m_acc');
   });
 
   it('access-scopes the create/close rate without state-scoping it', () => {
@@ -63,8 +90,8 @@ describe('attendance scoping', () => {
     // 164 items carry no meeting_id and 263 meetings record no participants. EXISTS is
     // false for both, so they are excluded rather than shown to everyone.
     const { sql } = actionItemsQuery(OPEN, { isOwner: false, email: 'a@b.com' });
-    expect(sql).toContain('m.id = a.meeting_id');
-    expect(sql).toContain("COALESCE(m.participants, '[]'::jsonb)");
+    expect(sql).toContain('m_acc.id = a.meeting_id');
+    expect(sql).toContain("COALESCE(m_acc.participants, '[]'::jsonb)");
   });
 
   it('tells a scoped caller that the totals are theirs, not the organisation\'s', () => {

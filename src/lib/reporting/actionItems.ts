@@ -32,6 +32,7 @@
  * meeting cannot be resolved, or whose meeting records no participants, is excluded for
  * everyone except the owner.
  */
+import { actionItemVisibility } from '@/lib/actionItems/meetingAccess';
 import { measure, type Measure } from './coverage';
 import {
   parseActionFilter,
@@ -77,14 +78,17 @@ export function actionItemsQuery(
   // are withheld rather than shown — failing closed is the only safe default when the
   // payload is verbatim meeting content.
   if (!access.isOwner) {
-    accessOnly.push(`EXISTS (
-          SELECT 1 FROM meetings m
-          WHERE m.id = a.meeting_id
-            AND EXISTS (
-              SELECT 1 FROM jsonb_array_elements(COALESCE(m.participants, '[]'::jsonb)) AS p
-              WHERE LOWER(p->>'email') = ${push(params, access.email.toLowerCase())}
-            )
-        )`);
+    // The SAME predicate module the HTTP routes use, in its meetings-only mode — not a
+    // second copy. Two independently-maintained visibility rules over one table is how
+    // they drift apart, and a drift in this direction is a leak.
+    accessOnly.push(
+      actionItemVisibility(
+        { isOwner: false, email: access.email.toLowerCase(), userId: '' },
+        params,
+        'a',
+        { meetingsOnly: true },
+      ),
+    );
   }
   where.push(...accessOnly.slice(1));
 

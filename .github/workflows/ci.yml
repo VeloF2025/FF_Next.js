@@ -438,6 +438,22 @@ jobs:
         run: npm run test:db:zone-delivery
         timeout-minutes: 15
 
+      # Action-item visibility DB tests — same rationale as the zone-delivery step above:
+      # the guarantee exists ONLY at this layer. Mutation testing during review showed the
+      # unit suite is blind to the mutations that matter. Pushing an extra `TRUE` arm into
+      # actionItemVisibility, dropping the sub-select correlation `m_acc.id = ai.meeting_id`,
+      # or replacing the participant match with `IS NOT NULL` each leave all 42 unit tests
+      # green while taking a caller from their own rows to every action item in the table.
+      # All three preserve the generated SQL's substrings and its parenthesis depth, so no
+      # assertion on the query TEXT can catch them — only executing the predicate and
+      # comparing the row set can, which needs a database.
+      #
+      # Blocking, and spins its own throwaway Postgres on an EPHEMERAL port
+      # (tests/db/setup/global-setup.ts) — never the shared dev+prod database.
+      - name: Action item visibility DB tests — real Postgres (gate)
+        run: npm run test:db:action-items
+        timeout-minutes: 15
+
       - name: Clean up this run's zone delivery test container
         if: always()
         run: |
