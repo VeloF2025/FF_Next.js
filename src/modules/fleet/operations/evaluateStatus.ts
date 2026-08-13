@@ -64,7 +64,7 @@ function latestVehicle(context: EvaluationContext): OperationalVehiclePoint | nu
 
 function attendanceWrongConfirmed(context: EvaluationContext): boolean {
   const { attendance } = context.evidence;
-  return Boolean(attendance.clockInAt && attendance.requiredSite?.valid && !attendance.requiredSite.inside
+  return Boolean(attendance.clockInAt && !attendance.clockOutAt && attendance.requiredSite?.valid && !attendance.requiredSite.inside
     && attendance.matchedSiteId && elapsedSeconds(attendance.clockInAt, context.evidence.asOf) >= context.evidence.rule.wrongSiteConfirmationMinutes * 60);
 }
 
@@ -102,8 +102,13 @@ function evaluateDeparture(context: EvaluationContext): Decision | null {
       ? decision('shift_complete', 'attendance_normal_clock_out') : decision('left_early', 'attendance_early_clock_out');
   }
   const departureStarted = vehicleOutside?.startedAt;
-  const hadInsideBefore = Boolean(departureStarted && evidence.vehicle.positions.some((point) => point.inside
-    && Date.parse(point.recordedAt) < Date.parse(departureStarted)));
+  const priorInside = departureStarted ? context.freshVehicle.filter((point) => point.inside
+    && Date.parse(point.recordedAt) < Date.parse(departureStarted)) : [];
+  const priorInsideFixes = priorInside.map((point) => ({ recordedAt: point.recordedAt, valid: point.valid,
+    inside: point.inside, distanceM: point.distanceM, speedKmh: point.speedKmh }));
+  const staleAfter = evidence.vehicle.staleAfterSeconds;
+  const hadInsideBefore = Boolean(departureStarted && staleAfter !== null && continuousInside(priorInsideFixes,
+    evidence.rule.arrivalDwellMinutes * 60, staleAfter, departureStarted).confirmed);
   if (vehicleOutside?.confirmed && hadInsideBefore) {
     if (Date.parse(evidence.asOf) < Date.parse(window.scheduledEnd)) return decision('left_early', 'vehicle_departure_confirmed_early');
     context.flags.add('vehicle_driver_presence_unconfirmed');

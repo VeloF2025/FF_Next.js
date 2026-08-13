@@ -70,6 +70,8 @@ describe('evaluateOperationalStatus', () => {
     const positions = ['06:00:00', '06:05:00'].map((time) => ({ ...wrongPoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: false, distanceM: 2000, speedKmh: 0, knownSiteId: 'site-2' }));
     expect(status(evidence({ attendance, vehicle: { ...vehicleInside, positions } }))).toBe('wrong_site');
     expect(status(evidence({ attendance, vehicle: evidence().vehicle }))).toBe('wrong_site');
+    expect(status(evidence({ attendance: { ...attendance, clockOutAt: '2026-08-14T12:00:00Z' } }))).toBe('left_early');
+    expect(status(evidence({ attendance: { ...attendance, clockOutAt: '2026-08-14T15:00:00Z' } }))).toBe('shift_complete');
   });
 
   it('distinguishes cross-site mismatch from coordinate jitter within tolerance', () => {
@@ -83,8 +85,31 @@ describe('evaluateOperationalStatus', () => {
   it('handles early and normal Attendance clock-out plus confirmed vehicle departure', () => {
     expect(status(evidence({ attendance: { ...attendanceInside, clockOutAt: '2026-08-14T12:00:00Z' } }))).toBe('left_early');
     expect(status(evidence({ attendance: { ...attendanceInside, clockOutAt: '2026-08-14T15:00:00Z' } }))).toBe('shift_complete');
-    const positions = [vehicleInside.positions[0]!, ...['12:00:00', '12:10:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: false, distanceM: 500, speedKmh: 20, knownSiteId: null }))];
+    const positions = [
+      ...['11:50:00', '11:55:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: true, distanceM: 0, speedKmh: 0, knownSiteId: 'site-1' })),
+      ...['12:00:00', '12:10:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: false, distanceM: 500, speedKmh: 20, knownSiteId: null })),
+    ];
     expect(status(evidence({ asOf: '2026-08-14T12:10:00Z', vehicle: { ...vehicleInside, staleAfterSeconds: 3600, positions } }))).toBe('left_early');
+  });
+
+  it.each([
+    { recordedAt: '2026-08-14T04:00:00Z', valid: true },
+    { recordedAt: '2026-08-14T06:00:00Z', valid: false },
+    { recordedAt: '2026-08-14T13:00:00Z', valid: true },
+  ])('does not treat an unusable historical inside fix as prior confirmed presence: %o', (historical) => {
+    const positions = [
+      { ...vehicleInside.positions[0]!, ...historical },
+      ...['12:00:00', '12:10:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: false, distanceM: 500, speedKmh: 20, knownSiteId: null })),
+    ];
+    expect(status(evidence({ asOf: '2026-08-14T12:10:00Z', vehicle: { ...vehicleInside, staleAfterSeconds: 3600, positions } }))).toBe('late');
+  });
+
+  it('requires a confirmed fresh inside sequence before a confirmed departure', () => {
+    const positions = [
+      { ...vehicleInside.positions[0]!, recordedAt: '2026-08-14T11:59:00Z' },
+      ...['12:00:00', '12:10:00'].map((time) => ({ ...insidePoint, recordedAt: `2026-08-14T${time}Z`, valid: true, inside: false, distanceM: 500, speedKmh: 20, knownSiteId: null })),
+    ];
+    expect(status(evidence({ asOf: '2026-08-14T12:10:00Z', vehicle: { ...vehicleInside, staleAfterSeconds: 3600, positions } }))).toBe('late');
   });
 
   it('returns pending and evidence-quality supporting flags', () => {
@@ -103,7 +128,7 @@ describe('evaluateOperationalStatus', () => {
       ['outside_monitoring_window', evidence({ asOf: '2026-08-14T16:00:01Z' })],
       ['arrival_dwell_pending', evidence({ vehicle: { ...vehicleInside, positions: [vehicleInside.positions[0]!] } })],
       ['wrong_site_confirmation_pending', evidence({ attendance: { ...attendanceInside, clockInAt: '2026-08-14T06:18:00Z', matchedSiteId: 'site-2', requiredSite: { valid: true, inside: false, distanceM: 500, knownSiteId: 'site-2' } } })],
-      ['departure_confirmation_pending', evidence({ asOf: '2026-08-14T12:01:00Z', vehicle: { ...vehicleInside, staleAfterSeconds: 30_000, positions: [vehicleInside.positions[0]!, { ...vehicleInside.positions[0]!, recordedAt: '2026-08-14T12:00:00Z', inside: false, distanceM: 500 }] } })],
+      ['departure_confirmation_pending', evidence({ asOf: '2026-08-14T12:01:00Z', vehicle: { ...vehicleInside, staleAfterSeconds: 30_000, positions: [...vehicleInside.positions, { ...vehicleInside.positions[0]!, recordedAt: '2026-08-14T12:00:00Z', inside: false, distanceM: 500 }] } })],
       ['vehicle_driver_presence_unconfirmed', evidence({ vehicle: vehicleInside })],
       ['evidence_source_error', evidence({ sourceErrors: ['attendance load failed'] })],
     ];
