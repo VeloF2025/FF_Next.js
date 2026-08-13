@@ -141,6 +141,17 @@ def _rate_limit(token: str) -> None:
         _call_times[key] = recent
 
 
+def build_query(**params: object) -> str:
+    """Urlencode the parameters that were actually given, dropping the rest.
+
+    Shared by every tool module. Sending `type=None` would filter on the literal string
+    "None" and match nothing, which reads back to the model as "this project has no depth
+    photos" rather than as an error.
+    """
+    present = {k: v for k, v in params.items() if v is not None and v != ""}
+    return urllib.parse.urlencode(present)
+
+
 def _reject(message: str, **extra) -> str:
     return json.dumps({"error": message, **extra}, indent=2)
 
