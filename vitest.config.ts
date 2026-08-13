@@ -162,6 +162,7 @@ export default defineConfig({
       { find: /^@\/lib\/wa-bridge-health/, replacement: path.resolve(__dirname, 'src/lib/wa-bridge-health') },
       { find: '@/lib/rateLimiter', replacement: path.resolve(__dirname, './src/lib/rateLimiter') },
       { find: '@/lib/featureFlags', replacement: path.resolve(__dirname, './src/lib/featureFlags') },
+      { find: '@/lib/actionItems', replacement: path.resolve(__dirname, './src/lib/actionItems') },
       { find: '@/lib/utils', replacement: path.resolve(__dirname, './src/lib/utils') },
       { find: '@/lib/smtpConfig', replacement: path.resolve(__dirname, './src/lib/smtpConfig') },
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
