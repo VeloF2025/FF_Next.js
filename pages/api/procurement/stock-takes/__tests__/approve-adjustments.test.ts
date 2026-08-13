@@ -42,10 +42,7 @@ const USER = { id: 'user-approver', role: 'admin', email: 'a@x.co', name: 'Ann A
 
 interface RecordedQuery { text: string; params: unknown[] }
 
-function invoke(takeRow: Record<string, unknown>, txnBehaviour?: {
-  lockedStatus?: string;
-  recorded?: RecordedQuery[];
-}) {
+function invoke(takeRow: Record<string, unknown>) {
   mocks.neonTag.mockResolvedValueOnce([takeRow]);
   const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
     method: 'POST',
