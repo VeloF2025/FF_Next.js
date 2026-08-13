@@ -440,6 +440,35 @@ The `VehicleCalibrationModal` and `OdometerOverrideModal` use `navigator.mediaDe
 ## Recent Changes (Feb 2026)
 - **Camera Permission UX**: Improved error messages with step-by-step fix instructions instead of generic "allow camera permissions" message (Johann Lubbe report, 2026-02-09)
 
+## Operational Assignments (migration 488, PR 3)
+
+`/fleet/assignments` holds the human-reviewed, explicit expectation for where a
+staff member is expected to work. It is protected by `fleet.assignments` and is
+scoped to projects the user may manage; a project-manager role alone never
+authorizes reads or edits for another project.
+
+| Table | Purpose |
+|---|---|
+| `fleet_project_operational_sites` | Auditable project-to-source mapping. A row has exactly one source: a project AOI or an authorized location; each project has at most one active default. |
+| `fleet_operational_assignments` | Explicit roster and daily-override expectations, including stable project/site display snapshots. Active dates for a staff member may not overlap. |
+| `fleet_project_operational_site_audit` | Append-only operational-site changes. |
+| `fleet_operational_assignment_audit` | Append-only roster, override, move, end, and supersede evidence. |
+
+**Precedence and source boundary.** A one-day, reasoned `daily_override` is
+highest precedence, followed by an active explicit roster assignment. Vehicle-
+project relationships and a staff member's home site remain derived fallbacks;
+they are not copied into assignment rows. Geometry also remains at its source
+instead of being duplicated into this module.
+
+**Bulk safety.** Preview produces a deterministic fingerprint of the requested
+roster and the conflict-relevant current state. Commit requires that fingerprint
+and rejects a stale preview before its transaction writes anything. The database
+exclusion constraint is the final concurrent-overlap guard.
+
+**PR boundary.** PR 3 ends at operational site configuration, explicit
+assignments, and expectation resolution. PR 4 owns downstream attendance-status
+or workflow behavior; do not introduce it here.
+
 ## Recent Changes (Jan 2026)
 - Added `VehicleCalibrationModal` for first-time setup
 - Added calibration API with grandfathering logic
