@@ -225,7 +225,14 @@ async function handleApprove(
     );
 
     for (const line of varianceLines) {
-      const finalCount = Number(line.recount_quantity ?? line.counted_quantity);
+      const rawCount = line.recount_quantity ?? line.counted_quantity;
+      if (rawCount === null || rawCount === undefined) {
+        // Never actually counted — must not silently write 0. Unreachable in the
+        // normal flow (handleComplete blocks pending_review with uncounted lines)
+        // but the guard should mean what it says.
+        throw new Error(`Stock take line ${String(line.id)} was never counted`);
+      }
+      const finalCount = Number(rawCount);
       const expected = Number(line.expected_quantity);
       if (!Number.isFinite(finalCount) || finalCount < 0) {
         throw new Error(`Invalid counted quantity for stock take line ${String(line.id)}`);

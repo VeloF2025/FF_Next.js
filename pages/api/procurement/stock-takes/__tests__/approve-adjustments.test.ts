@@ -94,10 +94,16 @@ describe('stock-take approve', () => {
     expect(res._getStatusCode()).toBe(200);
 
     // Absolute write: the stock_quants upsert receives the counted value (10),
-    // NOT the variance (10 - 4 = 6).
+    // NOT the variance (10 - 4 = 6)...
     const quantWrite = recorded.find(q => q.text.includes('INSERT INTO stock_quants'));
     expect(quantWrite).toBeDefined();
     expect(quantWrite!.params).toEqual(['item-1', 'loc-1', 10]);
+    // ...and the SQL SETs the quantity absolutely, not incrementally. This pins
+    // the exact bug the rewrite fixes: reverting to `quantity = quantity + $3`
+    // (the old delta write) must fail this test even though the params are equal.
+    expect(quantWrite!.text).toMatch(/DO UPDATE SET\s+quantity = \$3/);
+    expect(quantWrite!.text).not.toMatch(/quantity\s*=\s*stock_quants\.quantity\s*\+/);
+    expect(quantWrite!.text).not.toMatch(/quantity\s*=\s*quantity\s*\+/);
 
     // Adjustment audit + status flip attributed to the session user id.
     const finalUpdate = recorded.find(q => q.text.includes('UPDATE stock_takes'));
