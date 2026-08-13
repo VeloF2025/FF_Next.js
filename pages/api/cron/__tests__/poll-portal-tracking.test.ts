@@ -47,6 +47,7 @@ vi.mock('@/services/tracking/alerts', () => ({
 }));
 
 import { PartialFetchError } from '@/services/tracking/netstar/client';
+import { SILENCE_WINDOW_MS } from '@/services/tracking/silence';
 import handler from '../poll-portal-tracking';
 
 const SECRET = 'test-cron-secret';
@@ -1248,6 +1249,36 @@ describe('per-vehicle silence detection', () => {
     provider: 'netstar', account_ref: 'europcar',
     last_alert_at: null,
     ...overrides,
+  });
+
+  /**
+   * The real-time race (fix round 2, production 2026-08-13): evaluating a
+   * check-in immediately races a healthy tracker that has not had a chance
+   * to report yet. LL92LYGP checked in at 07:05:35; the detector ran at
+   * 07:10 and saw only the previous evening's fix, 13.1h away — past the
+   * 12h window — and flagged it. The tracker actually reported 24 minutes
+   * after check-in; the vehicle was never silent. This would fire most
+   * mornings for most of the fleet.
+   *
+   * `sqlMock` returns whatever rows it is handed regardless of the WHERE
+   * clause text — it does not run real SQL — so the row-exclusion behaviour
+   * itself cannot be exercised here. What CAN be proven at this layer is
+   * that the query sent to Postgres carries the upper bound at all, and
+   * that its value is tied to SILENCE_WINDOW_MS rather than a second,
+   * driftable literal. The exclusion behaviour itself is Postgres's to
+   * enforce; production is what surfaced its absence in the first place.
+   */
+  it('bounds the check-in query above by SILENCE_WINDOW_MS, not just below by the 3-day floor', async () => {
+    stubSilenceRows([silentRow()]);
+    await run(AUTH);
+    const call = sqlMock.mock.calls.find((c) =>
+      (c[0] as TemplateStringsArray).join('').includes('FROM fleet_check_records'));
+    expect(call).toBeDefined();
+    const text = (call![0] as TemplateStringsArray).join('');
+    expect(text).toMatch(/c\.created_at\s*<\s*now\(\)/);
+    // Tied to the constant, not a hardcoded second literal — the two must
+    // never be able to drift apart.
+    expect(call!.slice(1)).toContain(SILENCE_WINDOW_MS);
   });
 
   it('raises a gap alert for a vehicle whose tracker went dark, even with no providers configured this tick', async () => {
