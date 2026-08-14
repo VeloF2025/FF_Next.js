@@ -57,4 +57,21 @@ describe('createPicking idempotency', () => {
     // The idempotency lookup did run.
     expect(sqlCalls.some((s) => /WHERE idempotency_key =/i.test(s))).toBe(true);
   });
+
+  it('generates the picking number via the race-safe generate_picking_number(), not COUNT(*)', async () => {
+    // Fresh create (no idempotency key): it proceeds past the replay check to the
+    // numbering step. With the fully-mocked sql the header INSERT resolves []
+    // (→ 500 later), but the numbering query still ran and is recorded.
+    const res = mockRes();
+    await createPicking(
+      { body: {
+        pickingType: 'transfer', sourceLocationId: 'src', destinationLocationId: 'dst',
+        lines: [{ stockItemId: 'i1', plannedQuantity: 5, serialIds: ['S1'] }],
+      } } as NextApiRequest,
+      res, 'staff1');
+
+    expect(sqlCalls.some((s) => /generate_picking_number/i.test(s))).toBe(true);
+    // The racy COUNT(*)+1 numbering must be gone.
+    expect(sqlCalls.some((s) => /COUNT\(\*\)\s+as count FROM stock_pickings/i.test(s))).toBe(false);
+  });
 });

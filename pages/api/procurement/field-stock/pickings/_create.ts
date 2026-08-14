@@ -225,15 +225,17 @@ export async function createPicking(
     const resolvedSerialIds = serialCheck.resolvedSerialIds ?? new Map<string, string>();
     // ── End serial availability check ────────────────────────────────────────
 
-    // Generate picking number. NOTE: COUNT(*)+1 is racy (two concurrent creates
-    // can collide on picking_number's unique constraint → 500). Left as-is here
-    // to preserve the existing PCK-###### format; switching to the race-safe
-    // generate_picking_number() changes the format to ISS-YYYYMM-##### and is a
-    // separate follow-up. The idempotency key below is the fix for the offline
-    // queue's duplicate-submission problem (the actual double-issue bug).
-    const countResult = await sql`SELECT COUNT(*) as count FROM stock_pickings`;
-    const count = countResult[0] ? Number(countResult[0].count || 0) : 0;
-    const pickingNumber = `PCK-${String(count + 1).padStart(6, '0')}`;
+    // Generate the picking number via the race-safe SQL function (migration 028),
+    // which draws from an atomic sequence (nextval) — the old COUNT(*)+1 could
+    // let two concurrent creates compute the same number and collide on the
+    // picking_number unique constraint (500). Numbers are type-prefixed, e.g.
+    // ISS-YYYYMM-##### / TRF-… (legacy pickings keep their PCK-###### numbers;
+    // nothing in the codebase parses the format, and lists order by created_at).
+    // Pass the raw type (null when absent) so the function's prefix matches the
+    // stored picking_type: a typeless picking gets the PKG- fallback, not a
+    // misleading ISS-.
+    const numResult = await sql`SELECT generate_picking_number(${pickingType || null}) AS num`;
+    const pickingNumber = numResult[0]?.num as string;
 
     // Create picking header
     const pickingResult = await sql`
