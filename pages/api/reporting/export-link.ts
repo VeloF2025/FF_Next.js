@@ -20,6 +20,8 @@ import {
   type ExportReport,
 } from '@/lib/reporting/exportLinks';
 import { isConfigured } from '@/lib/photos/photoLinks';
+import { EXPORT_MAX_ROWS, exportCountQuery } from '@/lib/reporting/exportQueries';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 
 /**
@@ -76,8 +78,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // 31 users hold the meetings key against 84 for action items, so the two are not
   // interchangeable. Checked with the async helper because the sync `hasPermission` does
   // not consult user_permission_overrides.
+  // withAuth returns the handler promise without awaiting it, so an unhandled rejection
+  // here surfaces as a bare Next 500 with nothing logged. withPermission wraps its own
+  // check for exactly this reason; doing the check inline means doing the wrapping too.
   const key = REPORT_PERMISSION[report];
-  if (!(await userHasPermission(user.id, key, 'view'))) {
+  let permitted: boolean;
+  try {
+    permitted = await userHasPermission(user.id, key, 'view');
+  } catch (error) {
+    log.error('Export permission check failed', {
+      module: 'reporting-export',
+      key,
+      error: (error as Error).message,
+    });
+    return apiResponse.internalError(res, new Error('Could not verify your access.'));
+  }
+  if (!permitted) {
     return apiResponse.forbidden(res, `You do not have ${key} access.`);
   }
 
@@ -107,10 +123,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     email: resolved.access.email,
   });
 
+  // Count now, so the caller learns the size BEFORE downloading — and so an MCP client,
+  // which only ever sees this JSON and never the CSV's headers, can tell the truth about
+  // truncation. Previously the only signal was a response header on the file itself,
+  // which neither a browser download nor an agent observes.
+  let rows: number | null = null;
+  try {
+    const counted = exportCountQuery(report, resolved.access, filters);
+    rows = (await pool.query(counted.text, counted.params)).rows[0]?.n ?? null;
+  } catch (error) {
+    // A failed count must not block the link — the export itself still works, and the
+    // CSV carries its own truncation notice. Report null rather than guessing a number.
+    log.warn('Export row count failed; link issued without it', {
+      module: 'reporting-export',
+      report,
+      error: (error as Error).message,
+    });
+  }
+
   res.setHeader('Cache-Control', 'private, no-store');
   return apiResponse.success(res, {
     url: url.toString(),
     expiresInSeconds: EXPORT_TTL_SECONDS,
+    rows,
+    truncated: rows === null ? null : rows > EXPORT_MAX_ROWS,
+    maxRows: EXPORT_MAX_ROWS,
     scope: resolved.access.isOwner
       ? 'Every row in the report.'
       : 'Only the rows you can see — meetings you attended. Anyone holding this URL gets that same slice until it expires.',

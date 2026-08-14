@@ -15,8 +15,16 @@
  *    and which round-trips as data.
  */
 
-/** Characters that make a spreadsheet treat the cell as a formula rather than text. */
-const FORMULA_LEAD = /^[=+\-@\t\r]/;
+/**
+ * Characters that make a spreadsheet treat the cell as a formula rather than text.
+ *
+ * Leading WHITESPACE is included, not just the operators. Spreadsheets skip it before
+ * deciding, so ` =1+1` evaluates exactly as `=1+1` does — a documented bypass of naive
+ * neutralisers that only look at the first character. Two live meeting titles already
+ * begin with whitespace, so this is not a hypothetical shape for the data to take.
+ * `\u00A0` is a non-breaking space, which arrives from anything pasted out of a browser.
+ */
+const FORMULA_LEAD = /^[\s\u00A0]*[=+\-@]/;
 
 /**
  * A UTF-8 byte-order mark.
@@ -29,6 +37,12 @@ export const UTF8_BOM = '﻿';
 
 export function csvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
+
+  // A real number is never a formula, and prefixing it turns a value a spreadsheet would
+  // sum into text it cannot. Only strings — the ones that came from someone's typing —
+  // need neutralising. `-5` as a number stays `-5`; "-5" as free text does not.
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  if (typeof value === 'boolean') return String(value);
 
   let text: string;
   if (value instanceof Date) {
@@ -58,11 +72,30 @@ export interface CsvColumn<T> {
  * CRLF line endings, per RFC 4180 — Excel accepts LF but some older importers do not,
  * and a quoted field containing a bare LF is ambiguous to them.
  */
-export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): string {
+export function toCsv<T>(
+  rows: readonly T[],
+  columns: readonly CsvColumn<T>[],
+  truncation?: { truncated: boolean; total: number },
+): string {
   const lines: string[] = [columns.map((c) => csvCell(c.header)).join(',')];
   for (const row of rows) {
     lines.push(columns.map((c) => csvCell(c.value(row))).join(','));
   }
+
+  // A truncation notice belongs IN THE FILE. The response header that used to be the
+  // only signal is invisible to both delivery channels this export exists for — a
+  // browser download and a spreadsheet's web import — so a partial CSV was
+  // indistinguishable from a complete one to the person actually reading it.
+  //
+  // Written as a normal row so the column count still matches and nothing downstream
+  // trips over it, with the notice in the first cell where a reader will see it.
+  if (truncation?.truncated) {
+    const notice =
+      `NOTE: truncated — showing the first ${rows.length} of ${truncation.total} rows. ` +
+      `Narrow the report and export again to see the rest.`;
+    lines.push([csvCell(notice), ...columns.slice(1).map(() => '')].join(','));
+  }
+
   return UTF8_BOM + lines.join('\r\n') + '\r\n';
 }
 

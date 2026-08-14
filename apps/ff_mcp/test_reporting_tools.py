@@ -199,4 +199,10 @@ async def test_report_export_description_sets_expectations(svc):
     assert "anyone holding the url" in desc
     # Must not invite the model to fetch and paste the rows.
     assert "do not try to fetch it yourself" in desc
-    assert "x-export-truncated" in desc
+
+    # The truncation caveat must point at something the model can actually OBSERVE.
+    # It only ever sees this tool's JSON — never the CSV or its response headers — so an
+    # instruction to check a header on the download is unfollowable by construction.
+    assert "`rows`" in desc or "rows is how many" in desc
+    assert "truncated" in desc
+    assert "x-export-truncated" not in desc

@@ -261,8 +261,12 @@ async def get_report_export(report: str, state: str = "open") -> str:
       post in a shared channel. For most callers the slice is "meetings you attended";
       the response says which case applies.
 
-    The CSV covers up to 5,000 rows. If it is truncated the response header
-    X-Export-Truncated says so — never describe a truncated export as the complete set.
+    The response tells you the size before anyone downloads anything: `rows` is how many
+    the export contains and `truncated` says whether the 5,000-row cap cut it short. Read
+    those and say so — "4,812 rows" or "the first 5,000 of 5,235". Never describe a
+    truncated export as the complete set. If `rows` is null the count could not be taken;
+    say the size is unknown rather than inventing one. The CSV also carries a final row
+    saying it was truncated, for whoever opens the file.
     """
     query = build_query(report=report, state=state)
     return await anyio.to_thread.run_sync(partial(_export_link_sync, query))

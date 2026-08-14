@@ -26,12 +26,35 @@ describe('csvCell', () => {
   describe('formula injection', () => {
     // Excel, LibreOffice and Sheets evaluate a cell beginning with these. The export
     // carries free text written by other people, so the content is not ours to trust.
-    it.each(['=1+1', '+1', '-1', '@SUM(A1)', '\tx', '\rx'])(
-      'neutralises a leading %j',
+    it.each(['=1+1', '+1', '-1', '@SUM(A1)'])('neutralises a leading %j', (input) => {
+      expect(csvCell(input).replace(/^"/, '').startsWith("'")).toBe(true);
+    });
+
+    it.each([' =1+1', '\t=1+1', '\r=1+1', '\u00A0=1+1', '   @SUM(A1)', ' -2+3'])(
+      'neutralises %j despite the leading whitespace',
       (input) => {
+        // Spreadsheets skip leading whitespace before deciding whether a cell is a
+        // formula, so checking only the first character is a known bypass. Two live
+        // meeting titles begin with whitespace.
         expect(csvCell(input).replace(/^"/, '').startsWith("'")).toBe(true);
       },
     );
+
+    it('does not neutralise whitespace that is not followed by an operator', () => {
+      // ' hello' is not a formula in any spreadsheet; prefixing it would corrupt the
+      // value to no purpose.
+      expect(csvCell(' hello')).toBe(' hello');
+      expect(csvCell('\tindented note')).toBe('\tindented note');
+    });
+
+    it('leaves real numbers alone so a spreadsheet can still sum them', () => {
+      // Prefixing turns a summable number into text. Only free text needs neutralising.
+      expect(csvCell(-5)).toBe('-5');
+      expect(csvCell(0)).toBe('0');
+      expect(csvCell(3.5)).toBe('3.5');
+      // ...but a STRING that looks like a negative number is still free text.
+      expect(csvCell('-5')).toBe("'-5");
+    });
 
     it('neutralises the classic HYPERLINK payload', () => {
       const attack = '=HYPERLINK("http://evil.example/steal","Click me")';

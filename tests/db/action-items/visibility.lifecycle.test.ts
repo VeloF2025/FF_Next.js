@@ -33,6 +33,7 @@ import {
   ACTION_ITEM_COLUMNS,
   MEETING_COLUMNS,
   actionItemExportQuery,
+  exportCountQuery,
   meetingExportQuery,
 } from '@/lib/reporting/exportQueries';
 import { toCsv, UTF8_BOM } from '@/lib/reporting/csv';
@@ -621,6 +622,34 @@ describe('action item visibility (real Postgres)', () => {
       const all = await exportRows((a) => actionItemExportQuery(a, 'all'), owner);
       const open = await exportRows((a) => actionItemExportQuery(a, 'open'), owner);
       expect(open.length).toBeLessThanOrEqual(all.length);
+    });
+
+    it('counts under the SAME gate as the export, for both reports', async () => {
+      // The count feeds the "first N of TOTAL" notice and the mint response. An ungated
+      // count would tell a scoped caller how many rows exist that they cannot see, and
+      // put a number in the file that does not describe their own export.
+      async function counted(report: 'action-items' | 'meetings', a: ActionItemAccess) {
+        const { text, params } = exportCountQuery(report, a, 'all');
+        return (await pool.query(text, params)).rows[0].n as number;
+      }
+
+      const aliceMeetings = (await exportRows(meetingExportQuery, alice)).length;
+      expect(await counted('meetings', alice)).toBe(aliceMeetings);
+      expect(await counted('meetings', alice)).toBeLessThan(await counted('meetings', owner));
+
+      const aliceItems = (await exportRows((a) => actionItemExportQuery(a, 'all'), alice)).length;
+      expect(await counted('action-items', alice)).toBe(aliceItems);
+      expect(await counted('action-items', alice)).toBeLessThan(
+        await counted('action-items', owner),
+      );
+    });
+
+    it('counts nothing for an identity with no email', async () => {
+      const noEmail: ActionItemAccess = { isOwner: false, email: '', userId: '' };
+      for (const report of ['action-items', 'meetings'] as const) {
+        const { text, params } = exportCountQuery(report, noEmail, 'all');
+        expect((await pool.query(text, params)).rows[0].n).toBe(0);
+      }
     });
 
     it('produces a CSV whose header and row count match the rows returned', async () => {

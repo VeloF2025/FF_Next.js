@@ -20,6 +20,7 @@ import {
   EXPORT_MAX_ROWS,
   MEETING_COLUMNS,
   actionItemExportQuery,
+  exportCountQuery,
   meetingExportQuery,
   type ActionItemExportRow,
   type MeetingExportRow,
@@ -28,7 +29,19 @@ import rateLimiter from '@/lib/rateLimiter';
 
 /** A CSV of thousands of rows is not something anyone needs repeatedly. */
 const EXPORT_RATE_LIMIT = 20;
+/** Applied before the signature is known, so it must be tighter and keyed on the peer. */
+const UNVERIFIED_RATE_LIMIT = 60;
 const RATE_WINDOW_MS = 60_000;
+
+/** Today in South Africa, matching the timezone the rows are rendered in. */
+function sastDay(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
 
 function one(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value) ?? '';
@@ -48,20 +61,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.badRequest(res, 'Unknown report');
   }
 
-  // Rate-limited on the signature, not the IP: the signature identifies the link, and an
-  // IP is shared by everyone behind one office connection.
-  if (
-    !rateLimiter.check(
-      `report-export:${one(req.query.sig).slice(0, 32)}`,
-      EXPORT_RATE_LIMIT,
-      RATE_WINDOW_MS,
-    ).success
-  ) {
-    return apiResponse.error(
-      res,
-      ErrorCode.RATE_LIMIT,
-      'Too many export requests for this link — retry shortly.',
-    );
+  // Bound the UNAUTHENTICATED path first, keyed on the peer address.
+  //
+  // The previous shape keyed on the caller-supplied `sig` and ran before verification,
+  // which meant two things: no limit at all on invalid-signature attempts, since every
+  // guess got a fresh bucket; and an unauthenticated caller could insert unbounded keys
+  // into the process-global in-memory Map that backs the limiter. This service has a
+  // prior OOM history, so that is a cheap memory pump rather than a theoretical one.
+  const peer = (
+    (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ??
+    req.socket.remoteAddress ??
+    'unknown'
+  ).trim();
+  if (!rateLimiter.check(`report-export-ip:${peer}`, UNVERIFIED_RATE_LIMIT, RATE_WINDOW_MS).success) {
+    return apiResponse.error(res, ErrorCode.RATE_LIMIT, 'Too many export requests — retry shortly.');
   }
 
   const { verdict, access } = verifyExportLink(
@@ -83,6 +96,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
   }
 
+  // Now that the signature is verified, meter on the identity it was minted for. The key
+  // space is bounded by the user table rather than by whatever a caller can invent.
+  if (
+    !rateLimiter.check(`report-export:${access.email}`, EXPORT_RATE_LIMIT, RATE_WINDOW_MS).success
+  ) {
+    return apiResponse.error(
+      res,
+      ErrorCode.RATE_LIMIT,
+      'Too many export requests for this link — retry shortly.',
+    );
+  }
+
   try {
     const built =
       report === 'action-items'
@@ -96,12 +121,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const truncated = result.rows.length > EXPORT_MAX_ROWS;
     const rows = truncated ? result.rows.slice(0, EXPORT_MAX_ROWS) : result.rows;
 
+    // The true total, so the in-file notice can say "first 5,000 of 5,235" rather than
+    // leaving the reader to guess. Only run when the cap actually bit.
+    let total = rows.length;
+    if (truncated) {
+      const counted = exportCountQuery(report, access, filters);
+      total = (await pool.query(counted.text, counted.params)).rows[0]?.n ?? rows.length;
+    }
+
     const csv =
       report === 'action-items'
-        ? toCsv(rows as ActionItemExportRow[], ACTION_ITEM_COLUMNS)
-        : toCsv(rows as MeetingExportRow[], MEETING_COLUMNS);
+        ? toCsv(rows as ActionItemExportRow[], ACTION_ITEM_COLUMNS, { truncated, total })
+        : toCsv(rows as MeetingExportRow[], MEETING_COLUMNS, { truncated, total });
 
-    const today = new Date().toISOString().slice(0, 10);
+    // The SAST day, matching how the rows themselves are rendered. toISOString() is UTC,
+    // so between 00:00 and 02:00 SAST the file was named for the previous day.
+    const today = sastDay();
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader(
       'Content-Disposition',

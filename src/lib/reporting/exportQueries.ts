@@ -68,7 +68,13 @@ export function actionItemExportQuery(
   return {
     text: `
       SELECT a.id::text, a.description, a.assignee_name, a.assignee_email,
-             a.status::text, a.priority::text, a.due_date, a.completed_date, a.created_at,
+             a.status::text, a.priority::text,
+             -- Every timestamp in SAST. Rendering meeting_date in SAST while leaving the
+             -- rest in UTC put two timezones in one spreadsheet, and dated anything
+             -- created after 22:00 UTC to the previous day.
+             ${SAST('a.due_date')} AS due_date,
+             ${SAST('a.completed_date')} AS completed_date,
+             ${SAST('a.created_at')} AS created_at,
              a.source_type, a.meeting_id,
              m.title AS meeting_title,
              ${SAST('m.meeting_date')} AS meeting_date
@@ -137,3 +143,38 @@ export const MEETING_COLUMNS: readonly CsvColumn<MeetingExportRow>[] = [
   { header: 'Summary captured', value: (r) => (r.has_summary ? 'yes' : 'no') },
   { header: 'Action items', value: (r) => r.action_item_count },
 ];
+
+
+/**
+ * Count the rows an export WOULD return, under the same gate.
+ *
+ * Used at mint time so the response can say how many rows are coming and whether the cap
+ * will bite. Without it the only truncation signal was a response header on the CSV
+ * itself, which neither a browser download nor an MCP client ever sees — so the caller
+ * was told "5,000 rows" by a file that was actually the first 5,000 of 5,235.
+ */
+export function exportCountQuery(
+  report: 'action-items' | 'meetings',
+  access: ActionItemAccess,
+  state: string,
+): { text: string; params: unknown[] } {
+  const params: unknown[] = [];
+
+  if (report === 'meetings') {
+    return {
+      text: `SELECT count(*)::int AS n FROM meetings m
+              WHERE ${meetingAttendance(access, params, 'm')}`,
+      params,
+    };
+  }
+
+  const where: string[] = [actionItemVisibility(access, params, 'a', { meetingsOnly: true })];
+  if (state === 'open') where.push(`COALESCE(a.status, 'pending') <> 'completed'`);
+  if (state === 'completed') where.push(`a.status = 'completed'`);
+
+  return {
+    text: `SELECT count(*)::int AS n FROM action_items a
+            WHERE ${where.join('\n              AND ')}`,
+    params,
+  };
+}

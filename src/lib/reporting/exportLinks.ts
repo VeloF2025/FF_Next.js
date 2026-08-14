@@ -76,13 +76,18 @@ export function signExportLink(
 export function verifyExportLink(
   report: ExportReport,
   email: string,
-  owner: boolean,
+  owner: unknown,
   filters: string,
   exp: unknown,
   sig: unknown,
 ): { verdict: LinkVerdict; access?: ActionItemAccess } {
+  // Coerced at the boundary rather than trusted. The parameter is typed `unknown` because
+  // it arrives from a URL: `owner` was declared boolean while being consumed by
+  // truthiness, so `'yes'` read as owner and `null` read as not-owner. Only the exact
+  // value the minter signs counts as true, and anything else is narrowing.
+  const isOwner = owner === true;
   const access: ActionItemAccess = {
-    isOwner: owner,
+    isOwner,
     email,
     // Deliberately empty. The user id arm of the action-item rule would need the minter's
     // uuid in the URL, and it only ever WIDENS what is visible; omitting it makes a link
