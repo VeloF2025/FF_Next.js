@@ -72,5 +72,35 @@ describe('buildFailureDiagnosis (#2480)', () => {
       expect(message.length).toBe(2_000);
       expect(message.startsWith(`${KEY_A}: xxx`)).toBe(true);
     });
+
+    it('keeps the omitted marker when a huge FIRST line crowds out the rest', () => {
+      // Reachable in production: reconcile.ts caps each error at 2000 chars
+      // before it reaches the map, so one verbose driver error plus a day key
+      // already exceeds the budget on its own. Dropping the remaining days
+      // silently here would recreate the gap this module exists to close.
+      const failed = new Map([
+        [KEY_A, `day projection failed: ${'x'.repeat(2_000)}`],
+        [KEY_B, 'boom'],
+      ]);
+
+      const message = buildFailureDiagnosis([KEY_A, KEY_B], failed, new Set())!;
+
+      expect(message.length).toBeLessThanOrEqual(2_000);
+      expect(message).toContain(KEY_A);
+      expect(message.endsWith('… 1 more day(s) omitted')).toBe(true);
+    });
+
+    it('reports every remaining day in the count when the first line is huge', () => {
+      const keys = [KEY_A, KEY_B, 'dddddddd-0000-4000-8000-000000000004:2026-08-13'];
+      const failed = new Map<string, string>([
+        [keys[0]!, 'x'.repeat(3_000)],
+        [keys[1]!, 'boom'],
+        [keys[2]!, 'bang'],
+      ]);
+
+      const message = buildFailureDiagnosis(keys, failed, new Set())!;
+
+      expect(message.endsWith('… 2 more day(s) omitted')).toBe(true);
+    });
   });
 });

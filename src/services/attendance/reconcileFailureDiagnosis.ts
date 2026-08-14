@@ -48,11 +48,20 @@ export function buildFailureDiagnosis(
   return joinWithinBudget(lines);
 }
 
+function omittedMarker(count: number): string {
+  return `\n… ${count} more day(s) omitted`;
+}
+
 /**
  * Joins as many whole lines as fit, then appends a count of what was dropped.
- * The suffix is reserved up front so the result always fits the budget, and the
- * first line is always emitted even if it alone exceeds it — a truncated first
- * line is still more diagnostic than an empty message.
+ * The marker is reserved up front so the result always fits the budget.
+ *
+ * A single line can exceed the budget on its own: `reconcile.ts` caps each
+ * error at MAX_MESSAGE_CHARS before it reaches the map, so one verbose driver
+ * error plus a day key is already over. That line is truncated rather than
+ * dropped — a cut reason still names the failing day — but the marker is still
+ * emitted, because losing the other days silently is the same "in
+ * failedDayKeys with no way to know why" gap this module exists to close.
  */
 function joinWithinBudget(lines: string[]): string {
   const whole = lines.join('\n');
@@ -61,13 +70,22 @@ function joinWithinBudget(lines: string[]): string {
   const kept: string[] = [];
   let used = 0;
   for (const line of lines) {
-    const suffix = `\n… ${lines.length - kept.length - 1} more day(s) omitted`;
+    const marker = omittedMarker(lines.length - kept.length - 1);
     const cost = (kept.length === 0 ? 0 : 1) + line.length;
-    if (used + cost + suffix.length > MAX_MESSAGE_CHARS) break;
+    if (used + cost + marker.length > MAX_MESSAGE_CHARS) break;
     kept.push(line);
     used += cost;
   }
 
-  if (kept.length === 0) return lines[0]!.slice(0, MAX_MESSAGE_CHARS);
-  return `${kept.join('\n')}\n… ${lines.length - kept.length} more day(s) omitted`;
+  if (kept.length > 0) {
+    return `${kept.join('\n')}${omittedMarker(lines.length - kept.length)}`;
+  }
+
+  // Not even the first line fits. With no other days to report there is nothing
+  // to signal, so a plain truncation is honest; otherwise the marker must
+  // survive, so reserve its length out of the first line.
+  const first = lines[0]!;
+  if (lines.length === 1) return first.slice(0, MAX_MESSAGE_CHARS);
+  const marker = omittedMarker(lines.length - 1);
+  return `${first.slice(0, MAX_MESSAGE_CHARS - marker.length)}${marker}`;
 }
