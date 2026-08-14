@@ -62,6 +62,13 @@ describe('parseOperationFilters', () => {
     },
   );
 
+  it('accepts only the map visibility values', () => {
+    for (const visibility of ['all', 'vehicles', 'drivers']) {
+      expect(parseOperationFilters(new URLSearchParams({ visibility }))).toEqual({ visibility });
+    }
+    expect(() => parseOperationFilters('visibility=hidden')).toThrow(OperationFilterError);
+  });
+
   it('rejects unknown query parameters', () => {
     expect(() => parseOperationFilters('?projectId=' + PROJECT + '&debug=true'))
       .toThrowError(expect.objectContaining({ code: 'unknown_filter' }));
@@ -106,6 +113,11 @@ describe('serializeOperationFilters', () => {
     };
 
     expect(parseOperationFilters(serializeOperationFilters(dashboard))).toEqual(dashboard);
+  });
+
+  it('round-trips the presentation-only map visibility filter in canonical order', () => {
+    const filters = parseOperationFilters('visibility=drivers&workDate=2026-08-14');
+    expect(serializeOperationFilters(filters)).toBe('workDate=2026-08-14&visibility=drivers');
   });
 
   it('clears a selected status while retaining the remaining selection', () => {

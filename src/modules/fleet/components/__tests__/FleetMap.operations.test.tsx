@@ -109,4 +109,11 @@ describe('FleetMap operational composition', () => {
     expect(popupText).toContain('via cartrack');
     expect(layers.markers).toHaveBeenCalledTimes(1);
   });
+
+  it('can hide legacy vehicle circles without losing driver badge coordinate joins', () => {
+    render(<FleetMap operationalOverlay={operationalOverlay} showVehicleMarkers={false} vehicles={[vehicle]} />);
+
+    expect(layers.circleMarkers).not.toHaveBeenCalled();
+    expect(layers.markers).toHaveBeenCalledTimes(1);
+  });
 });

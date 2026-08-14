@@ -3,6 +3,7 @@ import type { OperationalStatusGroup } from '../presentationTypes';
 import type { OperationalStatus } from '../types';
 
 export type OperationEvidenceFilter = 'attendance_only' | 'vehicle_only' | 'dual' | 'missing' | 'stale';
+export type OperationVisibilityFilter = 'all' | 'vehicles' | 'drivers';
 
 export interface OperationFilters {
   projectId?: string;
@@ -13,6 +14,7 @@ export interface OperationFilters {
   status?: OperationalStatus;
   group?: OperationalStatusGroup;
   evidence?: OperationEvidenceFilter;
+  visibility?: OperationVisibilityFilter;
 }
 
 export type OperationFilterErrorCode =
@@ -29,7 +31,7 @@ export class OperationFilterError extends Error {
 }
 
 const FILTER_KEYS = [
-  'projectId', 'staffId', 'siteId', 'workDate', 'asOf', 'status', 'group', 'evidence',
+  'projectId', 'staffId', 'siteId', 'workDate', 'asOf', 'status', 'group', 'evidence', 'visibility',
 ] as const;
 type OperationFilterKey = typeof FILTER_KEYS[number];
 
@@ -47,6 +49,7 @@ const GROUPS = new Set<OperationalStatusGroup>([
 const EVIDENCE = new Set<OperationEvidenceFilter>([
   'attendance_only', 'vehicle_only', 'dual', 'missing', 'stale',
 ]);
+const VISIBILITY = new Set<OperationVisibilityFilter>(['all', 'vehicles', 'drivers']);
 
 function isValidDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -61,6 +64,7 @@ function validate(key: OperationFilterKey, value: string): void {
         : key === 'status' ? STATUSES.has(value as OperationalStatus)
           : key === 'group' ? GROUPS.has(value as OperationalStatusGroup)
             : key === 'evidence' ? EVIDENCE.has(value as OperationEvidenceFilter)
+              : key === 'visibility' ? VISIBILITY.has(value as OperationVisibilityFilter)
               : true;
   if (!valid) throw new OperationFilterError('invalid_filter', `Invalid operation filter: ${key}`);
 }

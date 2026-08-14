@@ -28,7 +28,7 @@ function completeRoster(result: RosterStatusResult): CompleteOperationalRosterSe
   return { ...result, hasMore: false };
 }
 
-function groupFor(status: OperationalStatus): OperationalStatusGroup {
+export function groupForOperationalStatus(status: OperationalStatus): OperationalStatusGroup {
   if (status === 'on_site_dual' || status === 'attendance_confirmed') return 'on_site';
   if (status === 'vehicle_on_site_driver_unconfirmed' || status === 'unverifiable') return 'unverifiable';
   if (status === 'evidence_mismatch') return 'mismatch';
@@ -55,7 +55,7 @@ function toAttentionRow(item: OperationalStatusSummary): OperationalAttentionRow
     operationalSiteId: item.operationalSiteId,
     operationalSiteName: item.operationalSiteName,
     status: item.status,
-    group: groupFor(item.status),
+    group: groupForOperationalStatus(item.status),
     reasonCodes: item.reasonCodes,
     reasonText: reasonText(item.reasonCodes),
     flags: item.flags,
@@ -76,7 +76,7 @@ export function buildOperationalOverview(result: RosterStatusResult, filters: Op
   const roster = completeRoster(result);
   const counts = new Map<OperationalStatusGroup, number>();
   for (const item of roster.items) {
-    const group = groupFor(item.status);
+    const group = groupForOperationalStatus(item.status);
     counts.set(group, (counts.get(group) ?? 0) + 1);
   }
 

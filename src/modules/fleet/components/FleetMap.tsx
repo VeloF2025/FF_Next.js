@@ -181,6 +181,7 @@ export interface FleetMapProps {
   operationalOverlay?: OperationalMapOverlay;
   selectedStaffId?: string | null;
   onStaffSelect?: (staffId: string) => void;
+  showVehicleMarkers?: boolean;
 }
 
 export default function FleetMap({
@@ -188,6 +189,7 @@ export default function FleetMap({
   operationalOverlay,
   selectedStaffId,
   onStaffSelect,
+  showVehicleMarkers = true,
 }: FleetMapProps) {
   const { plotted } = partitionVehicles(vehicles);
   return (
@@ -199,7 +201,7 @@ export default function FleetMap({
         maxZoom={18}
         detectRetina
       />
-      <VehicleMarkers plotted={plotted} />
+      {showVehicleMarkers && <VehicleMarkers plotted={plotted} />}
       {operationalOverlay && (
         <OperationalMapLayers
           onStaffSelect={onStaffSelect}

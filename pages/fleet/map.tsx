@@ -6,12 +6,24 @@
  * vehicle with an explicit trackingState, so this page must say so plainly
  * rather than silently drawing the handful it can plot.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { FleetMapLegend } from '@/modules/fleet/components/FleetMapLegend';
-import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
-import { log } from '@/lib/logger';
+import type { AssignmentOption } from '@/modules/fleet/assignments/rosterQueries';
+import { assignmentApi, AssignmentApiError } from '@/modules/fleet/assignments/web/assignmentApi';
+import {
+  MapAttentionPanel,
+} from '@/modules/fleet/operations/web/MapAttentionPanel';
+import { filterOperationalOverlay } from '@/modules/fleet/operations/web/mapOverlayFilters';
+import { MapOperationsToolbar } from '@/modules/fleet/operations/web/MapOperationsToolbar';
+import {
+  parseOperationFilters,
+  serializeOperationFilters,
+  type OperationFilters,
+} from '@/modules/fleet/operations/web/operationFilters';
+import { useFleetMapLayers } from '@/modules/fleet/operations/web/useFleetMapLayers';
+import { isCurrentOperationDate } from '@/modules/fleet/operations/web/useOperationalOverview';
 import {
   notPlottedReason,
   partitionVehicles,
@@ -24,42 +36,90 @@ const FleetMap = dynamic(() => import('@/modules/fleet/components/FleetMap'), {
   loading: () => <div className="p-6 text-sm">Loading map…</div>,
 });
 
-const REFRESH_MS = 30_000;
+const FILTER_KEYS: Array<keyof OperationFilters> = [
+  'projectId', 'staffId', 'siteId', 'workDate', 'asOf', 'status', 'group', 'evidence', 'visibility',
+];
 
-interface LivePositionsResponse {
-  success: true;
-  data: { vehicles: LiveVehicle[] };
+function sastDate(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+}
+
+function datedFilters(filters: OperationFilters, workDate: string, now = new Date()): OperationFilters {
+  const asOf = isCurrentOperationDate(workDate, now)
+    ? now.toISOString() : new Date(`${workDate}T23:59:59.999+02:00`).toISOString();
+  return { ...filters, workDate, asOf, visibility: filters.visibility ?? 'all' };
+}
+
+function locationFilters(now = new Date()): OperationFilters {
+  const source = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
+  const known = new URLSearchParams();
+  for (const key of FILTER_KEYS) for (const value of source.getAll(key)) known.append(key, value);
+  try {
+    const parsed = parseOperationFilters(known);
+    return datedFilters(parsed, parsed.workDate ?? sastDate(now), now);
+  } catch {
+    return datedFilters({}, sastDate(now), now);
+  }
+}
+
+function replaceLocation(filters: OperationFilters, replace: boolean): void {
+  const query = serializeOperationFilters(filters);
+  const next = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+  window.history[replace ? 'replaceState' : 'pushState']({}, '', next);
 }
 
 export default function FleetMapPage() {
-  const [vehicles, setVehicles] = useState<LiveVehicle[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<OperationFilters>(locationFilters);
+  const currentFilters = useRef(filters);
+  const [projects, setProjects] = useState<AssignmentOption[]>([]);
+  const [projectOptionsError, setProjectOptionsError] = useState(false);
+  const layers = useFleetMapLayers(filters);
+  const vehicles = layers.telemetry.data?.vehicles ?? [];
+  const change = useCallback((next: OperationFilters, replace = false) => {
+    currentFilters.current = next;
+    replaceLocation(next, replace);
+    setFilters(next);
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch('/api/fleet/positions/live', { credentials: 'include' });
-        if (!res.ok) throw new Error(`Failed to load positions (${res.status})`);
-        const body = (await res.json()) as LivePositionsResponse;
-        if (!cancelled) {
-          setVehicles(body.data.vehicles);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load positions');
-        }
-        log.error('[fleet/map] failed to load live positions', { error: err });
-      }
-    }
-    load();
-    const t = setInterval(load, REFRESH_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(t);
+    replaceLocation(currentFilters.current, true);
+    const navigate = () => {
+      const next = locationFilters();
+      currentFilters.current = next;
+      replaceLocation(next, true);
+      setFilters(next);
     };
+    window.addEventListener('popstate', navigate);
+    return () => window.removeEventListener('popstate', navigate);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    setProjectOptionsError(false);
+    const query = new URLSearchParams({ from: filters.workDate!, to: filters.workDate! }).toString();
+    void assignmentApi.options(query).then((options) => {
+      if (!active) return;
+      setProjectOptionsError(false);
+      setProjects(options.projects);
+      const current = currentFilters.current;
+      const valid = options.projects.some((project) => project.id === current.projectId);
+      const projectId = valid ? current.projectId : options.projects[0]?.id ?? current.projectId;
+      if (projectId !== current.projectId) change({ ...current, projectId }, true);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      const permission = error instanceof AssignmentApiError && (error.status === 401 || error.status === 403);
+      if (permission) setProjects([]);
+      setProjectOptionsError(!permission);
+    });
+    return () => { active = false; };
+  }, [change, filters.workDate]);
+
+  const visibleOverlay = layers.overlay.data
+    ? filterOperationalOverlay(layers.overlay.data, filters) : undefined;
+  const showOperations = (filters.visibility ?? 'all') !== 'vehicles';
+  const selectStaff = (staffId: string) => change({ ...currentFilters.current, staffId });
 
   const { plotted, notPlotted } = partitionVehicles(vehicles);
   // Counted from the plotted set only — the legend describes what is on the
@@ -104,13 +164,19 @@ export default function FleetMapPage() {
             {notPlotted.length > 0 && ` ${notPlotted.length} not on the map.`} Positions refresh
             every 30 seconds and are typically 1–5 minutes behind.
           </p>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          <MapOperationsToolbar filters={filters} onChange={change} overlay={layers.overlay}
+            projectOptionsError={projectOptionsError} projects={projects} telemetry={layers.telemetry} />
           <div className="mt-2">
             <FleetMapLegend counts={statusCounts} />
           </div>
         </header>
-        <div className="flex-1 min-h-0">
-          <FleetMap vehicles={vehicles} />
+        <div className="relative flex-1 min-h-0">
+          <FleetMap vehicles={vehicles} operationalOverlay={showOperations ? visibleOverlay : undefined}
+            onStaffSelect={selectStaff} selectedStaffId={filters.staffId ?? null}
+            showVehicleMarkers={(filters.visibility ?? 'all') !== 'drivers'} />
+          {showOperations && visibleOverlay && <MapAttentionPanel filters={filters}
+            operationalOverlay={visibleOverlay} onFocusStaff={selectStaff}
+            selectedStaffId={filters.staffId ?? null} />}
         </div>
         {notPlotted.length > 0 && (
           <aside className="px-4 py-2 border-t text-sm">
