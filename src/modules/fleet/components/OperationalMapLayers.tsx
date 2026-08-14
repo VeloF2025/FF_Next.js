@@ -1,0 +1,153 @@
+import type { Geometry } from 'geojson';
+import type { PathOptions } from 'leaflet';
+import { Circle, CircleMarker, GeoJSON, Marker, Popup } from 'react-leaflet';
+import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
+import type {
+  OperationalAttendancePoint,
+  OperationalBadgeRow,
+  OperationalMapOverlay,
+  OperationalOverlayGeometry,
+} from '../operations/mapOverlayService';
+import { partitionVehicles } from '../utils/liveMapHelpers';
+import { createOperationalBadgeIcon, operationalBadgeStyle } from './operationalMapStyles';
+
+export interface OperationalMapLayersProps {
+  operationalOverlay: OperationalMapOverlay;
+  vehicles: LiveVehicle[];
+  selectedStaffId?: string | null;
+  onStaffSelect?: (staffId: string) => void;
+}
+
+function clickHandler(staffId: string, onStaffSelect?: (staffId: string) => void) {
+  return onStaffSelect ? { click: () => onStaffSelect(staffId) } : undefined;
+}
+
+function OperationalBadgeMarker({ badge, vehicle, selected, onStaffSelect }: {
+  badge: OperationalBadgeRow;
+  vehicle: LiveVehicle & { lat: number; lon: number };
+  selected: boolean;
+  onStaffSelect?: (staffId: string) => void;
+}) {
+  const style = operationalBadgeStyle(badge.status);
+  const label = `${badge.staffName} — ${style.label} operational status`;
+  return (
+    <Marker
+      alt={label}
+      eventHandlers={clickHandler(badge.staffId, onStaffSelect)}
+      icon={createOperationalBadgeIcon(badge.status, selected)}
+      position={[vehicle.lat, vehicle.lon]}
+      title={label}
+    >
+      <Popup>
+        <strong>{badge.staffName}</strong>
+        <br />
+        <span className="sr-only">Operational status: </span>{style.label}
+        <br />
+        {badge.operationalSiteName ?? badge.projectName ?? 'No operational site assigned'}
+      </Popup>
+    </Marker>
+  );
+}
+
+function AttendanceMarker({ point, selected, onStaffSelect }: {
+  point: OperationalAttendancePoint;
+  selected: boolean;
+  onStaffSelect?: (staffId: string) => void;
+}) {
+  const selectedClass = selected ? ' fleet-map-attendance-marker--selected' : '';
+  return (
+    <CircleMarker
+      center={[point.latitude, point.longitude]}
+      eventHandlers={clickHandler(point.staffId, onStaffSelect)}
+      pathOptions={{
+        className: `fleet-map-attendance-marker${selectedClass}`,
+        color: selected ? '#facc15' : '#ffffff',
+        dashArray: '2 3',
+        fillColor: '#2563eb',
+        fillOpacity: 0.85,
+        opacity: 1,
+        weight: selected ? 3 : 2,
+      }}
+      radius={7}
+    >
+      <Popup>
+        <strong>{point.staffName}</strong>
+        <br />
+        {point.label}
+        <br />
+        Recorded at {point.recordedAt}
+      </Popup>
+    </CircleMarker>
+  );
+}
+
+function geometryPathOptions(lowConfidence: boolean): PathOptions {
+  return {
+    className: `fleet-map-operational-geometry${lowConfidence
+      ? ' fleet-map-operational-geometry--low-confidence' : ''}`,
+    color: lowConfidence ? '#b45309' : '#2563eb',
+    dashArray: lowConfidence ? '6 4' : undefined,
+    fillColor: lowConfidence ? '#f59e0b' : '#3b82f6',
+    fillOpacity: 0.12,
+    opacity: 0.9,
+    weight: 2,
+  };
+}
+
+function OperationalGeometry({ geometry }: { geometry: OperationalOverlayGeometry }) {
+  if (geometry.kind === 'aoi') {
+    return (
+      <GeoJSON data={geometry.geoJson as unknown as Geometry} pathOptions={geometryPathOptions(geometry.lowConfidence)}>
+        <Popup>
+          <strong>{geometry.operationalSiteName}</strong>
+          {geometry.lowConfidence && <><br />Low confidence geometry</>}
+        </Popup>
+      </GeoJSON>
+    );
+  }
+  return (
+    <Circle
+      center={[geometry.center.latitude, geometry.center.longitude]}
+      pathOptions={geometryPathOptions(false)}
+      radius={geometry.radiusM}
+    >
+      <Popup><strong>{geometry.operationalSiteName}</strong><br />Authorized Location</Popup>
+    </Circle>
+  );
+}
+
+export function OperationalMapLayers({
+  operationalOverlay,
+  vehicles,
+  selectedStaffId,
+  onStaffSelect,
+}: OperationalMapLayersProps) {
+  const plottedByVehicle = new Map(
+    partitionVehicles(vehicles).plotted.map((vehicle) => [vehicle.vehicleId, vehicle]),
+  );
+  return (
+    <>
+      {operationalOverlay.geometry && <OperationalGeometry geometry={operationalOverlay.geometry} />}
+      {operationalOverlay.badges.map((badge) => {
+        const vehicle = plottedByVehicle.get(badge.vehicleId);
+        return vehicle ? (
+          <OperationalBadgeMarker
+            key={`operational-badge:${badge.vehicleId}:${badge.staffId}`}
+            badge={badge}
+            onStaffSelect={onStaffSelect}
+            selected={badge.staffId === selectedStaffId}
+            vehicle={vehicle}
+          />
+        ) : null;
+      })}
+      {operationalOverlay.attendancePoints.map((point) => (
+        <AttendanceMarker
+          key={`operational-attendance:${point.staffId}`}
+          onStaffSelect={onStaffSelect}
+          point={point}
+          selected={point.staffId === selectedStaffId}
+        />
+      ))}
+    </>
+  );
+}

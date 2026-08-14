@@ -10,6 +10,12 @@ import { render, cleanup } from '@testing-library/react';
 import { Map as LeafletMap } from 'leaflet';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import FleetMap from '../FleetMap';
+import type { OperationalMapOverlay } from '../../operations/mapOverlayService';
+
+const operationalOverlay: OperationalMapOverlay = {
+  badges: [], attendancePoints: [], unplottable: [], page: 1, limit: 25, total: 0, hasMore: false,
+  workDate: '2026-08-14', evaluatedAt: '2026-08-14T08:00:00.000Z',
+};
 
 /** ResizeObserver stub whose callbacks we fire by hand. */
 class ControllableResizeObserver {
@@ -119,5 +125,14 @@ describe('FleetMap container resize handling', () => {
     view.unmount();
 
     expect(observer.disconnected).toBe(true);
+  });
+
+  it('keeps observing the same map container when optional operational layers mount', () => {
+    const { observer, view } = setup();
+
+    view.rerender(<FleetMap operationalOverlay={operationalOverlay} selectedStaffId="staff-1" vehicles={[]} />);
+
+    expect(observer.observed).toHaveLength(1);
+    expect(observer.observed[0]).toBe(view.container.querySelector('.leaflet-container'));
   });
 });
