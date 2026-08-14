@@ -18,7 +18,7 @@ interface StatusCountBarProps {
 export function StatusCountBar({ groups, selected, onSelect }: StatusCountBarProps) {
   const counts = new Map(groups.map((item) => [item.group, item.count]));
   return (
-    <div data-testid="status-count-bar" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+    <div data-testid="status-count-bar" className="flex gap-2 overflow-x-auto pb-2 lg:grid lg:grid-cols-6 lg:overflow-visible">
       {CONTROLS.map(({ group, label }) => {
         const count = counts.get(group) ?? 0;
         const pressed = selected === group;
@@ -29,7 +29,7 @@ export function StatusCountBar({ groups, selected, onSelect }: StatusCountBarPro
             aria-label={`${label} ${count}`}
             aria-pressed={pressed}
             onClick={() => onSelect(pressed ? undefined : group)}
-            className={`rounded-lg border px-3 py-3 text-left transition-colors ${pressed
+            className={`min-w-32 flex-none rounded-lg border px-3 py-3 text-left transition-colors lg:min-w-0 ${pressed
               ? 'border-[var(--ff-primary)] bg-[var(--ff-primary)] text-white'
               : 'border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]'}`}
           >

@@ -37,7 +37,7 @@ export class OperationsPresentationApiError extends Error {
     message: string,
     public status: number,
     public code: string,
-    public kind: ApiErrorKind = status === 403 ? 'permission' : 'transient',
+    public kind: ApiErrorKind = status === 401 || status === 403 ? 'permission' : 'transient',
   ) {
     super(message);
     this.name = 'OperationsPresentationApiError';

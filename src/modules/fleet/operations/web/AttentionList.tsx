@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import type { KeyboardEvent, MouseEvent } from 'react';
 import type { OperationalAttentionRow } from '../presentationTypes';
 import type { OperationalStatus } from '../types';
 import { serializeOperationFilters, type OperationFilters } from './operationFilters';
@@ -26,7 +25,7 @@ function assignmentHref(row: OperationalAttentionRow, filters: OperationFilters)
   const query = new URLSearchParams();
   if (row.projectId ?? filters.projectId) query.set('projectId', (row.projectId ?? filters.projectId)!);
   query.set('staffId', row.staffId);
-  if (filters.workDate) { query.set('from', filters.workDate); query.set('to', filters.workDate); }
+  if (filters.workDate) query.set('workDate', filters.workDate);
   return `/fleet/assignments?${query.toString()}`;
 }
 
@@ -37,25 +36,16 @@ interface AttentionListProps {
 }
 
 export function AttentionList({ rows, filters, onOpenEvidence }: AttentionListProps) {
-  const stop = (event: MouseEvent<HTMLElement>) => event.stopPropagation();
-  const openFromRow = (row: OperationalAttentionRow, target: HTMLElement) => onOpenEvidence(row, target);
-  const keyOpen = (event: KeyboardEvent<HTMLElement>, row: OperationalAttentionRow) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    openFromRow(row, event.currentTarget);
-  };
   return (
     <div className="divide-y divide-[var(--ff-border-light)]">
       {rows.map((row) => (
         <article
           key={row.staffId}
           data-testid={`attention-row-${row.status}`}
-          tabIndex={0}
-          onClick={(event) => openFromRow(row, event.currentTarget)}
-          onKeyDown={(event) => keyOpen(event, row)}
-          className="flex cursor-pointer flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
-          <div className="min-w-0">
+          <button type="button" aria-label={`View evidence for ${row.staffName}`}
+            onClick={(event) => onOpenEvidence(row, event.currentTarget)} className="min-w-0 text-left">
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="font-medium text-[var(--ff-text-primary)]">{row.staffName}</h4>
               <span className="rounded-full bg-[var(--ff-bg-tertiary)] px-2 py-1 text-xs text-[var(--ff-text-secondary)]">
@@ -69,12 +59,8 @@ export function AttentionList({ rows, filters, onOpenEvidence }: AttentionListPr
             <p className="text-xs text-[var(--ff-text-tertiary)]">
               {row.evidenceLabel}{row.durationSeconds === null ? '' : ` · ${Math.round(row.durationSeconds / 60)} min`}
             </p>
-          </div>
-          <div className="flex flex-wrap gap-2" onClick={stop}>
-            <button type="button" onClick={(event) => onOpenEvidence(row, event.currentTarget)}
-              className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">
-              <span className="sr-only">View evidence for {row.staffName}</span><span aria-hidden="true">View evidence</span>
-            </button>
+          </button>
+          <div className="flex flex-wrap gap-2">
             <Link href={mapHref(row, filters)} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">View on map</Link>
             <Link href={assignmentHref(row, filters)} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">Manage assignment</Link>
           </div>

@@ -61,8 +61,10 @@ export function useOperationalOverview(filters: OperationFilters): OperationalOv
         || generation.current !== requestGeneration) return;
       const typed = error instanceof OperationsPresentationApiError ? error
         : new OperationsPresentationApiError('Operational overview request failed', 0, 'UNKNOWN_ERROR');
-      setState((previous) => previous.selectionKey === filterKey
-        ? { ...previous, error: typed } : { ...emptyOverviewState(filterKey), error: typed });
+      setState((previous) => typed.kind === 'permission'
+        ? { ...emptyOverviewState(filterKey), error: typed }
+        : previous.selectionKey === filterKey
+          ? { ...previous, error: typed } : { ...emptyOverviewState(filterKey), error: typed });
     }
   }, [filterKey]);
 

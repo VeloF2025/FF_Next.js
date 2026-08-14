@@ -134,11 +134,11 @@ describe('useOperationalOverview', () => {
     expect(signals[1]?.aborted).toBe(true);
   });
 
-  it('retains the last success and distinguishes transient failures from permission denial', async () => {
+  it('retains transient failures but clears authorized data after a 401 permission loss', async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce(ok(overview))
       .mockResolvedValueOnce(fail(503, 'SERVICE_UNAVAILABLE', 'Try again'))
-      .mockResolvedValueOnce(fail(403, 'FORBIDDEN', 'No access'));
+      .mockResolvedValueOnce(fail(401, 'UNAUTHORIZED', 'Session expired'));
     const hook = renderHook(() => useOperationalOverview(historicalFilters));
     await flush();
     const lastSuccessAt = hook.result.current.lastSuccessAt;
@@ -149,8 +149,9 @@ describe('useOperationalOverview', () => {
     expect(hook.result.current.error).toMatchObject({ status: 503, code: 'SERVICE_UNAVAILABLE', kind: 'transient' });
 
     await act(async () => { await hook.result.current.refresh(); });
-    expect(hook.result.current.data).toEqual(overview);
-    expect(hook.result.current.error).toMatchObject({ status: 403, code: 'FORBIDDEN', kind: 'permission' });
+    expect(hook.result.current.data).toBeNull();
+    expect(hook.result.current.lastSuccessAt).toBeNull();
+    expect(hook.result.current.error).toMatchObject({ status: 401, code: 'UNAUTHORIZED', kind: 'permission' });
   });
 
   it('represents a malformed API envelope as a typed invalid-response failure', async () => {

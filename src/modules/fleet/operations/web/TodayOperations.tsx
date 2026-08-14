@@ -6,7 +6,7 @@ import { AttentionList } from './AttentionList';
 import { OperationalEvidenceDrawer } from './OperationalEvidenceDrawer';
 import { parseOperationFilters, serializeOperationFilters, type OperationFilters } from './operationFilters';
 import { StatusCountBar } from './StatusCountBar';
-import { useOperationalOverview } from './useOperationalOverview';
+import { isCurrentOperationDate, useOperationalOverview } from './useOperationalOverview';
 
 const FILTER_KEYS: Array<keyof OperationFilters> = [
   'projectId', 'staffId', 'siteId', 'workDate', 'asOf', 'status', 'group', 'evidence',
@@ -20,15 +20,21 @@ function sastDate(now = new Date()): string {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
-function locationFilters(): OperationFilters {
+function datedFilters(filters: OperationFilters, workDate: string, now = new Date()): OperationFilters {
+  const asOf = isCurrentOperationDate(workDate, now)
+    ? now.toISOString() : new Date(`${workDate}T23:59:59.999+02:00`).toISOString();
+  return { ...filters, workDate, asOf };
+}
+
+function locationFilters(now = new Date()): OperationFilters {
   const source = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
   const known = new URLSearchParams();
   for (const key of FILTER_KEYS) for (const value of source.getAll(key)) known.append(key, value);
   try {
     const parsed = parseOperationFilters(known);
-    return { ...parsed, workDate: parsed.workDate ?? sastDate(), asOf: parsed.asOf ?? new Date().toISOString() };
+    return datedFilters(parsed, parsed.workDate ?? sastDate(now), now);
   } catch {
-    return { workDate: sastDate(), asOf: new Date().toISOString() };
+    return datedFilters({}, sastDate(now), now);
   }
 }
 
@@ -49,6 +55,7 @@ function OperationsPanel({ filters, projects, onChange }: OperationsPanelProps) 
   const [selected, setSelected] = useState<OperationalAttentionRow | null>(null);
   const [opener, setOpener] = useState<HTMLElement | null>(null);
   if (error?.kind === 'permission') return null;
+  const evidenceFilters = data ? { ...filters, workDate: data.workDate, asOf: data.evaluatedAt } : filters;
   const selectGroup = (group: OperationalStatusGroup | undefined) => {
     const next = { ...filters, group }; delete next.status; onChange(next);
   };
@@ -60,6 +67,7 @@ function OperationsPanel({ filters, projects, onChange }: OperationsPanelProps) 
           {data && <p className="text-xs text-[var(--ff-text-tertiary)]">Last evaluated <time dateTime={data.evaluatedAt}>{new Date(data.evaluatedAt).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}</time><span className="sr-only"> · Rule version {data.rule.version ?? 'unavailable'}</span></p>}
         </div>
         <div className="flex flex-wrap items-end gap-3">
+          {!isCurrentOperationDate(filters.workDate) && <span className="text-xs font-medium text-amber-700">Historical view</span>}
           <label className="text-sm text-[var(--ff-text-secondary)]">Project
             <select aria-label="Operations project" value={filters.projectId ?? ''}
               onChange={(event) => onChange({ ...filters, projectId: event.target.value || undefined })}
@@ -68,8 +76,8 @@ function OperationsPanel({ filters, projects, onChange }: OperationsPanelProps) 
             </select>
           </label>
           <label className="text-sm text-[var(--ff-text-secondary)]">Date
-            <input aria-label="Operations date" type="date" value={filters.workDate ?? ''}
-              onChange={(event) => onChange({ ...filters, workDate: event.target.value })}
+            <input aria-label="Operations date" type="date" max={sastDate()} value={filters.workDate ?? ''}
+              onChange={(event) => onChange(datedFilters(filters, event.target.value))}
               className="ml-2 rounded border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] px-2 py-2" />
           </label>
           <button type="button" aria-label="Refresh operations" onClick={() => void refresh()}
@@ -86,11 +94,11 @@ function OperationsPanel({ filters, projects, onChange }: OperationsPanelProps) 
           <div><h3 className="mb-2 font-medium text-[var(--ff-text-primary)]">Needs Attention</h3>
             {data.selectionState === 'no_scheduled_staff' && <p>No staff are scheduled for this selection.</p>}
             {data.selectionState === 'no_attention' && <p>No operational items need attention.</p>}
-            {data.selectionState === 'attention_available' && <AttentionList rows={data.attention.items} filters={filters}
+            {data.selectionState === 'attention_available' && <AttentionList rows={data.attention.items} filters={evidenceFilters}
               onOpenEvidence={(row, target) => { setSelected(row); setOpener(target); }} />}
           </div></>}
       </div>
-      {selected && <OperationalEvidenceDrawer row={selected} filters={filters} returnFocus={opener}
+      {selected && <OperationalEvidenceDrawer row={selected} filters={evidenceFilters} returnFocus={opener}
         onClose={() => setSelected(null)} />}
     </section>
   );
@@ -108,7 +116,7 @@ export function TodayOperations() {
   useEffect(() => {
     replaceLocation(currentFilters.current, true);
     const navigate = () => {
-      const next = locationFilters(); currentFilters.current = next; setFilters(next);
+      const next = locationFilters(); currentFilters.current = next; replaceLocation(next, true); setFilters(next);
     };
     window.addEventListener('popstate', navigate);
     return () => window.removeEventListener('popstate', navigate);
@@ -126,7 +134,9 @@ export function TodayOperations() {
       if (projectId !== current.projectId) change({ ...current, projectId }, true);
     }).catch((caught: unknown) => {
       if (!active) return;
-      setOptionsState(caught instanceof AssignmentApiError && caught.status === 403 ? 'permission' : 'error');
+      const permission = caught instanceof AssignmentApiError && (caught.status === 401 || caught.status === 403);
+      if (permission) setProjects([]);
+      setOptionsState(permission ? 'permission' : 'error');
     });
     return () => { active = false; };
   }, [change, filters.workDate]);

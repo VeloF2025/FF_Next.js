@@ -23,7 +23,7 @@ function assignmentHref(row: OperationalAttentionRow, filters: OperationFilters)
   const projectId = row.projectId ?? filters.projectId;
   if (projectId) query.set('projectId', projectId);
   query.set('staffId', row.staffId);
-  if (filters.workDate) { query.set('from', filters.workDate); query.set('to', filters.workDate); }
+  if (filters.workDate) query.set('workDate', filters.workDate);
   return `/fleet/assignments?${query.toString()}`;
 }
 

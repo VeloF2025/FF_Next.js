@@ -103,8 +103,9 @@ function installFetch(options: { overview?: OperationalOverviewResponse; overvie
     if (url.startsWith('/api/fleet/operations/status/')) return Promise.resolve(options.detailFailure ?? ok(detail));
     if (url.startsWith('/api/fleet/operations/overview')) {
       if (options.overviewFailure) return Promise.resolve(options.overviewFailure);
-      const group = new URL(url, 'http://localhost').searchParams.get('group');
-      const data = options.overview ?? overview();
+      const params = new URL(url, 'http://localhost').searchParams;
+      const group = params.get('group');
+      const data = options.overview ?? overview({ evaluatedAt: params.get('asOf') ?? AS_OF });
       return Promise.resolve(ok(group ? {
         ...data,
         attention: { ...data.attention, items: data.attention.items.filter((item) => item.group === group) },
@@ -136,7 +137,8 @@ describe('TodayOperations', () => {
     expect(within(screen.getByTestId('attention-row-vehicle_on_site_driver_unconfirmed'))
       .getByText(/Vehicle on site; driver presence unconfirmed/)).toBeInTheDocument();
     for (const name of attentionRows.map((item) => item.staffName)) expect(screen.getByText(name)).toBeInTheDocument();
-    expect(counts).toHaveClass('grid-cols-2', 'sm:grid-cols-3', 'lg:grid-cols-6');
+    expect(counts).toHaveClass('overflow-x-auto');
+    expect(counts).not.toHaveClass('grid-cols-2');
     expect(screen.getByTestId('attention-row-late')).toHaveClass('flex-col', 'sm:flex-row');
   });
 
@@ -164,10 +166,32 @@ describe('TodayOperations', () => {
 
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('projectId')).toBe(PROJECT_ID));
     expect(new URLSearchParams(window.location.search).get('workDate')).toBe('2026-08-14');
+    const currentRow = await screen.findByTestId('attention-row-late');
+    expect(within(currentRow).getByRole('link', { name: 'View on map' })).toHaveAttribute('href', expect.stringContaining('asOf=2026-08-14T08%3A00%3A00.000Z'));
+    fireEvent.click(within(currentRow).getByRole('button', { name: 'View evidence for Late Driver' }));
+    const currentDialog = await screen.findByRole('dialog');
+    expect(within(currentDialog).getByRole('link', { name: 'View on map' })).toHaveAttribute('href', expect.stringContaining('asOf=2026-08-14T08%3A00%3A00.000Z'));
+    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => String(url).includes('/status/') && String(url).includes('asOf=2026-08-14T08%3A00%3A00.000Z'))).toBe(true);
+    fireEvent.click(within(currentDialog).getByRole('button', { name: 'Close evidence' }));
     const date = screen.getByLabelText('Operations date');
     fireEvent.change(date, { target: { value: WORK_DATE } });
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('workDate')).toBe(WORK_DATE));
+    expect(new URLSearchParams(window.location.search).get('asOf')).toBe('2026-08-13T21:59:59.999Z');
+    expect(await screen.findByText('Historical view')).toBeInTheDocument();
     expect(await screen.findByText('Late Driver')).toBeInTheDocument();
+  });
+
+  it('restores filters from popstate navigation', async () => {
+    installFetch();
+    render(<TodayOperations />);
+    await screen.findByText('Late Driver');
+
+    window.history.pushState({}, '', `/fleet?projectId=${PROJECT_ID}&workDate=2026-08-12&group=late`);
+    fireEvent.popState(window);
+
+    await waitFor(() => expect(screen.getByLabelText('Operations date')).toHaveValue('2026-08-12'));
+    expect(await screen.findByRole('button', { name: 'Late 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(new URLSearchParams(window.location.search).get('asOf')).toBe('2026-08-12T21:59:59.999Z');
   });
 
   it.each([
@@ -193,13 +217,14 @@ describe('TodayOperations', () => {
       if (url.startsWith('/api/fleet/assignments/options')) return Promise.resolve(ok({ staff: [], teams: [], projects: [{ id: PROJECT_ID, label: 'Lawley' }], sites: [], vehicles: [], siteSources: [] }));
       if (url.startsWith('/api/fleet/operations/overview')) {
         overviewCalls += 1;
-        return Promise.resolve(overviewCalls === 1 ? ok(overview()) : fail(503, 'SERVICE_UNAVAILABLE', 'Database detail'));
+        const asOf = new URL(url, 'http://localhost').searchParams.get('asOf') ?? AS_OF;
+        return Promise.resolve(overviewCalls === 1 ? ok(overview({ evaluatedAt: asOf })) : fail(503, 'SERVICE_UNAVAILABLE', 'Database detail'));
       }
       return Promise.resolve(ok(detail));
     });
     render(<TodayOperations />);
     expect(await screen.findByText('Late Driver')).toBeInTheDocument();
-    expect(screen.getByText(/Last evaluated/).querySelector('time')).toHaveAttribute('datetime', AS_OF);
+    expect(screen.getByText(/Last evaluated/).querySelector('time')).toHaveAttribute('datetime', '2026-08-13T21:59:59.999Z');
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh operations' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Showing the last successful operational data');
@@ -214,7 +239,13 @@ describe('TodayOperations', () => {
     await waitFor(() => expect(screen.queryByRole('region', { name: "Today's Operations" })).not.toBeInTheDocument());
     expect(screen.queryByText('Sensitive project name')).not.toBeInTheDocument();
   });
-
+  it('hides project options after an options 401', async () => {
+    global.fetch = vi.fn().mockResolvedValue(fail(401, 'UNAUTHORIZED', 'Private options'));
+    render(<TodayOperations />);
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByLabelText("Today's Operations")).not.toBeInTheDocument());
+    expect(screen.queryByText('Private options')).not.toBeInTheDocument();
+  });
   it('loads protected evidence, builds actions, traps focus, and restores the opener', async () => {
     installFetch();
     render(<TodayOperations />);
@@ -230,7 +261,12 @@ describe('TodayOperations', () => {
     expect(close).toHaveFocus();
     expect(map).toHaveAttribute('href', expect.stringContaining(`/fleet/map?projectId=${PROJECT_ID}`));
     expect(map).toHaveAttribute('href', expect.stringContaining(`staffId=${attentionRows[0]!.staffId}`));
+    expect(map).toHaveAttribute('href', expect.stringContaining('asOf=2026-08-13T21%3A59%3A59.999Z'));
     expect(manage).toHaveAttribute('href', expect.stringContaining(`/fleet/assignments?projectId=${PROJECT_ID}`));
+    expect(manage).toHaveAttribute('href', expect.stringContaining(`workDate=${WORK_DATE}`));
+    expect(manage).not.toHaveAttribute('href', expect.stringContaining('from='));
+    expect(dialog).not.toHaveTextContent('-26.2');
+    expect(dialog).not.toHaveTextContent('28.1');
 
     manage.focus();
     fireEvent.keyDown(dialog, { key: 'Tab' });
@@ -238,6 +274,18 @@ describe('TodayOperations', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(opener).toHaveFocus();
+  });
+  it('does not open evidence when a nested action receives Enter or Space', async () => {
+    installFetch();
+    render(<TodayOperations />);
+    const row = await screen.findByTestId('attention-row-late');
+    const map = within(row).getByRole('link', { name: 'View on map' });
+    const manage = within(row).getByRole('link', { name: 'Manage assignment' });
+
+    fireEvent.keyDown(map, { key: 'Enter' });
+    fireEvent.keyDown(manage, { key: ' ' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(row).not.toHaveTextContent('-26.2');
   });
 
   it('does not disclose a protected detail error message', async () => {
