@@ -68,6 +68,8 @@ export default defineConfig({
       { find: '@neondatabase/serverless', replacement: path.resolve(__dirname, 'src/lib/neon-shim.ts') },
       { find: /^@\/lib\/sentry/, replacement: path.resolve(__dirname, 'src/lib/sentry') },
       { find: /^@\/lib\/observability/, replacement: path.resolve(__dirname, 'src/lib/observability') },
+      { find: '@/lib/rateLimiter', replacement: path.resolve(__dirname, './src/lib/rateLimiter') },
+      { find: '@/lib/photos', replacement: path.resolve(__dirname, './src/lib/photos') },
       { find: '@/lib/reporting', replacement: path.resolve(__dirname, './src/lib/reporting') },
       { find: '@/lib/actionItems', replacement: path.resolve(__dirname, './src/lib/actionItems') },
       { find: '@/lib/utils', replacement: path.resolve(__dirname, './src/lib/utils') },

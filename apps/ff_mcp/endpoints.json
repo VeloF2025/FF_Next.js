@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-13T11:32:39.514Z",
+  "generatedAt": "2026-08-14T02:39:24.130Z",
   "routes": [
     {
       "path": "/api/activate/:dropNumber",
@@ -4891,6 +4891,22 @@
       ],
       "group": "reporting",
       "description": "GET /api/reporting/action-items?state=open&assignee=…&olderThanDays=90"
+    },
+    {
+      "path": "/api/reporting/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "reporting",
+      "description": "GET /api/reporting/export?report=…&filters=…&email=…&owner=…&exp=…&sig=…"
+    },
+    {
+      "path": "/api/reporting/export-link",
+      "methods": [
+        "GET"
+      ],
+      "group": "reporting",
+      "description": "GET /api/reporting/export-link?report=action-items|meetings&state=open"
     },
     {
       "path": "/api/reporting/meetings",

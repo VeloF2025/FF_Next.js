@@ -233,3 +233,40 @@ async def find_meetings(
         limit=limit,
     )
     return await anyio.to_thread.run_sync(partial(_meetings_sync, query))
+
+
+def _export_link_sync(query: str) -> str:
+    return _fibreflow_get_sync("/api/reporting/export-link", query)
+
+
+@mcp.tool()
+async def get_report_export(report: str, state: str = "open") -> str:
+    """Get a short-lived URL that downloads a report as a CSV spreadsheet.
+
+    - `report`: "action-items" or "meetings".
+    - `state`: action-items only — "open" (default), "completed" or "all".
+
+    Returns a URL, not the data. Give the URL to the person who asked; it opens in a
+    browser or can be pasted into a spreadsheet's "import from web". Do not try to fetch
+    it yourself and paste thousands of rows into the conversation — that is what the file
+    is for.
+
+    Two things to say plainly when you hand it over:
+
+    - It expires in 15 minutes. That is deliberate, so a URL left in a chat thread is dead
+      before anyone finds it. Ask again for a fresh one rather than treating an expired
+      link as a fault.
+    - It carries the SCOPE of whoever requested it, baked into the signature, and anyone
+      holding the URL gets that same slice until it expires. So it is not something to
+      post in a shared channel. For most callers the slice is "meetings you attended";
+      the response says which case applies.
+
+    The response tells you the size before anyone downloads anything: `rows` is how many
+    the export contains and `truncated` says whether the 5,000-row cap cut it short. Read
+    those and say so — "4,812 rows" or "the first 5,000 of 5,235". Never describe a
+    truncated export as the complete set. If `rows` is null the count could not be taken;
+    say the size is unknown rather than inventing one. The CSV also carries a final row
+    saying it was truncated, for whoever opens the file.
+    """
+    query = build_query(report=report, state=state)
+    return await anyio.to_thread.run_sync(partial(_export_link_sync, query))
