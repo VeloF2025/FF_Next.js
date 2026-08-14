@@ -102,8 +102,6 @@ interface StockTake {
   name?: string;
   status: 'draft' | 'in_progress' | 'pending_review' | 'approved' | 'completed' | 'cancelled' | 'historical';
   stock_take_type: string;
-  warehouse_name?: string;
-  warehouse_code?: string;
   started_at?: string;
   completed_at?: string;
   line_count?: number;
