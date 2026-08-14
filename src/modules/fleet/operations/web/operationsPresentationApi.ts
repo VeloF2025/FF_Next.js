@@ -1,5 +1,6 @@
 import type { OperationalMapOverlay } from '../mapOverlayService';
 import type { OperationalOverview } from '../presentationTypes';
+import type { OperationalEvidenceDetail } from '../statusService';
 import { serializeOperationFilters, type OperationFilters } from './operationFilters';
 
 export interface OperationalOverviewResponse extends OperationalOverview {
@@ -103,6 +104,11 @@ export const operationsPresentationApi = {
     const params = new URLSearchParams(url.split('?')[1]);
     params.set('page', '1'); params.set('limit', '25');
     return request(`${url.split('?')[0]}?${params.toString()}`, signal);
+  },
+  detail(staffId: string, filters: OperationFilters, signal: AbortSignal): Promise<OperationalEvidenceDetail> {
+    const url = endpoint(`/api/fleet/operations/status/${encodeURIComponent(staffId)}`, filters,
+      ['projectId', 'workDate', 'asOf']);
+    return request(url, signal);
   },
   overlay(filters: OperationFilters, signal: AbortSignal): Promise<OperationalMapOverlay> {
     const url = endpoint('/api/fleet/operations/map-overlay', filters,
