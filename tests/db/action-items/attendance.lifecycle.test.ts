@@ -79,10 +79,12 @@ describe('attendance queries (real Postgres)', () => {
     await pool.end();
   });
 
-  async function report(query: Record<string, string> = {}) {
+  async function report(query: Record<string, string> = {}, allowed: string[] | null = null) {
+    // Bounded by default: an unbounded query is now rejected outright.
+    if (!query.person && !query.since && !query.until) query = { ...query, since: '2026-01-01' };
     const parsed = parseAttendanceFilter(query);
     if ('error' in parsed) throw new Error(parsed.error);
-    const { sql, params } = attendanceQuery(parsed.filter);
+    const { sql, params } = attendanceQuery(parsed.filter, allowed);
     const { rows } = await pool.query(sql, params);
     return shapeAttendance(rows as never, parsed.filter);
   }
@@ -94,7 +96,7 @@ describe('attendance queries (real Postgres)', () => {
       const r = await report({ person: 'Alice' });
       expect(r.totals.daysShown).toBe(2);
       expect(r.totals.daysMatched).toBe(2);
-      expect(r.totals.regularHours).toBe(16);
+      expect(r.totals.regularHoursShown).toBe(16);
     });
 
     it('carries both exceptions on the day that has two', async () => {
@@ -196,9 +198,9 @@ describe('attendance queries (real Postgres)', () => {
       // Asserting on the shaped report alone is not enough: shapeAttendance maps named
       // fields, so a pay column added to the SELECT would sit unnoticed in the raw row
       // until someone spreads it into the response.
-      const parsed = parseAttendanceFilter({});
+      const parsed = parseAttendanceFilter({ since: '2026-01-01' });
       if ('error' in parsed) throw new Error(parsed.error);
-      const { sql, params } = attendanceQuery(parsed.filter);
+      const { sql, params } = attendanceQuery(parsed.filter, null);
       const { rows } = await pool.query(sql, params);
       const keys = Object.keys(rows[0] ?? {});
       expect(keys).not.toContain('wage_amount_cents');
@@ -220,6 +222,56 @@ describe('attendance queries (real Postgres)', () => {
       expect(r.totals.daysShown).toBe(1);
       expect(r.totals.daysMatched).toBe(4);
       expect(r.caveats.join(' ')).toContain('of 4');
+    });
+  });
+
+  describe('supervisor scope, executed', () => {
+    it('returns only the allowed staff', async () => {
+      const r = await report({}, [ALICE]);
+      expect([...new Set(r.days.map((d) => d.name))]).toEqual(['Alice Employee']);
+    });
+
+    it('returns NOTHING for a caller who supervises nobody', async () => {
+      // An empty allow-list is a real answer, not "no filter".
+      const r = await report({}, []);
+      expect(r.totals.daysShown).toBe(0);
+      expect(r.totals.daysMatched).toBe(0);
+    });
+
+    it('scopes the exceptions mode too', async () => {
+      const all = await report({ mode: 'exceptions', includeResolved: 'true' }, null);
+      const scoped = await report({ mode: 'exceptions', includeResolved: 'true' }, [ALICE]);
+      expect(all.totals.daysMatched).toBeGreaterThan(scoped.totals.daysMatched);
+      expect([...new Set(scoped.days.map((d) => d.name))]).toEqual(['Alice Employee']);
+    });
+  });
+
+  describe('totals describe what they say they describe', () => {
+    it('reports the FULL match count while summing only the page', async () => {
+      // The cap must not shrink daysMatched — a reader comparing 1 shown against 1
+      // matched would conclude the page was the whole set.
+      const r = await report({ limit: '1' });
+      expect(r.totals.daysShown).toBe(1);
+      expect(r.totals.daysMatched).toBe(4);
+      expect(r.totals.hoursArePartial).toBe(true);
+      expect(r.caveats.join(' ')).toContain('PARTIAL');
+    });
+
+    it('does not flag partial hours when the page IS the whole set', async () => {
+      const r = await report({ person: 'Gone' });
+      expect(r.totals.daysShown).toBe(r.totals.daysMatched);
+      expect(r.totals.hoursArePartial).toBe(false);
+    });
+  });
+
+  describe('the response carries only the fields it declares', () => {
+    it('never spreads a raw row into a returned day', async () => {
+      // The SELECT half of this guarantee is tested above; this is the other half —
+      // a column added to the query must not reach the response by accident.
+      const r = await report({});
+      const allowed = ['staffId','name','role','employmentStatus','date','regularHours',
+        'overtimeHours','sundayHours','holidayHours','approvalStatus','exceptions'].sort();
+      expect(Object.keys(r.days[0]).sort()).toEqual(allowed);
     });
   });
 });

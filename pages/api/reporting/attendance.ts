@@ -8,7 +8,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, withPermission } from '@/lib/auth/middleware';
+import {
+  withAuth,
+  withPermission,
+  type AuthenticatedNextApiRequest,
+} from '@/lib/auth/middleware';
+import { resolveScope } from '@/services/attendance/searchQueries';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { parseAttendanceFilter } from '@/lib/reporting/attendanceFilter';
@@ -27,12 +32,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if ('error' in parsed) return apiResponse.badRequest(res, parsed.error);
 
   try {
-    const { sql, params } = attendanceQuery(parsed.filter);
+    // The SAME supervisor-scope gate every other holder of this permission applies.
+    // Holding the key is not the whole rule: super_admin and admin see org-wide, and
+    // every other role is intersected with the staff they supervise. Without this a
+    // manager who supervises one person could read the entire workforce's hours.
+    const scope = await resolveScope((req as AuthenticatedNextApiRequest).user);
+
+    const { sql, params } = attendanceQuery(parsed.filter, scope.allowedStaffIds);
     const result = await pool.query<AttendanceDayRow>(sql, params);
 
     // Attendance is staff personal information: never cached anywhere shared.
     res.setHeader('Cache-Control', 'private, no-store');
-    return apiResponse.success(res, shapeAttendance(result.rows, parsed.filter));
+    return apiResponse.success(res, shapeAttendance(result.rows, parsed.filter, scope.note));
   } catch (error) {
     log.error(
       'Attendance report failed',

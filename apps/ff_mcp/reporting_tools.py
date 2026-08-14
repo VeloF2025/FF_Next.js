@@ -316,8 +316,20 @@ async def get_attendance(
       awaiting_supervisor backlog is an unworked queue, not a set of findings. Never
       characterise a named person's conduct from it.
 
-    Coverage starts 2026-04-25; there is nothing before that, and an empty result for an
-    earlier date means "not recorded here", not "did not work".
+    Coverage differs by mode: daily hours start 2026-04-25, day exceptions start
+    2026-07-13. An empty result before those dates means "not recorded here", NOT "did not
+    work" and NOT "no problems" — asked about exceptions in May, the honest answer is that
+    exception tracking had not begun.
+
+    You must narrow the query: give `person`, or a `since`/`until` range. A call with
+    neither is refused rather than returning every record for every person.
+
+    Read `totals` carefully: `daysMatched` is how many days matched, but
+    `regularHoursShown` and `overtimeHoursShown` sum only the days RETURNED. When
+    `hoursArePartial` is true they are a partial sum — never quote them as a period total.
+
+    Most callers see only the staff they supervise, not the organisation. The response
+    says so when that applies; do not generalise a supervisor's slice to the company.
     """
     query = build_query(
         mode=mode,

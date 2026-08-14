@@ -70,7 +70,20 @@ function escapeLike(value: string): string {
  * (There is a second table called attendance_exceptions; it is entry-level detection
  * data keyed on entry_id, and is NOT this.)
  */
-export function attendanceQuery(filter: AttendanceFilter): { sql: string; params: unknown[] } {
+export function attendanceQuery(
+  filter: AttendanceFilter,
+  /**
+   * Which staff this caller may see. `null` means org-wide.
+   *
+   * NOT optional, and not defaulted to null: every other consumer of
+   * people.staff.attendance.search intersects that key with supervisor scope
+   * (src/services/attendance/search/scope.ts, FR-SEARCH-08), and 11 of the 14
+   * staff-linked managers scope to exactly ONE staff record — themselves. Reusing the
+   * key without the gate turned "can see the person I supervise" into "can see all 54
+   * people with attendance". A required parameter means a new caller cannot forget it.
+   */
+  allowedStaffIds: string[] | null,
+): { sql: string; params: unknown[] } {
   const params: unknown[] = [];
   const push = (value: unknown) => `$${params.push(value)}`;
 
@@ -78,6 +91,12 @@ export function attendanceQuery(filter: AttendanceFilter): { sql: string; params
   // reading the generated SQL, and a test asserting "no 1=1 reached the query" then trips
   // on our own base clause.
   const where: string[] = ['TRUE'];
+
+  // Applied FIRST and unconditionally. An empty array is not "no filter" — it is a
+  // caller who supervises nobody, and must match nothing.
+  if (allowedStaffIds !== null) {
+    where.push(`${filter.mode === 'exceptions' ? 'x' : 'd'}.staff_id = ANY(${push(allowedStaffIds)}::uuid[])`);
+  }
 
   if (filter.person) {
     // Matched against the name as typed into the staff record. See the caveat: one
@@ -186,8 +205,18 @@ export interface AttendanceReport {
     daysShown: number;
     daysMatched: number;
     peopleShown: number;
-    regularHours: number | null;
-    overtimeHours: number | null;
+    /**
+     * Summed over the days SHOWN, not over daysMatched.
+     *
+     * Named `…HoursShown` because the previous name sat beside `daysMatched` and read as
+     * a total for the whole match set: a default call reported 3,536 hours that were
+     * actually the alphabetically-first 8 of 54 people, cut mid-person. This is the
+     * number a reader quotes, so the name has to carry the qualifier.
+     */
+    regularHoursShown: number | null;
+    overtimeHoursShown: number | null;
+    /** True when daysShown < daysMatched, i.e. the hours above are a partial sum. */
+    hoursArePartial: boolean;
   };
   caveats: string[];
 }
@@ -205,6 +234,7 @@ function day(value: Date | string | null): string | null {
 export function shapeAttendance(
   rows: AttendanceDayRow[],
   filter: AttendanceFilter,
+  scopeNote?: { kind: string; reason?: string; staffCount?: number },
 ): AttendanceReport {
   const matched = rows[0]?.total_matched ?? 0;
 
@@ -255,8 +285,29 @@ export function shapeAttendance(
 
   if (matched > days.length) {
     caveats.push(
-      `Showing ${days.length} of ${matched} matching days. Narrow with since/until or person ` +
-        'rather than treating this as the complete picture.',
+      `Showing ${days.length} of ${matched} matching days, so regularHoursShown and ` +
+        'overtimeHoursShown are a PARTIAL sum over those days only — not a total for the ' +
+        'period. Narrow with since/until or person rather than quoting these as the whole.',
+    );
+  }
+
+  // An in-range but empty result is as easy to misread as a reversed range, which is
+  // rejected outright for exactly this reason.
+  if (days.length === 0) {
+    caveats.push(
+      'No attendance records matched. That means nothing was RECORDED for this query — ' +
+        'not that nobody worked. Daily summaries begin 2026-04-25 and day exceptions ' +
+        'begin 2026-07-13; before those dates there is no data either way.',
+    );
+  }
+
+  // The caller may be seeing a slice of the workforce. Saying so stops a supervisor's
+  // view being reported as an organisation-wide figure.
+  if (scopeNote && scopeNote.kind !== 'orgwide') {
+    caveats.push(
+      scopeNote.kind === 'no_scope'
+        ? `You have no staff in scope, so this returns nothing regardless of the filters. ${scopeNote.reason ?? ''}`.trim()
+        : `Limited to the ${scopeNote.staffCount ?? 'some'} staff you supervise — this is NOT the whole organisation.`,
     );
   }
 
@@ -275,8 +326,9 @@ export function shapeAttendance(
       daysShown: days.length,
       daysMatched: matched,
       peopleShown: new Set(days.map((d) => d.staffId)).size,
-      regularHours: sum((d) => d.regularHours),
-      overtimeHours: sum((d) => d.overtimeHours),
+      regularHoursShown: sum((d) => d.regularHours),
+      overtimeHoursShown: sum((d) => d.overtimeHours),
+      hoursArePartial: matched > days.length,
     },
     caveats,
   };

@@ -32,8 +32,25 @@ export interface AttendanceFilter {
   limit: number;
 }
 
-/** `YYYY-MM-DD` only. Anything looser reaches Postgres as a date cast and 500s. */
+/** `YYYY-MM-DD` shape. Shape alone is not enough — see isRealDate. */
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A date that exists.
+ *
+ * The regex matches `0000-00-00`, `2026-02-30` and `2026-13-01`, all of which reach
+ * Postgres as a `::date` cast and throw — turning a client's typo into a 500 and a log
+ * line. Round-tripping through Date catches every one: an invalid day rolls over, so the
+ * formatted result differs from the input.
+ */
+function isRealDate(value: string): boolean {
+  const [y, m, d] = value.split('-').map(Number);
+  if (!y || !m || !d) return false;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return (
+    dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+  );
+}
 
 function one(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value.length > 0 ? value[0] : undefined;
@@ -55,8 +72,8 @@ export function parseAttendanceFilter(
   const rawLimit = one(query.limit)?.trim();
 
   for (const [name, value] of [['since', since], ['until', until]] as const) {
-    if (value && !ISO_DATE.test(value)) {
-      return { error: `${name} must be a date in YYYY-MM-DD form` };
+    if (value && (!ISO_DATE.test(value) || !isRealDate(value))) {
+      return { error: `${name} must be a real date in YYYY-MM-DD form` };
     }
   }
 
@@ -66,8 +83,21 @@ export function parseAttendanceFilter(
     return { error: 'since must not be after until' };
   }
 
-  // `roster` answers "who was here" — without a date it would mean "everyone, ever",
-  // which is a different and much larger question than the one being asked.
+  // EVERY mode needs a bound, not just roster.
+  //
+  // Guarding roster alone was decorative: `person` is the default, and with no person and
+  // no dates it issued the identical whole-workforce, all-time query — only the ORDER BY
+  // differed. `get_attendance()` with no arguments did exactly that and returned every
+  // summary row in the system. A question about attendance is always about somebody or
+  // some period; "everyone, ever" is not a question anyone asked.
+  const bounded = Boolean(person) || Boolean(since) || Boolean(until);
+  if (!bounded) {
+    return {
+      error:
+        'Narrow the query: give `person`, or a `since`/`until` range. ' +
+        'Without either this would return every attendance record for every person.',
+    };
+  }
   if (mode === 'roster' && !since) {
     return { error: 'roster mode needs at least `since` (a single date is fine)' };
   }
