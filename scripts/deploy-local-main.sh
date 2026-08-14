@@ -540,6 +540,58 @@ else
   warn "Health check returned HTTP $HTTP_CODE — may still be starting up"
 fi
 
+# --- Step 9b: Restart the MCP connector if its code changed ---
+#
+# The connectors run OUT OF the deploy directory but are not the service this script
+# restarts:
+#
+#   ff-remote-mcp.service             PYTHONPATH=/home/velo/fibreflow-dev/apps
+#   ff-remote-mcp-production.service  PYTHONPATH=/home/velo/fibreflow-production/apps
+#
+# So a deploy rewrites apps/ff_mcp/*.py under a live process that already imported the
+# old modules, and nothing says so: the health check and the BUILD_ID match both describe
+# the Next.js app only. On 2026-08-13 that shipped a security fix — an MCP denylist entry
+# — that was present on disk and absent from both running connectors. A grep of the
+# deployed file would have "confirmed" a fix that was not live.
+#
+# Restarted only when apps/ff_mcp actually changed, because a restart drops in-flight MCP
+# sessions and most deploys do not touch it.
+MCP_UNIT=""
+case "$TARGET" in
+  dev)        MCP_UNIT="ff-remote-mcp.service" ;;
+  production) MCP_UNIT="ff-remote-mcp-production.service" ;;
+esac
+
+if [[ -n "$MCP_UNIT" && "$CURRENT_COMMIT" != "$NEW_COMMIT" ]]; then
+  MCP_CHANGED=$(sudo -u velo bash -c \
+    "cd '$DIR' && git diff --name-only '$CURRENT_COMMIT' '$NEW_COMMIT' -- apps/ff_mcp 2>/dev/null | head -1") || MCP_CHANGED=""
+
+  if [[ -n "$MCP_CHANGED" ]]; then
+    # `systemctl --user` targets the invoking user's units, so this only works when the
+    # deploy is run by the account that owns them. Unattended runs (cron, another user)
+    # warn rather than fail: the app deploy itself succeeded, and a stale connector is a
+    # smaller problem than an aborted deploy that leaves the environment half-updated.
+    if systemctl --user list-unit-files "$MCP_UNIT" >/dev/null 2>&1; then
+      log "apps/ff_mcp changed — restarting $MCP_UNIT"
+      if systemctl --user restart "$MCP_UNIT" 2>/dev/null; then
+        sleep 3
+        MCP_STATE=$(systemctl --user is-active "$MCP_UNIT" 2>/dev/null || echo unknown)
+        if [[ "$MCP_STATE" == "active" ]]; then
+          log "$MCP_UNIT is active on the new code"
+        else
+          warn "$MCP_UNIT is '$MCP_STATE' after restart — check: systemctl --user status $MCP_UNIT"
+        fi
+      else
+        warn "could not restart $MCP_UNIT — it is STILL RUNNING THE OLD CODE"
+        warn "  run: systemctl --user restart $MCP_UNIT"
+      fi
+    else
+      warn "apps/ff_mcp changed but $MCP_UNIT is not visible to this user"
+      warn "  the connector is still running the old code — restart it as its owner"
+    fi
+  fi
+fi
+
 # --- Step 10: Clean old backups (keep last 3) ---
 sudo -u velo bash -c "cd $DIR && ls -dt .next-backup-* 2>/dev/null | tail -n +4 | xargs -r rm -rf"
 
