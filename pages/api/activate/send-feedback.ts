@@ -155,8 +155,8 @@ async function handlePost(
       }
     }
 
-    // Get WhatsApp group ID for project
-    const groupId = getWhatsAppGroupId(projectName || '');
+    // Resolve the destination group: the submission's own group, else the registry
+    const groupId = await resolveWhatsAppGroupJid(review.wa_group_jid, projectName || '');
 
     if (!groupId) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, `No WhatsApp group configured for project: ${projectName || 'unknown'}`);
@@ -639,19 +639,37 @@ async function createQaReworkTask(params: {
 }
 
 /**
- * Get WhatsApp group ID for a project
- * Note: Using hardcoded mappings from WA Monitor configuration
- * These match the groups configured in /opt/wa-monitor/prod/config/projects.yaml
+ * Resolve the WhatsApp group to send feedback to.
+ *
+ * Prefers the group the DR was actually submitted in, so the reply lands in the
+ * same thread as the submission. Older reviews (and 1Map/OES-sourced records)
+ * have no wa_group_jid, so fall back to the group registry.
+ *
+ * The fallback matches project_name first, then group_name — some review rows
+ * store a group name in `project` (e.g. "Velo Test", "Marketing Activations").
+ * A project can have several groups (Mamelodi has three), so prefer the
+ * dr_submission group and then the oldest registered one.
  */
-function getWhatsAppGroupId(project: string): string | null {
-  const groupMappings: Record<string, string> = {
-    'Lawley': '120363418298130331@g.us',
-    'Mohadin': '120363421532174586@g.us',
-    'Velo Test': '120363421664266245@g.us',
-    'Mamelodi': '120363408849234743@g.us',
-  };
+export async function resolveWhatsAppGroupJid(
+  waGroupJid: string | null,
+  project: string
+): Promise<string | null> {
+  if (waGroupJid) return waGroupJid;
+  if (!project) return null;
 
-  return groupMappings[project] || null;
+  const result = await pool.query<{ group_jid: string }>(
+    `SELECT group_jid
+       FROM wa_monitored_groups
+      WHERE is_active = true
+        AND (project_name = $1 OR group_name = $1)
+      ORDER BY (project_name = $1) DESC,
+               (group_type = 'dr_submission') DESC,
+               created_at ASC
+      LIMIT 1`,
+    [project]
+  );
+
+  return result.rows[0]?.group_jid ?? null;
 }
 
 interface WhatsAppReplyParams {
@@ -710,7 +728,9 @@ async function sendToWhatsApp(
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = await response.json().catch((parseError: unknown) => ({
+        parseError: parseError instanceof Error ? parseError.message : String(parseError),
+      }));
       log.error('wa-feedback API error', {
         status: response.status,
         error: errorData,
