@@ -92,22 +92,12 @@ export default function FleetMap({ vehicles }: { vehicles: LiveVehicle[] }) {
               {v.isSpeeding ? ' · SPEEDING' : ''}
               <br />
               {/*
-                No "(stale)" suffix. `statusFor` already says it, and says it
-                better: parkedSilent reads "Parked · no contact", lostContact
-                reads "Lost contact", unknown reads "No recent fix". The suffix
-                only ever repeated those — except on a PARKED vehicle, where it
-                flatly contradicted them. statusFor's own reasoning is that an
-                engine-off vehicle "is not moving, so its last position stays
-                true for as long as it stays off"; appending "(stale)" to that
-                told the reader not to trust a position we are most certain of.
-                Observed live: a vehicle parked and switched off at 15:13
-                (Cartrack's last event for it was literally "Ign OFF", confirmed
-                against their API) rendered "Parked · no contact ... (stale)".
-                Nothing was wrong — it was parked, exactly as stated.
-
-                `isStale` itself stays load-bearing in liveMapHelpers, where it
-                gates `speeding` on a fresh fix and turns ignition-on silence
-                into `lostContact`. Only this redundant echo of it is gone.
+                No "(stale)" suffix: `style.label` above already conveys
+                freshness, and on a parked vehicle the suffix contradicted it.
+                The reasoning lives in statusFor's docblock (liveMapHelpers) and
+                is deliberately NOT restated here, so the two cannot drift.
+                `isStale` is still load-bearing there — it gates `speeding` and
+                drives `lostContact`; only this echo of it is gone.
               */}
               Last fix: {ageLabel(v.ageSeconds)}
               <br />
