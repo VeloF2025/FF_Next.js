@@ -638,36 +638,62 @@ async function createQaReworkTask(params: {
   }
 }
 
+/** The submission's own group is only reused while it is still an active monitored group. */
+export const ACTIVE_GROUP_BY_JID_SQL = `
+  SELECT group_jid
+    FROM wa_monitored_groups
+   WHERE group_jid = $1
+     AND is_active = true`;
+
+/**
+ * Project fallback.
+ *
+ * A project match is restricted to dr_submission groups: projects also own civil,
+ * admin, maintenance and pre_provision groups, and QA feedback must never land in
+ * one of those. An exact group_name match is honoured whatever the type, because
+ * some review rows store a group name in `project` (e.g. "Velo Test").
+ *
+ * COALESCE keeps the project-match sort key non-null — `project_name` is nullable
+ * and a bare `(project_name = $1) DESC` sorts NULLs first in Postgres, which would
+ * rank a group_name-only match above a real project match. `group_jid` is the final
+ * tiebreaker so two groups registered in the same seed run cannot alternate.
+ */
+export const GROUP_FOR_PROJECT_SQL = `
+  SELECT group_jid
+    FROM wa_monitored_groups
+   WHERE is_active = true
+     AND ((project_name = $1 AND group_type = 'dr_submission') OR group_name = $1)
+   ORDER BY COALESCE(project_name = $1, false) DESC,
+            (group_type = 'dr_submission') DESC,
+            created_at ASC,
+            group_jid ASC
+   LIMIT 1`;
+
 /**
  * Resolve the WhatsApp group to send feedback to.
  *
  * Prefers the group the DR was actually submitted in, so the reply lands in the
- * same thread as the submission. Older reviews (and 1Map/OES-sourced records)
- * have no wa_group_jid, so fall back to the group registry.
- *
- * The fallback matches project_name first, then group_name — some review rows
- * store a group name in `project` (e.g. "Velo Test", "Marketing Activations").
- * A project can have several groups (Mamelodi has three), so prefer the
- * dr_submission group and then the oldest registered one.
+ * same thread as the submission — but only while that group is still active, so a
+ * decommissioned group falls back instead of swallowing the feedback. Older
+ * reviews (and 1Map/OES-sourced records) have no wa_group_jid at all.
  */
 export async function resolveWhatsAppGroupJid(
   waGroupJid: string | null,
   project: string
 ): Promise<string | null> {
-  if (waGroupJid) return waGroupJid;
+  if (waGroupJid) {
+    const live = await pool.query<{ group_jid: string }>(ACTIVE_GROUP_BY_JID_SQL, [waGroupJid]);
+    if (live.rows.length > 0) return waGroupJid;
+
+    log.warn('Submission group is no longer an active monitored group, falling back to project', {
+      waGroupJid,
+      project,
+    });
+  }
+
   if (!project) return null;
 
-  const result = await pool.query<{ group_jid: string }>(
-    `SELECT group_jid
-       FROM wa_monitored_groups
-      WHERE is_active = true
-        AND (project_name = $1 OR group_name = $1)
-      ORDER BY (project_name = $1) DESC,
-               (group_type = 'dr_submission') DESC,
-               created_at ASC
-      LIMIT 1`,
-    [project]
-  );
+  const result = await pool.query<{ group_jid: string }>(GROUP_FOR_PROJECT_SQL, [project]);
 
   return result.rows[0]?.group_jid ?? null;
 }
