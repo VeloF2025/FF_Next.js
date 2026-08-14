@@ -231,7 +231,10 @@ export async function createPicking(
     // picking_number unique constraint (500). Numbers are type-prefixed, e.g.
     // ISS-YYYYMM-##### / TRF-… (legacy pickings keep their PCK-###### numbers;
     // nothing in the codebase parses the format, and lists order by created_at).
-    const numResult = await sql`SELECT generate_picking_number(${pickingType || 'issue'}) AS num`;
+    // Pass the raw type (null when absent) so the function's prefix matches the
+    // stored picking_type: a typeless picking gets the PKG- fallback, not a
+    // misleading ISS-.
+    const numResult = await sql`SELECT generate_picking_number(${pickingType || null}) AS num`;
     const pickingNumber = numResult[0]?.num as string;
 
     // Create picking header
