@@ -92,6 +92,7 @@ async def test_every_fresh_service_registers_the_complete_tool_set_once(
         "get_procurement_summary",
         "get_action_items",
         "find_meetings",
+        "get_report_export",
     }
 
     assert set(names) == expected

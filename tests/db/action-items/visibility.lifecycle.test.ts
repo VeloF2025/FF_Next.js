@@ -29,6 +29,13 @@ import { buildActionItemListQuery } from '@/lib/actionItems/listQuery';
 import { meetingsQuery, parseMeetingFilter, shapeMeetings } from '@/lib/reporting/meetings';
 import { meetingForCaller } from '@/lib/actionItems/meetingFetch';
 import { commentVisibility } from '@/lib/actionItems/commentAccess';
+import {
+  ACTION_ITEM_COLUMNS,
+  MEETING_COLUMNS,
+  actionItemExportQuery,
+  meetingExportQuery,
+} from '@/lib/reporting/exportQueries';
+import { toCsv, UTF8_BOM } from '@/lib/reporting/csv';
 
 const ALICE = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
@@ -567,6 +574,83 @@ describe('action item visibility (real Postgres)', () => {
       expect(clause).toContain('$2');
       expect(clause).not.toMatch(/\$1\b/);
       expect(params).toEqual([ITEM, 'alice@example.com']);
+    });
+  });
+
+  describe('CSV export queries', () => {
+    // An export is a bulk extract, so the scope it runs under matters more here than
+    // anywhere else — and the row SET is only half of it. These execute the shipped
+    // queries and assert on the CSV that actually comes out.
+    async function exportRows(
+      build: (a: ActionItemAccess) => { text: string; params: unknown[] },
+      access: ActionItemAccess,
+    ) {
+      const { text, params } = build(access);
+      const { rows } = await pool.query(text, params);
+      return rows;
+    }
+
+    it('scopes the meetings export to what the caller attended', async () => {
+      const titles = (await exportRows(meetingExportQuery, alice)).map((r) => r.title).sort();
+      expect(titles).toEqual(['Alice handover', 'Late evening', 'Url only']);
+    });
+
+    it('gives the owner every meeting', async () => {
+      expect(await exportRows(meetingExportQuery, owner)).toHaveLength(6);
+    });
+
+    it('fails closed for an identity with no email', async () => {
+      const noEmail: ActionItemAccess = { isOwner: false, email: '', userId: '' };
+      expect(await exportRows(meetingExportQuery, noEmail)).toHaveLength(0);
+    });
+
+    it('scopes action items on ATTENDANCE ALONE, matching the report it exports', async () => {
+      // Deliberately narrower than the browser rule: no assignment arm, no no-meeting
+      // arm. An export that quietly covered more than its own report would be a second,
+      // undocumented access surface.
+      const rows = await exportRows((a) => actionItemExportQuery(a, 'all'), alice);
+      const ids = rows.map((r) => r.id).sort();
+      expect(ids).toEqual(['alice-attended']);
+      // These ARE visible to Alice in the UI — by assignment and by having no meeting —
+      // and must not appear here.
+      expect(ids).not.toContain('assigned-email');
+      expect(ids).not.toContain('no-meeting');
+    });
+
+    it('applies the state filter without widening the gate', async () => {
+      const all = await exportRows((a) => actionItemExportQuery(a, 'all'), owner);
+      const open = await exportRows((a) => actionItemExportQuery(a, 'open'), owner);
+      expect(open.length).toBeLessThanOrEqual(all.length);
+    });
+
+    it('produces a CSV whose header and row count match the rows returned', async () => {
+      const rows = await exportRows(meetingExportQuery, alice);
+      const csv = toCsv(rows as never, MEETING_COLUMNS);
+      const lines = csv.replace(UTF8_BOM, '').trimEnd().split('\r\n');
+      expect(lines[0]).toBe(MEETING_COLUMNS.map((c) => c.header).join(','));
+      expect(lines).toHaveLength(rows.length + 1);
+    });
+
+    it('quotes a description containing commas and quotes rather than shifting columns', async () => {
+      await pool.query(
+        `UPDATE action_items SET description = $1 WHERE id = 'alice-attended'`,
+        ['He said "do it, now", twice'],
+      );
+      const rows = await exportRows((a) => actionItemExportQuery(a, 'all'), alice);
+      const csv = toCsv(rows as never, ACTION_ITEM_COLUMNS);
+      const body = csv.replace(UTF8_BOM, '').trimEnd().split('\r\n')[1]!;
+      expect(body.startsWith('"He said ""do it, now"", twice"')).toBe(true);
+      // Every row still has the same number of top-level fields as the header.
+      const topLevelCommas = (line: string) => {
+        let inQuotes = false, n = 0;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') inQuotes = !inQuotes;
+          else if (ch === ',' && !inQuotes) n++;
+        }
+        return n;
+      };
+      expect(topLevelCommas(body)).toBe(ACTION_ITEM_COLUMNS.length - 1);
     });
   });
   });

@@ -233,3 +233,36 @@ async def find_meetings(
         limit=limit,
     )
     return await anyio.to_thread.run_sync(partial(_meetings_sync, query))
+
+
+def _export_link_sync(query: str) -> str:
+    return _fibreflow_get_sync("/api/reporting/export-link", query)
+
+
+@mcp.tool()
+async def get_report_export(report: str, state: str = "open") -> str:
+    """Get a short-lived URL that downloads a report as a CSV spreadsheet.
+
+    - `report`: "action-items" or "meetings".
+    - `state`: action-items only — "open" (default), "completed" or "all".
+
+    Returns a URL, not the data. Give the URL to the person who asked; it opens in a
+    browser or can be pasted into a spreadsheet's "import from web". Do not try to fetch
+    it yourself and paste thousands of rows into the conversation — that is what the file
+    is for.
+
+    Two things to say plainly when you hand it over:
+
+    - It expires in 15 minutes. That is deliberate, so a URL left in a chat thread is dead
+      before anyone finds it. Ask again for a fresh one rather than treating an expired
+      link as a fault.
+    - It carries the SCOPE of whoever requested it, baked into the signature, and anyone
+      holding the URL gets that same slice until it expires. So it is not something to
+      post in a shared channel. For most callers the slice is "meetings you attended";
+      the response says which case applies.
+
+    The CSV covers up to 5,000 rows. If it is truncated the response header
+    X-Export-Truncated says so — never describe a truncated export as the complete set.
+    """
+    query = build_query(report=report, state=state)
+    return await anyio.to_thread.run_sync(partial(_export_link_sync, query))

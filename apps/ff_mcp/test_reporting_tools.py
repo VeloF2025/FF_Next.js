@@ -48,6 +48,7 @@ async def test_every_reporting_tool_body_actually_runs(reporting, monkeypatch):
         mod.get_procurement_summary("Etwatwa"),
         mod.get_action_items(),
         mod.find_meetings(),
+        mod.get_report_export('action-items'),
     ):
         assert await call == '{"success":true}'
         assert seen["path"].startswith("/api/reporting/")
@@ -166,3 +167,36 @@ async def test_find_meetings_description_stops_the_absence_inference(svc):
     assert "index, not contents" in desc
     # Must not promise transcript search — search is title-only.
     assert "title only" in desc
+
+
+@pytest.mark.asyncio
+async def test_report_export_hits_the_link_route_not_the_data_route(reporting, monkeypatch):
+    """It must mint a link, never stream the CSV through the model's context."""
+    mod, _ = reporting
+    seen = _capture(mod, monkeypatch)
+
+    await mod.get_report_export("meetings")
+
+    assert seen["path"] == "/api/reporting/export-link"
+    assert urllib.parse.parse_qs(seen["query"]) == {"report": ["meetings"], "state": ["open"]}
+
+
+@pytest.mark.asyncio
+async def test_report_export_description_sets_expectations(svc):
+    """A model that posts this URL in a shared channel has leaked the caller's slice."""
+    import re
+
+    server, _ = svc
+    # Collapse whitespace: a docstring wraps where the line runs out, so asserting on a
+    # literal phrase makes the test depend on where the author happened to break a line.
+    tools = {
+        t.name: re.sub(r"\s+", " ", t.description.lower())
+        for t in await server.mcp.list_tools()
+    }
+    desc = tools["get_report_export"]
+
+    assert "expires in 15 minutes" in desc
+    assert "anyone holding the url" in desc
+    # Must not invite the model to fetch and paste the rows.
+    assert "do not try to fetch it yourself" in desc
+    assert "x-export-truncated" in desc
