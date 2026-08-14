@@ -36,10 +36,13 @@ async function handler(req: Request, res: NextApiResponse): Promise<void> {
   const asOf = stringValue(req.query.asOf); const page = integer(stringValue(req.query.page), 1, Number.MAX_SAFE_INTEGER);
   const limit = integer(stringValue(req.query.limit), 25, 100); const status = stringValue(req.query.status);
   const group = stringValue(req.query.group);
+  const repeatedFilter = [req.query.page, req.query.limit, req.query.status, req.query.group].some(Array.isArray);
+  const competingFilters = req.query.status !== undefined && req.query.group !== undefined;
   const statusFilter = status && STATUSES.includes(status as OperationalStatus) ? [status as OperationalStatus]
     : group && GROUPS[group] ? GROUPS[group] : status || group ? null : undefined;
   if (!projectId || !isValidUUID(projectId) || !workDate || !validDate(workDate) || !asOf
     || parseStrictIsoInstant(asOf) === null || page === null || limit === null || statusFilter === null
+    || repeatedFilter || competingFilters
     || req.query.includeGeometry !== undefined) {
     return apiResponse.badRequest(res, 'Valid projectId, workDate, asOf, filters, page and limit are required');
   }

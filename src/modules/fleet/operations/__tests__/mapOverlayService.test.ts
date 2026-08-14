@@ -4,10 +4,10 @@ import type { OperationalEvidence, OperationalStatusSummary } from '../types';
 const mocks = vi.hoisted(() => ({
   roster: vi.fn(), evidence: vi.fn(), detail: vi.fn(), query: vi.fn(), project: vi.fn(), oversight: vi.fn(),
 }));
-vi.mock('../statusService', () => ({
-  getOperationalRosterStatus: mocks.roster,
-  getOperationalEvidenceDetail: mocks.detail,
-}));
+vi.mock('../statusService', async () => {
+  const actual = await vi.importActual<typeof import('../statusService')>('../statusService');
+  return { ...actual, getOperationalRosterStatus: mocks.roster, getOperationalEvidenceDetail: mocks.detail };
+});
 vi.mock('../evidenceQueries', () => ({ loadOperationalEvidence: mocks.evidence }));
 vi.mock('../projectScope', () => ({
   canAccessOperationalProject: mocks.project,
@@ -23,6 +23,7 @@ import {
 
 const PROJECT = '33333333-3333-4333-8333-333333333333';
 const SITE = '44444444-4444-4444-8444-444444444444';
+const OTHER_SITE = '66666666-6666-4666-8666-666666666666';
 const STAFF = '22222222-2222-4222-8222-222222222222';
 const VEHICLE = '55555555-5555-4555-8555-555555555555';
 const AS_OF = '2026-08-14T08:00:00.000Z';
@@ -66,6 +67,16 @@ function evidence(values: Partial<OperationalEvidence> = {}): OperationalEvidenc
   };
 }
 
+function detail() {
+  return { staffId: STAFF, workDate: '2026-08-14', projectName: 'Project One', operationalSiteName: 'Site One',
+    monitoringStart: '2026-08-14T05:00:00.000Z', scheduledStart: '2026-08-14T06:00:00.000Z',
+    graceEnd: '2026-08-14T06:15:00.000Z', scheduledEnd: '2026-08-14T15:00:00.000Z',
+    monitoringEnd: '2026-08-14T16:00:00.000Z', gpsStaleAfterSeconds: 300,
+    evaluation: { status: 'attendance_confirmed' as const, flags: [], reasonCodes: ['attendance_inside_required_site'],
+      ruleId: 'rule-1', ruleVersion: 2, sourceTimestamps: ['2026-08-14T06:01:00.000Z'], thresholdsUsed: {} },
+    points: [] };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.project.mockResolvedValue(true); mocks.oversight.mockResolvedValue(false); mocks.query.mockResolvedValue([]);
@@ -100,6 +111,17 @@ describe('getOperationalMapOverlay', () => {
     const outside = await getOperationalMapOverlay(request, actor);
     expect(outside.attendancePoints).toEqual([]);
     expect(outside.unplottable).toEqual([expect.objectContaining({ staffId: STAFF, reason: 'no_permissible_coordinate' })]);
+  });
+
+  it('withholds Attendance coordinates when asOf is after the PR4 monitoring window', async () => {
+    const afterWindow = '2026-08-14T16:00:01.000Z';
+    mocks.roster.mockResolvedValue({ items: [summary({ status: 'off_duty',
+      reasonCodes: ['outside_monitoring_window'] })], page: 1, limit: 100, total: 1, hasMore: false });
+    mocks.evidence.mockResolvedValue({ items: [evidence({ asOf: afterWindow, vehicle: { assignmentId: null,
+      vehicleId: null, provider: null, accountRef: null, staleAfterSeconds: null, positions: [] } })], total: 1 });
+    const result = await getOperationalMapOverlay({ ...request, asOf: afterWindow }, actor);
+    expect(result.attendancePoints).toEqual([]);
+    expect(result.unplottable).toEqual([expect.objectContaining({ staffId: STAFF, status: 'off_duty' })]);
   });
 
   it('keeps a no-evidence driver unplottable instead of fabricating an expected-site point', async () => {
@@ -139,13 +161,7 @@ describe('getOperationalMapOverlay', () => {
 
   it('loads geometry from the authorized assignment for a staff-only oversight selection', async () => {
     mocks.oversight.mockResolvedValue(true);
-    mocks.detail.mockResolvedValue({ staffId: STAFF, workDate: '2026-08-14', projectName: 'Project One',
-      operationalSiteName: 'Site One', monitoringStart: '2026-08-14T05:00:00.000Z',
-      scheduledStart: '2026-08-14T06:00:00.000Z', graceEnd: '2026-08-14T06:15:00.000Z',
-      scheduledEnd: '2026-08-14T15:00:00.000Z', monitoringEnd: '2026-08-14T16:00:00.000Z',
-      gpsStaleAfterSeconds: 300, evaluation: { status: 'attendance_confirmed', flags: [],
-        reasonCodes: ['attendance_inside_required_site'], ruleId: 'rule-1', ruleVersion: 2,
-        sourceTimestamps: ['2026-08-14T06:01:00.000Z'], thresholdsUsed: {} }, points: [] });
+    mocks.detail.mockResolvedValue(detail());
     mocks.query.mockResolvedValue([{ site_id: SITE, project_id: PROJECT, site_name: 'Site One', source: 'aoi',
       confidence: 'medium', geojson: { type: 'MultiPolygon', coordinates: [] }, latitude: null,
       longitude: null, radius_m: null }]);
@@ -153,6 +169,37 @@ describe('getOperationalMapOverlay', () => {
       includeGeometry: true }, actor);
     expect(result.geometry).toEqual(expect.objectContaining({ kind: 'aoi', projectId: PROJECT,
       operationalSiteId: SITE }));
+  });
+
+  it('resolves a site-only selection to its project before authorization and loading', async () => {
+    mocks.query.mockResolvedValueOnce([{ project_id: PROJECT }]).mockResolvedValueOnce([{ site_id: SITE,
+      project_id: PROJECT, site_name: 'Site One', source: 'aoi', confidence: 'medium',
+      geojson: { type: 'MultiPolygon', coordinates: [] }, latitude: null, longitude: null, radius_m: null }]);
+    const result = await getOperationalMapOverlay({ ...request, projectId: undefined, siteId: SITE,
+      includeGeometry: true }, actor);
+    expect(mocks.project).toHaveBeenCalledWith(actor.userId, actor.staffId, actor.role, PROJECT);
+    expect(mocks.roster).toHaveBeenCalledWith(expect.objectContaining({ projectId: PROJECT }));
+    expect(result.geometry).toEqual(expect.objectContaining({ projectId: PROJECT, operationalSiteId: SITE }));
+  });
+
+  it('intersects staff and site selection instead of returning staff or geometry from a different site', async () => {
+    mocks.oversight.mockResolvedValue(true); mocks.detail.mockResolvedValue(detail());
+    mocks.query.mockResolvedValueOnce([{ project_id: PROJECT }]);
+    const result = await getOperationalMapOverlay({ ...request, projectId: undefined, staffId: STAFF,
+      siteId: OTHER_SITE, includeGeometry: true }, actor);
+    expect(result).toMatchObject({ badges: [], attendancePoints: [], unplottable: [], total: 0 });
+    expect(result.geometry).toBeUndefined(); expect(mocks.query).toHaveBeenCalledTimes(1);
+    expect(String(mocks.query.mock.calls[0]?.[0])).toContain('selected-site-scope');
+  });
+
+  it('derives selected staff geometry before pagination hides the row', async () => {
+    mocks.query.mockResolvedValue([{ site_id: SITE, project_id: PROJECT, site_name: 'Site One', source: 'aoi',
+      confidence: 'medium', geojson: { type: 'MultiPolygon', coordinates: [] }, latitude: null,
+      longitude: null, radius_m: null }]);
+    const result = await getOperationalMapOverlay({ ...request, staffId: STAFF, page: 2, limit: 1,
+      includeGeometry: true }, actor);
+    expect(result.badges).toEqual([]); expect(result.geometry).toEqual(expect.objectContaining({ operationalSiteId: SITE }));
+    expect(mocks.query.mock.calls[0]?.[1]).toEqual([PROJECT, SITE]);
   });
 
   it('enforces project scope before loading data and preserves the historical asOf boundary', async () => {

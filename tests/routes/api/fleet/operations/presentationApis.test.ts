@@ -89,6 +89,15 @@ describe('operational presentation APIs', () => {
     expect(result.status).toBe(400); expect(mocks.roster).not.toHaveBeenCalled();
   });
 
+  it('rejects repeated overview scalars and mutually exclusive status filters', async () => {
+    for (const query of [
+      { ...valid, page: ['1', '2'] }, { ...valid, limit: ['10', '20'] },
+      { ...valid, status: ['late', 'wrong_site'] }, { ...valid, group: ['late', 'wrong_site'] },
+      { ...valid, status: 'late', group: 'late' },
+    ]) expect((await call(overviewHandler, 'GET', query)).status).toBe(400);
+    expect(mocks.roster).not.toHaveBeenCalled(); expect(mocks.overview).not.toHaveBeenCalled();
+  });
+
   it('derives project scope from the session and delegates complete status to the coordinate-free overview', async () => {
     const roster = { items: [{ staffId: STAFF, latitude: -26.1, longitude: 28.1 }], page: 1,
       limit: 100, total: 1, hasMore: false };

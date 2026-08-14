@@ -4,6 +4,7 @@ import { canAccessOperationalProject, hasOperationalOversight } from './projectS
 import {
   getOperationalEvidenceDetail,
   getOperationalRosterStatus,
+  isOperationalAttendancePointEligible,
   type OperationalEvidenceDetail,
   type RosterStatusResult,
 } from './statusService';
@@ -56,6 +57,7 @@ interface GeometryRow extends Record<string, unknown> {
   confidence: string | null; geojson: Record<string, unknown> | null;
   latitude: string | number | null; longitude: string | number | null; radius_m: string | number | null;
 }
+interface SiteScopeRow extends Record<string, unknown> { project_id: string }
 interface JoinedRow { summary: OperationalStatusSummary; evidence: OperationalEvidence }
 const BATCH_LIMIT = 100;
 
@@ -75,6 +77,15 @@ function detailSummary(evidence: OperationalEvidence, detail: OperationalEvidenc
 async function authorizeProject(projectId: string, actor: OperationalMapActorScope): Promise<void> {
   const allowed = await canAccessOperationalProject(actor.userId, actor.staffId, actor.role, projectId);
   if (!allowed) throw new OperationalMapAccessError();
+}
+
+async function resolveSiteProject(siteId: string): Promise<string> {
+  const rows = await query<SiteScopeRow>(`/* fleet-operations:selected-site-scope */
+    SELECT project_id FROM fleet_project_operational_sites
+    WHERE id=$1::uuid AND is_active LIMIT 1`, [siteId]);
+  const projectId = rows[0]?.project_id;
+  if (!projectId) throw new OperationalMapRequestError('Operational site selection was not found');
+  return projectId;
 }
 
 async function loadProjectRows(request: OperationalMapOverlayRequest, actor: OperationalMapActorScope): Promise<JoinedRow[]> {
@@ -119,7 +130,10 @@ function attendancePoint(row: JoinedRow): OperationalAttendancePoint | null {
   if (row.evidence.vehicle.vehicleId) return null;
   const point = row.evidence.attendance.clockInPoint;
   const start = row.summary.monitoringStart; const end = row.summary.monitoringEnd;
-  if (!point || !start || !end || Date.parse(point.recordedAt) < Date.parse(start)
+  if (!point || !start || !end) return null;
+  if (!isOperationalAttendancePointEligible({ asOf: row.evidence.asOf, monitoringStart: start,
+    monitoringEnd: end, status: row.summary.status, reasonCodes: row.summary.reasonCodes })
+    || Date.parse(point.recordedAt) < Date.parse(start)
     || Date.parse(point.recordedAt) > Date.parse(end)
     || !row.summary.sourceTimestamps.includes(point.recordedAt)) return null;
   return { staffId: row.summary.staffId, staffName: row.summary.staffName, projectId: row.summary.projectId,
@@ -156,8 +170,12 @@ export async function getOperationalMapOverlay(
 ): Promise<OperationalMapOverlay> {
   if (!Number.isInteger(request.page) || request.page < 1 || !Number.isInteger(request.limit)
     || request.limit < 1 || request.limit > 100) throw new OperationalMapRequestError('Invalid pagination');
-  if (!request.projectId && !request.staffId) throw new OperationalMapRequestError('A project or staff selection is required');
-  const allRows = request.projectId ? await loadProjectRows(request, actor) : await loadStaffRow(request, actor);
+  if (!request.projectId && !request.staffId && !request.siteId) {
+    throw new OperationalMapRequestError('A project, staff or site selection is required');
+  }
+  const scopedRequest = !request.projectId && request.siteId
+    ? { ...request, projectId: await resolveSiteProject(request.siteId) } : request;
+  const allRows = scopedRequest.projectId ? await loadProjectRows(scopedRequest, actor) : await loadStaffRow(scopedRequest, actor);
   const offset = (request.page - 1) * request.limit; const rows = allRows.slice(offset, offset + request.limit);
   const badges = rows.flatMap(({ summary, evidence }) => evidence.vehicle.vehicleId ? [{ vehicleId: evidence.vehicle.vehicleId,
     staffId: summary.staffId, staffName: summary.staffName, projectId: summary.projectId, projectName: summary.projectName,
@@ -171,9 +189,11 @@ export async function getOperationalMapOverlay(
     operationalSiteId: summary.operationalSiteId, status: summary.status,
     reason: 'no_permissible_coordinate' as const,
   }));
-  const selectedSiteId = request.siteId ?? (request.staffId ? rows[0]?.summary.operationalSiteId ?? undefined : undefined);
-  const geometryProjectId = request.projectId ?? (request.staffId ? rows[0]?.summary.projectId ?? undefined : undefined);
-  const geometry = request.includeGeometry && geometryProjectId
+  const selectedRow = allRows[0];
+  const selectedSiteId = request.siteId ?? (request.staffId ? selectedRow?.summary.operationalSiteId ?? undefined : undefined);
+  const geometryProjectId = scopedRequest.projectId ?? (request.staffId ? selectedRow?.summary.projectId ?? undefined : undefined);
+  const matchingStaffSelection = !request.staffId || selectedRow !== undefined;
+  const geometry = request.includeGeometry && geometryProjectId && matchingStaffSelection
     ? await loadGeometry(geometryProjectId, selectedSiteId) : undefined;
   return { badges, attendancePoints, unplottable, ...(geometry ? { geometry } : {}), page: request.page,
     limit: request.limit, total: allRows.length, hasMore: offset + rows.length < allRows.length,
