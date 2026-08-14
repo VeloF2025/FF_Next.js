@@ -22,6 +22,7 @@ import {
   upsertSummary,
 } from './reconcileWriters';
 import { countsFrom, emptyReport, runStatus, type ReconcileReport } from './reconcileReport';
+import { buildFailureDiagnosis } from './reconcileFailureDiagnosis';
 import { loadObservedHolidays } from './saPublicHolidays';
 import { computeWageCents, hourlyRateCentsFromDbValue } from './wageCalculator';
 import { isoWeekMonday } from './isoWeek';
@@ -169,33 +170,10 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
     // A partial run is the only status that used to reach the database with no
     // diagnosis attached, so the row said which days failed but not why and the
     // reason survived only in the cron log file (#2480).
-    errorMessage: partialRunErrorMessage(report.failedDayKeys, failed, pendingClosed),
+    errorMessage: buildFailureDiagnosis(report.failedDayKeys, failed, pendingClosed),
     finishedAt: report.finishedAt,
   });
   return report;
-}
-
-/**
- * One line per failed day, in the same order as `failedDayKeys`. Returns null
- * for a clean run so a succeeded row keeps a NULL error_message.
- *
- * Days in `pendingClosed` were system-closed but never projected; there is no
- * thrown error to quote for them, so they are labelled explicitly rather than
- * silently omitted — a key in `failedDayKeys` with no line here would be worse
- * than the bug being fixed.
- */
-function partialRunErrorMessage(
-  failedDayKeys: string[],
-  failed: Map<string, string>,
-  pendingClosed: Set<string>,
-): string | null {
-  if (failedDayKeys.length === 0) return null;
-  const lines = failedDayKeys.map((key) => {
-    const reason = failed.get(key)
-      ?? (pendingClosed.has(key) ? 'system-closed but not projected' : 'unknown failure');
-    return `${key}: ${reason}`;
-  });
-  return lines.join('\n').slice(0, 2_000);
 }
 async function reconcileDay(
   day: DayCandidate,

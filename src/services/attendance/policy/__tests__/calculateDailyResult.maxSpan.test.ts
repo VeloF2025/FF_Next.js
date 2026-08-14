@@ -112,6 +112,45 @@ describe('calculateDailyResult — maximum span guard (#2479)', () => {
     expect(result.recordedElapsedHours).toBeNull();
   });
 
+  // The span guard alone does NOT bound overtime: overtime is span minus the
+  // schedule window, so the worst case scales with how SHORT the schedule is.
+  // Saturday is 08:00-13:00 (5h), half the weekday window, so a span well
+  // inside 24h still breached proposed_overtime_hrs <= 15 until the overtime
+  // ceiling was guarded in its own right.
+  describe('overtime ceiling — short schedule windows', () => {
+    it('parks a Saturday span that would propose 19h of overtime', () => {
+      // 2026-08-08 is a Saturday. 04:00 -> 03:59 SAST next day: 23h59m elapsed,
+      // inside the 24h span guard, but 18.98h of overtime against a 5h window.
+      const result = run(pair('2026-08-08', '2026-08-08T02:00:00Z', '2026-08-09T01:59:00Z'));
+
+      expectWithinDatabaseConstraints(result);
+      expect(result.exceptionKinds).toEqual(['evidence_unreliable']);
+      expect(result.status).toBe('awaiting_supervisor');
+      expect(result.proposedOvertimeHours).toBe(0);
+      expect(result.proposedRegularHours).toBeNull();
+    });
+
+    it('still projects a Saturday sitting exactly on the 15h overtime ceiling', () => {
+      // 05:00 -> 01:00 SAST next day against the 08:00-13:00 window:
+      // 3h before start + 12h after end = exactly the 15h ceiling, which is
+      // inclusive and must still project.
+      const result = run(pair('2026-08-08', '2026-08-08T03:00:00Z', '2026-08-08T23:00:00Z'));
+
+      expectWithinDatabaseConstraints(result);
+      expect(result.proposedOvertimeHours).toBe(15);
+      expect(result.exceptionKinds).not.toContain('evidence_unreliable');
+    });
+
+    it('leaves an ordinary Saturday morning alone', () => {
+      const result = run(pair('2026-08-08', '2026-08-08T06:00:00Z', '2026-08-08T11:00:00Z'));
+
+      expectWithinDatabaseConstraints(result);
+      expect(result.exceptionKinds).not.toContain('evidence_unreliable');
+      expect(result.proposedRegularHours).toBe(5);
+      expect(result.proposedOvertimeHours).toBe(0);
+    });
+  });
+
   it('leaves an ordinary cross-midnight night shift alone', () => {
     // 18:00 to 04:00 SAST — genuinely spans midnight, well inside the bound,
     // and must keep projecting overtime rather than being swept up by the guard.
