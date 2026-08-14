@@ -759,10 +759,28 @@ function StockTakesTabContent() {
     name: '',
     stock_take_type: 'full',
     notes: '',
+    location_id: '',
   });
+  const [warehouses, setWarehouses] = useState<Array<{ id: string; code?: string; name: string }>>([]);
 
   useEffect(() => {
     fetchStockTakes();
+  }, []);
+
+  // Warehouses for the location selector. A stock take is scoped to one
+  // location: expected quantities come from stock_quants at that location, and
+  // the create API + initialize_stock_take_lines require it.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/procurement/field-stock/locations?locationType=warehouse&isActive=true')
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : (data?.data ?? []);
+        setWarehouses(list);
+      })
+      .catch((err) => log.error('Failed to load warehouses', { error: err }));
+    return () => { cancelled = true; };
   }, []);
 
   const fetchStockTakes = async () => {
@@ -782,7 +800,7 @@ function StockTakesTabContent() {
 
   const openNewModal = () => {
     const today = new Date().toISOString().slice(0, 10);
-    setFormData({ name: `Stock Take ${today}`, stock_take_type: 'full', notes: '' });
+    setFormData({ name: `Stock Take ${today}`, stock_take_type: 'full', notes: '', location_id: '' });
     setShowModal(true);
   };
 
@@ -793,6 +811,10 @@ function StockTakesTabContent() {
   const handleCreate = async () => {
     if (!formData.name.trim()) {
       notificationService.error('Name is required');
+      return;
+    }
+    if (!formData.location_id) {
+      notificationService.error('Select a location');
       return;
     }
     setIsSaving(true);
@@ -964,6 +986,23 @@ function StockTakesTabContent() {
                   className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                   autoFocus
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Location *</label>
+                <select
+                  value={formData.location_id}
+                  onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+                >
+                  <option value="">Select a warehouse…</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}{w.code ? ` (${w.code})` : ''}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-[var(--ff-text-tertiary)]">
+                  Expected quantities are counted against this location&apos;s stock.
+                </p>
               </div>
 
               <div>
