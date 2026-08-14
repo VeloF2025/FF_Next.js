@@ -57,9 +57,18 @@ export interface OperationalOverviewFilters {
   attentionStatuses?: OperationalStatus[];
 }
 
+/**
+ * A complete, single PR4 roster-status selection. The overview must not be
+ * built from one page of a larger selection: groups and attention both need
+ * every evaluated staff member before attention pagination is applied.
+ */
+export interface CompleteOperationalRosterSelection extends RosterStatusResult {
+  hasMore: false;
+}
+
 export interface OperationalOverview {
   selectionState: 'no_scheduled_staff' | 'no_attention' | 'attention_available';
   groups: OperationalStatusGroupCount[];
   attention: OperationalAttentionPage;
-  roster: Pick<RosterStatusResult, 'page' | 'limit' | 'total' | 'hasMore'>;
+  roster: Pick<CompleteOperationalRosterSelection, 'page' | 'limit' | 'total' | 'hasMore'>;
 }

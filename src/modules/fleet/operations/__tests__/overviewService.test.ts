@@ -91,4 +91,15 @@ describe('buildOperationalOverview', () => {
     expect(buildOperationalOverview(result([summary('on_site_dual')]), { page: 1, limit: 25 }).selectionState).toBe('no_attention');
     expect(coordinateFreeContract).toBeUndefined();
   });
+
+  it('rejects a partial PR4 roster instead of omitting staff from groups or attention', () => {
+    const partialResult = {
+      ...result([summary('on_site_dual')]),
+      total: 2,
+      hasMore: true,
+    };
+
+    expect(() => buildOperationalOverview(partialResult, { page: 1, limit: 25 }))
+      .toThrow('complete roster selection');
+  });
 });

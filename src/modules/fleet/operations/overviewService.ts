@@ -1,5 +1,6 @@
 import type { RosterStatusResult } from './statusService';
 import type {
+  CompleteOperationalRosterSelection,
   OperationalAttentionRow,
   OperationalOverview,
   OperationalOverviewFilters,
@@ -14,6 +15,18 @@ const GROUP_ORDER: OperationalStatusGroup[] = [
 const DEFAULT_ATTENTION_STATUSES: OperationalStatus[] = [
   'late', 'wrong_site', 'evidence_mismatch', 'left_early', 'unassigned', 'unverifiable', 'vehicle_on_site_driver_unconfirmed',
 ];
+
+export class OperationalOverviewIncompleteRosterError extends Error {
+  constructor() {
+    super('Operational overview requires a complete roster selection');
+    this.name = 'OperationalOverviewIncompleteRosterError';
+  }
+}
+
+function completeRoster(result: RosterStatusResult): CompleteOperationalRosterSelection {
+  if (result.hasMore || result.items.length !== result.total) throw new OperationalOverviewIncompleteRosterError();
+  return { ...result, hasMore: false };
+}
 
 function groupFor(status: OperationalStatus): OperationalStatusGroup {
   if (status === 'on_site_dual' || status === 'attendance_confirmed') return 'on_site';
@@ -60,17 +73,18 @@ function selectedAttentionStatuses(filters: OperationalOverviewFilters): Operati
 }
 
 export function buildOperationalOverview(result: RosterStatusResult, filters: OperationalOverviewFilters): OperationalOverview {
+  const roster = completeRoster(result);
   const counts = new Map<OperationalStatusGroup, number>();
-  for (const item of result.items) {
+  for (const item of roster.items) {
     const group = groupFor(item.status);
     counts.set(group, (counts.get(group) ?? 0) + 1);
   }
 
   const statuses = new Set(selectedAttentionStatuses(filters));
-  const attentionRows = result.items.filter((item) => statuses.has(item.status)).map(toAttentionRow);
+  const attentionRows = roster.items.filter((item) => statuses.has(item.status)).map(toAttentionRow);
   const offset = (filters.page - 1) * filters.limit;
   const items = attentionRows.slice(offset, offset + filters.limit);
-  const selectionState = result.total === 0
+  const selectionState = roster.total === 0
     ? 'no_scheduled_staff'
     : attentionRows.length === 0 ? 'no_attention' : 'attention_available';
 
@@ -81,6 +95,6 @@ export function buildOperationalOverview(result: RosterStatusResult, filters: Op
       return count === undefined ? [] : [{ group, count }];
     }),
     attention: { items, page: filters.page, limit: filters.limit, total: attentionRows.length, hasMore: offset + items.length < attentionRows.length },
-    roster: { page: result.page, limit: result.limit, total: result.total, hasMore: result.hasMore },
+    roster: { page: roster.page, limit: roster.limit, total: roster.total, hasMore: roster.hasMore },
   };
 }
